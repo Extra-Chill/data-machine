@@ -26,6 +26,5 @@ datamachine_processed_items_revision_assert( str_contains( $docs, '`source_type`
 datamachine_processed_items_revision_assert( str_contains( $docs, '`item_identifier`' ), 'docs keep item identifier as caller-owned revision key' );
 datamachine_processed_items_revision_assert( str_contains( $docs, '`selected`, `skipped`, `processed`, `failed`, and `retried`' ), 'docs cover generic batch counters' );
 datamachine_processed_items_revision_assert( ! str_contains( $docs, 'CorpusRefreshConventions' ), 'docs do not advertise a Data Machine corpus helper' );
-datamachine_processed_items_revision_assert( ! str_contains( $docs, 'Intelligence' ), 'docs do not reference Intelligence product semantics' );
 
 echo "\n=== processed-items-revision-conventions-smoke: ALL PASS ===\n";

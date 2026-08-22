@@ -178,9 +178,9 @@ $agent = array(
 		'provider'                => 'openai',
 		'model'                   => 'gpt-5.5',
 		'tool_policy'             => array( 'allow' => array( 'datamachine/search' ) ),
-		'intelligence_wiki_brain' => array( 'graph' => array( 'enabled' => true ) ),
-		'intelligence'            => array(
-			'context_servers' => array( 'events' => array( 'url' => 'https://runtime.example.test' ) ),
+		'example_extension'       => array( 'graph' => array( 'enabled' => true ) ),
+		'example'                 => array(
+			'runtime_endpoints' => array( 'events' => array( 'url' => 'https://runtime.example.test' ) ),
 			'auth_refs'       => array( 'events' => 'runtime:events' ),
 		),
 		'plugin_runtime'          => array( 'endpoint' => 'https://plugin-runtime.example.test' ),
@@ -200,6 +200,16 @@ $agent = array(
 add_filter(
 	'datamachine_agent_config_artifact_projection_policies',
 	static function ( array $policies ): array {
+		$policies['example.runtime_endpoints'] = array(
+			'tracking' => 'exclude',
+			'merge'    => 'preserve_local',
+			'reason'   => 'preserve_plugin_runtime_config',
+		);
+		$policies['example.auth_refs'] = array(
+			'tracking' => 'exclude',
+			'merge'    => 'preserve_local',
+			'reason'   => 'preserve_plugin_runtime_config',
+		);
 		$policies['plugin_runtime'] = array(
 			'tracking' => 'exclude',
 			'merge'    => 'preserve_local',
@@ -230,19 +240,19 @@ foreach ( array( 'share', 'backup', 'fork' ) as $profile ) {
 	$config     = $round_trip['agent']['agent_config'] ?? array();
 	export_config_assert( "{$profile} omits runtime bundle metadata", ! array_key_exists( 'datamachine_bundle', $config ) );
 	if ( 'backup' === $profile ) {
-		export_config_assert_equals( 'backup keeps restorable plugin runtime context', 'https://runtime.example.test', $config['intelligence']['context_servers']['events']['url'] ?? null );
-		export_config_assert_equals( 'backup keeps restorable plugin auth refs', 'runtime:events', $config['intelligence']['auth_refs']['events'] ?? null );
+		export_config_assert_equals( 'backup keeps restorable plugin runtime context', 'https://runtime.example.test', $config['example']['runtime_endpoints']['events']['url'] ?? null );
+		export_config_assert_equals( 'backup keeps restorable plugin auth refs', 'runtime:events', $config['example']['auth_refs']['events'] ?? null );
 		export_config_assert_equals( 'backup keeps tracking-excluded plugin config', 'https://plugin-runtime.example.test', $config['plugin_runtime']['endpoint'] ?? null );
 	} else {
-		export_config_assert( "{$profile} omits plugin runtime context", ! isset( $config['intelligence']['context_servers'] ) );
-		export_config_assert( "{$profile} omits plugin runtime auth refs", ! isset( $config['intelligence']['auth_refs'] ) );
+		export_config_assert( "{$profile} omits plugin runtime context", ! isset( $config['example']['runtime_endpoints'] ) );
+		export_config_assert( "{$profile} omits plugin runtime auth refs", ! isset( $config['example']['auth_refs'] ) );
 		export_config_assert( "{$profile} omits tracking-excluded plugin config", ! isset( $config['plugin_runtime'] ) );
 	}
 	export_config_assert( "{$profile} honors explicit backup-private exclusion", ! isset( $config['backup_private'] ) );
 	export_config_assert_equals( "{$profile} keeps normalized provider", 'openai', $config['default_provider'] ?? null );
 	export_config_assert_equals( "{$profile} keeps normalized model", 'gpt-5.5', $config['default_model'] ?? null );
 	export_config_assert_equals( "{$profile} keeps tool policy", array( 'datamachine/search' ), $config['tool_policy']['allow'] ?? null );
-	export_config_assert_equals( "{$profile} keeps plugin bundle-owned policy", true, $config['intelligence_wiki_brain']['graph']['enabled'] ?? null );
+	export_config_assert_equals( "{$profile} keeps plugin bundle-owned policy", true, $config['example_extension']['graph']['enabled'] ?? null );
 	export_config_assert_equals( "{$profile} keeps site scope", 7, $round_trip['agent']['site_scope'] ?? null );
 }
 

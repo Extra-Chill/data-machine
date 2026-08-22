@@ -13,8 +13,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	$GLOBALS['rebase_filters'] = array();
+	function add_filter( $hook, $callback ) {
+		$GLOBALS['rebase_filters'][ $hook ][] = $callback;
+	}
+}
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( $hook, $value, ...$args ) {
+		foreach ( $GLOBALS['rebase_filters'][ $hook ] ?? array() as $callback ) {
+			$value = $callback( $value, ...$args );
+		}
 		return $value;
 	}
 }
@@ -70,6 +79,18 @@ function rebase_assert_equals( string $label, $expected, $actual ): void {
 
 echo "=== Agent Bundle Artifact Rebase Smoke (#1832) ===\n";
 
+add_filter(
+	'datamachine_agent_config_artifact_projection_policies',
+	static function ( array $policies ): array {
+		$policies['example.runtime_endpoints'] = array(
+			'tracking' => 'exclude',
+			'merge'    => 'preserve_local',
+			'reason'   => 'preserve_plugin_owned_agent_config',
+		);
+		return $policies;
+	}
+);
+
 // ---------------------------------------------------------------------------
 // [1] Conservative policy keeps local payload but flags every divergence.
 // ---------------------------------------------------------------------------
@@ -113,15 +134,15 @@ rebase_assert_equals( 'pipeline merged stays local under burn-in-safe', array( '
 // ---------------------------------------------------------------------------
 echo "\n[2b] burn-in-safe rebases agent_config path-wise\n";
 $base_agent_config = array(
-	'intelligence'            => array(
-		'context_servers' => array(
+	'example'           => array(
+		'runtime_endpoints' => array(
 			'a8c' => array(
 				'transport' => 'streamable-http',
 				'url'       => 'https://public-api.wordpress.com/wpcom/v2/context-a8c-mcp/v1',
 			),
 		),
 	),
-	'intelligence_wiki_brain' => array(
+	'example_extension' => array(
 		'graph_config' => array(
 			'entity_types' => array(
 				'strategic-signal' => array(
@@ -133,10 +154,10 @@ $base_agent_config = array(
 	),
 );
 $local_agent_config = $base_agent_config;
-$local_agent_config['intelligence']['context_servers']['a8c']['url']                      = 'https://local-tunnel.example.test/mcp';
-$local_agent_config['intelligence']['context_servers']['a8c']['headers']['Authorization'] = 'Bearer local-token';
+$local_agent_config['example']['runtime_endpoints']['a8c']['url']                      = 'https://local-tunnel.example.test/mcp';
+$local_agent_config['example']['runtime_endpoints']['a8c']['headers']['Authorization'] = 'Bearer local-token';
 $remote_agent_config = $base_agent_config;
-$remote_agent_config['intelligence_wiki_brain']['graph_config']['entity_types']['strategic-signal']['aliases'] = array( 'strategy-signal' );
+$remote_agent_config['example_extension']['graph_config']['entity_types']['strategic-signal']['aliases'] = array( 'strategy-signal' );
 
 $agent_config_result = AgentBundleArtifactRebase::rebase(
 	array(
@@ -149,14 +170,14 @@ $agent_config_result = AgentBundleArtifactRebase::rebase(
 	AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE
 );
 rebase_assert( 'agent_config rebase is unambiguous for runtime-local plus bundle-owned paths', false === $agent_config_result['requires_approval'] );
-rebase_assert_equals( 'agent_config preserves local context server URL', 'https://local-tunnel.example.test/mcp', $agent_config_result['merged']['intelligence']['context_servers']['a8c']['url'] ?? null );
-rebase_assert_equals( 'agent_config preserves local auth header', 'Bearer local-token', $agent_config_result['merged']['intelligence']['context_servers']['a8c']['headers']['Authorization'] ?? null );
-rebase_assert_equals( 'agent_config takes remote graph alias', array( 'strategy-signal' ), $agent_config_result['merged']['intelligence_wiki_brain']['graph_config']['entity_types']['strategic-signal']['aliases'] ?? null );
-rebase_assert_equals( 'agent_config records runtime-local decision', 'preserve_plugin_owned_agent_config', $agent_config_result['decisions']['intelligence.context_servers']['reason'] ?? null );
-rebase_assert_equals( 'agent_config records bundle-owned remote decision', 'local_unchanged_from_base', $agent_config_result['decisions']['intelligence_wiki_brain.graph_config.entity_types.strategic-signal.aliases']['reason'] ?? null );
+rebase_assert_equals( 'agent_config preserves local runtime endpoint URL', 'https://local-tunnel.example.test/mcp', $agent_config_result['merged']['example']['runtime_endpoints']['a8c']['url'] ?? null );
+rebase_assert_equals( 'agent_config preserves local auth header', 'Bearer local-token', $agent_config_result['merged']['example']['runtime_endpoints']['a8c']['headers']['Authorization'] ?? null );
+rebase_assert_equals( 'agent_config takes remote graph alias', array( 'strategy-signal' ), $agent_config_result['merged']['example_extension']['graph_config']['entity_types']['strategic-signal']['aliases'] ?? null );
+rebase_assert_equals( 'agent_config records runtime-local decision', 'preserve_plugin_owned_agent_config', $agent_config_result['decisions']['example.runtime_endpoints']['reason'] ?? null );
+rebase_assert_equals( 'agent_config records bundle-owned remote decision', 'local_unchanged_from_base', $agent_config_result['decisions']['example_extension.graph_config.entity_types.strategic-signal.aliases']['reason'] ?? null );
 $tracked_agent_config = AgentConfigArtifactProjector::tracked_payload( $local_agent_config );
-rebase_assert_equals( 'tracked agent_config excludes Intelligence context servers', false, isset( $tracked_agent_config['intelligence']['context_servers'] ) );
-rebase_assert_equals( 'tracked agent_config keeps bundle-owned Intelligence wiki brain config', 'Strategic signal', $tracked_agent_config['intelligence_wiki_brain']['graph_config']['entity_types']['strategic-signal']['label'] ?? null );
+rebase_assert_equals( 'tracked agent_config excludes plugin runtime endpoints', false, isset( $tracked_agent_config['example']['runtime_endpoints'] ) );
+rebase_assert_equals( 'tracked agent_config keeps plugin bundle-owned config', 'Strategic signal', $tracked_agent_config['example_extension']['graph_config']['entity_types']['strategic-signal']['label'] ?? null );
 
 // ---------------------------------------------------------------------------
 // [3] burn-in-safe takes remote source-shape, keeps local throttles.

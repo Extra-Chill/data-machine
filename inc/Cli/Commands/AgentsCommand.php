@@ -57,7 +57,7 @@ class AgentsCommand extends AgentBundleCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine agents active get
-	 *     wp datamachine agents active set intelligence-chubes4
+	 *     wp datamachine agents active set example-agent
 	 *     wp datamachine agents active set wordpress-com-wiki --user_id=1
 	 *
 	 * @subcommand active

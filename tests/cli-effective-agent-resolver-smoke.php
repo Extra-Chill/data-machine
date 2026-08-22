@@ -93,7 +93,7 @@ namespace {
 		),
 		array(
 			'agent_id'   => 2,
-			'agent_slug' => 'intelligence-chubes4',
+			'agent_slug' => 'example-agent',
 			'owner_id'   => 1,
 		),
 		array(
@@ -103,10 +103,10 @@ namespace {
 		),
 	);
 
-	$context = DataMachine\Cli\AgentResolver::resolveEffectiveContext( array( 'agent' => 'intelligence-chubes4' ) );
+	$context = DataMachine\Cli\AgentResolver::resolveEffectiveContext( array( 'agent' => 'example-agent' ) );
 	agents_api_smoke_assert_equals( 2, $context['agent_id'], 'explicit --agent resolves to agent id', $failures, $passes );
 	agents_api_smoke_assert_equals( 1, $context['user_id'], 'explicit --agent carries owner user id', $failures, $passes );
-	agents_api_smoke_assert_equals( 'intelligence-chubes4', $context['agent_slug'], 'explicit --agent carries slug', $failures, $passes );
+	agents_api_smoke_assert_equals( 'example-agent', $context['agent_slug'], 'explicit --agent carries slug', $failures, $passes );
 
 	$context = DataMachine\Cli\AgentResolver::resolveEffectiveContext( array( 'user' => 2 ) );
 	agents_api_smoke_assert_equals( 3, $context['agent_id'], 'single owned agent resolves from owner fallback', $failures, $passes );
@@ -119,18 +119,18 @@ namespace {
 		agents_api_smoke_assert_equals( true, str_contains( $e->getMessage(), 'ambiguous' ), 'ambiguous owner fallback is rejected', $failures, $passes );
 	}
 
-	$GLOBALS['__datamachine_test_user_meta'][1]['datamachine_active_agent_slug'] = 'intelligence-chubes4';
+	$GLOBALS['__datamachine_test_user_meta'][1]['datamachine_active_agent_slug'] = 'example-agent';
 	$context = DataMachine\Cli\AgentResolver::resolveEffectiveContext( array( 'user' => 1 ) );
 	agents_api_smoke_assert_equals( 2, $context['agent_id'], 'active preference resolves before ambiguous owner fallback', $failures, $passes );
-	agents_api_smoke_assert_equals( 'intelligence-chubes4', $context['agent_slug'], 'active preference carries slug', $failures, $passes );
+	agents_api_smoke_assert_equals( 'example-agent', $context['agent_slug'], 'active preference carries slug', $failures, $passes );
 
 	$GLOBALS['__datamachine_test_user_meta'][1]['datamachine_active_agent_slug'] = '';
-	putenv( 'DATAMACHINE_AGENT_SLUG=intelligence-chubes4' );
+	putenv( 'DATAMACHINE_AGENT_SLUG=example-agent' );
 	$context = DataMachine\Cli\AgentResolver::resolveEffectiveContext( array( 'user' => 1 ) );
 	agents_api_smoke_assert_equals( 2, $context['agent_id'], 'environment agent slug resolves before ambiguous owner fallback', $failures, $passes );
-	agents_api_smoke_assert_equals( 'intelligence-chubes4', $context['agent_slug'], 'environment agent slug carries slug', $failures, $passes );
+	agents_api_smoke_assert_equals( 'example-agent', $context['agent_slug'], 'environment agent slug carries slug', $failures, $passes );
 	putenv( 'DATAMACHINE_AGENT_SLUG' );
-	$GLOBALS['__datamachine_test_user_meta'][1]['datamachine_active_agent_slug'] = 'intelligence-chubes4';
+	$GLOBALS['__datamachine_test_user_meta'][1]['datamachine_active_agent_slug'] = 'example-agent';
 
 	add_filter(
 		'agents_api_execution_principal',

@@ -1093,10 +1093,20 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	}
 
 	public function test_upgrade_preserves_projection_excluded_agent_config_without_conflict(): void {
+		$this->agent_config_projection_filter = static function ( array $policies ): array {
+			$policies['example.runtime_endpoints'] = array(
+				'tracking' => 'exclude',
+				'merge'    => 'preserve_local',
+				'reason'   => 'preserve_plugin_runtime_config',
+			);
+			return $policies;
+		};
+		add_filter( 'datamachine_agent_config_artifact_projection_policies', $this->agent_config_projection_filter, 10, 1 );
+
 		$bundle = $this->fixture_bundle( 'context-agent' );
 		$bundle['agent']['agent_config'] = array(
-			'intelligence' => array(
-				'context_servers' => array(
+			'example' => array(
+				'runtime_endpoints' => array(
 					'wporg' => array(
 						'transport' => 'stdio',
 						'command'   => 'node',
@@ -1115,8 +1125,8 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'agent_config' => array_merge(
 					$agent['agent_config'],
 					array(
-						'intelligence' => array(
-							'context_servers' => array(
+						'example' => array(
+							'runtime_endpoints' => array(
 								'wporg' => array(
 									'transport' => 'streamable-http',
 									'url'       => 'https://example.test/mcp',
@@ -1130,7 +1140,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 
 		$updated_bundle = $bundle;
-		$updated_bundle['agent']['agent_config']['intelligence']['context_servers']['wporg']['args'] = array( 'mcp-context-wporg/dist/index.js' );
+		$updated_bundle['agent']['agent_config']['example']['runtime_endpoints']['wporg']['args'] = array( 'example-runtime/dist/index.js' );
 
 		$second = $this->bundler->import(
 			$updated_bundle,
@@ -1146,23 +1156,33 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$after = $this->agents_repo->get_by_slug( 'context-agent' );
 		$this->assertSame(
 			'streamable-http',
-			$after['agent_config']['intelligence']['context_servers']['wporg']['transport'] ?? null,
-			'Upgrade preserves the live context server transport.'
+			$after['agent_config']['example']['runtime_endpoints']['wporg']['transport'] ?? null,
+			'Upgrade preserves the live runtime endpoint transport.'
 		);
 		$this->assertSame(
 			'Bearer local-token',
-			$after['agent_config']['intelligence']['context_servers']['wporg']['headers']['Authorization'] ?? null,
-			'Upgrade preserves the live context server authorization header.'
+			$after['agent_config']['example']['runtime_endpoints']['wporg']['headers']['Authorization'] ?? null,
+			'Upgrade preserves the live runtime endpoint authorization header.'
 		);
 		$this->assertArrayNotHasKey(
 			'args',
-			$after['agent_config']['intelligence']['context_servers']['wporg'],
-			'Bundle context server args do not overwrite local runtime config without approval.'
+			$after['agent_config']['example']['runtime_endpoints']['wporg'],
+			'Bundle endpoint args do not overwrite local runtime config without approval.'
 		);
 	}
 
 	public function test_backup_export_restores_tracking_excluded_agent_config_to_fresh_agent(): void {
 		$this->agent_config_projection_filter = static function ( array $policies ): array {
+			$policies['example.runtime_endpoints'] = array(
+				'tracking' => 'exclude',
+				'merge'    => 'preserve_local',
+				'reason'   => 'preserve_plugin_runtime_config',
+			);
+			$policies['example.auth_refs'] = array(
+				'tracking' => 'exclude',
+				'merge'    => 'preserve_local',
+				'reason'   => 'preserve_plugin_runtime_config',
+			);
 			$policies['plugin_runtime'] = array(
 				'tracking' => 'exclude',
 				'merge'    => 'preserve_local',
@@ -1182,9 +1202,9 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 			'default_provider'        => 'openai',
 			'default_model'           => 'gpt-5.5',
 			'tool_policy'             => array( 'allow' => array( 'datamachine/search' ) ),
-			'intelligence_wiki_brain' => array( 'graph' => array( 'enabled' => true ) ),
-			'intelligence'            => array(
-				'context_servers' => array( 'events' => array( 'url' => 'https://runtime.example.test' ) ),
+			'example_extension'       => array( 'graph' => array( 'enabled' => true ) ),
+			'example'                 => array(
+				'runtime_endpoints' => array( 'events' => array( 'url' => 'https://runtime.example.test' ) ),
 				'auth_refs'       => array( 'events' => 'runtime:events' ),
 			),
 			'plugin_runtime'          => array( 'endpoint' => 'https://plugin-runtime.example.test' ),
@@ -1217,8 +1237,8 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'plugin_runtime', $share_config, 'Share follows lifecycle tracking exclusions.' );
 		$this->assertArrayNotHasKey( 'plugin_runtime', $fork_config, 'Fork follows lifecycle tracking exclusions.' );
 		$this->assertSame( 'https://plugin-runtime.example.test', $backup_config['plugin_runtime']['endpoint'] ?? null, 'Backup preserves tracking-excluded restorable config.' );
-		$this->assertSame( 'https://runtime.example.test', $backup_config['intelligence']['context_servers']['events']['url'] ?? null );
-		$this->assertSame( 'runtime:events', $backup_config['intelligence']['auth_refs']['events'] ?? null );
+		$this->assertSame( 'https://runtime.example.test', $backup_config['example']['runtime_endpoints']['events']['url'] ?? null );
+		$this->assertSame( 'runtime:events', $backup_config['example']['auth_refs']['events'] ?? null );
 		$this->assertArrayNotHasKey( 'backup_private', $backup_config, 'Backup honors explicit backup egress exclusion.' );
 
 		$restore = $this->bundler->import( $exports['backup'], 'backup-restored', $this->owner_id );
@@ -1230,9 +1250,9 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 'openai', $restored_config['default_provider'] ?? null );
 		$this->assertSame( 'gpt-5.5', $restored_config['default_model'] ?? null );
 		$this->assertSame( array( 'datamachine/search' ), $restored_config['tool_policy']['allow'] ?? null );
-		$this->assertTrue( $restored_config['intelligence_wiki_brain']['graph']['enabled'] ?? false );
-		$this->assertSame( 'https://runtime.example.test', $restored_config['intelligence']['context_servers']['events']['url'] ?? null );
-		$this->assertSame( 'runtime:events', $restored_config['intelligence']['auth_refs']['events'] ?? null );
+		$this->assertTrue( $restored_config['example_extension']['graph']['enabled'] ?? false );
+		$this->assertSame( 'https://runtime.example.test', $restored_config['example']['runtime_endpoints']['events']['url'] ?? null );
+		$this->assertSame( 'runtime:events', $restored_config['example']['auth_refs']['events'] ?? null );
 		$this->assertSame( 'https://plugin-runtime.example.test', $restored_config['plugin_runtime']['endpoint'] ?? null );
 		$this->assertArrayNotHasKey( 'backup_private', $restored_config );
 		$this->assertNotSame( 'source-only-revision', $restored_config['datamachine_bundle']['source_revision'] ?? null, 'Source install metadata does not survive the restore.' );

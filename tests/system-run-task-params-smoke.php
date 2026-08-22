@@ -279,10 +279,10 @@ $assert( 'raw argv preserves repeated pending_decision_limit param', 20 === $par
 
 $params = smoke_parse_run_task_params(
 	array(
-		'agent' => 'intelligence-chubes4',
+		'agent' => 'example-agent',
 	)
 );
-$assert( '--agent stores agent alias before ability extraction', 'intelligence-chubes4' === $params['agent'] );
+$assert( '--agent stores agent alias before ability extraction', 'example-agent' === $params['agent'] );
 $assert( 'empty --agent rejected', isset( smoke_parse_run_task_params( array( 'agent' => '' ) )['error'] ) );
 
 $params = smoke_parse_run_task_params(
@@ -320,9 +320,9 @@ $assert( 'accepted params reject unknown keys', false === $result['success'] );
 $readonly_result = smoke_validate_run_task_params( 'daily_memory_generation', array( 'params_schema' => array() ), array() );
 $assert( 'read-only/simple task remains schedulable', true === $readonly_result['success'] );
 
-$params  = array( 'agent' => 'intelligence-chubes4', 'date' => '2026-06-15' );
+$params  = array( 'agent' => 'example-agent', 'date' => '2026-06-15' );
 $context = smoke_extract_run_task_context( $params );
-$assert( 'agent alias becomes scheduler agent_slug context', 'intelligence-chubes4' === $context['agent_slug'] );
+$assert( 'agent alias becomes scheduler agent_slug context', 'example-agent' === $context['agent_slug'] );
 $assert( 'agent alias removed before task param validation', ! array_key_exists( 'agent', $params ) );
 $assert( 'other task params preserved after agent extraction', '2026-06-15' === $params['date'] );
 

@@ -136,7 +136,7 @@ $bundle = array(
 	'bundle_version'  => '1.2.3',
 	'template_slug'   => 'domain-wiki-template',
 	'template_version' => '4.5.6',
-	'source_ref'      => 'https://github.com/Automattic/intelligence/releases/download/v1.2.3/wpcom.zip',
+	'source_ref'      => 'https://example.test/releases/download/v1.2.3/package.zip',
 	'source_revision' => 'etag-abc123',
 	'agent'           => array( 'agent_slug' => 'wordpress-com-brain' ),
 );
@@ -171,7 +171,7 @@ $agent = array(
 			'template_version' => '4.5.6',
 			'bundle_slug'      => 'wordpress-com-brain',
 			'bundle_version'   => '1.2.3',
-			'source_ref'       => 'https://github.com/Automattic/intelligence/releases/download/v1.2.3/wpcom.zip',
+			'source_ref'       => 'https://example.test/releases/download/v1.2.3/package.zip',
 			'source_revision'  => 'etag-abc123',
 			'artifacts'        => array(
 				'agent_config:config' => array(

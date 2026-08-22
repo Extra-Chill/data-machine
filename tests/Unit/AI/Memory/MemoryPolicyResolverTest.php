@@ -45,7 +45,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 		AgentModeRegistry::register(
-			'intelligence',
+			'analysis',
 			30,
 			array(
 				'memory_contexts' => array( 'agent_identity', 'agent_memory' ),
@@ -141,7 +141,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	public function test_registered_custom_mode_uses_declared_memory_contexts(): void {
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode' => 'intelligence',
+				'mode' => 'analysis',
 			)
 		);
 

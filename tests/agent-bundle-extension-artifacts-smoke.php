@@ -258,7 +258,7 @@ add_filter(
 	'datamachine_agent_bundle_artifact_types',
 	static function ( array $types ): array {
 		$types[] = 'fake_plugin_artifact';
-		$types[] = 'intelligence/wiki-brain';
+		$types[] = 'example/report';
 		$types[] = 'datamachine-code/workspace_preload';
 		return $types;
 	},
@@ -313,7 +313,7 @@ add_filter(
 	'datamachine_agent_bundle_apply_artifact',
 	static function ( $result, array $artifact, array $agent, array $context ) use ( &$applied ) {
 		unset( $context );
-		if ( ! in_array( $artifact['artifact_type'] ?? '', array( 'fake_plugin_artifact', 'intelligence/wiki-brain' ), true ) ) {
+		if ( ! in_array( $artifact['artifact_type'] ?? '', array( 'fake_plugin_artifact', 'example/report' ), true ) ) {
 			return $result;
 		}
 		$applied[] = array( 'id' => $artifact['artifact_id'], 'agent' => $agent['agent_slug'] ?? '' );
@@ -328,7 +328,7 @@ echo "=== Agent Bundle Extension Artifact Smoke (#1577) ===\n";
 echo "\n[1] Plugins register artifact types and export/current artifacts\n";
 $types = DataMachine\Engine\Bundle\BundleSchema::artifact_types();
 assert_extension_bundle( 'fake plugin type is registered', in_array( 'fake_plugin_artifact', $types, true ) );
-assert_extension_bundle( 'namespaced plugin type is registered', in_array( 'intelligence/wiki-brain', $types, true ) );
+assert_extension_bundle( 'namespaced plugin type is registered', in_array( 'example/report', $types, true ) );
 assert_extension_bundle( 'hyphenated namespaced plugin type is registered', in_array( 'datamachine-code/workspace_preload', $types, true ) );
 
 $agent            = array( 'agent_id' => 7, 'agent_slug' => 'bundle-agent' );
@@ -343,15 +343,15 @@ assert_extension_bundle_equals( 'current hook returns fake artifact', 'fake_plug
 $namespaced_artifacts = AgentBundleArtifactExtensions::normalize_artifacts(
 	array(
 		array(
-			'artifact_type' => 'intelligence/wiki-brain',
-			'artifact_id'   => 'brain',
+			'artifact_type' => 'example/report',
+			'artifact_id'   => 'summary',
 			'payload'       => array( 'root' => 'wordpress-com' ),
 		),
 	)
 );
-assert_extension_bundle_equals( 'namespaced artifact type is preserved', 'intelligence/wiki-brain', $namespaced_artifacts[0]['artifact_type'] ?? null );
-assert_extension_bundle_equals( 'namespaced artifact defaults under extensions', 'extensions/intelligence/wiki-brain/brain.json', $namespaced_artifacts[0]['source_path'] ?? null );
-assert_extension_bundle_equals( 'namespaced artifact apply routes to plugin callback', array( 'applied' => 'brain' ), AgentBundleArtifactExtensions::apply_artifact( $namespaced_artifacts[0], $agent ) );
+assert_extension_bundle_equals( 'namespaced artifact type is preserved', 'example/report', $namespaced_artifacts[0]['artifact_type'] ?? null );
+assert_extension_bundle_equals( 'namespaced artifact defaults under extensions', 'extensions/example/report/summary.json', $namespaced_artifacts[0]['source_path'] ?? null );
+assert_extension_bundle_equals( 'namespaced artifact apply routes to plugin callback', array( 'applied' => 'summary' ), AgentBundleArtifactExtensions::apply_artifact( $namespaced_artifacts[0], $agent ) );
 
 echo "\n[2] Directory bundles persist plugin artifacts under extensions/\n";
 $manifest = new AgentBundleManifest(

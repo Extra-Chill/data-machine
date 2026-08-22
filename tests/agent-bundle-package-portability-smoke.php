@@ -141,7 +141,7 @@ function datamachine_portability_directory( string $version, string $prompt, str
 				'tool_policies' => array( 'safe-tools' ),
 				'auth_refs'     => array( 'github-default' ),
 				'seed_queues'   => array( 'topic-loop' ),
-				'extensions'    => array( 'extensions/intelligence/wiki-brain/portable.json' ),
+				'extensions'    => array( 'extensions/example/report/portable.json' ),
 				'handler_auth'  => 'refs',
 			)
 		),
@@ -184,9 +184,9 @@ function datamachine_portability_directory( string $version, string $prompt, str
 		),
 		array(
 			array(
-				'artifact_type' => 'intelligence/wiki-brain',
+				'artifact_type' => 'example/report',
 				'artifact_id'   => 'portable',
-				'source_path'   => 'extensions/intelligence/wiki-brain/portable.json',
+				'source_path'   => 'extensions/example/report/portable.json',
 				'payload'       => array( 'root' => $extension_root ),
 			),
 		)
@@ -225,7 +225,7 @@ function datamachine_portability_installed_snapshots( WP_Agent_Package $package,
 add_filter(
 	'datamachine_agent_bundle_artifact_types',
 	static function ( array $types ): array {
-		$types[] = 'intelligence/wiki-brain';
+		$types[] = 'example/report';
 		return $types;
 	},
 	10,
@@ -235,8 +235,8 @@ add_filter(
 add_filter(
 	'datamachine_agent_package_artifact_type_definitions',
 	static function ( array $definitions ): array {
-		$definitions['intelligence/wiki-brain'] = array(
-			'label'           => 'Portable wiki brain',
+		$definitions['example/report'] = array(
+			'label'           => 'Portable report',
 			'description'     => 'Fixture extension artifact.',
 			'import_callback' => 'DataMachine\\Engine\\Bundle\\import_datamachine_agent_package_artifact',
 		);
@@ -285,7 +285,7 @@ datamachine_portability_assert( 'rubric artifact round-trips', isset( $imported_
 datamachine_portability_assert( 'tool policy artifact round-trips', isset( $imported_by_key['datamachine/tool-policy:safe-tools'] ) );
 datamachine_portability_assert( 'auth ref artifact round-trips', isset( $imported_by_key['datamachine/auth-ref:github-default'] ) );
 datamachine_portability_assert( 'queue seed artifact round-trips', isset( $imported_by_key['datamachine/queue-seed:topic-loop'] ) );
-datamachine_portability_assert( 'extension artifact round-trips with namespaced type', isset( $imported_by_key['intelligence/wiki-brain:portable'] ) );
+datamachine_portability_assert( 'extension artifact round-trips with namespaced type', isset( $imported_by_key['example/report:portable'] ) );
 
 echo "\n[2] Agents API adoption plan preserves local edits while auto-applying clean artifacts:\n";
 $v2_directory = datamachine_portability_directory( '1.1.0', "Updated remote prompt.\n", 'hourly', 10, 'portable-v2' );
@@ -346,7 +346,7 @@ datamachine_portability_assert( 'approved prompt applies through Data Machine pa
 datamachine_portability_assert( 'locally edited flow is skipped without approval', in_array( 'datamachine/flow:daily-ingest-flow', $skipped_keys, true ) );
 datamachine_portability_assert_equals( 'approved prompt snapshot records target payload', "Updated remote prompt.\n", $recorded_payloads['datamachine/prompt:system-prompt'] ?? null );
 datamachine_portability_assert_equals( 'skipped flow keeps local schedule out of recorded snapshots', false, isset( $recorded_payloads['datamachine/flow:daily-ingest-flow'] ) );
-datamachine_portability_assert( 'extension artifact applied through namespaced package type', in_array( 'intelligence/wiki-brain:portable', $applied_keys, true ) );
+datamachine_portability_assert( 'extension artifact applied through namespaced package type', in_array( 'example/report:portable', $applied_keys, true ) );
 datamachine_portability_assert( 'Data Machine materializer saw applied artifacts', count( $GLOBALS['__datamachine_portability_applied'] ?? array() ) >= count( $applied_keys ) );
 
 datamachine_portability_rm_tree( $export_path );

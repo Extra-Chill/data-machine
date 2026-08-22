@@ -31,8 +31,8 @@ add_filter(
 	'datamachine_persisted_agent_description_sources',
 	static function ( array $sources, array $row, array $config ): array {
 		unset( $row );
-		if ( is_array( $config['intelligence_wiki_brain'] ?? null ) ) {
-			$sources[] = $config['intelligence_wiki_brain'];
+		if ( is_array( $config['example_extension'] ?? null ) ) {
+			$sources[] = $config['example_extension'];
 		}
 		return $sources;
 	},
@@ -45,13 +45,13 @@ add_filter(
 	static function ( array $projectors ): array {
 		$projectors[] = static function ( array $row, array $config ): array {
 			unset( $row );
-			$brain = is_array( $config['intelligence_wiki_brain'] ?? null ) ? $config['intelligence_wiki_brain'] : array();
-			$meta  = array();
+			$extension = is_array( $config['example_extension'] ?? null ) ? $config['example_extension'] : array();
+			$meta      = array();
 
 			foreach ( array( 'domain', 'wiki_slug', 'source_slug', 'brain_slug', 'bundle_slug' ) as $key ) {
-				$value = trim( (string) ( $brain[ $key ] ?? '' ) );
+				$value = trim( (string) ( $extension[ $key ] ?? '' ) );
 				if ( '' !== $value ) {
-					$meta[ 'intelligence_wiki_brain_' . $key ] = $value;
+					$meta[ 'example_extension_' . $key ] = $value;
 				}
 			}
 
@@ -104,8 +104,8 @@ $repository = new DataMachinePersistedAgentProjectorFakeRepository(
 			'owner_id'     => 7,
 			'agent_config' => array(
 				'default_model'           => 'gpt-5.5',
-				'intelligence_wiki_brain' => array(
-					'description' => 'Maintains the WordPress.com wiki brain.',
+				'example_extension' => array(
+					'description' => 'Maintains the WordPress.com reference index.',
 					'wiki_slug'   => 'wordpress-com',
 				),
 				'datamachine_bundle'      => array(
@@ -152,12 +152,12 @@ $roadie_agent = wp_get_agent( 'roadie' );
 	agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki', 'roadie', 'coordinator' ), array_keys( $agents ), 'persisted rows are visible through wp_get_agents()', $failures, $passes );
 agents_api_smoke_assert_equals( true, $agent instanceof WP_Agent, 'persisted row resolves through wp_get_agent()', $failures, $passes );
 agents_api_smoke_assert_equals( 'WordPress.com Wiki', $agent ? $agent->get_label() : '', 'row agent_name becomes label', $failures, $passes );
-agents_api_smoke_assert_equals( 'Maintains the WordPress.com wiki brain.', $agent ? $agent->get_description() : '', 'extension description source is surfaced', $failures, $passes );
+agents_api_smoke_assert_equals( 'Maintains the WordPress.com reference index.', $agent ? $agent->get_description() : '', 'extension description source is surfaced', $failures, $passes );
 agents_api_smoke_assert_equals( '', $roadie_agent ? $roadie_agent->get_description() : 'missing', 'missing config description stays empty instead of synthesizing a runtime-branded fallback', $failures, $passes );
 agents_api_smoke_assert_equals( 7, $agent && is_callable( $agent->get_owner_resolver() ) ? call_user_func( $agent->get_owner_resolver() ) : 0, 'owner_resolver returns persisted owner_id', $failures, $passes );
 agents_api_smoke_assert_equals( 'gpt-5.5', $agent ? $agent->get_default_config()['default_model'] ?? '' : '', 'agent_config becomes default_config', $failures, $passes );
 agents_api_smoke_assert_equals( 'wordpress-com-wiki', $agent ? $agent->get_meta()['source_package'] ?? '' : '', 'bundle slug is exposed as source package', $failures, $passes );
-agents_api_smoke_assert_equals( 'wordpress-com', $agent ? $agent->get_meta()['intelligence_wiki_brain_wiki_slug'] ?? '' : '', 'extension metadata projector is exposed', $failures, $passes );
+agents_api_smoke_assert_equals( 'wordpress-com', $agent ? $agent->get_meta()['example_extension_wiki_slug'] ?? '' : '', 'extension metadata projector is exposed', $failures, $passes );
 agents_api_smoke_assert_equals( array( 'researcher', 'writer' ), wp_get_agent( 'coordinator' ) ? wp_get_agent( 'coordinator' )->get_subagents() : array(), 'persisted config projects exact normalized subagent edges', $failures, $passes );
 
 echo "\n[1b] persisted agent config normalizes legacy model aliases:\n";

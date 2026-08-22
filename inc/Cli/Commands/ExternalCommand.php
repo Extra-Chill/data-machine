@@ -375,7 +375,7 @@ class ExternalCommand extends BaseCommand {
 	 *     wp datamachine external connect chubes.net chubes-bot
 	 *
 	 *     # Label the token so it's identifiable on the remote side
-	 *     wp datamachine external connect chubes.net chubes-bot --label="franklin-intelligence-chubes4"
+	 *     wp datamachine external connect example.net example-agent --label="remote-example-agent"
 	 *
 	 *     # Attempt to open the URL in a browser
 	 *     wp datamachine external connect chubes.net chubes-bot --open

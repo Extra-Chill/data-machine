@@ -461,7 +461,7 @@ class SystemCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine system run daily_memory_generation --agent=intelligence-chubes4
+	 *     wp datamachine system run daily_memory_generation --agent=example-agent
 	 *     wp datamachine system run daily_memory_generation
 	 *     wp datamachine system run daily_memory_generation --param=agent_slug=my-agent --wait
 	 *     wp datamachine system run alt_text_generation --format=json

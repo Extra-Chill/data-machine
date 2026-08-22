@@ -159,13 +159,13 @@ $built = build_configs_from_workflow_for_test(
 			array(
 				'step_type'     => 'ai',
 				'system_prompt' => 'be helpful',
-				'enabled_tools' => array( 'intelligence/search' ),
+				'enabled_tools' => array( 'example/search' ),
 			),
 		),
 	)
 );
 $step0 = $built['flow_config']['ephemeral_step_0'];
-assert_equals( array( 'intelligence/search' ), FlowStepConfig::getEnabledTools( $step0 ), 'AI enabled_tools readable', $failures, $passes );
+assert_equals( array( 'example/search' ), FlowStepConfig::getEnabledTools( $step0 ), 'AI enabled_tools readable', $failures, $passes );
 assert_absent( 'handler_slug', $step0, 'AI has no handler_slug', $failures, $passes );
 assert_absent( 'handler_slugs', $step0, 'AI has no handler_slugs', $failures, $passes );
 assert_equals( 'be helpful', $built['pipeline_config']['ephemeral_pipeline_0']['system_prompt'] ?? null, 'AI system_prompt lands in pipeline_config', $failures, $passes );

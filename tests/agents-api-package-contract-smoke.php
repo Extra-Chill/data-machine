@@ -47,13 +47,13 @@ $package = WP_Agent_Package::from_array(
 		'capabilities' => array( 'knowledge.read', 'knowledge.write', 'knowledge.read' ),
 		'artifacts'    => array(
 			array(
-				'type'        => 'intelligence/brain',
+				'type'        => 'example/report',
 				'slug'        => 'Historical Synthesis',
 				'label'       => 'Historical synthesis',
 				'description' => 'Converts source packets into grounded wiki notes.',
 				'source'      => 'brains/historical-synthesis.json',
 				'checksum'    => 'sha256:abc123',
-				'requires'    => array( 'intelligence', 'intelligence' ),
+				'requires'    => array( 'example/runtime', 'example/runtime' ),
 				'meta'        => array( 'root' => 'wordpress-com' ),
 			),
 			array(
@@ -79,9 +79,9 @@ agents_api_smoke_assert_equals( array( 'knowledge.read', 'knowledge.write' ), $p
 agents_api_smoke_assert_equals( array( 'SOUL.md' => 'memory/SOUL.md', 'MEMORY.md' => 'memory/MEMORY.md' ), $package->get_agent()->get_memory_seeds(), 'agent memory seeds use existing WP_Agent validation', $failures, $passes );
 agents_api_smoke_assert_equals( WP_Agent_Package_Artifact::class, get_class( $package->get_artifacts()[0] ), 'package artifacts normalize to artifact objects', $failures, $passes );
 agents_api_smoke_assert_equals( 'datamachine/flow', $manifest['artifacts'][0]['type'], 'artifacts preserve typed namespaced slugs', $failures, $passes );
-agents_api_smoke_assert_equals( 'intelligence/brain', $manifest['artifacts'][1]['type'], 'package carries another typed artifact without importing product code', $failures, $passes );
+agents_api_smoke_assert_equals( 'example/report', $manifest['artifacts'][1]['type'], 'package carries another typed artifact without importing product code', $failures, $passes );
 agents_api_smoke_assert_equals( 'sha256:abc123', $manifest['artifacts'][1]['checksum'], 'artifact checksum is preserved', $failures, $passes );
-agents_api_smoke_assert_equals( array( 'intelligence' ), $manifest['artifacts'][1]['requires'], 'artifact requires list is deduped', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'example/runtime' ), $manifest['artifacts'][1]['requires'], 'artifact requires list is deduped', $failures, $passes );
 agents_api_smoke_assert_equals( 'wordpress-com', $package->get_agent()->get_meta()['domain'] ?? '', 'agent meta can describe a domain without product vocabulary', $failures, $passes );
 
 echo "\n[2] Invalid package manifests fail before materialization:\n";
@@ -166,7 +166,7 @@ add_action(
 				'meta'              => array( 'owner' => 'example' ),
 			)
 		);
-		wp_register_agent_package_artifact_type( 'intelligence/brain', array( 'label' => 'Brain artifact' ) );
+		wp_register_agent_package_artifact_type( 'example/report', array( 'label' => 'Report artifact' ) );
 		wp_register_agent_package_artifact_type( 'datamachine/flow', array( 'label' => 'Duplicate' ) );
 		wp_register_agent_package_artifact_type( 'broken', array( 'label' => 'Broken' ) );
 		wp_register_agent_package_artifact_type( 'example/bad-callback', array( 'validate_callback' => 'not callable' ) );
@@ -178,7 +178,7 @@ $artifact_type       = wp_get_agent_package_artifact_type( 'DATAMACHINE/FLOW' );
 $artifact_type_slugs = array_keys( $artifact_types );
 sort( $artifact_type_slugs );
 agents_api_smoke_assert_equals( true, in_array( 'datamachine/flow', $artifact_type_slugs, true ), 'artifact type registry includes datamachine/flow', $failures, $passes );
-agents_api_smoke_assert_equals( true, in_array( 'intelligence/brain', $artifact_type_slugs, true ), 'artifact type registry includes intelligence/brain', $failures, $passes );
+agents_api_smoke_assert_equals( true, in_array( 'example/report', $artifact_type_slugs, true ), 'artifact type registry includes example/report', $failures, $passes );
 agents_api_smoke_assert_equals( true, $artifact_type instanceof WP_Agent_Package_Artifact_Type, 'artifact type getter returns object', $failures, $passes );
 agents_api_smoke_assert_equals( 'Package flow artifact', $artifact_type ? $artifact_type->get_label() : '', 'artifact type label is preserved', $failures, $passes );
 agents_api_smoke_assert_equals( true, is_callable( $artifact_type ? $artifact_type->get_validate_callback() : null ), 'validate callback is preserved', $failures, $passes );
@@ -188,9 +188,9 @@ agents_api_smoke_assert_equals( true, is_callable( $artifact_type ? $artifact_ty
 agents_api_smoke_assert_equals( array( 'owner' => 'example' ), $artifact_type ? $artifact_type->get_meta() : array(), 'artifact type meta is preserved', $failures, $passes );
 agents_api_smoke_assert_equals( true, wp_has_agent_package_artifact_type( 'datamachine/flow' ), 'wp_has_agent_package_artifact_type reports registered slug', $failures, $passes );
 agents_api_smoke_assert_equals( false, wp_has_agent_package_artifact_type( 'broken' ), 'invalid unnamespaced type is rejected', $failures, $passes );
-$removed = wp_unregister_agent_package_artifact_type( 'intelligence/brain' );
+$removed = wp_unregister_agent_package_artifact_type( 'example/report' );
 agents_api_smoke_assert_equals( true, $removed instanceof WP_Agent_Package_Artifact_Type, 'unregister returns removed artifact type', $failures, $passes );
-agents_api_smoke_assert_equals( false, wp_has_agent_package_artifact_type( 'intelligence/brain' ), 'unregister removes artifact type', $failures, $passes );
+agents_api_smoke_assert_equals( false, wp_has_agent_package_artifact_type( 'example/report' ), 'unregister removes artifact type', $failures, $passes );
 $GLOBALS['__agents_api_smoke_wrong'] = array();
 $outside_hook_result = wp_register_agent_package_artifact_type( 'outside/hook', array( 'label' => 'Outside Hook' ) );
 agents_api_smoke_assert_equals( null, $outside_hook_result, 'outside-hook direct artifact type registration is rejected', $failures, $passes );
@@ -236,7 +236,7 @@ $contract_files = array(
 	'src/Packages/class-wp-agent-package-adoption-result.php',
 	'src/Packages/register-agent-package-artifacts.php',
 );
-$forbidden = array( 'DataMachine\\', 'pipeline', 'flow', 'job', 'handler', 'Intelligence', 'wpcom', 'Dolly', 'Odie' );
+$forbidden = array( 'DataMachine\\', 'pipeline', 'flow', 'job', 'handler', 'wpcom', 'Dolly', 'Odie' );
 $matches   = array();
 foreach ( $contract_files as $contract_file ) {
 	$source = (string) file_get_contents( AGENTS_API_PATH . $contract_file );

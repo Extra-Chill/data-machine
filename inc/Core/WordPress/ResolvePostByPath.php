@@ -11,7 +11,7 @@
  * pipelines can find and enrich them later.
  *
  * This is the DM-core primitive that replaces the ad-hoc path-resolution
- * logic duplicated across Intelligence, data-machine-events, and extrachill-docs.
+ * logic duplicated across multiple consumer plugins.
  *
  * @package DataMachine\Core\WordPress
  * @since   0.77.0

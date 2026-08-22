@@ -331,8 +331,8 @@ $old_agent_config = upgrade_artifact(
 	'agent_config',
 	'config',
 	array(
-		'intelligence' => array(
-			'context_servers' => array(
+		'example' => array(
+			'runtime_endpoints' => array(
 				'wporg' => array( 'transport' => 'stdio' ),
 			),
 		),
@@ -343,8 +343,8 @@ $local_agent_config = upgrade_artifact(
 	'agent_config',
 	'config',
 	array(
-		'intelligence' => array(
-			'context_servers' => array(
+		'example' => array(
+			'runtime_endpoints' => array(
 				'wporg' => array(
 					'transport' => 'streamable-http',
 					'headers'   => array( 'Authorization' => 'Bearer local-token' ),
@@ -358,8 +358,8 @@ $target_agent_config = upgrade_artifact(
 	'agent_config',
 	'config',
 	array(
-		'intelligence' => array(
-			'context_servers' => array(
+		'example' => array(
+			'runtime_endpoints' => array(
 				'wporg' => array( 'transport' => 'stdio', 'command' => 'node' ),
 			),
 		),
@@ -375,7 +375,7 @@ $config_plan       = AgentBundleUpgradePlanner::plan(
 $config_conflict   = $config_plan['needs_approval'][0] ?? array();
 assert_upgrade_plan_equals( 'locally changed context server needs approval', 'agent_config:config', $config_conflict['artifact_key'] ?? null );
 assert_upgrade_plan_equals( 'agent config reason is local modified', 'local_modified', $config_conflict['reason'] ?? null );
-assert_upgrade_plan_equals( 'authorization header is redacted', '[redacted]', $config_conflict['diff']['before']['intelligence']['context_servers']['wporg']['headers']['Authorization'] ?? null );
+assert_upgrade_plan_equals( 'authorization header is redacted', '[redacted]', $config_conflict['diff']['before']['example']['runtime_endpoints']['wporg']['headers']['Authorization'] ?? null );
 assert_upgrade_plan( 'raw local bearer is absent from config preview', false === strpos( (string) json_encode( $config_plan ), 'local-token' ) );
 
 echo "\n[2c] Prompt/rubric artifact edits get readable approval diffs\n";

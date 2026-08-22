@@ -177,7 +177,7 @@ namespace {
 		array(),
 		null,
 		array(
-			'agent_modes' => array( 'intelligence' ),
+			'agent_modes' => array( 'analysis' ),
 			'session_id'  => 'session-1',
 			'user_id'     => 123,
 			'agent_id'    => 456,
@@ -185,7 +185,7 @@ namespace {
 	);
 
 	$custom_context = end( $GLOBALS['__core_memory_composable_resolver_contexts'] );
-	core_memory_composable_assert( in_array( 'intelligence', $custom_context['modes'] ?? array(), true ), 'custom mode is preserved for memory resolution' );
+	core_memory_composable_assert( in_array( 'analysis', $custom_context['modes'] ?? array(), true ), 'custom mode is preserved for memory resolution' );
 	core_memory_composable_assert( ! in_array( 'chat', $custom_context['modes'] ?? array(), true ), 'custom mode does not masquerade as chat' );
 
 	\DataMachine\Engine\AI\Directives\CoreMemoryFilesDirective::get_outputs(

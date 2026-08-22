@@ -87,7 +87,7 @@ namespace {
 		7 => array(
 			'agent_config' => array(
 				'mode_models' => array(
-					'intelligence' => array(
+					'analysis' => array(
 						'provider' => 'openai',
 						'model'    => '',
 					),
@@ -100,34 +100,34 @@ namespace {
 
 	$assert_same(
 		array( 'provider' => 'openai', 'model' => 'gpt-5.4-mini' ),
-		PluginSettings::resolveModelForAgentModes( 7, array( 'intelligence', 'pipeline' ), 'pipeline' ),
+		PluginSettings::resolveModelForAgentModes( 7, array( 'analysis', 'pipeline' ), 'pipeline' ),
 		'incomplete behavior mode falls through to pipeline model'
 	);
 
 	$assert_same(
 		array( 'provider' => 'openai', 'model' => 'gpt-5.5' ),
-		PluginSettings::resolveModelForAgentModes( 7, array( 'intelligence', 'chat' ), 'chat' ),
+		PluginSettings::resolveModelForAgentModes( 7, array( 'analysis', 'chat' ), 'chat' ),
 		'incomplete behavior mode falls through to chat model'
 	);
 
 	$assert_same(
 		array( 'provider' => 'openai', 'model' => 'gpt-5.5' ),
-		PluginSettings::resolveModelForAgentModes( 7, array( 'intelligence' ), 'chat' ),
+		PluginSettings::resolveModelForAgentModes( 7, array( 'analysis' ), 'chat' ),
 		'chat execution surface fallback applies when behavior mode is alone'
 	);
 
 	$assert_same(
 		array( 'provider' => 'openai', 'model' => 'gpt-5.4-mini' ),
-		PluginSettings::resolveModelForAgentModes( 7, array( 'intelligence' ), 'pipeline' ),
+		PluginSettings::resolveModelForAgentModes( 7, array( 'analysis' ), 'pipeline' ),
 		'pipeline execution surface fallback applies when behavior mode is alone'
 	);
 
-	Agents::$agents[7]['agent_config']['mode_models']['intelligence']['model'] = 'gpt-5.5-intelligence';
+	Agents::$agents[7]['agent_config']['mode_models']['analysis']['model'] = 'gpt-5.5-analysis';
 	PluginSettings::clearCache();
 
 	$assert_same(
-		array( 'provider' => 'openai', 'model' => 'gpt-5.5-intelligence' ),
-		PluginSettings::resolveModelForAgentModes( 7, array( 'intelligence', 'pipeline' ), 'pipeline' ),
+		array( 'provider' => 'openai', 'model' => 'gpt-5.5-analysis' ),
+		PluginSettings::resolveModelForAgentModes( 7, array( 'analysis', 'pipeline' ), 'pipeline' ),
 		'complete behavior mode still wins when intentionally configured'
 	);
 

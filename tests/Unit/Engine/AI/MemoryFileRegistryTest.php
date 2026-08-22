@@ -173,7 +173,7 @@ class MemoryFileRegistryTest extends TestCase {
 			'modes' => array( 'chat' ),
 		) );
 
-		$files = MemoryFileRegistry::get_for_modes( array( 'intelligence' ), array( MemoryFileRegistry::INJECTION_AGENT_IDENTITY ) );
+		$files = MemoryFileRegistry::get_for_modes( array( 'analysis' ), array( MemoryFileRegistry::INJECTION_AGENT_IDENTITY ) );
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayNotHasKey( 'CHAT_ONLY.md', $files );

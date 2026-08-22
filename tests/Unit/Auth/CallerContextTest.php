@@ -109,9 +109,9 @@ class CallerContextTest extends WP_UnitTestCase {
 
 	public function test_outbound_fresh_chain_shape(): void {
 		$top = \WP_Agent_Caller_Context::top_of_chain( 'fresh-root' );
-		$ctx = new \WP_Agent_Caller_Context( 'franklin', 7, 'https://intelligence-chubes4.local', 1, $top->chain_root_request_id );
+		$ctx = new \WP_Agent_Caller_Context( 'remote-agent', 7, 'https://agent.example.test', 1, $top->chain_root_request_id );
 
-		$this->assertSame( 'https://intelligence-chubes4.local', $ctx->caller_host );
+		$this->assertSame( 'https://agent.example.test', $ctx->caller_host );
 		$this->assertSame( 'franklin', $ctx->caller_agent_id );
 		$this->assertSame( 7, $ctx->caller_user_id );
 		$this->assertSame( 'fresh-root', $ctx->chain_root_request_id );
@@ -120,11 +120,11 @@ class CallerContextTest extends WP_UnitTestCase {
 
 	public function test_outbound_propagates_inbound_chain(): void {
 		$inbound = new \WP_Agent_Caller_Context( 'chubes-bot', 9, 'https://chubes.net', 2, 'original-chain' );
-		$ctx     = new \WP_Agent_Caller_Context( 'franklin', 7, 'https://intelligence-chubes4.local', $inbound->chain_depth + 1, $inbound->chain_root_request_id );
+		$ctx     = new \WP_Agent_Caller_Context( 'remote-agent', 7, 'https://agent.example.test', $inbound->chain_depth + 1, $inbound->chain_root_request_id );
 
 		$this->assertSame( 'original-chain', $ctx->chain_root_request_id, 'Chain root propagates from inbound' );
 		$this->assertSame( 3, $ctx->chain_depth, 'Depth increments by 1 for each hop' );
-		$this->assertSame( 'https://intelligence-chubes4.local', $ctx->caller_host, 'Host reflects current site, not inbound' );
+		$this->assertSame( 'https://agent.example.test', $ctx->caller_host, 'Host reflects current site, not inbound' );
 		$this->assertSame( 'franklin', $ctx->caller_agent_id, 'Agent reflects current site, not inbound' );
 	}
 

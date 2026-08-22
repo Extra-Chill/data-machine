@@ -623,14 +623,6 @@ $invalid = ResolvePendingActionAbility::execute(
 	)
 );
 resolver_smoke_assert( is_wp_error( $invalid ), 'unknown Agents API approval decision returns WP_Error', $failures, $passes );
-$legacy_alias_invalid = ResolvePendingActionAbility::execute_legacy_alias(
-	array(
-		'action_id' => 'act_missing',
-		'decision'  => 'approved',
-	)
-);
-resolver_smoke_assert( false === ( $legacy_alias_invalid['success'] ?? true ), 'bounded Intelligence alias presents canonical WP_Error as success=false', $failures, $passes );
-resolver_smoke_assert( 'agents_pending_action_invalid_decision' === ( $legacy_alias_invalid['code'] ?? '' ), 'bounded Intelligence alias preserves the canonical error code', $failures, $passes );
 
 $scoped_out_apply_calls = 0;
 add_filter(

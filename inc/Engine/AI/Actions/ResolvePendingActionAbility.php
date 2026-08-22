@@ -45,7 +45,6 @@ use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Handler;
 use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Status;
-use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
@@ -82,73 +81,8 @@ class ResolvePendingActionAbility {
 			return;
 		}
 
-		$this->register_ability_alias();
 		$this->register_rest_route();
 		self::$registered = true;
-	}
-
-	/**
-	 * Register the bounded alias consumed by installed Intelligence releases.
-	 *
-	 * The Agents API ability is canonical. This alias remains an active external
-	 * edge until Intelligence migrates its persisted tool reference.
-	 */
-	private function register_ability_alias(): void {
-		AbilityRegistration::on_abilities_api_init(
-			function () {
-				wp_register_ability(
-					'datamachine/resolve-pending-action',
-					array(
-						'label'               => __( 'Resolve Pending Action (Deprecated Alias)', 'data-machine' ),
-						'description'         => __( 'Deprecated compatibility alias for agents/resolve-pending-action retained for installed Intelligence consumers.', 'data-machine' ),
-						'category'            => 'datamachine-actions',
-						'input_schema'        => array(
-							'type'       => 'object',
-							'required'   => array( 'action_id', 'decision' ),
-							'properties' => array(
-								'action_id' => array( 'type' => 'string' ),
-								'decision'  => array(
-									'type' => 'string',
-									'enum' => array( 'accepted', 'rejected' ),
-								),
-							),
-						),
-						'output_schema'       => array( 'type' => 'object' ),
-						'execute_callback'    => array( self::class, 'execute_legacy_alias' ),
-						'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
-						'meta'                => array(
-							'show_in_rest' => true,
-							'annotations'  => array(
-								'deprecated'  => true,
-								'replacement' => 'agents/resolve-pending-action',
-								'destructive' => true,
-								'idempotent'  => false,
-							),
-						),
-					)
-				);
-			}
-		);
-	}
-
-	/**
-	 * Preserve Intelligence's legacy presentation contract at the named alias only.
-	 *
-	 * Canonical Agents API ability, REST, and resolver-tool callers continue to
-	 * receive WP_Error failures. Intelligence\Wiki\Intelligence_Wiki_Review_Items
-	 * still consumes this alias and expects an object with success=false.
-	 */
-	public static function execute_legacy_alias( array $input ): array {
-		$result = self::execute( $input );
-		if ( ! is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		return array(
-			'success' => false,
-			'error'   => $result->get_error_message(),
-			'code'    => $result->get_error_code(),
-		);
 	}
 
 	/**
