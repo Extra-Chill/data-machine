@@ -48,9 +48,21 @@ if ( ! function_exists( 'esc_html' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+	}
+}
+
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $value ): bool {
+		return $value instanceof WP_Error;
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
 require_once __DIR__ . '/../inc/Engine/PortableFlowStepFields.php';
+require_once __DIR__ . '/../inc/Engine/Bundle/AuthRefHandlerConfig.php';
 require_once __DIR__ . '/../inc/Engine/Actions/ImportExport.php';
 
 use DataMachine\Engine\Actions\ImportExport;
@@ -147,6 +159,40 @@ assert_csv_equals( array( 'webhook_payload' ), $fetch_settings['handler_slugs'] 
 assert_csv_equals( array( 'payload_path' => 'pull_request' ), $fetch_settings['handler_configs']['webhook_payload'] ?? null, 'fetch handler_configs export', $failures, $passes );
 assert_csv_equals( array( 'after' => '2026-04-01' ), $fetch_settings['config_patch_queue'][0]['patch'] ?? null, 'fetch config_patch_queue exports canonical patch entry', $failures, $passes );
 assert_csv_equals( 'drain', $fetch_settings['queue_mode'] ?? null, 'fetch queue_mode exports as portable settings', $failures, $passes );
+
+$secure_settings = call_import_export_private(
+	$import_export,
+	'export_flow_step_settings',
+	array(
+		'step_type'       => 'fetch',
+		'handler_slugs'   => array( 'custom_api' ),
+		'handler_configs' => array(
+			'custom_api' => array(
+				'auth_ref'  => 'custom:destination',
+				'api_key'   => 'csv-direct-key',
+				'endpoint'  => 'https://api.example.test',
+				'auth'      => array(
+					'refresh_token' => 'csv-refresh-token',
+					'password'      => 'csv-password',
+				),
+				'headers'   => array(
+					'bearer_token' => 'csv-bearer-token',
+					'accept'       => 'application/json',
+				),
+			),
+		),
+	)
+);
+$secure_json = json_encode( $secure_settings );
+assert_csv_equals( 'custom:destination', $secure_settings['handler_configs']['custom_api']['auth_ref'] ?? null, 'CSV settings preserve auth_ref', $failures, $passes );
+assert_csv_equals( 'https://api.example.test', $secure_settings['handler_configs']['custom_api']['endpoint'] ?? null, 'CSV settings preserve ordinary handler config', $failures, $passes );
+assert_csv_equals( 'application/json', $secure_settings['handler_configs']['custom_api']['headers']['accept'] ?? null, 'CSV settings preserve nested ordinary config', $failures, $passes );
+assert_csv_equals( false, str_contains( $secure_json, 'csv-direct-key' ) || str_contains( $secure_json, 'csv-refresh-token' ) || str_contains( $secure_json, 'csv-password' ) || str_contains( $secure_json, 'csv-bearer-token' ), 'CSV settings exclude direct and nested credentials', $failures, $passes );
+
+$secure_csv = 'pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
+$secure_csv .= '1,Secure,0,fetch,{},9,Destination,' . '"' . str_replace( '"', '""', (string) $secure_json ) . '"';
+$secure_rows = $parse_csv->invoke( $import_export, $secure_csv );
+assert_csv_equals( $secure_settings, $secure_rows[0]['settings'] ?? null, 'import preserves the credential-free exported settings', $failures, $passes );
 
 $normalized = call_import_export_private(
 	$import_export,

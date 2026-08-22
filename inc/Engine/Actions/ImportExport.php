@@ -13,6 +13,7 @@ namespace DataMachine\Engine\Actions;
 
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\FlowStepConfigFactory;
+use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 use DataMachine\Engine\PortableFlowStepFields;
 
 // Prevent direct access
@@ -32,9 +33,8 @@ class ImportExport {
 	 *            canonical handler fields into each flow_config entry keyed by the
 	 *            freshly-generated flow_step_id (#1133 step 2, #1293 shape cleanup).
 	 *
-	 * NOTE on secrets: handler_configs is restored verbatim. Any auth tokens / API keys in
-	 * the exported CSV will land in the imported flow's config. A scrub-or-reference policy
-	 * is orthogonal to the lossiness fix and is tracked separately.
+	 * Handler configs are restored as exported. Default exports contain portable auth refs
+	 * and ordinary settings, never inline credentials.
 	 */
 	public function handle_import( $type, $data ) {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -439,7 +439,13 @@ class ImportExport {
 					$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $step['pipeline_step_id'], $flow['flow_id'] );
 					$flow_step    = $flow_config[ $flow_step_id ] ?? array();
 
-					$settings = $this->export_flow_step_settings( $flow_step );
+					$settings = $this->export_flow_step_settings(
+						$flow_step,
+						array(
+							'pipeline_id' => (int) $pipeline_id,
+							'flow_id'     => (int) $flow['flow_id'],
+						)
+					);
 
 					if ( ! empty( $settings ) ) {
 						$csv_rows[] = array(
@@ -471,14 +477,14 @@ class ImportExport {
 	 * AI tool-policy state is stored beside those fields because it is flow-scoped
 	 * runtime state, not pipeline structure.
 	 */
-	private function export_flow_step_settings( array $flow_step ): array {
+	private function export_flow_step_settings( array $flow_step, array $context = array() ): array {
 		$settings        = array();
 		$primary_handler = FlowStepConfig::getPrimaryHandlerSlug( $flow_step ) ?? '';
 
 		if ( FlowStepConfig::usesHandler( $flow_step ) && ! empty( $primary_handler ) ) {
 			$settings = array(
 				'handler_slugs'   => FlowStepConfig::getHandlerSlugs( $flow_step ),
-				'handler_configs' => FlowStepConfig::getHandlerConfigs( $flow_step ),
+				'handler_configs' => AuthRefHandlerConfig::project_for_export( FlowStepConfig::getHandlerConfigs( $flow_step ), $context ),
 			);
 		} elseif ( ! FlowStepConfig::usesHandler( $flow_step ) && ! empty( FlowStepConfig::getPrimaryHandlerConfig( $flow_step ) ) ) {
 			$settings = array(
