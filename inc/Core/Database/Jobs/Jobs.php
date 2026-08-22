@@ -546,10 +546,10 @@ class Jobs extends BaseRepository {
 			'operation_generation'          => $new_generation,
 			'recovered_at'                  => gmdate( 'c' ),
 		);
-		$run_lifecycle                       = is_array( $engine['run_lifecycle'] ?? null ) ? $engine['run_lifecycle'] : array();
+		$run_lifecycle                       = is_array( $engine[ RunLifecycleStore::META_KEY ] ?? null ) ? $engine[ RunLifecycleStore::META_KEY ] : array();
 		$run_lifecycle['status']             = JobStatus::PENDING;
 		$run_lifecycle['updated_at']         = current_time( 'mysql', true );
-		$engine['run_lifecycle']             = $run_lifecycle;
+		$engine[ RunLifecycleStore::META_KEY ] = $run_lifecycle;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->update(

@@ -142,6 +142,7 @@ namespace {
 	require_once __DIR__ . '/../inc/Core/Database/TransactionScope.php';
 	require_once __DIR__ . '/../inc/Core/DataPacketStore.php';
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
+	require_once __DIR__ . '/../inc/Core/RunLifecycleStore.php';
 	require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
 
 	$assertions = 0;
@@ -170,7 +171,7 @@ namespace {
 	$assert( 'gate-step' === $engine['step_input_packets']['next-step'][0]['metadata']['flow_step_id'], 'winner binds payload to the gate step' );
 	$assert( array( 1 ) === $GLOBALS['wpdb']->actions, 'exactly one scheduler action commits' );
 	$assert( ! array_key_exists( 'job_status', $engine ), 'winner clears waiting override' );
-	$assert( 'processing' === $engine['run_lifecycle']['status'], 'winner commits the processing lifecycle projection' );
+	$assert( 'processing' === $engine[ \DataMachine\Core\RunLifecycleStore::META_KEY ]['status'], 'winner commits the processing lifecycle projection' );
 	$assert(
 		array(
 			array( 42, 'datamachine_engine_data' ),
