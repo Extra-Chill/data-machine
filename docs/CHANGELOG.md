@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.9] - 2026-08-22
+
+### Changed
+- Preserve migrated email flow authorization
+- Clear high-severity production npm advisories
+- Establish final pre-1.0 runtime baseline
+
+### Fixed
+- preserve queued system authorization
+
 ## [0.175.8] - 2026-08-21
 
 ### Changed
