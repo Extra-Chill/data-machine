@@ -555,12 +555,14 @@ $res = $queued->execute( array(
 
 ec_assert( 'queued async success', true === ( $res['success'] ?? false ), $res['error'] ?? '' );
 ec_assert( 'queued async returned action_id > 0', ( $res['action_id'] ?? 0 ) > 0 );
-$first = reset( $GLOBALS['ec_scheduled'] );
+$worker_actions = ec_scheduled_for_hook( 'datamachine_send_email_worker' );
+$first = $worker_actions[0] ?? array();
 ec_assert( 'queued async used async action', ( $first['kind'] ?? '' ) === 'async' );
 ec_assert( 'queued async hook is worker', ( $first['hook'] ?? '' ) === 'datamachine_send_email_worker' );
 $cleanup_actions = ec_scheduled_for_hook( \DataMachine\Abilities\Publish\SendEmailQueuedAbility::CLEANUP_HOOK );
 ec_assert( 'queue schedules one generic orphan cleanup action', 1 === count( $cleanup_actions ) );
 $cleanup_action = $cleanup_actions[0] ?? array();
+ec_assert( 'orphan cleanup is scheduled before send action', array_keys( $GLOBALS['ec_scheduled'] )[0] === array_search( $cleanup_action, $GLOBALS['ec_scheduled'], true ) && array_keys( $GLOBALS['ec_scheduled'] )[1] === array_search( $first, $GLOBALS['ec_scheduled'], true ) );
 ec_assert( 'cleanup action uses compact reference without sensitive args', ( $cleanup_action['args'][0] ?? null ) === ( $first['args'][0] ?? null ) && strlen( serialize( $cleanup_action['args'] ?? array() ) ) < 8000 && ! str_contains( serialize( $cleanup_action['args'] ?? array() ), 'user@example.com' ) && ! str_contains( serialize( $cleanup_action['args'] ?? array() ), 'recovery-code-123' ) );
 ec_assert( 'cleanup deadline exceeds delayed send and retry horizon', ( $cleanup_action['timestamp'] ?? 0 ) > ( $first['timestamp'] ?? 0 ) + 600 );
 $queued_reference = $first['args'][0] ?? array();
@@ -602,7 +604,8 @@ ec_assert( 'duplicate worker after cleanup does not resend', 1 === count( $GLOBA
 
 $GLOBALS['ec_scheduled'] = array();
 $queued->execute( array( 'to' => 'user@example.com', 'subject' => 'Demotion', 'body' => 'private demotion body' ) );
-$demotion_action    = reset( $GLOBALS['ec_scheduled'] );
+$demotion_actions   = ec_scheduled_for_hook( 'datamachine_send_email_worker' );
+$demotion_action    = $demotion_actions[0] ?? array();
 $demotion_reference = $demotion_action['args'][0] ?? array();
 $demotion_option    = 'datamachine_email_payload_' . ( $demotion_reference['_datamachine_email_payload']['id'] ?? '' );
 $GLOBALS['ec_manage_users'][1] = false;
@@ -642,7 +645,8 @@ $res = $queued->execute( array(
 	'send_at' => $future_iso,
 ) );
 ec_assert( 'queued ISO success', true === ( $res['success'] ?? false ), $res['error'] ?? '' );
-$first = reset( $GLOBALS['ec_scheduled'] );
+$iso_actions = ec_scheduled_for_hook( 'datamachine_send_email_worker' );
+$first = $iso_actions[0] ?? array();
 ec_assert( 'queued ISO used single action', ( $first['kind'] ?? '' ) === 'single' );
 ec_assert( 'queued ISO timestamp roughly matches', abs( ( $first['timestamp'] ?? 0 ) - ( time() + 3600 ) ) < 5 );
 $worker_for_delivery->runWorker( $first['args'][0] ?? array() );
@@ -679,6 +683,8 @@ $legacy_payload['_attempt'] = 1;
 $worker->runWorker( $legacy_payload );
 
 ec_assert( 'worker scheduled retry and bounded cleanup on first legacy failure', 1 === count( ec_scheduled_for_hook( 'datamachine_send_email_worker' ) ) && 1 === count( ec_scheduled_for_hook( \DataMachine\Abilities\Publish\SendEmailQueuedAbility::CLEANUP_HOOK ) ) );
+$legacy_retry_order = array_values( $GLOBALS['ec_scheduled'] );
+ec_assert( 'legacy retry cleanup is scheduled before retry send', \DataMachine\Abilities\Publish\SendEmailQueuedAbility::CLEANUP_HOOK === ( $legacy_retry_order[0]['hook'] ?? '' ) && 'datamachine_send_email_worker' === ( $legacy_retry_order[1]['hook'] ?? '' ) );
 $retry_actions = ec_scheduled_for_hook( 'datamachine_send_email_worker' );
 $retry = $retry_actions[0] ?? array();
 ec_assert( 'retry uses worker hook', ( $retry['hook'] ?? '' ) === 'datamachine_send_email_worker' );
@@ -741,7 +747,8 @@ echo "\nCase 9b: durable storage failures are closed and cleaned up\n";
 $queue_fixture = static function () use ( $queued, $large_body ): array {
 	$GLOBALS['ec_scheduled'] = array();
 	$result = $queued->execute( array( 'to' => 'user@example.com', 'subject' => 'Subject', 'body' => $large_body ) );
-	$action = reset( $GLOBALS['ec_scheduled'] );
+	$worker_actions = ec_scheduled_for_hook( 'datamachine_send_email_worker' );
+	$action = $worker_actions[0] ?? array();
 	$reference = $action['args'][0] ?? array();
 	$option_name = 'datamachine_email_payload_' . ( $reference['_datamachine_email_payload']['id'] ?? '' );
 	return array( $result, $reference, $option_name );
@@ -750,14 +757,21 @@ $queue_fixture = static function () use ( $queued, $large_body ): array {
 $GLOBALS['ec_options']         = array();
 $GLOBALS['ec_option_autoload'] = array();
 $GLOBALS['ec_schedule_fail_hook'] = \DataMachine\Abilities\Publish\SendEmailQueuedAbility::CLEANUP_HOOK;
-list( $cleanup_failure_result, $cleanup_failure_reference, $cleanup_failure_option ) = $queue_fixture();
-$cleanup_failure_logs = serialize( is_array( $cleanup_failure_result ) ? ( $cleanup_failure_result['logs'] ?? array() ) : array() );
-ec_assert( 'cleanup scheduling failure preserves runnable queued payload', is_array( $cleanup_failure_result ) && isset( $GLOBALS['ec_options'][ $cleanup_failure_option ] ) && 1 === count( ec_scheduled_for_hook( 'datamachine_send_email_worker' ) ) );
+$GLOBALS['ec_scheduled'] = array();
+$cleanup_failure_result = $queued->execute( array( 'to' => 'user@example.com', 'subject' => 'Cleanup failure', 'body' => $large_body ) );
+$cleanup_failure_logs = serialize( is_wp_error( $cleanup_failure_result ) ? $cleanup_failure_result->get_error_data() : array() );
+ec_assert( 'cleanup scheduling failure leaves no send action or storage', is_wp_error( $cleanup_failure_result ) && array() === $GLOBALS['ec_options'] && 0 === count( ec_scheduled_for_hook( 'datamachine_send_email_worker' ) ) );
 ec_assert( 'cleanup scheduling failure logs no plaintext', ! str_contains( $cleanup_failure_logs, 'user@example.com' ) && ! str_contains( $cleanup_failure_logs, 'recovery-code-123' ) );
 $GLOBALS['ec_schedule_fail_hook'] = '';
-$GLOBALS['ec_wp_mail_calls'] = array();
-$worker->runWorker( $cleanup_failure_reference );
-ec_assert( 'payload still delivers after cleanup scheduling failure', 1 === count( $GLOBALS['ec_wp_mail_calls'] ) && ! isset( $GLOBALS['ec_options'][ $cleanup_failure_option ] ) );
+
+$GLOBALS['ec_schedule_fail_hook'] = 'datamachine_send_email_worker';
+$GLOBALS['ec_scheduled'] = array();
+$send_failure_result = $queued->execute( array( 'to' => 'user@example.com', 'subject' => 'Send failure', 'body' => $large_body ) );
+$prescheduled_cleanup = ec_scheduled_for_hook( \DataMachine\Abilities\Publish\SendEmailQueuedAbility::CLEANUP_HOOK );
+ec_assert( 'send scheduling failure cleans storage but leaves harmless cleanup', is_wp_error( $send_failure_result ) && array() === $GLOBALS['ec_options'] && 1 === count( $prescheduled_cleanup ) && 0 === count( ec_scheduled_for_hook( 'datamachine_send_email_worker' ) ) );
+$GLOBALS['ec_schedule_fail_hook'] = '';
+$worker->runCleanup( $prescheduled_cleanup[0]['args'][0] ?? array() );
+ec_assert( 'pre-scheduled cleanup after send failure no-ops', array() === $GLOBALS['ec_options'] );
 
 $GLOBALS['ec_schedule_result'] = false;
 $failed_initial = $queued->execute( array( 'to' => 'user@example.com', 'subject' => 'Initial failure', 'body' => $large_body ) );
@@ -770,9 +784,16 @@ $GLOBALS['ec_schedule_throw'] = false;
 
 $GLOBALS['ec_wp_mail_result']  = false;
 $GLOBALS['ec_schedule_result'] = false;
+$GLOBALS['ec_scheduled']       = array();
 $worker->runWorker( $legacy_payload );
-ec_assert( 'retry scheduler failure cleans newly stored envelope', array() === $GLOBALS['ec_options'] );
+ec_assert( 'legacy retry cleanup failure leaves no retry or storage', array() === $GLOBALS['ec_options'] && 0 === count( ec_scheduled_for_hook( 'datamachine_send_email_worker' ) ) );
 $GLOBALS['ec_schedule_result'] = true;
+$GLOBALS['ec_schedule_fail_hook'] = 'datamachine_send_email_worker';
+$GLOBALS['ec_scheduled'] = array();
+$worker->runWorker( $legacy_payload );
+$legacy_failed_cleanup = ec_scheduled_for_hook( \DataMachine\Abilities\Publish\SendEmailQueuedAbility::CLEANUP_HOOK );
+ec_assert( 'legacy retry send failure cleans storage with harmless cleanup left', array() === $GLOBALS['ec_options'] && 1 === count( $legacy_failed_cleanup ) && 0 === count( ec_scheduled_for_hook( 'datamachine_send_email_worker' ) ) );
+$GLOBALS['ec_schedule_fail_hook'] = '';
 $GLOBALS['ec_wp_mail_result']  = true;
 
 list( , $missing_reference, $missing_option ) = $queue_fixture();
@@ -788,6 +809,25 @@ $worker->runCleanup( $orphan_cleanup['args'][0] ?? array() );
 $GLOBALS['ec_wp_mail_calls'] = array();
 $worker->runWorker( $orphan_reference );
 ec_assert( 'retention cleanup deletes orphan and later worker does not send', ! isset( $GLOBALS['ec_options'][ $orphan_option ] ) && 0 === count( $GLOBALS['ec_wp_mail_calls'] ) );
+
+list( , $contended_reference, $contended_option ) = $queue_fixture();
+$contended_id = $contended_reference['_datamachine_email_payload']['id'] ?? '';
+$contended_lock = 'datamachine_email_' . $contended_id;
+$GLOBALS['wpdb']->locks[ $contended_lock ] = true;
+$GLOBALS['ec_scheduled'] = array();
+$GLOBALS['ec_logs']      = array();
+$worker->runCleanup( $contended_reference );
+$cleanup_retries = ec_scheduled_for_hook( \DataMachine\Abilities\Publish\SendEmailQueuedAbility::CLEANUP_HOOK );
+$cleanup_retry_reference = $cleanup_retries[0]['args'][0] ?? array();
+$cleanup_retry_raw = serialize( $cleanup_retries[0]['args'] ?? array() );
+ec_assert( 'lock contention schedules one compact cleanup retry', 1 === count( $cleanup_retries ) && 1 === ( $cleanup_retry_reference['_datamachine_email_payload']['cleanup_attempt'] ?? 0 ) && strlen( $cleanup_retry_raw ) < 8000 && ! str_contains( $cleanup_retry_raw, 'user@example.com' ) );
+$GLOBALS['ec_scheduled'] = array();
+$worker->runCleanup( $cleanup_retry_reference );
+ec_assert( 'cleanup lock retry is bounded to one reschedule', 0 === count( ec_scheduled_for_hook( \DataMachine\Abilities\Publish\SendEmailQueuedAbility::CLEANUP_HOOK ) ) && isset( $GLOBALS['ec_options'][ $contended_option ] ) );
+unset( $GLOBALS['wpdb']->locks[ $contended_lock ] );
+$worker->runCleanup( $cleanup_retry_reference );
+ec_assert( 'bounded cleanup retry deletes orphan after contention clears', ! isset( $GLOBALS['ec_options'][ $contended_option ] ) );
+ec_assert( 'cleanup contention logs omit plaintext', ! str_contains( serialize( $GLOBALS['ec_logs'] ), 'user@example.com' ) && ! str_contains( serialize( $GLOBALS['ec_logs'] ), 'recovery-code-123' ) );
 
 list( , $crash_reference, $crash_option ) = $queue_fixture();
 $GLOBALS['ec_wp_mail_calls'] = array();
@@ -868,7 +908,8 @@ $queued->execute( array(
 	'subject'  => 'Revocation',
 	'body'     => 'body',
 ) );
-$scheduled = reset( $GLOBALS['ec_scheduled'] );
+$scheduled_actions = ec_scheduled_for_hook( 'datamachine_send_email_worker' );
+$scheduled = $scheduled_actions[0] ?? array();
 $revoked_payload = $scheduled['args'][0] ?? array();
 $named_raw = serialize( $scheduled['args'] );
 ec_assert( 'named mailbox scheduler args omit auth ref and grant', ! str_contains( $named_raw, 'email_imap:delegated' ) && ! str_contains( $named_raw, '_mailbox_grant' ) && ! str_contains( $named_raw, 'user@example.com' ) );
@@ -893,7 +934,8 @@ $enqueue_named = static function () use ( $queued ): array {
 	$GLOBALS['ec_mailbox_revoked'] = false;
 	$GLOBALS['ec_scheduled']       = array();
 	$queued->execute( array( 'auth_ref' => 'email_imap:delegated', 'to' => 'user@example.com', 'subject' => 'Authority', 'body' => 'body' ) );
-	$scheduled = reset( $GLOBALS['ec_scheduled'] );
+	$scheduled_actions = ec_scheduled_for_hook( 'datamachine_send_email_worker' );
+	$scheduled = $scheduled_actions[0] ?? array();
 	return $scheduled['args'][0] ?? array();
 };
 

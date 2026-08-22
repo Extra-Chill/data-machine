@@ -58,9 +58,11 @@ class SendEmailQueuedAbility {
 	/**
 	 * Retry backoff in seconds applied between attempts.
 	 */
-	private const RETRY_BACKOFF_SECONDS     = 300;
-	private const CLEANUP_RETENTION_SECONDS = 604800;
-	private const LOCK_TIMEOUT_SECONDS      = 5;
+	private const RETRY_BACKOFF_SECONDS      = 300;
+	private const CLEANUP_RETENTION_SECONDS  = 604800;
+	private const CLEANUP_LOCK_RETRY_SECONDS = 300;
+	private const MAX_CLEANUP_LOCK_RETRIES   = 1;
+	private const LOCK_TIMEOUT_SECONDS       = 5;
 
 	/**
 	 * Authenticated queue payload and compact reference formats.
@@ -347,15 +349,21 @@ class SendEmailQueuedAbility {
 
 		// Action Scheduler receives only a compact authenticated reference. The
 		// encrypted envelope remains in a non-autoloaded option until dispatch.
-		$as_args = array( $reference );
+		$as_args       = array( $reference );
+		$scheduled_for = null === $timestamp ? time() : $timestamp;
+
+		// Establish bounded orphan cleanup before making the send runnable. If
+		// cleanup cannot be scheduled, no send action may retain this payload.
+		if ( ! $this->schedulePayloadCleanup( $reference, $scheduled_for ) ) {
+			$this->deleteStoredPayload( $reference );
+			return $this->queueError( 'email_queue_cleanup_failed', 'Failed to schedule email payload cleanup.', 500, $logs );
+		}
 
 		try {
 			if ( null === $timestamp ) {
-				$action_id     = as_enqueue_async_action( self::WORKER_HOOK, $as_args, self::GROUP );
-				$scheduled_for = time();
+				$action_id = as_enqueue_async_action( self::WORKER_HOOK, $as_args, self::GROUP );
 			} else {
-				$action_id     = as_schedule_single_action( $timestamp, self::WORKER_HOOK, $as_args, self::GROUP );
-				$scheduled_for = $timestamp;
+				$action_id = as_schedule_single_action( $timestamp, self::WORKER_HOOK, $as_args, self::GROUP );
 			}
 		} catch ( \Throwable ) {
 			$this->deleteStoredPayload( $reference );
@@ -369,15 +377,6 @@ class SendEmailQueuedAbility {
 				'message' => 'Email queue: Action Scheduler did not return an action id',
 			);
 			return $this->queueError( 'email_queue_failed', 'Failed to schedule email action.', 500, $logs );
-		}
-
-		if ( ! $this->schedulePayloadCleanup( $reference, $scheduled_for ) ) {
-			// The send action already owns this payload. Never roll it back merely
-			// because best-effort orphan cleanup could not be scheduled.
-			$logs[] = array(
-				'level'   => 'warning',
-				'message' => 'Email queue: payload cleanup could not be scheduled',
-			);
 		}
 
 		$logs[] = array(
@@ -473,7 +472,17 @@ class SendEmailQueuedAbility {
 			return;
 		}
 		if ( ! $this->acquireReferenceLock( $reference_id ) ) {
-			do_action( 'datamachine_log', 'warning', 'Email queue cleanup: payload dispatch still active', array( 'reason' => 'email_queue_cleanup_locked' ) );
+			$retry_reference = $this->nextCleanupReference( $reference );
+			$retry_scheduled = ! is_wp_error( $retry_reference ) && $this->scheduleCleanupLockRetry( $retry_reference );
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Email queue cleanup: payload dispatch still active',
+				array(
+					'reason'          => 'email_queue_cleanup_locked',
+					'retry_scheduled' => $retry_scheduled,
+				)
+			);
 			return;
 		}
 		try {
@@ -559,6 +568,11 @@ class SendEmailQueuedAbility {
 			);
 			return;
 		}
+		if ( $created_retry_store && ! $this->schedulePayloadCleanup( $retry_reference, $retry_at ) ) {
+			$this->deleteStoredPayload( $retry_reference );
+			do_action( 'datamachine_log', 'error', 'Email worker: retry payload cleanup scheduling failed', array( 'attempt' => $attempt ) );
+			return;
+		}
 
 		try {
 			$retry_action_id = as_schedule_single_action( $retry_at, self::WORKER_HOOK, array( $retry_reference ), self::GROUP );
@@ -572,10 +586,6 @@ class SendEmailQueuedAbility {
 			do_action( 'datamachine_log', 'error', 'Email worker: retry scheduling failed', array( 'attempt' => $attempt ) );
 			return;
 		}
-		if ( $created_retry_store && ! $this->schedulePayloadCleanup( $retry_reference, $retry_at ) ) {
-			do_action( 'datamachine_log', 'warning', 'Email worker: retry payload cleanup could not be scheduled', array( 'attempt' => $attempt ) );
-		}
-
 		do_action(
 			'datamachine_log',
 			'warning',
@@ -729,6 +739,17 @@ class SendEmailQueuedAbility {
 	}
 
 	/**
+	 * Reschedule cleanup once when a live dispatch owns the reference lock.
+	 */
+	private function scheduleCleanupLockRetry( array $reference ): bool {
+		try {
+			return ! empty( as_schedule_single_action( time() + self::CLEANUP_LOCK_RETRY_SECONDS, self::CLEANUP_HOOK, array( $reference ), self::GROUP ) );
+		} catch ( \Throwable ) {
+			return false;
+		}
+	}
+
+	/**
 	 * Acquire a bounded connection-scoped MySQL lock for one opaque reference.
 	 */
 	private function acquireReferenceLock( string $reference_id ): bool {
@@ -762,14 +783,30 @@ class SendEmailQueuedAbility {
 	/**
 	 * Build an authenticated opaque scheduler reference.
 	 */
-	private function payloadReference( string $reference_id ): array {
+	private function payloadReference( string $reference_id, int $cleanup_attempt = 0 ): array {
 		return array(
 			self::REFERENCE_KEY => array(
-				'version' => self::REFERENCE_VERSION,
-				'id'      => $reference_id,
-				'mac'     => hash_hmac( 'sha256', self::REFERENCE_CONTEXT . '|' . $reference_id, $this->queuedPayloadKey() ),
+				'version'         => self::REFERENCE_VERSION,
+				'id'              => $reference_id,
+				'cleanup_attempt' => $cleanup_attempt,
+				'mac'             => $this->referenceMac( $reference_id, $cleanup_attempt ),
 			),
 		);
+	}
+
+	/**
+	 * Advance the authenticated cleanup generation at most once.
+	 */
+	private function nextCleanupReference( array $reference ): array|\WP_Error {
+		$reference_id = $this->validatePayloadReference( $reference );
+		if ( is_wp_error( $reference_id ) ) {
+			return $reference_id;
+		}
+		$cleanup_attempt = (int) $reference[ self::REFERENCE_KEY ]['cleanup_attempt'];
+		if ( $cleanup_attempt >= self::MAX_CLEANUP_LOCK_RETRIES ) {
+			return new \WP_Error( 'email_queue_cleanup_retry_exhausted', 'Queued email cleanup retry is exhausted.' );
+		}
+		return $this->payloadReference( $reference_id, $cleanup_attempt + 1 );
 	}
 
 	/**
@@ -781,16 +818,20 @@ class SendEmailQueuedAbility {
 		}
 
 		$value = $reference[ self::REFERENCE_KEY ];
-		if ( array( 'version', 'id', 'mac' ) !== array_keys( $value ) || self::REFERENCE_VERSION !== $value['version'] || ! is_string( $value['id'] ) || ! is_string( $value['mac'] ) || 1 !== preg_match( '/^[a-f0-9]{32}$/D', $value['id'] ) ) {
+		if ( array( 'version', 'id', 'cleanup_attempt', 'mac' ) !== array_keys( $value ) || self::REFERENCE_VERSION !== $value['version'] || ! is_string( $value['id'] ) || ! is_int( $value['cleanup_attempt'] ) || $value['cleanup_attempt'] < 0 || $value['cleanup_attempt'] > self::MAX_CLEANUP_LOCK_RETRIES || ! is_string( $value['mac'] ) || 1 !== preg_match( '/^[a-f0-9]{32}$/D', $value['id'] ) ) {
 			return new \WP_Error( 'email_queue_reference_malformed', 'Queued email payload reference is malformed.' );
 		}
 
-		$expected = hash_hmac( 'sha256', self::REFERENCE_CONTEXT . '|' . $value['id'], $this->queuedPayloadKey() );
+		$expected = $this->referenceMac( $value['id'], $value['cleanup_attempt'] );
 		if ( ! hash_equals( $expected, $value['mac'] ) ) {
 			return new \WP_Error( 'email_queue_reference_invalid', 'Queued email payload reference is invalid.' );
 		}
 
 		return $value['id'];
+	}
+
+	private function referenceMac( string $reference_id, int $cleanup_attempt ): string {
+		return hash_hmac( 'sha256', self::REFERENCE_CONTEXT . '|' . $reference_id . '|' . $cleanup_attempt, $this->queuedPayloadKey() );
 	}
 
 	private function deleteStoredPayload( ?array $reference ): void {
@@ -810,7 +851,7 @@ class SendEmailQueuedAbility {
 	 */
 	private function deleteReferencedOptionByShape( array $reference ): void {
 		$value = $reference[ self::REFERENCE_KEY ] ?? null;
-		if ( ! is_array( $value ) || array( 'version', 'id', 'mac' ) !== array_keys( $value ) || ! is_string( $value['id'] ) || 1 !== preg_match( '/^[a-f0-9]{32}$/D', $value['id'] ) ) {
+		if ( ! is_array( $value ) || array( 'version', 'id', 'cleanup_attempt', 'mac' ) !== array_keys( $value ) || ! is_string( $value['id'] ) || 1 !== preg_match( '/^[a-f0-9]{32}$/D', $value['id'] ) ) {
 			return;
 		}
 		if ( ! $this->acquireReferenceLock( $value['id'] ) ) {
