@@ -236,6 +236,10 @@ namespace DataMachine\Abilities\File {
 		public static function get_ability(): ?ScaffoldAbilityStub {
 			return self::$ability;
 		}
+
+		public static function execute( array $args ): void {
+			self::$ability?->execute( $args );
+		}
 	}
 
 	class ScaffoldAbilityStub {
