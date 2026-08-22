@@ -41,6 +41,11 @@ class SendEmailQueuedAbility {
 	public const WORKER_HOOK = 'datamachine_send_email_worker';
 
 	/**
+	 * Action Scheduler hook for bounded orphan payload cleanup.
+	 */
+	public const CLEANUP_HOOK = 'datamachine_cleanup_queued_email_payload';
+
+	/**
 	 * Action Scheduler group for queued email actions.
 	 */
 	public const GROUP = 'data-machine-email';
@@ -53,7 +58,24 @@ class SendEmailQueuedAbility {
 	/**
 	 * Retry backoff in seconds applied between attempts.
 	 */
-	private const RETRY_BACKOFF_SECONDS = 300;
+	private const RETRY_BACKOFF_SECONDS     = 300;
+	private const CLEANUP_RETENTION_SECONDS = 604800;
+	private const LOCK_TIMEOUT_SECONDS      = 5;
+
+	/**
+	 * Authenticated queue payload and compact reference formats.
+	 */
+	private const ENVELOPE_KEY      = '_datamachine_encrypted_email';
+	private const ENVELOPE_VERSION  = 1;
+	private const REFERENCE_KEY     = '_datamachine_email_payload';
+	private const REFERENCE_VERSION = 1;
+	private const OPTION_PREFIX     = 'datamachine_email_payload_';
+	private const CIPHER_ALGORITHM  = 'aes-256-gcm';
+	private const IV_LENGTH         = 12;
+	private const AUTH_TAG_LENGTH   = 16;
+	private const KEY_CONTEXT       = 'datamachine-send-email-queued-v1';
+	private const REFERENCE_CONTEXT = 'datamachine-send-email-queued-reference-v1';
+	private const AAD               = 'datamachine/send-email-queued|v1|aes-256-gcm';
 
 	public function __construct() {
 		if ( null === self::$instance ) {
@@ -251,6 +273,7 @@ class SendEmailQueuedAbility {
 		}
 
 		add_action( self::WORKER_HOOK, array( $instance, 'runWorker' ), 10, 1 );
+		add_action( self::CLEANUP_HOOK, array( $instance, 'runCleanup' ), 10, 1 );
 		self::$worker_registered = true;
 	}
 
@@ -275,7 +298,7 @@ class SendEmailQueuedAbility {
 			'user_id'  => PermissionHelper::acting_user_id(),
 			'agent_id' => absint( PermissionHelper::get_acting_agent_id() ),
 			'token_id' => absint( PermissionHelper::get_acting_token_id() ),
-			'system'   => method_exists( PermissionHelper::class, 'is_authenticated_context' ) && PermissionHelper::is_authenticated_context(),
+			'system'   => PermissionHelper::is_authenticated_context(),
 		);
 		if ( $context['user_id'] <= 0 && ! $context['system'] ) {
 			return $this->queueError( 'email_queue_issuer_required', 'An identified issuer is required to queue email.', 403, $logs );
@@ -283,7 +306,7 @@ class SendEmailQueuedAbility {
 		if ( ! empty( $input['auth_ref'] ) ) {
 			$providers = apply_filters( 'datamachine_auth_providers', array() );
 			$auth      = $providers['email_imap'] ?? null;
-			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send' ) ) ) {
+			if ( ! is_object( $auth ) || ! method_exists( $auth, 'resolve_mailbox' ) || is_wp_error( $auth->resolve_mailbox( $input['auth_ref'], 'send' ) ) ) {
 				return $this->queueError( 'email_queue_authorization_failed', 'Mailbox send authorization failed.', 403, $logs );
 			}
 		} elseif ( ! $this->canUseLegacySender() ) {
@@ -317,24 +340,44 @@ class SendEmailQueuedAbility {
 			return new \WP_Error( $timestamp->get_error_code(), $timestamp->get_error_message(), array_merge( array( 'status' => 400 ), is_array( $timestamp->get_error_data() ) ? $timestamp->get_error_data() : array(), array( 'logs' => $logs ) ) );
 		}
 
-		// Action Scheduler payload — wrap in an indexed array so the hook
-		// receives a single $payload argument.
-		$as_args = array( $input );
+		$reference = $this->storeQueuedPayload( $input );
+		if ( is_wp_error( $reference ) ) {
+			return $this->queueError( 'email_queue_encryption_failed', 'Failed to protect queued email payload.', 500, $logs );
+		}
 
-		if ( null === $timestamp ) {
-			$action_id     = as_enqueue_async_action( self::WORKER_HOOK, $as_args, self::GROUP );
-			$scheduled_for = time();
-		} else {
-			$action_id     = as_schedule_single_action( $timestamp, self::WORKER_HOOK, $as_args, self::GROUP );
-			$scheduled_for = $timestamp;
+		// Action Scheduler receives only a compact authenticated reference. The
+		// encrypted envelope remains in a non-autoloaded option until dispatch.
+		$as_args = array( $reference );
+
+		try {
+			if ( null === $timestamp ) {
+				$action_id     = as_enqueue_async_action( self::WORKER_HOOK, $as_args, self::GROUP );
+				$scheduled_for = time();
+			} else {
+				$action_id     = as_schedule_single_action( $timestamp, self::WORKER_HOOK, $as_args, self::GROUP );
+				$scheduled_for = $timestamp;
+			}
+		} catch ( \Throwable ) {
+			$this->deleteStoredPayload( $reference );
+			return $this->queueError( 'email_queue_failed', 'Failed to schedule email action.', 500, $logs );
 		}
 
 		if ( empty( $action_id ) ) {
+			$this->deleteStoredPayload( $reference );
 			$logs[] = array(
 				'level'   => 'error',
 				'message' => 'Email queue: Action Scheduler did not return an action id',
 			);
 			return $this->queueError( 'email_queue_failed', 'Failed to schedule email action.', 500, $logs );
+		}
+
+		if ( ! $this->schedulePayloadCleanup( $reference, $scheduled_for ) ) {
+			// The send action already owns this payload. Never roll it back merely
+			// because best-effort orphan cleanup could not be scheduled.
+			$logs[] = array(
+				'level'   => 'warning',
+				'message' => 'Email queue: payload cleanup could not be scheduled',
+			);
 		}
 
 		$logs[] = array(
@@ -375,15 +418,87 @@ class SendEmailQueuedAbility {
 			return;
 		}
 
+		if ( array_key_exists( self::REFERENCE_KEY, $payload ) ) {
+			$reference_id = $this->validatePayloadReference( $payload );
+			if ( is_wp_error( $reference_id ) ) {
+				$this->deleteReferencedOptionByShape( $payload );
+				do_action( 'datamachine_log', 'error', 'Email worker: stored payload reference rejected', array( 'reason' => $reference_id->get_error_code() ) );
+				return;
+			}
+
+			if ( ! $this->acquireReferenceLock( $reference_id ) ) {
+				do_action( 'datamachine_log', 'warning', 'Email worker: payload dispatch already active', array( 'reason' => 'email_queue_dispatch_locked' ) );
+				return;
+			}
+
+			try {
+				// Re-read only after acquiring the lock. A prior worker may have sent
+				// and deleted the option while this worker waited.
+				$envelope = get_option( $this->payloadOptionName( $reference_id ), null );
+				if ( ! is_array( $envelope ) ) {
+					do_action( 'datamachine_log', 'error', 'Email worker: stored payload unavailable', array( 'reason' => 'email_queue_payload_missing' ) );
+					return;
+				}
+
+				$decrypted = $this->decryptQueuedPayload( $envelope, $reference_id );
+				if ( is_wp_error( $decrypted ) ) {
+					$this->deleteStoredPayload( $payload );
+					do_action( 'datamachine_log', 'error', 'Email worker: stored payload rejected', array( 'reason' => $decrypted->get_error_code() ) );
+					return;
+				}
+
+				$this->dispatchPayload( $decrypted, $payload );
+			} finally {
+				$this->releaseReferenceLock( $reference_id );
+			}
+			return;
+		}
+
+		// Already-persisted legacy Action Scheduler jobs carry plaintext arrays.
+		$this->dispatchPayload( $payload, null );
+	}
+
+	/**
+	 * Delete an orphaned encrypted payload after its bounded retention window.
+	 *
+	 * @param mixed $reference Compact authenticated payload reference.
+	 */
+	public function runCleanup( $reference ): void {
+		if ( ! is_array( $reference ) ) {
+			return;
+		}
+		$reference_id = $this->validatePayloadReference( $reference );
+		if ( is_wp_error( $reference_id ) ) {
+			$this->deleteReferencedOptionByShape( $reference );
+			return;
+		}
+		if ( ! $this->acquireReferenceLock( $reference_id ) ) {
+			do_action( 'datamachine_log', 'warning', 'Email queue cleanup: payload dispatch still active', array( 'reason' => 'email_queue_cleanup_locked' ) );
+			return;
+		}
+		try {
+			delete_option( $this->payloadOptionName( $reference_id ) );
+		} finally {
+			$this->releaseReferenceLock( $reference_id );
+		}
+	}
+
+	/**
+	 * Verify authorization and dispatch one decrypted or legacy payload.
+	 */
+	private function dispatchPayload( array $payload, ?array $reference ): void {
+
 		$attempt = isset( $payload['_attempt'] ) ? max( 1, (int) $payload['_attempt'] ) : 1;
 		$grant   = $this->verifyMailboxGrant( $payload );
 		if ( is_wp_error( $grant ) || ! $this->currentIssuerAuthorized( $grant ) ) {
+			$this->deleteStoredPayload( $reference );
 			do_action( 'datamachine_log', 'error', 'Email worker: queued authorization denied', array( 'attempt' => $attempt ) );
 			return;
 		}
 
 		$ability = wp_get_ability( 'datamachine/send-email' );
 		if ( ! $ability ) {
+			$this->deleteStoredPayload( $reference );
 			do_action(
 				'datamachine_log',
 				'error',
@@ -397,27 +512,26 @@ class SendEmailQueuedAbility {
 		$ability_input = $payload;
 		unset( $ability_input['_attempt'] );
 
+		// Delivery is intentionally at-least-once. A process crash after the mail
+		// provider accepts the message but before local option deletion can replay
+		// it; exactly-once requires provider-supported idempotency.
 		$result = $ability->execute( $ability_input );
 
 		$success = is_array( $result ) && ! empty( $result['success'] );
 
 		if ( $success ) {
+			$this->deleteStoredPayload( $reference );
 			do_action(
 				'datamachine_log',
 				'info',
 				'Email worker: send succeeded',
-				array(
-					'attempt'    => $attempt,
-					'recipients' => $result['recipients'] ?? array(),
-					'subject'    => $result['subject'] ?? '',
-				)
+				array( 'attempt' => $attempt )
 			);
 			return;
 		}
 
-		$error_msg = is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'invalid result' );
-
 		if ( $attempt >= self::MAX_ATTEMPTS ) {
+			$this->deleteStoredPayload( $reference );
 			do_action(
 				'datamachine_log',
 				'error',
@@ -425,7 +539,6 @@ class SendEmailQueuedAbility {
 				array(
 					'attempt'      => $attempt,
 					'max_attempts' => self::MAX_ATTEMPTS,
-					'error'        => $error_msg,
 				)
 			);
 			return;
@@ -434,8 +547,34 @@ class SendEmailQueuedAbility {
 		// Re-enqueue with backoff. Bump the attempt counter on the payload.
 		$payload['_attempt'] = $attempt + 1;
 		$retry_at            = time() + self::RETRY_BACKOFF_SECONDS;
+		$created_retry_store = null === $reference;
+		$retry_reference     = $created_retry_store ? $this->storeQueuedPayload( $payload ) : $this->replaceStoredPayload( $reference, $payload );
+		if ( is_wp_error( $retry_reference ) ) {
+			$this->deleteStoredPayload( $reference );
+			do_action(
+				'datamachine_log',
+				'error',
+				'Email worker: retry payload encryption failed',
+				array( 'attempt' => $attempt )
+			);
+			return;
+		}
 
-		$retry_action_id = as_schedule_single_action( $retry_at, self::WORKER_HOOK, array( $payload ), self::GROUP );
+		try {
+			$retry_action_id = as_schedule_single_action( $retry_at, self::WORKER_HOOK, array( $retry_reference ), self::GROUP );
+		} catch ( \Throwable ) {
+			$this->deleteStoredPayload( $retry_reference );
+			do_action( 'datamachine_log', 'error', 'Email worker: retry scheduling failed', array( 'attempt' => $attempt ) );
+			return;
+		}
+		if ( empty( $retry_action_id ) ) {
+			$this->deleteStoredPayload( $retry_reference );
+			do_action( 'datamachine_log', 'error', 'Email worker: retry scheduling failed', array( 'attempt' => $attempt ) );
+			return;
+		}
+		if ( $created_retry_store && ! $this->schedulePayloadCleanup( $retry_reference, $retry_at ) ) {
+			do_action( 'datamachine_log', 'warning', 'Email worker: retry payload cleanup could not be scheduled', array( 'attempt' => $attempt ) );
+		}
 
 		do_action(
 			'datamachine_log',
@@ -446,9 +585,257 @@ class SendEmailQueuedAbility {
 				'next_attempt'    => $attempt + 1,
 				'retry_at'        => $retry_at,
 				'retry_action_id' => $retry_action_id,
-				'error'           => $error_msg,
 			)
 		);
+	}
+
+	/**
+	 * Encrypt a complete worker payload before it enters scheduler storage.
+	 *
+	 * The key is deliberately domain-separated from OAuth credential storage.
+	 * There is no key ring: rotating WordPress auth salts makes outstanding jobs
+	 * undecryptable, and the worker rejects them with a non-secret reason code.
+	 *
+	 * @param array $payload Plaintext worker payload.
+	 * @return array<string, array<string, int|string>>|\WP_Error
+	 */
+	private function encryptQueuedPayload( array $payload, ?string $reference_id = null ): array|\WP_Error {
+		try {
+			$iv = random_bytes( self::IV_LENGTH );
+		} catch ( \Throwable ) {
+			return new \WP_Error( 'email_queue_random_failed', 'Queued email encryption could not generate a nonce.' );
+		}
+
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Authenticated internal payload preserves exact PHP values across dispatch.
+		$plaintext  = serialize( $payload );
+		$tag        = '';
+		$ciphertext = openssl_encrypt( $plaintext, self::CIPHER_ALGORITHM, $this->queuedPayloadKey(), OPENSSL_RAW_DATA, $iv, $tag, $this->envelopeAad( $reference_id ), self::AUTH_TAG_LENGTH );
+		if ( false === $ciphertext || self::AUTH_TAG_LENGTH !== strlen( $tag ) ) {
+			return new \WP_Error( 'email_queue_encryption_failed', 'Queued email encryption failed.' );
+		}
+
+		return array(
+			self::ENVELOPE_KEY => array(
+				'version'    => self::ENVELOPE_VERSION,
+				'algorithm'  => self::CIPHER_ALGORITHM,
+				// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encoding binary authenticated-envelope fields.
+				'iv'         => base64_encode( $iv ),
+				'tag'        => base64_encode( $tag ),
+				'ciphertext' => base64_encode( $ciphertext ),
+				// phpcs:enable WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+			),
+		);
+	}
+
+	/**
+	 * Validate and decrypt a scheduler envelope at dispatch time.
+	 *
+	 * @param array $payload Raw worker argument.
+	 * @return array|\WP_Error
+	 */
+	private function decryptQueuedPayload( array $payload, ?string $reference_id = null ): array|\WP_Error {
+		if ( array( self::ENVELOPE_KEY ) !== array_keys( $payload ) || ! is_array( $payload[ self::ENVELOPE_KEY ] ) ) {
+			return new \WP_Error( 'email_queue_envelope_malformed', 'Encrypted queued email payload is malformed.' );
+		}
+
+		$envelope = $payload[ self::ENVELOPE_KEY ];
+		if ( array( 'version', 'algorithm', 'iv', 'tag', 'ciphertext' ) !== array_keys( $envelope ) ) {
+			return new \WP_Error( 'email_queue_envelope_malformed', 'Encrypted queued email payload is malformed.' );
+		}
+		if ( self::ENVELOPE_VERSION !== $envelope['version'] || self::CIPHER_ALGORITHM !== $envelope['algorithm'] ) {
+			return new \WP_Error( 'email_queue_envelope_unsupported', 'Encrypted queued email payload version is unsupported.' );
+		}
+		if ( ! is_string( $envelope['iv'] ) || ! is_string( $envelope['tag'] ) || ! is_string( $envelope['ciphertext'] ) ) {
+			return new \WP_Error( 'email_queue_envelope_malformed', 'Encrypted queued email payload is malformed.' );
+		}
+
+		// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding binary authenticated-envelope fields.
+		$iv         = base64_decode( $envelope['iv'], true );
+		$tag        = base64_decode( $envelope['tag'], true );
+		$ciphertext = base64_decode( $envelope['ciphertext'], true );
+		// phpcs:enable WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+		if ( false === $iv || false === $tag || false === $ciphertext || self::IV_LENGTH !== strlen( $iv ) || self::AUTH_TAG_LENGTH !== strlen( $tag ) || '' === $ciphertext ) {
+			return new \WP_Error( 'email_queue_envelope_malformed', 'Encrypted queued email payload is malformed.' );
+		}
+
+		$plaintext = openssl_decrypt( $ciphertext, self::CIPHER_ALGORITHM, $this->queuedPayloadKey(), OPENSSL_RAW_DATA, $iv, $tag, $this->envelopeAad( $reference_id ) );
+		if ( false === $plaintext ) {
+			return new \WP_Error( 'email_queue_envelope_decryption_failed', 'Encrypted queued email payload could not be decrypted.' );
+		}
+
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize -- Only authenticated ciphertext created by this class reaches unserialize.
+		$decrypted = unserialize( $plaintext, array( 'allowed_classes' => false ) );
+		if ( ! is_array( $decrypted ) ) {
+			return new \WP_Error( 'email_queue_envelope_payload_invalid', 'Encrypted queued email payload is invalid.' );
+		}
+
+		return $decrypted;
+	}
+
+	/**
+	 * Persist an encrypted payload and return its compact scheduler reference.
+	 */
+	private function storeQueuedPayload( array $payload ): array|\WP_Error {
+		for ( $attempt = 0; $attempt < 3; ++$attempt ) {
+			try {
+				$reference_id = bin2hex( random_bytes( 16 ) );
+			} catch ( \Throwable ) {
+				return new \WP_Error( 'email_queue_random_failed', 'Queued email storage could not generate a reference.' );
+			}
+
+			$envelope = $this->encryptQueuedPayload( $payload, $reference_id );
+			if ( is_wp_error( $envelope ) ) {
+				return $envelope;
+			}
+			if ( add_option( $this->payloadOptionName( $reference_id ), $envelope, '', false ) ) {
+				return $this->payloadReference( $reference_id );
+			}
+		}
+
+		return new \WP_Error( 'email_queue_storage_failed', 'Queued email payload could not be stored.' );
+	}
+
+	/**
+	 * Replace a stored envelope before scheduling its retry.
+	 */
+	private function replaceStoredPayload( array $reference, array $payload ): array|\WP_Error {
+		$reference_id = $this->validatePayloadReference( $reference );
+		if ( is_wp_error( $reference_id ) ) {
+			return $reference_id;
+		}
+
+		$envelope = $this->encryptQueuedPayload( $payload, $reference_id );
+		if ( is_wp_error( $envelope ) ) {
+			return $envelope;
+		}
+		if ( ! update_option( $this->payloadOptionName( $reference_id ), $envelope, false ) ) {
+			return new \WP_Error( 'email_queue_storage_failed', 'Queued email retry payload could not be stored.' );
+		}
+
+		return $reference;
+	}
+
+	/**
+	 * Schedule idempotent orphan cleanup well beyond the maximum retry horizon.
+	 */
+	private function schedulePayloadCleanup( array $reference, int $scheduled_for ): bool {
+		$retry_window = ( self::MAX_ATTEMPTS - 1 ) * self::RETRY_BACKOFF_SECONDS;
+		$cleanup_at   = $scheduled_for + $retry_window + self::CLEANUP_RETENTION_SECONDS;
+		try {
+			return ! empty( as_schedule_single_action( $cleanup_at, self::CLEANUP_HOOK, array( $reference ), self::GROUP ) );
+		} catch ( \Throwable ) {
+			return false;
+		}
+	}
+
+	/**
+	 * Acquire a bounded connection-scoped MySQL lock for one opaque reference.
+	 */
+	private function acquireReferenceLock( string $reference_id ): bool {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared -- MySQL advisory locks have no WordPress API.
+		$acquired = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $this->referenceLockName( $reference_id ), self::LOCK_TIMEOUT_SECONDS ) );
+		return '1' === (string) $acquired;
+	}
+
+	/**
+	 * Release a connection-scoped lock on every worker exit path.
+	 */
+	private function releaseReferenceLock( string $reference_id ): void {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared -- Releases the matching connection-scoped advisory lock.
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $this->referenceLockName( $reference_id ) ) );
+	}
+
+	private function referenceLockName( string $reference_id ): string {
+		return 'datamachine_email_' . $reference_id;
+	}
+
+	/**
+	 * Build an authenticated opaque scheduler reference.
+	 */
+	private function payloadReference( string $reference_id ): array {
+		return array(
+			self::REFERENCE_KEY => array(
+				'version' => self::REFERENCE_VERSION,
+				'id'      => $reference_id,
+				'mac'     => hash_hmac( 'sha256', self::REFERENCE_CONTEXT . '|' . $reference_id, $this->queuedPayloadKey() ),
+			),
+		);
+	}
+
+	/**
+	 * Validate a scheduler reference before using it as an option key.
+	 */
+	private function validatePayloadReference( array $reference ): string|\WP_Error {
+		if ( array( self::REFERENCE_KEY ) !== array_keys( $reference ) || ! is_array( $reference[ self::REFERENCE_KEY ] ) ) {
+			return new \WP_Error( 'email_queue_reference_malformed', 'Queued email payload reference is malformed.' );
+		}
+
+		$value = $reference[ self::REFERENCE_KEY ];
+		if ( array( 'version', 'id', 'mac' ) !== array_keys( $value ) || self::REFERENCE_VERSION !== $value['version'] || ! is_string( $value['id'] ) || ! is_string( $value['mac'] ) || 1 !== preg_match( '/^[a-f0-9]{32}$/D', $value['id'] ) ) {
+			return new \WP_Error( 'email_queue_reference_malformed', 'Queued email payload reference is malformed.' );
+		}
+
+		$expected = hash_hmac( 'sha256', self::REFERENCE_CONTEXT . '|' . $value['id'], $this->queuedPayloadKey() );
+		if ( ! hash_equals( $expected, $value['mac'] ) ) {
+			return new \WP_Error( 'email_queue_reference_invalid', 'Queued email payload reference is invalid.' );
+		}
+
+		return $value['id'];
+	}
+
+	private function deleteStoredPayload( ?array $reference ): void {
+		if ( null === $reference ) {
+			return;
+		}
+		$reference_id = $this->validatePayloadReference( $reference );
+		if ( ! is_wp_error( $reference_id ) ) {
+			delete_option( $this->payloadOptionName( $reference_id ) );
+		}
+	}
+
+	/**
+	 * Remove storage for a syntactically bounded reference that cannot be
+	 * authenticated, including after salt rotation. The opaque 128-bit id is
+	 * accepted only in the exact reference schema and cannot select other options.
+	 */
+	private function deleteReferencedOptionByShape( array $reference ): void {
+		$value = $reference[ self::REFERENCE_KEY ] ?? null;
+		if ( ! is_array( $value ) || array( 'version', 'id', 'mac' ) !== array_keys( $value ) || ! is_string( $value['id'] ) || 1 !== preg_match( '/^[a-f0-9]{32}$/D', $value['id'] ) ) {
+			return;
+		}
+		if ( ! $this->acquireReferenceLock( $value['id'] ) ) {
+			return;
+		}
+		try {
+			delete_option( $this->payloadOptionName( $value['id'] ) );
+		} finally {
+			$this->releaseReferenceLock( $value['id'] );
+		}
+	}
+
+	private function payloadOptionName( string $reference_id ): string {
+		return self::OPTION_PREFIX . $reference_id;
+	}
+
+	private function envelopeAad( ?string $reference_id ): string {
+		return null === $reference_id ? self::AAD : self::AAD . '|' . $reference_id;
+	}
+
+	/**
+	 * Derive a queue-only 256-bit key from the WordPress auth salts.
+	 */
+	private function queuedPayloadKey(): string {
+		return hash_hmac( 'sha256', self::KEY_CONTEXT, wp_salt( 'auth' ), true );
 	}
 
 	private function createMailboxGrant( array $input, array $context ): array {
