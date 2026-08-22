@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.10] - 2026-08-22
+
+### Changed
+- Stop pipeline CSV exports from leaking handler secrets
+
+### Fixed
+- retry migration updates after deadlocks
+
 ## [0.175.9] - 2026-08-22
 
 ### Changed
