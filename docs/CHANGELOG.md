@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.11] - 2026-08-22
+
+### Fixed
+- encrypt queued email payloads at rest
+
 ## [0.175.10] - 2026-08-22
 
 ### Changed
