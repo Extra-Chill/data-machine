@@ -195,7 +195,7 @@ function datamachine_run_conversation(
 		$completion_policy
 	);
 
-	$tool_executor     = datamachine_build_loop_tool_executor( $tools, $loop_payload, $mode, $modes, $event_sink, $base_log_context );
+	$tool_executor     = datamachine_build_loop_tool_executor( $tools, $loop_payload, $mode );
 	$pre_tool_mediator = datamachine_build_pre_tool_mediator(
 		$tools,
 		$loop_payload,
@@ -534,12 +534,9 @@ function datamachine_normalize_typed_artifact_outputs( array $result ): array {
  * @param array<string,array<string,mixed>> $tools        Tool declarations keyed by name.
  * @param array<string,mixed>              $loop_payload Cleaned loop payload.
  * @param string                           $mode         Comma-separated execution mode label.
- * @param array<int,string>                $modes        Execution mode slugs.
- * @param LoopEventSinkInterface           $event_sink   Event sink.
- * @param array<string,mixed>              $base_log_context Base log context.
  */
-function datamachine_build_loop_tool_executor( array $tools, array $loop_payload, string $mode, array $modes, LoopEventSinkInterface $event_sink, array $base_log_context ): WP_Agent_Tool_Executor {
-	return new class( $tools, $loop_payload, $mode, $modes, $event_sink, $base_log_context ) implements WP_Agent_Tool_Executor {
+function datamachine_build_loop_tool_executor( array $tools, array $loop_payload, string $mode ): WP_Agent_Tool_Executor {
+	return new class( $tools, $loop_payload, $mode ) implements WP_Agent_Tool_Executor {
 		/** @var array<string,array<string,mixed>> */
 		private array $tools;
 
@@ -548,29 +545,15 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 
 		private string $mode;
 
-		/** @var array<int,string> */
-		private array $modes;
-
-		private LoopEventSinkInterface $event_sink;
-
-		/** @var array<string,mixed> */
-		private array $base_log_context;
-
 		/**
 		 * @param array<string,array<string,mixed>> $tools        Tool declarations keyed by name.
 		 * @param array<string,mixed>              $loop_payload Cleaned loop payload.
 		 * @param string                           $mode         Comma-separated execution mode label.
-		 * @param array<int,string>                $modes        Execution mode slugs.
-		 * @param LoopEventSinkInterface           $event_sink   Event sink.
-		 * @param array<string,mixed>              $base_log_context Base log context.
 		 */
-		public function __construct( array $tools, array $loop_payload, string $mode, array $modes, LoopEventSinkInterface $event_sink, array $base_log_context ) {
-			$this->tools            = $tools;
-			$this->loop_payload     = $loop_payload;
-			$this->mode             = $mode;
-			$this->modes            = $modes;
-			$this->event_sink       = $event_sink;
-			$this->base_log_context = $base_log_context;
+		public function __construct( array $tools, array $loop_payload, string $mode ) {
+			$this->tools        = $tools;
+			$this->loop_payload = $loop_payload;
+			$this->mode         = $mode;
 		}
 
 		/** @inheritDoc */
@@ -582,7 +565,6 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 			$tool_payload['prior_tool_results'] = $prior_results;
 			$client_context                     = is_array( $tool_payload['client_context'] ?? null ) ? $tool_payload['client_context'] : array();
 			$disposition_id                     = '';
-			$reservation_token                  = '';
 			if ( ! empty( $tool_definition['packet_disposition_bound'] ) ) {
 				$engine_data = is_array( $tool_payload['engine_data'] ?? null ) ? $tool_payload['engine_data'] : array();
 				$provided_id = is_string( $parameters['disposition_id'] ?? null ) ? trim( $parameters['disposition_id'] ) : '';
@@ -601,76 +583,17 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 				$parameters['disposition_id'] = $disposition_id;
 			}
 
-			if ( datamachine_is_external_runtime_tool( $tool_definition ) ) {
-				if ( '' !== $disposition_id ) {
-					$reservation = ToolExecutor::beginPacketExecution( $tool_name, $disposition_id, $tool_payload );
-					if ( empty( $reservation['acquired'] ) ) {
-						return $reservation['result'];
-					}
-					$reservation_token                         = (string) $reservation['token'];
-					$tool_payload['packet_execution_identity'] = array(
-						'job_id'         => (int) ( $tool_payload['job_id'] ?? 0 ),
-						'tool_name'      => $tool_name,
-						'disposition_id' => $disposition_id,
-					);
-				}
-				try {
-					$result = datamachine_fulfill_runtime_tool_call(
-						array_merge(
-							$tool_call,
-							array(
-								'name'       => $tool_name,
-								'parameters' => $parameters,
-							)
-						),
-						$tool_definition,
-						$tool_payload,
-						$this->mode,
-						$this->modes,
-						(int) ( $context['turn'] ?? 0 ),
-						$this->event_sink,
-						$this->base_log_context
-					);
-				} catch ( \Throwable $exception ) {
-					if ( '' !== $reservation_token ) {
-						ToolExecutor::finishPacketExecution( $tool_name, $disposition_id, $tool_payload, $reservation_token, 'ambiguous' );
-					}
-					return array(
-						'success'                  => false,
-						'tool_name'                => $tool_name,
-						'disposition_id'           => $disposition_id,
-						'code'                     => 'packet_execution_outcome_ambiguous',
-						'automatic_replay_blocked' => true,
-						'error'                    => $exception->getMessage(),
-					);
-				}
-			} else {
-				$result = ToolExecutor::executeTool(
-					$tool_name,
-					$parameters,
-					$this->tools,
-					$tool_payload,
-					$this->mode,
-					(int) ( $tool_payload['agent_id'] ?? 0 ),
-					$client_context
-				);
-			}
+			$result = ToolExecutor::executeTool(
+				$tool_name,
+				$parameters,
+				$this->tools,
+				$tool_payload,
+				$this->mode,
+				(int) ( $tool_payload['agent_id'] ?? 0 ),
+				$client_context
+			);
 			if ( '' !== $disposition_id ) {
 				$result['disposition_id'] = $disposition_id;
-				if ( '' !== $reservation_token ) {
-					$state      = ! empty( $result['pending'] ) ? 'pending' : ( ! empty( $result['success'] ) ? 'succeeded' : 'failed' );
-					$request_id = is_array( $result['runtime_tool_request'] ?? null ) ? (string) ( $result['runtime_tool_request']['request_id'] ?? '' ) : '';
-					if ( ! ToolExecutor::finishPacketExecution( $tool_name, $disposition_id, $tool_payload, $reservation_token, $state, $request_id ) ) {
-						return array(
-							'success'                  => false,
-							'tool_name'                => $tool_name,
-							'disposition_id'           => $disposition_id,
-							'code'                     => 'packet_execution_outcome_ambiguous',
-							'automatic_replay_blocked' => true,
-							'error'                    => 'Runtime handler returned, but its durable execution outcome could not be persisted.',
-						);
-					}
-				}
 			}
 
 			$metadata                              = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
@@ -1652,36 +1575,6 @@ function datamachine_should_defer_runtime_tool_call( array $request, array $payl
 	}
 
 	return '' !== (string) ( $request['session_id'] ?? '' );
-}
-
-/**
- * Persist a pending runtime tool request and schedule its timeout.
- *
- * @param array<string,mixed> $request Runtime tool request.
- * @param array<string,mixed> $payload Loop/tool payload.
- * @return array<string,mixed>|\WP_Error Pending tool result or persistence error.
- */
-function datamachine_defer_runtime_tool_call( array $request, array $payload ): array|\WP_Error {
-	$pending_request = datamachine_prepare_runtime_tool_request( $request, $payload );
-	if ( $pending_request instanceof \WP_Error ) {
-		return $pending_request;
-	}
-
-	$pending_request = WP_Agent_Runtime_Tool_Lifecycle::create_pending_request(
-		datamachine_runtime_tool_request_store(),
-		$pending_request,
-		array( 'payload' => $payload )
-	);
-	return array(
-		'success'              => false,
-		'pending'              => true,
-		'status'               => WP_Agent_Runtime_Tool_Request::STATUS_PENDING,
-		'tool_name'            => $pending_request['tool_name'],
-		'executor'             => 'client',
-		'code'                 => WP_Agent_Runtime_Tool_Request::STATUS_PENDING,
-		'error'                => 'Runtime tool request is pending client fulfillment.',
-		'runtime_tool_request' => $pending_request,
-	);
 }
 
 /** Return Data Machine's Agents API runtime-tool request store adapter. */

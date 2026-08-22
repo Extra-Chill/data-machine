@@ -51,7 +51,10 @@ require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
 
 use DataMachine\Engine\AI\LoopEventSinkInterface;
-use function DataMachine\Engine\AI\datamachine_build_loop_tool_executor;
+use AgentsAPI\AI\Tools\WP_Agent_Tool_Executor;
+use AgentsAPI\AI\WP_Agent_Conversation_Loop;
+use DataMachine\Engine\AI\DataMachineToolRuntimeRules;
+use function DataMachine\Engine\AI\datamachine_build_pre_tool_mediator;
 
 class DelegatedRuntimeToolSmokeSink implements LoopEventSinkInterface {
 	public array $events = array();
@@ -60,6 +63,20 @@ class DelegatedRuntimeToolSmokeSink implements LoopEventSinkInterface {
 		$this->events[] = array(
 			'event'   => $event,
 			'payload' => $payload,
+		);
+	}
+}
+
+class DelegatedRuntimeToolUnexpectedExecutor implements WP_Agent_Tool_Executor {
+	public int $calls = 0;
+
+	public function executeWP_Agent_Tool_Call( array $tool_call, array $tool_definition, array $context = array() ): array {
+		unset( $tool_call, $tool_definition, $context );
+		++$this->calls;
+
+		return array(
+			'success' => false,
+			'error'   => 'External runtime tools must not reach the PHP executor.',
 		);
 	}
 }
@@ -94,6 +111,52 @@ $delegated_tool = array(
 $delegated_tools = array( 'delegated_action' => $delegated_tool );
 $sink            = new DelegatedRuntimeToolSmokeSink();
 
+$run_delegated_tool = static function ( string $call_id, string $value, array $payload = array() ) use ( $delegated_tools, $sink ): array {
+	$executor = new DelegatedRuntimeToolUnexpectedExecutor();
+	$turns    = 0;
+	$mediator = datamachine_build_pre_tool_mediator(
+		$delegated_tools,
+		$payload,
+		'chat',
+		array( 'chat' ),
+		new DataMachineToolRuntimeRules(),
+		$sink,
+		array()
+	);
+	$result   = WP_Agent_Conversation_Loop::run(
+		array( array( 'role' => 'user', 'content' => 'Run the delegated action.' ) ),
+		static function ( array $messages ) use ( &$turns, $call_id, $value ): array {
+			++$turns;
+			if ( 1 === $turns ) {
+				return array(
+					'messages'   => $messages,
+					'tool_calls' => array(
+						array(
+							'id'         => $call_id,
+							'name'       => 'delegated_action',
+							'parameters' => array( 'value' => $value ),
+						),
+					),
+				);
+			}
+
+			return array(
+				'messages'   => $messages,
+				'content'    => 'Delegated action complete.',
+				'tool_calls' => array(),
+			);
+		},
+		array(
+			'max_turns'         => 2,
+			'tool_executor'     => $executor,
+			'tool_declarations' => $delegated_tools,
+			'pre_tool_mediator' => $mediator,
+		)
+	);
+
+	return array( $result, $executor, $turns );
+};
+
 echo "runtime-tool-delegated-result-smoke\n\n";
 
 add_filter(
@@ -112,23 +175,22 @@ add_filter(
 	2
 );
 
-$filter_executor = datamachine_build_loop_tool_executor( $delegated_tools, array(), 'chat', array( 'chat' ), $sink, array() );
-$filter_result   = $filter_executor->executeWP_Agent_Tool_Call(
-	array(
-		'tool_name'  => 'delegated_action',
-		'id'         => 'delegated-filter-call',
-		'parameters' => array( 'value' => 'from-filter' ),
-	),
-	$delegated_tool,
-	array( 'turn' => 1 )
-);
-$assert( true === ( $filter_result['success'] ?? null ), 'filter result succeeds through delegated executor fallback' );
-$assert( 'client' === ( $filter_result['executor'] ?? null ), 'filter result is normalized as client-executed' );
-$assert( true === ( $filter_result['filtered'] ?? null ), 'filter payload is preserved' );
-$assert( 'from-filter' === ( $filter_result['value'] ?? null ), 'filter receives model parameters' );
+$filter_run      = $run_delegated_tool( 'delegated-filter-call', 'from-filter' );
+$filter_result   = $filter_run[0]['tool_execution_results'][0]['result'] ?? array();
+$filter_payload  = is_array( $filter_result['result'] ?? null ) ? $filter_result['result'] : array();
+$filter_executor = $filter_run[1];
+$assert( true === ( $filter_result['success'] ?? null ), 'filter result succeeds through the integrated mediator path' );
+$assert( 'client' === ( $filter_payload['executor'] ?? null ), 'filter result is normalized as client-executed' );
+$assert( true === ( $filter_payload['filtered'] ?? null ), 'filter payload is preserved' );
+$assert( 'from-filter' === ( $filter_payload['value'] ?? null ), 'filter receives model parameters' );
+$assert( 0 === $filter_executor->calls, 'filter fulfillment bypasses the PHP executor' );
+$assert( 2 === $filter_run[2], 'filter fulfillment continues to the next provider turn' );
+$assert( 'Delegated action complete.' === ( $filter_run[0]['final_content'] ?? null ), 'filter fulfillment preserves continuation content' );
+$assert( array( 'tool_call', 'tool_result' ) === array_column( $filter_run[0]['tool_events'] ?? array(), 'type' ), 'filter fulfillment preserves canonical tool events' );
 
-$callback_executor = datamachine_build_loop_tool_executor(
-	$delegated_tools,
+$callback_run = $run_delegated_tool(
+	'delegated-callback-call',
+	'from-callback',
 	array(
 		'client_context' => array(
 			'runtime_tool_callback' => static function ( array $request ): array {
@@ -138,28 +200,19 @@ $callback_executor = datamachine_build_loop_tool_executor(
 				);
 			},
 		),
-	),
-	'chat',
-	array( 'chat' ),
-	$sink,
-	array()
+	)
 );
-$callback_result   = $callback_executor->executeWP_Agent_Tool_Call(
-	array(
-		'tool_name'  => 'delegated_action',
-		'id'         => 'delegated-callback-call',
-		'parameters' => array( 'value' => 'from-callback' ),
-	),
-	$delegated_tool,
-	array( 'turn' => 2 )
-);
-$assert( true === ( $callback_result['success'] ?? null ), 'runtime_tool_callback result succeeds through delegated executor fallback' );
-$assert( 'client' === ( $callback_result['executor'] ?? null ), 'runtime_tool_callback result is normalized as client-executed' );
-$assert( true === ( $callback_result['callback'] ?? null ), 'runtime_tool_callback payload is preserved' );
-$assert( 'from-callback' === ( $callback_result['value'] ?? null ), 'runtime_tool_callback receives model parameters' );
+$callback_result = $callback_run[0]['tool_execution_results'][0]['result'] ?? array();
+$callback_payload = is_array( $callback_result['result'] ?? null ) ? $callback_result['result'] : array();
+$assert( true === ( $callback_result['success'] ?? null ), 'runtime_tool_callback result succeeds through the integrated mediator path' );
+$assert( 'client' === ( $callback_payload['executor'] ?? null ), 'runtime_tool_callback result is normalized as client-executed' );
+$assert( true === ( $callback_payload['callback'] ?? null ), 'runtime_tool_callback payload is preserved' );
+$assert( 'from-callback' === ( $callback_payload['value'] ?? null ), 'runtime_tool_callback receives model parameters' );
+$assert( 0 === $callback_run[1]->calls, 'runtime_tool_callback fulfillment bypasses the PHP executor' );
 
-$preseed_executor = datamachine_build_loop_tool_executor(
-	$delegated_tools,
+$preseed_run = $run_delegated_tool(
+	'delegated-preseed-call',
+	'ignored',
 	array(
 		'client_context' => array(
 			'runtime_tool_results' => array(
@@ -169,27 +222,17 @@ $preseed_executor = datamachine_build_loop_tool_executor(
 				),
 			),
 		),
-	),
-	'chat',
-	array( 'chat' ),
-	$sink,
-	array()
+	)
 );
-$preseed_result   = $preseed_executor->executeWP_Agent_Tool_Call(
-	array(
-		'tool_name'  => 'delegated_action',
-		'id'         => 'delegated-preseed-call',
-		'parameters' => array( 'value' => 'ignored' ),
-	),
-	$delegated_tool,
-	array( 'turn' => 3 )
-);
-$assert( true === ( $preseed_result['success'] ?? null ), 'runtime_tool_results pre-seeded result succeeds through delegated executor fallback' );
-$assert( 'client' === ( $preseed_result['executor'] ?? null ), 'runtime_tool_results result is normalized as client-executed' );
-$assert( true === ( $preseed_result['preseeded'] ?? null ), 'runtime_tool_results payload is preserved' );
-$assert( 'from-preseed' === ( $preseed_result['value'] ?? null ), 'runtime_tool_results result is selected by call id' );
-$assert( str_contains( wp_json_encode( $sink->events ), 'runtime_tool_call' ), 'delegated executor fallback emits runtime_tool_call events' );
-$assert( str_contains( wp_json_encode( $sink->events ), 'runtime_tool_result' ), 'delegated executor fallback emits runtime_tool_result events' );
+$preseed_result = $preseed_run[0]['tool_execution_results'][0]['result'] ?? array();
+$preseed_payload = is_array( $preseed_result['result'] ?? null ) ? $preseed_result['result'] : array();
+$assert( true === ( $preseed_result['success'] ?? null ), 'runtime_tool_results pre-seeded result succeeds through the integrated mediator path' );
+$assert( 'client' === ( $preseed_payload['executor'] ?? null ), 'runtime_tool_results result is normalized as client-executed' );
+$assert( true === ( $preseed_payload['preseeded'] ?? null ), 'runtime_tool_results payload is preserved' );
+$assert( 'from-preseed' === ( $preseed_payload['value'] ?? null ), 'runtime_tool_results result is selected by call id' );
+$assert( 0 === $preseed_run[1]->calls, 'runtime_tool_results fulfillment bypasses the PHP executor' );
+$assert( str_contains( wp_json_encode( $sink->events ), 'runtime_tool_call' ), 'integrated mediator emits runtime_tool_call events' );
+$assert( str_contains( wp_json_encode( $sink->events ), 'runtime_tool_result' ), 'integrated mediator emits runtime_tool_result events' );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " delegated runtime tool assertions failed.\n";

@@ -140,9 +140,10 @@ namespace DataMachine\Engine\AI {
 namespace {
 	use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request;
 	use AgentsAPI\AI\WP_Agent_Runtime_Tool_Result;
+	use AgentsAPI\AI\WP_Agent_Runtime_Tool_Lifecycle;
 	use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 	use DataMachine\Core\Database\Jobs\Jobs;
-	use function DataMachine\Engine\AI\datamachine_defer_runtime_tool_call;
+	use function DataMachine\Engine\AI\datamachine_prepare_runtime_tool_pending_result;
 	use function DataMachine\Engine\AI\datamachine_prepare_runtime_tool_request;
 	use function DataMachine\Engine\AI\datamachine_runtime_tool_request_store;
 	use function DataMachine\Engine\AI\datamachine_resume_runtime_tool_request;
@@ -224,6 +225,20 @@ namespace {
 	require __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';
 	require __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
 
+	function prepare_and_persist_runtime_tool_request( array $request, array $payload ): array|WP_Error {
+		$pending = datamachine_prepare_runtime_tool_pending_result( $request, $payload );
+		if ( $pending instanceof WP_Error ) {
+			return $pending;
+		}
+
+		$pending['runtime_tool_request'] = WP_Agent_Runtime_Tool_Lifecycle::create_pending_request(
+			datamachine_runtime_tool_request_store(),
+			$pending['runtime_tool_request'],
+			array( 'payload' => $payload )
+		);
+		return $pending;
+	}
+
 	$failures = array();
 	$passes   = 0;
 
@@ -244,7 +259,7 @@ namespace {
 	$chat_db->sessions['session-1']       = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 	$chat_db->sessions['session-timeout'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 
-	$pending = datamachine_defer_runtime_tool_call(
+	$pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/select_block',
 			'call_id'    => 'call-1',
@@ -298,7 +313,7 @@ namespace {
 	$assert( array( 'owner_tool' ) === ( $delegated_resume['tools'] ?? null ), 'delegated caller-scoped tools remain visible after async resume' );
 	$assert( 52 === ( Jobs::$engine_data[1]['runtime_tool_run_state']['resume_payload']['calling_user_id'] ?? null ), 'runtime run-state records the delegated caller in its resume payload' );
 
-	$timeout_pending = datamachine_defer_runtime_tool_call(
+	$timeout_pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/confirm',
 			'call_id'    => 'call-timeout',
@@ -315,7 +330,7 @@ namespace {
 	$assert( 'failed' === ( Jobs::$jobs[2]['status'] ?? '' ), 'timeout fails the Data Machine job' );
 
 	$chat_db->sessions['session-system'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
-	$system_pending = datamachine_defer_runtime_tool_call(
+	$system_pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/select_block',
 			'call_id'    => 'call-system',
@@ -414,7 +429,7 @@ namespace {
 	$assert( array() === datamachine_runtime_tool_request_store()->recent_pending(), 'store adapter implements the Agents API recent-pending contract' );
 
 	$chat_db->sessions['session-client-output'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
-	$client_pending = datamachine_defer_runtime_tool_call(
+	$client_pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/packet_handler',
 			'call_id'    => 'call-client-output',
