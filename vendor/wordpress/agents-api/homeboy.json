@@ -1,0 +1,17 @@
+{
+  "auto_cleanup": false,
+  "changelog_target": "CHANGELOG.md",
+  "extensions": {
+    "wordpress": {
+      "php": "8.1"
+    }
+  },
+  "id": "agents-api",
+  "remote_path": "../wp-content/plugins/agents-api",
+  "version_targets": [
+    {
+      "file": "agents-api.php",
+      "pattern": "Version:\\s*([0-9.]+)"
+    }
+  ]
+}

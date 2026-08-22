@@ -1,0 +1,413 @@
+<?php
+/**
+ * Generic option-backed lease store.
+ *
+ * @package DataMachine\Core
+ */
+
+namespace DataMachine\Core;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Coordinates tokened option-row leases with TTL cleanup.
+ */
+class OptionLeaseStore {
+
+	/**
+	 * Acquire one option-row lease.
+	 *
+	 * @param string              $option_name               Option name.
+	 * @param array<string,mixed> $payload Lease payload. Must include token and expires_at.
+	 * @param int                 $ttl                       Stale fallback TTL in seconds.
+	 * @param int|null            $now                       Current timestamp.
+	 * @param callable|null       $is_stale                  Optional extra stale predicate.
+	 * @param bool                $replace_stale_with_update Retained for compatibility; stale replacement is always atomic.
+	 * @return array{acquired:bool,status:string,payload:array<string,mixed>,option_name:string}
+	 */
+	public static function acquire(
+		string $option_name,
+		array $payload,
+		int $ttl,
+		?int $now = null,
+		?callable $is_stale = null,
+		bool $replace_stale_with_update = false
+	): array {
+		$now      = $now ?? time();
+		$existing = self::snapshot( $option_name, $ttl, $now, $is_stale );
+		// Stale takeover no longer has a non-atomic mode; retain the argument for named-call compatibility.
+		unset( $replace_stale_with_update );
+
+		if ( 'held' === $existing['status'] ) {
+			return array(
+				'acquired'    => false,
+				'status'      => 'held',
+				'payload'     => $existing['payload'],
+				'option_name' => $option_name,
+			);
+		}
+
+		if ( 'stale' === $existing['status'] && self::replaceStale( $option_name, $existing['payload'], $payload ) ) {
+			return array(
+				'acquired'    => true,
+				'status'      => 'held',
+				'payload'     => $payload,
+				'option_name' => $option_name,
+			);
+		}
+
+		if ( self::insertUnlocked( $option_name, $payload ) ) {
+			return array(
+				'acquired'    => true,
+				'status'      => 'held',
+				'payload'     => $payload,
+				'option_name' => $option_name,
+			);
+		}
+
+		$current = self::snapshot( $option_name, $ttl, $now, $is_stale );
+
+		return array(
+			'acquired'    => false,
+			'status'      => $current['status'],
+			'payload'     => $current['payload'],
+			'option_name' => $option_name,
+		);
+	}
+
+	/**
+	 * Atomically insert a lease only while its option row is absent.
+	 *
+	 * @param array<string,mixed> $payload Lease payload.
+	 */
+	private static function insertUnlocked( string $option_name, array $payload ): bool {
+		global $wpdb;
+		if ( isset( $wpdb->options ) && method_exists( $wpdb, 'query' ) && method_exists( $wpdb, 'prepare' ) ) {
+			$previous_suppression = method_exists( $wpdb, 'suppress_errors' ) ? $wpdb->suppress_errors( true ) : null;
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- A plain insert and the option-name unique key are the missing-row fencing primitive.
+			$inserted = $wpdb->query(
+				$wpdb->prepare(
+					'INSERT INTO %i (option_name, option_value, autoload) VALUES (%s, %s, %s)',
+					$wpdb->options,
+					$option_name,
+					maybe_serialize( $payload ),
+					'off'
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+			if ( null !== $previous_suppression ) {
+				$wpdb->suppress_errors( $previous_suppression );
+			}
+
+			// Both sessions may have cached the missing row before the unique-key race resolves.
+			wp_cache_delete( $option_name, 'options' );
+			wp_cache_delete( 'notoptions', 'options' );
+			wp_cache_delete( 'alloptions', 'options' );
+
+			return 1 === $inserted;
+		}
+
+		// Lightweight test runtimes may not provide wpdb.
+		return add_option( $option_name, $payload, '', false );
+	}
+
+	/**
+	 * Atomically replace one exact stale lease payload.
+	 *
+	 * @param array<string,mixed> $stale_payload Exact stale payload observed by the caller.
+	 * @param array<string,mixed> $replacement   New lease payload.
+	 */
+	private static function replaceStale( string $option_name, array $stale_payload, array $replacement ): bool {
+		global $wpdb;
+		if ( isset( $wpdb->options ) && method_exists( $wpdb, 'query' ) && method_exists( $wpdb, 'prepare' ) ) {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Exact-value CAS is the stale takeover fencing primitive.
+			$updated = $wpdb->query(
+				$wpdb->prepare(
+					'UPDATE %i SET option_value = %s WHERE option_name = %s AND option_value = %s',
+					$wpdb->options,
+					maybe_serialize( $replacement ),
+					$option_name,
+					maybe_serialize( $stale_payload )
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+
+			if ( 1 !== $updated ) {
+				return false;
+			}
+
+			wp_cache_delete( $option_name, 'options' );
+			return true;
+		}
+
+		// Lightweight test runtimes may not provide wpdb; preserve exact-value semantics as closely as possible.
+		if ( get_option( $option_name, null ) !== $stale_payload || ! update_option( $option_name, $replacement, false ) ) {
+			return false;
+		}
+
+		return get_option( $option_name, null ) === $replacement;
+	}
+
+	/**
+	 * Acquire the first available numbered slot in a scope.
+	 *
+	 * @param string              $prefix  Option-name prefix.
+	 * @param string              $scope   Lease scope.
+	 * @param int                 $limit   Maximum slots in scope.
+	 * @param array<string,mixed> $payload Lease payload.
+	 * @param int                 $ttl     Stale fallback TTL in seconds.
+	 * @param int|null            $now     Current timestamp.
+	 * @param callable|null       $is_stale Optional extra stale predicate.
+	 * @return array{acquired:bool,limit:int,active:int,option_name?:string}
+	 */
+	public static function acquireSlot(
+		string $prefix,
+		string $scope,
+		int $limit,
+		array $payload,
+		int $ttl,
+		?int $now = null,
+		?callable $is_stale = null
+	): array {
+		$active = 0;
+		$now    = $now ?? time();
+
+		for ( $slot = 1; $slot <= $limit; ++$slot ) {
+			$option_name = self::slotOptionName( $prefix, $scope, $slot );
+			$result      = self::acquire( $option_name, $payload, $ttl, $now, $is_stale );
+
+			if ( $result['acquired'] ) {
+				return array(
+					'acquired'    => true,
+					'limit'       => $limit,
+					'active'      => $active + 1,
+					'option_name' => $option_name,
+				);
+			}
+
+			if ( 'held' === $result['status'] ) {
+				++$active;
+			}
+		}
+
+		return array(
+			'acquired' => false,
+			'limit'    => $limit,
+			'active'   => $active,
+		);
+	}
+
+	/**
+	 * Return a read-only lease snapshot.
+	 *
+	 * @param string        $option_name Option name.
+	 * @param int           $ttl         Stale fallback TTL in seconds.
+	 * @param int|null      $now         Current timestamp.
+	 * @param callable|null $is_stale    Optional extra stale predicate.
+	 * @return array{status:string,payload:array<string,mixed>,option_name:string}
+	 */
+	public static function snapshot(
+		string $option_name,
+		int $ttl,
+		?int $now = null,
+		?callable $is_stale = null
+	): array {
+		$now     = $now ?? time();
+		$payload = get_option( $option_name, array() );
+
+		if ( ! is_array( $payload ) || empty( $payload ) ) {
+			return array(
+				'status'      => 'unlocked',
+				'payload'     => array(),
+				'option_name' => $option_name,
+			);
+		}
+
+		$status = self::isStale( $payload, $ttl, $now, $is_stale ) ? 'stale' : 'held';
+
+		return array(
+			'status'      => $status,
+			'payload'     => $payload,
+			'option_name' => $option_name,
+		);
+	}
+
+	/**
+	 * Delete a lease only when the token still owns it.
+	 */
+	public static function release( string $option_name, string $token ): void {
+		if ( '' === $token ) {
+			return;
+		}
+
+		$payload = get_option( $option_name, array() );
+		if ( is_array( $payload ) && hash_equals( (string) ( $payload['token'] ?? '' ), $token ) ) {
+			delete_option( $option_name );
+		}
+	}
+
+	/**
+	 * Atomically extend a lease only while the caller still owns its token.
+	 *
+	 * @param string   $option_name Option name.
+	 * @param string   $token       Current owner token.
+	 * @param int      $ttl         Extension in seconds.
+	 * @param int|null $now         Current timestamp.
+	 */
+	public static function refresh( string $option_name, string $token, int $ttl, ?int $now = null ): bool {
+		return false !== self::refreshOwned( $option_name, $token, $ttl, $now );
+	}
+
+	/**
+	 * Atomically extend and return the exact refreshed owner payload.
+	 *
+	 * @return array<string,mixed>|false Refreshed payload, or false after ownership loss.
+	 */
+	public static function refreshOwned( string $option_name, string $token, int $ttl, ?int $now = null ) {
+		if ( '' === $token ) {
+			return false;
+		}
+
+		$current = get_option( $option_name, array() );
+		if ( ! is_array( $current ) || ! hash_equals( (string) ( $current['token'] ?? '' ), $token ) ) {
+			return false;
+		}
+		$now = $now ?? time();
+		if ( (int) ( $current['expires_at'] ?? 0 ) <= $now ) {
+			return false;
+		}
+
+		$replacement               = $current;
+		$replacement['expires_at'] = max(
+			(int) ( $current['expires_at'] ?? 0 ) + 1,
+			$now + max( 1, $ttl )
+		);
+
+		global $wpdb;
+		if ( isset( $wpdb->options ) && method_exists( $wpdb, 'query' ) && method_exists( $wpdb, 'prepare' ) ) {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Conditional update is the fencing primitive.
+			$updated = $wpdb->query(
+				$wpdb->prepare(
+					'UPDATE %i SET option_value = %s WHERE option_name = %s AND option_value = %s',
+					$wpdb->options,
+					maybe_serialize( $replacement ),
+					$option_name,
+					maybe_serialize( $current )
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+
+			if ( 1 !== $updated ) {
+				return false;
+			}
+
+			wp_cache_delete( $option_name, 'options' );
+			return $replacement;
+		}
+
+		// Lightweight test runtimes may not provide wpdb; retain token verification.
+		if ( ! update_option( $option_name, $replacement, false ) ) {
+			return false;
+		}
+		$stored = get_option( $option_name, array() );
+		return is_array( $stored ) && hash_equals( $token, (string) ( $stored['token'] ?? '' ) )
+			? $replacement
+			: false;
+	}
+
+	/**
+	 * Compare-and-swap an option only while an exact, unexpired lease is stored.
+	 *
+	 * @param string              $option_name  Target option.
+	 * @param mixed               $expected     Exact target value expected.
+	 * @param mixed               $replacement  New target value.
+	 * @param string              $lease_name   Lease option.
+	 * @param array<string,mixed> $lease_payload Exact refreshed lease payload.
+	 * @param int|null            $now           Current timestamp.
+	 */
+	public static function compareAndSwapWhileOwned(
+		string $option_name,
+		$expected,
+		$replacement,
+		string $lease_name,
+		array $lease_payload,
+		?int $now = null
+	): bool {
+		$now = $now ?? time();
+		if ( (int) ( $lease_payload['expires_at'] ?? 0 ) <= $now ) {
+			return false;
+		}
+
+		global $wpdb;
+		if ( isset( $wpdb->options ) && method_exists( $wpdb, 'query' ) && method_exists( $wpdb, 'prepare' ) ) {
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Atomic target CAS is fenced by the exact lease row.
+			$updated = $wpdb->query(
+				$wpdb->prepare(
+					'UPDATE %i AS target INNER JOIN %i AS lease ON lease.option_name = %s AND lease.option_value = %s SET target.option_value = %s WHERE target.option_name = %s AND target.option_value = %s',
+					$wpdb->options,
+					$wpdb->options,
+					$lease_name,
+					maybe_serialize( $lease_payload ),
+					maybe_serialize( $replacement ),
+					$option_name,
+					maybe_serialize( $expected )
+				)
+			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+
+			if ( 1 !== $updated ) {
+				return false;
+			}
+
+			wp_cache_delete( $option_name, 'options' );
+			return true;
+		}
+
+		// Lightweight test fallback preserves both exact comparisons.
+		if ( get_option( $lease_name, null ) !== $lease_payload || get_option( $option_name, null ) !== $expected ) {
+			return false;
+		}
+		update_option( $option_name, $replacement, false );
+		return get_option( $lease_name, null ) === $lease_payload && get_option( $option_name, null ) === $replacement;
+	}
+
+	/**
+	 * Delete a stale lease when present.
+	 */
+	public static function cleanupStale(
+		string $option_name,
+		int $ttl,
+		?int $now = null,
+		?callable $is_stale = null
+	): bool {
+		$snapshot = self::snapshot( $option_name, $ttl, $now, $is_stale );
+		if ( 'stale' !== $snapshot['status'] ) {
+			return false;
+		}
+
+		return delete_option( $option_name );
+	}
+
+	/**
+	 * Build the option name for a numbered scope slot.
+	 */
+	public static function slotOptionName( string $prefix, string $scope, int $slot ): string {
+		return $prefix . md5( $scope ) . '_' . $slot;
+	}
+
+	/**
+	 * Determine whether a stored lease is stale.
+	 *
+	 * @param array<string,mixed> $payload Stored lease payload.
+	 */
+	private static function isStale( array $payload, int $ttl, int $now, ?callable $is_stale ): bool {
+		$started_at = (int) ( $payload['started_at'] ?? $payload['created_at'] ?? 0 );
+		$expires_at = (int) ( $payload['expires_at'] ?? ( $started_at + $ttl ) );
+
+		if ( $expires_at <= $now ) {
+			return true;
+		}
+
+		return null !== $is_stale && (bool) $is_stale( $payload, $now );
+	}
+}
