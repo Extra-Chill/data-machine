@@ -4,15 +4,15 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "370284267aa43f8613f9c0304be072de",
+    "content-hash": "c5a6d0a68e649d3643d26e66efea0cf8",
     "packages": [
         {
             "name": "automattic/blocks-engine-php-transformer",
-            "version": "0.1.0",
+            "version": "dev-trunk",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/blocks-engine.git",
-                "reference": "php-transformer-v0.1.0"
+                "reference": "d8842683cb7928a0ae1f56878de93cf0bc8b7343"
             },
             "require": {
                 "league/commonmark": "^2.5",
@@ -3433,7 +3433,8 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "wordpress/agents-api": 20
+        "wordpress/agents-api": 20,
+        "automattic/blocks-engine-php-transformer": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,

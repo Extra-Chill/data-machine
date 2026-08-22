@@ -132,6 +132,10 @@ $failure = ContentFormat::convert( 'FAIL', 'markdown', 'blocks' );
 assert_content_format_blocks_engine( 'blocks-engine-failure-becomes-wp-error', is_wp_error( $failure ) );
 assert_content_format_blocks_engine( 'blocks-engine-failure-code-preserved', is_wp_error( $failure ) && 'datamachine_content_format_fixture_failed' === $failure->get_error_code() );
 
+$rich_text_smoke_status = 0;
+passthru( escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( __DIR__ . '/blocks-engine-rich-text-attributes-smoke.php' ), $rich_text_smoke_status );
+assert_content_format_blocks_engine( 'rich-text-attributes-smoke-is-in-aggregated-content-format-suite', 0 === $rich_text_smoke_status );
+
 echo "\nContentFormat Blocks Engine smoke: {$total} assertions, {$failed} failures.\n";
 
 exit( min( 1, $failed ) );

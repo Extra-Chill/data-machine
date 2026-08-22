@@ -17,6 +17,7 @@ use DataMachine\Abilities\Content\GetPostBlocksAbility;
 use DataMachine\Abilities\Content\EditPostBlocksAbility;
 use DataMachine\Abilities\Content\ReplacePostBlocksAbility;
 use DataMachine\Core\AbilityResult;
+use DataMachine\Core\Content\SourceDerivedBlockAttributeRepair;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -255,5 +256,233 @@ class BlocksCommand extends BaseCommand {
 		if ( 'json' === ( $assoc_args['format'] ?? '' ) ) {
 			WP_CLI::log( wp_json_encode( $result['blocks_replaced'], JSON_PRETTY_PRINT ) );
 		}
+	}
+
+	/**
+	 * Inventory or repair the known malformed RichText content attributes.
+	 *
+	 * This is an operator-only maintenance command. On multisite, always pass the
+	 * intended site's `--url`; the command inspects only that site's posts.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--post_id=<id>]
+	 * : Inspect one post. By default all posts of the selected type are inspected.
+	 *
+	 * [--post_type=<type>]
+	 * : Comma-separated post types to inspect. Bulk apply requires this option.
+	 * Reusable `wp_block` records are inspected only when explicitly selected.
+	 * ---
+	 * default: page
+	 * ---
+	 *
+	 * [--post_status=<status>]
+	 * : Post status to inspect.
+	 * ---
+	 * default: any
+	 * ---
+	 *
+	 * [--limit=<number>]
+	 * : Maximum bulk posts per page. Default 100; maximum 500.
+	 *
+	 * [--paged=<number>]
+	 * : One-based bulk result page, ordered by ascending post ID.
+	 *
+	 * [--apply]
+	 * : Persist repairs. Without this flag the command is an inventory-only dry run.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp --url=https://example.com datamachine blocks repair-source-attributes --post_type=page
+	 *     wp --url=https://example.com datamachine blocks repair-source-attributes --post_id=123 --apply
+	 *
+	 * @subcommand repair-source-attributes
+	 */
+	public function repair_source_attributes( array $args, array $assoc_args ): void {
+		$apply  = isset( $assoc_args['apply'] );
+		$format = (string) ( $assoc_args['format'] ?? 'table' );
+		if ( ! in_array( $format, array( 'table', 'json', 'csv' ), true ) ) {
+			WP_CLI::error( '--format must be table, json, or csv.' );
+		}
+
+		$post_id = 0;
+		if ( array_key_exists( 'post_id', $assoc_args ) ) {
+			try {
+				$post_id = self::parsePositiveInteger( $assoc_args['post_id'], '--post_id' );
+			} catch ( \InvalidArgumentException $exception ) {
+				WP_CLI::error( $exception->getMessage() );
+			}
+		}
+
+		$limit = 1;
+		$paged = 1;
+		if ( $post_id > 0 ) {
+			if ( ! get_post( $post_id ) ) {
+				WP_CLI::error( sprintf( 'Post #%d does not exist on the selected site.', $post_id ) );
+			}
+			$post_ids = array( $post_id );
+			$post_types = array( get_post_type( $post_id ) );
+		} else {
+			try {
+				$limit = self::parsePositiveInteger( $assoc_args['limit'] ?? '100', '--limit', 500 );
+				$paged = self::parsePositiveInteger( $assoc_args['paged'] ?? '1', '--paged' );
+			} catch ( \InvalidArgumentException $exception ) {
+				WP_CLI::error( $exception->getMessage() );
+			}
+
+			$post_type_supplied = isset( $assoc_args['post_type'] ) && '' !== trim( (string) $assoc_args['post_type'] );
+			try {
+				$post_types = self::parsePostTypes( $assoc_args['post_type'] ?? 'page' );
+			} catch ( \InvalidArgumentException $exception ) {
+				WP_CLI::error( $exception->getMessage() );
+			}
+			if ( $apply && ( ! $post_type_supplied || in_array( 'any', $post_types, true ) ) ) {
+				WP_CLI::error( 'Bulk --apply requires an explicit --post_type that is not "any".' );
+			}
+
+			$query = new \WP_Query( self::bulkQueryArgs( $post_types, $assoc_args['post_status'] ?? 'any', $limit, $paged ) );
+			$post_ids = array_map( 'intval', $query->posts );
+		}
+
+		$repair = new SourceDerivedBlockAttributeRepair();
+		$findings = array();
+		foreach ( $post_ids as $candidate_id ) {
+			$post = get_post( $candidate_id );
+			if ( ! $post || ! is_string( $post->post_content ?? null ) || false === strpos( $post->post_content, '<!-- wp:' ) ) {
+				continue;
+			}
+
+			$result = $repair->processPost( (int) $candidate_id, $post->post_content, $apply );
+			foreach ( $result['findings'] as $finding ) {
+				$status = $finding['status'];
+				$reason = $finding['reason'];
+				if ( isset( $result['error_code'] ) && ( 'repairable' === $status || 'integrity_verification_failed' === $reason ) ) {
+					$status = 'error';
+					$reason = $result['error_code'];
+				} elseif ( $result['applied'] && 'repairable' === $status ) {
+					$status = 'removed';
+				} elseif ( 'repairable' === $status ) {
+					$status = 'would_remove';
+				}
+
+				$findings[] = array_merge(
+					$finding,
+					array(
+						'post_id' => (int) $candidate_id,
+						'status'  => $status,
+						'reason'  => $reason,
+					)
+				);
+			}
+		}
+
+		$summary = array(
+			'mode'            => $apply ? 'apply' : 'dry-run',
+			'site_url'        => home_url( '/' ),
+			'post_types'      => array_values( array_filter( $post_types ) ),
+			'limit'           => $limit,
+			'paged'           => $paged,
+			'posts_inspected' => count( $post_ids ),
+			'posts_with_findings' => count( array_unique( array_column( $findings, 'post_id' ) ) ),
+			'findings'        => count( $findings ),
+			'repairable'      => count( array_filter( $findings, static fn ( array $finding ): bool => in_array( $finding['status'], array( 'would_remove', 'removed' ), true ) ) ),
+			'skipped'         => count( array_filter( $findings, static fn ( array $finding ): bool => 'skipped' === $finding['status'] ) ),
+			'errors'          => count( array_filter( $findings, static fn ( array $finding ): bool => 'error' === $finding['status'] ) ),
+		);
+		$fields  = array( 'post_id', 'block_path', 'block_name', 'attribute', 'status', 'reason', 'value_type', 'value_bytes', 'value_sha256' );
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( (string) wp_json_encode( array( 'findings' => $findings, 'summary' => $summary ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		} else {
+			WP_CLI\Utils\format_items( $format, $findings, $fields );
+			if ( 'table' === $format ) {
+				WP_CLI::log( 'Summary: ' . (string) wp_json_encode( $summary, JSON_UNESCAPED_SLASHES ) );
+			}
+		}
+
+		if ( 0 !== self::applyExitCode( $apply, $summary ) ) {
+			if ( 'table' === $format ) {
+				WP_CLI::warning( 'One or more repairs failed; review error findings. Successful repairs remain committed.' );
+			}
+			WP_CLI::halt( 1 );
+		}
+	}
+
+	/**
+	 * Return a nonzero exit only when an apply run contains errors.
+	 *
+	 * @param bool  $apply Whether mutation was requested.
+	 * @param array $summary Output summary.
+	 */
+	private static function applyExitCode( bool $apply, array $summary ): int {
+		return $apply && 0 < (int) ( $summary['errors'] ?? 0 ) ? 1 : 0;
+	}
+
+	/**
+	 * Parse one positive canonical integer CLI value.
+	 *
+	 * @param mixed  $value Raw CLI value.
+	 * @param string $option Option name for errors.
+	 * @param int    $maximum Optional maximum.
+	 */
+	private static function parsePositiveInteger( $value, string $option, int $maximum = PHP_INT_MAX ): int {
+		$raw = is_string( $value ) || is_int( $value ) ? (string) $value : '';
+		if ( ! preg_match( '/^[1-9][0-9]*$/', $raw ) || (string) (int) $raw !== $raw || (int) $raw > $maximum ) {
+			throw new \InvalidArgumentException( sprintf( '%s must be a positive canonical integer%s.', $option, PHP_INT_MAX === $maximum ? '' : sprintf( ' no greater than %d', $maximum ) ) );
+		}
+
+		return (int) $raw;
+	}
+
+	/**
+	 * Parse selected post types without implicitly following reusable references.
+	 *
+	 * @param mixed $value Raw post type list.
+	 * @return string[]
+	 */
+	private static function parsePostTypes( $value ): array {
+		$types = array_values( array_unique( array_filter( array_map( 'sanitize_key', explode( ',', (string) $value ) ) ) ) );
+		if ( empty( $types ) ) {
+			throw new \InvalidArgumentException( '--post_type must contain at least one post type.' );
+		}
+
+		return $types;
+	}
+
+	/**
+	 * Build the bounded, cache-free bulk query.
+	 *
+	 * @param string[] $post_types Selected post types.
+	 * @param mixed    $post_status Raw post status.
+	 * @param int      $limit Page size.
+	 * @param int      $paged Result page.
+	 * @return array
+	 */
+	private static function bulkQueryArgs( array $post_types, $post_status, int $limit, int $paged ): array {
+		return array(
+			'post_type'              => 1 === count( $post_types ) ? $post_types[0] : $post_types,
+			'post_status'            => sanitize_key( (string) $post_status ) ?: 'any',
+			'fields'                 => 'ids',
+			'posts_per_page'         => $limit,
+			'paged'                  => $paged,
+			'orderby'                => 'ID',
+			'order'                  => 'ASC',
+			'no_found_rows'          => true,
+			'cache_results'          => false,
+			'update_post_meta_cache' => false,
+			'update_post_term_cache' => false,
+			'lazy_load_term_meta'    => false,
+			'suppress_filters'       => true,
+		);
 	}
 }
