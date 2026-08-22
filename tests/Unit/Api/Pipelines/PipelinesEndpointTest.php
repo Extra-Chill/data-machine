@@ -83,9 +83,15 @@ class PipelinesEndpointTest extends WP_UnitTestCase {
 		$this->assertIsArray( $ability_result );
 		$this->assertStringNotContainsString( 'public-boundary-api-key', $ability_result['data'] );
 		$this->assertStringNotContainsString( 'public-boundary-token', $ability_result['data'] );
-		$csv_rows          = str_getcsv( $ability_result['data'], "\n" );
-		$flow_row          = str_getcsv( $csv_rows[2] );
-		$exported_settings = json_decode( $flow_row[7], true );
+		$csv_rows = array_map( 'str_getcsv', str_getcsv( $ability_result['data'], "\n" ) );
+		$flow_row = current(
+			array_filter(
+				$csv_rows,
+				static fn( array $row ): bool => 'flow_step' === ( $row[1] ?? '' )
+			)
+		);
+		$this->assertIsArray( $flow_row );
+		$exported_settings = json_decode( $flow_row[9], true );
 		$this->assertSame( 'https://api.example.test', $exported_settings['handler_configs']['custom_api']['endpoint'] );
 
 		$request = new WP_REST_Request( 'GET', '/datamachine/v1/pipelines' );
