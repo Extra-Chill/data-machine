@@ -19,6 +19,7 @@ use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\Database\TransactionScope;
 use DataMachine\Core\Database\LifecycleStateTransition;
 use DataMachine\Core\Database\RunMetadata\RunMetadata;
+use DataMachine\Core\DataPacketStore;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
@@ -545,10 +546,10 @@ class Jobs extends BaseRepository {
 			'operation_generation'          => $new_generation,
 			'recovered_at'                  => gmdate( 'c' ),
 		);
-		$run_lifecycle                       = is_array( $engine['run_lifecycle'] ?? null ) ? $engine['run_lifecycle'] : array();
+		$run_lifecycle                       = is_array( $engine[ RunLifecycleStore::META_KEY ] ?? null ) ? $engine[ RunLifecycleStore::META_KEY ] : array();
 		$run_lifecycle['status']             = JobStatus::PENDING;
 		$run_lifecycle['updated_at']         = current_time( 'mysql', true );
-		$engine['run_lifecycle']             = $run_lifecycle;
+		$engine[ RunLifecycleStore::META_KEY ] = $run_lifecycle;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->update(
@@ -2379,6 +2380,205 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Claim one exact waiting webhook gate and hand off its next step atomically.
+	 *
+	 * The scheduler callback must insert through this repository's wpdb connection.
+	 * Its write, the durable input packet, and the receipt then share one transaction.
+	 *
+	 * @param array                    $data_packets Durable input for the resumed step.
+	 * @param callable(int,string):int $schedule Scheduler callback returning an action ID.
+	 * @return array{success:bool,owned:bool,already_resumed:bool,reason:string,job_id:int,next_flow_step_id:string,flow_step_id:string,action_id:int}
+	 */
+	public function claim_webhook_gate_resume( int $job_id, string $token, string $received_at, array $data_packets, callable $schedule ): array {
+		global $wpdb;
+
+		$result = array(
+			'success'           => false,
+			'owned'             => false,
+			'already_resumed'   => false,
+			'reason'            => 'invalid_claim',
+			'job_id'            => $job_id,
+			'next_flow_step_id' => '',
+			'flow_step_id'      => '',
+			'action_id'         => 0,
+		);
+		if ( $job_id <= 0 || 1 !== preg_match( '/^[a-f0-9]{64}$/', $token ) || '' === $received_at ) {
+			return $result;
+		}
+		if ( $wpdb !== $this->wpdb ) {
+			$result['reason'] = 'database_connection_mismatch';
+			return $result;
+		}
+		foreach ( $data_packets as $index => $packet ) {
+			if ( is_array( $packet ) && DataPacketStore::is_ref( $packet ) ) {
+				$packet = DataPacketStore::hydrate( $packet );
+				if ( null === $packet ) {
+					$result['reason'] = 'payload_persistence_failed';
+					return $result;
+				}
+				$data_packets[ $index ] = $packet;
+			}
+		}
+
+		$scope = TransactionScope::begin( $this->wpdb );
+		if ( null === $scope ) {
+			$result['reason'] = 'transaction_start_failed';
+			return $result;
+		}
+
+		$job = $this->get_job_for_update( $job_id );
+		if ( ! is_array( $job ) ) {
+			$scope->rollback();
+			$result['reason'] = 'job_not_found';
+			return $result;
+		}
+		if ( ! is_array( $job['engine_data'] ?? null ) ) {
+			$scope->rollback();
+			$result['reason'] = 'malformed_engine_data';
+			return $result;
+		}
+
+		$engine = $job['engine_data'];
+		$gate   = $engine['webhook_gate'] ?? null;
+		if ( ! is_array( $gate ) ) {
+			$scope->rollback();
+			$result['reason'] = 'gate_not_found';
+			return $result;
+		}
+		if ( ! is_string( $gate['token'] ?? null ) || ! hash_equals( $gate['token'], $token ) ) {
+			$scope->rollback();
+			$result['reason'] = 'token_mismatch';
+			return $result;
+		}
+
+		$result['next_flow_step_id'] = is_string( $gate['next_flow_step_id'] ?? null ) ? $gate['next_flow_step_id'] : '';
+		$result['flow_step_id']      = is_string( $gate['flow_step_id'] ?? null ) ? $gate['flow_step_id'] : '';
+		if ( '' === $result['next_flow_step_id'] ) {
+			$scope->rollback();
+			$result['reason'] = 'next_step_missing';
+			return $result;
+		}
+		if ( 'received' === (string) ( $gate['status'] ?? '' ) ) {
+			$scope->rollback();
+			$action_id = (int) ( $gate['action_id'] ?? 0 );
+			$packets   = $engine['step_input_packets'][ $result['next_flow_step_id'] ] ?? null;
+			if ( $action_id <= 0 || ! is_array( $packets ) || empty( $packets ) ) {
+				$result['reason'] = 'malformed_gate_receipt';
+				return $result;
+			}
+			$result['success']         = true;
+			$result['already_resumed'] = true;
+			$result['reason']          = 'already_resumed';
+			$result['action_id']       = $action_id;
+			return $result;
+		}
+		if ( JobStatus::WAITING !== (string) ( $job['status'] ?? '' ) || 'waiting' !== (string) ( $gate['status'] ?? '' ) ) {
+			$scope->rollback();
+			$result['reason'] = 'gate_not_waiting';
+			return $result;
+		}
+		if ( empty( $data_packets ) ) {
+			$scope->rollback();
+			$result['reason'] = 'payload_missing';
+			return $result;
+		}
+		$gate['status']      = 'received';
+		$gate['received_at'] = $received_at;
+		foreach ( $data_packets as &$packet ) {
+			if ( is_array( $packet ) ) {
+				$packet['metadata']                 = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+				$packet['metadata']['flow_step_id'] = $result['flow_step_id'];
+			}
+		}
+		unset( $packet );
+		$engine['step_input_packets'][ $result['next_flow_step_id'] ] = $data_packets;
+		$engine['webhook_gate']                                       = $gate;
+		unset( $engine['job_status'] );
+
+		if ( ! is_string( wp_json_encode( $engine ) ) ) {
+			$scope->rollback();
+			$result['reason'] = 'payload_persistence_failed';
+			return $result;
+		}
+
+		try {
+			$action_id = (int) $schedule( $job_id, $result['next_flow_step_id'] );
+		} catch ( \Throwable ) {
+			$scope->rollback();
+			$result['reason'] = 'scheduler_exception';
+			return $result;
+		}
+		if ( $action_id <= 0 ) {
+			$scope->rollback();
+			$result['reason'] = 'schedule_failed';
+			return $result;
+		}
+
+		$run_lifecycle                       = is_array( $engine['run_lifecycle'] ?? null ) ? $engine['run_lifecycle'] : array();
+		$run_lifecycle['run_id']             = (string) ( $run_lifecycle['run_id'] ?? 'job:' . $job_id );
+		$run_lifecycle['job_id']             = $job_id;
+		$run_lifecycle['attempt']            = max( 1, (int) ( $run_lifecycle['attempt'] ?? 1 ) );
+		$run_lifecycle['replay_events']      = is_array( $run_lifecycle['replay_events'] ?? null ) ? array_values( $run_lifecycle['replay_events'] ) : array();
+		$run_lifecycle['artifact_refs']      = is_array( $run_lifecycle['artifact_refs'] ?? null ) ? array_values( $run_lifecycle['artifact_refs'] ) : array();
+		$run_lifecycle['status']             = JobStatus::PROCESSING;
+		$run_lifecycle['updated_at']         = current_time( 'mysql', true );
+		$engine['run_lifecycle']             = $run_lifecycle;
+		$engine['webhook_gate']['action_id'] = $action_id;
+		if ( ! $this->store_engine_data_in_transaction( $job_id, $engine ) ) {
+			$scope->rollback();
+			$result['reason'] = 'lifecycle_persistence_failed';
+			return $result;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The locked jobs row is the ownership boundary.
+		$updated = $this->wpdb->update(
+			$this->table_name,
+			array( 'status' => JobStatus::PROCESSING ),
+			array(
+				'job_id' => $job_id,
+				'status' => JobStatus::WAITING,
+			),
+			array( '%s' ),
+			array( '%d', '%s' )
+		);
+		if ( 1 !== (int) $updated ) {
+			$scope->rollback();
+			$result['reason'] = 'status_persistence_failed';
+			return $result;
+		}
+
+		wp_cache_delete( $job_id, 'datamachine_engine_data' );
+		if ( ! $scope->commit() ) {
+			$scope->rollback();
+			$result['reason'] = 'transaction_commit_failed';
+			return $result;
+		}
+		$this->publish_committed_engine_data( $job_id, $engine );
+
+		$result['success']   = true;
+		$result['owned']     = true;
+		$result['reason']    = 'claimed';
+		$result['action_id'] = $action_id;
+		return $result;
+	}
+
+	/** Atomically terminalize one exact gate only while it remains waiting. */
+	public function timeout_webhook_gate( int $job_id, string $token ): array {
+		if ( $job_id <= 0 || 1 !== preg_match( '/^[a-f0-9]{64}$/', $token ) ) {
+			return $this->status_transition_result( false, false, null, JobStatus::FAILED );
+		}
+
+		return $this->transition_terminal_job_status_result(
+			$job_id,
+			JobStatus::failed( 'webhook_gate_timeout' )->toString(),
+			array(
+				'mode'  => 'webhook_gate_timeout',
+				'token' => $token,
+			)
+		);
+	}
+
+	/**
 	 * Commit a pathless-child terminal transition while its recovery lease owns the locked row.
 	 *
 	 * @return array{success:bool,changed:bool,current_status:?string,status:string}
@@ -2873,8 +3073,9 @@ class Jobs extends BaseRepository {
 		$update_data['engine_data'] = wp_json_encode( $engine );
 		$update_formats[] = '%s';
 		$owner_mode         = is_array( $recovery_owner ) ? (string) ( $recovery_owner['mode'] ?? '' ) : '';
-		$operation_recovery = 'operation' === $owner_mode;
-		$ai_deferral_recovery = 'ai_deferral' === $owner_mode;
+		$operation_recovery    = 'operation' === $owner_mode;
+		$ai_deferral_recovery  = 'ai_deferral' === $owner_mode;
+		$webhook_gate_timeout  = 'webhook_gate_timeout' === $owner_mode;
 		if ( $pending_direct_cancel || $operation_recovery ) {
 			$update_data['operation_state']       = 'cancelled';
 			$update_data['operation_claimed_at']  = null;
@@ -2917,7 +3118,12 @@ class Jobs extends BaseRepository {
 			unset( $engine['ai_concurrency_throttle'], $engine['ai_concurrency_resume_ownership'] );
 			$update_data['engine_data'] = wp_json_encode( $engine );
 		}
-		if ( is_array( $recovery_owner ) && ! $operation_recovery && ! $ai_deferral_recovery ) {
+		if ( $webhook_gate_timeout ) {
+			$engine['webhook_gate']['status']       = 'timed_out';
+			$engine['webhook_gate']['timed_out_at'] = gmdate( 'c' );
+			$update_data['engine_data']              = wp_json_encode( $engine );
+		}
+		if ( is_array( $recovery_owner ) && ! $operation_recovery && ! $ai_deferral_recovery && ! $webhook_gate_timeout ) {
 			$engine['scheduler_recovery']['state']        = 'terminalized';
 			$engine['scheduler_recovery']['completed_at'] = gmdate( 'c' );
 			$engine['scheduler_recovery']['receipt']      = array(
@@ -3258,6 +3464,14 @@ class Jobs extends BaseRepository {
 		}
 		if ( 'ai_deferral' === $mode ) {
 			return $this->expired_ai_deferral_owner_matches( $job, $owner );
+		}
+		if ( 'webhook_gate_timeout' === $mode ) {
+			$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+			$gate   = is_array( $engine['webhook_gate'] ?? null ) ? $engine['webhook_gate'] : array();
+			return JobStatus::WAITING === (string) ( $job['status'] ?? '' )
+				&& 'waiting' === (string) ( $gate['status'] ?? '' )
+				&& '' !== $token
+				&& hash_equals( $token, (string) ( $gate['token'] ?? '' ) );
 		}
 		if ( 'execution' !== $mode ) {
 			return $this->recovery_owner_matches( $job, $token, $generation );

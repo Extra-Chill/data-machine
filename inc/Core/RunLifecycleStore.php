@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
  */
 class RunLifecycleStore {
 
-	private const META_KEY = 'run_lifecycle';
+	public const META_KEY = 'run_lifecycle';
 
 	private Jobs $jobs;
 
