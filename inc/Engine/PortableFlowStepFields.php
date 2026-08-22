@@ -48,6 +48,12 @@ final class PortableFlowStepFields {
 			$normalized['queue_mode'] = $source['queue_mode'];
 		}
 
+		foreach ( array( 'completion_assertions', 'tool_runtime_rules', 'enabled' ) as $field ) {
+			if ( array_key_exists( $field, $source ) ) {
+				$normalized[ $field ] = self::normalize_field( $field, $source[ $field ], $message_prefix );
+			}
+		}
+
 		return $normalized;
 	}
 

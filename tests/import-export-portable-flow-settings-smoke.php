@@ -84,7 +84,7 @@ $import_export = new ImportExport();
 $parse_csv = new ReflectionMethod( ImportExport::class, 'parse_csv_rows' );
 $canonical_rows = $parse_csv->invoke(
 	$import_export,
-	"pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n1,Example,0,fetch,{},,,{}"
+	"format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n1.0,pipeline_step,1,Example,0,fetch,{},,,"
 );
 assert_csv_equals( 1, count( $canonical_rows ), 'canonical 1.0 CSV header is accepted', $failures, $passes );
 
@@ -92,7 +92,7 @@ $old_header_rejected = false;
 try {
 	$parse_csv->invoke(
 		$import_export,
-		"pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,handler,settings\n1,Example,0,fetch,{},,,rss,{}"
+		"pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n1,Example,0,fetch,{},,,{}"
 	);
 } catch ( InvalidArgumentException $e ) {
 	$old_header_rejected = true;
@@ -152,15 +152,21 @@ $normalized = call_import_export_private(
 	$import_export,
 	'normalize_portable_flow_step_settings',
 	array(
-		'enabled_tools' => array( 'datamachine/read-github-file' ),
-		'queue_mode'    => 'static',
-		'prompt_queue'  => array( array( 'prompt' => 'Pinned prompt.' ) ),
+		'enabled_tools'        => array( 'datamachine/read-github-file' ),
+		'queue_mode'           => 'static',
+		'prompt_queue'         => array( array( 'prompt' => 'Pinned prompt.' ) ),
+		'completion_assertions' => array( 'required_tool_names' => array( 'publish_result' ) ),
+		'tool_runtime_rules'    => array( array( 'id' => 'publish-result', 'max_calls' => 1 ) ),
+		'enabled'               => false,
 	)
 );
 
 assert_csv_equals( array( 'datamachine/read-github-file' ), $normalized['enabled_tools'] ?? null, 'import normalization keeps enabled_tools', $failures, $passes );
 assert_csv_equals( array( array( 'prompt' => 'Pinned prompt.' ) ), $normalized['prompt_queue'] ?? null, 'import normalization keeps prompt_queue', $failures, $passes );
 assert_csv_equals( 'static', $normalized['queue_mode'] ?? null, 'import normalization keeps queue_mode', $failures, $passes );
+assert_csv_equals( array( 'required_tool_names' => array( 'publish_result' ) ), $normalized['completion_assertions'] ?? null, 'import normalization keeps completion_assertions', $failures, $passes );
+assert_csv_equals( array( array( 'id' => 'publish-result', 'max_calls' => 1 ) ), $normalized['tool_runtime_rules'] ?? null, 'import normalization keeps tool_runtime_rules', $failures, $passes );
+assert_csv_equals( false, $normalized['enabled'] ?? null, 'import normalization keeps disabled step state', $failures, $passes );
 assert_csv_equals( false, array_key_exists( 'handler_slug', $normalized ), 'portable normalization does not duplicate handler fields', $failures, $passes );
 
 $normalized_patch = call_import_export_private(
@@ -200,6 +206,17 @@ try {
 	$threw = str_contains( $e->getMessage(), 'config_patch_queue entries must include an object patch' );
 }
 assert_csv_equals( true, $threw, 'malformed config_patch_queue fails clearly', $failures, $passes );
+
+$threw = false;
+try {
+	$parse_csv->invoke(
+		$import_export,
+		"format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n1.0,flow,1,Example,,,,42,Named Flow,{}"
+	);
+} catch ( InvalidArgumentException $e ) {
+	$threw = str_contains( $e->getMessage(), 'must contain an object scheduling_config' );
+}
+assert_csv_equals( true, $threw, 'flow metadata without scheduling_config fails clearly', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " portable flow settings assertions failed.\n";

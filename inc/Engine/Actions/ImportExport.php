@@ -11,6 +11,7 @@
 
 namespace DataMachine\Engine\Actions;
 
+use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\FlowStepConfigFactory;
 use DataMachine\Engine\PortableFlowStepFields;
@@ -22,13 +23,18 @@ if ( ! defined( 'WPINC' ) ) {
 
 class ImportExport {
 
+	private const CSV_FORMAT_VERSION = '1.0';
+	private const CSV_HEADER         = array( 'format_version', 'row_type', 'pipeline_id', 'pipeline_name', 'step_position', 'step_type', 'step_config', 'flow_id', 'flow_name', 'settings' );
+
 	/**
 	 * Import canonical pipeline CSV.
 	 *
-	 * Two-pass CSV import:
-	 *   Pass 1 — pipeline-structure rows (flow_id empty): create pipelines and add steps
+	 * Three-pass CSV import:
+	 *   Pass 1 — pipeline rows: create pipelines and add or reuse steps
 	 *            with their full step_config (#1133 step 1).
-	 *   Pass 2 — flow-step rows (flow_id present): ensure target flows exist, then write
+	 *   Pass 2 — flow metadata rows: create or update every named flow with its
+	 *            canonical scheduling configuration.
+	 *   Pass 3 — flow-step rows: write
 	 *            canonical handler fields into each flow_config entry keyed by the
 	 *            freshly-generated flow_step_id (#1133 step 2, #1293 shape cleanup).
 	 *
@@ -64,38 +70,37 @@ class ImportExport {
 
 		// Pass 1: pipelines + steps.
 		foreach ( $parsed_rows as $row ) {
-			if ( '' !== $row['flow_id'] ) {
-				continue;
-			}
-
 			$pipeline_name = $row['pipeline_name'];
 
 			if ( ! isset( $pipeline_ids_by_name[ $pipeline_name ] ) ) {
 				$pipeline_id = $this->ensure_pipeline( $pipeline_name );
 				if ( ! $pipeline_id ) {
-					continue;
+					return false;
 				}
 				$pipeline_ids_by_name[ $pipeline_name ] = $pipeline_id;
 				$imported_pipelines[]                   = $pipeline_id;
 			}
 
-			if ( ! $row['step_type'] ) {
+			if ( 'pipeline_step' !== $row['row_type'] ) {
 				continue;
 			}
 
-			$pipeline_step_id = $this->add_step_to_pipeline(
+			$pipeline_step_id = $this->ensure_pipeline_step(
 				$pipeline_ids_by_name[ $pipeline_name ],
+				$row['step_position'],
 				$row['step_type'],
 				$row['step_config']
 			);
 			if ( $pipeline_step_id ) {
 				$step_id_map[ $pipeline_name ][ $row['step_position'] ] = $pipeline_step_id;
+			} else {
+				return false;
 			}
 		}
 
-		// Pass 2: flows + handler configs.
+		// Pass 2: durable flow metadata.
 		foreach ( $parsed_rows as $row ) {
-			if ( '' === $row['flow_id'] ) {
+			if ( 'flow' !== $row['row_type'] ) {
 				continue;
 			}
 
@@ -106,42 +111,48 @@ class ImportExport {
 
 			$imported_pipeline_id = $pipeline_ids_by_name[ $pipeline_name ];
 			$source_flow_id       = $row['flow_id'];
-			$flow_name            = '' !== $row['flow_name'] ? $row['flow_name'] : 'Flow';
+			$flow_name            = $row['flow_name'];
 
+			$new_flow_id = $this->ensure_flow( $imported_pipeline_id, $flow_name, $row['metadata'] );
+			if ( ! $new_flow_id ) {
+				return false;
+			}
+			$flow_id_map[ $pipeline_name ][ $source_flow_id ] = $new_flow_id;
+		}
+
+		// Pass 3: flow-step settings.
+		foreach ( $parsed_rows as $row ) {
+			if ( 'flow_step' !== $row['row_type'] ) {
+				continue;
+			}
+
+			$pipeline_name  = $row['pipeline_name'];
+			$source_flow_id = $row['flow_id'];
 			if ( ! isset( $flow_id_map[ $pipeline_name ][ $source_flow_id ] ) ) {
-				$new_flow_id = $this->ensure_flow( $imported_pipeline_id, $flow_name );
-				if ( ! $new_flow_id ) {
-					continue;
-				}
-				$flow_id_map[ $pipeline_name ][ $source_flow_id ] = $new_flow_id;
+				return false;
 			}
 
 			$imported_flow_id = $flow_id_map[ $pipeline_name ][ $source_flow_id ];
 			$pipeline_step_id = $step_id_map[ $pipeline_name ][ $row['step_position'] ] ?? null;
 			if ( ! $pipeline_step_id ) {
-				continue;
+				return false;
 			}
 
 			$settings = $row['settings'];
 
 			try {
-				$this->restore_flow_step_config(
+				$restored = $this->restore_flow_step_config(
 					$imported_flow_id,
 					$pipeline_step_id,
 					$row['step_type'],
 					$settings
 				);
+				if ( ! $restored ) {
+					return false;
+				}
 			} catch ( \InvalidArgumentException $e ) {
 				do_action( 'datamachine_log', 'error', 'Import: malformed portable flow-step settings: ' . $e->getMessage() );
 				return false;
-			}
-		}
-
-		// Ensure every imported pipeline has at least one flow (fallback for exports with
-		// no flow rows — e.g. a pipeline containing only AI steps with no handlers).
-		foreach ( $pipeline_ids_by_name as $pipeline_name => $imported_pipeline_id ) {
-			if ( ! isset( $flow_id_map[ $pipeline_name ] ) ) {
-				$this->ensure_flow( $imported_pipeline_id, 'Default Flow' );
 			}
 		}
 
@@ -156,17 +167,17 @@ class ImportExport {
 	 *
 	 * @param string $data Raw CSV content.
 	 * @return array<int, array{
-	 *     pipeline_name:string, step_position:int, step_type:string, step_config:array,
-	 *     flow_id:string, flow_name:string, settings:array
+	 *     row_type:string, pipeline_name:string, step_position:int, step_type:string,
+	 *     step_config:array, flow_id:string, flow_name:string, settings:array, metadata:array
 	 * }>
 	 */
+	// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exceptions are logged, not rendered.
 	private function parse_csv_rows( string $data ): array {
-		$rows            = str_getcsv( $data, "\n" );
-		$parsed          = array();
-		$header          = isset( $rows[0] ) ? str_getcsv( $rows[0] ) : array();
-		$expected_header = array( 'pipeline_id', 'pipeline_name', 'step_position', 'step_type', 'step_config', 'flow_id', 'flow_name', 'settings' );
-		if ( $expected_header !== $header ) {
-			throw new \InvalidArgumentException( 'CSV header does not match the Data Machine 1.0 pipeline format.' );
+		$rows   = str_getcsv( $data, "\n" );
+		$parsed = array();
+		$header = isset( $rows[0] ) ? str_getcsv( $rows[0] ) : array();
+		if ( self::CSV_HEADER !== $header ) {
+			throw $this->csv_error( 'CSV header does not match the Data Machine 1.0 pipeline format.' );
 		}
 
 		foreach ( $rows as $index => $row ) {
@@ -175,41 +186,99 @@ class ImportExport {
 			}
 
 			$cols = str_getcsv( $row );
-			if ( count( $cols ) < 8 ) {
+			if ( 1 === count( $cols ) && '' === trim( (string) $cols[0] ) ) {
 				continue;
 			}
-
-			$step_config = json_decode( $cols[4], true );
-			if ( ! is_array( $step_config ) ) {
-				$step_config = array();
+			if ( count( $cols ) !== count( self::CSV_HEADER ) ) {
+				throw $this->csv_error( sprintf( 'CSV row %d must contain exactly %d columns.', $index + 1, count( self::CSV_HEADER ) ) );
+			}
+			if ( self::CSV_FORMAT_VERSION !== $cols[0] ) {
+				throw $this->csv_error( sprintf( 'CSV row %d uses unsupported format version %s.', $index + 1, (string) $cols[0] ) );
 			}
 
-			$settings_raw = $cols[7] ?? '';
-			$settings     = json_decode( $settings_raw, true );
-			if ( ! is_array( $settings ) ) {
-				$settings = array();
+			$row_type = (string) $cols[1];
+			if ( ! in_array( $row_type, array( 'pipeline_step', 'flow', 'flow_step' ), true ) ) {
+				throw $this->csv_error( sprintf( 'CSV row %d has invalid row_type.', $index + 1 ) );
+			}
+
+			$pipeline_name = (string) $cols[3];
+			if ( '' === trim( $pipeline_name ) ) {
+				throw $this->csv_error( sprintf( 'CSV row %d is missing pipeline_name.', $index + 1 ) );
+			}
+
+			$step_config = array();
+			if ( 'pipeline_step' === $row_type ) {
+				$step_config = json_decode( $cols[6], true );
+				if ( ! is_array( $step_config ) ) {
+					throw $this->csv_error( sprintf( 'CSV pipeline_step row %d has malformed step_config.', $index + 1 ) );
+				}
+				if ( '' === (string) $cols[5] ) {
+					throw $this->csv_error( sprintf( 'CSV pipeline_step row %d is missing step_type.', $index + 1 ) );
+				}
+			}
+
+			$settings = array();
+			if ( in_array( $row_type, array( 'flow', 'flow_step' ), true ) ) {
+				$settings = json_decode( $cols[9], true );
+				if ( ! is_array( $settings ) ) {
+					throw $this->csv_error( sprintf( 'CSV %s row %d has malformed settings.', $row_type, $index + 1 ) );
+				}
+				if ( '' === (string) $cols[7] ) {
+					throw $this->csv_error( sprintf( 'CSV %s row %d is missing flow_id.', $row_type, $index + 1 ) );
+				}
+				if ( 'flow_step' === $row_type && empty( $settings ) ) {
+					throw $this->csv_error( sprintf( 'CSV flow_step row %d must contain portable settings.', $index + 1 ) );
+				}
+			}
+
+			$metadata = array();
+			if ( 'flow' === $row_type ) {
+				if ( '' === trim( (string) $cols[8] ) ) {
+					throw $this->csv_error( sprintf( 'CSV flow row %d is missing flow_name.', $index + 1 ) );
+				}
+				if ( ! array_key_exists( 'scheduling_config', $settings ) || ! is_array( $settings['scheduling_config'] ) ) {
+					throw $this->csv_error( sprintf( 'CSV flow row %d must contain an object scheduling_config.', $index + 1 ) );
+				}
+				if ( empty( $settings['portable_slug'] ) || ! is_string( $settings['portable_slug'] ) ) {
+					throw $this->csv_error( sprintf( 'CSV flow row %d must contain a non-empty portable_slug.', $index + 1 ) );
+				}
+				$unsupported_metadata = array_diff( array_keys( $settings ), array( 'scheduling_config', 'portable_slug' ) );
+				if ( ! empty( $unsupported_metadata ) ) {
+					throw $this->csv_error( sprintf( 'CSV flow row %d contains unsupported metadata: %s.', $index + 1, implode( ', ', $unsupported_metadata ) ) );
+				}
+				$metadata = $settings;
 			}
 
 			$parsed[] = array(
-				'pipeline_name' => (string) $cols[1],
-				'step_position' => (int) $cols[2],
-				'step_type'     => (string) $cols[3],
+				'row_type'      => $row_type,
+				'pipeline_name' => $pipeline_name,
+				'step_position' => '' === $cols[4] ? -1 : (int) $cols[4],
+				'step_type'     => (string) $cols[5],
 				'step_config'   => $step_config,
-				'flow_id'       => (string) ( $cols[5] ?? '' ),
-				'flow_name'     => (string) ( $cols[6] ?? '' ),
+				'flow_id'       => (string) $cols[7],
+				'flow_name'     => (string) $cols[8],
 				'settings'      => $settings,
+				'metadata'      => $metadata,
 			);
 		}
 
 		return $parsed;
 	}
+	// phpcs:enable WordPress.Security.EscapeOutput.ExceptionNotEscaped
+
+	/**
+	 * Build a CSV validation exception whose text is logged, never rendered.
+	 */
+	private function csv_error( string $message ): \InvalidArgumentException {
+		// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is logged, not rendered.
+		return new \InvalidArgumentException( $message );
+	}
 
 	/**
 	 * Ensure a pipeline with the given name exists; return its id.
 	 *
-	 * Reuses any existing pipeline with a matching name. When a new pipeline is created we
-	 * deliberately skip auto-flow-creation (no flow_config) — flows are created in pass 2
-	 * from the CSV, with a final "Default Flow" fallback for exports that carry no flow rows.
+	 * Reuses any existing pipeline with a matching name. New pipelines deliberately skip
+	 * auto-flow-creation because durable flow metadata rows are authoritative in pass 2.
 	 */
 	private function ensure_pipeline( string $pipeline_name ): ?int {
 		$existing_id = $this->find_pipeline_by_name( $pipeline_name );
@@ -242,9 +311,33 @@ class ImportExport {
 	}
 
 	/**
-	 * Add a step to a pipeline with its full step_config; return the new pipeline_step_id.
+	 * Reuse the step already at this position or add it with its full step_config.
 	 */
-	private function add_step_to_pipeline( int $pipeline_id, string $step_type, array $step_config ): ?string {
+	private function ensure_pipeline_step( int $pipeline_id, int $position, string $step_type, array $step_config ): ?string {
+		$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
+		$pipeline     = $db_pipelines->get_pipeline( $pipeline_id );
+		$existing     = is_array( $pipeline['pipeline_config'] ?? null ) ? $pipeline['pipeline_config'] : array();
+		uasort(
+			$existing,
+			static fn( $a, $b ) => ( $a['execution_order'] ?? 0 ) <=> ( $b['execution_order'] ?? 0 )
+		);
+		$existing_step = array_values( $existing )[ $position ] ?? null;
+		if ( is_array( $existing_step ) ) {
+			if ( ( $existing_step['step_type'] ?? '' ) !== $step_type ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Import: existing pipeline step type does not match CSV',
+					array(
+						'pipeline_id'   => $pipeline_id,
+						'step_position' => $position,
+					)
+				);
+				return null;
+			}
+			return isset( $existing_step['pipeline_step_id'] ) ? (string) $existing_step['pipeline_step_id'] : null;
+		}
+
 		$ability = wp_get_ability( 'datamachine/add-pipeline-step' );
 		if ( ! $ability ) {
 			return null;
@@ -268,46 +361,79 @@ class ImportExport {
 	/**
 	 * Ensure a flow matching the given name exists on the pipeline; return its id.
 	 *
-	 * Reuses an existing flow by exact name match (case-sensitive) so repeated imports of
-	 * the same export don't spawn duplicate flows. Otherwise creates a new flow.
+	 * Reuses stable portable identity first. The name fallback claims only an unkeyed flow,
+	 * allowing one pre-format import to converge without collapsing duplicate names.
 	 */
-	private function ensure_flow( int $pipeline_id, string $flow_name ): ?int {
-		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
+	private function ensure_flow( int $pipeline_id, string $flow_name, array $metadata ): ?int {
+		$db_flows      = new \DataMachine\Core\Database\Flows\Flows();
+		$portable_slug = $metadata['portable_slug'];
+		$matched_flow  = $db_flows->get_by_portable_slug( $pipeline_id, $portable_slug );
+		$flow_id       = $matched_flow ? (int) $matched_flow['flow_id'] : null;
 
-		$existing = $db_flows->get_flows_for_pipeline( $pipeline_id );
-		foreach ( $existing as $flow ) {
-			if ( isset( $flow['flow_name'] ) && $flow['flow_name'] === $flow_name ) {
-				return (int) $flow['flow_id'];
+		if ( null === $flow_id ) {
+			$existing = $db_flows->get_flows_for_pipeline( $pipeline_id );
+			foreach ( $existing as $flow ) {
+				if ( empty( $flow['portable_slug'] ) && isset( $flow['flow_name'] ) && $flow['flow_name'] === $flow_name ) {
+					$flow_id = (int) $flow['flow_id'];
+					break;
+				}
 			}
 		}
 
-		$create_flow = wp_get_ability( 'datamachine/create-flow' );
-		if ( ! $create_flow ) {
-			do_action( 'datamachine_log', 'error', 'Import: create-flow ability not available' );
-			return null;
-		}
+		$scheduling_config = $metadata['scheduling_config'];
+		if ( null === $flow_id ) {
+			$create_flow = wp_get_ability( 'datamachine/create-flow' );
+			if ( ! $create_flow ) {
+				do_action( 'datamachine_log', 'error', 'Import: create-flow ability not available' );
+				return null;
+			}
 
-		$result = $create_flow->execute(
-			array(
-				'pipeline_id' => $pipeline_id,
-				'flow_name'   => $flow_name,
-			)
-		);
-
-		if ( is_wp_error( $result ) || empty( $result['success'] ) || empty( $result['flow_id'] ) ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Import: failed to create flow',
+			$result = $create_flow->execute(
 				array(
-					'pipeline_id' => $pipeline_id,
-					'flow_name'   => $flow_name,
+					'pipeline_id'       => $pipeline_id,
+					'flow_name'         => $flow_name,
+					'scheduling_config' => $scheduling_config,
 				)
 			);
+
+			if ( is_wp_error( $result ) || empty( $result['success'] ) || empty( $result['flow_id'] ) ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Import: failed to create flow',
+					array(
+						'pipeline_id' => $pipeline_id,
+						'flow_name'   => $flow_name,
+					)
+				);
+				return null;
+			}
+			$flow_id = (int) $result['flow_id'];
+		} else {
+			$update_flow = wp_get_ability( 'datamachine/update-flow' );
+			if ( ! $update_flow ) {
+				do_action( 'datamachine_log', 'error', 'Import: update-flow ability not available' );
+				return null;
+			}
+			$result = $update_flow->execute(
+				array(
+					'flow_id'           => $flow_id,
+					'flow_name'         => $flow_name,
+					'scheduling_config' => $scheduling_config,
+				)
+			);
+			if ( is_wp_error( $result ) || empty( $result['success'] ) ) {
+				do_action( 'datamachine_log', 'error', 'Import: failed to reconcile existing flow schedule', array( 'flow_id' => $flow_id ) );
+				return null;
+			}
+		}
+
+		if ( ! $db_flows->update_flow( $flow_id, array( 'portable_slug' => $portable_slug ) ) ) {
+			do_action( 'datamachine_log', 'error', 'Import: failed to restore flow portable_slug', array( 'flow_id' => $flow_id ) );
 			return null;
 		}
 
-		return (int) $result['flow_id'];
+		return $flow_id;
 	}
 
 	/**
@@ -362,8 +488,6 @@ class ImportExport {
 
 		$flow_config[ $flow_step_id ] = $step;
 
-		$flow_config[ $flow_step_id ]['enabled'] = true;
-
 		return (bool) $db_flows->update_flow(
 			$flow_id,
 			array( 'flow_config' => $flow_config )
@@ -391,7 +515,7 @@ class ImportExport {
 
 		// Build CSV using WordPress-compliant string approach
 		$csv_rows   = array();
-		$csv_rows[] = array( 'pipeline_id', 'pipeline_name', 'step_position', 'step_type', 'step_config', 'flow_id', 'flow_name', 'settings' );
+		$csv_rows[] = self::CSV_HEADER;
 
 		foreach ( $ids as $pipeline_id ) {
 			$pipeline = $db_pipelines->get_pipeline( $pipeline_id );
@@ -403,6 +527,37 @@ class ImportExport {
 			? ( json_decode( $pipeline['pipeline_config'], true ) ?? array() )
 			: ( $pipeline['pipeline_config'] ?? array() );
 			$flows           = $db_flows->get_flows_for_pipeline( $pipeline_id );
+			$used_flow_slugs = array();
+
+			foreach ( $flows as $flow ) {
+				$portable_slug = ! empty( $flow['portable_slug'] ) ? sanitize_title( (string) $flow['portable_slug'] ) : sanitize_title( (string) $flow['flow_name'] );
+				if ( '' === $portable_slug ) {
+					$portable_slug = 'flow';
+				}
+				$slug_base   = $portable_slug;
+				$slug_suffix = (int) $flow['flow_id'];
+				while ( in_array( $portable_slug, $used_flow_slugs, true ) ) {
+					$portable_slug = $slug_base . '-' . $slug_suffix;
+					++$slug_suffix;
+				}
+				$used_flow_slugs[] = $portable_slug;
+				$metadata          = array(
+					'scheduling_config' => $this->export_scheduling_config( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() ),
+					'portable_slug'     => $portable_slug,
+				);
+				$csv_rows[]        = array(
+					self::CSV_FORMAT_VERSION,
+					'flow',
+					$pipeline_id,
+					$pipeline['pipeline_name'],
+					'',
+					'',
+					'',
+					$flow['flow_id'],
+					$flow['flow_name'],
+					wp_json_encode( $metadata ),
+				);
+			}
 
 			$position = 0;
 			// Sort steps by execution_order for consistent export
@@ -419,12 +574,13 @@ class ImportExport {
 			foreach ( $sorted_steps as $step ) {
 				// Export pipeline structure
 				$csv_rows[] = array(
+					self::CSV_FORMAT_VERSION,
+					'pipeline_step',
 					$pipeline_id,
 					$pipeline['pipeline_name'],
 					$position++,
 					$step['step_type'] ?? '',
 					wp_json_encode( $step ),
-					'',
 					'',
 					'',
 					'',
@@ -443,6 +599,8 @@ class ImportExport {
 
 					if ( ! empty( $settings ) ) {
 						$csv_rows[] = array(
+							self::CSV_FORMAT_VERSION,
+							'flow_step',
 							$pipeline_id,
 							$pipeline['pipeline_name'],
 							$position - 1,
@@ -494,6 +652,13 @@ class ImportExport {
 	 */
 	private function normalize_portable_flow_step_settings( array $source ): array {
 		return PortableFlowStepFields::normalize_settings( $source );
+	}
+
+	/**
+	 * Remove scheduler-owned runtime observations from portable desired state.
+	 */
+	private function export_scheduling_config( array $scheduling_config ): array {
+		return FlowScheduling::portable_desired_config( $scheduling_config );
 	}
 
 	/**
