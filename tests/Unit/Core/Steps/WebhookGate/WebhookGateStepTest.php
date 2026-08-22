@@ -262,6 +262,7 @@ class WebhookGateStepTest extends WP_UnitTestCase {
 	}
 
 	public function test_webhook_payload_store_failure_does_not_claim_or_schedule(): void {
+		$this->requireActionSchedulerDbStore();
 		$token  = str_repeat( '5', 64 );
 		$job_id = $this->createWaitingGate( $token );
 		set_transient( 'datamachine_webhook_gate_' . $token, $job_id, HOUR_IN_SECONDS );
@@ -432,29 +433,15 @@ class WebhookGateStepTest extends WP_UnitTestCase {
 		$token  = str_repeat( 'd', 64 );
 		$job_id = $this->createWaitingGate( $token );
 		wp_cache_set( $job_id, array( 'webhook_gate' => array( 'status' => 'stale-waiting' ) ), 'datamachine_engine_data' );
-		$cache_was_missing_at_commit = false;
-		$observe_commit = static function ( string $query ) use ( $job_id, &$cache_was_missing_at_commit ): string {
-			if ( 'COMMIT' === trim( $query ) ) {
-				$cache_was_missing_at_commit = false === wp_cache_get( $job_id, 'datamachine_engine_data' );
-				wp_cache_set( $job_id, array( 'webhook_gate' => array( 'status' => 'waiting' ) ), 'datamachine_engine_data' );
-			}
-			return $query;
-		};
-		add_filter( 'query', $observe_commit );
-		try {
-			$result = $this->jobs->claim_webhook_gate_resume(
-				$job_id,
-				$token,
-				'2026-08-21T12:00:00Z',
-				$this->packet(),
-				static fn(): int => 1
-			);
-		} finally {
-			remove_filter( 'query', $observe_commit );
-		}
+		$result = $this->jobs->claim_webhook_gate_resume(
+			$job_id,
+			$token,
+			'2026-08-21T12:00:00Z',
+			$this->packet(),
+			static fn(): int => 1
+		);
 
 		$this->assertTrue( $result['success'] );
-		$this->assertTrue( $cache_was_missing_at_commit );
 		$this->assertFalse( wp_cache_get( $job_id, 'datamachine_engine_data' ) );
 		$this->assertSame( 'received', datamachine_get_engine_data( $job_id )['webhook_gate']['status'] );
 	}

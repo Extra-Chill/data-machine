@@ -121,7 +121,7 @@ namespace {
 				$this->last_error = 'forced update failure';
 				return false;
 			}
-			if ( $this->fail_lifecycle_update && isset( $data['engine_data'] ) && str_contains( (string) $data['engine_data'], 'run_lifecycle' ) ) {
+			if ( $this->fail_lifecycle_update && isset( $data['engine_data'] ) && str_contains( (string) $data['engine_data'], \DataMachine\Core\RunLifecycleStore::META_KEY ) ) {
 				$this->last_error = 'forced lifecycle update failure';
 				return false;
 			}
