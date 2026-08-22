@@ -2,7 +2,7 @@
 
 Issue: https://github.com/Extra-Chill/data-machine/issues/2303
 
-Data Machine skips the full runtime on normal frontend page views via `datamachine_should_load_full_runtime()`. Ability constructors inside `datamachine_run_datamachine_plugin()` therefore do not run on those lite requests unless the ability is explicitly hoisted to file-load registration.
+Data Machine skips the full runtime on normal frontend page views via `datamachine_should_load_full_runtime()`. Ability constructors inside `RuntimeServiceProvider::register()` therefore do not run on those lite requests unless the ability is explicitly hoisted to file-load registration.
 
 This audit records which gated abilities have proven frontend-lite consumers. Only proven reachable abilities should be hoisted; the rest stay gated until a concrete frontend-lite call site exists.
 

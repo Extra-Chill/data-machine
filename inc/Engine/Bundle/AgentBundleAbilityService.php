@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use WP_Agent_Package_Artifact_Hasher;
+
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Flows\Flows;
@@ -506,7 +508,7 @@ final class AgentBundleAbilityService {
 			$type      = (string) $entry['artifact_type'];
 			$slug_key  = (string) $entry['artifact_id'];
 			$record_id = (int) $entry['record_id'];
-			$hash      = AgentBundleArtifactHasher::hash( $entry['payload'] );
+			$hash      = WP_Agent_Package_Artifact_Hasher::hash( $entry['payload'] );
 
 			if ( ! empty( $entry['needs_backfill'] ) && $record_id > 0 ) {
 				if ( 'pipeline' === $type ) {
@@ -992,7 +994,7 @@ final class AgentBundleAbilityService {
 			$installed_value = array_key_exists( $key, $installed ) ? $installed[ $key ] : null;
 			$manifest_value  = array_key_exists( $key, $manifest ) ? $manifest[ $key ] : null;
 
-			if ( AgentBundleArtifactHasher::hash( $installed_value ) === AgentBundleArtifactHasher::hash( $manifest_value ) ) {
+			if ( WP_Agent_Package_Artifact_Hasher::hash( $installed_value ) === WP_Agent_Package_Artifact_Hasher::hash( $manifest_value ) ) {
 				continue;
 			}
 

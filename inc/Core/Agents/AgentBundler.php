@@ -19,14 +19,14 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Api\Flows\FlowScheduling;
-use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use WP_Agent_Package_Artifact_Hasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactPayloads;
 use DataMachine\Engine\Bundle\AgentBundleArtifactDefinitions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
 use DataMachine\Engine\Bundle\AgentBundleCompatibility;
-use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use WP_Agent_Package_Artifact_Status;
 use DataMachine\Engine\Bundle\AgentBundleMemoryArtifact;
 use DataMachine\Engine\Bundle\BundleStepIdRemapper;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
@@ -822,8 +822,8 @@ class AgentBundler {
 				|| ( ! is_array( $agent_config_record ) && ! empty( $current_config_payload ) )
 			);
 			$agent_config_target_differs    = ! hash_equals(
-				AgentBundleArtifactHasher::hash( $incoming_config_payload ),
-				AgentBundleArtifactHasher::hash( $current_config_payload )
+				WP_Agent_Package_Artifact_Hasher::hash( $incoming_config_payload ),
+				WP_Agent_Package_Artifact_Hasher::hash( $current_config_payload )
 			);
 
 			if ( $agent_config_has_local_changes && $agent_config_target_differs ) {
@@ -939,8 +939,8 @@ class AgentBundler {
 					$this->pipeline_artifact_payload( $existing_pipeline, $portable_slug )
 				)
 				&& ! hash_equals(
-					AgentBundleArtifactHasher::hash( $payload ),
-					AgentBundleArtifactHasher::hash( $this->pipeline_artifact_payload( $existing_pipeline, $portable_slug ) )
+					WP_Agent_Package_Artifact_Hasher::hash( $payload ),
+					WP_Agent_Package_Artifact_Hasher::hash( $this->pipeline_artifact_payload( $existing_pipeline, $portable_slug ) )
 				)
 				) {
 					$conflicts[]                = array(
@@ -1053,8 +1053,8 @@ class AgentBundler {
 					$this->normalized_existing_flow_payload( $existing_flow, $portable_slug, (int) $new_pipeline_id, is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null )
 				)
 				&& ! hash_equals(
-					AgentBundleArtifactHasher::hash( $payload ),
-					AgentBundleArtifactHasher::hash( $this->normalized_existing_flow_payload( $existing_flow, $portable_slug, (int) $new_pipeline_id, is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null ) )
+					WP_Agent_Package_Artifact_Hasher::hash( $payload ),
+					WP_Agent_Package_Artifact_Hasher::hash( $this->normalized_existing_flow_payload( $existing_flow, $portable_slug, (int) $new_pipeline_id, is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null ) )
 				)
 				) {
 					$conflicts[] = array(
@@ -1154,8 +1154,8 @@ class AgentBundler {
 						$record
 						&& $this->artifact_has_local_modifications( $record, $local_payload )
 						&& ! hash_equals(
-							AgentBundleArtifactHasher::hash( $artifact['payload'] ?? null ),
-							AgentBundleArtifactHasher::hash( $local_payload )
+							WP_Agent_Package_Artifact_Hasher::hash( $artifact['payload'] ?? null ),
+							WP_Agent_Package_Artifact_Hasher::hash( $local_payload )
 						)
 					) {
 						$conflicts[] = array(
@@ -1213,8 +1213,8 @@ class AgentBundler {
 						$record
 						&& $this->artifact_has_local_modifications( $record, $local_payload )
 						&& ! hash_equals(
-							AgentBundleArtifactHasher::hash( $artifact['payload'] ?? null ),
-							AgentBundleArtifactHasher::hash( $local_payload )
+							WP_Agent_Package_Artifact_Hasher::hash( $artifact['payload'] ?? null ),
+							WP_Agent_Package_Artifact_Hasher::hash( $local_payload )
 						)
 					) {
 						$conflicts[] = array(
@@ -2050,14 +2050,14 @@ class AgentBundler {
 			return false;
 		}
 
-		return AgentBundleArtifactStatus::MODIFIED === AgentBundleArtifactStatus::classify(
+		return WP_Agent_Package_Artifact_Status::MODIFIED === WP_Agent_Package_Artifact_Status::classify(
 			(string) $record['installed_hash'],
-			AgentBundleArtifactHasher::hash( $current_payload )
+			WP_Agent_Package_Artifact_Hasher::hash( $current_payload )
 		);
 	}
 
 	private function bundle_artifact_record( array $bundle_metadata, string $type, string $id, string $source_path, mixed $payload ): array {
-		$hash = AgentBundleArtifactHasher::hash( $payload );
+		$hash = WP_Agent_Package_Artifact_Hasher::hash( $payload );
 		$now  = gmdate( 'Y-m-d H:i:s' );
 
 		// installed_payload is the install-time snapshot. AgentBundleArtifactRebase
@@ -2075,7 +2075,7 @@ class AgentBundler {
 			'current_hash'      => $hash,
 			'installed_payload' => $payload,
 			'current_payload'   => $payload,
-			'status'            => AgentBundleArtifactStatus::CLEAN,
+			'status'            => WP_Agent_Package_Artifact_Status::CLEAN,
 			'installed_at'      => $now,
 			'updated_at'        => $now,
 		);

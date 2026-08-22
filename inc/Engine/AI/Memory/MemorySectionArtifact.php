@@ -7,8 +7,8 @@
 
 namespace DataMachine\Engine\AI\Memory;
 
-use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
-use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use WP_Agent_Package_Artifact_Hasher;
+use WP_Agent_Package_Artifact_Status;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\PortableSlug;
@@ -57,7 +57,7 @@ final class MemorySectionArtifact {
 		$this->source_path     = self::source_path( $data['source_path'] ?? '' );
 		$this->installed_hash  = self::optional_hash( $data['installed_hash'] ?? null );
 		$this->current_hash    = self::optional_hash( $data['current_hash'] ?? null );
-		$this->local_status    = AgentBundleArtifactStatus::classify( $this->installed_hash, $this->current_hash );
+		$this->local_status    = WP_Agent_Package_Artifact_Status::classify( $this->installed_hash, $this->current_hash );
 		$this->installed_at    = self::optional_string( $data['installed_at'] ?? '' );
 		$this->updated_at      = self::optional_string( $data['updated_at'] ?? '' );
 
@@ -67,7 +67,7 @@ final class MemorySectionArtifact {
 	}
 
 	public static function from_bundle_section( AgentBundleManifest $manifest, int $agent_id, string $section_heading, string $section_type, string $source_path, string $content, string $timestamp ): self {
-		$hash = AgentBundleArtifactHasher::hash( $content );
+		$hash = WP_Agent_Package_Artifact_Hasher::hash( $content );
 
 		return new self(
 			array(
@@ -92,7 +92,7 @@ final class MemorySectionArtifact {
 
 	public function with_current_content( ?string $content, string $updated_at ): self {
 		$data                 = $this->to_array();
-		$data['current_hash'] = null === $content ? null : AgentBundleArtifactHasher::hash( $content );
+		$data['current_hash'] = null === $content ? null : WP_Agent_Package_Artifact_Hasher::hash( $content );
 		$data['updated_at']   = $updated_at;
 		return new self( $data );
 	}
@@ -102,11 +102,11 @@ final class MemorySectionArtifact {
 	}
 
 	public function can_auto_update_from_bundle(): bool {
-		return $this->is_bundle_owned() && AgentBundleArtifactStatus::CLEAN === $this->local_status;
+		return $this->is_bundle_owned() && WP_Agent_Package_Artifact_Status::CLEAN === $this->local_status;
 	}
 
 	public function should_stage_bundle_update(): bool {
-		return $this->is_bundle_owned() && AgentBundleArtifactStatus::MODIFIED === $this->local_status;
+		return $this->is_bundle_owned() && WP_Agent_Package_Artifact_Status::MODIFIED === $this->local_status;
 	}
 
 	public function local_status(): string {

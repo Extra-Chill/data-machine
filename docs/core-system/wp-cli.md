@@ -1,6 +1,6 @@
 # WP-CLI Commands
 
-Data Machine provides a broad WP-CLI surface for managing pipelines, flows, jobs, agents, memory, system tasks, and more from the command line. Canonical commands are registered under the `datamachine` namespace via `inc/Cli/Bootstrap.php`; use `wp help datamachine` for the authoritative list in a running install.
+Data Machine provides a broad WP-CLI surface for managing pipelines, flows, jobs, agents, memory, system tasks, and more from the command line. Canonical commands are registered under the `datamachine` namespace by `Core\Bootstrap\CliServiceProvider`; use `wp help datamachine` for the authoritative list in a running install.
 
 Commands use the canonical plural roots documented below. Data Machine does not register singular root aliases.
 

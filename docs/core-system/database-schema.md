@@ -1,6 +1,6 @@
 # Database Schema
 
-Data Machine persists workflow definitions, execution state, access control, source tracking, artifacts, chat, approvals, and logs in custom tables. The authoritative installation path is `datamachine_ensure_all_tables()` in `data-machine.php`; table names and columns are authoritative in each repository's `TABLE_NAME` and `create_table()` implementation.
+Data Machine persists workflow definitions, execution state, access control, source tracking, artifacts, chat, approvals, and logs in custom tables. The authoritative installation path is `ActivationServiceProvider::ensure_all_tables()`; table names and columns are authoritative in each repository's `TABLE_NAME` and `create_table()` implementation.
 
 The current install path creates 17 named tables. Agent identity tables use `$wpdb->base_prefix`; workflow tables generally use the current site's `$wpdb->prefix`; the chat repository is network-aware.
 

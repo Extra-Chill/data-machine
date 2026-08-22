@@ -15,9 +15,9 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
-use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use WP_Agent_Package_Artifact_Hasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
-use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use WP_Agent_Package_Artifact_Status;
 use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleLifecycleProjection;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
@@ -1081,9 +1081,9 @@ class AgentBundleCommand extends BaseCommand {
 				continue;
 			}
 			$key                    = AgentBundleArtifactExtensions::artifact_key( (string) ( $record['artifact_type'] ?? '' ), (string) ( $record['artifact_id'] ?? '' ) );
-			$current_hash           = isset( $current[ $key ] ) ? AgentBundleArtifactHasher::hash( $current[ $key ]['payload'] ?? null ) : null;
+			$current_hash           = isset( $current[ $key ] ) ? WP_Agent_Package_Artifact_Hasher::hash( $current[ $key ]['payload'] ?? null ) : null;
 			$record['current_hash'] = $current_hash;
-			$record['status']       = AgentBundleArtifactStatus::classify( (string) ( $record['installed_hash'] ?? '' ), $current_hash );
+			$record['status']       = WP_Agent_Package_Artifact_Status::classify( (string) ( $record['installed_hash'] ?? '' ), $current_hash );
 			$classified[]           = $record;
 		}
 

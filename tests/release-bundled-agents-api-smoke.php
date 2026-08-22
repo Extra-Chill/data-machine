@@ -11,6 +11,8 @@ $failures = array();
 $passes   = 0;
 $root     = dirname( __DIR__ );
 
+require_once __DIR__ . '/agents-api-smoke-helpers.php';
+
 echo "release-bundled-agents-api-smoke\n";
 
 function datamachine_release_bundle_assert( bool $condition, string $name, array &$failures, int &$passes ): void {
@@ -58,6 +60,22 @@ datamachine_release_bundle_assert( false !== strpos( $plugin_source, "'loaded'  
 datamachine_release_bundle_assert( false !== strpos( $plugin_source, 'runtime substrate skew' ), 'Data Machine warns on external/bundled Agents API version mismatch', $failures, $passes );
 datamachine_release_bundle_assert( false !== strpos( $plugin_source, "vendor/wordpress/agents-api/agents-api.php" ), 'Data Machine references the bundled Agents API bootstrap', $failures, $passes );
 datamachine_release_bundle_assert( is_file( $root . '/vendor/wordpress/agents-api/agents-api.php' ), 'local bundled Agents API bootstrap exists for package validation', $failures, $passes );
+
+agents_api_smoke_require_module();
+datamachine_release_bundle_assert( class_exists( 'WP_Agent_Package_Artifact_Hasher' ), 'bundled package exposes canonical artifact hasher', $failures, $passes );
+datamachine_release_bundle_assert( class_exists( 'WP_Agent_Package_Artifact_Status' ), 'bundled package exposes canonical artifact status', $failures, $passes );
+datamachine_release_bundle_assert( hash( 'sha256', 'artifact' ) === \WP_Agent_Package_Artifact_Hasher::hash( 'artifact' ), 'canonical artifact hasher executes', $failures, $passes );
+datamachine_release_bundle_assert( \WP_Agent_Package_Artifact_Status::MODIFIED === \WP_Agent_Package_Artifact_Status::classify( 'before', 'after' ), 'canonical artifact status executes', $failures, $passes );
+
+$removed_package_files = array(
+	'inc/Cli/Bootstrap.php',
+	'inc/Core/Admin/Pages/Jobs/Jobs.php',
+	'inc/Engine/Bundle/AgentBundleArtifactHasher.php',
+	'inc/Engine/Bundle/AgentBundleArtifactStatus.php',
+);
+foreach ( $removed_package_files as $relative_path ) {
+	datamachine_release_bundle_assert( ! file_exists( $root . '/' . $relative_path ), "removed package path {$relative_path} is absent", $failures, $passes );
+}
 
 echo "\n[3] Validation paths no longer install a separate GitHub-only Agents API plugin:\n";
 $validation_dependencies = $harness['extensions']['wordpress']['settings']['validation_dependencies'] ?? '';

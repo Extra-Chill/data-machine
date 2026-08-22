@@ -18,15 +18,24 @@ function get_option( $key, $default = false ) { return $GLOBALS['setup_options']
 function update_option( $key, $value, $autoload = null ) { $GLOBALS['setup_options'][ $key ] = $value; return true; }
 function add_action( $hook, $callback, $priority = 10 ) { $GLOBALS['setup_actions'][] = compact( 'hook', 'callback', 'priority' ); }
 function wp_installing() { return false; }
-function datamachine_ensure_all_tables() { $GLOBALS['setup_calls'][] = 'schema'; return $GLOBALS['setup_schema_succeeds']; }
-function datamachine_register_capabilities() { $GLOBALS['setup_calls'][] = 'capabilities'; }
-function datamachine_activate_defaults_for_site() {
-	$GLOBALS['setup_calls'][] = 'defaults';
-	if ( ! isset( $GLOBALS['setup_options']['datamachine_settings'] ) ) {
-		$GLOBALS['setup_options']['datamachine_settings'] = array( 'seeded' => true );
-	}
-}
 function datamachine_mark_flow_schedule_reconciliation() { $GLOBALS['setup_calls'][] = 'flow-schedules'; }
+
+eval(
+	'namespace DataMachine\Core\Bootstrap;
+	class ActivationServiceProvider {
+		public static function ensure_all_tables(): bool {
+			$GLOBALS["setup_calls"][] = "schema";
+			return $GLOBALS["setup_schema_succeeds"];
+		}
+		public static function register_capabilities(): void { $GLOBALS["setup_calls"][] = "capabilities"; }
+		public static function activate_defaults_for_site(): void {
+			$GLOBALS["setup_calls"][] = "defaults";
+			if (!isset($GLOBALS["setup_options"]["datamachine_settings"])) {
+				$GLOBALS["setup_options"]["datamachine_settings"] = array("seeded" => true);
+			}
+		}
+	}'
+);
 
 eval(
 	'namespace DataMachine\Core\Database\PostIdentityReservations;

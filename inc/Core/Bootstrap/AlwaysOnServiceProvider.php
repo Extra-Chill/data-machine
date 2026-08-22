@@ -35,7 +35,7 @@ final class AlwaysOnServiceProvider {
 		);
 
 		if ( function_exists( 'wp_installing' ) && wp_installing() ) {
-			add_action( 'wp_loaded', 'datamachine_skip_action_scheduler_migration_during_install', 0 );
+			add_action( 'wp_loaded', array( self::class, 'skip_action_scheduler_migration_during_install' ), 0 );
 		}
 	}
 
@@ -43,7 +43,7 @@ final class AlwaysOnServiceProvider {
 	 * Register lightweight WordPress host hooks.
 	 */
 	public static function register_wordpress_hooks(): void {
-		add_filter( 'upload_mimes', 'datamachine_allow_json_upload' );
+		add_filter( 'upload_mimes', array( self::class, 'allow_json_upload' ) );
 		add_action( 'update_option_datamachine_settings', array( \DataMachine\Core\PluginSettings::class, 'clearCache' ) );
 	}
 

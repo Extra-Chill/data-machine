@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use WP_Agent_Package_Artifact_Hasher;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -215,7 +217,7 @@ final class AgentPackageProjection {
 		}
 
 		if ( null !== $payload ) {
-			$artifact['checksum'] = AgentBundleArtifactHasher::hash( $payload );
+			$artifact['checksum'] = WP_Agent_Package_Artifact_Hasher::hash( $payload );
 		}
 
 		return $artifact;

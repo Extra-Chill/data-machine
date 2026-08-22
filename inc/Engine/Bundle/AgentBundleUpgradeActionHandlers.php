@@ -7,6 +7,9 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use WP_Agent_Package_Artifact_Hasher;
+use WP_Agent_Package_Artifact_Status;
+
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
@@ -234,7 +237,7 @@ final class AgentBundleCoreArtifactApply {
 		$type             = (string) ( $artifact['artifact_type'] ?? '' );
 		$id               = (string) ( $artifact['artifact_id'] ?? '' );
 		$payload          = $artifact['payload'] ?? null;
-		$hash             = AgentBundleArtifactHasher::hash( $payload );
+		$hash             = WP_Agent_Package_Artifact_Hasher::hash( $payload );
 		$now              = gmdate( 'c' );
 
 		if ( '' === $bundle_slug || '' === $type || '' === $id ) {
@@ -256,7 +259,7 @@ final class AgentBundleCoreArtifactApply {
 			'installed_hash'    => $hash,
 			'current_hash'      => $hash,
 			'installed_payload' => $payload,
-			'status'            => AgentBundleArtifactStatus::CLEAN,
+			'status'            => WP_Agent_Package_Artifact_Status::CLEAN,
 			'installed_at'      => $now,
 			'updated_at'        => $now,
 		);

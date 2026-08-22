@@ -210,6 +210,7 @@ $adapter    = new AgentAccessStoreAdapter( $repository, $agents );
 
 agents_api_smoke_assert_equals( true, $adapter instanceof \WP_Agent_Access_Store, 'adapter implements Agents API store contract', $failures, $passes );
 agents_api_smoke_assert_equals( true, $adapter instanceof \WP_Agent_Principal_Access_Store, 'adapter implements Agents API principal store contract', $failures, $passes );
+agents_api_smoke_assert_equals( false, method_exists( $adapter, 'grant_principal_access' ), 'adapter does not expose an uncontracted mutation alias', $failures, $passes );
 
 $existing = new DataMachineAccessStoreAdapterExistingStore();
 agents_api_smoke_assert_equals( $existing, AgentAccessStoreAdapter::filter_access_store( $existing ), 'filter preserves existing host store', $failures, $passes );

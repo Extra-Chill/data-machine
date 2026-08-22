@@ -57,7 +57,7 @@ $assert(
 );
 
 $assert(
-	'lightweight provider call is outside datamachine_run_datamachine_plugin()',
+	'lightweight provider call is outside runtime registration',
 	(bool) preg_match(
 		'/^}\s*\/\*\*.*?AbilityServiceProvider::register_lightweight\(\);/ms',
 		$bootstrap

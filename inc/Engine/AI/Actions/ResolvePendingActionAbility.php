@@ -144,7 +144,7 @@ class ResolvePendingActionAbility {
 	public static function execute( array $input ): array|\WP_Error {
 		$action_id      = isset( $input['action_id'] ) ? sanitize_text_field( $input['action_id'] ) : '';
 		$decision_value = isset( $input['decision'] ) ? sanitize_text_field( $input['decision'] ) : '';
-		$resolver       = isset( $input['resolver'] ) ? sanitize_text_field( (string) $input['resolver'] ) : self::resolverFromCurrentUser();
+		$resolver       = isset( $input['resolver'] ) ? sanitize_text_field( (string) $input['resolver'] ) : self::resolver_from_current_user();
 
 		if ( '' === $action_id || '' === $decision_value || '' === $resolver ) {
 			return new \WP_Error( 'pending_action_input_required', 'action_id, decision, and resolver are required.', array( 'status' => 400 ) );
@@ -233,7 +233,7 @@ class ResolvePendingActionAbility {
 		$apply_input      = isset( $payload['apply_input'] ) && is_array( $payload['apply_input'] ) ? $payload['apply_input'] : array();
 		$resolver_payload = isset( $input['payload'] ) && is_array( $input['payload'] ) ? $input['payload'] : array();
 		$resolver_context = isset( $input['context'] ) && is_array( $input['context'] ) ? $input['context'] : array();
-		$resolver         = isset( $input['resolver'] ) ? sanitize_text_field( $input['resolver'] ) : self::resolverFromCurrentUser();
+		$resolver         = isset( $input['resolver'] ) ? sanitize_text_field( $input['resolver'] ) : self::resolver_from_current_user();
 		$resolver_context = array_merge( $resolver_context, array( 'resolver' => $resolver ) );
 		$pending_action   = PendingActionStore::get_action( $action_id );
 
@@ -776,12 +776,5 @@ class ResolvePendingActionAbility {
 	public static function resolver_from_current_user(): string {
 		$user_id = get_current_user_id();
 		return $user_id > 0 ? 'user:' . $user_id : 'system:anonymous';
-	}
-
-	/**
-	 * Back-compat shim for existing internal callers.
-	 */
-	private static function resolverFromCurrentUser(): string {
-		return self::resolver_from_current_user();
 	}
 }

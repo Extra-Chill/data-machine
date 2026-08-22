@@ -141,19 +141,6 @@ require_once __DIR__ . '/inc/bootstrap.php';
 \DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::register_scheduler();
 
 /**
- * Prevent AS migration scheduling during wp-phpunit install bootstrap.
- *
- * @return void
- */
-function datamachine_skip_action_scheduler_migration_during_install(): void {
-	\DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::skip_action_scheduler_migration_during_install();
-}
-
-function datamachine_run_datamachine_plugin() {
-	\DataMachine\Core\Bootstrap\RuntimeServiceProvider::register();
-}
-
-/**
  * Request full Data Machine runtime loading for the current request.
  *
  * Host runtimes that execute Data Machine abilities from non-standard request
@@ -180,7 +167,7 @@ function datamachine_activate_full_runtime( string $reason = '' ): void {
 	datamachine_request_full_runtime( $reason );
 
 	if ( did_action( 'plugins_loaded' ) ) {
-		datamachine_run_datamachine_plugin();
+		\DataMachine\Core\Bootstrap\RuntimeServiceProvider::register();
 	}
 }
 
@@ -200,22 +187,11 @@ function datamachine_should_load_full_runtime(): bool {
 
 \DataMachine\Core\Bootstrap\ActivationServiceProvider::register_defaults_hook( __FILE__ );
 
-function datamachine_activate_plugin_defaults( $network_wide = false ) {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_defaults( (bool) $network_wide );
-}
-
-/**
- * Set default settings for a single site.
- */
-function datamachine_activate_defaults_for_site() {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_defaults_for_site();
-}
-
 if ( did_action( 'plugins_loaded' ) ) {
-	datamachine_run_datamachine_plugin();
+	\DataMachine\Core\Bootstrap\RuntimeServiceProvider::register();
 } else {
 	// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
-	add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
+	add_action( 'plugins_loaded', array( \DataMachine\Core\Bootstrap\RuntimeServiceProvider::class, 'register' ), 20 );
 }
 
 /**
@@ -246,26 +222,6 @@ if ( did_action( 'plugins_loaded' ) ) {
 \DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();
 
 
-/**
- * Load and instantiate all step types - they self-register via constructors.
- * Uses StepTypeRegistrationTrait for standardized registration.
- */
-function datamachine_load_step_types() {
-	\DataMachine\Core\Bootstrap\RuntimeServiceProvider::register_step_types();
-}
-
-/**
- * Load and instantiate all handlers - they self-register via constructors.
- * Clean, explicit approach using composer PSR-4 autoloading.
- */
-function datamachine_load_handlers() {
-	\DataMachine\Core\Bootstrap\RuntimeServiceProvider::register_handlers();
-}
-
-function datamachine_allow_json_upload( $mimes ) {
-	return \DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::allow_json_upload( $mimes );
-}
-
 \DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::register_wordpress_hooks();
 \DataMachine\Core\Bootstrap\ActivationServiceProvider::register_lifecycle_hooks( __FILE__ );
 
@@ -277,69 +233,6 @@ function datamachine_allow_json_upload( $mimes ) {
  */
 function datamachine_register_capabilities(): void {
 	\DataMachine\Core\Bootstrap\ActivationServiceProvider::register_capabilities();
-}
-
-/**
- * Remove Data Machine custom capabilities from roles.
- *
- * @since 0.37.0
- * @return void
- */
-function datamachine_remove_capabilities(): void {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::remove_capabilities();
-}
-
-function datamachine_deactivate_plugin() {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::deactivate();
-}
-
-/**
- * Plugin activation handler.
- *
- * Creates database tables, log directory, and re-schedules any flows
- * with non-manual scheduling intervals.
- *
- * @param bool $network_wide Whether the plugin is being network-activated.
- */
-function datamachine_activate_plugin( $network_wide = false ) {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate( (bool) $network_wide );
-}
-
-/**
- * Create network-scoped agent tables.
- *
- * Agent identity, tokens, and access grants are shared across the multisite
- * network, following the WordPress pattern where wp_users/wp_usermeta use
- * base_prefix while per-site content uses site-specific prefixes.
- *
- * Safe to call multiple times — dbDelta is idempotent.
- */
-function datamachine_create_network_agent_tables() {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::create_network_agent_tables();
-}
-
-/**
- * Run activation tasks for a single site.
- *
- * Creates tables, log directory, default memory files, and re-schedules flows.
- * Called directly on single-site, or per-site during network activation and
- * new site creation.
- */
-function datamachine_activate_for_site() {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_for_site();
-}
-
-/**
- * Create or update every Data Machine database table.
- *
- * Shared by activation and the deploy-time deferred runtime. dbDelta and
- * the per-table column ensures are idempotent, so this is safe to call on
- * every version bump.
- *
- * @return void
- */
-function datamachine_ensure_all_tables() {
-	return \DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
 }
 
 /**
@@ -465,29 +358,6 @@ function datamachine_resolve_system_agent_context(): array {
 		'agent_id'           => $agent_id,
 		'triggering_user_id' => $triggering_user_id,
 	);
-}
-
-/**
- * Run a callback for every site on the network.
- *
- * Switches to each site, runs the callback, then restores. Used by
- * activation hooks and new site hooks to ensure per-site setup.
- *
- * @param callable $callback Function to call in each site context.
- */
-function datamachine_for_each_site( callable $callback ) {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::for_each_site( $callback );
-}
-
-/**
- * Create Data Machine tables and defaults when a new site is added to the network.
- *
- * Only runs if Data Machine is network-active.
- *
- * @param WP_Site $new_site New site object.
- */
-function datamachine_on_new_site( \WP_Site $new_site ) {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::on_new_site( $new_site );
 }
 
 \DataMachine\Core\Bootstrap\ActivationServiceProvider::register_new_site_hook();

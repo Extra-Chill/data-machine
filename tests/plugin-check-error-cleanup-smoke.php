@@ -35,7 +35,7 @@ agents_api_smoke_assert_equals( true, str_contains( $buildignore, ".datamachine/
 agents_api_smoke_assert_equals( true, str_contains( $buildignore, "AGENTS.md\n" ), 'agent context is excluded from distribution package', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $buildignore, "bin/install-wp-tests.sh\n" ), 'test install script is excluded from distribution package', $failures, $passes );
 
-foreach ( array( 'inc/Cli/Bootstrap.php', 'inc/Core/Admin/AdminRootFilters.php', 'inc/Engine/AI/Directives/ClientContextDirective.php' ) as $guarded_file ) {
+foreach ( array( 'inc/Core/Admin/AdminRootFilters.php', 'inc/Engine/AI/Directives/ClientContextDirective.php' ) as $guarded_file ) {
 	agents_api_smoke_assert_equals( true, str_contains( datamachine_plugin_check_source( $guarded_file ), "defined( 'ABSPATH' ) || exit;" ), "{$guarded_file} has a direct access guard", $failures, $passes );
 }
 

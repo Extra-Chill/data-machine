@@ -22,11 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * @return bool Whether schema and data-preservation convergence succeeded.
  */
 function datamachine_ensure_current_schema(): bool {
-	if ( function_exists( 'datamachine_ensure_all_tables' ) ) {
-		return false !== datamachine_ensure_all_tables();
-	}
-
-	return true;
+	return \DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
 }
 
 /**
@@ -69,13 +65,12 @@ function datamachine_maybe_install_post_identity_reservations(): void {
  * per-site (autoloaded `wp_options`). The hook fires per-request which is
  * naturally per-blog, so each subsite converges independently on its own
  * first post-deploy request. Sites with no traffic don't pay the cost
- * until they're hit. Activation still uses `datamachine_for_each_site()`
+ * until they're hit. Activation still uses the lifecycle service provider
  * to initialize every site eagerly when the operator explicitly activates
  * network-wide.
  *
  * Network-scoped agent tables don't need per-site setup because they live
- * on `base_prefix` and are touched once at activation via
- * `datamachine_create_network_agent_tables()`.
+ * on `base_prefix` and are touched once by activation.
  *
  * @since 0.84.0
  * @return void
@@ -120,7 +115,7 @@ function datamachine_maybe_ensure_current_schema(): void {
  * - a must-use plugin, for which `register_activation_hook` never fires at all
  *
  * Both calls below are idempotent by construction. `add_cap()` is a no-op for a
- * capability the role already has, and `datamachine_activate_defaults_for_site()`
+ * capability the role already has, and `activate_defaults_for_site()`
  * uses `add_option()`, which will not overwrite an operator's existing settings.
  * That matters because this runs on every version bump, not only once.
  *
@@ -133,17 +128,12 @@ function datamachine_maybe_ensure_current_schema(): void {
  * @return void
  */
 function datamachine_run_deferred_site_setup(): void {
-	if ( function_exists( 'datamachine_register_capabilities' ) ) {
-		datamachine_register_capabilities();
-	}
-
-	if ( function_exists( 'datamachine_activate_defaults_for_site' ) ) {
-		datamachine_activate_defaults_for_site();
-	}
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::register_capabilities();
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_defaults_for_site();
 }
 
 // Ensure schema early in plugins_loaded (priority 5) so that
-// `datamachine_run_datamachine_plugin` at priority 20 — and every consumer
+// RuntimeServiceProvider at priority 20 — and every consumer
 // after it sees the current shape. Same hook fires for both activated
 // and upgraded installs; the option-gate inside the function avoids
 // double-running when activation already initialized this request.

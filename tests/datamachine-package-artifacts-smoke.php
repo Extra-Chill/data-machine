@@ -24,7 +24,7 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 }
 
 use DataMachine\Core\Agents\AgentBundler;
-use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use WP_Agent_Package_Artifact_Hasher as AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactPayloads;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;

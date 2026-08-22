@@ -95,8 +95,6 @@ if ( ! function_exists( 'set_transient' ) ) {
 
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
-require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
-require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactStatus.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactRebase.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleUpgradePlanner.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleAdoptionStateStore.php';
