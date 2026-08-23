@@ -1218,17 +1218,7 @@ class RestApi {
 	 * @return bool
 	 */
 	public static function check_publish_permission() {
-		$allowed = current_user_can( 'publish_posts' );
-
-		/**
-		 * Filter whether the current user may act on the social surface.
-		 *
-		 * @param bool   $allowed Whether the base capability check passed.
-		 * @param string $action  The action being gated: one of
-		 *                        `publish` | `edit` | `upload`.
-		 * @param int    $user_id The current user ID.
-		 */
-		return apply_filters( 'datamachine_socials_user_can', $allowed, 'publish', get_current_user_id() );
+		return PublishAuthorization::can_publish();
 	}
 
 	/**

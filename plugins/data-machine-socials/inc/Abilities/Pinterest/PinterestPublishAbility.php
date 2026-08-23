@@ -11,9 +11,9 @@
 namespace DataMachineSocials\Abilities\Pinterest;
 
 use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -87,7 +87,7 @@ class PinterestPublishAbility extends AbstractSocialAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute_publish' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_publish' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

@@ -8,9 +8,9 @@
 namespace DataMachineSocials\Abilities;
 
 use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Abilities\ExecutionScope;
 use DataMachineSocials\Operations\DelegatedCrossPostAction;
 use DataMachineSocials\PublishComposerContract;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -86,10 +86,9 @@ class SocialPublishAbility extends AbstractSocialAbility {
 		}
 	}
 
-	/** Require an authenticated actor; owner policy performs resource authorization. */
+	/** Apply the canonical Socials publish policy; owner policy authorizes resources. */
 	public function checkPermission(): bool {
-		$scope = ExecutionScope::current( 'manage_flows' );
-		return $scope->acting_user_id() > 0 || (int) ( $scope->acting_agent_id() ?? 0 ) > 0;
+		return PublishAuthorization::can_publish();
 	}
 
 	/** Submit canonical content through Data Machine's public delegated operation ability. */

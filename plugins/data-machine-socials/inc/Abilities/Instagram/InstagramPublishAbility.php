@@ -19,6 +19,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -154,8 +155,8 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 						'error'      => array( 'type' => 'string' ),
 					),
 				),
-				'execute_callback'    => array( self::class, 'execute_publish' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
+					'execute_callback'    => array( self::class, 'execute_publish' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_publish' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
