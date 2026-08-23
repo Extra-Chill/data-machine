@@ -36,8 +36,12 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 
 		$this->step_types_filter = static function ( array $types ): array {
 			$types['fetch'] = array(
-				'class'        => MixedClaimFetchStep::class,
-				'uses_handler' => false,
+				'class'                     => MixedClaimFetchStep::class,
+				'uses_handler'              => false,
+				'source_ingestion'          => true,
+				'allows_empty_output'       => true,
+				'supports_item_disposition' => true,
+				'handler_category'          => 'source',
 			);
 			$types['ai'] = array(
 				'class'        => MixedClaimAIStep::class,
