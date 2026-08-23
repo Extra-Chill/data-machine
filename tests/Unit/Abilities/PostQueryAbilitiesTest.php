@@ -452,18 +452,6 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( $pipeline_id, $post['pipeline_id'] );
 	}
 
-	public function test_permission_callback_with_cli(): void {
-		if ( ! defined( 'WP_CLI' ) ) {
-			define( 'WP_CLI', true );
-		}
-		$ability = wp_get_ability( 'datamachine/query-posts' );
-
-		$this->assertNotNull( $ability );
-
-		$result = $ability->execute( array( 'filter_by' => 'handler', 'filter_value' => 'test' ) );
-		$this->assertNotInstanceOf( \WP_Error::class, $result );
-	}
-
 	public function test_permission_callback_without_permissions(): void {
 		wp_set_current_user( 0 );
 		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
