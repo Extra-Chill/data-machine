@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.14] - 2026-08-23
+
+### Changed
+- remove zero-behavior compatibility wrappers
+- remove downstream Intelligence knowledge
+- simplify conversation runtime tool mediation
+
+### Fixed
+- bound chat migration convergence updates
+
 ## [0.175.13] - 2026-08-22
 
 ### Changed
