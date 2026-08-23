@@ -57,6 +57,6 @@ class StepTypeMetadata {
 	public static function hasHandlerCategory( string $step_type, string $category ): bool {
 		$step_types = apply_filters( 'datamachine_step_types', array() );
 
-		return $category === ( $step_types[ $step_type ]['handler_category'] ?? null );
+		return ( $step_types[ $step_type ]['handler_category'] ?? null ) === $category;
 	}
 }

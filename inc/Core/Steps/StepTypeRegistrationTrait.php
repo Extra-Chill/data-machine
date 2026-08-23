@@ -99,10 +99,10 @@ trait StepTypeRegistrationTrait {
 					'has_pipeline_config'       => $hasPipelineConfig,
 					'consume_all_packets'       => $consumeAllPackets,
 					'show_settings_display'     => $showSettingsDisplay,
-					'source_ingestion'           => $sourceIngestion,
-					'allows_empty_output'        => $allowsEmptyOutput,
+					'source_ingestion'          => $sourceIngestion,
+					'allows_empty_output'       => $allowsEmptyOutput,
 					'supports_item_disposition' => $supportsItemDisposition,
-					'handler_category'           => $handlerCategory,
+					'handler_category'          => $handlerCategory,
 				);
 				return $steps;
 			}
