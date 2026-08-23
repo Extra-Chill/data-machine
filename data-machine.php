@@ -221,28 +221,6 @@ if ( did_action( 'plugins_loaded' ) ) {
  */
 \DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();
 
-/**
- * Compatibility entrypoint for extension integration fixtures.
- */
-function datamachine_load_step_types(): void {
-	\DataMachine\Core\Bootstrap\RuntimeServiceProvider::register_step_types();
-}
-
-/**
- * Compatibility entrypoint for network-scoped agent schema setup.
- */
-function datamachine_create_network_agent_tables(): void {
-	\DataMachine\Core\Bootstrap\ActivationServiceProvider::create_network_agent_tables();
-}
-
-/**
- * Compatibility entrypoint for complete schema setup.
- */
-function datamachine_ensure_all_tables(): bool {
-	return \DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
-}
-
-
 \DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::register_wordpress_hooks();
 \DataMachine\Core\Bootstrap\ActivationServiceProvider::register_lifecycle_hooks( __FILE__ );
 

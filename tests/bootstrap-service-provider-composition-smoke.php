@@ -73,12 +73,15 @@ $removed_functions = array(
 	'datamachine_run_datamachine_plugin',
 	'datamachine_activate_plugin_defaults',
 	'datamachine_activate_defaults_for_site',
+	'datamachine_load_step_types',
 	'datamachine_load_handlers',
 	'datamachine_allow_json_upload',
 	'datamachine_remove_capabilities',
 	'datamachine_deactivate_plugin',
 	'datamachine_activate_plugin',
+	'datamachine_create_network_agent_tables',
 	'datamachine_activate_for_site',
+	'datamachine_ensure_all_tables',
 	'datamachine_for_each_site',
 	'datamachine_on_new_site',
 );
@@ -86,9 +89,6 @@ foreach ( $removed_functions as $function ) {
 	$assert( ! str_contains( $main, "function {$function}(" ), "{$function} forwarding global is absent" );
 }
 $assert( str_contains( $main, 'function datamachine_register_capabilities(): void' ), 'externally consumed capability compatibility function remains' );
-$assert( str_contains( $main, 'function datamachine_load_step_types(): void' ), 'externally consumed step-type compatibility function remains' );
-$assert( str_contains( $main, 'function datamachine_create_network_agent_tables(): void' ), 'externally consumed network-schema compatibility function remains' );
-$assert( str_contains( $main, 'function datamachine_ensure_all_tables(): bool' ), 'externally consumed schema compatibility function remains' );
 $assert( str_contains( $bootstrap, 'function datamachine_register_default_memory_files(): void' ), 'memory compatibility function remains' );
 
 if ( $failures ) {
