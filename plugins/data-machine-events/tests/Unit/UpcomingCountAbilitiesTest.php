@@ -22,6 +22,7 @@ use DataMachineEvents\Abilities\UpcomingCountAbilities;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 
 class UpcomingCountAbilitiesTest extends WP_UnitTestCase {
 
@@ -71,6 +72,7 @@ class UpcomingCountAbilitiesTest extends WP_UnitTestCase {
 		}
 
 		$this->abilities = new UpcomingCountAbilities();
+		CalendarCache::invalidate();
 	}
 
 	/**
@@ -233,6 +235,86 @@ class UpcomingCountAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( $venue_b, $by_id );
 		$this->assertSame( 2, $by_id[ $venue_a ] );
 		$this->assertSame( 1, $by_id[ $venue_b ] );
+	}
+
+	public function test_unfiltered_counts_use_cache_until_calendar_invalidation(): void {
+		global $wpdb;
+
+		$venue  = $this->make_venue( 'Cached Venue' );
+		$event  = $this->seed_upcoming_event( $venue );
+		$first  = $this->abilities->executeGetUpcomingCounts( array( 'taxonomy' => 'venue' ) );
+		$by_id  = array_column( $first['terms'], 'count', 'term_id' );
+		$this->assertSame( 1, $by_id[ $venue ] );
+
+		$term_taxonomy_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} WHERE taxonomy = %s AND term_id = %d",
+				'venue',
+				$venue
+			)
+		);
+		$wpdb->delete(
+			$wpdb->term_relationships,
+			array(
+				'object_id'        => $event,
+				'term_taxonomy_id' => $term_taxonomy_id,
+			),
+			array( '%d', '%d' )
+		);
+
+		$cached = $this->abilities->executeGetUpcomingCounts( array( 'taxonomy' => 'venue' ) );
+		$this->assertSame( $first, $cached );
+
+		CalendarCache::invalidate();
+		$refreshed = $this->abilities->executeGetUpcomingCounts( array( 'taxonomy' => 'venue' ) );
+		$this->assertArrayNotHasKey( $venue, array_column( $refreshed['terms'], 'count', 'term_id' ) );
+	}
+
+	public function test_canonical_post_status_excludes_stale_published_date_row(): void {
+		global $wpdb;
+
+		$published_venue = $this->make_venue( 'Published Venue' );
+		$draft_venue     = $this->make_venue( 'Drifted Draft Venue' );
+		$this->seed_upcoming_event( $published_venue );
+		$draft_event = $this->seed_upcoming_event( $draft_venue );
+
+		// Reproduce #714 drift without firing the status-sync hook.
+		$wpdb->update( $wpdb->posts, array( 'post_status' => 'draft' ), array( 'ID' => $draft_event ), array( '%s' ), array( '%d' ) );
+		CalendarCache::invalidate();
+
+		$result = $this->abilities->executeGetUpcomingCounts( array( 'taxonomy' => 'venue' ) );
+		$by_id  = array_column( $result['terms'], 'count', 'term_id' );
+
+		$this->assertSame( 1, $by_id[ $published_venue ] );
+		$this->assertArrayNotHasKey( $draft_venue, $by_id );
+	}
+
+	public function test_direct_count_sql_groups_before_term_hydration_and_uses_canonical_status(): void {
+		global $wpdb;
+
+		$venue = $this->make_venue( 'SQL Shape Venue' );
+		$this->seed_upcoming_event( $venue );
+		CalendarCache::invalidate();
+
+		$count_queries = array();
+		$record_query  = static function ( string $query ) use ( &$count_queries ): string {
+			if ( str_contains( $query, 'COUNT(DISTINCT tr.object_id)' ) ) {
+				$count_queries[] = $query;
+			}
+			return $query;
+		};
+		add_filter( 'query', $record_query );
+		try {
+			$this->abilities->executeGetUpcomingCounts( array( 'taxonomy' => 'venue' ) );
+		} finally {
+			remove_filter( 'query', $record_query );
+		}
+
+		$this->assertCount( 1, $count_queries );
+		$this->assertStringContainsString( "INNER JOIN {$wpdb->posts} p ON p.ID = tr.object_id", $count_queries[0] );
+		$this->assertStringContainsString( 'GROUP BY tt.term_id', $count_queries[0] );
+		$this->assertStringContainsString( ') counts', $count_queries[0] );
+		$this->assertStringNotContainsString( 'ed.post_status', $count_queries[0] );
 	}
 
 	/**

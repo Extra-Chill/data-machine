@@ -8,8 +8,8 @@
  * primitive powering homepage badges, cross-site links, and market reports.
  *
  * The query joins event_dates using the canonical upcoming predicate and
- * published status filter, then GROUP BY term for counts.
- * Skips the posts table entirely via denormalized post_status column.
+ * canonical post status, then groups by term for counts. Shared unfiltered
+ * inventory shapes reuse the Calendar cache generation.
  *
  * @package DataMachineEvents\Abilities
  */
@@ -17,6 +17,8 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Core\Event_Post_Type;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -169,10 +171,32 @@ class UpcomingCountAbilities {
 			return $this->executeRollupCounts( $taxonomy, $exclude_roots, $has_filter, $filter_taxonomy, $filter_term_id );
 		}
 
+		// The four unfiltered inventory shapes are shared by badge, directory,
+		// and stats consumers. Reuse Calendar's generation and time-transition
+		// cache so each shape is aggregated once per inventory state, without
+		// creating per-term entries for the long artist tail.
+		$cache_key = '';
+		if ( ! $has_filter ) {
+			$cache_key = CalendarCache::generate_key(
+				array(
+					'tax_filters' => array(
+						'taxonomy'      => $taxonomy,
+						'exclude_roots' => $exclude_roots,
+					),
+					'scope_token' => wp_cache_get_last_changed( 'terms' ),
+				),
+				'upcoming_counts'
+			);
+			$cached    = CalendarCache::get( $cache_key );
+			if ( is_array( $cached ) ) {
+				return $cached;
+			}
+		}
+
 		global $wpdb;
 
 		$now            = current_time( 'mysql' );
-		$upcoming_sql   = UpcomingFilter::upcoming_sql( true, 'tr.object_id' );
+		$upcoming_sql   = UpcomingFilter::upcoming_sql( false, 'tr.object_id' );
 		$upcoming_join  = $upcoming_sql['joins'];
 		$upcoming_where = $upcoming_sql['where'];
 
@@ -186,59 +210,65 @@ class UpcomingCountAbilities {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT t.term_id, t.name, t.slug, COUNT(DISTINCT tr.object_id) AS event_count
-					FROM {$wpdb->term_relationships} tr
-					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-					INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
+					"SELECT t.term_id, t.name, t.slug, counts.event_count
+					FROM (
+						SELECT tt.term_id, COUNT(DISTINCT tr.object_id) AS event_count
+						FROM {$wpdb->term_relationships} tr
+						INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
 					{$upcoming_join}
+						INNER JOIN {$wpdb->posts} p ON p.ID = tr.object_id
 					INNER JOIN {$wpdb->term_relationships} f_tr ON f_tr.object_id = tr.object_id
 					INNER JOIN {$wpdb->term_taxonomy} f_tt ON f_tr.term_taxonomy_id = f_tt.term_taxonomy_id
 					WHERE tt.taxonomy = %s
 					AND {$upcoming_where}
+					AND p.post_type = %s
+					AND p.post_status = 'publish'
 					AND f_tt.taxonomy = %s
 					AND f_tt.term_id = %d
 					{$parent_clause}
-					GROUP BY t.term_id
-					ORDER BY event_count DESC",
+						GROUP BY tt.term_id
+					) counts
+					INNER JOIN {$wpdb->terms} t ON t.term_id = counts.term_id
+					ORDER BY counts.event_count DESC",
 					$taxonomy,
 					$now,
 					$now,
+					Event_Post_Type::POST_TYPE,
 					$filter_taxonomy,
 					$filter_term_id
 				)
 			);
 		} else {
-			// Uses ed.post_status to avoid joining the posts table (3s → <100ms).
+			// Canonical post status remains authoritative while event_dates status
+			// drift is repaired separately (see issue #714).
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT t.term_id, t.name, t.slug, COUNT(DISTINCT tr.object_id) AS event_count
-					FROM {$wpdb->term_relationships} tr
-					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-					INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
+					"SELECT t.term_id, t.name, t.slug, counts.event_count
+					FROM (
+						SELECT tt.term_id, COUNT(DISTINCT tr.object_id) AS event_count
+						FROM {$wpdb->term_relationships} tr
+						INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
 					{$upcoming_join}
+						INNER JOIN {$wpdb->posts} p ON p.ID = tr.object_id
 					WHERE tt.taxonomy = %s
 					AND {$upcoming_where}
+					AND p.post_type = %s
+					AND p.post_status = 'publish'
 					{$parent_clause}
-					GROUP BY t.term_id
-					ORDER BY event_count DESC",
+						GROUP BY tt.term_id
+					) counts
+					INNER JOIN {$wpdb->terms} t ON t.term_id = counts.term_id
+					ORDER BY counts.event_count DESC",
 					$taxonomy,
 					$now,
-					$now
+					$now,
+					Event_Post_Type::POST_TYPE
 				)
 			);
 		}
 
-		if ( empty( $rows ) ) {
-			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			return array(
-				'success'  => true,
-				'taxonomy' => $taxonomy,
-				'terms'    => array(),
-				'total'    => 0,
-			);
-		}
-
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$terms = array();
 		foreach ( $rows as $row ) {
 			$url = get_term_link( (int) $row->term_id, $taxonomy );
@@ -255,12 +285,17 @@ class UpcomingCountAbilities {
 			);
 		}
 
-		return array(
+		$result = array(
 			'success'  => true,
 			'taxonomy' => $taxonomy,
 			'terms'    => $terms,
 			'total'    => count( $terms ),
 		);
+		if ( '' !== $cache_key ) {
+			CalendarCache::set( $cache_key, $result, CalendarCache::ttl_for_upcoming_transition( CalendarCache::TTL_COUNTS ) );
+		}
+
+		return $result;
 	}
 
 	/**
