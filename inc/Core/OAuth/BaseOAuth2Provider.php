@@ -201,8 +201,11 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 			}
 
 			if ( ! is_wp_error( $refreshed ) && ! empty( $refreshed['access_token'] ) ) {
-				$account['access_token']      = $refreshed['access_token'];
-				$account['token_expires_at']  = $refreshed['expires_at'] ?? $account['token_expires_at'];
+				$account = array_merge( $this->get_account(), $refreshed );
+				unset( $account['expires_at'] );
+				if ( isset( $refreshed['expires_at'] ) ) {
+					$account['token_expires_at'] = $refreshed['expires_at'];
+				}
 				$account['last_refreshed_at'] = time();
 				$this->save_account( $account );
 
@@ -251,6 +254,10 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 *
 	 * Expected return format on success:
 	 *   ['access_token' => '...', 'expires_at' => <unix_timestamp>]
+	 *
+	 * Additional provider-specific account fields may be returned. They are
+	 * merged into the latest persisted account before the common token fields
+	 * are saved.
 	 *
 	 * @since 0.31.1
 	 * @param string $current_token The current access token to refresh.
@@ -454,8 +461,11 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 		}
 
 		if ( ! is_wp_error( $refreshed ) && ! empty( $refreshed['access_token'] ) ) {
-			$account['access_token']      = $refreshed['access_token'];
-			$account['token_expires_at']  = $refreshed['expires_at'] ?? $account['token_expires_at'];
+			$account = array_merge( $this->get_account(), $refreshed );
+			unset( $account['expires_at'] );
+			if ( isset( $refreshed['expires_at'] ) ) {
+				$account['token_expires_at'] = $refreshed['expires_at'];
+			}
 			$account['last_refreshed_at'] = time();
 			$this->save_account( $account );
 
