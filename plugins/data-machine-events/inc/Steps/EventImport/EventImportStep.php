@@ -22,6 +22,8 @@ class EventImportStep extends Step {
 
 	use StepTypeRegistrationTrait;
 
+	private static bool $capabilities_registered = false;
+
 	public function __construct() {
 		parent::__construct( 'event_import' );
 
@@ -34,6 +36,30 @@ class EventImportStep extends Step {
 			usesHandler: true,
 			hasPipelineConfig: false
 		);
+
+		if ( ! self::$capabilities_registered ) {
+			add_filter( 'datamachine_step_types', array( self::class, 'registerCapabilities' ), 20 );
+			self::$capabilities_registered = true;
+		}
+	}
+
+	/**
+	 * Declare source-step behavior owned by the event import type.
+	 *
+	 * @param array $step_types Registered step types.
+	 * @return array
+	 */
+	public static function registerCapabilities( array $step_types ): array {
+		if ( ! isset( $step_types['event_import'] ) ) {
+			return $step_types;
+		}
+
+		$step_types['event_import']['source_ingestion']          = true;
+		$step_types['event_import']['allows_empty_output']       = true;
+		$step_types['event_import']['supports_item_disposition'] = true;
+		$step_types['event_import']['handler_category']          = 'source';
+
+		return $step_types;
 	}
 
 	/**
