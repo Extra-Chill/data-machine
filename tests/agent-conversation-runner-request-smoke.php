@@ -69,6 +69,12 @@ if ( ! function_exists( 'get_option' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id(): int {
+		return 0;
+	}
+}
+
 require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 

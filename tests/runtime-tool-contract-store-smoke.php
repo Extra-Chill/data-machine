@@ -124,6 +124,16 @@ namespace DataMachine\Core\Database\Chat {
 
 namespace DataMachine\Engine\AI {
 	class ConversationManager {
+		public static function validateToolCall( string $tool_name, array $tool_parameters, array $messages, ?array $tool_definition ): array {
+			unset( $tool_name, $tool_parameters, $messages, $tool_definition );
+			return array( 'is_duplicate' => false );
+		}
+
+		public static function duplicateToolCallError( string $tool_name, string $mode ): string {
+			unset( $tool_name, $mode );
+			return 'Duplicate tool call.';
+		}
+
 		public static function formatToolResultMessage( string $tool_name, array $tool_result, array $tool_parameters, bool $is_handler_tool = false, int $turn_count = 0 ): array {
 			unset( $tool_parameters, $is_handler_tool );
 
@@ -140,9 +150,15 @@ namespace DataMachine\Engine\AI {
 namespace {
 	use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request;
 	use AgentsAPI\AI\WP_Agent_Runtime_Tool_Result;
+	use AgentsAPI\AI\WP_Agent_Runtime_Tool_Lifecycle;
+	use AgentsAPI\AI\WP_Agent_Conversation_Loop;
+	use AgentsAPI\AI\Tools\WP_Agent_Tool_Executor;
 	use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 	use DataMachine\Core\Database\Jobs\Jobs;
-	use function DataMachine\Engine\AI\datamachine_defer_runtime_tool_call;
+	use DataMachine\Engine\AI\DataMachineToolRuntimeRules;
+	use DataMachine\Engine\AI\LoopEventSinkInterface;
+	use function DataMachine\Engine\AI\datamachine_build_pre_tool_mediator;
+	use function DataMachine\Engine\AI\datamachine_prepare_runtime_tool_pending_result;
 	use function DataMachine\Engine\AI\datamachine_prepare_runtime_tool_request;
 	use function DataMachine\Engine\AI\datamachine_runtime_tool_request_store;
 	use function DataMachine\Engine\AI\datamachine_resume_runtime_tool_request;
@@ -180,6 +196,12 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_json_encode' ) ) {
+		function wp_json_encode( $data, int $flags = 0, int $depth = 512 ) {
+			return json_encode( $data, $flags, $depth );
+		}
+	}
+
 	$GLOBALS['datamachine_runtime_tool_scheduled'] = array();
 	$GLOBALS['datamachine_runtime_tool_enqueued']  = array();
 
@@ -208,21 +230,60 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, $value, ...$args ) {
+			unset( $hook, $args );
+			return $value;
+		}
+	}
+
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+			unset( $hook, $callback, $priority, $accepted_args );
+		}
+	}
+
+	if ( ! function_exists( 'did_action' ) ) {
+		function did_action( string $hook = '' ): int {
+			unset( $hook );
+			return 0;
+		}
+	}
+
 	if ( ! function_exists( 'add_action' ) ) {
 		function add_action( string $hook, callable|string $callback ): void {
 			unset( $hook, $callback );
 		}
 	}
 
-	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-citation-metadata.php';
-	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-runtime-tool-request.php';
-	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-runtime-tool-result.php';
-	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-runtime-tool-request-store.php';
-	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-runtime-tool-continuation.php';
-	require __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-runtime-tool-lifecycle.php';
-	require __DIR__ . '/../inc/Engine/AI/RuntimeToolRunStateStore.php';
-	require __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';
-	require __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
+	require __DIR__ . '/../vendor/autoload.php';
+	require_once __DIR__ . '/../inc/Engine/AI/RuntimeToolRunStateStore.php';
+	require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';
+	require_once __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
+
+	class RuntimeToolContractStoreSmokeExecutor implements WP_Agent_Tool_Executor {
+		public int $calls = 0;
+
+		public function executeWP_Agent_Tool_Call( array $tool_call, array $tool_definition, array $context = array() ): array {
+			unset( $tool_call, $tool_definition, $context );
+			++$this->calls;
+			return array( 'success' => false, 'error' => 'Deferred tools must not reach the PHP executor.' );
+		}
+	}
+
+	function prepare_and_persist_runtime_tool_request( array $request, array $payload ): array|WP_Error {
+		$pending = datamachine_prepare_runtime_tool_pending_result( $request, $payload );
+		if ( $pending instanceof WP_Error ) {
+			return $pending;
+		}
+
+		$pending['runtime_tool_request'] = WP_Agent_Runtime_Tool_Lifecycle::create_pending_request(
+			datamachine_runtime_tool_request_store(),
+			$pending['runtime_tool_request'],
+			array( 'payload' => $payload )
+		);
+		return $pending;
+	}
 
 	$failures = array();
 	$passes   = 0;
@@ -244,7 +305,7 @@ namespace {
 	$chat_db->sessions['session-1']       = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 	$chat_db->sessions['session-timeout'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 
-	$pending = datamachine_defer_runtime_tool_call(
+	$pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/select_block',
 			'call_id'    => 'call-1',
@@ -298,7 +359,7 @@ namespace {
 	$assert( array( 'owner_tool' ) === ( $delegated_resume['tools'] ?? null ), 'delegated caller-scoped tools remain visible after async resume' );
 	$assert( 52 === ( Jobs::$engine_data[1]['runtime_tool_run_state']['resume_payload']['calling_user_id'] ?? null ), 'runtime run-state records the delegated caller in its resume payload' );
 
-	$timeout_pending = datamachine_defer_runtime_tool_call(
+	$timeout_pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/confirm',
 			'call_id'    => 'call-timeout',
@@ -315,7 +376,7 @@ namespace {
 	$assert( 'failed' === ( Jobs::$jobs[2]['status'] ?? '' ), 'timeout fails the Data Machine job' );
 
 	$chat_db->sessions['session-system'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
-	$system_pending = datamachine_defer_runtime_tool_call(
+	$system_pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/select_block',
 			'call_id'    => 'call-system',
@@ -414,7 +475,7 @@ namespace {
 	$assert( array() === datamachine_runtime_tool_request_store()->recent_pending(), 'store adapter implements the Agents API recent-pending contract' );
 
 	$chat_db->sessions['session-client-output'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
-	$client_pending = datamachine_defer_runtime_tool_call(
+	$client_pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/packet_handler',
 			'call_id'    => 'call-client-output',
@@ -437,6 +498,67 @@ namespace {
 	$client_execution = $client_request['metadata']['datamachine']['packet_execution'] ?? array();
 	$assert( ! str_contains( (string) json_encode( $client_pending ), 'reservation_token' ) && ! str_contains( (string) json_encode( $client_pending ), 'must-never-leave-engine-state' ), 'actual client-visible deferred request output contains no reservation token' );
 	$assert( 808 === ( $client_execution['job_id'] ?? null ) && 'client/packet_handler' === ( $client_execution['tool_name'] ?? null ) && $packet_id === ( $client_execution['disposition_id'] ?? null ), 'client-visible deferred request retains only safe packet execution identity' );
+
+	$chat_db->sessions['session-integrated'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
+	$integrated_tool = array(
+		'name'              => 'client/deferred_action',
+		'description'       => 'A deferred client action.',
+		'parameters'        => array( 'type' => 'object', 'properties' => array() ),
+		'executor'          => 'client',
+		'external_executor' => true,
+		'runtime_tool'      => true,
+	);
+	$integrated_tools = array( 'client/deferred_action' => $integrated_tool );
+	$integrated_payload = array(
+		'user_id'        => 7,
+		'agent_id'       => 11,
+		'session_id'     => 'session-integrated',
+		'client_context' => array(
+			'session_id'         => 'session-integrated',
+			'runtime_tool_async' => true,
+		),
+	);
+	$integrated_executor = new RuntimeToolContractStoreSmokeExecutor();
+	$integrated_result   = WP_Agent_Conversation_Loop::run(
+		array( array( 'role' => 'user', 'content' => 'Run the deferred action.' ) ),
+		static fn( array $messages ): array => array(
+			'messages'   => $messages,
+			'tool_calls' => array(
+				array(
+					'id'         => 'call-integrated',
+					'name'       => 'client/deferred_action',
+					'parameters' => array(),
+				),
+			),
+		),
+		array(
+			'max_turns'         => 1,
+			'tool_executor'     => $integrated_executor,
+			'tool_declarations' => $integrated_tools,
+			'pre_tool_mediator' => datamachine_build_pre_tool_mediator(
+				$integrated_tools,
+				$integrated_payload,
+				'chat',
+				array( 'chat' ),
+				new DataMachineToolRuntimeRules(),
+				new class() implements LoopEventSinkInterface {
+					public function emit( string $event, array $payload = array() ): void {
+						unset( $event, $payload );
+					}
+				},
+				array()
+			),
+			'runtime_tool_store' => datamachine_runtime_tool_request_store(),
+		)
+	);
+	$integrated_request    = is_array( $integrated_result['runtime_tool_pending'] ?? null ) ? $integrated_result['runtime_tool_pending'] : array();
+	$integrated_request_id = (string) ( $integrated_request['request_id'] ?? '' );
+	$integrated_job_id     = (int) substr( $integrated_request_id, strlen( 'runtime_tool_' ) );
+	$assert( str_starts_with( $integrated_request_id, 'runtime_tool_' ) && $integrated_job_id > 0, 'integrated async mediation preserves the preallocated Data Machine request id' );
+	$assert( 'call-integrated' === ( $integrated_request['tool_call_id'] ?? '' ), 'integrated async mediation preserves the provider tool call id' );
+	$assert( $integrated_request_id === ( Jobs::$engine_data[ $integrated_job_id ]['runtime_tool_request']['request_id'] ?? '' ), 'Agents API persists the canonical mediated request in the Data Machine store' );
+	$assert( isset( $chat_db->sessions['session-integrated']['metadata']['runtime_tool_requests'][ $integrated_request_id ] ), 'integrated async mediation mirrors the canonical request into session state' );
+	$assert( 0 === $integrated_executor->calls, 'integrated async mediation bypasses the PHP executor' );
 	if ( $failures ) {
 		echo "\nFAILED: " . count( $failures ) . " runtime tool contract store assertions failed.\n";
 		exit( 1 );
