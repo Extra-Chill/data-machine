@@ -8,6 +8,7 @@
 namespace DataMachineSocials\Operations;
 
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachineSocials\PublishComposerContract;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -16,17 +17,6 @@ final class DelegatedCrossPostAction {
 	public const ACTION_ID = 'datamachine-socials/cross-post';
 
 	private const VERSION = '2';
-
-	private const CHANNELS = array(
-		'bluesky',
-		'facebook',
-		'instagram',
-		'pinterest',
-		'threads',
-		'twitter',
-	);
-
-	private const MEDIA_KINDS = array( 'image', 'carousel', 'reel', 'story' );
 
 	private const INPUT_KEYS = array(
 		'post_site_id',
@@ -127,15 +117,15 @@ final class DelegatedCrossPostAction {
 				}
 
 				$media_kind = $input['media_kind'] ?? null;
-				if ( ! is_string( $media_kind ) || ! in_array( $media_kind, self::MEDIA_KINDS, true ) ) {
+				if ( ! is_string( $media_kind ) ) {
 					return self::error( 'social_cross_post_unsupported_media_kind', 'The requested media kind is not supported.' );
 				}
 
-				if ( in_array( $media_kind, array( 'reel', 'story' ), true ) && array_diff( $channels, array( 'instagram' ) ) ) {
-					return self::error( 'social_cross_post_unsupported_channel_media', 'A selected channel does not support the requested media kind.' );
-				}
-				if ( 'carousel' === $media_kind && array_diff( $channels, array( 'instagram', 'twitter' ) ) ) {
-					return self::error( 'social_cross_post_unsupported_channel_media', 'A selected channel does not support carousel publishing.' );
+				if ( $channels ) {
+					$contract_validation = PublishComposerContract::validate_cross_post( $channels, $media_kind );
+					if ( is_wp_error( $contract_validation ) ) {
+						return $contract_validation;
+					}
 				}
 
 				$assets = self::normalize_asset_refs( $input['asset_refs'] ?? null, $media_kind );
@@ -508,13 +498,14 @@ final class DelegatedCrossPostAction {
 	 * @return array|\WP_Error
 	 */
 	private static function normalize_channels( $channels ) {
-		if ( ! is_array( $channels ) || ! array_is_list( $channels ) || count( $channels ) > count( self::CHANNELS ) ) {
+		$supported = PublishComposerContract::cross_post_channels();
+		if ( ! is_array( $channels ) || ! array_is_list( $channels ) || count( $channels ) > count( $supported ) ) {
 			return self::error( 'social_cross_post_invalid_channels', 'Channels must be a bounded list.' );
 		}
 
 		$normalized = array();
 		foreach ( $channels as $channel ) {
-			if ( ! is_string( $channel ) || ! in_array( $channel, self::CHANNELS, true ) ) {
+			if ( ! is_string( $channel ) || ! in_array( $channel, $supported, true ) ) {
 				return self::error( 'social_cross_post_unsupported_channel', 'A requested channel is not supported.' );
 			}
 			if ( in_array( $channel, $normalized, true ) ) {
@@ -655,7 +646,7 @@ final class DelegatedCrossPostAction {
 	}
 
 	private static function bounded_channel( $channel ): string {
-		return is_string( $channel ) && in_array( $channel, self::CHANNELS, true ) ? $channel : '';
+		return is_string( $channel ) && in_array( $channel, PublishComposerContract::cross_post_channels(), true ) ? $channel : '';
 	}
 
 	private static function strict_positive_int( $value ): int {

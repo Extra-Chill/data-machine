@@ -73,6 +73,11 @@ class YouTube extends PublishHandler {
 			'youtube',
 			array(
 				'supportsVideo' => true,
+				'composer'      => array(
+					'crossPostCompatible' => false,
+					'mediaKinds'           => array( 'video' ),
+					'ability'              => 'datamachine/youtube-upload',
+				),
 				'capabilities'  => array(
 					array( 'slug' => 'publish', 'label' => 'Publish' ),
 				),

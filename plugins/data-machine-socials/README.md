@@ -117,6 +117,11 @@ array(
     'defaultAspectRatio' => 'any',               // optional string
     'supportsCarousel'   => false,               // optional bool
     'supportsVideo'      => true,                // optional bool
+	'composer'           => array(               // required publish composition contract
+		'crossPostCompatible' => true,
+		'mediaKinds'           => array( 'image', 'carousel' ),
+		// Specialized composers also declare an `ability` name.
+	),
     'capabilities'       => array(               // optional, canonicalised server-side
         array( 'slug' => 'publish', 'label' => 'Publish' ),
     ),
@@ -127,6 +132,13 @@ array(
     ),
 )
 ```
+
+The platform endpoint normalizes `composer` into a transport-ready contract with
+`crossPostCompatible`, `mediaKinds`, `target`, `inputSchema`, and
+`mediaRequirements`. Generic targets point to `datamachine/v1/socials/post`.
+Specialized targets point to their WordPress Ability and expose that ability's
+input schema, so consumers can preserve requirements such as TikTok privacy
+controls and YouTube title/video upload input without platform-name branches.
 
 ### Preview shape
 

@@ -74,6 +74,10 @@ class Twitter extends PublishHandler {
 			'aspectRatios'       => array( 'any' ),
 			'defaultAspectRatio' => 'any',
 			'supportsCarousel'   => false,
+			'composer'          => array(
+				'crossPostCompatible' => true,
+				'mediaKinds'           => array( 'image', 'carousel' ),
+			),
 			'capabilities'       => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 			),

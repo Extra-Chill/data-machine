@@ -66,6 +66,11 @@ class Mastodon extends PublishHandler {
 				'aspectRatios'     => array( 'any' ),
 				'defaultAspectRatio' => 'any',
 				'supportsCarousel' => false,
+				'composer'        => array(
+					'crossPostCompatible' => false,
+					'mediaKinds'           => array( 'text', 'image' ),
+					'ability'              => 'datamachine/mastodon-publish',
+				),
 				'capabilities'     => array(
 					array( 'slug' => 'publish', 'label' => 'Publish' ),
 				),

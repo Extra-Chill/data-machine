@@ -99,6 +99,10 @@ class Pinterest extends PublishHandler {
 			'aspectRatios'       => array( '2:3' ),
 			'defaultAspectRatio' => '2:3',
 			'supportsCarousel'   => false,
+			'composer'          => array(
+				'crossPostCompatible' => true,
+				'mediaKinds'           => array( 'image' ),
+			),
 			'capabilities'       => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 			),

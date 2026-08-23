@@ -10,6 +10,7 @@ namespace DataMachineSocials\Abilities;
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\ExecutionScope;
 use DataMachineSocials\Operations\DelegatedCrossPostAction;
+use DataMachineSocials\PublishComposerContract;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -96,6 +97,12 @@ class SocialPublishAbility extends AbstractSocialAbility {
 		$content = is_array( $input['content_ref'] ?? null ) ? $input['content_ref'] : array();
 		$policy  = is_array( $input['target_policy'] ?? null ) ? $input['target_policy'] : array();
 		$targets = is_array( $policy['channels'] ?? null ) ? $policy['channels'] : array();
+		$media_kind = (string) ( $policy['media_kind'] ?? '' );
+
+		$contract_validation = PublishComposerContract::validate_cross_post( $targets, $media_kind );
+		if ( is_wp_error( $contract_validation ) ) {
+			return $this->failure( $contract_validation->get_error_code(), $contract_validation->get_error_message() );
+		}
 
 		$unavailable = array();
 		foreach ( $targets as $target ) {
@@ -122,7 +129,7 @@ class SocialPublishAbility extends AbstractSocialAbility {
 					'caption'      => $content['caption'] ?? null,
 					'content_hash' => $content['content_hash'] ?? null,
 					'channels'     => $targets,
-					'media_kind'   => $policy['media_kind'] ?? null,
+					'media_kind'   => $media_kind,
 					'asset_refs'   => $content['asset_refs'] ?? null,
 				),
 			)
@@ -289,6 +296,8 @@ class SocialPublishAbility extends AbstractSocialAbility {
 	}
 
 	private function enqueueSchema(): array {
+		$channels = PublishComposerContract::cross_post_channels();
+
 		return array(
 			'type'                 => 'object',
 			'required'             => array( 'content_ref', 'target_policy', 'idempotency_key' ),
@@ -349,10 +358,10 @@ class SocialPublishAbility extends AbstractSocialAbility {
 						'channels'   => array(
 							'type'     => 'array',
 							'minItems' => 1,
-							'maxItems' => 6,
+							'maxItems' => count( $channels ),
 							'items'    => array(
 								'type' => 'string',
-								'enum' => array( 'bluesky', 'facebook', 'instagram', 'pinterest', 'threads', 'twitter' ),
+								'enum' => $channels,
 							),
 						),
 						'media_kind' => array(

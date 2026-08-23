@@ -110,6 +110,14 @@ namespace DataMachineSocials\Tracking {
 	}
 }
 
+namespace DataMachineSocials {
+	class PublishComposerContract {
+		public static function validate_cross_post( $platforms, string $media_kind ): bool {
+			return array( 'twitter' ) === $platforms && 'image' === $media_kind;
+		}
+	}
+}
+
 namespace {
 	final class TwitterMediaConnection {
 		public int $http_code = 0;

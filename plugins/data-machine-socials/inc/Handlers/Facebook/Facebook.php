@@ -72,6 +72,10 @@ class Facebook extends PublishHandler {
 			'aspectRatios'       => array( 'any' ),
 			'defaultAspectRatio' => 'any',
 			'supportsCarousel'   => true,
+			'composer'          => array(
+				'crossPostCompatible' => true,
+				'mediaKinds'           => array( 'image' ),
+			),
 			'capabilities'       => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 				array( 'slug' => 'comments', 'label' => 'Comments' ),

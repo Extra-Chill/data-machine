@@ -61,6 +61,15 @@ class Publisher {
 			);
 		}
 
+		$contract_validation = PublishComposerContract::validate_cross_post( $platforms, $media_kind );
+		if ( is_wp_error( $contract_validation ) ) {
+			return array(
+				'success' => false,
+				'error'   => $contract_validation->get_error_message(),
+				'results' => array(),
+			);
+		}
+
 		if ( 'reel' === $media_kind ) {
 			if ( empty( $video_url ) ) {
 				return array(
@@ -160,6 +169,18 @@ class Publisher {
 	 * @return array Result.
 	 */
 	public static function post_to_platform( string $platform, array $images, string $caption, string $source_url, array $extra = array() ): array {
+		$media_kind          = $extra['media_kind'] ?? 'image';
+		$contract_validation = PublishComposerContract::validate_cross_post( array( $platform ), $media_kind );
+		if ( is_wp_error( $contract_validation ) ) {
+			return array(
+				'platform'       => $platform,
+				'success'        => false,
+				'error'          => $contract_validation->get_error_message(),
+				'error_code'     => $contract_validation->get_error_code(),
+				'delivery_state' => 'undelivered',
+			);
+		}
+
 		$ability_slug = "datamachine/{$platform}-publish";
 
 		$ability = wp_get_ability( $ability_slug );
@@ -197,8 +218,6 @@ class Publisher {
 				'link'        => $source_url,
 			);
 		}
-
-		$media_kind = $extra['media_kind'] ?? 'image';
 
 		$input['media_kind'] = $media_kind;
 		if ( 'reel' === $media_kind ) {

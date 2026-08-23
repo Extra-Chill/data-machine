@@ -1048,6 +1048,7 @@ class RestApi {
 
 			$entry['capabilities'] = self::normalize_capabilities( $entry['capabilities'] ?? null );
 			$entry['preview']      = self::normalize_preview( $entry['preview'] ?? null );
+			$entry['composer']     = PublishComposerContract::for_handler( $handler );
 
 			$platforms[] = $entry;
 		}
@@ -1305,6 +1306,11 @@ class RestApi {
 				),
 				400
 			);
+		}
+
+		$contract_validation = PublishComposerContract::validate_cross_post( $platforms, $media_kind );
+		if ( is_wp_error( $contract_validation ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'error' => $contract_validation->get_error_message(), 'code' => $contract_validation->get_error_code() ), 400 );
 		}
 
 		// Validate media: reels need video_url, stories need image or video, others need images.

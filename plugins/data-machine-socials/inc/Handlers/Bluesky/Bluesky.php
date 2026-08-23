@@ -63,6 +63,10 @@ class Bluesky extends PublishHandler {
 			'aspectRatios'       => array( 'any' ),
 			'defaultAspectRatio' => 'any',
 			'supportsCarousel'   => false,
+			'composer'          => array(
+				'crossPostCompatible' => true,
+				'mediaKinds'           => array( 'image' ),
+			),
 			'capabilities'       => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 			),

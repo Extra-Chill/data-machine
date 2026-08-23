@@ -90,6 +90,10 @@ class Instagram extends PublishHandler {
 			'supportsCarousel'    => true,
 			'supportsVideo'       => true,
 			'supportedMediaKinds' => array( 'image', 'carousel', 'reel', 'story' ),
+			'composer'            => array(
+				'crossPostCompatible' => true,
+				'mediaKinds'           => array( 'image', 'carousel', 'reel', 'story' ),
+			),
 			'capabilities'        => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 				array( 'slug' => 'comments', 'label' => 'Comments' ),

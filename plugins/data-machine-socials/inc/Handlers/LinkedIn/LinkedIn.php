@@ -75,6 +75,11 @@ class LinkedIn extends PublishHandler {
 			'aspectRatios'       => array( 'any' ),
 			'defaultAspectRatio' => 'any',
 			'supportsCarousel'   => false,
+			'composer'          => array(
+				'crossPostCompatible' => false,
+				'mediaKinds'           => array( 'text', 'image', 'article' ),
+				'ability'              => 'datamachine/linkedin-publish',
+			),
 			'capabilities'       => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 			),

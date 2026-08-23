@@ -77,6 +77,10 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'title' ),
+						'oneOf'      => array(
+							array( 'required' => array( 'video_file_path' ) ),
+							array( 'required' => array( 'video_url' ) ),
+						),
 						'properties' => array(
 							'title'           => array(
 								'type'        => 'string',

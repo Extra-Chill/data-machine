@@ -92,6 +92,11 @@ class Tumblr extends PublishHandler {
 				'charLimit'        => 0,
 				'maxImages'        => 0,
 				'supportsCarousel' => false,
+				'composer'        => array(
+					'crossPostCompatible' => false,
+					'mediaKinds'           => array( 'text' ),
+					'ability'              => 'datamachine/tumblr-publish',
+				),
 				'capabilities'     => array(
 					array( 'slug' => 'publish', 'label' => 'Publish' ),
 				),

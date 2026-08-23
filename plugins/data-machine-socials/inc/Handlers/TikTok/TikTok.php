@@ -83,6 +83,11 @@ class TikTok extends PublishHandler {
 				'maxImages'           => 0,
 				'supportsVideo'       => true,
 				'supportedMediaKinds' => array( 'video' ),
+				'composer'            => array(
+					'crossPostCompatible' => false,
+					'mediaKinds'           => array( 'video' ),
+					'ability'              => 'datamachine/tiktok-publish',
+				),
 				'capabilities'        => array(
 					array( 'slug' => 'publish', 'label' => 'Publish' ),
 				),

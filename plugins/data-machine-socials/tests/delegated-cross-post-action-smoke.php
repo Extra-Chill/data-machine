@@ -44,6 +44,14 @@ namespace {
 		return 42 === $post_id ? 'publish' : false;
 	}
 
+	function get_current_blog_id(): int {
+		return 1;
+	}
+
+	function is_multisite(): bool {
+		return false;
+	}
+
 	function get_permalink( int $post_id ): string|false {
 		return 42 === $post_id ? 'https://example.test/canonical-post/' : false;
 	}
@@ -113,6 +121,34 @@ namespace DataMachine\Core\Database\Jobs {
 	}
 }
 
+namespace DataMachine\Abilities {
+	class HandlerAbilities {
+		public function getAllHandlers(): array {
+			$handlers = array();
+			foreach ( array(
+				'bluesky'   => array( 'image' ),
+				'facebook'  => array( 'image' ),
+				'instagram' => array( 'image', 'carousel', 'reel', 'story' ),
+				'pinterest' => array( 'image' ),
+				'threads'   => array( 'image' ),
+				'twitter'   => array( 'image', 'carousel' ),
+			) as $channel => $media_kinds ) {
+				$handlers[ $channel . '_publish' ] = array(
+					'type'              => 'publish',
+					'auth_provider_key' => $channel,
+					'meta'              => array(
+						'composer' => array(
+							'crossPostCompatible' => true,
+							'mediaKinds'           => $media_kinds,
+						),
+					),
+				);
+			}
+			return $handlers;
+		}
+	}
+}
+
 namespace DataMachine\Engine\AI\System\Tasks {
 	abstract class SystemTask {
 		abstract public function executeTask( int $jobId, array $params ): void;
@@ -152,6 +188,12 @@ namespace DataMachineSocials {
 	}
 }
 
+namespace DataMachineSocials\Abilities {
+	class SocialPublishAbility {
+		public function __construct() {}
+	}
+}
+
 namespace DataMachineSocials\Tracking {
 	class SocialShareTracker {
 		public static function get_operation_share( int $post_id, string $platform, string $operation_ref ): ?array {
@@ -161,6 +203,7 @@ namespace DataMachineSocials\Tracking {
 }
 
 namespace {
+	require_once dirname( __DIR__ ) . '/inc/PublishComposerContract.php';
 	require_once dirname( __DIR__ ) . '/inc/Operations/DelegatedCrossPostAction.php';
 	require_once dirname( __DIR__ ) . '/inc/Tasks/SocialCrossPostTask.php';
 
@@ -235,6 +278,11 @@ namespace {
 	$unsupported['channels'] = array( 'unknown-network' );
 	$channel_error           = $action['normalize_input']( $unsupported, array() );
 	$assert( is_wp_error( $channel_error ) && 'social_cross_post_unsupported_channel' === $channel_error->get_error_code(), 'unsupported channels fail before enqueue' );
+	$unsupported_media               = $input;
+	$unsupported_media['channels']   = array( 'facebook' );
+	$unsupported_media['media_kind'] = 'carousel';
+	$media_error                     = $action['normalize_input']( $unsupported_media, array() );
+	$assert( is_wp_error( $media_error ) && 'social_cross_post_unsupported_channel_media' === $media_error->get_error_code(), 'unsupported channel/media combinations fail before enqueue' );
 
 	$raw_asset                         = $input;
 	$raw_asset['asset_refs'][0]['url'] = 'https://attacker.example/image.jpg';
