@@ -7,6 +7,7 @@ namespace DataMachine\Core\Database {
 	abstract class BaseRepository {
 		public static function database_table_exists( string $table, $wpdb = null ): bool { unset( $wpdb ); return isset( $GLOBALS['chat_tables'][ $table ] ); }
 		public static function column_exists( string $table, string $column, $wpdb = null ): bool { unset( $wpdb ); return in_array( $column, $GLOBALS['chat_columns'][ $table ] ?? array(), true ); }
+		public static function is_sqlite(): bool { return false; }
 	}
 }
 
@@ -193,7 +194,6 @@ namespace {
 		);
 	}
 	$GLOBALS['chat_batch_reads'] = array();
-	$GLOBALS['chat_cas_prepares'] = array();
 	$GLOBALS['chat_collision_probe_reads'] = 0;
 	$GLOBALS['chat_force_collision_probe_exhaustion'] = false;
 	$GLOBALS['chat_concurrent_updates'] = array(
@@ -228,9 +228,6 @@ namespace {
 				$replacement = is_int( $arg ) ? (string) $arg : "'" . str_replace( "'", "''", (string) $arg ) . "'";
 				$prepared_query = preg_replace( '/%[isd]/', $replacement, $prepared_query, 1 );
 			}
-			if ( str_starts_with( $query, 'UPDATE %i SET ' ) && str_contains( $query, 'BINARY %i = BINARY %s' ) ) {
-				$GLOBALS['chat_cas_prepares'][] = array( 'template' => $query, 'query' => $prepared_query );
-			}
 			return $prepared_query;
 		}
 		private function unquote( string $value ): string { return str_replace( "''", "'", trim( $value, "'" ) ); }
@@ -261,6 +258,10 @@ namespace {
 			if ( preg_match( "/SELECT \\* FROM '([^']+)' WHERE session_id = ('(?:''|[^'])*')/", $query, $matches ) ) {
 				$session_id = $this->unquote( $matches[2] );
 				if ( isset( $GLOBALS['chat_tables'][ $matches[1] ][ $session_id ] ) ) {
+					if ( str_contains( $query, 'FOR UPDATE' ) && isset( $GLOBALS['chat_concurrent_updates'][ $session_id ] ) ) {
+						$GLOBALS['chat_tables'][ $matches[1] ][ $session_id ] = array_merge( $GLOBALS['chat_tables'][ $matches[1] ][ $session_id ], $GLOBALS['chat_concurrent_updates'][ $session_id ] );
+						unset( $GLOBALS['chat_concurrent_updates'][ $session_id ] );
+					}
 					return $GLOBALS['chat_tables'][ $matches[1] ][ $session_id ];
 				}
 				if ( $GLOBALS['chat_force_collision_probe_exhaustion'] && str_starts_with( $session_id, 'dm-' ) ) {
@@ -272,6 +273,8 @@ namespace {
 			return null;
 		}
 		public function get_var( string $query ) {
+			if ( 'SELECT @@autocommit' === $query ) { return 1; }
+			if ( "SHOW VARIABLES LIKE 'in_transaction'" === $query ) { return null; }
 			if ( preg_match( "/SHOW TABLES LIKE '([^']+)'/", $query, $matches ) ) {
 				return isset( $GLOBALS['chat_tables'][ $matches[1] ] ) ? $matches[1] : null;
 			}
@@ -313,10 +316,10 @@ namespace {
 			return empty( $changed ) ? 0 : 1;
 		}
 		public function query( string $query ): int|false {
-			if ( preg_match( "/^UPDATE '([^']+)' SET (.*) WHERE (.*)$/", $query, $matches ) && str_contains( $matches[3], 'BINARY ' ) ) {
+			if ( in_array( $query, array( 'START TRANSACTION', 'COMMIT', 'ROLLBACK' ), true ) ) { return 1; }
+			if ( preg_match( "/^UPDATE '([^']+)' SET (.*) WHERE 'session_id' = ('(?:''|[^'])*')$/", $query, $matches ) ) {
 				$table = $matches[1];
-				preg_match( "/BINARY 'session_id' = BINARY ('(?:''|[^'])*')/", $matches[3], $id_match );
-				$id = isset( $id_match[1] ) ? $this->unquote( $id_match[1] ) : '';
+				$id    = $this->unquote( $matches[3] );
 				$this->migration_update_queries[] = $query;
 				if ( 0 < ( $this->deadlocks_remaining[ $id ] ?? 0 ) ) {
 					--$this->deadlocks_remaining[ $id ];
@@ -326,23 +329,7 @@ namespace {
 				}
 				$this->last_error = '';
 				if ( ! isset( $GLOBALS['chat_tables'][ $table ][ $id ] ) ) { return 0; }
-				if ( isset( $GLOBALS['chat_concurrent_updates'][ $id ] ) ) {
-					$GLOBALS['chat_tables'][ $table ][ $id ] = array_merge( $GLOBALS['chat_tables'][ $table ][ $id ], $GLOBALS['chat_concurrent_updates'][ $id ] );
-					unset( $GLOBALS['chat_concurrent_updates'][ $id ] );
-				}
 				$row = $GLOBALS['chat_tables'][ $table ][ $id ];
-				preg_match_all( "/BINARY '([a-z_]+)' = BINARY ('(?:''|[^'])*')/", $matches[3], $binary_conditions, PREG_SET_ORDER );
-				foreach ( $binary_conditions as $condition ) {
-					if ( (string) ( $row[ $condition[1] ] ?? '' ) !== $this->unquote( $condition[2] ) ) { return 0; }
-				}
-				preg_match_all( "/(?:^| AND )'([a-z_]+)' = (-?[0-9]+)/", $matches[3], $numeric_conditions, PREG_SET_ORDER );
-				foreach ( $numeric_conditions as $condition ) {
-					if ( (int) ( $row[ $condition[1] ] ?? 0 ) !== (int) $condition[2] ) { return 0; }
-				}
-				preg_match_all( "/(?:^| AND )'([a-z_]+)' IS NULL/", $matches[3], $null_conditions, PREG_SET_ORDER );
-				foreach ( $null_conditions as $condition ) {
-					if ( null !== ( $row[ $condition[1] ] ?? null ) ) { return 0; }
-				}
 				if ( $this->force_update_zero ) { return 0; }
 				$data = array();
 				preg_match_all( "/'([a-z_]+)' = (NULL|-?[0-9]+|'(?:''|[^'])*')/", $matches[2], $assignments, PREG_SET_ORDER );
@@ -350,6 +337,9 @@ namespace {
 					$data[ $assignment[1] ] = 'NULL' === $assignment[2] ? null : ( "'" === $assignment[2][0] ? $this->unquote( $assignment[2] ) : (int) $assignment[2] );
 				}
 				$changed = array_diff_assoc( $data, $row );
+				if ( ! empty( $changed ) && array_key_exists( 'updated_at', $row ) && ! array_key_exists( 'updated_at', $data ) ) {
+					$data['updated_at'] = '2026-12-31 23:59:59';
+				}
 				$GLOBALS['chat_tables'][ $table ][ $id ] = array_merge( $row, $data );
 				return empty( $changed ) ? 0 : 1;
 			}
@@ -397,6 +387,7 @@ namespace {
 	function do_action( string $hook, ...$args ): void { $GLOBALS['chat_logs'][] = array( $hook, $args ); }
 
 	require_once dirname( __DIR__ ) . '/inc/Core/Database/LifecycleStateTransition.php';
+	require_once dirname( __DIR__ ) . '/inc/Core/Database/TransactionScope.php';
 	require_once dirname( __DIR__ ) . '/inc/Core/Database/Chat/Chat.php';
 	require_once dirname( __DIR__ ) . '/inc/setup/chat-sessions-network.php';
 
@@ -457,15 +448,22 @@ namespace {
 	$trailing_space_collisions = array_filter( $GLOBALS['chat_tables']['wp_datamachine_chat_sessions'], static fn( array $row ): bool => 'concurrent-trailing-space' === ( json_decode( (string) ( $row['metadata'] ?? '' ), true )['migration_source']['session_id'] ?? '' ) && 'concurrent-trailing-space' !== ( $row['session_id'] ?? '' ) );
 	$assert( 'Same title ' === ( $trailing_space_target['title'] ?? '' ), 'same-second trailing-space target mutation is detected by byte-exact content CAS and never overwritten' );
 	$assert( 1 === count( $trailing_space_collisions ), 'trailing-space divergent source is preserved through deterministic collision handling' );
-	$cas_templates = array_column( $GLOBALS['chat_cas_prepares'], 'template' );
-	$cas_queries   = array_column( $GLOBALS['chat_cas_prepares'], 'query' );
-	$assert( count( array_filter( $cas_templates, static fn( string $query ): bool => str_contains( $query, 'BINARY %i = BINARY %s' ) ) ) === count( $cas_templates ), 'all textual CAS predicates are explicitly byte-exact' );
-	$assert( 0 < count( array_filter( $cas_queries, static fn( string $query ): bool => str_contains( $query, 'BINARY \'messages\' = BINARY \'[{"role":"assistant","content":"Case"}]\'' ) ) ), 'prepared CAS renders a byte-exact messages predicate for case-sensitive observation' );
-	$assert( 0 < count( array_filter( $cas_queries, static fn( string $query ): bool => str_contains( $query, 'BINARY \'title\' = BINARY \'Same title\'' ) ) ), 'prepared CAS renders a byte-exact title predicate for trailing-space-sensitive observation' );
-	$assert( 0 < count( array_filter( $cas_templates, static fn( string $query ): bool => str_contains( $query, '%i = %d' ) && str_contains( $query, '%i IS NULL' ) ) ), 'CAS preparation retains numeric and null predicate handling' );
+	$assert( 0 < count( $GLOBALS['wpdb']->migration_update_queries ), 'migration performs focused updates when canonical enrichment is required' );
+	$assert( 0 === count( array_filter( $GLOBALS['wpdb']->migration_update_queries, static function ( string $query ): bool {
+		$where = strstr( $query, ' WHERE ' );
+		return str_contains( (string) $where, "'messages'" ) || str_contains( (string) $where, "'metadata'" );
+	} ) ), 'migration update predicates never compare transcript blobs' );
+	$assert( 0 === count( array_filter( $GLOBALS['wpdb']->migration_update_queries, static fn( string $query ): bool => 1 !== preg_match( "/ WHERE 'session_id' = '(?:''|[^'])*'$/", $query ) ) ), 'migration updates use only the locked primary key predicate' );
 	$row_count = count( $GLOBALS['chat_tables']['wp_datamachine_chat_sessions'] );
+	$batch_read_count = count( $GLOBALS['chat_batch_reads'] );
+	$update_count = count( $GLOBALS['wpdb']->migration_update_queries );
 	$assert( datamachine_converge_chat_sessions_to_network(), 'convergence rerun is idempotent' );
 	$assert( $row_count === count( $GLOBALS['chat_tables']['wp_datamachine_chat_sessions'] ), 'rerun does not duplicate canonical or collision rows' );
+	$assert( $batch_read_count === count( $GLOBALS['chat_batch_reads'] ) && $update_count === count( $GLOBALS['wpdb']->migration_update_queries ), 'verified migration marker skips repeated reads and rewrites' );
+	delete_site_option( 'datamachine_chat_sessions_network_migrated' );
+	$batch_read_count = count( $GLOBALS['chat_batch_reads'] );
+	$assert( datamachine_converge_chat_sessions_to_network(), 'forced parity verification remains idempotent' );
+	$assert( $batch_read_count < count( $GLOBALS['chat_batch_reads'] ) && $update_count === count( $GLOBALS['wpdb']->migration_update_queries ), 'unchanged canonical rows are verified without rewrite' );
 	$GLOBALS['wpdb']->force_update_zero = true;
 	$chat = new \DataMachine\Core\Database\Chat\Chat();
 	$read_at = $chat->mark_session_read_for_workspace(
@@ -479,22 +477,26 @@ namespace {
 
 	$update_target = new \ReflectionMethod( \DataMachine\Core\Database\Chat\Chat::class, 'update_migration_target' );
 	$observed      = $GLOBALS['chat_tables']['wp_datamachine_chat_sessions']['legacy-user'];
+	$canonical     = array_merge( $observed, array( 'title' => 'Migrated title' ) );
 	$query_offset  = count( $GLOBALS['wpdb']->migration_update_queries );
 	$GLOBALS['wpdb']->deadlocks_remaining['legacy-user'] = 2;
-	$updated = $update_target->invoke( null, 'wp_datamachine_chat_sessions', $observed, $observed );
+	$updated = $update_target->invoke( null, 'wp_datamachine_chat_sessions', $canonical, $observed );
 	$retry_queries = array_slice( $GLOBALS['wpdb']->migration_update_queries, $query_offset );
-	$assert( 0 === $updated && 3 === count( $retry_queries ), 'transient migration deadlocks retry until the exact CAS succeeds' );
-	$assert( 1 === count( array_unique( $retry_queries ) ), 'deadlock retries preserve the complete optimistic row-match predicate' );
+	$assert( 1 === $updated && 3 === count( $retry_queries ), 'transient migration deadlocks retry until the locked update succeeds' );
+	$assert( 1 === count( array_unique( $retry_queries ) ), 'deadlock retries preserve the focused primary-key update' );
 	$assert( 0 === $GLOBALS['wpdb']->leaked_errors && ! $GLOBALS['wpdb']->errors_suppressed, 'recovered deadlocks do not leak database output or alter caller suppression state' );
 
+	$observed = $GLOBALS['chat_tables']['wp_datamachine_chat_sessions']['legacy-user'];
+	$canonical = array_merge( $observed, array( 'title' => 'Never committed' ) );
 	$query_offset = count( $GLOBALS['wpdb']->migration_update_queries );
 	$GLOBALS['wpdb']->deadlocks_remaining['legacy-user'] = 5;
-	$updated = $update_target->invoke( null, 'wp_datamachine_chat_sessions', $observed, $observed );
+	$updated = $update_target->invoke( null, 'wp_datamachine_chat_sessions', $canonical, $observed );
 	$retry_queries = array_slice( $GLOBALS['wpdb']->migration_update_queries, $query_offset );
 	$assert( false === $updated && 5 === count( $retry_queries ), 'persistent migration deadlocks stop after the bounded attempt budget' );
 	$assert( 1 === count( array_unique( $retry_queries ) ) && str_contains( $GLOBALS['wpdb']->last_error, 'Deadlock found' ), 'exhaustion retains the exact CAS and database error for convergence reporting' );
 	$assert( 0 === $GLOBALS['wpdb']->leaked_errors && ! $GLOBALS['wpdb']->errors_suppressed, 'exhausted retries remain contained and restore caller suppression state' );
 
+	delete_site_option( 'datamachine_chat_sessions_network_migrated' );
 	$GLOBALS['chat_tables']['wp_7_datamachine_chat_sessions']['unmappable'] = array( 'session_id' => 'unmappable', 'user_id' => 1, 'messages' => '[]', 'metadata' => '{}', 'context' => 'chat' );
 	$GLOBALS['chat_home_urls'][7] = '';
 	$assert( ! datamachine_converge_chat_sessions_to_network(), 'unmappable source row fails parity' );
@@ -503,6 +505,7 @@ namespace {
 	$GLOBALS['chat_home_urls'][7] = 'https://events.example/';
 	$assert( datamachine_converge_chat_sessions_to_network(), 'safe source-site fallback retries successfully' );
 
+	delete_site_option( 'datamachine_chat_sessions_network_migrated' );
 	$GLOBALS['chat_tables']['wp_2_datamachine_chat_sessions']['probe-exhaustion'] = array(
 		'session_id' => 'probe-exhaustion', 'user_id' => 27, 'messages' => '[{"source":true}]', 'metadata' => '{}', 'context' => 'chat',
 		'created_at' => '2026-01-08 00:00:00', 'updated_at' => '2026-01-08 01:00:00',
