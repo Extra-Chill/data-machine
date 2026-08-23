@@ -62,9 +62,9 @@ class RestApi {
 				'permission_callback' => array( __CLASS__, 'check_publish_permission' ),
 				'args'                => array(
 					'post_id'       => array(
-						'required'          => true,
 						'type'              => 'integer',
-						'minimum'           => 1,
+						'default'           => 0,
+						'minimum'           => 0,
 						'sanitize_callback' => 'absint',
 					),
 					'post_site_id'  => array(
@@ -1293,7 +1293,7 @@ class RestApi {
 		$images        = $params['images'] ?? array();
 		$caption       = sanitize_textarea_field( $params['caption'] ?? '' );
 		$post_id       = absint( $params['post_id'] ?? 0 );
-		$post_site_id  = array_key_exists( 'post_site_id', $params )
+		$post_site_id  = $post_id > 0 && array_key_exists( 'post_site_id', $params )
 			? absint( $params['post_site_id'] )
 			: get_current_blog_id();
 		$aspect_ratio  = sanitize_text_field( $params['aspect_ratio'] ?? '4:5' );
@@ -1302,7 +1302,7 @@ class RestApi {
 		$cover_url     = sanitize_url( $params['cover_url'] ?? '' );
 		$share_to_feed = $params['share_to_feed'] ?? true;
 
-		if ( ! self::is_valid_site( $post_site_id ) ) {
+		if ( $post_id > 0 && ! self::is_valid_site( $post_site_id ) ) {
 			return new \WP_REST_Response(
 				array(
 					'success' => false,
@@ -1313,11 +1313,10 @@ class RestApi {
 			);
 		}
 
-		$published_post = self::with_site(
-			$post_site_id,
-			static fn(): bool => $post_id > 0 && 'publish' === get_post_status( $post_id )
-		);
-		if ( ! $published_post ) {
+		$published_post = $post_id > 0
+			? self::with_site( $post_site_id, static fn(): bool => 'publish' === get_post_status( $post_id ) )
+			: true;
+		if ( $post_id > 0 && ! $published_post ) {
 			return new \WP_REST_Response(
 				array(
 					'success' => false,

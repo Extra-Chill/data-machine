@@ -97,6 +97,24 @@ final class RestCrossPostMultisiteTest extends WP_UnitTestCase {
 		restore_current_blog();
 	}
 
+	public function test_no_post_standalone_publish_reaches_existing_media_validation(): void {
+		$this->require_multisite();
+
+		switch_to_blog( $this->caller_site_id );
+		$response = RestApi::cross_post(
+			$this->request(
+				array(
+					'post_id'      => null,
+					'post_site_id' => PHP_INT_MAX,
+				)
+			)
+		);
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( 'No images provided', $response->get_data()['error'] );
+		$this->assertSame( $this->caller_site_id, get_current_blog_id() );
+		restore_current_blog();
+	}
+
 	public function test_task_workflow_preserves_the_canonical_site_parameter(): void {
 		$this->require_multisite();
 		$params   = array( 'post_id' => $this->post_id, 'post_site_id' => $this->canonical_site_id );
@@ -115,20 +133,21 @@ final class RestCrossPostMultisiteTest extends WP_UnitTestCase {
 	}
 
 	private function request( array $overrides = array() ): WP_REST_Request {
+		$body = array_merge(
+			array(
+				'post_id'   => $this->post_id,
+				'platforms' => array( 'instagram' ),
+				'caption'   => 'Canonical site context.',
+			),
+			$overrides
+		);
+		if ( null === $body['post_id'] ) {
+			unset( $body['post_id'] );
+		}
+
 		$request = new WP_REST_Request( 'POST', '/datamachine/v1/socials/post' );
 		$request->set_header( 'content-type', 'application/json' );
-		$request->set_body(
-			wp_json_encode(
-				array_merge(
-					array(
-						'post_id'   => $this->post_id,
-						'platforms' => array( 'instagram' ),
-						'caption'   => 'Canonical site context.',
-					),
-					$overrides
-				)
-			)
-		);
+		$request->set_body( wp_json_encode( $body ) );
 		return $request;
 	}
 
