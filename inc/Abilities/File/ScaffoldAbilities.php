@@ -111,7 +111,7 @@ class ScaffoldAbilities {
 	 * @return \WP_Ability|null The scaffold ability, or null if not available.
 	 */
 	public static function get_ability(): ?\WP_Ability {
-		if ( ! function_exists( 'wp_get_ability' ) || ! did_action( 'init' ) ) {
+		if ( ! did_action( 'init' ) ) {
 			return null;
 		}
 

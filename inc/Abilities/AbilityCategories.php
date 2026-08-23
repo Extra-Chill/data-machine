@@ -60,8 +60,7 @@ class AbilityCategories {
 		}
 
 		$late     = ! doing_action( 'wp_abilities_api_categories_init' )
-			&& did_action( 'wp_abilities_api_categories_init' )
-			&& class_exists( '\WP_Ability_Categories_Registry' );
+			&& did_action( 'wp_abilities_api_categories_init' );
 		$registry = $late ? \WP_Ability_Categories_Registry::get_instance() : null;
 
 		foreach ( self::get_category_definitions() as $slug => $args ) {

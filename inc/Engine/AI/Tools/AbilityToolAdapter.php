@@ -140,14 +140,6 @@ final class AbilityToolAdapter {
 			);
 		}
 
-		if ( ! class_exists( '\\WP_Abilities_Registry' ) ) {
-			return WP_Agent_Tool_Result::error(
-				$tool_name,
-				sprintf( "Tool '%s' references ability '%s', but the WordPress Abilities API is not available.", $tool_name, $ability_slug ),
-				array( 'ability' => $ability_slug )
-			);
-		}
-
 		$registry = \WP_Abilities_Registry::get_instance();
 		if ( method_exists( $registry, 'is_registered' ) && ! $registry->is_registered( $ability_slug ) ) {
 			return self::missingAbilityResult( $tool_name, $ability_slug );

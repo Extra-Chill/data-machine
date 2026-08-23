@@ -89,7 +89,7 @@ class ConsultAgent extends BaseTool {
 
 		$client_context = is_array( $parameters['client_context'] ?? null ) ? $parameters['client_context'] : array();
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'agents/chat' ) : null;
+		$ability = wp_get_ability( 'agents/chat' );
 		if ( ! $ability ) {
 			return $this->buildErrorResponse( 'agents/chat ability is not available.', 'consult_agent' );
 		}
