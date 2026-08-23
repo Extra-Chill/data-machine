@@ -15,11 +15,11 @@
  *     from using a single B-tree index for a range scan. However, with
  *     ORDER BY + LIMIT (which is the common case for user-facing queries),
  *     MySQL can use the start_datetime index for the sort and early-exit.
- *   - The real performance killer is SQL_CALC_FOUND_ROWS, which forces MySQL
- *     to scan ALL matching rows even with LIMIT. Callers should set
- *     'no_found_rows' => true on WP_Query to avoid this.
+ *   - SQL_CALC_FOUND_ROWS forces MySQL to scan all matching rows even with
+ *     LIMIT. Callers must set 'no_found_rows' => true and run a dedicated
+ *     count query only when a total is required.
  *   - For raw $wpdb queries (COUNT + GROUP BY without LIMIT), the OR pattern
- *     is still fast at current table size (~40k rows) and simpler than UNION ALL.
+ *     remains simpler than UNION ALL and avoids materializing event IDs.
  *
  * @package DataMachineEvents\Blocks\Calendar\Query
  * @since   0.25.0

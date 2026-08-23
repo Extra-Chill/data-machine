@@ -277,7 +277,8 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		EventDatesTable::upsert(
 			$post_id,
 			$now->modify( '-1 hour' )->format( 'Y-m-d H:i:s' ),
-			$now->modify( '+5 seconds' )->format( 'Y-m-d H:i:s' ),
+			// Leave enough time for both uncached Calendar renders before expiry.
+			$now->modify( '+1 minute' )->format( 'Y-m-d H:i:s' ),
 			'publish'
 		);
 		wp_set_object_terms( $post_id, array( (int) $venue['term_id'] ), 'venue' );
@@ -296,7 +297,7 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Flow Tribe', $before_searched['html'] );
 
 		$ttl = CalendarCache::ttl_for_envelope( array( 'past' => false ) );
-		$this->assertLessThanOrEqual( 6, $ttl );
+		$this->assertLessThanOrEqual( 61, $ttl );
 		sleep( $ttl + 1 );
 
 		$after_unfiltered = $this->server->dispatch( $unfiltered )->get_data();

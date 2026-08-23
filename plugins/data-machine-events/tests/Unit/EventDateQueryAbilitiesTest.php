@@ -254,6 +254,54 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertMatchesRegularExpression( '/ORDER BY\s+ed\.start_datetime ASC,\s*[^\s]+\.ID ASC/i', $queries[0] );
 	}
 
+	public function test_count_query_skips_found_rows_and_uses_event_date_status_index(): void {
+		$now = current_datetime();
+		$this->seed_event( 'Published past event', 'publish', $now->modify( '-2 days' )->format( 'Y-m-d H:i:s' ) );
+		$this->seed_event( 'Published future event', 'publish', $now->modify( '+2 days' )->format( 'Y-m-d H:i:s' ) );
+		$this->seed_event( 'Draft past event', 'draft', $now->modify( '-3 days' )->format( 'Y-m-d H:i:s' ) );
+
+		$query_args = array();
+		$args_filter = static function ( array $args ) use ( &$query_args ): array {
+			$query_args[] = $args;
+			return $args;
+		};
+		add_filter( 'data_machine_events_calendar_query_args', $args_filter );
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, EventDatesTable::table_name() ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		add_filter( 'query', $observer );
+		try {
+			$result = ( new EventDateQueryAbilities() )->executeQueryEvents(
+				array(
+					'scope'  => 'past',
+					'fields' => 'count',
+				)
+			);
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $args_filter );
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( 1, $result['total'] );
+		$this->assertSame( array(), $result['posts'] );
+		$this->assertSame( 0, $result['post_count'] );
+		$this->assertNotEmpty( $query_args );
+		$this->assertTrue( $query_args[0]['no_found_rows'] );
+		$this->assertCount( 1, $queries );
+		$this->assertMatchesRegularExpression( '/SELECT\s+COUNT\(\*\)/i', $queries[0] );
+		$this->assertStringContainsString( 'STRAIGHT_JOIN', $queries[0] );
+		$this->assertStringContainsString( "ed.post_status = 'publish'", $queries[0] );
+		$this->assertStringNotContainsString( 'SQL_CALC_FOUND_ROWS', $queries[0] );
+		$this->assertStringNotContainsString( 'FOUND_ROWS()', $queries[0] );
+		$this->assertStringNotContainsString( ' LIMIT ', strtoupper( $queries[0] ) );
+		$this->assertStringNotContainsString( ' ORDER BY ', strtoupper( $queries[0] ) );
+	}
+
 	public function test_matching_ids_sql_preserves_consumer_constraints_without_querying(): void {
 		wp_load_alloptions();
 		$filter = static function ( array $query_args, array $input ): array {
