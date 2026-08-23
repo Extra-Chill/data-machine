@@ -43,6 +43,12 @@ class TestOAuth2Provider extends BaseOAuth2Provider {
 	 */
 	public int $refreshed_expires_in = 5184000; // 60 days
 
+	/**
+	 * Provider-specific fields persisted or returned during refresh.
+	 */
+	public array $persisted_refresh_fields = array();
+	public array $returned_refresh_fields  = array();
+
 	public function get_config_fields(): array {
 		return array(
 			'client_id'     => array(
@@ -81,10 +87,14 @@ class TestOAuth2Provider extends BaseOAuth2Provider {
 			return new \WP_Error( 'test_refresh_failed', 'Simulated refresh failure' );
 		}
 
-		return array(
+		if ( ! empty( $this->persisted_refresh_fields ) ) {
+			$this->update_account( $this->persisted_refresh_fields );
+		}
+
+		return array_merge( array(
 			'access_token' => $this->refreshed_token,
 			'expires_at'   => time() + $this->refreshed_expires_in,
-		);
+		), $this->returned_refresh_fields );
 	}
 }
 
@@ -291,6 +301,23 @@ class BaseOAuth2ProviderTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( time() + 5000000, $account['token_expires_at'] );
 	}
 
+	public function test_refresh_preserves_provider_specific_account_fields(): void {
+		$this->provider->persisted_refresh_fields = array( 'provider_credential' => 'rotated_value' );
+		$this->provider->returned_refresh_fields  = array( 'provider_scope' => 'updated_scope' );
+		$this->provider->save_account( array(
+			'access_token'       => 'tok_old',
+			'token_expires_at'   => time() - 100,
+			'provider_credential' => 'stale_value',
+		) );
+
+		$this->provider->get_valid_access_token();
+
+		$account = $this->provider->get_account();
+		$this->assertSame( 'rotated_value', $account['provider_credential'] );
+		$this->assertSame( 'updated_scope', $account['provider_scope'] );
+		$this->assertArrayNotHasKey( 'expires_at', $account );
+	}
+
 	public function test_refresh_does_not_trigger_outside_buffer(): void {
 		// Token expires in 10 days — outside the 7-day buffer.
 		$this->provider->save_account( array(
@@ -434,9 +461,12 @@ class BaseOAuth2ProviderTest extends WP_UnitTestCase {
 	public function test_schedule_proactive_refresh_attempts_recovery_when_past(): void {
 		// Token expires in 2 days — refresh time would be (2d - 7d) = -5d, which is in the past.
 		// With recovery, the provider should attempt an immediate refresh.
+		$this->provider->persisted_refresh_fields = array( 'provider_credential' => 'rotated_value' );
+		$this->provider->returned_refresh_fields  = array( 'provider_scope' => 'updated_scope' );
 		$this->provider->save_account( array(
-			'access_token'    => 'tok_123',
-			'token_expires_at' => time() + ( 2 * DAY_IN_SECONDS ),
+			'access_token'       => 'tok_123',
+			'token_expires_at'   => time() + ( 2 * DAY_IN_SECONDS ),
+			'provider_credential' => 'stale_value',
 		) );
 
 		$result = $this->provider->schedule_proactive_refresh();
@@ -448,6 +478,8 @@ class BaseOAuth2ProviderTest extends WP_UnitTestCase {
 		// New token should be saved.
 		$account = $this->provider->get_account();
 		$this->assertSame( 'refreshed_tok_999', $account['access_token'] );
+		$this->assertSame( 'rotated_value', $account['provider_credential'] );
+		$this->assertSame( 'updated_scope', $account['provider_scope'] );
 
 		// A cron event should now be scheduled for the new token.
 		$next = wp_next_scheduled( $this->provider->get_cron_hook_name() );
