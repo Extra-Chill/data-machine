@@ -270,6 +270,54 @@ class UpcomingCountAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( $venue, array_column( $refreshed['terms'], 'count', 'term_id' ) );
 	}
 
+	public function test_superseded_generation_rebuild_does_not_fill_current_cold_cache(): void {
+		global $wpdb;
+
+		$venue = $this->make_venue( 'Pinned Generation Venue' );
+		$event = $this->seed_upcoming_event( $venue );
+		$old_generation = CalendarCache::get_generation();
+		$key = UpcomingCountAbilities::inventoryCacheKey( 'venue', false );
+
+		$term_taxonomy_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} WHERE taxonomy = %s AND term_id = %d",
+				'venue',
+				$venue
+			)
+		);
+		$wpdb->delete(
+			$wpdb->term_relationships,
+			array(
+				'object_id'        => $event,
+				'term_taxonomy_id' => $term_taxonomy_id,
+			),
+			array( '%d', '%d' )
+		);
+
+		CalendarCache::invalidate();
+		$current_generation = CalendarCache::get_generation();
+		$old_result = $this->abilities->executeGetUpcomingCounts(
+			array(
+				'taxonomy'      => 'venue',
+				'exclude_roots' => false,
+			),
+			$old_generation
+		);
+
+		$this->assertArrayNotHasKey( $venue, array_column( $old_result['terms'], 'count', 'term_id' ) );
+		$this->assertIsArray( CalendarCache::get( $key, $old_generation ) );
+		$this->assertFalse( CalendarCache::get( $key, $current_generation ) );
+
+		$current_result = $this->abilities->executeGetUpcomingCounts(
+			array(
+				'taxonomy'      => 'venue',
+				'exclude_roots' => false,
+			)
+		);
+		$this->assertArrayNotHasKey( $venue, array_column( $current_result['terms'], 'count', 'term_id' ) );
+		$this->assertIsArray( CalendarCache::get( $key, $current_generation ) );
+	}
+
 	public function test_canonical_post_status_excludes_stale_published_date_row(): void {
 		global $wpdb;
 

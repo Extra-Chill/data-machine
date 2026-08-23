@@ -46,23 +46,25 @@ class CalendarCache {
 	/**
 	 * Get a cached value (transient-backed bucket cache).
 	 *
-	 * @param string $key Full cache key.
+	 * @param string      $key        Full cache key.
+	 * @param string|null $generation Optional pinned generation.
 	 * @return mixed Cached value or false if not found.
 	 */
-	public static function get( string $key ) {
-		return get_transient( self::storage_key( $key ) );
+	public static function get( string $key, ?string $generation = null ) {
+		return get_transient( self::storage_key( $key, $generation ) );
 	}
 
 	/**
 	 * Set a cached value (transient-backed bucket cache).
 	 *
-	 * @param string $key   Full cache key.
-	 * @param mixed  $value Value to cache.
-	 * @param int    $ttl   Time-to-live in seconds.
+	 * @param string      $key        Full cache key.
+	 * @param mixed       $value      Value to cache.
+	 * @param int         $ttl        Time-to-live in seconds.
+	 * @param string|null $generation Optional pinned generation.
 	 * @return bool True on success.
 	 */
-	public static function set( string $key, $value, int $ttl ): bool {
-		return set_transient( self::storage_key( $key ), $value, $ttl );
+	public static function set( string $key, $value, int $ttl, ?string $generation = null ): bool {
+		return set_transient( self::storage_key( $key, $generation ), $value, $ttl );
 	}
 
 	/**
@@ -247,8 +249,8 @@ class CalendarCache {
 	/**
 	 * Resolve a logical calendar key to its current generation.
 	 */
-	private static function storage_key( string $key ): string {
-		return $key . '_' . self::get_generation();
+	private static function storage_key( string $key, ?string $generation = null ): string {
+		return $key . '_' . ( $generation ?? self::get_generation() );
 	}
 
 	/**

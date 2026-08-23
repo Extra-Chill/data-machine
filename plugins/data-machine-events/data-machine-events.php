@@ -170,6 +170,16 @@ class DATAMACHINE_Events {
 	private function __construct() {
 		add_action( 'init', array( $this, 'init' ), 0 );
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
+		add_action( 'plugins_loaded', array( $this, 'init_taxonomy_inventory_warmer' ), 20 );
+	}
+
+	/**
+	 * Register the event-owned cache warmer with Data Machine's task runtime.
+	 */
+	public function init_taxonomy_inventory_warmer(): void {
+		if ( class_exists( '\DataMachine\Engine\AI\System\Tasks\SystemTask' ) ) {
+			\DataMachineEvents\Tasks\TaxonomyInventoryWarmer::init();
+		}
 	}
 
 	public function init() {

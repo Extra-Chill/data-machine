@@ -28,6 +28,55 @@ class UpcomingCountAbilities {
 
 	private static bool $registered = false;
 
+	/**
+	 * Return the complete finite set of unfiltered inventory cache shapes.
+	 *
+	 * Location is the only hierarchical supported taxonomy, so it has both the
+	 * default leaf inventory and the root-inclusive variant used by stats.
+	 *
+	 * @return array<int,array{taxonomy:string,exclude_roots:bool}>
+	 */
+	public static function inventoryCacheShapes(): array {
+		return array(
+			array(
+				'taxonomy'      => 'location',
+				'exclude_roots' => true,
+			),
+			array(
+				'taxonomy'      => 'location',
+				'exclude_roots' => false,
+			),
+			array(
+				'taxonomy'      => 'venue',
+				'exclude_roots' => false,
+			),
+			array(
+				'taxonomy'      => 'artist',
+				'exclude_roots' => false,
+			),
+			array(
+				'taxonomy'      => 'festival',
+				'exclude_roots' => false,
+			),
+		);
+	}
+
+	/**
+	 * Build the shared Calendar cache key for an inventory shape.
+	 */
+	public static function inventoryCacheKey( string $taxonomy, bool $exclude_roots ): string {
+		return CalendarCache::generate_key(
+			array(
+				'tax_filters' => array(
+					'taxonomy'      => $taxonomy,
+					'exclude_roots' => $exclude_roots,
+				),
+				'scope_token' => wp_cache_get_last_changed( 'terms' ),
+			),
+			'upcoming_counts'
+		);
+	}
+
 	public function __construct() {
 		if ( ! self::$registered ) {
 			$this->registerAbilities();
@@ -117,9 +166,10 @@ class UpcomingCountAbilities {
 	 * @param array $input Input parameters.
 	 * @return array|\WP_Error Term counts sorted by event count descending.
 	 */
-	public function executeGetUpcomingCounts( array $input ): array|\WP_Error {
-		$taxonomy      = $input['taxonomy'];
-		$exclude_roots = $input['exclude_roots'] ?? ( is_taxonomy_hierarchical( $taxonomy ) );
+	public function executeGetUpcomingCounts( array $input, ?string $cache_generation = null ): array|\WP_Error {
+		$taxonomy         = $input['taxonomy'];
+		$exclude_roots    = $input['exclude_roots'] ?? ( is_taxonomy_hierarchical( $taxonomy ) );
+		$cache_generation = $cache_generation ?? CalendarCache::get_generation();
 
 		// Optional co-occurrence filter. Both keys must be set together;
 		// providing only one is misuse and returns an error so callers
@@ -177,17 +227,8 @@ class UpcomingCountAbilities {
 		// creating per-term entries for the long artist tail.
 		$cache_key = '';
 		if ( ! $has_filter ) {
-			$cache_key = CalendarCache::generate_key(
-				array(
-					'tax_filters' => array(
-						'taxonomy'      => $taxonomy,
-						'exclude_roots' => $exclude_roots,
-					),
-					'scope_token' => wp_cache_get_last_changed( 'terms' ),
-				),
-				'upcoming_counts'
-			);
-			$cached    = CalendarCache::get( $cache_key );
+			$cache_key = self::inventoryCacheKey( $taxonomy, $exclude_roots );
+			$cached    = CalendarCache::get( $cache_key, $cache_generation );
 			if ( is_array( $cached ) ) {
 				return $cached;
 			}
@@ -292,7 +333,7 @@ class UpcomingCountAbilities {
 			'total'    => count( $terms ),
 		);
 		if ( '' !== $cache_key ) {
-			CalendarCache::set( $cache_key, $result, CalendarCache::ttl_for_upcoming_transition( CalendarCache::TTL_COUNTS ) );
+			CalendarCache::set( $cache_key, $result, CalendarCache::ttl_for_upcoming_transition( CalendarCache::TTL_COUNTS ), $cache_generation );
 		}
 
 		return $result;
