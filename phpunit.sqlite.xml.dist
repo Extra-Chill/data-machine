@@ -8,7 +8,6 @@
 	<testsuites>
 		<testsuite name="Data Machine SQLite">
 			<directory suffix="Test.php">tests</directory>
-			<file>tests/test-sample.php</file>
 			<exclude>tests/Unit/AI/Tools/ImageGenerationToolCallTest.php</exclude>
 			<exclude>tests/Unit/AI/Tools/ToolExecutorValidationTest.php</exclude>
 			<exclude>tests/Unit/Abilities/Content/UpsertPostAbilityTest.php</exclude>

@@ -3,7 +3,6 @@
 	<testsuites>
 		<testsuite name="Data Machine">
 			<directory suffix="Test.php">tests</directory>
-			<file>tests/test-sample.php</file>
 		</testsuite>
 	</testsuites>
 </phpunit>
