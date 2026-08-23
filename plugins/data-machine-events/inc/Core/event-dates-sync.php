@@ -382,13 +382,25 @@ function data_machine_events_sync_status( $new_status, $old_status, $post ) {
 		return;
 	}
 
-	if ( $new_status === $old_status ) {
-		return;
-	}
-
 	EventDatesTable::update_status( $post->ID, $new_status );
 }
 add_action( 'transition_post_status', __NAMESPACE__ . '\\data_machine_events_sync_status', 10, 3 );
+
+/**
+ * Remove an event-date row after its canonical event is permanently deleted.
+ *
+ * Trash and untrash remain status transitions; only permanent deletion removes
+ * the derived row.
+ *
+ * @param int     $post_id Deleted post ID.
+ * @param WP_Post $post    Deleted post object.
+ */
+function data_machine_events_delete_dates( $post_id, $post ) {
+	if ( Event_Post_Type::POST_TYPE === $post->post_type ) {
+		EventDatesTable::delete( (int) $post_id );
+	}
+}
+add_action( 'deleted_post', __NAMESPACE__ . '\\data_machine_events_delete_dates', 10, 2 );
 
 /**
  * Get event dates from the dedicated event_dates table.

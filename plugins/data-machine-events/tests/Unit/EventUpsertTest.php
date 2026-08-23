@@ -204,6 +204,7 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$this->assertSame( $post_id, (int) $reimported['data']['post_id'] );
 		$this->assertSame( 'updated', $reimported['data']['action'] );
 		$this->assertSame( 'publish', get_post_status( $post_id ) );
+		$this->assertSame( 'publish', EventDatesTable::get( $post_id )->post_status );
 		$this->assertSame( $original_slug, get_post_field( 'post_name', $post_id ) );
 		$this->assertSame( array(), get_post_meta( $post_id, '_wp_desired_post_slug', false ) );
 		$this->assertSame( array(), get_post_meta( $post_id, '_wp_trash_meta_status', false ) );

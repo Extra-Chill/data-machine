@@ -115,6 +115,10 @@ class CommandRegistry {
 				'file'  => $cli . 'Check/CheckMalformedDatesCommand.php',
 				'class' => Check\CheckMalformedDatesCommand::class,
 			),
+			'data-machine-events check event-date-status' => array(
+				'file'  => $cli . 'Check/CheckEventDateStatusCommand.php',
+				'class' => Check\CheckEventDateStatusCommand::class,
+			),
 			'data-machine-events check all'              => array(
 				'file'  => $cli . 'Check/CheckAllCommand.php',
 				'class' => Check\CheckAllCommand::class,

@@ -86,11 +86,18 @@ class EventDatesTable {
 	 * @param int         $post_id        Post ID.
 	 * @param string      $start_datetime MySQL datetime string.
 	 * @param string|null $end_datetime   MySQL datetime string or null.
-	 * @param string|null $post_status    Post status (auto-detected from post if null).
+	 * @param string|null $post_status    Deprecated hint; canonical post status always wins.
 	 * @return bool True on success, false if a malformed date was rejected.
 	 */
 	public static function upsert( int $post_id, string $start_datetime, ?string $end_datetime = null, ?string $post_status = null ): bool {
 		global $wpdb;
+		$post = get_post( $post_id );
+
+		// The canonical event post always owns status. Never create an orphaned
+		// row or infer that a missing post is published.
+		if ( ! $post instanceof \WP_Post || Event_Post_Type::POST_TYPE !== $post->post_type ) {
+			return false;
+		}
 
 		if ( ! self::is_valid_datetime( $start_datetime ) ) {
 			do_action(
@@ -118,9 +125,7 @@ class EventDatesTable {
 			return false;
 		}
 
-		if ( null === $post_status ) {
-			$post_status = get_post_status( $post_id ) ?: 'publish';
-		}
+		$post_status = $post->post_status;
 
 		$result = $wpdb->replace(
 			self::table_name(),
@@ -161,16 +166,23 @@ class EventDatesTable {
 	 * @param int    $post_id     Post ID.
 	 * @param string $post_status New post status.
 	 */
-	public static function update_status( int $post_id, string $post_status ): void {
+	public static function update_status( int $post_id, string $post_status ): bool {
 		global $wpdb;
+		$post = get_post( $post_id );
+		if ( ! $post instanceof \WP_Post || Event_Post_Type::POST_TYPE !== $post->post_type ) {
+			return false;
+		}
+		$post_status = $post->post_status;
 
-		$wpdb->update(
+		$result = $wpdb->update(
 			self::table_name(),
 			array( 'post_status' => $post_status ),
 			array( 'post_id' => $post_id ),
 			array( '%s' ),
 			array( '%d' )
 		);
+
+		return false !== $result;
 	}
 
 	/**
@@ -200,7 +212,7 @@ class EventDatesTable {
 	 * Get event dates for a single post.
 	 *
 	 * @param int $post_id Post ID.
-	 * @return object{start_datetime:string,end_datetime:string|null}|null Event dates, or null.
+	 * @return object{start_datetime:string,end_datetime:string|null,post_status:string}|null Event dates, or null.
 	 */
 	public static function get( int $post_id ): ?object {
 		global $wpdb;
@@ -210,10 +222,99 @@ class EventDatesTable {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally by table_name(); query contains no request values.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$row = $wpdb->get_row(
-			$wpdb->prepare( "SELECT start_datetime, end_datetime FROM {$table} WHERE post_id = %d", $post_id )
+			$wpdb->prepare( "SELECT start_datetime, end_datetime, post_status FROM {$table} WHERE post_id = %d", $post_id )
 		);
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Subsequent queries use the same internally generated table identifier.
 		return $row ?: null;
+	}
+
+	/**
+	 * Find one keyset-paginated batch of status mismatches and orphans.
+	 *
+	 * @param int $after_id   Only inspect rows after this post ID.
+	 * @param int $batch_size Maximum rows returned.
+	 * @return array{rows:array<int,array<string,mixed>>,next_cursor:int,has_more:bool}
+	 */
+	public static function find_status_drift_batch( int $after_id = 0, int $batch_size = 100 ): array {
+		global $wpdb;
+
+		$table      = self::table_name();
+		$batch_size = max( 1, min( 1000, $batch_size ) );
+		$query_size = $batch_size + 1;
+
+		// Keyset pagination follows the event-dates primary key. The query reads
+		// only mismatches and does not hold a transaction or lock across repairs.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT ed.post_id, ed.post_status AS indexed_status,
+					p.post_status AS canonical_status, p.post_type AS canonical_post_type
+				FROM {$table} ed
+				LEFT JOIN {$wpdb->posts} p ON p.ID = ed.post_id
+				WHERE ed.post_id > %d
+					AND (p.ID IS NULL OR p.post_type <> %s OR ed.post_status <> p.post_status)
+				ORDER BY ed.post_id ASC
+				LIMIT %d",
+				$after_id,
+				Event_Post_Type::POST_TYPE,
+				$query_size
+			),
+			ARRAY_A
+		);
+
+		$has_more = count( $rows ) > $batch_size;
+		if ( $has_more ) {
+			$rows = array_slice( $rows, 0, $batch_size );
+		}
+
+		$rows = array_map(
+			static function ( array $row ): array {
+				$row['post_id'] = (int) $row['post_id'];
+				$row['action']  = empty( $row['canonical_post_type'] ) || Event_Post_Type::POST_TYPE !== $row['canonical_post_type']
+					? 'delete_orphan'
+					: 'update_status';
+				return $row;
+			},
+			$rows
+		);
+
+		$last = end( $rows );
+
+		return array(
+			'rows'        => $rows,
+			'next_cursor' => false === $last ? $after_id : (int) $last['post_id'],
+			'has_more'    => $has_more,
+		);
+	}
+
+	/**
+	 * Reconcile one candidate against its current canonical post state.
+	 *
+	 * @param int $post_id Event-date row post ID.
+	 * @return string One of status_updated, orphan_deleted, unchanged, or failed.
+	 */
+	public static function repair_status_drift_row( int $post_id ): string {
+		global $wpdb;
+		$table          = self::table_name();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$indexed_status = $wpdb->get_var(
+			$wpdb->prepare( "SELECT post_status FROM {$table} WHERE post_id = %d", $post_id )
+		);
+
+		if ( null === $indexed_status ) {
+			return 'unchanged';
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post instanceof \WP_Post || Event_Post_Type::POST_TYPE !== $post->post_type ) {
+			return self::delete( $post_id ) ? 'orphan_deleted' : 'failed';
+		}
+
+		if ( $post->post_status === $indexed_status ) {
+			return 'unchanged';
+		}
+
+		return self::update_status( $post_id, $post->post_status ) ? 'status_updated' : 'failed';
 	}
 
 	/**

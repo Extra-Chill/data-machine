@@ -27,7 +27,7 @@ Parses Gutenberg blocks to extract datetime information from Event Details block
 
 ### Denormalized post_status
 
-The table includes a `post_status` column kept in sync via `transition_post_status` so date queries can filter to published events without joining the posts table.
+The table includes a `post_status` column kept in sync on every `transition_post_status` invocation, including same-status saves, so date queries can filter to published events without joining the posts table. Permanent deletion removes the derived row.
 
 ## Key Function
 
@@ -86,3 +86,5 @@ The system reads these attributes from Event Details blocks:
 ## Migration
 
 The `EventDatesTable::backfill()` method performs a one-time migration of events that still have legacy `_datamachine_event_datetime` postmeta but no row in the table. New events are written directly to the table by `save_post`.
+
+Historical status drift and orphan rows can be audited in bounded batches with `wp data-machine-events check event-date-status`. The command is read-only unless `--apply` is explicit and reports an `--after-id` cursor for resumable keyset pagination.
