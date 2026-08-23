@@ -16,11 +16,12 @@ final class DelegatedCrossPostAction {
 
 	public const ACTION_ID = 'datamachine-socials/cross-post';
 
-	private const VERSION = '2';
+	private const VERSION = '3';
 
 	private const INPUT_KEYS = array(
 		'post_site_id',
 		'post_id',
+		'attribution_post',
 		'source_url',
 		'caption',
 		'content_hash',
@@ -44,7 +45,10 @@ final class DelegatedCrossPostAction {
 	public static function register_action( array $actions ): array {
 		$contract = self::contract( self::VERSION );
 
-		$contract['versions'] = array( '1' => self::contract( '1' ) );
+		$contract['versions'] = array(
+			'1' => self::contract( '1' ),
+			'2' => self::contract( '2' ),
+		);
 
 		$actions[ self::ACTION_ID ] = $contract;
 
@@ -95,6 +99,11 @@ final class DelegatedCrossPostAction {
 					return self::error( 'social_cross_post_invalid_post', 'A published canonical post is required.' );
 				}
 
+				$attribution_post = self::normalize_attribution_post( $input['attribution_post'] ?? null, array_key_exists( 'attribution_post', $input ) );
+				if ( is_wp_error( $attribution_post ) ) {
+					return $attribution_post;
+				}
+
 				$canonical_url = get_permalink( $post_id );
 				$source_url    = $input['source_url'] ?? null;
 				if ( ! is_string( $source_url ) || ! self::is_public_url( $source_url ) || ! is_string( $canonical_url ) || ! hash_equals( $canonical_url, $source_url ) ) {
@@ -136,7 +145,7 @@ final class DelegatedCrossPostAction {
 					return self::error( 'social_cross_post_unsupported_channel_media', 'Twitter carousels support at most four image assets.' );
 				}
 
-				return array(
+				$normalized = array(
 					'post_site_id'  => $post_site_id,
 					'post_id'       => $post_id,
 					'source_url'    => $source_url,
@@ -150,6 +159,11 @@ final class DelegatedCrossPostAction {
 					'cover_url'     => $assets['cover_url'],
 					'share_to_feed' => true,
 				);
+				if ( null !== $attribution_post ) {
+					$normalized['attribution_post'] = $attribution_post;
+				}
+
+				return $normalized;
 			}
 		);
 	}
@@ -218,6 +232,9 @@ final class DelegatedCrossPostAction {
 			'delegated_operation_ref' => (string) ( $context['operation_ref'] ?? '' ),
 			'delegated_input'         => self::canonical_input( $input ),
 		);
+		if ( isset( $input['attribution_post'] ) ) {
+			$params['attribution_post'] = $input['attribution_post'];
+		}
 
 		return array(
 			'owner_user_id' => (int) $owner['user_id'],
@@ -263,7 +280,8 @@ final class DelegatedCrossPostAction {
 		$share_refs    = array();
 		$error_codes   = array();
 		$input         = is_array( $context['input'] ?? null ) ? $context['input'] : array();
-		$post_id       = self::strict_positive_int( $input['post_id'] ?? null );
+		$tracking_post = self::tracking_post( $input );
+		$post_id       = $tracking_post['post_id'];
 		$operation_ref = is_string( $context['operation_ref'] ?? null ) ? $context['operation_ref'] : '';
 		foreach ( self::packet_refs( $run_result ) as $ref ) {
 			if ( self::RESULT_SOURCE !== ( $ref['source_type'] ?? '' ) ) {
@@ -276,10 +294,7 @@ final class DelegatedCrossPostAction {
 			}
 
 			if ( 'social_share_ref' === ( $ref['type'] ?? '' ) ) {
-				$post_site_id = self::strict_positive_int( $input['post_site_id'] ?? null );
-				if ( 0 === $post_site_id ) {
-					$post_site_id = get_current_blog_id();
-				}
+				$post_site_id = $tracking_post['site_id'];
 				$receipt = $post_id && '' !== $operation_ref
 					? self::with_site( $post_site_id, static fn() => \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref ) )
 					: null;
@@ -334,7 +349,8 @@ final class DelegatedCrossPostAction {
 	 */
 	public static function retry( array $run_result, array $context ) {
 		$input         = is_array( $context['input'] ?? null ) ? $context['input'] : array();
-		$post_id       = self::strict_positive_int( $input['post_id'] ?? null );
+		$tracking_post = self::tracking_post( $input );
+		$post_id       = $tracking_post['post_id'];
 		$operation_ref = is_string( $context['operation_ref'] ?? null ) ? $context['operation_ref'] : '';
 		$channels      = is_array( $input['channels'] ?? null ) ? $input['channels'] : array();
 		if ( ! $post_id || ! preg_match( '/^dop_[a-f0-9]{64}$/', $operation_ref ) || array() === $channels ) {
@@ -371,10 +387,7 @@ final class DelegatedCrossPostAction {
 				return self::error( 'social_cross_post_retry_unsafe', 'The prior delivery effects cannot be reconciled safely.' );
 			}
 
-			$post_site_id = self::strict_positive_int( $live_input['post_site_id'] ?? null );
-			if ( 0 === $post_site_id ) {
-				$post_site_id = get_current_blog_id();
-			}
+			$post_site_id = self::tracking_post( $live_input )['site_id'];
 			$receipt = self::with_site( $post_site_id, static fn() => \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref ) );
 			if ( is_array( $receipt ) ) {
 				$recorded_id = (string) ( $receipt['platform_post_id'] ?? '' );
@@ -468,6 +481,41 @@ final class DelegatedCrossPostAction {
 			'user_id'  => max( 0, (int) ( $actor['user_id'] ?? 0 ) ),
 			'agent_id' => max( 0, (int) ( $actor['agent_id'] ?? 0 ) ),
 		);
+	}
+
+	/** @return array{site_id:int,post_id:int}|null|\WP_Error */
+	private static function normalize_attribution_post( $reference, bool $provided ) {
+		if ( ! $provided ) {
+			return null;
+		}
+		if ( ! is_array( $reference ) || array_diff( array_keys( $reference ), array( 'site_id', 'post_id' ) ) || 2 !== count( $reference ) ) {
+			return self::error( 'social_cross_post_invalid_attribution_post', 'The attribution post reference is invalid.' );
+		}
+
+		$site_id = self::strict_positive_int( $reference['site_id'] ?? null );
+		$post_id = self::strict_positive_int( $reference['post_id'] ?? null );
+		if ( ! self::is_valid_site( $site_id ) ) {
+			return self::error( 'social_cross_post_invalid_attribution_post', 'The attribution post reference is invalid.' );
+		}
+
+		$published = self::with_site( $site_id, static fn(): bool => 'publish' === get_post_status( $post_id ) );
+		return $post_id && $published
+			? compact( 'site_id', 'post_id' )
+			: self::error( 'social_cross_post_invalid_attribution_post', 'The attribution post must be published.' );
+	}
+
+	/** @return array{site_id:int,post_id:int} */
+	private static function tracking_post( array $input ): array {
+		$reference = is_array( $input['attribution_post'] ?? null ) ? $input['attribution_post'] : array();
+		$site_id   = self::strict_positive_int( $reference['site_id'] ?? null );
+		$post_id   = self::strict_positive_int( $reference['post_id'] ?? null );
+		if ( $site_id && $post_id ) {
+			return compact( 'site_id', 'post_id' );
+		}
+
+		$site_id = self::strict_positive_int( $input['post_site_id'] ?? null ) ?: get_current_blog_id();
+		$post_id = self::strict_positive_int( $input['post_id'] ?? null );
+		return compact( 'site_id', 'post_id' );
 	}
 
 	/** @return array<int,array<string,mixed>> */

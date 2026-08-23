@@ -6,14 +6,19 @@
  */
 
 use DataMachineSocials\Operations\DelegatedCrossPostAction;
+use DataMachineSocials\Publisher;
+use DataMachineSocials\Tracking\SocialShareTracker;
 
 final class DelegatedCrossPostMultisiteTest extends WP_UnitTestCase {
 	private int $canonical_site_id;
 	private int $asset_site_id;
+	private int $attribution_site_id;
 	private int $post_id;
+	private int $attribution_post_id;
 	private int $attachment_id;
 	private string $canonical_url;
 	private string $asset_url;
+	private array $authorized_inputs = array();
 
 	public function set_up(): void {
 		parent::set_up();
@@ -23,6 +28,7 @@ final class DelegatedCrossPostMultisiteTest extends WP_UnitTestCase {
 
 		$this->canonical_site_id = self::factory()->blog->create();
 		$this->asset_site_id     = self::factory()->blog->create();
+		$this->attribution_site_id = self::factory()->blog->create();
 
 		switch_to_blog( $this->canonical_site_id );
 		try {
@@ -54,12 +60,153 @@ final class DelegatedCrossPostMultisiteTest extends WP_UnitTestCase {
 			restore_current_blog();
 		}
 
-		add_filter( 'datamachine_socials_delegated_cross_post_authorized', '__return_true' );
+		switch_to_blog( $this->attribution_site_id );
+		try {
+			$this->attribution_post_id = wp_insert_post(
+				array(
+					'import_id'   => $this->post_id,
+					'post_status' => 'publish',
+					'post_title'  => 'Attribution owner',
+				)
+			);
+			$this->assertSame( $this->post_id, $this->attribution_post_id, 'The fixture must create colliding post IDs.' );
+		} finally {
+			restore_current_blog();
+		}
+
+		add_filter( 'datamachine_socials_delegated_cross_post_authorized', array( $this, 'authorize' ), 10, 2 );
 	}
 
 	public function tear_down(): void {
-		remove_filter( 'datamachine_socials_delegated_cross_post_authorized', '__return_true' );
+		remove_filter( 'datamachine_socials_delegated_cross_post_authorized', array( $this, 'authorize' ), 10 );
 		parent::tear_down();
+	}
+
+	public function authorize( bool $authorized, array $context ): bool {
+		unset( $authorized );
+		$this->authorized_inputs[] = $context['input'] ?? array();
+		return true;
+	}
+
+	public function test_attribution_keeps_operation_resource_and_scopes_receipts_to_owner_site(): void {
+		$this->require_multisite();
+		$original_site_id = get_current_blog_id();
+
+		switch_to_blog( $this->canonical_site_id );
+		try {
+			$input                     = $this->input( $this->asset_site_id . ':' . $this->attachment_id );
+			$input['attribution_post'] = array(
+				'site_id' => $this->attribution_site_id,
+				'post_id' => $this->attribution_post_id,
+			);
+			$normalized                = DelegatedCrossPostAction::normalize_input( $input );
+			$this->assertIsArray( $normalized );
+			$operation_ref = 'dop_' . str_repeat( 'c', 64 );
+			$validated     = DelegatedCrossPostAction::validate_effect( $normalized, array( 'user_id' => 1 ), $operation_ref );
+			$this->assertIsArray( $validated );
+			$this->assertSame( $this->post_id, $this->authorized_inputs[0]['post_id'] );
+			$this->assertSame( $this->canonical_site_id, $this->authorized_inputs[0]['post_site_id'] );
+			$owner = static fn(): array => array( 'user_id' => 1, 'agent_id' => 1 );
+			add_filter( 'datamachine_socials_delegated_cross_post_execution_owner', $owner );
+			$prepared = DelegatedCrossPostAction::prepare( $normalized, array( 'operation_ref' => $operation_ref ) );
+			remove_filter( 'datamachine_socials_delegated_cross_post_execution_owner', $owner );
+			$params = $prepared['workflow']['steps'][0]['flow_step_settings']['params'];
+			$this->assertSame( $this->post_id, $params['post_id'] );
+			$this->assertSame( $normalized['attribution_post'], $params['attribution_post'] );
+
+		} finally {
+			restore_current_blog();
+		}
+
+		switch_to_blog( $this->attribution_site_id );
+		try {
+			$this->assertTrue(
+				SocialShareTracker::record(
+					$this->attribution_post_id,
+					'instagram',
+					'owner-receipt',
+					'https://www.instagram.com/p/owner-receipt/',
+					array( 'operation_ref' => $operation_ref )
+				)
+			);
+		} finally {
+			restore_current_blog();
+		}
+
+		switch_to_blog( $this->canonical_site_id );
+		try {
+			$result = Publisher::cross_post(
+				array(
+					'post_site_id'            => $this->canonical_site_id,
+					'post_id'                 => $this->post_id,
+					'attribution_post'        => $normalized['attribution_post'],
+					'platforms'               => array( 'instagram' ),
+					'caption'                 => 'Approved multisite caption.',
+					'images'                  => array( array( 'url' => $this->asset_url ) ),
+					'delegated_operation_ref' => $operation_ref,
+				)
+			);
+			$this->assertTrue( $result['success'] );
+			$this->assertTrue( $result['results'][0]['replayed'] );
+			$this->assertSame( array(), SocialShareTracker::get_shares( $this->post_id ) );
+		} finally {
+			restore_current_blog();
+		}
+
+		switch_to_blog( $this->attribution_site_id );
+		try {
+			$this->assertSame( 1, SocialShareTracker::count_shares( $this->attribution_post_id, 'instagram' ) );
+		} finally {
+			restore_current_blog();
+		}
+		$this->assertSame( $original_site_id, get_current_blog_id() );
+
+		$run_result = array(
+			'status'      => 'failed',
+			'packet_refs' => array(
+				array(
+					'type'           => 'social_share_ref',
+					'source_type'    => 'datamachine_socials_cross_post',
+					'source_id'      => 'instagram',
+					'source_item_id' => 'owner-receipt',
+				),
+			),
+		);
+		$context = array( 'input' => $normalized, 'actor' => array( 'user_id' => 1 ), 'operation_ref' => $operation_ref );
+		$this->assertSame( 'success', DelegatedCrossPostAction::project( $run_result, $context )['classification'] );
+		$this->assertTrue( DelegatedCrossPostAction::retry( $run_result, $context ) );
+	}
+
+	public function test_attribution_omission_and_invalid_references_are_bounded(): void {
+		$this->require_multisite();
+
+		switch_to_blog( $this->canonical_site_id );
+		try {
+			$input      = $this->input( $this->asset_site_id . ':' . $this->attachment_id );
+			$normalized = DelegatedCrossPostAction::normalize_input( $input );
+			$this->assertIsArray( $normalized );
+			$this->assertArrayNotHasKey( 'attribution_post', $normalized );
+
+			$malformed                     = $input;
+			$malformed['attribution_post'] = array( 'site_id' => $this->attribution_site_id, 'post_id' => $this->attribution_post_id, 'extra' => 1 );
+			$this->assertSame( 'social_cross_post_invalid_attribution_post', DelegatedCrossPostAction::normalize_input( $malformed )->get_error_code() );
+
+			$missing_site                     = $input;
+			$missing_site['attribution_post'] = array( 'site_id' => PHP_INT_MAX, 'post_id' => $this->attribution_post_id );
+			$this->assertSame( 'social_cross_post_invalid_attribution_post', DelegatedCrossPostAction::normalize_input( $missing_site )->get_error_code() );
+
+			switch_to_blog( $this->attribution_site_id );
+			wp_update_post( array( 'ID' => $this->attribution_post_id, 'post_status' => 'draft' ) );
+			restore_current_blog();
+			$draft                     = $input;
+			$draft['attribution_post'] = array( 'site_id' => $this->attribution_site_id, 'post_id' => $this->attribution_post_id );
+			$this->assertSame( 'social_cross_post_invalid_attribution_post', DelegatedCrossPostAction::normalize_input( $draft )->get_error_code() );
+		} finally {
+			if ( get_current_blog_id() !== $this->canonical_site_id ) {
+				restore_current_blog();
+			}
+			restore_current_blog();
+		}
 	}
 
 	public function test_cross_site_asset_identity_survives_effect_validation_and_retry(): void {

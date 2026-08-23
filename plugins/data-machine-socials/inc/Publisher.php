@@ -30,6 +30,7 @@ class Publisher {
 	 *     @type array  $images       Image objects with 'url' key.
 	 *     @type int    $post_id      Optional WP post ID.
 	 *     @type int    $post_site_id Optional canonical WP site ID.
+	 *     @type array  $attribution_post Optional site_id/post_id tracking owner.
 	 *     @type string $aspect_ratio Image aspect ratio.
 	 *     @type string $media_kind   image | carousel | reel | story.
 	 *     @type string $video_url    Video URL for reels/stories.
@@ -66,6 +67,7 @@ class Publisher {
 		$cover_url     = sanitize_url( $params['cover_url'] ?? '' );
 		$share_to_feed = $params['share_to_feed'] ?? true;
 		$operation_ref = sanitize_text_field( $params['delegated_operation_ref'] ?? '' );
+		$tracking_post = self::tracking_post( $params, $post_id );
 
 		if ( empty( $platforms ) || ! is_array( $platforms ) ) {
 			return array(
@@ -124,8 +126,8 @@ class Publisher {
 		$errors  = array();
 
 		foreach ( $platforms as $platform ) {
-			$existing_share = $post_id && '' !== $operation_ref
-				? SocialShareTracker::get_operation_share( $post_id, $platform, $operation_ref )
+			$existing_share = $tracking_post['post_id'] && '' !== $operation_ref
+				? self::with_site( $tracking_post['site_id'], static fn() => SocialShareTracker::get_operation_share( $tracking_post['post_id'], $platform, $operation_ref ) )
 				: null;
 			$result         = $existing_share
 				? array(
@@ -138,14 +140,17 @@ class Publisher {
 				)
 				: self::post_to_platform( $platform, $images, $caption, $source_url, $extra );
 			// Track successful shares via SocialShareTracker when post_id is available.
-			if ( $post_id && ! $existing_share && ! empty( $result['success'] ) ) {
-				$recorded = SocialShareTracker::record_from_result(
-					$post_id,
-					$platform,
-					$result,
-					array(
-						'media_kind'    => $media_kind,
-						'operation_ref' => $operation_ref,
+			if ( $tracking_post['post_id'] && ! $existing_share && ! empty( $result['success'] ) ) {
+				$recorded = self::with_site(
+					$tracking_post['site_id'],
+					static fn(): bool => SocialShareTracker::record_from_result(
+						$tracking_post['post_id'],
+						$platform,
+						$result,
+						array(
+							'media_kind'    => $media_kind,
+							'operation_ref' => $operation_ref,
+						)
 					)
 				);
 				if ( '' !== $operation_ref && ! $recorded ) {
@@ -170,6 +175,17 @@ class Publisher {
 			'results' => $results,
 			'errors'  => $errors ? $errors : null,
 		);
+	}
+
+	/** @return array{site_id:int,post_id:int} */
+	private static function tracking_post( array $params, int $post_id ): array {
+		$reference = is_array( $params['attribution_post'] ?? null ) ? $params['attribution_post'] : array();
+		$site_id   = absint( $reference['site_id'] ?? 0 );
+		$tracking_post_id = absint( $reference['post_id'] ?? 0 );
+
+		return $site_id && $tracking_post_id
+			? array( 'site_id' => $site_id, 'post_id' => $tracking_post_id )
+			: array( 'site_id' => get_current_blog_id(), 'post_id' => $post_id );
 	}
 
 	/** @return mixed */

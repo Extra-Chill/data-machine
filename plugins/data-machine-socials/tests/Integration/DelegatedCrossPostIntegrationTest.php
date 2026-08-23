@@ -65,7 +65,7 @@ final class DelegatedCrossPostIntegrationTest extends WP_UnitTestCase {
 	public function test_real_registry_service_and_cancelled_projection(): void {
 		$action = ( new DelegatedOperationRegistry() )->get( DelegatedCrossPostAction::ACTION_ID );
 		$this->assertIsArray( $action );
-		$this->assertSame( '2', $action['version'] );
+		$this->assertSame( '3', $action['version'] );
 		$this->assertIsCallable( $action['retry'] );
 
 		wp_set_current_user( $this->first_actor );

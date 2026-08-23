@@ -66,6 +66,9 @@ class SocialCrossPostTask extends SystemTask {
 					'share_to_feed' => true,
 				)
 			);
+			if ( isset( $revalidated['attribution_post'] ) ) {
+				$params['attribution_post'] = $revalidated['attribution_post'];
+			}
 			$post_id   = $revalidated['post_id'];
 			$platforms = $revalidated['channels'];
 			$caption   = $revalidated['caption'];
@@ -93,7 +96,9 @@ class SocialCrossPostTask extends SystemTask {
 		}
 
 		// Publish directly via Publisher utility (no REST round-trip).
-		$post_site_id   = absint( $params['post_site_id'] ?? get_current_blog_id() );
+		$tracking_post  = is_array( $params['attribution_post'] ?? null ) ? $params['attribution_post'] : array();
+		$tracking_site_id = absint( $tracking_post['site_id'] ?? $params['post_site_id'] ?? get_current_blog_id() );
+		$tracking_post_id = absint( $tracking_post['post_id'] ?? $post_id );
 		$publish_result = Publisher::cross_post( $params );
 
 		if ( ! empty( $publish_result['error'] ) && empty( $publish_result['results'] ) ) {
@@ -120,13 +125,13 @@ class SocialCrossPostTask extends SystemTask {
 		}
 
 		// Store results in post meta when post_id is available.
-		if ( $post_id ) {
+		if ( $tracking_post_id ) {
 			$this->with_site(
-				$post_site_id,
-				static function () use ( $post_id, $log ): void {
-					$existing_log = get_post_meta( $post_id, '_studio_social_publish_log', true );
+				$tracking_site_id,
+				static function () use ( $tracking_post_id, $log ): void {
+					$existing_log = get_post_meta( $tracking_post_id, '_studio_social_publish_log', true );
 					$existing_log = $existing_log ? $existing_log : array();
-					update_post_meta( $post_id, '_studio_social_publish_log', array_merge( $existing_log, $log ) );
+					update_post_meta( $tracking_post_id, '_studio_social_publish_log', array_merge( $existing_log, $log ) );
 				}
 			);
 		}
