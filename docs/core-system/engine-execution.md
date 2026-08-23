@@ -36,7 +36,7 @@ $payload = array(
 
 ## Core Step Types
 
-`datamachine_load_step_types()` instantiates the six core registrations:
+`Core\Bootstrap\RuntimeServiceProvider::register_step_types()` instantiates the six core registrations:
 
 | Slug | Class | Runtime behavior |
 |---|---|---|

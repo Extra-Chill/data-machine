@@ -37,7 +37,7 @@ $assert( str_contains( $main, 'CliServiceProvider::register();' ), 'entrypoint d
 $cli = (string) file_get_contents( $root . '/inc/Core/Bootstrap/CliServiceProvider.php' );
 $assert( str_contains( $cli, 'CommandRegistry::map()' ), 'CLI provider owns command registration' );
 $assert( str_contains( $cli, 'WP_CLI::add_command' ), 'CLI provider registers every mapped command' );
-$assert( str_contains( $main, 'RuntimeServiceProvider::register();' ), 'runtime wrapper delegates full composition' );
+$assert( str_contains( $main, 'RuntimeServiceProvider::register();' ), 'entrypoint delegates full runtime composition' );
 $assert( str_contains( $main, 'AbilityServiceProvider::register_lightweight();' ), 'lightweight abilities remain unconditional' );
 $assert( str_contains( $main, 'AlwaysOnServiceProvider::register_scheduler();' ), 'entrypoint delegates scheduler integrations' );
 $assert( str_contains( $main, 'AlwaysOnServiceProvider::register_wordpress_hooks();' ), 'entrypoint delegates always-on WordPress hooks' );
@@ -68,8 +68,27 @@ $assert( 27 === $rest_calls, 'REST provider composes all 27 controllers' );
 $assert( ! str_contains( $main, '\\DataMachine\\Api\\Execute::register();' ), 'entrypoint no longer composes concrete REST controllers' );
 $assert( substr_count( $main, 'register_activation_hook(' ) === 0, 'entrypoint no longer registers lifecycle hooks directly' );
 
-$assert( str_contains( $main, 'function datamachine_load_step_types()' ), 'step type compatibility wrapper remains' );
-$assert( str_contains( $main, 'function datamachine_ensure_all_tables()' ), 'database compatibility wrapper remains' );
+$removed_functions = array(
+	'datamachine_skip_action_scheduler_migration_during_install',
+	'datamachine_run_datamachine_plugin',
+	'datamachine_activate_plugin_defaults',
+	'datamachine_activate_defaults_for_site',
+	'datamachine_load_step_types',
+	'datamachine_load_handlers',
+	'datamachine_allow_json_upload',
+	'datamachine_remove_capabilities',
+	'datamachine_deactivate_plugin',
+	'datamachine_activate_plugin',
+	'datamachine_create_network_agent_tables',
+	'datamachine_activate_for_site',
+	'datamachine_ensure_all_tables',
+	'datamachine_for_each_site',
+	'datamachine_on_new_site',
+);
+foreach ( $removed_functions as $function ) {
+	$assert( ! str_contains( $main, "function {$function}(" ), "{$function} forwarding global is absent" );
+}
+$assert( str_contains( $main, 'function datamachine_register_capabilities(): void' ), 'externally consumed capability compatibility function remains' );
 $assert( str_contains( $bootstrap, 'function datamachine_register_default_memory_files(): void' ), 'memory compatibility function remains' );
 
 if ( $failures ) {

@@ -46,7 +46,7 @@ The engine normally processes one primary item per child job. A fetch step may p
 
 ### Steps and Handlers
 
-Core registers six step types in `datamachine_load_step_types()`:
+`Core\Bootstrap\RuntimeServiceProvider::register_step_types()` registers six core step types:
 
 | Slug | Responsibility | Handler-backed |
 |---|---|---|
@@ -57,13 +57,13 @@ Core registers six step types in `datamachine_load_step_types()`:
 | `webhook_gate` | Park a job until an inbound webhook resumes it | No |
 | `system_task` | Run a registered system task inline | No |
 
-Step constructors register definitions through `StepTypeRegistrationTrait`; `StepTypeAbilities` is the current read and validation surface. Core handlers are loaded explicitly by `datamachine_load_handlers()`. Extensions can add step types, handlers, tools, directives, authentication providers, and other documented registrations. Outbound agent calls use an ability or system task, and `Api\AgentPing` owns inbound callback routes.
+Step constructors register definitions through `StepTypeRegistrationTrait`; `StepTypeAbilities` is the current read and validation surface. Core handlers are loaded explicitly by `RuntimeServiceProvider::register_handlers()`. Extensions can add step types, handlers, tools, directives, authentication providers, and other documented registrations. Outbound agent calls use an ability or system task, and `Api\AgentPing` owns inbound callback routes.
 
 ### Persistence
 
 Workflow definitions and execution state use Data Machine tables. Packet payloads and flow files use `FilesRepository` beneath the WordPress uploads directory. Job `engine_data` stores the resolved execution snapshot and runtime metadata. Run artifacts and bundle artifacts have dedicated persistence. Agent identity, access, and tokens are network-scoped on multisite; most workflow tables are site-scoped, while chat uses its network-aware repository.
 
-`datamachine_ensure_all_tables()` and each repository's `TABLE_NAME`/`create_table()` implementation define the current persistence inventory. See [Database Schema](core-system/database-schema.md) for table scope and relationships.
+`ActivationServiceProvider::ensure_all_tables()` and each repository's `TABLE_NAME`/`create_table()` implementation define the current persistence inventory. See [Database Schema](core-system/database-schema.md) for table scope and relationships.
 
 ### AI Runtime Boundary
 

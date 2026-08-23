@@ -135,7 +135,7 @@ docs/
 
 Use these source files as authoritative anchors when docs and code disagree:
 
-- `inc/Cli/Bootstrap.php` registers the canonical WP-CLI command tree.
+- `inc/Core/Bootstrap/CliServiceProvider.php` registers the canonical WP-CLI command tree.
 - `inc/Api/` registers the Data Machine REST product API.
 - `inc/Engine/AI/conversation-loop.php` shows the Data Machine turn runner and Agents API loop boundary.
 - `inc/Engine/AI/Tools/` contains tool sources, execution, and policy resolution.

@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use WP_Agent_Package_Artifact_Hasher;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -95,10 +97,10 @@ final class AgentBundleArtifactRebase {
 			? array_values( array_unique( array_map( 'strval', $result['ambiguous'] ) ) )
 			: array();
 
-		$merged_hash = null === $merged ? null : AgentBundleArtifactHasher::hash( $merged );
-		$base_hash   = null === $base ? null : AgentBundleArtifactHasher::hash( $base );
-		$local_hash  = null === $local ? null : AgentBundleArtifactHasher::hash( $local );
-		$remote_hash = null === $remote ? null : AgentBundleArtifactHasher::hash( $remote );
+		$merged_hash = null === $merged ? null : WP_Agent_Package_Artifact_Hasher::hash( $merged );
+		$base_hash   = null === $base ? null : WP_Agent_Package_Artifact_Hasher::hash( $base );
+		$local_hash  = null === $local ? null : WP_Agent_Package_Artifact_Hasher::hash( $local );
+		$remote_hash = null === $remote ? null : WP_Agent_Package_Artifact_Hasher::hash( $remote );
 
 		return array(
 			'artifact_key'      => $artifact_key,

@@ -148,8 +148,8 @@ class AgentRegistry {
 	 * }
 	 */
 	public static function reconcile(): array {
-		if ( function_exists( 'datamachine_ensure_all_tables' ) ) {
-			datamachine_ensure_all_tables();
+		if ( class_exists( \DataMachine\Core\Bootstrap\ActivationServiceProvider::class ) ) {
+			\DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
 		}
 
 		return AgentMaterializer::reconcile( self::get_all() );

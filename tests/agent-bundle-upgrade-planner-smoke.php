@@ -230,7 +230,7 @@ require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/register-agent-package-art
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleUpgradeActionHandlers.php';
 
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
-use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use WP_Agent_Package_Artifact_Hasher as AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;

@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use WP_Agent_Package_Artifact_Status;
+
 use DataMachine\Core\Database\Agents\Agents;
 
 defined( 'ABSPATH' ) || exit;
@@ -110,7 +112,7 @@ final class AgentBundleAdoptionStateStore implements \WP_Agent_Package_Artifact_
 				'installed_hash'    => $row['installed_hash'] ?? null,
 				'current_hash'      => $row['current_hash'] ?? null,
 				'installed_payload' => $row['installed_payload'] ?? null,
-				'status'            => AgentBundleArtifactStatus::classify( $row['installed_hash'] ?? null, $row['current_hash'] ?? null ),
+				'status'            => WP_Agent_Package_Artifact_Status::classify( $row['installed_hash'] ?? null, $row['current_hash'] ?? null ),
 				'installed_at'      => (string) ( $row['installed_at'] ?? '' ),
 				'updated_at'        => (string) ( $row['updated_at'] ?? '' ),
 			);

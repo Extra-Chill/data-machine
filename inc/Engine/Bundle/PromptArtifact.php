@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use WP_Agent_Package_Artifact_Hasher;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -32,7 +34,7 @@ final class PromptArtifact {
 		$this->version       = self::non_empty_string( $version, 'version' );
 		$this->source_path   = self::normalize_source_path( $source_path );
 		$this->content       = $content;
-		$this->content_hash  = AgentBundleArtifactHasher::hash( $content );
+		$this->content_hash  = WP_Agent_Package_Artifact_Hasher::hash( $content );
 		$this->changelog     = trim( $changelog );
 		$this->metadata      = self::normalize_metadata( $metadata );
 	}

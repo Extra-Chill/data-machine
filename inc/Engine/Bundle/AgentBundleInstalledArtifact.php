@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use WP_Agent_Package_Artifact_Hasher;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -101,7 +103,7 @@ final class AgentBundleInstalledArtifact {
 	 * @return self
 	 */
 	public static function from_installed_payload( AgentBundleManifest $manifest, string $artifact_type, string $artifact_id, string $source_path, mixed $artifact_payload, string $timestamp ): self {
-		$hash = AgentBundleArtifactHasher::hash( $artifact_payload );
+		$hash = WP_Agent_Package_Artifact_Hasher::hash( $artifact_payload );
 		return new self(
 			$manifest->bundle_slug(),
 			$manifest->bundle_version(),
@@ -124,7 +126,7 @@ final class AgentBundleInstalledArtifact {
 	 * @return self
 	 */
 	public function with_current_payload( mixed $current_payload, string $updated_at ): self {
-		$current_hash = null === $current_payload ? null : AgentBundleArtifactHasher::hash( $current_payload );
+		$current_hash = null === $current_payload ? null : WP_Agent_Package_Artifact_Hasher::hash( $current_payload );
 
 		return new self(
 			$this->bundle_slug,

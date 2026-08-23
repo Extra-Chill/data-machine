@@ -141,15 +141,6 @@ class AgentAccessStoreAdapter implements \WP_Agent_Access_Store, \WP_Agent_Princ
 	}
 
 	/**
-	 * Alias for upstream contracts that choose principal-first naming.
-	 *
-	 * @return array<string,mixed>
-	 */
-	public function grant_principal_access( string $agent_id, string $principal_type, string $principal_id, string $role = \WP_Agent_Access_Grant::ROLE_VIEWER ): array {
-		return $this->grant_access_for_principal( $agent_id, $principal_type, $principal_id, $role );
-	}
-
-	/**
 	 * Revoke a non-user principal/audience grant.
 	 */
 	public function revoke_access_for_principal( string $agent_id, string $principal_type, string $principal_id, ?string $workspace_id = null ): bool {

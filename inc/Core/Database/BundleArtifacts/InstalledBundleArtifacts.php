@@ -8,8 +8,8 @@
 namespace DataMachine\Core\Database\BundleArtifacts;
 
 use DataMachine\Core\Database\BaseRepository;
-use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
-use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use WP_Agent_Package_Artifact_Hasher;
+use WP_Agent_Package_Artifact_Status;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 
@@ -286,7 +286,7 @@ final class InstalledBundleArtifacts extends BaseRepository {
 				'artifact_id'    => $artifact_id,
 				'source_path'    => $source_path,
 				'installed_hash' => '',
-				'current_hash'   => AgentBundleArtifactHasher::hash( $current_payload ),
+				'current_hash'   => WP_Agent_Package_Artifact_Hasher::hash( $current_payload ),
 				'installed_at'   => $timestamp,
 				'updated_at'     => $timestamp,
 			)
@@ -362,7 +362,7 @@ final class InstalledBundleArtifacts extends BaseRepository {
 			'bundle_slug'   => (string) $row['bundle_slug'],
 			'artifact_type' => (string) $row['artifact_type'],
 			'artifact_id'   => (string) $row['artifact_id'],
-			'local_status'  => AgentBundleArtifactStatus::classify( (string) $row['installed_hash'], isset( $row['current_hash'] ) ? (string) $row['current_hash'] : null ),
+			'local_status'  => WP_Agent_Package_Artifact_Status::classify( (string) $row['installed_hash'], isset( $row['current_hash'] ) ? (string) $row['current_hash'] : null ),
 		);
 	}
 

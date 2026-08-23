@@ -20,7 +20,7 @@ if ( ! function_exists( 'datamachine_test_prepare_site' ) ) {
 		delete_option( 'datamachine_settings' );
 		if ( ! $activated ) {
 			delete_option( 'datamachine_db_version' );
-			datamachine_activate_for_site();
+			\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_for_site();
 			$activated = true;
 		}
 		datamachine_test_clear_runtime_rows();

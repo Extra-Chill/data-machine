@@ -54,17 +54,15 @@ require_once dirname( __DIR__ ) . '/inc/Core/Agents/AgentConfigFactory.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentConfigArtifactProjector.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleAgentConfig.php';
-require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
-require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactStatus.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentTemplateMetadata.php';
 require_once dirname( __DIR__ ) . '/inc/Cli/BaseCommand.php';
 require_once dirname( __DIR__ ) . '/inc/Cli/Commands/AgentBundleCommand.php';
 
 use DataMachine\Cli\Commands\AgentBundleCommand;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
-use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use WP_Agent_Package_Artifact_Hasher as AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
-use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use WP_Agent_Package_Artifact_Status as AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 
 $failures = 0;

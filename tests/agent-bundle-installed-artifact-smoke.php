@@ -67,8 +67,8 @@ if ( ! function_exists( 'do_action' ) ) {
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
-use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
-use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use WP_Agent_Package_Artifact_Hasher as AgentBundleArtifactHasher;
+use WP_Agent_Package_Artifact_Status as AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\BundleValidationException;

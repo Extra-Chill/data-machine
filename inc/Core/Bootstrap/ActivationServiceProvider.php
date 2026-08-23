@@ -20,7 +20,7 @@ final class ActivationServiceProvider {
 	 * @param string $plugin_file Main plugin file.
 	 */
 	public static function register_defaults_hook( string $plugin_file ): void {
-		register_activation_hook( $plugin_file, 'datamachine_activate_plugin_defaults' );
+		register_activation_hook( $plugin_file, array( self::class, 'activate_defaults' ) );
 	}
 
 	/**
@@ -29,8 +29,8 @@ final class ActivationServiceProvider {
 	 * @param string $plugin_file Main plugin file.
 	 */
 	public static function register_lifecycle_hooks( string $plugin_file ): void {
-		register_activation_hook( $plugin_file, 'datamachine_activate_plugin' );
-		register_deactivation_hook( $plugin_file, 'datamachine_deactivate_plugin' );
+		register_activation_hook( $plugin_file, array( self::class, 'activate' ) );
+		register_deactivation_hook( $plugin_file, array( self::class, 'deactivate' ) );
 	}
 
 	/**
@@ -38,7 +38,7 @@ final class ActivationServiceProvider {
 	 */
 	public static function register_new_site_hook(): void {
 		// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
-		add_action( 'wp_initialize_site', 'datamachine_on_new_site', 200 );
+		add_action( 'wp_initialize_site', array( self::class, 'on_new_site' ), 200 );
 	}
 
 	/**

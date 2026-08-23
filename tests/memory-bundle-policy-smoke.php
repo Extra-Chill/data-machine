@@ -277,7 +277,7 @@ use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\AI\Memory\MemorySectionArtifact;
 use DataMachine\Engine\AI\Memory\MemorySectionPendingAction;
 use DataMachine\Engine\AI\Memory\SelfMemoryWritePolicy;
-use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use WP_Agent_Package_Artifact_Status as AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 
 class MemoryPolicyFakeStore implements WP_Agent_Memory_Store {

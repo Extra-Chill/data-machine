@@ -22,7 +22,7 @@ agents_api_smoke_require_module();
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/register-agent-package-artifacts.php';
 
 use DataMachine\Engine\Bundle\AgentBundleAbilityService;
-use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use WP_Agent_Package_Artifact_Hasher as AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleDirectoryRegistry;
 use DataMachine\Engine\Bundle\AgentConfigArtifactProjector;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
