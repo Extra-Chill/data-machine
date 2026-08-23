@@ -654,4 +654,124 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $result['event_count'] );
 		$this->assertSame( array( $target ), $this->result_post_ids( $result ) );
 	}
+
+	public function test_canonical_bucket_sql_aggregates_directly_without_rejoin_or_ordering(): void {
+		$date = current_datetime()->modify( '+80 days' );
+		$this->seed_event( 'Direct aggregate event', $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ) );
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, ' AS bucket_count' ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		$scope_filter = static function ( array $query_args ): array {
+			return $query_args;
+		};
+
+		add_filter( 'query', $observer );
+		add_filter( 'data_machine_events_calendar_query_args', $scope_filter );
+		try {
+			$result = $this->abilities->executeGetCalendarPage( array( 'include_html' => false ) );
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $scope_filter );
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertCount( 1, $queries );
+		$this->assertStringContainsString( 'COUNT(*) AS bucket_count', $queries[0] );
+		$this->assertStringContainsString( "post_status = 'publish'", $queries[0] );
+		$this->assertStringContainsString( "ed.post_status = 'publish'", $queries[0] );
+		$this->assertStringNotContainsString( 'FROM (SELECT', $queries[0] );
+		$this->assertStringNotContainsString( 'boundary_ed', $queries[0] );
+		$this->assertStringNotContainsString( ' ORDER BY ', strtoupper( $queries[0] ) );
+	}
+
+	public function test_canonical_bucket_sql_deduplicates_taxonomy_joins(): void {
+		$date = current_datetime()->modify( '+81 days' );
+		$term = wp_insert_term( 'Aggregate style ' . uniqid(), 'calendar_test_style' );
+		$this->assertNotWPError( $term );
+		$this->seed_event(
+			'Taxonomy aggregate event',
+			$date->format( 'Y-m-d 20:00:00' ),
+			$date->format( 'Y-m-d 22:00:00' ),
+			0,
+			array( 'calendar_test_style' => (int) $term['term_id'] )
+		);
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, ' AS bucket_count' ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		$scope_filter = static function ( array $query_args ): array {
+			return $query_args;
+		};
+
+		add_filter( 'query', $observer );
+		add_filter( 'data_machine_events_calendar_query_args', $scope_filter );
+		try {
+			$result = $this->abilities->executeGetCalendarPage(
+				array(
+					'tax_filter'   => array( 'calendar_test_style' => array( (int) $term['term_id'] ) ),
+					'include_html' => false,
+				)
+			);
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $scope_filter );
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertCount( 1, $queries );
+		$this->assertMatchesRegularExpression( '/COUNT\(DISTINCT\s+[^)]+\.ID\) AS bucket_count/i', $queries[0] );
+		$this->assertStringContainsString( 'term_relationships', $queries[0] );
+	}
+
+	public function test_requested_range_preserves_timezone_cutoff_and_multi_day_occurrences(): void {
+		$venue = $this->seed_venue( 'Timezone venue', '32.7765,-79.9311' );
+		update_term_meta( $venue, '_venue_timezone', 'America/New_York' );
+
+		$range_start = current_datetime()->modify( '+82 days' )->setTime( 0, 0 );
+		$range_end   = $range_start->modify( '+2 days' );
+		$search      = 'bounded-' . uniqid();
+
+		$multi_id = $this->seed_event(
+			"{$search} ongoing",
+			$range_start->modify( '-1 day' )->format( 'Y-m-d 20:00:00' ),
+			$range_end->format( 'Y-m-d 22:00:00' ),
+			$venue
+		);
+		$late_id = $this->seed_event(
+			"{$search} late night",
+			$range_start->modify( '+1 day' )->format( 'Y-m-d 04:00:00' ),
+			$range_start->modify( '+1 day' )->format( 'Y-m-d 04:30:00' ),
+			$venue
+		);
+		EventDatesTable::upsert( $late_id, $range_start->modify( '+1 day' )->format( 'Y-m-d 04:00:00' ), null, 'publish' );
+		$this->seed_event( "{$search} outside", $range_end->modify( '+1 day' )->format( 'Y-m-d 20:00:00' ), $range_end->modify( '+1 day' )->format( 'Y-m-d 22:00:00' ), $venue );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'event_search' => $search,
+				'date_start'   => $range_start->format( 'Y-m-d' ),
+				'date_end'     => $range_end->format( 'Y-m-d' ),
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame(
+			array( $range_start->format( 'Y-m-d' ), $range_start->modify( '+1 day' )->format( 'Y-m-d' ), $range_end->format( 'Y-m-d' ) ),
+			array_column( $result['paged_date_groups'], 'date' )
+		);
+		$this->assertSame( 2, $result['event_count'], 'The bounded row query returns unique event posts.' );
+		$this->assertSame( array_fill( 0, 3, $multi_id ), array_values( array_filter( $this->result_post_ids( $result ), static fn( int $id ): bool => $multi_id === $id ) ) );
+		$this->assertSame( $range_start->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
+		$this->assertContains( $late_id, array_column( $result['paged_date_groups'][0]['events'], 'post_id' ), 'A 4 AM venue-local event remains grouped under the prior night.' );
+		$this->assertSame( 'America/New_York', $result['paged_date_groups'][0]['events'][0]['event_data']['venueTimezone'] );
+	}
 }

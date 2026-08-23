@@ -660,23 +660,19 @@ class CalendarAbilities {
 		$start_bucket_sql = LateNightCutoff::sql_display_date_expression( 'ed.start_datetime' );
 
 		// Search, geo, and consumer scopes are implemented canonically by the
-		// event query ability. Capture its matching-ID SQL and aggregate it as a
-		// derived table so arbitrary WP_Query constraints remain authoritative
-		// without materializing every ID or generating placeholder-heavy IN lists.
+		// event query ability. Aggregate directly on that query so arbitrary
+		// WP_Query constraints remain authoritative without a derived ID query
+		// and second event-date join.
 		if ( self::requires_canonical_boundary_query( $params ) ) {
-			$event_query  = new EventDateQueryAbilities();
-			$matching_sql = $event_query->buildMatchingPostIdsSql( self::build_event_query_input( $params ) );
-
-			if ( '' === $matching_sql ) {
+			$event_query = new EventDateQueryAbilities();
+			$sql = $event_query->buildMatchingEventDateAggregateSql(
+				self::build_event_query_input( $params ),
+				$start_bucket_sql,
+				'DATE(ed.end_datetime)'
+			);
+			if ( '' === $sql ) {
 				return self::expand_date_buckets( array(), $show_past_param, $include_past_dates, $current_date );
 			}
-
-			$boundary_start_bucket_sql = LateNightCutoff::sql_display_date_expression( 'boundary_ed.start_datetime' );
-			$sql                       = "SELECT STRAIGHT_JOIN {$boundary_start_bucket_sql} AS start_date, DATE(boundary_ed.end_datetime) AS end_date, COUNT(DISTINCT matching.ID) AS bucket_count
-					FROM ({$matching_sql}) matching
-					INNER JOIN {$ed_table} boundary_ed ON matching.ID = boundary_ed.post_id
-					GROUP BY {$boundary_start_bucket_sql}, DATE(boundary_ed.end_datetime)
-					ORDER BY start_date ASC";
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
 			$rows = $wpdb->get_results( $sql );
@@ -695,8 +691,7 @@ class CalendarAbilities {
 			$sql   = "SELECT {$start_bucket_sql} AS start_date, DATE(ed.end_datetime) AS end_date, COUNT(*) AS bucket_count
 					FROM {$ed_table} ed
 					WHERE {$where}
-					GROUP BY {$start_bucket_sql}, DATE(ed.end_datetime)
-					ORDER BY start_date ASC";
+					GROUP BY {$start_bucket_sql}, DATE(ed.end_datetime)";
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$rows = empty( $query_values )
@@ -761,8 +756,7 @@ class CalendarAbilities {
 				INNER JOIN {$ed_table} ed ON p.ID = ed.post_id
 				{$joins}
 				WHERE {$where}
-				GROUP BY {$start_bucket_sql}, DATE(ed.end_datetime)
-				ORDER BY start_date ASC";
+				GROUP BY {$start_bucket_sql}, DATE(ed.end_datetime)";
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$query_values ) );

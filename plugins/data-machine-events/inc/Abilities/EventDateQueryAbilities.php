@@ -27,10 +27,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class EventDateQueryAbilities {
-	private const CAPTURE_IDS_QUERY_VAR   = '_data_machine_events_capture_ids_sql';
-	private const CAPTURE_COUNT_QUERY_VAR = '_data_machine_events_capture_count_sql';
-	private const MAX_PUBLIC_RESULTS      = 100;
-	private const DEFAULT_PUBLIC_RESULTS  = 50;
+	private const CAPTURE_IDS_QUERY_VAR       = '_data_machine_events_capture_ids_sql';
+	private const CAPTURE_COUNT_QUERY_VAR     = '_data_machine_events_capture_count_sql';
+	private const CAPTURE_AGGREGATE_QUERY_VAR = '_data_machine_events_capture_aggregate_sql';
+	private const MAX_PUBLIC_RESULTS          = 100;
+	private const DEFAULT_PUBLIC_RESULTS      = 50;
 
 	private static bool $registered = false;
 
@@ -278,7 +279,9 @@ class EventDateQueryAbilities {
 		$per_page    = (int) ( $input['per_page'] ?? -1 );
 		$page        = max( 1, (int) ( $input['page'] ?? 1 ) );
 		$fields      = $input['fields'] ?? 'all';
-		$capture_sql = ! empty( $input[ self::CAPTURE_IDS_QUERY_VAR ] ) || ! empty( $input[ self::CAPTURE_COUNT_QUERY_VAR ] );
+		$capture_sql = ! empty( $input[ self::CAPTURE_IDS_QUERY_VAR ] )
+			|| ! empty( $input[ self::CAPTURE_COUNT_QUERY_VAR ] )
+			|| ! empty( $input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] );
 		$order       = $capture_sql
 			? ''
 			: ( strtoupper( $input['order'] ?? 'ASC' ) === 'DESC' ? 'DESC' : 'ASC' );
@@ -344,6 +347,10 @@ class EventDateQueryAbilities {
 
 		if ( ! empty( $input[ self::CAPTURE_COUNT_QUERY_VAR ] ) ) {
 			$query_args[ self::CAPTURE_COUNT_QUERY_VAR ] = true;
+		}
+
+		if ( ! empty( $input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] ) ) {
+			$query_args[ self::CAPTURE_AGGREGATE_QUERY_VAR ] = $input[ self::CAPTURE_AGGREGATE_QUERY_VAR ];
 		}
 
 		if ( ! empty( $exclude ) ) {
@@ -422,7 +429,8 @@ class EventDateQueryAbilities {
 			$time_end,
 			$order,
 			$status,
-			! empty( $input[ self::CAPTURE_COUNT_QUERY_VAR ] )
+			! empty( $input[ self::CAPTURE_COUNT_QUERY_VAR ] ),
+			is_array( $input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] ?? null ) ? $input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] : array()
 		);
 		add_filter( 'posts_clauses', $clauses_filter );
 		$filters[] = $clauses_filter;
@@ -492,6 +500,47 @@ class EventDateQueryAbilities {
 	 */
 	public function buildMatchingPostIdsSql( array $input ): string {
 		return $this->buildMatchingSql( $input, false );
+	}
+
+	/**
+	 * Build canonical SQL that groups matching events by two date expressions.
+	 *
+	 * The expressions are trusted internal SQL fragments over the canonical `ed`
+	 * event-date alias. Queries without duplicating joins use COUNT(*); taxonomy,
+	 * meta, and consumer joins retain an exact distinct-post count.
+	 *
+	 * @param array  $input            Query-events ability input.
+	 * @param string $start_expression SQL expression for the start bucket.
+	 * @param string $end_expression   SQL expression for the end bucket.
+	 * @return string SQL selecting start_date, end_date, and bucket_count.
+	 */
+	public function buildMatchingEventDateAggregateSql( array $input, string $start_expression, string $end_expression ): string {
+		$request                                      = '';
+		$input['fields']                              = 'ids';
+		$input['per_page']                            = -1;
+		$input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] = array(
+			'start_expression' => $start_expression,
+			'end_expression'   => $end_expression,
+		);
+
+		$capture = static function ( $posts, $query ) use ( &$request ) {
+			if ( ! $query->get( self::CAPTURE_AGGREGATE_QUERY_VAR ) ) {
+				return $posts;
+			}
+
+			$request = $query->request;
+			return array();
+		};
+
+		add_filter( 'posts_pre_query', $capture, PHP_INT_MAX, 2 );
+
+		try {
+			$this->executeQueryEvents( $input );
+		} finally {
+			remove_filter( 'posts_pre_query', $capture, PHP_INT_MAX );
+		}
+
+		return $request;
 	}
 
 	/**
@@ -586,6 +635,7 @@ class EventDateQueryAbilities {
 	 * @param string $order      ASC or DESC.
 	 * @param mixed  $status     Requested WordPress post status.
 	 * @param bool   $count_sql  Whether clauses are building a direct count.
+	 * @param array  $aggregate  Optional trusted date aggregate expressions.
 	 * @return callable The posts_clauses filter callback.
 	 */
 	private function buildDateClauses(
@@ -598,25 +648,34 @@ class EventDateQueryAbilities {
 		string $time_end,
 		string $order,
 		$status,
-		bool $count_sql
+		bool $count_sql,
+		array $aggregate = array()
 	): callable {
-		return function ( $clauses ) use ( $scope, $date_start, $date_end, $date_match, $days_ahead, $time_start, $time_end, $order, $status, $count_sql ) {
+		return function ( $clauses ) use ( $scope, $date_start, $date_end, $date_match, $days_ahead, $time_start, $time_end, $order, $status, $count_sql, $aggregate ) {
 			global $wpdb;
 			$table = EventDatesTable::table_name();
 
 			// A count over the one-to-one event-date join cannot duplicate posts.
 			// Keep DISTINCT when taxonomy/meta joins are already present.
-			$count_rows_directly = $count_sql && '' === trim( $clauses['join'] ) && empty( $clauses['groupby'] );
+			$can_count_rows_directly = '' === trim( $clauses['join'] ) && empty( $clauses['groupby'] );
+			$count_rows_directly     = ( $count_sql || ! empty( $aggregate ) ) && $can_count_rows_directly;
 
 			// JOIN — only add once.
 			if ( strpos( $clauses['join'], $table ) === false ) {
-				$join_type        = $count_rows_directly ? 'STRAIGHT_JOIN' : 'INNER JOIN';
+				$join_type        = $count_sql && $can_count_rows_directly ? 'STRAIGHT_JOIN' : 'INNER JOIN';
 				$clauses['join'] .= " {$join_type} {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
 			}
 
 			// Taxonomy and consumer joins may match more than one relationship for
 			// a post. Calendar rows represent canonical events, never join rows.
-			if ( $count_sql ) {
+			if ( ! empty( $aggregate ) ) {
+				$start_expression    = $aggregate['start_expression'];
+				$end_expression      = $aggregate['end_expression'];
+				$bucket_count        = $count_rows_directly ? 'COUNT(*)' : "COUNT(DISTINCT {$wpdb->posts}.ID)";
+				$clauses['fields']   = "{$start_expression} AS start_date, {$end_expression} AS end_date, {$bucket_count} AS bucket_count";
+				$clauses['distinct'] = '';
+				$clauses['groupby']  = "{$start_expression}, {$end_expression}";
+			} elseif ( $count_sql ) {
 				$clauses['fields']   = $count_rows_directly ? 'COUNT(*)' : "{$wpdb->posts}.ID";
 				$clauses['distinct'] = $count_rows_directly ? '' : 'DISTINCT';
 			} else {
