@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.17] - 2026-08-23
+
+### Changed
+- remove dead projected tool handlers
+- drive source behavior from step metadata
+
+### Fixed
+- preserve refreshed OAuth account fields
+
 ## [0.175.16] - 2026-08-23
 
 ### Changed
