@@ -64,6 +64,24 @@ class EngineDataPersistenceTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'do-not-log', (string) wp_json_encode( $rejections ) );
 	}
 
+	public function test_missing_mysql_packet_limit_does_not_reject_engine_data_writes(): void {
+		remove_filter( 'datamachine_engine_data_query_budget', $this->budget_filter );
+		$packet_query = static function ( string $query ): string {
+			return str_contains( $query, '@@SESSION.max_allowed_packet' ) ? 'SELECT 0' : $query;
+		};
+		add_filter( 'query', $packet_query );
+
+		try {
+			$jobs   = new Jobs();
+			$job_id = $jobs->create_job( array( 'source' => 'pipeline', 'label' => 'Non-MySQL engine data budget test' ) );
+			$this->assertIsInt( $job_id );
+			$this->assertTrue( $jobs->store_engine_data( $job_id, array( 'payload' => str_repeat( 'x', 5000 ) ) ) );
+		} finally {
+			remove_filter( 'query', $packet_query );
+			add_filter( 'datamachine_engine_data_query_budget', $this->budget_filter );
+		}
+	}
+
 	public function test_mutation_stops_after_deterministic_oversize_rejection(): void {
 		$jobs   = new Jobs();
 		$job_id = $jobs->create_job( array( 'source' => 'pipeline', 'label' => 'Mutation budget test' ) );

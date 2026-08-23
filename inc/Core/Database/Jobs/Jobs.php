@@ -2174,7 +2174,7 @@ class Jobs extends BaseRepository {
 		}
 
 		$max_allowed_packet             = (int) $this->wpdb->get_var( 'SELECT @@SESSION.max_allowed_packet' );
-		$budget                         = (int) floor( $max_allowed_packet * 0.8 );
+		$budget                         = 0 < $max_allowed_packet ? (int) floor( $max_allowed_packet * 0.8 ) : PHP_INT_MAX;
 		$this->engine_data_query_budget = max( 0, (int) apply_filters( 'datamachine_engine_data_query_budget', $budget, $max_allowed_packet ) );
 		return $this->engine_data_query_budget;
 	}

@@ -7,7 +7,7 @@
  * @package DataMachine\Tests
  */
 
-$drain_file = __DIR__ . '/../inc/Cli/Commands/DrainCommand.php';
+$drain_file = __DIR__ . '/../inc/Core/ActionScheduler/ScopedDrainService.php';
 $drain_src  = file_get_contents( $drain_file ) ?: '';
 
 $assertions = 0;
@@ -36,7 +36,7 @@ assert_contains( 'runActionSchedulerTimeoutCleanup( $store )', $drain_src, 'drai
 assert_contains( 'stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain stakes a group-scoped Action Scheduler claim' );
 assert_contains( '$claim->get_actions()', $drain_src, 'drain processes actions from the claim' );
 assert_contains( 'find_actions_by_claim_id( $claim->get_id() )', $drain_src, 'drain rechecks claim ownership before processing each action' );
-assert_contains( '$runner->process_action( $action_id, \'Data Machine CLI drain\' )', $drain_src, 'drain executes only claim-owned action IDs' );
+assert_contains( '$runner->process_action( $action_id, $execution_context )', $drain_src, 'drain executes only claim-owned action IDs' );
 assert_contains( 'flushRuntimeCache()', $drain_src, 'drain flushes runtime cache between actions' );
 assert_contains( 'isMemorySoftLimitReached()', $drain_src, 'drain checks memory soft limit while processing actions' );
 assert_contains( "'memory_limit'", $drain_src, 'drain reports memory-limit stop reason from batch processing' );
@@ -49,7 +49,7 @@ $ensure_pos  = strpos( $drain_src, 'GroupRegistrar::ensureDataMachineGroup()' );
 $cleanup_pos = strpos( $drain_src, 'runActionSchedulerTimeoutCleanup( $store )' );
 $stake_pos   = strpos( $drain_src, 'stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP )' );
 $verify_pos  = strpos( $drain_src, 'find_actions_by_claim_id( $claim->get_id() )' );
-$process_pos = strpos( $drain_src, '$runner->process_action( $action_id, \'Data Machine CLI drain\' )' );
+$process_pos = strpos( $drain_src, '$runner->process_action( $action_id, $execution_context )' );
 $flush_pos   = strpos( $drain_src, 'flushRuntimeCache()' );
 $memory_pos  = strpos( $drain_src, 'isMemorySoftLimitReached()' );
 $release_pos = strpos( $drain_src, '$store->release_claim( $claim )' );
