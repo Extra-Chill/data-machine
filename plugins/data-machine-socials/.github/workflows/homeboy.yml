@@ -38,4 +38,3 @@ jobs:
         with:
           commands: audit
           app-token: ${{ steps.app-token.outputs.token || '' }}
-          autofix: 'false'
