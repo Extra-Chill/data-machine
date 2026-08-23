@@ -63,7 +63,11 @@ class FetchStep extends Step {
 			class_name: self::class,
 			position: 10,
 			usesHandler: true,
-			hasPipelineConfig: false
+			hasPipelineConfig: false,
+			sourceIngestion: true,
+			allowsEmptyOutput: true,
+			supportsItemDisposition: true,
+			handlerCategory: 'source'
 		);
 	}
 
@@ -159,12 +163,12 @@ class FetchStep extends Step {
 			$handler_settings,
 			(string) $handler,
 			array(
-				'flow_step_id' => $this->flow_step_config['flow_step_id'],
-				'pipeline_id'  => $this->flow_step_config['pipeline_id'],
-				'flow_id'      => $this->flow_step_config['flow_id'],
-				'job_id'       => $this->job_id,
-				'user_id'      => $owner_user_id,
-				'agent_id'     => $agent_id,
+				'flow_step_id'          => $this->flow_step_config['flow_step_id'],
+				'pipeline_id'           => $this->flow_step_config['pipeline_id'],
+				'flow_id'               => $this->flow_step_config['flow_id'],
+				'job_id'                => $this->job_id,
+				'user_id'               => $owner_user_id,
+				'agent_id'              => $agent_id,
 				'principal_less_system' => 0 === $owner_user_id && 0 === $agent_id,
 			)
 		);

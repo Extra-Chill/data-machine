@@ -18,6 +18,7 @@ namespace DataMachine\Core\Steps\Fetch\Tools;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\Steps\StepTypeMetadata;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -415,10 +416,10 @@ class FetchItemDispositionTool {
 	}
 
 	/**
-	 * Resolve the source fetch/event_import step ID from engine flow config.
+	 * Resolve the item-disposition source step ID from engine flow config.
 	 *
 	 * @param object $engine Engine data wrapper.
-	 * @return string|null Fetch step ID, or null when unavailable.
+	 * @return string|null Source step ID, or null when unavailable.
 	 */
 	private function resolveFetchFlowStepId( object $engine ): ?string {
 		$flow_config = $engine->get( 'flow_config' );
@@ -431,7 +432,7 @@ class FetchItemDispositionTool {
 				continue;
 			}
 
-			if ( in_array( $config['step_type'] ?? '', array( 'fetch', 'event_import' ), true ) ) {
+			if ( StepTypeMetadata::supportsItemDisposition( (string) ( $config['step_type'] ?? '' ) ) ) {
 				return (string) $step_id;
 			}
 		}

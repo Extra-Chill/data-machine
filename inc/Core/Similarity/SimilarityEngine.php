@@ -7,7 +7,7 @@
  *
  * - DuplicateDetection (Core/WordPress) — publish-level fuzzy title match
  * - QueueValidator (Engine/AI/Tools) — Jaccard word-set similarity
- * - EventIdentifierGenerator (data-machine-events) — event title/venue matching
+ * - Domain-specific identifier generators for structured record matching
  *
  * All similarity math lives here. Consumers (QueueValidator, publish handlers,
  * DuplicateCheckAbility, extension strategies) call these pure functions.

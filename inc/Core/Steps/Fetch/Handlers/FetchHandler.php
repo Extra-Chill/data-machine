@@ -403,7 +403,7 @@ abstract class FetchHandler {
 	 * Called after an item is marked as processed during dedup.
 	 *
 	 * Override in subclasses to add handler-specific side effects.
-	 * For example, EventImportHandler stores item context in engine data
+	 * For example, a specialized source handler may store item context in engine data
 	 * for the fetch disposition AI tools.
 	 *
 	 * @param ExecutionContext $context Execution context.
@@ -418,7 +418,7 @@ abstract class FetchHandler {
 	 *
 	 * Base handlers default to 1 to prevent unbounded fan-out for
 	 * AI-heavy pipelines (RSS, Reddit, etc.). Subclasses like
-	 * EventImportHandler override to 0 (unlimited) since structured
+	 * Specialized source handlers may override to 0 (unlimited) when structured
 	 * event scrapers produce clean data that is cheap to process.
 	 *
 	 * @return int Default max items. 0 = unlimited.
@@ -590,8 +590,7 @@ abstract class FetchHandler {
 	 * Initialize FetchHandler static functionality.
 	 *
 	 * Registers fetch disposition tools in the unified `datamachine_tools` registry
-	 * as a cross-cutting handler tool — ToolPolicyResolver resolves it for any
-	 * adjacent step whose handler type is `fetch` or `event_import`.
+	 * as a cross-cutting handler tool for adjacent source-category steps.
 	 *
 	 * @since 0.9.7
 	 */
@@ -602,7 +601,7 @@ abstract class FetchHandler {
 				$tools['__handler_tools_fetch_dispositions'] = ToolManager::handlerToolDeclaration(
 					array( self::class, 'resolveFetchDispositionTools' ),
 					array(
-						'handler_types'           => array( 'fetch', 'event_import' ),
+						'handler_categories'      => array( 'source' ),
 						'client_context_bindings' => array( 'job_id' ),
 					)
 				);
@@ -614,8 +613,8 @@ abstract class FetchHandler {
 	/**
 	 * Resolve fetch disposition tools for a specific fetch-type handler.
 	 *
-	 * Invoked lazily by ToolManager::resolveHandlerTools() when ANY adjacent
-	 * step handler's registered type is `fetch` or `event_import`. The tool
+	 * Invoked lazily by ToolManager::resolveHandlerTools() when an adjacent
+	 * step handler belongs to the source category. The tool
 	 * is re-shaped per-handler so the description can reference the concrete
 	 * source in pipeline prompts.
 	 *

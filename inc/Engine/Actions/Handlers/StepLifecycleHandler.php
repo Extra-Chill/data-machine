@@ -18,6 +18,7 @@ use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\PacketEngineData;
 use DataMachine\Core\RunMetrics;
+use DataMachine\Core\Steps\StepTypeMetadata;
 
 /**
  * Keeps source-ingestion processed-item behavior behind lifecycle hooks.
@@ -1192,6 +1193,6 @@ class StepLifecycleHandler {
 	 * @return bool
 	 */
 	private static function isSourceIngestionStep( string $step_type ): bool {
-		return in_array( $step_type, array( 'fetch', 'event_import' ), true );
+		return StepTypeMetadata::isSourceIngestion( $step_type );
 	}
 }

@@ -31,6 +31,22 @@ if ( ! function_exists( 'datamachine_get_engine_data' ) ) {
 	}
 }
 
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, $value ) {
+		if ( 'datamachine_step_types' === $hook ) {
+			$value['fetch'] = array( 'allows_empty_output' => true );
+		}
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $data, int $options = 0 ) {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Pure-PHP smoke test fallback outside WordPress.
+		return json_encode( $data, $options );
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/DataPacket.php';
 require_once __DIR__ . '/../inc/Core/EngineData.php';
 require_once __DIR__ . '/../inc/Core/JobStatus.php';

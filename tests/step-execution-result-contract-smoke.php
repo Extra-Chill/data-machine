@@ -25,6 +25,15 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, $value ) {
+		if ( 'datamachine_step_types' === $hook ) {
+			$value['fetch'] = array( 'allows_empty_output' => true );
+		}
+		return $value;
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepResult.php';
 require_once __DIR__ . '/../inc/Core/RunResult.php';

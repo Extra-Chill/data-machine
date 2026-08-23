@@ -134,7 +134,7 @@ The preferred direct-style callback receives `(string $handler_slug, array $hand
 
 Existing filter-style callbacks are also supported. `ToolManager::resolveHandlerTools()` invokes callbacks with `($tools, $handler_slug, $handler_config, $engine_data)` when reflection detects four or more parameters, or a first parameter named `$tools` or `$all_tools`.
 
-Handler tool matching is exact by default: a registry entry with `'handler' => 'wordpress_publish'` is resolved only for adjacent steps whose handler slug is exactly `wordpress_publish`. Cross-cutting tools can use `'handler_types' => ['fetch', 'event_import']`; those are matched against `datamachine_handlers` metadata.
+Handler tool matching is exact by default: a registry entry with `'handler' => 'wordpress_publish'` is resolved only for adjacent steps whose handler slug is exactly `wordpress_publish`. Cross-cutting tools can use `'handler_categories' => ['source']`; those are matched against the handler's registered step-type metadata.
 
 `_handler_callable` entries are deferred registry entries. They are not directly executable tools and should not include normal tool parameters at the wrapper level. The callback returns the executable tool definitions.
 

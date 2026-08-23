@@ -27,6 +27,7 @@ use DataMachine\Core\RunMetrics;
 use DataMachine\Core\StepExecutionResult;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\Step;
+use DataMachine\Core\Steps\StepTypeMetadata;
 use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
 use DataMachine\Engine\StepNavigator;
 
@@ -760,7 +761,7 @@ class ExecuteStepAbility {
 				'reason'       => 'packet_claim_reconciliation_failed',
 			);
 		}
-		if ( in_array( $step_type, array( 'fetch', 'event_import', 'ai' ), true ) ) {
+		if ( 'ai' === $step_type || StepTypeMetadata::isSourceIngestion( $step_type ) ) {
 			$dataPackets     = self::filterReconciledPacketsForRouting( $dataPackets, $reconciled );
 			$payload['data'] = $dataPackets;
 		}
@@ -1141,7 +1142,7 @@ class ExecuteStepAbility {
 		}
 
 		// completed_no_items is an execution status, not a packet-count guess.
-		// Fetch/event_import legacy empty outputs classify this way, and explicit
+		// Source-step legacy empty outputs classify this way, and explicit
 		// result-shaped step returns can also choose it without emitting packets.
 		if ( 'completed_no_items' === ( $execution_result['status'] ?? '' ) ) {
 			if ( ! $this->recoveryGenerationStillOwned( $job_id, $recovery_generation, $recovery_claim_token ) ) {

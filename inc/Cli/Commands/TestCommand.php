@@ -15,6 +15,7 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\Handler\TestHandlerAbility;
+use DataMachine\Core\Steps\StepTypeMetadata;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -141,13 +142,11 @@ class TestCommand extends BaseCommand {
 			return;
 		}
 
-		// Filter to fetch-type handlers (fetch + event_import).
-		$fetch_types = array( 'fetch', 'event_import' );
-		$items       = array();
+		$items = array();
 
 		foreach ( $handlers as $slug => $handler ) {
 			$handler_type = $handler['type'] ?? $handler['step_type'] ?? '';
-			if ( ! in_array( $handler_type, $fetch_types, true ) ) {
+			if ( ! StepTypeMetadata::hasHandlerCategory( (string) $handler_type, 'source' ) ) {
 				continue;
 			}
 

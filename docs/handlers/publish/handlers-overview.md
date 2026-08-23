@@ -138,7 +138,7 @@ add_filter('datamachine_tools', function($tools) {
 });
 ```
 
-Handler tool entries are deferred registry entries, not directly executable tools. `ToolManager::resolveHandlerTools()` resolves entries whose `handler` exactly matches the adjacent step handler slug. Cross-cutting tools may use `handler_types`, for example `['fetch', 'event_import']`, which matches against `datamachine_handlers` metadata.
+Handler tool entries are deferred registry entries, not directly executable tools. `ToolManager::resolveHandlerTools()` resolves entries whose `handler` exactly matches the adjacent step handler slug. Cross-cutting tools may use `handler_categories`, for example `['source']`, which matches the handler's registered step-type metadata.
 
 Callback conventions supported by `ToolManager`:
 

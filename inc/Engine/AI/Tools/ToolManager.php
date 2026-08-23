@@ -17,6 +17,7 @@ namespace DataMachine\Engine\AI\Tools;
 
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\Steps\StepTypeMetadata;
 use DataMachine\Engine\AI\ToolSchemaNormalizer;
 use DataMachine\Engine\AI\Tools\Sources\AbilityToolSource;
 
@@ -220,7 +221,7 @@ class ToolManager {
 	 * first-class shape new handler registrations should use.
 	 *
 	 * @param callable $handler_callable Callback that returns tools for a handler.
-	 * @param array    $args             Declaration args: handler, handler_types, modes,
+	 * @param array    $args             Declaration args: handler, handler_types, handler_categories, modes,
 	 *                                   access_level, ability, client_context_bindings.
 	 * @return array<string,mixed> Handler-tool declaration.
 	 */
@@ -251,6 +252,9 @@ class ToolManager {
 		if ( isset( $definition['handler_types'] ) && is_string( $definition['handler_types'] ) ) {
 			$definition['handler_types'] = array( $definition['handler_types'] );
 		}
+		if ( isset( $definition['handler_categories'] ) && is_string( $definition['handler_categories'] ) ) {
+			$definition['handler_categories'] = array( $definition['handler_categories'] );
+		}
 
 		return $definition;
 	}
@@ -264,9 +268,10 @@ class ToolManager {
 	 *
 	 * - **Exact slug**: `['handler' => 'wordpress_publish']` — the entry only
 	 *   applies when the adjacent step's handler_slug equals `'wordpress_publish'`.
-	 * - **Type match**: `['handler_types' => ['fetch', 'event_import']]` — the
-	 *   entry applies to any handler whose registered type is in the list
-	 *   (used by cross-cutting tools like `skip_item`).
+	 * - **Type match**: `['handler_types' => ['fetch']]` — the entry applies to
+	 *   any handler whose registered type is in the list.
+	 * - **Category match**: `['handler_categories' => ['source']]` — the entry
+	 *   applies when the handler's step type declares that category.
 	 *
 	 * Callbacks receive `(handler_slug, handler_config, engine_data)` and
 	 * return an `['tool_name' => $tool_definition]` array (empty to opt out).
@@ -297,7 +302,7 @@ class ToolManager {
 
 		$raw_tools        = $this->get_raw_tools();
 		$resolved         = array();
-		$handlers_by_slug = null; // Lazy-loaded only when handler_types matching is needed.
+		$handlers_by_slug = null; // Lazy-loaded only when handler metadata matching is needed.
 
 		foreach ( $raw_tools as $definition ) {
 			if ( ! is_array( $definition ) ) {
@@ -324,6 +329,21 @@ class ToolManager {
 				$handler_type = $handler_meta['type'] ?? '';
 				if ( $handler_type && in_array( $handler_type, $definition['handler_types'], true ) ) {
 					$matches = true;
+				}
+			}
+
+			// Handler-category match (cross-cutting tools across step types).
+			if ( ! $matches && ! empty( $definition['handler_categories'] ) && is_array( $definition['handler_categories'] ) ) {
+				if ( null === $handlers_by_slug ) {
+					$handlers_by_slug = apply_filters( 'datamachine_handlers', array() );
+				}
+				$handler_meta = $handlers_by_slug[ $handler_slug ] ?? null;
+				$handler_type = $handler_meta['type'] ?? '';
+				foreach ( $definition['handler_categories'] as $handler_category ) {
+					if ( $handler_type && is_string( $handler_category ) && StepTypeMetadata::hasHandlerCategory( $handler_type, $handler_category ) ) {
+						$matches = true;
+						break;
+					}
 				}
 			}
 

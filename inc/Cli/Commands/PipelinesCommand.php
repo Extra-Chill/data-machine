@@ -172,7 +172,7 @@ class PipelinesCommand extends BaseCommand {
 	 *
 	 *     # Create a pipeline with steps
 	 *     wp datamachine pipelines create --name="Event Pipeline" \
-	 *       --steps='[{"step_type":"event_import"},{"step_type":"ai_enrich"}]'
+	 *       --steps='[{"step_type":"fetch"},{"step_type":"ai"}]'
 	 *
 	 *     # Dry-run validation
 	 *     wp datamachine pipelines create --name="Test" --dry-run
