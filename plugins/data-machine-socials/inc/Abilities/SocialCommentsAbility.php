@@ -38,10 +38,24 @@ class SocialCommentsAbility extends AbstractSocialAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action'   => array( 'type' => 'string', 'enum' => array( 'recent_comments' ), 'default' => 'recent_comments' ),
-							'provider' => array( 'type' => 'string', 'description' => __( 'Provider slug.', 'data-machine-socials' ) ),
-							'limit'    => array( 'type' => 'integer', 'default' => 25, 'description' => __( 'Maximum comments to return.', 'data-machine-socials' ) ),
-							'after'    => array( 'type' => 'string', 'description' => __( 'Provider cursor for the next media page.', 'data-machine-socials' ) ),
+							'action'   => array(
+								'type'    => 'string',
+								'enum'    => array( 'recent_comments' ),
+								'default' => 'recent_comments',
+							),
+							'provider' => array(
+								'type'        => 'string',
+								'description' => __( 'Provider slug.', 'data-machine-socials' ),
+							),
+							'limit'    => array(
+								'type'        => 'integer',
+								'default'     => 25,
+								'description' => __( 'Maximum comments to return.', 'data-machine-socials' ),
+							),
+							'after'    => array(
+								'type'        => 'string',
+								'description' => __( 'Provider cursor for the next media page.', 'data-machine-socials' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -101,18 +115,29 @@ class SocialCommentsAbility extends AbstractSocialAbility {
 		if ( ! isset( self::PROVIDERS[ $provider ] ) ) {
 			$base['status'] = 'unsupported';
 			$base['error']  = 'Recent comments are not supported for this provider.';
-			return array( 'success' => false, 'data' => $base, 'error' => 'Recent comments are not supported for this provider.' );
+			return array(
+				'success' => false,
+				'data'    => $base,
+				'error'   => 'Recent comments are not supported for this provider.',
+			);
 		}
 
 		$ability = $this->getProviderAbility( $provider );
 		if ( ! $ability ) {
 			$base['status'] = 'provider_error';
 			$base['error']  = 'The provider read ability is not available.';
-			return array( 'success' => false, 'data' => $base, 'error' => 'The provider read ability is not available.' );
+			return array(
+				'success' => false,
+				'data'    => $base,
+				'error'   => 'The provider read ability is not available.',
+			);
 		}
 
 		$limit = min( max( absint( $input['limit'] ?? 25 ), 1 ), 100 );
-		$list  = array( 'action' => 'list', 'limit' => 25 );
+		$list  = array(
+			'action' => 'list',
+			'limit'  => 25,
+		);
 		if ( ! empty( $input['after'] ) ) {
 			$list['after'] = sanitize_text_field( $input['after'] );
 		}
@@ -121,7 +146,11 @@ class SocialCommentsAbility extends AbstractSocialAbility {
 		if ( is_wp_error( $media_result ) || empty( $media_result['success'] ) ) {
 			$base['status'] = 'provider_error';
 			$base['error']  = $this->errorMessage( $media_result, 'Provider media read failed.' );
-			return array( 'success' => false, 'data' => $base, 'error' => $base['error'] );
+			return array(
+				'success' => false,
+				'data'    => $base,
+				'error'   => $base['error'],
+			);
 		}
 
 		$media = $media_result['data']['media'] ?? $media_result['data']['posts'] ?? $media_result['data']['threads'] ?? array();
@@ -142,7 +171,11 @@ class SocialCommentsAbility extends AbstractSocialAbility {
 				$base['status']  = $base['partial'] ? 'partial' : 'provider_error';
 				$base['error']   = $this->errorMessage( $comments_result, 'Provider comments read failed.' );
 				if ( ! $base['partial'] ) {
-					return array( 'success' => false, 'data' => $base, 'error' => $base['error'] );
+					return array(
+						'success' => false,
+						'data'    => $base,
+						'error'   => $base['error'],
+					);
 				}
 				break;
 			}
@@ -165,7 +198,10 @@ class SocialCommentsAbility extends AbstractSocialAbility {
 		}
 		$base['next_cursor'] = $media_result['data']['cursors']['after'] ?? null;
 
-		return array( 'success' => true, 'data' => $base );
+		return array(
+			'success' => true,
+			'data'    => $base,
+		);
 	}
 
 	private function normalizeComment( array $comment, string $provider, string $media_id ): array {

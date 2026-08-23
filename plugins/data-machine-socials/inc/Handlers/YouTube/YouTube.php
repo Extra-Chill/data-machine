@@ -45,15 +45,16 @@ class YouTube extends PublishHandler {
 			true,
 			YouTubeAuth::class,
 			YouTubeSettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
 				return array(
 					'youtube_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Upload a video to YouTube. Requires a video source (local file path or URL) and a title. Defaults to private until the API project is audit-verified.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Upload a video to YouTube. Requires a video source (local file path or URL) and a title. Defaults to private until the API project is audit-verified.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
 								'title'       => array(
@@ -75,11 +76,14 @@ class YouTube extends PublishHandler {
 				'supportsVideo' => true,
 				'composer'      => array(
 					'crossPostCompatible' => false,
-					'mediaKinds'           => array( 'video' ),
-					'ability'              => 'datamachine/youtube-upload',
+					'mediaKinds'          => array( 'video' ),
+					'ability'             => 'datamachine/youtube-upload',
 				),
 				'capabilities'  => array(
-					array( 'slug' => 'publish', 'label' => 'Publish' ),
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
 				),
 				'preview'       => array(
 					'aspectRatio'     => '16:9',

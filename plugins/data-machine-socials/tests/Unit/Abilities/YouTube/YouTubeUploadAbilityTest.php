@@ -43,14 +43,15 @@ class YouTubeUploadAbilityTest extends WP_UnitTestCase {
 	public function test_upload_uses_resumable_protocol_and_defaults_to_private(): void {
 		$file = wp_tempnam( 'youtube-upload-test' );
 		file_put_contents( $file, 'test video bytes' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents -- Test fixture.
+		$expected_mime = mime_content_type( $file );
 
-		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
+		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) use ( $expected_mime ) {
 			if ( str_contains( $url, 'upload/youtube/v3/videos?uploadType=resumable' ) ) {
 				$this->assertSame( 'POST', $args['method'] );
 				$metadata = json_decode( $args['body'], true );
 				$this->assertSame( 'Pilot recap', $metadata['snippet']['title'] );
 				$this->assertSame( 'private', $metadata['status']['privacyStatus'] );
-				$this->assertSame( 'video/mp4', $args['headers']['X-Upload-Content-Type'] );
+				$this->assertSame( $expected_mime, $args['headers']['X-Upload-Content-Type'] );
 
 				return array(
 					'response' => array( 'code' => 200 ),

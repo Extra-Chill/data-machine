@@ -121,14 +121,14 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'  => array( 'type' => 'boolean' ),
-							'video_id' => array( 'type' => 'string' ),
-							'url'      => array(
+							'success'        => array( 'type' => 'boolean' ),
+							'video_id'       => array( 'type' => 'string' ),
+							'url'            => array(
 								'type'   => 'string',
 								'format' => 'uri',
 							),
 							'privacy_status' => array( 'type' => 'string' ),
-							'error'    => array( 'type' => 'string' ),
+							'error'          => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute_upload' ),
@@ -164,10 +164,12 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_auth', 'YouTube access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
 		}
 
-		// Resolve a local video file. YouTube requires raw bytes (it does not
-		// fetch from a URL like Instagram does), so a URL input is downloaded
-		// to a temp file first.
-		$temp_file = self::resolveLocalVideo( $input );
+		/*
+		 * Resolve a local video file. YouTube requires raw bytes (it does not
+		 * fetch from a URL like Instagram does), so a URL input is downloaded
+		 * to a temp file first.
+		 */
+						$temp_file = self::resolveLocalVideo( $input );
 		if ( is_wp_error( $temp_file ) ) {
 			return $temp_file;
 		}
@@ -241,7 +243,7 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 		return array(
 			'snippet' => $snippet,
 			'status'  => array(
-				'privacyStatus'      => $privacy_status,
+				'privacyStatus'           => $privacy_status,
 				'selfDeclaredMadeForKids' => false,
 			),
 		);
@@ -282,7 +284,7 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 		$headers  = $result['headers'];
 		$location = null;
 		if ( is_object( $headers ) ) {
-			$location = $headers->get( 'Location' ) ?: $headers->get( 'location' );
+			$location = $headers->get( 'Location' ) ? $headers->get( 'Location' ) : $headers->get( 'location' );
 		} elseif ( is_array( $headers ) ) {
 			foreach ( array( 'Location', 'location' ) as $key ) {
 				if ( ! empty( $headers[ $key ] ) ) {
@@ -309,7 +311,7 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 	 * @return array|\WP_Error Decoded video resource or error.
 	 */
 	private static function upload_bytes( string $location, string $access_token, string $file_path, string $mime ) {
-		$bytes = @file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading local video bytes for upload.
+		$bytes = file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading local video bytes for upload.
 		if ( false === $bytes ) {
 			return new \WP_Error( 'api_error', 'Could not read local video file for upload', array( 'status' => 500 ) );
 		}
@@ -370,7 +372,10 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'Either video_file_path or a valid video_url is required', array( 'status' => 400 ) );
 		}
 
-		$download = HttpClient::get( $video_url, array( 'context' => 'YouTube Upload Download', 'timeout' => 300 ) );
+		$download = HttpClient::get( $video_url, array(
+			'context' => 'YouTube Upload Download',
+			'timeout' => 300,
+		) );
 		if ( empty( $download['success'] ) ) {
 			return new \WP_Error( 'api_error', 'Could not download video for upload: ' . ( $download['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
 		}
@@ -379,7 +384,7 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 		if ( ! $tmp_path ) {
 			return new \WP_Error( 'api_error', 'Could not create a temp file for the video download', array( 'status' => 500 ) );
 		}
-		$written = file_put_contents( $tmp_path, $download['data'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents -- Writing downloaded video bytes to a temp file.
+		$written = file_put_contents( $tmp_path, $download['data'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writing downloaded video bytes to a temp file.
 		if ( false === $written ) {
 			return new \WP_Error( 'api_error', 'Could not write the downloaded video to a temp file', array( 'status' => 500 ) );
 		}
@@ -389,7 +394,7 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 			'mime'    => 'video/mp4',
 			'cleanup' => static function () use ( $tmp_path ) {
 				if ( file_exists( $tmp_path ) ) {
-					@unlink( $tmp_path );
+					wp_delete_file( $tmp_path );
 				}
 			},
 		);

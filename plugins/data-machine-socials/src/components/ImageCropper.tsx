@@ -5,19 +5,28 @@
  * Ported from post-to-instagram with TypeScript improvements
  */
 
+/**
+ * WordPress dependencies
+ */
 import { __, sprintf } from '@wordpress/i18n';
 import { Button, Modal, SelectControl } from '@wordpress/components';
 import { useState, useCallback, useMemo } from '@wordpress/element';
+/**
+ * External dependencies
+ */
 import Cropper from 'react-easy-crop';
+/**
+ * Internal dependencies
+ */
 import { getCroppedImg, parseAspectRatio } from '../utils/cropImage';
-import { SelectedImage, CropData } from '../types';
+import { SelectedImage } from '../types';
 
 interface ImageCropperProps {
 	images: SelectedImage[];
 	aspectRatio: string;
 	availableAspectRatios: string[];
-	onAspectRatioChange: (ratio: string) => void;
-	onImagesCropped: (images: SelectedImage[]) => void;
+	onAspectRatioChange: ( ratio: string ) => void;
+	onImagesCropped: ( images: SelectedImage[] ) => void;
 	isOpen: boolean;
 	onClose: () => void;
 }
@@ -34,7 +43,7 @@ interface Area {
 	height: number;
 }
 
-export function ImageCropper({
+export function ImageCropper( {
 	images,
 	aspectRatio,
 	availableAspectRatios,
@@ -42,40 +51,49 @@ export function ImageCropper({
 	onImagesCropped,
 	isOpen,
 	onClose,
-}: ImageCropperProps) {
-	const [currentIndex, setCurrentIndex] = useState(0);
-	const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
-	const [zoom, setZoom] = useState(1);
-	const [rotation, setRotation] = useState(0);
-	const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
-	const [isProcessing, setIsProcessing] = useState(false);
-	const [processedImages, setProcessedImages] = useState<SelectedImage[]>([]);
+}: ImageCropperProps ) {
+	const [ currentIndex, setCurrentIndex ] = useState( 0 );
+	const [ crop, setCrop ] = useState< Point >( { x: 0, y: 0 } );
+	const [ zoom, setZoom ] = useState( 1 );
+	const [ rotation, setRotation ] = useState( 0 );
+	const [ croppedAreaPixels, setCroppedAreaPixels ] = useState< Area | null >(
+		null
+	);
+	const [ isProcessing, setIsProcessing ] = useState( false );
+	const [ processedImages, setProcessedImages ] = useState< SelectedImage[] >(
+		[]
+	);
 
-	const currentImage = images[currentIndex];
+	const currentImage = images[ currentIndex ];
 	const isLastImage = currentIndex === images.length - 1;
 
-	const aspectRatioOptions = useMemo(() => {
-		return availableAspectRatios.map((ratio) => ({
-			label: ratio === 'any' ? __('Any ratio', 'data-machine-socials') : ratio,
+	const aspectRatioOptions = useMemo( () => {
+		return availableAspectRatios.map( ( ratio ) => ( {
+			label:
+				ratio === 'any'
+					? __( 'Any ratio', 'data-machine-socials' )
+					: ratio,
 			value: ratio,
-		}));
-	}, [availableAspectRatios]);
+		} ) );
+	}, [ availableAspectRatios ] );
 
-	const parsedAspect = useMemo(() => {
-		return parseAspectRatio(aspectRatio);
-	}, [aspectRatio]);
+	const parsedAspect = useMemo( () => {
+		return parseAspectRatio( aspectRatio );
+	}, [ aspectRatio ] );
 
 	const onCropComplete = useCallback(
-		(_croppedArea: Area, croppedAreaPixels: Area) => {
-			setCroppedAreaPixels(croppedAreaPixels);
+		( _croppedArea: Area, completedAreaPixels: Area ) => {
+			setCroppedAreaPixels( completedAreaPixels );
 		},
 		[]
 	);
 
-	const handleNext = useCallback(async () => {
-		if (!currentImage || !croppedAreaPixels) return;
+	const handleNext = useCallback( async () => {
+		if ( ! currentImage || ! croppedAreaPixels ) {
+			return;
+		}
 
-		setIsProcessing(true);
+		setIsProcessing( true );
 
 		try {
 			const croppedBlob = await getCroppedImg(
@@ -84,7 +102,7 @@ export function ImageCropper({
 				rotation
 			);
 
-			if (croppedBlob) {
+			if ( croppedBlob ) {
 				const processedImage: SelectedImage = {
 					...currentImage,
 					croppedBlob,
@@ -96,24 +114,25 @@ export function ImageCropper({
 					},
 				};
 
-				setProcessedImages((prev) => [...prev, processedImage]);
+				setProcessedImages( ( prev ) => [ ...prev, processedImage ] );
 
-				if (isLastImage) {
+				if ( isLastImage ) {
 					// All images processed
-					onImagesCropped([...processedImages, processedImage]);
+					onImagesCropped( [ ...processedImages, processedImage ] );
 					onClose();
 				} else {
 					// Move to next image
-					setCurrentIndex((prev) => prev + 1);
-					setCrop({ x: 0, y: 0 });
-					setZoom(1);
-					setRotation(0);
+					setCurrentIndex( ( prev ) => prev + 1 );
+					setCrop( { x: 0, y: 0 } );
+					setZoom( 1 );
+					setRotation( 0 );
 				}
 			}
-		} catch (error) {
-			console.error('Cropping failed:', error);
+		} catch ( error ) {
+			// eslint-disable-next-line no-console -- Cropping failures otherwise have no diagnostic surface.
+			console.error( 'Cropping failed:', error );
 		} finally {
-			setIsProcessing(false);
+			setIsProcessing( false );
 		}
 	}, [
 		currentImage,
@@ -123,115 +142,142 @@ export function ImageCropper({
 		processedImages,
 		onImagesCropped,
 		onClose,
-	]);
+	] );
 
-	const handleSkip = useCallback(() => {
-		if (!currentImage) return;
+	const handleSkip = useCallback( () => {
+		if ( ! currentImage ) {
+			return;
+		}
 
 		// Add image without cropping
-		setProcessedImages((prev) => [...prev, currentImage]);
+		setProcessedImages( ( prev ) => [ ...prev, currentImage ] );
 
-		if (isLastImage) {
-			onImagesCropped([...processedImages, currentImage]);
+		if ( isLastImage ) {
+			onImagesCropped( [ ...processedImages, currentImage ] );
 			onClose();
 		} else {
-			setCurrentIndex((prev) => prev + 1);
-			setCrop({ x: 0, y: 0 });
-			setZoom(1);
-			setRotation(0);
+			setCurrentIndex( ( prev ) => prev + 1 );
+			setCrop( { x: 0, y: 0 } );
+			setZoom( 1 );
+			setRotation( 0 );
 		}
-	}, [currentImage, isLastImage, processedImages, onImagesCropped, onClose]);
+	}, [
+		currentImage,
+		isLastImage,
+		processedImages,
+		onImagesCropped,
+		onClose,
+	] );
 
-	const handleCancel = useCallback(() => {
+	const handleCancel = useCallback( () => {
 		onClose();
-		setCurrentIndex(0);
-		setProcessedImages([]);
-		setCrop({ x: 0, y: 0 });
-		setZoom(1);
-		setRotation(0);
-	}, [onClose]);
+		setCurrentIndex( 0 );
+		setProcessedImages( [] );
+		setCrop( { x: 0, y: 0 } );
+		setZoom( 1 );
+		setRotation( 0 );
+	}, [ onClose ] );
 
-	if (!isOpen || !currentImage) {
+	if ( ! isOpen || ! currentImage ) {
 		return null;
 	}
 
 	return (
 		<Modal
-			title={
-				sprintf(
-					__('Crop Image %d of %d', 'data-machine-socials'),
-					currentIndex + 1,
-					images.length
-				)
-			}
-			onRequestClose={handleCancel}
+			title={ sprintf(
+				/* translators: 1: current image number, 2: total images. */
+				__( 'Crop Image %1$d of %2$d', 'data-machine-socials' ),
+				currentIndex + 1,
+				images.length
+			) }
+			onRequestClose={ handleCancel }
 			className="dms-crop-modal"
 		>
 			<div className="dms-crop-container">
-				{aspectRatioOptions.length > 1 && (
+				{ aspectRatioOptions.length > 1 && (
 					<div className="dms-aspect-ratio-selector">
 						<SelectControl
-							label={__('Aspect Ratio', 'data-machine-socials')}
-							value={aspectRatio}
-							options={aspectRatioOptions}
-							onChange={onAspectRatioChange}
+							label={ __(
+								'Aspect Ratio',
+								'data-machine-socials'
+							) }
+							value={ aspectRatio }
+							options={ aspectRatioOptions }
+							onChange={ onAspectRatioChange }
 						/>
 					</div>
-				)}
+				) }
 
 				<div className="dms-cropper-wrapper">
 					<Cropper
-						image={currentImage.url}
-						crop={crop}
-						zoom={zoom}
-						rotation={rotation}
-						aspect={parsedAspect || undefined}
-						onCropChange={setCrop}
-						onCropComplete={onCropComplete}
-						onZoomChange={setZoom}
+						image={ currentImage.url }
+						crop={ crop }
+						zoom={ zoom }
+						rotation={ rotation }
+						aspect={ parsedAspect || undefined }
+						onCropChange={ setCrop }
+						onCropComplete={ onCropComplete }
+						onZoomChange={ setZoom }
 					/>
 				</div>
 
 				<div className="dms-crop-controls">
 					<div className="dms-zoom-control">
-						<label>{__('Zoom', 'data-machine-socials')}</label>
+						<label htmlFor="dms-crop-zoom">
+							{ __( 'Zoom', 'data-machine-socials' ) }
+						</label>
 						<input
+							id="dms-crop-zoom"
 							type="range"
-							min={1}
-							max={3}
-							step={0.1}
-							value={zoom}
-							onChange={(e) => setZoom(parseFloat(e.target.value))}
+							min={ 1 }
+							max={ 3 }
+							step={ 0.1 }
+							value={ zoom }
+							onChange={ ( e ) =>
+								setZoom( parseFloat( e.target.value ) )
+							}
 						/>
 					</div>
 
 					<div className="dms-rotation-control">
 						<Button
 							isSecondary
-							onClick={() => setRotation((r) => (r - 90) % 360)}
-							disabled={isProcessing}
+							onClick={ () =>
+								setRotation( ( r ) => ( r - 90 ) % 360 )
+							}
+							disabled={ isProcessing }
 						>
-							{__('Rotate Left', 'data-machine-socials')}
+							{ __( 'Rotate Left', 'data-machine-socials' ) }
 						</Button>
 						<Button
 							isSecondary
-							onClick={() => setRotation((r) => (r + 90) % 360)}
-							disabled={isProcessing}
+							onClick={ () =>
+								setRotation( ( r ) => ( r + 90 ) % 360 )
+							}
+							disabled={ isProcessing }
 						>
-							{__('Rotate Right', 'data-machine-socials')}
+							{ __( 'Rotate Right', 'data-machine-socials' ) }
 						</Button>
 					</div>
 				</div>
 
 				<div className="dms-crop-actions">
-					<Button isSecondary onClick={handleSkip} disabled={isProcessing}>
-						{__('Skip Cropping', 'data-machine-socials')}
+					<Button
+						isSecondary
+						onClick={ handleSkip }
+						disabled={ isProcessing }
+					>
+						{ __( 'Skip Cropping', 'data-machine-socials' ) }
 					</Button>
 
-					<Button isPrimary onClick={handleNext} isBusy={isProcessing}>
-						{isLastImage
-							? __('Done', 'data-machine-socials')
-							: __('Next Image', 'data-machine-socials')}
+					<Button
+						isPrimary
+						onClick={ handleNext }
+						isBusy={ isProcessing }
+					>
+						{ isLastImage
+							? __( 'Done', 'data-machine-socials' )
+							: __( 'Next Image', 'data-machine-socials' ) }
 					</Button>
 				</div>
 			</div>

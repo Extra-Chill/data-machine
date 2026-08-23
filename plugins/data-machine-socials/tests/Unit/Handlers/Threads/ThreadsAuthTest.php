@@ -30,9 +30,11 @@ class ThreadsAuthTest extends WP_UnitTestCase {
 		parent::tear_down();
 	}
 
-	// -------------------------------------------------------------------------
-	// Provider identity
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Provider identity
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_provider_slug_is_threads(): void {
 		$this->assertSame( 'datamachine_refresh_token_threads', $this->auth->get_cron_hook_name() );
@@ -42,9 +44,11 @@ class ThreadsAuthTest extends WP_UnitTestCase {
 		$this->assertSame( 'https://graph.threads.net/refresh_access_token', ThreadsAuth::REFRESH_URL );
 	}
 
-	// -------------------------------------------------------------------------
-	// is_configured()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * is_configured()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_is_configured_returns_true_with_app_credentials(): void {
 		$this->auth->save_config( array(
@@ -59,9 +63,11 @@ class ThreadsAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->auth->is_configured() );
 	}
 
-	// -------------------------------------------------------------------------
-	// is_authenticated() — inherited from base class
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * is_authenticated() — inherited from base class
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_is_authenticated_returns_true_with_valid_token(): void {
 		$this->auth->save_account( array(
@@ -81,9 +87,11 @@ class ThreadsAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->auth->is_authenticated() );
 	}
 
-	// -------------------------------------------------------------------------
-	// get_page_id()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * get_page_id()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_get_page_id_returns_stored_id(): void {
 		$this->auth->save_account( array(
@@ -98,9 +106,11 @@ class ThreadsAuthTest extends WP_UnitTestCase {
 		$this->assertNull( $this->auth->get_page_id() );
 	}
 
-	// -------------------------------------------------------------------------
-	// do_refresh_token() via get_valid_access_token()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * do_refresh_token() via get_valid_access_token()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_refresh_calls_threads_api_with_th_refresh_token(): void {
 		$captured_url = null;
@@ -197,9 +207,11 @@ class ThreadsAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $refresh_called );
 	}
 
-	// -------------------------------------------------------------------------
-	// remove_account() with token revocation
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * remove_account() with token revocation
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_remove_account_clears_data(): void {
 		// Mock the revocation call.

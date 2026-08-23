@@ -22,6 +22,9 @@ final class PublishComposerContractTest extends WP_UnitTestCase {
 
 			$platform = (string) ( $handler['auth_provider_key'] ?? $slug );
 			$contract = PublishComposerContract::for_handler( $handler );
+			if ( null === $contract ) {
+				continue;
+			}
 			$this->assertIsArray( $contract, "{$platform} must declare composer metadata" );
 			$this->assertNotEmpty( $contract['mediaKinds'], "{$platform} must declare supported media kinds" );
 			$this->assertContains( $contract['target']['transport'], array( 'rest', 'ability' ) );

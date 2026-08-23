@@ -31,12 +31,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class TikTokAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
-	const AUTH_URL    = 'https://www.tiktok.com/v2/auth/authorize/';
-	const TOKEN_URL   = 'https://open.tiktokapis.com/v2/oauth/token/';
-	const REVOKE_URL  = 'https://open.tiktokapis.com/v2/oauth/revoke/';
-	const API_BASE    = 'https://open.tiktokapis.com';
-	const USER_INFO   = 'https://open.tiktokapis.com/v2/user/info/';
-	const SCOPES      = 'user.info.basic,video.list,video.publish';
+	const AUTH_URL   = 'https://www.tiktok.com/v2/auth/authorize/';
+	const TOKEN_URL  = 'https://open.tiktokapis.com/v2/oauth/token/';
+	const REVOKE_URL = 'https://open.tiktokapis.com/v2/oauth/revoke/';
+	const API_BASE   = 'https://open.tiktokapis.com';
+	const USER_INFO  = 'https://open.tiktokapis.com/v2/user/info/';
+	const SCOPES     = 'user.info.basic,video.list,video.publish';
 
 	public function __construct() {
 		parent::__construct( 'tiktok' );
@@ -52,7 +52,7 @@ class TikTokAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	 */
 	public function get_config_fields(): array {
 		return array(
-			'client_key' => array(
+			'client_key'    => array(
 				'label'       => __( 'Client Key', 'data-machine-socials' ),
 				'type'        => 'text',
 				'required'    => true,
@@ -137,9 +137,9 @@ class TikTokAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		}
 
 		// do_refresh_token() already saved a possibly rotated refresh token.
-		$account                     = $this->get_account();
-		$account['access_token']     = $refreshed['access_token'];
-		$account['token_expires_at'] = $refreshed['expires_at'];
+		$account                      = $this->get_account();
+		$account['access_token']      = $refreshed['access_token'];
+		$account['token_expires_at']  = $refreshed['expires_at'];
 		$account['last_refreshed_at'] = time();
 		$this->save_account( $account );
 		$this->schedule_proactive_refresh();
@@ -200,9 +200,11 @@ class TikTokAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		$expires_in = $data['expires_in'] ?? 86400;
 		$expires_at = time() + intval( $expires_in );
 
-		// Persist the (possibly rotated) refresh token immediately so the
-		// next refresh cycle uses the correct token.
-		$rotated_refresh_token = $data['refresh_token'] ?? $refresh_token;
+		/*
+		 * Persist the (possibly rotated) refresh token immediately so the
+		 * next refresh cycle uses the correct token.
+		 */
+				$rotated_refresh_token = $data['refresh_token'] ?? $refresh_token;
 		if ( '' !== $rotated_refresh_token ) {
 			$this->update_account_field( 'refresh_token', $rotated_refresh_token );
 
@@ -287,19 +289,19 @@ class TikTokAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 					return new \WP_Error( 'tiktok_no_access_token', 'TikTok did not return an access token.' );
 				}
 
-				$expires_in  = $token_data['expires_in'] ?? 86400;
-				$expires_at  = time() + intval( $expires_in );
+				$expires_in         = $token_data['expires_in'] ?? 86400;
+				$expires_at         = time() + intval( $expires_in );
 				$refresh_expires_in = $token_data['refresh_expires_in'] ?? 31536000;
 
 				return array(
-					'access_token'              => $token_data['access_token'],
-					'refresh_token'             => $token_data['refresh_token'] ?? '',
-					'open_id'                   => $token_data['open_id'] ?? '',
-					'scope'                     => $token_data['scope'] ?? self::SCOPES,
-					'token_type'                => $token_data['token_type'] ?? 'Bearer',
-					'authenticated_at'          => time(),
-					'token_expires_at'          => $expires_at,
-					'refresh_token_expires_at'  => time() + intval( $refresh_expires_in ),
+					'access_token'             => $token_data['access_token'],
+					'refresh_token'            => $token_data['refresh_token'] ?? '',
+					'open_id'                  => $token_data['open_id'] ?? '',
+					'scope'                    => $token_data['scope'] ?? self::SCOPES,
+					'token_type'               => $token_data['token_type'] ?? 'Bearer',
+					'authenticated_at'         => time(),
+					'token_expires_at'         => $expires_at,
+					'refresh_token_expires_at' => time() + intval( $refresh_expires_in ),
 				);
 			},
 			null,
@@ -371,7 +373,7 @@ class TikTokAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	 * @return void
 	 */
 	protected function update_account_field( string $key, $value ): void {
-		$account   = $this->get_account();
+		$account = $this->get_account();
 		if ( ! is_array( $account ) ) {
 			$account = array();
 		}

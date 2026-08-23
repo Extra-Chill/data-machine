@@ -2,54 +2,67 @@
  * Hook for managing platform authentication state
  */
 
+/**
+ * WordPress dependencies
+ */
 import { useState, useEffect, useCallback } from '@wordpress/element';
+/**
+ * Internal dependencies
+ */
 import { getAuthStatus } from '../utils/api';
 import { PlatformAuthStatus, AuthState } from '../types';
 
-type AuthStatusMap = Record<string, AuthState>;
+type AuthStatusMap = Record< string, AuthState >;
 
 export function usePlatformAuth() {
-	const [authStatus, setAuthStatus] = useState<AuthStatusMap>({});
-	const [isLoading, setIsLoading] = useState(true);
+	const [ authStatus, setAuthStatus ] = useState< AuthStatusMap >( {} );
+	const [ isLoading, setIsLoading ] = useState( true );
 
-	const fetchAuthStatus = useCallback(async () => {
+	const fetchAuthStatus = useCallback( async () => {
 		try {
-			setIsLoading(true);
+			setIsLoading( true );
 			const statuses = await getAuthStatus();
-			
+
 			const mapped: AuthStatusMap = {};
-			statuses.forEach((status: PlatformAuthStatus) => {
-				mapped[status.platform] = {
+			statuses.forEach( ( status: PlatformAuthStatus ) => {
+				mapped[ status.platform ] = {
 					isLoading: false,
 					isConfigured: true, // API only returns configured platforms
 					isAuthenticated: status.authenticated,
 					username: status.username,
 				};
-			});
+			} );
 
-			setAuthStatus(mapped);
-		} catch (error) {
-			console.error('Failed to fetch auth status:', error);
+			setAuthStatus( mapped );
+		} catch ( error ) {
+			// eslint-disable-next-line no-console -- Authentication failures otherwise have no diagnostic surface.
+			console.error( 'Failed to fetch auth status:', error );
 		} finally {
-			setIsLoading(false);
+			setIsLoading( false );
 		}
-	}, []);
+	}, [] );
 
-	useEffect(() => {
+	useEffect( () => {
 		fetchAuthStatus();
-	}, [fetchAuthStatus]);
+	}, [ fetchAuthStatus ] );
 
-	const isPlatformAuthenticated = useCallback((platform: string): boolean => {
-		return authStatus[platform]?.isAuthenticated ?? false;
-	}, [authStatus]);
+	const isPlatformAuthenticated = useCallback(
+		( platform: string ): boolean => {
+			return authStatus[ platform ]?.isAuthenticated ?? false;
+		},
+		[ authStatus ]
+	);
 
-	const getPlatformUsername = useCallback((platform: string): string | undefined => {
-		return authStatus[platform]?.username;
-	}, [authStatus]);
+	const getPlatformUsername = useCallback(
+		( platform: string ): string | undefined => {
+			return authStatus[ platform ]?.username;
+		},
+		[ authStatus ]
+	);
 
-	const refreshAuth = useCallback(() => {
+	const refreshAuth = useCallback( () => {
 		fetchAuthStatus();
-	}, [fetchAuthStatus]);
+	}, [ fetchAuthStatus ] );
 
 	return {
 		authStatus,

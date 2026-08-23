@@ -63,21 +63,21 @@ class YouTubeSearchAbility extends AbstractSocialAbility {
 								'type'        => 'string',
 								'description' => 'Search query string',
 							),
-							'type' => array(
+							'type'  => array(
 								'type'        => 'string',
 								'enum'        => array( 'video', 'channel', 'playlist', 'any' ),
 								'default'     => 'video',
 								'description' => 'Resource type to search for',
 							),
-							'limit'     => array(
+							'limit' => array(
 								'type'        => 'integer',
 								'default'     => 10,
 								'description' => 'Number of results (max 50)',
 							),
-							'order'     => array(
-								'type'        => 'string',
-								'enum'        => array( 'relevance', 'date', 'viewCount', 'rating' ),
-								'default'     => 'relevance',
+							'order' => array(
+								'type'    => 'string',
+								'enum'    => array( 'relevance', 'date', 'viewCount', 'rating' ),
+								'default' => 'relevance',
 							),
 						),
 					),
@@ -156,10 +156,10 @@ class YouTubeSearchAbility extends AbstractSocialAbility {
 
 		$items = array();
 		foreach ( (array) ( $data['items'] ?? array() ) as $item ) {
-			$id        = $item['id'] ?? array();
-			$snippet   = $item['snippet'] ?? array();
-			$resource  = '';
-			$video_id  = '';
+			$id       = $item['id'] ?? array();
+			$snippet  = $item['snippet'] ?? array();
+			$resource = '';
+			$video_id = '';
 			if ( ! empty( $id['videoId'] ) ) {
 				$video_id = (string) $id['videoId'];
 				$resource = 'video';

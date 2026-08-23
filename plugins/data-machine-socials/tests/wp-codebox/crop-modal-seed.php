@@ -152,8 +152,10 @@ if ( ! is_dir( $mu_dir ) ) {
 	wp_mkdir_p( $mu_dir );
 }
 
-// Read the real bundle's dependency/version metadata so the mu-plugin enqueues
-// it exactly as the plugin would (correct wp-* script handles + cache version).
+/*
+ * Read the real bundle's dependency/version metadata so the mu-plugin enqueues
+ * it exactly as the plugin would (correct wp-* script handles + cache version).
+ */
 $socials_asset = file_exists( $socials_asset_path ) ? ( require $socials_asset_path ) : array(
 	'dependencies' => array( 'wp-element', 'wp-components', 'wp-edit-post', 'wp-plugins', 'wp-api-fetch', 'wp-i18n' ),
 	'version'      => '0',

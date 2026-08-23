@@ -46,15 +46,16 @@ class Instagram extends PublishHandler {
 			true,
 			InstagramAuth::class,
 			InstagramSettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
 				return array(
 					'instagram_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Post content to Instagram. Supports single images and carousels (up to 10 images). Images are processed async.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post content to Instagram. Supports single images and carousels (up to 10 images). Images are processed async.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
 								'content'      => array(
@@ -83,27 +84,36 @@ class Instagram extends PublishHandler {
 			},
 			'instagram',
 			array(
-			'charLimit'           => 2200,
-			'maxImages'           => 10,
-			'aspectRatios'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
-			'defaultAspectRatio'  => '4:5',
-			'supportsCarousel'    => true,
-			'supportsVideo'       => true,
-			'supportedMediaKinds' => array( 'image', 'carousel', 'reel', 'story' ),
-			'composer'            => array(
-				'crossPostCompatible' => true,
-				'mediaKinds'           => array( 'image', 'carousel', 'reel', 'story' ),
-			),
-			'capabilities'        => array(
-				array( 'slug' => 'publish', 'label' => 'Publish' ),
-				array( 'slug' => 'comments', 'label' => 'Comments' ),
-				array( 'slug' => 'giveaway', 'label' => 'Giveaway' ),
-			),
-			'preview'             => array(
-				'aspectRatio'     => '1:1',
-				'captionPosition' => 'below',
-				'previewSurface'  => 'square',
-			),
+				'charLimit'           => 2200,
+				'maxImages'           => 10,
+				'aspectRatios'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
+				'defaultAspectRatio'  => '4:5',
+				'supportsCarousel'    => true,
+				'supportsVideo'       => true,
+				'supportedMediaKinds' => array( 'image', 'carousel', 'reel', 'story' ),
+				'composer'            => array(
+					'crossPostCompatible' => true,
+					'mediaKinds'          => array( 'image', 'carousel', 'reel', 'story' ),
+				),
+				'capabilities'        => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+					array(
+						'slug'  => 'comments',
+						'label' => 'Comments',
+					),
+					array(
+						'slug'  => 'giveaway',
+						'label' => 'Giveaway',
+					),
+				),
+				'preview'             => array(
+					'aspectRatio'     => '1:1',
+					'captionPosition' => 'below',
+					'previewSurface'  => 'square',
+				),
 			)
 		);
 	}
@@ -140,10 +150,10 @@ class Instagram extends PublishHandler {
 		}
 
 		// Resolve media from engine data — video takes priority (becomes a Reel).
-		$media          = $this->resolveMediaUrls( $engine );
-		$video_url      = $media['video_url'];
+		$media           = $this->resolveMediaUrls( $engine );
+		$video_url       = $media['video_url'];
 		$video_file_path = $media['video_file_path'];
-		$image_url      = $media['image_url'];
+		$image_url       = $media['image_url'];
 
 		// Build image URLs array.
 		$image_urls = array();

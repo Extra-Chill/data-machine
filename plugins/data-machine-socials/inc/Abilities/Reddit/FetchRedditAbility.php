@@ -596,9 +596,11 @@ class FetchRedditAbility extends AbstractSocialAbility {
 				);
 
 				if ( null === $collector ) {
-					// Direct REST/MCP/ad-hoc invocation — no DM core eligibility
-					// surface to consult; honor only the direct-call result cap.
-					$eligible_items[] = $candidate;
+					/*
+					 * Direct REST/MCP/ad-hoc invocation — no DM core eligibility
+					 * surface to consult; honor only the direct-call result cap.
+					 */
+										$eligible_items[] = $candidate;
 					if ( null !== $max_items && count( $eligible_items ) >= $max_items ) {
 						$truncated = $post_index < count( $post_wrappers ) - 1 || ! empty( $response_data['data']['after'] );
 						break;
@@ -606,10 +608,12 @@ class FetchRedditAbility extends AbstractSocialAbility {
 					continue;
 				}
 
-				// Pipeline-driven fetch: defer processed/claimed/reprocess
-				// decisions to the core fresh-candidate collector. The
-				// collector also de-duplicates within this scan, so we don't
-				// need to track seen IDs ourselves.
+				/*
+				 * Pipeline-driven fetch: defer processed/claimed/reprocess
+				 * decisions to the core fresh-candidate collector. The
+				 * collector also de-duplicates within this scan, so we don't
+				 * need to track seen IDs ourselves.
+				 */
 				if ( ! $collector->offer( (string) $current_item_id, $candidate ) ) {
 					if ( $collector->isFull() ) {
 						break;
@@ -653,14 +657,18 @@ class FetchRedditAbility extends AbstractSocialAbility {
 			}
 		}
 
-		// If we exited the pagination loop because we hit `max_pages` without
-		// either filling the collector or running out of Reddit `after`
-		// cursors, that is "scan budget exhausted", not source exhaustion —
-		// leave `source_exhausted=false` so callers can distinguish the two.
-		$truncated = $truncated || ( $pages_fetched >= $max_pages && ! empty( $after_param ) );
+		/*
+		 * If we exited the pagination loop because we hit `max_pages` without
+		 * either filling the collector or running out of Reddit `after`
+		 * cursors, that is "scan budget exhausted", not source exhaustion —
+		 * leave `source_exhausted=false` so callers can distinguish the two.
+		 */
+								$truncated = $truncated || ( $pages_fetched >= $max_pages && ! empty( $after_param ) );
 
-		// Pipeline path: emit collector accepted set as the result so handler
-		// post-processing iterates only the items the core primitive blessed.
+		/*
+		 * Pipeline path: emit collector accepted set as the result so handler
+		 * post-processing iterates only the items the core primitive blessed.
+		 */
 		if ( null !== $collector ) {
 			$eligible_items = $collector->getAccepted();
 		}
@@ -822,7 +830,7 @@ class FetchRedditAbility extends AbstractSocialAbility {
 			esc_attr( $subreddit ),
 			esc_attr( $sort ),
 			$fetch_batch_size,
-			$after_param ? '&after=' . urlencode( $after_param ) : '',
+			$after_param ? '&after=' . rawurlencode( $after_param ) : '',
 			$time_param
 		);
 	}

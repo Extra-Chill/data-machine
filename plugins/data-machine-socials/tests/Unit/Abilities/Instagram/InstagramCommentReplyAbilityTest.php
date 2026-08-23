@@ -81,8 +81,8 @@ class InstagramCommentReplyAbilityTest extends WP_UnitTestCase {
 			'message' => 'Thanks!',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'comment_id is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'comment_id is required', $result->get_error_message() );
 	}
 
 	public function test_reply_requires_message(): void {
@@ -92,8 +92,8 @@ class InstagramCommentReplyAbilityTest extends WP_UnitTestCase {
 			'comment_id' => 'comment_123',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'message is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'message is required', $result->get_error_message() );
 	}
 
 	public function test_reply_returns_api_error_message(): void {
@@ -117,8 +117,8 @@ class InstagramCommentReplyAbilityTest extends WP_UnitTestCase {
 			'message'    => 'Thanks!',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Unsupported post request.', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Unsupported post request.', $result->get_error_message() );
 	}
 
 	public function test_reply_returns_error_when_not_authenticated(): void {
@@ -127,7 +127,7 @@ class InstagramCommentReplyAbilityTest extends WP_UnitTestCase {
 			'message'    => 'Thanks!',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'access token', strtolower( $result['error'] ) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'access token', strtolower( $result->get_error_message() ) );
 	}
 }

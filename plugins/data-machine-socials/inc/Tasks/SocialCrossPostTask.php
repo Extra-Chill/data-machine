@@ -51,7 +51,7 @@ class SocialCrossPostTask extends SystemTask {
 				return;
 			}
 
-			$params    = array_replace(
+			$params = array_replace(
 				$params,
 				array(
 					'post_site_id'  => $revalidated['post_site_id'],
@@ -96,10 +96,10 @@ class SocialCrossPostTask extends SystemTask {
 		}
 
 		// Publish directly via Publisher utility (no REST round-trip).
-		$tracking_post  = is_array( $params['attribution_post'] ?? null ) ? $params['attribution_post'] : array();
+		$tracking_post    = is_array( $params['attribution_post'] ?? null ) ? $params['attribution_post'] : array();
 		$tracking_site_id = absint( $tracking_post['site_id'] ?? $params['post_site_id'] ?? get_current_blog_id() );
 		$tracking_post_id = absint( $tracking_post['post_id'] ?? $post_id );
-		$publish_result = Publisher::cross_post( $params );
+		$publish_result   = Publisher::cross_post( $params );
 
 		if ( ! empty( $publish_result['error'] ) && empty( $publish_result['results'] ) ) {
 			// Validation-level failure (e.g. missing video_url for reel).

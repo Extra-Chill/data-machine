@@ -46,15 +46,16 @@ class Twitter extends PublishHandler {
 			true,
 			TwitterAuth::class,
 			TwitterSettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
 				return array(
 					'twitter_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Post content to Twitter. Supports text (280 chars), images, and URL handling.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post content to Twitter. Supports text (280 chars), images, and URL handling.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
 								'content' => array(
@@ -69,23 +70,26 @@ class Twitter extends PublishHandler {
 			},
 			'twitter',
 			array(
-			'charLimit'          => 280,
-			'maxImages'          => 4,
-			'aspectRatios'       => array( 'any' ),
-			'defaultAspectRatio' => 'any',
-			'supportsCarousel'   => false,
-			'composer'          => array(
-				'crossPostCompatible' => true,
-				'mediaKinds'           => array( 'image', 'carousel' ),
-			),
-			'capabilities'       => array(
-				array( 'slug' => 'publish', 'label' => 'Publish' ),
-			),
-			'preview'            => array(
-				'aspectRatio'     => '16:9',
-				'captionPosition' => 'above',
-				'previewSurface'  => 'feed',
-			),
+				'charLimit'          => 280,
+				'maxImages'          => 4,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => false,
+				'composer'           => array(
+					'crossPostCompatible' => true,
+					'mediaKinds'          => array( 'image', 'carousel' ),
+				),
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+				),
+				'preview'            => array(
+					'aspectRatio'     => '16:9',
+					'captionPosition' => 'above',
+					'previewSurface'  => 'feed',
+				),
 			)
 		);
 	}

@@ -30,17 +30,21 @@ class FacebookAuthTest extends WP_UnitTestCase {
 		parent::tear_down();
 	}
 
-	// -------------------------------------------------------------------------
-	// Provider identity
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Provider identity
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_provider_slug_is_facebook(): void {
 		$this->assertSame( 'datamachine_refresh_token_facebook', $this->auth->get_cron_hook_name() );
 	}
 
-	// -------------------------------------------------------------------------
-	// is_configured()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * is_configured()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_is_configured_returns_true_with_app_credentials(): void {
 		$this->auth->save_config( array(
@@ -55,9 +59,11 @@ class FacebookAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->auth->is_configured() );
 	}
 
-	// -------------------------------------------------------------------------
-	// is_authenticated() — dual token system
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * is_authenticated() — dual token system
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_is_authenticated_requires_both_tokens(): void {
 		$this->auth->save_account( array(
@@ -97,9 +103,11 @@ class FacebookAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->auth->is_authenticated() );
 	}
 
-	// -------------------------------------------------------------------------
-	// get_page_id()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * get_page_id()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_get_page_id_returns_stored_id(): void {
 		$this->auth->save_account( array(
@@ -111,9 +119,11 @@ class FacebookAuthTest extends WP_UnitTestCase {
 		$this->assertSame( 'pg_123', $this->auth->get_page_id() );
 	}
 
-	// -------------------------------------------------------------------------
-	// do_refresh_token() — user token refresh + page credential re-fetch
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * do_refresh_token() — user token refresh + page credential re-fetch
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_refresh_exchanges_user_token_and_refetches_page(): void {
 		$captured_urls = array();
@@ -236,9 +246,11 @@ class FacebookAuthTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'client_secret=my_app_secret', $captured_url );
 	}
 
-	// -------------------------------------------------------------------------
-	// get_page_access_token() triggers refresh
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * get_page_access_token() triggers refresh
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_get_page_access_token_triggers_refresh(): void {
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
@@ -283,9 +295,11 @@ class FacebookAuthTest extends WP_UnitTestCase {
 		$this->assertNull( $this->auth->get_page_access_token() );
 	}
 
-	// -------------------------------------------------------------------------
-	// No refresh when tokens are fresh
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * No refresh when tokens are fresh
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_no_refresh_when_tokens_are_fresh(): void {
 		$http_called = false;
@@ -312,9 +326,11 @@ class FacebookAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $http_called );
 	}
 
-	// -------------------------------------------------------------------------
-	// remove_account() with token revocation
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * remove_account() with token revocation
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_remove_account_revokes_and_clears(): void {
 		$revocation_called = false;

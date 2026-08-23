@@ -93,9 +93,9 @@ class SocialPublishAbility extends AbstractSocialAbility {
 
 	/** Submit canonical content through Data Machine's public delegated operation ability. */
 	public function enqueue( array $input ): array {
-		$content = is_array( $input['content_ref'] ?? null ) ? $input['content_ref'] : array();
-		$policy  = is_array( $input['target_policy'] ?? null ) ? $input['target_policy'] : array();
-		$targets = is_array( $policy['channels'] ?? null ) ? $policy['channels'] : array();
+		$content    = is_array( $input['content_ref'] ?? null ) ? $input['content_ref'] : array();
+		$policy     = is_array( $input['target_policy'] ?? null ) ? $input['target_policy'] : array();
+		$targets    = is_array( $policy['channels'] ?? null ) ? $policy['channels'] : array();
 		$media_kind = (string) ( $policy['media_kind'] ?? '' );
 
 		$contract_validation = PublishComposerContract::validate_cross_post( $targets, $media_kind );
@@ -321,7 +321,7 @@ class SocialPublishAbility extends AbstractSocialAbility {
 					),
 					'additionalProperties' => false,
 				),
-				'content_ref'     => array(
+				'content_ref'      => array(
 					'type'                 => 'object',
 					'required'             => array( 'post_id', 'source_url', 'caption', 'content_hash', 'asset_refs' ),
 					'properties'           => array(
@@ -370,7 +370,7 @@ class SocialPublishAbility extends AbstractSocialAbility {
 					),
 					'additionalProperties' => false,
 				),
-				'target_policy'   => array(
+				'target_policy'    => array(
 					'type'                 => 'object',
 					'required'             => array( 'channels', 'media_kind' ),
 					'properties'           => array(
@@ -390,7 +390,7 @@ class SocialPublishAbility extends AbstractSocialAbility {
 					),
 					'additionalProperties' => false,
 				),
-				'idempotency_key' => array(
+				'idempotency_key'  => array(
 					'type'      => 'string',
 					'minLength' => 1,
 					'maxLength' => 191,

@@ -31,17 +31,21 @@ class RedditAuthTest extends WP_UnitTestCase {
 		parent::tear_down();
 	}
 
-	// -------------------------------------------------------------------------
-	// Provider identity
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Provider identity
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_provider_slug_is_reddit(): void {
 		$this->assertSame( 'datamachine_refresh_token_reddit', $this->auth->get_cron_hook_name() );
 	}
 
-	// -------------------------------------------------------------------------
-	// get_config_fields()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * get_config_fields()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_config_fields_include_required_keys(): void {
 		$fields = $this->auth->get_config_fields();
@@ -54,9 +58,11 @@ class RedditAuthTest extends WP_UnitTestCase {
 		$this->assertTrue( $fields['developer_username']['required'] );
 	}
 
-	// -------------------------------------------------------------------------
-	// is_configured()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * is_configured()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_is_configured_with_full_credentials(): void {
 		$this->auth->save_config( array(
@@ -71,9 +77,11 @@ class RedditAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->auth->is_configured() );
 	}
 
-	// -------------------------------------------------------------------------
-	// is_authenticated() — requires both access_token and refresh_token
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * is_authenticated() — requires both access_token and refresh_token
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_is_authenticated_with_valid_tokens(): void {
 		$this->auth->save_account( array(
@@ -108,9 +116,11 @@ class RedditAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->auth->is_authenticated() );
 	}
 
-	// -------------------------------------------------------------------------
-	// do_refresh_token() via get_valid_access_token()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * do_refresh_token() via get_valid_access_token()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_refresh_calls_reddit_api_with_basic_auth(): void {
 		$captured_args = null;
@@ -327,9 +337,11 @@ class RedditAuthTest extends WP_UnitTestCase {
 		$this->assertSame( 'reddit_refreshed', $token );
 	}
 
-	// -------------------------------------------------------------------------
-	// Proactive refresh scheduling
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Proactive refresh scheduling
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_successful_refresh_schedules_cron(): void {
 		add_filter( 'pre_http_request', function () {
@@ -359,9 +371,11 @@ class RedditAuthTest extends WP_UnitTestCase {
 		$this->assertNotFalse( $next );
 	}
 
-	// -------------------------------------------------------------------------
-	// remove_account() cleanup
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * remove_account() cleanup
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_remove_account_clears_data_and_cron(): void {
 		$this->auth->save_account( array(
@@ -377,9 +391,11 @@ class RedditAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( wp_next_scheduled( $this->auth->get_cron_hook_name() ) );
 	}
 
-	// -------------------------------------------------------------------------
-	// get_account_details()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * get_account_details()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_get_account_details_returns_null_without_account(): void {
 		$this->assertNull( $this->auth->get_account_details() );

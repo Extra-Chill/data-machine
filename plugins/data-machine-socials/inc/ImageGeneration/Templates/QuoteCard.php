@@ -75,7 +75,7 @@ class QuoteCard implements TemplateInterface {
 	 * @return array Palette keyed by region => array( r, g, b ).
 	 */
 	private function get_palette(): array {
-		/**
+		/*
 		 * Filters the quote-card color palette.
 		 *
 		 * @param array $palette Palette keyed by region => array( r, g, b ).
@@ -91,7 +91,7 @@ class QuoteCard implements TemplateInterface {
 	 * @return string Font filename resolved by GDRenderer against the theme.
 	 */
 	private function get_header_font(): string {
-		/**
+		/*
 		 * Filters the quote-card header font filename.
 		 *
 		 * @param string $font Font filename (resolved against the theme fonts dir).
@@ -114,7 +114,7 @@ class QuoteCard implements TemplateInterface {
 		$host    = wp_parse_url( home_url(), PHP_URL_HOST );
 		$default = is_string( $host ) && '' !== $host ? $host : (string) get_bloginfo( 'name' );
 
-		/**
+		/*
 		 * Filters the default quote-card branding text.
 		 *
 		 * @param string $default Site-derived branding text.

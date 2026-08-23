@@ -1,91 +1,124 @@
 /**
  * Image selector component
- * 
+ *
  * Displays images from post content for selection
  */
 
+/**
+ * WordPress dependencies
+ */
 import { __ } from '@wordpress/i18n';
 import { Button } from '@wordpress/components';
 import { useState, useCallback, useEffect } from '@wordpress/element';
-import { getPostImageIds, extractImagesFromBlocks, extractFeaturedImage } from '../utils/imageExtractor';
+/**
+ * Internal dependencies
+ */
+import {
+	extractImagesFromBlocks,
+	extractFeaturedImage,
+} from '../utils/imageExtractor';
 import { SelectedImage } from '../types';
 
 interface ImageSelectorProps {
 	selectedImages: SelectedImage[];
-	onChange: (images: SelectedImage[]) => void;
+	onChange: ( images: SelectedImage[] ) => void;
 	maxImages: number;
 	disabled?: boolean;
 	postId?: number;
 }
 
-export function ImageSelector({ selectedImages, onChange, maxImages, disabled, postId }: ImageSelectorProps) {
-	const [availableImages, setAvailableImages] = useState<SelectedImage[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
+export function ImageSelector( {
+	selectedImages,
+	onChange,
+	maxImages,
+	disabled,
+	postId,
+}: ImageSelectorProps ) {
+	const [ availableImages, setAvailableImages ] = useState< SelectedImage[] >(
+		[]
+	);
+	const [ isLoading, setIsLoading ] = useState( true );
 
 	// Extract images from blocks on mount
-	useEffect(() => {
+	useEffect( () => {
 		const loadImages = () => {
 			const featured = extractFeaturedImage();
 			const fromBlocks: SelectedImage[] = [];
-			
+
 			// Try to get from window.wp data
-			const editor = (window as any).wp?.data?.select('core/block-editor');
-			if (editor) {
+			const editor = ( window as any ).wp?.data?.select(
+				'core/block-editor'
+			);
+			if ( editor ) {
 				const blocks = editor.getBlocks();
-				const extracted = extractImagesFromBlocks(blocks);
-				fromBlocks.push(...extracted);
+				const extracted = extractImagesFromBlocks( blocks );
+				fromBlocks.push( ...extracted );
 			}
 
 			// Combine featured and blocks, deduplicate
 			const allImages: SelectedImage[] = [];
-			const seenIds = new Set<number>();
+			const seenIds = new Set< number >();
 
-			if (featured && !seenIds.has(featured.id)) {
-				allImages.push(featured);
-				seenIds.add(featured.id);
+			if ( featured && ! seenIds.has( featured.id ) ) {
+				allImages.push( featured );
+				seenIds.add( featured.id );
 			}
 
-			fromBlocks.forEach(img => {
-				if (!seenIds.has(img.id)) {
-					allImages.push(img);
-					seenIds.add(img.id);
+			fromBlocks.forEach( ( img ) => {
+				if ( ! seenIds.has( img.id ) ) {
+					allImages.push( img );
+					seenIds.add( img.id );
 				}
-			});
+			} );
 
-			setAvailableImages(allImages);
-			setIsLoading(false);
+			setAvailableImages( allImages );
+			setIsLoading( false );
 		};
 
 		loadImages();
-	}, [postId]);
+	}, [ postId ] );
 
-	const toggleImage = useCallback((image: SelectedImage) => {
-		const isSelected = selectedImages.some(img => img.id === image.id);
-		
-		if (isSelected) {
-			onChange(selectedImages.filter(img => img.id !== image.id));
-		} else if (selectedImages.length < maxImages) {
-			onChange([...selectedImages, image]);
-		}
-	}, [selectedImages, onChange, maxImages]);
+	const toggleImage = useCallback(
+		( image: SelectedImage ) => {
+			const isSelected = selectedImages.some(
+				( img ) => img.id === image.id
+			);
 
-	const clearAll = useCallback(() => {
-		onChange([]);
-	}, [onChange]);
+			if ( isSelected ) {
+				onChange(
+					selectedImages.filter( ( img ) => img.id !== image.id )
+				);
+			} else if ( selectedImages.length < maxImages ) {
+				onChange( [ ...selectedImages, image ] );
+			}
+		},
+		[ selectedImages, onChange, maxImages ]
+	);
 
-	if (isLoading) {
+	const clearAll = useCallback( () => {
+		onChange( [] );
+	}, [ onChange ] );
+
+	if ( isLoading ) {
 		return (
 			<div className="dms-image-selector is-loading">
-				{__('Loading images...', 'data-machine-socials')}
+				{ __( 'Loading images…', 'data-machine-socials' ) }
 			</div>
 		);
 	}
 
-	if (availableImages.length === 0) {
+	if ( availableImages.length === 0 ) {
 		return (
 			<div className="dms-image-selector is-empty">
-				<p>{__('No images found in post.', 'data-machine-socials')}</p>
-				<p>{__('Add images to your post to share on social media.', 'data-machine-socials')}</p>
+				<p>
+					{ __( 'No images found in post.', 'data-machine-socials' ) }
+				</p>
+				<p>
+					{ __(
+						'Add images to your post to share on social media.',
+						'data-machine-socials'
+					) }
+				</p>
 			</div>
 		);
 	}
@@ -93,45 +126,67 @@ export function ImageSelector({ selectedImages, onChange, maxImages, disabled, p
 	return (
 		<div className="dms-image-selector">
 			<div className="dms-image-selector-header">
-				<h4>{__('Select Images', 'data-machine-socials')}</h4>
+				<h4>{ __( 'Select Images', 'data-machine-socials' ) }</h4>
 				<span className="dms-image-count">
-					{selectedImages.length} / {maxImages} {__('selected', 'data-machine-socials')}
+					{ selectedImages.length } / { maxImages }{ ' ' }
+					{ __( 'selected', 'data-machine-socials' ) }
 				</span>
 			</div>
 
 			<div className="dms-image-grid">
-				{availableImages.map((image) => {
-					const isSelected = selectedImages.some(img => img.id === image.id);
-					const canSelect = selectedImages.length < maxImages || isSelected;
+				{ availableImages.map( ( image ) => {
+					const isSelected = selectedImages.some(
+						( img ) => img.id === image.id
+					);
+					const canSelect =
+						selectedImages.length < maxImages || isSelected;
 
 					return (
 						<div
-							key={image.id}
-							className={`dms-image-item ${isSelected ? 'is-selected' : ''} ${!canSelect ? 'is-disabled' : ''}`}
-							onClick={() => !disabled && canSelect && toggleImage(image)}
+							key={ image.id }
+							className={ `dms-image-item ${
+								isSelected ? 'is-selected' : ''
+							} ${ ! canSelect ? 'is-disabled' : '' }` }
+							onClick={ () =>
+								! disabled && canSelect && toggleImage( image )
+							}
+							role="button"
+							aria-pressed={ isSelected }
+							tabIndex={ disabled || ! canSelect ? -1 : 0 }
+							onKeyDown={ ( event ) => {
+								if (
+									! disabled &&
+									canSelect &&
+									( event.key === 'Enter' ||
+										event.key === ' ' )
+								) {
+									event.preventDefault();
+									toggleImage( image );
+								}
+							} }
 						>
-							<img src={image.url} alt={image.alt || ''} />
-							{isSelected && (
+							<img src={ image.url } alt={ image.alt || '' } />
+							{ isSelected && (
 								<div className="dms-image-selected-indicator">
 									✓
 								</div>
-							)}
+							) }
 						</div>
 					);
-				})}
+				} ) }
 			</div>
 
-			{selectedImages.length > 0 && (
+			{ selectedImages.length > 0 && (
 				<div className="dms-image-actions">
 					<Button
 						isSecondary
-						onClick={clearAll}
-						disabled={disabled}
+						onClick={ clearAll }
+						disabled={ disabled }
 					>
-						{__('Clear selection', 'data-machine-socials')}
+						{ __( 'Clear selection', 'data-machine-socials' ) }
 					</Button>
 				</div>
-			)}
+			) }
 		</div>
 	);
 }

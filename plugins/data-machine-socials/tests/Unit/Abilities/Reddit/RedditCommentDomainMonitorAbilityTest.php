@@ -94,11 +94,11 @@ class RedditCommentDomainMonitorAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 't1_newest', $result['data']['scopes']['WordPress']['checkpoint'] );
 		$records = RedditCommentDomainStore::report( array( 'limit' => 100 ) );
 		$this->assertCount( 2, $records );
-		$this->assertSame( 'post-newest', $records[0]['parent_post_id'] );
-		$this->assertSame( 'Parent newest', $records[0]['parent_post_title'] );
-		$this->assertSame( 'https://www.reddit.com/r/WordPress/comments/post-newest/x/newest/', $records[0]['permalink'] );
-		$this->assertTrue( $records[0]['known_owner'] );
-		$this->assertSame( '[deleted]', $records[1]['author'] );
+		$records_by_id = array_column( $records, null, 'parent_post_id' );
+		$this->assertSame( 'Parent newest', $records_by_id['post-newest']['parent_post_title'] );
+		$this->assertSame( 'https://www.reddit.com/r/WordPress/comments/post-newest/x/newest/', $records_by_id['post-newest']['permalink'] );
+		$this->assertTrue( $records_by_id['post-newest']['known_owner'] );
+		$this->assertSame( '[deleted]', $records_by_id['post-deletedauthor']['author'] );
 	}
 
 	public function test_cursor_replay_advances_to_new_head_without_duplicates(): void {

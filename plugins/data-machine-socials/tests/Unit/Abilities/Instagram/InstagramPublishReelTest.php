@@ -59,7 +59,7 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 			$request_count++;
 
 			// Step 1: Container creation.
-			if ( str_contains( $url, '12345/media' ) && 'POST' === $args['method'] ) {
+			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] ) {
 				$this->assertSame( 'REELS', $args['body']['media_type'] );
 				$this->assertSame( 'https://example.com/video.mp4', $args['body']['video_url'] );
 				$this->assertSame( 'Check this reel!', $args['body']['caption'] );
@@ -122,8 +122,8 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 			'media_kind' => 'reel',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'video_url is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'video_url is required', $result->get_error_message() );
 	}
 
 	public function test_reel_rejects_invalid_video_url(): void {
@@ -135,8 +135,8 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 			'video_url'  => 'not-a-url',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Invalid video URL', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Invalid video URL', $result->get_error_message() );
 	}
 
 	public function test_reel_returns_error_when_not_authenticated(): void {
@@ -146,15 +146,15 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 			'video_url'  => 'https://example.com/video.mp4',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not authenticated', strtolower( $result['error'] ) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'not authenticated', strtolower( $result->get_error_message() ) );
 	}
 
 	public function test_reel_container_creation_failure(): void {
 		$this->authenticate();
 
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
-			if ( str_contains( $url, '12345/media' ) && 'POST' === $args['method'] ) {
+			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] ) {
 				return array(
 					'response' => array( 'code' => 400 ),
 					'body'     => wp_json_encode( array(
@@ -171,8 +171,8 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 			'video_url'  => 'https://example.com/video.avi',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Invalid video format', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Invalid video format', $result->get_error_message() );
 	}
 
 	public function test_reel_video_processing_timeout(): void {
@@ -180,7 +180,7 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
 			// Container creation succeeds.
-			if ( str_contains( $url, '12345/media' ) && 'POST' === $args['method'] ) {
+			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] ) {
 				return array(
 					'response' => array( 'code' => 200 ),
 					'body'     => wp_json_encode( array( 'id' => 'container_slow' ) ),
@@ -205,8 +205,8 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 			'video_url'  => 'https://example.com/slow.mp4',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'processing failed or timed out', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'processing failed or timed out', $result->get_error_message() );
 	}
 
 	public function test_reel_with_cover_url(): void {
@@ -214,7 +214,7 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
 			// Container creation — verify cover_url is passed.
-			if ( str_contains( $url, '12345/media' ) && 'POST' === $args['method'] ) {
+			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] ) {
 				$this->assertSame( 'https://example.com/cover.jpg', $args['body']['cover_url'] );
 				return array(
 					'response' => array( 'code' => 200 ),
@@ -264,7 +264,7 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 		$this->authenticate();
 
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
-			if ( str_contains( $url, '12345/media' ) && 'POST' === $args['method'] ) {
+			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] ) {
 				$this->assertSame( 'false', $args['body']['share_to_feed'] );
 				return array(
 					'response' => array( 'code' => 200 ),
@@ -311,7 +311,7 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
 			// Container creation.
-			if ( str_contains( $url, '12345/media' ) && 'POST' === $args['method'] && ! isset( $args['body']['media_type'] ) ) {
+			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] && ! isset( $args['body']['media_type'] ) ) {
 				return array(
 					'response' => array( 'code' => 200 ),
 					'body'     => wp_json_encode( array( 'id' => 'container_img' ) ),

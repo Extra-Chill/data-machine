@@ -65,7 +65,7 @@ class MastodonPublishAbilityTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'https://social.example/api/v1/statuses', $captured_url );
 		$this->assertSame( 'Bearer access-token', $captured_headers['Authorization'] );
-		$this->assertSame( 'New show announced\n\nhttps://extrachill.com/event', $captured_body['status'] );
+		$this->assertSame( "New show announced\n\nhttps://extrachill.com/event", $captured_body['status'] );
 		$this->assertSame( 'unlisted', $captured_body['visibility'] );
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( '123', $result['post_id'] );

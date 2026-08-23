@@ -42,20 +42,20 @@ class TumblrEngageAbility extends AbstractSocialAbility {
 						'type'       => 'object',
 						'required'   => array( 'action' ),
 						'properties' => array(
-							'action'      => array(
+							'action'     => array(
 								'type'        => 'string',
 								'enum'        => array( 'like', 'unlike', 'follow', 'unfollow' ),
 								'description' => __( 'Engagement action', 'data-machine-socials' ),
 							),
-							'post_id'     => array(
+							'post_id'    => array(
 								'type'        => 'string',
 								'description' => __( 'Post ID (required for like/unlike)', 'data-machine-socials' ),
 							),
-							'reblog_key'  => array(
+							'reblog_key' => array(
 								'type'        => 'string',
 								'description' => __( 'Reblog key for the post (required for like/unlike)', 'data-machine-socials' ),
 							),
-							'blog_url'    => array(
+							'blog_url'   => array(
 								'type'        => 'string',
 								'format'      => 'uri',
 								'description' => __( 'URL of the blog to follow/unfollow (required for follow/unfollow)', 'data-machine-socials' ),

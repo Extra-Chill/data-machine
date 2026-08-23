@@ -54,7 +54,7 @@ class InstagramPublishStoryTest extends WP_UnitTestCase {
 
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
 			// Container creation.
-			if ( str_contains( $url, '12345/media' ) && 'POST' === $args['method'] ) {
+			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] ) {
 				$this->assertSame( 'STORIES', $args['body']['media_type'] );
 				$this->assertSame( 'https://example.com/story.jpg', $args['body']['image_url'] );
 				$this->assertArrayNotHasKey( 'caption', $args['body'] );
@@ -112,7 +112,7 @@ class InstagramPublishStoryTest extends WP_UnitTestCase {
 
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
 			// Container creation.
-			if ( str_contains( $url, '12345/media' ) && 'POST' === $args['method'] ) {
+			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] ) {
 				$this->assertSame( 'STORIES', $args['body']['media_type'] );
 				$this->assertSame( 'https://example.com/story.mp4', $args['body']['video_url'] );
 
@@ -168,8 +168,8 @@ class InstagramPublishStoryTest extends WP_UnitTestCase {
 			'media_kind' => 'story',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'story_image_url or video_url is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'story_image_url or video_url is required', $result->get_error_message() );
 	}
 
 	public function test_story_rejects_invalid_image_url(): void {
@@ -181,8 +181,8 @@ class InstagramPublishStoryTest extends WP_UnitTestCase {
 			'story_image_url' => 'not-a-url',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Invalid story image URL', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Invalid story image URL', $result->get_error_message() );
 	}
 
 	public function test_story_returns_error_when_not_authenticated(): void {
@@ -192,15 +192,15 @@ class InstagramPublishStoryTest extends WP_UnitTestCase {
 			'story_image_url' => 'https://example.com/story.jpg',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not authenticated', strtolower( $result['error'] ) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'not authenticated', strtolower( $result->get_error_message() ) );
 	}
 
 	public function test_story_container_creation_failure(): void {
 		$this->authenticate();
 
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
-			if ( str_contains( $url, '12345/media' ) && 'POST' === $args['method'] ) {
+			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] ) {
 				return array(
 					'response' => array( 'code' => 400 ),
 					'body'     => wp_json_encode( array(
@@ -217,7 +217,7 @@ class InstagramPublishStoryTest extends WP_UnitTestCase {
 			'story_image_url' => 'https://example.com/bad.jpg',
 		) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Invalid image dimensions', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Invalid image dimensions', $result->get_error_message() );
 	}
 }

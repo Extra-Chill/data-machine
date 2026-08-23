@@ -175,7 +175,7 @@ final class DelegatedCrossPostAction {
 	 * @return true|\WP_Error
 	 */
 	public static function authorize( array $context ) {
-		/**
+		/*
 		 * Filter delegated cross-post authorization.
 		 *
 		 * This action is denied by default. A domain owner may authorize its exact
@@ -203,14 +203,14 @@ final class DelegatedCrossPostAction {
 			? datamachine_resolve_system_agent_context()
 			: array();
 
-		/**
+		/*
 		 * Filter the trusted, stable execution owner registered for this action.
 		 *
 		 * @param array $owner   Data Machine user and agent identity.
 		 * @param array $input   Normalized owner input.
 		 * @param array $context Delegated operation context.
 		 */
-		/** @var mixed $filtered_owner Owner filters must remain runtime-validated. */
+		/* @var mixed $filtered_owner Owner filters must remain runtime-validated. */
 		$filtered_owner = apply_filters( 'datamachine_socials_delegated_cross_post_execution_owner', $owner, $input, $context );
 		$owner          = $filtered_owner;
 
@@ -295,7 +295,7 @@ final class DelegatedCrossPostAction {
 
 			if ( 'social_share_ref' === ( $ref['type'] ?? '' ) ) {
 				$post_site_id = $tracking_post['site_id'];
-				$receipt = $post_id && '' !== $operation_ref
+				$receipt      = $post_id && '' !== $operation_ref
 					? self::with_site( $post_site_id, static fn() => \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref ) )
 					: null;
 
@@ -388,7 +388,7 @@ final class DelegatedCrossPostAction {
 			}
 
 			$post_site_id = self::tracking_post( $live_input )['site_id'];
-			$receipt = self::with_site( $post_site_id, static fn() => \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref ) );
+			$receipt      = self::with_site( $post_site_id, static fn() => \DataMachineSocials\Tracking\SocialShareTracker::get_operation_share( $post_id, $channel, $operation_ref ) );
 			if ( is_array( $receipt ) ) {
 				$recorded_id = (string) ( $receipt['platform_post_id'] ?? '' );
 				if ( isset( $shares[ $channel ] ) && ! hash_equals( $recorded_id, $shares[ $channel ] ) ) {
@@ -513,7 +513,10 @@ final class DelegatedCrossPostAction {
 			return compact( 'site_id', 'post_id' );
 		}
 
-		$site_id = self::strict_positive_int( $input['post_site_id'] ?? null ) ?: get_current_blog_id();
+		$site_id = self::strict_positive_int( $input['post_site_id'] ?? null );
+		if ( ! $site_id ) {
+			$site_id = get_current_blog_id();
+		}
 		$post_id = self::strict_positive_int( $input['post_id'] ?? null );
 		return compact( 'site_id', 'post_id' );
 	}

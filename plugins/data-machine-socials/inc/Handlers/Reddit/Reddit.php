@@ -133,11 +133,13 @@ class Reddit extends FetchHandler {
 			return array();
 		}
 
-		// Build the core fresh-candidate collector. Selection-time eligibility
-		// (processed/claimed/reprocess) is decided by Data Machine core, not by
-		// Reddit. The ability paginates Reddit and offers each candidate to the
-		// collector; the collector stops the scan once we have enough fresh
-		// candidates to satisfy this fetch cycle's max_items target.
+		/*
+		 * Build the core fresh-candidate collector. Selection-time eligibility
+		 * (processed/claimed/reprocess) is decided by Data Machine core, not by
+		 * Reddit. The ability paginates Reddit and offers each candidate to the
+		 * collector; the collector stops the scan once we have enough fresh
+		 * candidates to satisfy this fetch cycle's max_items target.
+		 */
 		$max_items = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
 		$collector = new FreshCandidateCollector( $context, $max_items );
 
@@ -174,9 +176,11 @@ class Reddit extends FetchHandler {
 			return array();
 		}
 
-		// Surface collector diagnostics so an operator can tell whether a
-		// no-item run was caused by full top-of-feed processing vs. natural
-		// source exhaustion.
+		/*
+		 * Surface collector diagnostics so an operator can tell whether a
+		 * no-item run was caused by full top-of-feed processing vs. natural
+		 * source exhaustion.
+		 */
 		$context->log(
 			'debug',
 			'Reddit: Fresh-candidate scan complete',
@@ -194,9 +198,11 @@ class Reddit extends FetchHandler {
 			$data    = $item['data'];
 			$item_id = $item['item_id'] ?? ( $data['metadata']['original_id'] ?? '' );
 
-			// Wire the canonical Data Machine dedupe key so
-			// FetchHandler::get_fetch_data() can run final
-			// dedupe/claim/cap on these items.
+			/*
+			 * Wire the canonical Data Machine dedupe key so
+			 * FetchHandler::get_fetch_data() can run final
+			 * dedupe/claim/cap on these items.
+			 */
 			if ( $item_id ) {
 				$data['metadata']['item_identifier'] = (string) $item_id;
 			}
@@ -215,8 +221,10 @@ class Reddit extends FetchHandler {
 				unset( $data['image_info'] );
 			}
 
-			// Per-item engine data for batch fan-out.
-			// PipelineBatchScheduler seeds _engine_data into each child job.
+			/*
+			 * Per-item engine data for batch fan-out.
+			 * PipelineBatchScheduler seeds _engine_data into each child job.
+			 */
 			$data['metadata']['_engine_data'] = array_filter(
 				array(
 					'source_url'      => $item['source_url'] ?? '',

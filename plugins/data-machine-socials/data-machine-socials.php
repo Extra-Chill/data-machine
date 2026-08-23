@@ -36,9 +36,11 @@ function datamachine_socials_register_ability_category() {
 		return;
 	}
 
-	// wp_abilities_api_categories_init can fire more than once per request on
-	// multisite; guard against re-registering an already-registered category,
-	// which trips a _doing_it_wrong notice in core's categories registry.
+	/*
+	 * wp_abilities_api_categories_init can fire more than once per request on
+	 * multisite; guard against re-registering an already-registered category,
+	 * which trips a _doing_it_wrong notice in core's categories registry.
+	 */
 	if ( function_exists( 'wp_has_ability_category' ) && wp_has_ability_category( 'datamachine-socials' ) ) {
 		return;
 	}
@@ -191,7 +193,7 @@ function datamachine_socials_enqueue_assets( $hook ) {
 }
 add_action( 'admin_enqueue_scripts', 'datamachine_socials_enqueue_assets' );
 
-/**
+/*
  * Register WP-CLI commands.
  */
 if ( defined( 'WP_CLI' ) ) {

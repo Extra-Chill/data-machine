@@ -124,7 +124,7 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 		$did     = $session['did'];
 
 		// Extract the record key from URI: at://did/rkey
-		$parts = parse_url( $post_uri );
+		$parts = wp_parse_url( $post_uri );
 		$path  = ltrim( $parts['path'], '/' );
 		$rkey  = basename( $path );
 
@@ -144,7 +144,7 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 					'Authorization' => 'Bearer ' . $session['accessJwt'],
 					'Content-Type'  => 'application/json',
 				),
-				'body'    => json_encode( $params ),
+				'body'    => wp_json_encode( $params ),
 			)
 		);
 
@@ -176,7 +176,7 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 					'Authorization' => 'Bearer ' . $session['accessJwt'],
 					'Content-Type'  => 'application/json',
 				),
-				'body'    => json_encode( array(
+				'body'    => wp_json_encode( array(
 					'repo'       => $did,
 					'collection' => 'app.bsky.feed.like',
 					'record'     => array(
@@ -209,8 +209,10 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 		$pds_url = $session['pds_url'];
 		$did     = $session['did'];
 
-		// Unlike requires the like URI which we don't have stored.
-		// This is a limitation - user would need to query likes first.
-		return new \WP_Error( 'api_error', 'Unlike requires the like URI. Query likes first to get the like record to delete.', array( 'status' => 500 ) );
+		/*
+		 * Unlike requires the like URI which we don't have stored.
+		 * This is a limitation - user would need to query likes first.
+		 */
+				return new \WP_Error( 'api_error', 'Unlike requires the like URI. Query likes first to get the like record to delete.', array( 'status' => 500 ) );
 	}
 }

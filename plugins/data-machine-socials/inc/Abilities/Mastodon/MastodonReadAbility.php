@@ -38,31 +38,31 @@ class MastodonReadAbility extends AbstractSocialAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action'    => array(
+							'action'      => array(
 								'type'        => 'string',
 								'enum'        => array( 'list', 'get', 'context', 'profile', 'timeline', 'hashtag', 'search', 'notifications' ),
 								'default'     => 'list',
 								'description' => __( 'Action to perform', 'data-machine-socials' ),
 							),
-							'status_id' => array(
+							'status_id'   => array(
 								'type'        => 'string',
 								'description' => __( 'Status ID (required for get and context)', 'data-machine-socials' ),
 							),
-							'account_id' => array(
+							'account_id'  => array(
 								'type'        => 'string',
 								'description' => __( 'Account ID (for list by account, or profile)', 'data-machine-socials' ),
 							),
-							'timeline'  => array(
+							'timeline'    => array(
 								'type'        => 'string',
 								'enum'        => array( 'home', 'public' ),
 								'default'     => 'home',
 								'description' => __( 'Which timeline to read (timeline action)', 'data-machine-socials' ),
 							),
-							'tag'       => array(
+							'tag'         => array(
 								'type'        => 'string',
 								'description' => __( 'Hashtag name without # (hashtag action)', 'data-machine-socials' ),
 							),
-							'query'     => array(
+							'query'       => array(
 								'type'        => 'string',
 								'description' => __( 'Search query (search action)', 'data-machine-socials' ),
 							),
@@ -71,12 +71,12 @@ class MastodonReadAbility extends AbstractSocialAbility {
 								'enum'        => array( 'accounts', 'statuses', 'hashtags' ),
 								'description' => __( 'Filter search to a specific type', 'data-machine-socials' ),
 							),
-							'limit'     => array(
+							'limit'       => array(
 								'type'        => 'integer',
 								'default'     => 20,
 								'description' => __( 'Number of results (max 40)', 'data-machine-socials' ),
 							),
-							'max_id'    => array(
+							'max_id'      => array(
 								'type'        => 'string',
 								'description' => __( 'Pagination: return results older than this ID', 'data-machine-socials' ),
 							),
@@ -287,13 +287,13 @@ class MastodonReadAbility extends AbstractSocialAbility {
 	 * Search for accounts, statuses, or hashtags.
 	 */
 	private function search( string $instance, string $token, array $input ): array|\WP_Error {
-		$query  = $input['query'];
-		$type   = $input['search_type'] ?? '';
-		$limit  = min( absint( $input['limit'] ?? 20 ), 40 );
+		$query = $input['query'];
+		$type  = $input['search_type'] ?? '';
+		$limit = min( absint( $input['limit'] ?? 20 ), 40 );
 
 		$params = array(
-			'q'      => $query,
-			'limit'  => $limit,
+			'q'       => $query,
+			'limit'   => $limit,
 			'resolve' => 'true',
 		);
 
@@ -348,8 +348,8 @@ class MastodonReadAbility extends AbstractSocialAbility {
 		return array(
 			'success' => true,
 			'data'    => array(
-				$key     => $result,
-				'count'  => count( $result ),
+				$key    => $result,
+				'count' => count( $result ),
 			),
 		);
 	}

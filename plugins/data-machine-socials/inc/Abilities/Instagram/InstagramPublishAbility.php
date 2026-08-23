@@ -83,78 +83,78 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 				'datamachine/instagram-publish',
 				array(
 					'label'               => __( 'Publish to Instagram', 'data-machine-socials' ),
-				'description'         => __( 'Post content to Instagram — supports single image, carousel (up to 10 images), Reel (video), and Story (image or video)', 'data-machine-socials' ),
-				'category'            => 'datamachine-socials',
-				'input_schema'        => array(
-					'type'       => 'object',
-					'required'   => array( 'content' ),
-					'properties' => array(
-						'content'        => array(
-							'type'        => 'string',
-							'description' => 'Post caption text (max 2200 characters)',
-							'maxLength'   => 2200,
+					'description'         => __( 'Post content to Instagram — supports single image, carousel (up to 10 images), Reel (video), and Story (image or video)', 'data-machine-socials' ),
+					'category'            => 'datamachine-socials',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'content' ),
+						'properties' => array(
+							'content'         => array(
+								'type'        => 'string',
+								'description' => 'Post caption text (max 2200 characters)',
+								'maxLength'   => 2200,
+							),
+							'media_kind'      => array(
+								'type'        => 'string',
+								'description' => 'Type of media to publish: image (default), carousel, reel, or story',
+								'enum'        => array( 'image', 'carousel', 'reel', 'story' ),
+								'default'     => 'image',
+							),
+							'image_urls'      => array(
+								'type'        => 'array',
+								'description' => 'Array of image URLs to post (1-10 for carousel, 1 for single image)',
+								'items'       => array(
+									'type'   => 'string',
+									'format' => 'uri',
+								),
+								'maxItems'    => 10,
+							),
+							'video_url'       => array(
+								'type'        => 'string',
+								'description' => 'Public video URL for Reel or Story publishing',
+								'format'      => 'uri',
+							),
+							'cover_url'       => array(
+								'type'        => 'string',
+								'description' => 'Optional cover image URL for Reel',
+								'format'      => 'uri',
+							),
+							'share_to_feed'   => array(
+								'type'        => 'boolean',
+								'description' => 'Whether to share the Reel to the main feed (default true)',
+								'default'     => true,
+							),
+							'story_image_url' => array(
+								'type'        => 'string',
+								'description' => 'Image URL for Story publishing (use this or video_url for stories)',
+								'format'      => 'uri',
+							),
+							'aspect_ratio'    => array(
+								'type'        => 'string',
+								'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1',
+								'enum'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
+								'default'     => '4:5',
+							),
+							'source_url'      => array(
+								'type'        => 'string',
+								'description' => 'Source URL to include in caption',
+								'format'      => 'uri',
+							),
 						),
-						'media_kind'     => array(
-							'type'        => 'string',
-							'description' => 'Type of media to publish: image (default), carousel, reel, or story',
-							'enum'        => array( 'image', 'carousel', 'reel', 'story' ),
-							'default'     => 'image',
-						),
-						'image_urls'     => array(
-							'type'        => 'array',
-							'description' => 'Array of image URLs to post (1-10 for carousel, 1 for single image)',
-							'items'       => array(
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'media_id'   => array( 'type' => 'string' ),
+							'media_kind' => array( 'type' => 'string' ),
+							'permalink'  => array(
 								'type'   => 'string',
 								'format' => 'uri',
 							),
-							'maxItems'    => 10,
-						),
-						'video_url'      => array(
-							'type'        => 'string',
-							'description' => 'Public video URL for Reel or Story publishing',
-							'format'      => 'uri',
-						),
-						'cover_url'      => array(
-							'type'        => 'string',
-							'description' => 'Optional cover image URL for Reel',
-							'format'      => 'uri',
-						),
-						'share_to_feed'  => array(
-							'type'        => 'boolean',
-							'description' => 'Whether to share the Reel to the main feed (default true)',
-							'default'     => true,
-						),
-						'story_image_url' => array(
-							'type'        => 'string',
-							'description' => 'Image URL for Story publishing (use this or video_url for stories)',
-							'format'      => 'uri',
-						),
-						'aspect_ratio'   => array(
-							'type'        => 'string',
-							'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1',
-							'enum'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
-							'default'     => '4:5',
-						),
-						'source_url'     => array(
-							'type'        => 'string',
-							'description' => 'Source URL to include in caption',
-							'format'      => 'uri',
+							'error'      => array( 'type' => 'string' ),
 						),
 					),
-				),
-				'output_schema'       => array(
-					'type'       => 'object',
-					'properties' => array(
-						'success'    => array( 'type' => 'boolean' ),
-						'media_id'   => array( 'type' => 'string' ),
-						'media_kind' => array( 'type' => 'string' ),
-						'permalink'  => array(
-							'type'   => 'string',
-							'format' => 'uri',
-						),
-						'error'      => array( 'type' => 'string' ),
-					),
-				),
 					'execute_callback'    => array( self::class, 'execute_publish' ),
 					'permission_callback' => array( PublishAuthorization::class, 'can_publish' ),
 					'meta'                => array( 'show_in_rest' => true ),
@@ -284,8 +284,10 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 				'access_token' => $access_token,
 			);
 
-			// For single images, include caption.
-			// For carousel items, omit caption (goes on carousel container).
+			/*
+			 * For single images, include caption.
+			 * For carousel items, omit caption (goes on carousel container).
+			 */
 			if ( $is_carousel ) {
 				$container_body['is_carousel_item'] = 'true';
 			} else {
@@ -353,7 +355,7 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		$main_container_id = null;
 		$media_kind        = 'image';
 		if ( $is_carousel && count( $container_ids ) > 1 ) {
-			$children       = implode( ',', $container_ids );
+			$children        = implode( ',', $container_ids );
 			$carousel_result = HttpClient::post(
 				self::GRAPH_API_URL . "/{$user_id}/media",
 				array(
@@ -556,10 +558,12 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 
 		$container_id = $body['id'];
 
-		// Step 2: Wait for processing.
-		// Video stories need longer polling; image stories are usually instant.
-		$max_retries = ! empty( $video_url ) ? self::VIDEO_POLL_MAX_RETRIES : 10;
-		$interval    = ! empty( $video_url ) ? self::VIDEO_POLL_INTERVAL : 1;
+		/*
+		 * Step 2: Wait for processing.
+		 * Video stories need longer polling; image stories are usually instant.
+		 */
+				$max_retries = ! empty( $video_url ) ? self::VIDEO_POLL_MAX_RETRIES : 10;
+		$interval            = ! empty( $video_url ) ? self::VIDEO_POLL_INTERVAL : 1;
 
 		$ready = self::wait_for_container( $access_token, $container_id, $max_retries, $interval );
 		if ( ! $ready ) {

@@ -35,15 +35,16 @@ class Bluesky extends PublishHandler {
 			true,
 			BlueskyAuth::class,
 			BlueskySettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
 				return array(
 					'bluesky_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Post content to Bluesky. Supports text and images.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post content to Bluesky. Supports text and images.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
 								'content' => array(
@@ -58,23 +59,26 @@ class Bluesky extends PublishHandler {
 			},
 			'bluesky',
 			array(
-			'charLimit'          => 300,
-			'maxImages'          => 4,
-			'aspectRatios'       => array( 'any' ),
-			'defaultAspectRatio' => 'any',
-			'supportsCarousel'   => false,
-			'composer'          => array(
-				'crossPostCompatible' => true,
-				'mediaKinds'           => array( 'image' ),
-			),
-			'capabilities'       => array(
-				array( 'slug' => 'publish', 'label' => 'Publish' ),
-			),
-			'preview'            => array(
-				'aspectRatio'     => '16:9',
-				'captionPosition' => 'above',
-				'previewSurface'  => 'feed',
-			),
+				'charLimit'          => 300,
+				'maxImages'          => 4,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => false,
+				'composer'           => array(
+					'crossPostCompatible' => true,
+					'mediaKinds'          => array( 'image' ),
+				),
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+				),
+				'preview'            => array(
+					'aspectRatio'     => '16:9',
+					'captionPosition' => 'above',
+					'previewSurface'  => 'feed',
+				),
 			)
 		);
 	}

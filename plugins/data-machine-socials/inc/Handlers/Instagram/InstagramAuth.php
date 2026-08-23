@@ -118,8 +118,10 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		return $account['user_id'];
 	}
 
-	// get_username() is inherited from BaseAuthProvider.
-	// Instagram already stores username under the canonical 'username' key.
+	/*
+	 * get_username() is inherited from BaseAuthProvider.
+	 * Instagram already stores username under the canonical 'username' key.
+	 */
 
 	/**
 	 * Get authorization URL for Instagram OAuth
@@ -164,13 +166,15 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			function ( $short_lived_token_data ) use ( $config ) {
 				$access_token = $short_lived_token_data['access_token'];
 
-				// Facebook Login doesn't return user_id in token response.
-				// Fetch Instagram Business Account ID from Facebook Graph API.
-				// resolve_instagram_account_from_facebook_token() returns both id and
-				// username in one call, so we capture both up front and avoid a second
-				// round trip below.
-				$resolved_username = '';
-				$user_id           = $short_lived_token_data['user_id'] ?? null;
+				/*
+				 * Facebook Login doesn't return user_id in token response.
+				 * Fetch Instagram Business Account ID from Facebook Graph API.
+				 * resolve_instagram_account_from_facebook_token() returns both id and
+				 * username in one call, so we capture both up front and avoid a second
+				 * round trip below.
+				 */
+																				$resolved_username = '';
+				$user_id = $short_lived_token_data['user_id'] ?? null;
 				if ( empty( $user_id ) ) {
 					$resolved = $this->resolve_instagram_account_from_facebook_token( $access_token );
 					if ( is_wp_error( $resolved ) ) {
@@ -184,9 +188,11 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 					return new \WP_Error( 'instagram_missing_user_id', 'Could not determine Instagram user ID.' );
 				}
 
-				// Try Facebook token extension (fb_exchange_token) for Facebook Login tokens.
-				// Falls back to Instagram ig_exchange_token for backward compatibility.
-				$long_lived = $this->exchange_for_long_lived_token_fb( $access_token, $config );
+				/*
+				 * Try Facebook token extension (fb_exchange_token) for Facebook Login tokens.
+				 * Falls back to Instagram ig_exchange_token for backward compatibility.
+				 */
+								$long_lived = $this->exchange_for_long_lived_token_fb( $access_token, $config );
 				if ( is_wp_error( $long_lived ) ) {
 					// Fallback: try Instagram endpoint (legacy Basic Display tokens).
 					$long_lived = $this->exchange_for_long_lived_token( $access_token, $user_id, $config );
@@ -198,10 +204,12 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 				$long_lived['user_id'] = $user_id;
 
-				// Username preference: use the value already resolved from /me/accounts
-				// when present (Facebook Login path). Only hit the username-only endpoint
-				// as a fallback for legacy Instagram Basic Display tokens.
-				$username = $resolved_username;
+				/*
+				 * Username preference: use the value already resolved from /me/accounts
+				 * when present (Facebook Login path). Only hit the username-only endpoint
+				 * as a fallback for legacy Instagram Basic Display tokens.
+				 */
+												$username = $resolved_username;
 				if ( '' === $username ) {
 					$looked_up = $this->get_username_from_token( $long_lived['access_token'], $user_id );
 					if ( is_wp_error( $looked_up ) ) {
@@ -286,12 +294,12 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		do_action( 'datamachine_log', 'debug', 'Instagram OAuth: Exchanging short-lived Facebook token for long-lived token' );
 
 		$params = array(
-			'grant_type'    => 'fb_exchange_token',
-			'client_id'     => $config['app_id'] ?? '',
-			'client_secret' => $config['app_secret'] ?? '',
+			'grant_type'        => 'fb_exchange_token',
+			'client_id'         => $config['app_id'] ?? '',
+			'client_secret'     => $config['app_secret'] ?? '',
 			'fb_exchange_token' => $short_lived_token,
 		);
-		$url = self::FB_API_URL . '/oauth/access_token?' . http_build_query( $params );
+		$url    = self::FB_API_URL . '/oauth/access_token?' . http_build_query( $params );
 
 		$result = HttpClient::get( $url, array( 'context' => 'Instagram OAuth' ) );
 
@@ -335,7 +343,7 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'client_secret' => $config['app_secret'] ?? '',
 			'access_token'  => $short_lived_token,
 		);
-		$url = self::GRAPH_API_URL . '/access_token?' . http_build_query( $params );
+		$url    = self::GRAPH_API_URL . '/access_token?' . http_build_query( $params );
 
 		$result = HttpClient::get( $url, array( 'context' => 'Instagram OAuth' ) );
 

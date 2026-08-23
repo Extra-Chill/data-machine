@@ -30,9 +30,11 @@ class InstagramAuthTest extends WP_UnitTestCase {
 		parent::tear_down();
 	}
 
-	// -------------------------------------------------------------------------
-	// Provider identity
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Provider identity
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_provider_slug_is_instagram(): void {
 		$this->assertSame( 'datamachine_refresh_token_instagram', $this->auth->get_cron_hook_name() );
@@ -42,9 +44,11 @@ class InstagramAuthTest extends WP_UnitTestCase {
 		$this->assertSame( 'https://graph.instagram.com', InstagramAuth::GRAPH_API_URL );
 	}
 
-	// -------------------------------------------------------------------------
-	// is_configured()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * is_configured()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_is_configured_returns_true_with_app_credentials(): void {
 		$this->auth->save_config( array(
@@ -65,9 +69,11 @@ class InstagramAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->auth->is_configured() );
 	}
 
-	// -------------------------------------------------------------------------
-	// is_authenticated() — inherited from base class
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * is_authenticated() — inherited from base class
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_is_authenticated_returns_true_with_valid_token(): void {
 		$this->auth->save_account( array(
@@ -91,9 +97,11 @@ class InstagramAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->auth->is_authenticated() );
 	}
 
-	// -------------------------------------------------------------------------
-	// get_user_id() and get_username()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * get_user_id() and get_username()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_get_user_id_returns_stored_id(): void {
 		$this->auth->save_account( array(
@@ -117,9 +125,11 @@ class InstagramAuthTest extends WP_UnitTestCase {
 		$this->assertSame( 'extrachill', $this->auth->get_username() );
 	}
 
-	// -------------------------------------------------------------------------
-	// do_refresh_token() via get_valid_access_token()
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * do_refresh_token() via get_valid_access_token()
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_refresh_calls_instagram_api_with_ig_refresh_token(): void {
 		$captured_url = null;
@@ -219,9 +229,11 @@ class InstagramAuthTest extends WP_UnitTestCase {
 		$this->assertFalse( $refresh_called );
 	}
 
-	// -------------------------------------------------------------------------
-	// Proactive refresh scheduling
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Proactive refresh scheduling
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_successful_refresh_schedules_cron(): void {
 		add_filter( 'pre_http_request', function () {
@@ -245,9 +257,11 @@ class InstagramAuthTest extends WP_UnitTestCase {
 		$this->assertNotFalse( $next );
 	}
 
-	// -------------------------------------------------------------------------
-	// remove_account() cleanup
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * remove_account() cleanup
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_remove_account_clears_data_and_cron(): void {
 		$this->auth->save_account( array(

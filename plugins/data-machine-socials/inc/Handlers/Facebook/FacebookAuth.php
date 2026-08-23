@@ -147,10 +147,12 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			// Return the refreshed user token even if page refresh fails — page token may still work.
 		}
 
-		// Build return data — the base class will store access_token + expires_at.
-		// We also need to update the Facebook-specific fields, so we do a full
-		// account update here rather than relying solely on the base class.
-		$account                      = $this->get_account();
+		/*
+		 * Build return data — the base class will store access_token + expires_at.
+		 * We also need to update the Facebook-specific fields, so we do a full
+		 * account update here rather than relying solely on the base class.
+		 */
+						$account      = $this->get_account();
 		$account['user_access_token'] = $new_user_token;
 		$account['token_expires_at']  = $expires_at;
 		$account['last_refreshed_at'] = time();
@@ -158,6 +160,7 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		if ( ! is_wp_error( $page_credentials ) ) {
 			$account['page_access_token'] = $page_credentials['access_token'];
 			$account['page_id']           = $page_credentials['id'];
+			$account['page_name']         = $page_credentials['name'];
 			$account['username']          = $page_credentials['name'];
 		}
 

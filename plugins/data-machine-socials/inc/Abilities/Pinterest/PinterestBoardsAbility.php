@@ -185,7 +185,7 @@ class PinterestBoardsAbility extends AbstractSocialAbility {
 		for ( $i = 0; $i < 10; $i++ ) {
 			$url = 'https://api.pinterest.com/v5/boards?page_size=100';
 			if ( $bookmark ) {
-				$url .= '&bookmark=' . urlencode( $bookmark );
+				$url .= '&bookmark=' . rawurlencode( $bookmark );
 			}
 
 			$result = HttpClient::get( $url, array(

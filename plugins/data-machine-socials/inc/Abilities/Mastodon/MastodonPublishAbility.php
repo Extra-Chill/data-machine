@@ -149,8 +149,8 @@ class MastodonPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_auth', 'Mastodon instance or access token not configured', array( 'status' => 401 ) );
 		}
 
-		$visibility   = $input['visibility'] ?? 'public';
-		$source_url   = $input['source_url'] ?? '';
+		$visibility    = $input['visibility'] ?? 'public';
+		$source_url    = $input['source_url'] ?? '';
 		$link_handling = $input['link_handling'] ?? 'append';
 
 		// Build status text: append source URL if configured.

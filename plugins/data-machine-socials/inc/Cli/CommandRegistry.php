@@ -50,11 +50,11 @@ class CommandRegistry {
 	 * (`DataMachineSocials\Cli\Commands\FooCommand` => `inc/Cli/Commands/FooCommand.php`).
 	 * The WP-CLI bootstrap uses this to load each registered command class.
 	 *
-	 * @param class-string $class Fully-qualified command class.
+	 * @param class-string $command_class Fully-qualified command class.
 	 * @return string Absolute file path (may not exist).
 	 */
-	public static function file_for_class( $class ) {
-		$relative = substr( $class, strlen( 'DataMachineSocials\\' ) );
+	public static function file_for_class( $command_class ) {
+		$relative = substr( $command_class, strlen( 'DataMachineSocials\\' ) );
 		$relative = str_replace( '\\', '/', $relative );
 
 		return DATAMACHINE_SOCIALS_PATH . 'inc/' . $relative . '.php';

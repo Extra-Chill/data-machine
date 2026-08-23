@@ -44,15 +44,16 @@ class Facebook extends PublishHandler {
 			true,
 			FacebookAuth::class,
 			FacebookSettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
 				return array(
 					'facebook_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Post content to a Facebook Page. Supports text and images.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post content to a Facebook Page. Supports text and images.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
 								'content' => array(
@@ -67,24 +68,30 @@ class Facebook extends PublishHandler {
 			},
 			'facebook',
 			array(
-			'charLimit'          => 63206,
-			'maxImages'          => 10,
-			'aspectRatios'       => array( 'any' ),
-			'defaultAspectRatio' => 'any',
-			'supportsCarousel'   => true,
-			'composer'          => array(
-				'crossPostCompatible' => true,
-				'mediaKinds'           => array( 'image' ),
-			),
-			'capabilities'       => array(
-				array( 'slug' => 'publish', 'label' => 'Publish' ),
-				array( 'slug' => 'comments', 'label' => 'Comments' ),
-			),
-			'preview'            => array(
-				'aspectRatio'     => 'native',
-				'captionPosition' => 'above',
-				'previewSurface'  => 'card',
-			),
+				'charLimit'          => 63206,
+				'maxImages'          => 10,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => true,
+				'composer'           => array(
+					'crossPostCompatible' => true,
+					'mediaKinds'          => array( 'image' ),
+				),
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+					array(
+						'slug'  => 'comments',
+						'label' => 'Comments',
+					),
+				),
+				'preview'            => array(
+					'aspectRatio'     => 'native',
+					'captionPosition' => 'above',
+					'previewSurface'  => 'card',
+				),
 			)
 		);
 	}

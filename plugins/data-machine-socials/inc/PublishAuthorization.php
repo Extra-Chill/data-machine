@@ -30,7 +30,7 @@ final class PublishAuthorization {
 		$user_id = $scope->acting_user_id();
 		$allowed = $user_id > 0 && user_can( $user_id, 'publish_posts' );
 
-		/**
+		/*
 		 * Filter whether the acting user may publish to social accounts.
 		 *
 		 * @param bool   $allowed Whether the base capability check passed.

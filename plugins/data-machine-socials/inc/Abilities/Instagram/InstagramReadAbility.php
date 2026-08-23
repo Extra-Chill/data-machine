@@ -63,12 +63,12 @@ class InstagramReadAbility extends AbstractSocialAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-						'action'   => array(
-							'type'        => 'string',
-							'enum'        => array( 'list', 'get', 'comments', 'comments_all' ),
-							'default'     => 'list',
-							'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized)', 'data-machine-socials' ),
-						),
+							'action'   => array(
+								'type'        => 'string',
+								'enum'        => array( 'list', 'get', 'comments', 'comments_all' ),
+								'default'     => 'list',
+								'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized)', 'data-machine-socials' ),
+							),
 							'media_id' => array(
 								'type'        => 'string',
 								'description' => __( 'Instagram media ID (required for get and comments actions)', 'data-machine-socials' ),
@@ -311,7 +311,7 @@ class InstagramReadAbility extends AbstractSocialAbility {
 		$max_pages    = 200; // Safety limit: 200 pages × 50 comments = 10,000 comments max.
 
 		do {
-			$page++;
+			++$page;
 			$params = array(
 				'fields'       => 'id,text,timestamp,username,like_count',
 				'limit'        => 50, // Max per page for Instagram API.
@@ -331,11 +331,11 @@ class InstagramReadAbility extends AbstractSocialAbility {
 					return array(
 						'success' => true,
 						'data'    => array(
-							'comments'  => $all_comments,
-							'count'     => count( $all_comments ),
-							'platform'  => 'instagram',
-							'partial'   => true,
-							'error'     => 'Pagination interrupted: ' . ( $result['error'] ?? 'unknown' ),
+							'comments' => $all_comments,
+							'count'    => count( $all_comments ),
+							'platform' => 'instagram',
+							'partial'  => true,
+							'error'    => 'Pagination interrupted: ' . ( $result['error'] ?? 'unknown' ),
 						),
 					);
 				}
@@ -351,11 +351,11 @@ class InstagramReadAbility extends AbstractSocialAbility {
 					return array(
 						'success' => true,
 						'data'    => array(
-							'comments'  => $all_comments,
-							'count'     => count( $all_comments ),
-							'platform'  => 'instagram',
-							'partial'   => true,
-							'error'     => $data['error']['message'] ?? 'Pagination error',
+							'comments' => $all_comments,
+							'count'    => count( $all_comments ),
+							'platform' => 'instagram',
+							'partial'  => true,
+							'error'    => $data['error']['message'] ?? 'Pagination error',
 						),
 					);
 				}
@@ -380,11 +380,11 @@ class InstagramReadAbility extends AbstractSocialAbility {
 		return array(
 			'success' => true,
 			'data'    => array(
-				'comments'  => $all_comments,
-				'count'     => count( $all_comments ),
-				'platform'  => 'instagram',
-				'partial'   => false,
-				'pages'     => $page,
+				'comments' => $all_comments,
+				'count'    => count( $all_comments ),
+				'platform' => 'instagram',
+				'partial'  => false,
+				'pages'    => $page,
 			),
 		);
 	}

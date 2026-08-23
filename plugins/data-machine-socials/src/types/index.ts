@@ -91,5 +91,5 @@ export interface AuthState {
 
 export interface PlatformState {
 	selected: string[];
-	authStatus: Record<string, AuthState>;
+	authStatus: Record< string, AuthState >;
 }

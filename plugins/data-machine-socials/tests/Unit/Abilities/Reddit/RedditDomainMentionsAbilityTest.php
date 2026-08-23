@@ -11,6 +11,10 @@ use DataMachineSocials\Abilities\Reddit\RedditDomainMentionsAbility;
 use WP_UnitTestCase;
 
 class RedditDomainMentionsAbilityTest extends WP_UnitTestCase {
+	public function set_up(): void {
+		parent::set_up();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+	}
 
 	public function tear_down(): void {
 		remove_all_filters( 'pre_http_request' );
@@ -71,6 +75,7 @@ class RedditDomainMentionsAbilityTest extends WP_UnitTestCase {
 			)
 		);
 
+		$this->assertNotWPError( $result );
 		$this->assertTrue( $result['success'] );
 		$report = $result['report'];
 		$this->assertSame( 'example.org', $report['domain'] );

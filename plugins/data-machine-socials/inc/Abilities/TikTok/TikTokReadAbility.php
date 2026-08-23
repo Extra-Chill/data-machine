@@ -63,23 +63,23 @@ class TikTokReadAbility extends AbstractSocialAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action'   => array(
+							'action' => array(
 								'type'        => 'string',
 								'description' => 'Action to perform: list (default) or profile.',
 								'enum'        => array( 'list', 'profile' ),
 								'default'     => 'list',
 							),
-							'limit'    => array(
+							'limit'  => array(
 								'type'        => 'integer',
 								'description' => 'Number of videos to return (max 20 per page).',
 								'default'     => 10,
 							),
-							'cursor'   => array(
+							'cursor' => array(
 								'type'        => 'integer',
 								'description' => 'Pagination cursor (0 for first page).',
 								'default'     => 0,
 							),
-							'fields'   => array(
+							'fields' => array(
 								'type'        => 'array',
 								'description' => 'Video fields to request. Defaults to id,create_time,share_url,title,view_count,like_count,comment_count.',
 								'items'       => array( 'type' => 'string' ),
@@ -89,9 +89,9 @@ class TikTokReadAbility extends AbstractSocialAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'  => array( 'type' => 'boolean' ),
-							'data'     => array( 'type' => 'object' ),
-							'error'    => array( 'type' => 'string' ),
+							'success' => array( 'type' => 'boolean' ),
+							'data'    => array( 'type' => 'object' ),
+							'error'   => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute' ),
@@ -144,9 +144,9 @@ class TikTokReadAbility extends AbstractSocialAbility {
 		$fields = $input['fields'] ?? array( 'id', 'create_time', 'share_url', 'title', 'view_count', 'like_count', 'comment_count' );
 
 		$body = array(
-			'fields'  => implode( ',', $fields ),
-			'max_count'  => $limit,
-			'cursor'     => $cursor,
+			'fields'    => implode( ',', $fields ),
+			'max_count' => $limit,
+			'cursor'    => $cursor,
 		);
 
 		$result = HttpClient::post(
@@ -172,8 +172,8 @@ class TikTokReadAbility extends AbstractSocialAbility {
 	 * @return array|\WP_Error Result or error.
 	 */
 	private static function get_profile( string $access_token ): array|\WP_Error {
-		$fields   = array( 'open_id', 'display_name', 'avatar_url', 'follower_count', 'following_count', 'likes_count', 'video_count' );
-		$url      = self::USER_INFO_ENDPOINT . '?fields=' . implode( ',', $fields );
+		$fields = array( 'open_id', 'display_name', 'avatar_url', 'follower_count', 'following_count', 'likes_count', 'video_count' );
+		$url    = self::USER_INFO_ENDPOINT . '?fields=' . implode( ',', $fields );
 
 		$result = HttpClient::get(
 			$url,

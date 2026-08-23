@@ -47,15 +47,16 @@ class LinkedIn extends PublishHandler {
 			true,
 			LinkedInAuth::class,
 			LinkedInSettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
 				return array(
 					'linkedin_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Post content to LinkedIn. Supports text (up to 3000 chars), images, and article sharing.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post content to LinkedIn. Supports text (up to 3000 chars), images, and article sharing.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
 								'content' => array(
@@ -70,24 +71,27 @@ class LinkedIn extends PublishHandler {
 			},
 			'linkedin',
 			array(
-			'charLimit'          => 3000,
-			'maxImages'          => 9,
-			'aspectRatios'       => array( 'any' ),
-			'defaultAspectRatio' => 'any',
-			'supportsCarousel'   => false,
-			'composer'          => array(
-				'crossPostCompatible' => false,
-				'mediaKinds'           => array( 'text', 'image', 'article' ),
-				'ability'              => 'datamachine/linkedin-publish',
-			),
-			'capabilities'       => array(
-				array( 'slug' => 'publish', 'label' => 'Publish' ),
-			),
-			'preview'            => array(
-				'aspectRatio'     => 'native',
-				'captionPosition' => 'above',
-				'previewSurface'  => 'card',
-			),
+				'charLimit'          => 3000,
+				'maxImages'          => 9,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => false,
+				'composer'           => array(
+					'crossPostCompatible' => false,
+					'mediaKinds'          => array( 'text', 'image', 'article' ),
+					'ability'             => 'datamachine/linkedin-publish',
+				),
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+				),
+				'preview'            => array(
+					'aspectRatio'     => 'native',
+					'captionPosition' => 'above',
+					'previewSurface'  => 'card',
+				),
 			)
 		);
 	}
@@ -134,10 +138,10 @@ class LinkedIn extends PublishHandler {
 
 		$result = LinkedInPublishAbility::execute_publish(
 			array(
-				'content'     => $parameters['content'] ?? '',
-				'image_path'  => $media_path,
-				'source_url'  => $engine->getSourceUrl(),
-				'visibility'  => $handler_config['visibility'] ?? 'PUBLIC',
+				'content'    => $parameters['content'] ?? '',
+				'image_path' => $media_path,
+				'source_url' => $engine->getSourceUrl(),
+				'visibility' => $handler_config['visibility'] ?? 'PUBLIC',
 			)
 		);
 

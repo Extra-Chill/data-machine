@@ -49,7 +49,8 @@ class Pinterest extends PublishHandler {
 			true,
 			PinterestAuth::class,
 			PinterestSettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $handler_config, $_engine_data ) {
 				$board_id_description = 'Pinterest board ID override (uses default if omitted)';
 
 				// Inject cached board names when AI decides mode is active.
@@ -68,10 +69,10 @@ class Pinterest extends PublishHandler {
 					'pinterest_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Pin content to Pinterest with image, title, description, and link.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Pin content to Pinterest with image, title, description, and link.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
 								'title'       => array(
@@ -94,23 +95,26 @@ class Pinterest extends PublishHandler {
 			},
 			'pinterest',
 			array(
-			'charLimit'          => 500,
-			'maxImages'          => 1,
-			'aspectRatios'       => array( '2:3' ),
-			'defaultAspectRatio' => '2:3',
-			'supportsCarousel'   => false,
-			'composer'          => array(
-				'crossPostCompatible' => true,
-				'mediaKinds'           => array( 'image' ),
-			),
-			'capabilities'       => array(
-				array( 'slug' => 'publish', 'label' => 'Publish' ),
-			),
-			'preview'            => array(
-				'aspectRatio'     => '4:5',
-				'captionPosition' => 'below',
-				'previewSurface'  => 'square',
-			),
+				'charLimit'          => 500,
+				'maxImages'          => 1,
+				'aspectRatios'       => array( '2:3' ),
+				'defaultAspectRatio' => '2:3',
+				'supportsCarousel'   => false,
+				'composer'           => array(
+					'crossPostCompatible' => true,
+					'mediaKinds'          => array( 'image' ),
+				),
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+				),
+				'preview'            => array(
+					'aspectRatio'     => '4:5',
+					'captionPosition' => 'below',
+					'previewSurface'  => 'square',
+				),
 			)
 		);
 	}
@@ -161,9 +165,9 @@ class Pinterest extends PublishHandler {
 		}
 
 		$source_url = $engine->getSourceUrl();
-		$media     = $this->resolveMediaUrls( $engine );
-		$image_url = $media['image_url'];
-		$video_url = $media['video_url'];
+		$media      = $this->resolveMediaUrls( $engine );
+		$image_url  = $media['image_url'];
+		$video_url  = $media['video_url'];
 
 		if ( empty( $image_url ) && empty( $video_url ) ) {
 			return $this->errorResponse(
@@ -195,9 +199,9 @@ class Pinterest extends PublishHandler {
 		// Build media source — prefer video for video pins, fall back to image.
 		if ( ! empty( $video_url ) ) {
 			$media_source = array(
-				'source_type' => 'video_id',
-				'cover_image_url' => $image_url ?: '',
-				'url'         => $video_url,
+				'source_type'     => 'video_id',
+				'cover_image_url' => $image_url ? $image_url : '',
+				'url'             => $video_url,
 			);
 		} else {
 			$media_source = array(

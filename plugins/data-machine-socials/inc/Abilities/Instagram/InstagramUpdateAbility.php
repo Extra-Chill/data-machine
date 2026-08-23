@@ -223,9 +223,11 @@ class InstagramUpdateAbility extends AbstractSocialAbility {
 			)
 		);
 
-		// Note: Instagram API doesn't have a direct delete endpoint for media.
-		// We need to use the user media edge to delete. This is a limitation.
-		// For now, return an error with guidance.
+		/*
+		 * Note: Instagram API doesn't have a direct delete endpoint for media.
+		 * We need to use the user media edge to delete. This is a limitation.
+		 * For now, return an error with guidance.
+		 */
 
 		if ( ! empty( $result['success'] ) ) {
 			return array(
@@ -237,9 +239,11 @@ class InstagramUpdateAbility extends AbstractSocialAbility {
 			);
 		}
 
-		// Instagram doesn't support direct delete via API for all media types.
-		// Return informative error.
-		return new \WP_Error( 'api_error', $result['error'] ?? 'Delete not supported for this media type via API. Consider archiving instead.', array( 'status' => 500 ) );
+		/*
+		 * Instagram doesn't support direct delete via API for all media types.
+		 * Return informative error.
+		 */
+				return new \WP_Error( 'api_error', $result['error'] ?? 'Delete not supported for this media type via API. Consider archiving instead.', array( 'status' => 500 ) );
 	}
 
 	/**

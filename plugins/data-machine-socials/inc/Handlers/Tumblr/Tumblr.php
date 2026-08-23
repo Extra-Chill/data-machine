@@ -47,32 +47,33 @@ class Tumblr extends PublishHandler {
 			true,
 			TumblrAuth::class,
 			TumblrSettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
 				$blog_description = 'Tumblr blog identifier (blog name or hostname). Uses the configured default blog if omitted.';
 
 				return array(
 					'tumblr_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Publish a Tumblr post with a title, body text, tags, and a source link back to the origin URL.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Publish a Tumblr post with a title, body text, tags, and a source link back to the origin URL.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
-								'title'  => array(
+								'title'           => array(
 									'type'        => 'string',
 									'description' => 'Optional post title. Rendered as a heading at the top of the post.',
 								),
-								'body'   => array(
+								'body'            => array(
 									'type'        => 'string',
 									'description' => 'The main text body of the Tumblr post. Plain text; Tumblr renders it as an NPF text block.',
 								),
-								'tags'   => array(
+								'tags'            => array(
 									'type'        => 'string',
 									'description' => 'Optional comma-separated tags for the post (e.g. "live music, charleston"). Merged with default tags from handler settings.',
 								),
-								'state'  => array(
+								'state'           => array(
 									'type'        => 'string',
 									'enum'        => array( 'published', 'queue', 'draft' ),
 									'description' => 'Post state. Defaults to published.',
@@ -92,13 +93,16 @@ class Tumblr extends PublishHandler {
 				'charLimit'        => 0,
 				'maxImages'        => 0,
 				'supportsCarousel' => false,
-				'composer'        => array(
+				'composer'         => array(
 					'crossPostCompatible' => false,
-					'mediaKinds'           => array( 'text' ),
-					'ability'              => 'datamachine/tumblr-publish',
+					'mediaKinds'          => array( 'text' ),
+					'ability'             => 'datamachine/tumblr-publish',
 				),
 				'capabilities'     => array(
-					array( 'slug' => 'publish', 'label' => 'Publish' ),
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
 				),
 				'preview'          => array(
 					'captionPosition' => 'below',
@@ -207,9 +211,9 @@ class Tumblr extends PublishHandler {
 			'info',
 			'Tumblr: Creating post',
 			array(
-				'blog'    => $blog_identifier,
-				'state'   => $payload['state'],
-				'tag_count' => '' === $tags ? 0 : count( explode( ',', $tags ) ),
+				'blog'       => $blog_identifier,
+				'state'      => $payload['state'],
+				'tag_count'  => '' === $tags ? 0 : count( explode( ',', $tags ) ),
 				'source_url' => $source_url,
 			)
 		);
@@ -239,7 +243,7 @@ class Tumblr extends PublishHandler {
 			$response_data = is_array( $decoded ) ? ( $decoded['response'] ?? array() ) : array();
 
 			if ( in_array( $status_code, array( 200, 201 ), true ) && ! empty( $response_data['id'] ) ) {
-				$post_id = (string) $response_data['id'];
+				$post_id  = (string) $response_data['id'];
 				$post_url = 'https://' . self::hostname_for( $blog_identifier ) . '/post/' . $post_id;
 
 				$this->log(
@@ -259,7 +263,7 @@ class Tumblr extends PublishHandler {
 				);
 			}
 
-			$api_msg = is_array( $decoded ) ? ( $decoded['meta']['msg'] ?? '' ) : '';
+			$api_msg   = is_array( $decoded ) ? ( $decoded['meta']['msg'] ?? '' ) : '';
 			$error_msg = 'Tumblr API error';
 			if ( ! empty( $api_msg ) ) {
 				$error_msg .= ': ' . $api_msg;

@@ -108,9 +108,9 @@ class MastodonUpdateAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'api_error', "Unknown action: {$action}", array( 'status' => 500 ) );
 		}
 
-		$path     = $endpoint_map[ $action ];
-		$url      = $instance . '/api/v1/statuses/' . rawurlencode( $status_id ) . '/' . $path;
-		$verb     = ucfirst( $action );
+		$path = $endpoint_map[ $action ];
+		$url  = $instance . '/api/v1/statuses/' . rawurlencode( $status_id ) . '/' . $path;
+		$verb = ucfirst( $action );
 
 		$result = HttpClient::post(
 			$url,

@@ -1,18 +1,24 @@
 /**
  * Social Editor - Gutenberg Sidebar Plugin Entry Point
- * 
+ *
  * Provides a unified interface for cross-platform social media posting
  * from the WordPress block editor.
  */
 
+/**
+ * WordPress dependencies
+ */
 import { __ } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 import { registerPlugin } from '@wordpress/plugins';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/edit-post';
 import { PanelBody } from '@wordpress/components';
 import { useState, useEffect } from '@wordpress/element';
-import { SocialEditor } from './components/SocialEditor';
 import { share as SocialIcon } from '@wordpress/icons';
+/**
+ * Internal dependencies
+ */
+import { SocialEditor } from './components/SocialEditor';
 
 // Import styles
 import './style.scss';
@@ -25,7 +31,7 @@ declare global {
 		};
 		wp?: {
 			data?: {
-				select?: (store: string) => {
+				select?: ( store: string ) => {
 					getCurrentPostId?: () => number;
 				};
 			};
@@ -34,35 +40,39 @@ declare global {
 }
 
 // Configure API fetch with nonce
-if (typeof window !== 'undefined' && window.dmsData?.restNonce) {
-	apiFetch.use(apiFetch.createNonceMiddleware(window.dmsData.restNonce));
+if ( typeof window !== 'undefined' && window.dmsData?.restNonce ) {
+	apiFetch.use( apiFetch.createNonceMiddleware( window.dmsData.restNonce ) );
 }
 
 function SocialSidebarPlugin() {
-	const [postId, setPostId] = useState<number | undefined>(window.dmsData?.postId);
+	const [ postId, setPostId ] = useState< number | undefined >(
+		window.dmsData?.postId
+	);
 
-	useEffect(() => {
+	useEffect( () => {
 		// Try to get post ID from WP data store if not available
-		if (!postId && window.wp?.data?.select) {
-			const editor = window.wp.data.select('core/editor');
-			if (editor?.getCurrentPostId) {
+		if ( ! postId && window.wp?.data?.select ) {
+			const editor = window.wp.data.select( 'core/editor' );
+			if ( editor?.getCurrentPostId ) {
 				const id = editor.getCurrentPostId();
-				if (id) {
-					setPostId(id);
+				if ( id ) {
+					setPostId( id );
 				}
 			}
 		}
-	}, [postId]);
+	}, [ postId ] );
 
-	if (!postId) {
+	if ( ! postId ) {
 		return (
 			<PluginSidebar
 				name="data-machine-socials-sidebar"
-				title={__('Social Post', 'data-machine-socials')}
-				icon={SocialIcon}
+				title={ __( 'Social Post', 'data-machine-socials' ) }
+				icon={ SocialIcon }
 			>
 				<PanelBody>
-					<p>{__('Loading post data...', 'data-machine-socials')}</p>
+					<p>
+						{ __( 'Loading post data…', 'data-machine-socials' ) }
+					</p>
 				</PanelBody>
 			</PluginSidebar>
 		);
@@ -72,23 +82,23 @@ function SocialSidebarPlugin() {
 		<>
 			<PluginSidebarMoreMenuItem
 				target="data-machine-socials-sidebar"
-				icon={SocialIcon}
+				icon={ SocialIcon }
 			>
-				{__('Social Post', 'data-machine-socials')}
+				{ __( 'Social Post', 'data-machine-socials' ) }
 			</PluginSidebarMoreMenuItem>
 			<PluginSidebar
 				name="data-machine-socials-sidebar"
-				title={__('Social Post', 'data-machine-socials')}
-				icon={SocialIcon}
+				title={ __( 'Social Post', 'data-machine-socials' ) }
+				icon={ SocialIcon }
 			>
-				<SocialEditor postId={postId} />
+				<SocialEditor postId={ postId } />
 			</PluginSidebar>
 		</>
 	);
 }
 
 // Register the plugin
-registerPlugin('data-machine-socials', {
+registerPlugin( 'data-machine-socials', {
 	render: SocialSidebarPlugin,
 	icon: SocialIcon,
-});
+} );

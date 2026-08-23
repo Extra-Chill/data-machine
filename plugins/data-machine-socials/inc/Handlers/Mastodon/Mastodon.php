@@ -38,15 +38,16 @@ class Mastodon extends PublishHandler {
 			true,
 			MastodonAuth::class,
 			MastodonSettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
 				return array(
 					'mastodon_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Post content to Mastodon. Supports text, images, and source URLs.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post content to Mastodon. Supports text, images, and source URLs.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
 								'content' => array(
@@ -61,20 +62,23 @@ class Mastodon extends PublishHandler {
 			},
 			'mastodon',
 			array(
-				'charLimit'        => MastodonAuth::DEFAULT_CHAR_LIMIT,
-				'maxImages'        => 4,
-				'aspectRatios'     => array( 'any' ),
+				'charLimit'          => MastodonAuth::DEFAULT_CHAR_LIMIT,
+				'maxImages'          => 4,
+				'aspectRatios'       => array( 'any' ),
 				'defaultAspectRatio' => 'any',
-				'supportsCarousel' => false,
-				'composer'        => array(
+				'supportsCarousel'   => false,
+				'composer'           => array(
 					'crossPostCompatible' => false,
-					'mediaKinds'           => array( 'text', 'image' ),
-					'ability'              => 'datamachine/mastodon-publish',
+					'mediaKinds'          => array( 'text', 'image' ),
+					'ability'             => 'datamachine/mastodon-publish',
 				),
-				'capabilities'     => array(
-					array( 'slug' => 'publish', 'label' => 'Publish' ),
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
 				),
-				'preview'          => array(
+				'preview'            => array(
 					'aspectRatio'     => '16:9',
 					'captionPosition' => 'above',
 					'previewSurface'  => 'feed',
@@ -142,7 +146,7 @@ class Mastodon extends PublishHandler {
 		if ( $result['success'] ) {
 			return $this->successResponse(
 				array(
-					'post_id' => $result['post_id'] ?? '',
+					'post_id'  => $result['post_id'] ?? '',
 					'post_url' => $result['post_url'] ?? '',
 					'content'  => $parameters['content'] ?? '',
 				)

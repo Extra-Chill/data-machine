@@ -179,13 +179,19 @@ class Publisher {
 
 	/** @return array{site_id:int,post_id:int} */
 	private static function tracking_post( array $params, int $post_id ): array {
-		$reference = is_array( $params['attribution_post'] ?? null ) ? $params['attribution_post'] : array();
-		$site_id   = absint( $reference['site_id'] ?? 0 );
+		$reference        = is_array( $params['attribution_post'] ?? null ) ? $params['attribution_post'] : array();
+		$site_id          = absint( $reference['site_id'] ?? 0 );
 		$tracking_post_id = absint( $reference['post_id'] ?? 0 );
 
 		return $site_id && $tracking_post_id
-			? array( 'site_id' => $site_id, 'post_id' => $tracking_post_id )
-			: array( 'site_id' => get_current_blog_id(), 'post_id' => $post_id );
+			? array(
+				'site_id' => $site_id,
+				'post_id' => $tracking_post_id,
+			)
+			: array(
+				'site_id' => get_current_blog_id(),
+				'post_id' => $post_id,
+			);
 	}
 
 	/** @return mixed */

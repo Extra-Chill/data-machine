@@ -9,6 +9,10 @@ use DataMachineSocials\RestApi;
 use WP_UnitTestCase;
 
 class RestApiRecentCommentsTest extends WP_UnitTestCase {
+	public function set_up(): void {
+		parent::set_up();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+	}
 
 	public function test_omitted_media_id_uses_recent_comments_contract(): void {
 		$request = new \WP_REST_Request( 'GET', '/datamachine/v1/socials/comments/threads' );

@@ -50,7 +50,10 @@ class MastodonCommand {
 	 */
 	public function post( $args, $assoc_args ) {
 		$assoc_args;
-		$this->output_json( $this->read( array( 'action' => 'get', 'status_id' => $args[0] ?? '' ) ) );
+		$this->output_json( $this->read( array(
+			'action'    => 'get',
+			'status_id' => $args[0] ?? '',
+		) ) );
 	}
 
 	/**
@@ -63,7 +66,10 @@ class MastodonCommand {
 	 */
 	public function context( $args, $assoc_args ) {
 		$assoc_args;
-		$this->output_json( $this->read( array( 'action' => 'context', 'status_id' => $args[0] ?? '' ) ) );
+		$this->output_json( $this->read( array(
+			'action'    => 'context',
+			'status_id' => $args[0] ?? '',
+		) ) );
 	}
 
 	/**
@@ -152,7 +158,11 @@ class MastodonCommand {
 	 */
 	public function publish( $args, $assoc_args ) {
 		$input = array( 'content' => $args[0] ?? '' );
-		foreach ( array( 'image' => 'image_url', 'source-url' => 'source_url', 'visibility' => 'visibility' ) as $flag => $key ) {
+		foreach ( array(
+			'image'      => 'image_url',
+			'source-url' => 'source_url',
+			'visibility' => 'visibility',
+		) as $flag => $key ) {
 			if ( ! empty( $assoc_args[ $flag ] ) ) {
 				$input[ $key ] = $assoc_args[ $flag ];
 			}

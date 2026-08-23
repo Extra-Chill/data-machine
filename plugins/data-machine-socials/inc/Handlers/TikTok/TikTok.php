@@ -45,27 +45,28 @@ class TikTok extends PublishHandler {
 			true,
 			TikTokAuth::class,
 			TikTokSettings::class,
-			function ( $handler_slug, $handler_config, $engine_data ) {
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
 				return array(
 					'tiktok_publish' => array(
 						'class'                   => self::class,
 						'client_context_bindings' => array( 'job_id' ),
-						'method'      => 'handle_tool_call',
-						'handler'     => $handler_slug,
-						'description' => 'Post a video to TikTok from a public video URL. Pre-audit posts are private-only.',
-						'parameters'  => array(
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post a video to TikTok from a public video URL. Pre-audit posts are private-only.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
-								'content'        => array(
+								'content'       => array(
 									'type'        => 'string',
 									'description' => 'The caption text to post to TikTok (max 2200 characters)',
 								),
-								'video_url'      => array(
+								'video_url'     => array(
 									'type'        => 'string',
 									'description' => 'Public HTTPS video URL for TikTok to pull',
 									'format'      => 'uri',
 								),
-								'privacy_level'  => array(
+								'privacy_level' => array(
 									'type'        => 'string',
 									'description' => 'Visibility: PUBLIC_TO_EVERYONE (requires audit), SELF_ONLY, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR',
 									'enum'        => array( 'PUBLIC_TO_EVERYONE', 'SELF_ONLY', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR' ),
@@ -85,11 +86,14 @@ class TikTok extends PublishHandler {
 				'supportedMediaKinds' => array( 'video' ),
 				'composer'            => array(
 					'crossPostCompatible' => false,
-					'mediaKinds'           => array( 'video' ),
-					'ability'              => 'datamachine/tiktok-publish',
+					'mediaKinds'          => array( 'video' ),
+					'ability'             => 'datamachine/tiktok-publish',
 				),
 				'capabilities'        => array(
-					array( 'slug' => 'publish', 'label' => 'Publish' ),
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
 				),
 				'preview'             => array(
 					'aspectRatio'     => '9:16',
@@ -163,10 +167,10 @@ class TikTok extends PublishHandler {
 		$privacy_level = $parameters['privacy_level'] ?? $handler_config['default_privacy_level'] ?? 'PUBLIC_TO_EVERYONE';
 
 		$publish_input = array(
-			'content'        => $content,
-			'video_url'      => $video_url,
-			'privacy_level'  => $privacy_level,
-			'source_url'     => $engine->getSourceUrl(),
+			'content'       => $content,
+			'video_url'     => $video_url,
+			'privacy_level' => $privacy_level,
+			'source_url'    => $engine->getSourceUrl(),
 		);
 
 		$result = TikTokPublishAbility::execute_publish( $publish_input );

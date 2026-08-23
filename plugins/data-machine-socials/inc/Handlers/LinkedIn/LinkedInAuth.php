@@ -284,10 +284,10 @@ class LinkedInAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		}
 
 		$default_headers = array(
-			'Authorization'              => 'Bearer ' . $access_token,
-			'Linkedin-Version'           => self::API_VERSION,
-			'X-Restli-Protocol-Version'  => '2.0.0',
-			'Content-Type'               => 'application/json',
+			'Authorization'             => 'Bearer ' . $access_token,
+			'Linkedin-Version'          => self::API_VERSION,
+			'X-Restli-Protocol-Version' => '2.0.0',
+			'Content-Type'              => 'application/json',
 		);
 
 		$options['headers'] = array_merge( $default_headers, $options['headers'] ?? array() );

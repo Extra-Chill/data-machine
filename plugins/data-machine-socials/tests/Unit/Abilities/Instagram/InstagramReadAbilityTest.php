@@ -43,9 +43,11 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 		parent::tear_down();
 	}
 
-	// -------------------------------------------------------------------------
-	// Helper: set up authenticated provider
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Helper: set up authenticated provider
+	 * -------------------------------------------------------------------------
+	 */
 
 	private function authenticate( string $token = 'ig_test_tok', string $user_id = '12345' ): void {
 		$this->auth->save_account( array(
@@ -65,9 +67,11 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 		} );
 	}
 
-	// -------------------------------------------------------------------------
-	// Action: list
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Action: list
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_list_returns_media_on_success(): void {
 		$this->authenticate();
@@ -195,9 +199,11 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 		$this->assertFalse( $result['data']['has_next'] );
 	}
 
-	// -------------------------------------------------------------------------
-	// Action: get
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Action: get
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_get_returns_single_post_details(): void {
 		$this->authenticate();
@@ -233,8 +239,8 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$result = $this->ability->execute( array( 'action' => 'get' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'media_id is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'media_id is required', $result->get_error_message() );
 	}
 
 	public function test_get_sends_detail_fields(): void {
@@ -256,9 +262,11 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'is_shared_to_feed', $captured_url );
 	}
 
-	// -------------------------------------------------------------------------
-	// Action: comments
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Action: comments
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_comments_returns_post_comments(): void {
 		$this->authenticate();
@@ -304,20 +312,22 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$result = $this->ability->execute( array( 'action' => 'comments' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'media_id is required', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'media_id is required', $result->get_error_message() );
 	}
 
-	// -------------------------------------------------------------------------
-	// Auth errors
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Auth errors
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_returns_error_when_not_authenticated(): void {
 		// No call to authenticate() — provider has no token.
 		$result = $this->ability->execute( array( 'action' => 'list' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'access token', strtolower( $result['error'] ) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'access token', strtolower( $result->get_error_message() ) );
 	}
 
 	public function test_returns_error_when_token_expired_and_refresh_fails(): void {
@@ -335,8 +345,8 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$result = $this->ability->execute( array( 'action' => 'list' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'access token', strtolower( $result['error'] ) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'access token', strtolower( $result->get_error_message() ) );
 	}
 
 	public function test_returns_error_when_user_id_missing(): void {
@@ -348,8 +358,8 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$result = $this->ability->execute( array( 'action' => 'list' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'user ID', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'user ID', $result->get_error_message() );
 	}
 
 	public function test_returns_error_when_provider_unavailable(): void {
@@ -359,13 +369,15 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$result = $this->ability->execute( array( 'action' => 'list' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'auth provider', strtolower( $result['error'] ) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'auth provider', strtolower( $result->get_error_message() ) );
 	}
 
-	// -------------------------------------------------------------------------
-	// API error handling
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * API error handling
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_handles_api_http_error(): void {
 		$this->authenticate();
@@ -376,8 +388,8 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$result = $this->ability->execute( array( 'action' => 'list' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'failed', strtolower( $result['error'] ) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'failed', strtolower( $result->get_error_message() ) );
 	}
 
 	public function test_handles_api_error_response(): void {
@@ -393,26 +405,30 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$result = $this->ability->execute( array( 'action' => 'list' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Invalid user id', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Invalid user id', $result->get_error_message() );
 	}
 
-	// -------------------------------------------------------------------------
-	// Unknown action
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * Unknown action
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_returns_error_for_unknown_action(): void {
 		$this->authenticate();
 
 		$result = $this->ability->execute( array( 'action' => 'delete' ) );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Unknown action', $result['error'] );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Unknown action', $result->get_error_message() );
 	}
 
-	// -------------------------------------------------------------------------
-	// API URL construction
-	// -------------------------------------------------------------------------
+	/*
+	 * -------------------------------------------------------------------------
+	 * API URL construction
+	 * -------------------------------------------------------------------------
+	 */
 
 	public function test_list_calls_correct_api_url(): void {
 		$this->authenticate( 'ig_tok_url_test', '99999' );
@@ -428,7 +444,7 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$this->ability->execute( array( 'action' => 'list' ) );
 
-		$this->assertStringContainsString( 'graph.instagram.com/99999/media', $captured_url );
+		$this->assertStringContainsString( 'graph.facebook.com/v23.0/99999/media', $captured_url );
 		$this->assertStringContainsString( 'access_token=ig_tok_url_test', $captured_url );
 	}
 
@@ -446,7 +462,7 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$this->ability->execute( array( 'action' => 'get', 'media_id' => '777' ) );
 
-		$this->assertStringContainsString( 'graph.instagram.com/777', $captured_url );
+		$this->assertStringContainsString( 'graph.facebook.com/v23.0/777', $captured_url );
 	}
 
 	public function test_comments_calls_correct_api_url(): void {
@@ -463,6 +479,6 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 		$this->ability->execute( array( 'action' => 'comments', 'media_id' => '888' ) );
 
-		$this->assertStringContainsString( 'graph.instagram.com/888/comments', $captured_url );
+		$this->assertStringContainsString( 'graph.facebook.com/v23.0/888/comments', $captured_url );
 	}
 }

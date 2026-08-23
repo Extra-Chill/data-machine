@@ -185,7 +185,7 @@ class TumblrCommand {
 
 		WP_CLI::success( "Found {$result['data']['count']} tagged posts" );
 		foreach ( $posts as $post ) {
-			$blog = $post['blog_name'] ?? ( $post['blog']['name'] ?? '' );
+			$blog    = $post['blog_name'] ?? ( $post['blog']['name'] ?? '' );
 			$summary = $this->post_summary( $post );
 			WP_CLI::log( sprintf( '  [%s] %s  %s', $blog, $post['id_string'] ?? ( $post['id'] ?? '' ), $summary ) );
 		}

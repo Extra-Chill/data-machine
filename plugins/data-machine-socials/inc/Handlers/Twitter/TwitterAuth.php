@@ -24,15 +24,6 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 	}
 
 	/**
-	 * Check if Twitter authentication is valid.
-	 *
-	 * @return bool True if authenticated
-	 */
-	public function is_authenticated(): bool {
-		return parent::is_authenticated();
-	}
-
-	/**
 	 * Get Twitter configuration field definitions.
 	 *
 	 * @return array Configuration fields
@@ -52,15 +43,6 @@ class TwitterAuth extends \DataMachine\Core\OAuth\BaseOAuth1Provider {
 				'description' => __( 'Your Twitter application API secret from developer.twitter.com', 'data-machine-socials' ),
 			),
 		);
-	}
-
-	/**
-	 * Check if Twitter API credentials are configured.
-	 *
-	 * @return bool True if configured
-	 */
-	public function is_configured(): bool {
-		return parent::is_configured();
 	}
 
 	/**

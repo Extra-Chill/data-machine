@@ -172,6 +172,7 @@ class RedditCommentDomainStore {
 
 		foreach ( $records as $record ) {
 			$key    = hash( 'sha256', (string) $record['comment_fullname'] . '|' . (string) $record['matched_url'] . '|' . (string) $record['matched_host'] );
+			$exists = (bool) $wpdb->get_var( $wpdb->prepare( 'SELECT 1 FROM %i WHERE mention_key = %s', $table, $key ) );
 			$sql    = $wpdb->prepare(
 				'INSERT INTO %i (mention_key, comment_id, comment_fullname, parent_post_id, parent_post_title, subreddit, author, comment_created_utc, score, permalink, domain, matched_url, matched_host, known_owner, first_seen, last_seen)
 				VALUES (%s, %s, %s, %s, %s, %s, %s, %d, %d, %s, %s, %s, %s, %d, %d, %d)
@@ -198,7 +199,7 @@ class RedditCommentDomainStore {
 			if ( false === $result ) {
 				return new \WP_Error( 'reddit_comment_store_failed', 'Could not persist Reddit comment-domain observations.' );
 			}
-			1 === $result ? ++$inserted : ++$updated;
+			$exists ? ++$updated : ++$inserted;
 		}
 
 		self::enforceBounds();

@@ -129,9 +129,9 @@ class YouTubeAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			self::TOKEN_URL,
 			$token_params,
 			function ( array $token_data ): array|\WP_Error {
-				$access_token      = $token_data['access_token'];
-				$refresh_token     = $token_data['refresh_token'] ?? null;
-				$token_expires_at  = time() + intval( $token_data['expires_in'] ?? 3600 );
+				$access_token     = $token_data['access_token'];
+				$refresh_token    = $token_data['refresh_token'] ?? null;
+				$token_expires_at = time() + intval( $token_data['expires_in'] ?? 3600 );
 
 				// Resolve the authenticated YouTube channel identity up front.
 				$channel = self::fetch_channel_identity( $access_token );

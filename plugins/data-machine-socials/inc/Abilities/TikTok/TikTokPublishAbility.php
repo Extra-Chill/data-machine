@@ -50,10 +50,10 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 	 */
 	protected static bool $registered = false;
 
-	const API_BASE          = TikTokAuth::API_BASE;
-	const INIT_ENDPOINT     = self::API_BASE . '/v2/post/publish/video/init/';
-	const CREATOR_ENDPOINT  = self::API_BASE . '/v2/post/publish/creator_info/query/';
-	const STATUS_ENDPOINT   = self::API_BASE . '/v2/post/publish/status/fetch/';
+	const API_BASE         = TikTokAuth::API_BASE;
+	const INIT_ENDPOINT    = self::API_BASE . '/v2/post/publish/video/init/';
+	const CREATOR_ENDPOINT = self::API_BASE . '/v2/post/publish/creator_info/query/';
+	const STATUS_ENDPOINT  = self::API_BASE . '/v2/post/publish/status/fetch/';
 
 	const MAX_TITLE_LENGTH  = 2200;
 	const STATUS_POLL_MAX   = 40;
@@ -83,33 +83,33 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 						'type'       => 'object',
 						'required'   => array( 'content', 'video_url' ),
 						'properties' => array(
-							'content'        => array(
+							'content'            => array(
 								'type'        => 'string',
 								'description' => 'Video caption/title text (max 2200 characters)',
 								'maxLength'   => 2200,
 							),
-							'video_url'      => array(
+							'video_url'          => array(
 								'type'        => 'string',
 								'description' => 'Public HTTPS video URL for TikTok to pull (must be on a verified domain). MP4/WebM/MOV, max 4 GB.',
 								'format'      => 'uri',
 							),
-							'privacy_level'  => array(
+							'privacy_level'      => array(
 								'type'        => 'string',
 								'description' => 'Post visibility. PUBLIC_TO_EVERYONE requires Content Posting Audit; pre-audit posts are forced to SELF_ONLY.',
 								'enum'        => array( 'PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY' ),
 								'default'     => 'PUBLIC_TO_EVERYONE',
 							),
-							'disable_duet'   => array(
+							'disable_duet'       => array(
 								'type'        => 'boolean',
 								'description' => 'Disable duets on this video.',
 								'default'     => false,
 							),
-							'disable_stitch' => array(
+							'disable_stitch'     => array(
 								'type'        => 'boolean',
 								'description' => 'Disable stitches on this video.',
 								'default'     => false,
 							),
-							'disable_comment' => array(
+							'disable_comment'    => array(
 								'type'        => 'boolean',
 								'description' => 'Disable comments on this video.',
 								'default'     => false,
@@ -118,7 +118,7 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 								'type'        => 'integer',
 								'description' => 'Cover frame timestamp in milliseconds.',
 							),
-							'source_url'     => array(
+							'source_url'         => array(
 								'type'        => 'string',
 								'description' => 'Optional source URL appended to the caption.',
 								'format'      => 'uri',
@@ -132,7 +132,10 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 							'publish_id'     => array( 'type' => 'string' ),
 							'status'         => array( 'type' => 'string' ),
 							'public_post_id' => array( 'type' => 'string' ),
-							'post_url'       => array( 'type' => 'string', 'format' => 'uri' ),
+							'post_url'       => array(
+								'type'   => 'string',
+								'format' => 'uri',
+							),
 							'error'          => array( 'type' => 'string' ),
 						),
 					),
@@ -178,8 +181,8 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 	 * @return array|\WP_Error Response with publish_id and status, or error.
 	 */
 	public static function execute_publish( array $input ): array|\WP_Error {
-		$content  = $input['content'] ?? '';
-		$video_url = $input['video_url'] ?? '';
+		$content    = $input['content'] ?? '';
+		$video_url  = $input['video_url'] ?? '';
 		$source_url = $input['source_url'] ?? '';
 
 		if ( empty( $content ) ) {
@@ -286,10 +289,10 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 	 */
 	private static function init_direct_post( string $access_token, string $title, string $video_url, string $privacy_level, array $input ): string|\WP_Error {
 		$post_info = array(
-			'title'         => $title,
-			'privacy_level' => $privacy_level,
-			'disable_duet'  => ! empty( $input['disable_duet'] ),
-			'disable_stitch' => ! empty( $input['disable_stitch'] ),
+			'title'           => $title,
+			'privacy_level'   => $privacy_level,
+			'disable_duet'    => ! empty( $input['disable_duet'] ),
+			'disable_stitch'  => ! empty( $input['disable_stitch'] ),
 			'disable_comment' => ! empty( $input['disable_comment'] ),
 		);
 
@@ -354,13 +357,15 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 				}
 
 				return array(
-					'success'        => true,
-					'publish_id'     => $publish_id,
-					'status'         => 'PUBLISH_COMPLETE',
-					'public_post_id' => $public_post_id,
-					// TikTok status provides an ID, not a canonical public URL or
-					// username. Do not synthesize a misleading permalink.
-					'post_url'       => '',
+					'success'                      => true,
+					'publish_id'                   => $publish_id,
+					'status'                       => 'PUBLISH_COMPLETE',
+					'public_post_id'               => $public_post_id,
+					/*
+					 * TikTok status provides an ID, not a canonical public URL or
+					 * username. Do not synthesize a misleading permalink.
+					 */
+										'post_url' => '',
 				);
 			}
 
@@ -430,7 +435,10 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 		if ( isset( $error['code'] ) && 'ok' !== $error['code'] ) {
 			$message = $error['message'] ?? $error['code'];
 			$code    = $error['code'];
-			return new \WP_Error( 'api_error', $context . ': ' . $message . ' (' . $code . ')', array( 'status' => 500, 'tiktok_error' => $error ) );
+			return new \WP_Error( 'api_error', $context . ': ' . $message . ' (' . $code . ')', array(
+				'status'       => 500,
+				'tiktok_error' => $error,
+			) );
 		}
 
 		return $decoded['data'] ?? $decoded;

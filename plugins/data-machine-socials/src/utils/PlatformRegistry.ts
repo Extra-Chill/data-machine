@@ -1,23 +1,26 @@
 /**
  * Platform Registry
- * 
+ *
  * Central registry for social media platform configurations
  */
 
+/**
+ * Internal dependencies
+ */
 import type { PlatformConfig } from '../types';
 
-export const PLATFORMS: Record<string, PlatformConfig> = {
+export const PLATFORMS: Record< string, PlatformConfig > = {
 	instagram: {
 		slug: 'instagram',
 		label: 'Instagram',
 		icon: 'instagram',
 		maxImages: 10,
-		aspectRatios: ['1:1', '4:5', '3:4', '1.91:1'],
+		aspectRatios: [ '1:1', '4:5', '3:4', '1.91:1' ],
 		defaultAspectRatio: '4:5',
 		charLimit: 2200,
 		supportsCarousel: true,
 		supportsVideo: true,
-		supportedMediaKinds: ['image', 'carousel', 'reel', 'story'],
+		supportedMediaKinds: [ 'image', 'carousel', 'reel', 'story' ],
 		requiresAuth: true,
 		bestPractices: {
 			optimalLength: 138,
@@ -37,7 +40,7 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		label: 'Twitter / X',
 		icon: 'twitter',
 		maxImages: 4,
-		aspectRatios: ['any'],
+		aspectRatios: [ 'any' ],
 		defaultAspectRatio: 'any',
 		charLimit: 280,
 		supportsCarousel: false,
@@ -61,7 +64,7 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		label: 'Facebook',
 		icon: 'facebook',
 		maxImages: 10,
-		aspectRatios: ['any'],
+		aspectRatios: [ 'any' ],
 		defaultAspectRatio: 'any',
 		charLimit: 63206,
 		supportsCarousel: true,
@@ -85,7 +88,7 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		label: 'Bluesky',
 		icon: 'bluesky',
 		maxImages: 4,
-		aspectRatios: ['any'],
+		aspectRatios: [ 'any' ],
 		defaultAspectRatio: 'any',
 		charLimit: 300,
 		supportsCarousel: false,
@@ -109,7 +112,7 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		label: 'Threads',
 		icon: 'threads',
 		maxImages: 10,
-		aspectRatios: ['any'],
+		aspectRatios: [ 'any' ],
 		defaultAspectRatio: 'any',
 		charLimit: 500,
 		supportsCarousel: true,
@@ -133,7 +136,7 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 		label: 'Pinterest',
 		icon: 'pinterest',
 		maxImages: 1,
-		aspectRatios: ['2:3'],
+		aspectRatios: [ '2:3' ],
 		defaultAspectRatio: '2:3',
 		charLimit: 500,
 		supportsCarousel: false,
@@ -155,44 +158,47 @@ export const PLATFORMS: Record<string, PlatformConfig> = {
 	},
 };
 
-export function getPlatform(platform: string): PlatformConfig | null {
-	return PLATFORMS[platform] ?? null;
+export function getPlatform( platform: string ): PlatformConfig | null {
+	return PLATFORMS[ platform ] ?? null;
 }
 
-export function getAllPlatforms(): Record<string, PlatformConfig> {
+export function getAllPlatforms(): Record< string, PlatformConfig > {
 	return PLATFORMS;
 }
 
 export function getPlatformSlugs(): string[] {
-	return Object.keys(PLATFORMS);
+	return Object.keys( PLATFORMS );
 }
 
-export function supportsCarousel(platform: string): boolean {
-	return PLATFORMS[platform]?.supportsCarousel ?? false;
+export function supportsCarousel( platform: string ): boolean {
+	return PLATFORMS[ platform ]?.supportsCarousel ?? false;
 }
 
-export function getMaxImages(platform: string): number {
-	return PLATFORMS[platform]?.maxImages ?? 1;
+export function getMaxImages( platform: string ): number {
+	return PLATFORMS[ platform ]?.maxImages ?? 1;
 }
 
-export function getCharLimit(platform: string): number {
-	return PLATFORMS[platform]?.charLimit ?? 280;
+export function getCharLimit( platform: string ): number {
+	return PLATFORMS[ platform ]?.charLimit ?? 280;
 }
 
-export function getMinCharLimit(platforms: string[]): number {
-	return platforms.reduce((min, platform) => {
-		const limit = getCharLimit(platform);
+export function getMinCharLimit( platforms: string[] ): number {
+	return platforms.reduce( ( min, platform ) => {
+		const limit = getCharLimit( platform );
 		return limit < min ? limit : min;
-	}, Infinity);
+	}, Infinity );
 }
 
-export function validateCaptionLength(caption: string, platform: string): {
+export function validateCaptionLength(
+	caption: string,
+	platform: string
+): {
 	valid: boolean;
 	length: number;
 	limit: number;
 	remaining: number;
 } {
-	const limit = getCharLimit(platform);
+	const limit = getCharLimit( platform );
 	const length = caption?.length ?? 0;
 	return {
 		valid: length <= limit,
@@ -202,32 +208,36 @@ export function validateCaptionLength(caption: string, platform: string): {
 	};
 }
 
-export function getCombinedConstraints(platforms: string[]): {
+export function getCombinedConstraints( platforms: string[] ): {
 	charLimit: number;
 	maxImages: number;
 	aspectRatios: string[];
 	supportsCarousel: boolean;
 } | null {
-	if (!platforms?.length) return null;
+	if ( ! platforms?.length ) {
+		return null;
+	}
 
 	let minCharLimit = Infinity;
 	let minImages = Infinity;
 	let commonRatios: string[] | null = null;
 	let carouselSupport = false;
 
-	for (const platform of platforms) {
-		const config = PLATFORMS[platform];
-		if (!config) continue;
+	for ( const platform of platforms ) {
+		const config = PLATFORMS[ platform ];
+		if ( ! config ) {
+			continue;
+		}
 
-		minCharLimit = Math.min(minCharLimit, config.charLimit);
-		minImages = Math.min(minImages, config.maxImages);
+		minCharLimit = Math.min( minCharLimit, config.charLimit );
+		minImages = Math.min( minImages, config.maxImages );
 		carouselSupport = carouselSupport || config.supportsCarousel;
 
-		if (commonRatios === null) {
-			commonRatios = [...config.aspectRatios];
+		if ( commonRatios === null ) {
+			commonRatios = [ ...config.aspectRatios ];
 		} else {
-			commonRatios = commonRatios.filter(ratio => 
-				config.aspectRatios.includes(ratio)
+			commonRatios = commonRatios.filter( ( ratio ) =>
+				config.aspectRatios.includes( ratio )
 			);
 		}
 	}
@@ -235,7 +245,7 @@ export function getCombinedConstraints(platforms: string[]): {
 	return {
 		charLimit: minCharLimit === Infinity ? 280 : minCharLimit,
 		maxImages: minImages === Infinity ? 1 : minImages,
-		aspectRatios: commonRatios?.length ? commonRatios : ['any'],
+		aspectRatios: commonRatios?.length ? commonRatios : [ 'any' ],
 		supportsCarousel: carouselSupport,
 	};
 }

@@ -118,15 +118,15 @@ class YouTubeAccountAbility extends AbstractSocialAbility {
 		$statistics = $channel['statistics'] ?? array();
 
 		return array(
-			'success'         => true,
-			'channel_id'      => (string) ( $channel['id'] ?? '' ),
-			'title'           => (string) ( $snippet['title'] ?? '' ),
-			'description'     => (string) ( $snippet['description'] ?? '' ),
-			'custom_url'      => (string) ( $snippet['customUrl'] ?? '' ),
-			'published_at'    => (string) ( $snippet['publishedAt'] ?? '' ),
-			'view_count'      => (string) ( $statistics['viewCount'] ?? '' ),
+			'success'          => true,
+			'channel_id'       => (string) ( $channel['id'] ?? '' ),
+			'title'            => (string) ( $snippet['title'] ?? '' ),
+			'description'      => (string) ( $snippet['description'] ?? '' ),
+			'custom_url'       => (string) ( $snippet['customUrl'] ?? '' ),
+			'published_at'     => (string) ( $snippet['publishedAt'] ?? '' ),
+			'view_count'       => (string) ( $statistics['viewCount'] ?? '' ),
 			'subscriber_count' => (string) ( $statistics['subscriberCount'] ?? '' ),
-			'video_count'     => (string) ( $statistics['videoCount'] ?? '' ),
+			'video_count'      => (string) ( $statistics['videoCount'] ?? '' ),
 		);
 	}
 }

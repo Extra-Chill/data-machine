@@ -41,7 +41,7 @@ class TumblrReadAbility extends AbstractSocialAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action'   => array(
+							'action'          => array(
 								'type'        => 'string',
 								'enum'        => array( 'posts', 'post', 'info', 'tagged' ),
 								'default'     => 'posts',
@@ -51,19 +51,19 @@ class TumblrReadAbility extends AbstractSocialAbility {
 								'type'        => 'string',
 								'description' => __( 'Tumblr blog identifier (required for posts, post, info)', 'data-machine-socials' ),
 							),
-							'post_id'  => array(
+							'post_id'         => array(
 								'type'        => 'string',
 								'description' => __( 'Post ID (required for post action)', 'data-machine-socials' ),
 							),
-							'tag'      => array(
+							'tag'             => array(
 								'type'        => 'string',
 								'description' => __( 'Tag to discover (required for tagged action)', 'data-machine-socials' ),
 							),
-							'before'   => array(
+							'before'          => array(
 								'type'        => 'integer',
 								'description' => __( 'Unix timestamp — return posts older than this (pagination). Used by posts and tagged.', 'data-machine-socials' ),
 							),
-							'limit'    => array(
+							'limit'           => array(
 								'type'        => 'integer',
 								'default'     => 20,
 								'description' => __( 'Number of items to return (tagged max 20; posts max 100)', 'data-machine-socials' ),
@@ -138,8 +138,8 @@ class TumblrReadAbility extends AbstractSocialAbility {
 
 	private function listPosts( string $token, array $input ): array|\WP_Error {
 		$params = array(
-			'limit'        => min( max( absint( $input['limit'] ?? 20 ), 1 ), 100 ),
-			'npf'          => 'true',
+			'limit' => min( max( absint( $input['limit'] ?? 20 ), 1 ), 100 ),
+			'npf'   => 'true',
 		);
 		if ( ! empty( $input['before'] ) ) {
 			$params['before'] = absint( $input['before'] );
@@ -230,8 +230,10 @@ class TumblrReadAbility extends AbstractSocialAbility {
 		$response = $data['response'];
 		$items    = $response[ $data_key ] ?? array();
 
-		// Normalize a tagged/posts list: response.posts is the array for list endpoints,
-		// but for blog info response.blog is the object. Detect accordingly.
+		/*
+		 * Normalize a tagged/posts list: response.posts is the array for list endpoints,
+		 * but for blog info response.blog is the object. Detect accordingly.
+		 */
 		if ( 'blog' === $data_key ) {
 			return array(
 				'success' => true,
@@ -244,9 +246,9 @@ class TumblrReadAbility extends AbstractSocialAbility {
 		return array(
 			'success' => true,
 			'data'    => array(
-				'posts'   => $items,
-				'count'   => count( $items ),
-				'total'   => $response['total_posts'] ?? count( $items ),
+				'posts' => $items,
+				'count' => count( $items ),
+				'total' => $response['total_posts'] ?? count( $items ),
 			),
 		);
 	}
