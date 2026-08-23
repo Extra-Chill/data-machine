@@ -112,7 +112,7 @@ class CallerContextTest extends WP_UnitTestCase {
 		$ctx = new \WP_Agent_Caller_Context( 'remote-agent', 7, 'https://agent.example.test', 1, $top->chain_root_request_id );
 
 		$this->assertSame( 'https://agent.example.test', $ctx->caller_host );
-		$this->assertSame( 'franklin', $ctx->caller_agent_id );
+		$this->assertSame( 'remote-agent', $ctx->caller_agent_id );
 		$this->assertSame( 7, $ctx->caller_user_id );
 		$this->assertSame( 'fresh-root', $ctx->chain_root_request_id );
 		$this->assertSame( 1, $ctx->chain_depth, 'Top-of-chain outbound is depth 1' );
@@ -125,7 +125,7 @@ class CallerContextTest extends WP_UnitTestCase {
 		$this->assertSame( 'original-chain', $ctx->chain_root_request_id, 'Chain root propagates from inbound' );
 		$this->assertSame( 3, $ctx->chain_depth, 'Depth increments by 1 for each hop' );
 		$this->assertSame( 'https://agent.example.test', $ctx->caller_host, 'Host reflects current site, not inbound' );
-		$this->assertSame( 'franklin', $ctx->caller_agent_id, 'Agent reflects current site, not inbound' );
+		$this->assertSame( 'remote-agent', $ctx->caller_agent_id, 'Agent reflects current site, not inbound' );
 	}
 
 	public function test_to_outbound_headers_includes_required_fields(): void {
