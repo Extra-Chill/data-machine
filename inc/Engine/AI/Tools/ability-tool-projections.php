@@ -11,8 +11,8 @@ if ( ! function_exists( 'datamachine_register_ability_tool' ) ) {
 	/**
 	 * Register an ability as a model-facing tool projection.
 	 *
-	 * The declaration must include an `ability` slug. AbilityToolSource uses that
-	 * slug as both permission metadata and the explicit direct-execution marker.
+	 * The declaration must include an `ability` slug or non-empty `ability_map`.
+	 * AbilityToolSource uses the primary slug for projection metadata.
 	 * Optional keys such as `modes`, `description`, `parameters`,
 	 * `requires_opt_in`, `action_policy`, and `runtime` are passed through.
 	 *
@@ -21,7 +21,7 @@ if ( ! function_exists( 'datamachine_register_ability_tool' ) ) {
 	 * @return bool Whether the projection was registered.
 	 */
 	function datamachine_register_ability_tool( string $tool_name, array $declaration ): bool {
-		if ( '' === $tool_name || empty( $declaration['ability'] ) || ! is_string( $declaration['ability'] ) ) {
+		if ( '' === $tool_name || ( ( empty( $declaration['ability'] ) || ! is_string( $declaration['ability'] ) ) && ( empty( $declaration['ability_map'] ) || ! is_array( $declaration['ability_map'] ) ) ) ) {
 			return false;
 		}
 

@@ -33,7 +33,6 @@ class InternalLinkAudit extends BaseTool {
 			array_merge(
 				$this->getToolDefinition(),
 				array(
-					'ability'                    => 'datamachine/audit-internal-links',
 					'ability_map'                => array(
 						'audit'     => 'datamachine/audit-internal-links',
 						'orphans'   => 'datamachine/get-orphaned-posts',
