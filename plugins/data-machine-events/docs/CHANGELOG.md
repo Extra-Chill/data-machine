@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.9] - 2026-08-23
+
+### Changed
+- bound upcoming taxonomy counts
+- bound calendar bucket aggregation
+
 ## [0.55.8] - 2026-08-23
 
 ### Changed
