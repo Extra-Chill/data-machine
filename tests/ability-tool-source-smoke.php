@@ -307,6 +307,23 @@ $helper_registered = datamachine_register_ability_tool(
 		'modes'   => array( 'chat' ),
 	)
 );
+$helper_map_registered = datamachine_register_ability_tool(
+	'helper_map_demo',
+	array(
+		'ability_map'            => array( 'summarize' => 'demo/summarize' ),
+		'modes'                  => array( 'chat' ),
+		'strip_action_parameter' => true,
+		'parameters'             => array(
+			'type'       => 'object',
+			'properties' => array(
+				'action'  => array( 'type' => 'string' ),
+				'message' => array( 'type' => 'string' ),
+			),
+			'required'   => array( 'action', 'message' ),
+		),
+	)
+);
+$empty_map_registered = datamachine_register_ability_tool( 'empty_map_demo', array( 'ability_map' => array() ) );
 
 add_filter(
 	'datamachine_ability_tool_projections',
@@ -367,8 +384,12 @@ echo "\n[1] ability metadata becomes a model-facing tool declaration:\n";
 $source = new AbilityToolSource( new AbilityToolSourceSmokeManager() );
 $tools  = $source( array( 'chat' ), array( 'allow_only' => array( 'summarize_demo' ) ) );
 assert_ability_tool_source_equals( true, $helper_registered, 'helper registers a valid ability tool projection', $failures, $passes );
+assert_ability_tool_source_equals( true, $helper_map_registered, 'helper registers a non-empty ability map projection', $failures, $passes );
+assert_ability_tool_source_equals( false, $empty_map_registered, 'helper rejects an empty ability map projection', $failures, $passes );
 assert_ability_tool_source_equals( true, isset( $tools['summarize_demo'] ), 'chat mode exposes selected ability tool when opted in', $failures, $passes );
 assert_ability_tool_source_equals( true, isset( $tools['helper_demo'] ), 'helper projection feeds ability tool source', $failures, $passes );
+assert_ability_tool_source_equals( true, isset( $tools['helper_map_demo'] ), 'map-only helper projection feeds ability tool source', $failures, $passes );
+assert_ability_tool_source_equals( false, isset( $tools['helper_map_demo']['execution_ability'] ), 'map-only projection omits the scalar execution marker', $failures, $passes );
 assert_ability_tool_source_equals( 'demo/summarize', $tools['summarize_demo']['ability'] ?? '', 'generated tool links ability slug', $failures, $passes );
 assert_ability_tool_source_equals( 'demo/summarize', $tools['summarize_demo']['execution_ability'] ?? '', 'generated tool declares explicit direct-execution ability marker', $failures, $passes );
 assert_ability_tool_source_equals( 'Summarize Demo', $tools['summarize_demo']['label'] ?? '', 'generated tool carries ability label', $failures, $passes );
@@ -483,6 +504,38 @@ assert_ability_tool_source_equals( true, $result['success'] ?? false, 'generated
 assert_ability_tool_source_equals( 1, $ability->execute_count, 'ability execute callback ran once', $failures, $passes );
 assert_ability_tool_source_equals( 'hello', $result['result']['received']['message'] ?? '', 'AI parameter reached ability input', $failures, $passes );
 assert_ability_tool_source_equals( 123, $result['result']['received']['job_id'] ?? 0, 'payload context reached ability input through existing binding path', $failures, $passes );
+
+$mapped_result = ToolExecutor::executeTool(
+	'helper_map_demo',
+	array(
+		'action'  => 'summarize',
+		'message' => 'mapped hello',
+	),
+	array( 'helper_map_demo' => $tools['helper_map_demo'] ),
+	array()
+);
+assert_ability_tool_source_equals( true, $mapped_result['success'] ?? false, 'map-only helper projection executes successfully', $failures, $passes );
+assert_ability_tool_source_equals( 'mapped hello', $mapped_result['result']['received']['message'] ?? '', 'map-only projection forwards declared input', $failures, $passes );
+assert_ability_tool_source_equals( false, array_key_exists( 'action', $mapped_result['result']['received'] ?? array() ), 'map-only projection strips the routing action', $failures, $passes );
+
+$missing_action = ToolExecutor::executeTool(
+	'helper_map_demo',
+	array( 'message' => 'missing action' ),
+	array( 'helper_map_demo' => $tools['helper_map_demo'] ),
+	array()
+);
+assert_ability_tool_source_equals( 'missing_required_parameters', $missing_action['metadata']['error_type'] ?? '', 'map-only projection rejects a missing action', $failures, $passes );
+
+$unknown_action = ToolExecutor::executeTool(
+	'helper_map_demo',
+	array(
+		'action'  => 'unknown',
+		'message' => 'unknown action',
+	),
+	array( 'helper_map_demo' => $tools['helper_map_demo'] ),
+	array()
+);
+assert_ability_tool_source_equals( 'missing_execution_ability', $unknown_action['metadata']['error_type'] ?? '', 'map-only projection rejects an unknown action', $failures, $passes );
 
 echo "\n[5] required-tool evidence reports ability projection rejection reasons:\n";
 $resolver_evidence = ( new ToolPolicyResolver( new AbilityToolSourceSmokeManager() ) )->resolveWithEvidence(
