@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.10] - 2026-08-23
+
+### Fixed
+- keep event date status synchronized
+
 ## [0.55.9] - 2026-08-23
 
 ### Changed
