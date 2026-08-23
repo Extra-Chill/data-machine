@@ -150,20 +150,7 @@ final class AbilityToolAdapter {
 			return self::missingAbilityResult( $tool_name, $ability_slug );
 		}
 
-		$input      = self::buildAbilityInput( $parameters, $tool_definition );
-		$permission = $ability->check_permissions( $input );
-		if ( is_wp_error( $permission ) ) {
-			return WP_Agent_Tool_Result::error( $tool_name, $permission->get_error_message(), array( 'ability' => $ability_slug ) );
-		}
-
-		if ( true !== $permission ) {
-			return WP_Agent_Tool_Result::error(
-				$tool_name,
-				sprintf( "Tool '%s' is not permitted by ability '%s'.", $tool_name, $ability_slug ),
-				array( 'ability' => $ability_slug )
-			);
-		}
-
+		$input  = self::buildAbilityInput( $parameters, $tool_definition );
 		$result = $ability->execute( $input );
 		if ( is_wp_error( $result ) ) {
 			return WP_Agent_Tool_Result::error(
