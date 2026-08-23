@@ -61,39 +61,50 @@ class RestApi {
 				'callback'            => array( __CLASS__, 'cross_post' ),
 				'permission_callback' => array( __CLASS__, 'check_publish_permission' ),
 				'args'                => array(
-				'platforms'    => array(
-					'required' => true,
-					'type'     => 'array',
+					'post_id'       => array(
+						'required'          => true,
+						'type'              => 'integer',
+						'minimum'           => 1,
+						'sanitize_callback' => 'absint',
+					),
+					'post_site_id'  => array(
+						'type'              => 'integer',
+						'minimum'           => 1,
+						'sanitize_callback' => 'absint',
+					),
+					'platforms'     => array(
+						'required' => true,
+						'type'     => 'array',
+					),
+					'images'        => array(
+						'type' => 'array',
+					),
+					'caption'       => array(
+						'required' => true,
+						'type'     => 'string',
+					),
+					'aspect_ratio'  => array(
+						'type'    => 'string',
+						'default' => '4:5',
+					),
+					'media_kind'    => array(
+						'type'    => 'string',
+						'default' => 'image',
+						'enum'    => array( 'image', 'carousel', 'reel', 'story' ),
+					),
+					'video_url'     => array(
+						'type'   => 'string',
+						'format' => 'uri',
+					),
+					'cover_url'     => array(
+						'type'   => 'string',
+						'format' => 'uri',
+					),
+					'share_to_feed' => array(
+						'type'    => 'boolean',
+						'default' => true,
+					),
 				),
-				'images'       => array(
-					'type' => 'array',
-				),
-				'caption'      => array(
-					'required' => true,
-					'type'     => 'string',
-				),
-				'aspect_ratio' => array(
-					'type'    => 'string',
-					'default' => '4:5',
-				),
-				'media_kind'   => array(
-					'type'    => 'string',
-					'default' => 'image',
-					'enum'    => array( 'image', 'carousel', 'reel', 'story' ),
-				),
-				'video_url'    => array(
-					'type'   => 'string',
-					'format' => 'uri',
-				),
-				'cover_url'    => array(
-					'type'   => 'string',
-					'format' => 'uri',
-				),
-				'share_to_feed' => array(
-					'type'    => 'boolean',
-					'default' => true,
-				),
-			),
 			)
 		);
 
@@ -1281,12 +1292,41 @@ class RestApi {
 		$platforms     = $params['platforms'] ?? array();
 		$images        = $params['images'] ?? array();
 		$caption       = sanitize_textarea_field( $params['caption'] ?? '' );
-		$post_id       = intval( $params['post_id'] ?? 0 );
+		$post_id       = absint( $params['post_id'] ?? 0 );
+		$post_site_id  = array_key_exists( 'post_site_id', $params )
+			? absint( $params['post_site_id'] )
+			: get_current_blog_id();
 		$aspect_ratio  = sanitize_text_field( $params['aspect_ratio'] ?? '4:5' );
 		$media_kind    = sanitize_text_field( $params['media_kind'] ?? 'image' );
 		$video_url     = sanitize_url( $params['video_url'] ?? '' );
 		$cover_url     = sanitize_url( $params['cover_url'] ?? '' );
 		$share_to_feed = $params['share_to_feed'] ?? true;
+
+		if ( ! self::is_valid_site( $post_site_id ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'error'   => 'The canonical post site is invalid.',
+					'code'    => 'social_cross_post_invalid_post_site',
+				),
+				400
+			);
+		}
+
+		$published_post = self::with_site(
+			$post_site_id,
+			static fn(): bool => $post_id > 0 && 'publish' === get_post_status( $post_id )
+		);
+		if ( ! $published_post ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'error'   => 'A published canonical post is required.',
+					'code'    => 'social_cross_post_invalid_post',
+				),
+				400
+			);
+		}
 
 		if ( empty( $platforms ) ) {
 			return new \WP_REST_Response(
@@ -1336,6 +1376,7 @@ class RestApi {
 
 		$task_params = array(
 			'post_id'       => $post_id,
+			'post_site_id'  => $post_site_id,
 			'platforms'     => $platforms,
 			'caption'       => $caption,
 			'images'        => $images,
@@ -1365,7 +1406,10 @@ class RestApi {
 
 		// Store job reference on post when available.
 		if ( $post_id ) {
-			update_post_meta( $post_id, '_studio_social_job_id', $job_id );
+			self::with_site(
+				$post_site_id,
+				static fn() => update_post_meta( $post_id, '_studio_social_job_id', $job_id )
+			);
 		}
 
 		return new \WP_REST_Response(
@@ -1375,6 +1419,38 @@ class RestApi {
 				'status'  => 'pending',
 			)
 		);
+	}
+
+	private static function is_valid_site( int $site_id ): bool {
+		if ( $site_id <= 0 ) {
+			return false;
+		}
+		if ( ! is_multisite() ) {
+			return get_current_blog_id() === $site_id;
+		}
+
+		$site = get_site( $site_id );
+		return $site instanceof \WP_Site
+			&& get_current_network_id() === (int) $site->network_id
+			&& ! $site->archived
+			&& ! $site->deleted
+			&& ! $site->spam;
+	}
+
+	/** @return mixed */
+	private static function with_site( int $site_id, callable $callback ) {
+		$switched = get_current_blog_id() !== $site_id;
+		if ( $switched ) {
+			switch_to_blog( $site_id );
+		}
+
+		try {
+			return $callback();
+		} finally {
+			if ( $switched ) {
+				restore_current_blog();
+			}
+		}
 	}
 
 	/**

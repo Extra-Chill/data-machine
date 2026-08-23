@@ -94,7 +94,7 @@ class SocialCrossPostTask extends SystemTask {
 
 		// Publish directly via Publisher utility (no REST round-trip).
 		$post_site_id   = absint( $params['post_site_id'] ?? get_current_blog_id() );
-		$publish_result = $this->with_site( $post_site_id, static fn(): array => Publisher::cross_post( $params ) );
+		$publish_result = Publisher::cross_post( $params );
 
 		if ( ! empty( $publish_result['error'] ) && empty( $publish_result['results'] ) ) {
 			// Validation-level failure (e.g. missing video_url for reel).

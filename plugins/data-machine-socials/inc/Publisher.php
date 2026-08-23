@@ -29,6 +29,7 @@ class Publisher {
 	 *     @type string $caption      Post caption.
 	 *     @type array  $images       Image objects with 'url' key.
 	 *     @type int    $post_id      Optional WP post ID.
+	 *     @type int    $post_site_id Optional canonical WP site ID.
 	 *     @type string $aspect_ratio Image aspect ratio.
 	 *     @type string $media_kind   image | carousel | reel | story.
 	 *     @type string $video_url    Video URL for reels/stories.
@@ -42,6 +43,19 @@ class Publisher {
 	 * }
 	 */
 	public static function cross_post( array $params ): array {
+		$post_site_id = absint( $params['post_site_id'] ?? get_current_blog_id() );
+		if ( $post_site_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid canonical post site',
+				'results' => array(),
+			);
+		}
+
+		return self::with_site( $post_site_id, static fn(): array => self::cross_post_in_current_site( $params ) );
+	}
+
+	private static function cross_post_in_current_site( array $params ): array {
 		$platforms     = $params['platforms'] ?? array();
 		$images        = $params['images'] ?? array();
 		$caption       = sanitize_textarea_field( $params['caption'] ?? '' );
@@ -156,6 +170,22 @@ class Publisher {
 			'results' => $results,
 			'errors'  => $errors ? $errors : null,
 		);
+	}
+
+	/** @return mixed */
+	private static function with_site( int $site_id, callable $callback ) {
+		$switched = get_current_blog_id() !== $site_id;
+		if ( $switched ) {
+			switch_to_blog( $site_id );
+		}
+
+		try {
+			return $callback();
+		} finally {
+			if ( $switched ) {
+				restore_current_blog();
+			}
+		}
 	}
 
 	/**
