@@ -5,6 +5,8 @@
  * @package DataMachineSocials\Tests\Integration
  */
 
+use DataMachine\Core\Bootstrap\ActivationServiceProvider;
+use DataMachine\Core\Bootstrap\RuntimeServiceProvider;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\DelegatedOperations\DelegatedOperationService;
@@ -13,10 +15,9 @@ use DataMachineSocials\Tracking\SocialShareTracker;
 
 final class DelegatedCrossPostRetryTest extends WP_UnitTestCase {
 	public function test_failed_parent_reopens_and_successful_task_replay_executes(): void {
-		datamachine_create_network_agent_tables();
-		datamachine_ensure_all_tables();
+		ActivationServiceProvider::ensure_all_tables();
 		datamachine_register_core_actions();
-		datamachine_load_step_types();
+		RuntimeServiceProvider::register_step_types();
 		datamachine_socials_bootstrap();
 		\DataMachine\Engine\Tasks\TaskRegistry::reset();
 		$actor         = self::factory()->user->create( array( 'role' => 'administrator' ) );
