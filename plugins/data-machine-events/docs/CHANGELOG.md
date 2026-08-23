@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.12] - 2026-08-23
+
+### Changed
+- warm taxonomy inventories after invalidation
+
 ## [0.55.11] - 2026-08-23
 
 ### Fixed
