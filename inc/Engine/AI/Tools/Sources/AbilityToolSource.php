@@ -66,16 +66,6 @@ final class AbilityToolSource {
 		$diagnostic_tool_names = $this->stringList( $args['diagnostic_tool_names'] ?? array() );
 		$rejections            = array();
 
-		if ( ! class_exists( '\WP_Abilities_Registry' ) ) {
-			foreach ( $diagnostic_tool_names as $tool_name ) {
-				$rejections[ $tool_name ] = $this->rejection( $tool_name, 'ability_registry_unavailable' );
-			}
-			return array(
-				'tools'      => array(),
-				'rejections' => $rejections,
-			);
-		}
-
 		$registry = \WP_Abilities_Registry::get_instance();
 		if ( ! $registry || ! method_exists( $registry, 'get_registered' ) ) {
 			foreach ( $diagnostic_tool_names as $tool_name ) {

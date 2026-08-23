@@ -788,14 +788,6 @@ class ChatOrchestrator {
 				: 0;
 		}
 
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return new WP_Error(
-				'session_creation_ability_unavailable',
-				__( 'Chat session creation ability API is unavailable.', 'data-machine' ),
-				array( 'status' => 500 )
-			);
-		}
-
 		$ability = wp_get_ability( 'agents/create-conversation-session' );
 
 		if ( ! $ability ) {

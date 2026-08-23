@@ -57,7 +57,6 @@ namespace {
 		DependencyChecker::CHECK_ACTION_SCHEDULER === 'action_scheduler'
 			&& DependencyChecker::CHECK_FILESYSTEM_WRITES === 'filesystem_writes'
 			&& DependencyChecker::CHECK_IMAP === 'imap'
-			&& DependencyChecker::CHECK_WORDPRESS_ABILITIES === 'wordpress_abilities'
 			&& DependencyChecker::CHECK_ZIP_ARCHIVE === 'zip_archive'
 	);
 
@@ -158,7 +157,6 @@ namespace {
 			DependencyChecker::CHECK_ACTION_SCHEDULER,
 			DependencyChecker::CHECK_FILESYSTEM_WRITES,
 			DependencyChecker::CHECK_IMAP,
-			DependencyChecker::CHECK_WORDPRESS_ABILITIES,
 			DependencyChecker::CHECK_ZIP_ARCHIVE,
 		) === array_keys( $capability_report )
 			&& array_reduce(

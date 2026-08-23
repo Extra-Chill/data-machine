@@ -24,13 +24,6 @@ class AbilityRunner {
 	 * @return array Normalized ability result.
 	 */
 	public static function execute( string $ability_name, array $input = array() ): array {
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Abilities API is not available.',
-			);
-		}
-
 		$ability = wp_get_ability( $ability_name );
 		if ( ! $ability || ! is_callable( array( $ability, 'execute' ) ) ) {
 			return array(

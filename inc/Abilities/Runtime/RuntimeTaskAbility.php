@@ -112,10 +112,6 @@ class RuntimeTaskAbility {
 			return $this->normalizeResult( $request, $external_result, $started_at );
 		}
 
-		if ( ! function_exists( 'wp_get_ability' ) ) {
-			return $this->failure( $request, 'runtime_task_registry_unavailable', __( 'The WordPress Abilities API is not available for runtime task dispatch.', 'data-machine' ), $started_at );
-		}
-
 		$ability = wp_get_ability( $request['ability'] );
 		if ( ! $ability || ! is_callable( array( $ability, 'execute' ) ) ) {
 			return $this->failure( $request, 'runtime_task_ability_unavailable', __( 'The requested runtime task ability is not available.', 'data-machine' ), $started_at );

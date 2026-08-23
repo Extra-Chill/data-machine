@@ -69,7 +69,7 @@ class AgentAbilities {
 		// Late path: the init action has already fired (headless runtime
 		// load order). Register through the registry instance directly, which
 		// WordPress core permits any time after `init`.
-		if ( ! did_action( 'wp_abilities_api_init' ) || ! class_exists( '\WP_Abilities_Registry' ) ) {
+		if ( ! did_action( 'wp_abilities_api_init' ) ) {
 			return null;
 		}
 
@@ -3207,7 +3207,7 @@ class AgentAbilities {
 			return $result;
 		}
 
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/import-agent' ) : null;
+		$ability = wp_get_ability( 'datamachine/import-agent' );
 		if ( ! $ability instanceof \WP_Ability ) {
 			return new \WP_Error(
 				'datamachine_import_agent_unavailable',

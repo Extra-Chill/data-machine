@@ -18,7 +18,6 @@ class DependencyChecker {
 	public const CHECK_ACTION_SCHEDULER    = 'action_scheduler';
 	public const CHECK_FILESYSTEM_WRITES   = 'filesystem_writes';
 	public const CHECK_IMAP                = 'imap';
-	public const CHECK_WORDPRESS_ABILITIES = 'wordpress_abilities';
 	public const CHECK_ZIP_ARCHIVE         = 'zip_archive';
 
 	/** @return array<string,string> */
@@ -27,7 +26,6 @@ class DependencyChecker {
 			self::CHECK_ACTION_SCHEDULER    => 'Action Scheduler is available.',
 			self::CHECK_FILESYSTEM_WRITES   => 'The Data Machine directory is writable.',
 			self::CHECK_IMAP                => 'The PHP IMAP extension is available.',
-			self::CHECK_WORDPRESS_ABILITIES => 'The WordPress Abilities API is available.',
 			self::CHECK_ZIP_ARCHIVE         => 'The PHP Zip extension is available.',
 		);
 	}
@@ -43,7 +41,6 @@ class DependencyChecker {
 			self::CHECK_ACTION_SCHEDULER    => self::has_action_scheduler(),
 			self::CHECK_FILESYSTEM_WRITES   => self::has_filesystem_writes(),
 			self::CHECK_IMAP                => self::has_imap(),
-			self::CHECK_WORDPRESS_ABILITIES => self::has_wordpress_abilities(),
 			self::CHECK_ZIP_ARCHIVE         => self::has_zip_archive(),
 			default                         => false,
 		};
@@ -88,7 +85,6 @@ class DependencyChecker {
 			self::CHECK_ACTION_SCHEDULER    => 'Action Scheduler is unavailable.',
 			self::CHECK_FILESYSTEM_WRITES   => 'The Data Machine directory is not writable.',
 			self::CHECK_IMAP                => 'The PHP IMAP extension is unavailable.',
-			self::CHECK_WORDPRESS_ABILITIES => 'The WordPress Abilities API is unavailable.',
 			self::CHECK_ZIP_ARCHIVE         => 'The PHP Zip extension is unavailable.',
 			default                         => 'The dependency or capability is unavailable.',
 		};
@@ -126,15 +122,6 @@ class DependencyChecker {
 	 */
 	public static function has_imap(): bool {
 		return function_exists( 'imap_open' );
-	}
-
-	/**
-	 * Determine whether the WordPress Abilities API is available.
-	 *
-	 * @return bool True when WordPress abilities can be registered/resolved.
-	 */
-	public static function has_wordpress_abilities(): bool {
-		return class_exists( 'WP_Ability' ) && class_exists( 'WP_Abilities_Registry' );
 	}
 
 	/**

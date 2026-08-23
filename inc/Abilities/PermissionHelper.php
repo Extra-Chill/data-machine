@@ -522,7 +522,7 @@ class PermissionHelper {
 			return true;
 		}
 
-		if ( '' === $category && class_exists( '\\WP_Abilities_Registry' ) ) {
+		if ( '' === $category ) {
 			$registry = \WP_Abilities_Registry::get_instance();
 			if ( method_exists( $registry, 'is_registered' ) && $registry->is_registered( $ability_slug ) ) {
 				$ability = $registry->get_registered( $ability_slug );
