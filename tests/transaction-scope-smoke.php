@@ -5,6 +5,7 @@ define( 'ABSPATH', __DIR__ . '/' );
 
 class TransactionScopeFakeWpdb {
 	public array $queries = array();
+	public array $prepare_calls = array();
 	public function __construct( private bool $in_transaction = false ) {}
 	public function get_var( string $query ): string|false {
 		return match ( $query ) {
@@ -15,7 +16,8 @@ class TransactionScopeFakeWpdb {
 		};
 	}
 	public function prepare( string $query, mixed ...$args ): string {
-		return str_replace( '%i', (string) $args[0], $query );
+		$this->prepare_calls[] = array( $query, $args );
+		return str_replace( '%i', '`' . (string) $args[0] . '`', $query );
 	}
 	public function query( string $query ): int {
 		$this->queries[] = $query;
@@ -43,6 +45,18 @@ $scope  = \DataMachine\Core\Database\TransactionScope::begin( $nested );
 $assert( null !== $scope, 'nested scope opens a savepoint' );
 $scope?->rollback();
 $assert( 3 === count( $nested->queries ) && str_starts_with( $nested->queries[0], 'SAVEPOINT datamachine_transaction_' ) && str_starts_with( $nested->queries[1], 'ROLLBACK TO SAVEPOINT datamachine_transaction_' ) && str_starts_with( $nested->queries[2], 'RELEASE SAVEPOINT datamachine_transaction_' ), 'nested rollback is limited to its savepoint' );
+$assert( array() === $nested->prepare_calls && ! str_contains( implode( ' ', $nested->queries ), '`' ), 'internally generated savepoints use portable bare identifiers' );
+
+$nested = new TransactionScopeFakeWpdb( true );
+$scope  = \DataMachine\Core\Database\TransactionScope::begin( $nested );
+$assert( null !== $scope && $scope->commit(), 'nested scope releases its savepoint' );
+$assert( 2 === count( $nested->queries ) && str_starts_with( $nested->queries[0], 'SAVEPOINT datamachine_transaction_' ) && str_starts_with( $nested->queries[1], 'RELEASE SAVEPOINT datamachine_transaction_' ), 'release uses the same MySQL-compatible bare identifier spelling as savepoint creation' );
+$assert( array() === $nested->prepare_calls, 'savepoint release does not pass the internal identifier through wpdb prepare' );
+
+$stale = new TransactionScopeFakeWpdb( true );
+$scope = \DataMachine\Core\Database\TransactionScope::begin( $stale );
+$scope?->rollback();
+$assert( null !== $scope && ! $scope->commit() && 3 === count( $stale->queries ), 'rolled-back scope cannot issue a stale commit' );
 
 echo sprintf( "Transaction scope smoke complete: %d failures.\n", $failures );
 exit( $failures > 0 ? 1 : 0 );
