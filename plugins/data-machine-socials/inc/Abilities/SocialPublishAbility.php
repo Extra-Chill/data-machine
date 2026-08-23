@@ -117,20 +117,25 @@ class SocialPublishAbility extends AbstractSocialAbility {
 			return $this->failure( 'social_publish_provider_unavailable', __( 'One or more target providers are unavailable.', 'data-machine-socials' ), false, array( 'providers' => $unavailable ) );
 		}
 
+		$delegated_input = array(
+			'post_id'      => $content['post_id'] ?? null,
+			'source_url'   => $content['source_url'] ?? null,
+			'caption'      => $content['caption'] ?? null,
+			'content_hash' => $content['content_hash'] ?? null,
+			'channels'     => $targets,
+			'media_kind'   => $media_kind,
+			'asset_refs'   => $content['asset_refs'] ?? null,
+		);
+		if ( isset( $input['attribution_post'] ) ) {
+			$delegated_input['attribution_post'] = $input['attribution_post'];
+		}
+
 		$result = $this->invokeDelegated(
 			'submit',
 			array(
 				'action'       => DelegatedCrossPostAction::ACTION_ID,
 				'operation_id' => (string) ( $input['idempotency_key'] ?? '' ),
-				'input'        => array(
-					'post_id'      => $content['post_id'] ?? null,
-					'source_url'   => $content['source_url'] ?? null,
-					'caption'      => $content['caption'] ?? null,
-					'content_hash' => $content['content_hash'] ?? null,
-					'channels'     => $targets,
-					'media_kind'   => $media_kind,
-					'asset_refs'   => $content['asset_refs'] ?? null,
-				),
+				'input'        => $delegated_input,
 			)
 		);
 
@@ -301,6 +306,21 @@ class SocialPublishAbility extends AbstractSocialAbility {
 			'type'                 => 'object',
 			'required'             => array( 'content_ref', 'target_policy', 'idempotency_key' ),
 			'properties'           => array(
+				'attribution_post' => array(
+					'type'                 => 'object',
+					'required'             => array( 'site_id', 'post_id' ),
+					'properties'           => array(
+						'site_id' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+						'post_id' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+					),
+					'additionalProperties' => false,
+				),
 				'content_ref'     => array(
 					'type'                 => 'object',
 					'required'             => array( 'post_id', 'source_url', 'caption', 'content_hash', 'asset_refs' ),

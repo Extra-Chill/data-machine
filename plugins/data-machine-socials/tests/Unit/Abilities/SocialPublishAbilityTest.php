@@ -33,6 +33,41 @@ final class SocialPublishAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( '2:84', $ability->requests['submit']['input']['asset_refs'][0]['source_id'] );
 	}
 
+	public function test_enqueue_forwards_optional_attribution_post(): void {
+		$ability = $this->ability(
+			array(
+				'submit' => array(
+					'success'       => true,
+					'operation_ref' => $this->deliveryRef(),
+					'status'        => 'submitted',
+				),
+			)
+		);
+		$input = $this->enqueueInput();
+		$input['attribution_post'] = array( 'site_id' => 1, 'post_id' => 99 );
+
+		$result = $ability->enqueue( $input );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $input['attribution_post'], $ability->requests['submit']['input']['attribution_post'] );
+	}
+
+	public function test_enqueue_omits_attribution_when_not_provided(): void {
+		$ability = $this->ability(
+			array(
+				'submit' => array(
+					'success'       => true,
+					'operation_ref' => $this->deliveryRef(),
+					'status'        => 'submitted',
+				),
+			)
+		);
+
+		$ability->enqueue( $this->enqueueInput() );
+
+		$this->assertArrayNotHasKey( 'attribution_post', $ability->requests['submit']['input'] );
+	}
+
 	public function test_conflicting_idempotency_reuse_has_a_stable_error(): void {
 		$ability = $this->ability(
 			array(
