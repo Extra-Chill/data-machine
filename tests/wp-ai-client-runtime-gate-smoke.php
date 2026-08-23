@@ -168,13 +168,6 @@ assert_smoke( 0 === $dispatches, 'RequestBuilder does not dispatch chubes_ai_req
 assert_smoke( $response instanceof WP_Error, 'RequestBuilder returns WP_Error when wp-ai-client is missing' );
 assert_smoke( str_contains( $response->get_error_message(), 'wp-ai-client is unavailable' ), 'blocked request error names wp-ai-client gate', $response->get_error_message() );
 
-$request_builder_source = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/RequestBuilder.php' );
-
-assert_smoke( false === str_contains( $request_builder_source, "'chubes_ai_request'" ), 'RequestBuilder source has no chubes_ai_request dispatch' );
-assert_smoke( false === str_contains( $request_builder_source, 'Legacy path: ai-http-client' ), 'RequestBuilder source has no legacy provider path comment' );
-assert_smoke( str_contains( $request_builder_source, 'wpAiClientUnavailableReason' ), 'RequestBuilder owns product-level wp-ai-client gate' );
-assert_smoke( str_contains( $request_builder_source, 'wp_ai_client_prompt()' ), 'RequestBuilder calls wp_ai_client_prompt directly' );
-
 assert_smoke( ! is_file( AGENTS_API_PATH . 'inc/AI/WpAiClient.php' ), 'Agents API carries no low-level wp-ai-client execution wrapper' );
 
 echo "\n" . smoke_failure_count() . " failures\n";

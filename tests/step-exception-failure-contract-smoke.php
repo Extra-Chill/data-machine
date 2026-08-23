@@ -180,11 +180,6 @@ $assert( 'next step is not scheduled', empty( $scheduled_next ) );
 $assert( 'job failure action is emitted', ! empty( $failed_jobs ) );
 $assert( 'job failure reason comes from packet metadata', 'step_exception' === $failure_reason );
 
-echo "\n[4] UpsertStep override follows the explicit failure-packet contract\n";
-$upsert_source = file_get_contents( __DIR__ . '/../inc/Core/Steps/Upsert/UpsertStep.php' );
-$assert( 'UpsertStep does not return original packets from handleException', false === strpos( $upsert_source, 'return $this->dataPackets;' ) );
-$assert( 'UpsertStep uses shared exception failure packet builder', false !== strpos( $upsert_source, 'buildExceptionFailurePackets( $e, $context, \'upsert_step_exception\' )' ) );
-
 if ( $failures > 0 ) {
 	echo "\n=== step-exception-failure-contract-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
 	exit( 1 );

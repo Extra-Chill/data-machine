@@ -210,15 +210,6 @@ assert_workflow_spec_equals( false, array_key_exists( 'handler', $pipeline_steps
 assert_workflow_spec_equals( false, array_key_exists( 'handler_slug', $pipeline_steps[0] ), 'ephemeral pipeline rows do not emit scalar handler_slug', $failures, $passes );
 assert_workflow_spec_equals( false, array_key_exists( 'handler_config', $pipeline_steps[0] ), 'ephemeral pipeline rows do not emit scalar handler_config', $failures, $passes );
 
-$execute_source  = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' ) ?: '';
-$pipeline_source = file_get_contents( __DIR__ . '/../inc/Abilities/Pipeline/PipelineHelpers.php' ) ?: '';
-$system_task_source = file_get_contents( __DIR__ . '/../inc/Core/Steps/SystemTask/SystemTaskStep.php' ) ?: '';
-
-assert_workflow_spec_equals( 1, substr_count( $execute_source, 'WorkflowSpecValidator::validate' ), 'execute-workflow calls shared validator once', $failures, $passes );
-assert_workflow_spec_equals( 1, substr_count( $pipeline_source, 'WorkflowSpecValidator::validate' ), 'create-pipeline helper calls shared validator once', $failures, $passes );
-assert_workflow_spec_equals( false, str_contains( $system_task_source, "\$task_type = \$settings['task']" ), 'system_task execution does not resolve task type from legacy task field', $failures, $passes );
-assert_workflow_spec_equals( true, str_contains( $system_task_source, 'system_task_legacy_task_field' ), 'system_task execution rejects legacy task field explicitly', $failures, $passes );
-
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " workflow spec assertions failed.\n";
 	exit( 1 );

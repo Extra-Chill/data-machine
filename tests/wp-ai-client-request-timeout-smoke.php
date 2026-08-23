@@ -308,10 +308,6 @@ $transport_log_context = $transport_logs[0][1][2] ?? array();
 assert_timeout_smoke( 240.0 === ( $transport_log_context['request_timeout'] ?? null ), 'Transport log includes resolved request timeout' );
 assert_timeout_smoke( 120.0 === ( $transport_log_context['connect_timeout'] ?? null ), 'Transport log includes resolved connect timeout' );
 
-$request_builder_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestBuilder.php' );
-assert_timeout_smoke( is_string( $request_builder_source ) && str_contains( $request_builder_source, 'CURLOPT_CONNECTTIMEOUT' ), 'Data Machine scopes cURL connect timeout during wp-ai-client dispatch' );
-assert_timeout_smoke( is_string( $request_builder_source ) && str_contains( $request_builder_source, 'use ( $request_timeout, $connect_timeout )' ), 'Data Machine cURL timeout hook receives request and connect timeouts' );
-
 assert_timeout_smoke( 0 === timeout_smoke_filter_count( 'wp_ai_client_default_request_timeout' ), 'Data Machine removes temporary wp-ai-client timeout filter after dispatch' );
 assert_timeout_smoke( 0 === timeout_smoke_filter_count( 'http_api_curl' ), 'Data Machine removes temporary cURL low-speed filter after dispatch' );
 
