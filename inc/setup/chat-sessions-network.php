@@ -10,13 +10,18 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Preserve per-site chat history in the canonical network table.
  *
- * The completion marker is evidence, not a one-shot guard. Every schema setup
- * pass re-runs the idempotent copy and anti-join verification so rows missed by
- * an interrupted or older deployment are recovered later.
+ * A verified completion marker prevents every per-site schema pass from
+ * reconverging the same immutable legacy tables into the network target.
  */
 function datamachine_converge_chat_sessions_to_network(): bool {
 	if ( ! function_exists( 'is_multisite' ) || ! is_multisite() ) {
 		return true;
+	}
+	if ( function_exists( 'get_site_option' ) ) {
+		$marker = get_site_option( 'datamachine_chat_sessions_network_migrated' );
+		if ( is_array( $marker ) && true === ( $marker['verified'] ?? false ) ) {
+			return true;
+		}
 	}
 
 	$result = \DataMachine\Core\Database\Chat\Chat::migrate_per_site_tables_to_network();

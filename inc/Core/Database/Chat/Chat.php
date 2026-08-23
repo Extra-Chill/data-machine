@@ -16,6 +16,7 @@ use DataMachine\Abilities\Chat\ChatTranscriptOwner;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\Database\LifecycleStateTransition;
+use DataMachine\Core\Database\TransactionScope;
 use AgentsAPI\AI\WP_Agent_Execution_Principal;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
@@ -323,6 +324,10 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				continue;
 			}
 
+			if ( self::migration_rows_match( $observed, $canonical ) && self::migration_has_provenance( $observed, $blog_id, $source_session_id ) ) {
+				return $canonical;
+			}
+
 			$updated = self::update_migration_target( $table_name, $canonical, $observed );
 			if ( false === $updated ) {
 				return null;
@@ -337,56 +342,81 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		return null;
 	}
 
-	/** Update a target only when its complete observed version remains unchanged. */
+	/** Update changed columns only while holding an exact lock on the observed row. */
 	private static function update_migration_target( string $table_name, array $canonical, array $observed ) {
 		global $wpdb;
 
-		$set        = array();
-		$predicates = array();
-		$arguments  = array( $table_name );
-		foreach ( $canonical as $column => $value ) {
-			if ( null === $value ) {
-				$set[]       = '%i = NULL';
-				$arguments[] = $column;
-			} elseif ( in_array( $column, self::MIGRATION_NUMERIC_COLUMNS, true ) ) {
-				$set[]       = '%i = %d';
-				$arguments[] = $column;
-				$arguments[] = (int) $value;
-			} else {
-				$set[]       = '%i = %s';
-				$arguments[] = $column;
-				$arguments[] = (string) $value;
-			}
-		}
-
-		foreach ( $observed as $column => $value ) {
-			if ( null === $value ) {
-				$predicates[] = '%i IS NULL';
-				$arguments[]  = $column;
-			} elseif ( in_array( $column, self::MIGRATION_NUMERIC_COLUMNS, true ) ) {
-				$predicates[] = '%i = %d';
-				$arguments[]  = $column;
-				$arguments[]  = (int) $value;
-			} else {
-				$predicates[] = 'BINARY %i = BINARY %s';
-				$arguments[]  = $column;
-				$arguments[]  = (string) $value;
-			}
-		}
-
-		$sql = 'UPDATE %i SET ' . implode( ', ', $set ) . ' WHERE ' . implode( ' AND ', $predicates );
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$prepared = $wpdb->prepare( $sql, ...$arguments );
 		for ( $attempt = 1; $attempt <= self::MIGRATION_DEADLOCK_ATTEMPTS; ++$attempt ) {
 			$previous_suppression = method_exists( $wpdb, 'suppress_errors' ) ? $wpdb->suppress_errors( true ) : null;
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$updated  = $wpdb->query( $prepared );
-			$db_error = (string) $wpdb->last_error;
+			$scope                = TransactionScope::begin( $wpdb );
+			$updated              = false;
+			$db_error             = null === $scope ? (string) $wpdb->last_error : '';
+
+			if ( null !== $scope ) {
+				$locked = self::migration_target_row_for_update( $table_name, (string) ( $canonical['session_id'] ?? '' ) );
+				if ( ! is_array( $locked ) ) {
+					$db_error = (string) $wpdb->last_error;
+					$scope->rollback();
+					$updated = '' !== $db_error ? false : 0;
+				} elseif ( ! self::migration_observation_matches( $locked, $observed ) ) {
+					$scope->rollback();
+					$updated = 0;
+				} else {
+					$changes = array_filter(
+						$canonical,
+						static fn( $value, string $column ): bool => ! self::migration_values_match( $locked[ $column ] ?? null, $value, $column ),
+						ARRAY_FILTER_USE_BOTH
+					);
+					if ( ! empty( $changes ) && array_key_exists( 'updated_at', $canonical ) && ! array_key_exists( 'updated_at', $changes ) ) {
+						// Prevent the table's ON UPDATE clause from replacing the canonical source version.
+						$changes['updated_at'] = $canonical['updated_at'];
+					}
+
+					if ( empty( $changes ) ) {
+						$updated = $scope->commit() ? 0 : false;
+						$db_error = false === $updated ? (string) $wpdb->last_error : '';
+					} else {
+						$set       = array();
+						$arguments = array( $table_name );
+						foreach ( $changes as $column => $value ) {
+							if ( null === $value ) {
+								$set[]       = '%i = NULL';
+								$arguments[] = $column;
+							} elseif ( in_array( $column, self::MIGRATION_NUMERIC_COLUMNS, true ) ) {
+								$set[]       = '%i = %d';
+								$arguments[] = $column;
+								$arguments[] = (int) $value;
+							} else {
+								$set[]       = '%i = %s';
+								$arguments[] = $column;
+								$arguments[] = (string) $value;
+							}
+						}
+						$arguments[] = 'session_id';
+						$arguments[] = (string) $canonical['session_id'];
+						$sql         = 'UPDATE %i SET ' . implode( ', ', $set ) . ' WHERE %i = %s';
+						// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+						$updated = $wpdb->query( $wpdb->prepare( $sql, ...$arguments ) );
+						if ( false === $updated ) {
+							$db_error = (string) $wpdb->last_error;
+							$scope->rollback();
+						} elseif ( ! $scope->commit() ) {
+							$db_error = (string) $wpdb->last_error;
+							$scope->rollback();
+							$updated  = false;
+						}
+					}
+				}
+			}
+
 			if ( null !== $previous_suppression ) {
 				$wpdb->suppress_errors( $previous_suppression );
 			}
 
 			if ( false !== $updated || ! LifecycleStateTransition::is_deadlock_error( $db_error ) || $attempt >= self::MIGRATION_DEADLOCK_ATTEMPTS ) {
+				if ( false === $updated && '' !== $db_error ) {
+					$wpdb->last_error = $db_error;
+				}
 				return $updated;
 			}
 
@@ -406,6 +436,37 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		return false;
+	}
+
+	/** Read and lock one migration target for an atomic compare-and-update. */
+	private static function migration_target_row_for_update( string $table_name, string $session_id ): ?array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE session_id = %s FOR UPDATE', $table_name, $session_id ), ARRAY_A );
+		return is_array( $row ) ? $row : null;
+	}
+
+	/** Confirm the locked row is still the exact snapshot observed before locking. */
+	private static function migration_observation_matches( array $locked, array $observed ): bool {
+		foreach ( $observed as $column => $value ) {
+			if ( ! array_key_exists( $column, $locked ) || ! self::migration_values_match( $locked[ $column ], $value, $column ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	private static function migration_values_match( $stored, $expected, string $column ): bool {
+		if ( null === $stored || null === $expected ) {
+			return null === $stored && null === $expected;
+		}
+		if ( in_array( $column, self::MIGRATION_NUMERIC_COLUMNS, true ) ) {
+			return (int) $stored === (int) $expected;
+		}
+
+		return (string) $stored === (string) $expected;
 	}
 
 	private static function migration_row_is_unscoped( array $row ): bool {
