@@ -17,14 +17,13 @@
     "wordpress": {
       "php": "8.2",
       "node": "20",
-      "database_type": "mysql",
-      "mysql_host": "localhost",
-      "mysql_database": "wptests",
-      "mysql_user": "root",
-      "mysql_password": "",
+      "database_type": "sqlite",
       "release_latest_branch": "release-latest",
       "settings": {
-        "runtime_wordpress_version": "7.0"
+        "runtime_wordpress_version": "7.0",
+        "phpunit_no_tests": "fail",
+        "wp_codebox_phpunit_bootstrap_mode": "managed",
+        "wp_codebox_phpunit_config": "/wordpress/wp-content/plugins/data-machine/phpunit.sqlite.xml.dist"
       }
     }
   },

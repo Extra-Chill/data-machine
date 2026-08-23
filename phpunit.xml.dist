@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit colors="true">
+	<testsuites>
+		<testsuite name="Data Machine">
+			<directory suffix="Test.php">tests</directory>
+			<file>tests/test-sample.php</file>
+		</testsuite>
+	</testsuites>
+</phpunit>

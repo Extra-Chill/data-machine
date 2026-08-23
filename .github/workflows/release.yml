@@ -91,6 +91,7 @@ jobs:
         uses: Extra-Chill/homeboy-action@v2
         with:
           commands: release
+          args: '--setting database_type=mysql --setting wp_codebox_phpunit_config=/wordpress/wp-content/plugins/data-machine/phpunit.xml.dist'
           release-dry-run: 'true'
 
       - name: Decide whether to release
@@ -144,6 +145,7 @@ jobs:
         id: release
         with:
           commands: release
+          args: '--setting database_type=mysql --setting wp_codebox_phpunit_config=/wordpress/wp-content/plugins/data-machine/phpunit.xml.dist'
           release-dry-run: ${{ inputs.dry-run || 'false' }}
           app-token: ${{ steps.app-token.outputs.token || '' }}
 
