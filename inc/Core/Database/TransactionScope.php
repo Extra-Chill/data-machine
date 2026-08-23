@@ -12,6 +12,7 @@ defined( 'ABSPATH' ) || exit;
 final class TransactionScope {
 
 	private static int $savepoint_sequence = 0;
+	private bool $active = true;
 
 	private function __construct(
 		private $wpdb,
@@ -52,27 +53,45 @@ final class TransactionScope {
 
 	/** Commit only this scope. */
 	public function commit(): bool {
-		if ( 'savepoint' === $this->type ) {
-			$query = $this->wpdb->prepare( 'RELEASE SAVEPOINT %i', $this->name );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint identifier is prepared above.
-			return false !== $this->wpdb->query( $query );
+		if ( ! $this->active ) {
+			return false;
 		}
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		return false !== $this->wpdb->query( 'COMMIT' );
+
+		if ( 'savepoint' === $this->type ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The identifier is generated internally from a fixed prefix and integer sequence.
+			$committed = false !== $this->wpdb->query( "RELEASE SAVEPOINT {$this->name}" );
+		} else {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			$committed = false !== $this->wpdb->query( 'COMMIT' );
+		}
+
+		if ( $committed ) {
+			$this->active = false;
+		}
+		return $committed;
 	}
 
 	/** Roll back only this scope. */
 	public function rollback(): void {
+		if ( ! $this->active ) {
+			return;
+		}
+
 		if ( 'savepoint' === $this->type ) {
-			$rollback_query = $this->wpdb->prepare( 'ROLLBACK TO SAVEPOINT %i', $this->name );
-			$release_query  = $this->wpdb->prepare( 'RELEASE SAVEPOINT %i', $this->name );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint identifier is prepared above.
-			$this->wpdb->query( $rollback_query );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Savepoint identifier is prepared above.
-			$this->wpdb->query( $release_query );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The identifier is generated internally from a fixed prefix and integer sequence.
+			if ( false === $this->wpdb->query( "ROLLBACK TO SAVEPOINT {$this->name}" ) ) {
+				return;
+			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The identifier is generated internally from a fixed prefix and integer sequence.
+			if ( false === $this->wpdb->query( "RELEASE SAVEPOINT {$this->name}" ) ) {
+				return;
+			}
+			$this->active = false;
 			return;
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$this->wpdb->query( 'ROLLBACK' );
+		if ( false !== $this->wpdb->query( 'ROLLBACK' ) ) {
+			$this->active = false;
+		}
 	}
 }
