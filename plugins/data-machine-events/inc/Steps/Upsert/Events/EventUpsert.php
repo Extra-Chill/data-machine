@@ -629,7 +629,9 @@ class EventUpsert extends UpsertHandler {
 		string $state = '',
 		string $country = ''
 	): int|\WP_Error {
-		$duplicate_check = wp_get_ability( 'datamachine/check-duplicate' );
+		$duplicate_check = wp_has_ability( 'datamachine/check-duplicate' )
+			? wp_get_ability( 'datamachine/check-duplicate' )
+			: null;
 
 		if ( ! $duplicate_check ) {
 			return new \WP_Error(
@@ -659,7 +661,11 @@ class EventUpsert extends UpsertHandler {
 			)
 		);
 
-		if ( ! ( is_array( $result ) && 'duplicate' === ( $result['verdict'] ?? '' ) ) ) {
+		if (
+			! is_array( $result )
+			|| 'duplicate' !== ( $result['verdict'] ?? '' )
+			|| 'event_identity_index' !== ( $result['strategy'] ?? '' )
+		) {
 			return 0;
 		}
 

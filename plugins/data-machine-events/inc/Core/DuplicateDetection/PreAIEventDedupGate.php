@@ -85,7 +85,9 @@ class PreAIEventDedupGate {
 			return null;
 		}
 
-		$duplicate_check = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/check-duplicate' ) : null;
+		$duplicate_check = function_exists( 'wp_has_ability' ) && wp_has_ability( 'datamachine/check-duplicate' )
+			? wp_get_ability( 'datamachine/check-duplicate' )
+			: null;
 		if ( ! $duplicate_check ) {
 			throw new \RuntimeException( 'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.' );
 		}
@@ -105,7 +107,11 @@ class PreAIEventDedupGate {
 			),
 		) );
 
-		if ( ! is_array( $match ) || 'duplicate' !== ( $match['verdict'] ?? '' ) ) {
+		if (
+			! is_array( $match )
+			|| 'duplicate' !== ( $match['verdict'] ?? '' )
+			|| 'event_identity_index' !== ( $match['strategy'] ?? '' )
+		) {
 			return null;
 		}
 

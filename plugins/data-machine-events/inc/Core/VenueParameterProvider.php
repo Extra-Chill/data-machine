@@ -181,6 +181,11 @@ class VenueParameterProvider {
 			}
 		}
 
+		if ( ! empty( $venue_data['website'] ) && VenueService::is_ticketing_url( (string) $venue_data['website'] ) ) {
+			$venue_data['ticketing_url'] = $venue_data['ticketing_url'] ?? $venue_data['website'];
+			unset( $venue_data['website'] );
+		}
+
 		return $venue_data;
 	}
 

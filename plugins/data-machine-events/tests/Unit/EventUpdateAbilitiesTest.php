@@ -45,7 +45,6 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_registered_ability_execution_cannot_bypass_scoped_permission(): void {
-		do_action( 'wp_abilities_api_init' );
 		$registered = wp_get_ability( EventUpdateAbilities::SOURCE_ABILITY_NAME );
 		$this->assertNotNull( $registered );
 		$result = $registered->execute( $this->sourceInput( $this->makeSourceEvent(), array( 'startTime' => '21:00' ) ) );

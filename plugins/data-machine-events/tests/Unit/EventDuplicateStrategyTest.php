@@ -46,6 +46,12 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		if ( ! EventDatesTable::table_exists() ) {
 			EventDatesTable::create_table();
 		}
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+	}
+
+	public function tearDown(): void {
+		wp_set_current_user( 0 );
+		parent::tearDown();
 	}
 
 	// ---------------------------------------------------------------------

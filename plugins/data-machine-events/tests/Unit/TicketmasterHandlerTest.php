@@ -259,7 +259,10 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 					'tool_calls' => array(
 						array(
 							'name'       => 'ticketmaster_test_upsert',
-							'parameters' => array( 'description' => 'Production-shaped AI resume coverage.' ),
+							'parameters' => array(
+								'description'    => 'Production-shaped AI resume coverage.',
+								'disposition_id' => $claim['disposition_id'],
+							),
 						),
 					),
 					'usage'      => array( 'prompt_tokens' => 10, 'completion_tokens' => 5, 'total_tokens' => 15 ),
@@ -281,7 +284,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			$this->assertSame( 'blocked', $first['outcome'] );
 			$after_first = datamachine_get_engine_data( $job_id );
 			$this->assertSame( 1, $after_first['ai_concurrency_throttle']['resume_generation'] );
-			$this->assertSame( $claim, $after_first[ ProcessedItems::CLAIMS_METADATA_KEY ][0] );
+			$this->assertSame( $claim, $after_first[ ProcessedItems::CLAIM_METADATA_KEY ] );
 			$this->assertGreaterThan( time() + 3000, strtotime( (string) $wpdb->get_var( $wpdb->prepare( 'SELECT claim_expires_at FROM %i WHERE claim_token = %s', $wpdb->prefix . ProcessedItems::TABLE_NAME, $claim['ownership_token'] ) ) ) );
 
 			if ( ! function_exists( 'datamachine_resume_ai_step_action' ) ) {
@@ -291,11 +294,29 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			$this->assertFalse( AIConcurrencyBackpressure::beginGeneration( $job_id, 'ai-step', 1, time() ) );
 			$after_second = datamachine_get_engine_data( $job_id );
 			$this->assertSame( 2, $after_second['ai_concurrency_throttle']['resume_generation'] );
-			$this->assertSame( $claim, $after_second[ ProcessedItems::CLAIMS_METADATA_KEY ][0] );
+			$this->assertSame( $claim, $after_second[ ProcessedItems::CLAIM_METADATA_KEY ] );
 			$this->assertSame( $claim['disposition_id'], $packet['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] );
 
 			$blocker['lease']->release();
-			\datamachine_resume_ai_step_action( $job_id, 'ai-step', 0, '', 2 );
+			$this->assertTrue( AIConcurrencyBackpressure::beginGeneration( $job_id, 'ai-step', 2, time() ) );
+			$resumed = $executor->execute(
+				array(
+					'job_id'               => $job_id,
+					'flow_step_id'          => 'ai-step',
+					'ai_resume_generation' => 2,
+				)
+			);
+			$this->assertSame(
+				'inline_continuation',
+				$resumed['outcome'],
+				wp_json_encode(
+					array(
+						'result' => $resumed,
+						'job'    => ( new Jobs() )->get_job( $job_id ),
+						'engine' => datamachine_get_engine_data( $job_id ),
+					)
+				)
+			);
 			$this->assertCount( 1, $scheduled_packets );
 			$this->assertSame( $claim, $scheduled_packets[0]['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] );
 			$this->assertSame( $claim['disposition_id'], $scheduled_packets[0]['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] );

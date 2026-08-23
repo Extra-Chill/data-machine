@@ -301,17 +301,20 @@ class EventScraperTest {
 		$results = $handler->get_fetch_data( 'direct', $config, null );
 
 		if ( empty( $results ) ) {
-			$warnings         = array_values(
+			$failures         = array_values(
 				array_filter(
 					$logs,
 					static function ( array $entry ): bool {
-						return ( $entry['level'] ?? '' ) === 'warning';
+						return in_array( $entry['level'] ?? '', array( 'warning', 'error' ), true );
 					}
 				)
 			);
-			$warning_messages = array_map( fn( $w ) => $w['message'], $warnings );
+			$failure_messages = array_map(
+				static fn( array $entry ): string => (string) ( $entry['context']['error'] ?? $entry['message'] ),
+				$failures
+			);
 
-			return new \WP_Error( 'scraper_failed', 'Scraper returned no results. ' . implode( '; ', $warning_messages ), array( 'status' => 500 ) );
+			return new \WP_Error( 'scraper_failed', 'Scraper returned no results. ' . implode( '; ', array_unique( $failure_messages ) ), array( 'status' => 500 ) );
 		}
 
 		// Walk every packet returned by get_fetch_data(). One packet per extracted

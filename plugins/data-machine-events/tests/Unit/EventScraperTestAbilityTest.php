@@ -432,6 +432,7 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 	 */
 	public function test_server_rendered_listing_wins_before_fallback( string $fixture, string $target_url ): void {
 		$html   = (string) file_get_contents( $this->fixtures_dir . '/wp-generic/' . $fixture );
+		$html   = preg_replace( '/(August \d{1,2}(?:st|nd|rd|th))(?!, \d{4})/', '$1, ' . ( (int) gmdate( 'Y' ) + 1 ), $html );
 		$direct = ( new GenericHtmlEventsExtractor() )->extract( $html, $target_url );
 		$this->mockHttpResponse( $html );
 

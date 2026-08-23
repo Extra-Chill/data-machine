@@ -37,6 +37,7 @@ class EventSourceIdentityTest extends WP_UnitTestCase {
 			EventDatesTable::create_table();
 		}
 		( new ProcessedItems() )->create_table();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 	}
 
 	public function tearDown(): void {
@@ -50,6 +51,7 @@ class EventSourceIdentityTest extends WP_UnitTestCase {
 			wp_delete_term( $term_id, 'venue' );
 		}
 		$wpdb->delete( $wpdb->prefix . ProcessedItems::TABLE_NAME, array( 'flow_step_id' => $this->flow_step_id ), array( '%s' ) );
+		wp_set_current_user( 0 );
 
 		parent::tearDown();
 	}
