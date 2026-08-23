@@ -16,6 +16,7 @@ use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Core\Steps\StepTypeMetadata;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -416,13 +417,10 @@ class TestHandlerAbility {
 			);
 		}
 
-		// Find the first fetch or event_import step.
-		$fetch_step_types = array( 'fetch', 'event_import' );
-
 		foreach ( $flow_config as $step ) {
 			$step_type = $step['step_type'] ?? '';
 
-			if ( ! in_array( $step_type, $fetch_step_types, true ) ) {
+			if ( ! StepTypeMetadata::hasHandlerCategory( (string) $step_type, 'source' ) ) {
 				continue;
 			}
 
@@ -443,7 +441,7 @@ class TestHandlerAbility {
 
 		return array(
 			'success' => false,
-			'error'   => sprintf( 'Flow %d has no fetch or event_import step with a handler.', $flow_id ),
+			'error'   => sprintf( 'Flow %d has no source step with a handler.', $flow_id ),
 		);
 	}
 

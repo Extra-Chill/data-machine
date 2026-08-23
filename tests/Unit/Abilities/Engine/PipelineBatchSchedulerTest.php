@@ -31,6 +31,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	public function set_up(): void {
 		parent::set_up();
 		datamachine_test_prepare_site();
+		add_filter( 'datamachine_step_types', array( $this, 'registerSourceStepCapabilities' ) );
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
@@ -51,11 +52,23 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
+		remove_filter( 'datamachine_step_types', array( $this, 'registerSourceStepCapabilities' ) );
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
 			as_unschedule_all_actions( PipelineBatchScheduler::BATCH_HOOK );
 		}
 		wp_set_current_user( 0 );
 		parent::tear_down();
+	}
+
+	public function registerSourceStepCapabilities( array $step_types ): array {
+		$step_types['event_import'] = array(
+			'source_ingestion'          => true,
+			'allows_empty_output'       => true,
+			'supports_item_disposition' => true,
+			'handler_category'          => 'source',
+		);
+
+		return $step_types;
 	}
 
 	/**

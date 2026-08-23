@@ -63,7 +63,11 @@ class FetchStep extends Step {
 			class_name: self::class,
 			position: 10,
 			usesHandler: true,
-			hasPipelineConfig: false
+			hasPipelineConfig: false,
+			sourceIngestion: true,
+			allowsEmptyOutput: true,
+			supportsItemDisposition: true,
+			handlerCategory: 'source'
 		);
 	}
 

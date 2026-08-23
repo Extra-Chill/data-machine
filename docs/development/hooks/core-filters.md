@@ -308,9 +308,11 @@ Matching modes:
 
 - `'handler' => 'slug'` — entry applies only when the adjacent step's handler
   slug equals `'slug'`.
-- `'handler_types' => ['fetch', 'event_import']` — entry applies to any
-  handler whose registered `type` is in the list. Used for cross-cutting
-  tools (e.g. `skip_item` exposed to every fetch-type handler).
+- `'handler_types' => ['fetch']` — entry applies when the handler's registered
+  type is in the list.
+- `'handler_categories' => ['source']` — entry applies when the handler's
+  registered step type declares that category. Used for cross-cutting tools
+  exposed to every source handler.
 
 The callback signature is `(string $handler_slug, array $handler_config, array $engine_data): array`.
 Returned array is `['tool_name' => $tool_definition]` (empty array to opt out).
@@ -318,7 +320,7 @@ Returned array is `['tool_name' => $tool_definition]` (empty array to opt out).
 **Preferred pattern**: use `HandlerRegistrationTrait::registerHandler()` — the
 trait wires the callback into this filter with the correct wrapper shape. Manual
 registration is only needed for cross-cutting tools that register against
-`handler_types`.
+handler types or categories.
 
 #### Resolved tool definition contract
 

@@ -19,6 +19,10 @@ if ( ! defined('ABSPATH') ) {
 	exit;
 }
 
+if ( ! class_exists( StepTypeMetadata::class ) ) {
+	require_once __DIR__ . '/StepTypeMetadata.php';
+}
+
 abstract class Step {
 
 
@@ -121,7 +125,7 @@ abstract class Step {
 	 * @return array Explicit step execution result.
 	 */
 	protected function failedStepResult( string $reason ): array {
-		$status = in_array( $this->step_type, array( 'fetch', 'event_import' ), true ) && empty( $this->dataPackets ) ? 'completed_no_items' : 'failed';
+		$status = StepTypeMetadata::allowsEmptyOutput( $this->step_type ) && empty( $this->dataPackets ) ? 'completed_no_items' : 'failed';
 
 		return StepExecutionResult::fromStepOutput(
 			array(

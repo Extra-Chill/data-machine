@@ -7,10 +7,16 @@
 
 namespace DataMachine\Core;
 
+use DataMachine\Core\Steps\StepTypeMetadata;
+
 defined( 'ABSPATH' ) || exit;
 
 if ( ! class_exists( StepResult::class ) ) {
 	require_once __DIR__ . '/StepResult.php';
+}
+
+if ( ! class_exists( StepTypeMetadata::class ) ) {
+	require_once __DIR__ . '/Steps/StepTypeMetadata.php';
 }
 
 /**
@@ -85,7 +91,7 @@ class StepExecutionResult {
 		$packet_count = count( $data_packets );
 
 		if ( 0 === $packet_count ) {
-			if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
+			if ( StepTypeMetadata::allowsEmptyOutput( $step_type ) ) {
 				return self::buildResult( self::STATUS_COMPLETED_NO_ITEMS, array(), 'completed_no_items', JobStatus::COMPLETED_NO_ITEMS );
 			}
 

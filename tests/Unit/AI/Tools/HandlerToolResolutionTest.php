@@ -6,7 +6,7 @@
  * `chubes_ai_tools` filter:
  *
  *  - Exact slug matching (`'handler' => 'wp_publish'`)
- *  - Cross-cutting type matching (`'handler_types' => ['fetch', 'event_import']`)
+ *  - Cross-cutting type and category matching
  *  - Per-scope caching
  *  - Pipeline gather flow through ToolPolicyResolver
  *
@@ -46,7 +46,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 	private static function capture_filter_ids(): array {
 		global $wp_filter;
 		$ids = array();
-		foreach ( array( 'datamachine_handlers', 'datamachine_tools' ) as $hook ) {
+		foreach ( array( 'datamachine_handlers', 'datamachine_step_types', 'datamachine_tools' ) as $hook ) {
 			$ids[ $hook ] = array();
 			if ( ! isset( $wp_filter[ $hook ] ) ) {
 				continue;
@@ -340,6 +340,37 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 		$this->assertSame( 'Skip item from rss_feed', $resolved['skip_item_test']['description'] );
 		$this->assertSame( 'rss_feed', $resolved['skip_item_test']['handler'] );
 		$this->assertSame( 'rss_feed', $resolved['skip_item_test']['_resolved_slug'] );
+	}
+
+	public function test_resolves_cross_cutting_tool_via_handler_category(): void {
+		add_filter(
+			'datamachine_handlers',
+			static function ( array $handlers ): array {
+				$handlers['external_feed'] = array( 'type' => 'external_source' );
+				return $handlers;
+			}
+		);
+		add_filter(
+			'datamachine_step_types',
+			static function ( array $step_types ): array {
+				$step_types['external_source'] = array( 'handler_category' => 'source' );
+				return $step_types;
+			}
+		);
+		add_filter(
+			'datamachine_tools',
+			static function ( array $tools ): array {
+				$tools['__handler_tools_source_test'] = array(
+					'_handler_callable'  => static fn() => array( 'source_test' => array( 'description' => 'Source tool' ) ),
+					'handler_categories' => array( 'source' ),
+				);
+				return $tools;
+			}
+		);
+
+		$resolved = $this->tool_manager->resolveHandlerTools( 'external_feed', array(), array(), 'category-scope' );
+
+		$this->assertArrayHasKey( 'source_test', $resolved );
 	}
 
 	public function test_handler_types_skips_non_matching_handler_type(): void {

@@ -43,6 +43,10 @@ trait StepTypeRegistrationTrait {
 	 * @param bool       $hasPipelineConfig Whether step has pipeline-level configuration
 	 * @param bool       $consumeAllPackets Whether step consumes all packets at once
 	 * @param array|null $stepSettings Optional UI settings for pipeline step configuration
+	 * @param bool       $sourceIngestion Whether step owns source-ingestion lifecycle behavior
+	 * @param bool       $allowsEmptyOutput Whether empty output completes successfully
+	 * @param bool        $supportsItemDisposition Whether source items support disposition tools
+	 * @param string|null $handlerCategory Optional handler discovery category
 	 */
 	protected static function registerStepType(
 		string $slug,
@@ -55,7 +59,11 @@ trait StepTypeRegistrationTrait {
 		bool $hasPipelineConfig = false,
 		bool $consumeAllPackets = false,
 		?array $stepSettings = null,
-		bool $showSettingsDisplay = true
+		bool $showSettingsDisplay = true,
+		bool $sourceIngestion = false,
+		bool $allowsEmptyOutput = false,
+		bool $supportsItemDisposition = false,
+		?string $handlerCategory = null
 	): void {
 		// Prevent duplicate registration when step class is instantiated multiple times
 		if ( isset( self::$registered_step_types[ $slug ] ) ) {
@@ -75,18 +83,26 @@ trait StepTypeRegistrationTrait {
 				$multiHandler,
 				$hasPipelineConfig,
 				$consumeAllPackets,
-				$showSettingsDisplay
+				$showSettingsDisplay,
+				$sourceIngestion,
+				$allowsEmptyOutput,
+				$supportsItemDisposition,
+				$handlerCategory
 			) {
 				$steps[ $slug ] = array(
-					'label'                 => $label,
-					'description'           => $description,
-					'class'                 => $class_name,
-					'position'              => $position,
-					'uses_handler'          => $usesHandler,
-					'multi_handler'         => $multiHandler,
-					'has_pipeline_config'   => $hasPipelineConfig,
-					'consume_all_packets'   => $consumeAllPackets,
-					'show_settings_display' => $showSettingsDisplay,
+					'label'                     => $label,
+					'description'               => $description,
+					'class'                     => $class_name,
+					'position'                  => $position,
+					'uses_handler'              => $usesHandler,
+					'multi_handler'             => $multiHandler,
+					'has_pipeline_config'       => $hasPipelineConfig,
+					'consume_all_packets'       => $consumeAllPackets,
+					'show_settings_display'     => $showSettingsDisplay,
+					'source_ingestion'           => $sourceIngestion,
+					'allows_empty_output'        => $allowsEmptyOutput,
+					'supports_item_disposition' => $supportsItemDisposition,
+					'handler_category'           => $handlerCategory,
 				);
 				return $steps;
 			}
