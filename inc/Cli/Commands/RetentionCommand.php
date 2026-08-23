@@ -113,7 +113,7 @@ class RetentionCommand extends BaseCommand {
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function optimize( array $args, array $assoc_args ): void {
-		$raw = (string) ( $assoc_args['tables'] ?? '' );
+		$raw      = (string) ( $assoc_args['tables'] ?? '' );
 		$selected = array_values( array_filter( array_map( 'trim', explode( ',', $raw ) ) ) );
 		if ( empty( $selected ) ) {
 			WP_CLI::error( 'Provide --tables with one or more owned table names.' );
@@ -204,6 +204,7 @@ class RetentionCommand extends BaseCommand {
 
 		$this->report_action_scheduler_detail( $assoc_args );
 		$this->report_engine_data_detail();
+		$this->report_chat_session_detail( $assoc_args );
 
 		if ( ! $dry_run ) {
 			$total = array_sum( array_column( $results, 'eligible' ) );
@@ -326,6 +327,32 @@ class RetentionCommand extends BaseCommand {
 		} else {
 			WP_CLI::log( 'OPTIMIZE TABLE:  disabled (filter datamachine_retention_optimize_tables)' );
 		}
+	}
+
+	/**
+	 * Report independent eligibility for the shared chat table's two policies.
+	 *
+	 * @param array $assoc_args Associative arguments (for --format).
+	 */
+	private function report_chat_session_detail( array $assoc_args ): void {
+		$breakdown = RetentionCleanup::countChatSessionBreakdown();
+		$rows      = array(
+			array(
+				'type'      => 'Human chat sessions',
+				'threshold' => $breakdown['session_retention_days'] . ' days',
+				'eligible'  => $breakdown['sessions'],
+			),
+			array(
+				'type'      => 'Pipeline transcripts',
+				'threshold' => $breakdown['transcript_retention_days'] > 0 ? $breakdown['transcript_retention_days'] . ' days' : 'disabled',
+				'eligible'  => $breakdown['transcripts'],
+			),
+		);
+
+		WP_CLI::log( '' );
+		WP_CLI::log( WP_CLI::colorize( '%BChat retention - independent eligibility%n' ) );
+		WP_CLI::log( '' );
+		$this->format_items( $rows, array( 'type', 'threshold', 'eligible' ), $assoc_args );
 	}
 
 	/**
@@ -452,6 +479,10 @@ class RetentionCommand extends BaseCommand {
 				'retention' => \DataMachine\Core\PluginSettings::get( 'chat_retention_days', 90 ) . ' days',
 				'filter'    => 'setting: chat_retention_days',
 			),
+			'Pipeline transcripts' => array(
+				'retention' => RetentionCleanup::transcriptRetentionDays() > 0 ? RetentionCleanup::transcriptRetentionDays() . ' days' : 'disabled',
+				'filter'    => 'option: datamachine_pipeline_transcript_retention_days',
+			),
 			'File cleanup'         => array(
 				'retention' => \DataMachine\Core\PluginSettings::get( 'file_retention_days', 7 ) . ' days',
 				'filter'    => 'setting: file_retention_days',
@@ -471,7 +502,7 @@ class RetentionCommand extends BaseCommand {
 	private function get_table_sizes(): array {
 		global $wpdb;
 
-		$tables = array(
+		$tables      = array(
 			'Completed jobs'  => $wpdb->prefix . 'datamachine_jobs',
 			'Failed jobs'     => $wpdb->prefix . 'datamachine_jobs',
 			'Pipeline logs'   => $wpdb->prefix . 'datamachine_logs',
@@ -483,9 +514,9 @@ class RetentionCommand extends BaseCommand {
 		$table_data  = array();
 		foreach ( $allocations as $table => $data ) {
 			$table_data[ $table ] = array(
-				'rows'    => $data['rows'],
-				'size_mb' => null === $data['live_bytes'] ? 'N/A' : number_format( $data['live_bytes'] / 1024 / 1024, 1 ),
-				'free_mb' => null === $data['allocated_free_bytes'] ? 'N/A' : number_format( $data['allocated_free_bytes'] / 1024 / 1024, 1 ),
+				'rows'          => $data['rows'],
+				'size_mb'       => null === $data['live_bytes'] ? 'N/A' : number_format( $data['live_bytes'] / 1024 / 1024, 1 ),
+				'free_mb'       => null === $data['allocated_free_bytes'] ? 'N/A' : number_format( $data['allocated_free_bytes'] / 1024 / 1024, 1 ),
 				'reclaim_ratio' => null === $data['reclaim_ratio'] ? 'N/A' : number_format( 100 * $data['reclaim_ratio'], 1 ) . '%',
 			);
 		}

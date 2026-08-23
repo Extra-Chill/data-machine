@@ -282,12 +282,12 @@ class RetentionCleanup {
 		global $wpdb;
 
 		return array(
-			'datamachine_jobs'              => $wpdb->prefix . 'datamachine_jobs',
-			'datamachine_logs'              => $wpdb->prefix . 'datamachine_logs',
-			'datamachine_processed_items'   => $wpdb->prefix . 'datamachine_processed_items',
-			'actionscheduler_actions'       => $wpdb->prefix . 'actionscheduler_actions',
-			'actionscheduler_logs'          => $wpdb->prefix . 'actionscheduler_logs',
-			'actionscheduler_claims'        => $wpdb->prefix . 'actionscheduler_claims',
+			'datamachine_jobs'            => $wpdb->prefix . 'datamachine_jobs',
+			'datamachine_logs'            => $wpdb->prefix . 'datamachine_logs',
+			'datamachine_processed_items' => $wpdb->prefix . 'datamachine_processed_items',
+			'actionscheduler_actions'     => $wpdb->prefix . 'actionscheduler_actions',
+			'actionscheduler_logs'        => $wpdb->prefix . 'actionscheduler_logs',
+			'actionscheduler_claims'      => $wpdb->prefix . 'actionscheduler_claims',
 		);
 	}
 
@@ -311,15 +311,15 @@ class RetentionCleanup {
 
 		foreach ( $tables as $suffix => $table ) {
 			$report[ $table ] = array(
-				'table'                 => $table,
-				'logical_name'          => $suffix,
-				'rows'                  => 0,
-				'live_bytes'            => null,
-				'allocated_free_bytes'  => null,
-				'allocation_bytes'      => null,
+				'table'                => $table,
+				'logical_name'         => $suffix,
+				'rows'                 => 0,
+				'live_bytes'           => null,
+				'allocated_free_bytes' => null,
+				'allocation_bytes'     => null,
 				'reclaim_ratio'        => null,
 				'engine'               => null,
-				'available'             => false,
+				'available'            => false,
 			);
 		}
 
@@ -334,14 +334,14 @@ class RetentionCleanup {
 
 		$names        = array_keys( $report );
 		$placeholders = implode( ',', array_fill( 0, count( $names ), '%s' ) );
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT TABLE_NAME, ENGINE, TABLE_ROWS, DATA_LENGTH, INDEX_LENGTH, DATA_FREE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ({$placeholders})",
 				...$names
 			)
 		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 
 		if ( ! is_array( $results ) ) {
 			return $report;
@@ -354,13 +354,14 @@ class RetentionCleanup {
 			}
 			$live = (int) ( $result->DATA_LENGTH ?? 0 ) + (int) ( $result->INDEX_LENGTH ?? 0 );
 			$free = max( 0, (int) ( $result->DATA_FREE ?? 0 ) );
+
 			$report[ $table ]['rows']                 = (int) ( $result->TABLE_ROWS ?? 0 );
 			$report[ $table ]['live_bytes']           = $live;
 			$report[ $table ]['allocated_free_bytes'] = $free;
 			$report[ $table ]['allocation_bytes']     = $live + $free;
 			$report[ $table ]['reclaim_ratio']        = $live + $free > 0 ? $free / ( $live + $free ) : 0.0;
-			$report[ $table ]['engine']                = (string) ( $result->ENGINE ?? '' );
-			$report[ $table ]['available']             = true;
+			$report[ $table ]['engine']               = (string) ( $result->ENGINE ?? '' );
+			$report[ $table ]['available']            = true;
 		}
 
 		return $report;
@@ -373,8 +374,8 @@ class RetentionCleanup {
 	 * @return array{optimized: array<int, string>, rejected: array<string, string>}
 	 */
 	public static function optimizeOwnedTables( array $selected ): array {
-		$owned    = self::ownedTableNames();
-		$allowed  = array_combine( array_values( $owned ), array_values( $owned ) );
+		$owned   = self::ownedTableNames();
+		$allowed = array_combine( array_values( $owned ), array_values( $owned ) );
 		foreach ( $owned as $suffix => $table ) {
 			$allowed[ $suffix ] = $table;
 		}
@@ -386,7 +387,10 @@ class RetentionCleanup {
 			foreach ( $selected as $table ) {
 				$rejected[ (string) $table ] = 'SQLite does not support InnoDB table allocation';
 			}
-			return array( 'optimized' => $optimized, 'rejected' => $rejected );
+			return array(
+				'optimized' => $optimized,
+				'rejected'  => $rejected,
+			);
 		}
 
 		global $wpdb;
@@ -407,7 +411,10 @@ class RetentionCleanup {
 			}
 		}
 
-		return array( 'optimized' => $optimized, 'rejected' => $rejected );
+		return array(
+			'optimized' => $optimized,
+			'rejected'  => $rejected,
+		);
 	}
 
 	/**
@@ -420,24 +427,27 @@ class RetentionCleanup {
 		$ratio    = self::tableFreeRatioThreshold();
 		$warnings = array();
 		foreach ( self::ownedTableAllocations() as $table => $data ) {
-			$free = $data['allocated_free_bytes'];
+			$free  = $data['allocated_free_bytes'];
 			$share = $data['reclaim_ratio'];
 			if ( null === $free || null === $share || ( $free < $absolute && $share < $ratio ) ) {
 				continue;
 			}
 			$warnings[] = array(
-				'table'              => $table,
-				'live_bytes'         => $data['live_bytes'],
-				'reclaimable_bytes'  => $free,
-				'reclaim_ratio'      => $share,
-				'command'            => 'wp datamachine retention optimize --tables=' . $table . ' --yes',
+				'table'             => $table,
+				'live_bytes'        => $data['live_bytes'],
+				'reclaimable_bytes' => $free,
+				'reclaim_ratio'     => $share,
+				'command'           => 'wp datamachine retention optimize --tables=' . $table . ' --yes',
 			);
 		}
 
 		return array(
 			'status'     => empty( $warnings ) ? 'ok' : 'warning',
 			'warnings'   => $warnings,
-			'thresholds' => array( 'free_bytes' => $absolute, 'free_ratio' => $ratio ),
+			'thresholds' => array(
+				'free_bytes' => $absolute,
+				'free_ratio' => $ratio,
+			),
 		);
 	}
 
@@ -1378,7 +1388,7 @@ class RetentionCleanup {
 
 		$threshold = self::actionSchedulerOptimizeThreshold();
 		$optimized = array();
-		$owned    = array_values( self::ownedTableNames() );
+		$owned     = array_values( self::ownedTableNames() );
 
 		foreach ( $tables_affected as $table => $affected ) {
 			if ( ! in_array( $table, $owned, true ) || (int) $affected < $threshold ) {
@@ -1504,19 +1514,38 @@ class RetentionCleanup {
 	}
 
 	public static function countChatSessions(): int {
-		$chat_db = ConversationStoreFactory::get();
+		$breakdown = self::countChatSessionBreakdown();
+		return $breakdown['sessions'] + $breakdown['transcripts'];
+	}
 
-		if ( $chat_db instanceof Chat && ! Chat::table_exists() ) {
-			return 0;
-		}
+	/**
+	 * Count human sessions and pipeline transcripts against independent TTLs.
+	 *
+	 * @return array{sessions:int,transcripts:int,session_retention_days:int,transcript_retention_days:int}
+	 */
+	public static function countChatSessionBreakdown(): array {
+		$chat_db = ConversationStoreFactory::get();
 
 		$retention_days            = self::chatRetentionDays();
 		$transcript_retention_days = self::transcriptRetentionDays();
-		$transcript_count          = method_exists( $chat_db, 'count_old_pipeline_transcripts' ) ? $chat_db->count_old_pipeline_transcripts( $transcript_retention_days ) : 0;
 
-		$session_count = $chat_db->count_old_sessions( $retention_days, $transcript_retention_days > 0 );
+		if ( $chat_db instanceof Chat && ! Chat::table_exists() ) {
+			return array(
+				'sessions'                  => 0,
+				'transcripts'               => 0,
+				'session_retention_days'    => $retention_days,
+				'transcript_retention_days' => $transcript_retention_days,
+			);
+		}
 
-		return $transcript_count + $session_count;
+		$transcript_count = method_exists( $chat_db, 'count_old_pipeline_transcripts' ) ? $chat_db->count_old_pipeline_transcripts( $transcript_retention_days ) : 0;
+
+		return array(
+			'sessions'                  => $chat_db->count_old_sessions( $retention_days, true ),
+			'transcripts'               => $transcript_count,
+			'session_retention_days'    => $retention_days,
+			'transcript_retention_days' => $transcript_retention_days,
+		);
 	}
 
 	public static function cleanupChatSessions(): array {

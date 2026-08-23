@@ -21,6 +21,7 @@
  *             'first_run_arg'      => 'tomorrow midnight',
  *             'label'              => 'Daily at midnight UTC',
  *             'per_agent'          => true, // Fan out one job per active agent.
+ *             'network_only'       => false, // Main site owns one network-wide recurrence.
  *         );
  *         return $schedules;
  *     } );
@@ -81,6 +82,7 @@ class RecurringScheduleRegistry {
 					'first_run_arg'      => null,
 					'label'              => null,
 					'per_agent'          => false,
+					'network_only'       => false,
 				),
 				$def
 			);
