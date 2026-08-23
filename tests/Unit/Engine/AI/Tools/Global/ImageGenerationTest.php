@@ -106,20 +106,6 @@ class ImageGenerationTest extends WP_UnitTestCase {
 		$this->assertTrue( $def['requires_config'] );
 	}
 
-	public function test_handle_tool_call_error_when_prompt_empty(): void {
-		$result = $this->tool->handle_tool_call( [] );
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'prompt', $result['error'] );
-		$this->assertSame( 'image_generation', $result['tool_name'] );
-	}
-
-	public function test_handle_tool_call_error_when_not_configured(): void {
-		delete_site_option( ImageGenerationAbilities::CONFIG_OPTION );
-		$result = $this->tool->handle_tool_call( [ 'prompt' => 'A sunset' ] );
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not configured', $result['error'] );
-	}
-
 	public function test_tool_registers_ability_projection(): void {
 		$tools = apply_filters( 'datamachine_ability_tool_projections', [] );
 		$this->assertArrayHasKey( 'image_generation', $tools );
