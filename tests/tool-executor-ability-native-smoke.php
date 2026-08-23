@@ -14,14 +14,28 @@ namespace {
 
 	if ( ! class_exists( 'WP_Error' ) ) {
 		class WP_Error {
+			private string $code;
+
 			private string $message;
 
-			public function __construct( string $code = '', string $message = '' ) {
+			private mixed $data;
+
+			public function __construct( string $code = '', string $message = '', $data = null ) {
+				$this->code    = $code;
 				$this->message = '' !== $message ? $message : $code;
+				$this->data    = $data;
 			}
 
 			public function get_error_message(): string {
 				return $this->message;
+			}
+
+			public function get_error_code(): string {
+				return $this->code;
+			}
+
+			public function get_error_data() {
+				return $this->data;
 			}
 		}
 	}
@@ -55,6 +69,8 @@ namespace {
 	}
 
 	class Ability_Native_Smoke_Ability {
+		private string $name = '';
+
 		/** @var callable */
 		private $permission_callback;
 
@@ -63,6 +79,8 @@ namespace {
 
 		public int $execute_count = 0;
 
+		public int $permission_count = 0;
+
 		public mixed $last_input = null;
 
 		public function __construct( callable $permission_callback, callable $execute_callback ) {
@@ -70,11 +88,23 @@ namespace {
 			$this->execute_callback    = $execute_callback;
 		}
 
+		public function set_name( string $name ): void {
+			$this->name = $name;
+		}
+
 		public function check_permissions( $input = null ) {
+			++$this->permission_count;
 			return call_user_func( $this->permission_callback, $input );
 		}
 
 		public function execute( $input = null ) {
+			if ( true !== $this->check_permissions( $input ) ) {
+				return new WP_Error(
+					'ability_invalid_permissions',
+					sprintf( 'Ability "%s" does not have necessary permission.', $this->name )
+				);
+			}
+
 			++$this->execute_count;
 			$this->last_input = $input;
 			return call_user_func( $this->execute_callback, $input );
@@ -100,6 +130,7 @@ namespace {
 		}
 
 		public function register_for_smoke( string $slug, Ability_Native_Smoke_Ability $ability ): void {
+			$ability->set_name( $slug );
 			$this->abilities[ $slug ] = $ability;
 		}
 
@@ -604,6 +635,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		)
 	);
 	assert_smoke( 'permission-denied ability fails', false === ( $result['success'] ?? true ) );
+	assert_smoke( 'permission callback ran exactly once', 1 === $denied->permission_count );
 	assert_smoke( 'permission-denied ability execute callback did not run', 0 === ability_execute_count( $denied ) );
 	assert_smoke( 'permission-denied error names the ability slug', false !== strpos( $result['error'] ?? '', 'datamachine/denied-ability' ) );
 
