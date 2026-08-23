@@ -373,7 +373,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 					}
 
 					if ( empty( $changes ) ) {
-						$updated = $scope->commit() ? 0 : false;
+						$updated  = $scope->commit() ? 0 : false;
 						$db_error = false === $updated ? (string) $wpdb->last_error : '';
 					} else {
 						$set       = array();
@@ -403,7 +403,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 						} elseif ( ! $scope->commit() ) {
 							$db_error = (string) $wpdb->last_error;
 							$scope->rollback();
-							$updated  = false;
+							$updated = false;
 						}
 					}
 				}

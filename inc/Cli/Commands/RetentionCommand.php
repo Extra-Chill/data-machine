@@ -113,7 +113,7 @@ class RetentionCommand extends BaseCommand {
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function optimize( array $args, array $assoc_args ): void {
-		$raw = (string) ( $assoc_args['tables'] ?? '' );
+		$raw      = (string) ( $assoc_args['tables'] ?? '' );
 		$selected = array_values( array_filter( array_map( 'trim', explode( ',', $raw ) ) ) );
 		if ( empty( $selected ) ) {
 			WP_CLI::error( 'Provide --tables with one or more owned table names.' );
@@ -502,7 +502,7 @@ class RetentionCommand extends BaseCommand {
 	private function get_table_sizes(): array {
 		global $wpdb;
 
-		$tables = array(
+		$tables      = array(
 			'Completed jobs'  => $wpdb->prefix . 'datamachine_jobs',
 			'Failed jobs'     => $wpdb->prefix . 'datamachine_jobs',
 			'Pipeline logs'   => $wpdb->prefix . 'datamachine_logs',
@@ -514,9 +514,9 @@ class RetentionCommand extends BaseCommand {
 		$table_data  = array();
 		foreach ( $allocations as $table => $data ) {
 			$table_data[ $table ] = array(
-				'rows'    => $data['rows'],
-				'size_mb' => null === $data['live_bytes'] ? 'N/A' : number_format( $data['live_bytes'] / 1024 / 1024, 1 ),
-				'free_mb' => null === $data['allocated_free_bytes'] ? 'N/A' : number_format( $data['allocated_free_bytes'] / 1024 / 1024, 1 ),
+				'rows'          => $data['rows'],
+				'size_mb'       => null === $data['live_bytes'] ? 'N/A' : number_format( $data['live_bytes'] / 1024 / 1024, 1 ),
+				'free_mb'       => null === $data['allocated_free_bytes'] ? 'N/A' : number_format( $data['allocated_free_bytes'] / 1024 / 1024, 1 ),
 				'reclaim_ratio' => null === $data['reclaim_ratio'] ? 'N/A' : number_format( 100 * $data['reclaim_ratio'], 1 ) . '%',
 			);
 		}
