@@ -72,19 +72,19 @@ class AgentsCommandTest extends TestCase {
 		$method->setAccessible( true );
 
 		$config = array(
-			'intelligence' => array(
-				'context_servers' => 'legacy',
+			'example' => array(
+				'runtime_endpoints' => 'legacy',
 			),
 		);
 
-		$method->invokeArgs( $command, array( &$config, 'intelligence.context_servers.a8c.url', 'https://example.com/mcp' ) );
+		$method->invokeArgs( $command, array( &$config, 'example.runtime_endpoints.primary.url', 'https://example.com/api' ) );
 
 		$this->assertSame(
 			array(
-				'intelligence' => array(
-					'context_servers' => array(
-						'a8c' => array(
-							'url' => 'https://example.com/mcp',
+				'example' => array(
+					'runtime_endpoints' => array(
+						'primary' => array(
+							'url' => 'https://example.com/api',
 						),
 					),
 				),
@@ -102,24 +102,24 @@ class AgentsCommandTest extends TestCase {
 		$method->setAccessible( true );
 
 		$config = array(
-			'intelligence' => array(
-				'context_servers' => array(
-					'a8c' => array(
-						'url'     => 'https://example.com/mcp',
+			'example' => array(
+				'runtime_endpoints' => array(
+					'primary' => array(
+						'url'     => 'https://example.com/api',
 						'timeout' => 30,
 					),
 				),
 			),
 		);
 
-		$removed = $method->invokeArgs( $command, array( &$config, 'intelligence.context_servers.a8c.url' ) );
+		$removed = $method->invokeArgs( $command, array( &$config, 'example.runtime_endpoints.primary.url' ) );
 
 		$this->assertTrue( $removed );
 		$this->assertSame(
 			array(
-				'intelligence' => array(
-					'context_servers' => array(
-						'a8c' => array(
+				'example' => array(
+					'runtime_endpoints' => array(
+						'primary' => array(
 							'timeout' => 30,
 						),
 					),
@@ -138,12 +138,12 @@ class AgentsCommandTest extends TestCase {
 		$method->setAccessible( true );
 
 		$config = array(
-			'intelligence' => array(
-				'context_servers' => array(),
+			'example' => array(
+				'runtime_endpoints' => array(),
 			),
 		);
 
-		$removed = $method->invokeArgs( $command, array( &$config, 'intelligence.context_servers.a8c.url' ) );
+		$removed = $method->invokeArgs( $command, array( &$config, 'example.runtime_endpoints.primary.url' ) );
 
 		$this->assertFalse( $removed );
 	}

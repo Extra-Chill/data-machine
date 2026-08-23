@@ -52,7 +52,7 @@ function datamachine_package_smoke_artifacts_by_type( WP_Agent_Package $package 
 add_filter(
 	'datamachine_agent_bundle_artifact_types',
 	static function ( array $types ): array {
-		$types[] = 'intelligence/wiki-brain';
+		$types[] = 'example/report';
 		$types[] = 'legacy_plugin_artifact';
 		return $types;
 	},
@@ -62,9 +62,9 @@ add_filter(
 add_filter(
 	'datamachine_agent_package_artifact_type_definitions',
 	static function ( array $definitions ): array {
-		$definitions['intelligence/wiki-brain'] = array(
-			'label'           => 'Intelligence wiki brain',
-			'description'     => 'Plugin-owned Intelligence wiki brain artifact.',
+		$definitions['example/report'] = array(
+			'label'           => 'Example report',
+			'description'     => 'Plugin-owned example report artifact.',
 			'import_callback' => 'DataMachine\\Engine\\Bundle\\import_datamachine_agent_package_artifact',
 		);
 		$definitions['datamachine-extension/legacy_plugin_artifact'] = array(
@@ -112,7 +112,7 @@ $directory = new AgentBundleDirectory(
 			'auth_refs'     => array( 'github-default' ),
 			'seed_queues'   => array( 'mgs-topic-loop' ),
 			'extensions'    => array(
-				'extensions/intelligence/wiki-brain/woocommerce.json',
+				'extensions/example/report/woocommerce.json',
 				'extensions/legacy-plugin/seed.json',
 			),
 			'handler_auth'  => 'refs',
@@ -162,9 +162,9 @@ $directory = new AgentBundleDirectory(
 	),
 	array(
 		array(
-			'artifact_type' => 'intelligence/wiki-brain',
+			'artifact_type' => 'example/report',
 			'artifact_id'   => 'woocommerce',
-			'source_path'   => 'extensions/intelligence/wiki-brain/woocommerce.json',
+			'source_path'   => 'extensions/example/report/woocommerce.json',
 			'payload'       => array( 'root' => 'woocommerce' ),
 		),
 		array(
@@ -186,7 +186,7 @@ agents_api_smoke_assert_equals( 'pipelines/daily-ingest.json', $artifacts['datam
 agents_api_smoke_assert_equals( 'flows/daily-ingest-flow.json', $artifacts['datamachine/flow:daily-ingest-flow']['source'] ?? '', 'flow artifact keeps package-local source', $failures, $passes );
 agents_api_smoke_assert_equals( 'prompts/extract-facts.md', $artifacts['datamachine/prompt:extract-facts']['source'] ?? '', 'prompt artifact is typed without moving prompt fields into agents-api', $failures, $passes );
 agents_api_smoke_assert_equals( 'seed-queues/mgs-topic-loop.json', $artifacts['datamachine/queue-seed:mgs-topic-loop']['source'] ?? '', 'queue seed artifact is typed as a Data Machine payload', $failures, $passes );
-agents_api_smoke_assert_equals( 'extensions/intelligence/wiki-brain/woocommerce.json', $artifacts['intelligence/wiki-brain:woocommerce']['source'] ?? '', 'namespaced plugin artifact projects with package-relative extension source', $failures, $passes );
+agents_api_smoke_assert_equals( 'extensions/example/report/woocommerce.json', $artifacts['example/report:woocommerce']['source'] ?? '', 'namespaced plugin artifact projects with package-relative extension source', $failures, $passes );
 agents_api_smoke_assert_equals( 'extensions/legacy-plugin/seed.json', $artifacts['datamachine-extension/legacy_plugin_artifact:seed']['source'] ?? '', 'legacy plugin artifact maps to generic package namespace', $failures, $passes );
 agents_api_smoke_assert_equals( 'legacy_plugin_artifact', $artifacts['datamachine-extension/legacy_plugin_artifact:seed']['meta']['extension_artifact_type'] ?? '', 'legacy plugin artifact preserves bundle artifact type in metadata', $failures, $passes );
 $flow_document = $directory->flows()[0]->to_array();

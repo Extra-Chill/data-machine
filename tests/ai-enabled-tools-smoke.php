@@ -82,10 +82,10 @@ $config = array(
 	'flow_step_id'  => 'flow_ai_1',
 	'step_type'     => 'ai',
 	'handler_slugs' => array(),
-	'enabled_tools' => array( 'intelligence/search', 'intelligence/wiki-upsert' ),
+	'enabled_tools' => array( 'example/search', 'example/upsert' ),
 );
 assert_equals(
-	array( 'intelligence/search', 'intelligence/wiki-upsert' ),
+	array( 'example/search', 'example/upsert' ),
 	get_enabled_tools_for_test( $config ),
 	'returns enabled_tools verbatim',
 	$failures,
@@ -105,7 +105,7 @@ echo "\n[3] AI step with handler_slugs populated but enabled_tools empty (post-m
 $config = array(
 	'flow_step_id'  => 'flow_ai_legacy',
 	'step_type'     => 'ai',
-	'handler_slugs' => array( 'intelligence/search' ),
+	'handler_slugs' => array( 'example/search' ),
 );
 assert_equals( array(), get_enabled_tools_for_test( $config ), 'no fallback to handler_slugs', $failures, $passes );
 
@@ -113,13 +113,13 @@ echo "\n[4] Non-AI step (publish) returns empty:\n";
 $config = array(
 	'step_type'     => 'publish',
 	'handler_slugs' => array( 'wordpress_publish' ),
-	'enabled_tools' => array( 'intelligence/search' ),
+	'enabled_tools' => array( 'example/search' ),
 );
 assert_equals( array(), get_enabled_tools_for_test( $config ), 'publish step has no AI tools', $failures, $passes );
 
 echo "\n[5] Step config without step_type:\n";
 $config = array(
-	'enabled_tools' => array( 'intelligence/search' ),
+	'enabled_tools' => array( 'example/search' ),
 );
 assert_equals( array(), get_enabled_tools_for_test( $config ), 'no step_type → empty', $failures, $passes );
 
@@ -135,7 +135,7 @@ assert_equals( array(), get_enabled_tools_for_test( $config ), 'non-array enable
 echo "\n[7] explicit detection — populated enabled_tools is explicit:\n";
 assert_equals(
 	true,
-	is_enabled_tools_explicit_for_test( array( 'step_type' => 'ai', 'enabled_tools' => array( 'intelligence/search' ) ) ),
+	is_enabled_tools_explicit_for_test( array( 'step_type' => 'ai', 'enabled_tools' => array( 'example/search' ) ) ),
 	'populated array => explicit',
 	$failures,
 	$passes

@@ -461,12 +461,10 @@ through the same lane.
 > **Which preview primitive should I use?** There is only one. Call
 > `PendingActionHelper::stage()` to stage a pending invocation and register
 > your apply callback on `datamachine_pending_action_handlers`. The
-> `ResolvePendingActionAbility` (ability slug
-> `datamachine/resolve-pending-action`, REST route
+> `ResolvePendingActionAbility` (canonical ability slug
+> `agents/resolve-pending-action`, REST route
 > `POST /datamachine/v1/actions/resolve`, chat tool
-> `resolve_pending_action`) finalizes every kind. New ability clients should
-> prefer the canonical Agents API ability `agents/resolve-pending-action`; the
-> Data Machine slug remains a compatibility alias.
+> `resolve_pending_action`) finalizes every kind.
 
 ### `datamachine_pending_action_handlers`
 
@@ -1457,7 +1455,7 @@ keep the built-in store. Misuse falls back to the default and logs via
 
 **Use case**: managed-host environments where chat sessions should live in
 a framework-provided conversation store rather than the site DB (e.g.
-Intelligence on WordPress.com routing through `\WPCOM\AI\Services\Conversation_Storage`).
+a consumer on WordPress.com routing through `\WPCOM\AI\Services\Conversation_Storage`).
 A consumer plugin ships an adapter and registers it conditionally:
 
 ```php
@@ -1551,7 +1549,7 @@ filter. Data Machine passes the current scope as `$context['scope']`. Return `nu
 (the default) to let Data Machine read and write through the filesystem.
 
 **Use case**: managed-host environments where the local filesystem is not
-writable (e.g. WordPress.com, VIP). A consumer plugin (e.g. Intelligence)
+writable (e.g. WordPress.com, VIP). A consumer plugin
 ships a DB-backed implementation and registers it conditionally:
 
 ```php

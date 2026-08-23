@@ -8,7 +8,7 @@
  * surrounding batch discovery path were post-type-blind. This test exercises
  * the new `getEligiblePostTypes()` helper and the
  * `datamachine_post_types_for_meta_description` filter that lets plugins
- * extend batch discovery to custom post types (e.g. Intelligence's `wiki`
+ * extend batch discovery to custom post types (e.g. a consumer's `record`
  * articles).
  *
  * The test stubs WordPress filter functions with a tiny in-memory registry

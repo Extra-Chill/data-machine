@@ -77,7 +77,7 @@ $messages = $method->invoke(
 		array(
 			'role'    => 'assistant',
 			'type'    => 'tool_call',
-			'content' => 'AI ACTION (Turn 1): Executing Wiki Brain List.',
+			'content' => 'AI ACTION (Turn 1): Executing Example Report List.',
 		),
 		array(
 			'role'    => 'user',

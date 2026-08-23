@@ -2,7 +2,7 @@
 
 Data Machine provides a broad WP-CLI surface for managing pipelines, flows, jobs, agents, memory, system tasks, and more from the command line. Canonical commands are registered under the `datamachine` namespace via `inc/Cli/Bootstrap.php`; use `wp help datamachine` for the authoritative list in a running install.
 
-Only two non-canonical root aliases remain: `wp datamachine flow` and `wp datamachine agent`. The deployed Intelligence plugin invokes those exact roots for brain flow dispatch and bundle installation; all other commands use the canonical spellings documented below.
+Commands use the canonical plural roots documented below. Data Machine does not register singular root aliases.
 
 > **Note:** The `wp datamachine workspace` and `wp datamachine github` commands have been moved to the `data-machine-code` extension plugin.
 

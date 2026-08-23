@@ -67,7 +67,7 @@ Ability-only tools omit `class` and `method` and execute through the linked Word
 array(
     'description' => 'Create a wiki note.',
     'parameters'  => array( /* JSON-schema-like parameter map */ ),
-    'ability'     => 'intelligence/create-wiki-note',
+    'ability'     => 'example/create-report',
     'modes'       => array( 'chat' ),
 )
 ```

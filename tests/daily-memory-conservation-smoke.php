@@ -189,7 +189,7 @@ assert_committed( true, array( 'committed' => str_contains( $source, 'headings m
 assert_committed( false, array( 'committed' => str_contains( $source, 'NEVER discard information' ), 'reason' => 'prompt contract' ), 'default prompt no longer demands preserve-everything wording', $failures, $passes );
 assert_committed( false, array( 'committed' => str_contains( $source, 'preserve existing section structure' ), 'reason' => 'prompt contract' ), 'default prompt no longer locks the original heading structure', $failures, $passes );
 
-// Test 1: real-world reproducer from intelligence-chubes4 2026-04-25.
+// Test 1: real-world reproducer from a configured agent on 2026-04-25.
 // 55KB original, 20KB persistent, 335B archived. Should reject.
 echo "\n[1] reproducer from live failure (55KB → 20KB + 335B):\n";
 $result = evaluate_conservation( 55 * 1024, 20 * 1024, 335 );

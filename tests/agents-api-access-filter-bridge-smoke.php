@@ -82,7 +82,7 @@ $agents = new AgentAccessFilterBridgeFakeAgentsRepository(
 	array(
 		42 => array(
 			'agent_id'   => 42,
-			'agent_slug' => 'wiki-brain',
+			'agent_slug' => 'example-agent',
 		),
 		77 => array(
 			'agent_id'   => 77,
@@ -107,7 +107,7 @@ add_filter(
 	4
 );
 
-agents_api_smoke_assert_equals( true, $bridge->bridge_access_decision( false, $user_principal, 'wiki-brain', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'grant hook widens denied store decision to true', $failures, $passes );
+agents_api_smoke_assert_equals( true, $bridge->bridge_access_decision( false, $user_principal, 'example-agent', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'grant hook widens denied store decision to true', $failures, $passes );
 
 $last_hook_args = null;
 agent_access_filter_bridge_clear_hooks();
@@ -120,7 +120,7 @@ add_filter(
 	10,
 	4
 );
-$bridge->bridge_access_decision( false, $user_principal, 'wiki-brain', \WP_Agent_Access_Grant::ROLE_VIEWER, array() );
+$bridge->bridge_access_decision( false, $user_principal, 'example-agent', \WP_Agent_Access_Grant::ROLE_VIEWER, array() );
 agents_api_smoke_assert_equals( array( false, 42, 7, \WP_Agent_Access_Grant::ROLE_VIEWER ), $last_hook_args, 'hook receives numeric agent ID, user ID, and seed decision', $failures, $passes );
 
 // ---- 2. Deny hook tightens access despite a store grant (seed true → false) ----
@@ -134,13 +134,13 @@ add_filter(
 	4
 );
 
-agents_api_smoke_assert_equals( false, $bridge->bridge_access_decision( true, $user_principal, 'wiki-brain', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'deny hook tightens granted store decision to false', $failures, $passes );
+agents_api_smoke_assert_equals( false, $bridge->bridge_access_decision( true, $user_principal, 'example-agent', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'deny hook tightens granted store decision to false', $failures, $passes );
 
 // ---- 3. No hook = unchanged store behavior (both directions) ----
 agent_access_filter_bridge_clear_hooks();
 
-agents_api_smoke_assert_equals( true, $bridge->bridge_access_decision( true, $user_principal, 'wiki-brain', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'no hook passes granted store decision through unchanged', $failures, $passes );
-agents_api_smoke_assert_equals( false, $bridge->bridge_access_decision( false, $user_principal, 'wiki-brain', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'no hook passes denied store decision through unchanged', $failures, $passes );
+agents_api_smoke_assert_equals( true, $bridge->bridge_access_decision( true, $user_principal, 'example-agent', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'no hook passes granted store decision through unchanged', $failures, $passes );
+agents_api_smoke_assert_equals( false, $bridge->bridge_access_decision( false, $user_principal, 'example-agent', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'no hook passes denied store decision through unchanged', $failures, $passes );
 
 // ---- 4. Audience principals unaffected (hook must not run) ----
 $audience_hook_ran = false;
@@ -155,7 +155,7 @@ add_filter(
 	4
 );
 
-agents_api_smoke_assert_equals( true, $bridge->bridge_access_decision( true, $audience_principal, 'wiki-brain', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'audience principal passes granted decision through unchanged', $failures, $passes );
+agents_api_smoke_assert_equals( true, $bridge->bridge_access_decision( true, $audience_principal, 'example-agent', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'audience principal passes granted decision through unchanged', $failures, $passes );
 agents_api_smoke_assert_equals( false, $audience_hook_ran, 'datamachine_can_access_agent hook is not invoked for audience principals', $failures, $passes );
 
 // ---- 5. Unresolvable slug passes through unchanged (hook must not run) ----
@@ -211,6 +211,6 @@ add_filter(
 	4
 );
 
-agents_api_smoke_assert_equals( true, $bridge->bridge_access_decision( true, null, 'wiki-brain', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'non-principal value passes through unchanged', $failures, $passes );
+agents_api_smoke_assert_equals( true, $bridge->bridge_access_decision( true, null, 'example-agent', \WP_Agent_Access_Grant::ROLE_VIEWER, array() ), 'non-principal value passes through unchanged', $failures, $passes );
 
 agents_api_smoke_finish( 'access-filter bridge smoke', $failures, $passes );

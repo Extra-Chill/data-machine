@@ -202,7 +202,7 @@ $agents     = new DataMachineAccessStoreAdapterFakeAgentsRepository(
 	array(
 		42 => array(
 			'agent_id'   => 42,
-			'agent_slug' => 'wiki-brain',
+			'agent_slug' => 'example-agent',
 		),
 	)
 );
@@ -216,25 +216,25 @@ agents_api_smoke_assert_equals( $existing, AgentAccessStoreAdapter::filter_acces
 agents_api_smoke_assert_equals( true, AgentAccessStoreAdapter::filter_access_store( null ) instanceof AgentAccessStoreAdapter, 'filter supplies Data Machine adapter when empty', $failures, $passes );
 agents_api_smoke_assert_equals( AgentAccessStoreAdapter::filter_access_store( null ), AgentAccessStoreAdapter::filter_access_store( null ), 'filter reuses default adapter instance', $failures, $passes );
 
-$grant          = new \WP_Agent_Access_Grant( 'wiki-brain', 7, \WP_Agent_Access_Grant::ROLE_OPERATOR );
+$grant          = new \WP_Agent_Access_Grant( 'example-agent', 7, \WP_Agent_Access_Grant::ROLE_OPERATOR );
 $stored_grant   = new \WP_Agent_Access_Grant( '42', 7, \WP_Agent_Access_Grant::ROLE_OPERATOR );
 $returned_grant = $adapter->grant_access( $grant );
 agents_api_smoke_assert_equals( $grant->to_array(), $returned_grant->to_array(), 'grant maps slug to storage ID and returns slug contract', $failures, $passes );
 agents_api_smoke_assert_equals( $stored_grant->to_array(), $repository->get_access( '42', 7 )->to_array(), 'grant delegates numeric ID to repository', $failures, $passes );
-agents_api_smoke_assert_equals( $grant->to_array(), $adapter->get_access( 'wiki-brain', 7 )->to_array(), 'get_access maps slug to storage ID and returns slug contract', $failures, $passes );
-agents_api_smoke_assert_equals( array( 'wiki-brain' ), $adapter->get_agent_ids_for_user( 7, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'agent ID list is Agents API slug shape', $failures, $passes );
-agents_api_smoke_assert_equals( array( $grant->to_array() ), array_map( static fn( \WP_Agent_Access_Grant $value ): array => $value->to_array(), $adapter->get_users_for_agent( 'wiki-brain' ) ), 'get_users_for_agent returns slug contract', $failures, $passes );
+agents_api_smoke_assert_equals( $grant->to_array(), $adapter->get_access( 'example-agent', 7 )->to_array(), 'get_access maps slug to storage ID and returns slug contract', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'example-agent' ), $adapter->get_agent_ids_for_user( 7, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'agent ID list is Agents API slug shape', $failures, $passes );
+agents_api_smoke_assert_equals( array( $grant->to_array() ), array_map( static fn( \WP_Agent_Access_Grant $value ): array => $value->to_array(), $adapter->get_users_for_agent( 'example-agent' ) ), 'get_users_for_agent returns slug contract', $failures, $passes );
 
 $user_principal = \AgentsAPI\AI\WP_Agent_Execution_Principal::user_session( 7, '__wordpress_user__' );
-agents_api_smoke_assert_equals( $grant->to_array(), $adapter->get_access_for_principal( 'wiki-brain', $user_principal )->to_array(), 'principal grant falls back to user access for WordPress user sessions', $failures, $passes );
-agents_api_smoke_assert_equals( array( 'wiki-brain' ), $adapter->get_agent_ids_for_principal( $user_principal, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'principal agent IDs fall back to user access for WordPress user sessions', $failures, $passes );
+agents_api_smoke_assert_equals( $grant->to_array(), $adapter->get_access_for_principal( 'example-agent', $user_principal )->to_array(), 'principal grant falls back to user access for WordPress user sessions', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'example-agent' ), $adapter->get_agent_ids_for_principal( $user_principal, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'principal agent IDs fall back to user access for WordPress user sessions', $failures, $passes );
 
-agents_api_smoke_assert_equals( true, $adapter->revoke_access( 'wiki-brain', 7 ), 'revoke maps slug to storage ID', $failures, $passes );
-agents_api_smoke_assert_equals( null, $adapter->get_access( 'wiki-brain', 7 ), 'revoke removes repository grant', $failures, $passes );
+agents_api_smoke_assert_equals( true, $adapter->revoke_access( 'example-agent', 7 ), 'revoke maps slug to storage ID', $failures, $passes );
+agents_api_smoke_assert_equals( null, $adapter->get_access( 'example-agent', 7 ), 'revoke removes repository grant', $failures, $passes );
 
 $principal_grant = array(
 	'grant_id'           => null,
-	'agent_id'           => 'wiki-brain',
+	'agent_id'           => 'example-agent',
 	'user_id'            => 0,
 	'role'               => \WP_Agent_Access_Grant::ROLE_OPERATOR,
 	'workspace_id'       => null,
@@ -244,11 +244,11 @@ $principal_grant = array(
 	'audience_id'        => 'audience:operators',
 );
 $principal = \AgentsAPI\AI\WP_Agent_Execution_Principal::audience( 'audience:operators', 'frontend-chat' );
-$adapter->grant_access_for_principal( 'wiki-brain', 'audience', 'operators', \WP_Agent_Access_Grant::ROLE_OPERATOR );
-agents_api_smoke_assert_equals( $principal_grant, $adapter->get_access_for_principal( 'wiki-brain', $principal )->to_array(), 'principal grant resolves audience principal', $failures, $passes );
-agents_api_smoke_assert_equals( array( 'wiki-brain' ), $adapter->get_agent_ids_for_principal( $principal, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'principal agent ID list is Agents API slug shape', $failures, $passes );
-agents_api_smoke_assert_equals( array( $principal_grant ), $adapter->get_principals_for_agent( 'wiki-brain' ), 'principal grants list returns slug contract', $failures, $passes );
-agents_api_smoke_assert_equals( true, $adapter->revoke_access_for_principal( 'wiki-brain', 'audience', 'operators' ), 'principal revoke maps slug to storage ID', $failures, $passes );
-agents_api_smoke_assert_equals( null, $adapter->get_access_for_principal( 'wiki-brain', $principal ), 'principal revoke removes grant', $failures, $passes );
+$adapter->grant_access_for_principal( 'example-agent', 'audience', 'operators', \WP_Agent_Access_Grant::ROLE_OPERATOR );
+agents_api_smoke_assert_equals( $principal_grant, $adapter->get_access_for_principal( 'example-agent', $principal )->to_array(), 'principal grant resolves audience principal', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'example-agent' ), $adapter->get_agent_ids_for_principal( $principal, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'principal agent ID list is Agents API slug shape', $failures, $passes );
+agents_api_smoke_assert_equals( array( $principal_grant ), $adapter->get_principals_for_agent( 'example-agent' ), 'principal grants list returns slug contract', $failures, $passes );
+agents_api_smoke_assert_equals( true, $adapter->revoke_access_for_principal( 'example-agent', 'audience', 'operators' ), 'principal revoke maps slug to storage ID', $failures, $passes );
+agents_api_smoke_assert_equals( null, $adapter->get_access_for_principal( 'example-agent', $principal ), 'principal revoke removes grant', $failures, $passes );
 
 agents_api_smoke_finish( 'access-store adapter smoke', $failures, $passes );

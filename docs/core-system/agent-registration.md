@@ -181,7 +181,7 @@ Plugins that bundle their own default registrations should follow the same conve
 Neither path 1 nor path 2 touches SOUL.md content once it exists on disk. To replace content for an already-materialized agent, the clean options are:
 
 - **Delete and reseed** — remove the existing `SOUL.md` file, let the scaffold ability regenerate on the next read path (scaffold is idempotent + never overwrites extant files, so deletion is the trigger).
-- **Hook `datamachine_scaffold_content` directly** — for conditional overrides based on agent context (e.g. Intelligence's `intelligence_kit` agent_config flag already does this at priority 20).
+- **Hook `datamachine_scaffold_content` directly** — for conditional overrides based on agent context supplied by a consumer plugin.
 
 Registry-level overrides are the right tool for declaring defaults; content-level overrides are the right tool for active SOUL.md substitution.
 

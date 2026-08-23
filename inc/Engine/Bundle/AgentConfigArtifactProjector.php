@@ -29,31 +29,21 @@ final class AgentConfigArtifactProjector {
 	 */
 	public static function policies(): array {
 		$policies = array(
-			'datamachine_bundle'           => array(
+			'datamachine_bundle'    => array(
 				'tracking'      => 'exclude',
 				'backup_egress' => 'exclude',
 				'merge'         => 'preserve_local',
 				'reason'        => 'preserve_runtime_bundle_metadata',
 			),
-			'intelligence.context_servers' => array(
-				'tracking' => 'exclude',
-				'merge'    => 'preserve_local',
-				'reason'   => 'preserve_plugin_owned_agent_config',
-			),
-			'intelligence.auth_refs'       => array(
-				'tracking' => 'exclude',
-				'merge'    => 'preserve_local',
-				'reason'   => 'preserve_plugin_owned_agent_config',
-			),
-			'allowed_redirect_uris'        => array(
+			'allowed_redirect_uris' => array(
 				'merge'  => 'preserve_local',
 				'reason' => 'preserve_runtime_agent_config',
 			),
-			'model'                        => array(
+			'model'                 => array(
 				'merge'  => 'preserve_local',
 				'reason' => 'preserve_runtime_agent_config',
 			),
-			'provider'                     => array(
+			'provider'              => array(
 				'merge'  => 'preserve_local',
 				'reason' => 'preserve_runtime_agent_config',
 			),
@@ -172,7 +162,7 @@ final class AgentConfigArtifactProjector {
 			$tracking      = (string) ( $policy['tracking'] ?? 'include' );
 			$backup_egress = (string) ( $policy['backup_egress'] ?? 'include' );
 			$merge         = (string) ( $policy['merge'] ?? 'three_way' );
-			$entry    = array(
+			$entry         = array(
 				'tracking'      => in_array( $tracking, array( 'include', 'exclude' ), true ) ? $tracking : 'include',
 				'backup_egress' => in_array( $backup_egress, array( 'include', 'exclude' ), true ) ? $backup_egress : 'include',
 				'merge'         => in_array( $merge, array( 'three_way', 'preserve_local' ), true ) ? $merge : 'three_way',

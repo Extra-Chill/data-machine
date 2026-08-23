@@ -169,7 +169,7 @@ echo "\n[2] Projected extension artifact requirements are reported as unsupporte
 add_filter(
 	'datamachine_agent_bundle_artifact_types',
 	static function ( array $types ): array {
-		$types[] = 'intelligence/wiki-brain';
+		$types[] = 'example/report';
 		return $types;
 	},
 	10,
@@ -199,7 +199,7 @@ $extension_directory = new AgentBundleDirectory(
 			'tool_policies' => array(),
 			'auth_refs'     => array(),
 			'seed_queues'   => array(),
-			'extensions'    => array( 'extensions/intelligence/wiki-brain/woocommerce.json' ),
+			'extensions'    => array( 'extensions/example/report/woocommerce.json' ),
 			'handler_auth'  => 'refs',
 		)
 	),
@@ -209,18 +209,18 @@ $extension_directory = new AgentBundleDirectory(
 	array(),
 	array(
 		array(
-			'artifact_type' => 'intelligence/wiki-brain',
+			'artifact_type' => 'example/report',
 			'artifact_id'   => 'woocommerce',
-			'source_path'   => 'extensions/intelligence/wiki-brain/woocommerce.json',
+			'source_path'   => 'extensions/example/report/woocommerce.json',
 			'payload'       => array( 'root' => 'woocommerce' ),
-			'requires'      => array( 'intelligence/wiki-brain' ),
+			'requires'      => array( 'example/report' ),
 		),
 	)
 );
 $extension_report = AgentBundleAbilityService::capability_report( AgentPackageProjection::from_directory( $extension_directory ) )->to_array();
 agents_api_smoke_assert_equals( false, $extension_report['compatible'] ?? true, 'bundle with unsupported extension requirement is incompatible', $failures, $passes );
-agents_api_smoke_assert_equals( array( 'intelligence/wiki-brain' ), $extension_report['unsupported_capabilities'] ?? null, 'unsupported artifact requirement is promoted to required capabilities', $failures, $passes );
-agents_api_smoke_assert_equals( 'intelligence/wiki-brain:woocommerce', $extension_report['unsupported_artifacts'][0]['artifact_key'] ?? '', 'unsupported extension artifact carries stable key', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'example/report' ), $extension_report['unsupported_capabilities'] ?? null, 'unsupported artifact requirement is promoted to required capabilities', $failures, $passes );
+agents_api_smoke_assert_equals( 'example/report:woocommerce', $extension_report['unsupported_artifacts'][0]['artifact_key'] ?? '', 'unsupported extension artifact carries stable key', $failures, $passes );
 
 echo "\n[3] Unsupported capability and unknown artifact reports stay machine-readable:\n";
 $unsupported_package = WP_Agent_Package::from_array(
@@ -233,7 +233,7 @@ $unsupported_package = WP_Agent_Package::from_array(
 			'description'    => '',
 			'default_config' => array(),
 		),
-		'capabilities' => array( 'datamachine/agent-bundle', 'example/registered-report', 'intelligence/wiki-brain' ),
+		'capabilities' => array( 'datamachine/agent-bundle', 'example/registered-report', 'example/report' ),
 		'artifacts'    => array(
 			array(
 				'type'     => 'unknown/vendor-artifact',
@@ -248,7 +248,7 @@ $unsupported_package = WP_Agent_Package::from_array(
 $unsupported_report = WP_Agent_Package_Capability_Checker::check( $unsupported_package, AgentBundleCompatibility::host_capabilities() )->to_array();
 agents_api_smoke_assert_equals( false, $unsupported_report['compatible'] ?? true, 'unsupported package is incompatible', $failures, $passes );
 agents_api_smoke_assert_equals( true, in_array( 'example/registered-report', AgentBundleCompatibility::host_capabilities(), true ), 'registered WordPress ability is a host capability', $failures, $passes );
-agents_api_smoke_assert_equals( array( 'intelligence/wiki-brain', 'unknown/runtime' ), $unsupported_report['unsupported_capabilities'] ?? null, 'unsupported capabilities include package and artifact requirements', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'example/report', 'unknown/runtime' ), $unsupported_report['unsupported_capabilities'] ?? null, 'unsupported capabilities include package and artifact requirements', $failures, $passes );
 agents_api_smoke_assert_equals( array( 'unknown/vendor-artifact' ), $unsupported_report['unknown_artifact_types'] ?? null, 'unknown artifact type is reported', $failures, $passes );
 agents_api_smoke_assert_equals( 'unknown/vendor-artifact:opaque-seed', $unsupported_report['unsupported_artifacts'][0]['artifact_key'] ?? '', 'unsupported artifact carries stable key', $failures, $passes );
 

@@ -113,29 +113,29 @@ namespace {
 	};
 
 	$GLOBALS['datamachine_agents_chat_access_identities'] = array(
-		'wiki-brain' => new AgentIdentity( 42, 'wiki-brain', 7, 'Wiki Brain' ),
-		'42'         => new AgentIdentity( 42, 'wiki-brain', 7, 'Wiki Brain' ),
+		'example-agent' => new AgentIdentity( 42, 'example-agent', 7, 'Example Agent' ),
+		'42'            => new AgentIdentity( 42, 'example-agent', 7, 'Example Agent' ),
 	);
 
 	$handler = new AgentsChatHandler();
 
 	$GLOBALS['datamachine_agents_chat_access_broad_chat'] = true;
-	$GLOBALS['datamachine_agents_chat_access_grants']     = array( 'wiki-brain' => false );
-	$assert_same( false, $handler->checkPermission( false, array( 'agent' => 'wiki-brain' ) ), 'chat-capable caller without agent access is denied' );
-	$assert_same( array( 'wiki-brain', WP_Agent_Access_Grant::ROLE_VIEWER ), $GLOBALS['datamachine_agents_chat_access_last_check'], 'unauthorized caller is checked against canonical slug' );
+	$GLOBALS['datamachine_agents_chat_access_grants']     = array( 'example-agent' => false );
+	$assert_same( false, $handler->checkPermission( false, array( 'agent' => 'example-agent' ) ), 'chat-capable caller without agent access is denied' );
+	$assert_same( array( 'example-agent', WP_Agent_Access_Grant::ROLE_VIEWER ), $GLOBALS['datamachine_agents_chat_access_last_check'], 'unauthorized caller is checked against canonical slug' );
 
 	$GLOBALS['datamachine_agents_chat_access_broad_chat'] = false;
-	$GLOBALS['datamachine_agents_chat_access_grants']     = array( 'wiki-brain' => true );
-	$assert_same( true, $handler->checkPermission( false, array( 'agent' => 'wiki-brain' ) ), 'explicitly authorized caller can chat with the agent' );
+	$GLOBALS['datamachine_agents_chat_access_grants']     = array( 'example-agent' => true );
+	$assert_same( true, $handler->checkPermission( false, array( 'agent' => 'example-agent' ) ), 'explicitly authorized caller can chat with the agent' );
 
-	$GLOBALS['datamachine_agents_chat_access_grants'] = array( 'wiki-brain' => false );
-	$assert_same( true, $handler->checkPermission( true, array( 'agent' => 'wiki-brain' ) ), 'explicit upstream admin/operator override can chat with the agent' );
+	$GLOBALS['datamachine_agents_chat_access_grants'] = array( 'example-agent' => false );
+	$assert_same( true, $handler->checkPermission( true, array( 'agent' => 'example-agent' ) ), 'explicit upstream admin/operator override can chat with the agent' );
 	$assert_same( true, $handler->checkPermission( true, array( 'agent' => 'headless-runtime-sandbox' ) ), 'explicit upstream runtime-principal override is preserved for runtime agent slugs' );
 
 	$GLOBALS['datamachine_agents_chat_access_broad_chat'] = true;
-	$GLOBALS['datamachine_agents_chat_access_grants']     = array( 'wiki-brain' => false );
+	$GLOBALS['datamachine_agents_chat_access_grants']     = array( 'example-agent' => false );
 	$assert_same( false, $handler->checkPermission( false, array( 'agent' => '42' ) ), 'numeric agent ID cannot bypass access checks' );
-	$assert_same( array( 'wiki-brain', WP_Agent_Access_Grant::ROLE_VIEWER ), $GLOBALS['datamachine_agents_chat_access_last_check'], 'numeric agent ID is normalized to canonical slug before access check' );
+	$assert_same( array( 'example-agent', WP_Agent_Access_Grant::ROLE_VIEWER ), $GLOBALS['datamachine_agents_chat_access_last_check'], 'numeric agent ID is normalized to canonical slug before access check' );
 
 	$assert_same( false, $handler->checkPermission( false, array( 'agent' => '999' ) ), 'unknown numeric agent ID is denied' );
 

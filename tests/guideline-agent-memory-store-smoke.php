@@ -219,8 +219,8 @@ datamachine_guideline_memory_assert(
 
 foreach ( $actual_meta as $meta_key ) {
 	datamachine_guideline_memory_assert(
-		! str_contains( $meta_key, '_intelligence_' ),
-		"Meta key {$meta_key} is not Intelligence-branded"
+		! str_contains( $meta_key, '_product_' ),
+		"Meta key {$meta_key} is not product-branded"
 	);
 }
 
