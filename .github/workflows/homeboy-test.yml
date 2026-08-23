@@ -22,6 +22,9 @@ jobs:
       # alone decides whether the full-suite candidate regresses from main.
       commands: 'review test'
       expected-commands: 'review test'
+      # PR CI is the authoritative complete MySQL suite. Repository defaults
+      # remain Docker-free SQLite for local and release-preflight parity.
+      args: '--setting database_type=mysql --setting wp_codebox_phpunit_config=/wordpress/wp-content/plugins/data-machine/phpunit.xml.dist'
       scope: full
       differential-gating: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
       baseline-commands: ${{ github.event_name == 'pull_request' && 'review test' || 'none' }}
