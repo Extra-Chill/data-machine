@@ -2905,6 +2905,7 @@ class Jobs extends BaseRepository {
 			array( '%s', '%s' ),
 			array( '%d', '%s' )
 		);
+
 		if ( 1 !== (int) $updated || ! $scope->commit() ) {
 			$scope->rollback();
 			return $this->status_transition_result( false, false, $current_status, $status );
