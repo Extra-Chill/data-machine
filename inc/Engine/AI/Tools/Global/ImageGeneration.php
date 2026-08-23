@@ -43,63 +43,6 @@ class ImageGeneration extends BaseTool {
 	}
 
 	/**
-	 * Execute image generation by delegating to the ability.
-	 *
-	 * @param array $parameters Contains 'prompt' and optional 'provider', 'model', 'aspect_ratio'.
-	 * @param array $tool_def   Tool definition (unused).
-	 * @return array Result with pending status on success.
-	 */
-	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		$ability = wp_get_ability( 'datamachine/generate-image' );
-
-		if ( ! $ability ) {
-			return $this->buildErrorResponse(
-				'Image generation ability not registered. Ensure WordPress 6.9+ and ImageGenerationAbilities is loaded.',
-				'image_generation'
-			);
-		}
-
-		$input = array(
-			'prompt'       => $parameters['prompt'] ?? '',
-			'provider'     => $parameters['provider'] ?? '',
-			'model'        => $parameters['model'] ?? '',
-			'aspect_ratio' => $parameters['aspect_ratio'] ?? '',
-		);
-
-		// Pass pipeline job context for featured image assignment.
-		if ( ! empty( $parameters['job_id'] ) ) {
-			$input['pipeline_job_id'] = (int) $parameters['job_id'];
-		}
-		if ( ! empty( $parameters['agent_id'] ) ) {
-			$input['agent_id'] = (int) $parameters['agent_id'];
-		}
-		if ( ! empty( $parameters['agent_slug'] ) ) {
-			$input['agent_slug'] = (string) $parameters['agent_slug'];
-		}
-
-		$result = $ability->execute( $input );
-
-		// Handle WP_Error from ability execution.
-		if ( is_wp_error( $result ) ) {
-			return $this->buildErrorResponse(
-				$result->get_error_message(),
-				'image_generation'
-			);
-		}
-
-		if ( ! empty( $result['error'] ) ) {
-			return $this->buildErrorResponse(
-				$result['error'],
-				'image_generation'
-			);
-		}
-
-		// Return the ability result with tool_name added.
-		$result['tool_name'] = 'image_generation';
-		return $result;
-	}
-
-	/**
 	 * Get tool definition for AI agents.
 	 *
 	 * @return array Tool definition array.

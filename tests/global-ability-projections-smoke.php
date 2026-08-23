@@ -61,6 +61,7 @@ foreach ( $migrated as $path => $expectations ) {
 	assert_global_projection( false !== strpos( $source, "'{$ability_slug}'" ), "{$tool_name} projection links {$ability_slug}", $failures, $passes );
 	assert_global_projection( false === strpos( $source, "'class'           => __CLASS__" ), "{$tool_name} no longer declares a class handler", $failures, $passes );
 	assert_global_projection( false === strpos( $source, "'method'          => 'handle_tool_call'" ), "{$tool_name} no longer declares a method handler", $failures, $passes );
+	assert_global_projection( false === strpos( $source, 'function handle_tool_call' ), "{$tool_name} no longer carries an unreachable execution handler", $failures, $passes );
 }
 
 $exceptions = array(
