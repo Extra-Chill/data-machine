@@ -76,16 +76,22 @@ final class TransactionScope {
 		if ( ! $this->active ) {
 			return;
 		}
-		$this->active = false;
 
 		if ( 'savepoint' === $this->type ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The identifier is generated internally from a fixed prefix and integer sequence.
-			$this->wpdb->query( "ROLLBACK TO SAVEPOINT {$this->name}" );
+			if ( false === $this->wpdb->query( "ROLLBACK TO SAVEPOINT {$this->name}" ) ) {
+				return;
+			}
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The identifier is generated internally from a fixed prefix and integer sequence.
-			$this->wpdb->query( "RELEASE SAVEPOINT {$this->name}" );
+			if ( false === $this->wpdb->query( "RELEASE SAVEPOINT {$this->name}" ) ) {
+				return;
+			}
+			$this->active = false;
 			return;
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-		$this->wpdb->query( 'ROLLBACK' );
+		if ( false !== $this->wpdb->query( 'ROLLBACK' ) ) {
+			$this->active = false;
+		}
 	}
 }
