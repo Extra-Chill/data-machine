@@ -452,6 +452,12 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( $pipeline_id, $post['pipeline_id'] );
 	}
 
+	/**
+	 * Keep the immutable WP_CLI constant from leaking into later test files.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_permission_callback_with_cli(): void {
 		if ( ! defined( 'WP_CLI' ) ) {
 			define( 'WP_CLI', true );
