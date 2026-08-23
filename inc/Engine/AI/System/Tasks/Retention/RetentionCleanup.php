@@ -1504,19 +1504,37 @@ class RetentionCleanup {
 	}
 
 	public static function countChatSessions(): int {
+		$breakdown = self::countChatSessionBreakdown();
+		return $breakdown['sessions'] + $breakdown['transcripts'];
+	}
+
+	/**
+	 * Count human sessions and pipeline transcripts against independent TTLs.
+	 *
+	 * @return array{sessions:int,transcripts:int,session_retention_days:int,transcript_retention_days:int}
+	 */
+	public static function countChatSessionBreakdown(): array {
 		$chat_db = ConversationStoreFactory::get();
-
-		if ( $chat_db instanceof Chat && ! Chat::table_exists() ) {
-			return 0;
-		}
-
 		$retention_days            = self::chatRetentionDays();
 		$transcript_retention_days = self::transcriptRetentionDays();
+
+		if ( $chat_db instanceof Chat && ! Chat::table_exists() ) {
+			return array(
+				'sessions'                 => 0,
+				'transcripts'              => 0,
+				'session_retention_days'   => $retention_days,
+				'transcript_retention_days' => $transcript_retention_days,
+			);
+		}
+
 		$transcript_count          = method_exists( $chat_db, 'count_old_pipeline_transcripts' ) ? $chat_db->count_old_pipeline_transcripts( $transcript_retention_days ) : 0;
 
-		$session_count = $chat_db->count_old_sessions( $retention_days, $transcript_retention_days > 0 );
-
-		return $transcript_count + $session_count;
+		return array(
+			'sessions'                  => $chat_db->count_old_sessions( $retention_days, true ),
+			'transcripts'               => $transcript_count,
+			'session_retention_days'    => $retention_days,
+			'transcript_retention_days' => $transcript_retention_days,
+		);
 	}
 
 	public static function cleanupChatSessions(): array {

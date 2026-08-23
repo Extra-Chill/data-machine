@@ -204,6 +204,7 @@ class RetentionCommand extends BaseCommand {
 
 		$this->report_action_scheduler_detail( $assoc_args );
 		$this->report_engine_data_detail();
+		$this->report_chat_session_detail( $assoc_args );
 
 		if ( ! $dry_run ) {
 			$total = array_sum( array_column( $results, 'eligible' ) );
@@ -329,6 +330,32 @@ class RetentionCommand extends BaseCommand {
 	}
 
 	/**
+	 * Report independent eligibility for the shared chat table's two policies.
+	 *
+	 * @param array $assoc_args Associative arguments (for --format).
+	 */
+	private function report_chat_session_detail( array $assoc_args ): void {
+		$breakdown = RetentionCleanup::countChatSessionBreakdown();
+		$rows      = array(
+			array(
+				'type'      => 'Human chat sessions',
+				'threshold' => $breakdown['session_retention_days'] . ' days',
+				'eligible'  => $breakdown['sessions'],
+			),
+			array(
+				'type'      => 'Pipeline transcripts',
+				'threshold' => $breakdown['transcript_retention_days'] > 0 ? $breakdown['transcript_retention_days'] . ' days' : 'disabled',
+				'eligible'  => $breakdown['transcripts'],
+			),
+		);
+
+		WP_CLI::log( '' );
+		WP_CLI::log( WP_CLI::colorize( '%BChat retention - independent eligibility%n' ) );
+		WP_CLI::log( '' );
+		$this->format_items( $rows, array( 'type', 'threshold', 'eligible' ), $assoc_args );
+	}
+
+	/**
 	 * Format a fractional-day window for human-readable CLI output.
 	 *
 	 * @param float $days Window in days (may be fractional, e.g. 0.25).
@@ -451,6 +478,10 @@ class RetentionCommand extends BaseCommand {
 			'Chat sessions'        => array(
 				'retention' => \DataMachine\Core\PluginSettings::get( 'chat_retention_days', 90 ) . ' days',
 				'filter'    => 'setting: chat_retention_days',
+			),
+			'Pipeline transcripts' => array(
+				'retention' => RetentionCleanup::transcriptRetentionDays() > 0 ? RetentionCleanup::transcriptRetentionDays() . ' days' : 'disabled',
+				'filter'    => 'option: datamachine_pipeline_transcript_retention_days',
 			),
 			'File cleanup'         => array(
 				'retention' => \DataMachine\Core\PluginSettings::get( 'file_retention_days', 7 ) . ' days',

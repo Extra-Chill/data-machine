@@ -2278,12 +2278,18 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$table_name  = self::get_prefixed_table_name();
 		$cutoff_date = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
 
+		// Pipeline transcripts have their own retention window and must never be
+		// deleted by the human-session policy.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
-				'DELETE FROM %i WHERE updated_at < %s',
+				'DELETE FROM %i
+				WHERE updated_at < %s
+				AND NOT (mode = %s AND metadata LIKE %s)',
 				$table_name,
-				$cutoff_date
+				$cutoff_date,
+				'pipeline',
+				'%"source":"pipeline_transcript"%'
 			)
 		);
 

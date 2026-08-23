@@ -261,6 +261,7 @@ class SystemAgentServiceProvider {
 					'enabled_setting' => 'retention_chat_sessions_enabled',
 					'default_enabled' => true,
 					'label'           => 'Daily chat-session cleanup',
+					'network_only'    => true,
 				)
 			),
 			RetentionCleanup::TASK_JOB_ARTIFACTS   => array_merge(
@@ -316,7 +317,7 @@ class SystemAgentServiceProvider {
 
 			$dispatch_schedule = static function () use ( $schedule_id, $task_type ): void {
 				$def = RecurringScheduleRegistry::get( $schedule_id );
-				if ( null === $def ) {
+				if ( null === $def || ! self::isScheduleOwnedByCurrentSite( $def ) ) {
 					return;
 				}
 
@@ -420,7 +421,8 @@ class SystemAgentServiceProvider {
 
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
 			$hook    = RecurringScheduleRegistry::hookFor( $schedule );
-			$enabled = RecurringScheduleRegistry::isEnabled( $schedule );
+			$enabled = self::isScheduleOwnedByCurrentSite( $schedule )
+				&& RecurringScheduleRegistry::isEnabled( $schedule );
 
 			$options = array();
 			if ( ! empty( $schedule['cron_expression'] ) ) {
@@ -460,6 +462,22 @@ class SystemAgentServiceProvider {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Determine whether the current site owns a recurring schedule.
+	 *
+	 * Network-table maintenance is scheduled only from the network's main site.
+	 * Reconciliation on subsites receives disabled state so legacy duplicate
+	 * chains are unscheduled, while the dispatch guard makes fetched stale
+	 * actions harmless before that reconciliation occurs.
+	 */
+	private static function isScheduleOwnedByCurrentSite( array $schedule ): bool {
+		if ( empty( $schedule['network_only'] ) || ! function_exists( 'is_multisite' ) || ! is_multisite() ) {
+			return true;
+		}
+
+		return function_exists( 'is_main_site' ) && is_main_site();
 	}
 
 	/**
