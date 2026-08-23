@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.18] - 2026-08-23
+
+### Changed
+- remove leaking CLI permission case
+
+### Fixed
+- make transaction savepoints portable
+
 ## [0.175.17] - 2026-08-23
 
 ### Changed
