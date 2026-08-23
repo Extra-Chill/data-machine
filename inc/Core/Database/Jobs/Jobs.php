@@ -2891,13 +2891,12 @@ class Jobs extends BaseRepository {
 			return $this->status_transition_result( false, false, $current_status, $status );
 		}
 
-		$engine         = $this->engine_data_with_status_reason( $current_engine, $job_status );
-		$encoded_engine = wp_json_encode( $engine );
-		$updated        = $this->wpdb->update(
+		$engine  = $this->engine_data_with_status_reason( $current_engine, $job_status );
+		$updated = $this->wpdb->update(
 			$this->table_name,
 			array(
 				'status'      => $status,
-				'engine_data' => $encoded_engine,
+				'engine_data' => wp_json_encode( $engine ),
 			),
 			array(
 				'job_id' => $job_id,
@@ -2906,8 +2905,7 @@ class Jobs extends BaseRepository {
 			array( '%s', '%s' ),
 			array( '%d', '%s' )
 		);
-
-		if ( ! $this->job_status_update_succeeded( $updated, $job_id, $status, $encoded_engine ) || ! $scope->commit() ) {
+		if ( 1 !== (int) $updated || ! $scope->commit() ) {
 			$scope->rollback();
 			return $this->status_transition_result( false, false, $current_status, $status );
 		}
@@ -3168,31 +3166,6 @@ class Jobs extends BaseRepository {
 		$this->reconcile_terminal_accounting( $job_id );
 
 		return $this->status_transition_result( true, true, $current_status, $status );
-	}
-
-	/** Normalize SQLite's unknown affected-row sentinel only after an exact persisted-state check. */
-	private function job_status_update_succeeded( int|false $updated, int $job_id, string $status, string $encoded_engine ): bool {
-		if ( 1 === $updated ) {
-			return true;
-		}
-		if ( ! self::is_sqlite() || ! is_int( $updated ) || 0 <= $updated || '' !== (string) $this->wpdb->last_error ) {
-			return false;
-		}
-
-		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the table identifier and exact persisted status payload.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Disambiguates an adapter sentinel inside the still-held status CAS transaction.
-		$persisted = $this->wpdb->get_var(
-			$this->wpdb->prepare(
-				'SELECT 1 FROM %i WHERE job_id = %d AND status = %s AND engine_data = %s',
-				$this->table_name,
-				$job_id,
-				$status,
-				$encoded_engine
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL
-
-		return '1' === (string) $persisted && '' === (string) $this->wpdb->last_error;
 	}
 
 	/** Keep status detail structured and clear stale detail on later transitions. */
