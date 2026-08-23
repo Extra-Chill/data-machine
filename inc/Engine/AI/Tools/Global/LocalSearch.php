@@ -33,49 +33,6 @@ class LocalSearch extends BaseTool {
 		);
 	}
 
-	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		$ability = wp_get_ability( 'datamachine/local-search' );
-
-		if ( ! $ability ) {
-			return array(
-				'success'   => false,
-				'error'     => 'Local Search ability not registered. Ensure WordPress 6.9+ and LocalSearchAbilities is loaded.',
-				'tool_name' => 'local_search',
-			);
-		}
-
-		$result = $ability->execute(
-			array(
-				'query'      => $parameters['query'] ?? '',
-				'post_types' => $parameters['post_types'] ?? array( 'post', 'page' ),
-				'title_only' => $parameters['title_only'] ?? false,
-			)
-		);
-
-		// Handle WP_Error from ability execution (e.g., permission denied).
-		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'tool_name' => 'local_search',
-			);
-		}
-
-		if ( isset( $result['error'] ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result['error'],
-				'tool_name' => 'local_search',
-			);
-		}
-
-		return array(
-			'success'   => true,
-			'data'      => $result,
-			'tool_name' => 'local_search',
-		);
-	}
-
 	public function getToolDefinition(): array {
 		return array(
 			'description'     => 'Search this WordPress site for posts by title or content. Returns up to 10 results with titles, excerpts, permalinks, and metadata. Automatically tries multiple search strategies (standard search, title matching, split queries) if initial search returns no results. For best results, search for ONE item at a time. Use title_only=true for precise title matching.',
