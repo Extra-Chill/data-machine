@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.16] - 2026-08-23
+
+### Changed
+- accept map-only ability tool projections
+- remove duplicated source-inspection smokes
+- remove dead pre-1.0 state guards
+
+### Fixed
+- allow engine data writes without MySQL packet limits
+- parse owned JSX in repository ESLint
+- restore canonical ability tool execution
+
 ## [0.175.15] - 2026-08-23
 
 ### Changed
