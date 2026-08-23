@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.15] - 2026-08-23
+
+### Changed
+- make canonical test gate fail closed
+
+### Fixed
+- schedule network-safe transcript retention
+
 ## [0.175.14] - 2026-08-23
 
 ### Changed
