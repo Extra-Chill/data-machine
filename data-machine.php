@@ -117,6 +117,7 @@ function datamachine_log_agents_api_load_warning(): void {
 }
 
 require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/inc/Engine/AI/conversation-loop.php';
 $datamachine_agents_api_load_state = datamachine_load_bundled_agents_api();
 
 \DataMachine\Core\Bootstrap\CliServiceProvider::register();
