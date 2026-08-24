@@ -32,6 +32,7 @@ class EventDateQueryAbilities {
 	private const CAPTURE_AGGREGATE_QUERY_VAR = '_data_machine_events_capture_aggregate_sql';
 	private const MAX_PUBLIC_RESULTS          = 100;
 	private const DEFAULT_PUBLIC_RESULTS      = 50;
+	private const TAXONOMY_CANDIDATE_BATCH    = 100;
 
 	private static bool $registered = false;
 
@@ -371,10 +372,11 @@ class EventDateQueryAbilities {
 
 			foreach ( $tax_filters as $taxonomy => $term_ids ) {
 				$term_ids    = is_array( $term_ids ) ? $term_ids : array( $term_ids );
+				$term_ids    = array_values( array_unique( array_filter( array_map( 'absint', $term_ids ) ) ) );
 				$tax_query[] = array(
 					'taxonomy' => sanitize_key( $taxonomy ),
 					'field'    => 'term_id',
-					'terms'    => array_map( 'absint', $term_ids ),
+					'terms'    => $term_ids,
 					'operator' => 'IN',
 				);
 			}
@@ -455,7 +457,14 @@ class EventDateQueryAbilities {
 		 * @param array $query_args WP_Query arguments about to be executed.
 		 * @param array $input      The full ability input array.
 		 */
-		$query_args = (array) apply_filters( 'data_machine_events_calendar_query_args', $query_args, $input );
+		$base_query_args = $query_args;
+		$query_args      = (array) apply_filters( 'data_machine_events_calendar_query_args', $query_args, $input );
+
+		if ( $query_args === $base_query_args && $this->canUseBoundedTaxonomyCandidates( $input, $tax_filters, $scope, $status, $per_page, $page ) ) {
+			remove_filter( 'posts_clauses', $clauses_filter );
+
+			return $this->executeBoundedTaxonomyQuery( $tax_filters, $exclude, $per_page, $page, $fields, $order );
+		}
 
 		// Execute query.
 		$query = new WP_Query( $query_args );
@@ -488,6 +497,191 @@ class EventDateQueryAbilities {
 	}
 
 	/**
+	 * Whether a query can use taxonomy/date candidates before post hydration.
+	 *
+	 * Consumer-modified, unbounded, operational, and compound query shapes stay
+	 * on WP_Query so this optimization cannot bypass their constraints.
+	 *
+	 * @param array  $input       Raw ability input.
+	 * @param array  $tax_filters Taxonomy filters.
+	 * @param string $scope       Date scope.
+	 * @param mixed  $status      Requested post status.
+	 * @param int    $per_page    Page size.
+	 * @param int    $page        Page number.
+	 * @return bool
+	 */
+	private function canUseBoundedTaxonomyCandidates( array $input, array $tax_filters, string $scope, $status, int $per_page, int $page ): bool {
+		return 'upcoming' === $scope
+			&& 'publish' === $status
+			&& $per_page > 0
+			&& 1 === $page
+			&& 1 === count( $tax_filters )
+			&& empty( $input['date_start'] )
+			&& empty( $input['date_end'] )
+			&& empty( $input['date_match'] )
+			&& empty( $input['days_ahead'] )
+			&& empty( $input['time_scope'] )
+			&& empty( $input['search'] )
+			&& empty( $input['geo'] )
+			&& empty( $input['meta_query'] )
+			&& empty( $input[ self::CAPTURE_IDS_QUERY_VAR ] )
+			&& empty( $input[ self::CAPTURE_COUNT_QUERY_VAR ] )
+			&& empty( $input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] )
+			&& in_array( $input['fields'] ?? 'all', array( 'all', 'ids' ), true );
+	}
+
+	/**
+	 * Query bounded taxonomy/date candidates, then validate canonical posts.
+	 *
+	 * The event-date status column and relationship index identify ordered
+	 * candidates without reading every matching posts row. Small WP_Query batches
+	 * retain canonical post type/status eligibility and fill through stale rows,
+	 * preserving the exact page rather than trusting denormalized status blindly.
+	 *
+	 * @param array  $tax_filters One taxonomy mapped to term IDs.
+	 * @param int[]  $exclude     Post IDs to exclude.
+	 * @param int    $per_page    Page size.
+	 * @param int    $page        Page number.
+	 * @param string $fields      all|ids.
+	 * @param string $order       ASC|DESC.
+	 * @return array { posts: array, total: int, post_count: int }
+	 */
+	private function executeBoundedTaxonomyQuery( array $tax_filters, array $exclude, int $per_page, int $page, string $fields, string $order ): array {
+		global $wpdb;
+
+		$taxonomy         = sanitize_key( (string) array_key_first( $tax_filters ) );
+		$term_ids         = (array) reset( $tax_filters );
+		$taxonomy_ids     = $this->resolveTermTaxonomyIds( $taxonomy, $term_ids );
+		$target_count     = $per_page * $page;
+		$candidate_offset = 0;
+		$valid_ids        = array();
+		$table            = EventDatesTable::table_name();
+		$order            = 'DESC' === $order ? 'DESC' : 'ASC';
+
+		if ( empty( $taxonomy_ids ) ) {
+			return array(
+				'posts'      => array(),
+				'total'      => 0,
+				'post_count' => 0,
+			);
+		}
+
+		$taxonomy_placeholders = implode( ',', array_fill( 0, count( $taxonomy_ids ), '%d' ) );
+		$exclude               = array_values( array_unique( array_filter( array_map( 'absint', $exclude ) ) ) );
+		$exclude_sql           = '';
+		if ( ! empty( $exclude ) ) {
+			$exclude_sql = ' AND tr.object_id NOT IN (' . implode( ',', array_fill( 0, count( $exclude ), '%d' ) ) . ')';
+		}
+
+		$now         = current_time( 'mysql' );
+		$valid_count = 0;
+		do {
+			$params = array_merge( $taxonomy_ids, $exclude, array( $now, $now, self::TAXONOMY_CANDIDATE_BATCH, $candidate_offset ) );
+			$sql    = "SELECT ed.post_id
+				FROM {$wpdb->term_relationships} tr FORCE INDEX (term_taxonomy_id)
+				INNER JOIN {$table} ed ON ed.post_id = tr.object_id
+				WHERE tr.term_taxonomy_id IN ({$taxonomy_placeholders}){$exclude_sql}
+					AND ed.post_status = 'publish'
+					AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)
+				GROUP BY ed.post_id, ed.start_datetime
+				ORDER BY ed.start_datetime {$order}, ed.post_id {$order}
+				LIMIT %d OFFSET %d";
+
+			$prepared_sql    = $wpdb->prepare( $sql, $params ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Identifiers and sort direction are trusted; all values use placeholders.
+			$candidate_ids   = array_map(
+				'intval',
+				$wpdb->get_col( $prepared_sql ) // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Bounded indexed candidate query; canonical posts are validated below.
+			);
+			$candidate_count = count( $candidate_ids );
+
+			if ( empty( $candidate_ids ) ) {
+				break;
+			}
+
+			$validated = get_posts(
+				array(
+					'post_type'      => Event_Post_Type::POST_TYPE,
+					'post_status'    => 'publish',
+					'post__in'       => $candidate_ids,
+					'posts_per_page' => count( $candidate_ids ),
+					'orderby'        => 'post__in',
+					'fields'         => 'ids',
+					'no_found_rows'  => true,
+				)
+			);
+			$validated = array_fill_keys( array_map( 'intval', $validated ), true );
+
+			foreach ( $candidate_ids as $candidate_id ) {
+				if ( isset( $validated[ $candidate_id ] ) ) {
+					$valid_ids[] = $candidate_id;
+				}
+			}
+
+			$candidate_offset += $candidate_count;
+			$valid_count       = count( $valid_ids );
+		} while ( self::TAXONOMY_CANDIDATE_BATCH === $candidate_count && $valid_count < $target_count );
+
+		$page_ids = array_slice( $valid_ids, ( $page - 1 ) * $per_page, $per_page );
+		$posts    = $page_ids;
+		if ( 'all' === $fields && ! empty( $page_ids ) ) {
+			_prime_post_caches( $page_ids, true, true );
+			$posts = array_values( array_filter( array_map( 'get_post', $page_ids ) ) );
+		}
+
+		return array(
+			'posts'      => $posts,
+			'total'      => count( $posts ),
+			'post_count' => count( $posts ),
+		);
+	}
+
+	/**
+	 * Resolve term IDs to the exact term-taxonomy IDs used by WP_Tax_Query.
+	 *
+	 * @param string $taxonomy Taxonomy slug.
+	 * @param array  $term_ids Term IDs.
+	 * @return int[]
+	 */
+	private function resolveTermTaxonomyIds( string $taxonomy, array $term_ids ): array {
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return array();
+		}
+
+		$term_ids = array_values( array_unique( array_filter( array_map( 'absint', $term_ids ) ) ) );
+		if ( is_taxonomy_hierarchical( $taxonomy ) ) {
+			foreach ( $term_ids as $term_id ) {
+				$children = get_term_children( $term_id, $taxonomy );
+				if ( is_wp_error( $children ) ) {
+					return array();
+				}
+				$term_ids = array_merge( $term_ids, $children );
+			}
+			$term_ids = array_values( array_unique( array_map( 'absint', $term_ids ) ) );
+		}
+
+		$taxonomy_ids = get_terms(
+			array(
+				'taxonomy'               => $taxonomy,
+				'include'                => $term_ids,
+				'fields'                 => 'tt_ids',
+				'hide_empty'             => false,
+				'number'                 => 0,
+				'orderby'                => 'none',
+				'update_term_meta_cache' => false,
+			)
+		);
+
+		if ( is_wp_error( $taxonomy_ids ) ) {
+			return array();
+		}
+
+		$taxonomy_ids = array_values( array_unique( array_map( 'absint', $taxonomy_ids ) ) );
+		sort( $taxonomy_ids, SORT_NUMERIC );
+
+		return $taxonomy_ids;
+	}
+
+	/**
 	 * Build the canonical matching-post IDs SQL without executing it.
 	 *
 	 * The generated query includes the same WordPress search, taxonomy, geo,
@@ -515,9 +709,9 @@ class EventDateQueryAbilities {
 	 * @return string SQL selecting start_date, end_date, and bucket_count.
 	 */
 	public function buildMatchingEventDateAggregateSql( array $input, string $start_expression, string $end_expression ): string {
-		$request                                      = '';
-		$input['fields']                              = 'ids';
-		$input['per_page']                            = -1;
+		$request                                    = '';
+		$input['fields']                            = 'ids';
+		$input['per_page']                          = -1;
 		$input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] = array(
 			'start_expression' => $start_expression,
 			'end_expression'   => $end_expression,
@@ -572,11 +766,11 @@ class EventDateQueryAbilities {
 	private function buildMatchingSql( array $input, bool $count ): string {
 		global $wpdb;
 
-		$request                              = '';
-		$input['fields']                      = $count ? 'count' : 'ids';
-		$input['per_page']                    = -1;
-		$query_var                            = $count ? self::CAPTURE_COUNT_QUERY_VAR : self::CAPTURE_IDS_QUERY_VAR;
-		$input[ $query_var ]                  = true;
+		$request             = '';
+		$input['fields']     = $count ? 'count' : 'ids';
+		$input['per_page']   = -1;
+		$query_var           = $count ? self::CAPTURE_COUNT_QUERY_VAR : self::CAPTURE_IDS_QUERY_VAR;
+		$input[ $query_var ] = true;
 
 		$capture  = static function ( $posts, $query ) use ( &$request, $query_var ) {
 			if ( ! $query->get( $query_var ) ) {

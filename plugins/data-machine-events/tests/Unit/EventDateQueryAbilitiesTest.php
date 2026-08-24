@@ -254,6 +254,130 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertMatchesRegularExpression( '/ORDER BY\s+ed\.start_datetime ASC,\s*[^\s]+\.ID ASC/i', $queries[0] );
 	}
 
+	public function test_upcoming_taxonomy_query_bounds_candidates_and_preserves_related_event_semantics(): void {
+		$venue = wp_insert_term( 'Related venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		$venue_id = (int) $venue['term_id'];
+		$now      = current_datetime();
+		$current  = $this->seed_event( 'Current related event', 'publish', $now->modify( '+1 hour' )->format( 'Y-m-d H:i:s' ), null, $venue_id );
+		$ongoing  = $this->seed_event( 'Ongoing related event', 'publish', $now->modify( '-1 day' )->format( 'Y-m-d H:i:s' ), $now->modify( '+1 hour' )->format( 'Y-m-d H:i:s' ), $venue_id );
+		$future   = $this->seed_event( 'Future related event', 'publish', $now->modify( '+2 days' )->format( 'Y-m-d H:i:s' ), null, $venue_id );
+		$this->seed_event( 'Past related event', 'publish', $now->modify( '-2 days' )->format( 'Y-m-d H:i:s' ), $now->modify( '-1 day' )->format( 'Y-m-d H:i:s' ), $venue_id );
+		$this->seed_event( 'Draft related event', 'draft', $now->modify( '+3 days' )->format( 'Y-m-d H:i:s' ), null, $venue_id );
+		$this->seed_event( 'Unrelated event', 'publish', $now->modify( '+4 days' )->format( 'Y-m-d H:i:s' ) );
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, EventDatesTable::table_name() ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		add_filter( 'query', $observer );
+		try {
+			$result = ( new EventDateQueryAbilities() )->executeQueryEvents(
+				array(
+					'scope'       => 'upcoming',
+					'tax_filters' => array( 'venue' => array( $venue_id ) ),
+					'exclude'     => array( $current ),
+					'per_page'    => 20,
+					'fields'      => 'ids',
+					'order'       => 'ASC',
+				)
+			);
+		} finally {
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( array( $ongoing, $future ), $result['posts'] );
+		$this->assertCount( 1, $queries );
+		$this->assertStringContainsString( 'FORCE INDEX (term_taxonomy_id)', $queries[0] );
+		$this->assertStringContainsString( "ed.post_status = 'publish'", $queries[0] );
+		$this->assertStringContainsString( 'ed.end_datetime >=', $queries[0] );
+		$this->assertStringContainsString( 'GROUP BY ed.post_id, ed.start_datetime', $queries[0] );
+		$this->assertMatchesRegularExpression( '/ORDER BY ed\.start_datetime ASC, ed\.post_id ASC\s+LIMIT 100 OFFSET 0/i', $queries[0] );
+		$this->assertStringNotContainsString( $GLOBALS['wpdb']->posts, $queries[0] );
+	}
+
+	public function test_upcoming_multi_term_taxonomy_candidates_are_deduplicated(): void {
+		$first_term  = wp_insert_term( 'Related multi-term A ' . uniqid(), 'venue' );
+		$second_term = wp_insert_term( 'Related multi-term B ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $first_term );
+		$this->assertNotWPError( $second_term );
+
+		$now       = current_datetime();
+		$first_id  = $this->seed_event( 'First multi-term related event', 'publish', $now->modify( '+1 day' )->format( 'Y-m-d H:i:s' ) );
+		$second_id = $this->seed_event( 'Second multi-term related event', 'publish', $now->modify( '+2 days' )->format( 'Y-m-d H:i:s' ) );
+		wp_set_object_terms( $first_id, array( (int) $first_term['term_id'], (int) $second_term['term_id'] ), 'venue' );
+		wp_set_object_terms( $second_id, array( (int) $second_term['term_id'] ), 'venue' );
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, EventDatesTable::table_name() ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		add_filter( 'query', $observer );
+		try {
+			$result = ( new EventDateQueryAbilities() )->executeQueryEvents(
+				array(
+					'scope'       => 'upcoming',
+					'tax_filters' => array(
+						'venue' => array( (int) $first_term['term_id'], (int) $second_term['term_id'], (int) $second_term['term_id'] ),
+					),
+					'per_page'    => 20,
+					'fields'      => 'ids',
+				)
+			);
+		} finally {
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( array( $first_id, $second_id ), $result['posts'] );
+		$this->assertCount( 1, $queries );
+		$this->assertMatchesRegularExpression( '/term_taxonomy_id IN \(\d+,\d+\)/', $queries[0] );
+		$this->assertSame( 1, substr_count( $queries[0], (string) $second_term['term_taxonomy_id'] ) );
+	}
+
+	public function test_paginated_upcoming_taxonomy_query_uses_canonical_wp_query(): void {
+		$venue = wp_insert_term( 'Paginated related venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		$venue_id = (int) $venue['term_id'];
+		$now      = current_datetime();
+		$this->seed_event( 'First paginated related event', 'publish', $now->modify( '+1 day' )->format( 'Y-m-d H:i:s' ), null, $venue_id );
+		$second = $this->seed_event( 'Second paginated related event', 'publish', $now->modify( '+2 days' )->format( 'Y-m-d H:i:s' ), null, $venue_id );
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, EventDatesTable::table_name() ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		add_filter( 'query', $observer );
+		try {
+			$result = ( new EventDateQueryAbilities() )->executeQueryEvents(
+				array(
+					'scope'       => 'upcoming',
+					'tax_filters' => array( 'venue' => array( $venue_id ) ),
+					'per_page'    => 1,
+					'page'        => 2,
+					'fields'      => 'ids',
+				)
+			);
+		} finally {
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( array( $second ), array_map( 'intval', $result['posts'] ) );
+		$this->assertCount( 1, $queries );
+		$this->assertStringContainsString( $GLOBALS['wpdb']->posts, $queries[0] );
+		$this->assertStringContainsString( $GLOBALS['wpdb']->term_relationships, $queries[0] );
+		$this->assertStringNotContainsString( 'FORCE INDEX (term_taxonomy_id)', $queries[0] );
+		$this->assertMatchesRegularExpression( '/LIMIT\s+1\s*,\s*1\b/i', $queries[0] );
+	}
+
 	public function test_count_query_skips_found_rows_and_uses_event_date_status_index(): void {
 		$now = current_datetime();
 		$this->seed_event( 'Published past event', 'publish', $now->modify( '-2 days' )->format( 'Y-m-d H:i:s' ) );
