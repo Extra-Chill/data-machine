@@ -126,8 +126,13 @@ class Agents extends BaseRepository {
 		}
 
 		if ( ! self::is_sqlite() ) {
-			self::query_or_throw( $wpdb, $wpdb->prepare( 'ALTER TABLE %i MODIFY instance_key LONGTEXT NOT NULL', $table_name ), 'make agent instance keys non-null' );
-			self::query_or_throw( $wpdb, $wpdb->prepare( 'ALTER TABLE %i MODIFY instance_key_hash CHAR(64) NOT NULL', $table_name ), 'make agent instance digests non-null' );
+			$identity_columns = BaseRepository::get_column_meta( $table_name, array( 'instance_key', 'instance_key_hash' ), $wpdb );
+			if ( 'NO' !== ( $identity_columns['instance_key']->IS_NULLABLE ?? null ) ) {
+				self::query_or_throw( $wpdb, $wpdb->prepare( 'ALTER TABLE %i MODIFY instance_key LONGTEXT NOT NULL', $table_name ), 'make agent instance keys non-null' );
+			}
+			if ( 'NO' !== ( $identity_columns['instance_key_hash']->IS_NULLABLE ?? null ) ) {
+				self::query_or_throw( $wpdb, $wpdb->prepare( 'ALTER TABLE %i MODIFY instance_key_hash CHAR(64) NOT NULL', $table_name ), 'make agent instance digests non-null' );
+			}
 		}
 
 		$indexes = self::get_identity_indexes( $wpdb, $table_name );
