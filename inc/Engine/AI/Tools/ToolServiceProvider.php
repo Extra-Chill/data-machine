@@ -17,12 +17,9 @@ defined( 'ABSPATH' ) || exit;
 // Global tools. Each class declares the modes where its tool is visible.
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Global\AgentMemory;
-use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
-use DataMachine\Engine\AI\Tools\Global\InternalLinkAudit;
-use DataMachine\Engine\AI\Tools\Global\LocalSearch;
+use DataMachine\Engine\AI\Configuration\ImageGenerationSettings;
 use DataMachine\Engine\AI\Tools\Global\QueueValidator;
 use DataMachine\Engine\AI\Tools\Global\WebFetch;
-use DataMachine\Engine\AI\Tools\Global\WordPressPostReader;
 
 // Chat-only tools.
 use DataMachine\Api\Chat\Tools\AddPipelineStep;
@@ -79,12 +76,10 @@ class ToolServiceProvider {
 		// Global tools. Each class declares its own mode visibility.
 		new AgentDailyMemory();
 		new AgentMemory();
-		new ImageGeneration();
-		new InternalLinkAudit();
-		new LocalSearch();
+		new ImageGenerationSettings();
+		\datamachine_register_global_ability_tools();
 		new QueueValidator();
 		new WebFetch();
-		new WordPressPostReader();
 
 		// Chat-only tools.
 		new ConsultAgent();

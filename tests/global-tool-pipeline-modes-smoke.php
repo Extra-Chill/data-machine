@@ -45,6 +45,8 @@ if ( ! function_exists( 'apply_filters' ) ) {
 
 require_once __DIR__ . '/../inc/Engine/AI/Tools/BaseTool.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/ability-tool-projections.php';
+datamachine_register_global_ability_tools();
 
 $failures = array();
 $passes   = 0;
@@ -155,8 +157,7 @@ assert_true_for_pipeline_modes(
 );
 
 $pipeline_tools = array(
-	'web_fetch'           => array( 'inc/Engine/AI/Tools/Global/WebFetch.php', 'DataMachine\Engine\AI\Tools\Global\WebFetch' ),
-	'internal_link_audit' => array( 'inc/Engine/AI/Tools/Global/InternalLinkAudit.php', 'DataMachine\Engine\AI\Tools\Global\InternalLinkAudit' ),
+	'web_fetch' => array( 'inc/Engine/AI/Tools/Global/WebFetch.php', 'DataMachine\Engine\AI\Tools\Global\WebFetch' ),
 );
 
 foreach ( $pipeline_tools as $tool => [ $path, $class_name ] ) {
@@ -173,16 +174,12 @@ foreach ( $pipeline_tools as $tool => $unused ) {
 	);
 }
 
-$projected_pipeline_tools = array(
-	'wordpress_post_reader' => 'inc/Engine/AI/Tools/Global/WordPressPostReader.php',
-	'image_generation'      => 'inc/Engine/AI/Tools/Global/ImageGeneration.php',
-	'local_search'          => 'inc/Engine/AI/Tools/Global/LocalSearch.php',
-);
+$projected_pipeline_tools = array( 'wordpress_post_reader', 'image_generation', 'internal_link_audit', 'local_search' );
+$projections              = apply_filters( 'datamachine_ability_tool_projections', array() );
 
-foreach ( $projected_pipeline_tools as $tool => $path ) {
+foreach ( $projected_pipeline_tools as $tool ) {
 	assert_true_for_pipeline_modes(
-		file_contains_for_pipeline_modes( $path, 'datamachine_register_ability_tool' )
-			&& file_contains_for_pipeline_modes( $path, "'modes'   => array( 'chat', 'pipeline' )" ),
+		array( 'chat', 'pipeline' ) === ( $projections[ $tool ]['modes'] ?? array() ),
 		"{$tool} remains pipeline-visible through ability projection",
 		$failures,
 		$passes
