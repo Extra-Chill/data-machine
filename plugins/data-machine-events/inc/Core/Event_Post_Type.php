@@ -227,7 +227,6 @@ class Event_Post_Type {
 				$query->set( 'posts_per_page', 1 );
 				$query->set( 'fields', 'ids' );
 				$query->set( 'no_found_rows', true );
-				$query->set( 'orderby', 'none' );
 
 				// Reset paged to 1 so WordPress doesn't 404 on paginated
 				// requests. The calendar block reads the real page number
@@ -287,7 +286,6 @@ class Event_Post_Type {
 		}
 
 		global $wp_query;
-		/** @var \WP_Query $wp_query */
 
 		if ( ! $wp_query->is_404() ) {
 			return;
@@ -304,7 +302,7 @@ class Event_Post_Type {
 				// extract the leaf slug for lookup.
 				$slug = basename( $wp_query->query[ $taxonomy ] );
 				$term = get_term_by( 'slug', $slug, $taxonomy );
-				if ( $term ) {
+				if ( $term && ! is_wp_error( $term ) ) {
 					$wp_query->is_404     = false;
 					$wp_query->is_tax     = true;
 					$wp_query->is_archive = true;
@@ -408,11 +406,7 @@ class Event_Post_Type {
 		if ( isset( $submenu[ $post_type_menu ] ) ) {
 			foreach ( $submenu[ $post_type_menu ] as $key => $menu_item ) {
 				if ( strpos( $menu_item[2], 'taxonomy=' ) !== false ) {
-					$query_string = wp_parse_url( $menu_item[2], PHP_URL_QUERY );
-					if ( ! is_string( $query_string ) ) {
-						continue;
-					}
-					parse_str( $query_string, $query_vars );
+					parse_str( wp_parse_url( $menu_item[2], PHP_URL_QUERY ), $query_vars );
 					$taxonomy = $query_vars['taxonomy'] ?? '';
 
 					if ( $taxonomy && ! isset( $allowed_items[ $taxonomy ] ) ) {

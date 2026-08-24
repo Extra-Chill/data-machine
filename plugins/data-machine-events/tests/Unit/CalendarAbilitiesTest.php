@@ -774,27 +774,4 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertContains( $late_id, array_column( $result['paged_date_groups'][0]['events'], 'post_id' ), 'A 4 AM venue-local event remains grouped under the prior night.' );
 		$this->assertSame( 'America/New_York', $result['paged_date_groups'][0]['events'][0]['event_data']['venueTimezone'] );
 	}
-
-	public function test_taxonomy_archive_404_probe_disables_ordering(): void {
-		global $wp_the_query;
-
-		$original     = $wp_the_query;
-		$wp_the_query = new \WP_Query();
-		$wp_the_query->set( 'calendar_test_region', 'probe' );
-
-		try {
-			Event_Post_Type::prevent_taxonomy_archive_404( $wp_the_query );
-		} finally {
-			$query        = $wp_the_query;
-			$wp_the_query = $original;
-		}
-
-		$this->assertSame( Event_Post_Type::POST_TYPE, $query->get( 'post_type' ) );
-		$this->assertSame( 1, $query->get( 'posts_per_page' ) );
-		$this->assertSame( 'ids', $query->get( 'fields' ) );
-		$this->assertTrue( $query->get( 'no_found_rows' ) );
-		$this->assertSame( 'none', $query->get( 'orderby' ) );
-		$this->assertSame( 1, $query->get( 'paged' ) );
-	}
-
 }

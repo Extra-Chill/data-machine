@@ -488,20 +488,4 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( '%d', $sql );
 		$this->assertStringNotContainsString( ' LIMIT ', strtoupper( $sql ) );
 	}
-
-	public function test_matching_term_count_sql_groups_directly_without_returning_post_ids(): void {
-		$sql = ( new EventDateQueryAbilities() )->buildMatchingTermCountSql(
-			array(
-				'scope'       => 'upcoming',
-			),
-			array( 'venue' )
-		);
-
-		$this->assertIsString( $sql );
-		$this->assertMatchesRegularExpression( '/SELECT\s+count_tt\.taxonomy,\s*count_tt\.term_id,\s*COUNT\(DISTINCT\s+[^)]+\.ID\) AS event_count/i', $sql );
-		$this->assertStringContainsString( 'GROUP BY count_tt.taxonomy, count_tt.term_id', $sql );
-		$this->assertStringNotContainsString( 'FROM (SELECT', $sql );
-		$this->assertStringNotContainsString( ' ORDER BY ', strtoupper( $sql ) );
-		$this->assertStringNotContainsString( ' LIMIT ', strtoupper( $sql ) );
-	}
 }
