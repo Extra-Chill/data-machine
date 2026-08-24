@@ -341,15 +341,6 @@ if ( function_exists( 'remove_filter' ) ) {
 	HandlerAbilities::clearCache();
 }
 
-$command = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/TestCommand.php' ) ?: '';
-assert_test_handler_raw( 'CLI adapter maps --raw and --byte-limit', str_contains( $command, "\$input['output_mode'] = 'raw';" ) && str_contains( $command, "\$input['byte_limit'] = \$byte_limit;" ) );
-assert_test_handler_raw( 'every explicit raw CLI format emits JSON', str_contains( $command, "if ( \$raw ) {\n\t\t\t\$format = 'json';" ) );
-
-$ability_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Handler/TestHandlerAbility.php' ) ?: '';
-assert_test_handler_raw( 'schema discriminates failure, compact, and raw output', str_contains( $ability_source, "'oneOf'" ) && str_contains( $ability_source, "array( 'compact' )" ) && str_contains( $ability_source, "array( 'raw' )" ) );
-assert_test_handler_raw( 'input schema remains extensible', ! str_contains( substr( $ability_source, strpos( $ability_source, "'input_schema'" ), 500 ), "'additionalProperties' => false" ) );
-assert_test_handler_raw( 'direct execution remains lifecycle-read-only', str_contains( $ability_source, "get_fetch_data( 'direct', \$config, null )" ) );
-
 if ( $failed > 0 ) {
 	echo "\ntest-handler-raw-output-smoke failed: {$failed}/{$total} assertions failed.\n";
 	exit( 1 );

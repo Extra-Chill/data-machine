@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
 class EmailAbilities {
 
 	private static bool $registered = false;
-	private ?array $activeMailbox = null;
+	private ?array $activeMailbox   = null;
 
 	public function __construct() {
 		if ( self::$registered ) {
@@ -103,11 +103,11 @@ class EmailAbilities {
 						'required'   => array( 'uid' ),
 						'properties' => array(
 							'auth_ref' => self::authRefProperty(),
-							'uid'    => array(
+							'uid'      => array(
 								'type'        => 'integer',
 								'description' => __( 'Message UID to delete', 'data-machine' ),
 							),
-							'folder' => array(
+							'folder'   => array(
 								'type'    => 'string',
 								'default' => 'INBOX',
 							),
@@ -138,7 +138,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'uid', 'destination' ),
 						'properties' => array(
-							'auth_ref'     => self::authRefProperty(),
+							'auth_ref'    => self::authRefProperty(),
 							'uid'         => array(
 								'type'        => 'integer',
 								'description' => __( 'Message UID to move', 'data-machine' ),
@@ -179,20 +179,20 @@ class EmailAbilities {
 						'required'   => array( 'uid', 'flag' ),
 						'properties' => array(
 							'auth_ref' => self::authRefProperty(),
-							'uid'    => array(
+							'uid'      => array(
 								'type'        => 'integer',
 								'description' => __( 'Message UID', 'data-machine' ),
 							),
-							'flag'   => array(
+							'flag'     => array(
 								'type'        => 'string',
 								'description' => __( 'IMAP flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
 							),
-							'action' => array(
+							'action'   => array(
 								'type'        => 'string',
 								'default'     => 'set',
 								'description' => __( 'set or clear the flag', 'data-machine' ),
 							),
-							'folder' => array(
+							'folder'   => array(
 								'type'    => 'string',
 								'default' => 'INBOX',
 							),
@@ -223,7 +223,7 @@ class EmailAbilities {
 						'type'       => 'object',
 						'required'   => array( 'search', 'destination' ),
 						'properties' => array(
-							'auth_ref'     => self::authRefProperty(),
+							'auth_ref'    => self::authRefProperty(),
 							'search'      => array(
 								'type'        => 'string',
 								'description' => __( 'IMAP search criteria (e.g., FROM "github.com")', 'data-machine' ),
@@ -271,24 +271,24 @@ class EmailAbilities {
 						'required'   => array( 'search', 'flag' ),
 						'properties' => array(
 							'auth_ref' => self::authRefProperty(),
-							'search' => array(
+							'search'   => array(
 								'type'        => 'string',
 								'description' => __( 'IMAP search criteria', 'data-machine' ),
 							),
-							'flag'   => array(
+							'flag'     => array(
 								'type'        => 'string',
 								'description' => __( 'Flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
 							),
-							'action' => array(
+							'action'   => array(
 								'type'        => 'string',
 								'default'     => 'set',
 								'description' => __( 'set or clear', 'data-machine' ),
 							),
-							'folder' => array(
+							'folder'   => array(
 								'type'    => 'string',
 								'default' => 'INBOX',
 							),
-							'max'    => array(
+							'max'      => array(
 								'type'    => 'integer',
 								'default' => 500,
 							),
@@ -322,15 +322,15 @@ class EmailAbilities {
 						'required'   => array( 'search' ),
 						'properties' => array(
 							'auth_ref' => self::authRefProperty(),
-							'search' => array(
+							'search'   => array(
 								'type'        => 'string',
 								'description' => __( 'IMAP search criteria', 'data-machine' ),
 							),
-							'folder' => array(
+							'folder'   => array(
 								'type'    => 'string',
 								'default' => 'INBOX',
 							),
-							'max'    => array(
+							'max'      => array(
 								'type'        => 'integer',
 								'default'     => 100,
 								'description' => __( 'Maximum messages to delete (safety limit, lower default)', 'data-machine' ),
@@ -365,11 +365,11 @@ class EmailAbilities {
 						'required'   => array( 'uid' ),
 						'properties' => array(
 							'auth_ref' => self::authRefProperty(),
-							'uid'    => array(
+							'uid'      => array(
 								'type'        => 'integer',
 								'description' => __( 'Message UID to unsubscribe from', 'data-machine' ),
 							),
-							'folder' => array(
+							'folder'   => array(
 								'type'    => 'string',
 								'default' => 'INBOX',
 							),
@@ -402,15 +402,15 @@ class EmailAbilities {
 						'required'   => array( 'search' ),
 						'properties' => array(
 							'auth_ref' => self::authRefProperty(),
-							'search' => array(
+							'search'   => array(
 								'type'        => 'string',
 								'description' => __( 'IMAP search criteria', 'data-machine' ),
 							),
-							'folder' => array(
+							'folder'   => array(
 								'type'    => 'string',
 								'default' => 'INBOX',
 							),
-							'max'    => array(
+							'max'      => array(
 								'type'        => 'integer',
 								'default'     => 20,
 								'description' => __( 'Max unique senders to unsubscribe from (deduped by sender)', 'data-machine' ),

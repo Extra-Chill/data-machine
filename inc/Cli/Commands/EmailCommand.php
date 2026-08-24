@@ -431,9 +431,9 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
-			'auth_ref'        => $this->mailboxRef( $assoc_args ),
-			'folder'          => $assoc_args['folder'] ?? 'INBOX',
-			'uid'             => $uid,
+			'auth_ref' => $this->mailboxRef( $assoc_args ),
+			'folder'   => $assoc_args['folder'] ?? 'INBOX',
+			'uid'      => $uid,
 		) );
 
 		if ( is_wp_error( $result ) ) {
@@ -593,8 +593,8 @@ class EmailCommand extends BaseCommand {
 
 		$result = $ability->execute( array(
 			'auth_ref' => $this->mailboxRef( $assoc_args ),
-			'uid'    => $uid,
-			'folder' => $assoc_args['folder'] ?? 'INBOX',
+			'uid'      => $uid,
+			'folder'   => $assoc_args['folder'] ?? 'INBOX',
 		) );
 
 		if ( is_wp_error( $result ) ) {
@@ -652,7 +652,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
-			'auth_ref'     => $this->mailboxRef( $assoc_args ),
+			'auth_ref'    => $this->mailboxRef( $assoc_args ),
 			'uid'         => $uid,
 			'destination' => $destination,
 			'folder'      => $assoc_args['folder'] ?? 'INBOX',
@@ -723,10 +723,10 @@ class EmailCommand extends BaseCommand {
 
 		$result = $ability->execute( array(
 			'auth_ref' => $this->mailboxRef( $assoc_args ),
-			'uid'    => $uid,
-			'flag'   => $flag,
-			'action' => $assoc_args['action'] ?? 'set',
-			'folder' => $assoc_args['folder'] ?? 'INBOX',
+			'uid'      => $uid,
+			'flag'     => $flag,
+			'action'   => $assoc_args['action'] ?? 'set',
+			'folder'   => $assoc_args['folder'] ?? 'INBOX',
 		) );
 
 		if ( is_wp_error( $result ) ) {
@@ -798,7 +798,7 @@ class EmailCommand extends BaseCommand {
 		}
 
 		$result = $ability->execute( array(
-			'auth_ref'     => $this->mailboxRef( $assoc_args ),
+			'auth_ref'    => $this->mailboxRef( $assoc_args ),
 			'search'      => $search,
 			'destination' => $destination,
 			'folder'      => $assoc_args['folder'] ?? 'INBOX',
@@ -885,11 +885,11 @@ class EmailCommand extends BaseCommand {
 
 		$result = $ability->execute( array(
 			'auth_ref' => $this->mailboxRef( $assoc_args ),
-			'search' => $search,
-			'flag'   => $flag,
-			'action' => $action,
-			'folder' => $assoc_args['folder'] ?? 'INBOX',
-			'max'    => (int) ( $assoc_args['max'] ?? 500 ),
+			'search'   => $search,
+			'flag'     => $flag,
+			'action'   => $action,
+			'folder'   => $assoc_args['folder'] ?? 'INBOX',
+			'max'      => (int) ( $assoc_args['max'] ?? 500 ),
 		) );
 
 		if ( is_wp_error( $result ) ) {
@@ -956,9 +956,9 @@ class EmailCommand extends BaseCommand {
 
 		$result = $ability->execute( array(
 			'auth_ref' => $this->mailboxRef( $assoc_args ),
-			'search' => $search,
-			'folder' => $assoc_args['folder'] ?? 'INBOX',
-			'max'    => (int) ( $assoc_args['max'] ?? 100 ),
+			'search'   => $search,
+			'folder'   => $assoc_args['folder'] ?? 'INBOX',
+			'max'      => (int) ( $assoc_args['max'] ?? 100 ),
 		) );
 
 		if ( is_wp_error( $result ) ) {
@@ -1014,8 +1014,8 @@ class EmailCommand extends BaseCommand {
 
 		$result = $ability->execute( array(
 			'auth_ref' => $this->mailboxRef( $assoc_args ),
-			'uid'    => $uid,
-			'folder' => $assoc_args['folder'] ?? 'INBOX',
+			'uid'      => $uid,
+			'folder'   => $assoc_args['folder'] ?? 'INBOX',
 		) );
 
 		if ( is_wp_error( $result ) ) {
@@ -1086,9 +1086,9 @@ class EmailCommand extends BaseCommand {
 
 		$result = $ability->execute( array(
 			'auth_ref' => $this->mailboxRef( $assoc_args ),
-			'search' => $search,
-			'folder' => $assoc_args['folder'] ?? 'INBOX',
-			'max'    => (int) ( $assoc_args['max'] ?? 20 ),
+			'search'   => $search,
+			'folder'   => $assoc_args['folder'] ?? 'INBOX',
+			'max'      => (int) ( $assoc_args['max'] ?? 20 ),
 		) );
 
 		if ( is_wp_error( $result ) ) {
@@ -1169,11 +1169,11 @@ class EmailCommand extends BaseCommand {
 		return $providers['email_imap'] ?? null;
 	}
 
-	private function mailboxRef( array $assoc_args, bool $default = true ): string {
+	private function mailboxRef( array $assoc_args, bool $use_default = true ): string {
 		$ref = trim( (string) ( $assoc_args['auth-ref'] ?? '' ) );
 		if ( '' === $ref && ! empty( $assoc_args['mailbox'] ) ) {
 			$ref = 'email_imap:' . trim( (string) $assoc_args['mailbox'] );
 		}
-		return '' !== $ref ? $ref : ( $default ? 'email_imap:default' : '' );
+		return '' !== $ref ? $ref : ( $use_default ? 'email_imap:default' : '' );
 	}
 }

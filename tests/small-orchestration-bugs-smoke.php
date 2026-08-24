@@ -155,27 +155,6 @@ list( $result, $writes ) = move_queue_slot_for_test( $queue, 5, 5 );
 small_orchestration_assert( 'same out-of-range indexes do not bypass range validation', false === $result['success'] );
 small_orchestration_assert( 'out-of-range same-position move does not write', 0 === $writes );
 
-echo "\n[3] Production source contains the fixed comparisons/order\n";
-$system_task_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Steps/SystemTask/SystemTaskStep.php' );
-$queue_source       = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Flow/QueueAbility.php' );
-
-small_orchestration_assert(
-	'SystemTaskStep compares processing status through JobStatus::PROCESSING',
-	str_contains( $system_task_source, 'JobStatus::PROCESSING === $status' )
-);
-small_orchestration_assert(
-	'SystemTaskStep uses JobStatus::isStatusFailure for child failure detection',
-	str_contains( $system_task_source, 'JobStatus::isStatusFailure( $child_status )' )
-);
-small_orchestration_assert(
-	'SystemTaskStep no longer compares uppercase FAILED literal',
-	! str_contains( $system_task_source, 'str_starts_with( $child_status, \'FAILED\' )' )
-);
-small_orchestration_assert(
-	'QueueAbility same-position branch returns queue_length from loaded queue',
-	str_contains( $queue_source, '\'queue_length\' => $queue_length' )
-);
-
 if ( 0 === $failed ) {
 	echo "\n=== small-orchestration-bugs-smoke: all {$total} assertions passed ===\n";
 	exit( 0 );

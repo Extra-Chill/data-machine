@@ -34,7 +34,12 @@ class PendingActionsCommand extends BaseCommand {
 		if ( '' === $action_id ) {
 			WP_CLI::error( 'action_id is required.' );
 		}
-		$result = \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::execute( array( 'action_id' => $action_id, 'decision' => $decision, 'resolver' => 'cli:' . get_current_user_id(), 'context' => array( 'resolution_transport' => 'cli' ) ) );
+		$result = \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::execute( array(
+			'action_id' => $action_id,
+			'decision'  => $decision,
+			'resolver'  => 'cli:' . get_current_user_id(),
+			'context'   => array( 'resolution_transport' => 'cli' ),
+		) );
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( (string) ( $result['error'] ?? 'Pending action could not be resolved.' ) );
 		}

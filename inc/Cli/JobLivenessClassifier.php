@@ -67,22 +67,22 @@ class JobLivenessClassifier {
 		$oldest_progress_age = self::minutesSince( $oldest_in_progress, $now );
 		$owner_actions       = array_merge( $pending, $fresh_progress );
 
-		$job_id          = (int) ( $job['job_id'] ?? 0 );
-		$active_children = (int) ( $child_counts['active'] ?? 0 );
-		$total_children  = (int) ( $child_counts['total'] ?? 0 );
-		$batch_total     = (int) ( $engine_data['batch_total'] ?? 0 );
-		$throttle        = is_array( $engine_data['ai_concurrency_throttle'] ?? null ) ? $engine_data['ai_concurrency_throttle'] : array();
+		$job_id             = (int) ( $job['job_id'] ?? 0 );
+		$active_children    = (int) ( $child_counts['active'] ?? 0 );
+		$total_children     = (int) ( $child_counts['total'] ?? 0 );
+		$batch_total        = (int) ( $engine_data['batch_total'] ?? 0 );
+		$throttle           = is_array( $engine_data['ai_concurrency_throttle'] ?? null ) ? $engine_data['ai_concurrency_throttle'] : array();
 		$contention_actions = array_values(
 			array_filter(
 				$owner_actions,
 				static fn( array $action ): bool => 'datamachine_resume_ai_step' === (string) ( $action['hook'] ?? '' )
 			)
 		);
-		$contention_owned = ! empty( $throttle )
+		$contention_owned   = ! empty( $throttle )
 			&& 'deferred' === ( $throttle['state'] ?? 'deferred' )
 			&& ! empty( $contention_actions );
-		$first_deferred  = strtotime( (string) ( $throttle['first_deferred_at'] ?? '' ) );
-		$defer_age       = false === $first_deferred ? (int) ( $throttle['defer_age_seconds'] ?? 0 ) : max( 0, $now - $first_deferred );
+		$first_deferred     = strtotime( (string) ( $throttle['first_deferred_at'] ?? '' ) );
+		$defer_age          = false === $first_deferred ? (int) ( $throttle['defer_age_seconds'] ?? 0 ) : max( 0, $now - $first_deferred );
 
 		if ( ! empty( $fresh_progress ) ) {
 			$classification = 'active_processing';
