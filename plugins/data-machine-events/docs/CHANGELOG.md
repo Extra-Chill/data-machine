@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.14] - 2026-08-24
+
+### Changed
+- bound related event taxonomy candidates
+- isolate taxonomy warmer shutdown coverage
+
 ## [0.55.13] - 2026-08-24
 
 ### Fixed
