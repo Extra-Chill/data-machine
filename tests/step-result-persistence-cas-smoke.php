@@ -131,6 +131,12 @@ namespace {
 		'existing' => array(
 			'value' => 'preserved',
 		),
+		'step_result' => array(
+			'legacy_step' => array(
+				'schema_version' => 'datamachine.step_result.v1',
+				'status'         => 'succeeded',
+			),
+		),
 	);
 	Jobs::$inject_conflict      = true;
 
@@ -187,6 +193,8 @@ namespace {
 	datamachine_step_result_persistence_assert( 'preserved' === ( $snapshot['existing']['value'] ?? null ), 'pre-existing engine_data remains intact' );
 	datamachine_step_result_persistence_assert( 'datamachine.step_result.v1' === ( $snapshot['step_results']['fetch_sources']['step_result']['schema_version'] ?? null ), 'canonical StepResult envelope is persisted' );
 	datamachine_step_result_persistence_assert( 'kept' === ( $snapshot['step_results']['fetch_sources']['step_result']['outputs']['nested']['value'] ?? null ), 'nested envelope data survives sanitization' );
+	datamachine_step_result_persistence_assert( ! isset( $snapshot['step_result']['fetch_sources'] ), 'new writes do not create the redundant top-level StepResult projection' );
+	datamachine_step_result_persistence_assert( 'succeeded' === ( $snapshot['step_result']['legacy_step']['status'] ?? null ), 'historical top-level StepResult data remains untouched' );
 	datamachine_step_result_persistence_assert( 2 === ( $snapshot['run_metrics']['counts']['fetch_packets'] ?? 0 ), 'fetch packet count is recorded in run metrics' );
 
 	$metrics = RunMetrics::fromJob(

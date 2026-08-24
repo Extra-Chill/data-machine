@@ -53,8 +53,6 @@ class RunMetrics {
 
 	private const STEP_RESULTS_KEY = 'step_results';
 
-	private const STEP_RESULT_ENVELOPES_KEY = 'step_result';
-
 	private const RUN_RESULT_KEY = 'run_result';
 
 	public static function recordStepResult( int $job_id, string $flow_step_id, array $result ): bool {
@@ -81,13 +79,6 @@ class RunMetrics {
 				);
 
 				$engine[ self::STEP_RESULTS_KEY ] = $step_results;
-				if ( is_array( $clean_result['step_result'] ?? null ) ) {
-					$step_result_envelopes                     = is_array( $engine[ self::STEP_RESULT_ENVELOPES_KEY ] ?? null ) ? $engine[ self::STEP_RESULT_ENVELOPES_KEY ] : array();
-					$step_result_envelope                      = $clean_result['step_result'];
-					$step_result_envelope['flow_step_id']    ??= $flow_step_id;
-					$step_result_envelopes[ $flow_step_id ]    = $step_result_envelope;
-					$engine[ self::STEP_RESULT_ENVELOPES_KEY ] = $step_result_envelopes;
-				}
 
 				$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
 				if ( isset( $clean_result['packet_count'] ) && 'fetch' === ( $clean_result['step_type'] ?? '' ) ) {
@@ -671,7 +662,7 @@ class RunMetrics {
 
 	private static function jobForEnvelope( int $job_id, array $engine, ?string $status_override = null ): ?array {
 		global $wpdb;
-		if ( $job_id <= 0 || ! is_object( $wpdb ) ) {
+		if ( $job_id <= 0 || ! ( $wpdb instanceof \wpdb ) ) {
 			return null;
 		}
 
@@ -714,7 +705,7 @@ class RunMetrics {
 		}
 
 		global $wpdb;
-		if ( ! is_object( $wpdb ) ) {
+		if ( ! ( $wpdb instanceof \wpdb ) ) {
 			return $empty;
 		}
 
