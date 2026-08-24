@@ -210,6 +210,10 @@ $assert(
 // --- Provider composition: the lightweight path attaches category and ability hooks.
 $reset();
 require_once $plugin_root . '/inc/Abilities/AbilityRegistration.php';
+require_once $plugin_root . '/inc/Abilities/AgentAbilities.php';
+require_once $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
+require_once $plugin_root . '/inc/Abilities/Publish/SendEmailAbility.php';
+require_once $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
 if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
 	eval(
 		'namespace DataMachine\Abilities;
