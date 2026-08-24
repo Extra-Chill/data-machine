@@ -171,6 +171,7 @@ class Jobs {
 	 * Check if user has permission to manage jobs
 	 */
 	public static function check_permission( $request ) {
+		unset( $request );
 		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
