@@ -67,4 +67,12 @@ class ChatToolsAvailabilityTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'class', $tools['web_fetch'] );
 		$this->assertArrayHasKey( 'method', $tools['web_fetch'] );
 	}
+
+	public function test_problem_flows_tool_is_absent_from_model_tool_resolution(): void {
+		foreach ( array( ToolPolicyResolver::MODE_CHAT, 'pipeline_editor', ToolPolicyResolver::MODE_PIPELINE ) as $mode ) {
+			$tools = $this->resolver->resolve( array( 'mode' => $mode ) );
+
+			$this->assertArrayNotHasKey( 'get_problem_flows', $tools, "Problem flows tool is absent from {$mode} model resolution." );
+		}
+	}
 }
