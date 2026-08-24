@@ -71,6 +71,7 @@ vendor/wordpress/agents-api/homeboy.json
 vendor/wordpress/agents-api/phpstan.neon.dist
 vendor/wordpress/agents-api/phpunit.xml.dist
 vendor/wordpress/agents-api/README.md
+vendor/wordpress/agents-api/stubs/
 vendor/wordpress/agents-api/tests/
 vendor/automattic/blocks-engine-php-transformer/.git/
 vendor/automattic/blocks-engine-php-transformer/.github/
@@ -94,6 +95,9 @@ vendor/automattic/blocks-engine-php-transformer/php-transformer/homeboy.json
 vendor/automattic/blocks-engine-php-transformer/php-transformer/README.md
 vendor/automattic/blocks-engine-php-transformer/php-transformer/tests/
 vendor/automattic/blocks-engine-php-transformer/php-transformer/tools/
+vendor/**/phpstan.neon.dist
+vendor/**/psalm.xml
+vendor/**/phpcs.xml.dist
 
 # Temporary and cache files
 *.tmp

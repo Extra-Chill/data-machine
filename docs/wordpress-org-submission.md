@@ -1,5 +1,7 @@
 # WordPress.org Submission Checklist
 
+This document is a preparatory checklist. Issue #2424 remains open until release automation builds the exact 1.0.0 bytes and the package hash, Plugin Check, network activation, full lint, and approved artwork gates all pass. Do not manually bump 1.0 versions.
+
 The WordPress.org package must be the exact Data Machine release package produced by Homeboy. Do not rebuild or edit files in SVN after release packaging.
 
 ## Candidate Gate
@@ -7,8 +9,9 @@ The WordPress.org package must be the exact Data Machine release package produce
 1. Confirm the release commit is clean, pushed, and is the intended tag commit.
 2. Build through Homeboy's WordPress release package path. `.buildignore` is the authoritative package exclusion file; `.distignore` is not used by this repository-supported path.
 3. Record the ZIP path, SHA256, uncompressed inventory, entry count, and version from `data-machine.php` and `readme.txt`.
-4. Reject packages containing tests, fixtures, PHPUnit files, development configuration, nested archives, local paths, secrets, private endpoints, or unbuilt frontend source that is not required for license compliance.
+4. Reject packages containing tests, fixtures, PHPUnit files, development configuration, nested archives, local paths, secrets, private domains, identities, endpoints, or runtime assumptions. Project names and public source provenance are allowed.
 5. Run Plugin Check against the installed ZIP on the `Tested up to` WordPress version. Resolve all errors and record every warning code, count, and disposition.
+   Preserve the exact report or a package-hash-bound machine-readable location map such as `plugin-check-wordpress-org-candidate.json`.
 6. Run clean single-site activation, deactivation, and reactivation. Confirm missing requirements fail with WordPress's normal plugin requirement message and no fatal error.
 7. Run network activation on multisite, verify Data Machine loads on at least two sites, then network-deactivate cleanly.
 8. Run the full Homeboy audit, lint, build, and test gates without skipped checks.
