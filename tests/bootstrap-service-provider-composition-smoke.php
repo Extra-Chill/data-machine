@@ -45,6 +45,7 @@ $assert( str_contains( $main, 'ActivationServiceProvider::register_defaults_hook
 $assert( str_contains( $main, 'ActivationServiceProvider::register_lifecycle_hooks( __FILE__ );' ), 'entrypoint delegates lifecycle registration' );
 $assert( str_contains( $main, 'ActivationServiceProvider::register_new_site_hook();' ), 'entrypoint delegates multisite setup registration' );
 $assert( str_contains( $bootstrap, 'HostIntegrationServiceProvider::register();' ), 'bootstrap delegates host integrations' );
+$assert( str_contains( $bootstrap, "require_once __DIR__ . '/Engine/AI/Tools/ability-tool-projections.php';" ), 'bootstrap defines projection helpers before runtime composition' );
 
 $runtime = (string) file_get_contents( $root . '/inc/Core/Bootstrap/RuntimeServiceProvider.php' );
 $order   = array(
@@ -67,6 +68,19 @@ $rest_calls = substr_count( $rest, '::register();' );
 $assert( 27 === $rest_calls, 'REST provider composes all 27 controllers' );
 $assert( ! str_contains( $main, '\\DataMachine\\Api\\Execute::register();' ), 'entrypoint no longer composes concrete REST controllers' );
 $assert( substr_count( $main, 'register_activation_hook(' ) === 0, 'entrypoint no longer registers lifecycle hooks directly' );
+
+$tool_provider       = (string) file_get_contents( $root . '/inc/Engine/AI/Tools/ToolServiceProvider.php' );
+$tool_provider_order = array(
+	'new ImageGeneration();',
+	'\\datamachine_register_global_ability_tools();',
+	'new QueueValidator();',
+);
+$offset              = -1;
+foreach ( $tool_provider_order as $needle ) {
+	$position = strpos( $tool_provider, $needle );
+	$assert( false !== $position && $position > $offset, "tool provider order preserves {$needle}" );
+	$offset = false === $position ? $offset : $position;
+}
 
 $removed_functions = array(
 	'datamachine_skip_action_scheduler_migration_during_install',

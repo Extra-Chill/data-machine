@@ -46,6 +46,7 @@ if ( ! function_exists( 'apply_filters' ) ) {
 require_once __DIR__ . '/../inc/Engine/AI/Tools/BaseTool.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ability-tool-projections.php';
+datamachine_register_global_ability_tools();
 
 $failures = array();
 $passes   = 0;

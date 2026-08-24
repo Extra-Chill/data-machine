@@ -65,6 +65,7 @@ if ( ! function_exists( 'apply_filters' ) ) {
 require_once $root . '/inc/Engine/AI/Tools/BaseTool.php';
 require_once $root . '/inc/Engine/AI/Tools/ToolPolicyResolver.php';
 require_once $root . '/inc/Engine/AI/Tools/ability-tool-projections.php';
+datamachine_register_global_ability_tools();
 
 $tools_dir = $root . '/inc/Engine/AI/Tools/Global';
 $tool_files = glob( $tools_dir . '/*.php' ) ?: array();

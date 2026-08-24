@@ -27,6 +27,9 @@ if ( ! function_exists( 'add_filter' ) ) {
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value ) {
 		global $projection_filters;
+		if ( empty( $projection_filters[ $hook ] ) ) {
+			return $value;
+		}
 		ksort( $projection_filters[ $hook ] );
 		foreach ( $projection_filters[ $hook ] ?? array() as $callbacks ) {
 			foreach ( $callbacks as $callback ) {
@@ -56,7 +59,37 @@ function read_global_tool_source( string $relative_path, string $root ): string 
 echo "global-ability-projections-smoke\n";
 
 require_once $root . '/inc/Engine/AI/Tools/ability-tool-projections.php';
-$projections = apply_filters( 'datamachine_ability_tool_projections', array() );
+assert_global_projection( array() === apply_filters( 'datamachine_ability_tool_projections', array() ), 'bootstrap defines projection helpers without registering built-in tools', $failures, $passes );
+
+add_filter(
+	'datamachine_ability_tool_projections',
+	static function ( array $tools ): array {
+		$tools['before_projection_registrar'] = true;
+		return $tools;
+	}
+);
+
+datamachine_register_global_ability_tools();
+
+add_filter(
+	'datamachine_ability_tool_projections',
+	static function ( array $tools ): array {
+		$tools['after_projection_registrar'] = true;
+		return $tools;
+	}
+);
+
+$registered  = apply_filters( 'datamachine_ability_tool_projections', array() );
+$expected    = require $root . '/tests/fixtures/global-ability-tool-projections.php';
+$projections = array_intersect_key( $registered, $expected );
+
+assert_global_projection( $expected === $projections, 'built-in raw projection declarations exactly match the pre-contraction snapshot', $failures, $passes );
+assert_global_projection(
+	array( 'before_projection_registrar', 'image_generation', 'internal_link_audit', 'local_search', 'wordpress_post_reader', 'after_projection_registrar' ) === array_keys( $registered ),
+	'built-in projections preserve same-priority filter precedence and registration order',
+	$failures,
+	$passes
+);
 
 $migrated = array(
 	'local_search'         => 'datamachine/local-search',
@@ -84,6 +117,17 @@ foreach ( array( 'InternalLinkAudit.php', 'LocalSearch.php', 'WordPressPostReade
 $image_source = read_global_tool_source( 'inc/Engine/AI/Tools/Global/ImageGeneration.php', $root );
 assert_global_projection( false === strpos( $image_source, 'datamachine_register_ability_tool' ), 'image_generation projection is separated from its bounded configuration adapter', $failures, $passes );
 assert_global_projection( false !== strpos( $image_source, "registerConfigurationHandlers( 'image_generation' )" ), 'image_generation retains its bounded configuration adapter', $failures, $passes );
+
+$provider_source = read_global_tool_source( 'inc/Engine/AI/Tools/ToolServiceProvider.php', $root );
+$image_position  = strpos( $provider_source, 'new ImageGeneration();' );
+$register_position = strpos( $provider_source, '\\datamachine_register_global_ability_tools();' );
+$queue_position    = strpos( $provider_source, 'new QueueValidator();' );
+assert_global_projection(
+	false !== $image_position && false !== $register_position && false !== $queue_position && $image_position < $register_position && $register_position < $queue_position,
+	'full-runtime tool provider invokes the registrar at the former projected-tool registration point',
+	$failures,
+	$passes
+);
 
 $exceptions = array(
 	'inc/Engine/AI/Tools/Global/AgentMemory.php'       => 'agent_memory',

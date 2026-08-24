@@ -77,6 +77,7 @@ class ToolServiceProvider {
 		new AgentDailyMemory();
 		new AgentMemory();
 		new ImageGeneration();
+		\datamachine_register_global_ability_tools();
 		new QueueValidator();
 		new WebFetch();
 
