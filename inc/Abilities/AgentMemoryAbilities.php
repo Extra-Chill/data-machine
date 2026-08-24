@@ -317,7 +317,7 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function getMemory( array $input ): array|\WP_Error {
-		$memory  = self::resolveMemory( $input );
+		$memory = self::resolveMemory( $input );
 		if ( is_wp_error( $memory ) ) {
 			return $memory;
 		}
@@ -490,7 +490,7 @@ class AgentMemoryAbilities {
 	 * @return array Search results.
 	 */
 	public static function searchMemory( array $input ): array|\WP_Error {
-		$memory  = self::resolveMemory( $input );
+		$memory = self::resolveMemory( $input );
 		if ( is_wp_error( $memory ) ) {
 			return $memory;
 		}
@@ -534,9 +534,9 @@ class AgentMemoryAbilities {
 	 * @return AgentMemory|\WP_Error
 	 */
 	private static function resolveMemory( array $input ): AgentMemory|\WP_Error {
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$filename = $input['file'] ?? 'MEMORY.md';
+		$user_id   = (int) ( $input['user_id'] ?? 0 );
+		$agent_id  = (int) ( $input['agent_id'] ?? 0 );
+		$filename  = $input['file'] ?? 'MEMORY.md';
 		$principal = PermissionHelper::get_execution_principal();
 
 		if ( null !== $principal ) {

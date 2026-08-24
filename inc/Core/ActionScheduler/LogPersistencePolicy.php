@@ -44,6 +44,7 @@ class LogPersistencePolicy {
 	 * @param array|bool|null $policy  Persistence policy, if configured.
 	 * @return mixed
 	 */
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- The filter contract supplies four arguments to this callback.
 	public static function filterPersistentTableQuery( $query, string $table_suffix, string $table, $policy ) {
 		if ( self::TABLE_SUFFIX !== $table_suffix || ! is_string( $query ) || '' === $query ) {
 			return $query;

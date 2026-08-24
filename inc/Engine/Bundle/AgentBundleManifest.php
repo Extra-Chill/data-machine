@@ -42,8 +42,8 @@ final class AgentBundleManifest {
 		$this->subagents       = AgentSubagentGraph::normalize( $subagents, (string) $this->agent['slug'] );
 		if ( ! empty( $this->subagents ) ) {
 			$this->agent['subagents'] = AgentSubagentGraph::coordinator_edges( $this->agent['subagents'] ?? array(), $this->subagents, (string) $this->agent['slug'] );
-			$this->capabilities[] = AgentSubagentGraph::CAPABILITY;
-			$this->capabilities   = array_values( array_unique( $this->capabilities ) );
+			$this->capabilities[]     = AgentSubagentGraph::CAPABILITY;
+			$this->capabilities       = array_values( array_unique( $this->capabilities ) );
 			sort( $this->capabilities, SORT_STRING );
 		}
 	}

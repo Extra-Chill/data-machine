@@ -28,8 +28,8 @@ class DirectoryManager {
 	 *
 	 * @var bool
 	 */
-	private static bool $agent_files_ensured     = false;
-	private static ?int $default_agent_user_id   = null;
+	private static bool $agent_files_ensured   = false;
+	private static ?int $default_agent_user_id = null;
 
 	/**
 	 * Ensure default memory files exist across layers (SOUL.md + MEMORY.md in agent, USER.md in user).
@@ -226,7 +226,7 @@ class DirectoryManager {
 	 * @return string Full principal memory directory path.
 	 */
 	public function get_principal_directory( int $user_id, int $agent_id ): string {
-		$user_id = absint( $user_id );
+		$user_id  = absint( $user_id );
 		$agent_id = absint( $agent_id );
 		if ( 0 === $user_id || 0 === $agent_id ) {
 			throw new \InvalidArgumentException( 'Principal memory requires a positive user ID and agent ID.' );

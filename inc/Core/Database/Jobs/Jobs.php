@@ -537,7 +537,7 @@ class Jobs extends BaseRepository {
 		}
 		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		unset( $engine['job_status_reason'] );
-		$engine['direct_operation_recovery'] = array(
+		$engine['direct_operation_recovery']   = array(
 			'schema'                        => 'datamachine.direct-operation-recovery.v1',
 			'state'                         => 'requeued',
 			'trigger'                       => sanitize_key( $trigger ),
@@ -547,9 +547,9 @@ class Jobs extends BaseRepository {
 			'operation_generation'          => $new_generation,
 			'recovered_at'                  => gmdate( 'c' ),
 		);
-		$run_lifecycle                       = is_array( $engine[ RunLifecycleStore::META_KEY ] ?? null ) ? $engine[ RunLifecycleStore::META_KEY ] : array();
-		$run_lifecycle['status']             = JobStatus::PENDING;
-		$run_lifecycle['updated_at']         = current_time( 'mysql', true );
+		$run_lifecycle                         = is_array( $engine[ RunLifecycleStore::META_KEY ] ?? null ) ? $engine[ RunLifecycleStore::META_KEY ] : array();
+		$run_lifecycle['status']               = JobStatus::PENDING;
+		$run_lifecycle['updated_at']           = current_time( 'mysql', true );
 		$engine[ RunLifecycleStore::META_KEY ] = $run_lifecycle;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
