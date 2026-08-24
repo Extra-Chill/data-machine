@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.16] - 2026-08-24
+
+### Changed
+- remove regressive archive count optimization
+
 ## [0.55.15] - 2026-08-24
 
 ### Changed
