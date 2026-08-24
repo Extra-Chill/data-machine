@@ -57,10 +57,10 @@ class HttpClient {
 			);
 		}
 
-		$method       = strtoupper( $method );
-		$context      = $options['context'] ?? 'HTTP Request';
+		$method                    = strtoupper( $method );
+		$context                   = $options['context'] ?? 'HTTP Request';
 		$log_response_body_preview = $options['log_response_body_preview'] ?? true;
-		$proxy_filter = null;
+		$proxy_filter              = null;
 
 		if ( ! in_array( $method, self::VALID_METHODS, true ) ) {
 			do_action(

@@ -94,7 +94,7 @@ class WebhookGateStep extends Step {
 		add_action(
 			'datamachine_webhook_gate_timeout',
 			function ( $job_id, $token ) {
-				$job_id = (int) $job_id;
+				$job_id  = (int) $job_id;
 				$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
 				$result  = $db_jobs->timeout_webhook_gate( $job_id, (string) $token );
 
@@ -298,7 +298,7 @@ class WebhookGateStep extends Step {
 				$webhook_body = array();
 			}
 
-			$webhook_packet    = new DataPacket(
+			$webhook_packet = new DataPacket(
 				array(
 					'title' => 'Webhook Payload',
 					'body'  => $webhook_body,
@@ -311,7 +311,7 @@ class WebhookGateStep extends Step {
 				),
 				'webhook_payload'
 			);
-			$data_packets      = $webhook_packet->addTo( array() );
+			$data_packets   = $webhook_packet->addTo( array() );
 			if ( ! is_string( wp_json_encode( $data_packets ) ) ) {
 				return new \WP_Error(
 					'webhook_payload_persistence_failed',

@@ -15,18 +15,18 @@ defined( 'ABSPATH' ) || exit;
  */
 class DependencyChecker {
 
-	public const CHECK_ACTION_SCHEDULER    = 'action_scheduler';
-	public const CHECK_FILESYSTEM_WRITES   = 'filesystem_writes';
-	public const CHECK_IMAP                = 'imap';
-	public const CHECK_ZIP_ARCHIVE         = 'zip_archive';
+	public const CHECK_ACTION_SCHEDULER  = 'action_scheduler';
+	public const CHECK_FILESYSTEM_WRITES = 'filesystem_writes';
+	public const CHECK_IMAP              = 'imap';
+	public const CHECK_ZIP_ARCHIVE       = 'zip_archive';
 
 	/** @return array<string,string> */
 	private static function checks(): array {
 		return array(
-			self::CHECK_ACTION_SCHEDULER    => 'Action Scheduler is available.',
-			self::CHECK_FILESYSTEM_WRITES   => 'The Data Machine directory is writable.',
-			self::CHECK_IMAP                => 'The PHP IMAP extension is available.',
-			self::CHECK_ZIP_ARCHIVE         => 'The PHP Zip extension is available.',
+			self::CHECK_ACTION_SCHEDULER  => 'Action Scheduler is available.',
+			self::CHECK_FILESYSTEM_WRITES => 'The Data Machine directory is writable.',
+			self::CHECK_IMAP              => 'The PHP IMAP extension is available.',
+			self::CHECK_ZIP_ARCHIVE       => 'The PHP Zip extension is available.',
 		);
 	}
 

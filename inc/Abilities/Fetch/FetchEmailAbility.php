@@ -487,7 +487,7 @@ class FetchEmailAbility {
 	 */
 	private function fetchBody( $connection, int $uid, bool $peek ): string {
 		$fetch_flags = FT_UID | ( $peek ? FT_PEEK : 0 );
-		$structure = imap_fetchstructure( $connection, $uid, FT_UID );
+		$structure   = imap_fetchstructure( $connection, $uid, FT_UID );
 		if ( ! $structure ) {
 			return '';
 		}

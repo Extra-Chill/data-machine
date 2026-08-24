@@ -29,13 +29,13 @@ class WorkerHealth {
 			);
 		}
 
-		$due_count               = max( 0, (int) ( $evidence['due_count'] ?? 0 ) );
-		$deferred                = max( 0, (int) ( $evidence['concurrency_deferred_actions'] ?? 0 ) );
-		$stale_due_sample_age    = isset( $evidence['stale_due_sample_age_seconds'] ) ? max( 0, (int) $evidence['stale_due_sample_age_seconds'] ) : null;
-		$queue_trigger_state     = (string) ( $evidence['queue_trigger_state'] ?? 'unknown' );
-		$heartbeat_state         = (string) ( $evidence['worker_heartbeat_state'] ?? 'absent' );
-		$worker_claimed          = 'fresh' === $heartbeat_state;
-		$dispatcher_starved      = $due_count > 0
+		$due_count            = max( 0, (int) ( $evidence['due_count'] ?? 0 ) );
+		$deferred             = max( 0, (int) ( $evidence['concurrency_deferred_actions'] ?? 0 ) );
+		$stale_due_sample_age = isset( $evidence['stale_due_sample_age_seconds'] ) ? max( 0, (int) $evidence['stale_due_sample_age_seconds'] ) : null;
+		$queue_trigger_state  = (string) ( $evidence['queue_trigger_state'] ?? 'unknown' );
+		$heartbeat_state      = (string) ( $evidence['worker_heartbeat_state'] ?? 'absent' );
+		$worker_claimed       = 'fresh' === $heartbeat_state;
+		$dispatcher_starved   = $due_count > 0
 			&& ! $worker_claimed
 			&& null !== $stale_due_sample_age
 			&& $stale_due_sample_age > $stale_threshold_seconds

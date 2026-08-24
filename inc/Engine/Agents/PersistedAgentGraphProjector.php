@@ -140,7 +140,7 @@ final class PersistedAgentGraphProjector {
 			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exception data is returned to callers, never rendered here.
 			throw new BundleValidationException( sprintf( 'Graph %s source is missing or escapes its root: %s', $label, $relative ) );
 		}
-		$contents = file_get_contents( $real );
+		$contents = file_get_contents( $real ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- This is a verified local file path, not a remote URL.
 		if ( ! is_string( $contents ) ) {
 			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exception data is returned to callers, never rendered here.
 			throw new BundleValidationException( sprintf( 'Graph %s source is unreadable: %s', $label, $relative ) );

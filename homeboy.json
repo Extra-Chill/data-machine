@@ -9,60 +9,69 @@
       "metadata": {
         "findings_count": 0
       }
+    },
+    "lint:115f25907f28371418122a6879a5e3b487458182b6a658ba4e6fcf7f4c741bf5": {
+      "context_id": "data-machine",
+      "created_at": "2026-08-24T04:02:42Z",
+      "item_count": 0,
+      "known_fingerprints": [],
+      "metadata": {
+        "findings_count": 0
+      }
     }
   },
   "changelog_target": "docs/CHANGELOG.md",
-  "remote_path": "wp-content/plugins/data-machine",
   "extensions": {
     "wordpress": {
-      "php": "8.2",
-      "node": "20",
       "database_type": "sqlite",
+      "node": "20",
+      "php": "8.2",
       "release_latest_branch": "release-latest",
       "settings": {
-        "runtime_wordpress_version": "7.0",
         "phpunit_no_tests": "fail",
+        "runtime_wordpress_version": "7.0",
         "wp_codebox_phpunit_bootstrap_mode": "managed",
         "wp_codebox_phpunit_config": "/wordpress/wp-content/plugins/data-machine/phpunit.sqlite.xml.dist"
       }
     }
   },
   "id": "data-machine",
+  "remote_path": "wp-content/plugins/data-machine",
   "transforms": {
     "drop_wp_ability_dead_guards": {
       "description": "Drop dead class_exists('WP_Ability') and class_exists('WP_Abilities_Registry') guards. Plugin header requires WP 7.0 where both classes ship in core, so every guard on these symbols is unreachable. Ref: https://github.com/Extra-Chill/data-machine/issues/XXXX",
       "rules": [
         {
-          "id": "simple_guard",
+          "context": "file",
           "description": "Remove standalone if ( ! class_exists( 'WP_Ability' ) ) { return; } blocks.",
+          "files": "inc/Abilities/**/*.php",
           "find": "(?s)\n\t\tif \\( ! class_exists\\( ?'WP_Ability' ?\\) \\) \\{\n\t\t\treturn;\n\t\t\\}\n",
-          "replace": "",
-          "files": "inc/Abilities/**/*.php",
-          "context": "file"
+          "id": "simple_guard",
+          "replace": ""
         },
         {
-          "id": "combined_guard_registered",
+          "context": "file",
           "description": "Drop the WP_Ability half of 'if ( ! class_exists( WP_Ability ) || self::$registered ) { return; }' guards.",
-          "find": "(?s)if \\( ! class_exists\\( 'WP_Ability' \\) \\|\\| self::\\$registered \\) \\{\n\t+return;\n\t+\\}",
-          "replace": "if ( self::$$registered ) {\n\t\t\treturn;\n\t\t}",
           "files": "inc/Abilities/**/*.php",
-          "context": "file"
-        },
-        {
-          "id": "ternary_registry_guard",
-          "description": "Replace '(class_exists(WP_Abilities_Registry) ? WP_Abilities_Registry::get_instance() : null)' with a direct call — the ternary is unreachable.",
-          "find": "class_exists\\( 'WP_Abilities_Registry' \\) \\? \\\\WP_Abilities_Registry::get_instance\\(\\) : null",
-          "replace": "\\\\WP_Abilities_Registry::get_instance()",
-          "files": "inc/**/*.php",
-          "context": "line"
-        },
-        {
-          "id": "combined_guard_registered_engine",
-          "description": "Same as combined_guard_registered but catches the one hit in inc/Engine/ (ResolvePendingActionAbility).",
           "find": "(?s)if \\( ! class_exists\\( 'WP_Ability' \\) \\|\\| self::\\$registered \\) \\{\n\t+return;\n\t+\\}",
-          "replace": "if ( self::$$registered ) {\n\t\t\treturn;\n\t\t}",
+          "id": "combined_guard_registered",
+          "replace": "if ( self::$$registered ) {\n\t\t\treturn;\n\t\t}"
+        },
+        {
+          "context": "line",
+          "description": "Replace '(class_exists(WP_Abilities_Registry) ? WP_Abilities_Registry::get_instance() : null)' with a direct call — the ternary is unreachable.",
+          "files": "inc/**/*.php",
+          "find": "class_exists\\( 'WP_Abilities_Registry' \\) \\? \\\\WP_Abilities_Registry::get_instance\\(\\) : null",
+          "id": "ternary_registry_guard",
+          "replace": "\\\\WP_Abilities_Registry::get_instance()"
+        },
+        {
+          "context": "file",
+          "description": "Same as combined_guard_registered but catches the one hit in inc/Engine/ (ResolvePendingActionAbility).",
           "files": "inc/Engine/**/*.php",
-          "context": "file"
+          "find": "(?s)if \\( ! class_exists\\( 'WP_Ability' \\) \\|\\| self::\\$registered \\) \\{\n\t+return;\n\t+\\}",
+          "id": "combined_guard_registered_engine",
+          "replace": "if ( self::$$registered ) {\n\t\t\treturn;\n\t\t}"
         }
       ]
     }

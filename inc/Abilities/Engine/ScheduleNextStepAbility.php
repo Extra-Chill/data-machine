@@ -268,13 +268,13 @@ class ScheduleNextStepAbility {
 		}
 
 		$action_args = $this->actionArgs( $job_id, $flow_step_id );
-		$action = new \ActionScheduler_Action(
+		$action      = new \ActionScheduler_Action(
 			'datamachine_execute_step',
 			$action_args,
 			new \ActionScheduler_SimpleSchedule( as_get_datetime_object( time() ) ),
 			'data-machine'
 		);
-		$action_id = $this->saveAtomicAction( $store, $action );
+		$action_id   = $this->saveAtomicAction( $store, $action );
 		if ( $action_id <= 0
 			|| $action_id <= (int) $previous_max_id
 			|| \ActionScheduler_Store::STATUS_PENDING !== $store->get_status( $action_id )

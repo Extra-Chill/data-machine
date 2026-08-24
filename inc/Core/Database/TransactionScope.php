@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 final class TransactionScope {
 
 	private static int $savepoint_sequence = 0;
-	private bool $active = true;
+	private bool $active                   = true;
 
 	private function __construct(
 		private $wpdb,
