@@ -26,6 +26,7 @@ class CalendarCacheTest extends WP_UnitTestCase {
 
 	public function setUp(): void {
 		parent::setUp();
+		wp_cache_flush();
 
 		global $wp_rest_server;
 		$this->server = $wp_rest_server = new WP_REST_Server();
@@ -46,12 +47,8 @@ class CalendarCacheTest extends WP_UnitTestCase {
 	public function tearDown(): void {
 		global $wp_rest_server;
 		$wp_rest_server = null;
-		// Ensure no test bleeds cache state into the next.
-		if ( function_exists( 'wp_cache_flush_group' ) ) {
-			wp_cache_flush_group( CalendarCache::GROUP );
-		} else {
-			wp_cache_flush();
-		}
+		// The generation option and calendar entries must roll back together.
+		wp_cache_flush();
 		parent::tearDown();
 	}
 

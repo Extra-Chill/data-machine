@@ -88,14 +88,9 @@ class TaxonomyInventoryWarmerTest extends WP_UnitTestCase {
 		$accepted_args = $wp_filter['shutdown']->callbacks[10][ $callback_id ]['accepted_args'];
 		$this->assertSame( 0, $accepted_args );
 
-		$shutdown_hook         = $wp_filter['shutdown'];
-		$wp_filter['shutdown'] = new \WP_Hook();
-		$wp_filter['shutdown']->add_filter( 'shutdown', array( TaxonomyInventoryWarmer::class, 'flushPending' ), 10, $accepted_args );
-		try {
-			do_action( 'shutdown' );
-		} finally {
-			$wp_filter['shutdown'] = $shutdown_hook;
-		}
+		$shutdown_hook = new \WP_Hook();
+		$shutdown_hook->add_filter( 'shutdown', array( TaxonomyInventoryWarmer::class, 'flushPending' ), 10, $accepted_args );
+		$shutdown_hook->do_action( array( '' ) );
 	}
 
 	public function test_pending_generations_remain_separate_per_multisite_site(): void {

@@ -31,6 +31,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		}
 
 		parent::setUp();
+		wp_cache_flush();
 		$this->original_user_id = get_current_user_id();
 		wp_set_current_user( 0 );
 
