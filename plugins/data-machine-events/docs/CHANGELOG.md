@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.15] - 2026-08-24
+
+### Changed
+- bound hierarchical archive queries
+
 ## [0.55.14] - 2026-08-24
 
 ### Changed
