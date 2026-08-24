@@ -488,8 +488,8 @@ class BlocksCommand extends BaseCommand {
 			'update_post_meta_cache' => false,
 			'update_post_term_cache' => false,
 			'lazy_load_term_meta'    => false,
-			// phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.SuppressFilters_suppress_filters -- Destructive repair inventory must include every matching post regardless of site filters.
-			'suppress_filters'       => false,
+			// phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.SuppressFilters_suppress_filters -- Destructive repair inventory must bypass site query filters so matching posts cannot be hidden.
+			'suppress_filters'       => true,
 		);
 	}
 }

@@ -29,7 +29,6 @@ The compiled JavaScript includes these direct production packages or consumes th
 | --- | --- | --- |
 | `@extrachill/chat` | GPL-2.0-or-later | Compiled into Data Machine browser assets; source at https://github.com/Extra-Chill/chat |
 | `@tanstack/react-query` | MIT | Compiled into Data Machine browser assets; source at https://github.com/TanStack/query |
-| `@tanstack/react-query-devtools` | MIT | Compiled into Data Machine browser assets; source at https://github.com/TanStack/query |
 | `react-markdown` and its unified/remark/unist dependencies | MIT | Compiled into Data Machine browser assets; source at https://github.com/remarkjs/react-markdown |
 | `zustand` | MIT | Compiled into Data Machine browser assets; source at https://github.com/pmndrs/zustand |
 | `@wordpress/api-fetch`, `components`, `data`, `dom-ready`, `element`, `hooks`, `i18n`, and `notices` | GPL-2.0-or-later | Build/runtime dependencies externalized to WordPress-provided script handles; source at https://github.com/WordPress/gutenberg |

@@ -1,6 +1,6 @@
 {
   "schema": "data-machine/plugin-check-unescaped-parameter-map/v1",
-  "package_sha256": "99bb77b18bd06e3e80befee215973ba922d199d86027b8e53b8e2792d86d9049",
+  "package_sha256": "e65dac886a6ee35db0003bb923b9a5779003e1e3b3bfb57b8cfecfee7c544073",
   "command": "wordpress.plugin-check",
   "wordpress_version": "7.1",
   "plugin_check": {
