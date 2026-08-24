@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Api\Chat\Tools;
 
+use DataMachine\Abilities\Taxonomy\CreateTaxonomyTermAbility;
 use DataMachine\Api\Chat\Tools\CreateTaxonomyTerm;
 use WP_Ability;
 use WP_Abilities_Registry;
@@ -15,7 +16,6 @@ use WP_UnitTestCase;
 
 class CreateTaxonomyTermTest extends WP_UnitTestCase {
 
-	private const ABILITY_NAME = 'datamachine/create-taxonomy-term';
 	private const TAXONOMY     = 'datamachine_chat_create_terms';
 
 	private CreateTaxonomyTerm $tool;
@@ -31,8 +31,8 @@ class CreateTaxonomyTermTest extends WP_UnitTestCase {
 			array( 'hierarchical' => true )
 		);
 
-		$this->original_ability = wp_get_ability( self::ABILITY_NAME );
-		$this->ability          = new CountingCreateTaxonomyTermAbility( self::ABILITY_NAME );
+		$this->original_ability = wp_get_ability( CreateTaxonomyTermAbility::ABILITY_NAME );
+		$this->ability          = new CountingCreateTaxonomyTermAbility( CreateTaxonomyTermAbility::ABILITY_NAME );
 		$this->replaceAbility( $this->ability );
 		$this->tool = new CreateTaxonomyTerm();
 	}
@@ -204,7 +204,7 @@ class CreateTaxonomyTermTest extends WP_UnitTestCase {
 		$reflection = new \ReflectionProperty( $registry, 'registered_abilities' );
 		$abilities  = $reflection->getValue( $registry );
 
-		$abilities[ self::ABILITY_NAME ] = $ability;
+		$abilities[ CreateTaxonomyTermAbility::ABILITY_NAME ] = $ability;
 		$reflection->setValue( $registry, $abilities );
 	}
 }
