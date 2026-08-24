@@ -74,6 +74,42 @@ class TaxonomyAbilityWpErrorTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Missing Term', $result['error'] );
 	}
 
+	public function test_registered_delete_taxonomy_term_accepts_null_reassignment(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
+		$term = wp_insert_term( 'Delete without reassignment', self::TEST_TAXONOMY );
+
+		$result = wp_get_ability( 'datamachine/delete-taxonomy-term' )->execute(
+			array(
+				'term'     => (string) $term['term_id'],
+				'taxonomy' => self::TEST_TAXONOMY,
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertTrue( $result['success'] );
+		$this->assertNull( $result['reassigned'] );
+	}
+
+	public function test_registered_delete_taxonomy_term_accepts_integer_reassignment(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
+		$source = wp_insert_term( 'Delete with reassignment', self::TEST_TAXONOMY );
+		$target = wp_insert_term( 'Reassignment target', self::TEST_TAXONOMY );
+
+		$result = wp_get_ability( 'datamachine/delete-taxonomy-term' )->execute(
+			array(
+				'term'     => (string) $source['term_id'],
+				'taxonomy' => self::TEST_TAXONOMY,
+				'reassign' => (int) $target['term_id'],
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( (int) $target['term_id'], $result['reassigned'] );
+	}
+
 	public function test_merge_term_meta_callback_failure_returns_wp_error(): void {
 		$result = ( new MergeTermMetaAbility() )->execute(
 			array(
