@@ -34,7 +34,6 @@
 		},
 		"files": [
 			"tests/fixtures/identity-store-doubles.php",
-			"tests/fixtures/engine-data.php",
 			"tests/fixtures/phpunit-isolation.php"
 		]
 	},

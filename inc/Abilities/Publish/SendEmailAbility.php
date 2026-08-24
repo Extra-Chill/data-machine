@@ -516,20 +516,20 @@ class SendEmailAbility {
 		if ( ! is_array( $grant ) || empty( $grant['signature'] ) ) {
 			return new \WP_Error( 'email_queue_grant_invalid', 'Queued mailbox authorization is invalid.', array( 'status' => 403 ) );
 		}
-		$user_id  = absint( $grant['user_id'] ?? 0 );
-		$agent_id = absint( $grant['agent_id'] ?? 0 );
+		$user_id   = absint( $grant['user_id'] ?? 0 );
+		$agent_id  = absint( $grant['agent_id'] ?? 0 );
 		$issued_at = absint( $grant['issued_at'] ?? 0 );
 		$nonce     = (string) ( $grant['nonce'] ?? '' );
 		$payload   = $this->mailboxGrantPayload( $config, $user_id, $agent_id, $issued_at, $nonce );
-		$expected = hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
+		$expected  = hash_hmac( 'sha256', $payload, wp_salt( 'auth' ) );
 		if ( ! hash_equals( $expected, (string) $grant['signature'] ) ) {
 			return new \WP_Error( 'email_queue_grant_invalid', 'Queued mailbox authorization is invalid.', array( 'status' => 403 ) );
 		}
 		return array(
-			'user_id'      => $user_id,
-			'agent_id'     => $agent_id,
-			'token_id'     => absint( $grant['token_id'] ?? 0 ),
-			'issuer_type'  => (string) ( $grant['issuer_type'] ?? '' ),
+			'user_id'       => $user_id,
+			'agent_id'      => $agent_id,
+			'token_id'      => absint( $grant['token_id'] ?? 0 ),
+			'issuer_type'   => (string) ( $grant['issuer_type'] ?? '' ),
 			'legacy_sender' => ! empty( $grant['legacy_sender'] ),
 		);
 	}
@@ -539,6 +539,7 @@ class SendEmailAbility {
 		unset( $payload['_attempt'], $payload['_mailbox_grant'] );
 		$payload = $this->canonicalizeGrantValue( $payload );
 		return implode( '|', array(
+			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Canonical internal data is hashed for an HMAC and never unserialized.
 			hash( 'sha256', serialize( $payload ) ),
 			(string) $user_id,
 			(string) $agent_id,

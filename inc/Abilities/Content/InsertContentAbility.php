@@ -183,7 +183,7 @@ class InsertContentAbility {
 	/** Execute only from the pending-action dispatcher with a one-time receipt. */
 	public static function apply_pending_action( array $input, array $payload, array $receipt ): array|\WP_Error {
 		$input['preview'] = false;
-		$receipt_input = $input;
+		$receipt_input    = $input;
 		unset( $receipt_input['preview'] );
 		$authorized = ContentActionHandlers::consume_receipt( 'insert_content', $receipt_input, $payload, $receipt );
 		if ( is_wp_error( $authorized ) ) {

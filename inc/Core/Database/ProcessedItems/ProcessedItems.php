@@ -1243,7 +1243,7 @@ class ProcessedItems extends BaseRepository {
 			status VARCHAR(20) NOT NULL DEFAULT 'processed',
 			claim_expires_at DATETIME NULL,
 			claim_token VARCHAR(64) NULL,
-			deferral_count INT UNSIGNED NOT NULL DEFAULT 0,
+			deferral_count INT(10) UNSIGNED NOT NULL DEFAULT 0,
 			last_deferral_job_id BIGINT(20) UNSIGNED NULL,
 			deferred_at DATETIME NULL,
 			last_seen_at DATETIME NULL,

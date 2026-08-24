@@ -40,32 +40,32 @@ class Execute {
 					return PermissionHelper::can( 'manage_flows' );
 				},
 				'args'                => array(
-					'flow_id'      => array(
+					'flow_id'       => array(
 						'type'        => 'integer',
 						'required'    => false,
 						'description' => 'Database flow ID to execute',
 					),
-					'workflow'     => array(
+					'workflow'      => array(
 						'type'        => 'object',
 						'required'    => false,
 						'description' => 'Ephemeral workflow structure',
 					),
-					'count'        => array(
+					'count'         => array(
 						'type'        => 'integer',
 						'required'    => false,
 						'description' => 'Number of times to run (1-10, database flow only)',
 					),
-					'timestamp'    => array(
+					'timestamp'     => array(
 						'type'        => 'integer',
 						'required'    => false,
 						'description' => 'Unix timestamp for delayed execution',
 					),
-					'initial_data' => array(
+					'initial_data'  => array(
 						'type'        => 'object',
 						'required'    => false,
 						'description' => 'Initial engine data to merge before workflow execution',
 					),
-					'dry_run'      => array(
+					'dry_run'       => array(
 						'type'        => 'boolean',
 						'required'    => false,
 						'default'     => false,
@@ -232,10 +232,10 @@ class Execute {
 	 * Handle ephemeral workflow execution via datamachine/execute-workflow.
 	 */
 	private static function handle_ephemeral_execution( $request ) {
-		$workflow     = $request->get_param( 'workflow' );
-		$timestamp    = $request->get_param( 'timestamp' );
-		$initial_data = $request->get_param( 'initial_data' );
-		$dry_run      = $request->get_param( 'dry_run' );
+		$workflow      = $request->get_param( 'workflow' );
+		$timestamp     = $request->get_param( 'timestamp' );
+		$initial_data  = $request->get_param( 'initial_data' );
+		$dry_run       = $request->get_param( 'dry_run' );
 		$operation_key = $request->get_param( 'operation_key' );
 
 		$ability = wp_get_ability( 'datamachine/execute-workflow' );
@@ -268,8 +268,8 @@ class Execute {
 		}
 
 		if ( ! ( $result['success'] ?? false ) ) {
-			$status = 400;
-			$error  = $result['error'] ?? __( 'Execution failed', 'data-machine' );
+			$status     = 400;
+			$error      = $result['error'] ?? __( 'Execution failed', 'data-machine' );
 			$error_data = array( 'status' => $status );
 
 			if ( false !== strpos( $error, 'not found' ) ) {
@@ -277,7 +277,7 @@ class Execute {
 			} elseif ( false !== strpos( $error, 'Failed to create' ) || false !== strpos( $error, 'not available' ) ) {
 				$status = 500;
 			} elseif ( ! empty( $result['retryable'] ) ) {
-				$status = 409;
+				$status                      = 409;
 				$error_data['retryable']     = true;
 				$error_data['enqueue_state'] = (string) ( $result['enqueue_state'] ?? 'enqueuing' );
 			}
