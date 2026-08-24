@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.13] - 2026-08-24
+
+### Fixed
+- register taxonomy warmer shutdown safely
+
 ## [0.55.12] - 2026-08-23
 
 ### Changed
