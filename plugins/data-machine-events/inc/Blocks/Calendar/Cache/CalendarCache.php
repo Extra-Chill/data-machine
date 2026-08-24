@@ -81,7 +81,7 @@ class CalendarCache {
 			&& empty( $params['user_date_range'] )
 			&& empty( $params['date_start'] )
 			&& empty( $params['date_end'] );
-		$key_data = array(
+		$key_data      = array(
 			'show_past'       => $params['show_past'] ?? false,
 			'search_query'    => $params['search_query'] ?? '',
 			'date_start'      => $params['date_start'] ?? '',
@@ -104,7 +104,7 @@ class CalendarCache {
 			'next_transition' => $live_upcoming ? self::next_upcoming_transition() : '',
 		);
 
-		return self::PREFIX . $prefix . '_' . md5( wp_json_encode( $key_data ) );
+		return self::PREFIX . $prefix . '_' . md5( (string) wp_json_encode( $key_data ) );
 	}
 
 	/**
@@ -120,12 +120,12 @@ class CalendarCache {
 	 * @return string Full cache key.
 	 */
 	public static function generate_full_response_key( array $envelope ): string {
-		$fixed_window = ! empty( $envelope['date_start'] )
+		$fixed_window  = ! empty( $envelope['date_start'] )
 			|| ! empty( $envelope['date_end'] )
 			|| ! empty( $envelope['month'] )
 			|| ! empty( $envelope['scope'] );
 		$live_upcoming = empty( $envelope['past'] ) && ! $fixed_window;
-		$key_data = array(
+		$key_data      = array(
 			'paged'            => (int) ( $envelope['paged'] ?? 1 ),
 			'past'             => (bool) ( $envelope['past'] ?? false ),
 			'event_search'     => (string) ( $envelope['event_search'] ?? '' ),
@@ -169,7 +169,7 @@ class CalendarCache {
 			'next_transition'  => $live_upcoming ? self::next_upcoming_transition() : '',
 		);
 
-		return self::FULL_PREFIX . md5( wp_json_encode( $key_data ) );
+		return self::FULL_PREFIX . md5( (string) wp_json_encode( $key_data ) );
 	}
 
 	/**
@@ -227,8 +227,25 @@ class CalendarCache {
 	 * Rotate the owner-scoped generation used by every calendar cache layer.
 	 */
 	public static function invalidate(): void {
-		self::get_generation();
-		update_option( self::GENERATION_OPTION, wp_generate_uuid4(), false );
+		self::publish_generation( wp_generate_uuid4() );
+	}
+
+	/**
+	 * Publish an exact generation, allowing crash-safe idempotent replays.
+	 *
+	 * @return bool Whether the requested generation is current.
+	 */
+	public static function publish_generation( string $generation ): bool {
+		$current = self::get_generation();
+		if ( '' === $generation ) {
+			return false;
+		}
+		if ( hash_equals( $current, $generation ) ) {
+			return true;
+		}
+
+		return update_option( self::GENERATION_OPTION, $generation, false )
+			|| hash_equals( self::get_generation(), $generation );
 	}
 
 	/**

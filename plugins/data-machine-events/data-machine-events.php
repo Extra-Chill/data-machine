@@ -178,6 +178,7 @@ class DATAMACHINE_Events {
 	 */
 	public function init_taxonomy_inventory_warmer(): void {
 		if ( class_exists( '\DataMachine\Engine\AI\System\Tasks\SystemTask' ) ) {
+			\DataMachineEvents\Tasks\CalendarGenerationPublisher::init();
 			\DataMachineEvents\Tasks\TaxonomyInventoryWarmer::init();
 		}
 	}

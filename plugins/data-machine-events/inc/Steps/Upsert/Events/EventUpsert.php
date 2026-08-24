@@ -25,6 +25,7 @@ use DataMachine\Core\AbilityResult;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\PluginSettings;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
+use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\EventSchemaProvider;
@@ -36,6 +37,7 @@ use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
+use DataMachineEvents\Tasks\CalendarGenerationPublisher;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -200,9 +202,19 @@ class EventUpsert extends UpsertHandler {
 			);
 		}
 
+		$job_context        = $engine->get( 'job' );
+		$batch_parent_id    = is_array( $job_context ) ? absint( $job_context['parent_job_id'] ?? 0 ) : 0;
+		$defer_invalidation = CalendarGenerationPublisher::deferBatch( $batch_parent_id );
+		if ( $defer_invalidation ) {
+			CacheInvalidator::defer();
+		}
+
 		try {
 			return $this->executeUpsertWithinLock( $title, $venue, $identity_start, $ticketUrl, $parameters, $handler_config, $engine );
 		} finally {
+			if ( $defer_invalidation ) {
+				CacheInvalidator::resume();
+			}
 			$this->releaseUpsertLocks( $lock_keys );
 		}
 	}

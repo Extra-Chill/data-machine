@@ -19,7 +19,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CacheInvalidator {
 
-	private static bool $initialized = false;
+	private static bool $initialized           = false;
+	private static int $deferred_invalidations = 0;
 
 	/** @var array<string,array<array<int>>> LIFO removal frames scoped by object and taxonomy. */
 	private static array $pending_removed_terms = array();
@@ -212,7 +213,21 @@ class CacheInvalidator {
 	 * Invalidate all calendar caches
 	 */
 	public static function invalidate_all(): void {
+		if ( self::$deferred_invalidations > 0 ) {
+			return;
+		}
+
 		CalendarCache::invalidate();
+	}
+
+	/** Defer invalidations while a durable import-batch publication owns freshness. */
+	public static function defer(): void {
+		++self::$deferred_invalidations;
+	}
+
+	/** Restore immediate invalidation after the scoped import mutation. */
+	public static function resume(): void {
+		self::$deferred_invalidations = max( 0, self::$deferred_invalidations - 1 );
 	}
 }
 
