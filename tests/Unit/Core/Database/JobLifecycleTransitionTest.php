@@ -767,7 +767,15 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 	}
 
 	public function test_reopening_failed_job_starts_a_fresh_accounting_receipt(): void {
-		$job_id = $this->db_jobs->create_job( array( 'label' => 'Fresh retry accounting' ) );
+		$job_id = $this->db_jobs->create_job(
+			array(
+				'label'       => 'Fresh retry accounting',
+				'engine_data' => array(
+					'job_status_reason' => 'delegated_operation_failed',
+					'retry_context'     => 'preserved',
+				),
+			)
+		);
 		$this->assertIsInt( $job_id );
 		$this->assertTrue( $this->db_jobs->complete_job( $job_id, JobStatus::FAILED ) );
 		$this->assertSame( Jobs::TERMINAL_ACCOUNTING_COMPLETE, (int) $this->db_jobs->get_job( $job_id )['terminal_accounting_state'] );
@@ -776,6 +784,8 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$reopened = $this->db_jobs->get_job( $job_id );
 		$this->assertSame( JobStatus::PENDING, $reopened['status'] );
 		$this->assertNull( $reopened['terminal_accounting_state'] );
+		$this->assertArrayNotHasKey( 'job_status_reason', $reopened['engine_data'] );
+		$this->assertSame( 'preserved', $reopened['engine_data']['retry_context'] );
 
 		$this->assertTrue( $this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED ) );
 		$this->assertSame( Jobs::TERMINAL_ACCOUNTING_COMPLETE, (int) $this->db_jobs->get_job( $job_id )['terminal_accounting_state'] );

@@ -27,9 +27,6 @@ $check( false !== $source && str_contains( $source, 'final class DuplicateLoserA
 $composer = json_decode( (string) file_get_contents( $root . '/composer.json' ), true );
 $dev_files = $composer['autoload-dev']['files'] ?? array();
 $check( in_array( 'tests/fixtures/identity-store-doubles.php', $dev_files, true ), 'identity-store doubles must be explicitly autoloaded' );
-$check( in_array( 'tests/fixtures/engine-data.php', $dev_files, true ), 'EngineData compatibility fixture must be explicitly autoloaded' );
-$engine_fixture = file_get_contents( $root . '/tests/fixtures/engine-data.php' );
-$check( false !== $engine_fixture && str_contains( $engine_fixture, 'class_alias' ), 'EngineData compatibility must remain fixture-owned' );
 
 $clusters = array(
 	'agent context'       => 'tests/Unit/Abilities/AgentContextPropagationTest.php',

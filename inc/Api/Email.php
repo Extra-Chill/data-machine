@@ -477,9 +477,9 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
-			'auth_ref'        => self::mailbox_ref( $request ),
-			'folder'          => $request->get_param( 'folder' ) ?? 'INBOX',
-			'uid'             => (int) $request->get_param( 'uid' ),
+			'auth_ref' => self::mailbox_ref( $request ),
+			'folder'   => $request->get_param( 'folder' ) ?? 'INBOX',
+			'uid'      => (int) $request->get_param( 'uid' ),
 		) );
 
 		return self::to_response( $result );
@@ -513,8 +513,8 @@ class Email {
 
 		$result = $ability->execute( array(
 			'auth_ref' => self::mailbox_ref( $request ),
-			'uid'    => (int) $request->get_param( 'uid' ),
-			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
+			'uid'      => (int) $request->get_param( 'uid' ),
+			'folder'   => $request->get_param( 'folder' ) ?? 'INBOX',
 		) );
 
 		return self::to_response( $result );
@@ -527,7 +527,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
-			'auth_ref'     => self::mailbox_ref( $request ),
+			'auth_ref'    => self::mailbox_ref( $request ),
 			'uid'         => (int) $request->get_param( 'uid' ),
 			'destination' => $request->get_param( 'destination' ),
 			'folder'      => $request->get_param( 'folder' ) ?? 'INBOX',
@@ -544,10 +544,10 @@ class Email {
 
 		$result = $ability->execute( array(
 			'auth_ref' => self::mailbox_ref( $request ),
-			'uid'    => (int) $request->get_param( 'uid' ),
-			'flag'   => $request->get_param( 'flag' ),
-			'action' => $request->get_param( 'action' ) ?? 'set',
-			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
+			'uid'      => (int) $request->get_param( 'uid' ),
+			'flag'     => $request->get_param( 'flag' ),
+			'action'   => $request->get_param( 'action' ) ?? 'set',
+			'folder'   => $request->get_param( 'folder' ) ?? 'INBOX',
 		) );
 
 		return self::to_response( $result );
@@ -560,7 +560,7 @@ class Email {
 		}
 
 		$result = $ability->execute( array(
-			'auth_ref'     => self::mailbox_ref( $request ),
+			'auth_ref'    => self::mailbox_ref( $request ),
 			'search'      => $request->get_param( 'search' ),
 			'destination' => $request->get_param( 'destination' ),
 			'folder'      => $request->get_param( 'folder' ) ?? 'INBOX',
@@ -578,11 +578,11 @@ class Email {
 
 		$result = $ability->execute( array(
 			'auth_ref' => self::mailbox_ref( $request ),
-			'search' => $request->get_param( 'search' ),
-			'flag'   => $request->get_param( 'flag' ),
-			'action' => $request->get_param( 'action' ) ?? 'set',
-			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
-			'max'    => (int) ( $request->get_param( 'max' ) ?? 500 ),
+			'search'   => $request->get_param( 'search' ),
+			'flag'     => $request->get_param( 'flag' ),
+			'action'   => $request->get_param( 'action' ) ?? 'set',
+			'folder'   => $request->get_param( 'folder' ) ?? 'INBOX',
+			'max'      => (int) ( $request->get_param( 'max' ) ?? 500 ),
 		) );
 
 		return self::to_response( $result );
@@ -596,9 +596,9 @@ class Email {
 
 		$result = $ability->execute( array(
 			'auth_ref' => self::mailbox_ref( $request ),
-			'search' => $request->get_param( 'search' ),
-			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
-			'max'    => (int) ( $request->get_param( 'max' ) ?? 100 ),
+			'search'   => $request->get_param( 'search' ),
+			'folder'   => $request->get_param( 'folder' ) ?? 'INBOX',
+			'max'      => (int) ( $request->get_param( 'max' ) ?? 100 ),
 		) );
 
 		return self::to_response( $result );
@@ -612,8 +612,8 @@ class Email {
 
 		$result = $ability->execute( array(
 			'auth_ref' => self::mailbox_ref( $request ),
-			'uid'    => (int) $request->get_param( 'uid' ),
-			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
+			'uid'      => (int) $request->get_param( 'uid' ),
+			'folder'   => $request->get_param( 'folder' ) ?? 'INBOX',
 		) );
 
 		return self::to_response( $result );
@@ -627,9 +627,9 @@ class Email {
 
 		$result = $ability->execute( array(
 			'auth_ref' => self::mailbox_ref( $request ),
-			'search' => $request->get_param( 'search' ),
-			'folder' => $request->get_param( 'folder' ) ?? 'INBOX',
-			'max'    => (int) ( $request->get_param( 'max' ) ?? 20 ),
+			'search'   => $request->get_param( 'search' ),
+			'folder'   => $request->get_param( 'folder' ) ?? 'INBOX',
+			'max'      => (int) ( $request->get_param( 'max' ) ?? 20 ),
 		) );
 
 		return self::to_response( $result );
@@ -655,13 +655,13 @@ class Email {
 		return rest_ensure_response( $result );
 	}
 
-	private static function mailbox_ref( \WP_REST_Request $request, bool $default = true ): string {
+	private static function mailbox_ref( \WP_REST_Request $request, bool $use_default = true ): string {
 		$ref = trim( (string) $request->get_param( 'auth_ref' ) );
 		if ( '' === $ref ) {
 			$mailbox = trim( (string) $request->get_param( 'mailbox' ) );
 			$ref     = '' !== $mailbox ? 'email_imap:' . $mailbox : '';
 		}
-		return '' !== $ref ? $ref : ( $default ? 'email_imap:default' : '' );
+		return '' !== $ref ? $ref : ( $use_default ? 'email_imap:default' : '' );
 	}
 
 	private static function mailbox_args(): array {

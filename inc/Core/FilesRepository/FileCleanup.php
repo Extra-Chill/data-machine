@@ -309,7 +309,7 @@ class FileCleanup {
 				'warning',
 				'FileCleanup: Artifact is not readable by the cleanup runtime user.',
 				array(
-					'file_path'      => $file_path,
+					'file_path'       => $file_path,
 					'retention_scope' => $retention_scope,
 				)
 			);

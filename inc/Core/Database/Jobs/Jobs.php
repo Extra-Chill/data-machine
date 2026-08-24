@@ -23,6 +23,7 @@ use DataMachine\Core\DataPacketStore;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
+use DataMachine\Core\EngineData;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\RunLifecycleStore;
@@ -536,7 +537,7 @@ class Jobs extends BaseRepository {
 		}
 		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		unset( $engine['job_status_reason'] );
-		$engine['direct_operation_recovery'] = array(
+		$engine['direct_operation_recovery']   = array(
 			'schema'                        => 'datamachine.direct-operation-recovery.v1',
 			'state'                         => 'requeued',
 			'trigger'                       => sanitize_key( $trigger ),
@@ -546,9 +547,9 @@ class Jobs extends BaseRepository {
 			'operation_generation'          => $new_generation,
 			'recovered_at'                  => gmdate( 'c' ),
 		);
-		$run_lifecycle                       = is_array( $engine[ RunLifecycleStore::META_KEY ] ?? null ) ? $engine[ RunLifecycleStore::META_KEY ] : array();
-		$run_lifecycle['status']             = JobStatus::PENDING;
-		$run_lifecycle['updated_at']         = current_time( 'mysql', true );
+		$run_lifecycle                         = is_array( $engine[ RunLifecycleStore::META_KEY ] ?? null ) ? $engine[ RunLifecycleStore::META_KEY ] : array();
+		$run_lifecycle['status']               = JobStatus::PENDING;
+		$run_lifecycle['updated_at']           = current_time( 'mysql', true );
 		$engine[ RunLifecycleStore::META_KEY ] = $run_lifecycle;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -3808,10 +3809,10 @@ class Jobs extends BaseRepository {
 			operation_ref_hash char(64) NULL DEFAULT NULL,
 			operation_effects_begun_at datetime NULL DEFAULT NULL,
 			operation_envelope longtext NULL,
-			terminal_accounting_state tinyint unsigned NULL DEFAULT NULL,
+			terminal_accounting_state tinyint(3) unsigned NULL DEFAULT NULL,
 			terminal_accounting_owner varchar(64) NULL DEFAULT NULL,
 			terminal_accounting_claimed_at datetime NULL DEFAULT NULL,
-			terminal_accounting_processed_count int unsigned NOT NULL DEFAULT 0,
+			terminal_accounting_processed_count int(10) unsigned NOT NULL DEFAULT 0,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             completed_at datetime NULL DEFAULT NULL,
             PRIMARY KEY  (job_id),
