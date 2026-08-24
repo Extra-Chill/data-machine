@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 // Global tools. Each class declares the modes where its tool is visible.
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Global\AgentMemory;
-use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
+use DataMachine\Engine\AI\Configuration\ImageGenerationSettings;
 use DataMachine\Engine\AI\Tools\Global\QueueValidator;
 use DataMachine\Engine\AI\Tools\Global\WebFetch;
 
@@ -76,7 +76,7 @@ class ToolServiceProvider {
 		// Global tools. Each class declares its own mode visibility.
 		new AgentDailyMemory();
 		new AgentMemory();
-		new ImageGeneration();
+		new ImageGenerationSettings();
 		\datamachine_register_global_ability_tools();
 		new QueueValidator();
 		new WebFetch();

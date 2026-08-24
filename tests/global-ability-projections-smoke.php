@@ -114,12 +114,12 @@ foreach ( array( 'InternalLinkAudit.php', 'LocalSearch.php', 'WordPressPostReade
 	assert_global_projection( ! file_exists( $root . '/inc/Engine/AI/Tools/Global/' . $deleted_shell ), "{$deleted_shell} declaration shell is deleted", $failures, $passes );
 }
 
-$image_source = read_global_tool_source( 'inc/Engine/AI/Tools/Global/ImageGeneration.php', $root );
+$image_source = read_global_tool_source( 'inc/Engine/AI/Configuration/ImageGenerationSettings.php', $root );
 assert_global_projection( false === strpos( $image_source, 'datamachine_register_ability_tool' ), 'image_generation projection is separated from its bounded configuration adapter', $failures, $passes );
 assert_global_projection( false !== strpos( $image_source, "registerConfigurationHandlers( 'image_generation' )" ), 'image_generation retains its bounded configuration adapter', $failures, $passes );
 
 $provider_source = read_global_tool_source( 'inc/Engine/AI/Tools/ToolServiceProvider.php', $root );
-$image_position  = strpos( $provider_source, 'new ImageGeneration();' );
+$image_position  = strpos( $provider_source, 'new ImageGenerationSettings();' );
 $register_position = strpos( $provider_source, '\\datamachine_register_global_ability_tools();' );
 $queue_position    = strpos( $provider_source, 'new QueueValidator();' );
 assert_global_projection(

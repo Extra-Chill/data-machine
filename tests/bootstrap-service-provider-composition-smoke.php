@@ -71,7 +71,7 @@ $assert( substr_count( $main, 'register_activation_hook(' ) === 0, 'entrypoint n
 
 $tool_provider       = (string) file_get_contents( $root . '/inc/Engine/AI/Tools/ToolServiceProvider.php' );
 $tool_provider_order = array(
-	'new ImageGeneration();',
+	'new ImageGenerationSettings();',
 	'\\datamachine_register_global_ability_tools();',
 	'new QueueValidator();',
 );

@@ -1,28 +1,20 @@
 <?php
 /**
- * Image Generation tool — AI agent wrapper for the generate-image ability.
+ * Image generation tool settings adapter.
  *
- * Provides the AI-callable tool interface and settings page configuration.
- * Delegates actual image generation to the datamachine/generate-image ability.
+ * Provides settings-page configuration for the image generation ability tool.
  *
- * @package DataMachine\Engine\AI\Tools\Global
+ * @package DataMachine\Engine\AI\Configuration
  */
 
-namespace DataMachine\Engine\AI\Tools\Global;
+namespace DataMachine\Engine\AI\Configuration;
 
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Abilities\Media\ImageGenerationAbilities;
 use DataMachine\Engine\AI\Tools\BaseTool;
 
-class ImageGeneration extends BaseTool {
-
-	/**
-	 * This tool uses async execution via the System Agent.
-	 *
-	 * @var bool
-	 */
-	protected bool $async = true;
+class ImageGenerationSettings extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'image_generation' );
