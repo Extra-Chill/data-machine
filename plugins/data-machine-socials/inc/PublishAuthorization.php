@@ -1,6 +1,6 @@
 <?php
 /**
- * Canonical authorization policy for social publishing.
+ * Canonical authorization policy for shared social accounts.
  *
  * @package DataMachineSocials
  */
@@ -15,6 +15,16 @@ final class PublishAuthorization {
 
 	/** Determine whether the current execution context may publish socially. */
 	public static function can_publish(): bool {
+		return self::can( 'publish', 'publish_posts' );
+	}
+
+	/** Determine whether the current execution context may read or edit socially. */
+	public static function can_edit(): bool {
+		return self::can( 'edit', 'edit_posts' );
+	}
+
+	/** Apply the shared execution and owner authorization contract. */
+	private static function can( string $action, string $capability ): bool {
 		$scope = ExecutionScope::current( 'use_tools' );
 
 		// Preserve Data Machine's trusted non-user execution semantics and agent ceilings.
@@ -28,15 +38,15 @@ final class PublishAuthorization {
 		}
 
 		$user_id = $scope->acting_user_id();
-		$allowed = $user_id > 0 && user_can( $user_id, 'publish_posts' );
+		$allowed = $user_id > 0 && user_can( $user_id, $capability );
 
 		/*
-		 * Filter whether the acting user may publish to social accounts.
+		 * Filter whether the acting user may access shared social accounts.
 		 *
 		 * @param bool   $allowed Whether the base capability check passed.
 		 * @param string $action  The Socials action being gated.
 		 * @param int    $user_id The acting WordPress user ID.
 		 */
-		return (bool) apply_filters( 'datamachine_socials_user_can', $allowed, 'publish', $user_id );
+		return (bool) apply_filters( 'datamachine_socials_user_can', $allowed, $action, $user_id );
 	}
 }

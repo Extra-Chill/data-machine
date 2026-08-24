@@ -22,6 +22,8 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 	public function set_up(): void {
 		parent::set_up();
 		delete_site_option( 'datamachine_auth_data' );
+		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
+		wp_set_current_user( 0 );
 
 		$this->auth = new InstagramAuth();
 
@@ -38,9 +40,42 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 	public function tear_down(): void {
 		remove_all_filters( 'pre_http_request' );
 		remove_all_filters( 'datamachine_auth_providers' );
+		remove_all_filters( 'datamachine_cli_bypass_permissions' );
+		remove_all_filters( 'datamachine_socials_user_can' );
 		\DataMachine\Abilities\AuthAbilities::clearCache();
 		delete_site_option( 'datamachine_auth_data' );
+		wp_set_current_user( 0 );
 		parent::tear_down();
+	}
+
+	public function test_read_permission_denies_user_rejected_by_owner_policy(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'author' ) ) );
+		add_filter( 'datamachine_socials_user_can', '__return_false' );
+		$ability = wp_get_ability( 'datamachine/instagram-read' );
+
+		$this->assertNotNull( $ability );
+		$this->assertTrue( $ability->get_meta()['show_in_rest'] );
+		$this->assertFalse( $ability->check_permissions( array( 'action' => 'comments', 'media_id' => 'ig-media-1' ) ) );
+	}
+
+	public function test_read_permission_allows_authorized_owner(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'author' ) );
+		wp_set_current_user( $user_id );
+		add_filter(
+			'datamachine_socials_user_can',
+			function ( bool $allowed, string $action, int $acting_user_id ) use ( $user_id ): bool {
+				$this->assertTrue( $allowed );
+				$this->assertSame( 'edit', $action );
+				$this->assertSame( $user_id, $acting_user_id );
+				return true;
+			},
+			10,
+			3
+		);
+		$ability = wp_get_ability( 'datamachine/instagram-read' );
+
+		$this->assertNotNull( $ability );
+		$this->assertTrue( $ability->check_permissions( array( 'action' => 'comments', 'media_id' => 'ig-media-1' ) ) );
 	}
 
 	/*

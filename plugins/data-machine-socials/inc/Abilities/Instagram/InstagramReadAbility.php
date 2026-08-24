@@ -12,8 +12,8 @@
 
 namespace DataMachineSocials\Abilities\Instagram;
 
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\PublishAuthorization;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
@@ -106,7 +106,7 @@ class InstagramReadAbility extends AbstractSocialAbility {
 	 * @return bool
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		return PublishAuthorization::can_edit();
 	}
 
 	/**
