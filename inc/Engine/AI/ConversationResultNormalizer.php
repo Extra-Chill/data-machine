@@ -44,7 +44,7 @@ final class ConversationResultNormalizer {
 	 * @param int                          $turn_ceiling             Max-turn ceiling from the turn budget.
 	 * @param DataMachineCompletionAssertions $assertions            Completion assertions for this run.
 	 * @param array                        $loop_payload             Cleaned loop payload (assertion evaluation context).
-	 * @return ConversationResultNormalization Normalized metadata and final status.
+	 * @return array{metadata:array<string,mixed>,status:string,status_overridden:bool} Normalized metadata and final status.
 	 */
 	public static function normalize(
 		array $result,
@@ -56,7 +56,7 @@ final class ConversationResultNormalizer {
 		int $turn_ceiling,
 		DataMachineCompletionAssertions $assertions,
 		array $loop_payload
-	): ConversationResultNormalization {
+	): array {
 		$status            = (string) ( $result['status'] ?? '' );
 		$status_overridden = false;
 
@@ -140,6 +140,10 @@ final class ConversationResultNormalizer {
 			);
 		}
 
-		return new ConversationResultNormalization( $datamachine_metadata, $status, $status_overridden );
+		return array(
+			'metadata'          => $datamachine_metadata,
+			'status'            => $status,
+			'status_overridden' => $status_overridden,
+		);
 	}
 }
