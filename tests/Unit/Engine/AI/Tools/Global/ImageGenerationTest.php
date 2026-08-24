@@ -98,8 +98,9 @@ class ImageGenerationTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'default_provider', $fields );
 	}
 
-	public function test_get_tool_definition_has_required_keys(): void {
-		$def = $this->tool->getToolDefinition();
+	public function test_ability_projection_has_required_keys(): void {
+		$tools = apply_filters( 'datamachine_ability_tool_projections', [] );
+		$def   = $tools['image_generation'];
 		$this->assertArrayHasKey( 'description', $def );
 		$this->assertArrayHasKey( 'requires_config', $def );
 		$this->assertArrayHasKey( 'parameters', $def );

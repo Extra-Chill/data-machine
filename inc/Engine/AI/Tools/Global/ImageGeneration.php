@@ -26,54 +26,6 @@ class ImageGeneration extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'image_generation' );
-		if ( ! function_exists( '\datamachine_register_ability_tool' ) ) {
-			return;
-		}
-
-		\datamachine_register_ability_tool(
-			'image_generation',
-			array_merge(
-				$this->getToolDefinition(),
-				array(
-					'ability' => 'datamachine/generate-image',
-					'modes'   => array( 'chat', 'pipeline' ),
-				)
-			)
-		);
-	}
-
-	/**
-	 * Get tool definition for AI agents.
-	 *
-	 * @return array Tool definition array.
-	 */
-	public function getToolDefinition(): array {
-		return array(
-			'description'     => 'Generate images using wp-ai-client image models. Returns a pending image-generation job that will sideload the generated image and optionally set it as featured media. Use descriptive, detailed prompts for best results. Default aspect ratio is 3:4 (portrait, ideal for Pinterest and blog featured images).',
-			'requires_config' => true,
-			'parameters'      => array(
-				'type'       => 'object',
-				'properties' => array(
-					'prompt'       => array(
-					'type'        => 'string',
-					'description' => 'Detailed image generation prompt describing the desired image. Be specific about style, composition, lighting, and subject.',
-				),
-					'model'        => array(
-					'type'        => 'string',
-					'description' => 'wp-ai-client model identifier. Defaults to the image generation tool configuration.',
-				),
-					'provider'     => array(
-					'type'        => 'string',
-					'description' => 'wp-ai-client provider identifier. Defaults to the image generation tool configuration.',
-				),
-					'aspect_ratio' => array(
-					'type'        => 'string',
-					'description' => 'Image aspect ratio. Options: 1:1, 3:4, 4:3, 9:16, 16:9. Default: 3:4 (portrait).',
-				),
-				),
-				'required'   => array( 'prompt' ),
-			),
-		);
 	}
 
 	/**

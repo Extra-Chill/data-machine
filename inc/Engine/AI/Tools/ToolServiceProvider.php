@@ -18,11 +18,8 @@ defined( 'ABSPATH' ) || exit;
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Global\AgentMemory;
 use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
-use DataMachine\Engine\AI\Tools\Global\InternalLinkAudit;
-use DataMachine\Engine\AI\Tools\Global\LocalSearch;
 use DataMachine\Engine\AI\Tools\Global\QueueValidator;
 use DataMachine\Engine\AI\Tools\Global\WebFetch;
-use DataMachine\Engine\AI\Tools\Global\WordPressPostReader;
 
 // Chat-only tools.
 use DataMachine\Api\Chat\Tools\AddPipelineStep;
@@ -80,11 +77,8 @@ class ToolServiceProvider {
 		new AgentDailyMemory();
 		new AgentMemory();
 		new ImageGeneration();
-		new InternalLinkAudit();
-		new LocalSearch();
 		new QueueValidator();
 		new WebFetch();
-		new WordPressPostReader();
 
 		// Chat-only tools.
 		new ConsultAgent();
