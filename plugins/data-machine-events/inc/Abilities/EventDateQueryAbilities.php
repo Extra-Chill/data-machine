@@ -738,6 +738,74 @@ class EventDateQueryAbilities {
 	}
 
 	/**
+	 * Build canonical SQL that counts matching events by taxonomy term.
+	 *
+	 * The query changes only the captured SELECT/GROUP BY shape. Date, search,
+	 * geo, taxonomy, and consumer constraints still pass through the canonical
+	 * WP_Query path, while the result remains bounded to taxonomy terms rather
+	 * than returning every matching post ID to PHP.
+	 *
+	 * @param array    $input      Query-events ability input.
+	 * @param string[] $taxonomies Taxonomies whose direct term counts are needed.
+	 * @return string|false SQL selecting taxonomy, term_id, and event_count, or false when preempted.
+	 */
+	public function buildMatchingTermCountSql( array $input, array $taxonomies ) {
+		global $wpdb;
+
+		$taxonomies = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'sanitize_key', $taxonomies ),
+					'taxonomy_exists'
+				)
+			)
+		);
+		if ( empty( $taxonomies ) ) {
+			return '';
+		}
+
+		$taxonomy_sql = $wpdb->prepare(
+			implode( ', ', array_fill( 0, count( $taxonomies ), '%s' ) ),
+			...$taxonomies
+		);
+
+		$request                                    = '';
+		$supported                                  = true;
+		$input['fields']                            = 'ids';
+		$input['per_page']                          = -1;
+		$input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] = array( 'taxonomy_sql' => $taxonomy_sql );
+
+		$capture = static function ( $posts, $query ) use ( &$request, &$supported ) {
+			if ( ! $query->get( self::CAPTURE_AGGREGATE_QUERY_VAR ) ) {
+				return $posts;
+			}
+			if ( null !== $posts ) {
+				$supported = false;
+				return $posts;
+			}
+
+			$request = $query->request;
+			return array();
+		};
+
+		add_filter( 'posts_pre_query', $capture, PHP_INT_MAX, 2 );
+		try {
+			$this->executeQueryEvents( $input );
+		} finally {
+			remove_filter( 'posts_pre_query', $capture, PHP_INT_MAX );
+		}
+
+		if ( ! $supported
+			|| false === stripos( $request, ' AS event_count' )
+			|| false === stripos( $request, 'GROUP BY count_tt.taxonomy, count_tt.term_id' )
+		) {
+			return false;
+		}
+
+		return $request;
+	}
+
+	/**
 	 * Execute an exact count through the canonical WP_Query constraint path.
 	 *
 	 * @param array $input Query-events ability input.
@@ -862,7 +930,13 @@ class EventDateQueryAbilities {
 
 			// Taxonomy and consumer joins may match more than one relationship for
 			// a post. Calendar rows represent canonical events, never join rows.
-			if ( ! empty( $aggregate ) ) {
+			if ( isset( $aggregate['taxonomy_sql'] ) ) {
+				$clauses['join']    .= " INNER JOIN {$wpdb->term_relationships} count_tr ON {$wpdb->posts}.ID = count_tr.object_id";
+				$clauses['join']    .= " INNER JOIN {$wpdb->term_taxonomy} count_tt ON count_tr.term_taxonomy_id = count_tt.term_taxonomy_id AND count_tt.taxonomy IN ({$aggregate['taxonomy_sql']})";
+				$clauses['fields']   = "count_tt.taxonomy, count_tt.term_id, COUNT(DISTINCT {$wpdb->posts}.ID) AS event_count";
+				$clauses['distinct'] = '';
+				$clauses['groupby']  = 'count_tt.taxonomy, count_tt.term_id';
+			} elseif ( ! empty( $aggregate ) ) {
 				$start_expression    = $aggregate['start_expression'];
 				$end_expression      = $aggregate['end_expression'];
 				$bucket_count        = $count_rows_directly ? 'COUNT(*)' : "COUNT(DISTINCT {$wpdb->posts}.ID)";
@@ -885,7 +959,8 @@ class EventDateQueryAbilities {
 			// datetime range so MySQL can use the start_datetime index.
 			if ( ! empty( $date_match ) ) {
 				$start             = $date_match . ' 00:00:00';
-				$end               = gmdate( 'Y-m-d H:i:s', strtotime( $start . ' +1 day' ) );
+				$end_timestamp     = strtotime( $start . ' +1 day' );
+				$end               = false === $end_timestamp ? $start : gmdate( 'Y-m-d H:i:s', $end_timestamp );
 				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime >= %s AND ed.start_datetime < %s', $start, $end );
 			} elseif ( ! empty( $date_start ) || ! empty( $date_end ) ) {
 				// Explicit date range — delegates to UpcomingFilter.
@@ -941,7 +1016,7 @@ class EventDateQueryAbilities {
 
 		$dates     = EventDatesTable::get( (int) $post->ID );
 		$permalink = get_permalink( $post );
-		if ( ! $dates || ! is_string( $permalink ) ) {
+		if ( ! $dates || ! $permalink ) {
 			return null;
 		}
 
@@ -981,7 +1056,7 @@ class EventDateQueryAbilities {
 			if ( __CLASS__ === $class || 'WP_Query' === $class ) {
 				continue;
 			}
-			$caller = $class . '::' . ( $frame['function'] ?? 'unknown' );
+			$caller = $class . '::' . $frame['function'];
 			break;
 		}
 
