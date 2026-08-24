@@ -535,9 +535,9 @@ class Jobs extends BaseRepository {
 			$result['reason'] = 'action_receipt_missing';
 			return $result;
 		}
-		$engine   = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		unset( $engine['job_status_reason'] );
-		$engine['direct_operation_recovery'] = array(
+		$engine['direct_operation_recovery']   = array(
 			'schema'                        => 'datamachine.direct-operation-recovery.v1',
 			'state'                         => 'requeued',
 			'trigger'                       => sanitize_key( $trigger ),
