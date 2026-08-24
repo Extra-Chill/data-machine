@@ -10,7 +10,10 @@ namespace DataMachine\Core\Bootstrap;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Abilities\AbilityCategories;
-use DataMachine\Abilities\AbilityManifest;
+use DataMachine\Abilities\AgentAbilities;
+use DataMachine\Abilities\Media\ImageTemplateAbilities;
+use DataMachine\Abilities\Publish\SendEmailAbility;
+use DataMachine\Abilities\Publish\SendEmailQueuedAbility;
 
 /**
  * Registers lightweight and full-runtime ability surfaces.
@@ -21,13 +24,11 @@ final class AbilityServiceProvider {
 	 * Register abilities required on lightweight requests.
 	 */
 	public static function register_lightweight(): void {
-		$plugin_root = dirname( __DIR__, 3 );
-
-		require_once $plugin_root . '/inc/Abilities/AbilityCategories.php';
 		AbilityCategories::ensure_registered();
-
-		require_once $plugin_root . '/inc/Abilities/AbilityManifest.php';
-		AbilityManifest::register( self::lightweight_ability_manifest() );
+		new AgentAbilities();
+		ImageTemplateAbilities::ensure_registered();
+		SendEmailAbility::ensure_registered();
+		SendEmailQueuedAbility::ensure_registered();
 	}
 
 	/**
@@ -37,67 +38,10 @@ final class AbilityServiceProvider {
 		$plugin_root = dirname( __DIR__, 3 );
 
 		// Register ability categories first — must happen before any ability registration.
-		require_once $plugin_root . '/inc/Abilities/AbilityCategories.php';
-		\DataMachine\Abilities\AbilityCategories::ensure_registered();
+		AbilityCategories::ensure_registered();
 
-		// Load abilities.
-		require_once $plugin_root . '/inc/Abilities/AuthAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/AI/InspectRequestAbility.php';
-		require_once $plugin_root . '/inc/Abilities/File/FileConstants.php';
-		require_once $plugin_root . '/inc/Abilities/File/AgentFileAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/File/FlowFileAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/File/ScaffoldAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Job/JobHelpers.php';
-		require_once $plugin_root . '/inc/Abilities/LogAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/PostQueryAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/PipelineStepAbilities.php';
-		require_once $plugin_root . '/inc/Core/Similarity/SimilarityResult.php';
-		require_once $plugin_root . '/inc/Core/Similarity/SimilarityEngine.php';
-		require_once $plugin_root . '/inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php';
-		require_once $plugin_root . '/inc/Abilities/ProcessedItemsAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/TrackedItemsAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/SettingsAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/HandlerAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/StepTypeAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/LocalSearchAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/SourceAggregateAbility.php';
-		require_once $plugin_root . '/inc/Core/SourceAggregation/SourceInventoryProfiler.php';
-		require_once $plugin_root . '/inc/Abilities/SourceInventoryAbility.php';
-		require_once $plugin_root . '/inc/Abilities/SystemAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Media/AltTextAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Media/ImageGenerationAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Media/MediaAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/SEO/MetaDescriptionAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/AgentCallAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/AgentRemoteCallAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Runtime/RuntimeTaskAbility.php';
-		require_once $plugin_root . '/inc/Abilities/AgentAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/AgentMemoryAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/InjectableMemoryFilesAbility.php';
-		require_once $plugin_root . '/inc/Abilities/DailyMemoryAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/InternalLinkingAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Content/BlockSanitizer.php';
-		require_once $plugin_root . '/inc/Abilities/Content/CanonicalDiffPreview.php';
-		require_once $plugin_root . '/inc/Abilities/Content/GetPostBlocksAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Content/EditPostBlocksAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Content/UpsertPostAbility.php';
+		// This file registers pending-action handlers at load time.
 		require_once $plugin_root . '/inc/Abilities/Content/ContentActionHandlers.php';
-		// GitHubAbilities moved to data-machine-code extension.
-		require_once $plugin_root . '/inc/Abilities/Fetch/FetchFilesAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Email/EmailAbilities.php';
-		require_once $plugin_root . '/inc/Abilities/Fetch/FetchEmailAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Fetch/FetchRssAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Fetch/FetchWordPressApiAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Fetch/FetchWordPressMediaAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Fetch/GetWordPressPostAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Fetch/QueryWordPressPostsAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Publish/PublishWordPressAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Publish/SendEmailAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Update/UpdateWordPressAbility.php';
-		require_once $plugin_root . '/inc/Abilities/Handler/TestHandlerAbility.php';
 
 		new \DataMachine\Abilities\AuthAbilities();
 		new \DataMachine\Abilities\AI\InspectRequestAbility();
@@ -200,36 +144,5 @@ final class AbilityServiceProvider {
 
 		// Task registry initialization can resolve abilities, so register it last.
 		new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
-	}
-
-	/**
-	 * Declare abilities whose schemas are cheap enough for lite requests.
-	 *
-	 * @return array<int, array{file:string,class:string,method?:string}>
-	 */
-	private static function lightweight_ability_manifest(): array {
-		$plugin_root = dirname( __DIR__, 3 );
-
-		return array(
-			array(
-				'file'  => $plugin_root . '/inc/Abilities/AgentAbilities.php',
-				'class' => \DataMachine\Abilities\AgentAbilities::class,
-			),
-			array(
-				'file'   => $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php',
-				'class'  => \DataMachine\Abilities\Media\ImageTemplateAbilities::class,
-				'method' => 'ensure_registered',
-			),
-			array(
-				'file'   => $plugin_root . '/inc/Abilities/Publish/SendEmailAbility.php',
-				'class'  => \DataMachine\Abilities\Publish\SendEmailAbility::class,
-				'method' => 'ensure_registered',
-			),
-			array(
-				'file'   => $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php',
-				'class'  => \DataMachine\Abilities\Publish\SendEmailQueuedAbility::class,
-				'method' => 'ensure_registered',
-			),
-		);
 	}
 }
