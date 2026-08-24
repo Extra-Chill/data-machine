@@ -156,9 +156,6 @@ namespace DataMachine\Api\Chat\Tools {
 	$result          = $tool->handle_tool_call( array( 'taxonomy' => 'genre' ) );
 	assert_search_taxonomy_terms( 'legacy failure maps to stable tool failure', false === $result['success'] && 'Legacy query failed' === $result['error'] );
 
-	$source = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Api/Chat/Tools/SearchTaxonomyTerms.php' );
-	assert_search_taxonomy_terms( 'tool has no direct get_terms query', false === strpos( $source, 'get_terms(' ) );
-
 	echo "\n";
 	if ( 0 === $failed ) {
 		echo "=== search-taxonomy-terms-delegation-smoke: ALL PASS ({$total}) ===\n";

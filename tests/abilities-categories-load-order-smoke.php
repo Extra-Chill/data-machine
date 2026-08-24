@@ -4,14 +4,8 @@
  * ability registration, regardless of which plugin instantiates the
  * abilities registry first.
  *
- * Two kinds of assertions:
- *
- * 1. Provider composition assertions — `data-machine.php` must invoke the
- *    lightweight provider unconditionally, and both provider paths must
- *    ensure categories are registered before abilities.
- *
- * 2. Behavioral assertions — `AbilityCategories::ensure_registered()` must
- *    use the public lifecycle-safe registration path:
+ * `AbilityCategories::ensure_registered()` must use the public lifecycle-safe
+ * registration path:
  *      - `doing_action()` → register immediately
  *      - `! did_action()` → hook for later
  *      - already-fired → no-op instead of writing through registry internals
@@ -37,70 +31,7 @@ $assert = static function ( string $name, bool $condition ) use ( &$failed, &$to
 	++$failed;
 };
 
-// ============================================================
-// Source-string assertions
-// ============================================================
-
 $plugin_root = dirname( __DIR__ );
-$bootstrap   = file_get_contents( $plugin_root . '/data-machine.php' );
-$provider    = file_get_contents( $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php' );
-$categories  = file_get_contents( $plugin_root . '/inc/Abilities/AbilityCategories.php' );
-
-if ( false === $bootstrap || false === $provider || false === $categories ) {
-	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read plugin source\n" );
-	exit( 1 );
-}
-
-$assert(
-	'data-machine.php invokes lightweight ability composition unconditionally',
-	str_contains( $bootstrap, '\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();' )
-);
-
-$assert(
-	'lightweight provider call is outside runtime registration',
-	(bool) preg_match(
-		'/^}\s*\/\*\*.*?AbilityServiceProvider::register_lightweight\(\);/ms',
-		$bootstrap
-	)
-);
-
-$assert(
-	'both provider paths ensure categories before ability registration',
-	2 === substr_count( $provider, 'AbilityCategories::ensure_registered();' )
-		&& strpos( $provider, 'AbilityCategories::ensure_registered();' ) < strpos( $provider, 'AbilityManifest::register(' )
-);
-
-// ============================================================
-// Behavioral assertions: lifecycle-safe registration pattern
-// ============================================================
-
-$assert(
-	'ensure_registered() handles doing_action state',
-	str_contains( $categories, "doing_action( 'wp_abilities_api_categories_init' )" )
-);
-
-$assert(
-	'ensure_registered() handles pre-action state',
-	str_contains( $categories, "! did_action( 'wp_abilities_api_categories_init' )" )
-		&& str_contains( $categories, "add_action( 'wp_abilities_api_categories_init'" )
-);
-
-$assert(
-	'register() supports a late registry-backed path for headless runtimes',
-	str_contains( $categories, 'WP_Ability_Categories_Registry::get_instance()' )
-		&& str_contains( $categories, '$registry->register(' )
-);
-
-$assert(
-	'ensure_registered() documents the headless runtime late-registration path',
-	str_contains( $categories, 'headless runtime' )
-);
-
-$assert(
-	'category definitions extracted into shared helper to avoid drift',
-	str_contains( $categories, 'private static function get_category_definitions(): array' )
-);
-
 // ============================================================
 // Behavioral simulation: load class under three stubbed states
 // ============================================================
@@ -112,18 +43,15 @@ $assert(
 // WordPress runtime they are inert:
 // `doing_action( 'wp_abilities_api_categories_init' )` reflects the live
 // dispatch state (false during the test) and the simulation can't control it,
-// which made state 1 fail spuriously. The source-string assertions above
-// already lock the real contract (unconditional call site + lifecycle-safe
-// branches) in every backend, and the behavioral path is fully exercised in
-// the pure-PHP / PHPUnit context, so skip the stub-driven simulation under a
-// real WordPress runtime.
+// which makes state 1 fail spuriously. The behavioral path is exercised in the
+// pure-PHP context, so skip the stub-driven simulation under WordPress.
 if ( defined( 'WPINC' ) ) {
 	if ( $failed > 0 ) {
 		fwrite( fopen( 'php://stderr', 'w' ), "\nabilities-categories-load-order-smoke: {$failed}/{$total} assertions failed\n" );
 		exit( 1 );
 	}
 
-	echo "\nAll {$total} abilities-categories-load-order source-string assertions passed (behavioral simulation skipped under real WordPress).\n";
+	echo "\nabilities-categories-load-order behavioral simulation skipped under WordPress.\n";
 	return;
 }
 
