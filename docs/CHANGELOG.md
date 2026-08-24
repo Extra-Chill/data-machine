@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.22] - 2026-08-24
+
+### Fixed
+- mark Jobs permission request unused
+- preserve Jobs delete REST error
+
 ## [0.175.21] - 2026-08-24
 
 ### Changed
