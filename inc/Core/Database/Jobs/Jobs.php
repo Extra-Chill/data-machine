@@ -23,6 +23,7 @@ use DataMachine\Core\DataPacketStore;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
+use DataMachine\Core\EngineData;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\RunLifecycleStore;
