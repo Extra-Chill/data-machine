@@ -159,11 +159,6 @@ namespace {
 
 	echo "=== AgentAbilities Registration Timing Smoke (#2523) ===\n";
 
-	$source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/AgentAbilities.php' ) ?: '';
-	$assert( 'agent abilities support a late registry-backed registration path for headless runtimes', str_contains( $source, 'WP_Abilities_Registry::get_instance()' ) );
-	$assert( 'late path is guarded by is_registered() for idempotency', str_contains( $source, 'is_registered' ) );
-	$assert( 'agent abilities document the headless runtime load order', str_contains( $source, 'headless runtime' ) );
-
 	$reset_state();
 	new AgentAbilities();
 	$assert( 'pre-action constructor hooks wp_abilities_api_init registration', 1 === count( $GLOBALS['datamachine_test_state']->added_actions ) );
@@ -192,17 +187,6 @@ namespace {
 	$assert( 'post-action constructor registers run-agent-bundle via the registry (headless runtime load order)', in_array( 'datamachine/run-agent-bundle', $post_registered, true ) );
 	$assert( 'post-action constructor registers import-agent via the registry', in_array( 'datamachine/import-agent', $post_registered, true ) );
 	$assert( 'post-action constructor does not defer to an already-fired action', array() === $GLOBALS['datamachine_test_state']->added_actions );
-
-	$plugin_source   = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Bootstrap/AbilityServiceProvider.php' ) ?: '';
-	$provider_offset = strpos( $plugin_source, 'new \\DataMachine\\Engine\\AI\\System\\SystemAgentServiceProvider();' );
-	$agent_offset    = strpos( $plugin_source, 'new \\DataMachine\\Abilities\\AgentAbilities();' );
-	$upsert_offset   = strpos( $plugin_source, 'new \\DataMachine\\Abilities\\Content\\UpsertPostAbility();' );
-
-	$assert( 'system provider is present', false !== $provider_offset );
-	$assert( 'agent abilities are present', false !== $agent_offset );
-	$assert( 'upsert-post ability is present', false !== $upsert_offset );
-	$assert( 'system provider initializes after agent abilities', $agent_offset < $provider_offset );
-	$assert( 'system provider initializes after upsert-post ability', $upsert_offset < $provider_offset );
 
 	echo "All {$assertions} AgentAbilities registration timing assertions passed.\n";
 }

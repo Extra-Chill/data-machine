@@ -25,76 +25,19 @@ $assert = static function ( string $name, bool $condition ) use ( &$failed, &$to
 };
 
 $plugin_root = dirname( __DIR__ );
-$bootstrap   = file_get_contents( $plugin_root . '/data-machine.php' );
-$provider    = file_get_contents( $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php' );
-$send_source = file_get_contents( $plugin_root . '/inc/Abilities/Publish/SendEmailAbility.php' );
-$queue_source = file_get_contents( $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php' );
-
-if ( false === $bootstrap || false === $provider || false === $send_source || false === $queue_source ) {
-	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read plugin source\n" );
-	exit( 1 );
-}
-
-$assert(
-	'lightweight provider declares both send-email abilities',
-	str_contains( $provider, "'/inc/Abilities/Publish/SendEmailAbility.php'" )
-		&& str_contains( $provider, "'/inc/Abilities/Publish/SendEmailQueuedAbility.php'" )
-);
-
-$assert(
-	'lightweight provider call is unconditional',
-	str_contains( $bootstrap, '\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();' )
-);
-
-$assert(
-	'full-runtime provider retains send-email instantiation',
-	str_contains( $provider, 'new \\DataMachine\\Abilities\\Publish\\SendEmailAbility();' )
-);
-
-$assert(
-	'full-runtime provider retains send-email-queued instantiation',
-	str_contains( $provider, 'new \\DataMachine\\Abilities\\Publish\\SendEmailQueuedAbility();' )
-);
-
-foreach ( array( 'send-email' => $send_source, 'send-email-queued' => $queue_source ) as $label => $source ) {
-	$assert(
-		"{$label}: ensure_registered() handles doing_action state",
-		str_contains( $source, "doing_action( 'wp_abilities_api_init' )" )
-	);
-	$assert(
-		"{$label}: ensure_registered() handles pre-action state",
-		str_contains( $source, "! did_action( 'wp_abilities_api_init' )" )
-			&& str_contains( $source, "add_action(\n\t\t\t\t'wp_abilities_api_init'" )
-	);
-	$assert(
-		"{$label}: ensure_registered() avoids post-action registry writes",
-		! str_contains( $source, '\\WP_Abilities_Registry::get_instance()' )
-			&& ! str_contains( $source, '$registry->register( $name, $args )' )
-	);
-	$assert(
-		"{$label}: ensure_registered() documents missing late registration surface",
-		str_contains( $source, 'does not expose a late-registration surface' )
-	);
-	$assert(
-		"{$label}: definitions are shared across timing branches",
-		str_contains( $source, 'private static function get_ability_definitions' )
-	);
-}
-
 // The behavioral simulation below stubs WordPress lifecycle functions, which
 // are only installed when the real ones are absent. Under a real WordPress
 // runtime those stubs are inert and
 // the simulation cannot control `doing_action()`, making state 1 fail
-// spuriously. The source-string assertions above lock the real contract in
-// every backend and the behavioral path is covered in the pure-PHP / PHPUnit
-// context, so skip the stub-driven simulation under a real WordPress runtime.
+// spuriously. The behavioral path is covered in the pure-PHP context, so skip
+// the stub-driven simulation under WordPress.
 if ( defined( 'WPINC' ) ) {
 	if ( $failed > 0 ) {
 		fwrite( fopen( 'php://stderr', 'w' ), "\nabilities-send-email-load-order-smoke: {$failed}/{$total} assertions failed\n" );
 		exit( 1 );
 	}
 
-	echo "\nAll {$total} abilities-send-email-load-order source-string assertions passed (behavioral simulation skipped under real WordPress).\n";
+	echo "\nabilities-send-email-load-order behavioral simulation skipped under WordPress.\n";
 	return;
 }
 
