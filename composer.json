@@ -23,17 +23,13 @@
 			"DataMachine\\Cli\\": "inc/Cli/",
 			"DataMachine\\Core\\": "inc/Core/",
 			"DataMachine\\Engine\\": "inc/Engine/"
-		},
-		"files": [
-			"inc/Engine/AI/conversation-loop.php"
-		]
+		}
 	},
 	"autoload-dev": {
 		"psr-4": {
 			"DataMachine\\Tests\\": "tests/"
 		},
 		"files": [
-			"tests/fixtures/identity-store-doubles.php",
 			"tests/fixtures/phpunit-isolation.php"
 		]
 	},

@@ -3,7 +3,7 @@
  * Processed Items REST API Endpoint
  *
  * Provides REST API access to clear processed items tracking for deduplication.
- * Delegates to ProcessedItemsAbilities for core logic.
+ * Delegates to the registered clear-processed-items ability.
  * Requires WordPress manage_options capability for all operations.
  *
  * Endpoints:
@@ -15,22 +15,12 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Abilities\ProcessedItemsAbilities;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class ProcessedItems {
-
-	private static ?ProcessedItemsAbilities $abilities = null;
-
-	private static function getAbilities(): ProcessedItemsAbilities {
-		if ( null === self::$abilities ) {
-			self::$abilities = new ProcessedItemsAbilities();
-		}
-		return self::$abilities;
-	}
 
 	/**
 	 * Register REST API routes
@@ -94,7 +84,12 @@ class ProcessedItems {
 		$clear_type = $request->get_param( 'clear_type' );
 		$target_id  = (int) $request->get_param( 'target_id' );
 
-		$result = self::getAbilities()->executeClearProcessedItems(
+		$ability = wp_get_ability( 'datamachine/clear-processed-items' );
+		if ( ! $ability ) {
+			return new \WP_Error( 'ability_not_found', __( 'Ability not found', 'data-machine' ), array( 'status' => 500 ) );
+		}
+
+		$result = $ability->execute(
 			array(
 				'clear_type' => $clear_type,
 				'target_id'  => $target_id,

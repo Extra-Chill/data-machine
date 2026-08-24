@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.20] - 2026-08-24
+
+### Changed
+- remove redundant source-inspection appendices
+- route processed items through ability
+- align direct operation recovery assignments
+- restore clean full-tree lint gate
+
+### Fixed
+- make Composer autoload safe outside WordPress
+
 ## [0.175.19] - 2026-08-24
 
 ### Fixed

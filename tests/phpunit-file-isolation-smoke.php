@@ -16,17 +16,57 @@ $check    = static function ( bool $condition, string $message ) use ( &$failure
 		$failures[] = $message;
 	}
 };
+$run      = static function ( array $command ) use ( $root ): array {
+	$process = proc_open( $command, array( 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes, $root );
+	if ( ! is_resource( $process ) ) {
+		return array( 1, '', 'Failed to start process.' );
+	}
 
-$fixture = $root . '/tests/fixtures/identity-store-doubles.php';
-$source  = file_get_contents( $fixture );
-$check( false !== $source, 'identity-store doubles fixture must be readable' );
-$check( false !== $source && str_contains( $source, 'final class FailingProvisionAdapter' ), 'failing provision double must be fixture-owned' );
-$check( false !== $source && str_contains( $source, 'final class CountingProvisionAdapter' ), 'counting provision double must be fixture-owned' );
-$check( false !== $source && str_contains( $source, 'final class DuplicateLoserAgents' ), 'duplicate loser double must be fixture-owned' );
+	$stdout = stream_get_contents( $pipes[1] );
+	$stderr = stream_get_contents( $pipes[2] );
+	fclose( $pipes[1] );
+	fclose( $pipes[2] );
+
+	return array( proc_close( $process ), (string) $stdout, (string) $stderr );
+};
 
 $composer = json_decode( (string) file_get_contents( $root . '/composer.json' ), true );
+$autoload_files = $composer['autoload']['files'] ?? array();
 $dev_files = $composer['autoload-dev']['files'] ?? array();
-$check( in_array( 'tests/fixtures/identity-store-doubles.php', $dev_files, true ), 'identity-store doubles must be explicitly autoloaded' );
+$psr4      = $composer['autoload-dev']['psr-4'] ?? array();
+$check( ! in_array( 'inc/Engine/AI/conversation-loop.php', $autoload_files, true ), 'WordPress-guarded conversation loop must not be eagerly loaded' );
+$check( ! in_array( 'tests/fixtures/identity-store-doubles.php', $dev_files, true ), 'identity-store doubles must not be eagerly loaded' );
+$check( 'tests/' === ( $psr4['DataMachine\\Tests\\'] ?? null ), 'test namespace must retain PSR-4 ownership' );
+
+$plugin_bootstrap = (string) file_get_contents( $root . '/data-machine.php' );
+$check( str_contains( $plugin_bootstrap, "require_once __DIR__ . '/inc/Engine/AI/conversation-loop.php';" ), 'WordPress plugin bootstrap must load the conversation loop explicitly' );
+
+list( $autoload_status, $autoload_output ) = $run( array( PHP_BINARY, '-r', 'require "vendor/autoload.php"; echo "autoload-ok\\n";' ) );
+$check( 0 === $autoload_status && "autoload-ok\n" === $autoload_output, 'Composer autoload must complete outside WordPress' );
+list( $phpunit_status, $phpunit_output ) = $run( array( $root . '/vendor/bin/phpunit', '--version' ) );
+$check( 0 === $phpunit_status && str_starts_with( $phpunit_output, 'PHPUnit ' ), 'PHPUnit must start and report its version' );
+list( $phpcs_status, $phpcs_output ) = $run( array( $root . '/vendor/bin/phpcs', '--version' ) );
+$check( 0 === $phpcs_status && str_starts_with( $phpcs_output, 'PHP_CodeSniffer version ' ), 'PHPCS must start and report its version' );
+
+$homeboy = json_decode( (string) file_get_contents( $root . '/homeboy.json' ), true );
+$check( 'fail' === ( $homeboy['extensions']['wordpress']['settings']['phpunit_no_tests'] ?? null ), 'authoritative PHPUnit gate must fail closed on zero tests' );
+
+$fixtures = array(
+	'FailingProvisionAdapter'  => 'tests/Fixtures/FailingProvisionAdapter.php',
+	'CountingProvisionAdapter' => 'tests/Fixtures/CountingProvisionAdapter.php',
+	'DuplicateLoserAgents'     => 'tests/Fixtures/DuplicateLoserAgents.php',
+);
+foreach ( $fixtures as $class => $relative_path ) {
+	$path = $root . '/' . $relative_path;
+	$data = file_get_contents( $path );
+	$check( false !== $data, "{$class} fixture must be readable" );
+	$check( false !== $data && str_contains( $data, "final class {$class}" ), "{$class} fixture must be PSR-4 addressable" );
+}
+
+$phpunit = (string) file_get_contents( $root . '/phpunit.xml.dist' );
+$check( str_contains( $phpunit, '<directory suffix="Test.php">tests</directory>' ), 'authoritative WordPress suite must discover Test.php files' );
+$selected_test = $root . '/tests/Unit/Core/Identity/AgentIdentityStoreAdapterTest.php';
+$check( is_file( $selected_test ), 'known identity test must be discoverable in the authoritative suite' );
 
 $clusters = array(
 	'agent context'       => 'tests/Unit/Abilities/AgentContextPropagationTest.php',
