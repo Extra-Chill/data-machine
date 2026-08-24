@@ -93,7 +93,7 @@ final class DelegatedCrossPostAction {
 
 		return self::with_site(
 			$post_site_id,
-			static function () use ( $input, $post_site_id ) {
+			static function () use ( $input, $post_site_id, $phase ) {
 				$post_id = self::strict_positive_int( $input['post_id'] ?? null );
 				if ( ! $post_id || 'publish' !== get_post_status( $post_id ) ) {
 					return self::error( 'social_cross_post_invalid_post', 'A published canonical post is required.' );
@@ -146,19 +146,21 @@ final class DelegatedCrossPostAction {
 				}
 
 				$normalized = array(
-					'post_site_id'  => $post_site_id,
-					'post_id'       => $post_id,
-					'source_url'    => $source_url,
-					'caption'       => $caption,
-					'content_hash'  => $content_hash,
-					'channels'      => $channels,
-					'media_kind'    => $media_kind,
-					'asset_refs'    => $assets['refs'],
-					'images'        => $assets['images'],
-					'video_url'     => $assets['video_url'],
-					'cover_url'     => $assets['cover_url'],
-					'share_to_feed' => true,
+					'post_site_id' => $post_site_id,
+					'post_id'      => $post_id,
+					'source_url'   => $source_url,
+					'caption'      => $caption,
+					'content_hash' => $content_hash,
+					'channels'     => $channels,
+					'media_kind'   => $media_kind,
+					'asset_refs'   => $assets['refs'],
 				);
+				if ( 'effect' === $phase ) {
+					$normalized['images']        = $assets['images'];
+					$normalized['video_url']     = $assets['video_url'];
+					$normalized['cover_url']     = $assets['cover_url'];
+					$normalized['share_to_feed'] = true;
+				}
 				if ( null !== $attribution_post ) {
 					$normalized['attribution_post'] = $attribution_post;
 				}
@@ -223,10 +225,7 @@ final class DelegatedCrossPostAction {
 			'post_id'                 => $input['post_id'],
 			'platforms'               => $input['channels'],
 			'caption'                 => $input['caption'],
-			'images'                  => $input['images'],
 			'media_kind'              => $input['media_kind'],
-			'video_url'               => $input['video_url'],
-			'cover_url'               => $input['cover_url'],
 			'share_to_feed'           => true,
 			'source_url'              => $input['source_url'],
 			'delegated_operation_ref' => (string) ( $context['operation_ref'] ?? '' ),

@@ -243,7 +243,10 @@ namespace {
 	$normalized = $action['normalize_input']( $input, array( 'phase' => 'submit' ) );
 	$assert( ! is_wp_error( $normalized ), 'valid canonical input normalizes' );
 	$assert( array( 'instagram', 'twitter' ) === ( $normalized['channels'] ?? null ), 'channels normalize deterministically' );
-	$assert( array( array( 'url' => 'https://example.test/uploads/image-one.jpg' ) ) === ( $normalized['images'] ?? null ), 'registered attachment resolves to public publisher input' );
+	$assert( ! isset( $normalized['images'] ), 'normalized operation persists canonical attachment identity without a request-specific transport URL' );
+	$GLOBALS['delegated_cross_post_assets'][101]['url'] = 'https://fresh.example.test/uploads/image-one.jpg';
+	$effect_input = $action['normalize_input']( $normalized, array( 'phase' => 'effect' ) );
+	$assert( array( array( 'url' => 'https://fresh.example.test/uploads/image-one.jpg' ) ) === ( $effect_input['images'] ?? null ), 'effect validation resolves the current transport URL from frozen attachment identity' );
 
 	$denied = $action['authorize']( array( 'phase' => 'submit', 'input' => $normalized, 'actor' => array( 'user_id' => 11 ) ) );
 	$assert( is_wp_error( $denied ) && 'social_cross_post_forbidden' === $denied->get_error_code(), 'owner action denies every actor by default' );

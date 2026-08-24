@@ -286,25 +286,9 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 	 * @return array|null Blob reference or null.
 	 */
 	private static function upload_image( string $access_token, string $image_url ): ?array {
-		// Download image
-		$download = HttpClient::get(
-			$image_url,
-			array(
-				'context' => 'Bluesky Image Download',
-				'timeout' => 30,
-			)
-		);
-		if ( empty( $download['success'] ) ) {
+		$image = self::load_image( $image_url );
+		if ( null === $image ) {
 			return null;
-		}
-
-		$image_data   = $download['data'];
-		$content_type = '';
-		if ( ! empty( $download['headers'] ) ) {
-			$headers      = $download['headers'];
-			$content_type = is_object( $headers ) && method_exists( $headers, 'offsetGet' )
-				? (string) ( $headers['content-type'] ?? '' )
-				: (string) ( is_array( $headers ) ? ( $headers['content-type'] ?? '' ) : '' );
 		}
 
 		// Upload blob
@@ -314,9 +298,9 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 				'context' => 'Bluesky Blob Upload',
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $access_token,
-					'Content-Type'  => $content_type ? $content_type : 'image/jpeg',
+					'Content-Type'  => $image['content_type'] ? $image['content_type'] : 'image/jpeg',
 				),
-				'body'    => $image_data,
+				'body'    => $image['data'],
 				'timeout' => 30,
 			)
 		);
@@ -332,6 +316,43 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 		}
 
 		return null;
+	}
+
+	/** Resolve a current local attachment before falling back to HTTP. */
+	private static function load_image( string $image_url ): ?array {
+		$attachment_id = attachment_url_to_postid( $image_url );
+		if ( $attachment_id > 0 ) {
+			$current_url  = wp_get_attachment_url( $attachment_id );
+			$path         = get_attached_file( $attachment_id, true );
+			$content_type = (string) get_post_mime_type( $attachment_id );
+			if ( is_string( $current_url ) && hash_equals( $current_url, $image_url ) && is_string( $path ) && is_readable( $path ) && str_starts_with( $content_type, 'image/' ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Canonical attachment path is owner-resolved and read only.
+				$data = file_get_contents( $path );
+				if ( false !== $data ) {
+					return compact( 'data', 'content_type' );
+				}
+			}
+		}
+
+		$download = HttpClient::get(
+			$image_url,
+			array(
+				'context' => 'Bluesky Image Download',
+				'timeout' => 30,
+			)
+		);
+		if ( empty( $download['success'] ) ) {
+			return null;
+		}
+
+		$headers      = $download['headers'] ?? array();
+		$content_type = is_object( $headers ) && method_exists( $headers, 'offsetGet' )
+			? (string) ( $headers['content-type'] ?? '' )
+			: (string) ( is_array( $headers ) ? ( $headers['content-type'] ?? '' ) : '' );
+		return array(
+			'data'         => $download['data'],
+			'content_type' => $content_type,
+		);
 	}
 
 	/**
