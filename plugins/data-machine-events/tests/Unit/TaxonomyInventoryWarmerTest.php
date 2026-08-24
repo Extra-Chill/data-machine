@@ -66,6 +66,8 @@ class TaxonomyInventoryWarmerTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $calls );
 		$this->assertSame( 'generation-two', $calls[0]['params']['generation'] );
 		$this->assertSame( $site_id, $calls[0]['params']['site_id'] );
+		$this->assertSame( array(), $calls[0]['context'] );
+		$this->assertSame( 0, $calls[0]['parent_job_id'] );
 		$this->assertSame( TaxonomyInventoryWarmer::operationKey( $site_id, 'generation-two' ), $calls[0]['operation_key'] );
 
 		TaxonomyInventoryWarmer::flushPending( static function () use ( &$calls ): int {
@@ -73,6 +75,27 @@ class TaxonomyInventoryWarmerTest extends WP_UnitTestCase {
 			return 124;
 		} );
 		$this->assertCount( 1, $calls, 'A flushed generation must not schedule twice.' );
+	}
+
+	public function test_shutdown_dispatch_uses_zero_arguments_and_init_is_idempotent(): void {
+		global $wp_filter;
+
+		$callbacks = $wp_filter['shutdown']->callbacks;
+		TaxonomyInventoryWarmer::init();
+		TaxonomyInventoryWarmer::init();
+		$this->assertSame( $callbacks, $wp_filter['shutdown']->callbacks );
+		$callback_id = _wp_filter_build_unique_id( 'shutdown', array( TaxonomyInventoryWarmer::class, 'flushPending' ), 10 );
+		$accepted_args = $wp_filter['shutdown']->callbacks[10][ $callback_id ]['accepted_args'];
+		$this->assertSame( 0, $accepted_args );
+
+		$shutdown_hook         = $wp_filter['shutdown'];
+		$wp_filter['shutdown'] = new \WP_Hook();
+		$wp_filter['shutdown']->add_filter( 'shutdown', array( TaxonomyInventoryWarmer::class, 'flushPending' ), 10, $accepted_args );
+		try {
+			do_action( 'shutdown' );
+		} finally {
+			$wp_filter['shutdown'] = $shutdown_hook;
+		}
 	}
 
 	public function test_pending_generations_remain_separate_per_multisite_site(): void {
@@ -103,6 +126,39 @@ class TaxonomyInventoryWarmerTest extends WP_UnitTestCase {
 		$this->assertSame( 'second-generation', $calls[ $second_site ]['generation'] );
 		$this->assertSame( $second_site, $calls[ $second_site ]['current_site'] );
 		$this->assertSame( $first_site, get_current_blog_id() );
+	}
+
+	public function test_scheduler_exception_restores_site_and_does_not_replay_pending_generation(): void {
+		$first_site  = get_current_blog_id();
+		$second_site = self::factory()->blog->create();
+		switch_to_blog( $second_site );
+		try {
+			TaxonomyInventoryWarmer::queueGeneration( 'old', 'exception-generation' );
+		} finally {
+			restore_current_blog();
+		}
+
+		$calls = 0;
+		try {
+			TaxonomyInventoryWarmer::flushPending(
+				static function () use ( &$calls ): void {
+					++$calls;
+					throw new \RuntimeException( 'Scheduler failure' );
+				}
+			);
+			$this->fail( 'Expected scheduler exception.' );
+		} catch ( \RuntimeException $exception ) {
+			$this->assertSame( 'Scheduler failure', $exception->getMessage() );
+		}
+
+		$this->assertSame( $first_site, get_current_blog_id() );
+		TaxonomyInventoryWarmer::flushPending(
+			static function () use ( &$calls ): int {
+				++$calls;
+				return 1;
+			}
+		);
+		$this->assertSame( 1, $calls, 'Failed pending work must not be scheduled twice in one request.' );
 	}
 
 	public function test_task_retry_policy_is_bounded_and_does_not_affect_other_tasks(): void {

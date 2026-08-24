@@ -33,7 +33,7 @@ class TaxonomyInventoryWarmer extends SystemTask {
 		add_filter( 'datamachine_tasks', array( __CLASS__, 'registerTask' ) );
 		add_filter( 'datamachine_job_retry_policy', array( __CLASS__, 'filterRetryPolicy' ), 10, 6 );
 		add_action( 'update_option_' . CalendarCache::GENERATION_OPTION, array( __CLASS__, 'queueGeneration' ), 10, 2 );
-		add_action( 'shutdown', array( __CLASS__, 'flushPending' ) );
+		add_action( 'shutdown', array( __CLASS__, 'flushPending' ), 10, 0 );
 	}
 
 	/** @param array<string,string> $tasks Registered task handlers. */
