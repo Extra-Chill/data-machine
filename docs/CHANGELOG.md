@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.21] - 2026-08-24
+
+### Changed
+- route jobs REST through abilities
+- remove problem flows chat wrapper
+- move image settings out of tool family
+- expect missing ability notice
+- preserve projection registration lifecycle
+- collapse ability projection shells
+
+### Fixed
+- allow null taxonomy reassignment output
+
 ## [0.175.20] - 2026-08-24
 
 ### Changed
