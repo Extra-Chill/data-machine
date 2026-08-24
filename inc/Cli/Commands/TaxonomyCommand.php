@@ -2,7 +2,7 @@
 /**
  * WP-CLI Taxonomy Command
  *
- * Wraps concrete Taxonomy abilities for taxonomy term management.
+ * Wraps registered Taxonomy abilities for taxonomy term management.
  *
  * @package DataMachine\Cli\Commands
  * @since 0.41.0
@@ -13,11 +13,6 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\AbilityRunner;
 use DataMachine\Cli\BaseCommand;
-use DataMachine\Abilities\Taxonomy\CreateTaxonomyTermAbility;
-use DataMachine\Abilities\Taxonomy\DeleteTaxonomyTermAbility;
-use DataMachine\Abilities\Taxonomy\GetTaxonomyTermsAbility;
-use DataMachine\Abilities\Taxonomy\ResolveTermAbility;
-use DataMachine\Abilities\Taxonomy\UpdateTaxonomyTermAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -221,7 +216,7 @@ class TaxonomyCommand extends BaseCommand {
 			$input['description'] = $assoc_args['description'];
 		}
 
-		$result = ( new CreateTaxonomyTermAbility() )->execute( $input );
+		$result = AbilityRunner::execute( 'datamachine/create-taxonomy-term', $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to create term.' );
@@ -297,7 +292,7 @@ class TaxonomyCommand extends BaseCommand {
 			$input['parent'] = (int) $assoc_args['parent'];
 		}
 
-		$result = ( new UpdateTaxonomyTermAbility() )->execute( $input );
+		$result = AbilityRunner::execute( 'datamachine/update-taxonomy-term', $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to update term.' );
@@ -347,7 +342,8 @@ class TaxonomyCommand extends BaseCommand {
 			WP_CLI::confirm( sprintf( 'Delete term %d?', $term_id ) );
 		}
 
-		$result = ( new DeleteTaxonomyTermAbility() )->execute(
+		$result = AbilityRunner::execute(
+			'datamachine/delete-taxonomy-term',
 			array(
 				'term'     => (string) $term_id,
 				'taxonomy' => $taxonomy,
@@ -409,7 +405,14 @@ class TaxonomyCommand extends BaseCommand {
 			return;
 		}
 
-		$result = ResolveTermAbility::resolve( $identifier, $taxonomy, $create );
+		$result = AbilityRunner::execute(
+			'datamachine/resolve-term',
+			array(
+				'identifier' => (string) $identifier,
+				'taxonomy'   => $taxonomy,
+				'create'     => $create,
+			)
+		);
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Term not found.' );
