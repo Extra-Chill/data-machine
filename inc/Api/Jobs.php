@@ -17,8 +17,6 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Abilities\Job\DeleteJobsAbility;
-use DataMachine\Abilities\Job\GetJobsAbility;
 use DataMachine\Core\AbilityResult;
 
 if ( ! defined( 'WPINC' ) ) {
@@ -228,7 +226,7 @@ class Jobs {
 			$input['metadata_scan_limit'] = (int) $request->get_param( 'metadata_scan_limit' );
 		}
 
-		$result = ( new GetJobsAbility() )->execute( $input );
+		$result = wp_get_ability( 'datamachine/get-jobs' )->execute( $input );
 
 		return AbilityResult::rest_collection_response( $result, 'jobs', array( 'top_extra' => array( 'filters_applied', 'metadata_query' ) ), 'get_jobs_failed', __( 'Failed to get jobs.', 'data-machine' ) );
 	}
@@ -241,7 +239,7 @@ class Jobs {
 	public static function handle_get_job_by_id( $request ) {
 		$job_id = (int) $request->get_param( 'id' );
 
-		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
+		$result = wp_get_ability( 'datamachine/get-jobs' )->execute( array( 'job_id' => $job_id ) );
 
 		if ( is_wp_error( $result ) || empty( $result['jobs'] ) ) {
 			return is_wp_error( $result ) ? $result : new \WP_Error( 'job_not_found', __( 'Job not found.', 'data-machine' ), array( 'status' => 404 ) );
@@ -259,7 +257,7 @@ class Jobs {
 		$type              = $request->get_param( 'type' );
 		$cleanup_processed = (bool) $request->get_param( 'cleanup_processed' );
 
-		$result = ( new DeleteJobsAbility() )->execute(
+		$result = wp_get_ability( 'datamachine/delete-jobs' )->execute(
 			array(
 				'type'              => $type,
 				'cleanup_processed' => $cleanup_processed,
