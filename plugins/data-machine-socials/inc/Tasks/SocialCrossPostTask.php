@@ -148,6 +148,7 @@ class SocialCrossPostTask extends SystemTask {
 
 		if ( '' !== $operation_ref ) {
 			$completion_data['output_data_packets']    = self::delegated_result_packets( $results );
+			$completion_data['replace_data_packets']   = true;
 			$completion_data['suppress_result_packet'] = true;
 			$completion_data['job_status']             = 'completed';
 		}
@@ -219,6 +220,7 @@ class SocialCrossPostTask extends SystemTask {
 				'job_status'             => 'failed - delegated_cross_post_effect_denied',
 				'results'                => $results,
 				'output_data_packets'    => self::delegated_result_packets( $results ),
+				'replace_data_packets'   => true,
 				'suppress_result_packet' => true,
 			)
 		);
