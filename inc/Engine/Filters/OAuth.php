@@ -82,7 +82,7 @@ function datamachine_register_oauth_system() {
 
 			if ( $auth_instance instanceof \DataMachine\Core\OAuth\BaseOAuth2Provider && $auth_instance->supports_agent_scoped_oauth_callback() ) {
 				$is_implicit_initial_request = 'token' === $auth_instance->get_oauth_response_type() && empty( $_POST['datamachine_implicit_flow'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- This only permits rendering a token/state relay page.
-				$agent_callback             = $is_implicit_initial_request || false !== datamachine_oauth_agent_callback_payload( $auth_instance, $request_params );
+				$agent_callback              = $is_implicit_initial_request || false !== datamachine_oauth_agent_callback_payload( $auth_instance, $request_params );
 				if ( ! $can_handle && $agent_callback ) {
 					$can_handle = $is_implicit_initial_request || datamachine_oauth_can_handle_agent_scoped_callback( $auth_instance, $request_params );
 				}

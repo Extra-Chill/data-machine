@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.19] - 2026-08-24
+
+### Fixed
+- resolve engine data when reopening jobs
+- make schema normalization converge
+
 ## [0.175.18] - 2026-08-23
 
 ### Changed

@@ -559,7 +559,10 @@ final class AgentBundleDirectory {
 					$stored = BundleSchema::SUBAGENTS_DIR . '/' . $child['slug'] . '/' . $kind . '/' . $path;
 					self::ensure_directory( dirname( $directory . '/' . $stored ) );
 					self::write_file( $directory . '/' . $stored, $contents );
-					$entries[] = array( 'path' => $path, 'sha256' => hash( 'sha256', $contents ) );
+					$entries[] = array(
+						'path'   => $path,
+						'sha256' => hash( 'sha256', $contents ),
+					);
 				}
 				$manifest['subagents'][ $index ][ $kind ] = $entries;
 			}
@@ -567,7 +570,10 @@ final class AgentBundleDirectory {
 	}
 
 	private static function write_agent_artifacts( string $directory, array &$manifest ): void {
-		foreach ( array( 'skills' => BundleSchema::SKILLS_DIR, 'references' => BundleSchema::REFERENCES_DIR ) as $kind => $root ) {
+		foreach ( array(
+			'skills'     => BundleSchema::SKILLS_DIR,
+			'references' => BundleSchema::REFERENCES_DIR,
+		) as $kind => $root ) {
 			if ( ! array_key_exists( $kind, $manifest['agent'] ?? array() ) ) {
 				continue;
 			}
@@ -579,7 +585,10 @@ final class AgentBundleDirectory {
 				}
 				self::ensure_directory( dirname( $directory . '/' . $root . '/' . $path ) );
 				self::write_file( $directory . '/' . $root . '/' . $path, $contents );
-				$entries[] = array( 'path' => $path, 'sha256' => hash( 'sha256', $contents ) );
+				$entries[] = array(
+					'path'   => $path,
+					'sha256' => hash( 'sha256', $contents ),
+				);
 			}
 			$manifest['agent'][ $kind ] = $entries;
 		}
@@ -600,7 +609,7 @@ final class AgentBundleDirectory {
 					if ( ! is_array( $entry ) || ! is_string( $entry['path'] ?? null ) || ! preg_match( '/^[a-f0-9]{64}$/', (string) ( $entry['sha256'] ?? '' ) ) ) {
 						throw new BundleValidationException( sprintf( 'Subagent %s artifact metadata is invalid.', esc_html( $kind ) ) );
 					}
-					$path = self::normalize_relative_path( $entry['path'], 'subagent ' . $kind );
+					$path      = self::normalize_relative_path( $entry['path'], 'subagent ' . $kind );
 					$candidate = $directory . '/' . BundleSchema::SUBAGENTS_DIR . '/' . $child['slug'] . '/' . $kind . '/' . $path;
 					$file_real = realpath( $candidate );
 					if ( false === $file_real || ! is_file( $file_real ) || ! str_starts_with( $file_real, $bundle_real . DIRECTORY_SEPARATOR ) ) {
@@ -622,7 +631,10 @@ final class AgentBundleDirectory {
 		if ( false === $bundle_real ) {
 			throw new BundleValidationException( 'Bundle directory cannot be resolved.' );
 		}
-		foreach ( array( 'skills' => BundleSchema::SKILLS_DIR, 'references' => BundleSchema::REFERENCES_DIR ) as $kind => $root ) {
+		foreach ( array(
+			'skills'     => BundleSchema::SKILLS_DIR,
+			'references' => BundleSchema::REFERENCES_DIR,
+		) as $kind => $root ) {
 			if ( ! array_key_exists( $kind, $manifest['agent'] ?? array() ) ) {
 				continue;
 			}
@@ -634,7 +646,7 @@ final class AgentBundleDirectory {
 				if ( ! is_array( $entry ) || ! is_string( $entry['path'] ?? null ) || ! preg_match( '/^[a-f0-9]{64}$/', (string) ( $entry['sha256'] ?? '' ) ) ) {
 					throw new BundleValidationException( sprintf( 'Agent %s artifact metadata is invalid.', esc_html( $kind ) ) );
 				}
-				$path = self::normalize_relative_path( $entry['path'], 'agent ' . $kind );
+				$path      = self::normalize_relative_path( $entry['path'], 'agent ' . $kind );
 				$candidate = $directory . '/' . $root . '/' . $path;
 				$file_real = realpath( $candidate );
 				if ( false === $file_real || ! is_file( $file_real ) || ! str_starts_with( $file_real, $bundle_real . DIRECTORY_SEPARATOR ) ) {
