@@ -121,7 +121,7 @@ class TaxonomyCommand extends BaseCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -226,7 +226,7 @@ class TaxonomyCommand extends BaseCommand {
 		WP_CLI::success( sprintf( 'Created term "%s" (ID: %d).', $result['term_name'] ?? $name, $result['term_id'] ?? 0 ) );
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		}
 	}
 
@@ -342,13 +342,10 @@ class TaxonomyCommand extends BaseCommand {
 			WP_CLI::confirm( sprintf( 'Delete term %d?', $term_id ) );
 		}
 
-		$result = AbilityRunner::execute(
-			'datamachine/delete-taxonomy-term',
-			array(
-				'term'     => (string) $term_id,
-				'taxonomy' => $taxonomy,
-			)
-		);
+		$result = AbilityRunner::execute( 'datamachine/delete-taxonomy-term', array(
+			'term'     => (string) $term_id,
+			'taxonomy' => $taxonomy,
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to delete term.' );
@@ -405,14 +402,11 @@ class TaxonomyCommand extends BaseCommand {
 			return;
 		}
 
-		$result = AbilityRunner::execute(
-			'datamachine/resolve-term',
-			array(
-				'identifier' => (string) $identifier,
-				'taxonomy'   => $taxonomy,
-				'create'     => $create,
-			)
-		);
+		$result = AbilityRunner::execute( 'datamachine/resolve-term', array(
+			'identifier' => (string) $identifier,
+			'taxonomy'   => $taxonomy,
+			'create'     => $create,
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Term not found.' );
@@ -420,7 +414,7 @@ class TaxonomyCommand extends BaseCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
