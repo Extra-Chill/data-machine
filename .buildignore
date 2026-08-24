@@ -4,6 +4,7 @@
 .gitignore
 .github/
 .datamachine/
+artifacts/
 AGENTS.md
 .DS_Store
 **/.DS_Store
