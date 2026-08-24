@@ -488,7 +488,6 @@ class BlocksCommand extends BaseCommand {
 			'update_post_meta_cache' => false,
 			'update_post_term_cache' => false,
 			'lazy_load_term_meta'    => false,
-			'suppress_filters'       => true,
 		);
 	}
 }

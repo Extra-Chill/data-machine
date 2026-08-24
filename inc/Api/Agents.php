@@ -285,7 +285,7 @@ class Agents {
 							'type'              => 'string',
 							'required'          => false,
 							'default'           => '',
-							'description'       => __( 'Human-readable label (e.g., "kimaki-prod").', 'data-machine' ),
+							'description'       => __( 'Human-readable label (e.g., "desktop-client").', 'data-machine' ),
 							'sanitize_callback' => 'sanitize_text_field',
 						),
 						'capabilities' => array(

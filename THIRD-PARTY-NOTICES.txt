@@ -1,0 +1,28 @@
+# Third-Party Notices
+
+Data Machine bundles production dependencies so the WordPress plugin can run without Composer or npm on the destination site.
+
+## PHP Runtime Dependencies
+
+| Dependency | License |
+| --- | --- |
+| Automattic Blocks Engine PHP Transformer | GPL-3.0 |
+| WordPress Agents API | GPL-2.0-or-later |
+| WooCommerce Action Scheduler | GPL-3.0-or-later |
+| league/commonmark | BSD-3-Clause |
+| league/config | BSD-3-Clause |
+| league/html-to-markdown | MIT |
+| dflydev/dot-access-data | MIT |
+| nette/schema | BSD-3-Clause, GPL-2.0-only, or GPL-3.0-only |
+| nette/utils | BSD-3-Clause, GPL-2.0-only, or GPL-3.0-only |
+| psr/event-dispatcher | MIT |
+| symfony/deprecation-contracts | MIT |
+| symfony/polyfill-php80 | MIT |
+
+The package includes applicable license files supplied by these dependencies. Blocks Engine is pinned to upstream commit `d8842683cb7928a0ae1f56878de93cf0bc8b7343`; its GPL-3.0 license is available at https://github.com/Automattic/blocks-engine/blob/d8842683cb7928a0ae1f56878de93cf0bc8b7343/LICENSE.
+
+## Browser Assets
+
+Compiled browser assets include code from the npm dependencies declared in `package.json`. Their source packages, versions, integrity hashes, and license metadata are recorded by `package-lock.json` in the source repository. Production npm dependencies are GPL-compatible permissive packages (MIT, ISC, BSD, Apache-2.0, and Unicode licenses).
+
+Source: https://github.com/Extra-Chill/data-machine

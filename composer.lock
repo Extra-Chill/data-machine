@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c5a6d0a68e649d3643d26e66efea0cf8",
+    "content-hash": "ba6789360b94a464d6a964024ee957bc",
     "packages": [
         {
             "name": "automattic/blocks-engine-php-transformer",

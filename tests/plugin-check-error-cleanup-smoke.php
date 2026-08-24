@@ -34,6 +34,10 @@ agents_api_smoke_assert_equals( true, str_contains( $buildignore, ".git\n" ), 'g
 agents_api_smoke_assert_equals( true, str_contains( $buildignore, ".datamachine/\n" ), 'DMC metadata is excluded from distribution package', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $buildignore, "AGENTS.md\n" ), 'agent context is excluded from distribution package', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $buildignore, "bin/install-wp-tests.sh\n" ), 'test install script is excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "phpunit.xml.dist\n" ), 'PHPUnit configuration is excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "phpunit.sqlite.xml.dist\n" ), 'SQLite PHPUnit configuration is excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "vendor/wordpress/agents-api/tests/\n" ), 'bundled Agents API tests are excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "vendor/automattic/blocks-engine-php-transformer/fixtures/\n" ), 'bundled Blocks Engine fixtures are excluded from distribution package', $failures, $passes );
 
 foreach ( array( 'inc/Core/Admin/AdminRootFilters.php', 'inc/Engine/AI/Directives/ClientContextDirective.php' ) as $guarded_file ) {
 	agents_api_smoke_assert_equals( true, str_contains( datamachine_plugin_check_source( $guarded_file ), "defined( 'ABSPATH' ) || exit;" ), "{$guarded_file} has a direct access guard", $failures, $passes );

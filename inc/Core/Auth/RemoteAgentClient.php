@@ -12,8 +12,8 @@
  *
  * Usage:
  *   $result = RemoteAgentClient::request(
- *       'chubes.net',
- *       'chubes-bot',
+ *       'remote.example',
+ *       'content-agent',
  *       'POST',
  *       '/wp-json/datamachine/v1/chat',
  *       array( 'body' => array( 'message' => 'hello' ) )
@@ -66,7 +66,7 @@ class RemoteAgentClient {
 	 *     error?: string,
 	 *   }
 	 *
-	 * @param string $remote_site  Remote site domain (e.g., "chubes.net"). Scheme optional.
+	 * @param string $remote_site  Remote site domain (e.g., "remote.example"). Scheme optional.
 	 * @param string $agent_slug   Agent slug on the remote site.
 	 * @param string $method       HTTP method: GET, POST, PUT, PATCH, DELETE.
 	 * @param string $path         Path starting with "/" (e.g., "/wp-json/wp/v2/users/me")

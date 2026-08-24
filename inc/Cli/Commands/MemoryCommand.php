@@ -247,7 +247,7 @@ class MemoryCommand extends BaseCommand {
 	 *     wp datamachine memory write "Lessons Learned" "- Always check file permissions" --mode=append
 	 *
 	 *     # Write to a section in SOUL.md
-	 *     wp datamachine memory write SOUL.md "Identity" "I am chubes-bot"
+	 *     wp datamachine memory write SOUL.md "Identity" "I am content-agent"
 	 *
 	 *     # Append to a section in USER.md
 	 *     wp datamachine memory write USER.md "Goals" "- Ship the feature" --mode=append
@@ -1106,7 +1106,7 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # List injectable files for an agent as JSON
-	 *     wp datamachine memory injectable-files --agent=extra-chill-bot --format=json
+	 *     wp datamachine memory injectable-files --agent=content-agent --format=json
 	 *
 	 *     # List for the effective context as a table
 	 *     wp datamachine memory injectable-files
@@ -1465,7 +1465,7 @@ class MemoryCommand extends BaseCommand {
 	 *     wp datamachine memory paths --format=json
 	 *
 	 *     # Get paths for a specific agent (multi-agent)
-	 *     wp datamachine memory paths --agent=chubes-bot
+	 *     wp datamachine memory paths --agent=content-agent
 	 *
 	 *     # Get relative paths for config file injection
 	 *     wp datamachine memory paths --relative

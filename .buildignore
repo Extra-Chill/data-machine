@@ -19,7 +19,10 @@ build.sh
 # Testing
 bin/install-wp-tests.sh
 tests/
+bench/
 phpunit.xml
+phpunit.xml.dist
+phpunit.sqlite.xml.dist
 coverage/
 
 # Development dependencies (handled by composer --no-dev)
@@ -36,6 +39,12 @@ vendor/php-stubs/
 # Composer development files
 composer.lock
 
+# Development configuration
+eslint.config.js
+jsconfig.json
+phpstan-baseline.neon
+webpack.config.js
+
 # Node.js (if any)
 node_modules/
 package-lock.json
@@ -50,6 +59,41 @@ CLAUDE.md
 README.md
 docs/
 extensions/
+
+# Bundled dependency development files
+vendor/wordpress/agents-api/.github/
+vendor/wordpress/agents-api/.gitignore
+vendor/wordpress/agents-api/CHANGELOG.md
+vendor/wordpress/agents-api/composer.json
+vendor/wordpress/agents-api/composer.lock
+vendor/wordpress/agents-api/docs/
+vendor/wordpress/agents-api/homeboy.json
+vendor/wordpress/agents-api/phpstan.neon.dist
+vendor/wordpress/agents-api/phpunit.xml.dist
+vendor/wordpress/agents-api/README.md
+vendor/wordpress/agents-api/tests/
+vendor/automattic/blocks-engine-php-transformer/.git/
+vendor/automattic/blocks-engine-php-transformer/.github/
+vendor/automattic/blocks-engine-php-transformer/.gitignore
+vendor/automattic/blocks-engine-php-transformer/CONTEXT.md
+vendor/automattic/blocks-engine-php-transformer/CONTRIBUTING.md
+vendor/automattic/blocks-engine-php-transformer/docs/
+vendor/automattic/blocks-engine-php-transformer/figma-transformer/
+vendor/automattic/blocks-engine-php-transformer/fixtures/
+vendor/automattic/blocks-engine-php-transformer/packages/
+vendor/automattic/blocks-engine-php-transformer/README.md
+vendor/automattic/blocks-engine-php-transformer/scripts/
+vendor/automattic/blocks-engine-php-transformer/tests/
+vendor/automattic/blocks-engine-php-transformer/php-transformer/.gitattributes
+vendor/automattic/blocks-engine-php-transformer/php-transformer/.gitignore
+vendor/automattic/blocks-engine-php-transformer/php-transformer/CHANGELOG.md
+vendor/automattic/blocks-engine-php-transformer/php-transformer/composer.json
+vendor/automattic/blocks-engine-php-transformer/php-transformer/composer.lock
+vendor/automattic/blocks-engine-php-transformer/php-transformer/docs/
+vendor/automattic/blocks-engine-php-transformer/php-transformer/homeboy.json
+vendor/automattic/blocks-engine-php-transformer/php-transformer/README.md
+vendor/automattic/blocks-engine-php-transformer/php-transformer/tests/
+vendor/automattic/blocks-engine-php-transformer/php-transformer/tools/
 
 # Temporary and cache files
 *.tmp

@@ -40,7 +40,7 @@ class AgentRemoteCallAbility {
 						'properties' => array(
 							'remote_site' => array(
 								'type'        => 'string',
-								'description' => __( 'Remote site domain (e.g., "chubes.net"). Scheme optional.', 'data-machine' ),
+								'description' => __( 'Remote site domain (e.g., "remote.example"). Scheme optional.', 'data-machine' ),
 							),
 							'agent_slug'  => array(
 								'type'        => 'string',
