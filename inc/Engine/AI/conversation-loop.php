@@ -401,11 +401,11 @@ function datamachine_run_conversation(
 		$assertions,
 		$loop_payload
 	);
-	if ( $normalization->status_overridden ) {
-		$result['status'] = $normalization->status;
+	if ( $normalization['status_overridden'] ) {
+		$result['status'] = $normalization['status'];
 	}
 
-	$result                       = datamachine_with_conversation_metadata( $result, $normalization->metadata );
+	$result                       = datamachine_with_conversation_metadata( $result, $normalization['metadata'] );
 	$result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $result, $loop_payload, $provider, $model, $modes );
 	if ( DataMachineConversationStatus::FAILED === (string) ( $result['status'] ?? '' ) || isset( $result['error'] ) ) {
 		$transcript_session_id = $transcript_persister->persist( is_array( $result['messages'] ?? null ) ? $result['messages'] : $turn_state->latest_messages, $conversation_request, $result );
