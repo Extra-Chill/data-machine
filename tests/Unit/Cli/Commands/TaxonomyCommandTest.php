@@ -7,7 +7,9 @@
 
 namespace DataMachine\Tests\Unit\Cli\Commands;
 
+use DataMachine\Abilities\Taxonomy\CreateTaxonomyTermAbility;
 use DataMachine\Cli\AbilityRunner;
+use DataMachine\Cli\Commands\TaxonomyCommand;
 use WP_UnitTestCase;
 
 class TaxonomyCommandTest extends WP_UnitTestCase {
@@ -20,16 +22,17 @@ class TaxonomyCommandTest extends WP_UnitTestCase {
 	}
 
 	public function test_taxonomy_command_and_registered_abilities_are_available(): void {
-		$this->assertTrue( class_exists( \DataMachine\Cli\Commands\TaxonomyCommand::class ) );
+		$this->assertTrue( class_exists( TaxonomyCommand::class ) );
+		$this->assertNotNull( wp_get_ability( CreateTaxonomyTermAbility::ABILITY_NAME ) );
 
-		foreach ( array( 'get-taxonomy-terms', 'create-taxonomy-term', 'update-taxonomy-term', 'delete-taxonomy-term', 'resolve-term' ) as $slug ) {
+		foreach ( array( 'get-taxonomy-terms', 'update-taxonomy-term', 'delete-taxonomy-term', 'resolve-term' ) as $slug ) {
 			$this->assertNotNull( wp_get_ability( "datamachine/{$slug}" ) );
 		}
 	}
 
 	public function test_taxonomy_mutations_execute_through_registered_abilities(): void {
 		$created = AbilityRunner::execute(
-			'datamachine/create-taxonomy-term',
+			CreateTaxonomyTermAbility::ABILITY_NAME,
 			array(
 				'name'     => 'Taxonomy CLI Boundary',
 				'taxonomy' => 'post_tag',

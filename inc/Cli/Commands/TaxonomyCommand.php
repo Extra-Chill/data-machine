@@ -11,6 +11,7 @@
 namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
+use DataMachine\Abilities\Taxonomy\CreateTaxonomyTermAbility;
 use DataMachine\Cli\AbilityRunner;
 use DataMachine\Cli\BaseCommand;
 
@@ -216,7 +217,7 @@ class TaxonomyCommand extends BaseCommand {
 			$input['description'] = $assoc_args['description'];
 		}
 
-		$result = AbilityRunner::execute( 'datamachine/create-taxonomy-term', $input );
+		$result = AbilityRunner::execute( CreateTaxonomyTermAbility::ABILITY_NAME, $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to create term.' );
