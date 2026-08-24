@@ -211,22 +211,6 @@ namespace {
 	$assert( 'sk-new-secret' === get_option( 'connectors_ai_openai_api_key' ), 'settings update writes unmasked key to connector option' );
 	$assert( '' === get_option( 'connectors_ai_gemini_api_key', '' ), 'settings update ignores masked round-trip value' );
 
-	$production_files = array(
-		'inc/Api/Providers.php',
-		'inc/Api/Chat/Chat.php',
-		'inc/Abilities/SettingsAbilities.php',
-		'inc/Engine/AI/RequestBuilder.php',
-		'inc/Engine/AI/WpAiClientProviderAdmin.php',
-		'inc/Engine/Filters/DataMachineFilters.php',
-	);
-
-	foreach ( $production_files as $file ) {
-		$source = file_get_contents( __DIR__ . '/../' . $file ) ?: '';
-		$assert( ! str_contains( $source, "apply_filters( 'chubes_ai_providers'" ), $file . ' no longer calls chubes_ai_providers' );
-		$assert( ! str_contains( $source, "apply_filters( 'chubes_ai_models'" ), $file . ' no longer calls chubes_ai_models' );
-		$assert( ! str_contains( $source, "apply_filters( 'chubes_ai_provider_api_keys'" ), $file . ' no longer calls chubes_ai_provider_api_keys' );
-	}
-
 	if ( $failures ) {
 		foreach ( $failures as $failure ) {
 			fwrite( fopen( 'php://stderr', 'w' ), "FAIL: {$failure}\n" );

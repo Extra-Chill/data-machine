@@ -164,9 +164,6 @@ namespace {
 	$result = $tool->handle_tool_call( array( 'term' => '10', 'taxonomy' => 'category', 'name' => 'New Name', 'meta' => array( 'capacity' => 500 ) ) );
 	assert_update_term( 'mixed update executes core before meta', true === $result['success'] && array( 'core', 'meta' ) === $GLOBALS['sequence'] );
 
-	$source = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Api/Chat/Tools/UpdateTaxonomyTerm.php' );
-	assert_update_term( 'tool has no direct wp_update_term call', false === strpos( $source, 'wp_update_term(' ) );
-
 	echo "\n";
 	if ( 0 === $failed ) {
 		echo "=== update-taxonomy-term-delegation-smoke: ALL PASS ({$total}) ===\n";

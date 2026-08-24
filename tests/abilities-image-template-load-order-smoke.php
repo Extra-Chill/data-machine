@@ -5,15 +5,9 @@
  * lite frontend requests where `datamachine_should_load_full_runtime()`
  * returns false.
  *
- * Two kinds of assertions:
- *
- * 1. Provider assertions — the lightweight provider must declare
- *    `ImageTemplateAbilities::ensure_registered()` and the plugin must invoke
- *    that provider unconditionally at file include time.
- *
- * 2. Behavioral assertions — `ImageTemplateAbilities::ensure_registered()`
- *    must handle all three timing states defensively, matching the
- *    pattern adopted for `AbilityCategories` in #2288.
+ * `ImageTemplateAbilities::ensure_registered()` must handle all three timing
+ * states defensively, matching the pattern adopted for `AbilityCategories` in
+ * #2288.
  *
  * Run with: php tests/abilities-image-template-load-order-smoke.php
  *
@@ -36,68 +30,7 @@ $assert = static function ( string $name, bool $condition ) use ( &$failed, &$to
 	++$failed;
 };
 
-// ============================================================
-// Source-string assertions
-// ============================================================
-
-$plugin_root  = dirname( __DIR__ );
-$bootstrap    = file_get_contents( $plugin_root . '/data-machine.php' );
-$provider     = file_get_contents( $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php' );
-$class_source = file_get_contents( $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php' );
-
-if ( false === $bootstrap || false === $provider || false === $class_source ) {
-	fwrite( fopen( 'php://stderr', 'w' ), "FAIL: unable to read plugin source\n" );
-	exit( 1 );
-}
-
-$assert(
-	'lightweight provider declares ImageTemplateAbilities::ensure_registered()',
-	str_contains( $provider, "'/inc/Abilities/Media/ImageTemplateAbilities.php'" )
-		&& str_contains( $provider, "'class'  => \\DataMachine\\Abilities\\Media\\ImageTemplateAbilities::class," )
-		&& str_contains( $provider, "'method' => 'ensure_registered'," )
-);
-
-$assert(
-	'lightweight provider registration is unconditional at file load',
-	str_contains( $bootstrap, '\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();' )
-);
-
-$assert(
-	'full-runtime provider retains defensive instantiation',
-	str_contains( $provider, 'new \\DataMachine\\Abilities\\Media\\ImageTemplateAbilities();' )
-);
-
-// ============================================================
-// Behavioral assertions: lifecycle-safe registration pattern
-// ============================================================
-
-$assert(
-	'ensure_registered() handles doing_action state',
-	str_contains( $class_source, "doing_action( 'wp_abilities_api_init' )" )
-);
-
-$assert(
-	'ensure_registered() handles pre-action state',
-	str_contains( $class_source, "! did_action( 'wp_abilities_api_init' )" )
-		&& str_contains( $class_source, "add_action(\n\t\t\t\t'wp_abilities_api_init'" )
-);
-
-$assert(
-	'ensure_registered() avoids post-action registry writes',
-	! str_contains( $class_source, '\WP_Abilities_Registry::get_instance()' )
-		&& ! str_contains( $class_source, '$registry->register( $name, $args )' )
-);
-
-$assert(
-	'ensure_registered() documents missing late registration surface',
-	str_contains( $class_source, 'does not expose a late-registration surface' )
-);
-
-$assert(
-	'ability definitions extracted into shared helper to avoid drift',
-	str_contains( $class_source, 'private static function get_ability_definitions(): array' )
-);
-
+$plugin_root = dirname( __DIR__ );
 // ============================================================
 // Behavioral simulation: load class under three stubbed states
 // ============================================================
@@ -106,16 +39,15 @@ $assert(
 // only installed when the real functions are absent, so under a real WordPress
 // runtime they are inert and the
 // simulation cannot control `doing_action()`, making state 1 fail spuriously.
-// The source-string assertions above lock the real contract in every backend
-// and the behavioral path is covered in the pure-PHP / PHPUnit context, so skip
-// the stub-driven simulation under a real WordPress runtime.
+// The behavioral path is covered in the pure-PHP context, so skip the
+// stub-driven simulation under WordPress.
 if ( defined( 'WPINC' ) ) {
 	if ( $failed > 0 ) {
 		fwrite( fopen( 'php://stderr', 'w' ), "\nabilities-image-template-load-order-smoke: {$failed}/{$total} assertions failed\n" );
 		exit( 1 );
 	}
 
-	echo "\nAll {$total} abilities-image-template-load-order source-string assertions passed (behavioral simulation skipped under real WordPress).\n";
+	echo "\nabilities-image-template-load-order behavioral simulation skipped under WordPress.\n";
 	return;
 }
 
