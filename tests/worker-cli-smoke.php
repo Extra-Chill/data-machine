@@ -8,7 +8,7 @@
  */
 
 $worker_file = __DIR__ . '/../inc/Cli/Commands/WorkerCommand.php';
-$boot_file   = __DIR__ . '/../inc/Cli/CommandRegistry.php';
+$boot_file   = __DIR__ . '/../inc/Core/Bootstrap/CliServiceProvider.php';
 $lock_file   = __DIR__ . '/../inc/Cli/WorkerLock.php';
 $worker_src  = file_get_contents( $worker_file ) ?: '';
 $boot_src    = file_get_contents( $boot_file ) ?: '';
