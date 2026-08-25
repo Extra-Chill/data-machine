@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.20.2] - 2026-08-25
+
+### Changed
+- register delegated retry step directly
+
+### Fixed
+- resolve delegated media at delivery time
+- replace delegated retry result packets
+- enforce owner policy for Instagram reads
+
 ## [0.20.1] - 2026-08-23
 
 ### Fixed
