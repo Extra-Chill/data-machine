@@ -97,6 +97,7 @@ if ( ! function_exists( 'get_option' ) ) {
 
 require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/conversation-loop.php';
 
 use AgentsAPI\AI\WP_Agent_Conversation_Completion_Decision;
 use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
