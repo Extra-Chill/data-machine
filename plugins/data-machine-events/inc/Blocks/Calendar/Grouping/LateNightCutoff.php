@@ -17,6 +17,7 @@
 namespace DataMachineEvents\Blocks\Calendar\Grouping;
 
 use DateTime;
+use DateTimeImmutable;
 use DateTimeZone;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -151,5 +152,34 @@ class LateNightCutoff {
 		}
 
 		return sprintf( 'DATE(%s - INTERVAL %d HOUR)', $column, $cutoff );
+	}
+
+	/**
+	 * Convert inclusive display dates into raw datetime query bounds.
+	 *
+	 * @return array{date_start:string,time_start:string,date_end:string,time_end:string}
+	 */
+	public static function query_bounds_for_display_range( string $start_date, string $end_date ): array {
+		$cutoff = self::cutoff_hour();
+		if ( $cutoff <= 0 ) {
+			return array(
+				'date_start' => $start_date,
+				'time_start' => '00:00:00',
+				'date_end'   => $end_date,
+				'time_end'   => '23:59:59',
+			);
+		}
+
+		$end_boundary = ( new DateTimeImmutable( $end_date ) )
+			->modify( '+1 day' )
+			->setTime( $cutoff, 0 )
+			->modify( '-1 second' );
+
+		return array(
+			'date_start' => $start_date,
+			'time_start' => sprintf( '%02d:00:00', $cutoff ),
+			'date_end'   => $end_boundary->format( 'Y-m-d' ),
+			'time_end'   => $end_boundary->format( 'H:i:s' ),
+		);
 	}
 }

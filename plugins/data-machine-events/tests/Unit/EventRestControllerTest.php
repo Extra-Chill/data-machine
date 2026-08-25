@@ -17,6 +17,8 @@ use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarGenerationFence;
+use DataMachineEvents\Abilities\EventDateQueryAbilities;
 use const DataMachineEvents\Api\API_NAMESPACE;
 
 class EventRestControllerTest extends WP_UnitTestCase {
@@ -32,6 +34,10 @@ class EventRestControllerTest extends WP_UnitTestCase {
 
 		parent::setUp();
 		wp_cache_flush();
+		delete_option( CalendarGenerationFence::OPTION );
+		delete_option( CalendarCache::GENERATION_OPTION );
+		wp_cache_flush();
+		CalendarCache::get_generation();
 		$this->original_user_id = get_current_user_id();
 		wp_set_current_user( 0 );
 
@@ -108,8 +114,12 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		// Set event datetime in the future (table is the query source of truth).
 		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
 		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		$generation = CalendarCache::get_generation();
 		CalendarCache::invalidate();
-
+		$this->assertNotSame( $generation, CalendarCache::get_generation() );
+		$this->assertNotNull( EventDatesTable::get( $post_id ) );
+		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array( 'scope' => 'upcoming', 'fields' => 'ids' ) );
+		$this->assertContains( $post_id, $direct['posts'] );
 		$request  = $this->calendar_request();
 		$request->set_param( 'format', 'data' );
 		$response = $this->server->dispatch( $request );
@@ -136,7 +146,12 @@ class EventRestControllerTest extends WP_UnitTestCase {
 
 		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
 		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		$generation = CalendarCache::get_generation();
 		CalendarCache::invalidate();
+		$this->assertNotSame( $generation, CalendarCache::get_generation() );
+		$this->assertNotNull( EventDatesTable::get( $post_id ) );
+		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array( 'scope' => 'upcoming', 'fields' => 'ids' ) );
+		$this->assertContains( $post_id, $direct['posts'] );
 
 		$request = $this->calendar_request();
 		$request->set_param( 'event_search', $unique_term );

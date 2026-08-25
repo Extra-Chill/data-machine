@@ -117,7 +117,12 @@ class DateGrouper {
 					$start_date,
 					$event_data['startTime'] ?? ''
 				);
-				$event_dates          = array( $effective_start_date );
+				if ( $end_date > $effective_start_date ) {
+					$is_multi_day = true;
+					$event_dates  = MultiDayResolver::get_date_range( $effective_start_date, $end_date, $event_tz );
+				} else {
+					$event_dates = array( $effective_start_date );
+				}
 			}
 
 			// Filter out past dates when show_past is false.

@@ -227,31 +227,39 @@ class CalendarCache {
 	 * Rotate the owner-scoped generation used by every calendar cache layer.
 	 */
 	public static function invalidate(): void {
-		self::publish_generation( wp_generate_uuid4() );
+		$generation = wp_generate_uuid4();
+		if ( false !== CalendarGenerationFence::invalidate( $generation ) ) {
+			return;
+		}
+
+		if ( ! CalendarGenerationFence::isSupported() ) {
+			// Unsupported databases never defer, so the legacy option remains canonical.
+			update_option( self::GENERATION_OPTION, $generation, false );
+			return;
+		}
+
+		do_action(
+			'datamachine_log',
+			'error',
+			'Calendar generation fence could not complete immediate invalidation',
+			array( 'site_id' => get_current_blog_id() )
+		);
 	}
 
-	/**
-	 * Publish an exact generation, allowing crash-safe idempotent replays.
-	 *
-	 * @return bool Whether the requested generation is current.
-	 */
-	public static function publish_generation( string $generation ): bool {
-		$current = self::get_generation();
-		if ( '' === $generation ) {
-			return false;
-		}
-		if ( hash_equals( $current, $generation ) ) {
-			return true;
-		}
-
-		return update_option( self::GENERATION_OPTION, $generation, false )
-			|| hash_equals( self::get_generation(), $generation );
+	/** Reserve one owner-scoped publication revision. */
+	public static function reserve_revision( ?callable $query = null ): int|false {
+		return CalendarGenerationFence::reserveRevision( $query );
 	}
 
 	/**
 	 * Get the current owner-scoped cache generation.
 	 */
 	public static function get_generation(): string {
+		$state = CalendarGenerationFence::currentState();
+		if ( is_array( $state ) ) {
+			return (string) $state['generation'];
+		}
+
 		$generation = get_option( self::GENERATION_OPTION );
 		if ( false === $generation ) {
 			$generation = wp_generate_uuid4();

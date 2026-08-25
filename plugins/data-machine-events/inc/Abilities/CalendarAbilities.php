@@ -306,8 +306,10 @@ class CalendarAbilities {
 				$range_start = $show_past ? $date_boundaries['end_date'] : $date_boundaries['start_date'];
 				$range_end   = $show_past ? $date_boundaries['start_date'] : $date_boundaries['end_date'];
 
-				$query_params['date_start'] = $range_start;
-				$query_params['date_end']   = $range_end;
+				$query_params = array_merge(
+					$query_params,
+					self::query_bounds_for_display_range( $range_start, $range_end, $show_past )
+				);
 			}
 
 			// Determine progressive rendering: only query the first day's events
@@ -332,10 +334,9 @@ class CalendarAbilities {
 
 				if ( $page_event_total >= EventRenderer::PROGRESSIVE_THRESHOLD && count( $page_dates ) > 1 ) {
 					// Query only the first day.
-					$first_date                 = $page_dates[0];
-					$query_params['date_start'] = $first_date;
-					$query_params['date_end']   = $first_date;
-					$deferred_dates             = array_slice( $page_dates, 1 );
+					$first_date     = $page_dates[0];
+					$query_params   = array_merge( $query_params, self::query_bounds_for_display_range( $first_date, $first_date, $show_past ) );
+					$deferred_dates = array_slice( $page_dates, 1 );
 				}
 			}
 		}
@@ -354,8 +355,8 @@ class CalendarAbilities {
 		$paged_date_groups = DateGrouper::group_events_by_date(
 			$paged_events,
 			$show_past,
-			$query_params['date_start'],
-			$query_params['date_end']
+			$range_start,
+			$range_end
 		);
 
 		$gaps_detected = array();
@@ -665,7 +666,7 @@ class CalendarAbilities {
 		// and second event-date join.
 		if ( self::requires_canonical_boundary_query( $params ) ) {
 			$event_query = new EventDateQueryAbilities();
-			$sql = $event_query->buildMatchingEventDateAggregateSql(
+			$sql         = $event_query->buildMatchingEventDateAggregateSql(
 				self::build_event_query_input( $params ),
 				$start_bucket_sql,
 				'DATE(ed.end_datetime)'
@@ -923,6 +924,18 @@ class CalendarAbilities {
 			'total_events'    => $total_events,
 			'events_per_date' => $events_per_date,
 		);
+	}
+
+	/** Convert display dates to raw bounds while retaining currently ongoing events. */
+	private static function query_bounds_for_display_range( string $start_date, string $end_date, bool $show_past ): array {
+		$bounds = LateNightCutoff::query_bounds_for_display_range( $start_date, $end_date );
+		if ( ! $show_past && current_time( 'Y-m-d' ) === $start_date ) {
+			$now                  = current_datetime();
+			$bounds['date_start'] = $now->format( 'Y-m-d' );
+			$bounds['time_start'] = $now->format( 'H:i:s' );
+		}
+
+		return $bounds;
 	}
 
 	/**

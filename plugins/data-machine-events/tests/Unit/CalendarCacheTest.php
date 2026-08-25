@@ -15,7 +15,10 @@ use WP_UnitTestCase;
 use WP_REST_Request;
 use WP_REST_Server;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarGenerationFence;
 use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
+use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
@@ -27,6 +30,10 @@ class CalendarCacheTest extends WP_UnitTestCase {
 	public function setUp(): void {
 		parent::setUp();
 		wp_cache_flush();
+		delete_option( CalendarGenerationFence::OPTION );
+		delete_option( CalendarCache::GENERATION_OPTION );
+		wp_cache_flush();
+		CalendarCache::get_generation();
 
 		global $wp_rest_server;
 		$this->server = $wp_rest_server = new WP_REST_Server();
@@ -125,6 +132,20 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		$this->assertNotSame( $key, CalendarCache::generate_key( $other_lat, 'dates' ) );
 		$this->assertNotSame( $key, CalendarCache::generate_key( $other_radius, 'dates' ) );
 		$this->assertNotSame( $key, CalendarCache::generate_key( $other_time, 'dates' ) );
+	}
+
+	public function test_display_date_range_expands_to_cutoff_aware_raw_bounds(): void {
+		$bounds = LateNightCutoff::query_bounds_for_display_range( '2026-08-31', '2026-08-31' );
+
+		$this->assertSame(
+			array(
+				'date_start' => '2026-08-31',
+				'time_start' => '05:00:00',
+				'date_end'   => '2026-09-01',
+				'time_end'   => '04:59:59',
+			),
+			$bounds
+		);
 	}
 
 	/**
@@ -279,7 +300,12 @@ class CalendarCacheTest extends WP_UnitTestCase {
 			'publish'
 		);
 		wp_set_object_terms( $post_id, array( (int) $venue['term_id'] ), 'venue' );
+		$generation = CalendarCache::get_generation();
 		CalendarCache::invalidate();
+		$this->assertNotSame( $generation, CalendarCache::get_generation() );
+		$this->assertNotNull( EventDatesTable::get( $post_id ) );
+		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array( 'scope' => 'upcoming', 'fields' => 'ids' ) );
+		$this->assertContains( $post_id, $direct['posts'] );
 		wp_set_current_user( 0 );
 
 		$unfiltered = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
