@@ -145,29 +145,6 @@ class Pipelines {
 							'type'        => 'array',
 							'description' => __( 'Flow configuration', 'data-machine' ),
 						),
-						'batch_import'  => array(
-							'required'          => false,
-							'type'              => 'boolean',
-							'default'           => false,
-							'description'       => __( 'Enable batch import mode', 'data-machine' ),
-							'sanitize_callback' => 'rest_sanitize_boolean',
-						),
-						'format'        => array(
-							'required'          => false,
-							'type'              => 'string',
-							'default'           => 'json',
-							'enum'              => array( 'json', 'csv' ),
-							'description'       => __( 'Import format (json or csv)', 'data-machine' ),
-							'sanitize_callback' => 'sanitize_text_field',
-						),
-						'data'          => array(
-							'required'          => false,
-							'type'              => 'string',
-							'description'       => __( 'CSV data for batch import', 'data-machine' ),
-							'sanitize_callback' => function ( $param ) {
-								return wp_unslash( $param );
-							},
-						),
 					),
 				),
 			)

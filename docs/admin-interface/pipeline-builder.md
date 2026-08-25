@@ -48,7 +48,7 @@ Updates, deletes, queue changes, handler changes, and file operations do not add
 | Rename pipeline | `updatePipelineTitle(pipelineId, name)` | `PATCH /pipelines/{pipeline_id}` |
 | Delete pipeline | `deletePipeline(pipelineId)` | `DELETE /pipelines/{pipeline_id}` |
 | Export pipelines | `exportPipelines(pipelineIds)` | `GET /pipelines?format=csv&ids=...` |
-| Import pipelines | `importPipelines(csvContent)` | `POST /pipelines` with `batch_import`, `format=csv`, `data` |
+| Import pipelines | `importPipelines(csvContent)` | `POST /wp-abilities/v1/abilities/datamachine/import-pipelines/run` with `input.data` and `input.format=csv` |
 
 List mode requests `output_mode=list` with `include_flows=false`; selected pipeline flows are loaded separately.
 

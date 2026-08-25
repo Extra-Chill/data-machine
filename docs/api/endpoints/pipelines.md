@@ -111,7 +111,7 @@ Delete a pipeline and related records.
 
 Export pipelines as CSV. Use `ids=1,2` or `pipeline_id=1` to limit the export. The response is raw CSV with `Content-Type: text/csv; charset=utf-8`.
 
-CSV import is not wired through `inc/Api/Pipelines/Pipelines.php`. The REST schema still registers `batch_import`, `format`, and `data` args on `POST /pipelines`, but the controller currently ignores them and requires `pipeline_name` for normal creation.
+CSV import is not wired through `inc/Api/Pipelines/Pipelines.php`. Execute the REST-visible `datamachine/import-pipelines` ability through `POST /wp-json/wp-abilities/v1/abilities/datamachine/import-pipelines/run`; `POST /pipelines` remains ordinary single-pipeline creation.
 
 ## Pipeline Step Routes
 
