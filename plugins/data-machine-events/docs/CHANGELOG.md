@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.55.17] - 2026-08-25
+
+### Changed
+- coalesce Calendar generation churn across imports
+
+### Fixed
+- atomically fence Calendar generation publication
+
 ## [0.55.16] - 2026-08-24
 
 ### Changed
