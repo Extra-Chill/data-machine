@@ -23,7 +23,6 @@ $providers = array(
 	'AlwaysOnServiceProvider',
 	'ActivationServiceProvider',
 	'RuntimeServiceProvider',
-	'RestServiceProvider',
 	'HostIntegrationServiceProvider',
 );
 
@@ -50,10 +49,12 @@ $assert( str_contains( $bootstrap, "require_once __DIR__ . '/Engine/AI/Tools/abi
 $runtime = (string) file_get_contents( $root . '/inc/Core/Bootstrap/RuntimeServiceProvider.php' );
 $order   = array(
 	'RuntimeEnvironment::should_load_full_runtime()',
-	'self::register_step_types();',
-	'self::register_handlers();',
-	'ToolServiceProvider::register();',
-	'RestServiceProvider::register();',
+	'new \\DataMachine\\Core\\Steps\\Fetch\\FetchStep();',
+	'new \\DataMachine\\Core\\Steps\\Publish\\Handlers\\WordPress\\WordPress();',
+	'new \\DataMachine\\Engine\\AI\\Tools\\Global\\AgentDailyMemory();',
+	'new \\DataMachine\\Api\\Chat\\Tools\\ConsultAgent();',
+	'\\DataMachine\\Api\\Execute::register();',
+	'\\DataMachine\\Api\\Email::register();',
 	'AbilityServiceProvider::register_full_runtime();',
 );
 $offset  = -1;
@@ -63,22 +64,24 @@ foreach ( $order as $needle ) {
 	$offset = false === $position ? $offset : $position;
 }
 
-$rest       = (string) file_get_contents( $root . '/inc/Core/Bootstrap/RestServiceProvider.php' );
-$rest_calls = substr_count( $rest, '::register();' );
-$assert( 27 === $rest_calls, 'REST provider composes all 27 controllers' );
+$rest_start = strpos( $runtime, '\\DataMachine\\Api\\Execute::register();' );
+$rest_end   = strpos( $runtime, '\\DataMachine\\Api\\Email::register();' );
+$rest       = false !== $rest_start && false !== $rest_end ? substr( $runtime, $rest_start, $rest_end - $rest_start + strlen( '\\DataMachine\\Api\\Email::register();' ) ) : '';
+$assert( 27 === substr_count( $rest, '::register();' ), 'runtime composes all 27 REST controllers' );
+$assert( ! is_file( $root . '/inc/Core/Bootstrap/RestServiceProvider.php' ), 'single-caller REST provider is absent' );
+$assert( ! is_file( $root . '/inc/Engine/AI/Tools/ToolServiceProvider.php' ), 'single-caller tool provider is absent' );
 $assert( ! str_contains( $main, '\\DataMachine\\Api\\Execute::register();' ), 'entrypoint no longer composes concrete REST controllers' );
 $assert( substr_count( $main, 'register_activation_hook(' ) === 0, 'entrypoint no longer registers lifecycle hooks directly' );
 
-$tool_provider       = (string) file_get_contents( $root . '/inc/Engine/AI/Tools/ToolServiceProvider.php' );
 $tool_provider_order = array(
-	'new ImageGenerationSettings();',
+	'new \\DataMachine\\Engine\\AI\\Configuration\\ImageGenerationSettings();',
 	'\\datamachine_register_global_ability_tools();',
-	'new QueueValidator();',
+	'new \\DataMachine\\Engine\\AI\\Tools\\Global\\QueueValidator();',
 );
 $offset              = -1;
 foreach ( $tool_provider_order as $needle ) {
-	$position = strpos( $tool_provider, $needle );
-	$assert( false !== $position && $position > $offset, "tool provider order preserves {$needle}" );
+	$position = strpos( $runtime, $needle );
+	$assert( false !== $position && $position > $offset, "runtime tool order preserves {$needle}" );
 	$offset = false === $position ? $offset : $position;
 }
 

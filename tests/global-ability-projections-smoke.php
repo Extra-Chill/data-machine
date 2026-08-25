@@ -118,13 +118,13 @@ $image_source = read_global_tool_source( 'inc/Engine/AI/Configuration/ImageGener
 assert_global_projection( false === strpos( $image_source, 'datamachine_register_ability_tool' ), 'image_generation projection is separated from its bounded configuration adapter', $failures, $passes );
 assert_global_projection( false !== strpos( $image_source, "registerConfigurationHandlers( 'image_generation' )" ), 'image_generation retains its bounded configuration adapter', $failures, $passes );
 
-$provider_source = read_global_tool_source( 'inc/Engine/AI/Tools/ToolServiceProvider.php', $root );
-$image_position  = strpos( $provider_source, 'new ImageGenerationSettings();' );
+$provider_source = read_global_tool_source( 'inc/Core/Bootstrap/RuntimeServiceProvider.php', $root );
+$image_position  = strpos( $provider_source, 'new \\DataMachine\\Engine\\AI\\Configuration\\ImageGenerationSettings();' );
 $register_position = strpos( $provider_source, '\\datamachine_register_global_ability_tools();' );
-$queue_position    = strpos( $provider_source, 'new QueueValidator();' );
+$queue_position    = strpos( $provider_source, 'new \\DataMachine\\Engine\\AI\\Tools\\Global\\QueueValidator();' );
 assert_global_projection(
 	false !== $image_position && false !== $register_position && false !== $queue_position && $image_position < $register_position && $register_position < $queue_position,
-	'full-runtime tool provider invokes the registrar at the former projected-tool registration point',
+	'full runtime invokes the registrar at the former projected-tool registration point',
 	$failures,
 	$passes
 );
