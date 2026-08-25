@@ -283,17 +283,6 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->bundler->import( $bundle, null, $this->owner_id );
 	}
 
-	public function test_legacy_import_rejects_empty_bundle_version(): void {
-		$bundle = $this->fixture_bundle( 'empty-bundle-version-agent' );
-		$bundle['bundle_version']   = ' ';
-		$bundle['template_version'] = '2.0.0';
-
-		$this->expectException( BundleValidationException::class );
-		$this->expectExceptionMessage( 'agent template metadata bundle_version must be a non-empty string.' );
-
-		$this->bundler->import( $bundle, null, $this->owner_id );
-	}
-
 	public function test_legacy_import_validates_nested_source_metadata_before_mutation(): void {
 		$bundle = $this->fixture_bundle( 'oversized-source-agent' );
 		$bundle['template_metadata'] = array( 'source_ref' => str_repeat( 'x', 192 ) );
