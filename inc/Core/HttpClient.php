@@ -79,7 +79,7 @@ class HttpClient {
 		}
 
 		$options = self::resolveAuthRefOptions( $options, $context );
-		if ( is_wp_error( $options ) ) {
+		if ( $options instanceof \WP_Error ) {
 			return array(
 				'success' => false,
 				'error'   => $options->get_error_message(),
@@ -103,7 +103,7 @@ class HttpClient {
 			}
 		}
 
-		if ( is_wp_error( $response ) ) {
+		if ( $response instanceof \WP_Error ) {
 			return self::handleWpError( $response, $method, $url, $context, $args );
 		}
 
@@ -297,7 +297,7 @@ class HttpClient {
 				'runtime' => true,
 			)
 		);
-		if ( is_wp_error( $resolved ) ) {
+		if ( $resolved instanceof \WP_Error ) {
 			$error_code = $resolved->get_error_code();
 			return new \WP_Error(
 				'' !== $error_code ? $error_code : 'http_auth_ref_unresolved',
@@ -359,6 +359,8 @@ class HttpClient {
 
 	/**
 	 * Handle WP_Error response
+	 *
+	 * @return array{success: false, error: string}
 	 */
 	private static function handleWpError( \WP_Error $response, string $method, string $url, string $context, array $args = array() ): array {
 		$error_message = sprintf(
@@ -408,6 +410,8 @@ class HttpClient {
 
 	/**
 	 * Handle non-success HTTP status code
+	 *
+	 * @return array{success: false, error: string, data: string, status_code: int, headers: mixed, response: array}
 	 */
 	private static function handleHttpError( array $response, int $status_code, string $body, string $method, string $url, string $context, bool $log_response_body_preview ): array {
 		$error_message = sprintf(
