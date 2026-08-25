@@ -794,12 +794,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "c930b9afeb2019e83a60f62a80104b90833dd81d"
+                "reference": "5f893293851cac8cad8a862ed2f096ffda6f23da"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/c930b9afeb2019e83a60f62a80104b90833dd81d",
-                "reference": "c930b9afeb2019e83a60f62a80104b90833dd81d",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/5f893293851cac8cad8a862ed2f096ffda6f23da",
+                "reference": "5f893293851cac8cad8a862ed2f096ffda6f23da",
                 "shasum": ""
             },
             "require": {
@@ -820,14 +820,22 @@
             "autoload": {
                 "files": [
                     "agents-api.php"
+                ],
+                "classmap": [
+                    "src/Registry/class-wp-agent.php",
+                    "src/Packages/"
                 ]
             },
             "scripts": {
                 "phpstan": [
                     "phpstan analyse --no-progress --memory-limit=2G"
                 ],
+                "phpstan-consumer": [
+                    "phpstan analyse --no-progress --memory-limit=1G -c tests/fixtures/phpstan-consumer.neon"
+                ],
                 "smoke": [
                     "php tests/composer-autoload-smoke.php",
+                    "@phpstan-consumer",
                     "php tests/bootstrap-version-skew-smoke.php",
                     "php tests/bootstrap-smoke.php",
                     "php tests/message-envelope-smoke.php",
@@ -964,7 +972,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-08-23T00:35:11+00:00"
+            "time": "2026-08-25T03:29:11+00:00"
         }
     ],
     "packages-dev": [
