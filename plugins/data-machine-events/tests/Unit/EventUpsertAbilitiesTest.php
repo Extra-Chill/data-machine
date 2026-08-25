@@ -136,6 +136,48 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'InStock', $attrs['offerAvailability'] );
 	}
 
+	public function test_public_upsert_forwards_exact_source_hash_as_identity_meta(): void {
+		$input      = $this->validInput();
+		$expected   = hash( 'sha256', $input['source'] . "\0" . $input['source_id'] );
+		$forwarded  = null;
+		$ability    = wp_get_ability( 'datamachine/upsert-post' );
+		$property   = new \ReflectionProperty( \WP_Ability::class, 'execute_callback' );
+		$callback   = $property->getValue( $ability );
+		$property->setValue(
+			$ability,
+			static function ( array $upsert_input ) use ( &$forwarded ): array {
+				$forwarded = $upsert_input;
+				$post_id   = wp_insert_post(
+					array(
+						'post_type'    => $upsert_input['post_type'],
+						'post_title'   => $upsert_input['title'],
+						'post_content' => $upsert_input['content'],
+						'post_status'  => $upsert_input['post_status'],
+						'meta_input'   => $upsert_input['meta_input'],
+					),
+					true
+				);
+
+				return array( 'success' => true, 'post_id' => (int) $post_id, 'action' => 'created' );
+			}
+		);
+
+		try {
+			$result = $this->ability->executeUpsertEvent( $input );
+		} finally {
+			$property->setValue( $ability, $callback );
+		}
+
+		$this->assertIsArray( $result );
+		$this->assertSame(
+			array(
+				'key'   => EventUpsert::SOURCE_IDENTITY_META_KEY,
+				'value' => $expected,
+			),
+			$forwarded['identity_meta']
+		);
+	}
+
 	public function test_schema_fields_update_same_source_event_without_changing_duplicate_identity(): void {
 		$input = $this->validInput();
 		$first = $this->ability->executeUpsertEvent( $input );
