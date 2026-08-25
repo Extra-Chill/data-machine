@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.24] - 2026-08-25
+
+### Changed
+- remove downstream Agents API scans
+- make AgentBundler pass PHPStan
+
+### Fixed
+- complete identity reservation retries
+
 ## [0.175.23] - 2026-08-25
 
 ### Changed
