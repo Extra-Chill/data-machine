@@ -98,6 +98,33 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 'complete', $this->repository->get_reservation( $identity['identity_hash'] )['state'] );
 	}
 
+	public function test_explicit_retry_completes_matching_link_and_clears_stale_diagnostic(): void {
+		$reserved = $this->repository->reserve_and_resolve(
+			'post',
+			array(
+				'key'   => '_source',
+				'value' => 'explicit-retry',
+			),
+			0,
+			0,
+			$this->shell()
+		);
+		update_post_meta( $reserved['post_id'], '_source', 'explicit-retry' );
+		$this->repository->record_error( $reserved['identity']['identity_hash'], 'interrupted_population', 'Interrupted after metadata write.' );
+
+		$input            = $this->input( 'explicit-retry', 'Recovered' );
+		$input['post_id'] = $reserved['post_id'];
+		$result           = UpsertPostAbility::execute( $input );
+		$row              = $this->repository->get_reservation( $reserved['identity']['identity_hash'] );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $reserved['post_id'], $result['post_id'] );
+		$this->assertSame( 'complete', $row['state'] );
+		$this->assertNull( $row['last_error_code'] );
+		$this->assertNull( $row['last_error_message'] );
+		$this->assertNotEmpty( $row['completed_at'] );
+	}
+
 	public function test_linked_shell_retry_reconciles_full_post_behavior(): void {
 		$reserved = $this->repository->reserve_and_resolve(
 			'post',
@@ -236,7 +263,7 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $count );
 	}
 
-	public function test_explicit_post_bypasses_identity_reservation_and_metadata(): void {
+	public function test_first_explicit_identity_adopts_explicit_post_over_other_candidates(): void {
 		$explicit_id = self::factory()->post->create( array( 'post_type' => 'post' ) );
 		$identity_id = self::factory()->post->create( array( 'post_type' => 'post' ) );
 		$slug_id     = self::factory()->post->create( array( 'post_type' => 'post', 'post_name' => 'priority-slug' ) );
@@ -251,13 +278,44 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( $explicit_id, $result['post_id'] );
 		$this->assertSame( 'Explicit wins', get_post( $explicit_id )->post_title );
-		$this->assertSame( '', get_post_meta( $explicit_id, '_source', true ) );
+		$this->assertSame( 'priority-explicit', get_post_meta( $explicit_id, '_source', true ) );
 		$this->assertSame( 'priority-explicit', get_post_meta( $identity_id, '_source', true ) );
 		$this->assertSame( $identity_title, get_post( $identity_id )->post_title );
 		$this->assertNotSame( 'Explicit wins', get_post( $slug_id )->post_title );
 
 		$identity = PostIdentityReservations::normalize_identity( 'post', $input['identity_meta'] );
-		$this->assertNull( $this->repository->get_reservation( $identity['identity_hash'] ) );
+		$row      = $this->repository->get_reservation( $identity['identity_hash'] );
+		$this->assertSame( 'complete', $row['state'] );
+		$this->assertSame( $explicit_id, (int) $row['post_id'] );
+	}
+
+	public function test_explicit_identity_suppresses_slug_fallback_lookup(): void {
+		$explicit_id = self::factory()->post->create( array( 'post_type' => 'post' ) );
+		self::factory()->post->create(
+			array(
+				'post_type' => 'post',
+				'post_name' => 'observable-fallback',
+			)
+		);
+		$slug_queries = 0;
+		$observer     = static function ( \WP_Query $query ) use ( &$slug_queries ): void {
+			if ( 'observable-fallback' === $query->get( 'name' ) ) {
+				++$slug_queries;
+			}
+		};
+		add_action( 'pre_get_posts', $observer );
+		try {
+			$input            = $this->input( 'observable-explicit', 'Explicit without fallback' );
+			$input['post_id'] = $explicit_id;
+			$input['slug']    = 'observable-fallback';
+			$result           = UpsertPostAbility::execute( $input );
+		} finally {
+			remove_action( 'pre_get_posts', $observer );
+		}
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $explicit_id, $result['post_id'] );
+		$this->assertSame( 0, $slug_queries );
 	}
 
 	public function test_wrong_type_explicit_post_fails_before_reservation(): void {
@@ -298,21 +356,75 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 'identity-miss', get_post_meta( $slug_id, '_source', true ) );
 	}
 
-	public function test_explicit_post_bypasses_an_existing_link_without_rebinding_it(): void {
-		$first       = UpsertPostAbility::execute( $this->input( 'linked-conflict', 'First' ) );
-		$other_id    = self::factory()->post->create( array( 'post_type' => 'post' ) );
-		$retry_input = $this->input( 'linked-conflict', 'Other' );
+	public function test_conflicting_explicit_post_fails_without_rebinding_existing_link(): void {
+		$first                  = UpsertPostAbility::execute( $this->input( 'linked-conflict', 'First' ) );
+		$other_id               = self::factory()->post->create( array( 'post_type' => 'post' ) );
+		$retry_input            = $this->input( 'linked-conflict', 'Other' );
 		$retry_input['post_id'] = $other_id;
+		$identity               = PostIdentityReservations::normalize_identity( 'post', $retry_input['identity_meta'] );
+		$before                 = $this->repository->get_reservation( $identity['identity_hash'] );
 
 		$result = UpsertPostAbility::execute( $retry_input );
 
-		$this->assertTrue( $result['success'] );
-		$this->assertSame( $other_id, $result['post_id'] );
+		$this->assertWPError( $result );
+		$this->assertSame( 'identity_explicit_conflict', $result->get_error_code() );
+		$this->assertSame( $first['post_id'], $result->get_error_data()['linked_post_id'] );
+		$this->assertSame( $other_id, $result->get_error_data()['explicit_post_id'] );
 		$this->assertSame( '', get_post_meta( $other_id, '_source', true ) );
-		$identity = PostIdentityReservations::normalize_identity( 'post', $retry_input['identity_meta'] );
-		$row      = $this->repository->get_reservation( $identity['identity_hash'] );
+		$row = $this->repository->get_reservation( $identity['identity_hash'] );
 		$this->assertSame( $first['post_id'], (int) $row['post_id'] );
+		$this->assertSame( $before['state'], $row['state'] );
+		$this->assertSame( $before['completed_at'], $row['completed_at'] );
 		$this->assertSame( 'linked-conflict', get_post_meta( $first['post_id'], '_source', true ) );
+		$this->assertIdentityLockIsFree( 'linked-conflict' );
+	}
+
+	public function test_unusable_identity_meta_keeps_direct_explicit_post_behavior(): void {
+		$identity = static fn( $key, $value ): array => array(
+			'key'   => $key,
+			'value' => $value,
+		);
+		$cases    = array(
+			'omitted'               => null,
+			'empty-array'           => array(),
+			'partial-key'           => array( 'key' => '_source' ),
+			'partial-value'         => array( 'value' => 'partial' ),
+			'empty-key'             => $identity( '', 'empty-key' ),
+			'empty-value'           => $identity( '_source', '' ),
+			'false-key'             => $identity( false, 'false-key' ),
+			'false-value'           => $identity( '_source', false ),
+			'integer-zero-value'    => $identity( '_source', 0 ),
+			'string-zero-value'     => $identity( '_source', '0' ),
+			'non-array-string'      => 'not-an-array',
+			'non-array-false'       => false,
+			'non-array-null'        => null,
+			'sanitized-empty-key'   => $identity( '!!!', 'sanitized-empty' ),
+			'sanitized-empty-value' => $identity( '_source', '<>' ),
+		);
+
+		foreach ( $cases as $label => $identity_meta ) {
+			$post_id = self::factory()->post->create( array( 'post_type' => 'post' ) );
+			$input   = array(
+				'post_type' => 'post',
+				'post_id'   => $post_id,
+				'title'     => 'Direct explicit ' . $label,
+				'content'   => '<!-- wp:paragraph --><p>Direct body</p><!-- /wp:paragraph -->',
+			);
+			if ( 'omitted' !== $label ) {
+				$input['identity_meta'] = $identity_meta;
+			}
+
+			$result = UpsertPostAbility::execute( $input );
+
+			$this->assertTrue( $result['success'], $label );
+			$this->assertSame( 'updated', $result['action'], $label );
+			$this->assertSame( $post_id, $result['post_id'], $label );
+			$this->assertSame( 'Direct explicit ' . $label, get_post( $post_id )->post_title, $label );
+			$this->assertSame( '', get_post_meta( $post_id, '_source', true ), $label );
+		}
+
+		global $wpdb;
+		$this->assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $this->repository->get_table_name() ) ) );
 	}
 
 	public function test_identity_meta_round_trips_backslashes_and_quotes(): void {
@@ -526,6 +638,17 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		update_post_meta( $post_id, UpsertPostAbility::META_CONTENT_HASH, hash( 'sha256', $content ) );
 
 		return $post_id;
+	}
+
+	private function shell(): array {
+		return array(
+			'post_author'    => get_current_user_id(),
+			'comment_status' => get_default_comment_status( 'post' ),
+			'ping_status'    => get_default_comment_status( 'post', 'pingback' ),
+			'post_date'      => current_time( 'mysql' ),
+			'post_date_gmt'  => current_time( 'mysql', true ),
+			'guid'           => 'urn:uuid:' . wp_generate_uuid4(),
+		);
 	}
 
 	private function status_input( int $post_id, string $post_status ): array {

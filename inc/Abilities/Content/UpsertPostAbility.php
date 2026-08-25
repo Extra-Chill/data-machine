@@ -414,7 +414,9 @@ class UpsertPostAbility {
 				);
 			}
 
-			return self::callback_result( self::execute_resolved_write( $write_context, (int) $existing_id ) );
+			if ( ! self::has_usable_identity_meta( $identity_meta ) ) {
+				return self::callback_result( self::execute_resolved_write( $write_context, (int) $existing_id ) );
+			}
 		}
 
 		if ( self::has_usable_identity_meta( $identity_meta ) ) {
@@ -422,7 +424,8 @@ class UpsertPostAbility {
 				$write_context,
 				$identity_meta,
 				$slug,
-				$parent_id
+				$parent_id,
+				$post_id
 			);
 		}
 
@@ -446,22 +449,24 @@ class UpsertPostAbility {
 	/**
 	 * Execute an identity-backed write while holding its advisory fence.
 	 *
-	 * @param array $context       Normalized write context.
-	 * @param array $identity_meta Identity meta input.
-	 * @param string $slug         Slug fallback.
-	 * @param int   $parent_id     Slug parent scope.
+	 * @param array  $context          Normalized write context.
+	 * @param array  $identity_meta    Identity meta input.
+	 * @param string $slug             Slug fallback.
+	 * @param int    $parent_id        Slug parent scope.
+	 * @param int    $explicit_post_id Explicit post candidate.
 	 * @return array|\WP_Error
 	 */
 	private static function execute_identity_backed(
 		array $context,
 		array $identity_meta,
 		string $slug,
-		int $parent_id
+		int $parent_id,
+		int $explicit_post_id = 0
 	): array|\WP_Error {
 		$post_type = $context['post_type'];
 
 		$slug_fallback_id = 0;
-		if ( '' !== $slug ) {
+		if ( $explicit_post_id <= 0 && '' !== $slug ) {
 			$slug_fallback_id = self::resolve_existing_post( 0, $slug, $parent_id, array(), $post_type );
 			if ( is_wp_error( $slug_fallback_id ) ) {
 				return self::callback_result( array(
@@ -509,7 +514,7 @@ class UpsertPostAbility {
 			$reservation = $reservations->reserve_and_resolve(
 				$post_type,
 				$identity_meta,
-				0,
+				$explicit_post_id,
 				(int) $slug_fallback_id,
 				$shell
 			);
