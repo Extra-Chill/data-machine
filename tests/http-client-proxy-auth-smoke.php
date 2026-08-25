@@ -59,6 +59,37 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	}
 }
 
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( string $hook, mixed ...$args ): void {
+		unset( $hook, $args );
+	}
+}
+
+if ( ! function_exists( 'wp_remote_get' ) ) {
+	function wp_remote_get( string $url, array $args ): array {
+		$GLOBALS['datamachine_http_client_request'] = compact( 'url', 'args' );
+		return $GLOBALS['datamachine_http_client_response'];
+	}
+}
+
+if ( ! function_exists( 'wp_remote_retrieve_response_code' ) ) {
+	function wp_remote_retrieve_response_code( array $response ): int {
+		return (int) ( $response['response']['code'] ?? 0 );
+	}
+}
+
+if ( ! function_exists( 'wp_remote_retrieve_body' ) ) {
+	function wp_remote_retrieve_body( array $response ): string {
+		return (string) ( $response['body'] ?? '' );
+	}
+}
+
+if ( ! function_exists( 'wp_remote_retrieve_headers' ) ) {
+	function wp_remote_retrieve_headers( array $response ): array {
+		return (array) ( $response['headers'] ?? array() );
+	}
+}
+
 if ( ! function_exists( 'get_site_option' ) ) {
 	function get_site_option( string $name, mixed $default = false ): mixed {
 		return $GLOBALS['datamachine_http_client_options'][ $name ] ?? $default;
@@ -187,6 +218,20 @@ $bounded_args = http_client_private( 'buildRequestArgs', 'GET', array( 'limit_re
 http_client_smoke_assert( 'response byte limit is forwarded to WordPress HTTP', 1048576 === ( $bounded_args['limit_response_size'] ?? null ) );
 $unbounded_args = http_client_private( 'buildRequestArgs', 'GET', array( 'limit_response_size' => 0 ) );
 http_client_smoke_assert( 'invalid response byte limit is omitted', ! isset( $unbounded_args['limit_response_size'] ) );
+
+$GLOBALS['datamachine_http_client_response'] = array(
+	'response' => array( 'code' => 206 ),
+	'headers'  => array( 'content-range' => 'bytes 900-999/1000' ),
+	'body'     => 'bounded tail',
+);
+$partial_response = HttpClient::get(
+	'https://example.test/log.txt',
+	array( 'headers' => array( 'Range' => 'bytes=-100' ) )
+);
+http_client_smoke_assert(
+	'partial content is a successful bounded GET response',
+	true === ( $partial_response['success'] ?? false ) && 206 === ( $partial_response['status_code'] ?? 0 ) && 'bounded tail' === ( $partial_response['data'] ?? '' )
+);
 
 echo "\n[2] Auth ref options\n";
 
