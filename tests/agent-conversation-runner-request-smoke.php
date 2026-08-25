@@ -77,6 +77,7 @@ if ( ! function_exists( 'get_current_user_id' ) ) {
 
 require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/conversation-loop.php';
 
 use DataMachine\Engine\AI\LoopEventSinkInterface;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
@@ -200,7 +201,7 @@ $result_metadata = datamachine_conversation_metadata( $result );
 
 assert_runner_request( 'substrate ok' === ( $result['final_content'] ?? null ), 'result preserves final content from provider' );
 assert_runner_request( true === ( $result_metadata['completed'] ?? null ), 'result marks conversation complete when no tools called' );
-assert_runner_request( ! array_key_exists( 'completed', $result ), 'DM completion flag is namespaced outside the Agents API result top level' );
+assert_runner_request( true === ( $result['completed'] ?? null ), 'canonical Agents API completion remains at the result top level' );
 assert_runner_request( is_array( $result['metadata']['datamachine'] ?? null ), 'result carries Data Machine diagnostics under metadata.datamachine' );
 assert_runner_request( 1 === ( $result['turn_count'] ?? null ), 'result preserves turn count' );
 assert_runner_request( is_array( $result['tool_execution_results'] ?? null ), 'result includes tool execution results' );

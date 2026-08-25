@@ -16,7 +16,6 @@ namespace DataMachine\Engine\AI;
 
 use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
 use AgentsAPI\AI\WP_Agent_Conversation_Loop;
-use AgentsAPI\AI\WP_Agent_Conversation_Result;
 use AgentsAPI\AI\WP_Agent_Default_Provider_Turn_Adapter;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Message;
@@ -27,6 +26,7 @@ use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request_Store;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Result;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Lifecycle;
+use AgentsAPI\AI\WP_Agent_Run_Outcome;
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Executor;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\PluginSettings;
@@ -307,9 +307,8 @@ function datamachine_run_conversation(
 		return $error_result;
 	}
 
-	// Normalize the substrate result and augment with DM-specific fields.
+	// Augment the canonical substrate result with Data Machine-specific fields.
 	try {
-		$result                    = WP_Agent_Conversation_Result::normalize( $result );
 		$completion_policy_stopped = false;
 		$compaction_event_types    = array(
 			\AgentsAPI\AI\WP_Agent_Conversation_Compaction::EVENT_STARTED,
@@ -334,11 +333,11 @@ function datamachine_run_conversation(
 				continue;
 			}
 
-			if ( ! is_array( $event ) || ! in_array( $event_type, array( DataMachineConversationStatus::COMPLETION_POLICY_STOP, DataMachineConversationStatus::COMPLETION_POLICY_CONTINUE ), true ) ) {
+			if ( ! is_array( $event ) || ! in_array( $event_type, array( 'completion_policy_stop', 'completion_policy_continue' ), true ) ) {
 				continue;
 			}
 
-			if ( DataMachineConversationStatus::COMPLETION_POLICY_STOP === $event_type ) {
+			if ( 'completion_policy_stop' === $event_type ) {
 				$completion_policy_stopped = true;
 			}
 
@@ -349,8 +348,8 @@ function datamachine_run_conversation(
 		}
 		if ( isset( $result['failure'] ) && is_array( $result['failure'] ) && ! isset( $result['error'] ) ) {
 			$result['error']         = (string) ( $result['failure']['message'] ?? 'Provider request failed.' );
-			$result['error_code']    = (string) ( $result['failure']['code'] ?? DataMachineConversationStatus::PROVIDER_ERROR );
-			$result['finish_reason'] = DataMachineConversationStatus::PROVIDER_ERROR;
+			$result['error_code']    = (string) ( $result['failure']['code'] ?? WP_Agent_Run_Outcome::STOP_PROVIDER_ERROR );
+			$result['finish_reason'] = WP_Agent_Run_Outcome::STOP_PROVIDER_ERROR;
 		}
 		$tool_execution_results = datamachine_enrich_mediated_tool_results(
 			is_array( $result['tool_execution_results'] ?? null ) ? $result['tool_execution_results'] : array(),
@@ -383,14 +382,9 @@ function datamachine_run_conversation(
 		return $error_result;
 	}
 
-	// Substrate now surfaces turn_count, final_content, usage, and
-	// request_metadata directly on the result (agents-api#136). Derive the
-	// DM-only diagnostics (completed / max_turns_reached / runtime_tool_pending
-	// / interrupted / completion-assertion evaluation / warning) through a
-	// single normalizer pass keyed off DataMachineConversationStatus constants,
-	// instead of re-reading $result['status'] across scattered if-blocks. Keep
-	// the diagnostics namespaced so the top level remains the Agents API result.
-	$normalization = ConversationResultNormalizer::normalize(
+	// Keep product diagnostics namespaced so the top level remains the canonical
+	// Agents API conversation result and run outcome.
+	$diagnostics = datamachine_conversation_diagnostics(
 		$result,
 		$turn_state->last_tool_calls,
 		$turn_state->all_tool_calls,
@@ -401,13 +395,10 @@ function datamachine_run_conversation(
 		$assertions,
 		$loop_payload
 	);
-	if ( $normalization['status_overridden'] ) {
-		$result['status'] = $normalization['status'];
-	}
 
-	$result                       = datamachine_with_conversation_metadata( $result, $normalization['metadata'] );
+	$result                       = datamachine_with_conversation_metadata( $result, $diagnostics );
 	$result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $result, $loop_payload, $provider, $model, $modes );
-	if ( DataMachineConversationStatus::FAILED === (string) ( $result['status'] ?? '' ) || isset( $result['error'] ) ) {
+	if ( WP_Agent_Run_Outcome::STATUS_FAILED === (string) ( $result['status'] ?? '' ) || isset( $result['error'] ) ) {
 		$transcript_session_id = $transcript_persister->persist( is_array( $result['messages'] ?? null ) ? $result['messages'] : $turn_state->latest_messages, $conversation_request, $result );
 		if ( '' !== $transcript_session_id ) {
 			$result['transcript_session_id'] = $transcript_session_id;
@@ -415,6 +406,117 @@ function datamachine_run_conversation(
 	}
 
 	return $result;
+}
+
+/**
+ * Project Data Machine-only diagnostics from a canonical Agents API result.
+ *
+ * @param array                           $result                    Canonical conversation result.
+ * @param array                           $last_tool_calls           Tool calls from the latest turn.
+ * @param array                           $all_tool_calls            Tool calls accumulated across all turns.
+ * @param array                           $tool_execution_results    Enriched tool results.
+ * @param array                           $completion_nudges         Completion nudges recorded during the loop.
+ * @param bool                            $completion_policy_stopped Whether the completion policy stopped.
+ * @param int                             $turn_ceiling              Maximum conversation turns.
+ * @param DataMachineCompletionAssertions $assertions                Completion assertions.
+ * @param array                           $loop_payload              Assertion evaluation context.
+ * @return array<string,mixed>
+ */
+function datamachine_conversation_diagnostics(
+	array $result,
+	array $last_tool_calls,
+	array $all_tool_calls,
+	array $tool_execution_results,
+	array $completion_nudges,
+	bool $completion_policy_stopped,
+	int $turn_ceiling,
+	DataMachineCompletionAssertions $assertions,
+	array $loop_payload
+): array {
+	$outcome        = is_array( $result['run_outcome'] ?? null ) ? $result['run_outcome'] : array();
+	$outcome_status = (string) ( $outcome['status'] ?? $result['status'] ?? '' );
+	$diagnostics    = array(
+		'completed'       => (bool) ( $result['completed'] ?? $outcome['completed'] ?? false ),
+		'last_tool_calls' => $last_tool_calls,
+		'tool_calls'      => $all_tool_calls,
+	);
+
+	if ( ! empty( $tool_execution_results ) ) {
+		$diagnostics['tool_execution_summary'] = datamachine_summarize_tool_execution_results( $tool_execution_results, false );
+	}
+	if ( WP_Agent_Run_Outcome::STATUS_INTERRUPTED === $outcome_status && isset( $result['interrupted'] ) ) {
+		$diagnostics['interrupted'] = $result['interrupted'];
+	}
+
+	$budget_exceeded          = WP_Agent_Run_Outcome::STATUS_BUDGET_EXCEEDED === $outcome_status;
+	$silent_max_turns_reached = ! empty( $last_tool_calls )
+		&& (int) ( $result['turn_count'] ?? 0 ) >= $turn_ceiling
+		&& ! $budget_exceeded;
+	if ( $silent_max_turns_reached ) {
+		$diagnostics['completed']         = false;
+		$diagnostics['max_turns_reached'] = true;
+		$diagnostics['warning']           = sprintf(
+			'Maximum conversation turns (%d) reached. Response may be incomplete.',
+			$turn_ceiling
+		);
+	}
+
+	if ( WP_Agent_Run_Outcome::STATUS_RUNTIME_TOOL_PENDING === $outcome_status || ! empty( $result['runtime_tool_pending'] ) ) {
+		$diagnostics['completed']                     = false;
+		$diagnostics['runtime_tool_pending']          = true;
+		$diagnostics['runtime_tool_pending_requests'] = is_array( $result['runtime_tool_pending'] ?? null ) ? array( $result['runtime_tool_pending'] ) : array();
+	}
+
+	if ( ! empty( $completion_nudges ) ) {
+		$latest_nudge                                   = $completion_nudges[ count( $completion_nudges ) - 1 ];
+		$diagnostics['completion_nudge_count']          = count( $completion_nudges );
+		$diagnostics['completion_nudge']                = $latest_nudge['completion_nudge'] ?? '';
+		$diagnostics['completion_assertions_required']  = $latest_nudge['completion_assertions_required'] ?? array();
+		$diagnostics['completion_assertions_missing']   = $latest_nudge['completion_assertions_missing'] ?? array();
+		$diagnostics['completion_assertions_satisfied'] = $latest_nudge['completion_assertions_satisfied'] ?? array();
+		if ( ! $completion_policy_stopped && (int) ( $result['turn_count'] ?? 0 ) >= $turn_ceiling ) {
+			$diagnostics['completed']         = false;
+			$diagnostics['max_turns_reached'] = true;
+			$diagnostics['warning']           = sprintf(
+				'Maximum conversation turns (%d) reached before completion policy was satisfied.',
+				$turn_ceiling
+			);
+		}
+	}
+
+	if ( $assertions->hasAssertions() ) {
+		$evaluation_context = $loop_payload;
+		$typed_artifacts    = datamachine_normalize_typed_artifact_outputs( $result );
+		if ( ! empty( $typed_artifacts ) ) {
+			$evaluation_engine_data                               = is_array( $evaluation_context['engine_data'] ?? null ) ? $evaluation_context['engine_data'] : array();
+			$evaluation_engine_data['outputs']                    = is_array( $evaluation_engine_data['outputs'] ?? null ) ? $evaluation_engine_data['outputs'] : array();
+			$evaluation_engine_data['outputs']['typed_artifacts'] = array_replace_recursive(
+				is_array( $evaluation_engine_data['outputs']['typed_artifacts'] ?? null ) ? $evaluation_engine_data['outputs']['typed_artifacts'] : array(),
+				$typed_artifacts
+			);
+			$evaluation_context['engine_data']                    = $evaluation_engine_data;
+		}
+
+		$evaluation                                     = $assertions->evaluate( $evaluation_context, $result['final_content'] ?? '' );
+		$diagnostics['completion_assertions_required']  = $assertions->required();
+		$diagnostics['completion_assertions_missing']   = $evaluation['missing'];
+		$diagnostics['completion_assertions_satisfied'] = $evaluation['satisfied'];
+		$diagnostics['completion_assertions_complete']  = ! empty( $evaluation['complete'] );
+		if ( ! empty( $evaluation['complete'] ) && ! $budget_exceeded ) {
+			$diagnostics['completed'] = true;
+		}
+	}
+
+	if ( $budget_exceeded && in_array( $result['budget'] ?? '', array( 'conversation_turns', 'turns' ), true ) ) {
+		$diagnostics['max_turns_reached'] = true;
+		$diagnostics['completed']         = false;
+		$diagnostics['warning']           = sprintf(
+			'Maximum conversation turns (%d) reached. Response may be incomplete.',
+			$turn_ceiling
+		);
+	}
+
+	return $diagnostics;
 }
 
 /**
@@ -446,10 +548,8 @@ function datamachine_with_conversation_metadata( array $result, array $datamachi
  */
 function datamachine_conversation_metadata_top_level_keys(): array {
 	return array(
-		'completed',
 		'last_tool_calls',
 		'tool_calls',
-		'runtime_tool_pending',
 		'runtime_tool_pending_requests',
 		'completion_nudge_count',
 		'completion_nudge',
@@ -769,8 +869,8 @@ function datamachine_build_pre_tool_mediator( array $tools, array $loop_payload,
 				$tool_result['result'] = $runtime_result_payload;
 			}
 			if ( ! empty( $tool_result['pending'] ) ) {
-				$tool_result['status']             = DataMachineConversationStatus::RUNTIME_TOOL_PENDING;
-				$tool_result['metadata']['status'] = DataMachineConversationStatus::RUNTIME_TOOL_PENDING;
+				$tool_result['status']             = WP_Agent_Runtime_Tool_Request::STATUS_PENDING;
+				$tool_result['metadata']['status'] = WP_Agent_Runtime_Tool_Request::STATUS_PENDING;
 			}
 
 			$is_pending = ! empty( $tool_result['pending'] );
