@@ -19,6 +19,7 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Api\Flows\FlowScheduling;
+use WP_Agent_Package;
 use WP_Agent_Package_Artifact_Hasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactPayloads;
 use DataMachine\Engine\Bundle\AgentBundleArtifactDefinitions;
@@ -399,9 +400,9 @@ class AgentBundler {
 	 * Project a legacy bundle array to the Core-shaped package contract.
 	 *
 	 * @param array<string,mixed> $bundle Legacy bundle array.
-	 * @return object
+	 * @return WP_Agent_Package
 	 */
-	public static function package_from_bundle( array $bundle ): object {
+	public static function package_from_bundle( array $bundle ): WP_Agent_Package {
 		return AgentPackageProjection::from_array_bundle( $bundle );
 	}
 
@@ -409,9 +410,9 @@ class AgentBundler {
 	 * Project a bundle directory to the Core-shaped package contract.
 	 *
 	 * @param AgentBundleDirectory $directory Bundle directory.
-	 * @return object
+	 * @return WP_Agent_Package
 	 */
-	public static function package_from_directory( AgentBundleDirectory $directory ): object {
+	public static function package_from_directory( AgentBundleDirectory $directory ): WP_Agent_Package {
 		return AgentPackageProjection::from_directory( $directory );
 	}
 
@@ -592,7 +593,7 @@ class AgentBundler {
 	 *                                target instead of returning a slug-collision error. Required when the live
 	 *                                pipelines/flows have been edited (`local_modified`) so the importer can stage
 	 *                                conflicts and the CLI can hand them to the planner / PendingActions.
-	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
+	 * @return array<string,mixed>
 	 */
 	public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
 		// Validate bundle.
@@ -871,7 +872,7 @@ class AgentBundler {
 				// by `??` and collapsed into the unspecified sentinel.
 				$raw_site_scope    = array_key_exists( 'site_scope', $agent_data ) ? $agent_data['site_scope'] : BundleSchema::SITE_SCOPE_UNSPECIFIED;
 				$bundle_site_scope = BundleSchema::normalize_agent_site_scope( $raw_site_scope );
-				$create_site_scope = ( BundleSchema::SITE_SCOPE_UNSPECIFIED === $bundle_site_scope ) ? false : $bundle_site_scope;
+				$create_site_scope = is_int( $bundle_site_scope ) || null === $bundle_site_scope ? $bundle_site_scope : false;
 
 				$agent_id = $this->agents_repo->create_if_missing(
 					$slug,
@@ -1507,7 +1508,7 @@ class AgentBundler {
 	 * @param int                  $owner_id WordPress user ID to own the imported agent.
 	 * @param bool                 $dry_run If true, validate without writing.
 	 * @param array                $options Import options.
-	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
+	 * @return array<string,mixed>
 	 */
 	public function import_directory_object( AgentBundleDirectory $directory, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
 		return $this->import_directory_materialization( $directory, $new_slug, $owner_id, $dry_run, $options );
@@ -1522,7 +1523,7 @@ class AgentBundler {
 	 * @param bool                 $dry_run If true, validate without writing.
 	 * @param array                $options Import options.
 	 * @param array                $abilities_manifest Compatibility abilities manifest.
-	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
+	 * @return array<string,mixed>
 	 */
 	private function import_directory_materialization( AgentBundleDirectory $directory, ?string $new_slug, int $owner_id, bool $dry_run, array $options, array $abilities_manifest = array() ): array {
 		$compatibility = AgentBundleCompatibility::report( AgentPackageProjection::from_directory( $directory ) )->to_array();
@@ -2249,7 +2250,7 @@ class AgentBundler {
 		return $files;
 	}
 
-	/** @param array<string,string> $metadata @return array<string,string> */
+	/** @param array<string,mixed> $metadata @return array<string,string> */
 	private function collect_subagent_runtime_artifacts( string $slug, array $metadata, string $kind ): array {
 		$files = array();
 		$root  = $this->directory_manager->get_agent_identity_directory( $slug ) . '/' . $kind;

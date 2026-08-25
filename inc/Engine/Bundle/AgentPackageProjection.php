@@ -7,6 +7,7 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use WP_Agent_Package;
 use WP_Agent_Package_Artifact_Hasher;
 
 defined( 'ABSPATH' ) || exit;
@@ -20,13 +21,12 @@ final class AgentPackageProjection {
 	 * Build a package from a bundle directory value object.
 	 *
 	 * @param AgentBundleDirectory $directory Bundle directory.
-	 * @return object
+	 * @return WP_Agent_Package
 	 */
-	public static function from_directory( AgentBundleDirectory $directory ): object {
-		$manifest      = $directory->manifest()->to_array();
-		$package_class = 'WP_Agent_Package';
+	public static function from_directory( AgentBundleDirectory $directory ): WP_Agent_Package {
+		$manifest = $directory->manifest()->to_array();
 
-		return $package_class::from_array(
+		return WP_Agent_Package::from_array(
 			array(
 				'slug'         => (string) $manifest['bundle_slug'],
 				'version'      => (string) $manifest['bundle_version'],
@@ -42,9 +42,9 @@ final class AgentPackageProjection {
 	 * Build a package from a bundle array.
 	 *
 	 * @param array<string,mixed> $bundle Canonical bundle document.
-	 * @return object
+	 * @return WP_Agent_Package
 	 */
-	public static function from_array_bundle( array $bundle ): object {
+	public static function from_array_bundle( array $bundle ): WP_Agent_Package {
 		return self::from_directory( AgentBundleArrayAdapter::from_array_bundle( $bundle ) );
 	}
 
