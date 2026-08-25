@@ -2,6 +2,23 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.23] - 2026-08-25
+
+### Changed
+- remove agent template metadata wrapper
+- keep CLI registration contract concise
+- collapse CLI command registry
+- collapse runtime composition providers
+- remove redundant ability bootstrap ceremony
+- remove conversation result carrier
+- stop duplicate step result writes
+- centralize taxonomy ability slug
+- keep taxonomy adapter net negative
+- route taxonomy CLI through abilities
+
+### Fixed
+- propagate subagent export profile
+
 ## [0.175.22] - 2026-08-24
 
 ### Fixed
