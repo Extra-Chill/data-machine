@@ -20,7 +20,7 @@ class HttpClient {
 	private const VALID_METHODS = array( 'GET', 'POST', 'PUT', 'DELETE', 'PATCH' );
 
 	private const SUCCESS_CODES = array(
-		'GET'    => array( 200, 202 ),
+		'GET'    => array( 200, 202, 206 ),
 		'POST'   => array( 200, 201, 202 ),
 		'PUT'    => array( 200, 201, 204 ),
 		'PATCH'  => array( 200, 204 ),
