@@ -1271,6 +1271,33 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		};
 		add_filter( 'datamachine_agent_config_artifact_projection_policies', $this->agent_config_projection_filter, 10, 1 );
 
+		$grandchild_config = array(
+			'default_model'      => 'gpt-5.5-mini',
+			'plugin_runtime'     => array( 'endpoint' => 'https://grandchild-runtime.example.test' ),
+			'backup_private'     => array( 'token' => 'grandchild-secret' ),
+			'datamachine_bundle' => array( 'source_revision' => 'grandchild-source-revision' ),
+		);
+		$grandchild_id = $this->agents_repo->create_if_missing( 'backup-grandchild', 'Backup Grandchild', $this->owner_id, $grandchild_config, 7 );
+		$this->assertIsInt( $grandchild_id );
+
+		$child_config = array(
+			'default_model'      => 'gpt-5.5-mini',
+			'plugin_runtime'     => array( 'endpoint' => 'https://child-runtime.example.test' ),
+			'backup_private'     => array( 'token' => 'child-secret' ),
+			'datamachine_bundle' => array( 'source_revision' => 'child-source-revision' ),
+			'subagents'          => array( 'backup-grandchild' ),
+		);
+		$child_id = $this->agents_repo->create_if_missing( 'backup-child', 'Backup Child', $this->owner_id, $child_config, 7 );
+		$this->assertIsInt( $child_id );
+		$coordinator_id = $this->agents_repo->create_if_missing(
+			'profile-coordinator',
+			'Profile Coordinator',
+			$this->owner_id,
+			array( 'subagents' => array( 'backup-child' ) ),
+			7
+		);
+		$this->assertIsInt( $coordinator_id );
+
 		$source_config = array(
 			'default_provider'        => 'openai',
 			'default_model'           => 'gpt-5.5',
@@ -1294,7 +1321,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 		$exports = array();
 		foreach ( array( 'share', 'backup', 'fork' ) as $profile ) {
-			$result = $this->bundler->export_directory_object( 'backup-source', array( 'profile' => $profile ) );
+			$result = $this->bundler->export_directory_object( 'backup-source', array( 'profile' => $profile, 'reproducible' => true ) );
 			$this->assertTrue( (bool) $result['success'], "{$profile} export succeeds." );
 			$this->assertInstanceOf( AgentBundleDirectory::class, $result['directory'] ?? null );
 			$exports[ $profile ] = AgentBundleArrayAdapter::to_array_bundle( $result['directory'] );
@@ -1313,6 +1340,37 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 'https://runtime.example.test', $backup_config['example']['runtime_endpoints']['events']['url'] ?? null );
 		$this->assertSame( 'runtime:events', $backup_config['example']['auth_refs']['events'] ?? null );
 		$this->assertArrayNotHasKey( 'backup_private', $backup_config, 'Backup honors explicit backup egress exclusion.' );
+
+		$nested_exports = array();
+		foreach ( array( 'share', 'backup', 'fork' ) as $profile ) {
+			$result = $this->bundler->export_directory_object( 'profile-coordinator', array( 'profile' => $profile, 'reproducible' => true ) );
+			$this->assertTrue( (bool) $result['success'], "{$profile} nested export succeeds." );
+			$nested_exports[ $profile ] = AgentBundleArrayAdapter::to_array_bundle( $result['directory'] );
+		}
+		$share_subagents    = array_column( $nested_exports['share']['subagents'], null, 'slug' );
+		$backup_subagents   = array_column( $nested_exports['backup']['subagents'], null, 'slug' );
+		$fork_subagents     = array_column( $nested_exports['fork']['subagents'], null, 'slug' );
+		$subagent_endpoints = array(
+			'backup-child'      => 'https://child-runtime.example.test',
+			'backup-grandchild' => 'https://grandchild-runtime.example.test',
+		);
+		foreach ( $subagent_endpoints as $subagent_slug => $expected_endpoint ) {
+			$share_child      = $share_subagents[ $subagent_slug ]['agent_config'] ?? array();
+			$backup_child     = $backup_subagents[ $subagent_slug ]['agent_config'] ?? array();
+			$fork_child       = $fork_subagents[ $subagent_slug ]['agent_config'] ?? array();
+
+			$this->assertArrayNotHasKey( 'plugin_runtime', $share_child, "Share applies tracking exclusions to {$subagent_slug}." );
+			$this->assertArrayNotHasKey( 'plugin_runtime', $fork_child, "Fork applies tracking exclusions to {$subagent_slug}." );
+			$this->assertSame( $expected_endpoint, $backup_child['plugin_runtime']['endpoint'] ?? null );
+			$this->assertArrayNotHasKey( 'backup_private', $backup_child, "Backup applies egress exclusions to {$subagent_slug}." );
+			$this->assertArrayNotHasKey( 'datamachine_bundle', $share_child );
+			$this->assertArrayNotHasKey( 'datamachine_bundle', $backup_child );
+			$this->assertArrayNotHasKey( 'datamachine_bundle', $fork_child );
+		}
+
+		$repeat = $this->bundler->export_directory_object( 'profile-coordinator', array( 'profile' => 'backup', 'reproducible' => true ) );
+		$this->assertTrue( (bool) $repeat['success'] );
+		$this->assertSame( $nested_exports['backup'], AgentBundleArrayAdapter::to_array_bundle( $repeat['directory'] ) );
 
 		$restore = $this->bundler->import( $exports['backup'], 'backup-restored', $this->owner_id );
 		$this->assertTrue( (bool) $restore['success'], 'Backup imports into a fresh agent.' );
