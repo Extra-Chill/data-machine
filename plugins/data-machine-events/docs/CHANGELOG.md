@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.56.0] - 2026-08-25
+
+### Added
+- adopt existing canonical event candidates
+
+### Fixed
+- honor no-op calendar query filters
+
 ## [0.55.18] - 2026-08-25
 
 ### Changed
