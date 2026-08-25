@@ -139,6 +139,7 @@ class AgentBundler {
 		$agent_id        = (int) $agent['agent_id'];
 		$export_manifest = self::resolve_export_manifest( $agent_id, $context );
 		$handler_auth    = (string) $export_manifest['handler_auth'];
+		$profile         = (string) ( $context['profile'] ?? 'share' );
 
 		$pipelines                 = $this->pipelines_repo->get_all_pipelines( null, $agent_id );
 		$flows                     = $this->flows_repo->get_all_flows( null, $agent_id );
@@ -243,7 +244,7 @@ class AgentBundler {
 			\DataMachine\Engine\Bundle\BundleSchema::PROMPTS_DIR => SystemTaskPromptRegistry::bundle_prompt_files(),
 		);
 		$extension_paths   = array_map( static fn( array $artifact ) => (string) ( $artifact['source_path'] ?? '' ), $extension_artifacts );
-		$subagents         = $this->export_subagents( is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array() );
+		$subagents         = $this->export_subagents( is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(), $profile );
 		$root_subagent     = is_array( $agent['agent_config']['datamachine_subagent'] ?? null ) ? $agent['agent_config']['datamachine_subagent'] : array();
 		$coordinator_edges = AgentSubagentGraph::coordinator_edges(
 			is_array( $agent['agent_config'] ?? null ) ? ( $agent['agent_config']['subagents'] ?? array() ) : array(),
@@ -263,7 +264,7 @@ class AgentBundler {
 				'description'  => '',
 				'agent_config' => AgentBundleAgentConfig::export_payload(
 					is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
-					(string) ( $context['profile'] ?? 'share' )
+					$profile
 				),
 				'subagents'    => $coordinator_edges,
 				'tool_policy'  => is_array( $root_subagent['tool_policy'] ?? null ) ? $root_subagent['tool_policy'] : array(),
@@ -309,8 +310,12 @@ class AgentBundler {
 		return ! empty( $context['reproducible'] ) ? self::REPRODUCIBLE_EXPORTED_AT : gmdate( 'c' );
 	}
 
-	/** @return array<int,array<string,mixed>> */
-	private function export_subagents( array $coordinator_config ): array {
+	/**
+	 * @param array<string,mixed> $coordinator_config Coordinator agent config.
+	 * @param string              $profile            Export projection profile.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function export_subagents( array $coordinator_config, string $profile ): array {
 		$edges = AgentSubagentGraph::edges_from_config( $coordinator_config['subagents'] ?? array() );
 		$nodes = array();
 		while ( ! empty( $edges ) ) {
@@ -329,7 +334,7 @@ class AgentBundler {
 				'slug'         => (string) $child['agent_slug'],
 				'label'        => (string) $child['agent_name'],
 				'description'  => (string) ( $config['description'] ?? '' ),
-				'agent_config' => AgentBundleAgentConfig::export_payload( $config ),
+				'agent_config' => AgentBundleAgentConfig::export_payload( $config, $profile ),
 				'memory'       => $memory,
 				'tool_policy'  => is_array( $subagent['tool_policy'] ?? null ) ? $subagent['tool_policy'] : array(),
 				'skill_policy' => is_array( $subagent['skill_policy'] ?? null ) ? $subagent['skill_policy'] : array(),
