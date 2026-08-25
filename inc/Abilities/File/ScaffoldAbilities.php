@@ -401,7 +401,7 @@ class ScaffoldAbilities {
 		 */
 		$content = apply_filters( 'datamachine_scaffold_content', '', $filename, $context );
 
-		return is_string( $content ) ? trim( $content ) : '';
+		return trim( $content );
 	}
 
 	/**

@@ -32,8 +32,9 @@ class ComposableFileLock {
 	 * @param resource $handle Locked file handle.
 	 */
 	private function __construct( $handle ) {
+		$pid             = getmypid();
 		$this->handle    = $handle;
-		$this->owner_pid = getmypid();
+		$this->owner_pid = false === $pid ? 0 : $pid;
 	}
 
 	/**

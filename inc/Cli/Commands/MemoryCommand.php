@@ -668,11 +668,11 @@ class MemoryCommand extends BaseCommand {
 		$result = $daily->read( $parts['year'], $parts['month'], $parts['day'] );
 
 		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['message'] );
+			WP_CLI::error( $result['message'] ?? 'Daily memory file could not be read.' );
 			return;
 		}
 
-		WP_CLI::log( $result['content'] );
+		WP_CLI::log( $result['content'] ?? '' );
 	}
 
 	/**
@@ -890,12 +890,13 @@ class MemoryCommand extends BaseCommand {
 		$now   = time();
 
 		foreach ( $files as $file ) {
-			$mtime    = filemtime( $file );
+			$mtime    = (int) filemtime( $file );
+			$size     = (int) filesize( $file );
 			$age_days = floor( ( $now - $mtime ) / 86400 );
 
 			$items[] = array(
 				'file'     => basename( $file ),
-				'size'     => size_format( filesize( $file ) ),
+				'size'     => size_format( $size ),
 				'modified' => wp_date( 'Y-m-d H:i:s', $mtime ),
 				'age'      => $age_days . 'd',
 			);
@@ -931,7 +932,7 @@ class MemoryCommand extends BaseCommand {
 		$stale     = 0;
 
 		foreach ( $files as $file ) {
-			$mtime    = filemtime( $file );
+			$mtime    = (int) filemtime( $file );
 			$age_days = floor( ( $now - $mtime ) / 86400 );
 			$is_stale = $mtime < $threshold;
 
@@ -1241,7 +1242,7 @@ class MemoryCommand extends BaseCommand {
 				$result = ComposableFileGenerator::regenerate_all( $context );
 
 				foreach ( $result['results'] as $file_result ) {
-					$status = ! empty( $file_result['success'] ) ? 'OK' : 'FAIL';
+					$status  = ! empty( $file_result['success'] ) ? 'OK' : 'FAIL';
 					$message = $file_result['message'];
 					if ( isset( $file_result['blocker'] ) ) {
 						$message .= ' Blocker: ' . wp_json_encode( $file_result['blocker'], JSON_UNESCAPED_SLASHES );
@@ -1640,7 +1641,7 @@ class MemoryCommand extends BaseCommand {
 				'relative_files' => $relative_files,
 			);
 
-			WP_CLI::line( wp_json_encode( $output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		} else {
 			$items = array();
 			foreach ( $core_files as $entry ) {

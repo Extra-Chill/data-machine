@@ -41,7 +41,7 @@ class ComposableFileGenerator {
 	 *     @type string $agent_slug Agent slug.
 	 *     @type int    $agent_id   Agent ID.
 	 * }
-	 * @return array{success: bool, message: string, filepath?: string, stale_removed?: string}
+	 * @return array{success:true,message:string,filepath:string,stale_removed:string}|array{success:false,message:string,error_code?:string,blocker?:array<string,int|string|bool>}
 	 */
 	public static function regenerate( string $filename, array $context = array() ): array {
 		$meta = MemoryFileRegistry::get( $filename );
@@ -221,7 +221,7 @@ class ComposableFileGenerator {
 		}
 
 		return array(
-			'success' => $regenerated === count( $composable ),
+			'success' => count( $composable ) === $regenerated,
 			'message' => sprintf( 'Regenerated %d of %d composable file(s).', $regenerated, count( $composable ) ),
 			'results' => $results,
 		);
@@ -264,7 +264,7 @@ class ComposableFileGenerator {
 	 * @param string $filename Composable filename.
 	 * @param array  $meta     Registry metadata.
 	 * @param array  $context  Generation context.
-	 * @return array{success:bool,directory?:string,filepath?:string,message?:string}
+	 * @return array{success:true,directory:string,filepath:string}|array{success:false,message:string}
 	 */
 	private static function resolve_target( string $filename, array $meta, array $context ): array {
 		if ( ! empty( $meta['convention_path'] ) ) {

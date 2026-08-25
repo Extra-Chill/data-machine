@@ -15,19 +15,19 @@ defined( 'ABSPATH' ) || exit;
 class CallerLivenessMonitor {
 
 	/** Whether monitoring is active. */
-	private static bool $active                        = false;
+	private static bool $active = false;
 	/** Original parent process ID. */
-	private static int $parent_pid                    = 0;
+	private static int $parent_pid = 0;
 	/** Previous alarm handler. */
-	private static $previous_handler                  = null;
+	private static mixed $previous_handler = null;
 	/** Previous asynchronous-signal mode. */
-	private static bool $previous_async_signals        = false;
+	private static bool $previous_async_signals = false;
 	/** Previous termination handlers keyed by signal. */
 	private static array $previous_termination_handlers = array();
 	/** Original process group. */
-	private static int $previous_process_group        = 0;
+	private static int $previous_process_group = 0;
 	/** Whether start() isolated the process group. */
-	private static bool $changed_process_group         = false;
+	private static bool $changed_process_group = false;
 
 	/**
 	 * Start monitoring when the host provides asynchronous POSIX signals.
