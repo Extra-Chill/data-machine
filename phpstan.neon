@@ -1,0 +1,6 @@
+parameters:
+	# Guarded global classes are not Composer-discoverable until agents-api#524 ships consumer config.
+	scanFiles:
+		- %currentWorkingDirectory%/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package.php
+		- %currentWorkingDirectory%/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-capability-report.php
+		- %currentWorkingDirectory%/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-status.php
