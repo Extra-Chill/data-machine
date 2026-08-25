@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.25] - 2026-08-25
+
+### Fixed
+- satisfy composition quality gates
+- contain abandoned composition
+
 ## [0.175.24] - 2026-08-25
 
 ### Changed
