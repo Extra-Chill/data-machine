@@ -794,12 +794,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "5f893293851cac8cad8a862ed2f096ffda6f23da"
+                "reference": "6c785b32ebfd9af45ccddccbeadcd9ddcbdbaffb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/5f893293851cac8cad8a862ed2f096ffda6f23da",
-                "reference": "5f893293851cac8cad8a862ed2f096ffda6f23da",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/6c785b32ebfd9af45ccddccbeadcd9ddcbdbaffb",
+                "reference": "6c785b32ebfd9af45ccddccbeadcd9ddcbdbaffb",
                 "shasum": ""
             },
             "require": {
@@ -822,8 +822,7 @@
                     "agents-api.php"
                 ],
                 "classmap": [
-                    "src/Registry/class-wp-agent.php",
-                    "src/Packages/"
+                    "src/"
                 ]
             },
             "scripts": {
@@ -972,7 +971,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-08-25T03:29:11+00:00"
+            "time": "2026-08-25T14:20:15+00:00"
         }
     ],
     "packages-dev": [

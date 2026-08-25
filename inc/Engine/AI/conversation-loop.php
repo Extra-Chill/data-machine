@@ -901,11 +901,7 @@ function datamachine_messages_before_current_tool_call( array $messages, string 
 		return $messages;
 	}
 
-	$last_index = array_key_last( $messages );
-	if ( null === $last_index || ! is_array( $messages[ $last_index ] ) ) {
-		return $messages;
-	}
-
+	$last_index   = array_key_last( $messages );
 	$last_message = $messages[ $last_index ];
 	if ( 'tool_call' !== (string) ( $last_message['type'] ?? '' ) ) {
 		return $messages;
@@ -931,10 +927,6 @@ function datamachine_messages_before_current_tool_call( array $messages, string 
 function datamachine_enrich_mediated_tool_results( array $tool_results, array $tools, array $loop_payload ): array {
 	$enriched = array();
 	foreach ( $tool_results as $tool_result_entry ) {
-		if ( ! is_array( $tool_result_entry ) ) {
-			continue;
-		}
-
 		$tool_name  = (string) ( $tool_result_entry['tool_name'] ?? $tool_result_entry['name'] ?? '' );
 		$parameters = is_array( $tool_result_entry['parameters'] ?? null ) ? $tool_result_entry['parameters'] : array();
 		$result     = is_array( $tool_result_entry['result'] ?? null ) ? $tool_result_entry['result'] : array();
@@ -1358,18 +1350,15 @@ function datamachine_build_provider_turn_adapter(
 			'continuation_messages' => $continuation_messages,
 			'request_metadata'      => $request_metadata,
 			'usage'                 => $turn_usage,
-			'provider_diagnostics'  => array_filter(
-				array(
-					'datamachine' => array_filter(
-						array(
-							'finish_reason'         => $finish_reason,
-							'conversation_complete' => $conversation_complete,
-							'completion_nudge'      => $completion_nudge,
-						),
-						static fn( $value ) => null !== $value && '' !== $value
+			'provider_diagnostics'  => array(
+				'datamachine' => array_filter(
+					array(
+						'finish_reason'         => $finish_reason,
+						'conversation_complete' => $conversation_complete,
+						'completion_nudge'      => $completion_nudge,
 					),
+					static fn( $value ) => null !== $value && '' !== $value
 				),
-				static fn( $value ) => ! empty( $value )
 			),
 		);
 	};
@@ -1810,7 +1799,7 @@ function datamachine_runtime_tool_request_store(): WP_Agent_Runtime_Tool_Request
 
 				$this->transition_pending(
 					$request_id,
-					WP_Agent_Runtime_Tool_Request::STATUS_TIMED_OUT,
+					WP_Agent_Runtime_Tool_Request::STATUS_TIMEOUT,
 					WP_Agent_Runtime_Tool_Result::normalize(
 						array(
 							'request_id' => $request_id,
@@ -1982,7 +1971,7 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 		$jobs_db       = new \DataMachine\Core\Database\Jobs\Jobs();
 		$completed     = $jobs_db->complete_job( $job_id, $target_status );
 		if ( ! $completed ) {
-			$job       = method_exists( $jobs_db, 'get_job' ) ? $jobs_db->get_job( $job_id ) : null;
+			$job       = $jobs_db->get_job( $job_id );
 			$completed = is_array( $job ) && (string) ( $job['status'] ?? '' ) === $target_status;
 		}
 		if ( ! $completed || ! datamachine_mark_runtime_tool_completion_phase( $job_id, $request_id, 'job_terminalized_at' ) ) {
@@ -2002,8 +1991,8 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 	}
 
 	$chat_db      = \DataMachine\Core\Database\Chat\ConversationStoreFactory::get();
-	$session_lock = method_exists( $chat_db, 'acquire_session_lock' ) ? $chat_db->acquire_session_lock( $session_id, 60 ) : '';
-	if ( method_exists( $chat_db, 'acquire_session_lock' ) && ! is_string( $session_lock ) ) {
+	$session_lock = $chat_db->acquire_session_lock( $session_id, 60 );
+	if ( null === $session_lock ) {
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 		return array(
 			'scheduled'      => false,
@@ -2013,9 +2002,7 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 	}
 	$session = $chat_db->get_session( $session_id );
 	if ( ! is_array( $session ) ) {
-		if ( '' !== $session_lock && method_exists( $chat_db, 'release_session_lock' ) ) {
-			$chat_db->release_session_lock( $session_id, $session_lock );
-		}
+		$chat_db->release_session_lock( $session_id, $session_lock );
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 		return array( 'scheduled' => false );
 	}
@@ -2063,9 +2050,7 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 		(string) ( $session['provider'] ?? '' ),
 		(string) ( $session['model'] ?? '' )
 	);
-	if ( '' !== $session_lock && method_exists( $chat_db, 'release_session_lock' ) ) {
-		$chat_db->release_session_lock( $session_id, $session_lock );
-	}
+	$chat_db->release_session_lock( $session_id, $session_lock );
 	if ( ! $session_updated ) {
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 		return array(
@@ -2524,10 +2509,6 @@ function datamachine_record_tool_results_to_engine_data( array $loop_payload, ar
 
 	$engine_data = array();
 	foreach ( $tool_execution_results as $entry ) {
-		if ( ! is_array( $entry ) ) {
-			continue;
-		}
-
 		$tool_name = (string) ( $entry['tool_name'] ?? $entry['name'] ?? '' );
 		$result    = is_array( $entry['result'] ?? null ) ? $entry['result'] : array();
 		if ( '' === $tool_name || empty( $result['success'] ) ) {

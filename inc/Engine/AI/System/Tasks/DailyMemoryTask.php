@@ -975,7 +975,7 @@ class DailyMemoryTask extends SystemTask {
 			)
 		);
 
-		if ( WP_Agent_Markdown_Section_Compaction_Adapter::STATUS_ARCHIVED !== ( $split['status'] ?? '' ) || empty( $split['archive_items'] ) ) {
+		if ( WP_Agent_Markdown_Section_Compaction_Adapter::STATUS_ARCHIVED !== $split['status'] || empty( $split['archive_items'] ) ) {
 			return array(
 				'persistent'        => $content,
 				'archived'          => '',
