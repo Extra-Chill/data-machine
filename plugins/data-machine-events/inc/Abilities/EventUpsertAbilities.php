@@ -89,6 +89,7 @@ class EventUpsertAbilities {
 		$source    = trim( sanitize_text_field( (string) ( $input['source'] ?? '' ) ) );
 		$source_id = trim( sanitize_text_field( (string) ( $input['source_id'] ?? '' ) ) );
 		$event     = is_array( $input['event'] ?? null ) ? $input['event'] : array();
+		$event_id  = is_int( $input['event_id'] ?? null ) ? $input['event_id'] : 0;
 
 		if ( '' === $source || '' === $source_id ) {
 			return new \WP_Error( 'missing_source_identity', 'Both source and source_id are required.', array( 'status' => 400 ) );
@@ -96,6 +97,10 @@ class EventUpsertAbilities {
 
 		if ( empty( $event ) ) {
 			return new \WP_Error( 'missing_event', 'The event object is required.', array( 'status' => 400 ) );
+		}
+
+		if ( array_key_exists( 'event_id', $input ) && ( ! is_int( $input['event_id'] ) || $event_id <= 0 ) ) {
+			return new \WP_Error( 'invalid_event_candidate', 'event_id must be a positive event ID.', array( 'status' => 400 ) );
 		}
 
 		$venue_error = $this->validateVenueIdentity( $event );
@@ -106,6 +111,9 @@ class EventUpsertAbilities {
 		$event['source']          = $source;
 		$event['source_id']       = $source_id;
 		$event['source_identity'] = hash( 'sha256', $source . "\0" . $source_id );
+		if ( $event_id > 0 ) {
+			$event['event_id'] = $event_id;
+		}
 
 		$config = array(
 			'post_status'    => sanitize_key( (string) ( $input['post_status'] ?? 'publish' ) ),
@@ -220,6 +228,11 @@ class EventUpsertAbilities {
 				'post_author' => array(
 					'type'    => 'integer',
 					'minimum' => 1,
+				),
+				'event_id'    => array(
+					'type'        => 'integer',
+					'minimum'     => 1,
+					'description' => 'Existing canonical event candidate to adopt for this source identity.',
 				),
 				'event'       => array(
 					'type'       => 'object',

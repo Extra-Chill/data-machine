@@ -190,7 +190,8 @@ class EventUpsert extends UpsertHandler {
 				'city'    => (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' ),
 				'state'   => (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' ),
 				'country' => (string) ( $engine->get( 'venueCountry' ) ?? $parameters['venueCountry'] ?? '' ),
-			)
+			),
+			absint( $parameters['event_id'] ?? 0 )
 		);
 		if ( null === $lock_keys ) {
 			return array(
@@ -298,7 +299,15 @@ class EventUpsert extends UpsertHandler {
 		$venueState       = (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' );
 		$venueCountry     = (string) ( $engine->get( 'venueCountry' ) ?? $parameters['venueCountry'] ?? '' );
 		$source_identity  = (string) ( $parameters['source_identity'] ?? '' );
-		$existing_post_id = $this->findExistingEventBySourceIdentity( $source_identity );
+		$existing_post_id = $this->resolveExistingEventCandidate(
+			$source_identity,
+			absint( $parameters['event_id'] ?? 0 ),
+			(string) ( $parameters['source'] ?? '' ),
+			(string) ( $parameters['source_id'] ?? '' )
+		);
+		if ( is_wp_error( $existing_post_id ) ) {
+			return $this->lifecycleErrorResponse( $existing_post_id, $title );
+		}
 		if ( $existing_post_id <= 0 ) {
 			$duplicate_result = $this->findExistingEventViaAbility(
 				$title,
@@ -366,6 +375,9 @@ class EventUpsert extends UpsertHandler {
 		$meta_input = $this->buildEventMetaInput( $event_data, $parameters, $engine );
 
 		// 6. Delegate to DM core upsert ability.
+		// DME's sorted lock set is acquired before Data Machine's identity lock.
+		// Both waits are bounded, so any cross-layer inversion fails retryably
+		// rather than deadlocking; changing that ownership belongs upstream.
 		$upsert_input = array(
 			'post_type'    => Event_Post_Type::POST_TYPE,
 			'title'        => $event_data['title'],
@@ -576,9 +588,9 @@ class EventUpsert extends UpsertHandler {
 	 * Resolve a caller-supplied source identity before domain deduplication.
 	 *
 	 * @param string $source_identity Stable hashed source identity.
-	 * @return int Matching event ID, or 0 when no event is associated.
+	 * @return int|\WP_Error Matching event ID, zero, or an ambiguous claimant conflict.
 	 */
-	private function findExistingEventBySourceIdentity( string $source_identity ): int {
+	private function findExistingEventBySourceIdentity( string $source_identity ): int|\WP_Error {
 		if ( '' === $source_identity ) {
 			return 0;
 		}
@@ -587,7 +599,7 @@ class EventUpsert extends UpsertHandler {
 			array(
 				'post_type'      => Event_Post_Type::POST_TYPE,
 				'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private', 'trash' ),
-				'posts_per_page' => 1,
+				'posts_per_page' => -1,
 				'fields'         => 'ids',
 				'no_found_rows'  => true,
 				'meta_query'     => array(
@@ -603,8 +615,99 @@ class EventUpsert extends UpsertHandler {
 			return 0;
 		}
 
-		$first_post = $query->posts[0];
-		return $first_post instanceof \WP_Post ? (int) $first_post->ID : (int) $first_post;
+		$claimant_ids = array_values(
+			array_unique(
+				array_map(
+					static fn( $post ): int => absint( $post instanceof \WP_Post ? $post->ID : $post ),
+					$query->posts
+				)
+			)
+		);
+		if ( count( $claimant_ids ) > 1 ) {
+			sort( $claimant_ids, SORT_NUMERIC );
+			return new \WP_Error(
+				'event_source_claimant_ambiguous',
+				'Multiple canonical events claim the source identity.',
+				array(
+					'status'       => 409,
+					'claimant_ids' => $claimant_ids,
+				)
+			);
+		}
+
+		return (int) reset( $claimant_ids );
+	}
+
+	/**
+	 * Reconcile an explicit event candidate with the stable source claimant.
+	 *
+	 * This runs under the source advisory lock, immediately before canonical
+	 * duplicate detection and persistence.
+	 *
+	 * @param string $source_identity Stable hashed source identity.
+	 * @param int    $candidate_id    Existing canonical event candidate.
+	 * @param string $source          Stable source namespace.
+	 * @param string $source_id       Stable item ID within the source.
+	 * @return int|\WP_Error Resolved event ID, zero, or a typed conflict.
+	 */
+	private function resolveExistingEventCandidate( string $source_identity, int $candidate_id, string $source, string $source_id ): int|\WP_Error {
+		$claimant_id = $this->findExistingEventBySourceIdentity( $source_identity );
+		if ( is_wp_error( $claimant_id ) ) {
+			return $claimant_id;
+		}
+		if ( $candidate_id <= 0 ) {
+			return $claimant_id;
+		}
+
+		$candidate = get_post( $candidate_id );
+		if ( ! $candidate instanceof \WP_Post ) {
+			return new \WP_Error(
+				'event_candidate_not_found',
+				'The existing event candidate was not found.',
+				array( 'status' => 404 )
+			);
+		}
+		if ( Event_Post_Type::POST_TYPE !== $candidate->post_type ) {
+			return new \WP_Error(
+				'event_candidate_wrong_post_type',
+				'The existing event candidate has the wrong post type.',
+				array( 'status' => 409 )
+			);
+		}
+		if ( $claimant_id > 0 && $claimant_id !== $candidate_id ) {
+			return new \WP_Error(
+				'event_source_claimant_conflict',
+				'The source identity is already claimed by a different canonical event.',
+				array(
+					'status'       => 409,
+					'claimant_id'  => $claimant_id,
+					'candidate_id' => $candidate_id,
+				)
+			);
+		}
+
+		$expected_meta = array(
+			self::SOURCE_IDENTITY_META_KEY => $source_identity,
+			self::SOURCE_NAME_META_KEY     => $source,
+			self::SOURCE_ID_META_KEY       => $source_id,
+		);
+		foreach ( $expected_meta as $meta_key => $expected_value ) {
+			foreach ( get_post_meta( $candidate_id, $meta_key, false ) as $stored_value ) {
+				$stored_value = (string) $stored_value;
+				if ( '' !== $stored_value && $stored_value !== $expected_value ) {
+					return new \WP_Error(
+						'event_candidate_source_metadata_conflict',
+						'The existing event candidate has conflicting canonical source metadata.',
+						array(
+							'status'   => 409,
+							'meta_key' => $meta_key,
+						)
+					);
+				}
+			}
+		}
+
+		return $candidate_id;
 	}
 
 	/**
@@ -754,12 +857,13 @@ class EventUpsert extends UpsertHandler {
 	 * @param string $startDate       Event start date or datetime.
 	 * @param string $source_identity Optional stable source identity.
 	 * @param array  $venue_context   Venue address geography.
+	 * @param int    $candidate_id    Existing canonical event candidate.
 	 * @return array|null The acquired lock keys, or null on timeout/error.
 	 */
-	private function acquireUpsertLocks( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array() ): ?array {
+	private function acquireUpsertLocks( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array(), int $candidate_id = 0 ): ?array {
 		global $wpdb;
 
-		$lock_keys = $this->buildUpsertLockKeys( $title, $venue, $startDate, $source_identity, $venue_context );
+		$lock_keys = $this->buildUpsertLockKeys( $title, $venue, $startDate, $source_identity, $venue_context, $candidate_id );
 		$acquired  = array();
 		$deadline  = microtime( true ) + 10;
 		$complete  = false;
@@ -833,9 +937,10 @@ class EventUpsert extends UpsertHandler {
 	 * @param string $startDate       Event start date or datetime.
 	 * @param string $source_identity Optional stable source identity.
 	 * @param array  $venue_context   Venue address geography.
+	 * @param int    $candidate_id    Existing canonical event candidate.
 	 * @return array Ordered advisory lock keys.
 	 */
-	private function buildUpsertLockKeys( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array() ): array {
+	private function buildUpsertLockKeys( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array(), int $candidate_id = 0 ): array {
 		$blog_id   = get_current_blog_id();
 		$date_only = self::extractDateForQuery( $startDate );
 		$identity  = \DataMachineEvents\Core\Venue_Taxonomy::resolve_venue_identity( $venue, $venue_context );
@@ -863,6 +968,9 @@ class EventUpsert extends UpsertHandler {
 		$domains = array();
 		if ( '' !== $source_identity ) {
 			$domains[] = 'source|' . $blog_id . '|' . $source_identity;
+		}
+		if ( $candidate_id > 0 ) {
+			$domains[] = 'candidate|' . $blog_id . '|' . $candidate_id;
 		}
 
 		if ( preg_match( '/\b(\d{1,2}):(\d{2})/', $startDate, $matches ) ) {

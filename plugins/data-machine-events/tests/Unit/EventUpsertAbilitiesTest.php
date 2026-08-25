@@ -113,6 +113,168 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'wp:data-machine-events/event-details', get_post_field( 'post_content', $result['event_id'] ) );
 	}
 
+	public function test_event_candidate_is_optional_positive_integer_in_public_schema(): void {
+		$method = new \ReflectionMethod( $this->ability, 'getInputSchema' );
+		$method->setAccessible( true );
+		$schema = $method->invoke( $this->ability );
+
+		$this->assertArrayNotHasKey( 'event_id', array_flip( $schema['required'] ) );
+		$this->assertSame( 'integer', $schema['properties']['event_id']['type'] );
+		$this->assertSame( 1, $schema['properties']['event_id']['minimum'] );
+
+		$input             = $this->validInput();
+		$input['event_id'] = '12';
+		$result            = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'invalid_event_candidate', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
+	}
+
+	public function test_adopts_existing_event_candidate_and_replay_is_idempotent(): void {
+		$candidate_id      = $this->createEventCandidate( 'Legacy Candidate ' . uniqid() );
+		$input             = $this->validInput();
+		$input['event_id'] = $candidate_id;
+
+		$first  = $this->ability->executeUpsertEvent( $input );
+		$second = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertIsArray( $first );
+		$this->assertIsArray( $second );
+		$this->assertSame( $candidate_id, $first['event_id'] );
+		$this->assertSame( $candidate_id, $second['event_id'] );
+		$this->assertContains( $first['action'], array( 'updated', 'no_change' ) );
+		$this->assertSame( 'no_change', $second['action'] );
+		$this->assertSame( $input['source'], get_post_meta( $candidate_id, EventUpsert::SOURCE_NAME_META_KEY, true ) );
+		$this->assertSame( $input['source_id'], get_post_meta( $candidate_id, EventUpsert::SOURCE_ID_META_KEY, true ) );
+		$this->assertSame( hash( 'sha256', $input['source'] . "\0" . $input['source_id'] ), get_post_meta( $candidate_id, EventUpsert::SOURCE_IDENTITY_META_KEY, true ) );
+		$this->assertReservationComplete( $candidate_id, $input );
+	}
+
+	public function test_missing_and_wrong_type_event_candidates_fail_without_mutation(): void {
+		$input             = $this->validInput();
+		$input['event_id'] = 999999999;
+		$missing           = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertWPError( $missing );
+		$this->assertSame( 'event_candidate_not_found', $missing->get_error_code() );
+		$this->assertSame( 404, $missing->get_error_data()['status'] );
+		$this->assertSame( 0, $this->countEventsWithTitle( $input['event']['title'] ) );
+
+		$post_id           = self::factory()->post->create( array( 'post_title' => 'Wrong Candidate Type' ) );
+		$input             = $this->validInput();
+		$input['event_id'] = $post_id;
+		$wrong_type        = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertWPError( $wrong_type );
+		$this->assertSame( 'event_candidate_wrong_post_type', $wrong_type->get_error_code() );
+		$this->assertSame( 409, $wrong_type->get_error_data()['status'] );
+		$this->assertSame( 'Wrong Candidate Type', get_post_field( 'post_title', $post_id ) );
+		$this->assertSame( '', get_post_meta( $post_id, EventUpsert::SOURCE_IDENTITY_META_KEY, true ) );
+		$this->assertSame( 0, $this->countEventsWithTitle( $input['event']['title'] ) );
+	}
+
+	public function test_different_source_claimant_rejects_event_candidate_without_mutation(): void {
+		$input             = $this->validInput();
+		$claimed           = $this->ability->executeUpsertEvent( $input );
+		$candidate_id      = $this->createEventCandidate( 'Unclaimed Candidate ' . uniqid() );
+		$original          = get_post_field( 'post_title', $candidate_id );
+		$input['event_id'] = $candidate_id;
+
+		$result = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'event_source_claimant_conflict', $result->get_error_code() );
+		$this->assertSame( 409, $result->get_error_data()['status'] );
+		$this->assertSame( $claimed['event_id'], $result->get_error_data()['claimant_id'] );
+		$this->assertSame( $original, get_post_field( 'post_title', $candidate_id ) );
+		$this->assertSame( '', get_post_meta( $candidate_id, EventUpsert::SOURCE_IDENTITY_META_KEY, true ) );
+		$this->assertReservationComplete( $claimed['event_id'], $input );
+	}
+
+	public function test_ambiguous_legacy_source_claimants_fail_without_mutation(): void {
+		$input           = $this->validInput();
+		$identity        = hash( 'sha256', $input['source'] . "\0" . $input['source_id'] );
+		$first_id        = $this->createEventCandidate( 'First Legacy Claimant ' . uniqid() );
+		$second_id       = $this->createEventCandidate( 'Second Legacy Claimant ' . uniqid() );
+		$original_titles = array(
+			$first_id  => get_post_field( 'post_title', $first_id ),
+			$second_id => get_post_field( 'post_title', $second_id ),
+		);
+		add_post_meta( $first_id, EventUpsert::SOURCE_IDENTITY_META_KEY, $identity );
+		add_post_meta( $second_id, EventUpsert::SOURCE_IDENTITY_META_KEY, $identity );
+
+		$result            = $this->ability->executeUpsertEvent( $input );
+		$input['event_id'] = $first_id;
+		$candidate_result  = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'event_source_claimant_ambiguous', $result->get_error_code() );
+		$this->assertSame( 409, $result->get_error_data()['status'] );
+		$this->assertWPError( $candidate_result );
+		$this->assertSame( 'event_source_claimant_ambiguous', $candidate_result->get_error_code() );
+		$this->assertSame( 409, $candidate_result->get_error_data()['status'] );
+		$claimant_ids = array( $first_id, $second_id );
+		sort( $claimant_ids, SORT_NUMERIC );
+		$this->assertSame( $claimant_ids, $result->get_error_data()['claimant_ids'] );
+		foreach ( $original_titles as $event_id => $title ) {
+			$this->assertSame( $title, get_post_field( 'post_title', $event_id ) );
+			$this->assertSame( array( $identity ), get_post_meta( $event_id, EventUpsert::SOURCE_IDENTITY_META_KEY, false ) );
+		}
+		$this->assertSame( 0, $this->countEventsWithTitle( $input['event']['title'] ) );
+		$this->assertReservationMissing( $input );
+	}
+
+	public function test_conflicting_candidate_source_metadata_fails_without_mutation(): void {
+		foreach ( array( EventUpsert::SOURCE_IDENTITY_META_KEY, EventUpsert::SOURCE_NAME_META_KEY, EventUpsert::SOURCE_ID_META_KEY ) as $meta_key ) {
+			$input             = $this->validInput();
+			$candidate_id      = $this->createEventCandidate( 'Conflicting Candidate ' . uniqid() );
+			$original          = get_post_field( 'post_title', $candidate_id );
+			update_post_meta( $candidate_id, $meta_key, 'different-canonical-value' );
+			$input['event_id'] = $candidate_id;
+
+			$result = $this->ability->executeUpsertEvent( $input );
+
+			$this->assertWPError( $result );
+			$this->assertSame( 'event_candidate_source_metadata_conflict', $result->get_error_code() );
+			$this->assertSame( 409, $result->get_error_data()['status'] );
+			$this->assertSame( $meta_key, $result->get_error_data()['meta_key'] );
+			$this->assertSame( $original, get_post_field( 'post_title', $candidate_id ) );
+			$this->assertSame( 'different-canonical-value', get_post_meta( $candidate_id, $meta_key, true ) );
+			$this->assertSame( 0, $this->countEventsWithTitle( $input['event']['title'] ) );
+			$this->assertReservationMissing( $input );
+		}
+	}
+
+	public function test_mixed_duplicate_candidate_metadata_cannot_hide_conflict(): void {
+		foreach ( array( EventUpsert::SOURCE_IDENTITY_META_KEY, EventUpsert::SOURCE_NAME_META_KEY, EventUpsert::SOURCE_ID_META_KEY ) as $meta_key ) {
+			$input           = $this->validInput();
+			$candidate_id    = $this->createEventCandidate( 'Mixed Metadata Candidate ' . uniqid() );
+			$original_title  = get_post_field( 'post_title', $candidate_id );
+			$expected_values = array(
+				EventUpsert::SOURCE_IDENTITY_META_KEY => hash( 'sha256', $input['source'] . "\0" . $input['source_id'] ),
+				EventUpsert::SOURCE_NAME_META_KEY     => $input['source'],
+				EventUpsert::SOURCE_ID_META_KEY       => $input['source_id'],
+			);
+			$original_values = array( $expected_values[ $meta_key ], 'conflicting-row', $expected_values[ $meta_key ] );
+			foreach ( $original_values as $value ) {
+				add_post_meta( $candidate_id, $meta_key, $value );
+			}
+			$input['event_id'] = $candidate_id;
+
+			$result = $this->ability->executeUpsertEvent( $input );
+
+			$this->assertWPError( $result );
+			$this->assertSame( 'event_candidate_source_metadata_conflict', $result->get_error_code() );
+			$this->assertSame( 409, $result->get_error_data()['status'] );
+			$this->assertSame( $meta_key, $result->get_error_data()['meta_key'] );
+			$this->assertSame( $original_title, get_post_field( 'post_title', $candidate_id ) );
+			$this->assertSame( $original_values, get_post_meta( $candidate_id, $meta_key, false ) );
+			$this->assertSame( 0, $this->countEventsWithTitle( $input['event']['title'] ) );
+			$this->assertReservationMissing( $input );
+		}
+	}
+
 	public function test_replay_of_source_identity_returns_same_event(): void {
 		$input  = $this->validInput();
 		$input['event']['price']             = '$25';
@@ -309,6 +471,47 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 				'eventStatus'  => 'EventScheduled',
 			),
 		);
+	}
+
+	private function createEventCandidate( string $title ): int {
+		return self::factory()->post->create(
+			array(
+				'post_title'  => $title,
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+			)
+		);
+	}
+
+	private function assertReservationComplete( int $event_id, array $input ): void {
+		$reservation = $this->reservationForInput( $input );
+		$this->assertNotNull( $reservation, 'Data Machine must reserve an adopted event identity.' );
+		$this->assertSame( 'complete', $reservation['state'] );
+		$this->assertSame( $event_id, (int) $reservation['post_id'] );
+	}
+
+	private function assertReservationMissing( array $input ): void {
+		$this->assertNull( $this->reservationForInput( $input ), 'A rejected event identity must not create a reservation.' );
+	}
+
+	private function reservationForInput( array $input ): ?array {
+		$this->assertTrue(
+			class_exists( '\\DataMachine\\Core\\Database\\PostIdentityReservations\\PostIdentityReservations' ),
+			'Data Machine #3408 reservation infrastructure is required.'
+		);
+		$repository = new \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations();
+		$identity   = $repository::normalize_identity(
+			Event_Post_Type::POST_TYPE,
+			array(
+				'key'   => EventUpsert::SOURCE_IDENTITY_META_KEY,
+				'value' => hash( 'sha256', $input['source'] . "\0" . $input['source_id'] ),
+			)
+		);
+		if ( is_wp_error( $identity ) ) {
+			$this->fail( $identity->get_error_message() );
+		}
+
+		return $repository->get_reservation( $identity['identity_hash'] );
 	}
 
 	private function countEventsWithTitle( string $title ): int {

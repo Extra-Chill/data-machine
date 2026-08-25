@@ -584,6 +584,9 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$source_before = $method->invoke( $this->handler, 'Original Billing', 'Shared Venue', '2026-11-14 20:00', 'stable-source' );
 		$source_after  = $method->invoke( $this->handler, 'Corrected Billing', 'Moved Venue', '2026-11-15 21:00', 'stable-source' );
 		$this->assertNotEmpty( array_intersect( $source_before, $source_after ), 'A concrete source identity must serialize updates when canonical fields change.' );
+		$candidate_a = $method->invoke( $this->handler, 'First Source', 'First Venue', '2026-11-14 20:00', 'source-a', array(), 481 );
+		$candidate_b = $method->invoke( $this->handler, 'Second Source', 'Second Venue', '2026-11-15 21:00', 'source-b', array(), 481 );
+		$this->assertNotEmpty( array_intersect( $candidate_a, $candidate_b ), 'Different source identities targeting one candidate must serialize.' );
 
 		$fuzzy_a = $method->invoke( $this->handler, 'The Falling Spikes Live', 'Shared Venue', '2026-11-14 19:59' );
 		$fuzzy_b = $method->invoke( $this->handler, 'Falling Spikes', 'Shared Venue', '2026-11-14 21:58' );
@@ -596,6 +599,9 @@ class EventUpsertTest extends WP_UnitTestCase {
 		$sorted = $fuzzy_a;
 		sort( $sorted, SORT_STRING );
 		$this->assertSame( $sorted, $fuzzy_a, 'Every request must acquire lock keys in the same deterministic order.' );
+		$sorted = $candidate_a;
+		sort( $sorted, SORT_STRING );
+		$this->assertSame( $sorted, $candidate_a, 'Candidate locks must participate in the same deterministic DME lock order.' );
 	}
 
 	public function test_lock_domains_separate_different_time_and_unknown_venue_events(): void {
