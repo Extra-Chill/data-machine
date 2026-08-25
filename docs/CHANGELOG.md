@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.26] - 2026-08-25
+
+### Changed
+- isolate explicit identity fallback query
+
+### Fixed
+- make response types explicit
+- accept partial content responses
+
 ## [0.175.25] - 2026-08-25
 
 ### Fixed
