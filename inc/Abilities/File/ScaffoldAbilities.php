@@ -160,7 +160,7 @@ class ScaffoldAbilities {
 		if ( ! empty( $result['success'] ) ) {
 			return $result;
 		}
-		return new \WP_Error( $result['error_code'] ?? 'scaffold_failed', $result['error'] ?? 'Scaffold failed.', array_merge( array( 'status' => 500 ), $result ) );
+		return new \WP_Error( $result['error_code'] ?? 'scaffold_failed', $result['error'] ?? $result['message'] ?? 'Scaffold failed.', array_merge( array( 'status' => 500 ), $result ) );
 	}
 
 	// =========================================================================
@@ -186,12 +186,12 @@ class ScaffoldAbilities {
 		// Composable files delegate to ComposableFileGenerator.
 		if ( ! empty( $meta['composable'] ) ) {
 			$result = ComposableFileGenerator::regenerate( $filename, $input );
-			return array(
-				'success'  => $result['success'],
-				'message'  => $result['message'],
-				'filename' => $filename,
-				'filepath' => $result['filepath'] ?? '',
-				'created'  => $result['success'],
+			return array_merge(
+				$result,
+				array(
+					'filename' => $filename,
+					'created'  => $result['success'],
+				)
 			);
 		}
 
@@ -401,7 +401,7 @@ class ScaffoldAbilities {
 		 */
 		$content = apply_filters( 'datamachine_scaffold_content', '', $filename, $context );
 
-		return is_string( $content ) ? trim( $content ) : '';
+		return trim( $content );
 	}
 
 	/**
