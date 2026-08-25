@@ -336,8 +336,13 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertSame( array( $first_id, $second_id ), $result['posts'] );
 		$this->assertCount( 1, $queries );
-		$this->assertMatchesRegularExpression( '/term_taxonomy_id IN \(\d+,\d+\)/', $queries[0] );
-		$this->assertSame( 1, substr_count( $queries[0], (string) $second_term['term_taxonomy_id'] ) );
+		$matched = preg_match( '/term_taxonomy_id IN \((\d+(?:,\d+)*)\)/', $queries[0], $matches );
+		$this->assertSame( 1, $matched );
+		$taxonomy_ids = isset( $matches[1] ) ? array_map( 'intval', explode( ',', $matches[1] ) ) : array();
+		$this->assertEqualsCanonicalizing(
+			array( (int) $first_term['term_taxonomy_id'], (int) $second_term['term_taxonomy_id'] ),
+			$taxonomy_ids
+		);
 	}
 
 	public function test_paginated_upcoming_taxonomy_query_uses_canonical_wp_query(): void {

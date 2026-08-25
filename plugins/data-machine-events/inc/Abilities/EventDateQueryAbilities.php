@@ -709,6 +709,11 @@ class EventDateQueryAbilities {
 	 * @return string SQL selecting start_date, end_date, and bucket_count.
 	 */
 	public function buildMatchingEventDateAggregateSql( array $input, string $start_expression, string $end_expression ): string {
+		$selective = $this->buildSelectiveTaxonomyAggregateSql( $input, $start_expression, $end_expression );
+		if ( '' !== $selective ) {
+			return $selective;
+		}
+
 		$request                                    = '';
 		$input['fields']                            = 'ids';
 		$input['per_page']                          = -1;
@@ -735,6 +740,96 @@ class EventDateQueryAbilities {
 		}
 
 		return $request;
+	}
+
+	/**
+	 * Build the selective taxonomy aggregate used by simple Calendar archives.
+	 *
+	 * Compound, customized, and portable-database requests retain the canonical
+	 * WP_Query path above. The selective path expands hierarchical descendants
+	 * through the same resolver used by bounded event rows, then applies indexed
+	 * taxonomy membership without multiplying event-date rows.
+	 */
+	private function buildSelectiveTaxonomyAggregateSql( array $input, string $start_expression, string $end_expression ): string {
+		global $wpdb;
+
+		$db_engine     = defined( 'DB_ENGINE' ) ? strtolower( (string) constant( 'DB_ENGINE' ) ) : '';
+		$database_type = defined( 'DATABASE_TYPE' ) ? strtolower( (string) constant( 'DATABASE_TYPE' ) ) : '';
+		$tax_filters   = is_array( $input['tax_filters'] ?? null ) ? array_filter( $input['tax_filters'] ) : array();
+		if (
+			'sqlite' === $db_engine
+			|| 'sqlite' === $database_type
+			|| true !== $wpdb->is_mysql
+			|| 1 !== count( $tax_filters )
+			|| 'publish' !== ( $input['status'] ?? 'publish' )
+			|| ! empty( $input['search'] )
+			|| ! empty( $input['geo'] )
+			|| ! empty( $input['exclude'] )
+			|| ! empty( $input['meta_query'] )
+			|| ! empty( $input['scope_token'] )
+			|| ! empty( $input['time_scope'] )
+			|| false !== has_filter( 'data_machine_events_calendar_query_args' )
+		) {
+			return '';
+		}
+
+		$taxonomy     = sanitize_key( (string) array_key_first( $tax_filters ) );
+		$taxonomy_ids = $this->resolveTermTaxonomyIds( $taxonomy, (array) reset( $tax_filters ) );
+		if ( empty( $taxonomy_ids ) ) {
+			return '';
+		}
+
+		$where        = array( "ed.post_status = 'publish'" );
+		$where_values = array();
+		$scope        = $input['scope'] ?? 'upcoming';
+		$now          = current_time( 'mysql' );
+
+		if ( ! empty( $input['date_match'] ) ) {
+			if ( ! DateTimeParser::isValidYmd( $input['date_match'] ) ) {
+				return '';
+			}
+			$start          = $input['date_match'] . ' 00:00:00';
+			$end            = ( new \DateTimeImmutable( $start ) )->modify( '+1 day' )->format( 'Y-m-d H:i:s' );
+			$where[]        = 'ed.start_datetime >= %s AND ed.start_datetime < %s';
+			$where_values[] = $start;
+			$where_values[] = $end;
+		} elseif ( ! empty( $input['date_start'] ) || ! empty( $input['date_end'] ) ) {
+			if ( ! empty( $input['date_start'] ) ) {
+				$start   = $input['date_start'] . ' ' . ( ! empty( $input['time_start'] ) ? $input['time_start'] : '00:00:00' );
+				$where[] = UpcomingFilter::range_start_where( $start );
+			}
+			if ( ! empty( $input['date_end'] ) ) {
+				$end            = $input['date_end'] . ' ' . ( ! empty( $input['time_end'] ) ? $input['time_end'] : '23:59:59' );
+				$where[]        = 'ed.start_datetime <= %s';
+				$where_values[] = $end;
+			}
+		} elseif ( 'upcoming' === $scope ) {
+			$days_ahead = (int) ( $input['days_ahead'] ?? 0 );
+			if ( $days_ahead > 0 ) {
+				$end     = current_datetime()->modify( "+{$days_ahead} days" )->setTime( 23, 59, 59 )->format( 'Y-m-d H:i:s' );
+				$where[] = UpcomingFilter::upcoming_bounded_where( $now, $end );
+			} else {
+				$where[] = UpcomingFilter::upcoming_where( $now );
+			}
+		} elseif ( 'past' === $scope ) {
+			$where[] = UpcomingFilter::past_where( $now );
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $taxonomy_ids ), '%d' ) );
+		$table        = EventDatesTable::table_name();
+		$values       = array_merge( array( Event_Post_Type::POST_TYPE, 'publish' ), $taxonomy_ids, $where_values );
+		$sql          = "SELECT {$start_expression} AS start_date, {$end_expression} AS end_date, COUNT(*) AS bucket_count
+			FROM {$table} ed
+			INNER JOIN {$wpdb->posts} p ON p.ID = ed.post_id
+			WHERE p.post_type = %s AND p.post_status = %s
+				AND EXISTS (
+					SELECT 1 FROM {$wpdb->term_relationships} tr
+					WHERE tr.object_id = ed.post_id AND tr.term_taxonomy_id IN ({$placeholders})
+				)
+				AND " . implode( ' AND ', $where ) . "
+			GROUP BY {$start_expression}, {$end_expression}";
+
+		return $wpdb->prepare( $sql, ...$values ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Trusted table/expression fragments; all values use placeholders.
 	}
 
 	/**

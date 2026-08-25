@@ -9,6 +9,7 @@ namespace DataMachineEvents\Tests\Unit;
 
 use WP_UnitTestCase;
 use DataMachineEvents\Abilities\CalendarAbilities;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
@@ -37,6 +38,9 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		}
 		if ( ! taxonomy_exists( 'calendar_test_style' ) ) {
 			register_taxonomy( 'calendar_test_style', Event_Post_Type::POST_TYPE );
+		}
+		if ( ! taxonomy_exists( 'calendar_test_location' ) ) {
+			register_taxonomy( 'calendar_test_location', Event_Post_Type::POST_TYPE, array( 'hierarchical' => true ) );
 		}
 		$this->abilities = new CalendarAbilities();
 		delete_transient( 'data-machine_cal_counts' );
@@ -126,6 +130,89 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $result['total_event_count'] );
 		$this->assertSame( 1, $result['event_count'] );
 		$this->assertSame( $past_id, $result['paged_date_groups'][0]['events'][0]['post_id'] );
+	}
+
+	public function test_hierarchical_archive_boundaries_include_descendants_once_and_reuse_across_pages(): void {
+		$root       = wp_insert_term( 'Root calendar location ' . uniqid(), 'calendar_test_location' );
+		$this->assertNotWPError( $root );
+		$child      = wp_insert_term( 'Child calendar location ' . uniqid(), 'calendar_test_location', array( 'parent' => (int) $root['term_id'] ) );
+		$this->assertNotWPError( $child );
+		$grandchild = wp_insert_term( 'Deep calendar location ' . uniqid(), 'calendar_test_location', array( 'parent' => (int) $child['term_id'] ) );
+		$outside    = wp_insert_term( 'Outside calendar location ' . uniqid(), 'calendar_test_location' );
+		$this->assertNotWPError( $grandchild );
+		$this->assertNotWPError( $outside );
+
+		$last_date_ids = array();
+		for ( $day = 0; $day < 6; ++$day ) {
+			$date = current_datetime()->modify( '+' . ( $day + 2 ) . ' days' );
+			for ( $event = 0; $event < 4; ++$event ) {
+				$terms   = 0 === $event
+					? array( (int) $child['term_id'], (int) $grandchild['term_id'] )
+					: ( 1 === $event ? array( (int) $root['term_id'] ) : array( (int) $grandchild['term_id'] ) );
+				$post_id = $this->seed_event(
+					"Hierarchical event {$day}-{$event}",
+					$date->format( 'Y-m-d 20:00:00' ),
+					$date->format( 'Y-m-d 22:00:00' ),
+					0,
+					array( 'calendar_test_location' => $terms )
+				);
+				if ( 5 === $day ) {
+					$last_date_ids[] = $post_id;
+				}
+			}
+		}
+		$outside_date = current_datetime()->modify( '+8 days' );
+		$this->seed_event(
+			'Outside hierarchy event',
+			$outside_date->format( 'Y-m-d 20:00:00' ),
+			$outside_date->format( 'Y-m-d 22:00:00' ),
+			0,
+			array( 'calendar_test_location' => (int) $outside['term_id'] )
+		);
+
+		global $wpdb;
+		CalendarCache::invalidate();
+		$aggregate_queries = array();
+		$observer          = static function ( string $sql ) use ( &$aggregate_queries ): string {
+			if ( str_contains( $sql, 'AS bucket_count' ) ) {
+				$aggregate_queries[] = $sql;
+			}
+			return $sql;
+		};
+		add_filter( 'query', $observer );
+		try {
+			$first = $this->abilities->executeGetCalendarPage(
+				array(
+					'archive_taxonomy' => 'calendar_test_location',
+					'archive_term_id'  => (int) $root['term_id'],
+					'include_html'     => false,
+				)
+			);
+			$second = $this->abilities->executeGetCalendarPage(
+				array(
+					'archive_taxonomy' => 'calendar_test_location',
+					'archive_term_id'  => (int) $root['term_id'],
+					'paged'            => 2,
+					'include_html'     => false,
+				)
+			);
+		} finally {
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( 24, $first['total_event_count'] );
+		$this->assertSame( 2, $first['max_pages'] );
+		$this->assertSame( 24, $second['total_event_count'] );
+		$this->assertSame( 2, $second['current_page'] );
+		$this->assertSame( 4, $second['event_count'] );
+		$this->assertEqualsCanonicalizing( $last_date_ids, $this->result_post_ids( $second ) );
+		$this->assertCount( 1, $aggregate_queries, 'Generation-scoped date boundaries must be reused across archive pages.' );
+		$db_engine     = defined( 'DB_ENGINE' ) ? strtolower( (string) constant( 'DB_ENGINE' ) ) : '';
+		$database_type = defined( 'DATABASE_TYPE' ) ? strtolower( (string) constant( 'DATABASE_TYPE' ) ) : '';
+		if ( true === $wpdb->is_mysql && 'sqlite' !== $db_engine && 'sqlite' !== $database_type ) {
+			$this->assertStringContainsString( 'EXISTS (', $aggregate_queries[0] );
+			$this->assertStringContainsString( $wpdb->term_relationships, $aggregate_queries[0] );
+		}
 	}
 
 	public function test_upcoming_boundaries_exclude_past_dates_from_ongoing_multi_day_events(): void {
