@@ -10,7 +10,7 @@
 $flows_file   = __DIR__ . '/../inc/Cli/Commands/Flows/FlowsCommand.php';
 $drain_file   = __DIR__ . '/../inc/Cli/Commands/DrainCommand.php';
 $service_file = __DIR__ . '/../inc/Core/ActionScheduler/ScopedDrainService.php';
-$boot_file    = __DIR__ . '/../inc/Cli/CommandRegistry.php';
+$boot_file    = __DIR__ . '/../inc/Core/Bootstrap/CliServiceProvider.php';
 $src          = file_get_contents( $flows_file ) ?: '';
 $drain_src    = file_get_contents( $drain_file ) ?: '';
 $service_src  = file_get_contents( $service_file ) ?: '';

@@ -34,8 +34,9 @@ foreach ( $providers as $provider ) {
 
 $assert( str_contains( $main, 'CliServiceProvider::register();' ), 'entrypoint delegates CLI composition' );
 $cli = (string) file_get_contents( $root . '/inc/Core/Bootstrap/CliServiceProvider.php' );
-$assert( str_contains( $cli, 'CommandRegistry::map()' ), 'CLI provider owns command registration' );
-$assert( str_contains( $cli, 'WP_CLI::add_command' ), 'CLI provider registers every mapped command' );
+$assert( str_contains( $cli, "'datamachine settings'" ), 'CLI provider owns the canonical command map' );
+$assert( str_contains( $cli, 'WP_CLI::add_command' ), 'CLI provider registers every command' );
+$assert( ! is_file( $root . '/inc/Cli/CommandRegistry.php' ), 'single-caller command registry is absent' );
 $assert( str_contains( $main, 'RuntimeServiceProvider::register();' ), 'entrypoint delegates full runtime composition' );
 $assert( str_contains( $main, 'AbilityServiceProvider::register_lightweight();' ), 'lightweight abilities remain unconditional' );
 $assert( str_contains( $main, 'AlwaysOnServiceProvider::register_scheduler();' ), 'entrypoint delegates scheduler integrations' );

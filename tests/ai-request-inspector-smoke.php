@@ -233,7 +233,7 @@ assert_test( 'directive kill switch reports suppressed directive', array( 'Test_
 
 echo "\nCase 5: CLI command surface is registered and documented\n";
 
-$bootstrap = (string) file_get_contents( __DIR__ . '/../inc/Cli/CommandRegistry.php' );
+$bootstrap = (string) file_get_contents( __DIR__ . '/../inc/Core/Bootstrap/CliServiceProvider.php' );
 $command   = (string) file_get_contents( __DIR__ . '/../inc/Cli/Commands/AICommand.php' );
 
 assert_test( 'datamachine ai namespace registered', false !== strpos( $bootstrap, "datamachine ai" ) );
