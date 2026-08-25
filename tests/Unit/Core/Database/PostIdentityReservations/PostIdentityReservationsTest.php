@@ -417,6 +417,51 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		$this->assertFalse( $result['allocated'] );
 	}
 
+	public function test_first_explicit_candidate_is_adopted_without_legacy_lookup(): void {
+		$explicit_id = self::factory()->post->create( array( 'post_type' => 'post' ) );
+		$legacy_id   = self::factory()->post->create( array( 'post_type' => 'post' ) );
+		update_post_meta( $legacy_id, '_source', 'explicit-adoption' );
+
+		$result = $this->repository->reserve_and_resolve(
+			'post',
+			array(
+				'key'   => '_source',
+				'value' => 'explicit-adoption',
+			),
+			$explicit_id,
+			0,
+			$this->shell()
+		);
+
+		$this->assertSame( $explicit_id, $result['post_id'] );
+		$this->assertTrue( $result['adopted'] );
+		$this->assertFalse( $result['allocated'] );
+		$row = $this->repository->get_reservation( $result['identity']['identity_hash'] );
+		$this->assertSame( $explicit_id, (int) $row['post_id'] );
+		$this->assertSame( 'linked', $row['state'] );
+	}
+
+	public function test_conflicting_explicit_candidate_retains_original_link(): void {
+		$identity = array(
+			'key'   => '_source',
+			'value' => 'explicit-conflict',
+		);
+		$first    = $this->repository->reserve_and_resolve( 'post', $identity, 0, 0, $this->shell() );
+		$other_id = self::factory()->post->create( array( 'post_type' => 'post' ) );
+		$before   = $this->repository->get_reservation( $first['identity']['identity_hash'] );
+
+		$result = $this->repository->reserve_and_resolve( 'post', $identity, $other_id, 0, $this->shell() );
+		$row    = $this->repository->get_reservation( $first['identity']['identity_hash'] );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'identity_explicit_conflict', $result->get_error_code() );
+		$this->assertSame( $first['post_id'], $result->get_error_data()['linked_post_id'] );
+		$this->assertSame( $other_id, $result->get_error_data()['explicit_post_id'] );
+		$this->assertSame( $first['post_id'], (int) $row['post_id'] );
+		$this->assertSame( $before['state'], $row['state'] );
+		$this->assertSame( $before['completed_at'], $row['completed_at'] );
+	}
+
 	public function test_duplicate_legacy_claimants_are_visible_conflict(): void {
 		$ids = array(
 			self::factory()->post->create( array( 'post_type' => 'post' ) ),
