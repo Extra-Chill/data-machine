@@ -10,8 +10,7 @@ $failures = array();
 
 $must_not_contain = array(
 	'data-machine.php'                         => 'BingWebmasterAbilities',
-	'inc/Engine/AI/Tools/ToolServiceProvider.php' => 'BingWebmaster',
-	'inc/Cli/Commands/AnalyticsCommand.php'    => 'datamachine/bing-webmaster',
+	'inc/Core/Bootstrap/RuntimeServiceProvider.php' => 'BingWebmaster',
 	'uninstall.php'                            => 'datamachine_bing_webmaster_config',
 );
 
