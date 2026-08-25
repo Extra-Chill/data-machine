@@ -37,7 +37,6 @@ use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 use DataMachine\Engine\Bundle\AgentConfigArtifactProjector;
-use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleSchema;
 use DataMachine\Engine\Bundle\BundleRelativePath;
@@ -678,13 +677,11 @@ class AgentBundler {
 			'source_ref'      => $bundle_source_ref,
 			'source_revision' => $bundle_source_revision,
 		);
-		$template_metadata      = AgentTemplateMetadata::from_bundle_array( $bundle )->to_array();
-		unset( $template_metadata['installed_hashes'] );
-		$bundle_metadata    = array_merge( $template_metadata, $bundle_metadata );
-		$is_portable_bundle = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
-		$reconcile_runtime  = ! empty( $options['reconcile_runtime'] );
-		$is_upgrade         = ! empty( $options['is_upgrade'] );
-		$root_import        = empty( $options['_graph_transaction'] );
+		$bundle_metadata        = array_merge( self::legacy_template_metadata( $bundle ), $bundle_metadata );
+		$is_portable_bundle     = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
+		$reconcile_runtime      = ! empty( $options['reconcile_runtime'] );
+		$is_upgrade             = ! empty( $options['is_upgrade'] );
+		$root_import            = empty( $options['_graph_transaction'] );
 
 		// Check for slug collision.
 		// On install: existing slug + (renamed-to-collision OR non-portable bundle) is a hard error.
@@ -1461,6 +1458,40 @@ class AgentBundler {
 				'error'      => $error,
 			);
 		}
+	}
+
+	/**
+	 * Preserve template metadata normalization for legacy array imports.
+	 *
+	 * @param array $bundle Legacy bundle payload.
+	 * @return array{template_slug:string,template_version:string}
+	 */
+	private static function legacy_template_metadata( array $bundle ): array {
+		$bundle_slug      = (string) ( $bundle['bundle_slug'] ?? ( $bundle['agent']['agent_slug'] ?? 'bundle' ) );
+		$bundle_version   = (string) ( $bundle['bundle_version'] ?? '1' );
+		$template         = is_array( $bundle['template'] ?? null ) ? $bundle['template'] : array();
+		$template_meta    = is_array( $bundle['template_metadata'] ?? null ) ? $bundle['template_metadata'] : array();
+		$template_slug    = PortableSlug::normalize( (string) ( $bundle['template_slug'] ?? $template['slug'] ?? $template_meta['template_slug'] ?? $bundle_slug ), 'template' );
+		$template_version = trim( (string) ( $bundle['template_version'] ?? $template['version'] ?? $template_meta['template_version'] ?? $bundle_version ) );
+		if ( '' === $template_version ) {
+			throw new BundleValidationException( 'agent template metadata template_version must be a non-empty string.' );
+		}
+
+		PortableSlug::normalize( $bundle_slug, 'bundle' );
+		if ( '' === trim( $bundle_version ) ) {
+			throw new BundleValidationException( 'agent template metadata bundle_version must be a non-empty string.' );
+		}
+
+		$source_ref      = trim( (string) ( $bundle['source_ref'] ?? $template_meta['source_ref'] ?? '' ) );
+		$source_revision = trim( (string) ( $bundle['source_revision'] ?? $template_meta['source_revision'] ?? '' ) );
+		if ( strlen( $source_ref ) > 191 || strlen( $source_revision ) > 191 ) {
+			throw new BundleValidationException( 'agent template metadata source fields must be 191 characters or fewer.' );
+		}
+
+		return array(
+			'template_slug'    => $template_slug,
+			'template_version' => $template_version,
+		);
 	}
 
 	/**

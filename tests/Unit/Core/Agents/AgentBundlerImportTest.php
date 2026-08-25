@@ -46,6 +46,7 @@ use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\BundleSchema;
+use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Agents\PersistedAgentGraphProjector;
 use DataMachine\Engine\Agents\AgentSubagentGraph;
 use WP_UnitTestCase;
@@ -222,6 +223,89 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				),
 			),
 		);
+	}
+
+	public function test_legacy_import_persists_template_metadata_with_existing_precedence(): void {
+		$bundle = $this->fixture_bundle( 'template-metadata-agent' );
+		$bundle['template_slug']     = 'top-level-template';
+		$bundle['template_version']  = ' 4.5.6 ';
+		$bundle['source_ref']        = ' refs/tags/v4.5.6 ';
+		$bundle['source_revision']   = ' revision-456 ';
+		$bundle['template']          = array(
+			'slug'    => 'nested-template',
+			'version' => '3.0.0',
+		);
+		$bundle['template_metadata'] = array(
+			'template_slug'    => 'legacy-template',
+			'template_version' => '2.0.0',
+			'source_ref'       => 'legacy-ref',
+			'source_revision'  => 'legacy-revision',
+		);
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'] );
+		$agent    = $this->agents_repo->get_by_slug( 'template-metadata-agent' );
+		$metadata = $agent['agent_config']['datamachine_bundle'] ?? array();
+		$this->assertSame( 'top-level-template', $metadata['template_slug'] ?? null );
+		$this->assertSame( '4.5.6', $metadata['template_version'] ?? null );
+		$this->assertSame( 'template-metadata-agent', $metadata['bundle_slug'] ?? null );
+		$this->assertSame( '1', $metadata['bundle_version'] ?? null );
+		$this->assertSame( 'refs/tags/v4.5.6', $metadata['source_ref'] ?? null );
+		$this->assertSame( 'revision-456', $metadata['source_revision'] ?? null );
+	}
+
+	public function test_legacy_import_preserves_explicit_empty_template_slug_semantics(): void {
+		$bundle = $this->fixture_bundle( 'empty-template-slug-agent' );
+		$bundle['template_slug'] = '';
+		$bundle['template']      = array(
+			'slug'    => 'nested-template',
+			'version' => '2.0.0',
+		);
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'] );
+		$agent    = $this->agents_repo->get_by_slug( 'empty-template-slug-agent' );
+		$metadata = $agent['agent_config']['datamachine_bundle'] ?? array();
+		$this->assertSame( 'template', $metadata['template_slug'] ?? null );
+		$this->assertSame( '2.0.0', $metadata['template_version'] ?? null );
+	}
+
+	public function test_legacy_import_rejects_explicit_empty_template_version(): void {
+		$bundle = $this->fixture_bundle( 'empty-template-version-agent' );
+		$bundle['template_version'] = ' ';
+		$bundle['template']         = array( 'version' => '2.0.0' );
+
+		$this->expectException( BundleValidationException::class );
+		$this->expectExceptionMessage( 'agent template metadata template_version must be a non-empty string.' );
+
+		$this->bundler->import( $bundle, null, $this->owner_id );
+	}
+
+	public function test_legacy_import_rejects_empty_bundle_version(): void {
+		$bundle = $this->fixture_bundle( 'empty-bundle-version-agent' );
+		$bundle['bundle_version']   = ' ';
+		$bundle['template_version'] = '2.0.0';
+
+		$this->expectException( BundleValidationException::class );
+		$this->expectExceptionMessage( 'agent template metadata bundle_version must be a non-empty string.' );
+
+		$this->bundler->import( $bundle, null, $this->owner_id );
+	}
+
+	public function test_legacy_import_validates_nested_source_metadata_before_mutation(): void {
+		$bundle = $this->fixture_bundle( 'oversized-source-agent' );
+		$bundle['template_metadata'] = array( 'source_ref' => str_repeat( 'x', 192 ) );
+
+		$this->expectException( BundleValidationException::class );
+		$this->expectExceptionMessage( 'agent template metadata source fields must be 191 characters or fewer.' );
+
+		try {
+			$this->bundler->import( $bundle, null, $this->owner_id );
+		} finally {
+			$this->assertNull( $this->agents_repo->get_by_slug( 'oversized-source-agent' ) );
+		}
 	}
 
 	public function test_import_honors_scheduled_bundle_flows_on_create(): void {
