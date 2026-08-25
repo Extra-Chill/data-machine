@@ -467,6 +467,82 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( ' ORDER BY ', strtoupper( $sql ) );
 	}
 
+	public function test_taxonomy_aggregate_uses_selective_sql_with_registered_noop_query_filter(): void {
+		$venue = wp_insert_term( 'No-op aggregate venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		$invocations = 0;
+		$filter      = static function ( array $query_args ) use ( &$invocations ): array {
+			++$invocations;
+			return $query_args;
+		};
+		add_filter( 'data_machine_events_calendar_query_args', $filter );
+		try {
+			$sql = ( new EventDateQueryAbilities() )->buildMatchingEventDateAggregateSql(
+				array(
+					'scope'       => 'past',
+					'tax_filters' => array( 'venue' => array( (int) $venue['term_id'] ) ),
+				),
+				'DATE(ed.start_datetime)',
+				'DATE(ed.end_datetime)'
+			);
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $filter );
+		}
+
+		$this->assertStringContainsString( 'EXISTS (', $sql );
+		$this->assertStringNotContainsString( 'LEFT JOIN', $sql );
+		$this->assertSame( 1, $invocations );
+	}
+
+	public function test_taxonomy_aggregate_falls_back_when_query_filter_changes_args(): void {
+		$venue = wp_insert_term( 'Customized aggregate venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		$invocations = 0;
+		$filter      = static function ( array $query_args ) use ( &$invocations ): array {
+			++$invocations;
+			if ( 1 === $invocations ) {
+				$query_args['post__in'] = array( 123, 456 );
+			}
+			return $query_args;
+		};
+		add_filter( 'data_machine_events_calendar_query_args', $filter );
+		try {
+			$sql = ( new EventDateQueryAbilities() )->buildMatchingEventDateAggregateSql(
+				array(
+					'scope'       => 'past',
+					'tax_filters' => array( 'venue' => array( (int) $venue['term_id'] ) ),
+				),
+				'DATE(ed.start_datetime)',
+				'DATE(ed.end_datetime)'
+			);
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $filter );
+		}
+
+		$this->assertStringContainsString( '123,456', str_replace( ' ', '', $sql ) );
+		$this->assertStringContainsString( $GLOBALS['wpdb']->term_relationships, $sql );
+		$this->assertSame( 1, $invocations );
+	}
+
+	public function test_taxonomy_aggregate_rejects_mixed_active_and_empty_filters(): void {
+		$venue = wp_insert_term( 'Mixed aggregate venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		$sql = ( new EventDateQueryAbilities() )->buildMatchingEventDateAggregateSql(
+			array(
+				'scope'       => 'past',
+				'tax_filters' => array(
+					'venue'  => array( (int) $venue['term_id'] ),
+					'artist' => array(),
+				),
+			),
+			'DATE(ed.start_datetime)',
+			'DATE(ed.end_datetime)'
+		);
+
+		$this->assertStringNotContainsString( 'EXISTS (', $sql );
+		$this->assertStringContainsString( '0 = 1', $sql );
+	}
+
 	public function test_matching_ids_sql_handles_large_consumer_sets_without_materializing_results(): void {
 		wp_load_alloptions();
 		$large_set = range( 1, 17000 );

@@ -815,7 +815,8 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertSame( 1, $result['total_event_count'] );
 		$this->assertCount( 1, $queries );
-		$this->assertMatchesRegularExpression( '/COUNT\(DISTINCT\s+[^)]+\.ID\) AS bucket_count/i', $queries[0] );
+		$this->assertStringContainsString( 'COUNT(*) AS bucket_count', $queries[0] );
+		$this->assertStringContainsString( 'EXISTS (', $queries[0] );
 		$this->assertStringContainsString( 'term_relationships', $queries[0] );
 	}
 

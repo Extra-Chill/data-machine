@@ -34,7 +34,8 @@ class EventDateQueryAbilities {
 	private const DEFAULT_PUBLIC_RESULTS      = 50;
 	private const TAXONOMY_CANDIDATE_BATCH    = 100;
 
-	private static bool $registered = false;
+	private static bool $registered      = false;
+	private ?array $prefilteredQueryArgs = null;
 
 	public function __construct() {
 		if ( ! self::$registered ) {
@@ -458,7 +459,10 @@ class EventDateQueryAbilities {
 		 * @param array $input      The full ability input array.
 		 */
 		$base_query_args = $query_args;
-		$query_args      = (array) apply_filters( 'data_machine_events_calendar_query_args', $query_args, $input );
+		$prefiltered     = $this->consumePrefilteredQueryArgs();
+		$query_args      = is_array( $prefiltered )
+			? $prefiltered
+			: (array) apply_filters( 'data_machine_events_calendar_query_args', $query_args, $input );
 
 		if ( $query_args === $base_query_args && $this->canUseBoundedTaxonomyCandidates( $input, $tax_filters, $scope, $status, $per_page, $page ) ) {
 			remove_filter( 'posts_clauses', $clauses_filter );
@@ -709,18 +713,20 @@ class EventDateQueryAbilities {
 	 * @return string SQL selecting start_date, end_date, and bucket_count.
 	 */
 	public function buildMatchingEventDateAggregateSql( array $input, string $start_expression, string $end_expression ): string {
-		$selective = $this->buildSelectiveTaxonomyAggregateSql( $input, $start_expression, $end_expression );
-		if ( '' !== $selective ) {
-			return $selective;
-		}
-
-		$request                                    = '';
 		$input['fields']                            = 'ids';
 		$input['per_page']                          = -1;
 		$input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] = array(
 			'start_expression' => $start_expression,
 			'end_expression'   => $end_expression,
 		);
+
+		$this->prefilteredQueryArgs = null;
+		$selective                  = $this->buildSelectiveTaxonomyAggregateSql( $input, $start_expression, $end_expression );
+		if ( '' !== $selective ) {
+			return $selective;
+		}
+
+		$request = '';
 
 		$capture = static function ( $posts, $query ) use ( &$request ) {
 			if ( ! $query->get( self::CAPTURE_AGGREGATE_QUERY_VAR ) ) {
@@ -737,6 +743,7 @@ class EventDateQueryAbilities {
 			$this->executeQueryEvents( $input );
 		} finally {
 			remove_filter( 'posts_pre_query', $capture, PHP_INT_MAX );
+			$this->prefilteredQueryArgs = null;
 		}
 
 		return $request;
@@ -755,12 +762,13 @@ class EventDateQueryAbilities {
 
 		$db_engine     = defined( 'DB_ENGINE' ) ? strtolower( (string) constant( 'DB_ENGINE' ) ) : '';
 		$database_type = defined( 'DATABASE_TYPE' ) ? strtolower( (string) constant( 'DATABASE_TYPE' ) ) : '';
-		$tax_filters   = is_array( $input['tax_filters'] ?? null ) ? array_filter( $input['tax_filters'] ) : array();
+		$tax_filters   = is_array( $input['tax_filters'] ?? null ) ? $input['tax_filters'] : array();
 		if (
 			'sqlite' === $db_engine
 			|| 'sqlite' === $database_type
 			|| true !== $wpdb->is_mysql
 			|| 1 !== count( $tax_filters )
+			|| empty( reset( $tax_filters ) )
 			|| 'publish' !== ( $input['status'] ?? 'publish' )
 			|| ! empty( $input['search'] )
 			|| ! empty( $input['geo'] )
@@ -768,7 +776,6 @@ class EventDateQueryAbilities {
 			|| ! empty( $input['meta_query'] )
 			|| ! empty( $input['scope_token'] )
 			|| ! empty( $input['time_scope'] )
-			|| false !== has_filter( 'data_machine_events_calendar_query_args' )
 		) {
 			return '';
 		}
@@ -814,6 +821,9 @@ class EventDateQueryAbilities {
 		} elseif ( 'past' === $scope ) {
 			$where[] = UpcomingFilter::past_where( $now );
 		}
+		if ( $this->hasCustomizedAggregateQueryArgs( $input, $tax_filters ) ) {
+			return '';
+		}
 
 		$placeholders = implode( ',', array_fill( 0, count( $taxonomy_ids ), '%d' ) );
 		$table        = EventDatesTable::table_name();
@@ -830,6 +840,49 @@ class EventDateQueryAbilities {
 			GROUP BY {$start_expression}, {$end_expression}";
 
 		return $wpdb->prepare( $sql, ...$values ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Trusted table/expression fragments; all values use placeholders.
+	}
+
+	/** Determine whether registered query callbacks actually constrain this aggregate. */
+	private function hasCustomizedAggregateQueryArgs( array $input, array $tax_filters ): bool {
+		if ( false === has_filter( 'data_machine_events_calendar_query_args' ) ) {
+			return false;
+		}
+
+		$query_args                                      = array(
+			'post_type'      => Event_Post_Type::POST_TYPE,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'paged'          => max( 1, (int) ( $input['page'] ?? 1 ) ),
+			'no_found_rows'  => true,
+			'orderby'        => 'none',
+			'fields'         => 'ids',
+			'tax_query'      => array( 'relation' => 'AND' ),
+		);
+		$query_args[ self::CAPTURE_AGGREGATE_QUERY_VAR ] = $input[ self::CAPTURE_AGGREGATE_QUERY_VAR ];
+
+		foreach ( $tax_filters as $taxonomy => $term_ids ) {
+			$query_args['tax_query'][] = array(
+				'taxonomy' => sanitize_key( $taxonomy ),
+				'field'    => 'term_id',
+				'terms'    => array_values( array_unique( array_filter( array_map( 'absint', (array) $term_ids ) ) ) ),
+				'operator' => 'IN',
+			);
+		}
+
+		$filtered = (array) apply_filters( 'data_machine_events_calendar_query_args', $query_args, $input );
+		if ( $filtered === $query_args ) {
+			return false;
+		}
+
+		$this->prefilteredQueryArgs = $filtered;
+		return true;
+	}
+
+	/** Consume the one-shot aggregate fallback handoff before WP_Query can re-enter. */
+	private function consumePrefilteredQueryArgs(): ?array {
+		$prefiltered                = $this->prefilteredQueryArgs;
+		$this->prefilteredQueryArgs = null;
+		return $prefiltered;
 	}
 
 	/**
