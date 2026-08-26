@@ -56,7 +56,6 @@ require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 require_once __DIR__ . '/../inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreFactory.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemory.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DailyMemoryStorage.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DailyMemory.php';
