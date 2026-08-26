@@ -701,6 +701,205 @@ class EventDateQueryAbilities {
 	}
 
 	/**
+	 * Build a selective grouped term-count query for a canonical event slice.
+	 *
+	 * This is intentionally limited to the MySQL shapes that can be expressed
+	 * directly over the event-date and taxonomy indexes. Unsupported or
+	 * customized requests return an empty string so callers retain WP_Query and
+	 * wp_get_object_terms() as the exact fallback.
+	 *
+	 * @param array    $input      Query-events ability input.
+	 * @param string[] $taxonomies Taxonomies whose direct assignments are counted.
+	 * @return string Prepared grouped SQL, or an empty string when unsupported.
+	 */
+	public function buildMatchingTermCountSql( array $input, array $taxonomies ): string {
+		global $wpdb;
+
+		$db_engine     = defined( 'DB_ENGINE' ) ? strtolower( (string) constant( 'DB_ENGINE' ) ) : '';
+		$database_type = defined( 'DATABASE_TYPE' ) ? strtolower( (string) constant( 'DATABASE_TYPE' ) ) : '';
+		$taxonomies    = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'sanitize_key', $taxonomies ),
+					'taxonomy_exists'
+				)
+			)
+		);
+		if (
+			'sqlite' === $db_engine
+			|| 'sqlite' === $database_type
+			|| true !== $wpdb->is_mysql
+			|| empty( $taxonomies )
+			|| 'publish' !== ( $input['status'] ?? 'publish' )
+			|| ! empty( $input['search'] )
+			|| ! empty( $input['geo'] )
+			|| ! empty( $input['exclude'] )
+			|| ! empty( $input['meta_query'] )
+			|| ! empty( $input['scope_token'] )
+			|| ! empty( $input['time_scope'] )
+			|| $this->hasCustomizedMatchingQuery( $input )
+		) {
+			return '';
+		}
+
+		$where        = array( "ed.post_status = 'publish'" );
+		$where_values = array();
+		$scope        = $input['scope'] ?? 'upcoming';
+		$now          = current_time( 'mysql' );
+
+		if ( ! empty( $input['date_match'] ) ) {
+			if ( ! DateTimeParser::isValidYmd( $input['date_match'] ) ) {
+				return '';
+			}
+			$start          = $input['date_match'] . ' 00:00:00';
+			$end            = ( new \DateTimeImmutable( $start ) )->modify( '+1 day' )->format( 'Y-m-d H:i:s' );
+			$where[]        = 'ed.start_datetime >= %s AND ed.start_datetime < %s';
+			$where_values[] = $start;
+			$where_values[] = $end;
+		} elseif ( ! empty( $input['date_start'] ) || ! empty( $input['date_end'] ) ) {
+			if ( ! empty( $input['date_start'] ) ) {
+				$start   = $input['date_start'] . ' ' . ( ! empty( $input['time_start'] ) ? $input['time_start'] : '00:00:00' );
+				$where[] = UpcomingFilter::range_start_where( $start );
+			}
+			if ( ! empty( $input['date_end'] ) ) {
+				$end            = $input['date_end'] . ' ' . ( ! empty( $input['time_end'] ) ? $input['time_end'] : '23:59:59' );
+				$where[]        = 'ed.start_datetime <= %s';
+				$where_values[] = $end;
+			}
+		} elseif ( 'upcoming' === $scope ) {
+			$days_ahead = (int) ( $input['days_ahead'] ?? 0 );
+			if ( $days_ahead > 0 ) {
+				$end     = current_datetime()->modify( "+{$days_ahead} days" )->setTime( 23, 59, 59 )->format( 'Y-m-d H:i:s' );
+				$where[] = UpcomingFilter::upcoming_bounded_where( $now, $end );
+			} else {
+				$where[] = UpcomingFilter::upcoming_where( $now );
+			}
+		} elseif ( 'past' === $scope ) {
+			$where[] = UpcomingFilter::past_where( $now );
+		}
+
+		$tax_filters = is_array( $input['tax_filters'] ?? null ) ? $input['tax_filters'] : array();
+		foreach ( $tax_filters as $taxonomy => $term_ids ) {
+			$taxonomy_ids = $this->resolveTermTaxonomyIds( sanitize_key( $taxonomy ), (array) $term_ids );
+			if ( empty( $taxonomy_ids ) ) {
+				return '';
+			}
+
+			$placeholders = implode( ',', array_fill( 0, count( $taxonomy_ids ), '%d' ) );
+			$where[]      = "EXISTS (
+				SELECT 1 FROM {$wpdb->term_relationships} filter_tr
+				WHERE filter_tr.object_id = ed.post_id
+					AND filter_tr.term_taxonomy_id IN ({$placeholders})
+			)";
+			$where_values = array_merge( $where_values, $taxonomy_ids );
+		}
+
+		$taxonomy_placeholders = implode( ', ', array_fill( 0, count( $taxonomies ), '%s' ) );
+		$table                 = EventDatesTable::table_name();
+		$values                = array_merge(
+			$taxonomies,
+			array( Event_Post_Type::POST_TYPE, 'publish' ),
+			$where_values
+		);
+		$sql                   = "SELECT count_tt.taxonomy, count_tt.term_id, COUNT(DISTINCT ed.post_id) AS event_count
+			FROM {$table} ed
+			INNER JOIN {$wpdb->posts} p ON p.ID = ed.post_id
+			INNER JOIN {$wpdb->term_relationships} count_tr ON count_tr.object_id = ed.post_id
+			INNER JOIN {$wpdb->term_taxonomy} count_tt ON count_tt.term_taxonomy_id = count_tr.term_taxonomy_id
+				AND count_tt.taxonomy IN ({$taxonomy_placeholders})
+			WHERE p.post_type = %s AND p.post_status = %s
+				AND " . implode( ' AND ', $where ) . '
+			GROUP BY count_tt.taxonomy, count_tt.term_id';
+
+		return $wpdb->prepare( $sql, ...$values ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Trusted tables; all values use placeholders.
+	}
+
+	/**
+	 * Determine whether registered query callbacks change the canonical SQL.
+	 *
+	 * The callback-free query is captured without execution, then compared with
+	 * the live callback result. This keeps registered identity callbacks eligible
+	 * while forcing every effective query customization onto the canonical path.
+	 */
+	private function hasCustomizedMatchingQuery( array $input ): bool {
+		global $wp_filter;
+
+		$hooks      = array(
+			'data_machine_events_calendar_query_args',
+			'parse_query',
+			'parse_tax_query',
+			'pre_get_posts',
+			'posts_selection',
+			'posts_search',
+			'posts_search_orderby',
+			'posts_where',
+			'posts_join',
+			'posts_where_paged',
+			'posts_groupby',
+			'posts_join_paged',
+			'posts_orderby',
+			'posts_distinct',
+			'posts_fields',
+			'post_limits',
+			'posts_clauses',
+			'posts_where_request',
+			'posts_groupby_request',
+			'posts_join_request',
+			'posts_orderby_request',
+			'posts_distinct_request',
+			'posts_fields_request',
+			'post_limits_request',
+			'posts_clauses_request',
+			'posts_request',
+			'posts_request_ids',
+			'posts_pre_query',
+		);
+		$registered = array();
+		foreach ( $hooks as $hook ) {
+			if ( isset( $wp_filter[ $hook ] ) ) {
+				$registered[ $hook ] = $wp_filter[ $hook ]->callbacks;
+				remove_all_filters( $hook );
+			}
+		}
+
+		try {
+			$baseline = $this->buildMatchingPostIdsSql( $input );
+		} finally {
+			foreach ( $registered as $hook => $callbacks ) {
+				$added = isset( $wp_filter[ $hook ] ) ? $wp_filter[ $hook ]->callbacks : array();
+				remove_all_filters( $hook );
+				foreach ( array( $callbacks, $added ) as $callback_set ) {
+					foreach ( $callback_set as $priority => $priority_callbacks ) {
+						foreach ( $priority_callbacks as $callback ) {
+							add_filter( $hook, $callback['function'], $priority, $callback['accepted_args'] );
+						}
+					}
+				}
+			}
+		}
+
+		if ( empty( $registered ) ) {
+			return false;
+		}
+
+		$short_circuited = false;
+		$observer        = static function ( $posts, $query ) use ( &$short_circuited ) {
+			if ( null !== $posts && $query->get( self::CAPTURE_IDS_QUERY_VAR ) ) {
+				$short_circuited = true;
+			}
+			return $posts;
+		};
+		add_filter( 'posts_pre_query', $observer, PHP_INT_MAX, 2 );
+		try {
+			$customized = $this->buildMatchingPostIdsSql( $input );
+		} finally {
+			remove_filter( 'posts_pre_query', $observer, PHP_INT_MAX );
+		}
+
+		return $short_circuited || $baseline !== $customized;
+	}
+
+	/**
 	 * Build canonical SQL that groups matching events by two date expressions.
 	 *
 	 * The expressions are trusted internal SQL fragments over the canonical `ed`

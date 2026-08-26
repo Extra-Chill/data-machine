@@ -569,4 +569,24 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( '%d', $sql );
 		$this->assertStringNotContainsString( ' LIMIT ', strtoupper( $sql ) );
 	}
+
+	public function test_matching_term_count_sql_uses_grouped_rows_and_indexed_membership(): void {
+		$venue = wp_insert_term( 'Grouped count venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+
+		$sql = ( new EventDateQueryAbilities() )->buildMatchingTermCountSql(
+			array(
+				'scope'       => 'past',
+				'tax_filters' => array( 'venue' => array( (int) $venue['term_id'] ) ),
+			),
+			array( 'venue' )
+		);
+
+		$this->assertMatchesRegularExpression( '/SELECT\s+count_tt\.taxonomy,\s*count_tt\.term_id,\s*COUNT\(DISTINCT ed\.post_id\) AS event_count/i', $sql );
+		$this->assertStringContainsString( 'EXISTS (', $sql );
+		$this->assertStringContainsString( 'GROUP BY count_tt.taxonomy, count_tt.term_id', $sql );
+		$this->assertStringNotContainsString( 'FROM (SELECT', $sql );
+		$this->assertStringNotContainsString( ' LIMIT ', strtoupper( $sql ) );
+		$this->assertStringNotContainsString( ' ORDER BY ', strtoupper( $sql ) );
+	}
 }

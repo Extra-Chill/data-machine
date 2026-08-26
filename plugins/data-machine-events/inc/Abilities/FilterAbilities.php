@@ -17,6 +17,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Blocks\Calendar\Geo_Query;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Core\Event_Post_Type;
 
@@ -26,7 +27,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class FilterAbilities {
 
-	private static bool $registered = false;
+	private static bool $registered          = false;
+	private bool $grouped_term_counts_failed = false;
 
 	public function __construct() {
 		if ( ! self::$registered ) {
@@ -303,12 +305,22 @@ class FilterAbilities {
 
 		$excluded_taxonomies = apply_filters( 'data_machine_events_excluded_taxonomies', array(), 'modal' );
 
+		$included_taxonomies = array();
 		foreach ( $taxonomies as $taxonomy ) {
 			if ( in_array( $taxonomy->name, $excluded_taxonomies, true ) || ! $taxonomy->public ) {
 				continue;
 			}
+			$included_taxonomies[ $taxonomy->name ] = $taxonomy;
+		}
 
-			$terms_hierarchy = $this->get_taxonomy_hierarchy( $taxonomy->name, null, $date_context, $active_filters, $tax_query_override, $query_context );
+		$shared_counts = empty( $active_filters )
+			? $this->get_grouped_term_counts( array_keys( $included_taxonomies ), $date_context, array(), $tax_query_override, $query_context )
+			: false;
+
+		foreach ( $included_taxonomies as $taxonomy ) {
+			$taxonomy_counts = is_array( $shared_counts ) ? ( $shared_counts[ $taxonomy->name ] ?? array() ) : null;
+
+			$terms_hierarchy = $this->get_taxonomy_hierarchy( $taxonomy->name, null, $date_context, $active_filters, $tax_query_override, $query_context, $taxonomy_counts );
 
 			if ( ! empty( $terms_hierarchy ) ) {
 				$taxonomies_data[ $taxonomy->name ] = array(
@@ -334,7 +346,7 @@ class FilterAbilities {
 	 * @param array      $query_context   Search, geo, and opaque scope-token context.
 	 * @return array Hierarchical term structure with event counts.
 	 */
-	private function get_taxonomy_hierarchy( $taxonomy_slug, $allowed_term_ids = null, $date_context = array(), $active_filters = array(), $tax_query_override = null, $query_context = array() ) {
+	private function get_taxonomy_hierarchy( $taxonomy_slug, $allowed_term_ids = null, $date_context = array(), $active_filters = array(), $tax_query_override = null, $query_context = array(), ?array $term_counts = null ) {
 		$terms = get_terms(
 			array(
 				'taxonomy'   => $taxonomy_slug,
@@ -352,7 +364,7 @@ class FilterAbilities {
 			return array();
 		}
 
-		$term_counts = $this->get_batch_term_counts( $taxonomy_slug, $date_context, $active_filters, $tax_query_override, $query_context );
+		$term_counts = $term_counts ?? $this->get_batch_term_counts( $taxonomy_slug, $date_context, $active_filters, $tax_query_override, $query_context );
 
 		$terms_with_events = array();
 		foreach ( $terms as $term ) {
@@ -362,8 +374,10 @@ class FilterAbilities {
 
 			$event_count = $term_counts[ $term->term_id ] ?? 0;
 			if ( $event_count > 0 ) {
-				$term->event_count   = $event_count;
-				$terms_with_events[] = $term;
+				$terms_with_events[] = array(
+					'term'        => $term,
+					'event_count' => $event_count,
+				);
 			}
 		}
 
@@ -377,12 +391,13 @@ class FilterAbilities {
 		}
 
 		return array_map(
-			function ( $term ) {
+			function ( $term_count ) {
+				$term = $term_count['term'];
 				return array(
 					'term_id'     => $term->term_id,
 					'name'        => $term->name,
 					'slug'        => $term->slug,
-					'event_count' => $term->event_count,
+					'event_count' => $term_count['event_count'],
 					'level'       => 0,
 					'children'    => array(),
 				);
@@ -406,6 +421,11 @@ class FilterAbilities {
 	 */
 	private function get_batch_term_counts( $taxonomy_slug, $date_context = array(), $active_filters = array(), $tax_query_override = null, $query_context = array() ) {
 		$tax_filters = array_diff_key( $active_filters, array( $taxonomy_slug => true ) );
+		$grouped     = $this->get_grouped_term_counts( array( $taxonomy_slug ), $date_context, $tax_filters, $tax_query_override, $query_context );
+		if ( is_array( $grouped ) ) {
+			return $grouped[ $taxonomy_slug ] ?? array();
+		}
+
 		foreach ( (array) $tax_query_override as $clause ) {
 			$taxonomy = sanitize_key( $clause['taxonomy'] ?? '' );
 			$terms    = array_map( 'absint', (array) ( $clause['terms'] ?? array() ) );
@@ -448,9 +468,164 @@ class FilterAbilities {
 	}
 
 	/**
+	 * Return request-safe grouped assignment counts, or false for fallback.
+	 *
+	 * @param string[]  $taxonomy_slugs    Taxonomies whose direct assignments are counted.
+	 * @param array     $date_context      Date filtering context.
+	 * @param array     $tax_filters       Canonical cross-filter constraints.
+	 * @param array|null $tax_query_override Archive taxonomy constraint.
+	 * @param array     $query_context     Search, geo, and scope-token context.
+	 * @return array<string,array<int,int>>|false
+	 */
+	private function get_grouped_term_counts( array $taxonomy_slugs, array $date_context, array $tax_filters, $tax_query_override, array $query_context ) {
+		global $wpdb;
+
+		if ( ! $this->can_use_grouped_term_counts( $taxonomy_slugs, $query_context ) ) {
+			return false;
+		}
+
+		foreach ( (array) $tax_query_override as $clause ) {
+			$taxonomy = sanitize_key( $clause['taxonomy'] ?? '' );
+			$terms    = array_values( array_unique( array_filter( array_map( 'absint', (array) ( $clause['terms'] ?? array() ) ) ) ) );
+			if ( $taxonomy && $terms ) {
+				$tax_filters[ $taxonomy ] = $terms;
+			}
+		}
+
+		$taxonomy_slugs = array_values( array_unique( array_map( 'sanitize_key', $taxonomy_slugs ) ) );
+		sort( $taxonomy_slugs, SORT_STRING );
+		ksort( $tax_filters, SORT_STRING );
+		foreach ( $tax_filters as &$term_ids ) {
+			$term_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) $term_ids ) ) ) );
+			sort( $term_ids, SORT_NUMERIC );
+		}
+		unset( $term_ids );
+
+		$query_input = array(
+			'scope'       => ! empty( $date_context['past'] ) && '1' === $date_context['past'] ? 'past' : 'upcoming',
+			'date_start'  => $date_context['date_start'] ?? '',
+			'date_end'    => $date_context['date_end'] ?? '',
+			'time_start'  => $date_context['time_start'] ?? '',
+			'time_end'    => $date_context['time_end'] ?? '',
+			'tax_filters' => $tax_filters,
+		);
+		$generation  = CalendarCache::get_generation();
+		$cache_key   = CalendarCache::PREFIX . 'filter_inventory_' . md5(
+			(string) wp_json_encode(
+				array(
+					'taxonomies' => $taxonomy_slugs,
+					'query'      => $query_input,
+				)
+			)
+		);
+		$sql         = ( new EventDateQueryAbilities() )->buildMatchingTermCountSql( $query_input, $taxonomy_slugs );
+		if ( '' === $sql ) {
+			return false;
+		}
+		$cached = CalendarCache::get( $cache_key, $generation );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$wpdb->flush();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Prepared bounded grouped aggregate cached below.
+		$rows      = $wpdb->get_results( $sql );
+		$new_error = (string) $wpdb->last_error;
+		if ( ! is_array( $rows ) || '' !== $new_error ) {
+			$this->grouped_term_counts_failed = true;
+			return false;
+		}
+
+		$counts = array();
+		foreach ( $rows as $row ) {
+			$taxonomy = sanitize_key( (string) $row->taxonomy );
+			if ( ! in_array( $taxonomy, $taxonomy_slugs, true ) ) {
+				continue;
+			}
+			$counts[ $taxonomy ][ (int) $row->term_id ] = (int) $row->event_count;
+		}
+
+		$ttl = 'upcoming' === $query_input['scope'] && empty( $query_input['date_start'] ) && empty( $query_input['date_end'] )
+			? CalendarCache::ttl_for_upcoming_transition( CalendarCache::TTL_COUNTS )
+			: CalendarCache::TTL_COUNTS;
+		CalendarCache::set( $cache_key, $counts, $ttl, $generation );
+
+		return $counts;
+	}
+
+	/** Determine whether direct grouped rows preserve the canonical term path. */
+	private function can_use_grouped_term_counts( array $taxonomy_slugs, array $query_context ): bool {
+		if (
+			$this->grouped_term_counts_failed
+			|| ! empty( $query_context['scope_token'] )
+			|| ! empty( $query_context['event_search'] )
+			|| ! empty( $query_context['geo'] )
+		) {
+			return false;
+		}
+
+		return ! $this->has_unsupported_term_customization( $taxonomy_slugs );
+	}
+
+	/**
+	 * Detect term callbacks bypassed by direct assignment rows.
+	 *
+	 * WordPress's post-format callbacks are identity callbacks for every other
+	 * taxonomy and therefore do not exclude the normal production path.
+	 */
+	private function has_unsupported_term_customization( array $taxonomy_slugs ): bool {
+		global $wp_filter;
+
+		$hooks = array(
+			'wp_get_object_terms_args',
+			'get_object_terms',
+			'wp_get_object_terms',
+			'get_terms_defaults',
+			'get_terms_args',
+			'pre_get_terms',
+			'list_terms_exclusions',
+			'get_terms_fields',
+			'terms_clauses',
+			'terms_pre_query',
+			'get_terms_orderby',
+			'get_terms',
+			'get_term',
+			'parse_term_query',
+		);
+		foreach ( $taxonomy_slugs as $taxonomy ) {
+			$hooks[] = 'get_' . sanitize_key( $taxonomy );
+			$object  = get_taxonomy( $taxonomy );
+			if ( $object && ! empty( $object->args ) ) {
+				return true;
+			}
+		}
+
+		$core_callbacks = array(
+			'wp_get_object_terms' => '_post_format_wp_get_object_terms',
+			'get_terms'           => '_post_format_get_terms',
+		);
+		foreach ( array_unique( $hooks ) as $hook ) {
+			if ( empty( $wp_filter[ $hook ]->callbacks ) ) {
+				continue;
+			}
+			foreach ( $wp_filter[ $hook ]->callbacks as $callbacks ) {
+				foreach ( $callbacks as $callback ) {
+					$allowed = ! in_array( 'post_format', $taxonomy_slugs, true )
+						&& ( $core_callbacks[ $hook ] ?? null ) === $callback['function'];
+					if ( ! $allowed ) {
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Build a nested hierarchy tree from a flat array of terms.
 	 *
-	 * @param array $terms     Flat array of term objects.
+	 * @param array $terms     Flat array of term/count pairs.
 	 * @param int   $parent_id Parent term ID for current level.
 	 * @param int   $level     Current nesting level.
 	 * @return array Nested tree structure.
@@ -459,13 +634,14 @@ class FilterAbilities {
 		$tree = array();
 
 		$term_ids = array_map(
-			function ( $t ) {
-				return $t->term_id;
+			function ( $term_count ) {
+				return $term_count['term']->term_id;
 			},
 			$terms
 		);
 
-		foreach ( $terms as $term ) {
+		foreach ( $terms as $term_count ) {
+			$term             = $term_count['term'];
 			$effective_parent = $term->parent;
 			while ( 0 !== $effective_parent && ! in_array( $effective_parent, $term_ids, true ) ) {
 				$parent_term      = get_term( $effective_parent );
@@ -476,7 +652,7 @@ class FilterAbilities {
 					'term_id'     => $term->term_id,
 					'name'        => $term->name,
 					'slug'        => $term->slug,
-					'event_count' => $term->event_count,
+					'event_count' => $term_count['event_count'],
 					'level'       => $level,
 					'children'    => array(),
 				);
