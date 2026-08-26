@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.56.1] - 2026-08-26
+
+### Changed
+- bound archive filter inventory queries
+
 ## [0.56.0] - 2026-08-25
 
 ### Added
