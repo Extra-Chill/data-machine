@@ -35,13 +35,27 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	}
 }
 
+if ( ! function_exists( 'has_filter' ) ) {
+	function has_filter( string $hook, $callback = false ) {
+		foreach ( $GLOBALS['datamachine_agent_memory_store_contract_filters'][ $hook ] ?? array() as $priority => $filters ) {
+			foreach ( $filters as $filter ) {
+				if ( false === $callback || $filter['callback'] === $callback ) {
+					return $priority;
+				}
+			}
+		}
+
+		return false;
+	}
+}
+
 require_once __DIR__ . '/../inc/Engine/AI/MemoryFileRegistry.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DirectoryManager.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/FilesystemHelper.php';
 require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreFactory.php';
+require_once __DIR__ . '/../inc/Core/Bootstrap/HostIntegrationServiceProvider.php';
 
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_List_Entry;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
@@ -49,9 +63,10 @@ use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Query;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Read_Result;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
-use DataMachine\Core\FilesRepository\AgentMemoryStoreFactory;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Stores;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
+use DataMachine\Core\Bootstrap\HostIntegrationServiceProvider;
 use DataMachine\Core\FilesRepository\DiskAgentMemoryStore;
 
 class AgentMemoryStoreContractFakeStore implements WP_Agent_Memory_Store {
@@ -160,10 +175,15 @@ function datamachine_agent_memory_store_contract_round_trip( WP_Agent_Memory_Sto
 $scope = new WP_Agent_Memory_Scope( 'agent', 'site', 'https://example.test', 7, 42, 'MEMORY.md' );
 
 datamachine_agent_memory_store_contract_reset_filters();
-$default_store = AgentMemoryStoreFactory::for_scope( $scope );
-datamachine_agent_memory_store_contract_assert( $default_store instanceof DiskAgentMemoryStore, 'factory falls back to the disk store with no filter' );
+HostIntegrationServiceProvider::register_memory_store();
+HostIntegrationServiceProvider::register_memory_store();
+$fallback_callbacks = $GLOBALS['datamachine_agent_memory_store_contract_filters']['wp_agent_memory_store'][ PHP_INT_MAX ] ?? array();
+datamachine_agent_memory_store_contract_assert( 1 === count( $fallback_callbacks ), 'repeated bootstrap registration adds the disk fallback once' );
+$default_store = WP_Agent_Memory_Stores::get_store( array( 'scope' => $scope ) );
+datamachine_agent_memory_store_contract_assert( $default_store instanceof DiskAgentMemoryStore, 'canonical resolver returns the disk store with no host store' );
 
 datamachine_agent_memory_store_contract_reset_filters();
+HostIntegrationServiceProvider::register_memory_store();
 $fake_store       = new AgentMemoryStoreContractFakeStore();
 $filter_arguments = array();
 add_filter(
@@ -176,8 +196,8 @@ add_filter(
 	2
 );
 
-$selected_store = AgentMemoryStoreFactory::for_scope( $scope );
-datamachine_agent_memory_store_contract_assert( $fake_store === $selected_store, 'factory selects a valid store from wp_agent_memory_store' );
+$selected_store = WP_Agent_Memory_Stores::get_store( array( 'scope' => $scope ) );
+datamachine_agent_memory_store_contract_assert( $fake_store === $selected_store, 'valid host store takes precedence over the disk fallback' );
 datamachine_agent_memory_store_contract_assert( 1 === count( $filter_arguments ), 'store filter is invoked once for one resolution' );
 datamachine_agent_memory_store_contract_assert( null === $filter_arguments[0][0], 'store filter receives null as the default candidate' );
 datamachine_agent_memory_store_contract_assert( $scope === ( $filter_arguments[0][1]['scope'] ?? null ), 'store filter context receives the scope being resolved' );
@@ -187,16 +207,18 @@ datamachine_agent_memory_store_contract_assert( true === $read->exists, 'selecte
 datamachine_agent_memory_store_contract_assert( "# Memory\n" === $read->content, 'selected store preserves content through read/write round trip' );
 
 datamachine_agent_memory_store_contract_reset_filters();
+HostIntegrationServiceProvider::register_memory_store();
 add_filter(
 	'wp_agent_memory_store',
 	static fn( $_store, $_scope ) => new stdClass(),
 	10,
 	2
 );
-$invalid_store = AgentMemoryStoreFactory::for_scope( $scope );
-datamachine_agent_memory_store_contract_assert( $invalid_store instanceof DiskAgentMemoryStore, 'factory ignores non-WP_Agent_Memory_Store filter returns' );
+$invalid_store = WP_Agent_Memory_Stores::get_store( array( 'scope' => $scope ) );
+datamachine_agent_memory_store_contract_assert( $invalid_store instanceof DiskAgentMemoryStore, 'invalid host candidate cannot displace the disk fallback' );
 
 datamachine_agent_memory_store_contract_reset_filters();
+HostIntegrationServiceProvider::register_memory_store();
 add_filter(
 	'agents_api_memory_store',
 	static function ( $_store, $_scope ) use ( $fake_store ) {
@@ -205,10 +227,11 @@ add_filter(
 	10,
 	2
 );
-$previous_agents_api_filter_store = AgentMemoryStoreFactory::for_scope( $scope );
+$previous_agents_api_filter_store = WP_Agent_Memory_Stores::get_store( array( 'scope' => $scope ) );
 datamachine_agent_memory_store_contract_assert( $previous_agents_api_filter_store instanceof DiskAgentMemoryStore, 'previous agents_api_memory_store filter is not mirrored as a runtime alias' );
 
 datamachine_agent_memory_store_contract_reset_filters();
+HostIntegrationServiceProvider::register_memory_store();
 add_filter(
 	'datamachine_memory_store',
 	static function ( $_store, $_scope ) use ( $fake_store ) {
@@ -217,7 +240,7 @@ add_filter(
 	10,
 	2
 );
-$old_filter_store = AgentMemoryStoreFactory::for_scope( $scope );
+$old_filter_store = WP_Agent_Memory_Stores::get_store( array( 'scope' => $scope ) );
 datamachine_agent_memory_store_contract_assert( $old_filter_store instanceof DiskAgentMemoryStore, 'old datamachine_memory_store filter is not mirrored as a runtime alias' );
 
-echo "Agent memory store factory contract smoke passed.\n";
+echo "Agent memory store resolver contract smoke passed.\n";

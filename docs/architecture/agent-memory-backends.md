@@ -38,7 +38,7 @@ CoreMemoryFilesDirective
   reads each file through AgentMemory
         |
         v
-AgentMemoryStoreFactory
+AgentMemory
   WP_Agent_Memory_Stores::get_store()
   -> wp_agent_memory_store filter
         |
@@ -134,7 +134,7 @@ The memory-store seam is not a replacement for AI Framework. Data Machine still 
 
 ## Extension Rules
 
-- Read and write memory through `AgentMemory`, not `AgentMemoryStoreFactory` directly.
+- Read and write memory through `AgentMemory`, not concrete stores directly.
 - Implement `WP_Agent_Memory_Store` when replacing persistence.
 - Preserve the four-tuple identity model exactly, even if the physical backend has different keys.
 - Keep section parsing, scaffolding, editability gating, ability permissions, prompt-injection policy, and registry semantics above the store layer.
