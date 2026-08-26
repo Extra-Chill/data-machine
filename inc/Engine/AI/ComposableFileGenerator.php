@@ -246,8 +246,8 @@ class ComposableFileGenerator {
 			return false;
 		}
 
-		$payload = $content . "\n";
-		$written = file_put_contents( $temp_path, $payload, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		$payload   = $content . "\n";
+		$written   = file_put_contents( $temp_path, $payload, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 		$file_mode = defined( 'FS_CHMOD_FILE' ) ? FS_CHMOD_FILE : 0644;
 		@chmod( $temp_path, $file_mode ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod,WordPress.PHP.NoSilencedErrors.Discouraged
 		if ( strlen( $payload ) !== $written || ! @rename( $temp_path, $filepath ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename,WordPress.PHP.NoSilencedErrors.Discouraged
