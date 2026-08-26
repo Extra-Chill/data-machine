@@ -36,6 +36,18 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WordPress\\AiClient\\Messages\\DTO\\MessagePart' ) ) {
+	class Datamachine_Runtime_Gate_Message_Part {
+		public function __construct( private $content = null ) {}
+
+		public function getText(): ?string {
+			return is_string( $this->content ) ? $this->content : null;
+		}
+	}
+
+	class_alias( Datamachine_Runtime_Gate_Message_Part::class, 'WordPress\\AiClient\\Messages\\DTO\\MessagePart' );
+}
+
 if ( ! function_exists( 'is_wp_error' ) ) {
     function is_wp_error( $thing ): bool {
     	return $thing instanceof WP_Error;
@@ -104,7 +116,7 @@ require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectiveOutputVali
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectiveRenderer.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectivePolicyResolver.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/PromptBuilder.php';
-require_once dirname( __DIR__ ) . '/inc/Engine/AI/ProviderRequestAssembler.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/ToolSchemaNormalizer.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/RequestMetadata.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/WpAiClientProviderAdmin.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/RequestBuilder.php';

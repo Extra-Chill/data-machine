@@ -56,7 +56,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveRenderer.php';
 require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 require_once __DIR__ . '/../inc/Engine/AI/PromptBuilder.php';
-require_once __DIR__ . '/../inc/Engine/AI/ProviderRequestAssembler.php';
+require_once __DIR__ . '/../inc/Engine/AI/ToolSchemaNormalizer.php';
 require_once __DIR__ . '/../inc/Engine/AI/RequestBuilder.php';
 
 class Test_Request_Inspector_Directive implements \DataMachine\Engine\AI\Directives\DirectiveInterface {
@@ -86,7 +86,7 @@ function assert_test( string $name, bool $cond, string $detail = '' ): void {
 	}
 }
 
-echo "Case 1: ProviderRequestAssembler builds without Data Machine hooks or dispatch\n";
+echo "Case 1: RequestBuilder::assemble applies Data Machine directive policy without provider dispatch\n";
 
 $dispatch_count             = 0;
 $directive_discovery_count  = 0;
@@ -124,33 +124,6 @@ $tools = array(
 	),
 );
 
-$generic_assembled = ( new \DataMachine\Engine\AI\ProviderRequestAssembler() )->assemble(
-	$messages,
-	'openai',
-	'gpt-test',
-	$tools,
-	array( 'pipeline' ),
-	array(
-		'job_id'       => 1423,
-		'flow_step_id' => 'ai_step_1',
-		'step_id'      => 'pipeline_ai_1',
-	),
-	array(
-		array(
-			'class'    => Test_Request_Inspector_Directive::class,
-			'priority' => 20,
-			'modes'    => array( 'pipeline' ),
-		),
-	)
-);
-
-assert_test( 'generic assembler did not call chubes_ai_request', 0 === $dispatch_count );
-assert_test( 'generic assembler did not discover datamachine_directives', 0 === $directive_discovery_count );
-assert_test( 'generic assembler set model', 'gpt-test' === ( $generic_assembled['request']['model'] ?? '' ) );
-assert_test( 'generic assembler restructured tool', 'inspect_tool' === ( $generic_assembled['structured_tools']['inspect_tool']['name'] ?? '' ) );
-
-echo "\nCase 2: RequestBuilder::assemble applies Data Machine directive policy without provider dispatch\n";
-
 add_filter(
 	'datamachine_directives',
 	function ( array $directives ): array {
@@ -183,7 +156,7 @@ assert_test( 'directive prepended a system message', 'system' === ( $assembled['
 assert_test( 'original user message preserved', 'Original user packet' === ( $assembled['request']['messages'][1]['content'] ?? '' ) );
 assert_test( 'tool restructured with explicit name', 'inspect_tool' === ( $assembled['structured_tools']['inspect_tool']['name'] ?? '' ) );
 
-echo "\nCase 3: directive breakdown and byte counts are deterministic\n";
+echo "\nCase 2: directive breakdown and byte counts are deterministic\n";
 
 $breakdown = $assembled['directive_breakdown'][0] ?? array();
 assert_test( 'fake directive appears in breakdown', Test_Request_Inspector_Directive::class === ( $breakdown['class'] ?? '' ) );
@@ -199,7 +172,7 @@ assert_test( 'request JSON byte count stable', 496 === $request_json_bytes, 'got
 assert_test( 'messages JSON byte count stable', 277 === $messages_json_bytes, 'got ' . $messages_json_bytes );
 assert_test( 'tools JSON byte count stable', 178 === $tools_json_bytes, 'got ' . $tools_json_bytes );
 
-echo "\nCase 4: directives can be disabled before any directive class renders\n";
+echo "\nCase 3: directives can be disabled before any directive class renders\n";
 
 add_filter(
 	'datamachine_directives_enabled',
@@ -231,7 +204,7 @@ assert_test( 'directive kill switch removes rendered directive breakdown', array
 assert_test( 'directive kill switch removes applied directives', array() === ( $without_directives['applied_directives'] ?? array() ) );
 assert_test( 'directive kill switch reports suppressed directive', array( 'Test_Request_Inspector_Directive' ) === ( $without_directives['suppressed_directives'] ?? array() ) );
 
-echo "\nCase 5: CLI command surface is registered and documented\n";
+echo "\nCase 4: CLI command surface is registered and documented\n";
 
 $bootstrap = (string) file_get_contents( __DIR__ . '/../inc/Core/Bootstrap/CliServiceProvider.php' );
 $command   = (string) file_get_contents( __DIR__ . '/../inc/Cli/Commands/AICommand.php' );
@@ -254,7 +227,7 @@ assert_test( 'inspect request ability loaded by plugin bootstrap', false !== str
 assert_test( 'inspect request ability instantiated by plugin bootstrap', false !== strpos( $plugin, 'new \\DataMachine\\Abilities\\AI\\InspectRequestAbility()' ) );
 assert_test( 'ability registers datamachine/inspect-ai-request', false !== strpos( $ability, 'datamachine/inspect-ai-request' ) );
 
-echo "\nCase 6: prompt validation context is adapter-provided\n";
+echo "\nCase 5: prompt validation context is adapter-provided\n";
 
 $prompt_builder_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/PromptBuilder.php' );
 $request_builder_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestBuilder.php' );
@@ -263,7 +236,7 @@ assert_test( 'PromptBuilder no longer reads job_id directly', false === strpos( 
 assert_test( 'PromptBuilder no longer reads flow_step_id directly', false === strpos( $prompt_builder_source, "\$payload['flow_step_id']" ) );
 assert_test( 'RequestBuilder maps legacy identifiers into directive_context', false !== strpos( $request_builder_source, "'directive_context'" ) );
 
-echo "\nCase 7: direct workflow packets are inspectable\n";
+echo "\nCase 6: direct workflow packets are inspectable\n";
 
 $request_inspector_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestInspector.php' );
 assert_test( 'RequestInspector passes flow step id into packet retrieval', false !== strpos( $request_inspector_source, '$this->retrieveDataPackets( $job_id, $engine, $flow_step_id )' ) );
