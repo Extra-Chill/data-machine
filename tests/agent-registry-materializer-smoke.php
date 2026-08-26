@@ -81,6 +81,21 @@ namespace {
 			add_action( $hook, $callback, $priority, $accepted_args );
 		}
 	}
+
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( string $hook, $value, ...$args ) {
+			$callbacks = $GLOBALS['__agent_materializer_hooks'][ $hook ] ?? array();
+			ksort( $callbacks );
+
+			foreach ( $callbacks as $priority_callbacks ) {
+				foreach ( $priority_callbacks as $callback ) {
+					$value = call_user_func_array( $callback, array_merge( array( $value ), $args ) );
+				}
+			}
+
+			return $value;
+		}
+	}
 }
 
 namespace DataMachine\Core\Database\Agents {
@@ -257,7 +272,6 @@ namespace {
 	datamachine_tests_require_agents_api();
 	require_once __DIR__ . '/../inc/Core/Identity/AgentIdentityStoreAdapter.php';
 	require_once __DIR__ . '/../inc/Engine/Agents/AgentMaterializer.php';
-	require_once __DIR__ . '/../inc/Engine/Agents/AgentRegistry.php';
 	require_once __DIR__ . '/../inc/Engine/Agents/datamachine-register-agents.php';
 
 	use DataMachine\Abilities\File\ScaffoldAbilities;
@@ -266,7 +280,6 @@ namespace {
 	use DataMachine\Core\Database\Agents\Agents;
 	use DataMachine\Core\FilesRepository\DirectoryManager;
 	use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
-	use DataMachine\Engine\Agents\AgentRegistry;
 
 	$failures = array();
 	$passes   = 0;
@@ -285,7 +298,7 @@ namespace {
 	}
 
 	function reset_agent_materializer_smoke(): void {
-		AgentRegistry::reset_for_tests();
+		\WP_Agents_Registry::reset_for_tests();
 		Agents::$rows                                    = array();
 		AgentAccess::$bootstrapped                       = array();
 		DirectoryManager::$default_user_id               = 0;
@@ -296,22 +309,25 @@ namespace {
 		$GLOBALS['__agent_materializer_current'] = array();
 		$GLOBALS['__agent_materializer_done']    = array();
 		add_action( 'init', array( 'WP_Agents_Registry', 'init' ), 10 );
+		add_filter( 'datamachine_scaffold_content', 'datamachine_registered_agent_memory_seed', 5, 3 );
 	}
 
 	echo "agent-registry-materializer-smoke\n";
 
 	echo "\n[1] WordPress-shaped registry vocabulary collects definitions without materializing rows:\n";
 	reset_agent_materializer_smoke();
+	$seed_path = tempnam( sys_get_temp_dir(), 'datamachine-agent-seed-' );
+	file_put_contents( $seed_path, "Seeded identity\n" );
 	add_action(
 		'wp_agents_api_init',
-		static function (): void {
+		static function () use ( $seed_path ): void {
 			wp_register_agent(
 				new WP_Agent(
 					'Example Agent!',
 					array(
 						'label'          => 'Example Agent',
 						'description'    => 'Collect only',
-						'memory_seeds'   => array( '../SOUL.md' => '/tmp/seed-soul.md' ),
+						'memory_seeds'   => array( '../SOUL.md' => $seed_path ),
 						'owner_resolver' => static fn() => 7,
 						'default_config' => array( 'default_provider' => 'openai' ),
 					)
@@ -320,43 +336,14 @@ namespace {
 		}
 	);
 	do_action( 'init' );
-	$definitions = AgentRegistry::get_all();
+	$definitions = array_map( static fn( WP_Agent $agent ): array => $agent->to_array(), wp_get_agents() );
 	assert_agent_materializer_equals( true, class_exists( 'WP_Agent' ), 'WP_Agent definition object is available', $failures, $passes );
 	assert_agent_materializer_equals( true, class_exists( 'WP_Agents_Registry' ), 'WP_Agents_Registry facade is available', $failures, $passes );
 	assert_agent_materializer_equals( array( 'example-agent' ), array_keys( $definitions ), 'definition slug is normalized', $failures, $passes );
 	assert_agent_materializer_equals( 'Example Agent', $definitions['example-agent']['label'] ?? '', 'definition label is preserved', $failures, $passes );
 	assert_agent_materializer_equals( array(), Agents::$rows, 'collecting definitions does not create agent rows', $failures, $passes );
-
-	echo "\n[1b] wp_agents_api_init is the primary collection hook while legacy hook remains available:\n";
-	reset_agent_materializer_smoke();
-	add_action(
-		'wp_agents_api_init',
-		static function (): void {
-			wp_register_agent(
-				'hook-agent',
-				array(
-					'label'          => 'Hook Agent',
-					'owner_resolver' => static fn() => 9,
-				)
-			);
-		}
-	);
-	add_action(
-		'datamachine_register_agents',
-		static function (): void {
-			datamachine_register_agent(
-				'legacy-agent',
-				array(
-					'label'          => 'Legacy Agent',
-					'owner_resolver' => static fn() => 11,
-				)
-			);
-		}
-	);
-	do_action( 'init' );
-	$definitions = AgentRegistry::get_all();
-	assert_agent_materializer_equals( array( 'hook-agent', 'legacy-agent' ), array_keys( $definitions ), 'new and in-repo legacy hooks both contribute definitions', $failures, $passes );
-	assert_agent_materializer_equals( array(), Agents::$rows, 'hook collection remains side-effect free', $failures, $passes );
+	assert_agent_materializer_equals( "Seeded identity\n", apply_filters( 'datamachine_scaffold_content', '', 'SOUL.md', array( 'agent_slug' => 'example-agent' ) ), 'canonical agent memory seed supplies scaffold content', $failures, $passes );
+	unlink( $seed_path );
 
 	echo "\n[2] reconciliation creates rows, access grants, directories, scaffold calls, and action hooks:\n";
 	reset_agent_materializer_smoke();
@@ -376,7 +363,7 @@ namespace {
 		}
 	);
 	do_action( 'init' );
-	$summary = AgentRegistry::reconcile();
+	$summary = datamachine_reconcile_registered_agents();
 	assert_agent_materializer_equals( array( 'created' => array( 'example-agent' ), 'existing' => array(), 'definition_only' => array(), 'skipped' => array() ), $summary, 'created summary matches pre-split registry behavior', $failures, $passes );
 	assert_agent_materializer_equals( 7, Agents::$rows['example-agent:7:default']['owner_id'] ?? 0, 'owner resolver controls created row owner', $failures, $passes );
 	assert_agent_materializer_equals( array( 'default_provider' => 'openai' ), Agents::$rows['example-agent:7:default']['agent_config'] ?? array(), 'default config persists on creation', $failures, $passes );
@@ -386,7 +373,7 @@ namespace {
 	assert_agent_materializer_equals( 'example-agent', $GLOBALS['__agent_materializer_actions']['datamachine_registered_agent_reconciled'][0][1] ?? '', 'reconciled action still fires with slug', $failures, $passes );
 
 	echo "\n[3] existing rows are adopted and mutable fields stay DB-owned:\n";
-	$summary = AgentRegistry::reconcile();
+	$summary = datamachine_reconcile_registered_agents();
 	assert_agent_materializer_equals( array( 'created' => array(), 'existing' => array( 'example-agent' ), 'definition_only' => array(), 'skipped' => array() ), $summary, 'second reconcile reports existing row', $failures, $passes );
 	assert_agent_materializer_equals( 1, count( AgentAccess::$bootstrapped ), 'existing row does not bootstrap access again', $failures, $passes );
 	assert_agent_materializer_equals( 1, count( ScaffoldAbilities::$ability->calls ), 'existing row does not scaffold again', $failures, $passes );
@@ -408,7 +395,7 @@ namespace {
 		}
 	);
 	do_action( 'init' );
-	$summary = AgentRegistry::reconcile();
+	$summary = datamachine_reconcile_registered_agents();
 	assert_agent_materializer_equals( array( 'created' => array(), 'existing' => array(), 'definition_only' => array( 'definition-only-agent' ), 'skipped' => array() ), $summary, 'definition-only summary exposes the opt-out', $failures, $passes );
 	assert_agent_materializer_equals( array(), Agents::$rows, 'definition-only reconciliation creates no default row', $failures, $passes );
 	assert_agent_materializer_equals( array(), AgentAccess::$bootstrapped, 'definition-only reconciliation grants no owner access', $failures, $passes );
@@ -452,12 +439,7 @@ namespace {
 	assert_agent_materializer_equals( false, isset( Agents::$rows['definition-only-agent:19:default'] ), 'bundle reconciliation does not materialize definition-only defaults', $failures, $passes );
 
 	echo "\n[5] materializer owns Data Machine side-effect dependencies:\n";
-	$registration_source = (string) file_get_contents( AGENTS_API_PATH . 'src/Registry/register-agents.php' );
-	$registry_source     = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentRegistry.php' );
 	$materializer_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentMaterializer.php' );
-	assert_agent_materializer_equals( false, false !== strpos( $registration_source, 'datamachine_register_agent' ), 'Agents API registration helper does not define Data Machine legacy wrapper', $failures, $passes );
-	assert_agent_materializer_equals( false, false !== strpos( $registry_source, 'Core\\Database\\Agents' ), 'registry no longer imports agent database repositories', $failures, $passes );
-	assert_agent_materializer_equals( false, false !== strpos( $registry_source, 'ScaffoldAbilities' ), 'registry no longer imports scaffold ability', $failures, $passes );
 	$identity_store_source = (string) file_get_contents( __DIR__ . '/../inc/Core/Identity/AgentIdentityStoreAdapter.php' );
 	assert_agent_materializer_equals( false, false !== strpos( $materializer_source, 'Core\\Database\\Agents' ), 'materializer delegates database storage to identity store adapter', $failures, $passes );
 	assert_agent_materializer_equals( true, false !== strpos( $identity_store_source, 'Core\\Database\\Agents' ), 'identity store adapter owns agent database repositories', $failures, $passes );
