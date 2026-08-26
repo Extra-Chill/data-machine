@@ -37,7 +37,7 @@ require_once $root . '/inc/Engine/AI/Directives/DirectiveOutputValidator.php';
 require_once $root . '/inc/Engine/AI/Directives/DirectiveRenderer.php';
 require_once $root . '/inc/Engine/AI/Directives/DirectivePolicyResolver.php';
 require_once $root . '/inc/Engine/AI/PromptBuilder.php';
-require_once $root . '/inc/Engine/AI/ProviderRequestAssembler.php';
+require_once $root . '/inc/Engine/AI/ToolSchemaNormalizer.php';
 require_once $root . '/inc/Engine/AI/RequestMetadata.php';
 require_once $root . '/inc/Core/PluginSettings.php';
 require_once $root . '/inc/Engine/AI/WpAiClientProviderAdmin.php';
@@ -171,7 +171,7 @@ $response = \DataMachine\Engine\AI\RequestBuilder::build(
 	array( 'job_id' => 1684 )
 );
 
-$schema = $captured_request['tools']['client/test_tool']['parameters'] ?? null;
+$schema = $captured_request['tools']['client_test_tool']['parameters'] ?? null;
 
 $assert( $response instanceof \WordPress\AiClient\Results\DTO\GenerativeAiResult, 'RequestBuilder returns a wp-ai-client result DTO' );
 $assert( ! is_array( $response ), 'RequestBuilder does not return the legacy provider envelope' );
@@ -184,6 +184,7 @@ $assert( 7 === $response->getTokenUsage()->getTotalTokens(), 'token usage is rea
 $assert( 'Describe this file.' === ( $captured_request['prompt'] ?? null ), 'latest user message becomes the wp-ai-client prompt' );
 $assert( 'System directive.' === ( $captured_request['messages'][0]['content'] ?? null ), 'system instruction reaches wp-ai-client builder' );
 $assert( 'Run tool.' === ( $captured_request['messages'][1]['content'] ?? null ), 'earlier user message remains wp-ai-client history' );
+$assert( 'client_test_tool' === ( $captured_request['tools']['client_test_tool']['name'] ?? null ), 'provider receives the provider-safe tool alias' );
 $assert( is_array( $schema ), 'canonical parameter schema reaches wp-ai-client as an array' );
 $assert( 'object' === ( $schema['type'] ?? null ), 'canonical parameter schema remains an object schema' );
 $assert( array( 'reason' ) === ( $schema['required'] ?? null ), 'canonical object-level required array is preserved' );
@@ -231,7 +232,7 @@ $captured_request = array();
 	array( 'job_id' => 1686 )
 );
 
-$legacy_schema = $captured_request['tools']['client/legacy_schema_tool']['parameters'] ?? null;
+$legacy_schema = $captured_request['tools']['client_legacy_schema_tool']['parameters'] ?? null;
 $assert( 'object' === ( $legacy_schema['type'] ?? null ), 'legacy flat parameter map becomes a root object schema' );
 $assert( array( 'reason' ) === ( $legacy_schema['required'] ?? null ), 'legacy property-level required flag becomes object-level required array' );
 $assert( ! isset( $legacy_schema['properties']['reason']['required'] ), 'legacy property-level required flag is removed from property schema' );
@@ -320,7 +321,7 @@ $captured_request = array();
 	array( 'job_id' => 1686 )
 );
 
-$empty_schema = $captured_request['tools']['client/no_arg_tool']['parameters'] ?? null;
+$empty_schema = $captured_request['tools']['client_no_arg_tool']['parameters'] ?? null;
 $assert( is_array( $empty_schema ), 'no-argument tools use a parameter schema array' );
 $assert( 'object' === ( $empty_schema['type'] ?? null ), 'no-argument tools use object parameter schemas' );
 $assert( isset( $empty_schema['properties'] ), 'no-argument tool schemas keep explicit properties for strict providers' );

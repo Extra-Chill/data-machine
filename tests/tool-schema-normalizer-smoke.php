@@ -9,7 +9,6 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use DataMachine\Engine\AI\ProviderRequestAssembler;
 use DataMachine\Engine\AI\ToolSchemaNormalizer;
 
 $failures = array();
@@ -88,22 +87,6 @@ $required = ToolSchemaNormalizer::normalize(
 );
 datamachine_tool_schema_assert_equals( array( 'message', 'title' ), $required['required'] ?? null, 'property-level required flags are hoisted and deduped', $failures, $passes );
 datamachine_tool_schema_assert_equals( false, isset( $required['properties']['title']['required'] ), 'property-level required flag is removed from property schema', $failures, $passes );
-
-$structured = ProviderRequestAssembler::restructureTools(
-	array(
-		'summarize' => array(
-			'description' => 'Summarize text.',
-			'parameters'  => array(
-				'message' => array(
-					'type'     => 'string',
-					'required' => true,
-				),
-			),
-		),
-	)
-);
-datamachine_tool_schema_assert_equals( array( 'message' ), $structured['summarize']['parameters']['required'] ?? null, 'ProviderRequestAssembler uses canonical normalizer', $failures, $passes );
-datamachine_tool_schema_assert_equals( false, isset( $structured['summarize']['parameters']['properties']['message']['required'] ), 'ProviderRequestAssembler strips legacy property required flag', $failures, $passes );
 
 echo "\nAssertions: {$passes} passed, " . count( $failures ) . ' failed, ' . ( $passes + count( $failures ) ) . " total\n";
 exit( count( $failures ) );
