@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.27] - 2026-08-26
+
+### Changed
+- align composable file assignments
+- delete agent memory store factory
+- fold provider request assembly into builder
+- delete duplicate agent registry facade
+
+### Fixed
+- default composable file mode
+
 ## [0.175.26] - 2026-08-25
 
 ### Changed
