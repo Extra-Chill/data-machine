@@ -56,6 +56,7 @@ assert_worker_contains( 'stop_on_pending_actions', $worker_src, 'worker can stop
 assert_worker_contains( 'max_passes', $worker_src, 'worker supports bounded pass counts' );
 assert_worker_contains( 'stop_before_timeout', $worker_src, 'worker exits before external supervisor timeouts' );
 assert_worker_contains( 'drain_time_limit', $worker_src, 'worker bounds each drain pass' );
+assert_worker_contains( 'WorkerProcessDeadline::arm( $time_limit )', $worker_src, 'worker enforces its time limit at the process level' );
 assert_worker_contains( '[--mode=<mode>]', $worker_src, 'worker exposes execution mode option' );
 assert_worker_contains( '[--job-step-budget=<number>]', $worker_src, 'worker exposes per-job step budget option' );
 assert_worker_contains( "'mode'                    => isset( \$assoc_args['mode'] )", $worker_src, 'worker passes mode option into run loop' );
