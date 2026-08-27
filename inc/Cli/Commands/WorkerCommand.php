@@ -13,6 +13,7 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\WorkerHealth;
 use DataMachine\Cli\WorkerLock;
+use DataMachine\Cli\WorkerProcessDeadline;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
@@ -35,7 +36,8 @@ class WorkerCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * [--time-limit=<seconds>]
-	 * : Maximum wall-clock seconds to run. 0 means no time limit.
+	 * : Maximum wall-clock seconds to run, enforced at the process level
+	 * so a hung pass or shutdown path still terminates the process. 0 means no time limit.
 	 * ---
 	 * default: 300
 	 * ---
@@ -149,6 +151,11 @@ class WorkerCommand extends BaseCommand {
 			'job_step_budget'         => isset( $assoc_args['job-step-budget'] ) ? max( 1, (int) $assoc_args['job-step-budget'] ) : 50,
 			'lane'                    => isset( $assoc_args['lane'] ) ? (string) $assoc_args['lane'] : '',
 		);
+
+		$time_limit = (int) $options['time_limit'];
+		if ( $time_limit > 0 ) {
+			WorkerProcessDeadline::arm( $time_limit );
+		}
 
 		$stats = self::runLoop( $options );
 
