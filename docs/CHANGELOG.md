@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.28] - 2026-08-27
+
+### Fixed
+- enforce the worker time limit at the process level
+
 ## [0.175.27] - 2026-08-26
 
 ### Changed
