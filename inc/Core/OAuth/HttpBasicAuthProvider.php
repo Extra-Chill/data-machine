@@ -83,12 +83,13 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 		}
 
 		$accounts             = $this->stored_accounts( $context, false );
-		$accounts[ $account ] = $this->encrypt_account(
+		$accounts[ $account ] = $this->map_account_secrets(
 			array(
 				'username'  => (string) ( $data['username'] ?? '' ),
 				'password'  => (string) ( $data['password'] ?? '' ),
 				'proxy_url' => trim( (string) ( $data['proxy_url'] ?? '' ) ),
-			)
+			),
+			true
 		);
 
 		return parent::save_config( array( 'accounts' => $accounts ), $context );
@@ -184,7 +185,7 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 				'proxy_url' => trim( (string) ( $config['proxy_url'] ?? '' ) ),
 			);
 
-			return array( $legacy_account => $decrypt ? $legacy : $this->encrypt_account( $legacy ) );
+			return array( $legacy_account => $decrypt ? $legacy : $this->map_account_secrets( $legacy, true ) );
 		}
 
 		$accounts = array();
@@ -192,43 +193,34 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 			if ( ! is_array( $credential ) ) {
 				continue;
 			}
-			$accounts[ (string) $name ] = $decrypt ? $this->decrypt_account( $credential ) : $credential;
+			$accounts[ (string) $name ] = $decrypt ? $this->map_account_secrets( $credential, false ) : $credential;
 		}
 
 		return $accounts;
 	}
 
 	/**
-	 * Encrypt the secret fields of a single account entry.
+	 * Map the secret fields of a single account entry through the base encrypt or decrypt pass.
 	 *
-	 * @param array $credential Plaintext account entry.
+	 * The base helpers only walk top-level string keys, so an account nested under `accounts`
+	 * has to be handed to them one field at a time; doing that in one place keeps the two
+	 * directions from drifting apart.
+	 *
+	 * @param array $credential Account entry.
+	 * @param bool  $encrypt    True to encrypt, false to decrypt.
 	 * @return array<string, string>
 	 */
-	private function encrypt_account( array $credential ): array {
+	private function map_account_secrets( array $credential, bool $encrypt ): array {
 		foreach ( self::ACCOUNT_SECRET_FIELDS as $field ) {
 			$value = (string) ( $credential[ $field ] ?? '' );
 			if ( '' === $value ) {
 				continue;
 			}
-			$credential[ $field ] = $this->encrypt_fields( array( $field => $value ) )[ $field ] ?? $value;
-		}
 
-		return $credential;
-	}
-
-	/**
-	 * Decrypt the secret fields of a single account entry.
-	 *
-	 * @param array $credential Stored account entry.
-	 * @return array<string, string>
-	 */
-	private function decrypt_account( array $credential ): array {
-		foreach ( self::ACCOUNT_SECRET_FIELDS as $field ) {
-			$value = (string) ( $credential[ $field ] ?? '' );
-			if ( '' === $value ) {
-				continue;
-			}
-			$credential[ $field ] = $this->decrypt_fields( array( $field => $value ) )[ $field ] ?? $value;
+			$mapped               = $encrypt
+				? $this->encrypt_fields( array( $field => $value ) )
+				: $this->decrypt_fields( array( $field => $value ) );
+			$credential[ $field ] = $mapped[ $field ] ?? $value;
 		}
 
 		return $credential;
