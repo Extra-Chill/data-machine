@@ -56,7 +56,7 @@ class AgentTokenAbilities {
 						),
 						'label'        => array(
 							'type'        => 'string',
-							'description' => __( 'Human-readable label (e.g., "kimaki-prod", "ci-pipeline")', 'data-machine' ),
+							'description' => __( 'Human-readable label (e.g., "desktop-client", "ci-pipeline")', 'data-machine' ),
 						),
 						'capabilities' => array(
 							'type'        => 'array',

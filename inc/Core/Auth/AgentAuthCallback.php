@@ -7,13 +7,13 @@
  * this endpoint captures the token and stores it securely.
  *
  * Flow (from this site's perspective — we are the RECEIVING side):
- * 1. Our agent initiates auth on remote site (e.g., extrachill.com)
+ * 1. Our agent initiates auth on a remote site (e.g., remote.example)
  * 2. Human approves on remote site
  * 3. Remote site redirects to: our-site.com/wp-json/datamachine/v1/agent/auth/callback?token=X&agent_slug=Y
  * 4. This handler stores the token and shows a success page
  *
  * Storage: tokens are stored in a network option keyed by remote site + agent slug.
- * Format: datamachine_external_tokens = { "extrachill.com/sarai": { token, agent_slug, agent_id, received_at } }
+ * Format: datamachine_external_tokens = { "remote.example/content-agent": { token, agent_slug, agent_id, received_at } }
  *
  * @package DataMachine\Core\Auth
  * @since 0.56.0
@@ -371,7 +371,7 @@ class AgentAuthCallback {
 	/**
 	 * Get a stored external token programmatically.
 	 *
-	 * @param string $remote_site Remote site domain (e.g., "extrachill.com").
+	 * @param string $remote_site Remote site domain (e.g., "remote.example").
 	 * @param string $agent_slug  Agent slug on the remote site.
 	 * @return string|null Raw token or null if not stored.
 	 */

@@ -2,7 +2,7 @@
 Contributors: extrachill
 Tags: ai, automation, workflow, agents, pipelines
 Requires at least: 7.0
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 8.2
 Stable tag: 0.175.28
 License: GPLv2 or later
@@ -116,16 +116,7 @@ Email fetch operations connect to the administrator's selected IMAP server and s
 
 == Changelog ==
 
-= 0.174.1 =
-
-* Continued pre-1.0 reliability and release-readiness work across jobs, agents, email, bundles, tests, and packaging.
-* See the complete release history at https://github.com/Extra-Chill/data-machine/releases.
-
-== Upgrade Notice ==
-
-= 0.174.1 =
-
-This is a pre-1.0 release. Review the GitHub release notes and back up the site before upgrading a production installation.
+Release notes and the complete changelog are maintained at https://github.com/Extra-Chill/data-machine/releases.
 
 == Links ==
 

@@ -37,7 +37,7 @@ class ExternalCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * <site>
-	 * : Remote site domain (e.g., extrachill.com).
+	 * : Remote site domain (e.g., remote.example).
 	 *
 	 * <agent_slug>
 	 * : Agent slug on the remote site.
@@ -54,13 +54,13 @@ class ExternalCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Register with inline token
-	 *     wp datamachine external add extrachill.com sarai --token="datamachine_sarai_abc123..."
+	 *     wp datamachine external add remote.example content-agent --token="datamachine_example_abc123..."
 	 *
 	 *     # Register with token from STDIN (for piping)
-	 *     echo "datamachine_sarai_abc123..." | wp datamachine external add extrachill.com sarai
+	 *     echo "datamachine_example_abc123..." | wp datamachine external add remote.example content-agent
 	 *
 	 *     # Register and verify the token works
-	 *     wp datamachine external add extrachill.com sarai --token="..." --verify
+	 *     wp datamachine external add remote.example content-agent --token="..." --verify
 	 *
 	 * @subcommand add
 	 */
@@ -189,15 +189,15 @@ class ExternalCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * <key>
-	 * : Connection key (site/agent_slug, e.g., "extrachill.com/sarai").
+	 * : Connection key (site/agent_slug, e.g., "remote.example/content-agent").
 	 *
 	 * [--yes]
 	 * : Skip confirmation prompt.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine external remove extrachill.com/sarai
-	 *     wp datamachine external remove extrachill.com/sarai --yes
+	 *     wp datamachine external remove remote.example/content-agent
+	 *     wp datamachine external remove remote.example/content-agent --yes
 	 *
 	 * @subcommand remove
 	 */
@@ -232,15 +232,15 @@ class ExternalCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * <key>
-	 * : Connection key (site/agent_slug, e.g., "extrachill.com/sarai").
+	 * : Connection key (site/agent_slug, e.g., "remote.example/content-agent").
 	 *
 	 * [--show-token]
 	 * : Display the bearer token value (hidden by default).
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine external show extrachill.com/sarai
-	 *     wp datamachine external show extrachill.com/sarai --show-token
+	 *     wp datamachine external show remote.example/content-agent
+	 *     wp datamachine external show remote.example/content-agent --show-token
 	 *
 	 * @subcommand show
 	 */
@@ -281,11 +281,11 @@ class ExternalCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * <key>
-	 * : Connection key (site/agent_slug, e.g., "extrachill.com/sarai").
+	 * : Connection key (site/agent_slug, e.g., "remote.example/content-agent").
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine external test extrachill.com/sarai
+	 *     wp datamachine external test remote.example/content-agent
 	 *
 	 * @subcommand test
 	 */
@@ -354,10 +354,10 @@ class ExternalCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * <site>
-	 * : Remote site domain (e.g., chubes.net).
+	 * : Remote site domain (e.g., remote.example).
 	 *
 	 * <agent_slug>
-	 * : Agent slug on the remote site (e.g., chubes-bot).
+	 * : Agent slug on the remote site (e.g., content-agent).
 	 *
 	 * [--label=<label>]
 	 * : Optional token label (shown in the remote agent's token list).
@@ -372,13 +372,13 @@ class ExternalCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Print the URL for manual opening
-	 *     wp datamachine external connect chubes.net chubes-bot
+	 *     wp datamachine external connect remote.example content-agent
 	 *
 	 *     # Label the token so it's identifiable on the remote side
 	 *     wp datamachine external connect example.net example-agent --label="remote-example-agent"
 	 *
 	 *     # Attempt to open the URL in a browser
-	 *     wp datamachine external connect chubes.net chubes-bot --open
+	 *     wp datamachine external connect remote.example content-agent --open
 	 *
 	 * @subcommand connect
 	 */
@@ -439,7 +439,7 @@ class ExternalCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * <key>
-	 * : Connection key (site/agent_slug, e.g., "chubes.net/chubes-bot").
+	 * : Connection key (site/agent_slug, e.g., "remote.example/content-agent").
 	 *
 	 * <method>
 	 * : HTTP method: GET, POST, PUT, PATCH, DELETE.
@@ -469,14 +469,14 @@ class ExternalCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Who am I on the remote site?
-	 *     wp datamachine external call chubes.net/chubes-bot GET /wp-json/wp/v2/users/me
+	 *     wp datamachine external call remote.example/content-agent GET /wp-json/wp/v2/users/me
 	 *
 	 *     # List wiki articles
-	 *     wp datamachine external call chubes.net/chubes-bot GET /wp-json/wp/v2/wiki
+	 *     wp datamachine external call remote.example/content-agent GET /wp-json/wp/v2/wiki
 	 *
 	 *     # Send a chat message to the peer agent
-	 *     wp datamachine external call chubes.net/chubes-bot POST /wp-json/datamachine/v1/chat \
-	 *         --body='{"message":"hello from franklin"}'
+	 *     wp datamachine external call remote.example/content-agent POST /wp-json/datamachine/v1/chat \
+	 *         --body='{"message":"hello from local-agent"}'
 	 *
 	 * @subcommand call
 	 */
