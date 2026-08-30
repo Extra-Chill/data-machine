@@ -349,7 +349,7 @@ class PipelineBatchScheduler {
 		$creation     = '' !== $payload_checksum
 			? $this->db_jobs->create_or_get_job( $child_job_args )
 			: $this->db_jobs->create_job( $child_job_args );
-		$child_job_id = is_array( $creation ) ? (int) ( $creation['job_id'] ?? 0 ) : (int) $creation;
+		$child_job_id = is_array( $creation ) ? (int) $creation['job_id'] : (int) $creation;
 
 		if ( ! $child_job_id ) {
 			do_action(

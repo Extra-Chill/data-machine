@@ -367,7 +367,7 @@ class BatchScheduler {
 	 *     cancelled:bool,
 	 *     missing:bool,
 	 *     duplicate:bool,
-	 *     schedule_failed?:bool
+	 *     schedule_failed?:bool,
 	 *     item_failed?:bool
 	 * } Chunk result. `missing` is true only when the batch_state key
 	 *   has been lost; consumer must fail the parent in that case.
@@ -438,10 +438,10 @@ class BatchScheduler {
 			return self::chunkResult( 0, (int) ( $state['offset'] ?? 0 ), $total, false, true );
 		}
 
-		$offset     = null === $expected_offset ? (int) ( $state['offset'] ?? 0 ) : $expected_offset;
-		$chunk_size = max( 1, (int) ( $parent_engine['batch_chunk_size'] ?? self::chunkSize( $context ) ) );
-		$lease      = (int) apply_filters( 'datamachine_batch_item_lease_seconds', BatchItems::DEFAULT_LEASE_SECONDS, $context );
-		$rows       = $repository->claim_chunk(
+		$offset      = null === $expected_offset ? (int) ( $state['offset'] ?? 0 ) : $expected_offset;
+		$chunk_size  = max( 1, (int) ( $parent_engine['batch_chunk_size'] ?? self::chunkSize( $context ) ) );
+		$lease       = (int) apply_filters( 'datamachine_batch_item_lease_seconds', BatchItems::DEFAULT_LEASE_SECONDS, $context );
+		$rows        = $repository->claim_chunk(
 			$parent_job_id,
 			$offset,
 			$chunk_size,
@@ -588,7 +588,7 @@ class BatchScheduler {
 		}
 
 		$args = self::v2ChunkArgs( $parent_job_id, $offset );
-		if ( self::pendingChunkActionId( $hook, $args ) > 0 ) {
+		if ( 0 !== self::pendingChunkActionId( $hook, $args ) ) {
 			return true;
 		}
 
@@ -627,7 +627,7 @@ class BatchScheduler {
 			return false;
 		}
 		$result = wp_schedule_single_event( $timestamp, $hook, $wp_args, true );
-		return ! is_wp_error( $result ) && true === $result;
+		return ! is_wp_error( $result );
 	}
 
 	/** @return array{parent_job_id:int,offset:int} */
@@ -655,7 +655,7 @@ class BatchScheduler {
 				),
 				'ids'
 			);
-			$action_id = is_array( $action_ids ) ? reset( $action_ids ) : 0;
+			$action_id  = reset( $action_ids );
 			if ( is_numeric( $action_id ) && (int) $action_id > 0 ) {
 				return (int) $action_id;
 			}
@@ -933,7 +933,7 @@ class BatchScheduler {
 			);
 
 			if ( empty( $claim['success'] ) ) {
-				$latest       = is_array( $claim['snapshot'] ?? null ) ? $claim['snapshot'] : datamachine_get_engine_data( $parent_job_id );
+				$latest       = $claim['snapshot'];
 				$latest_state = is_array( $latest['batch_state'] ?? null ) ? $latest['batch_state'] : array();
 
 				return array(
