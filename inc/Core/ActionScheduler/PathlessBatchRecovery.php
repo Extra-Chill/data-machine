@@ -363,29 +363,8 @@ class PathlessBatchRecovery {
 		return 0;
 	}
 
-	/** Schedule a recovered chunk without scanning the scheduler table. */
+	/** Schedule a recovered chunk through the exact v2 chunk identity. */
 	private static function schedule( string $hook, int $parent_job_id, int $offset ): bool {
-		$args = array(
-			'parent_job_id' => $parent_job_id,
-			'offset'        => $offset,
-		);
-		try {
-			if ( as_schedule_single_action( time(), $hook, $args, GroupRegistrar::GROUP ) ) {
-				return true;
-			}
-		} catch ( \Throwable $exception ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Pathless batch recovery scheduling failed',
-				array(
-					'parent_job_id' => $parent_job_id,
-					'exception'     => $exception->getMessage(),
-				)
-			);
-		}
-
-		$result = wp_schedule_single_event( time(), $hook, array( $parent_job_id, $offset ), true );
-		return ! is_wp_error( $result ) && true === $result;
+		return BatchScheduler::scheduleChunk( $hook, $parent_job_id, $offset, time() );
 	}
 }

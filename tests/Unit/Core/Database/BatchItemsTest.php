@@ -158,6 +158,25 @@ class BatchItemsTest extends WP_UnitTestCase {
 		$this->assertSame( array(), $claimed[0]['payload'] );
 	}
 
+	public function test_claim_increments_attempts_and_fail_claim_is_terminal(): void {
+		global $wpdb;
+		$this->assertTrue( $this->repository->insert_batch( $this->batch_job_id, array( array( 'id' => 1 ) ), array( array() ) )['success'] );
+
+		$first = $this->repository->claim_chunk( $this->batch_job_id, 0, 1, 60 );
+		$this->assertSame( 1, (int) $first[0]['attempts'] );
+		$this->assertTrue( $this->repository->release( $this->batch_job_id, 0, $first[0]['lease_token'] ) );
+
+		$second = $this->repository->claim_chunk( $this->batch_job_id, 0, 1, 60 );
+		$this->assertSame( 2, (int) $second[0]['attempts'] );
+		$this->assertTrue( $this->repository->fail_claim( $this->batch_job_id, 0, $second[0]['lease_token'] ) );
+
+		$this->assertSame( 1, $this->repository->count_failed( $this->batch_job_id ) );
+		$this->assertNull( $this->repository->first_outstanding_index( $this->batch_job_id ) );
+		$this->assertSame( array(), $this->repository->claim_chunk( $this->batch_job_id, 0, 1, 60 ) );
+		$this->assertSame( BatchItems::STATE_FAILED, $wpdb->get_var( $wpdb->prepare( 'SELECT state FROM %i WHERE batch_job_id = %d AND item_index = 0', $this->repository->get_table_name(), $this->batch_job_id ) ) );
+		$this->assertSame( 3, BatchItems::maxAttempts() );
+	}
+
 	public function test_start_does_not_schedule_when_parent_state_cannot_persist(): void {
 		global $wpdb;
 		$scheduled = 0;
