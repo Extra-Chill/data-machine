@@ -4,7 +4,12 @@
 namespace DataMachine\Core\Database\BatchItems {
 	class BatchItems {
 		public const DEFAULT_LEASE_SECONDS = 60;
+		public const DEFAULT_MAX_ATTEMPTS  = 3;
 		public static array $worklists = array();
+		public static function maxAttempts( string $context = '' ): int {
+			unset( $context );
+			return self::DEFAULT_MAX_ATTEMPTS;
+		}
 		public function insert_batch( int $job_id, array $items, array $cleanup ): array {
 			unset( $cleanup );
 			if ( isset( self::$worklists[ $job_id ] ) ) {
@@ -34,7 +39,9 @@ namespace DataMachine\Core\Database\BatchItems {
 			}
 			$rows = array();
 			foreach ( array_slice( self::$worklists[ $job_id ]['items'], $offset, $limit, true ) as $index => $payload ) {
-				$rows[] = array( 'item_index' => $index, 'payload' => $payload, 'payload_valid' => true, 'payload_checksum' => hash( 'sha256', (string) json_encode( $payload ) ), 'cleanup_context' => array(), 'lease_token' => 'lease-' . $index );
+				$attempts = (int) ( self::$worklists[ $job_id ]['attempts'][ $index ] ?? 0 ) + 1;
+				self::$worklists[ $job_id ]['attempts'][ $index ] = $attempts;
+				$rows[] = array( 'item_index' => $index, 'payload' => $payload, 'payload_valid' => true, 'payload_checksum' => hash( 'sha256', (string) json_encode( $payload ) ), 'cleanup_context' => array(), 'lease_token' => 'lease-' . $index, 'attempts' => $attempts );
 			}
 			return $rows;
 		}
@@ -56,6 +63,16 @@ namespace DataMachine\Core\Database\BatchItems {
 			return null;
 		}
 		public function count_completed( int $job_id ): int { return count( self::$worklists[ $job_id ]['completed'] ?? array() ); }
+		public function count_failed( int $job_id ): int { return count( self::$worklists[ $job_id ]['failed'] ?? array() ); }
+		public function fail_claim( int $job_id, int $index, string $lease ): bool {
+			unset( $lease );
+			self::$worklists[ $job_id ]['failed'][ $index ] = true;
+			return true;
+		}
+		public function release( int $job_id, int $index, string $lease ): bool {
+			unset( $job_id, $index, $lease );
+			return true;
+		}
 	}
 }
 

@@ -298,15 +298,10 @@ class BatchScheduler {
 
 	/** Find or idempotently create the initial chunk action. */
 	private static function ensureInitialChunkScheduled( string $hook, int $parent_job_id ): int {
-		$args = array(
-			'parent_job_id' => $parent_job_id,
-			'offset'        => 0,
-		);
-		if ( function_exists( 'as_has_scheduled_action' ) ) {
-			$existing = (int) as_has_scheduled_action( $hook, $args, GroupRegistrar::GROUP );
-			if ( $existing > 0 ) {
-				return $existing;
-			}
+		$args     = self::v2ChunkArgs( $parent_job_id, 0 );
+		$existing = self::pendingChunkActionId( $hook, $args );
+		if ( $existing > 0 ) {
+			return $existing;
 		}
 		try {
 			$action_id = (int) as_schedule_single_action( time(), $hook, $args, GroupRegistrar::GROUP );
@@ -324,9 +319,7 @@ class BatchScheduler {
 				)
 			);
 		}
-		return function_exists( 'as_has_scheduled_action' )
-			? (int) as_has_scheduled_action( $hook, $args, GroupRegistrar::GROUP )
-			: 0;
+		return self::pendingChunkActionId( $hook, $args );
 	}
 
 	/** Build the stable public start result. */
@@ -375,8 +368,10 @@ class BatchScheduler {
 	 *     missing:bool,
 	 *     duplicate:bool,
 	 *     schedule_failed?:bool
+	 *     item_failed?:bool
 	 * } Chunk result. `missing` is true only when the batch_state key
 	 *   has been lost; consumer must fail the parent in that case.
+	 *   `item_failed` is true when an item exhausted its attempt budget.
 	 */
 	public static function processChunk( int $parent_job_id, callable $createItem, ?int $expected_offset = null ): array {
 		// A scheduled chunk starts in a separate request. Read through the jobs
@@ -387,7 +382,11 @@ class BatchScheduler {
 			return self::processV2Chunk( $parent_job_id, $createItem, $expected_offset, $parent_engine );
 		}
 
-		return self::processLegacyChunk( $parent_job_id, $createItem, $expected_offset, $parent_engine );
+		$result = self::processLegacyChunk( $parent_job_id, $createItem, $expected_offset, $parent_engine );
+		if ( ! isset( $result['item_failed'] ) ) {
+			$result['item_failed'] = false;
+		}
+		return $result;
 	}
 
 	/** Process a durable v2 worklist chunk. */
@@ -403,7 +402,8 @@ class BatchScheduler {
 				! empty( $parent_engine['cancelled'] ),
 				false,
 				false,
-				! empty( $parent_engine['batch_schedule_failed'] )
+				! empty( $parent_engine['batch_schedule_failed'] ),
+				! empty( $parent_engine['batch_item_failed'] )
 			);
 		}
 		if ( null === $state ) {
@@ -446,29 +446,40 @@ class BatchScheduler {
 			$offset,
 			$chunk_size,
 			$lease,
-			static fn(): bool => self::scheduleV2Chunk( (string) $state['hook'], $parent_job_id, $offset, time() + max( 1, $lease ) )
+			static fn(): bool => self::scheduleChunk( (string) $state['hook'], $parent_job_id, $offset, time() + max( 1, $lease ) )
 		);
+		$item_failed = ! empty( $parent_engine['batch_item_failed'] ) || $repository->count_failed( $parent_job_id ) > 0;
 		if ( ! $rows ) {
 			$outstanding = $repository->first_outstanding_index( $parent_job_id );
 			if ( null === $outstanding ) {
 				$completed = $repository->count_completed( $parent_job_id );
-				if ( ! self::finishV2State( $parent_job_id, $completed, $total, true ) ) {
+				if ( ! self::finishV2State( $parent_job_id, $completed, $total, true, false, $item_failed ) ) {
 					throw new \RuntimeException( 'Terminal batch progress could not persist.' );
 				}
-				return self::chunkResult( 0, $total, $total, false );
+				return self::chunkResult( 0, $total, $total, false, false, false, false, false, $item_failed );
 			}
-			return self::chunkResult( 0, $outstanding, $total, true, false, false, true );
+			return self::chunkResult( 0, $outstanding, $total, true, false, false, true, false, $item_failed );
 		}
 
 		$extra     = is_array( $state['extra'] ?? null ) ? $state['extra'] : array();
 		$scheduled = 0;
 		$cancelled = false;
+		$max       = BatchItems::maxAttempts( $context );
 		foreach ( $rows as $row ) {
 			$latest = EngineData::retrieve( $parent_job_id );
 			if ( ! empty( $latest['cancelled'] ) ) {
 				$cancelled = true;
 				if ( $repository->discard_cancel_pending( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'] ) ) {
 					do_action( 'datamachine_batch_items_discarded', array( $row['payload'] ), $parent_job_id, $context, array( $row['cleanup_context'] ) );
+				}
+				continue;
+			}
+
+			$attempts = (int) ( $row['attempts'] ?? 0 );
+			if ( $attempts > $max ) {
+				if ( $repository->fail_claim( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'] ) ) {
+					self::notifyDiscardedRows( array( $row ), $parent_job_id, $context );
+					$item_failed = true;
 				}
 				continue;
 			}
@@ -506,7 +517,14 @@ class BatchScheduler {
 			if ( $item_finished ) {
 				++$scheduled;
 			} elseif ( ! $result ) {
-				$repository->release( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'] );
+				if ( $attempts >= $max ) {
+					if ( $repository->fail_claim( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'] ) ) {
+						self::notifyDiscardedRows( array( $row ), $parent_job_id, $context );
+						$item_failed = true;
+					}
+				} else {
+					$repository->release( $parent_job_id, (int) $row['item_index'], (string) $row['lease_token'] );
+				}
 			}
 			if ( ! empty( EngineData::retrieve( $parent_job_id )['cancelled'] ) ) {
 				$cancelled = true;
@@ -524,9 +542,10 @@ class BatchScheduler {
 		$next_offset = $repository->first_outstanding_index( $parent_job_id );
 		$more        = null !== $next_offset;
 		$failed      = false;
-		if ( $more && ! self::scheduleV2Chunk( (string) $state['hook'], $parent_job_id, $next_offset, time() + self::chunkDelay( $context ) ) ) {
+		$item_failed = $item_failed || $repository->count_failed( $parent_job_id ) > 0;
+		if ( $more && ! self::scheduleChunk( (string) $state['hook'], $parent_job_id, $next_offset, time() + self::chunkDelay( $context ) ) ) {
 			if ( ! self::discardV2Outstanding( $repository, $parent_job_id, $context ) ) {
-				return self::chunkResult( $scheduled, $offset, $total, true, false, false, true );
+				return self::chunkResult( $scheduled, $offset, $total, true, false, false, true, false, $item_failed );
 			}
 			$more   = false;
 			$failed = true;
@@ -534,15 +553,15 @@ class BatchScheduler {
 
 		$new_offset = $more ? (int) $next_offset : $total;
 		$completed  = $repository->count_completed( $parent_job_id );
-		$persisted  = self::finishV2State( $parent_job_id, $completed, $new_offset, ! $more, $failed );
+		$persisted  = self::finishV2State( $parent_job_id, $completed, $new_offset, ! $more, $failed, $item_failed );
 		if ( ! $more && ! $persisted ) {
 			throw new \RuntimeException( 'Terminal batch progress could not persist.' );
 		}
-		return self::chunkResult( $scheduled, $new_offset, $total, $more, false, false, false, $failed );
+		return self::chunkResult( $scheduled, $new_offset, $total, $more, false, false, false, $failed, $item_failed );
 	}
 
 	/** Build a stable chunk result for both consumers. */
-	private static function chunkResult( int $scheduled, int $offset, int $total, bool $more, bool $cancelled = false, bool $missing = false, bool $duplicate = false, bool $schedule_failed = false ): array {
+	private static function chunkResult( int $scheduled, int $offset, int $total, bool $more, bool $cancelled = false, bool $missing = false, bool $duplicate = false, bool $schedule_failed = false, bool $item_failed = false ): array {
 		return array(
 			'scheduled'       => $scheduled,
 			'offset'          => $offset,
@@ -552,14 +571,27 @@ class BatchScheduler {
 			'missing'         => $missing,
 			'duplicate'       => $duplicate,
 			'schedule_failed' => $schedule_failed,
+			'item_failed'     => $item_failed,
 		);
 	}
 
-	private static function scheduleV2Chunk( string $hook, int $parent_job_id, int $offset, int $timestamp ): bool {
-		$args = array(
-			'parent_job_id' => $parent_job_id,
-			'offset'        => $offset,
-		);
+	/**
+	 * Schedule one exact v2 chunk, adopting a pending Action Scheduler row first.
+	 *
+	 * Queries pending actions by exact hook, JSON-stable named args, and the
+	 * Data Machine group. Integer and string argument encodings are both tried
+	 * because Action Scheduler persists args as JSON.
+	 */
+	public static function scheduleChunk( string $hook, int $parent_job_id, int $offset, int $timestamp ): bool {
+		if ( '' === $hook || $parent_job_id <= 0 || $offset < 0 ) {
+			return false;
+		}
+
+		$args = self::v2ChunkArgs( $parent_job_id, $offset );
+		if ( self::pendingChunkActionId( $hook, $args ) > 0 ) {
+			return true;
+		}
+
 		try {
 			$action_id = as_schedule_single_action(
 				$timestamp,
@@ -583,12 +615,73 @@ class BatchScheduler {
 			);
 		}
 
-		$wp_args = array( $parent_job_id, $offset );
-		if ( is_int( wp_next_scheduled( $hook, $wp_args ) ) ) {
+		if ( self::pendingChunkActionId( $hook, $args ) > 0 ) {
 			return true;
+		}
+
+		$wp_args = array( $parent_job_id, $offset );
+		if ( function_exists( 'wp_next_scheduled' ) && is_int( wp_next_scheduled( $hook, $wp_args ) ) ) {
+			return true;
+		}
+		if ( ! function_exists( 'wp_schedule_single_event' ) ) {
+			return false;
 		}
 		$result = wp_schedule_single_event( $timestamp, $hook, $wp_args, true );
 		return ! is_wp_error( $result ) && true === $result;
+	}
+
+	/** @return array{parent_job_id:int,offset:int} */
+	private static function v2ChunkArgs( int $parent_job_id, int $offset ): array {
+		return array(
+			'parent_job_id' => $parent_job_id,
+			'offset'        => $offset,
+		);
+	}
+
+	/** Find one pending action for the exact v2 chunk identity. */
+	private static function pendingChunkActionId( string $hook, array $args ): int {
+		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return 0;
+		}
+
+		foreach ( self::v2ChunkArgVariants( $args ) as $candidate ) {
+			$action_ids = as_get_scheduled_actions(
+				array(
+					'hook'     => $hook,
+					'args'     => $candidate,
+					'group'    => GroupRegistrar::GROUP,
+					'status'   => 'pending',
+					'per_page' => 1,
+				),
+				'ids'
+			);
+			$action_id = is_array( $action_ids ) ? reset( $action_ids ) : 0;
+			if ( is_numeric( $action_id ) && (int) $action_id > 0 ) {
+				return (int) $action_id;
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Exact Action Scheduler JSON encodings for one chunk identity.
+	 *
+	 * @return array<int,array{parent_job_id:int|string,offset:int|string}>
+	 */
+	private static function v2ChunkArgVariants( array $args ): array {
+		$parent_job_id = (int) ( $args['parent_job_id'] ?? 0 );
+		$offset        = (int) ( $args['offset'] ?? 0 );
+		return array(
+			array(
+				'parent_job_id' => $parent_job_id,
+				'offset'        => $offset,
+			),
+			array(
+				'parent_job_id' => (string) $parent_job_id,
+				'offset'        => (string) $offset,
+			),
+		);
 	}
 
 	private static function discardV2Outstanding( BatchItems $repository, int $parent_job_id, string $context ): bool {
@@ -644,10 +737,10 @@ class BatchScheduler {
 		);
 	}
 
-	private static function finishV2State( int $parent_job_id, int $scheduled, int $offset, bool $finished, bool $failed = false ): bool {
+	private static function finishV2State( int $parent_job_id, int $scheduled, int $offset, bool $finished, bool $failed = false, bool $item_failed = false ): bool {
 		$result = EngineData::mutate(
 			$parent_job_id,
-			static function ( array $current ) use ( $scheduled, $offset, $finished, $failed ): array {
+			static function ( array $current ) use ( $scheduled, $offset, $finished, $failed, $item_failed ): array {
 				$current['batch_scheduled'] = $scheduled;
 				$current['batch_offset']    = $offset;
 				if ( $finished ) {
@@ -660,6 +753,9 @@ class BatchScheduler {
 				}
 				if ( $failed ) {
 					$current['batch_schedule_failed'] = true;
+				}
+				if ( $item_failed ) {
+					$current['batch_item_failed'] = true;
 				}
 				return $current;
 			},
@@ -720,7 +816,7 @@ class BatchScheduler {
 		if ( '' === $hook ) {
 			return false;
 		}
-		return self::scheduleV2Chunk( $hook, $parent_job_id, (int) ( $state['offset'] ?? $engine['batch_offset'] ?? 0 ), time() + 60 );
+		return self::scheduleChunk( $hook, $parent_job_id, (int) ( $state['offset'] ?? $engine['batch_offset'] ?? 0 ), time() + 60 );
 	}
 
 	/** Existing engine_data worklist processor for persisted v1 batches. */

@@ -194,6 +194,19 @@ class PipelineBatchScheduler {
 			return;
 		}
 
+		if ( ! empty( $result['item_failed'] ) && empty( $result['more'] ) ) {
+			if ( $this->failParentIfStillProcessing( $parent_job_id, 'batch_item_attempts_exhausted' ) ) {
+				BatchScheduler::finalize( $parent_job_id );
+			}
+			do_action(
+				'datamachine_log',
+				'error',
+				'Pipeline batch: item attempt budget exhausted; parent marked failed',
+				array( 'parent_job_id' => $parent_job_id )
+			);
+			return;
+		}
+
 		do_action(
 			'datamachine_log',
 			'debug',
@@ -624,7 +637,9 @@ class PipelineBatchScheduler {
 		$failed    = (int) $counts['failed'];
 		$skipped   = (int) $counts['skipped'];
 
-		if ( ! empty( $parent_engine['batch_schedule_failed'] ) ) {
+		if ( ! empty( $parent_engine['batch_item_failed'] ) ) {
+			$parent_status = JobStatus::failed( 'batch_item_attempts_exhausted' )->toString();
+		} elseif ( ! empty( $parent_engine['batch_schedule_failed'] ) ) {
 			$parent_status = JobStatus::failed( 'batch_schedule_failed' )->toString();
 		} elseif ( $completed > 0 ) {
 			$parent_status = JobStatus::COMPLETED;

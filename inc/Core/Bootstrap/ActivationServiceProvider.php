@@ -305,7 +305,7 @@ final class ActivationServiceProvider {
 				'indexes' => array( 'PRIMARY', 'flow_source_item', 'flow_step_id', 'source_type', 'job_id', 'status_claim_expires', 'status_deferred_at', 'flow_source_ts' ),
 			),
 			$site . 'datamachine_batch_items'      => array(
-				'columns' => array( 'batch_job_id', 'item_index', 'payload', 'payload_checksum', 'cleanup_context', 'state', 'worklist_token', 'lease_token', 'lease_expires_at', 'child_result_id', 'created_at', 'updated_at' ),
+				'columns' => array( 'batch_job_id', 'item_index', 'payload', 'payload_checksum', 'cleanup_context', 'state', 'worklist_token', 'lease_token', 'lease_expires_at', 'child_result_id', 'attempts', 'created_at', 'updated_at' ),
 				'indexes' => array( 'PRIMARY', 'claimable' ),
 			),
 			$site . 'datamachine_tracked_items'    => array(
