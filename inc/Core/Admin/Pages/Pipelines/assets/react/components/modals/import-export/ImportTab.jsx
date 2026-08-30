@@ -58,7 +58,7 @@ export default function ImportTab( { onSuccess, onClose } ) {
 			const response = await importPipelines( csvContent );
 
 			if ( response.success ) {
-				const count = response.data.created_count || 0;
+				const count = response.count || 0;
 				const message = count > 0
 					? sprintf(
 							/* translators: %d: Number of imported pipelines. */

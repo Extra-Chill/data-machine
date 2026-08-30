@@ -415,10 +415,16 @@ export const exportPipelines = async ( pipelineIds ) => {
  * @return {Promise<Object>} Import result with created pipeline IDs
  */
 export const importPipelines = async ( csvContent ) => {
-	return await client.post( '/pipelines', {
-		batch_import: true,
-		format: 'csv',
-		data: csvContent,
+	const { default: apiFetch } = await import( '@wordpress/api-fetch' );
+	return await apiFetch( {
+		path: '/wp-abilities/v1/abilities/datamachine/import-pipelines/run',
+		method: 'POST',
+		data: {
+			input: {
+				format: 'csv',
+				data: csvContent,
+			},
+		},
 	} );
 };
 
