@@ -2007,11 +2007,16 @@ class GoogleAnalyticsAbilities {
 	/**
 	 * Get an OAuth2 access token using service account JWT flow.
 	 *
+	 * The token is cached network-wide via site transients. The service account
+	 * credential is itself network-scoped (CONFIG_OPTION is read with
+	 * get_site_option()), so the token it mints is valid for every site on the
+	 * network. Caching it per-site would re-mint the same token once per site.
+	 *
 	 * @param array $service_account Parsed service account JSON.
 	 * @return string|\WP_Error Access token or error.
 	 */
 	private static function get_access_token( array $service_account ) {
-		$cached = get_transient( self::TOKEN_TRANSIENT );
+		$cached = get_site_transient( self::TOKEN_TRANSIENT );
 
 		if ( ! empty( $cached ) ) {
 			return $cached;
@@ -2068,7 +2073,7 @@ class GoogleAnalyticsAbilities {
 			return new \WP_Error( 'ga_token_failed', 'Failed to get access token: ' . $error_desc );
 		}
 
-		set_transient( self::TOKEN_TRANSIENT, $body['access_token'], 3500 );
+		set_site_transient( self::TOKEN_TRANSIENT, $body['access_token'], 3500 );
 
 		return $body['access_token'];
 	}
