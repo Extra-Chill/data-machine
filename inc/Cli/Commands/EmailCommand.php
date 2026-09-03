@@ -15,10 +15,6 @@ use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
 
-if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
-	return;
-}
-
 class EmailCommand extends BaseCommand {
 
 	/**
@@ -451,7 +447,7 @@ class EmailCommand extends BaseCommand {
 
 		$format = $assoc_args['format'] ?? 'text';
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $item, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $item, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -1157,16 +1153,6 @@ class EmailCommand extends BaseCommand {
 		} else {
 			WP_CLI::error( $result['error'] ?? 'Connection failed.' );
 		}
-	}
-
-	/**
-	 * Get the IMAP auth provider.
-	 *
-	 * @return object|null
-	 */
-	private function getAuthProvider(): ?object {
-		$providers = apply_filters( 'datamachine_auth_providers', array() );
-		return $providers['email_imap'] ?? null;
 	}
 
 	private function mailboxRef( array $assoc_args, bool $use_default = true ): string {

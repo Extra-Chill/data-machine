@@ -472,7 +472,6 @@ class AuthCommand extends BaseCommand {
 	 * @subcommand refresh
 	 */
 	public function refresh( array $args, array $assoc_args ): void {
-		$assoc_args;
 		if ( empty( $args[0] ) ) {
 			WP_CLI::error( 'Handler slug is required. Use "wp datamachine auth status" to see available providers.' );
 			return;
@@ -521,8 +520,6 @@ class AuthCommand extends BaseCommand {
 	 * @subcommand refresh-all
 	 */
 	public function refresh_all( array $args, array $assoc_args ): void {
-		$args;
-		$assoc_args;
 		$providers = $this->abilities->getAllProviders();
 
 		if ( empty( $providers ) ) {
@@ -535,6 +532,10 @@ class AuthCommand extends BaseCommand {
 		$failed    = 0;
 
 		foreach ( $providers as $key => $provider ) {
+			if ( ! is_object( $provider ) ) {
+				++$skipped;
+				continue;
+			}
 			$authenticated = method_exists( $provider, 'is_authenticated' ) && $provider->is_authenticated();
 			$can_refresh   = method_exists( $provider, 'get_valid_access_token' );
 
@@ -588,6 +589,9 @@ class AuthCommand extends BaseCommand {
 		$items = array();
 
 		foreach ( $providers as $key => $provider ) {
+			if ( ! is_object( $provider ) ) {
+				continue;
+			}
 			$authenticated = method_exists( $provider, 'is_authenticated' ) ? $provider->is_authenticated() : false;
 			$configured    = method_exists( $provider, 'is_configured' ) ? $provider->is_configured() : false;
 			$is_oauth      = method_exists( $provider, 'get_authorization_url' );
@@ -647,6 +651,10 @@ class AuthCommand extends BaseCommand {
 		}
 
 		$provider      = $auth_status['provider'];
+		if ( ! is_object( $provider ) ) {
+			WP_CLI::error( sprintf( 'Auth provider "%s" is invalid.', $handler_slug ) );
+			return;
+		}
 		$authenticated = $auth_status['authenticated'];
 		$configured    = method_exists( $provider, 'is_configured' ) ? $provider->is_configured() : false;
 		$is_oauth      = method_exists( $provider, 'get_authorization_url' );
@@ -687,7 +695,7 @@ class AuthCommand extends BaseCommand {
 				}
 			}
 
-			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -961,7 +969,7 @@ class AuthCommand extends BaseCommand {
 		}
 
 		WP_CLI::log( '' );
-		$cli_key_example = str_replace( '_', '-', array_key_first( $config_fields ) );
+		$cli_key_example = str_replace( '_', '-', (string) array_key_first( $config_fields ) );
 		WP_CLI::log(
 			sprintf(
 				'To update: wp datamachine auth config %s --%s=<value>',
