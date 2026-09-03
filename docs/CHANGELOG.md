@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.175.29] - 2026-09-03
+
+### Fixed
+- open real transactions when no boundary exists
+- avoid WP-CLI global option collisions
+- Fix bounded idempotent batch retries
+
 ## [0.175.28] - 2026-08-27
 
 ### Fixed
