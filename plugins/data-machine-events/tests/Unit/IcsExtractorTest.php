@@ -222,4 +222,118 @@ ICS;
 		$this->assertEquals( array( 'Near5', 'Mid20' ), $titles, 'Cap must keep the nearest events, ascending' );
 		$this->assertNotContains( 'Mid30', $titles, 'Farthest event within horizon must be dropped when cap bites' );
 	}
+
+	public function test_uid_and_change_markers_are_surfaced() {
+		$date = gmdate( 'Ymd\THis', strtotime( '+14 days' ) );
+		$ics  = <<<ICS
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VEVENT
+UID:stable-uid-abc
+DTSTART:{$date}Z
+SUMMARY:Identity Test
+SEQUENCE:4
+LAST-MODIFIED:20260315T120000Z
+LOCATION:Test Venue
+END:VEVENT
+END:VCALENDAR
+ICS;
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertCount( 1, $events );
+		$this->assertSame( 'stable-uid-abc', $events[0]['uid'] );
+		$this->assertSame( '4', $events[0]['sequence'] );
+		$this->assertSame( '20260315T120000Z', $events[0]['lastModified'] );
+	}
+
+	/**
+	 * A missing UID must stay empty rather than being synthesized. A derived
+	 * identity would look stable while silently changing whenever the content
+	 * it was derived from changed — worse than no identity at all, because a
+	 * consumer would trust it.
+	 */
+	public function test_missing_uid_yields_empty_identity() {
+		$date = gmdate( 'Ymd\THis', strtotime( '+14 days' ) );
+		$ics  = $this->build_ics( $date, 'No Uid' );
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertCount( 1, $events );
+		$this->assertSame( '', $events[0]['uid'] );
+		$this->assertSame( '', $events[0]['occurrenceIdentity'] );
+	}
+
+	/**
+	 * skipRecurrence is false, so an RRULE is expanded into one entry per
+	 * occurrence and every expansion carries the parent's UID. Keying identity
+	 * on UID alone would collapse a whole series into one event, so identity
+	 * must stay distinct per occurrence.
+	 */
+	public function test_recurring_occurrences_share_uid_but_get_distinct_identities() {
+		$start = gmdate( 'Ymd\THis', strtotime( '+7 days' ) );
+		$ics   = <<<ICS
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VEVENT
+UID:weekly-series-uid
+DTSTART:{$start}Z
+SUMMARY:Weekly Residency
+RRULE:FREQ=WEEKLY;COUNT=3
+LOCATION:Test Venue
+END:VEVENT
+END:VCALENDAR
+ICS;
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertGreaterThan( 1, count( $events ), 'Recurrence must expand to multiple occurrences' );
+
+		$uids = array_unique( array_column( $events, 'uid' ) );
+		$this->assertSame( array( 'weekly-series-uid' ), array_values( $uids ), 'Every expansion carries the parent UID' );
+
+		$identities = array_column( $events, 'occurrenceIdentity' );
+		$this->assertCount(
+			count( $identities ),
+			array_unique( $identities ),
+			'Each occurrence must get a distinct identity despite the shared UID'
+		);
+	}
+
+	/**
+	 * A modified instance is published as its own VEVENT carrying
+	 * RECURRENCE-ID. That is the authoritative discriminator for the instance
+	 * it replaces, so it must win over the occurrence start date.
+	 */
+	public function test_recurrence_id_is_used_as_the_discriminator() {
+		$start     = gmdate( 'Ymd\THis', strtotime( '+7 days' ) );
+		$overridden = gmdate( 'Ymd\THis', strtotime( '+14 days' ) );
+		$moved     = gmdate( 'Ymd\THis', strtotime( '+14 days +1 hour' ) );
+
+		$ics = <<<ICS
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VEVENT
+UID:override-uid
+RECURRENCE-ID:{$overridden}Z
+DTSTART:{$moved}Z
+SUMMARY:Moved Instance
+LOCATION:Test Venue
+END:VEVENT
+END:VCALENDAR
+ICS;
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertCount( 1, $events );
+		$this->assertSame( $overridden . 'Z', $events[0]['recurrenceId'] );
+		$this->assertSame(
+			'override-uid::' . $overridden . 'Z',
+			$events[0]['occurrenceIdentity'],
+			'RECURRENCE-ID must take precedence over the occurrence start date'
+		);
+	}
 }

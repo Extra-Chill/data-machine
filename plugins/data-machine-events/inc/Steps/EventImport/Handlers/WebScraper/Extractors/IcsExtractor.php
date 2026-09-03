@@ -93,6 +93,50 @@ class IcsExtractor extends BaseExtractor {
 		}
 	}
 
+	/**
+	 * Build a stable per-occurrence identity for one normalized event.
+	 *
+	 * `UID` is the only feed-authored identity an ICS event carries, and RFC
+	 * 5545 requires it to persist across edits to the same event — which is
+	 * exactly what a consumer wants for `source_id`, so a venue editing a title
+	 * or moving a start time updates in place instead of creating a duplicate.
+	 *
+	 * **A UID alone is not unique per returned item.** `skipRecurrence` is
+	 * false, so a recurring rule is expanded into one entry per occurrence and
+	 * every expansion carries the parent's UID. Verified against the bundled
+	 * parser: an `RRULE:FREQ=WEEKLY;COUNT=3` yields three items all reporting
+	 * the same UID, differing only by `dtstart`. Keying on UID alone would
+	 * collapse an entire series into a single event.
+	 *
+	 * Identity is therefore UID plus the occurrence discriminator:
+	 *
+	 * - `RECURRENCE-ID` when present. A modified instance is published as a
+	 *   separate VEVENT pointing at the occurrence it replaces, and is the
+	 *   authoritative discriminator for that instance.
+	 * - Otherwise the occurrence start date, which is what actually varies
+	 *   across expansions of the same rule.
+	 *
+	 * Returns an empty string when the source omits `UID`. Callers must treat
+	 * that as "no stable identity available" and fall back to their own
+	 * matching; a synthesized identity would be worse than none, because it
+	 * would look stable while changing whenever the content it was derived
+	 * from changed.
+	 *
+	 * @param string $uid           Feed-authored UID.
+	 * @param string $recurrence_id Occurrence override id, when present.
+	 * @param string $start_date    Occurrence start date.
+	 * @return string Stable occurrence identity, or empty string.
+	 */
+	private function buildOccurrenceIdentity( string $uid, string $recurrence_id, string $start_date ): string {
+		if ( '' === $uid ) {
+			return '';
+		}
+
+		$discriminator = '' !== $recurrence_id ? $recurrence_id : $start_date;
+
+		return '' !== $discriminator ? $uid . '::' . $discriminator : $uid;
+	}
+
 	public function getMethod(): string {
 		return 'ics_feed';
 	}
@@ -120,11 +164,21 @@ class IcsExtractor extends BaseExtractor {
 			'performer'     => '',
 			'organizer'     => sanitize_text_field( $ical_event->organizer ?? '' ),
 			'source_url'    => esc_url_raw( $ical_event->url ?? '' ),
+			'uid'           => sanitize_text_field( $ical_event->uid ?? '' ),
+			'recurrenceId'  => sanitize_text_field( $ical_event->recurrence_id ?? '' ),
+			'sequence'      => sanitize_text_field( $ical_event->sequence ?? '' ),
+			'lastModified'  => sanitize_text_field( $ical_event->last_modified ?? '' ),
 		);
 
 		$this->parseStartDateTime( $event, $ical_event, $calendar_timezone, $event_timezone );
 		$this->parseEndDateTime( $event, $ical_event, $calendar_timezone, $event_timezone );
 		$this->parseLocation( $event, $ical_event );
+
+		$event['occurrenceIdentity'] = $this->buildOccurrenceIdentity(
+			(string) $event['uid'],
+			(string) $event['recurrenceId'],
+			(string) $event['startDate']
+		);
 
 		return $event;
 	}
