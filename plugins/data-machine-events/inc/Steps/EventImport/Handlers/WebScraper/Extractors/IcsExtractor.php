@@ -168,6 +168,13 @@ class IcsExtractor extends BaseExtractor {
 			'recurrenceId'  => sanitize_text_field( $ical_event->recurrence_id ?? '' ),
 			'sequence'      => sanitize_text_field( $ical_event->sequence ?? '' ),
 			'lastModified'  => sanitize_text_field( $ical_event->last_modified ?? '' ),
+			// RFC 5545 privacy and confirmation signals, passed through as
+			// authored. A consumer cannot tell a public show from a private
+			// diary entry without these; deciding what to do about PRIVATE or
+			// TENTATIVE is the consumer's policy, not this extractor's.
+			'class'         => sanitize_text_field( $ical_event->class ?? '' ),
+			'eventStatus'   => sanitize_text_field( $ical_event->status ?? '' ),
+			'transparency'  => sanitize_text_field( $ical_event->transp ?? '' ),
 		);
 
 		$this->parseStartDateTime( $event, $ical_event, $calendar_timezone, $event_timezone );

@@ -336,4 +336,87 @@ ICS;
 			'RECURRENCE-ID must take precedence over the occurrence start date'
 		);
 	}
+
+	/**
+	 * Without these a consumer cannot distinguish a public show from a private
+	 * diary entry, and a venue that points a feed at its working calendar
+	 * would publish staff meetings.
+	 *
+	 * @dataProvider privacy_markers
+	 */
+	public function test_privacy_and_confirmation_markers_are_surfaced(
+		string $properties,
+		string $expected_class,
+		string $expected_status
+	) {
+		$date = gmdate( 'Ymd\THis', strtotime( '+14 days' ) );
+		$ics  = <<<ICS
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VEVENT
+UID:marker-test
+DTSTART:{$date}Z
+SUMMARY:Marker Test
+{$properties}
+LOCATION:Test Venue
+END:VEVENT
+END:VCALENDAR
+ICS;
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertCount( 1, $events );
+		$this->assertSame( $expected_class, $events[0]['class'] );
+		$this->assertSame( $expected_status, $events[0]['eventStatus'] );
+	}
+
+	public function privacy_markers(): array {
+		return array(
+			'private'      => array( 'CLASS:PRIVATE', 'PRIVATE', '' ),
+			'confidential' => array( 'CLASS:CONFIDENTIAL', 'CONFIDENTIAL', '' ),
+			'public'       => array( 'CLASS:PUBLIC', 'PUBLIC', '' ),
+			'tentative'    => array( 'STATUS:TENTATIVE', '', 'TENTATIVE' ),
+			'cancelled'    => array( 'STATUS:CANCELLED', '', 'CANCELLED' ),
+			'confirmed'    => array( 'STATUS:CONFIRMED', '', 'CONFIRMED' ),
+		);
+	}
+
+	/**
+	 * Absent markers must stay empty. Defaulting to CONFIRMED or PUBLIC would
+	 * assert something the source never said.
+	 */
+	public function test_absent_markers_are_empty_not_defaulted() {
+		$date = gmdate( 'Ymd\THis', strtotime( '+14 days' ) );
+		$ics  = $this->build_ics( $date, 'No Markers' );
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertCount( 1, $events );
+		$this->assertSame( '', $events[0]['class'] );
+		$this->assertSame( '', $events[0]['eventStatus'] );
+		$this->assertSame( '', $events[0]['transparency'] );
+	}
+
+	public function test_transparency_is_surfaced() {
+		$date = gmdate( 'Ymd\THis', strtotime( '+14 days' ) );
+		$ics  = <<<ICS
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+BEGIN:VEVENT
+UID:transp-test
+DTSTART:{$date}Z
+SUMMARY:Buyout
+TRANSP:OPAQUE
+LOCATION:Test Venue
+END:VEVENT
+END:VCALENDAR
+ICS;
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertCount( 1, $events );
+		$this->assertSame( 'OPAQUE', $events[0]['transparency'] );
+	}
 }
