@@ -650,7 +650,7 @@ class AuthCommand extends BaseCommand {
 			return;
 		}
 
-		$provider      = $auth_status['provider'];
+		$provider = $auth_status['provider'];
 		if ( ! is_object( $provider ) ) {
 			WP_CLI::error( sprintf( 'Auth provider "%s" is invalid.', $handler_slug ) );
 			return;
