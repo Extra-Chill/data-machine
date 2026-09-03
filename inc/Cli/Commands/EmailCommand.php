@@ -15,10 +15,6 @@ use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
 
-if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
-	return;
-}
-
 class EmailCommand extends BaseCommand {
 
 	/**
@@ -136,7 +132,7 @@ class EmailCommand extends BaseCommand {
 	 * [--template=<id>]
 	 * : Template id resolved via the datamachine_email_templates filter at worker run time.
 	 *
-	 * [--context=<json>]
+	 * [--template-context=<json>]
 	 * : JSON-encoded context object passed to the template callable.
 	 *
 	 * [--mail-site-id=<int>]
@@ -178,7 +174,7 @@ class EmailCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine email send-queued --to=user@example.com --subject="Report" --body="<p>Hello</p>"
-	 *     wp datamachine email send-queued --to=a@x.com --subject="Digest" --template=weekly-digest --context='{"week":"2026-W14"}'
+	 *     wp datamachine email send-queued --to=a@x.com --subject="Digest" --template=weekly-digest --template-context='{"week":"2026-W14"}'
 	 *     wp datamachine email send-queued --to=a@x.com --subject="Later" --body="..." --send-at=2026-04-01T09:00:00Z
 	 *
 	 * @subcommand send-queued
@@ -211,10 +207,10 @@ class EmailCommand extends BaseCommand {
 			$input['attachments'] = array_map( 'trim', explode( ',', $assoc_args['attachments'] ) );
 		}
 
-		if ( ! empty( $assoc_args['context'] ) ) {
-			$decoded = json_decode( (string) $assoc_args['context'], true );
+		if ( ! empty( $assoc_args['template-context'] ) ) {
+			$decoded = json_decode( (string) $assoc_args['template-context'], true );
 			if ( ! is_array( $decoded ) ) {
-				WP_CLI::error( '--context must be a JSON-encoded object.' );
+				WP_CLI::error( '--template-context must be a JSON-encoded object.' );
 			}
 			$input['context'] = $decoded;
 		}
@@ -451,7 +447,7 @@ class EmailCommand extends BaseCommand {
 
 		$format = $assoc_args['format'] ?? 'text';
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $item, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $item, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -1157,16 +1153,6 @@ class EmailCommand extends BaseCommand {
 		} else {
 			WP_CLI::error( $result['error'] ?? 'Connection failed.' );
 		}
-	}
-
-	/**
-	 * Get the IMAP auth provider.
-	 *
-	 * @return object|null
-	 */
-	private function getAuthProvider(): ?object {
-		$providers = apply_filters( 'datamachine_auth_providers', array() );
-		return $providers['email_imap'] ?? null;
 	}
 
 	private function mailboxRef( array $assoc_args, bool $use_default = true ): string {

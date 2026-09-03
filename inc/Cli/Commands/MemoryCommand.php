@@ -1184,9 +1184,6 @@ class MemoryCommand extends BaseCommand {
 	 *   - yaml
 	 * ---
 	 *
-	 * [--quiet]
-	 * : Suppress output on success.
-	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Regenerate all composable files
@@ -1201,12 +1198,14 @@ class MemoryCommand extends BaseCommand {
 	 *     # List all sections across all composable files
 	 *     wp datamachine memory compose --list
 	 *
+	 *     # Suppress informational output with WP-CLI's global option
+	 *     wp --quiet datamachine memory compose
+	 *
 	 * @subcommand compose
 	 */
 	public function compose( array $args, array $assoc_args ): void {
 		$filename = $args[0] ?? '';
 		$list     = \WP_CLI\Utils\get_flag_value( $assoc_args, 'list', false );
-		$quiet    = \WP_CLI\Utils\get_flag_value( $assoc_args, 'quiet', false );
 
 		if ( $list ) {
 			$this->compose_list( $filename, $assoc_args );
@@ -1234,9 +1233,7 @@ class MemoryCommand extends BaseCommand {
 					WP_CLI::error( $message );
 				}
 
-				if ( ! $quiet ) {
-					WP_CLI::success( $result['message'] );
-				}
+				WP_CLI::success( $result['message'] );
 			} else {
 				// Regenerate all composable files.
 				$result = ComposableFileGenerator::regenerate_all( $context );
@@ -1247,9 +1244,7 @@ class MemoryCommand extends BaseCommand {
 					if ( isset( $file_result['blocker'] ) ) {
 						$message .= ' Blocker: ' . wp_json_encode( $file_result['blocker'], JSON_UNESCAPED_SLASHES );
 					}
-					if ( ! $quiet || empty( $file_result['success'] ) ) {
-						WP_CLI::log( sprintf( '  [%s] %s — %s', $status, $file_result['filename'], $message ) );
-					}
+					WP_CLI::log( sprintf( '  [%s] %s — %s', $status, $file_result['filename'], $message ) );
 				}
 				if ( ! $result['success'] ) {
 					if ( $monitoring ) {
@@ -1258,9 +1253,7 @@ class MemoryCommand extends BaseCommand {
 					}
 					WP_CLI::error( $result['message'] );
 				}
-				if ( ! $quiet ) {
-					WP_CLI::success( $result['message'] );
-				}
+				WP_CLI::success( $result['message'] );
 			}
 		} finally {
 			if ( $monitoring ) {
