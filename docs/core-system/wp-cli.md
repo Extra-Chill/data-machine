@@ -539,6 +539,9 @@ wp --user=42 datamachine auth connect google --agent=writer
 # Revoke site-wide credentials
 wp datamachine auth revoke google --yes
 
+# Revoke a user's credentials
+wp datamachine auth revoke google --target-user=42 --yes
+
 # View or save API config
 wp datamachine auth config google --show-secrets
 wp datamachine auth config reddit --client_id=xxx --client_secret=xxx
@@ -550,13 +553,13 @@ Manage chat sessions. **Since**: 0.40.0
 
 ```bash
 # List chat sessions
-wp datamachine chat list --user=1 --limit=20
+wp datamachine chat list --owner-user=1 --limit=20
 
 # Get a session with conversation
 wp datamachine chat get abc-123
 
 # Create a session
-wp datamachine chat create --user=1 --context=sidebar
+wp datamachine chat create --owner-user=1 --session-context=sidebar
 
 # Delete a session
 wp datamachine chat delete abc-123 --yes

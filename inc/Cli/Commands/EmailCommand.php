@@ -136,7 +136,7 @@ class EmailCommand extends BaseCommand {
 	 * [--template=<id>]
 	 * : Template id resolved via the datamachine_email_templates filter at worker run time.
 	 *
-	 * [--context=<json>]
+	 * [--template-context=<json>]
 	 * : JSON-encoded context object passed to the template callable.
 	 *
 	 * [--mail-site-id=<int>]
@@ -178,7 +178,7 @@ class EmailCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine email send-queued --to=user@example.com --subject="Report" --body="<p>Hello</p>"
-	 *     wp datamachine email send-queued --to=a@x.com --subject="Digest" --template=weekly-digest --context='{"week":"2026-W14"}'
+	 *     wp datamachine email send-queued --to=a@x.com --subject="Digest" --template=weekly-digest --template-context='{"week":"2026-W14"}'
 	 *     wp datamachine email send-queued --to=a@x.com --subject="Later" --body="..." --send-at=2026-04-01T09:00:00Z
 	 *
 	 * @subcommand send-queued
@@ -211,10 +211,10 @@ class EmailCommand extends BaseCommand {
 			$input['attachments'] = array_map( 'trim', explode( ',', $assoc_args['attachments'] ) );
 		}
 
-		if ( ! empty( $assoc_args['context'] ) ) {
-			$decoded = json_decode( (string) $assoc_args['context'], true );
+		if ( ! empty( $assoc_args['template-context'] ) ) {
+			$decoded = json_decode( (string) $assoc_args['template-context'], true );
 			if ( ! is_array( $decoded ) ) {
-				WP_CLI::error( '--context must be a JSON-encoded object.' );
+				WP_CLI::error( '--template-context must be a JSON-encoded object.' );
 			}
 			$input['context'] = $decoded;
 		}

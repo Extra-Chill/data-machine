@@ -154,8 +154,8 @@ class AuthCommand extends BaseCommand {
 	/**
 	 * Revoke authentication for a handler at site or per-user scope.
 	 *
-	 * Without --user, behaves like `disconnect` — clears the shared
-	 * site-wide account slot. With --user=<id>, clears only that user's
+	 * Without --target-user, behaves like `disconnect` — clears the shared
+	 * site-wide account slot. With --target-user=<id>, clears only that user's
 	 * per-user credential slot via the BaseAuthProvider per-user API.
 	 *
 	 * Providers that expose an upstream revoke endpoint are called first,
@@ -168,7 +168,7 @@ class AuthCommand extends BaseCommand {
 	 * <handler_slug>
 	 * : Handler to revoke (e.g., a registered handler slug).
 	 *
-	 * [--user=<id>]
+	 * [--target-user=<id>]
 	 * : Target user ID. When provided, revokes only that user's per-user
 	 *   credentials. When omitted, revokes the site-wide account.
 	 *
@@ -181,7 +181,7 @@ class AuthCommand extends BaseCommand {
 	 *     wp datamachine auth revoke <handler>
 	 *
 	 *     # Revoke a specific user's per-user credentials.
-	 *     wp datamachine auth revoke <handler> --user=42
+	 *     wp datamachine auth revoke <handler> --target-user=42
 	 *
 	 * @subcommand revoke
 	 */
@@ -198,7 +198,7 @@ class AuthCommand extends BaseCommand {
 			return;
 		}
 
-		$user_id = isset( $assoc_args['user'] ) ? absint( $assoc_args['user'] ) : 0;
+		$user_id = isset( $assoc_args['target-user'] ) ? absint( $assoc_args['target-user'] ) : 0;
 		$message = '';
 
 		// Per-user revoke path.
