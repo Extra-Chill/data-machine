@@ -326,6 +326,7 @@ abstract class BaseServiceAccountProvider extends BaseAuthProvider {
 	 * @return string
 	 */
 	protected static function base64url_encode( string $data ): string {
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- RFC 7515 requires base64url for JWT segments; this is a wire format, not obfuscation.
 		return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
 	}
 }

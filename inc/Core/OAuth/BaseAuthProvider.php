@@ -1191,7 +1191,10 @@ abstract class BaseAuthProvider {
 		$tag        = '';
 		$ciphertext = openssl_encrypt( $plaintext, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv, $tag, '', self::AUTH_TAG_LENGTH );
 
-		if ( false === $ciphertext || '' === $tag ) {
+		// $tag is filled by reference, so static analysis cannot see that it
+		// may still be empty here. The check is real: an empty auth tag would
+		// produce an envelope that cannot be decrypted.
+		if ( false === $ciphertext || 0 === strlen( (string) $tag ) ) {
 			$this->log_encryption_error( 'Encryption failed' );
 			return null;
 		}

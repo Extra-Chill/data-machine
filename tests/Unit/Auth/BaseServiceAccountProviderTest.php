@@ -15,12 +15,12 @@ use DataMachine\Core\OAuth\BaseServiceAccountProvider;
 use WP_UnitTestCase;
 
 /**
- * Concrete provider under test.
+ * Concrete stub used to exercise the primitive.
  *
  * Config is injected directly so the test exercises the token mechanism
  * without depending on stored auth data.
  */
-class TestServiceAccountProvider extends BaseServiceAccountProvider {
+class StubServiceAccountProvider extends BaseServiceAccountProvider {
 
 	/** @var array */
 	public $injected_config = array();
@@ -77,8 +77,8 @@ class BaseServiceAccountProviderTest extends WP_UnitTestCase {
 		self::$public_key = $details['key'];
 	}
 
-	private function provider(): TestServiceAccountProvider {
-		$provider                  = new TestServiceAccountProvider();
+	private function provider(): StubServiceAccountProvider {
+		$provider                  = new StubServiceAccountProvider();
 		$provider->injected_config = array(
 			'client_email' => 'svc@project.iam.gserviceaccount.com',
 			'private_key'  => self::$private_key,
@@ -205,7 +205,7 @@ class BaseServiceAccountProviderTest extends WP_UnitTestCase {
 	}
 
 	public function test_missing_credential_is_a_specific_error(): void {
-		$provider                  = new TestServiceAccountProvider();
+		$provider                  = new StubServiceAccountProvider();
 		$provider->injected_config = array();
 
 		$result = $provider->get_access_token( 'scope-a' );
@@ -215,7 +215,7 @@ class BaseServiceAccountProviderTest extends WP_UnitTestCase {
 	}
 
 	public function test_incomplete_credential_is_a_specific_error(): void {
-		$provider                  = new TestServiceAccountProvider();
+		$provider                  = new StubServiceAccountProvider();
 		$provider->injected_config = array( 'client_email' => 'svc@project.iam.gserviceaccount.com' );
 
 		$result = $provider->get_access_token( 'scope-a' );
@@ -236,7 +236,7 @@ class BaseServiceAccountProviderTest extends WP_UnitTestCase {
 	 * operators paste it verbatim, so that shape has to work.
 	 */
 	public function test_raw_service_account_json_is_accepted(): void {
-		$provider                  = new TestServiceAccountProvider();
+		$provider                  = new StubServiceAccountProvider();
 		$provider->injected_config = array(
 			'service_account_json' => (string) wp_json_encode(
 				array(
@@ -250,7 +250,7 @@ class BaseServiceAccountProviderTest extends WP_UnitTestCase {
 	}
 
 	public function test_malformed_json_credential_is_a_specific_error(): void {
-		$provider                  = new TestServiceAccountProvider();
+		$provider                  = new StubServiceAccountProvider();
 		$provider->injected_config = array( 'service_account_json' => 'not json at all' );
 
 		$result = $provider->get_access_token( 'scope-a' );
@@ -262,7 +262,7 @@ class BaseServiceAccountProviderTest extends WP_UnitTestCase {
 	public function test_is_authenticated_reflects_credential_validity(): void {
 		$this->assertTrue( $this->provider()->is_authenticated() );
 
-		$empty                  = new TestServiceAccountProvider();
+		$empty                  = new StubServiceAccountProvider();
 		$empty->injected_config = array();
 
 		$this->assertFalse( $empty->is_authenticated() );
