@@ -14,6 +14,7 @@ namespace DataMachineBusiness\Engine\AI\Tools\Global;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachineBusiness\Abilities\Analytics\GoogleAnalyticsAbilities;
+use DataMachineBusiness\OAuth\Providers\GoogleServiceAccountAuth;
 use DataMachine\Engine\AI\Tools\BaseTool;
 
 class GoogleAnalytics extends BaseTool {
@@ -183,7 +184,11 @@ class GoogleAnalytics extends BaseTool {
 	}
 
 	protected function before_config_save( array $config_data ): void {
-		delete_transient( GoogleAnalyticsAbilities::TOKEN_TRANSIENT );
+		// Clear through the provider so the cache scope stays owned in one
+		// place. This previously used delete_transient(), which is site-scoped
+		// and therefore never cleared the network-wide token it was meant to.
+		( new GoogleServiceAccountAuth( GoogleAnalyticsAbilities::CONFIG_OPTION ) )
+			->clear_cached_token( GoogleAnalyticsAbilities::SCOPE );
 	}
 
 	/**

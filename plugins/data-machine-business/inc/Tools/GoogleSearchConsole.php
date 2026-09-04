@@ -13,6 +13,7 @@ namespace DataMachineBusiness\Tools;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachineBusiness\OAuth\Providers\GoogleServiceAccountAuth;
 use DataMachineBusiness\Abilities\Analytics\GoogleSearchConsoleAbilities;
 
 class GoogleSearchConsole extends BaseTool {
@@ -219,10 +220,9 @@ class GoogleSearchConsole extends BaseTool {
 	}
 
 	protected function before_config_save( array $config_data ): void {
-		// The service-account credential is network-wide (get_site_option), so its
-		// cached access token is stored as a network transient. Clear the network
-		// transient so a config change invalidates the cache for every blog.
-		delete_site_transient( GoogleSearchConsoleAbilities::TOKEN_TRANSIENT );
+		// Clear through the provider, which owns the cache scope.
+		( new GoogleServiceAccountAuth( GoogleSearchConsoleAbilities::CONFIG_OPTION ) )
+			->clear_cached_token( GoogleSearchConsoleAbilities::SCOPE );
 	}
 
 	/**

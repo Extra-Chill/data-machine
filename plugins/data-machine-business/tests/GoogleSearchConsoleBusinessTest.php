@@ -27,8 +27,12 @@ class GoogleSearchConsoleBusinessTest extends \PHPUnit\Framework\TestCase {
 			$this->read_file( 'inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php' )
 		);
 
+		// The per-ability token transient was removed when JWT-bearer auth moved
+		// to the shared BaseServiceAccountProvider. Legacy credential storage is
+		// still honoured: the provider falls back to this option when no
+		// provider-scoped config exists.
 		$this->assertStringContainsString(
-			"TOKEN_TRANSIENT = 'datamachine_gsc_access_token'",
+			'new GoogleServiceAccountAuth( self::CONFIG_OPTION )',
 			$this->read_file( 'inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php' )
 		);
 	}

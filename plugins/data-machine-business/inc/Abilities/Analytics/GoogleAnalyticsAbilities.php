@@ -19,6 +19,7 @@ namespace DataMachineBusiness\Abilities\Analytics;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachineBusiness\OAuth\Providers\GoogleServiceAccountAuth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -31,12 +32,9 @@ class GoogleAnalyticsAbilities {
 	 */
 	const CONFIG_OPTION = 'datamachine_ga_config';
 
-	/**
-	 * Transient key for cached access token.
-	 *
-	 * @var string
-	 */
-	const TOKEN_TRANSIENT = 'datamachine_ga_access_token';
+	/** OAuth scope this ability requests. */
+	const SCOPE = 'https://www.googleapis.com/auth/analytics.readonly';
+
 
 	/**
 	 * GA4 Data API base URL.
@@ -861,25 +859,7 @@ class GoogleAnalyticsAbilities {
 			);
 		}
 
-		$config = self::get_config();
-
-		if ( empty( $config['service_account_json'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Google Analytics not configured. Add service account JSON in Settings.',
-			);
-		}
-
-		$service_account = json_decode( $config['service_account_json'], true );
-
-		if ( json_last_error() !== JSON_ERROR_NONE || empty( $service_account['client_email'] ) || empty( $service_account['private_key'] ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Invalid service account JSON. Ensure it contains client_email and private_key.',
-			);
-		}
-
-		$access_token = self::get_access_token( $service_account );
+		$access_token = ( new GoogleServiceAccountAuth() )->get_access_token( self::SCOPE );
 
 		if ( is_wp_error( $access_token ) ) {
 			return array(
@@ -2004,90 +1984,7 @@ class GoogleAnalyticsAbilities {
 		return $rows;
 	}
 
-	/**
-	 * Get an OAuth2 access token using service account JWT flow.
-	 *
-	 * The token is cached network-wide via site transients. The service account
-	 * credential is itself network-scoped (CONFIG_OPTION is read with
-	 * get_site_option()), so the token it mints is valid for every site on the
-	 * network. Caching it per-site would re-mint the same token once per site.
-	 *
-	 * @param array $service_account Parsed service account JSON.
-	 * @return string|\WP_Error Access token or error.
-	 */
-	private static function get_access_token( array $service_account ) {
-		$cached = get_site_transient( self::TOKEN_TRANSIENT );
 
-		if ( ! empty( $cached ) ) {
-			return $cached;
-		}
-
-		$header_json = wp_json_encode(
-				array(
-					'alg' => 'RS256',
-					'typ' => 'JWT',
-				)
-		);
-		$header      = self::base64url_encode( false === $header_json ? '' : $header_json );
-		$now    = time();
-		$claims_json = wp_json_encode(
-				array(
-					'iss'   => $service_account['client_email'],
-					'scope' => 'https://www.googleapis.com/auth/analytics.readonly',
-					'aud'   => 'https://oauth2.googleapis.com/token',
-					'iat'   => $now,
-					'exp'   => $now + 3600,
-				)
-		);
-		$claims      = self::base64url_encode( false === $claims_json ? '' : $claims_json );
-
-		$unsigned = $header . '.' . $claims;
-
-		$sign_result = openssl_sign( $unsigned, $signature, $service_account['private_key'], 'SHA256' );
-
-		if ( ! $sign_result ) {
-			return new \WP_Error( 'ga_jwt_sign_failed', 'Failed to sign JWT. Check private key in service account JSON.' );
-		}
-
-		$jwt = $unsigned . '.' . self::base64url_encode( $signature );
-
-		$response = wp_remote_post(
-			'https://oauth2.googleapis.com/token',
-			array(
-				'timeout' => 15,
-				'body'    => array(
-					'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-					'assertion'  => $jwt,
-				),
-			)
-		);
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		$body = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( empty( $body['access_token'] ) ) {
-			$error_desc = $body['error_description'] ?? ( $body['error'] ?? 'Unknown token error' );
-			return new \WP_Error( 'ga_token_failed', 'Failed to get access token: ' . $error_desc );
-		}
-
-		set_site_transient( self::TOKEN_TRANSIENT, $body['access_token'], 3500 );
-
-		return $body['access_token'];
-	}
-
-	/**
-	 * Base64url encode (RFC 7515).
-	 *
-	 * @param string $data Data to encode.
-	 * @return string Base64url encoded string.
-	 */
-	private static function base64url_encode( string $data ): string {
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions -- Required for API authentication, not obfuscation.
-		return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
-	}
 
 	/**
 	 * Check if Google Analytics is configured.
