@@ -77,6 +77,32 @@ abstract class BaseServiceAccountProvider extends BaseAuthProvider {
 	}
 
 	/**
+	 * Configuration fields for CLI/UI credential entry.
+	 *
+	 * Every service account flow takes the same input — a key file and an
+	 * optional delegated subject — so this is provided rather than left
+	 * abstract. Subclasses override only when a vendor needs something else.
+	 *
+	 * @return array<string,array>
+	 */
+	public function get_config_fields(): array {
+		return array(
+			'service_account_json' => array(
+				'label'       => __( 'Service account JSON', 'data-machine' ),
+				'type'        => 'textarea',
+				'required'    => true,
+				'description' => __( 'The full service account key file contents, including client_email and private_key.', 'data-machine' ),
+			),
+			'subject'              => array(
+				'label'       => __( 'Delegated subject', 'data-machine' ),
+				'type'        => 'text',
+				'required'    => false,
+				'description' => __( 'Optional user to impersonate for domain-wide delegation.', 'data-machine' ),
+			),
+		);
+	}
+
+	/**
 	 * Whether a usable service account credential is stored.
 	 */
 	public function is_authenticated(): bool {
