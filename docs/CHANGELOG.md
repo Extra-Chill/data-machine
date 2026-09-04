@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.0] - 2026-09-04
+
+### Added
+- add BaseServiceAccountProvider for RFC 7523 JWT-bearer auth
+
 ## [0.175.29] - 2026-09-03
 
 ### Fixed
