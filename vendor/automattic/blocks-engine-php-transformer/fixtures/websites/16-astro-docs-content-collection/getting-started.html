@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Install SignalForge CLI, define your first monitor, and receive your first signal in under 10 minutes.">
+  <title>Getting Started — SignalForge Docs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="mobile-nav-toggle" id="navToggle" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <div class="overlay" id="overlay"></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <a href="index.html">
+          <svg class="sidebar-logo-mark" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="7" fill="#111512"/>
+            <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#2a352a"/>
+            <polyline points="3,16 7,16 9,10 11,22 13,16 16,16 18,8 20,24 22,16 29,16"
+              stroke="#3efb6a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="sidebar-logo-text">
+            <span class="sidebar-logo-name">SignalForge</span>
+            <span class="sidebar-logo-sub">docs</span>
+          </div>
+        </a>
+      </div>
+      <div class="sidebar-version">
+        <span class="status-dot live"></span>
+        <span class="sidebar-status-text">all systems operational</span>
+        <span class="sidebar-version-badge">v0.9.2</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <span class="nav-section-label">Docs</span>
+          <a class="nav-link" href="index.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+            Home
+          </a>
+          <a class="nav-link" href="overview.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.5"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1"/></svg>
+            Product Overview
+          </a>
+          <a class="nav-link" href="getting-started.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12L6 4l3 5 2-3 3 6"/></svg>
+            Getting Started
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Guides</span>
+          <a class="nav-link" href="incident-workflow.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2l1.5 4h4l-3.2 2.3 1.2 3.9L8 10l-3.5 2.2 1.2-3.9L2.5 6H6.5z"/></svg>
+            Incident Workflow
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Reference</span>
+          <a class="nav-link" href="api-reference.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="1.5"/><path d="M5 5V4a3 3 0 016 0v1"/><path d="M6 9h4M8 8v2"/></svg>
+            API Reference
+          </a>
+          <a class="nav-link" href="changelog.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2" width="11" height="13" rx="1.5"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>
+            Changelog
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Help</span>
+          <a class="nav-link" href="support.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 10.5v.5M8 5.5a1.5 1.5 0 011.5 1.5c0 1-1.5 1.5-1.5 2.5"/></svg>
+            Support
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        <a href="changelog.html">Releases</a>
+        <a href="support.html">Discord</a>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-breadcrumb">
+          <a href="index.html">Docs</a>
+          <span class="sep">/</span>
+          <span class="current">Getting Started</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="topbar-search-btn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+            <span class="topbar-search-text">Search docs</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="content-with-toc">
+          <div class="main-content">
+            <div class="page-header">
+              <div class="page-tag">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12L6 4l3 5 2-3 3 6"/></svg>
+                Getting Started
+              </div>
+              <h1>From zero to first signal</h1>
+              <p class="page-desc">
+                Install the CLI, create your workspace, define a monitor, and receive your first signal.
+                Estimated time: <strong style="color: var(--accent);">8–10 minutes</strong>.
+              </p>
+            </div>
+
+            <!-- Prerequisites -->
+            <h2 id="prerequisites">Prerequisites</h2>
+            <p>Before you begin, make sure you have:</p>
+            <ul>
+              <li>Node.js v18 or later (for npm install), <em>or</em> Homebrew on macOS</li>
+              <li>An HTTPS endpoint you want to monitor (your own API, or use our example endpoint)</li>
+              <li>A SignalForge account — <a href="https://app.signalforge.io/signup" target="_blank" rel="noopener">sign up free at app.signalforge.io</a></li>
+            </ul>
+
+            <div class="callout info">
+              <div class="callout-icon">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 5.5v.5"/></svg>
+              </div>
+              <div class="callout-body">
+                <span class="callout-title">Free tier limits</span>
+                <p>Free accounts include 5 monitors, 30-second minimum interval, and 30-day signal history. No credit card required.</p>
+              </div>
+            </div>
+
+            <!-- Steps -->
+            <h2 id="installation">Step-by-step</h2>
+
+            <div class="steps">
+
+              <!-- Step 1 -->
+              <div class="step active">
+                <div class="step-number">01</div>
+                <div class="step-connector"></div>
+                <div class="step-body">
+                  <div class="step-title" id="install-cli">Install the CLI</div>
+                  <div class="step-desc">Install the <code>@signalforge/cli</code> package globally. You can use npm, yarn, pnpm, or Homebrew.</div>
+
+                  <div class="code-block">
+                    <div class="code-block-header">
+                      <span class="code-block-filename">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
+                        via npm
+                      </span>
+                      <span class="code-block-lang">bash</span>
+                      <button class="copy-btn">copy</button>
+                    </div>
+                    <pre><span class="hl-prompt">$</span> <span class="hl-cmd">npm</span> <span class="hl-arg">install</span> <span class="hl-flag">-g</span> <span class="hl-arg">@signalforge/cli</span>
+
+<span class="hl-out">+ @signalforge/cli@0.9.2</span>
+<span class="hl-out">added 47 packages in 3.2s</span></pre>
+                  </div>
+
+                  <div class="code-block">
+                    <div class="code-block-header">
+                      <span class="code-block-filename">via Homebrew (macOS)</span>
+                      <span class="code-block-lang">bash</span>
+                      <button class="copy-btn">copy</button>
+                    </div>
+                    <pre><span class="hl-prompt">$</span> <span class="hl-cmd">brew</span> <span class="hl-arg">install</span> <span class="hl-arg">signalforge/tap/signalforge</span>
+
+<span class="hl-out">🍺 /usr/local/Cellar/signalforge/0.9.2: 52 files, 9.1MB</span></pre>
+                  </div>
+
+                  <p>Verify the installation:</p>
+
+                  <div class="code-block">
+                    <div class="code-block-header">
+                      <span class="code-block-lang">bash</span>
+                      <button class="copy-btn">copy</button>
+                    </div>
+                    <pre><span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-flag">--version</span>
+<span class="hl-out">signalforge/0.9.2 darwin-arm64 node-v20.10.0</span></pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 2 -->
+              <div class="step">
+                <div class="step-number">02</div>
+                <div class="step-connector"></div>
+                <div class="step-body">
+                  <div class="step-title" id="authenticate">Authenticate</div>
+                  <div class="step-desc">Run <code>signalforge auth login</code> to open a browser-based OAuth flow. Your API key is stored in <code>~/.signalforge/credentials</code>.</div>
+
+                  <div class="code-block">
+                    <div class="code-block-header">
+                      <span class="code-block-lang">bash</span>
+                      <button class="copy-btn">copy</button>
+                    </div>
+                    <pre><span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">auth login</span>
+
+<span class="hl-out">Opening browser for authentication…</span>
+<span class="hl-out">✓ Authenticated as jamie@acme.io</span>
+<span class="hl-out">✓ Workspace: acme-platform (ID: ws_01HX3K9F2J)</span>
+<span class="hl-out">✓ Credentials stored: ~/.signalforge/credentials</span></pre>
+                  </div>
+
+                  <p>If you prefer token-based auth (for CI environments), set the <code>SIGNALFORGE_TOKEN</code> environment variable instead. See <a href="api-reference.html#authentication">API authentication docs</a>.</p>
+                </div>
+              </div>
+
+              <!-- Step 3 -->
+              <div class="step">
+                <div class="step-number">03</div>
+                <div class="step-connector"></div>
+                <div class="step-body">
+                  <div class="step-title" id="first-monitor">Define your first monitor</div>
+                  <div class="step-desc">
+                    Create a <code>signalforge.yml</code> file in your project root. This is a declarative definition of everything you want to monitor. Here's a real example for an API service:
+                  </div>
+
+                  <div class="code-block">
+                    <div class="code-block-header">
+                      <span class="code-block-filename">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
+                        signalforge.yml
+                      </span>
+                      <span class="code-block-lang">yaml</span>
+                      <button class="copy-btn">copy</button>
+                    </div>
+                    <pre><span class="hl-c"># SignalForge workspace configuration</span>
+<span class="hl-p">workspace</span><span class="hl-o">:</span>
+  <span class="hl-p">name</span><span class="hl-o">:</span> <span class="hl-s">acme-platform</span>
+  <span class="hl-p">environment</span><span class="hl-o">:</span> <span class="hl-s">production</span>
+
+<span class="hl-p">monitors</span><span class="hl-o">:</span>
+  <span class="hl-o">-</span> <span class="hl-p">id</span><span class="hl-o">:</span> <span class="hl-s">payments-api-health</span>
+    <span class="hl-p">name</span><span class="hl-o">:</span> <span class="hl-s">"Payments API Health"</span>
+    <span class="hl-p">type</span><span class="hl-o">:</span> <span class="hl-v">http</span>
+    <span class="hl-p">url</span><span class="hl-o">:</span> <span class="hl-u">https://api.acme.io/v1/health</span>
+    <span class="hl-p">interval</span><span class="hl-o">:</span> <span class="hl-v">30s</span>
+    <span class="hl-p">timeout</span><span class="hl-o">:</span> <span class="hl-v">5s</span>
+    <span class="hl-p">regions</span><span class="hl-o">:</span> <span class="hl-o">[</span><span class="hl-s">us-east-1</span><span class="hl-o">,</span> <span class="hl-s">eu-west-1</span><span class="hl-o">]</span>
+    <span class="hl-p">expect</span><span class="hl-o">:</span>
+      <span class="hl-p">status</span><span class="hl-o">:</span> <span class="hl-n">200</span>
+      <span class="hl-p">body_contains</span><span class="hl-o">:</span> <span class="hl-s">"status"</span><span class="hl-o">:</span> <span class="hl-s">"ok"</span>
+      <span class="hl-p">latency_p95_ms</span><span class="hl-o">:</span> <span class="hl-n">2000</span>
+    <span class="hl-p">alert</span><span class="hl-o">:</span>
+      <span class="hl-o">-</span> <span class="hl-p">on</span><span class="hl-o">:</span> <span class="hl-v">status_not_2xx</span>
+        <span class="hl-p">severity</span><span class="hl-o">:</span> <span class="hl-v">critical</span>
+        <span class="hl-p">after_failures</span><span class="hl-o">:</span> <span class="hl-n">2</span>
+      <span class="hl-o">-</span> <span class="hl-p">on</span><span class="hl-o">:</span> <span class="hl-v">latency_p95_exceeded</span>
+        <span class="hl-p">severity</span><span class="hl-o">:</span> <span class="hl-v">warning</span>
+    <span class="hl-p">tags</span><span class="hl-o">:</span>
+      <span class="hl-p">team</span><span class="hl-o">:</span> <span class="hl-s">payments</span>
+      <span class="hl-p">tier</span><span class="hl-o">:</span> <span class="hl-s">tier-1</span>
+
+  <span class="hl-o">-</span> <span class="hl-p">id</span><span class="hl-o">:</span> <span class="hl-s">catalog-api-health</span>
+    <span class="hl-p">name</span><span class="hl-o">:</span> <span class="hl-s">"Catalog API Health"</span>
+    <span class="hl-p">type</span><span class="hl-o">:</span> <span class="hl-v">http</span>
+    <span class="hl-p">url</span><span class="hl-o">:</span> <span class="hl-u">https://catalog.acme.io/health</span>
+    <span class="hl-p">interval</span><span class="hl-o">:</span> <span class="hl-v">60s</span>
+    <span class="hl-p">timeout</span><span class="hl-o">:</span> <span class="hl-v">8s</span>
+    <span class="hl-p">expect</span><span class="hl-o">:</span>
+      <span class="hl-p">status</span><span class="hl-o">:</span> <span class="hl-n">200</span>
+      <span class="hl-p">latency_p95_ms</span><span class="hl-o">:</span> <span class="hl-n">3000</span>
+    <span class="hl-p">alert</span><span class="hl-o">:</span>
+      <span class="hl-o">-</span> <span class="hl-p">on</span><span class="hl-o">:</span> <span class="hl-v">status_not_2xx</span>
+        <span class="hl-p">severity</span><span class="hl-o">:</span> <span class="hl-v">warning</span>
+        <span class="hl-p">after_failures</span><span class="hl-o">:</span> <span class="hl-n">3</span>
+
+<span class="hl-c"># Alert rule: escalate if two tier-1 monitors are critical simultaneously</span>
+<span class="hl-p">rules</span><span class="hl-o">:</span>
+  <span class="hl-o">-</span> <span class="hl-p">id</span><span class="hl-o">:</span> <span class="hl-s">multi-service-outage</span>
+    <span class="hl-p">name</span><span class="hl-o">:</span> <span class="hl-s">"Multi-service outage"</span>
+    <span class="hl-p">when</span><span class="hl-o">:</span>
+      <span class="hl-p">all_critical</span><span class="hl-o">:</span>
+        <span class="hl-o">-</span> <span class="hl-s">payments-api-health</span>
+        <span class="hl-o">-</span> <span class="hl-s">catalog-api-health</span>
+    <span class="hl-p">notify</span><span class="hl-o">:</span>
+      <span class="hl-o">-</span> <span class="hl-p">channel</span><span class="hl-o">:</span> <span class="hl-s">pagerduty</span>
+        <span class="hl-p">severity</span><span class="hl-o">:</span> <span class="hl-v">critical</span></pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 4 -->
+              <div class="step">
+                <div class="step-number">04</div>
+                <div class="step-connector"></div>
+                <div class="step-body">
+                  <div class="step-title" id="sync-monitors">Sync to your workspace</div>
+                  <div class="step-desc">Push your monitor definitions to SignalForge with <code>signalforge monitor sync</code>. This validates your config, diffs against current state, and applies changes.</div>
+
+                  <div class="code-block">
+                    <div class="code-block-header">
+                      <span class="code-block-lang">bash</span>
+                      <button class="copy-btn">copy</button>
+                    </div>
+                    <pre><span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">monitor sync</span>
+
+<span class="hl-out">Reading signalforge.yml…</span>
+<span class="hl-out">Validating config… ✓</span>
+<span class="hl-out">Diffing against workspace acme-platform…</span>
+<span class="hl-out"></span>
+<span class="hl-out">  + payments-api-health   [CREATE]</span>
+<span class="hl-out">  + catalog-api-health    [CREATE]</span>
+<span class="hl-out">  + multi-service-outage  [CREATE]</span>
+<span class="hl-out"></span>
+<span class="hl-out">Apply 3 changes? [y/N] y</span>
+<span class="hl-out"></span>
+<span class="hl-out">✓ payments-api-health   created (mon_01HXK8A2BC)</span>
+<span class="hl-out">✓ catalog-api-health    created (mon_01HXK8A2BD)</span>
+<span class="hl-out">✓ multi-service-outage  created (rule_01HXK8A2BE)</span>
+<span class="hl-out"></span>
+<span class="hl-out">2 monitors active. First check in ~30s.</span></pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 5 -->
+              <div class="step">
+                <div class="step-number">05</div>
+                <div class="step-connector"></div>
+                <div class="step-body">
+                  <div class="step-title" id="verify-status">Verify monitor status</div>
+                  <div class="step-desc">After a few seconds, check that your monitors are running and healthy.</div>
+
+                  <div class="code-block">
+                    <div class="code-block-header">
+                      <span class="code-block-lang">bash</span>
+                      <button class="copy-btn">copy</button>
+                    </div>
+                    <pre><span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">status</span>
+
+<span class="hl-out">MONITOR                   STATUS    LAST CHECK      UPTIME</span>
+<span class="hl-out">─────────────────────────────────────────────────────────</span>
+<span class="hl-out">payments-api-health       ● OK      14s ago         100%</span>
+<span class="hl-out">catalog-api-health        ● OK      22s ago         100%</span>
+<span class="hl-out"></span>
+<span class="hl-out">2 monitors · 0 active signals · all OK</span></pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 6 -->
+              <div class="step">
+                <div class="step-number">06</div>
+                <div class="step-connector"></div>
+                <div class="step-body">
+                  <div class="step-title" id="configure-notifications">Configure notifications</div>
+                  <div class="step-desc">Add a destination so you actually hear about problems. The simplest option is a Slack incoming webhook.</div>
+
+                  <div class="code-block">
+                    <div class="code-block-header">
+                      <span class="code-block-filename">signalforge.yml — add destinations section</span>
+                      <span class="code-block-lang">yaml</span>
+                      <button class="copy-btn">copy</button>
+                    </div>
+                    <pre><span class="hl-p">destinations</span><span class="hl-o">:</span>
+  <span class="hl-o">-</span> <span class="hl-p">id</span><span class="hl-o">:</span> <span class="hl-s">slack-platform</span>
+    <span class="hl-p">type</span><span class="hl-o">:</span> <span class="hl-v">slack_webhook</span>
+    <span class="hl-p">url</span><span class="hl-o">:</span> <span class="hl-s">${SLACK_WEBHOOK_URL}</span>
+    <span class="hl-p">channel</span><span class="hl-o">:</span> <span class="hl-s">#platform-alerts</span>
+    <span class="hl-p">on_severity</span><span class="hl-o">:</span> <span class="hl-o">[</span><span class="hl-s">warning</span><span class="hl-o">,</span> <span class="hl-s">critical</span><span class="hl-o">]</span>
+
+  <span class="hl-o">-</span> <span class="hl-p">id</span><span class="hl-o">:</span> <span class="hl-s">pagerduty-oncall</span>
+    <span class="hl-p">type</span><span class="hl-o">:</span> <span class="hl-v">pagerduty</span>
+    <span class="hl-p">integration_key</span><span class="hl-o">:</span> <span class="hl-s">${PAGERDUTY_KEY}</span>
+    <span class="hl-p">on_severity</span><span class="hl-o">:</span> <span class="hl-o">[</span><span class="hl-s">critical</span><span class="hl-o">]</span></pre>
+                  </div>
+
+                  <div class="callout warning">
+                    <div class="callout-icon">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2L1 14h14L8 2z" stroke-linejoin="round"/><path d="M8 7v3M8 12v.5"/></svg>
+                    </div>
+                    <div class="callout-body">
+                      <span class="callout-title">Keep secrets out of YAML</span>
+                      <p>Use environment variable references like <code>${SLACK_WEBHOOK_URL}</code> rather than hardcoding credentials. The CLI reads them from your shell environment at sync time.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 7 -->
+              <div class="step">
+                <div class="step-number">07</div>
+                <div class="step-body">
+                  <div class="step-title" id="test-alert">Test your first alert</div>
+                  <div class="step-desc">Use the CLI to fire a test signal to your configured destinations without triggering a real check failure.</div>
+
+                  <div class="code-block">
+                    <div class="code-block-header">
+                      <span class="code-block-lang">bash</span>
+                      <button class="copy-btn">copy</button>
+                    </div>
+                    <pre><span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">test-alert</span> <span class="hl-flag">--monitor</span> <span class="hl-arg">payments-api-health</span> <span class="hl-flag">--severity</span> <span class="hl-arg">critical</span>
+
+<span class="hl-out">Sending test signal…</span>
+<span class="hl-out">✓ Delivered to slack-platform     (200 OK, 143ms)</span>
+<span class="hl-out">✓ Delivered to pagerduty-oncall   (200 OK, 89ms)</span>
+<span class="hl-out"></span>
+<span class="hl-out">Check your #platform-alerts Slack channel for the test alert.</span></pre>
+                  </div>
+
+                  <div class="callout tip">
+                    <div class="callout-icon">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2a4.5 4.5 0 010 9H6v2h4" stroke-linecap="round"/><circle cx="8" cy="6" r="1"/></svg>
+                    </div>
+                    <div class="callout-body">
+                      <span class="callout-title">You're done</span>
+                      <p>Your monitors are running, alerts are wired up, and you'll hear about problems before your customers do. When an incident fires, follow the <a href="incident-workflow.html">Incident Workflow runbook →</a></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Next steps -->
+            <h2 id="next-steps">Next steps</h2>
+            <ul>
+              <li><a href="incident-workflow.html">Learn the incident workflow</a> — understand how to triage, escalate, and resolve alerts from SignalForge.</li>
+              <li><a href="api-reference.html">Explore the REST API</a> — build integrations, pull signal history into your dashboards, or automate monitor management.</li>
+              <li><a href="overview.html#monitor-types">Add more monitor types</a> — set up TCP, SSL, and DNS monitors for full-stack coverage.</li>
+              <li><a href="overview.html#alert-rules">Compose advanced alert rules</a> — build multi-signal rules with AND/OR logic and maintenance window support.</li>
+            </ul>
+
+          </div>
+
+          <!-- TOC -->
+          <aside>
+            <div class="toc-aside">
+              <span class="toc-label">On this page</span>
+              <ul class="toc-list">
+                <li><a href="#prerequisites">Prerequisites</a></li>
+                <li><a href="#installation">Step-by-step</a></li>
+                <li><a href="#install-cli">  Install CLI</a></li>
+                <li><a href="#authenticate">  Authenticate</a></li>
+                <li><a href="#first-monitor">  First monitor</a></li>
+                <li><a href="#sync-monitors">  Sync monitors</a></li>
+                <li><a href="#verify-status">  Verify status</a></li>
+                <li><a href="#configure-notifications">  Notifications</a></li>
+                <li><a href="#test-alert">  Test alert</a></li>
+                <li><a href="#next-steps">Next steps</a></li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-left">SignalForge v0.9.2 · MIT License</div>
+        <div class="footer-links">
+          <a href="api-reference.html">API</a>
+          <a href="changelog.html">Changelog</a>
+          <a href="support.html">Support</a>
+          <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>

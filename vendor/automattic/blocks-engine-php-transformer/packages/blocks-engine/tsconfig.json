@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"],
+  "comment:exclude": "wp-runtime-entry.ts is an esbuild-only bundle entry (re-exports untyped @wordpress modules); it is never part of the typed library surface.",
+  "exclude": ["node_modules", "dist", "src/wp/wp-runtime-entry.ts"]
+}

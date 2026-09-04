@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Harbor Steps helps coastal communities prepare for flooding, heat, and climate displacement — before the next storm arrives.">
+  <title>Harbor Steps — Coastal Climate Resilience</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- =========================================================
+     HEADER
+     ========================================================= -->
+<header class="site-header" role="banner">
+  <div class="container header-inner">
+    <a href="#" class="logo" aria-label="Harbor Steps home">
+      Harbor<span class="logo-accent"> Steps</span>
+    </a>
+
+    <nav aria-label="Primary">
+      <ul class="nav-links">
+        <li><a href="#mission">Mission</a></li>
+        <li><a href="#programs">Programs</a></li>
+        <li><a href="#impact">Impact</a></li>
+        <li><a href="#transparency">Transparency</a></li>
+        <li><a href="#donate">Volunteer</a></li>
+      </ul>
+    </nav>
+
+    <a href="#donate" class="btn-nav-donate">Donate Now</a>
+
+    <button class="nav-toggle" aria-label="Open navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+
+<!-- =========================================================
+     HERO
+     ========================================================= -->
+<section class="hero" id="hero" aria-label="Hero">
+  <div class="hero-glow" aria-hidden="true"></div>
+
+  <div class="hero-content container">
+    <span class="eyebrow">Est. 2019 &nbsp;·&nbsp; Gulf &amp; Atlantic Coasts &nbsp;·&nbsp; 501(c)(3)</span>
+
+    <h1>
+      Rising Water.<br>
+      <em>Rising</em> Stakes.
+    </h1>
+
+    <p class="hero-sub">
+      Harbor Steps prepares coastal communities for flooding, extreme heat, and
+      climate displacement — before the next storm arrives. Because preparation
+      is the most powerful thing we can give each other.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="#donate" class="btn-primary">Support the Work</a>
+      <a href="#mission" class="btn-secondary">Our Mission ↓</a>
+    </div>
+
+    <p class="hero-footnote">
+      Serving 47,000+ households across 9 states
+    </p>
+  </div>
+
+  <!-- Animated SVG waves -->
+  <div class="hero-waves" aria-hidden="true">
+    <svg class="wave-svg" viewBox="0 0 1440 240" preserveAspectRatio="none"
+         xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <style>
+          .w1 { animation: waveShift1 9s ease-in-out infinite alternate; }
+          .w2 { animation: waveShift2 12s ease-in-out infinite alternate; }
+          .w3 { animation: waveShift3 7s ease-in-out infinite alternate; }
+          @keyframes waveShift1 {
+            from { d: path("M0,140 C240,100 480,180 720,140 C960,100 1200,175 1440,140 L1440,240 L0,240 Z"); }
+            to   { d: path("M0,160 C240,120 480,165 720,120 C960,80  1200,155 1440,160 L1440,240 L0,240 Z"); }
+          }
+          @keyframes waveShift2 {
+            from { d: path("M0,175 C200,135 440,195 720,175 C1000,155 1240,190 1440,175 L1440,240 L0,240 Z"); }
+            to   { d: path("M0,185 C240,155 500,185 720,155 C940,125 1200,175 1440,185 L1440,240 L0,240 Z"); }
+          }
+          @keyframes waveShift3 {
+            from { d: path("M0,205 C280,185 560,215 840,205 C1120,195 1300,215 1440,205 L1440,240 L0,240 Z"); }
+            to   { d: path("M0,210 C300,195 600,218 840,198 C1080,178 1280,208 1440,210 L1440,240 L0,240 Z"); }
+          }
+        </style>
+      </defs>
+      <!-- Layer 1 — deep -->
+      <path class="w1"
+        d="M0,140 C240,100 480,180 720,140 C960,100 1200,175 1440,140 L1440,240 L0,240 Z"
+        fill="rgba(14,48,80,0.55)"/>
+      <!-- Layer 2 — mid -->
+      <path class="w2"
+        d="M0,175 C200,135 440,195 720,175 C1000,155 1240,190 1440,175 L1440,240 L0,240 Z"
+        fill="rgba(11,31,52,0.75)"/>
+      <!-- Layer 3 — surface -->
+      <path class="w3"
+        d="M0,205 C280,185 560,215 840,205 C1120,195 1300,215 1440,205 L1440,240 L0,240 Z"
+        fill="var(--ocean-mid)"/>
+    </svg>
+  </div>
+
+  <div class="scroll-cue" aria-hidden="true">
+    <span class="scroll-cue-text">Scroll</span>
+    <div class="scroll-cue-line"></div>
+  </div>
+</section>
+
+
+<!-- =========================================================
+     MISSION
+     ========================================================= -->
+<section class="mission" id="mission" aria-labelledby="mission-heading">
+  <div class="container mission-grid">
+
+    <div class="mission-text">
+      <span class="eyebrow reveal">What We Do</span>
+      <h2 class="reveal" id="mission-heading">
+        Communities built the coast.<br>
+        We help them <em>stay</em>.
+      </h2>
+      <p class="reveal reveal-d1">
+        Coastal communities face a compounding crisis: floods that arrive faster,
+        heat that lingers longer, and displacement that tears apart the social fabric
+        that kept people safe for generations. Harbor Steps was founded on a single
+        conviction — that access to preparation should not depend on income.
+      </p>
+      <p class="reveal reveal-d2">
+        We partner directly with residents, local emergency managers, schools, and
+        housing advocates to deliver practical tools, training, and resources where
+        they're needed most — before disaster strikes.
+      </p>
+
+      <div class="mission-pillars reveal reveal-d3">
+        <div class="pillar">
+          <span class="pillar-num">01</span>
+          <div class="pillar-body">
+            <strong>Prepare</strong>
+            <span>Flood kits, heat plans, and neighborhood-level emergency training</span>
+          </div>
+        </div>
+        <div class="pillar">
+          <span class="pillar-num">02</span>
+          <div class="pillar-body">
+            <strong>Connect</strong>
+            <span>Building neighbor networks and mutual aid systems that outlast any single storm</span>
+          </div>
+        </div>
+        <div class="pillar">
+          <span class="pillar-num">03</span>
+          <div class="pillar-body">
+            <strong>Relocate</strong>
+            <span>Legal and housing support for families facing permanent displacement</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inline SVG coastline illustration -->
+    <div class="mission-illustration reveal reveal-d2" aria-hidden="true">
+      <svg viewBox="0 0 400 420" fill="none" xmlns="http://www.w3.org/2000/svg"
+           style="width:100%; max-width:400px; margin:0 auto;">
+        <defs>
+          <linearGradient id="oceanGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#134060" stop-opacity="0.9"/>
+            <stop offset="100%" stop-color="#050f1c" stop-opacity="1"/>
+          </linearGradient>
+          <linearGradient id="coastGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1b5a40"/>
+            <stop offset="100%" stop-color="#0d3628"/>
+          </linearGradient>
+          <clipPath id="mapClip">
+            <rect width="400" height="420" rx="4"/>
+          </clipPath>
+        </defs>
+
+        <g clip-path="url(#mapClip)">
+          <!-- Ocean fill -->
+          <rect width="400" height="420" fill="url(#oceanGrad)"/>
+
+          <!-- Animated water ripples -->
+          <ellipse cx="200" cy="300" rx="180" ry="30" fill="none" stroke="rgba(82,196,176,0.12)" stroke-width="1">
+            <animate attributeName="rx" values="160;185;160" dur="4s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.4;0.8;0.4" dur="4s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="200" cy="300" rx="120" ry="20" fill="none" stroke="rgba(82,196,176,0.18)" stroke-width="1">
+            <animate attributeName="rx" values="110;130;110" dur="3.2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.6;1;0.6" dur="3.2s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="200" cy="300" rx="70" ry="12" fill="none" stroke="rgba(82,196,176,0.25)" stroke-width="1">
+            <animate attributeName="rx" values="60;80;60" dur="2.8s" repeatCount="indefinite"/>
+          </ellipse>
+
+          <!-- Coastline silhouette -->
+          <path d="M0,220 C40,195 80,240 130,215 C165,198 185,225 220,205
+                   C250,188 275,220 310,208 C345,196 370,225 400,210 L400,420 L0,420 Z"
+                fill="url(#coastGrad)"/>
+
+          <!-- Water line on coast -->
+          <path d="M0,225 C40,200 80,245 130,220 C165,203 185,230 220,210
+                   C250,193 275,225 310,213 C345,201 370,230 400,215"
+                stroke="rgba(82,196,176,0.35)" stroke-width="1.5" fill="none">
+            <animate attributeName="d"
+              values="M0,225 C40,200 80,245 130,220 C165,203 185,230 220,210 C250,193 275,225 310,213 C345,201 370,230 400,215;
+                      M0,222 C40,205 80,240 130,217 C165,200 185,227 220,207 C250,190 275,222 310,210 C345,198 370,227 400,212;
+                      M0,225 C40,200 80,245 130,220 C165,203 185,230 220,210 C250,193 275,225 310,213 C345,201 370,230 400,215"
+              dur="5s" repeatCount="indefinite"/>
+          </path>
+
+          <!-- Land vegetation dots -->
+          <circle cx="80"  cy="205" r="3" fill="rgba(82,196,176,0.3)"/>
+          <circle cx="95"  cy="200" r="2" fill="rgba(82,196,176,0.2)"/>
+          <circle cx="180" cy="195" r="2.5" fill="rgba(82,196,176,0.25)"/>
+          <circle cx="280" cy="200" r="3" fill="rgba(82,196,176,0.3)"/>
+          <circle cx="350" cy="198" r="2" fill="rgba(82,196,176,0.2)"/>
+
+          <!-- House silhouettes on coast -->
+          <g fill="rgba(168,221,214,0.5)">
+            <!-- house 1 -->
+            <rect x="66" y="190" width="14" height="12"/>
+            <polygon points="66,190 80,190 73,181"/>
+            <!-- house 2 -->
+            <rect x="168" y="182" width="12" height="10"/>
+            <polygon points="168,182 180,182 174,174"/>
+            <!-- house 3 -->
+            <rect x="268" y="188" width="14" height="11"/>
+            <polygon points="268,188 282,188 275,179"/>
+          </g>
+
+          <!-- Flood water level indicator -->
+          <line x1="0" y1="240" x2="400" y2="240"
+                stroke="rgba(232,92,40,0.4)" stroke-width="1" stroke-dasharray="6,4">
+            <animate attributeName="y1" values="240;236;240" dur="3s" repeatCount="indefinite"/>
+            <animate attributeName="y2" values="240;236;240" dur="3s" repeatCount="indefinite"/>
+          </line>
+          <text x="8" y="235" font-family="DM Mono, monospace" font-size="8"
+                fill="rgba(232,92,40,0.7)" letter-spacing="0.05em">PROJECTED FLOOD LINE 2045</text>
+
+          <!-- Grid overlay -->
+          <line x1="133" y1="0" x2="133" y2="420" stroke="rgba(82,196,176,0.06)" stroke-width="1"/>
+          <line x1="266" y1="0" x2="266" y2="420" stroke="rgba(82,196,176,0.06)" stroke-width="1"/>
+          <line x1="0" y1="140" x2="400" y2="140" stroke="rgba(82,196,176,0.06)" stroke-width="1"/>
+          <line x1="0" y1="280" x2="400" y2="280" stroke="rgba(82,196,176,0.06)" stroke-width="1"/>
+
+          <!-- Border -->
+          <rect width="400" height="420" rx="4" fill="none"
+                stroke="rgba(82,196,176,0.18)" stroke-width="1"/>
+
+          <!-- Label -->
+          <text x="16" y="18" font-family="DM Mono, monospace" font-size="8"
+                fill="rgba(82,196,176,0.5)" letter-spacing="0.15em">GULF &amp; ATLANTIC COASTAL ZONE</text>
+        </g>
+      </svg>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- =========================================================
+     IMPACT METRICS
+     ========================================================= -->
+<section class="impact" id="impact" aria-labelledby="impact-heading">
+  <div class="container">
+    <div class="impact-header">
+      <span class="eyebrow">By the Numbers</span>
+      <h2 id="impact-heading">Five years of measurable change</h2>
+    </div>
+
+    <div class="metrics-grid" role="list">
+
+      <div class="metric-card" role="listitem">
+        <span class="metric-number"
+              data-target="47200"
+              data-float="false"
+              data-prefix=""
+              data-suffix="">0</span>
+        <span class="metric-unit" aria-hidden="true">+</span>
+        <p class="metric-label">Households reached<br>with flood preparedness<br>training</p>
+      </div>
+
+      <div class="metric-card" role="listitem">
+        <span class="metric-number"
+              data-target="23"
+              data-float="false"
+              data-prefix=""
+              data-suffix="">0</span>
+        <p class="metric-label">Harbor resilience centers<br>operational across<br>the coastline</p>
+      </div>
+
+      <div class="metric-card" role="listitem">
+        <span class="metric-number"
+              data-target="8.4"
+              data-float="true"
+              data-prefix="$"
+              data-suffix="M">$0</span>
+        <p class="metric-label">In emergency resources<br>mobilized for displaced<br>families since 2019</p>
+      </div>
+
+      <div class="metric-card" role="listitem">
+        <span class="metric-number"
+              data-target="89"
+              data-float="false"
+              data-prefix=""
+              data-suffix="%">0</span>
+        <p class="metric-label">Of program participants<br>report improved<br>disaster readiness</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- =========================================================
+     PROGRAMS
+     ========================================================= -->
+<section class="programs" id="programs" aria-labelledby="programs-heading">
+  <div class="container">
+    <div class="programs-header reveal">
+      <span class="eyebrow">Our Work</span>
+      <h2 id="programs-heading">Four programs,<br>one mission</h2>
+      <p>From backyard flood kits to cross-county relocation support —
+         our programs meet communities where they are.</p>
+    </div>
+
+    <div class="programs-grid">
+
+      <!-- 1 -->
+      <article class="program-card reveal" data-num="1" aria-label="Flood Ready Neighborhoods program">
+        <div class="program-icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5,17 L20,4 L35,17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="10" y="17" width="20" height="18" rx="1" stroke="currentColor" stroke-width="2"/>
+            <path d="M16,35 L16,25 L24,25 L24,35" stroke="currentColor" stroke-width="1.5"/>
+            <!-- water waves below -->
+            <path d="M2,38 C8,35 14,40 20,38 C26,36 32,40 38,38" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5">
+              <animate attributeName="d"
+                values="M2,38 C8,35 14,40 20,38 C26,36 32,40 38,38;
+                        M2,39 C8,36 14,41 20,39 C26,37 32,41 38,39;
+                        M2,38 C8,35 14,40 20,38 C26,36 32,40 38,38"
+                dur="2.5s" repeatCount="indefinite"/>
+            </path>
+          </svg>
+        </div>
+        <h3 class="program-name">Flood Ready Neighborhoods</h3>
+        <p class="program-desc">
+          Community-level flood preparedness training and sealed emergency kits
+          delivered to households in vulnerable zip codes. Each kit includes
+          waterproof document storage, a 72-hour supply plan, and access to a
+          trained neighborhood coordinator.
+        </p>
+        <p class="program-stat">12,400 kits distributed · 9 states</p>
+      </article>
+
+      <!-- 2 -->
+      <article class="program-card reveal reveal-d1" data-num="2" aria-label="Climate Migration Network program">
+        <div class="program-icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- people silhouettes -->
+            <circle cx="14" cy="10" r="4" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M8,24 C8,18 20,18 20,24 L20,28 L8,28 Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <!-- arrow -->
+            <path d="M23,18 L36,18 M31,13 L36,18 L31,23" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- new home -->
+            <path d="M28,32 L36,32 L36,26 L32,22 L28,26 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3 class="program-name">Climate Migration Network</h3>
+        <p class="program-desc">
+          Legal aid, relocation counseling, and housing placement services for
+          families facing permanent displacement due to repeated flooding or
+          uninhabitable heat. We keep communities intact by prioritizing
+          resettlement in neighboring areas with existing social ties.
+        </p>
+        <p class="program-stat">1,840 families served · $3.1M in housing aid facilitated</p>
+      </article>
+
+      <!-- 3 -->
+      <article class="program-card reveal reveal-d2" data-num="3" aria-label="Coastal Schools Initiative program">
+        <div class="program-icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- school building -->
+            <rect x="8" y="16" width="24" height="18" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M4,16 L20,6 L36,16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <!-- windows -->
+            <rect x="12" y="20" width="6" height="6" stroke="currentColor" stroke-width="1.2"/>
+            <rect x="22" y="20" width="6" height="6" stroke="currentColor" stroke-width="1.2"/>
+            <!-- door -->
+            <rect x="16" y="27" width="8" height="7" stroke="currentColor" stroke-width="1.2"/>
+            <!-- flag/leaf -->
+            <line x1="20" y1="6" x2="20" y2="1" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M20,1 L26,3 L20,5 Z" fill="currentColor" opacity="0.6"/>
+          </svg>
+        </div>
+        <h3 class="program-name">Coastal Schools Initiative</h3>
+        <p class="program-desc">
+          Climate science and emergency preparedness curriculum deployed across
+          47 schools in Gulf Coast and Southeast Atlantic districts. Students
+          learn to read flood maps, create family response plans, and become
+          youth resilience ambassadors in their neighborhoods.
+        </p>
+        <p class="program-stat">47 schools · 22,000 students enrolled</p>
+      </article>
+
+      <!-- 4 -->
+      <article class="program-card reveal reveal-d3" data-num="4" aria-label="Heat Harbor Centers program">
+        <div class="program-icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- sun -->
+            <circle cx="20" cy="14" r="6" stroke="currentColor" stroke-width="1.8"/>
+            <line x1="20" y1="4" x2="20" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="28.5" y1="5.5" x2="26.4" y2="7.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="32" y1="14" x2="29" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="28.5" y1="22.5" x2="26.4" y2="20.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="11.5" y1="5.5" x2="13.6" y2="7.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="8" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <!-- building / shelter -->
+            <rect x="10" y="26" width="20" height="12" rx="1" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M7,26 L20,20 L33,26" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <rect x="16" y="30" width="8" height="8" stroke="currentColor" stroke-width="1.2"/>
+            <!-- cool indicator -->
+            <path d="M14,30 L14,34 M12,32 L16,32" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+          </svg>
+        </div>
+        <h3 class="program-name">Heat Harbor Centers</h3>
+        <p class="program-desc">
+          A network of 23 community cooling and resilience centers providing
+          refuge, supplies, medical triage, and coordination during extreme heat
+          events and post-storm recovery. Staffed 24/7 during declared
+          emergencies, open 6 days a week year-round.
+        </p>
+        <p class="program-stat">23 centers · 340,000 visits recorded in 2024</p>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- =========================================================
+     STORY / QUOTE
+     ========================================================= -->
+<section class="story" id="story" aria-label="Participant story">
+  <div class="container story-inner">
+
+    <!-- Illustrated portrait -->
+    <div class="story-portrait-wrap reveal" aria-hidden="true">
+      <svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg"
+           style="width:100%;">
+        <defs>
+          <radialGradient id="portBg" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#1a5070"/>
+            <stop offset="100%" stop-color="#0b2035"/>
+          </radialGradient>
+          <clipPath id="circClip">
+            <circle cx="120" cy="120" r="112"/>
+          </clipPath>
+        </defs>
+
+        <!-- Background circle -->
+        <circle cx="120" cy="120" r="112" fill="url(#portBg)"/>
+        <circle cx="120" cy="120" r="112" fill="none" stroke="rgba(82,196,176,0.25)" stroke-width="2"/>
+
+        <g clip-path="url(#circClip)">
+          <!-- Water at base -->
+          <path d="M0,175 C40,162 80,178 120,170 C160,162 200,178 240,170 L240,240 L0,240 Z"
+                fill="rgba(20,80,110,0.7)"/>
+          <path d="M0,185 C40,172 80,188 120,180 C160,172 200,188 240,180 L240,240 L0,240 Z"
+                fill="rgba(14,50,80,0.8)"/>
+
+          <!-- Body / clothing -->
+          <ellipse cx="120" cy="220" rx="60" ry="40" fill="#1b4a5e"/>
+          <!-- Shirt detail -->
+          <path d="M95,200 Q120,215 145,200 L145,240 L95,240 Z" fill="#15394a"/>
+
+          <!-- Neck -->
+          <rect x="112" y="150" width="16" height="28" rx="8" fill="#c4845c"/>
+
+          <!-- Head -->
+          <ellipse cx="120" cy="130" rx="40" ry="42" fill="#c4845c"/>
+
+          <!-- Hair — silver/dark -->
+          <path d="M80,118 Q82,90 120,88 Q158,90 160,118 Q155,100 120,98 Q85,100 80,118 Z"
+                fill="#5a4a3a"/>
+          <!-- hair streaks -->
+          <path d="M85,112 Q88,95 110,92" stroke="#9a8a7a" stroke-width="2" fill="none" opacity="0.5"/>
+
+          <!-- Eyes -->
+          <ellipse cx="108" cy="128" rx="5" ry="4" fill="#3a2820"/>
+          <ellipse cx="132" cy="128" rx="5" ry="4" fill="#3a2820"/>
+          <circle cx="110" cy="127" r="1.5" fill="white" opacity="0.7"/>
+          <circle cx="134" cy="127" r="1.5" fill="white" opacity="0.7"/>
+
+          <!-- Eyebrows -->
+          <path d="M102,120 Q108,117 114,120" stroke="#5a3828" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M126,120 Q132,117 138,120" stroke="#5a3828" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+          <!-- Nose -->
+          <path d="M118,132 Q116,140 118,143 Q122,145 126,143 Q128,140 122,132" stroke="#b0744a" stroke-width="1.2" fill="none"/>
+
+          <!-- Smile -->
+          <path d="M110,152 Q120,160 130,152" stroke="#a0623a" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+          <!-- Small earrings -->
+          <circle cx="80" cy="135" r="3" fill="#d4a060" opacity="0.8"/>
+          <circle cx="160" cy="135" r="3" fill="#d4a060" opacity="0.8"/>
+        </g>
+
+        <!-- Decorative ring -->
+        <circle cx="120" cy="120" r="116" fill="none"
+                stroke="rgba(82,196,176,0.12)" stroke-width="1" stroke-dasharray="4,6"/>
+      </svg>
+    </div>
+
+    <!-- Quote -->
+    <div class="story-quote-wrap reveal reveal-d2">
+      <span class="quote-glyph" aria-hidden="true">&ldquo;</span>
+      <blockquote>
+        "When Hurricane Ida hit, I'd already moved my family's documents to
+        waterproof storage and knew exactly which shelter had space for us.
+        Harbor Steps gave us a plan when everything else felt out of control.
+        That plan saved us weeks of chaos."
+      </blockquote>
+      <div>
+        <span class="attribution-name">Rosa Martínez</span>
+        <span class="attribution-detail">58 &nbsp;·&nbsp; Biloxi, Mississippi &nbsp;·&nbsp; Flood Ready Neighborhoods participant, 2021</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- =========================================================
+     DONATE & VOLUNTEER
+     ========================================================= -->
+<section class="donate" id="donate" aria-labelledby="donate-heading">
+  <div class="container donate-grid">
+
+    <!-- Donate form area -->
+    <div>
+      <span class="eyebrow reveal">Make a Difference</span>
+      <div class="donate-text reveal reveal-d1">
+        <h2 id="donate-heading">
+          Every dollar<br>
+          <em>stays coastal</em>.
+        </h2>
+        <p>
+          78 cents of every dollar goes directly to program delivery.
+          Choose a monthly gift and join 6,400 regular donors helping
+          coastal families prepare for what's coming.
+        </p>
+      </div>
+
+      <div class="reveal reveal-d2">
+        <span class="amount-label">Select a monthly amount</span>
+        <div class="amount-grid" role="group" aria-label="Donation amount options">
+          <button class="amount-btn" data-amount="15" aria-label="Donate $15 monthly">$15</button>
+          <button class="amount-btn active" data-amount="35" aria-label="Donate $35 monthly">$35</button>
+          <button class="amount-btn" data-amount="75" aria-label="Donate $75 monthly">$75</button>
+          <button class="amount-btn" data-amount="150" aria-label="Donate $150 monthly">$150</button>
+          <button class="amount-btn" data-amount="350" aria-label="Donate $350 monthly">$350</button>
+          <button class="amount-btn" data-amount="750" aria-label="Donate $750 monthly">$750</button>
+        </div>
+
+        <div class="amount-custom-row" role="group" aria-label="Custom donation amount">
+          <span class="currency-symbol" aria-hidden="true">$</span>
+          <input type="number" placeholder="Custom amount" value="35"
+                 aria-label="Enter custom donation amount" min="1">
+        </div>
+
+        <button class="donate-submit" type="button">
+          Donate Now &nbsp;&rarr;
+        </button>
+        <p class="donate-notice">
+          Secure · Tax-deductible (EIN 84-2917650) · Cancel anytime
+        </p>
+      </div>
+    </div>
+
+    <!-- Volunteer panel -->
+    <div class="volunteer-panel reveal reveal-d3">
+      <h3>Volunteer<br>with us</h3>
+      <p>
+        Harbor Steps depends on more than 2,200 trained community
+        volunteers in 9 states. Whether you have an afternoon or
+        a career to offer, there's a role for you.
+      </p>
+      <ul class="volunteer-roles" aria-label="Volunteer role types">
+        <li class="volunteer-role">Neighborhood preparedness coordinator</li>
+        <li class="volunteer-role">Harbor center staff &amp; medical support</li>
+        <li class="volunteer-role">Legal aid intake &amp; case navigation</li>
+        <li class="volunteer-role">Youth climate curriculum facilitator</li>
+        <li class="volunteer-role">Flood kit assembly &amp; distribution driver</li>
+      </ul>
+      <a href="#volunteer" class="btn-volunteer" aria-label="Apply to volunteer with Harbor Steps">
+        Apply to Volunteer &nbsp;→
+      </a>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- =========================================================
+     PARTNERS
+     ========================================================= -->
+<section class="partners" aria-label="Partner organizations">
+  <div class="container">
+    <p class="partners-label">Coalition partners &amp; funders</p>
+    <div class="partners-strip" role="list">
+      <span class="partner-name" role="listitem">Coastal Resilience Fund</span>
+      <span class="partner-name" role="listitem">Gulf States Climate Coalition</span>
+      <span class="partner-name" role="listitem">The Tidewater Foundation</span>
+      <span class="partner-name" role="listitem">National Housing Adaptation Network</span>
+      <span class="partner-name" role="listitem">Marine &amp; Shoreline Alliance</span>
+    </div>
+  </div>
+</section>
+
+
+<!-- =========================================================
+     TRANSPARENCY & FAQ
+     ========================================================= -->
+<section class="transparency" id="transparency" aria-labelledby="transparency-heading">
+  <div class="container transparency-grid">
+
+    <!-- Left: financial summary + budget bars -->
+    <div class="transparency-left">
+      <span class="eyebrow reveal">Accountability</span>
+      <h2 class="reveal" id="transparency-heading">Where the money goes</h2>
+      <p class="reveal reveal-d1">
+        We publish full financials annually. Our 2024 IRS Form 990 is
+        available on request. Here's the plain-language breakdown.
+      </p>
+
+      <div class="financials-row reveal reveal-d2" aria-label="Financial summary">
+        <div class="fin-stat">
+          <span class="fin-stat-num">$5.1M</span>
+          <span class="fin-stat-label">2024 Revenue</span>
+        </div>
+        <div class="fin-stat">
+          <span class="fin-stat-num">$4.2M</span>
+          <span class="fin-stat-label">2024 Expenditure</span>
+        </div>
+        <div class="fin-stat">
+          <span class="fin-stat-num">$0.9M</span>
+          <span class="fin-stat-label">Reserve Fund</span>
+        </div>
+      </div>
+
+      <p class="budget-section-title reveal reveal-d2">Expenditure breakdown</p>
+      <div class="budget-bars reveal reveal-d3" aria-label="Budget allocation bars">
+        <div class="budget-item">
+          <div class="budget-label-row">
+            <span class="budget-cat">Program delivery</span>
+            <span class="budget-pct">78%</span>
+          </div>
+          <div class="budget-track" role="progressbar" aria-valuenow="78" aria-valuemin="0" aria-valuemax="100">
+            <div class="budget-fill programs" data-w="78%"></div>
+          </div>
+        </div>
+        <div class="budget-item">
+          <div class="budget-label-row">
+            <span class="budget-cat">Operations &amp; admin</span>
+            <span class="budget-pct">12%</span>
+          </div>
+          <div class="budget-track" role="progressbar" aria-valuenow="12" aria-valuemin="0" aria-valuemax="100">
+            <div class="budget-fill ops" data-w="12%"></div>
+          </div>
+        </div>
+        <div class="budget-item">
+          <div class="budget-label-row">
+            <span class="budget-cat">Fundraising</span>
+            <span class="budget-pct">10%</span>
+          </div>
+          <div class="budget-track" role="progressbar" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100">
+            <div class="budget-fill fundraise" data-w="10%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ratings-row reveal reveal-d4">
+        <div class="rating-badge" aria-label="Charity Navigator 4-star rating">
+          <strong>★★★★</strong>
+          <span>Charity Navigator</span>
+        </div>
+        <div class="rating-badge" aria-label="GuideStar Platinum seal">
+          <strong>Platinum</strong>
+          <span>GuideStar Seal</span>
+        </div>
+        <div class="rating-badge" aria-label="100 out of 100 score">
+          <strong>100/100</strong>
+          <span>Finance &amp; Accountability</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: FAQ -->
+    <div class="transparency-right reveal reveal-d1">
+      <h3 class="faq-title">Common questions</h3>
+
+      <div class="faq-list" role="list">
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-btn" aria-expanded="false">
+            Is my donation tax-deductible?
+            <svg class="faq-icon" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <line x1="9" y1="1" x2="9" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="1" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <div class="faq-body" aria-hidden="true">
+            <p>Yes. Harbor Steps is a 501(c)(3) nonprofit registered in the United States (EIN 84-2917650). All donations are tax-deductible to the extent permitted by law. You will receive an email receipt immediately after your gift.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-btn" aria-expanded="false">
+            How do you select the communities you serve?
+            <svg class="faq-icon" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <line x1="9" y1="1" x2="9" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="1" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <div class="faq-body" aria-hidden="true">
+            <p>We prioritize low-income coastal zip codes with documented flood risk in FEMA's National Flood Insurance Program data and surface heat indexes above EPA warning thresholds. We partner with local emergency managers to confirm community readiness before launching a program.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-btn" aria-expanded="false">
+            Can I designate my gift to a specific program?
+            <svg class="faq-icon" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <line x1="9" y1="1" x2="9" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="1" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <div class="faq-body" aria-hidden="true">
+            <p>Yes — after checkout, you can note a program preference (Flood Ready Neighborhoods, Climate Migration Network, Coastal Schools Initiative, or Heat Harbor Centers). Unrestricted gifts allow us to direct funds where they are most urgent at any given moment.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-btn" aria-expanded="false">
+            How do I cancel or modify a recurring gift?
+            <svg class="faq-icon" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <line x1="9" y1="1" x2="9" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="1" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <div class="faq-body" aria-hidden="true">
+            <p>Log in to your donor portal at giving.harborsteps.org, or email donors@harborsteps.org and we will make the change within 24 hours — no questions asked. We will never make it difficult to cancel.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" role="listitem">
+          <button class="faq-btn" aria-expanded="false">
+            Where can I read your full financial reports?
+            <svg class="faq-icon" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <line x1="9" y1="1" x2="9" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="1" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <div class="faq-body" aria-hidden="true">
+            <p>Our 2024 Annual Report, IRS Form 990, and audited financial statements are downloadable from harborsteps.org/transparency. We have published complete financials every year since our founding in 2019.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- =========================================================
+     FINAL CTA
+     ========================================================= -->
+<section class="cta-final" aria-labelledby="final-cta-heading">
+  <div class="container">
+    <span class="eyebrow reveal" style="justify-content:center;display:flex;">The water is rising</span>
+    <h2 class="reveal reveal-d1" id="final-cta-heading">
+      The next storm<br>
+      doesn&rsquo;t wait.<br>
+      <em>Neither should we.</em>
+    </h2>
+    <p class="sub reveal reveal-d2">
+      Every week we don't prepare is a week a family spends recovering instead
+      of thriving. Join Harbor Steps and help coastal communities get ahead
+      of what's coming.
+    </p>
+    <div class="cta-actions reveal reveal-d3">
+      <a href="#donate" class="btn-primary" style="font-size:0.88rem;padding:1.1rem 2.75rem;">
+        Donate Monthly
+      </a>
+      <a href="#donate" class="btn-secondary" style="font-size:0.88rem;padding:1.1rem 2.75rem;">
+        Volunteer Now
+      </a>
+    </div>
+  </div>
+
+  <!-- subtle decorative wave -->
+  <svg class="cta-wave-deco" viewBox="0 0 1440 60" preserveAspectRatio="none"
+       aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0,30 C240,10 480,50 720,30 C960,10 1200,50 1440,30 L1440,60 L0,60 Z"
+          fill="rgba(82,196,176,0.5)">
+      <animate attributeName="d"
+        values="M0,30 C240,10 480,50 720,30 C960,10 1200,50 1440,30 L1440,60 L0,60 Z;
+                M0,35 C240,15 480,55 720,35 C960,15 1200,55 1440,35 L1440,60 L0,60 Z;
+                M0,30 C240,10 480,50 720,30 C960,10 1200,50 1440,30 L1440,60 L0,60 Z"
+        dur="8s" repeatCount="indefinite"/>
+    </path>
+  </svg>
+</section>
+
+
+<!-- =========================================================
+     FOOTER
+     ========================================================= -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-inner">
+
+      <div class="footer-brand">
+        <a href="#" class="logo" aria-label="Harbor Steps home">
+          Harbor<span class="logo-accent"> Steps</span>
+        </a>
+        <p>
+          A nonprofit dedicated to coastal climate resilience —
+          preparing communities for flooding, heat, and displacement
+          with dignity and urgency since 2019.
+        </p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Programs</h4>
+        <ul>
+          <li><a href="#programs">Flood Ready Neighborhoods</a></li>
+          <li><a href="#programs">Climate Migration Network</a></li>
+          <li><a href="#programs">Coastal Schools Initiative</a></li>
+          <li><a href="#programs">Heat Harbor Centers</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Organization</h4>
+        <ul>
+          <li><a href="#mission">Mission &amp; Values</a></li>
+          <li><a href="#transparency">Financials</a></li>
+          <li><a href="#donate">Volunteer</a></li>
+          <li><a href="#">Annual Report</a></li>
+          <li><a href="#">Press</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p class="footer-legal">
+        &copy; 2025 Harbor Steps, Inc. &nbsp;·&nbsp; 501(c)(3) EIN 84-2917650
+        &nbsp;·&nbsp; P.O. Box 4412, Biloxi, MS 39531
+      </p>
+      <p class="footer-legal">
+        Privacy Policy &nbsp;·&nbsp; Terms &nbsp;·&nbsp; Accessibility
+      </p>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

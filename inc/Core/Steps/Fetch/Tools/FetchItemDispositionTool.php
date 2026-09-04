@@ -1,0 +1,604 @@
+<?php
+/**
+ * Fetch Item Disposition Tool
+ *
+ * Handler tool that allows the pipeline agent to explicitly reject or defer
+	 * a fetched source item. The step lifecycle completes or releases only the
+	 * exact packet claim identified by the successful tool result.
+ *
+ * This provides a safety net when keyword exclusions or other filters
+ * miss items that shouldn't be processed (e.g., non-music events).
+ *
+ * @package DataMachine\Core\Steps\Fetch\Tools
+ * @since 0.9.7
+ */
+
+namespace DataMachine\Core\Steps\Fetch\Tools;
+
+use DataMachine\Core\RunMetrics;
+use DataMachine\Core\EngineData;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\Steps\StepTypeMetadata;
+
+defined( 'ABSPATH' ) || exit;
+
+class FetchItemDispositionTool {
+
+	private const DISPOSITION_REJECT_SOURCE = 'reject_source';
+	private const DISPOSITION_DEFER_ITEM    = 'defer_item';
+	private const DISPOSITION_DEFER_EXHAUSTED = 'defer_exhausted';
+	private const MAX_DIAGNOSTIC_CHARS      = 1200;
+
+	/**
+	 * Handle the reject_source/defer_item tool call.
+	 *
+	 * @param array $parameters Tool parameters from AI (reason required).
+	 * @param array $tool_def Tool definition with handler_config.
+	 * @return array Tool result with success status.
+	 */
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		$disposition = $this->getDisposition( $tool_def );
+		if ( self::DISPOSITION_DEFER_ITEM === $disposition ) {
+			return $this->deferItem( $parameters, $tool_def );
+		}
+
+		return $this->rejectSource( $parameters, $tool_def );
+	}
+
+	/**
+	 * Mark the current source item as rejected.
+	 *
+	 * @param array $parameters Tool parameters from AI.
+	 * @param array $tool_def Tool definition with handler_config.
+	 * @return array Tool result with success status.
+	 */
+	private function rejectSource( array $parameters, array $tool_def ): array {
+		unset( $tool_def );
+
+		$reason    = trim( $parameters['reason'] ?? '' );
+		$tool_name = self::DISPOSITION_REJECT_SOURCE;
+
+		if ( empty( $reason ) ) {
+			return array(
+				'success'   => false,
+				'error'     => 'reason parameter is required - explain why this source is being rejected',
+				'tool_name' => $tool_name,
+			);
+		}
+
+		$job_id = (int) ( $parameters['job_id'] ?? 0 );
+		if ( ! $job_id ) {
+			return array(
+				'success'   => false,
+				'error'     => 'job_id is required for reject_source operations',
+				'tool_name' => $tool_name,
+			);
+		}
+
+		// Get engine data for item identification.
+		$engine = $this->resolveEngineData( $parameters, $job_id );
+		if ( ! $engine ) {
+			return array(
+				'success'   => false,
+				'error'     => 'Engine context not available',
+				'tool_name' => $tool_name,
+			);
+		}
+
+		// Get item identifier and source type from engine data (set by fetch handler)
+		$target          = $this->resolveTargetClaim( $engine, $parameters );
+		$item_identifier = $target['item_identifier'] ?? null;
+		$source_type     = $target['source_type'] ?? null;
+		$disposition_id  = $target['disposition_id'] ?? null;
+		if ( ! $target ) {
+			return array( 'success' => false, 'error' => 'packet disposition identity is required', 'tool_name' => $tool_name );
+		}
+		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
+		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_REJECT_SOURCE, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
+
+		$persisted = $this->persistDisposition(
+			$job_id,
+			(string) $disposition_id,
+			array(
+				'disposition'     => self::DISPOSITION_REJECT_SOURCE,
+				'reason'          => $reason,
+				'flow_step_id'    => $flow_step_id,
+				'item_identifier' => $item_identifier,
+				'source_type'     => $source_type,
+				'diagnostic'      => $diagnostic,
+			)
+		);
+		if ( empty( $persisted['success'] ) ) {
+			return array( 'success' => false, 'error' => 'packet rejection could not be persisted', 'tool_name' => $tool_name, 'disposition_id' => $disposition_id );
+		}
+		if ( empty( $persisted['created'] ) ) {
+			return $this->alreadyDispositionedResult( $tool_name, $persisted['record'], $job_id, (string) $disposition_id );
+		}
+
+		if ( $flow_step_id && class_exists( RunMetrics::class ) ) {
+			RunMetrics::recordStepResult(
+				$job_id,
+				(string) $flow_step_id,
+				array(
+					'step_type'               => 'fetch',
+					'result'                  => 'source_rejected',
+					'packet_count'            => 0,
+					'source_rejection_reason' => $reason,
+					'source_type'             => $source_type,
+					'item_identifier'         => $item_identifier,
+				)
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'FetchItemDispositionTool: Packet rejection persisted',
+			array(
+				'job_id' => $job_id,
+				'reason' => $reason,
+			)
+		);
+
+		return array(
+			'success'         => true,
+			'message'         => "Source rejected: {$reason}",
+			'item_identifier' => $item_identifier,
+			'tool_name'       => $tool_name,
+			'disposition'     => self::DISPOSITION_REJECT_SOURCE,
+			'disposition_id'  => $disposition_id,
+			'reason'          => $reason,
+		);
+	}
+
+	/**
+	 * Defer the current source item without marking it processed.
+	 *
+	 * @param array $parameters Tool parameters from AI.
+	 * @param array $tool_def Tool definition with handler_config.
+	 * @return array Tool result with success status.
+	 */
+	private function deferItem( array $parameters, array $tool_def ): array {
+		unset( $tool_def );
+
+		$reason    = trim( $parameters['reason'] ?? '' );
+		$tool_name = self::DISPOSITION_DEFER_ITEM;
+
+		if ( empty( $reason ) ) {
+			return array(
+				'success'   => false,
+				'error'     => 'reason parameter is required - explain why this item cannot be safely completed now',
+				'tool_name' => $tool_name,
+			);
+		}
+
+		$job_id = (int) ( $parameters['job_id'] ?? 0 );
+		if ( ! $job_id ) {
+			return array(
+				'success'   => false,
+				'error'     => 'job_id is required for defer_item operations',
+				'tool_name' => $tool_name,
+			);
+		}
+
+		$engine = $this->resolveEngineData( $parameters, $job_id );
+		if ( ! $engine ) {
+			return array(
+				'success'   => false,
+				'error'     => 'Engine context not available',
+				'tool_name' => $tool_name,
+			);
+		}
+
+		$target          = $this->resolveTargetClaim( $engine, $parameters );
+		$item_identifier = $target['item_identifier'] ?? null;
+		$source_type     = $target['source_type'] ?? null;
+		$disposition_id  = $target['disposition_id'] ?? null;
+		if ( ! $target ) {
+			return array( 'success' => false, 'error' => 'packet disposition identity is required', 'tool_name' => $tool_name );
+		}
+		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
+		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_DEFER_ITEM, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
+
+		$persisted = $this->persistDisposition(
+			$job_id,
+			(string) $disposition_id,
+			array(
+				'disposition'     => self::DISPOSITION_DEFER_ITEM,
+				'reason'          => $reason,
+				'flow_step_id'    => $flow_step_id,
+				'item_identifier' => $item_identifier,
+				'source_type'     => $source_type,
+				'diagnostic'      => $diagnostic,
+			)
+		);
+		if ( empty( $persisted['success'] ) ) {
+			return array( 'success' => false, 'error' => 'packet deferral could not be persisted', 'tool_name' => $tool_name, 'disposition_id' => $disposition_id );
+		}
+		if ( empty( $persisted['created'] ) && self::DISPOSITION_DEFER_ITEM !== ( $persisted['record']['disposition'] ?? '' ) ) {
+			return $this->alreadyDispositionedResult( $tool_name, $persisted['record'], $job_id, (string) $disposition_id );
+		}
+
+		$attempt = ( new ProcessedItems() )->record_owned_deferral_attempt( $target, $job_id );
+		if ( false === $attempt ) {
+			return array( 'success' => false, 'error' => 'packet deferral attempt could not be persisted', 'tool_name' => $tool_name, 'disposition_id' => $disposition_id );
+		}
+		if ( $attempt['exhausted'] && ! $this->persistDeferralExhaustion( $job_id, (string) $disposition_id, $attempt['attempts'] ) ) {
+			return array( 'success' => false, 'error' => 'packet deferral exhaustion could not be persisted', 'tool_name' => $tool_name, 'disposition_id' => $disposition_id );
+		}
+
+		if ( $flow_step_id && class_exists( RunMetrics::class ) ) {
+			RunMetrics::recordStepResult(
+				$job_id,
+				(string) $flow_step_id,
+				array(
+					'step_type'       => 'fetch',
+					'result'          => $attempt['exhausted'] ? 'defer_exhausted' : 'item_deferred',
+					'packet_count'    => 0,
+					'reason'          => $attempt['exhausted'] ? 'defer-exhausted' : 'item-deferred',
+					'source_type'     => $source_type,
+					'item_identifier' => $item_identifier,
+				)
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'FetchItemDispositionTool: Packet deferral persisted',
+			array(
+				'job_id'          => $job_id,
+				'flow_step_id'    => $flow_step_id,
+				'item_identifier' => $item_identifier,
+				'source_type'     => $source_type,
+				'reason'          => $reason,
+				'deferral_attempts' => $attempt['attempts'],
+				'deferral_cap'      => ProcessedItems::MAX_DEFERRAL_ATTEMPTS,
+				'exhausted'         => $attempt['exhausted'],
+			)
+		);
+
+		return array(
+			'success'               => true,
+			'message'               => $attempt['exhausted'] ? "Item deferral limit reached: {$reason}" : "Item deferred for retry: {$reason}",
+			'item_identifier'       => $item_identifier,
+			'tool_name'             => $tool_name,
+			'disposition'           => $attempt['exhausted'] ? self::DISPOSITION_DEFER_EXHAUSTED : self::DISPOSITION_DEFER_ITEM,
+			'disposition_id'        => $disposition_id,
+			'reason'                => $reason,
+			'deferral_attempts'     => $attempt['attempts'],
+			'deferral_cap'          => ProcessedItems::MAX_DEFERRAL_ATTEMPTS,
+			'exhausted'             => $attempt['exhausted'],
+			'already_dispositioned' => empty( $persisted['created'] ),
+		);
+	}
+
+	/** Refine a won defer disposition to terminal exhaustion without allowing another disposition to replace it. */
+	private function persistDeferralExhaustion( int $job_id, string $disposition_id, int $attempts ): bool {
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $disposition_id, $attempts ): array {
+				$record = is_array( $engine['packet_dispositions'][ $disposition_id ] ?? null ) ? $engine['packet_dispositions'][ $disposition_id ] : array();
+				if ( self::DISPOSITION_DEFER_ITEM !== ( $record['disposition'] ?? '' ) && self::DISPOSITION_DEFER_EXHAUSTED !== ( $record['disposition'] ?? '' ) ) {
+					return $engine;
+				}
+				$record['disposition']      = self::DISPOSITION_DEFER_EXHAUSTED;
+				$record['deferral_attempts'] = $attempts;
+				if ( is_array( $record['diagnostic'] ?? null ) ) {
+					$record['diagnostic']['disposition']      = self::DISPOSITION_DEFER_EXHAUSTED;
+					$record['diagnostic']['deferral_attempts'] = $attempts;
+				}
+				$engine['packet_dispositions'][ $disposition_id ] = $record;
+				return $engine;
+			},
+			'packet_deferral_exhausted'
+		);
+
+		return ! empty( $result['success'] );
+	}
+
+	/**
+	 * Atomically persist the first disposition recorded for a packet identity.
+	 *
+	 * @return array{success:bool,created:bool,record:array{disposition:string,reason:string}}
+	 */
+	private function persistDisposition( int $job_id, string $disposition_id, array $record ): array {
+		$created  = false;
+		$selected = array();
+		$result   = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $disposition_id, $record, &$created, &$selected ): array {
+				$existing = is_array( $engine['packet_dispositions'][ $disposition_id ] ?? null ) ? $engine['packet_dispositions'][ $disposition_id ] : array();
+				if ( '' !== (string) ( $existing['disposition'] ?? '' ) ) {
+					$created  = false;
+					$selected = $existing;
+					return $engine;
+				}
+
+				$created  = true;
+				$selected = $record;
+				$engine['packet_dispositions'][ $disposition_id ] = $record;
+				return $engine;
+			},
+			'packet_disposition_first_write'
+		);
+
+		return array(
+			'success' => ! empty( $result['success'] ),
+			'created' => $created,
+			'record'  => array(
+				'disposition' => (string) ( $selected['disposition'] ?? '' ),
+				'reason'      => (string) ( $selected['reason'] ?? '' ),
+			),
+		);
+	}
+
+	/**
+	 * Build the idempotent success result for an already-dispositioned job.
+	 *
+	 * Returned as success so the model is not pushed into error-retry loops;
+	 * the original disposition for this packet remains authoritative.
+	 *
+	 * @param string                                              $tool_name Tool that attempted the second disposition.
+	 * @param array{disposition:string,reason:string} $existing  Existing disposition record.
+	 * @param int                                                 $job_id    Job ID.
+	 * @return array Tool result.
+	 */
+	private function alreadyDispositionedResult( string $tool_name, array $existing, int $job_id, string $disposition_id ): array {
+		$label = match ( $existing['disposition'] ) {
+			self::DISPOSITION_DEFER_ITEM => 'item-deferred',
+			self::DISPOSITION_DEFER_EXHAUSTED => 'defer-exhausted',
+			default => 'source-rejected',
+		};
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'FetchItemDispositionTool: Ignoring repeat disposition call - job already dispositioned',
+			array(
+				'job_id'               => $job_id,
+				'attempted_tool'       => $tool_name,
+				'existing_disposition' => $existing['disposition'],
+				'disposition_id'       => $disposition_id,
+			)
+		);
+
+		return array(
+			'success'              => true,
+			'message'              => "Item already dispositioned ({$label}); no further action needed.",
+			'tool_name'            => $tool_name,
+			'disposition'          => $existing['disposition'],
+			'disposition_id'       => $disposition_id,
+			'reason'               => $existing['reason'],
+			'already_dispositioned' => true,
+		);
+	}
+
+	/**
+	 * Return the disposition encoded by the resolved tool definition.
+	 *
+	 * @param array $tool_def Tool definition.
+	 * @return string
+	 */
+	private function getDisposition( array $tool_def ): string {
+		$disposition = $tool_def['disposition'] ?? self::DISPOSITION_REJECT_SOURCE;
+
+		return self::DISPOSITION_DEFER_ITEM === $disposition ? self::DISPOSITION_DEFER_ITEM : self::DISPOSITION_REJECT_SOURCE;
+	}
+
+	/** Resolve a stable packet identity against engine-owned claim descriptors. */
+	private function resolveTargetClaim( object $engine, array $parameters ): array {
+		$container = array(
+			ProcessedItems::CLAIM_METADATA_KEY  => $engine->get( ProcessedItems::CLAIM_METADATA_KEY ),
+			ProcessedItems::CLAIMS_METADATA_KEY => $engine->get( ProcessedItems::CLAIMS_METADATA_KEY ),
+		);
+		return ProcessedItems::resolve_disposition_claim( $container, (string) ( $parameters['disposition_id'] ?? '' ), true ) ?? array();
+	}
+
+	/**
+	 * Resolve engine data from explicit runtime context or persisted job state.
+	 *
+	 * @param array<string,mixed> $parameters Tool parameters.
+	 * @param int                 $job_id Job ID.
+	 * @return object|null Engine-like object exposing get(), or null.
+	 */
+	private function resolveEngineData( array $parameters, int $job_id ): ?object {
+		$engine = $parameters['engine'] ?? null;
+		if ( is_object( $engine ) && method_exists( $engine, 'get' ) ) {
+			return $engine;
+		}
+
+		if ( $job_id <= 0 ) {
+			return null;
+		}
+
+		return EngineData::forJob( $job_id );
+	}
+
+	/**
+	 * Resolve the item-disposition source step ID from engine flow config.
+	 *
+	 * @param object $engine Engine data wrapper.
+	 * @return string|null Source step ID, or null when unavailable.
+	 */
+	private function resolveFetchFlowStepId( object $engine ): ?string {
+		$flow_config = $engine->get( 'flow_config' );
+		if ( ! is_array( $flow_config ) ) {
+			return null;
+		}
+
+		foreach ( $flow_config as $step_id => $config ) {
+			if ( ! is_array( $config ) ) {
+				continue;
+			}
+
+			if ( StepTypeMetadata::supportsItemDisposition( (string) ( $config['step_type'] ?? '' ) ) ) {
+				return (string) $step_id;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Build bounded, generic evidence for skipped/deferred source decisions.
+	 *
+	 * @param string     $disposition     Disposition slug.
+	 * @param string     $tool_name       Tool name.
+	 * @param string     $reason          Operator-visible disposition reason.
+	 * @param mixed      $flow_step_id    Flow step ID.
+	 * @param mixed      $item_identifier Source item identifier.
+	 * @param mixed      $source_type     Source type.
+	 * @param array      $parameters      Tool parameters including current data packets.
+	 * @return array<string,mixed>
+	 */
+	private function buildDispositionDiagnostic( string $disposition, string $tool_name, string $reason, mixed $flow_step_id, mixed $item_identifier, mixed $source_type, array $parameters ): array {
+		$packets       = is_array( $parameters['data'] ?? null ) ? $parameters['data'] : array();
+		$packet        = $this->selectDiagnosticPacket( $packets, $item_identifier );
+		$packet_data   = is_array( $packet['data'] ?? null ) ? $packet['data'] : array();
+		$metadata      = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+		$excerpt       = $this->packetExcerpt( $packet_data );
+		$bounded       = $this->boundAndRedact( $excerpt );
+		$diagnostic    = array(
+			'type'            => 'pipeline_disposition_diagnostic',
+			'disposition'     => $disposition,
+			'reason'          => $this->cleanScalar( $reason ),
+			'tool_name'       => $this->cleanScalar( $tool_name ),
+			'item_identifier' => $this->cleanScalar( $item_identifier ),
+			'source_url'      => $this->sourceUrlFromMetadata( $metadata ),
+			'provider'        => $this->providerFromMetadata( $metadata ),
+			'source_type'     => $this->cleanScalar( $source_type ? $source_type : ( $metadata['source_type'] ?? '' ) ),
+			'flow_step_id'    => $this->cleanScalar( $flow_step_id ),
+			'packet_count'    => count( $packets ),
+			'excerpt'         => $bounded['text'],
+			'excerpt_chars'   => strlen( $bounded['text'] ),
+			'excerpt_limit'   => self::MAX_DIAGNOSTIC_CHARS,
+			'truncated'       => $bounded['truncated'],
+		);
+
+		if ( '' === $diagnostic['excerpt'] ) {
+			$diagnostic['diagnostic'] = $this->packetShapeDiagnostic( $packet );
+			unset( $diagnostic['excerpt'], $diagnostic['excerpt_chars'], $diagnostic['truncated'] );
+		}
+
+		return array_filter(
+			$diagnostic,
+			static fn( $value ) => null !== $value && '' !== $value && array() !== $value
+		);
+	}
+
+	/**
+	 * @param array<int,array<string,mixed>> $packets Data packets.
+	 * @param mixed                          $item_identifier Current item identifier.
+	 * @return array<string,mixed>
+	 */
+	private function selectDiagnosticPacket( array $packets, mixed $item_identifier ): array {
+		$item_identifier = (string) $item_identifier;
+		foreach ( $packets as $packet ) {
+			if ( ! is_array( $packet ) ) {
+				continue;
+			}
+
+			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+			if ( '' !== $item_identifier && $item_identifier === (string) ( $metadata['item_identifier'] ?? '' ) ) {
+				return $packet;
+			}
+		}
+
+		$first = reset( $packets );
+		return is_array( $first ) ? $first : array();
+	}
+
+	/**
+	 * @param array<string,mixed> $data Packet data.
+	 */
+	private function packetExcerpt( array $data ): string {
+		$parts = array();
+		foreach ( array( 'title', 'body', 'content', 'text', 'description', 'summary' ) as $key ) {
+			if ( ! isset( $data[ $key ] ) || is_array( $data[ $key ] ) || is_object( $data[ $key ] ) ) {
+				continue;
+			}
+
+			$value = trim( (string) $data[ $key ] );
+			if ( '' !== $value ) {
+				$parts[] = $value;
+			}
+		}
+
+		return trim( implode( "\n\n", $parts ) );
+	}
+
+	/**
+	 * @return array{text:string,truncated:bool}
+	 */
+	private function boundAndRedact( string $text ): array {
+		$text = wp_strip_all_tags( $text );
+		$text = trim( preg_replace( '/\s+/u', ' ', $text ) ?? '' );
+		$text = preg_replace( '/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/-]+=*/i', '$1 [redacted]', $text ) ?? $text;
+		$text = preg_replace( '/\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)\b\s*[:=]\s*[^\s,;]+/i', '$1=[redacted]', $text ) ?? $text;
+		$text = preg_replace( '/([?&](?:token|access_token|key|api_key|secret|password)=)[^&\s]+/i', '$1[redacted]', $text ) ?? $text;
+
+		$truncated = strlen( $text ) > self::MAX_DIAGNOSTIC_CHARS;
+		if ( $truncated ) {
+			$text = substr( $text, 0, self::MAX_DIAGNOSTIC_CHARS );
+		}
+
+		return array(
+			'text'      => $text,
+			'truncated' => $truncated,
+		);
+	}
+
+	/**
+	 * @param array<string,mixed> $metadata Packet metadata.
+	 */
+	private function sourceUrlFromMetadata( array $metadata ): string {
+		foreach ( array( 'source_url', 'url', 'permalink', 'link', 'guid' ) as $key ) {
+			if ( ! empty( $metadata[ $key ] ) && is_scalar( $metadata[ $key ] ) ) {
+				return $this->redactScalar( (string) $metadata[ $key ] );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * @param array<string,mixed> $metadata Packet metadata.
+	 */
+	private function providerFromMetadata( array $metadata ): string {
+		foreach ( array( 'provider_id', 'provider_slug', 'provider', 'auth_provider', 'server_key', 'context_server_key', 'handler' ) as $key ) {
+			if ( ! empty( $metadata[ $key ] ) && is_scalar( $metadata[ $key ] ) ) {
+				return $this->cleanScalar( (string) $metadata[ $key ] );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * @param array<string,mixed> $packet Packet data.
+	 */
+	private function packetShapeDiagnostic( array $packet ): string {
+		$data     = is_array( $packet['data'] ?? null ) ? $packet['data'] : array();
+		$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+
+		return sprintf(
+			'No textual packet excerpt available; packet keys: %s; metadata keys: %s',
+			implode( ',', array_slice( array_map( 'strval', array_keys( $data ) ), 0, 12 ) ),
+			implode( ',', array_slice( array_map( 'strval', array_keys( $metadata ) ), 0, 12 ) )
+		);
+	}
+
+	private function cleanScalar( mixed $value ): string {
+		if ( ! is_scalar( $value ) ) {
+			return '';
+		}
+
+		return trim( preg_replace( '/\s+/u', ' ', (string) $value ) ?? '' );
+	}
+
+	private function redactScalar( string $value ): string {
+		$bounded = $this->boundAndRedact( $value );
+		return $bounded['text'];
+	}
+}

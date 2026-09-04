@@ -1,0 +1,13 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "marketing",
+    "editorial",
+    "wordpress",
+    "has-form",
+    "has-nav",
+    "multipage",
+    "scroll-animation"
+  ],
+  "complexity": 2
+}

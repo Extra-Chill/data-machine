@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plant Care Advice — Juniper Lane Plant Shop</title>
+  <meta name="description" content="Real plant care tips from Juniper Lane in Benton Harbor, Michigan. Watering, light, repotting, and common troubleshooting — plain language, no fuss.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .tip-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+    .tip-card {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      border: 1px solid var(--parchment);
+      transition: box-shadow 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+    }
+    .tip-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+    }
+    .tip-card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+    .tip-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      margin-bottom: 0.6rem;
+    }
+    .tip-card p {
+      font-size: 0.9rem;
+      color: var(--forest-mid);
+      line-height: 1.7;
+    }
+    .tip-card .tip-sub {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--parchment);
+      font-size: 0.83rem;
+      color: var(--forest-mid);
+      font-style: italic;
+    }
+    .plant-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1.25rem;
+      align-items: center;
+      padding: 1.75rem 0;
+      border-bottom: 1px solid var(--parchment);
+    }
+    .plant-row:first-child { padding-top: 0; }
+    .plant-badges {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.6rem;
+    }
+    .badge {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-pill);
+    }
+    .badge-green  { background: var(--sage-pale); color: var(--forest-mid); }
+    .badge-rust   { background: #f0ddd0; color: var(--rust); }
+    .badge-gold   { background: var(--gold-pale); color: var(--bark); }
+    .badge-forest { background: #d4e3d5; color: var(--forest); }
+    .quick-ref {
+      background: var(--forest);
+      color: var(--cream);
+      border-radius: var(--radius-xl);
+      padding: 2.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .quick-ref::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 80% 20%, rgba(93,138,98,0.25) 0%, transparent 60%);
+    }
+    .quick-ref-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      position: relative;
+      z-index: 2;
+    }
+    .quick-ref-item h4 {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      color: var(--cream);
+      margin-bottom: 0.4rem;
+    }
+    .quick-ref-item p {
+      font-size: 0.83rem;
+      color: rgba(245,237,215,0.65);
+      line-height: 1.65;
+    }
+    @media (max-width: 720px) {
+      .tip-grid { grid-template-columns: 1fr; }
+      .quick-ref-grid { grid-template-columns: 1fr; }
+      .plant-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo" aria-label="Juniper Lane Home">
+      <svg class="logo-mark" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+        <circle cx="18" cy="18" r="17" fill="#D0E3D2" stroke="#5D8A62" stroke-width="1.5"/>
+        <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#5D8A62"/>
+        <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#3A5438"/>
+        <ellipse cx="18" cy="30.5" rx="4" ry="1.5" fill="#B85A37" opacity="0.6"/>
+      </svg>
+      <span>
+        <span class="logo-text">Juniper Lane</span>
+        <span class="logo-sub">Plant Shop &amp; Gifts</span>
+      </span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html">Workshops</a>
+      <a href="plant-care.html" class="active">Plant Care</a>
+      <a href="events.html">Private Events</a>
+      <a href="visit.html">Visit Us</a>
+    </nav>
+    <div class="header-cta">
+      <a href="tel:+12695550193" class="phone-cta">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        (269) 555-0193
+      </a>
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav" role="dialog" aria-label="Navigation menu">
+  <div class="mobile-nav-overlay" aria-hidden="true"></div>
+  <div class="mobile-nav-panel">
+    <nav class="mobile-nav-links">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html">Workshops</a>
+      <a href="plant-care.html">Plant Care</a>
+      <a href="events.html">Private Events</a>
+      <a href="visit.html">Visit Us</a>
+    </nav>
+    <div class="mobile-nav-info">
+      <div>214 Maple Street · Benton Harbor, MI</div>
+      <div style="margin-top:0.5rem">Wed–Sat 10am–6pm · Sun 11am–4pm</div>
+    </div>
+    <div class="mobile-nav-phone">
+      <a href="tel:+12695550193" class="btn btn-primary btn-lg" style="width:100%; justify-content:center;">Call Us</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE HERO ========== -->
+<section class="page-hero">
+  <div class="container page-hero-inner">
+    <span class="eyebrow">From Us to You</span>
+    <h1>Plant Care Advice</h1>
+    <p class="lead">Plain language, no fuss. The stuff we actually tell customers when they buy a plant from us.</p>
+  </div>
+</section>
+
+<!-- ========== CORE TIPS ========== -->
+<section class="section" aria-labelledby="core-tips-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="eyebrow">The Fundamentals</span>
+      <h2 id="core-tips-heading" style="margin-top:0.5rem;">Most plants die from <em style="font-style:italic; color:var(--terracotta)">one of four things.</em></h2>
+      <div class="section-divider"></div>
+      <p class="lead" style="max-width:600px; margin-top:1rem;">Get these right and you'll keep most plants alive indefinitely. We promise they're simpler than the internet makes them look.</p>
+    </div>
+
+    <div class="tip-grid">
+      <!-- Watering -->
+      <div class="tip-card reveal reveal-delay-1">
+        <div class="tip-card-icon" style="background:rgba(93,138,98,0.12);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 2C12 2 5 10 5 15C5 18.87 8.13 22 12 22C15.87 22 19 18.87 19 15C19 10 12 2 12 2Z" fill="#5D8A62"/>
+            <path d="M12 18 C10 18 8 16.5 8 15" stroke="rgba(245,237,215,0.8)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3>Watering</h3>
+        <p>Most people overwater. The most reliable test: stick your finger an inch into the soil. If it's damp, wait. If it's dry, water thoroughly — enough that water runs out the drainage hole. Then empty the saucer so the roots aren't sitting in water.</p>
+        <p class="tip-sub">Tip: Pots with drainage holes are not optional. Rocks at the bottom of a pot without a hole don't help — they just move the problem deeper.</p>
+      </div>
+
+      <!-- Light -->
+      <div class="tip-card reveal reveal-delay-2">
+        <div class="tip-card-icon" style="background:rgba(196,147,58,0.12);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="5" fill="#C4933A"/>
+            <line x1="12" y1="2" x2="12" y2="5" stroke="#C4933A" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="12" y1="19" x2="12" y2="22" stroke="#C4933A" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="2" y1="12" x2="5" y2="12" stroke="#C4933A" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="19" y1="12" x2="22" y2="12" stroke="#C4933A" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="4.93" y1="4.93" x2="7.05" y2="7.05" stroke="#C4933A" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="16.95" y1="16.95" x2="19.07" y2="19.07" stroke="#C4933A" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="4.93" y1="19.07" x2="7.05" y2="16.95" stroke="#C4933A" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="16.95" y1="7.05" x2="19.07" y2="4.93" stroke="#C4933A" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3>Light</h3>
+        <p>"Low light" doesn't mean no light — it means no direct sun rays. A room with windows on a cloudy Michigan day is still bright enough for pothos, snake plants, and ZZ plants. "Bright indirect" means near a window but not in the sunbeam. "Direct sun" means on the sill in a south- or west-facing window.</p>
+        <p class="tip-sub">Tip: If a plant is reaching or leaning toward the window, it needs more light. Rotate it a quarter turn every two weeks to keep it growing evenly.</p>
+      </div>
+
+      <!-- Soil & Pots -->
+      <div class="tip-card reveal reveal-delay-3">
+        <div class="tip-card-icon" style="background:rgba(122,82,51,0.1);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 14 L5 20 Q5 22 7 22 L17 22 Q19 22 19 20 L18 14 Z" fill="#B85A37"/>
+            <ellipse cx="12" cy="14" rx="8" ry="3" fill="#C4933A"/>
+            <path d="M12 14 C12 10 10 6 12 2" stroke="#5D8A62" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M12 10 C10 8 6 8 6 12" stroke="#5D8A62" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <h3>Soil &amp; Pots</h3>
+        <p>Potting soil from the hardware store is fine for most tropical houseplants. For succulents and cacti, mix in perlite at roughly 50/50 to improve drainage. For orchids, use bark. Never put a plant in a pot that's much bigger than its current root ball — too much soil stays wet too long and rots the roots.</p>
+        <p class="tip-sub">Tip: Terracotta pots are more forgiving than plastic because they're breathable and help prevent overwatering. A great choice for beginners or anyone who tends to water too much.</p>
+      </div>
+
+      <!-- Feeding & Seasons -->
+      <div class="tip-card reveal reveal-delay-4">
+        <div class="tip-card-icon" style="background:rgba(36,53,32,0.08);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 2 C8 2 4 6 4 11 C4 16 8 20 12 22 C16 20 20 16 20 11 C20 6 16 2 12 2Z" fill="#3A5438" opacity="0.8"/>
+            <path d="M12 22 L12 10" stroke="#88B38D" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M12 16 C10 14 7 14 7 17" stroke="#88B38D" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+            <path d="M12 13 C14 11 17 11 17 14" stroke="#88B38D" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <h3>Feeding &amp; Seasons</h3>
+        <p>Feed your plants during the growing season only — roughly April through September here in Michigan. A balanced liquid fertilizer diluted to half strength, once a month, is plenty. In winter, most tropical houseplants are in a rest period. Skip the fertilizer and water less frequently. They're not dying — they're just sleeping.</p>
+        <p class="tip-sub">Tip: Yellow leaves in fall don't always mean something is wrong. If it's happening slowly on lower leaves, it's usually just seasonal adjustment. Sudden widespread yellowing is a different story — usually overwatering.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PLANT-BY-PLANT GUIDE ========== -->
+<section class="section" style="background:var(--parchment);" aria-labelledby="by-plant-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="eyebrow">Quick Reference</span>
+      <h2 id="by-plant-heading" style="margin-top:0.5rem;">Care by <em style="font-style:italic; color:var(--sage)">plant</em></h2>
+      <div class="section-divider"></div>
+      <p class="lead" style="max-width:540px; margin-top:1rem;">The plants we carry most often, and what you need to know about each one.</p>
+    </div>
+
+    <div style="background:var(--white); border-radius:var(--radius-xl); padding:2.5rem; border:1px solid var(--parchment-dk);">
+
+      <div class="plant-row reveal">
+        <div>
+          <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:0.3rem;">Golden Pothos <em style="font-size:1rem; color:var(--forest-mid); font-weight:300">(Epipremnum aureum)</em></h4>
+          <p style="font-size:0.9rem; color:var(--forest-mid); line-height:1.65; max-width:600px;">Water every 1–2 weeks; let the top 2" dry out. Low to bright indirect light. Mist occasionally in winter when your heat is running and the air gets dry. Fertilize monthly in summer. One of the most forgiving plants we sell.</p>
+          <div class="plant-badges">
+            <span class="badge badge-green">Low Light OK</span>
+            <span class="badge badge-rust">Not Pet Safe</span>
+            <span class="badge badge-gold">Beginner Friendly</span>
+          </div>
+        </div>
+        <svg width="60" height="80" viewBox="0 0 60 80" fill="none" aria-hidden="true" style="flex-shrink:0;">
+          <path d="M30 75 C26 62 18 55 18 44 C18 35 22 28 30 24" stroke="#3A5438" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <path d="M28 50 C16 38 4 40 4 52 C4 60 14 66 26 62Z" fill="#5D8A62"/>
+          <path d="M32 38 C42 26 54 30 54 42 C54 50 44 56 32 52Z" fill="#6B9B70"/>
+          <path d="M28 26 C18 16 6 20 6 30 C6 38 18 44 28 40Z" fill="#88B38D"/>
+        </svg>
+      </div>
+
+      <div class="plant-row reveal reveal-delay-1">
+        <div>
+          <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:0.3rem;">Calathea Orbifolia <em style="font-size:1rem; color:var(--forest-mid); font-weight:300">(Calathea orbifolia)</em></h4>
+          <p style="font-size:0.9rem; color:var(--forest-mid); line-height:1.65; max-width:600px;">Water when the top inch dries out — but not bone dry. Prefers filtered or distilled water; tap water can cause brown leaf tips from fluoride. Keep humidity above 50% if possible. A pebble tray with water under the pot makes a noticeable difference in winter. No direct sun.</p>
+          <div class="plant-badges">
+            <span class="badge badge-green">Indirect Light</span>
+            <span class="badge badge-forest">Pet Safe</span>
+            <span class="badge badge-gold">Humidity Lover</span>
+          </div>
+        </div>
+        <svg width="60" height="80" viewBox="0 0 60 80" fill="none" aria-hidden="true" style="flex-shrink:0;">
+          <ellipse cx="30" cy="38" rx="22" ry="30" fill="#5D8A62"/>
+          <path d="M30 68 C30 68 16 52 16 38 C16 26 22 16 30 12" stroke="#3A5438" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M10 38 Q30 30 50 38" stroke="#88B38D" stroke-width="1.2" fill="none" opacity="0.6"/>
+          <path d="M12 46 Q30 38 48 46" stroke="#88B38D" stroke-width="1.2" fill="none" opacity="0.5"/>
+        </svg>
+      </div>
+
+      <div class="plant-row reveal reveal-delay-2">
+        <div>
+          <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:0.3rem;">Snake Plant <em style="font-size:1rem; color:var(--forest-mid); font-weight:300">(Dracaena trifasciata)</em></h4>
+          <p style="font-size:0.9rem; color:var(--forest-mid); line-height:1.65; max-width:600px;">Water every 2–6 weeks depending on your light level — less in winter, more in summer. Let the soil go completely dry between waterings. Survives low light but grows faster in brighter conditions. Almost impossible to kill by neglect; very easy to kill by overwatering.</p>
+          <div class="plant-badges">
+            <span class="badge badge-green">Any Light</span>
+            <span class="badge badge-rust">Not Pet Safe</span>
+            <span class="badge badge-gold">Drought Tolerant</span>
+          </div>
+        </div>
+        <svg width="60" height="80" viewBox="0 0 60 80" fill="none" aria-hidden="true" style="flex-shrink:0;">
+          <rect x="24" y="10" width="12" height="62" rx="5" fill="#5D8A62"/>
+          <rect x="24" y="10" width="3" height="62" rx="1.5" fill="#3A5438" opacity="0.3"/>
+          <rect x="33" y="10" width="3" height="62" rx="1.5" fill="#88B38D" opacity="0.3"/>
+          <rect x="14" y="18" width="10" height="55" rx="4" fill="#6B9B70" transform="rotate(-10 19 18)"/>
+          <rect x="36" y="20" width="10" height="52" rx="4" fill="#5D8A62" transform="rotate(9 41 20)"/>
+        </svg>
+      </div>
+
+      <div class="plant-row reveal reveal-delay-3">
+        <div>
+          <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:0.3rem;">Succulents &amp; Cacti</h4>
+          <p style="font-size:0.9rem; color:var(--forest-mid); line-height:1.65; max-width:600px;">The single biggest mistake: treating them like tropical plants. They need bright, direct or very bright indirect light (a south-facing window). Water thoroughly but infrequently — once every 2–4 weeks in summer, once a month or less in winter. Use cactus mix or add perlite to regular soil. Never mist. Never let them sit in water.</p>
+          <div class="plant-badges">
+            <span class="badge badge-gold">Bright Light Required</span>
+            <span class="badge badge-forest">Pet-Friendly Options</span>
+            <span class="badge badge-green">Drought Tolerant</span>
+          </div>
+        </div>
+        <svg width="60" height="80" viewBox="0 0 60 80" fill="none" aria-hidden="true" style="flex-shrink:0;">
+          <!-- Succulent rosette from side -->
+          <ellipse cx="30" cy="52" rx="28" ry="8" fill="#5D8A62" opacity="0.3"/>
+          <path d="M10 52 C8 40 16 30 30 28 C44 30 52 40 50 52Z" fill="#5D8A62"/>
+          <path d="M15 52 C14 42 20 34 30 32 C40 34 46 42 45 52Z" fill="#6B9B70"/>
+          <path d="M20 52 C19 44 23 38 30 36 C37 38 41 44 40 52Z" fill="#88B38D"/>
+          <ellipse cx="30" cy="48" rx="8" ry="5" fill="#5D8A62"/>
+        </svg>
+      </div>
+
+      <div class="plant-row reveal reveal-delay-4" style="border-bottom:none; padding-bottom:0;">
+        <div>
+          <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:0.3rem;">Peace Lily <em style="font-size:1rem; color:var(--forest-mid); font-weight:300">(Spathiphyllum)</em></h4>
+          <p style="font-size:0.9rem; color:var(--forest-mid); line-height:1.65; max-width:600px;">One of the best plants for telling you what it needs. When the leaves droop slightly, it's thirsty — water deeply and it perks back up within hours. Prefers low to medium indirect light. Blooms occasionally in bright indirect light. Wipe the large leaves with a damp cloth every couple of months to remove dust.</p>
+          <div class="plant-badges">
+            <span class="badge badge-green">Low Light OK</span>
+            <span class="badge badge-rust">Not Pet Safe</span>
+            <span class="badge badge-gold">Self-Signals</span>
+          </div>
+        </div>
+        <svg width="60" height="80" viewBox="0 0 60 80" fill="none" aria-hidden="true" style="flex-shrink:0;">
+          <path d="M30 78 C30 68 26 55 28 40 C30 28 30 18 30 12" stroke="#3A5438" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <path d="M26 55 C12 42 2 48 4 60 C6 70 20 74 30 68Z" fill="#5D8A62"/>
+          <path d="M34 42 C46 30 58 36 58 48 C58 58 46 64 34 58Z" fill="#6B9B70"/>
+          <path d="M28 30 C18 20 8 26 10 38 C12 48 24 52 30 44Z" fill="#5D8A62"/>
+          <path d="M32 26 C32 14 36 8 38 6 C40 10 40 18 34 26Z" fill="white"/>
+          <rect x="34" y="12" width="2" height="14" rx="1" fill="#E8C97A"/>
+        </svg>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ========== QUICK REFERENCE ========== -->
+<section class="section" aria-labelledby="quick-ref-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="eyebrow">Common Problems</span>
+      <h2 id="quick-ref-heading" style="margin-top:0.5rem;">Something <em style="font-style:italic; color:var(--terracotta)">going wrong?</em></h2>
+      <div class="section-divider"></div>
+    </div>
+
+    <div class="quick-ref reveal">
+      <div class="quick-ref-grid">
+        <div class="quick-ref-item">
+          <h4>Yellow leaves</h4>
+          <p>Usually overwatering — the most common problem. Check your drainage and let the soil dry out more between waterings. If it's just lower leaves yellowing slowly, it may be normal leaf turnover.</p>
+        </div>
+        <div class="quick-ref-item">
+          <h4>Brown leaf tips</h4>
+          <p>Low humidity or fluoride in tap water. Try filtered or distilled water. In winter, run a humidifier or set your plant on a pebble tray with water. Once brown, tips won't green back up — trim them at an angle with clean scissors.</p>
+        </div>
+        <div class="quick-ref-item">
+          <h4>Drooping leaves</h4>
+          <p>Usually either too dry (water it!) or root rot from overwatering (stop watering and check the roots). If the soil is soggy and roots look brown and mushy, it needs repotting into fresh dry mix immediately.</p>
+        </div>
+        <div class="quick-ref-item">
+          <h4>Leggy or reaching</h4>
+          <p>Not enough light. Move it closer to a window or supplement with a grow light. Plants stretch toward light in low conditions — this isn't always deadly but slows growth and weakens the plant over time.</p>
+        </div>
+        <div class="quick-ref-item">
+          <h4>White spots on leaves</h4>
+          <p>Could be mineral deposits from hard water (wipe with a damp cloth), powdery mildew (improve air circulation, reduce humidity around leaves), or spider mites (check the undersides of leaves for fine webbing).</p>
+        </div>
+        <div class="quick-ref-item">
+          <h4>Tiny bugs in the soil</h4>
+          <p>Fungus gnats — annoying but rarely fatal. Let the top 2 inches of soil dry out completely between waterings to interrupt their life cycle. Yellow sticky traps catch the adults. A diluted hydrogen peroxide soil drench kills larvae.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="highlight-box reveal" style="margin-top:2rem;">
+      <div style="display:grid; grid-template-columns:1fr auto; gap:1.5rem; align-items:center;">
+        <div>
+          <span class="eyebrow" style="display:block; margin-bottom:0.5rem;">Still stumped?</span>
+          <h4 style="font-family:var(--font-display); font-size:1.35rem; margin-bottom:0.4rem;">Bring it in. We'll take a look.</h4>
+          <p style="font-size:0.9rem; color:var(--forest-mid); line-height:1.65;">We're happy to do a quick diagnosis on a plant you bought from us — or from anywhere else, honestly. Bring it in during store hours or call to describe what's happening and we'll try to help over the phone.</p>
+        </div>
+        <a href="visit.html" class="btn btn-sage btn-lg" style="flex-shrink:0; white-space:nowrap;">Find Our Hours</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="cta-band">
+  <div class="container" style="position:relative;z-index:2;">
+    <h2>Questions we haven't answered?</h2>
+    <p class="lead">Call us. We love talking about plants almost as much as we love selling them.</p>
+    <a href="tel:+12695550193" class="btn-white">
+      <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+        <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Call (269) 555-0193
+    </a>
+  </div>
+</div>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="site-logo" style="margin-bottom:0.75rem; display:inline-flex;">
+          <svg class="logo-mark" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+            <circle cx="18" cy="18" r="17" fill="rgba(93,138,98,0.3)" stroke="#5D8A62" stroke-width="1.5"/>
+            <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#88B38D"/>
+            <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#5D8A62"/>
+          </svg>
+          <span>
+            <span class="logo-text">Juniper Lane</span>
+            <span class="logo-sub">Plant Shop &amp; Gifts</span>
+          </span>
+        </a>
+        <p class="footer-tagline">A warm neighborhood shop rooted in Benton Harbor since 2018.</p>
+      </div>
+      <div>
+        <div class="footer-heading">Explore</div>
+        <ul class="footer-links">
+          <li><a href="shop.html">Shop</a></li>
+          <li><a href="workshops.html">Workshops</a></li>
+          <li><a href="plant-care.html">Plant Care Tips</a></li>
+          <li><a href="events.html">Private Events</a></li>
+          <li><a href="visit.html">Visit Us</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-heading">Find Us</div>
+        <div class="footer-info">
+          <strong>214 Maple Street</strong><br>
+          Benton Harbor, MI 49022<br><br>
+          <strong>Wed–Sat</strong> 10am–6pm<br>
+          <strong>Sunday</strong> 11am–4pm<br>
+          Mon &amp; Tue: Closed<br><br>
+          <a href="tel:+12695550193" style="color:var(--sage-light);">(269) 555-0193</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-heading">Stay in the Loop</div>
+        <p style="font-size:0.85rem; color:rgba(245,237,215,0.6); margin-bottom:1rem; line-height:1.6;">Care guides, workshop dates, and new arrivals.</p>
+        <div class="newsletter-wrap">
+          <form class="newsletter-form" aria-label="Newsletter signup">
+            <input type="email" placeholder="your@email.com" required autocomplete="email">
+            <button type="submit">Subscribe</button>
+          </form>
+          <div class="newsletter-success" role="status">You're on the list. See you soon!</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-copy">© 2025 Juniper Lane · 214 Maple Street, Benton Harbor, MI</span>
+      <span class="footer-copy">Made with care in Michigan</span>
+    </div>
+  </div>
+</footer>
+
+<a href="tel:+12695550193" class="mobile-phone-bar" aria-label="Call Juniper Lane">
+  <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+    <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  Call Us · (269) 555-0193
+</a>
+
+<script src="main.js"></script>
+</body>
+</html>

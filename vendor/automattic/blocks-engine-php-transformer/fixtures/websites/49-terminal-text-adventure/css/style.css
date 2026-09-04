@@ -1,0 +1,502 @@
+/* ============================================================================
+   THE WAKING DEPTH — Saltwire Interactive
+   CRT terminal interactive fiction. Vanilla CSS.
+   Phosphor-green theme, scanlines + glow gated behind prefers-reduced-motion.
+   ============================================================================ */
+
+:root {
+  --bg: #04100a;
+  --bg-deep: #020a06;
+  --phosphor: #6effb0;
+  --phosphor-dim: #3fae7e;
+  --phosphor-faint: #1f6b4d;
+  --amber: #ffcf6e;
+  --rose: #ff8fa3;
+  --panel: #06160e;
+  --panel-line: #0e3324;
+  --glow: 0 0 6px rgba(110, 255, 176, 0.55), 0 0 18px rgba(110, 255, 176, 0.18);
+  --mono: "VT323", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --ui: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: radial-gradient(ellipse at 50% -10%, #0a2418 0%, var(--bg) 45%, var(--bg-deep) 100%);
+  color: var(--phosphor);
+  font-family: var(--ui);
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--amber); text-decoration: none; }
+a:hover, a:focus { text-decoration: underline; outline: none; }
+a:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+::selection { background: var(--phosphor-dim); color: #02160d; }
+
+/* ───────────────────────── HEADER ───────────────────────── */
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.4rem;
+  border-bottom: 1px solid var(--panel-line);
+  background: linear-gradient(180deg, rgba(8,30,20,0.9), rgba(4,16,10,0.6));
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(3px);
+}
+.brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.brand .glyph {
+  font-family: var(--mono);
+  font-size: 1.6rem;
+  letter-spacing: 0.06em;
+  color: var(--phosphor);
+  text-shadow: var(--glow);
+}
+.brand .studio {
+  font-size: 0.6rem;
+  letter-spacing: 0.34em;
+  color: var(--phosphor-dim);
+  text-transform: uppercase;
+  margin-top: 0.3rem;
+}
+.site-nav {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.site-nav a {
+  color: var(--phosphor-dim);
+  border: 1px solid transparent;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-radius: 2px;
+}
+.site-nav a:hover, .site-nav a.active {
+  color: var(--phosphor);
+  border-color: var(--panel-line);
+  background: rgba(110,255,176,0.05);
+  text-decoration: none;
+  text-shadow: var(--glow);
+}
+
+/* ───────────────────────── GAME LAYOUT ───────────────────────── */
+
+.game-shell {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1rem;
+  max-width: 1180px;
+  margin: 1rem auto;
+  padding: 0 1rem;
+  align-items: start;
+}
+
+/* CRT bezel + screen */
+.crt {
+  border-radius: 14px;
+  padding: 14px;
+  background:
+    linear-gradient(160deg, #0a1a12, #050d09);
+  border: 1px solid #12251b;
+  box-shadow:
+    0 0 0 2px #02100a,
+    0 24px 60px rgba(0,0,0,0.6),
+    inset 0 0 40px rgba(0,0,0,0.7);
+  position: relative;
+}
+
+#terminal {
+  position: relative;
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at 50% 40%, #06180f 0%, #04110a 70%, #020a06 100%);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: min(72vh, 640px);
+  border: 1px solid #0c2418;
+}
+
+/* scanlines + vignette overlays (animation gated below) */
+#terminal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0) 0px,
+    rgba(0,0,0,0) 2px,
+    rgba(0,0,0,0.22) 3px,
+    rgba(0,0,0,0.22) 4px
+  );
+  z-index: 6;
+  mix-blend-mode: multiply;
+}
+#terminal::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 7;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%);
+}
+
+.term-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.8rem;
+  border-bottom: 1px solid #0c2418;
+  background: rgba(4,16,10,0.7);
+  font-size: 0.66rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--phosphor-dim);
+  z-index: 8;
+  position: relative;
+}
+.term-bar .dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--phosphor);
+  box-shadow: var(--glow);
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+.term-tools { display: flex; gap: 0.35rem; }
+.term-tools button {
+  font-family: var(--ui);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--phosphor-dim);
+  border: 1px solid var(--panel-line);
+  border-radius: 2px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.term-tools button:hover { color: var(--phosphor); border-color: var(--phosphor-faint); }
+.term-tools button:focus-visible { outline: 2px solid var(--amber); }
+
+/* scrollback */
+#screen {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.1rem 1.4rem;
+  font-family: var(--mono);
+  font-size: 1.18rem;
+  line-height: 1.42;
+  color: var(--phosphor);
+  text-shadow: var(--glow);
+  z-index: 4;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: var(--phosphor-faint) transparent;
+}
+#screen::-webkit-scrollbar { width: 8px; }
+#screen::-webkit-scrollbar-thumb { background: var(--phosphor-faint); border-radius: 4px; }
+
+.line {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0 0 0.55rem;
+}
+.line.echo { color: var(--amber); text-shadow: 0 0 6px rgba(255,207,110,0.4); }
+.line.sys { color: var(--phosphor-dim); font-style: italic; }
+.line.title {
+  color: #aef7cf;
+  font-size: 1.5rem;
+  letter-spacing: 0.08em;
+}
+.line.win {
+  color: #c9ffe2;
+  text-shadow: 0 0 8px rgba(110,255,176,0.7), 0 0 22px rgba(110,255,176,0.35);
+}
+
+/* input line */
+#cmd-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem 0.9rem;
+  border-top: 1px solid #0c2418;
+  background: rgba(3,12,8,0.6);
+  z-index: 8;
+  position: relative;
+}
+.prompt-glyph {
+  font-family: var(--mono);
+  font-size: 1.3rem;
+  color: var(--phosphor);
+  text-shadow: var(--glow);
+}
+#cmd {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--phosphor);
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+  text-shadow: var(--glow);
+  caret-color: var(--phosphor);
+}
+#cmd::placeholder { color: var(--phosphor-faint); }
+
+/* blinking block cursor that trails the input via animated caret fallback */
+.cursor-block {
+  width: 0.6ch;
+  height: 1.1em;
+  background: var(--phosphor);
+  box-shadow: var(--glow);
+  animation: blink 1.05s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ───────────────────────── SIDE PANEL ───────────────────────── */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: sticky;
+  top: 80px;
+}
+.panel {
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 0.9rem;
+}
+.panel h2 {
+  margin: 0 0 0.7rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--phosphor-dim);
+  border-bottom: 1px dashed var(--panel-line);
+  padding-bottom: 0.5rem;
+}
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+  color: var(--phosphor);
+}
+.hud-row .k { color: var(--phosphor-dim); font-size: 0.85rem; align-self: center; letter-spacing: 0.1em; }
+.hud-row .v { text-shadow: var(--glow); }
+
+#mapsvg {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+.mnode { fill: #08231a; stroke: var(--phosphor-faint); stroke-width: 1; }
+.mnode.mhere { fill: #0d4a34; stroke: var(--phosphor); }
+.mtext { fill: var(--phosphor-dim); font-family: var(--ui); font-size: 9px; text-anchor: middle; letter-spacing: 0.05em; }
+.mhere + .mtext, .mnode.mhere ~ .mtext { fill: var(--phosphor); }
+.mlink { stroke: var(--phosphor-faint); stroke-width: 1.2; stroke-dasharray: 3 3; }
+
+/* example command chips */
+#examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.chip {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  background: #07201580;
+  color: var(--phosphor-dim);
+  border: 1px solid var(--panel-line);
+  border-radius: 3px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.chip:hover { color: var(--phosphor); border-color: var(--phosphor-faint); text-shadow: var(--glow); }
+.chip:focus-visible { outline: 2px solid var(--amber); }
+
+.panel-note {
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--phosphor-dim);
+  margin: 0.4rem 0 0;
+}
+
+/* ───────────────────────── CONTENT PAGES ───────────────────────── */
+
+.page {
+  max-width: 760px;
+  margin: 2.5rem auto 4rem;
+  padding: 0 1.3rem;
+}
+.page h1 {
+  font-family: var(--mono);
+  font-size: 2.6rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.4rem;
+  color: #aef7cf;
+  text-shadow: var(--glow);
+}
+.page .lede {
+  color: var(--phosphor-dim);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  border-left: 2px solid var(--panel-line);
+  padding-left: 1rem;
+  margin: 0 0 2rem;
+}
+.page h2 {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  margin: 2.2rem 0 0.8rem;
+  color: var(--phosphor);
+  letter-spacing: 0.03em;
+}
+.page h3 {
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin: 1.6rem 0 0.5rem;
+}
+.page p, .page li {
+  line-height: 1.72;
+  color: #b6e9cf;
+  font-size: 0.98rem;
+}
+.page ul, .page ol { padding-left: 1.2rem; }
+.page li { margin-bottom: 0.5rem; }
+.page em { color: var(--amber); font-style: italic; }
+.page strong { color: var(--phosphor); }
+
+.boxlist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.boxlist li {
+  border: 1px solid var(--panel-line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 0.9rem 1rem;
+}
+.boxlist b { color: var(--phosphor); }
+
+.cmd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 1rem;
+}
+.cmd-table td {
+  border-bottom: 1px dashed var(--panel-line);
+  padding: 0.4rem 0.6rem;
+  vertical-align: top;
+}
+.cmd-table td:first-child { color: var(--amber); white-space: nowrap; }
+.cmd-table td:last-child { color: var(--phosphor-dim); }
+
+.callout {
+  border: 1px solid var(--panel-line);
+  border-left: 3px solid var(--amber);
+  background: #0a1f15;
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  margin: 1.6rem 0;
+}
+.callout p { margin: 0; color: var(--phosphor-dim); }
+
+details.spoiler {
+  border: 1px dashed var(--panel-line);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  margin: 1.4rem 0;
+  background: #06150e;
+}
+details.spoiler summary {
+  cursor: pointer;
+  color: var(--rose);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+details.spoiler[open] summary { margin-bottom: 0.8rem; }
+details.spoiler ol { color: var(--phosphor-dim); font-family: var(--mono); }
+
+/* ───────────────────────── FOOTER ───────────────────────── */
+
+.site-footer {
+  border-top: 1px solid var(--panel-line);
+  margin-top: 3rem;
+  padding: 1.6rem 1.4rem;
+  color: var(--phosphor-dim);
+  font-size: 0.76rem;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  letter-spacing: 0.06em;
+}
+.site-footer a { color: var(--phosphor-dim); }
+.site-footer a:hover { color: var(--phosphor); }
+
+/* ───────────────────────── RESPONSIVE ───────────────────────── */
+
+@media (max-width: 880px) {
+  .game-shell { grid-template-columns: 1fr; }
+  .side { position: static; }
+  #terminal { height: 60vh; }
+  #screen { font-size: 1.05rem; }
+}
+@media (max-width: 520px) {
+  .site-header { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+  .page h1 { font-size: 2rem; }
+}
+
+/* ───────────────────────── MOTION & CRT FX ───────────────────────── */
+
+/* power-on flicker + subtle phosphor flicker — only when motion allowed */
+@media (prefers-reduced-motion: no-preference) {
+  .power-on { animation: powerOn 0.9s ease-out 1; }
+  @keyframes powerOn {
+    0%   { filter: brightness(3) blur(2px); transform: scaleY(0.004); opacity: 0; }
+    18%  { transform: scaleY(0.004); opacity: 1; }
+    40%  { transform: scaleY(1.02); filter: brightness(1.6); }
+    100% { transform: scaleY(1); filter: brightness(1); }
+  }
+  #screen { animation: flicker 5.5s infinite steps(60); }
+  @keyframes flicker {
+    0%, 97%, 100% { opacity: 1; }
+    97.5% { opacity: 0.93; }
+    98.5% { opacity: 0.98; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #terminal::before { display: none; }   /* drop scanlines for sensitivity */
+  .cursor-block { animation: none; opacity: 1; }
+  * { scroll-behavior: auto; }
+}

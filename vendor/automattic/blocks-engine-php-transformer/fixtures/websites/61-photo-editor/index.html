@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tonebox — In-Browser Photo &amp; Image Editor</title>
+  <meta name="description" content="Tonebox is a real raster photo editor in your browser. Pixel-accurate brightness, contrast, curves, hue, convolution filters (blur, sharpen, Sobel edge, emboss), live RGB histogram, presets, crop/rotate, undo, and PNG/JPEG export — all client-side.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23111827'/><circle cx='12' cy='13' r='5' fill='%23f43f5e'/><circle cx='20' cy='13' r='5' fill='%2334d399' opacity='0.85'/><circle cx='16' cy='20' r='5' fill='%2360a5fa' opacity='0.85'/></svg>">
+</head>
+<body class="editor-body">
+
+  <!-- ══════════════ TOP BAR ══════════════ -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <a class="brand" href="about.html" aria-label="About Tonebox">
+        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="#111827"/>
+          <circle cx="12" cy="13" r="5" fill="#f43f5e"/>
+          <circle cx="20" cy="13" r="5" fill="#34d399" opacity="0.85"/>
+          <circle cx="16" cy="20" r="5" fill="#60a5fa" opacity="0.85"/>
+        </svg>
+        <span>Tonebox</span>
+      </a>
+
+      <div class="sample-wrap">
+        <button id="open-samples" class="topbar-btn" aria-haspopup="true">Open ▾</button>
+        <div id="sample-pop" class="sample-pop" role="menu">
+          <p class="pop-head">Built-in samples</p>
+          <div id="sample-list" class="sample-list"></div>
+          <hr>
+          <label class="upload-row">
+            <input type="file" id="upload-input" accept="image/*" hidden>
+            <span class="upload-fake">⬆ Upload your own image…</span>
+          </label>
+        </div>
+      </div>
+
+      <span class="doc-name" id="meta-name" title="Current image">Cypress Coast</span>
+      <span class="doc-dims" id="meta-dims">— × — px</span>
+    </div>
+
+    <nav class="topbar-nav">
+      <a href="index.html" class="is-current" aria-current="page">Editor</a>
+      <a href="gallery.html">Gallery</a>
+      <a href="about.html">About</a>
+      <button id="help-btn" class="topbar-btn ghost" title="Keyboard shortcuts (?)">?</button>
+    </nav>
+
+    <div class="topbar-right">
+      <button id="export-jpg" class="topbar-btn">Export JPEG</button>
+      <button id="export-png" class="topbar-btn primary">Export PNG</button>
+    </div>
+  </header>
+
+  <!-- ══════════════ MAIN: tools · canvas · panel ══════════════ -->
+  <main class="workspace">
+
+    <!-- left tool rail -->
+    <aside class="toolrail" role="toolbar" aria-label="Image operations">
+      <button id="act-undo" class="tool" title="Undo (Ctrl+Z)" disabled>
+        <svg viewBox="0 0 24 24"><path d="M9 7L5 11l4 4M5 11h9a5 5 0 010 10h-3" fill="none" stroke-width="1.8"/></svg></button>
+      <button id="act-redo" class="tool" title="Redo (Ctrl+Shift+Z)" disabled>
+        <svg viewBox="0 0 24 24"><path d="M15 7l4 4-4 4M19 11h-9a5 5 0 000 10h3" fill="none" stroke-width="1.8"/></svg></button>
+      <span class="rail-sep"></span>
+      <button id="act-crop" class="tool" title="Crop (C)">
+        <svg viewBox="0 0 24 24"><path d="M7 2v15h15M2 7h15v15" fill="none" stroke-width="1.7"/></svg></button>
+      <button id="act-rot-l" class="tool" title="Rotate left (Shift+R)">
+        <svg viewBox="0 0 24 24"><path d="M4 9a8 8 0 1 1 1.5 7" fill="none" stroke-width="1.7"/><path d="M3 4v5h5" fill="none" stroke-width="1.7"/></svg></button>
+      <button id="act-rot-r" class="tool" title="Rotate right (R)">
+        <svg viewBox="0 0 24 24"><path d="M20 9a8 8 0 1 0-1.5 7" fill="none" stroke-width="1.7"/><path d="M21 4v5h-5" fill="none" stroke-width="1.7"/></svg></button>
+      <button id="act-flip-h" class="tool" title="Flip horizontal (F)">
+        <svg viewBox="0 0 24 24"><path d="M12 3v18M7 8l-4 4 4 4M17 8l4 4-4 4" fill="none" stroke-width="1.7"/></svg></button>
+      <button id="act-flip-v" class="tool" title="Flip vertical (V)">
+        <svg viewBox="0 0 24 24"><path d="M3 12h18M8 7L12 3l4 4M8 17l4 4 4-4" fill="none" stroke-width="1.7"/></svg></button>
+      <span class="rail-sep"></span>
+      <button id="act-half" class="tool tiny" title="Resize to 50%">½×</button>
+      <button id="act-double" class="tool tiny" title="Resize to 200%">2×</button>
+      <span class="rail-sep"></span>
+      <button id="act-reset" class="tool" title="Reset all adjustments (0)">
+        <svg viewBox="0 0 24 24"><path d="M4 4v6h6M20 20v-6h-6" fill="none" stroke-width="1.7"/><path d="M5 13a7 7 0 0 0 13 2M19 11A7 7 0 0 0 6 9" fill="none" stroke-width="1.7"/></svg></button>
+    </aside>
+
+    <!-- center canvas stage -->
+    <section id="canvas-stage" class="canvas-stage" aria-label="Image canvas">
+      <div class="canvas-pad">
+        <div class="canvas-frame">
+          <canvas id="view" aria-label="Edited image preview"></canvas>
+          <!-- crop overlay -->
+          <div id="crop-overlay" class="crop-overlay" hidden>
+            <div id="crop-mask" class="crop-mask"></div>
+            <div id="crop-box" class="crop-box">
+              <span class="crop-handle" data-h="nw"></span>
+              <span class="crop-handle" data-h="ne"></span>
+              <span class="crop-handle" data-h="sw"></span>
+              <span class="crop-handle" data-h="se"></span>
+              <span class="crop-handle edge" data-h="n"></span>
+              <span class="crop-handle edge" data-h="s"></span>
+              <span class="crop-handle edge" data-h="e"></span>
+              <span class="crop-handle edge" data-h="w"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="crop-bar" class="crop-bar" hidden>
+        <span>Drag to set the crop region.</span>
+        <button id="crop-cancel" class="btn-mini ghost">Cancel</button>
+        <button id="crop-apply" class="btn-mini primary">Apply crop</button>
+      </div>
+      <p class="drop-hint">Drop an image here, or use <strong>Open ▾</strong> to pick a built-in sample.</p>
+    </section>
+
+    <!-- right inspector panel -->
+    <aside class="inspector" aria-label="Adjustments">
+      <!-- histogram -->
+      <div class="insp-block">
+        <div class="insp-head">
+          <h2>Histogram</h2>
+          <div class="hist-tabs" role="group" aria-label="Histogram channel">
+            <button class="hist-tab is-active" data-ch="rgb">RGB</button>
+            <button class="hist-tab" data-ch="luma">Luma</button>
+          </div>
+        </div>
+        <canvas id="histogram" width="280" height="120" class="hist-canvas"></canvas>
+      </div>
+
+      <!-- presets -->
+      <div class="insp-block">
+        <div class="insp-head"><h2>Looks</h2><span class="hint-text">click a thumbnail</span></div>
+        <div id="preset-strip" class="preset-strip"></div>
+      </div>
+
+      <!-- adjustments -->
+      <div class="insp-block grow">
+        <div class="insp-head"><h2>Adjustments</h2><span class="hint-text">dbl-click value to reset</span></div>
+        <div id="adjust-panel" class="adjust-panel"></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ══════════════ SHORTCUTS MODAL ══════════════ -->
+  <div id="shortcuts" class="modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <div class="modal-card">
+      <button class="modal-close" data-close aria-label="Close">×</button>
+      <h2>Keyboard shortcuts</h2>
+      <div class="sc-grid">
+        <div>
+          <h3>Edit</h3>
+          <dl>
+            <dt><kbd>Ctrl</kbd>+<kbd>Z</kbd></dt><dd>Undo</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></dt><dd>Redo</dd>
+            <dt><kbd>0</kbd></dt><dd>Reset adjustments</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>Export PNG</dd>
+          </dl>
+        </div>
+        <div>
+          <h3>Transform</h3>
+          <dl>
+            <dt><kbd>C</kbd></dt><dd>Crop (again = apply)</dd>
+            <dt><kbd>R</kbd> / <kbd>Shift</kbd>+<kbd>R</kbd></dt><dd>Rotate right / left</dd>
+            <dt><kbd>F</kbd></dt><dd>Flip horizontal</dd>
+            <dt><kbd>V</kbd></dt><dd>Flip vertical</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Cancel crop / close</dd>
+          </dl>
+        </div>
+        <div>
+          <h3>Looks</h3>
+          <dl>
+            <dt><kbd>1</kbd>–<kbd>8</kbd></dt><dd>Apply preset look</dd>
+            <dt><kbd>?</kbd></dt><dd>This dialog</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/samples.js"></script>
+  <script src="js/filters.js"></script>
+  <script src="js/histogram.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

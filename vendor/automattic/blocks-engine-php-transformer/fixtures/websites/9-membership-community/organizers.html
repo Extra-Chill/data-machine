@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meet the Organizers — Common Table</title>
+  <meta name="description" content="Meet Rosa, Declan, and Priya — the three neighbors who started and run Common Table.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Organizer page layout */
+    .organizers-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+    }
+    @media (max-width: 900px) { .organizers-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 580px)  { .organizers-grid { grid-template-columns: 1fr; } }
+
+    /* Featured organizer (full-width intro) */
+    .org-intro {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 4rem;
+      align-items: center;
+      padding: 4rem 0 5rem;
+    }
+    @media (max-width: 820px) {
+      .org-intro { grid-template-columns: 1fr; gap: 2.5rem; }
+    }
+
+    .org-intro-visual {
+      position: relative;
+      display: flex;
+      justify-content: center;
+    }
+    .org-intro-visual svg {
+      max-width: 420px;
+      width: 100%;
+      filter: drop-shadow(0 8px 28px rgba(30,18,8,0.1));
+    }
+
+    .org-intro-label {
+      font-family: var(--font-hand);
+      font-size: 1.15rem;
+      color: var(--terracotta);
+      display: block;
+      margin-bottom: 0.75rem;
+    }
+    .org-intro h2 { font-size: clamp(1.8rem, 3vw, 2.6rem); margin-bottom: 1rem; }
+    .org-intro p { font-size: 1rem; color: var(--ink-light); line-height: 1.75; }
+
+    /* Value list */
+    .value-list {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin: 1.75rem 0;
+    }
+    .value-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+      font-size: 0.95rem;
+      color: var(--ink-light);
+      margin: 0;
+    }
+    .value-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--terracotta);
+      flex-shrink: 0;
+      margin-top: 0.45em;
+    }
+
+    /* Avatar SVG illustrations */
+    .avatar-rosa-bg   { background: linear-gradient(135deg, #D4A090 0%, #E8C4B0 100%); }
+    .avatar-declan-bg { background: linear-gradient(135deg, #8DAE88 0%, #C0D8B8 100%); }
+    .avatar-priya-bg  { background: linear-gradient(135deg, #8898C0 0%, #B8C8E0 100%); }
+
+    /* Contact strip */
+    .contact-strip {
+      background-color: var(--warm-white);
+      border-radius: var(--radius-xl);
+      padding: 3.5rem;
+      text-align: center;
+      margin-top: 5rem;
+    }
+    .contact-strip h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    .contact-strip p { color: var(--ink-muted); margin-bottom: 1.75rem; }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────────────── -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      Common Table
+    </a>
+    <button class="hamburger" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-menu" id="nav-menu" role="list">
+      <li><a href="index.html"       class="nav-link">Home</a></li>
+      <li><a href="gatherings.html"  class="nav-link">Gatherings</a></li>
+      <li><a href="organizers.html"  class="nav-link">Organizers</a></li>
+      <li><a href="stories.html"     class="nav-link">Stories</a></li>
+      <li><a href="membership.html"  class="nav-link">Membership</a></li>
+      <li><a href="faq.html"         class="nav-link">FAQ</a></li>
+      <li><a href="membership.html"  class="nav-cta">Join Us</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+
+<!-- ── PAGE HERO ─────────────────────────────────────────────── -->
+<header class="page-hero">
+  <div class="container">
+    <span class="overline">The people behind it</span>
+    <h1>Meet the Organizers</h1>
+    <p class="lead">Three neighbors who believed a shared table could change the feeling of a block.</p>
+  </div>
+</header>
+
+<!-- ── ORG INTRO (gathering illustration + mission) ────────── -->
+<section class="section--sm bg-warm-white">
+  <div class="container">
+    <div class="org-intro">
+      <div class="org-intro-visual reveal" aria-hidden="true">
+        <!-- Gathering circle illustration -->
+        <svg viewBox="0 0 420 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Table -->
+          <ellipse cx="210" cy="185" rx="100" ry="75" fill="#D4A870" opacity="0.2"/>
+          <ellipse cx="210" cy="183" rx="95" ry="70" fill="#E8D4A8" opacity="0.45"/>
+          <ellipse cx="210" cy="183" rx="95" ry="70" stroke="#C4A068" stroke-width="1.5" fill="none" opacity="0.2"/>
+          <!-- Center plant -->
+          <rect x="200" y="162" width="20" height="28" rx="5" fill="#C05A36" opacity="0.35"/>
+          <path d="M206 162 C204 148 200 140 194 132" stroke="#4A6741" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M212 161 C212 145 216 137 222 130" stroke="#4A6741" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <ellipse cx="191" cy="129" rx="13" ry="6" fill="#4A6741" opacity="0.6" transform="rotate(-35 191 129)"/>
+          <ellipse cx="224" cy="127" rx="13" ry="6" fill="#4A6741" opacity="0.55" transform="rotate(30 224 127)"/>
+          <circle cx="190" cy="123" r="4" fill="#C8A040" opacity="0.6"/>
+          <circle cx="226" cy="121" r="4" fill="#D4897A" opacity="0.65"/>
+
+          <!-- Person 1 — top, Rosa-ish (terracotta top) -->
+          <circle cx="210" cy="60" r="20" fill="#E8C4A0"/>
+          <path d="M190 60 C190 40 230 40 230 60" fill="#2C1A0E" opacity="0.85"/>
+          <circle cx="210" cy="45" r="12" fill="#2C1A0E" opacity="0.85"/>
+          <path d="M188 100 C188 88 200 82 210 82 C220 82 232 88 232 100" fill="#C05A36" opacity="0.7"/>
+          <path d="M196 97 Q210 108 224 97" stroke="#C05A36" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.5"/>
+
+          <!-- Person 2 — bottom left, Declan-ish (sage shirt) -->
+          <circle cx="100" cy="270" r="20" fill="#C8A870"/>
+          <path d="M80 270 C80 250 120 250 120 270" fill="#8A7050" opacity="0.7"/>
+          <path d="M78 310 C78 298 90 292 100 292 C110 292 122 298 122 310" fill="#4A6741" opacity="0.7"/>
+          <path d="M86 307 Q100 318 114 307" stroke="#4A6741" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.5"/>
+
+          <!-- Person 3 — bottom right, Priya-ish (blue-ish) -->
+          <circle cx="320" cy="270" r="20" fill="#D4B090"/>
+          <path d="M300 270 C300 250 340 250 340 270" fill="#2C1A0E" opacity="0.6"/>
+          <circle cx="320" cy="256" r="10" fill="#2C1A0E" opacity="0.6"/>
+          <path d="M298 310 C298 298 310 292 320 292 C330 292 342 298 342 310" fill="#8898C0" opacity="0.7"/>
+          <path d="M306 307 Q320 318 334 307" stroke="#8898C0" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.5"/>
+
+          <!-- Arms toward table (suggesting connection) -->
+          <path d="M210 100 L210 115" stroke="#D4A870" stroke-width="6" stroke-linecap="round" opacity="0.4"/>
+          <path d="M118 295 L155 240" stroke="#A07030" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+          <path d="M302 295 L265 240" stroke="#A07030" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+
+          <!-- Small plates on table -->
+          <circle cx="210" cy="205" r="18" fill="#FAF7EF" stroke="#E0CDB8" stroke-width="1.5"/>
+          <circle cx="160" cy="195" r="14" fill="#FAF7EF" stroke="#E0CDB8" stroke-width="1.5"/>
+          <circle cx="258" cy="198" r="14" fill="#FAF7EF" stroke="#E0CDB8" stroke-width="1.5"/>
+
+          <!-- Speech/warmth circles -->
+          <circle cx="210" cy="185" r="108" stroke="#C05A36" stroke-width="1" fill="none" opacity="0.08" stroke-dasharray="6 8"/>
+
+          <!-- Name tags -->
+          <text x="210" y="35" text-anchor="middle" font-family="'Caveat', cursive" font-size="13" fill="#C05A36" opacity="0.7">Rosa</text>
+          <text x="76" y="252" text-anchor="middle" font-family="'Caveat', cursive" font-size="13" fill="#4A6741" opacity="0.7">Declan</text>
+          <text x="344" y="252" text-anchor="middle" font-family="'Caveat', cursive" font-size="13" fill="#8898C0" opacity="0.7">Priya</text>
+        </svg>
+      </div>
+
+      <div class="reveal" data-delay="150">
+        <span class="org-intro-label">Our story</span>
+        <h2>Started with one potluck that wouldn't end</h2>
+        <p>
+          In 2021, Rosa Figueroa set up a folding table in front of her apartment and invited the block to share a meal. Fourteen people showed up. Then twenty. Then neighbors started bringing neighbors who didn't know anyone yet.
+        </p>
+        <p>
+          Declan Walsh brought his heirloom tomatoes. Priya Nakamura brought <em>Their Eyes Were Watching God</em> and suggested they read it together next month. Common Table had already started — it just didn't have a name.
+        </p>
+        <ul class="value-list">
+          <li><span class="value-dot"></span>We believe the neighborhood already has everything it needs — the skills, the food, the wisdom — it just needs a table to gather around.</li>
+          <li><span class="value-dot"></span>Every gathering is member-led. We are not a service. We are a community.</li>
+          <li><span class="value-dot"></span>No experience required. First-timers and long-timers share the same chair.</li>
+        </ul>
+        <a href="membership.html" class="btn btn-primary">Join the Table</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── ORGANIZER CARDS ───────────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="text-center reveal" style="margin-bottom:3rem;">
+      <span class="overline">The core three</span>
+      <h2>Who keeps the lights on</h2>
+    </div>
+
+    <div class="organizers-grid" data-stagger="120">
+
+      <!-- Rosa -->
+      <article class="organizer-card">
+        <div class="organizer-avatar avatar-rosa-bg">
+          <!-- Rosa illustration -->
+          <svg viewBox="0 0 300 220" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%;">
+            <!-- Background wash -->
+            <rect width="300" height="220" fill="#D4A090"/>
+            <!-- Gentle bg circle -->
+            <circle cx="150" cy="210" r="180" fill="#E8B8A0" opacity="0.3"/>
+            <!-- Flour/texture dots -->
+            <circle cx="50" cy="160" r="6" fill="#FAF7EF" opacity="0.25"/>
+            <circle cx="250" cy="140" r="4" fill="#FAF7EF" opacity="0.2"/>
+            <circle cx="80" cy="180" r="3" fill="#FAF7EF" opacity="0.2"/>
+            <circle cx="230" cy="175" r="5" fill="#FAF7EF" opacity="0.2"/>
+            <!-- Body / shoulders -->
+            <path d="M60 220 C60 185 110 170 150 170 C190 170 240 185 240 220 Z" fill="#C05A36" opacity="0.75"/>
+            <!-- Neck -->
+            <rect x="135" y="130" width="30" height="45" rx="8" fill="#F0C4A0"/>
+            <!-- Head -->
+            <ellipse cx="150" cy="110" rx="48" ry="52" fill="#F0C4A0"/>
+            <!-- Hair (dark, full) -->
+            <path d="M102 108 C102 62 198 62 198 108 C198 78 102 78 102 108Z" fill="#1E1208" opacity="0.9"/>
+            <ellipse cx="150" cy="68" rx="48" ry="30" fill="#1E1208" opacity="0.9"/>
+            <!-- Bun -->
+            <circle cx="150" cy="52" r="22" fill="#1E1208" opacity="0.85"/>
+            <circle cx="166" cy="44" r="10" fill="#1E1208" opacity="0.8"/>
+            <!-- Face features -->
+            <ellipse cx="133" cy="112" rx="6" ry="7" fill="#E8B090"/>
+            <ellipse cx="167" cy="112" rx="6" ry="7" fill="#E8B090"/>
+            <circle cx="133" cy="111" r="3.5" fill="#2C1A0E"/>
+            <circle cx="167" cy="111" r="3.5" fill="#2C1A0E"/>
+            <circle cx="134" cy="110" r="1.2" fill="white"/>
+            <circle cx="168" cy="110" r="1.2" fill="white"/>
+            <!-- Nose -->
+            <path d="M148 118 Q150 122 152 118" stroke="#C4906A" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <!-- Smile -->
+            <path d="M138 127 Q150 136 162 127" stroke="#C4705A" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- Earrings -->
+            <circle cx="102" cy="118" r="4" fill="#C8A040" opacity="0.8"/>
+            <circle cx="198" cy="118" r="4" fill="#C8A040" opacity="0.8"/>
+            <!-- Apron strings suggestion -->
+            <path d="M110 175 L140 165 L160 165 L190 175" stroke="#FAF7EF" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="organizer-body">
+          <h3 class="organizer-name">Rosa Figueroa</h3>
+          <span class="organizer-role">Co-Founder &amp; Potluck Lead</span>
+          <p class="organizer-bio">
+            Rosa grew up cooking for a large family in Oaxaca and moved to the Portsmith District eight years ago after landing a job teaching art at Garfield Middle School. She started Common Table in 2021 by dragging a folding table out of her apartment and chalking "Bring a dish, stay awhile" on the sidewalk. She wasn't sure anyone would come. Fourteen people did, and things have never really stopped since.
+          </p>
+          <p class="organizer-bio mt-sm">
+            Rosa leads the potluck series and the skill-share kitchen sessions. Her sourdough starter is named Gerald and is four years old.
+          </p>
+        </div>
+      </article>
+
+      <!-- Declan -->
+      <article class="organizer-card">
+        <div class="organizer-avatar avatar-declan-bg">
+          <svg viewBox="0 0 300 220" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%;">
+            <rect width="300" height="220" fill="#8DAE88"/>
+            <circle cx="150" cy="210" r="180" fill="#A0C4A0" opacity="0.3"/>
+            <!-- Leaf accents in background -->
+            <ellipse cx="30" cy="50" rx="20" ry="10" fill="#4A6741" opacity="0.25" transform="rotate(-30 30 50)"/>
+            <ellipse cx="270" cy="60" rx="18" ry="9" fill="#4A6741" opacity="0.2" transform="rotate(25 270 60)"/>
+            <ellipse cx="240" cy="185" rx="16" ry="8" fill="#4A6741" opacity="0.2" transform="rotate(-15 240 185)"/>
+            <!-- Body -->
+            <path d="M60 220 C60 185 110 170 150 170 C190 170 240 185 240 220 Z" fill="#4A6741" opacity="0.7"/>
+            <!-- Neck -->
+            <rect x="137" y="132" width="26" height="42" rx="7" fill="#D4B890"/>
+            <!-- Head -->
+            <ellipse cx="150" cy="112" rx="44" ry="48" fill="#D4B890"/>
+            <!-- Hair — short, silver-grey -->
+            <path d="M106 105 C106 68 194 68 194 105" fill="#9A9A9A" opacity="0.8"/>
+            <path d="M108 95 C108 72 192 72 192 95" fill="#B4B4B4" opacity="0.6"/>
+            <!-- Face -->
+            <ellipse cx="134" cy="114" rx="6" ry="7" fill="#C8A870" opacity="0.5"/>
+            <ellipse cx="166" cy="114" rx="6" ry="7" fill="#C8A870" opacity="0.5"/>
+            <circle cx="134" cy="113" r="3.5" fill="#3A2A18"/>
+            <circle cx="166" cy="113" r="3.5" fill="#3A2A18"/>
+            <circle cx="135" cy="112" r="1.2" fill="white"/>
+            <circle cx="167" cy="112" r="1.2" fill="white"/>
+            <!-- Nose -->
+            <path d="M148 120 Q150 125 152 120" stroke="#C4906A" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+            <!-- Warm smile -->
+            <path d="M136 129 Q150 138 164 129" stroke="#8A5A30" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- Glasses -->
+            <rect x="122" y="108" width="20" height="14" rx="5" stroke="#5A4A38" stroke-width="1.5" fill="none"/>
+            <rect x="158" y="108" width="20" height="14" rx="5" stroke="#5A4A38" stroke-width="1.5" fill="none"/>
+            <path d="M142 115 H158" stroke="#5A4A38" stroke-width="1.5"/>
+            <path d="M118 113 L122 113" stroke="#5A4A38" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M178 113 L182 113" stroke="#5A4A38" stroke-width="1.5" stroke-linecap="round"/>
+            <!-- Beard / stubble suggestion -->
+            <path d="M120 130 Q150 148 180 130" stroke="#9A9A9A" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+          </svg>
+        </div>
+        <div class="organizer-body">
+          <h3 class="organizer-name">Declan Walsh</h3>
+          <span class="organizer-role">Co-Founder &amp; Garden Lead</span>
+          <p class="organizer-bio">
+            Declan spent thirty years as a city planner before retiring to what he describes as "full-time gardening with light bureaucracy on the side." He keeps three raised beds on his back patio, tends a dwarf apple orchard, and has more seeds than he will ever have time to plant. The seed library was his idea and remains his proudest contribution to Common Table.
+          </p>
+          <p class="organizer-bio mt-sm">
+            He organizes the garden walks, coordinates the volunteer days, and is reliably the person who shows up an hour early to move the furniture.
+          </p>
+        </div>
+      </article>
+
+      <!-- Priya -->
+      <article class="organizer-card">
+        <div class="organizer-avatar avatar-priya-bg">
+          <svg viewBox="0 0 300 220" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%;">
+            <rect width="300" height="220" fill="#8898C0"/>
+            <circle cx="150" cy="210" r="180" fill="#98A8D0" opacity="0.3"/>
+            <!-- Book accents in bg -->
+            <rect x="25" y="145" width="18" height="26" rx="2" fill="#FAF7EF" opacity="0.2" transform="rotate(-10 25 145)"/>
+            <rect x="40" y="148" width="16" height="24" rx="2" fill="#FAF7EF" opacity="0.15" transform="rotate(5 40 148)"/>
+            <rect x="246" y="150" width="18" height="25" rx="2" fill="#FAF7EF" opacity="0.18" transform="rotate(8 246 150)"/>
+            <!-- Body -->
+            <path d="M60 220 C60 185 110 170 150 170 C190 170 240 185 240 220 Z" fill="#7A8AB0" opacity="0.75"/>
+            <!-- Dupatta/scarf suggestion -->
+            <path d="M240 190 C260 175 270 165 255 145" stroke="#FAF7EF" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.2"/>
+            <!-- Neck -->
+            <rect x="137" y="132" width="26" height="42" rx="7" fill="#E8C4A8"/>
+            <!-- Head -->
+            <ellipse cx="150" cy="112" rx="45" ry="50" fill="#E8C4A8"/>
+            <!-- Hair (dark, loose) -->
+            <path d="M105 108 C105 65 195 65 195 108" fill="#1E1208" opacity="0.88"/>
+            <ellipse cx="150" cy="70" rx="45" ry="28" fill="#1E1208" opacity="0.88"/>
+            <!-- Side part / wave -->
+            <path d="M105 85 C115 80 130 82 150 76" stroke="#3A2A18" stroke-width="3" fill="none" opacity="0.3"/>
+            <!-- Face -->
+            <ellipse cx="134" cy="115" rx="6" ry="7" fill="#D4A870" opacity="0.5"/>
+            <ellipse cx="166" cy="115" rx="6" ry="7" fill="#D4A870" opacity="0.5"/>
+            <circle cx="134" cy="114" r="3.5" fill="#1E1208"/>
+            <circle cx="166" cy="114" r="3.5" fill="#1E1208"/>
+            <circle cx="135" cy="113" r="1.2" fill="white"/>
+            <circle cx="167" cy="113" r="1.2" fill="white"/>
+            <!-- Nose dot -->
+            <circle cx="150" cy="122" r="1.5" fill="#C4906A" opacity="0.6"/>
+            <!-- Bindi -->
+            <circle cx="150" cy="100" r="3.5" fill="#C05A36" opacity="0.6"/>
+            <!-- Smile -->
+            <path d="M137 129 Q150 140 163 129" stroke="#8A5A30" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- Small earrings -->
+            <circle cx="105" cy="120" r="3.5" fill="#C8A040" opacity="0.75"/>
+            <circle cx="195" cy="120" r="3.5" fill="#C8A040" opacity="0.75"/>
+          </svg>
+        </div>
+        <div class="organizer-body">
+          <h3 class="organizer-name">Priya Nakamura</h3>
+          <span class="organizer-role">Reading &amp; Programs Lead</span>
+          <p class="organizer-bio">
+            Priya is a reference librarian at the Portsmith Branch by day and an enthusiastic book evangelist the rest of the time. She joined Common Table as a volunteer two years ago, after attending four reading circles in a row and realizing she had opinions about the facilitation. She took over the reading program the following month. The quality of the discussions improved immediately.
+          </p>
+          <p class="organizer-bio mt-sm">
+            She lives with her partner Kenji and their two cats, Miso and Nori. She is the person who will remember your name and the title of the book you mentioned offhand six months ago.
+          </p>
+        </div>
+      </article>
+    </div><!-- /.organizers-grid -->
+
+    <!-- Get in touch strip -->
+    <div class="contact-strip reveal">
+      <div aria-hidden="true" style="margin-bottom:1rem; opacity:0.35;">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="22" stroke="#C05A36" stroke-width="1.5"/>
+          <path d="M16 24h16M24 16v16" stroke="#C05A36" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2>Questions? Ideas? A dish to share?</h2>
+      <p>Rosa, Declan, and Priya are all reachable via email and love hearing from neighbors.</p>
+      <a href="faq.html#contact" class="btn btn-primary">Send us a note →</a>
+    </div>
+
+  </div>
+</section>
+
+</main>
+
+<!-- ── FOOTER ─────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="index.html" class="footer-brand-logo">
+          <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          Common Table
+        </a>
+        <p class="footer-tagline">A neighborhood membership club for people who love to share food, skills, stories, and a few hours of doing something that matters.</p>
+        <address class="footer-address">48 Elm Street · Portsmith District<br><a href="mailto:hello@commontable.club" style="color:rgba(240,232,212,0.5); text-decoration:none;">hello@commontable.club</a></address>
+      </div>
+      <div>
+        <span class="footer-col-heading">Explore</span>
+        <ul class="footer-links">
+          <li><a href="gatherings.html">Upcoming Gatherings</a></li>
+          <li><a href="organizers.html">Meet the Organizers</a></li>
+          <li><a href="stories.html">Member Stories</a></li>
+          <li><a href="membership.html">Membership Levels</a></li>
+          <li><a href="faq.html">FAQ &amp; Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <span class="footer-col-heading">Get Involved</span>
+        <ul class="footer-links">
+          <li><a href="membership.html">Join the Table</a></li>
+          <li><a href="gatherings.html">RSVP to a Gathering</a></li>
+          <li><a href="membership.html#host">Host Your Own</a></li>
+          <li><a href="faq.html#contact">Send Us a Note</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Common Table · Eval Membership Community</span>
+      <span>Made with care in the neighborhood</span>
+    </div>
+  </div>
+</footer>
+
+<script src="nav.js"></script>
+</body>
+</html>

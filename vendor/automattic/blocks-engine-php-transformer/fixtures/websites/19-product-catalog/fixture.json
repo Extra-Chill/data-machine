@@ -1,0 +1,17 @@
+{
+  "fixture_class": "ecommerce/catalog",
+  "tags": [
+    "ecommerce",
+    "catalog",
+    "retail",
+    "woodwork",
+    "has-nav",
+    "multipage",
+    "product-grid",
+    "pricing"
+  ],
+  "capabilities": [
+    "commerce-products"
+  ],
+  "complexity": 2
+}

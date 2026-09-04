@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Fluxnode Procedural Texture Editor</title>
+  <meta name="description" content="Fluxnode is a node-based dataflow editor for procedural textures. Learn how its world↔screen camera, topological evaluation engine, cycle detection, and live-rendered pipeline work.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/page.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%237c5cff'/><circle cx='9' cy='16' r='3' fill='none' stroke='white' stroke-width='2'/><circle cx='23' cy='16' r='3' fill='none' stroke='white' stroke-width='2'/><path d='M12 16h8' stroke='white' stroke-width='2'/></svg>">
+</head>
+<body class="page-body">
+
+  <header class="site-header">
+    <a class="brand" href="about.html" aria-label="Fluxnode home" style="text-decoration:none;color:var(--txt);display:flex;align-items:center;gap:9px;font-weight:800;">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#7c5cff"/>
+        <circle cx="9" cy="16" r="3" fill="none" stroke="#fff" stroke-width="2"/>
+        <circle cx="23" cy="16" r="3" fill="none" stroke="#fff" stroke-width="2"/>
+        <path d="M12 16h8" stroke="#fff" stroke-width="2"/>
+      </svg>
+      <span>Fluxnode</span>
+    </a>
+    <nav class="site-nav">
+      <a href="about.html" class="is-current" aria-current="page">About</a>
+      <a href="examples.html">Examples</a>
+      <a href="index.html" class="nav-cta">Open editor</a>
+    </nav>
+  </header>
+
+  <section class="page-hero">
+    <div class="wrap">
+      <span class="eyebrow">A graph that computes a picture</span>
+      <h1>Fluxnode turns wired nodes into a live texture.</h1>
+      <p class="lead">Drop source nodes — gradients, noise, checkers — wire them through mixers, warps, and filters, and watch an Output node render the result pixel-by-pixel as you tweak a slider. It's a real dataflow engine: typed ports, a topological evaluator, and cycle detection, all running in your browser.</p>
+      <div class="hero-actions">
+        <a href="index.html" class="btn btn-primary">Open the editor →</a>
+        <a href="examples.html" class="btn btn-ghost">Browse examples</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="specs">
+      <div class="spec"><div class="num">14</div><div class="lbl">Node types across 4 groups</div></div>
+      <div class="spec"><div class="num">2</div><div class="lbl">Typed signals: color &amp; number</div></div>
+      <div class="spec"><div class="num">∞</div><div class="lbl">Pan/zoom canvas, 20–300%</div></div>
+      <div class="spec"><div class="num">live</div><div class="lbl">Re-evaluates on every edit</div></div>
+    </div>
+
+    <div class="section-head">
+      <h2>What makes it feel alive</h2>
+      <p>Fluxnode is a stateful pointer-driven application — a transform matrix, a graph model, an evaluator, and a renderer — the kind of tool you'd never assemble from page blocks.</p>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 11L15.5 7M8.5 13l7 4"/></svg></div>
+        <h3>Real dataflow graph</h3>
+        <p>Nodes carry typed input and output ports. A connection is just an edge; the engine resolves the whole network into a single composed function every time you change anything.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h6l2 3 2-7 2 9h2"/></svg></div>
+        <h3>Topological evaluation</h3>
+        <p>Before rendering, Fluxnode sorts the graph with Kahn's algorithm so every node is computed only after its inputs are ready — no matter how you arrange the wires.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 109-7"/><path d="M14 2l1 3-3 1"/><path d="M8 8l8 8"/></svg></div>
+        <h3>Cycle detection</h3>
+        <p>Try to wire an output back into its own ancestor and the connection is refused. A reachability check runs before any edge is created, so the graph can never loop.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 11l4-3 4 4 4-5 6 6"/></svg></div>
+        <h3>Pixel-accurate preview</h3>
+        <p>The Output node exposes the final sampler — a pure <code>(x,y,t) → rgb</code> function. It's rasterized into an <code>ImageData</code> buffer, so what you see is exactly what exports.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v6m0 0l-3-3m3 3l3-3M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg></div>
+        <h3>Local-first &amp; portable</h3>
+        <p>Your flow autosaves to this browser as you work. Export the whole graph to JSON to back it up or share it, or export the rendered texture to PNG.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 12h6m6 0h6M12 3v6m0 6v6"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <h3>Infinite canvas + minimap</h3>
+        <p>Pan and zoom toward your cursor on a scaling dotted grid. A live minimap shows the whole graph and your viewport; click it to leap across the network.</p>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-bottom:14px">
+      <h2>The node library</h2>
+      <p>Fourteen node types in four families. Color signals are full samplers; number signals are scalars you can route into factor and level ports.</p>
+    </div>
+    <table class="types-table">
+      <thead><tr><th>Node</th><th>Group</th><th>In</th><th>Out</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>Gradient</td><td>Source</td><td>—</td><td><span class="chip color">color</span></td><td>Two-stop linear gradient at any angle.</td></tr>
+        <tr><td>Solid Color</td><td>Source</td><td>—</td><td><span class="chip color">color</span></td><td>A flat fill — handy for tinting and masking.</td></tr>
+        <tr><td>Noise Field</td><td>Source</td><td>—</td><td><span class="chip color">color</span></td><td>Fractal-brownian value noise with octaves &amp; seed.</td></tr>
+        <tr><td>Checker</td><td>Source</td><td>—</td><td><span class="chip color">color</span></td><td>Two-colour checkerboard at any tile count.</td></tr>
+        <tr><td>Radial Rings</td><td>Source</td><td>—</td><td><span class="chip color">color</span></td><td>Concentric sine rings from the centre.</td></tr>
+        <tr><td>Mix</td><td>Operator</td><td><span class="chip color">color</span> <span class="chip color">color</span> <span class="chip number">num</span></td><td><span class="chip color">color</span></td><td>Blend A→B by a factor (slider or wired).</td></tr>
+        <tr><td>Multiply</td><td>Operator</td><td><span class="chip color">color</span> <span class="chip color">color</span></td><td><span class="chip color">color</span></td><td>Multiply / screen / add / difference blend.</td></tr>
+        <tr><td>Tint / HSV</td><td>Operator</td><td><span class="chip color">color</span></td><td><span class="chip color">color</span></td><td>Shift hue, scale saturation &amp; brightness.</td></tr>
+        <tr><td>Threshold</td><td>Operator</td><td><span class="chip color">color</span> <span class="chip number">num</span></td><td><span class="chip color">color</span></td><td>Soft cut on luminance into two colours.</td></tr>
+        <tr><td>Warp</td><td>Operator</td><td><span class="chip color">color</span></td><td><span class="chip color">color</span></td><td>Displace lookups by noise; optionally animate.</td></tr>
+        <tr><td>Invert</td><td>Operator</td><td><span class="chip color">color</span></td><td><span class="chip color">color</span></td><td>Mixable colour inversion.</td></tr>
+        <tr><td>Posterize</td><td>Operator</td><td><span class="chip color">color</span></td><td><span class="chip color">color</span></td><td>Quantize each channel into N bands.</td></tr>
+        <tr><td>Value / Math</td><td>Number</td><td>—/<span class="chip number">num</span></td><td><span class="chip number">num</span></td><td>Constant &amp; arithmetic (add, mul, sine…).</td></tr>
+        <tr><td>Output</td><td>Output</td><td><span class="chip color">color</span></td><td>—</td><td>Gamma + vignette; renders the live preview.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="prose">
+      <h2>How the engine works</h2>
+      <p>Everything on the canvas is a plain, serializable record. A <strong>node</strong> stores its type, position, and parameter values; an <strong>edge</strong> stores the source node/port and target node/port it connects. Because the document is just data, the whole graph round-trips through <code>localStorage</code> and JSON without any special casing.</p>
+      <p>Each node type declares an <code>evaluate(node, inputs)</code> function. For color nodes it doesn't return a pixel — it returns a <em>sampler</em>: a pure function <code>(x, y, t) → [r,g,b]</code>. Operators simply close over their upstream samplers, so a five-node chain becomes five nested closures. When the Output node evaluates, it hands the editor a single composed function representing the entire pipeline. The preview then calls that function for every pixel and writes the bytes straight into an <code>ImageData</code> buffer.</p>
+      <p>To compute the whole graph in the right order, Fluxnode runs a <strong>topological sort</strong> (Kahn's algorithm): it counts incoming edges per node, repeatedly emits the nodes with none left, and decrements their neighbours. If any nodes remain when the queue empties, the graph contains a cycle — which the HUD reports. But you'll rarely see that, because connections are validated up front: before an edge is created, a reachability walk checks whether the target can already reach the source, and refuses the wire if so.</p>
+
+      <div class="diagram" aria-label="Dataflow diagram">
+        <svg viewBox="0 0 760 150">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#7c5cff"/></marker>
+          </defs>
+          <g font-family="Inter, sans-serif" font-size="12" font-weight="600">
+            <rect x="10" y="40" width="110" height="44" rx="8" fill="#1c2330" stroke="#283042"/><text x="65" y="67" fill="#ffb454" text-anchor="middle">Gradient</text>
+            <rect x="10" y="96" width="110" height="44" rx="8" fill="#1c2330" stroke="#283042"/><text x="65" y="123" fill="#ffb454" text-anchor="middle">Noise</text>
+            <rect x="190" y="40" width="110" height="44" rx="8" fill="#1c2330" stroke="#283042"/><text x="245" y="67" fill="#7c5cff" text-anchor="middle">Warp</text>
+            <rect x="370" y="68" width="110" height="44" rx="8" fill="#1c2330" stroke="#283042"/><text x="425" y="95" fill="#7c5cff" text-anchor="middle">Mix</text>
+            <rect x="550" y="68" width="110" height="44" rx="8" fill="#1c2330" stroke="#283042"/><text x="605" y="95" fill="#00d3a7" text-anchor="middle">Output</text>
+            <path d="M120 62 C160 62 160 62 190 62" fill="none" stroke="#ffb454" stroke-width="2" marker-end="url(#arr)"/>
+            <path d="M300 62 C340 62 340 84 370 84" fill="none" stroke="#7c5cff" stroke-width="2" marker-end="url(#arr)"/>
+            <path d="M120 118 C250 118 250 96 370 96" fill="none" stroke="#ffb454" stroke-width="2" marker-end="url(#arr)"/>
+            <path d="M480 90 C515 90 515 90 550 90" fill="none" stroke="#7c5cff" stroke-width="2" marker-end="url(#arr)"/>
+          </g>
+        </svg>
+      </div>
+
+      <h2>Why you'd never build this in a page builder</h2>
+      <p>A page builder stacks static blocks. Fluxnode is the opposite: a single live surface where a graph data-structure, a scheduler, and a rasterizer cooperate on every pointer move. There are no sections to publish — there's one computation that updates the instant you drag a slider, drop a node, or pull a wire. That interactivity, with cycle-safe wiring and a real evaluator underneath, is exactly the kind of thing Gutenberg was never meant to express.</p>
+
+      <h2>Get started</h2>
+      <ul>
+        <li>Open the <a href="index.html">editor</a> — it loads the “Sunset Dunes” graph so you're never staring at a blank canvas.</li>
+        <li>Browse <a href="examples.html">examples</a> for an animated aurora, a circuit weave, and a topographic map.</li>
+        <li>Press <strong>Tab</strong> on the canvas to summon the node palette, or <strong>?</strong> for every shortcut.</li>
+      </ul>
+    </div>
+
+    <div class="cta-band">
+      <h2>Ready to wire something up?</h2>
+      <p>Your first graph is already rendering on the canvas.</p>
+      <a href="index.html" class="btn btn-primary">Open Fluxnode →</a>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>© 2026 Fluxnode. A fictional product, hand-built in vanilla HTML, CSS &amp; Canvas.</span>
+      <span><a href="about.html">About</a> · <a href="examples.html">Examples</a> · <a href="index.html">Editor</a></span>
+    </div>
+  </footer>
+
+</body>
+</html>

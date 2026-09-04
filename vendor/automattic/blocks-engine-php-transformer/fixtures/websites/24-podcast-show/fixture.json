@@ -1,0 +1,14 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "podcast",
+    "audio",
+    "show",
+    "blog",
+    "has-form",
+    "has-nav",
+    "multipage",
+    "has-audio"
+  ],
+  "complexity": 2
+}

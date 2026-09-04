@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Levels — Lumen Leap</title>
+  <meta name="description" content="Choose a level in Lumen Leap. Unlock Hollow's Edge, Bramble Climb and Lantern's Heart by relighting each lantern in turn.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Lumen Leap home">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">
+        <span class="logo-name">Lumen<b>·</b>Leap</span>
+        <span class="logo-sub">A Firefly Platformer</span>
+      </span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="play.html">Play</a>
+      <a href="levels.html" class="active">Levels</a>
+      <a href="about.html">Story &amp; Help</a>
+      <a href="play.html" class="nav-cta">Play now ▸</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="wrap">
+    <p class="section-eyebrow">Choose your hollow</p>
+    <h1 class="section-title">Levels</h1>
+    <p class="section-lead">
+      Each lantern you relight unlocks the next. Earn up to three stars per level: one for
+      finishing, one for collecting every lumen (and the gem), and one for a quick clear under
+      45 seconds. Your best runs are saved on this device.
+    </p>
+
+    <div class="progress-line">
+      <span data-progress>Loading progress…</span>
+      <button class="reset-btn" data-action="reset-progress">Reset progress</button>
+    </div>
+
+    <!-- Cards injected by levelselect.js -->
+    <div class="level-grid" aria-label="Level list"></div>
+
+    <p class="hint" style="color:var(--ink-faint);font-size:0.85rem;margin-top:1.6rem;">
+      Locked a level by accident? Progress is stored only in your browser — clearing site data
+      resets everything. New here? Start with <a href="play.html?level=1&autostart=1">Hollow's Edge</a>.
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <div>© <span data-year>2026</span> Lumen Leap — pick a lantern and go.</div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="index.html">Home</a>
+      <a href="play.html">Play</a>
+      <a href="about.html">Story &amp; Help</a>
+    </nav>
+  </footer>
+
+  <script src="js/storage.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/levelselect.js"></script>
+  <script src="js/nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+/* ============================================================================
+   VANTAPOINT — world.css
+   The pure-CSS 3D museum: perspective viewport, preserve-3d scene, rooms,
+   walls, floors, ceilings, doorways, hanging artwork panels, atmosphere.
+   ========================================================================== */
+
+.page-world { overflow: hidden; height: 100vh; }
+.page-world main { height: 100vh; }
+
+/* ---------------------------------------------------------------- stage --- */
+.stage { position: fixed; inset: 0; background: #04050a; }
+
+/* The lens. A fixed perspective + perspective-origin makes the camera. */
+.viewport {
+  position: absolute; inset: 0;
+  perspective: 900px;
+  perspective-origin: 50% 46%;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(120% 90% at 50% 30%, #11151f 0%, #080a10 45%, #04050a 100%);
+}
+.viewport.grabbing { cursor: grabbing; }
+
+/* The 3D world. camera.js writes its transform. */
+.scene {
+  position: absolute; left: 50%; top: 50%;
+  transform-style: preserve-3d;
+  /* will be overwritten each frame; this just sets the initial frame */
+  transform: translate3d(0,0,260px);
+  /* place world-origin at viewport centre */
+  margin-left: 0; margin-top: 0;
+  transition: transform 0s linear;
+}
+
+/* ---------------------------------------------------------------- room ---- */
+.room {
+  position: absolute; left: 0; top: 0;
+  transform-style: preserve-3d;
+}
+
+/* common face styling for walls / floor / ceiling */
+.wall, .floor, .ceiling {
+  position: absolute; left: 0; top: 0;
+  transform-style: preserve-3d;
+  /* centre each face on the room origin before its own transform */
+  transform-origin: 50% 50%;
+  margin-left: -700px;   /* half of ROOM_SIZE (1400) */
+  margin-top: -380px;    /* half of WALL_H (760) */
+  backface-visibility: hidden;
+}
+/* floors/ceilings use room-size on both dims; recenter vertically differently */
+.floor, .ceiling { margin-top: -700px; }
+
+/* ---------------------------------------------------------------- walls --- */
+.wall {
+  background:
+    radial-gradient(140% 90% at 50% 8%, color-mix(in srgb, var(--wc) 60%, #fff) 0%, transparent 55%),
+    linear-gradient(180deg, color-mix(in srgb, var(--wc) 82%, #000) 0%,
+                            color-mix(in srgb, var(--wc) 130%, #fff) 16%,
+                            color-mix(in srgb, var(--wc) 110%, #fff) 84%,
+                            color-mix(in srgb, var(--wc) 65%, #000) 100%);
+  border: 1px solid rgba(0,0,0,.4);
+  overflow: hidden;
+}
+/* angled shading: each wall gets a soft directional gradient so faces read */
+.wall-shade {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, rgba(0,0,0,.45), rgba(0,0,0,0) 40%, rgba(255,255,255,.03) 75%, rgba(0,0,0,.3));
+}
+.wall-east .wall-shade  { background: linear-gradient(255deg, rgba(0,0,0,.5), transparent 55%); }
+.wall-west .wall-shade  { background: linear-gradient(75deg, rgba(0,0,0,.5), transparent 55%); }
+.wall-south .wall-shade { background: linear-gradient(180deg, rgba(0,0,0,.4), transparent 60%); }
+.wall-base {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 60px; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.55));
+  border-top: 1px solid rgba(255,255,255,.05);
+}
+
+/* doorway: a darkened opening through the wall toward the next room */
+.wall.has-door {
+  -webkit-mask: var(--door-mask, none);
+}
+.doorway {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  height: 520px; border-radius: 14px 14px 0 0;
+  background:
+    radial-gradient(120% 80% at 50% 100%, rgba(2,3,6,.96), rgba(4,6,11,.7) 70%, transparent),
+    linear-gradient(180deg, rgba(3,4,8,.4), rgba(2,3,6,.95));
+  box-shadow: inset 0 0 60px rgba(0,0,0,.9);
+  pointer-events: none;
+}
+.door-arch {
+  position: absolute; inset: 0; border-radius: 14px 14px 0 0;
+  border: 2px solid rgba(255,255,255,.08); border-bottom: 0;
+}
+
+/* ---------------------------------------------------------------- floor --- */
+.floor {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, #0a0c11), #06070b 70%);
+  overflow: hidden;
+}
+.floor-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 100px 100px;
+  -webkit-mask: radial-gradient(80% 80% at 50% 50%, #000 30%, transparent 85%);
+          mask: radial-gradient(80% 80% at 50% 50%, #000 30%, transparent 85%);
+}
+.floor-label {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  font-family: var(--serif); font-size: 86px; letter-spacing: .12em;
+  color: color-mix(in srgb, var(--accent) 28%, transparent);
+  text-align: center; line-height: 1; pointer-events: none;
+  text-shadow: 0 0 30px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.floor-label span {
+  display: block; font-family: var(--mono); font-size: 22px; letter-spacing: .5em;
+  color: color-mix(in srgb, var(--accent) 40%, transparent); margin-top: 12px;
+}
+
+/* ---------------------------------------------------------------- ceiling - */
+.ceiling {
+  background: radial-gradient(60% 60% at 50% 50%,
+      color-mix(in srgb, var(--accent) 10%, #0a0c12), #050609 80%);
+}
+.ceil-light {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 60%; height: 60%; border-radius: 50%;
+  background: radial-gradient(closest-side,
+     color-mix(in srgb, var(--accent) 40%, #fff) 0%,
+     color-mix(in srgb, var(--accent) 20%, transparent) 40%, transparent 75%);
+  filter: blur(8px);
+}
+
+/* ---------------------------------------------------------------- art panel */
+.art-panel {
+  position: absolute;
+  width: 520px;
+  transform: translateZ(8px);      /* lift slightly off the wall */
+  cursor: pointer;
+  text-align: left;
+  transition: transform .25s;
+}
+.art-panel:hover, .art-panel:focus-visible { transform: translateZ(26px); }
+.art-frame {
+  position: relative; width: 520px; height: 460px;
+  border: 14px solid #15130f;
+  border-radius: 3px;
+  background: #0a0c10;
+  box-shadow:
+    0 30px 50px rgba(0,0,0,.6),
+    inset 0 0 0 2px color-mix(in srgb, var(--accent) 40%, #000);
+}
+.art-canvas { position: absolute; inset: 0; overflow: hidden; }
+.art-canvas svg { width: 100%; height: 100%; }
+.art-glass {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, rgba(255,255,255,.12), transparent 35%, transparent 70%, rgba(255,255,255,.05));
+}
+/* spotlight cast on the frame from above */
+.art-frame::before {
+  content: ''; position: absolute; left: -30px; right: -30px; top: -120px; height: 120px;
+  background: radial-gradient(60% 120% at 50% 100%, color-mix(in srgb, var(--accent) 30%, #fff8) 0%, transparent 70%);
+  pointer-events: none; opacity: .5;
+}
+
+.art-plate {
+  margin-top: 18px; padding: 14px 18px;
+  background: rgba(10,12,17,.7); border-left: 3px solid var(--accent);
+  border-radius: 2px;
+}
+.art-plate h3 { font-size: 1.5rem; }
+.art-line { font-family: var(--mono); font-size: .68rem; letter-spacing: .04em; color: var(--accent); margin: 6px 0 8px; text-transform: uppercase; }
+.art-cap { font-size: .92rem; color: var(--ink-dim); margin: 0; }
+.art-more { display: inline-block; margin-top: 10px; font-family: var(--mono); font-size: .72rem; color: var(--ink-faint); }
+
+/* text / wall-statement panels */
+.text-panel { width: 560px; cursor: default; }
+.text-card {
+  padding: 28px 32px; background: rgba(8,10,15,.55);
+  border: 1px solid var(--line); border-radius: 4px; backdrop-filter: blur(2px);
+}
+.text-card h3 { font-size: 1.7rem; margin-bottom: 12px; }
+.text-card p { color: var(--ink-dim); font-size: 1rem; margin: 0; }
+
+/* ---------------------------------------------------------------- atmosphere */
+.atmosphere {
+  position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  /* depth fog: a gentle haze toward the edges so far walls recede */
+  background:
+    radial-gradient(130% 95% at 50% 52%, transparent 45%, rgba(8,10,18,.4) 82%, rgba(5,6,12,.62) 100%);
+}
+.vignette {
+  position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 160px 20px rgba(0,0,0,.55);
+}
+
+/* floating dust particles for depth */
+.dust { position: absolute; inset: 0; pointer-events: none; z-index: 2; overflow: hidden; }
+.dust span {
+  position: absolute; width: var(--sz); height: var(--sz); border-radius: 50%;
+  background: rgba(255,255,255,.5);
+  animation: drift var(--d) linear var(--delay) infinite;
+  opacity: .35;
+}
+@keyframes drift {
+  0%   { transform: translate(0,0); opacity: 0; }
+  10%  { opacity: .4; }
+  90%  { opacity: .4; }
+  100% { transform: translate(28px, -60px); opacity: 0; }
+}
+
+/* ---------------------------------------------------------------- reduced - */
+@media (prefers-reduced-motion: reduce) {
+  .dust { display: none; }
+  .scene { transition: none; }
+  .art-panel { transition: none; }
+}

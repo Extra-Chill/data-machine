@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skillet &amp; Stem — Vegetable-forward home cooking from a Brooklyn kitchen</title>
+  <meta name="description" content="Weeknight recipes that lean on vegetables — written by Mira Okafor, a former Brooklyn line cook. Real technique, plain language, no precious instructions.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo" aria-label="Skillet and Stem — Home">
+      <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="20" cy="20" r="19" fill="#F0D878" stroke="#2A2722" stroke-width="1.4"/>
+        <path d="M9 23 Q20 12 31 23 L31 28 Q20 25 9 28 Z" fill="#2A2722"/>
+        <path d="M20 13 Q22 8 26 7 Q25 11 22 13 Z" fill="#6B7A3F"/>
+        <path d="M20 14 Q18 9 14 8 Q15 12 19 14 Z" fill="#6B7A3F"/>
+        <circle cx="20" cy="14" r="1.6" fill="#C8442F"/>
+      </svg>
+      <span>
+        <span class="logo-text">Skillet &amp; Stem</span>
+        <span class="logo-sub">Brooklyn · Est. 2021</span>
+      </span>
+    </a>
+
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="recipes.html">Recipes</a>
+      <a href="collections.html">Collections</a>
+      <a href="about.html">About</a>
+    </nav>
+
+    <div class="header-cta">
+      <button class="search-btn" aria-label="Search recipes">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ========== MOBILE NAV ========== -->
+<div class="mobile-nav" id="mobile-nav" role="dialog" aria-label="Navigation menu">
+  <div class="mobile-nav-overlay" aria-hidden="true"></div>
+  <div class="mobile-nav-panel">
+    <nav class="mobile-nav-links" aria-label="Mobile navigation">
+      <a href="index.html">Home</a>
+      <a href="recipes.html">Recipes</a>
+      <a href="collections.html">Collections</a>
+      <a href="about.html">About</a>
+    </nav>
+    <div class="mobile-nav-info">
+      <div>Brooklyn, New York</div>
+      <div>Three new recipes / week</div>
+      <div style="margin-top:0.5rem">hello@skilletandstem.test</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== FEATURED HERO ========== -->
+<section class="featured-hero">
+  <div class="container">
+    <div class="featured-hero-grid">
+      <div>
+        <span class="eyebrow">This Week · Issue №142</span>
+        <h1 class="display-xxl">
+          Pan-seared <em>cod</em><br>
+          on charred greens,<br>
+          in brown butter.
+        </h1>
+        <p class="lead">
+          A 35-minute weeknight dinner that punches like a restaurant plate. The trick is a screaming-hot cast iron and treating those greens like they owe you money.
+        </p>
+        <div class="featured-hero-meta">
+          <span>By Mira Okafor</span>
+          <span class="dot"></span>
+          <span>March 14, 2026</span>
+          <span class="dot"></span>
+          <span>35 min</span>
+          <span class="dot"></span>
+          <span>Serves 2</span>
+        </div>
+        <div style="margin-top:2rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <a href="recipe-pan-seared-cod.html" class="btn btn-primary btn-lg">Get the recipe</a>
+          <a href="collections.html" class="btn btn-ghost">Browse all collections</a>
+        </div>
+      </div>
+      <div class="photo-block recipe-hero" role="img" aria-label="Pan-seared cod fillet on a bed of charred mustard greens with a pool of brown butter, top-down on natural linen"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== LATEST RECIPES ========== -->
+<section style="padding-top:1rem">
+  <div class="container">
+    <div class="section-head row row-between" style="align-items:flex-end">
+      <div>
+        <span class="eyebrow eyebrow-olive">Latest</span>
+        <h2 class="display-lg" style="margin-top:0.6rem">Fresh from the kitchen.</h2>
+      </div>
+      <a href="recipes.html" class="btn btn-ghost">All recipes</a>
+    </div>
+
+    <div class="recipes-grid">
+
+      <a href="recipe-pan-seared-cod.html" class="recipe-card">
+        <div class="photo-block recipe-card-img recipe-fish" role="img" aria-label="Crisp-skinned cod fillet on charred greens with brown butter, shot from above"></div>
+        <div class="recipe-card-eyebrow">
+          <span>Dinner</span><span class="sep">·</span><span>Mediterranean</span>
+        </div>
+        <h3 class="recipe-card-title">Pan-Seared Cod with Charred Greens &amp; Brown Butter</h3>
+        <p class="recipe-card-desc">Crisp skin, sweet bitter greens, a slick of nutty butter. The weeknight fish dinner you'll actually make.</p>
+        <div class="recipe-card-meta">
+          <span>35 min</span><span class="dot"></span><span>Serves 2</span><span class="dot"></span><span>★ 4.9</span>
+        </div>
+      </a>
+
+      <a href="#" class="recipe-card">
+        <div class="photo-block recipe-card-img recipe-stew" role="img" aria-label="A deep-red West African peanut stew with sweet potato and collards in a dark cast iron pot"></div>
+        <div class="recipe-card-eyebrow">
+          <span>Dinner</span><span class="sep">·</span><span>West African</span>
+        </div>
+        <h3 class="recipe-card-title">Peanut Stew with Sweet Potato &amp; Collards</h3>
+        <p class="recipe-card-desc">A Sunday-night one-pot built on tomato paste, ginger, and Virginia peanuts. Better on day two.</p>
+        <div class="recipe-card-meta">
+          <span>1 hr 10</span><span class="dot"></span><span>Serves 4–6</span><span class="dot"></span><span>★ 4.8</span>
+        </div>
+      </a>
+
+      <a href="#" class="recipe-card">
+        <div class="photo-block recipe-card-img recipe-pasta" role="img" aria-label="A bowl of cacio e pepe with toasted black pepper, twirled into a nest"></div>
+        <div class="recipe-card-eyebrow">
+          <span>Dinner</span><span class="sep">·</span><span>Italian</span>
+        </div>
+        <h3 class="recipe-card-title">Cacio e Pepe with Cracked Black Pepper Crust</h3>
+        <p class="recipe-card-desc">Three ingredients, two pans, one cardinal rule: toast the pepper. Skip that step and you've made noodles.</p>
+        <div class="recipe-card-meta">
+          <span>20 min</span><span class="dot"></span><span>Serves 2</span><span class="dot"></span><span>★ 4.9</span>
+        </div>
+      </a>
+
+      <a href="#" class="recipe-card">
+        <div class="photo-block recipe-card-img recipe-tacos" role="img" aria-label="Three crispy potato tacos topped with shredded cabbage, salsa verde, and crumbled cotija"></div>
+        <div class="recipe-card-eyebrow">
+          <span>Dinner</span><span class="sep">·</span><span>Mexican</span>
+        </div>
+        <h3 class="recipe-card-title">Crispy Potato Tacos with Salsa Verde</h3>
+        <p class="recipe-card-desc">Smashed Yukon golds, cumin, a hard sear in lard, and a green salsa that goes on everything else for a week.</p>
+        <div class="recipe-card-meta">
+          <span>40 min</span><span class="dot"></span><span>Makes 8</span><span class="dot"></span><span>★ 4.7</span>
+        </div>
+      </a>
+
+      <a href="#" class="recipe-card">
+        <div class="photo-block recipe-card-img recipe-kimchi" role="img" aria-label="A bowl of kimchi jjigae with tofu, green onion, and a soft egg yolk, steaming"></div>
+        <div class="recipe-card-eyebrow">
+          <span>Dinner</span><span class="sep">·</span><span>Korean</span>
+        </div>
+        <h3 class="recipe-card-title">Kimchi Jjigae with Soft Tofu &amp; Pork Belly</h3>
+        <p class="recipe-card-desc">Ripe kimchi (the older the better), pork belly, gochugaru. Twenty-five minutes, one pot, no apologies.</p>
+        <div class="recipe-card-meta">
+          <span>30 min</span><span class="dot"></span><span>Serves 3</span><span class="dot"></span><span>★ 4.9</span>
+        </div>
+      </a>
+
+      <a href="#" class="recipe-card">
+        <div class="photo-block recipe-card-img recipe-grain" role="img" aria-label="A platter of farro with roasted delicata squash, pomegranate seeds, and parsley"></div>
+        <div class="recipe-card-eyebrow">
+          <span>Lunch</span><span class="sep">·</span><span>Vegetable-forward</span>
+        </div>
+        <h3 class="recipe-card-title">Farro with Roasted Delicata &amp; Pomegranate</h3>
+        <p class="recipe-card-desc">A make-ahead grain bowl that holds for four days. Get the squash dark — almost too dark — for the candy edges.</p>
+        <div class="recipe-card-meta">
+          <span>45 min</span><span class="dot"></span><span>Serves 4</span><span class="dot"></span><span>★ 4.8</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- ========== COLLECTIONS ========== -->
+<section class="collections-strip">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Curated</span>
+      <h2 class="display-lg" style="margin-top:0.6rem">Three collections for right now.</h2>
+      <p>Recipes grouped the way I actually cook — by mood, by what's at the market, by how much patience I have on a Tuesday.</p>
+    </div>
+
+    <div class="collections-grid">
+      <a href="collections.html#cold-snap" class="collection-card">
+        <div class="photo-block collection-card-img collection-block-1" role="img" aria-label="A pot of deep red braised short ribs with carrots and herbs in a heavy enameled Dutch oven"></div>
+        <div class="collection-card-body">
+          <span class="eyebrow">Collection №07</span>
+          <h3>Cold-Snap Suppers</h3>
+          <p>Twelve braises, stews, and slow-cooked things for the kind of week that needs a lid on it.</p>
+          <span class="collection-card-count">12 recipes</span>
+        </div>
+      </a>
+
+      <a href="collections.html#market-haul" class="collection-card">
+        <div class="photo-block collection-card-img collection-block-2" role="img" aria-label="A bunch of dark green lacinato kale fanned out on a wooden cutting board with a knife"></div>
+        <div class="collection-card-body">
+          <span class="eyebrow eyebrow-olive">Collection №08</span>
+          <h3>The Greens Project</h3>
+          <p>A working catalog of every way I've cooked a leaf this year — kale, chard, mustard, dandelion, and more.</p>
+          <span class="collection-card-count">16 recipes</span>
+        </div>
+      </a>
+
+      <a href="collections.html#thirty-minute" class="collection-card">
+        <div class="photo-block collection-card-img collection-block-3" role="img" aria-label="An overhead shot of a pan of golden eggs with shallots and herbs on toast"></div>
+        <div class="collection-card-body">
+          <span class="eyebrow">Collection №09</span>
+          <h3>Thirty Minutes, Tops</h3>
+          <p>Fast dinners that don't taste fast. No five-minute promises, just honest weeknight math.</p>
+          <span class="collection-card-count">14 recipes</span>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ========== ESSAY TEASER ========== -->
+<section class="essay-teaser">
+  <div class="container">
+    <div class="essay-teaser-grid">
+      <div class="photo-block kitchen-block" role="img" aria-label="A small Brooklyn kitchen counter with a wooden cutting board, three lemons, a chef's knife, and a paper bag of greens"></div>
+      <div class="essay-teaser-body">
+        <span class="eyebrow eyebrow-olive">From the Kitchen</span>
+        <h2 class="display-lg">A short defense of the unfussy weeknight.</h2>
+        <p class="lead">I'm not interested in twelve-step Sunday projects. I'm interested in what you can make at 7:14 p.m. on a Wednesday in February with what's already in your fridge.</p>
+        <div class="essay-teaser-byline">
+          <div class="byline-avatar" aria-hidden="true"></div>
+          <div>
+            <div style="font-family:var(--display); font-style:italic; font-size:1rem; color:var(--charcoal); text-transform:none; letter-spacing:0;">Mira Okafor</div>
+            <div>March 9, 2026 · 6 min read</div>
+          </div>
+        </div>
+        <a href="about.html" class="btn btn-outline">Keep reading</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== NEWSLETTER ========== -->
+<section class="newsletter">
+  <div class="container">
+    <div class="newsletter-wrap">
+      <span class="eyebrow" style="color: var(--butter);">The Weekly</span>
+      <h2 class="display-lg" style="margin-top:0.85rem">Three recipes. <em>Every Sunday.</em></h2>
+      <p>The new recipes of the week, a short kitchen note, and one ingredient I'm obsessed with right now. No ads. No sponsored anything. Unsubscribe in two clicks.</p>
+      <form class="newsletter-form" novalidate>
+        <input type="email" placeholder="your@email.com" required aria-label="Email address">
+        <button type="submit">Subscribe</button>
+      </form>
+      <div class="newsletter-success">Welcome in. Look for Sunday's issue in your inbox.</div>
+      <div class="newsletter-fine">14,200 home cooks · Issued Sundays at 8am ET</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="site-logo" style="color:var(--paper)">
+          <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="20" cy="20" r="19" fill="#F0D878" stroke="#F7F1DE" stroke-width="1.4"/>
+            <path d="M9 23 Q20 12 31 23 L31 28 Q20 25 9 28 Z" fill="#2A2722"/>
+            <path d="M20 13 Q22 8 26 7 Q25 11 22 13 Z" fill="#6B7A3F"/>
+            <path d="M20 14 Q18 9 14 8 Q15 12 19 14 Z" fill="#6B7A3F"/>
+            <circle cx="20" cy="14" r="1.6" fill="#C8442F"/>
+          </svg>
+          <span>
+            <span class="logo-text">Skillet &amp; Stem</span>
+            <span class="logo-sub">Brooklyn · Est. 2021</span>
+          </span>
+        </div>
+        <p>Vegetable-forward home cooking, written by people who actually cook on weeknights. Recipes published Tuesdays and Fridays.</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Cook</h4>
+        <ul>
+          <li><a href="recipes.html">All Recipes</a></li>
+          <li><a href="collections.html">Collections</a></li>
+          <li><a href="recipes.html?filter=quick">30 Min &amp; Under</a></li>
+          <li><a href="recipes.html?filter=vegetarian">Vegetarian</a></li>
+          <li><a href="recipes.html?filter=make-ahead">Make-Ahead</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Read</h4>
+        <ul>
+          <li><a href="about.html">About Mira</a></li>
+          <li><a href="about.html#kitchen-notes">Kitchen Notes</a></li>
+          <li><a href="about.html#pantry">The Pantry</a></li>
+          <li><a href="#">Recipe Index</a></li>
+          <li><a href="#">Search</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Elsewhere</h4>
+        <ul>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">Substack</a></li>
+          <li><a href="#">RSS Feed</a></li>
+          <li><a href="#">Contact</a></li>
+          <li><a href="#">Press</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div>© 2026 Skillet &amp; Stem · Made in Brooklyn</div>
+      <div class="footer-social">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Colophon</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

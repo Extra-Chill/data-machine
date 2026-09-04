@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLTA AURA One — The Electric Motorcycle, Reimagined</title>
+  <meta name="description" content="VOLTA AURA One — a 171-mile electric motorcycle with 2.6s 0–60, mid-mounted hub motor and adaptive haptic suspension. Reserve the launch edition.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ══════════ INTRO LOADER ══════════ -->
+  <div class="loader" role="status" aria-live="polite" aria-label="Loading">
+    <div class="loader-inner">
+      <div class="loader-mark"><span>V</span><span>O</span><span>L</span><span>T</span><span>A</span></div>
+      <div class="loader-sub">Aura One · Launch Edition</div>
+      <div class="loader-bar"><i></i></div>
+      <div class="loader-pct">000</div>
+    </div>
+  </div>
+
+  <div class="scroll-progress" aria-hidden="true"></div>
+
+  <!-- ══════════ HEADER ══════════ -->
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="VOLTA home">
+      <span class="logo-mark">VOLTA</span>
+      <span class="logo-sub">Aura One</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Launch</a>
+      <a href="features.html">Features</a>
+      <a href="specs.html">Specs</a>
+      <a href="reserve.html" class="nav-cta">Reserve</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- ══════════ SCROLL-PINNED HERO ══════════ -->
+    <section class="hero-scope" aria-label="AURA One reveal">
+      <div class="hero-track">
+        <div class="hero-pin">
+          <div class="hero-aura" aria-hidden="true"></div>
+          <div class="hero-grid" aria-hidden="true"></div>
+
+          <p class="eyebrow hero-eyebrow-fixed">Introducing · 2026</p>
+
+          <div class="hero-copy" aria-hidden="true">
+            <h1 class="hero-headline">AURA<em>.</em></h1>
+          </div>
+
+          <div class="hero-stage">
+            <!-- ═══ INLINE SVG MOTORCYCLE ═══ -->
+            <svg class="hero-bike config-bike" viewBox="0 0 900 460" role="img"
+                 aria-label="VOLTA AURA One electric motorcycle"
+                 style="--bike-body:#27305c;--bike-body-2:#3a447a;--bike-body-d:#161c38;--bike-accent:#6f7bff">
+              <defs>
+                <linearGradient id="tank" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="var(--bike-body-2)"/>
+                  <stop offset="1" stop-color="var(--bike-body-d)"/>
+                </linearGradient>
+                <linearGradient id="seat" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#2a2f3e"/>
+                  <stop offset="1" stop-color="#11131b"/>
+                </linearGradient>
+                <radialGradient id="rim" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0.55" stop-color="#0b0d14"/>
+                  <stop offset="0.78" stop-color="var(--bike-accent)"/>
+                  <stop offset="0.82" stop-color="#0b0d14"/>
+                  <stop offset="1" stop-color="#1a1d28"/>
+                </radialGradient>
+                <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="var(--bike-accent)" stop-opacity="0"/>
+                  <stop offset="1" stop-color="var(--bike-accent)"/>
+                </linearGradient>
+              </defs>
+
+              <!-- ground shadow -->
+              <ellipse cx="450" cy="412" rx="320" ry="20" fill="#000" opacity="0.45"/>
+
+              <!-- REAR WHEEL (part) -->
+              <g data-part data-dx="120" data-dy="60" data-rot="0" style="transform-origin:235px 330px">
+                <circle cx="235" cy="330" r="92" fill="url(#rim)"/>
+                <circle cx="235" cy="330" r="92" fill="none" stroke="#05060a" stroke-width="14"/>
+                <circle cx="235" cy="330" r="46" fill="#10131c" stroke="var(--bike-accent)" stroke-width="2"/>
+                <circle cx="235" cy="330" r="12" fill="#05060a"/>
+                <!-- spokes -->
+                <g stroke="var(--bike-accent)" stroke-width="3" opacity="0.75">
+                  <line x1="235" y1="288" x2="235" y2="372"/>
+                  <line x1="193" y1="330" x2="277" y2="330"/>
+                  <line x1="205" y1="300" x2="265" y2="360"/>
+                  <line x1="205" y1="360" x2="265" y2="300"/>
+                </g>
+              </g>
+
+              <!-- FRONT WHEEL (part) -->
+              <g data-part data-dx="-130" data-dy="60" data-rot="0" style="transform-origin:690px 330px">
+                <circle cx="690" cy="330" r="92" fill="url(#rim)"/>
+                <circle cx="690" cy="330" r="92" fill="none" stroke="#05060a" stroke-width="14"/>
+                <circle cx="690" cy="330" r="46" fill="#10131c" stroke="var(--bike-accent)" stroke-width="2"/>
+                <circle cx="690" cy="330" r="12" fill="#05060a"/>
+                <g stroke="var(--bike-accent)" stroke-width="3" opacity="0.75">
+                  <line x1="690" y1="288" x2="690" y2="372"/>
+                  <line x1="648" y1="330" x2="732" y2="330"/>
+                  <line x1="660" y1="300" x2="720" y2="360"/>
+                  <line x1="660" y1="360" x2="720" y2="300"/>
+                </g>
+              </g>
+
+              <!-- SWINGARM + FRAME -->
+              <g data-part data-dx="0" data-dy="0" data-rot="0">
+                <path d="M235,330 L420,300 L520,318 L690,330" fill="none" stroke="#1a1f2e" stroke-width="14" stroke-linecap="round"/>
+                <path d="M430,250 L500,300 L560,250 Z" fill="var(--bike-body-d)" stroke="#0c0f18" stroke-width="2"/>
+              </g>
+
+              <!-- BATTERY / MID MOTOR (part) -->
+              <g data-part data-dx="0" data-dy="120" data-rot="-6" style="transform-origin:455px 300px">
+                <rect x="395" y="262" width="130" height="78" rx="14" fill="var(--bike-body-d)" stroke="var(--bike-accent)" stroke-width="2"/>
+                <rect x="408" y="276" width="104" height="10" rx="5" fill="var(--bike-accent)" opacity="0.85"/>
+                <rect x="408" y="294" width="80" height="6" rx="3" fill="var(--bike-accent)" opacity="0.5"/>
+                <rect x="408" y="308" width="92" height="6" rx="3" fill="var(--bike-accent)" opacity="0.5"/>
+                <circle cx="455" cy="330" r="24" fill="#10131c" stroke="var(--bike-accent)" stroke-width="3"/>
+                <text x="455" y="252" text-anchor="middle" font-family="Space Mono, monospace" font-size="11" fill="var(--bike-accent)">21.5 kWh</text>
+              </g>
+
+              <!-- TANK / SHROUD (part) -->
+              <g data-part data-dx="-20" data-dy="-130" data-rot="-4" style="transform-origin:430px 230px">
+                <path d="M340,250 C360,205 430,188 510,200 C540,205 555,225 545,250 C520,262 380,266 340,250 Z"
+                      fill="url(#tank)" stroke="#0c0f18" stroke-width="2"/>
+                <path d="M360,232 C400,214 470,210 520,224" fill="none" stroke="var(--bike-accent)" stroke-width="2.5" opacity="0.9"/>
+                <path d="M364,242 C404,228 468,226 514,238" fill="none" stroke="var(--bike-accent)" stroke-width="1.2" opacity="0.4"/>
+              </g>
+
+              <!-- SEAT + TAIL (part) -->
+              <g data-part data-dx="120" data-dy="-90" data-rot="6" style="transform-origin:290px 250px">
+                <path d="M230,256 C260,242 360,244 380,250 C384,260 360,268 320,270 C280,272 240,268 230,256 Z"
+                      fill="url(#seat)" stroke="#05060a" stroke-width="2"/>
+                <path d="M232,248 L200,250 C190,250 188,262 200,264 L235,260 Z" fill="var(--bike-body)" stroke="var(--bike-accent)" stroke-width="1.5"/>
+                <rect x="195" y="252" width="12" height="5" rx="2.5" fill="var(--bike-accent)"/>
+              </g>
+
+              <!-- FORK + HEADLIGHT (part) -->
+              <g data-part data-dx="-40" data-dy="-120" data-rot="8" style="transform-origin:640px 250px">
+                <path d="M560,250 L660,300" stroke="#2a3044" stroke-width="10" stroke-linecap="round"/>
+                <path d="M690,330 L668,236" stroke="#3a4258" stroke-width="9" stroke-linecap="round"/>
+                <path d="M690,330 L676,238" stroke="#1a1f2e" stroke-width="9" stroke-linecap="round"/>
+                <!-- headlight -->
+                <path d="M662,210 C690,206 712,220 716,244 C700,250 676,250 660,242 C656,228 656,216 662,210 Z"
+                      fill="var(--bike-body-d)" stroke="#0c0f18" stroke-width="2"/>
+                <ellipse cx="694" cy="228" rx="14" ry="16" fill="var(--bike-accent)" opacity="0.95"/>
+                <ellipse cx="694" cy="228" rx="6" ry="8" fill="#fff" opacity="0.9"/>
+                <!-- handlebar -->
+                <path d="M640,206 L688,196" stroke="#1a1f2e" stroke-width="7" stroke-linecap="round"/>
+              </g>
+
+              <!-- headlight beam glow -->
+              <path data-part data-dx="-60" data-dy="0" data-rot="0" d="M708,228 L860,180 L860,280 Z" fill="url(#glow)" opacity="0.18"/>
+
+              <!-- front fender (part) -->
+              <g data-part data-dx="-90" data-dy="40" data-rot="0" style="transform-origin:690px 270px">
+                <path d="M636,278 C652,250 728,250 744,278" fill="none" stroke="var(--bike-body)" stroke-width="8" stroke-linecap="round"/>
+              </g>
+            </svg>
+          </div>
+
+          <!-- floating spec callouts revealed during scroll -->
+          <div class="hero-spec s1" aria-hidden="true"><span class="n">2.6s</span><span class="l">0–60 mph</span></div>
+          <div class="hero-spec s2" aria-hidden="true"><span class="n">171</span><span class="l">miles range</span></div>
+          <div class="hero-spec s3" aria-hidden="true"><span class="n">21.5</span><span class="l">kWh pack</span></div>
+          <div class="hero-spec s4" aria-hidden="true"><span class="n">408</span><span class="l">lb-ft torque</span></div>
+
+          <div class="hero-cta-row">
+            <a href="reserve.html" class="btn btn-primary magnetic" data-strength="0.4">Reserve from $500 <span class="arrow">→</span></a>
+            <a href="features.html" class="btn btn-ghost magnetic" data-strength="0.25">Explore the build</a>
+          </div>
+
+          <div class="scroll-hint" aria-hidden="true">Scroll<span class="line"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ STATEMENT ══════════ -->
+    <section class="section">
+      <div class="wrap statement-grid">
+        <div>
+          <p class="eyebrow reveal">The thesis</p>
+          <p class="lede split" data-split>Electric should never mean apologetic.</p>
+        </div>
+        <div class="statement-side reveal" data-delay="2">
+          <p>The AURA One is not a quiet commuter pretending to be a motorcycle. It is a ground-up electric platform built around a centre-mounted liquid-cooled motor, a structural battery, and a chassis tuned at the Anglesey circuit. The result is a machine that out-accelerates a litre superbike to 60 and still carries you 171 miles between charges.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ STATS COUNT-UP ══════════ -->
+    <section class="section-sm">
+      <div class="wrap">
+        <div class="stat-row reveal">
+          <div class="stat"><div class="num"><span data-count="2.6" data-decimals="1">0</span>s</div><div class="label">0–60 mph (RS mode)</div></div>
+          <div class="stat"><div class="num"><span data-count="171">0</span><span class="unit">mi</span></div><div class="label">EPA-equivalent range</div></div>
+          <div class="stat"><div class="num"><span data-count="408">0</span></div><div class="label">lb-ft instant torque</div></div>
+          <div class="stat"><div class="num"><span data-count="431">0</span><span class="unit">lb</span></div><div class="label">curb weight</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ FEATURE 1 ══════════ -->
+    <section class="section">
+      <div class="wrap feature">
+        <div class="feature-media reveal">
+          <!-- motor diagram svg -->
+          <svg viewBox="0 0 320 260" aria-label="Mid-mounted motor diagram">
+            <circle cx="160" cy="130" r="92" fill="none" stroke="#6f7bff" stroke-width="2" opacity="0.3"/>
+            <circle cx="160" cy="130" r="70" fill="#171b2b" stroke="#6f7bff" stroke-width="2"/>
+            <g stroke="#c4ff3d" stroke-width="3" opacity="0.85">
+              <line x1="160" y1="60" x2="160" y2="200"/>
+              <line x1="90" y1="130" x2="230" y2="130"/>
+              <line x1="110" y1="80" x2="210" y2="180"/>
+              <line x1="110" y1="180" x2="210" y2="80"/>
+            </g>
+            <circle cx="160" cy="130" r="26" fill="#0c0e16" stroke="#c4ff3d" stroke-width="2"/>
+            <circle cx="160" cy="130" r="8" fill="#c4ff3d"/>
+            <text x="160" y="240" text-anchor="middle" font-family="Space Mono" font-size="12" fill="#9aa3bd">AURA-DRIVE · 110 kW peak</text>
+          </svg>
+        </div>
+        <div class="feature-copy reveal" data-delay="2">
+          <p class="eyebrow">Powertrain</p>
+          <h2>One motor. Centred. Liquid-cooled.</h2>
+          <p>Rather than bolting a hub motor to the rear wheel, we mounted a 110 kW oil-cooled axial-flux motor at the centre of mass. Mass sits low and central, so the AURA One turns in like a 600 and holds peak torque from a standstill to 80 mph without thermal roll-off.</p>
+          <ul class="feature-list">
+            <li>Axial-flux motor, 110 kW peak / 65 kW continuous</li>
+            <li>408 lb-ft at the crank, available from 0 rpm</li>
+            <li>Sealed wet clutch for true engine-braking feel</li>
+            <li>Sustains peak output for 90s laps without derating</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ HORIZONTAL-SCROLL COLOURWAYS ══════════ -->
+    <section class="hscroll-scope" aria-label="Colourways">
+      <div class="hscroll-track-wrap">
+        <div class="hscroll-pin">
+          <div class="hscroll-head reveal">
+            <p class="eyebrow">Five finishes</p>
+            <h2 style="font-size:clamp(2rem,5vw,3.4rem);margin-top:.6rem">Pick your light.</h2>
+          </div>
+          <div class="hscroll-track">
+            <article class="hcard" style="--swatch:#6f7bff">
+              <div class="swatch-orb"></div>
+              <span class="cname">Standard</span>
+              <h3>Midnight Indigo</h3>
+              <p>A deep liquid blue that shifts toward violet under sodium light. Our signature launch finish, hand-polished over a graphite base.</p>
+              <div class="hmeta"><div>Finish<b>Gloss</b></div><div>Adds<b>$0</b></div></div>
+            </article>
+            <article class="hcard" style="--swatch:#c4ff3d">
+              <div class="swatch-orb"></div>
+              <span class="cname">Standard</span>
+              <h3>Acid Volt</h3>
+              <p>Matte charcoal body with our reactive acid-lime accent across the rims, motor cage and headlight ring. The track-day favourite.</p>
+              <div class="hmeta"><div>Finish<b>Matte</b></div><div>Adds<b>$0</b></div></div>
+            </article>
+            <article class="hcard" style="--swatch:#ff6a3d">
+              <div class="swatch-orb"></div>
+              <span class="cname">Premium</span>
+              <h3>Ember Copper</h3>
+              <p>A burnt-orange metallic over a copper flake. Warm, aggressive, and surprisingly subtle at dusk. Limited to 400 units.</p>
+              <div class="hmeta"><div>Finish<b>Metallic</b></div><div>Adds<b>$600</b></div></div>
+            </article>
+            <article class="hcard" style="--swatch:#b06bff">
+              <div class="swatch-orb"></div>
+              <span class="cname">Premium</span>
+              <h3>Nova Magenta</h3>
+              <p>An iridescent magenta-to-purple flip-flake paint developed with our aerospace coatings partner. No two angles look alike.</p>
+              <div class="hmeta"><div>Finish<b>Flip-flake</b></div><div>Adds<b>$600</b></div></div>
+            </article>
+            <article class="hcard" style="--swatch:#cfe6ff">
+              <div class="swatch-orb"></div>
+              <span class="cname">Signature</span>
+              <h3>Glacier Silver</h3>
+              <p>Raw brushed aluminium tank, hand-grained and clear-anodised. Each panel is signed by the technician who finished it.</p>
+              <div class="hmeta"><div>Finish<b>Anodised</b></div><div>Adds<b>$1,200</b></div></div>
+            </article>
+          </div>
+          <div class="hscroll-progress" aria-hidden="true"><i></i></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ LIVE CONFIGURATOR ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head center reveal">
+          <p class="eyebrow" style="justify-content:center">Configure</p>
+          <h2>See it in your colour.</h2>
+          <p>Tap a finish to recolour the AURA One in real time.</p>
+        </div>
+        <div class="configurator" data-configurator data-base-price="14900">
+          <div class="config-stage reveal" style="--cfg-glow:rgba(111,123,255,.4)">
+            <svg class="config-bike" viewBox="0 0 900 460" role="img" aria-label="AURA One configurator preview"
+                 style="--bike-body:#27305c;--bike-body-2:#3a447a;--bike-body-d:#161c38;--bike-accent:#6f7bff">
+              <ellipse cx="450" cy="412" rx="300" ry="18" fill="#000" opacity="0.4"/>
+              <circle cx="235" cy="330" r="84" fill="#0b0d14" stroke="var(--bike-accent)" stroke-width="6"/>
+              <circle cx="235" cy="330" r="40" fill="#10131c" stroke="var(--bike-accent)" stroke-width="2"/>
+              <circle cx="690" cy="330" r="84" fill="#0b0d14" stroke="var(--bike-accent)" stroke-width="6"/>
+              <circle cx="690" cy="330" r="40" fill="#10131c" stroke="var(--bike-accent)" stroke-width="2"/>
+              <path d="M235,330 L420,300 L520,318 L690,330" fill="none" stroke="#1a1f2e" stroke-width="14" stroke-linecap="round"/>
+              <rect x="395" y="262" width="130" height="78" rx="14" fill="var(--bike-body-d)" stroke="var(--bike-accent)" stroke-width="2"/>
+              <rect x="408" y="276" width="104" height="10" rx="5" fill="var(--bike-accent)" opacity="0.85"/>
+              <path d="M340,250 C360,205 430,188 510,200 C540,205 555,225 545,250 C520,262 380,266 340,250 Z" fill="var(--bike-body-2)" stroke="#0c0f18" stroke-width="2"/>
+              <path d="M360,232 C400,214 470,210 520,224" fill="none" stroke="var(--bike-accent)" stroke-width="2.5"/>
+              <path d="M230,256 C260,242 360,244 380,250 C384,260 360,268 320,270 C280,272 240,268 230,256 Z" fill="#1c2030" stroke="#05060a" stroke-width="2"/>
+              <ellipse cx="694" cy="228" rx="13" ry="15" fill="var(--bike-accent)"/>
+              <path d="M560,250 L660,300 M690,330 L672,236" stroke="#2a3044" stroke-width="9" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="config-controls reveal" data-delay="2">
+            <h3>AURA One</h3>
+            <p class="cfg-price" data-cfg-price>$14,900</p>
+            <p class="cfg-name" data-cfg-name>Finish &mdash; <b>Midnight Indigo</b></p>
+            <div class="swatch-row" role="group" aria-label="Colourway"></div>
+            <a href="reserve.html" class="btn btn-primary magnetic">Reserve this build <span class="arrow">→</span></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ FEATURE GRID ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <p class="eyebrow">Engineered around the ride</p>
+          <h2>Details that disappear.</h2>
+        </div>
+        <div class="grid-3">
+          <div class="card reveal">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v20M5 8l7-6 7 6"/><circle cx="12" cy="16" r="4"/></svg>
+            <h3>Adaptive haptic suspension</h3>
+            <p>Semi-active damping reads the road 500 times a second and firms up under braking. Three rider-selectable maps, infinitely tunable in the app.</p>
+          </div>
+          <div class="card reveal" data-delay="1">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
+            <h3>Edge-to-edge HUD</h3>
+            <p>A 7-inch bonded glass display with optically-laminated anti-glare. Turn-by-turn, charge-aware routing, and a circuit telemetry mode.</p>
+          </div>
+          <div class="card reveal" data-delay="2">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+            <h3>AuraDock fast charging</h3>
+            <p>10–80% in 38 minutes on a 7 kW AuraDock, or top up overnight on any wall outlet. CCS adapter available for public DC networks.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ CTA BAND ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="cta-band reveal">
+          <p class="eyebrow" style="justify-content:center">Launch Edition · Q3 2026</p>
+          <h2>Be among the first 1,000.</h2>
+          <p>Reserve your AURA One with a fully-refundable $500 deposit. Launch Edition riders get priority delivery, a numbered tank badge, and lifetime free AuraDock charging.</p>
+          <a href="reserve.html" class="btn btn-primary magnetic" data-strength="0.4">Reserve your AURA One <span class="arrow">→</span></a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════ FOOTER ══════════ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <span class="logo-mark">VOLTA</span>
+          <p>Electric motorcycles designed and assembled in Portland, Oregon. Built for the people who actually ride.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Machine</h4>
+          <a href="features.html">Features</a>
+          <a href="specs.html">Specifications</a>
+          <a href="reserve.html">Reserve</a>
+          <a href="index.html">Colourways</a>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <a href="#">Our story</a>
+          <a href="#">Newsroom</a>
+          <a href="#">Careers</a>
+          <a href="#">Showrooms</a>
+        </div>
+        <div class="footer-col">
+          <h4>Support</h4>
+          <a href="#">VoltaCare</a>
+          <a href="#">Charging network</a>
+          <a href="#">Owner's manual</a>
+          <a href="#">Contact</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 VOLTA Motorworks, Inc. All rights reserved. EPA-equivalent figures; actual range varies.</span>
+        <div class="socials">
+          <a href="#" aria-label="Instagram">Instagram</a>
+          <a href="#" aria-label="YouTube">YouTube</a>
+          <a href="#" aria-label="X">X</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+  <script src="js/configurator.js"></script>
+  <script src="js/launch.js"></script>
+</body>
+</html>

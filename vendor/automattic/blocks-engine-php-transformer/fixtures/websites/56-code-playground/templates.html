@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Starter Templates — Forkbench</title>
+  <meta name="description" content="Ready-made example pens for Forkbench: CSS animations, canvas sketches, and small JavaScript apps you can open and edit live.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="is-page">
+
+  <header class="page-header">
+    <div class="inner">
+      <a href="index.html" class="logo" aria-label="Forkbench home">
+        <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M6 9 L2 16 L6 23" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M26 9 L30 16 L26 23" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M19 6 L13 26" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <span class="logo-word">Fork<b>bench</b></span>
+      </a>
+      <nav class="page-nav" aria-label="Primary">
+        <a href="index.html">Editor</a>
+        <a href="templates.html" class="active" aria-current="page">Templates</a>
+        <a href="about.html">About</a>
+        <a href="index.html" class="cta">Open editor →</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero page-wrap">
+      <p class="eyebrow">Starter pens</p>
+      <h1>Don't start from a <em>blank file</em>.</h1>
+      <p class="lead">Every template below is a complete, working pen. Click one and it loads straight into the editor — HTML, CSS, and JS already wired up — so you can poke at it and watch the live preview react. They range from a pure-CSS animation to a canvas sketch to a small stateful app.</p>
+    </section>
+
+    <section class="section page-wrap">
+      <h2>Browse the gallery</h2>
+      <p class="sub">Click any card to open it in the editor. Your work autosaves locally, and you can fork, export, or share whatever you build from there.</p>
+      <div class="tpl-grid" id="tpl-grid">
+        <!-- rendered by js/gallery.js -->
+        <noscript><p style="color:var(--ink-soft)">Enable JavaScript to browse the interactive template gallery, or just <a href="index.html" style="color:var(--accent)">open the editor</a>.</p></noscript>
+      </div>
+    </section>
+
+    <section class="section page-wrap">
+      <h2>How loading works</h2>
+      <p class="sub">Forkbench encodes everything into the URL — no server, no accounts.</p>
+      <div class="codeblock">
+        <span class="c">// Opening a template just sets the URL hash:</span><br>
+        index.html<span class="k">#t=</span><span class="s">canvas-orbits</span><br><br>
+        <span class="c">// Sharing your own pen base64-encodes the three sources:</span><br>
+        index.html<span class="k">#pen=</span><span class="s">eyJ0IjoiTXkgUGVuIiwiaCI6Ii4uLiJ9…</span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <div class="inner">
+      <span>© <span id="year">2026</span> Forkbench · A live code playground in your browser.</span>
+      <span><a href="index.html">Editor</a> · <a href="about.html">About</a> · <a href="index.html" id="lucky">I'm feeling lucky</a></span>
+    </div>
+  </footer>
+
+  <script src="js/templates-data.js"></script>
+  <script src="js/gallery.js"></script>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    // "I'm feeling lucky" loads a random template.
+    (function () {
+      var lucky = document.getElementById('lucky');
+      var list = window.FORKBENCH_TEMPLATES || [];
+      if (lucky && list.length) {
+        var pick = list[Math.floor(Math.random() * list.length)];
+        lucky.href = 'index.html#t=' + pick.id;
+      }
+    })();
+  </script>
+</body>
+</html>

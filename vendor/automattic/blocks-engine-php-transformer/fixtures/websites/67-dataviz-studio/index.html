@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plotweaver — Data Visualization Studio</title>
+  <meta name="description" content="Plotweaver is a from-scratch charting studio: edit data in a grid or paste CSV, then render bar, line, area, scatter, pie, donut, radar, heatmap and histogram charts with full axis, legend and export control.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='16' width='4' height='11' rx='1' fill='%236ee7ff'/%3E%3Crect x='13' y='9' width='4' height='18' rx='1' fill='%23a78bfa'/%3E%3Crect x='21' y='13' width='4' height='14' rx='1' fill='%23fb7185'/%3E%3Cpath d='M5 8 L13 12 L21 5 L28 9' fill='none' stroke='%236ee7ff' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body data-theme="dark">
+
+<!-- ══════════ SHARED HEADER ══════════ -->
+<header class="topbar">
+  <a class="brand" href="index.html" aria-label="Plotweaver home">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="5" y="16" width="4" height="11" rx="1" fill="#6ee7ff"/>
+      <rect x="13" y="9" width="4" height="18" rx="1" fill="#a78bfa"/>
+      <rect x="21" y="13" width="4" height="14" rx="1" fill="#fb7185"/>
+      <path d="M5 8 L13 12 L21 5 L28 9" fill="none" stroke="#6ee7ff" stroke-width="2"/>
+    </svg>
+    <span class="brand-name">Plot<b>weaver</b><span class="brand-sub">DataViz Studio</span></span>
+  </a>
+  <nav class="top-nav" aria-label="Primary">
+    <a href="index.html" class="active">Studio</a>
+    <a href="gallery.html">Gallery</a>
+    <a href="about.html">About</a>
+  </nav>
+  <div class="top-spacer"></div>
+  <button class="ctrl" id="exportPngBtn" aria-label="Export chart as PNG">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+    <span>PNG</span>
+  </button>
+  <button class="ctrl" id="exportSvgBtn" aria-label="Export chart as SVG">SVG</button>
+  <button class="ctrl" id="exportJsonBtn" aria-label="Export config and data as JSON">JSON</button>
+  <button class="ctrl accent" id="copyEmbedBtn" aria-label="Copy share link and embed code">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>
+    <span>Share</span>
+  </button>
+  <button class="ctrl" id="themeToggle" aria-label="Toggle color theme">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+    <span class="tlabel">Dark</span>
+  </button>
+</header>
+
+<!-- ══════════ STUDIO ══════════ -->
+<div class="studio">
+
+  <!-- ── DATA PANE ── -->
+  <section class="pane pane-data active" id="pane-data">
+    <div class="pane-head">
+      <h2>Data</h2>
+      <div class="spacer"></div>
+      <button class="btn sm" id="addRowBtn" title="Add a row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Row
+      </button>
+      <button class="btn sm" id="addColBtn" title="Add a column">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Col
+      </button>
+    </div>
+
+    <div class="dataset-row">
+      <label for="datasetSelect">Load</label>
+      <select class="select" id="datasetSelect" aria-label="Load a built-in dataset"></select>
+      <label for="importJsonInput" class="btn sm" title="Import a Plotweaver JSON export" style="cursor:pointer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/></svg>JSON
+      </label>
+      <input type="file" id="importJsonInput" accept=".json,application/json" hidden>
+    </div>
+
+    <div class="grid-wrap" id="gridWrap"></div>
+
+    <div class="csv-box">
+      <h3>Paste CSV / TSV</h3>
+      <textarea id="csvInput" spellcheck="false" placeholder="month,sales,returns&#10;Jan,4200,120&#10;Feb,3850,98&#10;Mar,5100,140&#10;&#10;Tabs, semicolons and quoted &quot;fields, with commas&quot; all parse."></textarea>
+      <div class="csv-row">
+        <label class="toggle-row" style="margin:0;flex:none;gap:7px">
+          <span class="toggle"><input type="checkbox" id="csvHeader" checked><span class="track"><span class="thumb"></span></span></span>
+          <span style="font-size:12px;color:var(--ink-soft)">First row is header</span>
+        </label>
+        <div class="spacer" style="flex:1"></div>
+        <button class="btn sm ghost" id="clearPasteBtn">Clear</button>
+        <button class="btn sm accent" id="applyPasteBtn">Import</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CANVAS PANE ── -->
+  <section class="pane pane-canvas" id="pane-canvas">
+    <div class="pane-head">
+      <h2>Chart</h2>
+      <div class="spacer"></div>
+      <span style="font-size:11px;color:var(--ink-faint)">click a legend swatch to toggle a series · hover for values</span>
+    </div>
+    <div class="canvas-stage">
+      <div class="chart-card fade-up">
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+    <div class="canvas-statbar" id="statbar"></div>
+  </section>
+
+  <!-- ── CONFIG PANE ── -->
+  <section class="pane pane-config" id="pane-config">
+    <div class="pane-head"><h2>Configure</h2></div>
+    <div class="config-body">
+
+      <div class="cfg-section">
+        <h3>Chart type</h3>
+        <div class="type-grid" id="typeGrid" role="group" aria-label="Chart type"></div>
+      </div>
+
+      <div class="cfg-section">
+        <h3>Map columns</h3>
+        <div class="cfg-row">
+          <label id="mapXLabel">X axis</label>
+          <div class="control"><select class="select full" id="mapX" aria-label="X column"></select></div>
+        </div>
+        <div class="cfg-row" style="align-items:flex-start">
+          <label id="mapSeriesLabel" style="margin-top:6px">Series</label>
+          <div class="control" id="mapSeries"></div>
+        </div>
+        <div class="cfg-row" id="mapGroupRow" style="display:none">
+          <label>Group by</label>
+          <div class="control"><select class="select full" id="mapGroup" aria-label="Group column"></select></div>
+        </div>
+      </div>
+
+      <div class="cfg-section">
+        <h3>Palette</h3>
+        <div class="palette-grid" id="paletteGrid" role="group" aria-label="Color palette"></div>
+      </div>
+
+      <div class="cfg-section">
+        <h3>Labels</h3>
+        <div class="cfg-row"><label for="cfgTitle">Title</label><div class="control"><input class="cfg-input" id="cfgTitle" placeholder="Chart title"></div></div>
+        <div id="axisRows">
+          <div class="cfg-row"><label for="cfgXLabel">X label</label><div class="control"><input class="cfg-input" id="cfgXLabel" placeholder="x axis"></div></div>
+          <div class="cfg-row"><label for="cfgYLabel">Y label</label><div class="control"><input class="cfg-input" id="cfgYLabel" placeholder="y axis"></div></div>
+        </div>
+      </div>
+
+      <div class="cfg-section">
+        <h3>Legend</h3>
+        <div class="seg" id="legendSeg" role="group" aria-label="Legend position">
+          <button data-leg="top">Top</button>
+          <button data-leg="right">Right</button>
+          <button data-leg="left">Left</button>
+          <button data-leg="bottom">Bottom</button>
+          <button data-leg="none">Off</button>
+        </div>
+      </div>
+
+      <div class="cfg-section">
+        <h3>Options</h3>
+        <div class="toggle-row" id="stackedRow">
+          <label for="cfgStacked">Stacked</label>
+          <span class="toggle"><input type="checkbox" id="cfgStacked"><span class="track"><span class="thumb"></span></span></span>
+        </div>
+        <div class="toggle-row" id="gridRow">
+          <label for="cfgGrid">Gridlines</label>
+          <span class="toggle"><input type="checkbox" id="cfgGrid" checked><span class="track"><span class="thumb"></span></span></span>
+        </div>
+        <div class="toggle-row">
+          <label for="cfgAnimate">Entrance animation</label>
+          <span class="toggle"><input type="checkbox" id="cfgAnimate" checked><span class="track"><span class="thumb"></span></span></span>
+        </div>
+        <div class="cfg-row" style="margin-top:4px">
+          <label for="cfgFormat">Value fmt</label>
+          <div class="control"><select class="select full" id="cfgFormat">
+            <option value="number">Number (1,234.5)</option>
+            <option value="thousands">Thousands grouped</option>
+            <option value="compact">Compact (1.2k / 3.4M)</option>
+            <option value="currency">Currency ($)</option>
+            <option value="percent">Percent (%)</option>
+          </select></div>
+        </div>
+        <div class="cfg-row">
+          <label>Sort</label>
+          <div class="control">
+            <div class="seg" id="sortSeg" role="group" aria-label="Sort order">
+              <button data-sort="none">None</button>
+              <button data-sort="asc">Asc</button>
+              <button data-sort="desc">Desc</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
+
+<!-- mobile pane switcher -->
+<nav class="mobtab" aria-label="Studio panes">
+  <button data-pane="data" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="9" x2="9" y2="21"/></svg>Data</button>
+  <button data-pane="canvas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="7"/><rect x="13" y="7" width="3" height="11"/></svg>Chart</button>
+  <button data-pane="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>Config</button>
+</nav>
+
+<!-- tooltip + toast -->
+<div class="chart-tooltip" id="chartTooltip" role="status" aria-live="off"></div>
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span id="toastMsg"></span></div>
+
+<script src="js/data.js"></script>
+<script src="js/chart.js"></script>
+<script src="js/svgexport.js"></script>
+<script src="js/model.js"></script>
+<script src="js/presets.js"></script>
+<script src="js/studio.js"></script>
+</body>
+</html>

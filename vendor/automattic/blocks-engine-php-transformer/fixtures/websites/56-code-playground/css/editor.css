@@ -1,0 +1,115 @@
+/* =========================================================
+   FORKBENCH — Code editor styling
+   The textarea is transparent and sits on top of a <pre>
+   highlight layer. Metrics (font, size, line-height, padding,
+   tab-size, letter-spacing) MUST match exactly between the
+   textarea and the <pre> or the cursor will drift.
+   ========================================================= */
+
+.ce {
+  --ce-fs: 14px;
+  --ce-lh: 21px;          /* 1.5 * 14, also referenced in editor.js */
+  --ce-pad-y: 8px;
+  --ce-pad-x: 12px;
+  --ce-gutter-w: 46px;
+
+  position: absolute; inset: 0;
+  display: flex; overflow: hidden;
+  background: var(--panel);
+  font-family: var(--font-mono);
+  font-size: var(--ce-fs);
+  line-height: var(--ce-lh);
+}
+
+/* Gutter */
+.ce-gutter {
+  flex: 0 0 var(--ce-gutter-w);
+  padding: var(--ce-pad-y) 8px var(--ce-pad-y) 0;
+  text-align: right;
+  color: var(--ink-faint);
+  background: var(--head);
+  border-right: 1px solid var(--line-soft);
+  white-space: pre;
+  overflow: hidden;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scroll container holds the layered pre + textarea */
+.ce-scroll {
+  position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden;
+}
+
+/* Current-line highlight bar */
+.ce-curline {
+  position: absolute; left: 0; right: 0; height: var(--ce-lh);
+  background: rgba(255,255,255,0.035);
+  pointer-events: none; z-index: 0; opacity: 0;
+  transition: opacity 0.1s;
+}
+.ce.is-focus .ce-curline { opacity: 1; }
+
+/* Shared text metrics for both layers */
+.ce-highlight,
+.ce-input {
+  margin: 0;
+  padding: var(--ce-pad-y) var(--ce-pad-x);
+  font-family: var(--font-mono);
+  font-size: var(--ce-fs);
+  line-height: var(--ce-lh);
+  letter-spacing: 0;
+  tab-size: 2;
+  -moz-tab-size: 2;
+  white-space: pre;
+  word-wrap: normal;
+  border: 0;
+}
+
+/* Highlight layer (behind) */
+.ce-highlight {
+  position: absolute; top: 0; left: 0;
+  min-width: 100%;
+  z-index: 1; pointer-events: none;
+  will-change: transform;
+  color: var(--ink);
+}
+.ce-highlight code { font: inherit; display: block; }
+
+/* Textarea (transparent text, visible caret) */
+.ce-input {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  resize: none; outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--accent);
+  z-index: 2;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.ce-input::-webkit-scrollbar { width: 10px; height: 10px; }
+.ce-input::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid var(--panel); }
+.ce-input::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+.ce-input::selection { background: rgba(108,242,200,0.25); color: transparent; }
+
+/* ───────────── Token colors ───────────── */
+.tok-comment  { color: #5f6580; font-style: italic; }
+.tok-keyword  { color: #c792ea; }       /* violet */
+.tok-string   { color: #c3e88d; }       /* green */
+.tok-number   { color: #f78c6c; }       /* orange */
+.tok-literal  { color: #ff9cac; }
+.tok-builtin  { color: #82aaff; }       /* blue */
+.tok-func     { color: #ffd166; }       /* amber */
+.tok-regex    { color: #89ddff; }
+.tok-op       { color: #89ddff; }
+.tok-punc     { color: #a6accd; }
+
+/* HTML */
+.tok-tag      { color: #f07178; }       /* coral */
+.tok-attr     { color: #ffd166; }
+.tok-string.tok-attrval { color: #c3e88d; }
+
+/* CSS */
+.tok-selector { color: #ffcb6b; }
+.tok-property { color: #82aaff; }
+.tok-value    { color: #c3e88d; }

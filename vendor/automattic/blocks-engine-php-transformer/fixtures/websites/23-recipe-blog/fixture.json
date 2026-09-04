@@ -1,0 +1,12 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "blog",
+    "recipes",
+    "food",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

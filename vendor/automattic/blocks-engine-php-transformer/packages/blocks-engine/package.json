@@ -1,0 +1,81 @@
+{
+  "name": "@automattic/blocks-engine",
+  "version": "0.2.2",
+  "description": "Convert HTML and static sites into WordPress block markup and block themes.",
+  "keywords": ["wordpress", "blocks", "gutenberg", "block-theme", "html", "static-site"],
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Automattic/blocks-engine.git",
+    "directory": "packages/blocks-engine"
+  },
+  "homepage": "https://github.com/Automattic/blocks-engine/tree/trunk/packages/blocks-engine#readme",
+  "bugs": "https://github.com/Automattic/blocks-engine/issues",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "bin": {
+    "blocks-engine": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./theme": {
+      "types": "./dist/theme/index.d.ts",
+      "source": "./src/theme/index.ts",
+      "import": "./dist/theme/index.js",
+      "require": "./dist/theme/index.cjs"
+    },
+    "./wp": {
+      "types": "./dist/wp/index.d.ts",
+      "source": "./src/wp/index.ts",
+      "import": "./dist/wp/index.js",
+      "require": "./dist/wp/index.cjs"
+    },
+    "./internals": {
+      "types": "./dist/internals/index.d.ts",
+      "source": "./src/internals/index.ts",
+      "import": "./dist/internals/index.js",
+      "require": "./dist/internals/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup && node scripts/build-wp-runtime.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:bundle": "pnpm build && BLOCKS_ENGINE_WP_RUNTIME=bundle BLOCKS_ENGINE_WP_RUNTIME_PATH=\"$PWD/dist/wp-runtime.cjs\" vitest run",
+    "bench": "node --import tsx scripts/tuner/bench.ts",
+    "bench:record": "node --import tsx scripts/tuner/bench.ts --record",
+    "bench:derive": "node --import tsx scripts/tuner/derive.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "acorn": "^8.18.0",
+    "cheerio": "1.2.0",
+    "domhandler": "5.0.3",
+    "jsdom": "29.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "@wordpress/block-library": "10.0.0",
+    "@wordpress/block-serialization-default-parser": "5.49.0",
+    "@wordpress/blocks": "15.22.0",
+    "esbuild": "^0.24.0",
+    "tsup": "8.0.0",
+    "vitest": "2.0.0",
+    "typescript": "5.7.3",
+    "tsx": "^4.22.4"
+  }
+}

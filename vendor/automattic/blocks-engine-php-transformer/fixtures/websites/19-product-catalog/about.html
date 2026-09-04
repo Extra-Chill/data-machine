@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About &amp; Inquire — Hollow &amp; Grain</title>
+  <meta name="description" content="The story behind Hollow &amp; Grain, a small woodworking shop in Bellingham, WA — plus a way to get in touch.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ══ Navigation ══════════════════════════════════════════════ -->
+<header class="site-header" id="site-header">
+  <nav class="nav container">
+    <a href="index.html" class="nav__logo" aria-label="Hollow &amp; Grain home">
+      <svg class="nav__logo-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="36" height="36" rx="3" fill="rgba(250,244,228,0.08)"/>
+        <path d="M8 10 L8 26 M8 18 L16 18 M16 10 L16 26" stroke="#FAF4E4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 10 Q28 10 28 18 Q28 26 20 26 L20 10Z" stroke="#FAF4E4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <line x1="7" y1="29" x2="29" y2="29" stroke="rgba(212,168,74,0.6)" stroke-width="0.75"/>
+      </svg>
+      <span class="nav__logo-text">Hollow &amp; Grain</span>
+    </a>
+    <button class="nav__toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav__links" id="navLinks">
+      <li><a href="index.html" class="nav__link">Home</a></li>
+      <li><a href="shop.html" class="nav__link">Shop</a></li>
+      <li><a href="custom.html" class="nav__link">Custom</a></li>
+      <li><a href="care.html" class="nav__link">Care</a></li>
+      <li><a href="about.html" class="nav__link active">About</a></li>
+      <li><a href="about.html#inquire" class="btn btn--sm btn--oak">Inquire</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- ══ About Hero ═══════════════════════════════════════════════ -->
+<section class="about-hero">
+  <div class="about-hero__visual" aria-hidden="true">
+    <!-- Workshop scene: portrait of the maker's bench -->
+    <svg viewBox="0 0 360 420" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px">
+      <!-- warm light wash -->
+      <defs>
+        <radialGradient id="ab-light" cx="50%" cy="35%" r="65%">
+          <stop offset="0%" stop-color="rgba(212,168,74,0.22)"/>
+          <stop offset="100%" stop-color="rgba(212,168,74,0)"/>
+        </radialGradient>
+      </defs>
+      <rect width="360" height="420" fill="url(#ab-light)"/>
+      <!-- pegboard wall -->
+      <g opacity="0.5">
+        <circle cx="60" cy="60" r="2" fill="rgba(250,244,228,0.25)"/>
+        <circle cx="90" cy="60" r="2" fill="rgba(250,244,228,0.25)"/>
+        <circle cx="120" cy="60" r="2" fill="rgba(250,244,228,0.25)"/>
+        <circle cx="150" cy="60" r="2" fill="rgba(250,244,228,0.25)"/>
+        <circle cx="60" cy="90" r="2" fill="rgba(250,244,228,0.2)"/>
+        <circle cx="90" cy="90" r="2" fill="rgba(250,244,228,0.2)"/>
+        <circle cx="120" cy="90" r="2" fill="rgba(250,244,228,0.2)"/>
+      </g>
+      <!-- hanging tools: chisel + mallet + saw -->
+      <rect x="210" y="40" width="8" height="70" rx="2" fill="rgba(250,244,228,0.4)"/>
+      <rect x="206" y="36" width="16" height="14" rx="3" fill="rgba(212,168,74,0.55)"/>
+      <rect x="248" y="42" width="22" height="40" rx="4" fill="rgba(212,168,74,0.5)"/>
+      <rect x="256" y="78" width="6" height="40" rx="2" fill="rgba(250,244,228,0.35)"/>
+      <path d="M290 44 L320 44 L316 92 L294 92 Z" fill="rgba(250,244,228,0.18)" stroke="rgba(250,244,228,0.35)" stroke-width="1"/>
+      <!-- workbench -->
+      <rect x="0" y="250" width="360" height="170" fill="#2A1408"/>
+      <rect x="0" y="250" width="360" height="14" fill="#3D2010"/>
+      <line x1="0" y1="252" x2="360" y2="252" stroke="rgba(250,244,228,0.12)" stroke-width="1"/>
+      <line x1="0" y1="290" x2="360" y2="290" stroke="rgba(250,244,228,0.04)" stroke-width="1"/>
+      <line x1="0" y1="330" x2="360" y2="330" stroke="rgba(250,244,228,0.03)" stroke-width="1"/>
+      <!-- vise -->
+      <rect x="30" y="240" width="50" height="20" rx="2" fill="#1E0C06"/>
+      <rect x="34" y="234" width="42" height="8" rx="2" fill="#3D2010"/>
+      <!-- board clamped, being finished -->
+      <rect x="100" y="218" width="180" height="34" rx="4" fill="#5C3220"/>
+      <line x1="115" y1="228" x2="268" y2="228" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <line x1="115" y1="238" x2="268" y2="238" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+      <rect x="100" y="218" width="180" height="34" rx="4" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="1"/>
+      <!-- hand plane resting -->
+      <rect x="150" y="190" width="90" height="26" rx="5" fill="#B89040"/>
+      <rect x="153" y="193" width="84" height="20" rx="3" fill="#C8A050"/>
+      <path d="M205 190 Q218 172 226 190" fill="#8B4A20"/>
+      <ellipse cx="170" cy="192" rx="9" ry="6" fill="#9B5A28"/>
+      <!-- wood shavings curl -->
+      <path d="M150 216 Q128 196 100 202 Q82 206 80 218" stroke="rgba(212,168,74,0.55)" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M150 216 Q138 204 118 209" stroke="rgba(212,168,74,0.35)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <!-- jar of oil -->
+      <rect x="300" y="222" width="26" height="30" rx="3" fill="rgba(212,168,74,0.4)"/>
+      <rect x="303" y="216" width="20" height="8" rx="2" fill="#3D2010"/>
+      <!-- sawdust scatter -->
+      <circle cx="95" cy="258" r="2" fill="rgba(212,168,74,0.4)"/>
+      <circle cx="120" cy="262" r="1.5" fill="rgba(212,168,74,0.3)"/>
+      <circle cx="280" cy="260" r="2" fill="rgba(212,168,74,0.3)"/>
+      <circle cx="305" cy="264" r="1.5" fill="rgba(212,168,74,0.25)"/>
+    </svg>
+  </div>
+
+  <div class="about-hero__text">
+    <span class="label">Bellingham, WA · Est. 2016</span>
+    <h1>Two hands,<br>one bench,<br>no rush.</h1>
+    <p>Hollow &amp; Grain is a one-bench workshop on the north end of Bellingham, a few blocks from the bay. We make kitchen pieces the slow way — by hand, one at a time — because that's the only way that ever felt right.</p>
+    <p>We're not trying to be big. We're trying to make the board you'll still be using in thirty years.</p>
+  </div>
+</section>
+
+<!-- ══ Story ════════════════════════════════════════════════════ -->
+<section class="section section--parchment">
+  <div class="container container--narrow">
+    <div class="reveal">
+      <span class="label">The Long Version</span>
+      <h2 style="margin-block:var(--s-md) var(--s-lg)">How it started</h2>
+      <p style="font-size:1.125rem;line-height:1.85;color:var(--c-text-mid);margin-bottom:var(--s-lg)">
+        It started with a leftover walnut slab and a borrowed hand plane in a one-car garage. The first board was for our own kitchen — too thick, slightly crooked, and we still use it every day. Friends asked for one. Then friends of friends. Eight years later the garage has become a proper shop, but not much else has changed.
+      </p>
+      <p style="font-size:1.125rem;line-height:1.85;color:var(--c-text-mid);margin-bottom:var(--s-lg)">
+        We still pick every board off the lumber rack ourselves, matching grain by eye. We still glue up by hand, flatten with planes, and sand through five grits until the surface feels like skin. Every piece gets a coat of our own mineral-oil-and-beeswax finish before it leaves the bench, and a small branded stamp on the underside.
+      </p>
+      <p style="font-size:1.125rem;line-height:1.85;color:var(--c-text-mid)">
+        We're a catalog-and-inquiry shop, not a checkout cart. We'd rather have a quick conversation, get the details right, and make you exactly the thing you need — than sell you something off a shelf that's almost right.
+      </p>
+    </div>
+
+    <!-- Values -->
+    <div class="values-grid reveal-stagger">
+      <div class="value-item">
+        <h4>Made by hand, on purpose</h4>
+        <p>No CNC, no production line. The marks of the tools are part of the piece. If you want perfectly identical, machined boards, we're honestly not your shop.</p>
+      </div>
+      <div class="value-item">
+        <h4>Wood with a backstory</h4>
+        <p>We buy from regional mills and small private timberlands across the Pacific Northwest. We know where most of our walnut and maple grew.</p>
+      </div>
+      <div class="value-item">
+        <h4>Built to be repaired</h4>
+        <p>A board from us can be re-sanded, re-oiled, and brought back to life for decades. Send yours back anytime for a refresh — we only charge shipping.</p>
+      </div>
+      <div class="value-item">
+        <h4>Honest about timing</h4>
+        <p>If we can't make your deadline, we'll tell you before you pay. A two-bench shop has limits, and we'd rather keep your trust than overpromise.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Customer Photos ══════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header section-header--center reveal">
+      <span class="label">In Your Kitchens</span>
+      <h2>From the people who use them</h2>
+      <div class="divider divider--center"></div>
+      <p>A few of our favorite photos customers have sent over the years. Tag us and you might end up here.</p>
+    </div>
+
+    <div class="photo-grid reveal-stagger">
+
+      <!-- Photo card 1 -->
+      <div class="photo-card">
+        <svg viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%" aria-hidden="true">
+          <rect width="300" height="300" fill="#E8D5A8"/>
+          <!-- countertop scene: board with bread -->
+          <rect x="0" y="200" width="300" height="100" fill="#D4BC84"/>
+          <line x1="0" y1="200" x2="300" y2="200" stroke="rgba(120,90,40,0.2)" stroke-width="2"/>
+          <rect x="40" y="150" width="220" height="70" rx="8" fill="#5C3220"/>
+          <line x1="55" y1="170" x2="245" y2="170" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+          <line x1="55" y1="190" x2="245" y2="190" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+          <!-- loaf -->
+          <ellipse cx="120" cy="150" rx="55" ry="26" fill="#C89858"/>
+          <ellipse cx="120" cy="146" rx="50" ry="22" fill="#D8A868"/>
+          <path d="M95 138 L105 150 M120 134 L120 150 M145 138 L135 150" stroke="rgba(120,80,30,0.4)" stroke-width="2" stroke-linecap="round"/>
+          <!-- slices -->
+          <rect x="175" y="135" width="30" height="26" rx="3" fill="#E0C088" transform="rotate(-8 190 148)"/>
+          <rect x="200" y="140" width="30" height="26" rx="3" fill="#E0C088" transform="rotate(6 215 153)"/>
+          <!-- knife -->
+          <rect x="60" y="125" width="120" height="6" rx="3" fill="#9AA0A8" transform="rotate(-18 120 128)"/>
+          <rect x="48" y="132" width="26" height="9" rx="3" fill="#3D2010" transform="rotate(-18 60 136)"/>
+        </svg>
+        <span class="photo-card__caption">"The Shoreline lives on our counter now." — Priya R.</span>
+      </div>
+
+      <!-- Photo card 2 -->
+      <div class="photo-card">
+        <svg viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%" aria-hidden="true">
+          <rect width="300" height="300" fill="#DBC9A0"/>
+          <!-- tray with cheese board spread -->
+          <rect x="0" y="210" width="300" height="90" fill="#C8B488"/>
+          <ellipse cx="150" cy="180" rx="120" ry="50" fill="#3D2010"/>
+          <ellipse cx="150" cy="176" rx="112" ry="44" fill="#5C3220"/>
+          <!-- maple handles -->
+          <ellipse cx="40" cy="176" rx="14" ry="20" fill="#C8A050"/>
+          <ellipse cx="260" cy="176" rx="14" ry="20" fill="#C8A050"/>
+          <!-- cheese wedges + grapes -->
+          <path d="M110 160 L140 150 L138 175 Z" fill="#E8D58A"/>
+          <path d="M150 152 L182 160 L168 178 Z" fill="#EAD89A"/>
+          <circle cx="110" cy="185" r="6" fill="#6B5A8A"/>
+          <circle cx="122" cy="190" r="6" fill="#6B5A8A"/>
+          <circle cx="116" cy="196" r="6" fill="#7A6A9A"/>
+          <circle cx="195" cy="172" r="7" fill="#B83838"/>
+          <circle cx="208" cy="178" r="7" fill="#C84848"/>
+          <!-- crackers -->
+          <rect x="160" y="186" width="14" height="14" rx="2" fill="#D8B870" transform="rotate(12 167 193)"/>
+          <rect x="176" y="190" width="14" height="14" rx="2" fill="#D8B870" transform="rotate(-6 183 197)"/>
+        </svg>
+        <span class="photo-card__caption">"Harvest tray, every Friday night." — The Delgados</span>
+      </div>
+
+      <!-- Photo card 3 -->
+      <div class="photo-card">
+        <svg viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%" aria-hidden="true">
+          <rect width="300" height="300" fill="#E2D2A4"/>
+          <!-- kitchen wall with spice rack -->
+          <rect x="0" y="0" width="300" height="300" fill="#E2D2A4"/>
+          <rect x="0" y="240" width="300" height="60" fill="#CDB888"/>
+          <!-- rack frame -->
+          <rect x="62" y="60" width="14" height="170" rx="3" fill="#B09A68"/>
+          <rect x="224" y="60" width="14" height="170" rx="3" fill="#B09A68"/>
+          <rect x="60" y="108" width="180" height="11" rx="2" fill="#9A8050"/>
+          <rect x="60" y="166" width="180" height="11" rx="2" fill="#9A8050"/>
+          <rect x="60" y="224" width="180" height="11" rx="2" fill="#9A8050"/>
+          <!-- jars -->
+          <rect x="84" y="80" width="18" height="28" rx="3" fill="#7A9060"/><rect x="85" y="78" width="16" height="6" rx="1.5" fill="#9AB080"/>
+          <rect x="112" y="82" width="18" height="26" rx="3" fill="#8A6020"/><rect x="113" y="80" width="16" height="6" rx="1.5" fill="#AA8038"/>
+          <rect x="140" y="78" width="18" height="30" rx="3" fill="#604030"/><rect x="141" y="76" width="16" height="6" rx="1.5" fill="#806050"/>
+          <rect x="168" y="82" width="18" height="26" rx="3" fill="#506840"/><rect x="169" y="80" width="16" height="6" rx="1.5" fill="#708858"/>
+          <rect x="196" y="80" width="18" height="28" rx="3" fill="#8A7040"/><rect x="197" y="78" width="16" height="6" rx="1.5" fill="#A89058"/>
+          <rect x="84" y="138" width="18" height="28" rx="3" fill="#8A6020"/><rect x="85" y="136" width="16" height="6" rx="1.5" fill="#AA8038"/>
+          <rect x="112" y="140" width="18" height="26" rx="3" fill="#7A9060"/><rect x="113" y="138" width="16" height="6" rx="1.5" fill="#9AB080"/>
+          <rect x="140" y="138" width="18" height="28" rx="3" fill="#604030"/><rect x="141" y="136" width="16" height="6" rx="1.5" fill="#806050"/>
+          <rect x="168" y="140" width="18" height="26" rx="3" fill="#8A7040"/><rect x="169" y="138" width="16" height="6" rx="1.5" fill="#A89058"/>
+          <rect x="196" y="138" width="18" height="28" rx="3" fill="#506840"/><rect x="197" y="136" width="16" height="6" rx="1.5" fill="#708858"/>
+        </svg>
+        <span class="photo-card__caption">"Galley Wall finally tamed our spice chaos." — Marcus T.</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══ Inquiry Form ═════════════════════════════════════════════ -->
+<section class="section section--parchment" id="inquire" aria-labelledby="inquire-heading">
+  <div class="container container--narrow">
+    <div class="section-header section-header--center reveal">
+      <span class="label">Say Hello</span>
+      <h2 id="inquire-heading">Inquire about a piece</h2>
+      <div class="divider divider--center"></div>
+      <p>Questions about availability, a custom idea, board butter, wholesale, or just want to talk wood? This is the place. We answer every note ourselves, usually within two business days.</p>
+    </div>
+
+    <form class="inquiry-form js-inquiry-form reveal" novalidate>
+      <p class="inquiry-form__title">Get in touch</p>
+      <p class="inquiry-form__subtitle">No checkout, no spam — just a real reply from the bench.</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="a-name">Your Name *</label>
+          <input class="form-control" type="text" id="a-name" name="name" required placeholder="Jane Cooper">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="a-email">Email *</label>
+          <input class="form-control" type="email" id="a-email" name="email" required placeholder="jane@example.com">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="a-topic">What's this about?</label>
+        <select class="form-control" id="a-topic" name="topic">
+          <option>A specific piece from the shop</option>
+          <option>A custom order idea</option>
+          <option>Board butter / refinishing</option>
+          <option>Wholesale &amp; corporate gifts</option>
+          <option>Local pickup question</option>
+          <option>Just saying hi</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="a-msg">Your Message *</label>
+        <textarea class="form-control" id="a-msg" name="message" required placeholder="Tell us what you're thinking. The more detail, the better the answer we can give you."></textarea>
+      </div>
+
+      <button class="btn btn--primary btn--lg" type="submit">Send Inquiry</button>
+      <div class="form-notice" role="status" aria-live="polite"></div>
+    </form>
+
+    <div class="text-center mt-2xl reveal">
+      <p class="label" style="margin-bottom:var(--s-sm)">Or reach us directly</p>
+      <p style="font-family:var(--f-display);font-size:1.4rem;font-style:italic;color:var(--c-walnut)">hello@hollowandgrain.com</p>
+      <p class="label" style="margin-top:var(--s-md)">Workshop &amp; pickup · Bellingham, WA 98225 · by appointment</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Footer ═══════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>
+      <div class="footer__logo">
+        <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="36" height="36" rx="3" fill="rgba(250,244,228,0.06)"/>
+          <path d="M8 10 L8 26 M8 18 L16 18 M16 10 L16 26" stroke="rgba(250,244,228,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M20 10 Q28 10 28 18 Q28 26 20 26 L20 10Z" stroke="rgba(250,244,228,0.6)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          <line x1="7" y1="29" x2="29" y2="29" stroke="rgba(212,168,74,0.5)" stroke-width="0.75"/>
+        </svg>
+        <span class="footer__logo-text">Hollow &amp; Grain</span>
+      </div>
+      <p class="footer__tagline">Handmade kitchen pieces built for a lifetime of daily use. Bellingham, WA.</p>
+    </div>
+    <div>
+      <p class="footer__heading">Pages</p>
+      <ul class="footer__nav-list">
+        <li><a href="shop.html">Shop the Collection</a></li>
+        <li><a href="custom.html">Custom Orders</a></li>
+        <li><a href="care.html">Care Instructions</a></li>
+        <li><a href="about.html">About &amp; Inquire</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="footer__heading">Contact</p>
+      <p class="footer__contact-item">hello@hollowandgrain.com</p>
+      <p class="footer__contact-item">Bellingham, WA 98225</p>
+      <p class="footer__contact-item" style="margin-top:1rem;font-size:0.875rem">Pickup by appointment.<br>Ships UPS Ground, US only.</p>
+    </div>
+  </div>
+  <div class="footer__bottom">
+    <div class="container">
+      <p class="footer__copy">&copy; 2024 Hollow &amp; Grain. All rights reserved.</p>
+      <p class="footer__copy">Inquiry-only catalog &mdash; no live checkout.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Play Lumen Leap — A Cosy Firefly Platformer</title>
+  <meta name="description" content="Play Lumen Leap right in your browser. Arrows/WASD to move, Space to jump. Relight the lanterns of the Dusk Hollow.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-game-state="title">
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Lumen Leap home">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">
+        <span class="logo-name">Lumen<b>·</b>Leap</span>
+        <span class="logo-sub">A Firefly Platformer</span>
+      </span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="play.html" class="active">Play</a>
+      <a href="levels.html">Levels</a>
+      <a href="about.html">Story &amp; Help</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="play-shell">
+    <div class="play-bar">
+      <h1>Dusk Hollow</h1>
+      <span class="spacer"></span>
+      <button class="tool-btn" data-action="help" aria-label="How to play">？ Help</button>
+      <button class="tool-btn" data-action="reduced" aria-pressed="false" aria-label="Toggle calm / reduced motion mode">
+        <span class="lbl">Calm: off</span>
+      </button>
+      <button class="tool-btn" data-action="mute" aria-pressed="false" aria-label="Toggle sound">
+        <span class="lbl">Sound: on</span>
+      </button>
+      <button class="tool-btn" data-action="pause" aria-label="Pause">⏸ Pause</button>
+    </div>
+
+    <!-- ══════════════ GAME STAGE ══════════════ -->
+    <div class="stage">
+      <canvas id="game" tabindex="0" aria-label="Lumen Leap game"></canvas>
+
+      <!-- HUD -->
+      <div class="hud" aria-hidden="true">
+        <span class="hud-pill lum">
+          <svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="#ffe27a"/></svg>
+          <span data-hud="lumens">0/0</span>
+        </span>
+        <span class="hud-pill"><span>★</span><span data-hud="score">000000</span></span>
+        <span class="hud-pill time">⏱ <span data-hud="time">00:00.00</span></span>
+        <span class="hud-pill lvl"><span data-hud="level">1. Hollow's Edge</span></span>
+        <span class="hud-pill lives"><span data-hud="lives">✦✦✦</span></span>
+      </div>
+
+      <!-- TITLE -->
+      <div class="overlay show" data-overlay="title">
+        <div class="overlay-card">
+          <h2>Lumen Leap</h2>
+          <p class="sub">Relight the lanterns of the Dusk Hollow. Three worlds, one tiny firefly.</p>
+          <div class="actions">
+            <button class="btn btn-primary" data-action="start">▶ New game</button>
+            <button class="btn btn-outline" data-action="levels">Choose level</button>
+          </div>
+          <p class="hint">Arrows / WASD to move · Space / Up to jump · P to pause · Press Enter to begin</p>
+        </div>
+      </div>
+
+      <!-- PAUSED -->
+      <div class="overlay" data-overlay="paused">
+        <div class="overlay-card">
+          <h2>Paused</h2>
+          <p class="sub">Catch your breath. The Hollow will wait.</p>
+          <div class="actions">
+            <button class="btn btn-primary" data-action="resume">Resume</button>
+            <button class="btn btn-ghost" data-action="restart">Restart level</button>
+            <button class="btn btn-outline" data-action="title">Quit to title</button>
+          </div>
+          <p class="hint">Press P or Esc to resume · R to restart</p>
+        </div>
+      </div>
+
+      <!-- LEVEL CLEAR -->
+      <div class="overlay" data-overlay="levelclear">
+        <div class="overlay-card">
+          <h2>Lantern relit!</h2>
+          <p class="sub">You cleared <strong data-clear="name">the level</strong>.</p>
+          <div class="stars" data-clear="stars">★★★</div>
+          <p class="new-best" data-clear="best"></p>
+          <div class="stat-row">
+            <div class="stat"><div class="k">Time</div><div class="v" data-clear="time">00:00</div></div>
+            <div class="stat"><div class="k">Lumens</div><div class="v" data-clear="lumens">0/0</div></div>
+            <div class="stat"><div class="k">Score</div><div class="v" data-clear="score">000000</div></div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" data-action="next">Next level →</button>
+            <button class="btn btn-ghost" data-action="restart">Replay</button>
+          </div>
+          <p class="hint">Press Enter for the next level</p>
+        </div>
+      </div>
+
+      <!-- GAME OVER -->
+      <div class="overlay" data-overlay="gameover">
+        <div class="overlay-card">
+          <h2>Pip's light went out…</h2>
+          <p class="sub">All your glimmers are gone — but the Hollow always gives another try.</p>
+          <div class="stat-row">
+            <div class="stat"><div class="k">Score</div><div class="v" data-clear="score">000000</div></div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" data-action="retry">Try again</button>
+            <button class="btn btn-outline" data-action="title">Quit to title</button>
+          </div>
+          <p class="hint">Press Enter to retry the level</p>
+        </div>
+      </div>
+
+      <!-- WIN -->
+      <div class="overlay" data-overlay="win">
+        <div class="overlay-card">
+          <h2>The Hollow shines again ✦</h2>
+          <p class="sub">Every lantern is lit and the dawn is creeping over the brambles. Thank you, Pip.</p>
+          <div class="stars" data-clear="stars">★★★</div>
+          <p class="new-best" data-clear="best"></p>
+          <div class="stat-row">
+            <div class="stat"><div class="k">Final time</div><div class="v" data-clear="time">00:00</div></div>
+            <div class="stat"><div class="k">Lumens</div><div class="v" data-clear="lumens">0/0</div></div>
+            <div class="stat"><div class="k">Score</div><div class="v" data-clear="score">000000</div></div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" data-action="levels">Level select</button>
+            <button class="btn btn-outline" data-action="title">Back to title</button>
+          </div>
+          <p class="hint">Press Enter to return to the title</p>
+        </div>
+      </div>
+
+      <!-- HELP -->
+      <div class="overlay" data-overlay="help">
+        <div class="overlay-card" style="max-width:520px;">
+          <h2>How to play</h2>
+          <div class="help-grid">
+            <span class="keys"><kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd></span><span class="what">Run left and right</span>
+            <span class="keys"><kbd>Space</kbd> / <kbd>↑</kbd> / <kbd>W</kbd></span><span class="what">Jump — hold for higher, tap for a hop</span>
+            <span class="keys"><kbd>P</kbd> / <kbd>Esc</kbd></span><span class="what">Pause &amp; resume</span>
+            <span class="keys"><kbd>R</kbd></span><span class="what">Restart the current level</span>
+            <span class="keys"><kbd>M</kbd></span><span class="what">Mute / unmute sound</span>
+            <span class="keys"><kbd>Enter</kbd></span><span class="what">Confirm on menus</span>
+          </div>
+          <p class="sub" style="margin:0;">
+            Land on beetles to stomp them. Avoid spikes and pits. Collect lumens, find the gem,
+            touch a checkpoint lantern to save your spot, and reach the big lantern to finish.
+          </p>
+          <div class="actions">
+            <button class="btn btn-primary" data-action="close-help">Got it</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TOUCH CONTROLS -->
+      <div class="touch-controls" aria-hidden="true">
+        <div class="pad">
+          <button class="touch-btn" data-act="left" aria-label="Move left">◀</button>
+          <button class="touch-btn" data-act="right" aria-label="Move right">▶</button>
+        </div>
+        <div class="pad">
+          <button class="touch-btn jump" data-act="jump" aria-label="Jump">⤒</button>
+        </div>
+      </div>
+    </div>
+
+    <p style="color:var(--ink-faint);font-size:0.85rem;margin-top:0.8rem;">
+      Tip: click the stage once to give it focus, then use the keyboard. On touch devices,
+      use the on-screen buttons. Stuck? Open <a href="about.html">Story &amp; Help</a>.
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <div>© <span data-year>2026</span> Lumen Leap — built with vanilla canvas, no game libraries.</div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="index.html">Home</a>
+      <a href="levels.html">Levels</a>
+      <a href="about.html">Story &amp; Help</a>
+    </nav>
+  </footer>
+
+  <script src="js/storage.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/play.js"></script>
+  <script src="js/nav.js"></script>
+</body>
+</html>

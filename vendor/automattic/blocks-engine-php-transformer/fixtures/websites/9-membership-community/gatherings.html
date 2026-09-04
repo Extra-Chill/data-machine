@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upcoming Gatherings — Common Table</title>
+  <meta name="description" content="Browse upcoming potlucks, skill shares, reading groups, and volunteer days hosted by Common Table members.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .gatherings-filter {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 2.75rem;
+    }
+    .filter-btn {
+      font-family: var(--font-hand);
+      font-size: 1rem;
+      padding: 0.4rem 1.1rem;
+      border-radius: 100px;
+      border: 1.5px solid var(--parchment);
+      background: transparent;
+      color: var(--ink-light);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .filter-btn:hover,
+    .filter-btn.active {
+      background-color: var(--terracotta);
+      border-color: var(--terracotta);
+      color: var(--warm-white);
+    }
+    .gathering-card.hidden { display: none; }
+
+    .gatherings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+    }
+    @media (max-width: 680px) {
+      .gatherings-grid { grid-template-columns: 1fr; }
+    }
+
+    .past-note {
+      background-color: var(--warm-white);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem;
+      text-align: center;
+      border: 1.5px dashed var(--parchment);
+      margin-top: 4rem;
+    }
+    .past-note h3 { font-size: 1.2rem; margin-bottom: 0.5rem; }
+    .past-note p { font-size: 0.9rem; color: var(--ink-muted); margin: 0; }
+
+    .gathering-card.featured {
+      grid-column: span 2;
+      flex-direction: row;
+    }
+    .gathering-card.featured .gc-date-strip {
+      flex-direction: column;
+      justify-content: center;
+      min-width: 110px;
+      text-align: center;
+    }
+    @media (max-width: 680px) {
+      .gathering-card.featured { grid-column: span 1; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────────────── -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      Common Table
+    </a>
+    <button class="hamburger" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-menu" id="nav-menu" role="list">
+      <li><a href="index.html"       class="nav-link">Home</a></li>
+      <li><a href="gatherings.html"  class="nav-link">Gatherings</a></li>
+      <li><a href="organizers.html"  class="nav-link">Organizers</a></li>
+      <li><a href="stories.html"     class="nav-link">Stories</a></li>
+      <li><a href="membership.html"  class="nav-link">Membership</a></li>
+      <li><a href="faq.html"         class="nav-link">FAQ</a></li>
+      <li><a href="membership.html"  class="nav-cta">Join Us</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+
+<!-- ── PAGE HERO ─────────────────────────────────────────────── -->
+<header class="page-hero">
+  <div class="container">
+    <span class="overline">On the calendar</span>
+    <h1>Upcoming Gatherings</h1>
+    <p class="lead">Five ways to show up this summer. All welcome — member or not for your first visit.</p>
+  </div>
+</header>
+
+<!-- ── GATHERINGS ─────────────────────────────────────────────── -->
+<section class="section--sm">
+  <div class="container">
+
+    <!-- Filters -->
+    <div class="gatherings-filter" role="group" aria-label="Filter gatherings by type">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="potluck">Potluck</button>
+      <button class="filter-btn" data-filter="skill-share">Skill Share</button>
+      <button class="filter-btn" data-filter="reading-group">Reading Group</button>
+      <button class="filter-btn" data-filter="volunteer">Volunteer Day</button>
+    </div>
+
+    <!-- Grid -->
+    <div class="gatherings-grid" id="gatherings-grid">
+
+      <!-- Event 1 — FEATURED -->
+      <article class="gathering-card featured" data-type="potluck">
+        <div class="gc-date-strip">
+          <span class="gc-day">12</span>
+          <span class="gc-month">July 2026</span>
+        </div>
+        <div class="gc-body">
+          <span class="gc-type">Potluck</span>
+          <h2 class="gc-title" style="font-size:1.4rem;">Summer Potluck &amp; Backyard Movie Night</h2>
+          <p class="gc-location">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 1C4.3 1 2.5 2.8 2.5 5C2.5 7.5 6.5 12 6.5 12S10.5 7.5 10.5 5C10.5 2.8 8.7 1 6.5 1Z" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="5" r="1.4" fill="currentColor"/></svg>
+            Riverside Park Pavilion, West Side
+          </p>
+          <p class="gc-desc">
+            Our biggest gathering of the summer. Spread a blanket on the grass, lay out your best dish, and stay through sunset for an outdoor screening of <em>Tampopo</em> — the greatest film ever made about food, noodles, and the ache of desire. This is BYOB, BYOBlanket, and bring enough to share. Kids and dogs warmly welcome.
+          </p>
+          <div class="gc-footer">
+            <span class="gc-time">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3.5V6.5l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              6:00 PM · Film at dark (~9 PM)
+            </span>
+            <a href="membership.html" class="btn btn-primary">RSVP →</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Event 2 -->
+      <article class="gathering-card" data-type="skill-share">
+        <div class="gc-date-strip">
+          <span class="gc-day">19</span>
+          <span class="gc-month">July 2026</span>
+        </div>
+        <div class="gc-body">
+          <span class="gc-type">Skill Share</span>
+          <h3 class="gc-title">Sourdough from Scratch with Rosa Figueroa</h3>
+          <p class="gc-location">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 1C4.3 1 2.5 2.8 2.5 5C2.5 7.5 6.5 12 6.5 12S10.5 7.5 10.5 5C10.5 2.8 8.7 1 6.5 1Z" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="5" r="1.4" fill="currentColor"/></svg>
+            The Common Kitchen · 48 Elm Street
+          </p>
+          <p class="gc-desc">Rosa learned to make sourdough from her grandmother in Oaxaca and has been refining the recipe ever since. You'll mix, fold, and shape your own loaf. Take home your own active starter and a printed recipe card. Beginners especially encouraged.</p>
+          <div class="gc-footer">
+            <span class="gc-time">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3.5V6.5l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              10:00 AM – 1:00 PM
+            </span>
+            <a href="membership.html" class="btn btn-primary">RSVP →</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Event 3 -->
+      <article class="gathering-card" data-type="volunteer">
+        <div class="gc-date-strip">
+          <span class="gc-day">2</span>
+          <span class="gc-month">Aug 2026</span>
+        </div>
+        <div class="gc-body">
+          <span class="gc-type">Volunteer Day</span>
+          <h3 class="gc-title">Seed Library &amp; Community Garden Walk</h3>
+          <p class="gc-location">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 1C4.3 1 2.5 2.8 2.5 5C2.5 7.5 6.5 12 6.5 12S10.5 7.5 10.5 5C10.5 2.8 8.7 1 6.5 1Z" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="5" r="1.4" fill="currentColor"/></svg>
+            Elm Street Community Garden
+          </p>
+          <p class="gc-desc">Declan Walsh leads a slow walk through the 40-plot community garden, introducing growers and their plants. Afterwards: open the seed library for summer trades. Bring any saved seeds to donate; leave with a handful of something new. Gloves and coffee provided.</p>
+          <div class="gc-footer">
+            <span class="gc-time">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3.5V6.5l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              9:30 AM – 12:00 PM
+            </span>
+            <a href="membership.html" class="btn btn-primary">RSVP →</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Event 4 -->
+      <article class="gathering-card" data-type="reading-group">
+        <div class="gc-date-strip">
+          <span class="gc-day">9</span>
+          <span class="gc-month">Aug 2026</span>
+        </div>
+        <div class="gc-body">
+          <span class="gc-type">Reading Group</span>
+          <h3 class="gc-title">Reading Circle: <em>Braiding Sweetgrass</em> by Robin Wall Kimmerer</h3>
+          <p class="gc-location">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 1C4.3 1 2.5 2.8 2.5 5C2.5 7.5 6.5 12 6.5 12S10.5 7.5 10.5 5C10.5 2.8 8.7 1 6.5 1Z" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="5" r="1.4" fill="currentColor"/></svg>
+            Portsmith Branch Library, Reading Room B
+          </p>
+          <p class="gc-desc">Priya Nakamura facilitates our summer title — a braided meditation on Indigenous plant knowledge, the grammar of animacy, and what it means to live in gratitude. Chapters 1–12 for this session. Extra copies available at the library front desk. Tea provided.</p>
+          <div class="gc-footer">
+            <span class="gc-time">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3.5V6.5l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              6:30 PM – 8:30 PM
+            </span>
+            <a href="membership.html" class="btn btn-primary">RSVP →</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Event 5 -->
+      <article class="gathering-card" data-type="volunteer" style="grid-column: span 2;" >
+        <div class="gc-date-strip" style="min-width:110px; text-align:center; justify-content:center; flex-direction:column;">
+          <span class="gc-day" style="font-size:2rem;">23</span>
+          <span class="gc-month">Aug 2026</span>
+        </div>
+        <div class="gc-body">
+          <span class="gc-type">Volunteer Day</span>
+          <h3 class="gc-title">Street Mural Volunteer Day — Caldera &amp; 5th</h3>
+          <p class="gc-location">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 1C4.3 1 2.5 2.8 2.5 5C2.5 7.5 6.5 12 6.5 12S10.5 7.5 10.5 5C10.5 2.8 8.7 1 6.5 1Z" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="5" r="1.4" fill="currentColor"/></svg>
+            Corner of Caldera Avenue &amp; 5th Street
+          </p>
+          <p class="gc-desc">
+            The long blank wall at Caldera &amp; 5th is getting a neighborhood mural, designed by local artist and Common Table member Rosa Figueroa. We need painters, coffee runners, music providers, and anyone willing to hold a roller for a few hours. No artistic experience required — just enthusiasm and clothes you don't mind getting paint on. Lunch will be a potluck on the sidewalk. Come for an hour or stay all day.
+          </p>
+          <div class="gc-footer">
+            <span class="gc-time">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 3.5V6.5l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              9:00 AM – 5:00 PM (drop in anytime)
+            </span>
+            <a href="membership.html" class="btn btn-primary">RSVP →</a>
+          </div>
+        </div>
+      </article>
+
+    </div><!-- /.gatherings-grid -->
+
+    <!-- Past gatherings note -->
+    <div class="past-note reveal">
+      <div aria-hidden="true" style="margin-bottom:0.75rem; opacity:0.35;">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+          <circle cx="20" cy="20" r="18" stroke="#4A6741" stroke-width="1.5"/>
+          <path d="M14 20l4 4 8-8" stroke="#4A6741" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h3>Looking for something that already happened?</h3>
+      <p>We share photos, recipes, and notes from past gatherings in the member newsletter. Join us to get the archive.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── CTA ───────────────────────────────────────────────────── -->
+<section class="cta-strip">
+  <div class="container">
+    <div class="reveal">
+      <h2 style="color:var(--cream);">Want to host your own?</h2>
+      <p>Regular and Steward members can pitch and host any gathering type — we'll help promote it and bring chairs.</p>
+      <a href="membership.html" class="btn btn-white btn-lg">Become a member</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ── FOOTER ─────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="index.html" class="footer-brand-logo">
+          <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          Common Table
+        </a>
+        <p class="footer-tagline">A neighborhood membership club for people who love to share food, skills, stories, and a few hours of doing something that matters.</p>
+        <address class="footer-address">48 Elm Street · Portsmith District<br><a href="mailto:hello@commontable.club" style="color:rgba(240,232,212,0.5); text-decoration:none;">hello@commontable.club</a></address>
+      </div>
+      <div>
+        <span class="footer-col-heading">Explore</span>
+        <ul class="footer-links">
+          <li><a href="gatherings.html">Upcoming Gatherings</a></li>
+          <li><a href="organizers.html">Meet the Organizers</a></li>
+          <li><a href="stories.html">Member Stories</a></li>
+          <li><a href="membership.html">Membership Levels</a></li>
+          <li><a href="faq.html">FAQ &amp; Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <span class="footer-col-heading">Get Involved</span>
+        <ul class="footer-links">
+          <li><a href="membership.html">Join the Table</a></li>
+          <li><a href="gatherings.html">RSVP to a Gathering</a></li>
+          <li><a href="membership.html#host">Host Your Own</a></li>
+          <li><a href="faq.html#contact">Send Us a Note</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Common Table · Eval Membership Community</span>
+      <span>Made with care in the neighborhood</span>
+    </div>
+  </div>
+</footer>
+
+<script src="nav.js"></script>
+<script>
+  // Gathering filter
+  var filterBtns = document.querySelectorAll('.filter-btn');
+  var cards = document.querySelectorAll('.gathering-card');
+
+  filterBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      filterBtns.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var type = btn.dataset.filter;
+      cards.forEach(function (card) {
+        if (type === 'all' || card.dataset.type === type) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+    });
+  });
+</script>
+</body>
+</html>

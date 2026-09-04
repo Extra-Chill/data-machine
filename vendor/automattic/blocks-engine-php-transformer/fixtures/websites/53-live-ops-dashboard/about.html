@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Helix Grid — About the Console</title>
+  <meta name="description" content="About Helix Grid: a fictional real-time renewable-grid operations console. How the live data engine, charts and incident simulation work.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 L28 9 V23 L16 30 L4 23 V9 Z' fill='none' stroke='%2334e0c4' stroke-width='2'/%3E%3Cpath d='M10 20 Q16 6 22 20' fill='none' stroke='%2334e0c4' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body data-theme="dark">
+<div class="app">
+
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 L28 9 V23 L16 30 L4 23 V9 Z" fill="none" stroke="#34e0c4" stroke-width="2"/><path d="M9 21 Q16 5 23 21" fill="none" stroke="#34e0c4" stroke-width="2"/><circle cx="16" cy="16" r="2.4" fill="#34e0c4"/></svg>
+      <span><span class="brand-name">Helix<b>Grid</b></span><br><span class="brand-sub">Ops Console</span></span>
+    </a>
+    <nav class="side-nav" aria-label="Primary">
+      <div class="side-section-label">Monitor</div>
+      <a class="side-link" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Overview</a>
+      <a class="side-link" href="service.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Service Detail</a>
+      <a class="side-link" href="alerts.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg>Alerts &amp; Incidents<span class="badge crit" id="alertsBadge">0</span></a>
+      <div class="side-section-label">Reference</div>
+      <a class="side-link" href="about.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r="0.6" fill="currentColor"/></svg>About Helix Grid</a>
+    </nav>
+    <div class="side-foot"><span class="op-avatar">CH</span><span class="op">on-call: C. Huber</span><br><span style="opacity:.7">shift 19:00–07:00 UTC · NOC-2</span></div>
+  </aside>
+  <div class="nav-scrim"></div>
+
+  <header class="topbar">
+    <button class="ctrl menu-toggle" id="menuToggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <div class="page-title">About Helix Grid</div>
+    <div class="topbar-spacer"></div>
+    <button class="ctrl" id="themeToggle" aria-label="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg><span class="tlabel">Dark</span></button>
+    <div class="clock" id="clock"></div>
+  </header>
+
+  <main class="main">
+    <article class="content">
+      <h1>Helix Grid Operations Console</h1>
+      <p class="lead">Helix Grid is a fictional real-time observability console for a six-region renewable-energy network — the kind of always-on, streaming, stateful interface that a network operations center watches around the clock. Everything you see is generated live in your browser; there is no server.</p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <svg class="fc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+          <h3>Live data engine</h3>
+          <p>A simulated streaming source ticks once per second of grid time — demand waves, a diurnal solar curve, generation mix, frequency, market price and per-service latency, all with realistic noise.</p>
+        </div>
+        <div class="feature-card">
+          <svg class="fc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18 L9 10 L13 14 L20 5"/><path d="M4 21h16"/></svg>
+          <h3>Hand-drawn charts</h3>
+          <p>Scrolling time-series, a stacked generation-mix area, sparklines, radial gauges, bar charts and a 144-node substation heatmap — every pixel painted on canvas and SVG, zero chart libraries.</p>
+        </div>
+        <div class="feature-card">
+          <svg class="fc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><line x1="12" y1="9" x2="12" y2="14"/></svg>
+          <h3>Incident simulation</h3>
+          <p>Spontaneous and operator-triggered incidents ripple through the charts, spike the right service, flood the event log and raise an alert banner — then auto-resolve and log their MTTR.</p>
+        </div>
+      </div>
+
+      <h2>What you're looking at</h2>
+      <p>The console models a renewable operator coordinating <strong>six control areas</strong> — Pacific NW, California, ERCOT Texas, Midwest, New England and the Southeast — across roughly 25 GW of nameplate capacity. The operator's job is to keep generation matched to demand within a razor-thin frequency band around <code>60.00 Hz</code>, dispatch storage and reserves, and keep the software platform (SCADA gateway, dispatch engine, forecast ML, settlement API and more) healthy.</p>
+
+      <h2>How the simulation works</h2>
+      <ul class="bullets">
+        <li>A small xorshift RNG plus layered sine waves produce believable trends, daily seasonality and Gaussian noise — no two sessions look the same.</li>
+        <li>The engine keeps fixed-length ring buffers per metric so charts open already full and scroll smoothly as new ticks arrive.</li>
+        <li>A <code>requestAnimationFrame</code> scheduler advances sim time, honoring your <strong>play-speed</strong> (0.25×–8×) and <strong>pause</strong> state, and catches up if a tab was backgrounded.</li>
+        <li>Charts redraw every animation frame for smoothness while KPIs, bars and the heatmap update once per simulated tick.</li>
+        <li>Incidents have a severity, a lifetime and a blast radius — they bias the affected service's latency and error rate and the matching region's stress until they resolve.</li>
+      </ul>
+
+      <h2>Controls &amp; persistence</h2>
+      <ul class="bullets">
+        <li><strong>Pause / Resume</strong> the feed — or press <code>Space</code>.</li>
+        <li><strong>Simulate incident</strong> to inject a fault — or press <code>I</code>. If one is already open it escalates to SEV-1.</li>
+        <li><strong>Time window</strong> (30s–4m), <strong>region</strong> filter, and <strong>play speed</strong> on the overview control bar.</li>
+        <li><strong>Log severity</strong> chips and a free-text filter on the event stream.</li>
+        <li><strong>Theme</strong> toggle (dark / light).</li>
+      </ul>
+      <p>Your theme, paused state, play speed, time window, region selection and log filters all persist to <code>localStorage</code> under <code>helix.prefs.v1</code>, so the console comes back exactly how you left it.</p>
+
+      <h2>System facts (fictional)</h2>
+      <table class="specs">
+        <tr><td>Operator</td><td>Helix Grid Cooperative</td></tr>
+        <tr><td>Control areas</td><td>6 regions · 144 substations</td></tr>
+        <tr><td>Nameplate capacity</td><td>25,200 MW</td></tr>
+        <tr><td>Generation sources</td><td>Solar · Wind · Hydro · Storage</td></tr>
+        <tr><td>Tracked services</td><td>8 (5 core · 3 edge)</td></tr>
+        <tr><td>Frequency target</td><td>60.00 Hz ± 0.05</td></tr>
+        <tr><td>Telemetry cadence</td><td>1 Hz (simulated)</td></tr>
+        <tr><td>Stack</td><td>Vanilla HTML · CSS · JS · Canvas · SVG</td></tr>
+      </table>
+
+      <p style="margin-top:24px;color:var(--ink-faint);font-size:12.5px">Helix Grid is a demonstration fixture. No real grid, market, or service is monitored, and all data is synthetic.</p>
+    </article>
+  </main>
+</div>
+
+<script src="js/engine.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/shell.js"></script>
+</body>
+</html>

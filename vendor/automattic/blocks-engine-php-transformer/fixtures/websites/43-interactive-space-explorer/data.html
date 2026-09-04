@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AETHELON — Instruments, Data & Science Team</title>
+  <meta name="description" content="The AETHELON science payload, plume chemistry data, the E-ring composition chart, and the people behind the mission to Enceladus.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <canvas class="starfield" aria-hidden="true"></canvas>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="AETHELON home">
+      <span class="logo-mark">AETHELON</span>
+      <span class="logo-sub">Mission to Enceladus</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Journey</a>
+      <a href="mission.html">Mission</a>
+      <a href="explore.html">Explore</a>
+      <a href="data.html">Science</a>
+      <a href="explore.html" class="nav-cta">Launch Explorer</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="wrap">
+        <p class="eyebrow reveal" style="justify-content:center">Payload & science</p>
+        <h1 class="reveal" data-delay="1">The data behind the mission</h1>
+        <p class="reveal" data-delay="2">Seven instruments, one ocean. Here is what AETHELON carries, what Cassini already found in the plume, and the team turning droplets into discoveries.</p>
+      </div>
+    </section>
+
+    <!-- ══════════ STATS ══════════ -->
+    <section class="section-sm">
+      <div class="wrap">
+        <div class="stat-row reveal">
+          <div class="stat"><div class="num"><span data-count="7">0</span></div><div class="label">science instruments</div></div>
+          <div class="stat"><div class="num"><span data-count="290">0</span><span class="unit">W</span></div><div class="label">generator output</div></div>
+          <div class="stat"><div class="num"><span data-count="23">0</span></div><div class="label">Enceladus flybys</div></div>
+          <div class="stat"><div class="num"><span data-count="1.2">0</span><span class="unit">Tb</span></div><div class="label">data returned</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ INSTRUMENT TABLE ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <p class="eyebrow">Payload manifest</p>
+          <h2>The seven instruments</h2>
+        </div>
+        <div class="data-table-wrap reveal" data-delay="1">
+          <table class="data-table">
+            <thead>
+              <tr><th>Instrument</th><th>Acronym</th><th>Measures</th><th>Mass</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Surface & Plume Mass Spectrometer</td><td>SUNA</td><td>Molecular composition to 2,000 Da</td><td>24 kg</td><td><span class="tag-pill ok">Flight ready</span></td></tr>
+              <tr><td>Cosmic Dust Analyser</td><td>CDA-2</td><td>Grain size, charge, impact rate</td><td>17 kg</td><td><span class="tag-pill ok">Flight ready</span></td></tr>
+              <tr><td>Ice-Penetrating Radar</td><td>REASON-E</td><td>Shell thickness, sub-surface layers</td><td>31 kg</td><td><span class="tag-pill ok">Flight ready</span></td></tr>
+              <tr><td>Narrow-Angle Camera</td><td>NAC</td><td>2 m/pixel surface imaging</td><td>13 kg</td><td><span class="tag-pill ok">Flight ready</span></td></tr>
+              <tr><td>Thermal Mapper</td><td>TIRS</td><td>Surface temperature, jet hotspots</td><td>9 kg</td><td><span class="tag-pill ok">Flight ready</span></td></tr>
+              <tr><td>Magnetometer</td><td>MAG</td><td>Induced field → ocean conductivity</td><td>4 kg</td><td><span class="tag-pill warn">In calibration</span></td></tr>
+              <tr><td>Radio Science Subsystem</td><td>RSS</td><td>Gravity field, shell rigidity</td><td>3 kg</td><td><span class="tag-pill ok">Flight ready</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ PLUME CHEMISTRY CHART ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <p class="eyebrow">Cassini legacy data</p>
+          <h2>What's in the spray</h2>
+          <p>Relative abundance of materials Cassini detected in the Enceladus plume and Saturn's E-ring — the baseline AETHELON will measure in far greater detail.</p>
+        </div>
+        <div class="chart-card reveal" data-delay="1">
+          <div class="chart" role="img" aria-label="Bar chart of plume composition by relative abundance">
+            <div class="bar"><span class="bval">91%</span><span class="fill" data-h="91"></span><span class="blabel">Water ice</span></div>
+            <div class="bar"><span class="bval">4%</span><span class="fill" data-h="14"></span><span class="blabel">CO₂</span></div>
+            <div class="bar"><span class="bval">3.2%</span><span class="fill" data-h="11"></span><span class="blabel">CH₄ + N₂</span></div>
+            <div class="bar"><span class="bval">1.4%</span><span class="fill" data-h="7"></span><span class="blabel">Organics</span></div>
+            <div class="bar"><span class="bval">0.5%</span><span class="fill" data-h="4"></span><span class="blabel">Silica</span></div>
+            <div class="bar"><span class="bval">0.3%</span><span class="fill" data-h="3"></span><span class="blabel">NaCl salts</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ FLYBY TABLE ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <p class="eyebrow">Encounter plan</p>
+          <h2>Selected Enceladus flybys</h2>
+        </div>
+        <div class="data-table-wrap reveal" data-delay="1">
+          <table class="data-table">
+            <thead>
+              <tr><th>Flyby</th><th>Altitude</th><th>Speed</th><th>Through plume</th><th>Primary target</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>E-1</td><td>1,200 km</td><td>6.1 km/s</td><td><span class="tag-pill">No</span></td><td>Global imaging</td></tr>
+              <tr><td>E-4</td><td>98 km</td><td>4.4 km/s</td><td><span class="tag-pill ok">Yes</span></td><td>Plume sampling</td></tr>
+              <tr><td>E-7</td><td>49 km</td><td>3.9 km/s</td><td><span class="tag-pill ok">Yes</span></td><td>Organics survey</td></tr>
+              <tr><td>E-12</td><td>72 km</td><td>4.2 km/s</td><td><span class="tag-pill ok">Yes</span></td><td>Salt isotopes</td></tr>
+              <tr><td>E-18</td><td>30 km</td><td>3.6 km/s</td><td><span class="tag-pill ok">Yes</span></td><td>Deep plume core</td></tr>
+              <tr><td>E-23</td><td>210 km</td><td>5.3 km/s</td><td><span class="tag-pill">No</span></td><td>Gravity science</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ TEAM ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <p class="eyebrow">The people</p>
+          <h2>Science team</h2>
+        </div>
+        <div class="team-grid">
+          <div class="member reveal">
+            <div class="avatar" style="background:linear-gradient(135deg,#7fe7ff,#2bb6da)">RV</div>
+            <h3>Dr. Renata Vasquez</h3>
+            <p class="role">Principal Investigator</p>
+            <p>Planetary chemist; led Cassini's last plume flythrough. Builds AETHELON's case for slow, low-altitude sampling.</p>
+          </div>
+          <div class="member reveal" data-delay="1">
+            <div class="avatar" style="background:linear-gradient(135deg,#6f7bff,#b06bff)">KO</div>
+            <h3>Dr. Kenji Ono</h3>
+            <p class="role">Mass Spectrometry Lead</p>
+            <p>Designed SUNA's impact-ionisation source to keep fragile organics intact at flythrough speeds.</p>
+          </div>
+          <div class="member reveal" data-delay="2">
+            <div class="avatar" style="background:linear-gradient(135deg,#ffd479,#ff8a4d)">AB</div>
+            <h3>Dr. Amara Boateng</h3>
+            <p class="role">Mission Navigator</p>
+            <p>Plots the four-planet gravity-assist chain and threads each flyby to within a kilometre of target.</p>
+          </div>
+          <div class="member reveal">
+            <div class="avatar" style="background:linear-gradient(135deg,#bfeaff,#5a8fa8)">LM</div>
+            <h3>Dr. Lucas Meyer</h3>
+            <p class="role">Ice & Radar Science</p>
+            <p>Models the shell's tidal flexing and interprets REASON-E sounding to find the ocean's roof.</p>
+          </div>
+          <div class="member reveal" data-delay="1">
+            <div class="avatar" style="background:linear-gradient(135deg,#b06bff,#6f7bff)">SP</div>
+            <h3>Dr. Saanvi Patel</h3>
+            <p class="role">Astrobiology Lead</p>
+            <p>Sets the biosignature thresholds — what molecular pattern would count as evidence of life.</p>
+          </div>
+          <div class="member reveal" data-delay="2">
+            <div class="avatar" style="background:linear-gradient(135deg,#7fe7ff,#6f7bff)">TG</div>
+            <h3>Dr. Tomás García</h3>
+            <p class="role">Spacecraft Systems</p>
+            <p>Owns power, thermal and autonomy — keeping a sterilised probe alive for 20 years in the cold.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="cta-band reveal">
+          <p class="eyebrow" style="justify-content:center">Start at the beginning</p>
+          <h2>Take the journey.</h2>
+          <p>Return to the homepage and scroll through AETHELON's seven-year flight to Enceladus, narrated stage by stage.</p>
+          <a href="index.html" class="btn btn-primary magnetic" data-strength="0.35">Replay the journey <span class="arrow">→</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <span class="logo-mark">AETHELON</span>
+          <p>An open deep-space outreach project tracing a robotic mission to Enceladus, Saturn's ocean moon. Figures are plausible mission estimates for educational use.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Mission</h4>
+          <a href="mission.html">Timeline</a>
+          <a href="mission.html">Trajectory</a>
+          <a href="data.html">Instruments</a>
+          <a href="explore.html">The system</a>
+        </div>
+        <div class="footer-col">
+          <h4>Science</h4>
+          <a href="data.html">Plume chemistry</a>
+          <a href="data.html">Data archive</a>
+          <a href="explore.html">Ocean worlds</a>
+          <a href="#">Publications</a>
+        </div>
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <a href="#">Newsletter</a>
+          <a href="#">Education kit</a>
+          <a href="#">Press</a>
+          <a href="#">Contact team</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2031 AETHELON Outreach Consortium. Educational fiction. Data are illustrative estimates.</span>
+        <div class="socials">
+          <a href="#" aria-label="Mastodon">Mastodon</a>
+          <a href="#" aria-label="YouTube">YouTube</a>
+          <a href="#" aria-label="GitHub">GitHub</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+</body>
+</html>

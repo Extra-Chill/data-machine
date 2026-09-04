@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Resources — Civic Signal Resource Library</title>
+  <meta name="description" content="Browse and filter all 12 free resources for neighborhood organizers covering outreach, meetings, funding, and community projects.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .resources-hero {
+      background: var(--forest);
+      padding: var(--sp-12) 0 var(--sp-10);
+      position: relative;
+      overflow: hidden;
+    }
+    .resources-hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(245,240,232,0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+    }
+    .resources-hero-inner { position: relative; z-index: 1; }
+    .resources-hero h1 { color: var(--cream); font-size: clamp(var(--text-3xl), 5vw, var(--text-5xl)); margin-bottom: var(--sp-3); }
+    .resources-hero p { color: rgba(245,240,232,0.7); font-size: var(--text-lg); max-width: 520px; }
+
+    .filter-section {
+      background: var(--paper);
+      border-bottom: var(--border);
+      padding: var(--sp-5) 0;
+      position: sticky;
+      top: var(--nav-h);
+      z-index: 50;
+      box-shadow: var(--sh-sm);
+    }
+
+    .resource-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: var(--sp-6);
+    }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--sp-6);
+    }
+
+    .results-count {
+      font-family: var(--font-ui);
+      font-size: var(--text-sm);
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====== NAVIGATION ====== -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="container nav-inner">
+    <a href="index.html" class="nav-logo" aria-label="Civic Signal Home">
+      <div class="nav-logo-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg>
+      </div>
+      <div class="nav-logo-text">
+        <span class="nav-logo-name">Civic Signal</span>
+        <span class="nav-logo-sub">Resource Library</span>
+      </div>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="resources.html" class="nav-link active">All Resources</a>
+      <a href="about.html" class="nav-link">About</a>
+      <a href="outreach-checklist.html" class="nav-link">Outreach</a>
+      <a href="grant-readiness.html" class="nav-link">Grants</a>
+    </div>
+    <div class="nav-cta">
+      <a href="index.html" class="btn btn-outline-light">← Home</a>
+    </div>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+<div class="nav-drawer" id="nav-drawer">
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="resources.html" class="nav-link">All Resources</a>
+  <a href="about.html" class="nav-link">About</a>
+  <a href="outreach-checklist.html" class="nav-link">Outreach Checklist</a>
+  <a href="meeting-agenda.html" class="nav-link">Meeting Agenda Template</a>
+  <a href="grant-readiness.html" class="nav-link">Grant Readiness Guide</a>
+  <a href="case-study-roslindale.html" class="nav-link">Case Study</a>
+</div>
+
+<!-- ====== PAGE HEADER ====== -->
+<div class="resources-hero">
+  <div class="container resources-hero-inner">
+    <nav aria-label="Breadcrumb" class="breadcrumbs" style="padding-top: 0; margin-bottom: var(--sp-5);">
+      <a href="index.html">Home</a>
+      <span class="breadcrumbs-sep" aria-hidden="true">/</span>
+      <span class="breadcrumbs-current">All Resources</span>
+    </nav>
+    <h1>All Resources</h1>
+    <p>12 free toolkits, checklists, templates, and guides for neighborhood organizers.</p>
+  </div>
+</div>
+
+<!-- ====== FILTER BAR ====== -->
+<div class="filter-section" role="search" aria-label="Filter resources">
+  <div class="container">
+    <div class="filter-bar">
+      <div class="search-box" style="max-width: 340px;">
+        <div class="search-box-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <input
+          type="search"
+          class="search-input"
+          placeholder="Search resources…"
+          data-resource-search
+          aria-label="Search resources"
+          autocomplete="off"
+        >
+      </div>
+      <div class="filter-group" role="group" aria-label="Filter by topic">
+        <button class="filter-btn active" data-filter="all">All Topics</button>
+        <button class="filter-btn" data-filter="outreach">
+          <span aria-hidden="true">★</span> Outreach
+        </button>
+        <button class="filter-btn" data-filter="meetings">
+          <span aria-hidden="true">▦</span> Meetings
+        </button>
+        <button class="filter-btn" data-filter="funding">
+          <span aria-hidden="true">◎</span> Funding
+        </button>
+        <button class="filter-btn" data-filter="projects">
+          <span aria-hidden="true">✓</span> Projects
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== RESOURCE GRID ====== -->
+<section class="section section--cream" aria-label="Resource list">
+  <div class="container">
+    <div class="results-header">
+      <p class="results-count"><span data-result-count>12 resources</span></p>
+      <p class="section-label">Civic Signal Library</p>
+    </div>
+
+    <div class="resource-grid stagger" data-resource-grid>
+
+      <!-- ===== OUTREACH ===== -->
+      <a href="outreach-checklist.html" class="resource-card reveal"
+         data-topic="outreach"
+         data-search="outreach checklist door-knocking canvassing community survey tabling phone banking campaign planning mobilize volunteers">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-outreach">Outreach</span>
+          <span class="resource-time">Interactive · ~15 min setup</span>
+        </div>
+        <h3 class="resource-card-title">Community Outreach Checklist</h3>
+        <p class="resource-card-desc">Five-phase checklist covering planning, materials prep, volunteer mobilization, field execution, and data follow-up. Tracks your progress in the browser.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Interactive Checklist</span>
+          <span class="arrow-link">Open <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </div>
+      </a>
+
+      <a href="resources.html#door-knocking-script" class="resource-card reveal"
+         data-topic="outreach"
+         data-search="door knocking script tracking sheet canvassing conversation talking points">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-outreach">Outreach</span>
+          <span class="resource-time">Printable · 2 pages</span>
+        </div>
+        <h3 class="resource-card-title">Door-Knocking Script &amp; Tracking Sheet</h3>
+        <p class="resource-card-desc">A tested conversation script with common objections and responses, plus a paper tracking sheet for logging contacts, no-answers, and call-backs in the field.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Script + Printable</span>
+          <span class="arrow-link">Coming Soon</span>
+        </div>
+      </a>
+
+      <a href="resources.html#survey-design" class="resource-card reveal"
+         data-topic="outreach"
+         data-search="survey design neighborhood priorities community input questionnaire data collection">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-outreach">Outreach</span>
+          <span class="resource-time">Guide · ~20 min read</span>
+        </div>
+        <h3 class="resource-card-title">Survey Design Guide for Neighborhood Priorities</h3>
+        <p class="resource-card-desc">How to write surveys people actually complete — covering question types, length, language accessibility, distribution methods, and how to make sense of the results.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">How-To Guide</span>
+          <span class="arrow-link">Coming Soon</span>
+        </div>
+      </a>
+
+      <!-- ===== MEETINGS ===== -->
+      <a href="meeting-agenda.html" class="resource-card reveal"
+         data-topic="meetings"
+         data-search="meeting agenda template public meeting facilitation neighborhood community board minutes timed blocks">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-meetings">Meetings</span>
+          <span class="resource-time">Fillable · Print-ready</span>
+        </div>
+        <h3 class="resource-card-title">Public Meeting Agenda Template</h3>
+        <p class="resource-card-desc">A complete, timed agenda for neighborhood meetings — with public comment period, action item capture, facilitator notes, and tips for keeping discussion on track.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Fillable Template</span>
+          <span class="arrow-link">Open <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </div>
+      </a>
+
+      <a href="resources.html#minutes-template" class="resource-card reveal"
+         data-topic="meetings"
+         data-search="meeting minutes template note-taker documentation decisions action items record">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-meetings">Meetings</span>
+          <span class="resource-time">Fillable · 1 page</span>
+        </div>
+        <h3 class="resource-card-title">Meeting Minutes Template</h3>
+        <p class="resource-card-desc">A structured template for capturing attendance, decisions made, motions and seconds, and action items — designed to create a clear official record your group can rely on.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Fillable Template</span>
+          <span class="arrow-link">Coming Soon</span>
+        </div>
+      </a>
+
+      <a href="resources.html#conflict-resolution" class="resource-card reveal"
+         data-topic="meetings"
+         data-search="conflict resolution public meeting facilitation de-escalation difficult conversations community tensions">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-meetings">Meetings</span>
+          <span class="resource-time">Framework · ~15 min read</span>
+        </div>
+        <h3 class="resource-card-title">Conflict Resolution Framework for Public Meetings</h3>
+        <p class="resource-card-desc">Practical techniques for de-escalating tension at community meetings — covering how to respond to disruptions, manage time, and keep space safe for everyone.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Framework + Scripts</span>
+          <span class="arrow-link">Coming Soon</span>
+        </div>
+      </a>
+
+      <!-- ===== FUNDING ===== -->
+      <a href="grant-readiness.html" class="resource-card reveal"
+         data-topic="funding"
+         data-search="grant readiness guide nonprofit funding proposal writing budget narrative organizational capacity funder research">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-funding">Funding</span>
+          <span class="resource-time">Guide · ~30 min read</span>
+        </div>
+        <h3 class="resource-card-title">Grant Readiness Guide</h3>
+        <p class="resource-card-desc">Six sections covering organizational foundations, identifying funders, building your case, proposal elements, relationship-building, and a grant calendar template.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">In-Depth Guide</span>
+          <span class="arrow-link">Open <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </div>
+      </a>
+
+      <a href="resources.html#foundation-research" class="resource-card reveal"
+         data-topic="funding"
+         data-search="foundation research worksheet funder database grant database 990 nonprofit search alignment">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-funding">Funding</span>
+          <span class="resource-time">Worksheet · Fillable</span>
+        </div>
+        <h3 class="resource-card-title">Foundation Research Worksheet</h3>
+        <p class="resource-card-desc">A structured worksheet for evaluating potential funders — capturing deadlines, geographic focus, giving range, past grantees, and alignment with your organization's mission.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Fillable Worksheet</span>
+          <span class="arrow-link">Coming Soon</span>
+        </div>
+      </a>
+
+      <a href="resources.html#grant-budget" class="resource-card reveal"
+         data-topic="funding"
+         data-search="grant budget line item indirect costs fringe benefits personnel narrative budget justification">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-funding">Funding</span>
+          <span class="resource-time">Guide · ~15 min read</span>
+        </div>
+        <h3 class="resource-card-title">Grant Budget Line-Item Guide</h3>
+        <p class="resource-card-desc">How to build a grant budget that holds up to scrutiny — covering personnel, fringe, indirect costs, in-kind contributions, and how to write a budget narrative funders trust.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">How-To Guide</span>
+          <span class="arrow-link">Coming Soon</span>
+        </div>
+      </a>
+
+      <!-- ===== PROJECTS ===== -->
+      <a href="case-study-roslindale.html" class="resource-card reveal"
+         data-topic="projects"
+         data-search="case study roslindale boston community garden neighborhood project vacant lots fundraising coalition">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-projects">Projects</span>
+          <span class="resource-time">Boston, MA · 2021–2023</span>
+        </div>
+        <h3 class="resource-card-title">Case Study: Roslindale Community Garden Network</h3>
+        <p class="resource-card-desc">How five volunteers turned four neglected lots into a thriving network — raising $85,000 and connecting 120 families to growing plots over two years.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Case Study</span>
+          <span class="arrow-link">Read <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </div>
+      </a>
+
+      <a href="resources.html#project-timeline" class="resource-card reveal"
+         data-topic="projects"
+         data-search="project timeline planner community project milestones phases gantt schedule planning">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-projects">Projects</span>
+          <span class="resource-time">Fillable · Printable</span>
+        </div>
+        <h3 class="resource-card-title">Community Project Timeline Planner</h3>
+        <p class="resource-card-desc">A visual planning worksheet for mapping out phases, milestones, dependencies, and responsible parties for neighborhood improvement projects of any scale.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Planning Template</span>
+          <span class="arrow-link">Coming Soon</span>
+        </div>
+      </a>
+
+      <a href="resources.html#mou-template" class="resource-card reveal"
+         data-topic="projects"
+         data-search="memorandum of understanding MOU partnership agreement nonprofit collaboration community organization">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-projects">Projects</span>
+          <span class="resource-time">Template · 2 pages</span>
+        </div>
+        <h3 class="resource-card-title">Community Partnership MOU Template</h3>
+        <p class="resource-card-desc">A plain-language memorandum of understanding for formalizing relationships between neighborhood groups and partner organizations — without needing a lawyer to interpret it.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Legal Template</span>
+          <span class="arrow-link">Coming Soon</span>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- No results state -->
+    <div class="no-results" role="status" aria-live="polite">
+      <div class="no-results-icon" aria-hidden="true">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="21" cy="21" r="13" stroke="currentColor" stroke-width="2"/>
+          <path d="M30 30L42 42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M16 21H26M21 16V26" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3 style="font-size: var(--text-xl); margin-bottom: var(--sp-2);">No resources found</h3>
+      <p style="color: var(--muted);">Try different search terms or clear your filter to browse all resources.</p>
+      <button class="btn btn-outline" style="margin-top: var(--sp-4);" onclick="document.querySelector('[data-resource-search]').value=''; document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.remove('active')}); document.querySelector('[data-filter=all]').classList.add('active'); document.querySelector('[data-resource-search]').dispatchEvent(new Event('input'));">Clear Search</button>
+    </div>
+  </div>
+</section>
+
+<!-- ====== ABOUT BAND ====== -->
+<section class="section section--sand" aria-label="About the library" style="padding-block: var(--sp-10);">
+  <div class="container">
+    <div class="grid-2" style="align-items: center; gap: var(--sp-10);">
+      <div>
+        <p class="kicker">About This Library</p>
+        <h2 style="font-size: var(--text-2xl); margin-bottom: var(--sp-3);">Made for organizers, by organizers</h2>
+        <p style="color: var(--muted);">Every resource in this library was developed with input from people doing this work in real neighborhoods. We test them, revise them based on feedback, and keep them free. <a href="about.html" style="color: var(--amber); text-decoration: underline; text-underline-offset: 3px;">Learn about Civic Signal →</a></p>
+      </div>
+      <div class="tag-list" aria-label="Topic tags">
+        <a href="resources.html?filter=outreach" class="tag">Outreach</a>
+        <a href="resources.html?filter=meetings" class="tag">Public Meetings</a>
+        <a href="resources.html?filter=funding" class="tag">Grant Writing</a>
+        <a href="resources.html?filter=projects" class="tag">Community Projects</a>
+        <a href="outreach-checklist.html" class="tag">Door-Knocking</a>
+        <a href="grant-readiness.html" class="tag">Nonprofit Readiness</a>
+        <a href="meeting-agenda.html" class="tag">Facilitation</a>
+        <a href="case-study-roslindale.html" class="tag">Case Studies</a>
+        <a href="grant-readiness.html#funder-research" class="tag">Funder Research</a>
+        <a href="outreach-checklist.html" class="tag">Volunteer Coordination</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FOOTER ====== -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" style="margin-bottom: var(--sp-4); display: inline-flex;">
+          <div class="nav-logo-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg></div>
+          <div class="nav-logo-text"><span class="nav-logo-name">Civic Signal</span><span class="nav-logo-sub">Resource Library</span></div>
+        </a>
+        <p>Publishing practical toolkits for neighborhood organizers, free of charge and free of jargon.</p>
+      </div>
+      <div>
+        <span class="footer-col-title">Resources</span>
+        <div class="footer-links">
+          <a href="outreach-checklist.html" class="footer-link">Outreach Checklist</a>
+          <a href="meeting-agenda.html" class="footer-link">Meeting Agenda Template</a>
+          <a href="grant-readiness.html" class="footer-link">Grant Readiness Guide</a>
+          <a href="case-study-roslindale.html" class="footer-link">Case Study: Roslindale</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Topics</span>
+        <div class="footer-links">
+          <a href="resources.html?filter=outreach" class="footer-link">Outreach</a>
+          <a href="resources.html?filter=meetings" class="footer-link">Meetings</a>
+          <a href="resources.html?filter=funding" class="footer-link">Funding</a>
+          <a href="resources.html?filter=projects" class="footer-link">Projects</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Organization</span>
+        <div class="footer-links">
+          <a href="about.html" class="footer-link">About Civic Signal</a>
+          <a href="about.html#newsletter" class="footer-link">Newsletter</a>
+          <a href="about.html#contribute" class="footer-link">Contribute a Resource</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-legal">© 2024 Civic Signal. All resources are free to use and adapt with attribution.</p>
+      <div class="footer-bottom-links">
+        <a href="about.html">About</a>
+        <a href="index.html">Home</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+<script>
+  // Handle ?filter= URL param to pre-select a topic filter
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const filter = params.get('filter');
+    if (filter) {
+      document.addEventListener('DOMContentLoaded', function () {
+        const btn = document.querySelector('[data-filter="' + filter + '"]');
+        if (btn) btn.click();
+      });
+    }
+  })();
+</script>
+</body>
+</html>

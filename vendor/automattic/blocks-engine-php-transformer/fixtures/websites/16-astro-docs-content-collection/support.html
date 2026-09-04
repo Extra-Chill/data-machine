@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SignalForge support — Discord community, GitHub issues, documentation feedback, and enterprise support.">
+  <title>Support — SignalForge Docs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="mobile-nav-toggle" id="navToggle" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <div class="overlay" id="overlay"></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <a href="index.html">
+          <svg class="sidebar-logo-mark" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="7" fill="#111512"/>
+            <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#2a352a"/>
+            <polyline points="3,16 7,16 9,10 11,22 13,16 16,16 18,8 20,24 22,16 29,16"
+              stroke="#3efb6a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="sidebar-logo-text">
+            <span class="sidebar-logo-name">SignalForge</span>
+            <span class="sidebar-logo-sub">docs</span>
+          </div>
+        </a>
+      </div>
+      <div class="sidebar-version">
+        <span class="status-dot live"></span>
+        <span class="sidebar-status-text">all systems operational</span>
+        <span class="sidebar-version-badge">v0.9.2</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <span class="nav-section-label">Docs</span>
+          <a class="nav-link" href="index.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+            Home
+          </a>
+          <a class="nav-link" href="overview.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.5"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1"/></svg>
+            Product Overview
+          </a>
+          <a class="nav-link" href="getting-started.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12L6 4l3 5 2-3 3 6"/></svg>
+            Getting Started
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Guides</span>
+          <a class="nav-link" href="incident-workflow.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2l1.5 4h4l-3.2 2.3 1.2 3.9L8 10l-3.5 2.2 1.2-3.9L2.5 6H6.5z"/></svg>
+            Incident Workflow
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Reference</span>
+          <a class="nav-link" href="api-reference.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="1.5"/><path d="M5 5V4a3 3 0 016 0v1"/><path d="M6 9h4M8 8v2"/></svg>
+            API Reference
+          </a>
+          <a class="nav-link" href="changelog.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2" width="11" height="13" rx="1.5"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>
+            Changelog
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Help</span>
+          <a class="nav-link" href="support.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 10.5v.5M8 5.5a1.5 1.5 0 011.5 1.5c0 1-1.5 1.5-1.5 2.5"/></svg>
+            Support
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        <a href="changelog.html">Releases</a>
+        <a href="support.html">Discord</a>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-breadcrumb">
+          <a href="index.html">Docs</a>
+          <span class="sep">/</span>
+          <span class="current">Support</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="topbar-search-btn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+            <span class="topbar-search-text">Search docs</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="content-with-toc">
+          <div class="main-content">
+
+            <div class="page-header">
+              <div class="page-tag">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M8 10.5v.5M8 5.5a1.5 1.5 0 011.5 1.5c0 1-1.5 1.5-1.5 2.5"/></svg>
+                Support
+              </div>
+              <h1>Get help</h1>
+              <p class="page-desc">
+                Community Discord, GitHub issues, and enterprise support channels. We're a small team — response times reflect that.
+              </p>
+            </div>
+
+            <!-- Support channels -->
+            <h2 id="channels" style="margin-top:0; padding-top:0; border-top:none;">Support channels</h2>
+
+            <div class="support-grid">
+              <div class="support-card">
+                <div class="support-card-icon" style="background: rgba(88,101,242,0.15); border: 1px solid rgba(88,101,242,0.3);">
+                  <!-- Discord icon -->
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#5865f2">
+                    <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/>
+                  </svg>
+                </div>
+                <div class="support-card-title">Discord Community</div>
+                <p>The fastest way to get help. #general for questions, #incident-war-room for active incidents, #feedback for product input. 400+ members.</p>
+                <a href="https://discord.gg/signalforge" target="_blank" rel="noopener" class="support-card-link" style="color: #5865f2;">
+                  Join Discord
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+                </a>
+              </div>
+
+              <div class="support-card">
+                <div class="support-card-icon" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-strong);">
+                  <!-- GitHub icon -->
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--text-secondary)">
+                    <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"/>
+                  </svg>
+                </div>
+                <div class="support-card-title">GitHub Issues</div>
+                <p>Bug reports and feature requests. Check existing issues before filing. Use the bug or feature request templates — they speed up triage significantly.</p>
+                <a href="https://github.com/signalforge/signalforge/issues" target="_blank" rel="noopener" class="support-card-link" style="color: var(--text-secondary);">
+                  Open an issue
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+                </a>
+              </div>
+
+              <div class="support-card">
+                <div class="support-card-icon" style="background: var(--accent-dim); border: 1px solid var(--accent-border);">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--accent)" stroke-width="1.7">
+                    <path d="M10 2a7 7 0 110 14A7 7 0 0110 2z"/>
+                    <path d="M7 10l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <div class="support-card-title">Status Page</div>
+                <p>Real-time status for the SignalForge API, probe network, and dashboard. Subscribe to receive email or webhook notifications on incidents.</p>
+                <a href="https://status.signalforge.io" target="_blank" rel="noopener" class="support-card-link" style="color: var(--accent);">
+                  View status
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+                </a>
+              </div>
+
+              <div class="support-card">
+                <div class="support-card-icon" style="background: var(--blue-dim); border: 1px solid var(--blue-border);">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--blue)" stroke-width="1.7">
+                    <rect x="2" y="4" width="16" height="13" rx="2"/>
+                    <path d="M2 8h16M6 4V2M14 4V2"/>
+                  </svg>
+                </div>
+                <div class="support-card-title">Office Hours</div>
+                <p>Live Q&amp;A with the core team every other Thursday at 11:00 AM ET. Zoom link posted in the Discord #announcements channel.</p>
+                <a href="https://discord.gg/signalforge" target="_blank" rel="noopener" class="support-card-link" style="color: var(--blue);">
+                  Join on Discord
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- Enterprise -->
+            <h2 id="enterprise">Enterprise support</h2>
+            <p>Enterprise customers get SLA-backed response times, a dedicated Slack channel, and access to the engineering team for integration support.</p>
+
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Tier</th><th>Response time (critical)</th><th>Channel</th><th>Included with</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td>Community</td>
+                    <td>Best-effort</td>
+                    <td>Discord, GitHub</td>
+                    <td>All plans</td>
+                  </tr>
+                  <tr>
+                    <td>Pro</td>
+                    <td>&lt; 24 hours</td>
+                    <td>Email + Discord priority</td>
+                    <td>Pro plan</td>
+                  </tr>
+                  <tr>
+                    <td>Enterprise</td>
+                    <td>&lt; 4 hours (business hours) &lt;br&gt; &lt; 1 hour (P1 incidents)</td>
+                    <td>Dedicated Slack channel</td>
+                    <td>Enterprise plan</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p>To inquire about Enterprise: <a href="mailto:enterprise@signalforge.io">enterprise@signalforge.io</a></p>
+
+            <!-- FAQ -->
+            <h2 id="faq">Common questions</h2>
+
+            <h3 id="faq-false-alerts">Why am I getting false alerts?</h3>
+            <p>
+              The most common cause is a check interval that's too short relative to your endpoint's cold-start or GC pause behavior. Try:
+            </p>
+            <ul>
+              <li>Increasing <code>after_failures</code> to 2 or 3 — this requires <em>n</em> consecutive failures before firing</li>
+              <li>Increasing <code>timeout_s</code> to accommodate occasional slow responses</li>
+              <li>Using multi-region probes — if only one region fails, it's likely a network issue, not a service outage</li>
+            </ul>
+
+            <h3 id="faq-webhook-not-firing">My webhook isn't receiving events</h3>
+            <p>Check the webhook delivery log: <code>GET /v1/webhooks/{id}/deliveries</code>. Common causes:</p>
+            <ul>
+              <li>Your endpoint returned a non-2xx response — SignalForge marks the delivery as failed and will retry</li>
+              <li>Your endpoint took longer than 10 seconds to respond — webhook delivery times out at 10s</li>
+              <li>Your firewall is blocking outbound requests from SignalForge's IP ranges — see <a href="https://docs.signalforge.io/ip-ranges">IP ranges</a></li>
+              <li>The webhook destination is not configured in the correct alert rule or monitor's <code>alert</code> block</li>
+            </ul>
+
+            <h3 id="faq-upgrade-config">How do I upgrade my config from v0.8.x?</h3>
+            <p>Run the migration command. It reads your current <code>signalforge.yml</code>, applies the v0.9.x schema changes, and writes a new file. Review the diff before committing.</p>
+            <div class="code-block">
+              <div class="code-block-header">
+                <span class="code-block-lang">bash</span>
+                <button class="copy-btn">copy</button>
+              </div>
+              <pre><span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">migrate</span> <span class="hl-flag">--from</span> <span class="hl-arg">0.8</span> <span class="hl-flag">--dry-run</span>
+
+<span class="hl-out">Migration: 0.8.x → 0.9.x</span>
+<span class="hl-out"></span>
+<span class="hl-out">  ~ Renamed top-level `notify` → per-monitor `alert` blocks</span>
+<span class="hl-out">  ~ Moved global destinations to top-level `destinations` array</span>
+<span class="hl-out"></span>
+<span class="hl-out">No breaking changes detected. Apply with --write flag.</span>
+<span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">migrate</span> <span class="hl-flag">--from</span> <span class="hl-arg">0.8</span> <span class="hl-flag">--write</span></pre>
+            </div>
+
+            <h3 id="faq-rate-limits">I'm hitting rate limits on the API</h3>
+            <p>The free tier allows 60 reads/min and 20 writes/min. If you're hitting this while building a dashboard or integration, consider:</p>
+            <ul>
+              <li>Polling <code>GET /v1/signals</code> with a <code>since</code> timestamp rather than fetching all signals each time</li>
+              <li>Using webhooks for real-time signal delivery instead of polling</li>
+              <li>Upgrading to the Pro tier (300 reads/min, 100 writes/min)</li>
+            </ul>
+
+            <!-- Docs feedback -->
+            <h2 id="docs-feedback">Documentation feedback</h2>
+            <p>Found an error in the docs? Missing a concept that would have helped you? The docs source is on GitHub — PRs welcome.</p>
+
+            <div class="support-grid" style="margin-top: 1rem;">
+              <div class="support-card">
+                <div class="support-card-icon" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-strong);">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--text-secondary)" stroke-width="1.7">
+                    <path d="M4 13l3-3 3 3 5-5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 10a8 8 0 1016 0 8 8 0 00-16 0z"/>
+                  </svg>
+                </div>
+                <div class="support-card-title">Edit on GitHub</div>
+                <p>Every page has an "Edit this page" workflow. Fork, fix, and open a PR. We review docs PRs within 2 business days.</p>
+                <a href="https://github.com/signalforge/signalforge/tree/main/docs" target="_blank" rel="noopener" class="support-card-link" style="color: var(--text-secondary);">
+                  Browse docs source
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+                </a>
+              </div>
+
+              <div class="support-card">
+                <div class="support-card-icon" style="background: var(--amber-dim); border: 1px solid var(--amber-border);">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--amber)" stroke-width="1.7">
+                    <path d="M10 3v2M10 15v2M3 10H1M19 10h-2M5.05 5.05L3.64 3.64M16.36 16.36l-1.41-1.41M5.05 14.95l-1.41 1.41M16.36 3.64l-1.41 1.41"/>
+                    <circle cx="10" cy="10" r="4"/>
+                  </svg>
+                </div>
+                <div class="support-card-title">Request a guide</div>
+                <p>Is there a workflow, integration, or concept you'd like to see covered? Open a GitHub Discussion and vote on others' requests.</p>
+                <a href="https://github.com/signalforge/signalforge/discussions" target="_blank" rel="noopener" class="support-card-link" style="color: var(--amber);">
+                  Open a discussion
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- Contact -->
+            <h2 id="contact">Direct contact</h2>
+
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Topic</th><th>Contact</th><th>Response time</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td>Security vulnerabilities</td>
+                    <td><a href="mailto:security@signalforge.io">security@signalforge.io</a></td>
+                    <td>&lt; 24 hours</td>
+                  </tr>
+                  <tr>
+                    <td>Enterprise / sales</td>
+                    <td><a href="mailto:enterprise@signalforge.io">enterprise@signalforge.io</a></td>
+                    <td>1–2 business days</td>
+                  </tr>
+                  <tr>
+                    <td>Press / partnerships</td>
+                    <td><a href="mailto:hello@signalforge.io">hello@signalforge.io</a></td>
+                    <td>3–5 business days</td>
+                  </tr>
+                  <tr>
+                    <td>Billing issues</td>
+                    <td>In-app chat or <a href="mailto:billing@signalforge.io">billing@signalforge.io</a></td>
+                    <td>1 business day</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="callout tip">
+              <div class="callout-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2a4.5 4.5 0 010 9H6v2h4" stroke-linecap="round"/><circle cx="8" cy="6" r="1"/></svg></div>
+              <div class="callout-body">
+                <span class="callout-title">For fastest response on bugs</span>
+                <p>Include your <code>request_id</code> from the API error response, your CLI version (<code>signalforge --version</code>), and a minimal reproduction. This cuts our debug time by 80%.</p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- TOC -->
+          <aside>
+            <div class="toc-aside">
+              <span class="toc-label">On this page</span>
+              <ul class="toc-list">
+                <li><a href="#channels">Support channels</a></li>
+                <li><a href="#enterprise">Enterprise</a></li>
+                <li><a href="#faq">Common questions</a></li>
+                <li><a href="#faq-false-alerts">  False alerts</a></li>
+                <li><a href="#faq-webhook-not-firing">  Webhooks</a></li>
+                <li><a href="#faq-upgrade-config">  Config migration</a></li>
+                <li><a href="#faq-rate-limits">  Rate limits</a></li>
+                <li><a href="#docs-feedback">Docs feedback</a></li>
+                <li><a href="#contact">Direct contact</a></li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-left">SignalForge v0.9.2 · MIT License · <a href="mailto:hello@signalforge.io" style="color: var(--text-muted);">hello@signalforge.io</a></div>
+        <div class="footer-links">
+          <a href="api-reference.html">API</a>
+          <a href="changelog.html">Changelog</a>
+          <a href="support.html">Support</a>
+          <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>

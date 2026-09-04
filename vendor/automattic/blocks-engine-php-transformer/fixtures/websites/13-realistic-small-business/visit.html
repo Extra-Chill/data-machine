@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visit Us — Juniper Lane Plant Shop | Benton Harbor, MI</title>
+  <meta name="description" content="Find Juniper Lane at 214 Maple Street in Benton Harbor, Michigan. Open Wednesday–Saturday 10am–6pm and Sunday 11am–4pm.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .visit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(3rem, 6vw, 6rem);
+      align-items: start;
+    }
+    .map-svg-area {
+      background: var(--sage-pale);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      border: 1px solid var(--sage-light);
+      position: relative;
+    }
+    .neighborhood-note {
+      display: flex;
+      align-items: start;
+      gap: 1rem;
+      padding: 1.25rem;
+      background: var(--white);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--parchment);
+      margin-bottom: 1rem;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .neighborhood-note:hover {
+      border-color: var(--sage);
+      background: var(--sage-pale);
+    }
+    .neighborhood-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--sage-pale);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.2rem;
+    }
+    .newsletter-section {
+      background: var(--forest);
+      color: var(--cream);
+      padding: clamp(4rem, 7vw, 6rem) 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .newsletter-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 70% 30%, rgba(93,138,98,0.25) 0%, transparent 60%);
+    }
+    .newsletter-section-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(3rem, 5vw, 5rem);
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+    @media (max-width: 720px) {
+      .visit-grid { grid-template-columns: 1fr; }
+      .newsletter-section-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo" aria-label="Juniper Lane Home">
+      <svg class="logo-mark" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+        <circle cx="18" cy="18" r="17" fill="#D0E3D2" stroke="#5D8A62" stroke-width="1.5"/>
+        <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#5D8A62"/>
+        <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#3A5438"/>
+        <ellipse cx="18" cy="30.5" rx="4" ry="1.5" fill="#B85A37" opacity="0.6"/>
+      </svg>
+      <span>
+        <span class="logo-text">Juniper Lane</span>
+        <span class="logo-sub">Plant Shop &amp; Gifts</span>
+      </span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html">Workshops</a>
+      <a href="plant-care.html">Plant Care</a>
+      <a href="events.html">Private Events</a>
+      <a href="visit.html" class="active">Visit Us</a>
+    </nav>
+    <div class="header-cta">
+      <a href="tel:+12695550193" class="phone-cta">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        (269) 555-0193
+      </a>
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav" role="dialog" aria-label="Navigation menu">
+  <div class="mobile-nav-overlay" aria-hidden="true"></div>
+  <div class="mobile-nav-panel">
+    <nav class="mobile-nav-links">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html">Workshops</a>
+      <a href="plant-care.html">Plant Care</a>
+      <a href="events.html">Private Events</a>
+      <a href="visit.html">Visit Us</a>
+    </nav>
+    <div class="mobile-nav-info">
+      <div>214 Maple Street · Benton Harbor, MI</div>
+      <div style="margin-top:0.5rem">Wed–Sat 10am–6pm · Sun 11am–4pm</div>
+    </div>
+    <div class="mobile-nav-phone">
+      <a href="tel:+12695550193" class="btn btn-primary btn-lg" style="width:100%; justify-content:center;">Call Us</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE HERO ========== -->
+<section class="page-hero">
+  <div class="container page-hero-inner">
+    <span class="eyebrow">214 Maple Street</span>
+    <h1>Come find us.</h1>
+    <p class="lead">We're on Maple Street in downtown Benton Harbor. Parking in front and around the corner on Oak.</p>
+  </div>
+  <svg style="position:absolute;bottom:-1px;left:0;right:0;width:100%;" viewBox="0 0 1440 40" fill="none" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 40 C360 0 720 20 1440 0 L1440 40 Z" fill="var(--cream)"/>
+  </svg>
+</section>
+
+<!-- ========== HOURS & LOCATION ========== -->
+<section class="section" aria-labelledby="hours-heading">
+  <div class="container">
+    <div class="visit-grid">
+      <!-- Info Column -->
+      <div>
+        <div class="info-block reveal">
+          <h4>Address</h4>
+          <address>
+            214 Maple Street<br>
+            Benton Harbor, MI 49022
+          </address>
+          <div style="margin-top:1rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <a href="https://maps.google.com/?q=214+Maple+Street+Benton+Harbor+MI" target="_blank" rel="noopener noreferrer" class="btn btn-sage" style="font-size:0.68rem; padding:0.55rem 1.1rem;">
+              Open in Google Maps
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M2 10L10 2M10 2H5M10 2V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+            <a href="https://maps.apple.com/?address=214+Maple+Street,Benton+Harbor,MI" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size:0.68rem; padding:0.55rem 1.1rem;">
+              Apple Maps
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M2 10L10 2M10 2H5M10 2V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        <div class="info-block reveal reveal-delay-1" style="margin-top:2.5rem;">
+          <h4>Hours</h4>
+          <table class="hours-table" role="table" aria-label="Store hours">
+            <tbody>
+              <tr>
+                <td>Wednesday</td>
+                <td>10:00am – 6:00pm</td>
+              </tr>
+              <tr>
+                <td>Thursday</td>
+                <td>10:00am – 6:00pm</td>
+              </tr>
+              <tr>
+                <td>Friday</td>
+                <td>10:00am – 6:00pm</td>
+              </tr>
+              <tr>
+                <td>Saturday</td>
+                <td>10:00am – 6:00pm</td>
+              </tr>
+              <tr>
+                <td>Sunday</td>
+                <td>11:00am – 4:00pm</td>
+              </tr>
+              <tr>
+                <td>Monday</td>
+                <td class="hours-closed">Closed</td>
+              </tr>
+              <tr>
+                <td>Tuesday</td>
+                <td class="hours-closed">Closed</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="info-block reveal reveal-delay-2" style="margin-top:2.5rem;">
+          <h4>Phone</h4>
+          <p>
+            <a href="tel:+12695550193" style="font-size:1.4rem; font-family:var(--font-display); color:var(--terracotta); text-decoration:none; font-weight:500;">
+              (269) 555-0193
+            </a>
+          </p>
+          <p style="font-size:0.85rem; color:var(--forest-mid); margin-top:0.4rem;">We answer during store hours. For private event inquiries, calling is the best way to reach us.</p>
+        </div>
+
+        <div class="info-block reveal reveal-delay-3" style="margin-top:2.5rem;">
+          <h4>Parking</h4>
+          <p>Free street parking on Maple Street in front of the shop. Additional parking on Oak Street (the block behind us) and a small lot on the corner of Maple and 3rd Street.</p>
+        </div>
+      </div>
+
+      <!-- Map / Visual Column -->
+      <div class="reveal reveal-delay-1">
+        <!-- Illustrated map -->
+        <div class="map-svg-area" style="margin-bottom:2rem;">
+          <svg viewBox="0 0 480 360" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%; display:block;" role="img" aria-label="Illustrated map showing Juniper Lane at 214 Maple Street in Benton Harbor, Michigan">
+            <!-- Background -->
+            <rect width="480" height="360" fill="#D0E3D2"/>
+
+            <!-- Streets -->
+            <!-- Maple Street (horizontal) -->
+            <rect x="0" y="148" width="480" height="48" fill="#EAD9BC"/>
+            <!-- 3rd Street (vertical) -->
+            <rect x="148" y="0" width="40" height="360" fill="#EAD9BC"/>
+            <!-- Oak Street (horizontal) -->
+            <rect x="0" y="248" width="480" height="36" fill="#EAD9BC"/>
+            <!-- 4th Street (vertical) -->
+            <rect x="280" y="0" width="36" height="360" fill="#EAD9BC"/>
+            <!-- 2nd Street (vertical) -->
+            <rect x="30" y="0" width="36" height="360" fill="#EAD9BC"/>
+
+            <!-- Center lines on streets -->
+            <line x1="0" y1="172" x2="480" y2="172" stroke="rgba(180,155,100,0.4)" stroke-width="2" stroke-dasharray="20 10"/>
+            <line x1="168" y1="0" x2="168" y2="360" stroke="rgba(180,155,100,0.4)" stroke-width="2" stroke-dasharray="20 10"/>
+            <line x1="298" y1="0" x2="298" y2="360" stroke="rgba(180,155,100,0.4)" stroke-width="2" stroke-dasharray="20 10"/>
+
+            <!-- City blocks -->
+            <!-- Block 1: Upper left -->
+            <rect x="70" y="20" width="70" height="120" rx="4" fill="#C8DDB0" opacity="0.6"/>
+            <!-- Block 2: Upper middle -->
+            <rect x="196" y="20" width="76" height="120" rx="4" fill="#C8DDB0" opacity="0.6"/>
+            <!-- Block 3: Upper right -->
+            <rect x="324" y="20" width="140" height="120" rx="4" fill="#C8DDB0" opacity="0.6"/>
+            <!-- Block 4: Lower left -->
+            <rect x="70" y="204" width="70" height="140" rx="4" fill="#C8DDB0" opacity="0.6"/>
+            <!-- Block 5: Lower middle -->
+            <rect x="196" y="204" width="76" height="140" rx="4" fill="#C8DDB0" opacity="0.6"/>
+            <!-- Block 6: Lower right -->
+            <rect x="324" y="204" width="140" height="140" rx="4" fill="#C8DDB0" opacity="0.6"/>
+
+            <!-- Street labels -->
+            <text x="240" y="144" font-family="'DM Mono', monospace" font-size="9" fill="#7A5233" text-anchor="middle" letter-spacing="1">MAPLE STREET</text>
+            <text x="240" y="244" font-family="'DM Mono', monospace" font-size="9" fill="#7A5233" text-anchor="middle" letter-spacing="1">OAK STREET</text>
+            <text x="168" y="100" font-family="'DM Mono', monospace" font-size="8" fill="#7A5233" text-anchor="middle" transform="rotate(-90 168 100)" letter-spacing="1">3RD ST</text>
+            <text x="298" y="100" font-family="'DM Mono', monospace" font-size="8" fill="#7A5233" text-anchor="middle" transform="rotate(-90 298 100)" letter-spacing="1">4TH ST</text>
+            <text x="48" y="100" font-family="'DM Mono', monospace" font-size="8" fill="#7A5233" text-anchor="middle" transform="rotate(-90 48 100)" letter-spacing="1">2ND ST</text>
+
+            <!-- Parking indicators -->
+            <rect x="196" y="226" width="30" height="20" rx="3" fill="rgba(93,138,98,0.3)"/>
+            <text x="211" y="239" font-family="'DM Mono', monospace" font-size="9" fill="#3A5438" text-anchor="middle" font-weight="bold">P</text>
+
+            <!-- JUNIPER LANE — the shop! -->
+            <rect x="76" y="155" width="64" height="40" rx="3" fill="#B85A37"/>
+            <!-- Roof -->
+            <polygon points="72,158 144,158 144,155 108,148 72,155" fill="#943F23"/>
+            <!-- Windows -->
+            <rect x="82" y="162" width="14" height="14" rx="1" fill="rgba(245,237,215,0.6)"/>
+            <rect x="102" y="162" width="14" height="14" rx="1" fill="rgba(245,237,215,0.6)"/>
+            <rect x="122" y="162" width="12" height="26" rx="1" fill="rgba(245,237,215,0.4)"/>
+            <!-- Door -->
+            <rect x="93" y="175" width="14" height="20" rx="1" fill="#7A5233"/>
+            <!-- Sign above shop -->
+            <rect x="76" y="139" width="64" height="16" rx="3" fill="#5D8A62"/>
+            <text x="108" y="150" font-family="'Cormorant Garamond', serif" font-size="7" fill="#F5EDD7" text-anchor="middle" letter-spacing="0.5" font-style="italic">Juniper Lane</text>
+
+            <!-- Potted plant in front of shop -->
+            <ellipse cx="108" cy="196" rx="8" ry="2.5" fill="#7A5233"/>
+            <path d="M108 196 C108 190 106 184 107 178" stroke="#3A5438" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            <path d="M107 184 C101 179 95 181 95 186 C95 190 101 192 107 190Z" fill="#5D8A62"/>
+            <path d="M109 180 C114 175 119 177 119 182 C119 186 114 188 109 186Z" fill="#6B9B70"/>
+
+            <!-- Location PIN -->
+            <circle cx="108" cy="172" r="22" fill="rgba(184,90,55,0.2)"/>
+            <circle cx="108" cy="172" r="14" fill="rgba(184,90,55,0.3)"/>
+            <circle cx="108" cy="142" r="9" fill="#B85A37"/>
+            <path d="M108 142 L108 155" stroke="#B85A37" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="108" cy="142" r="4" fill="white"/>
+
+            <!-- You are here label -->
+            <rect x="126" y="136" width="82" height="20" rx="4" fill="var(--forest)" opacity="0.9"/>
+            <text x="167" y="149" font-family="'DM Mono', monospace" font-size="8.5" fill="#F5EDD7" text-anchor="middle" letter-spacing="0.5">214 Maple Street</text>
+
+            <!-- Small trees in blocks -->
+            <circle cx="110" cy="60" r="10" fill="#5D8A62" opacity="0.6"/>
+            <circle cx="130" cy="78" r="7" fill="#6B9B70" opacity="0.5"/>
+            <circle cx="88" cy="80" r="8" fill="#5D8A62" opacity="0.5"/>
+            <circle cx="230" cy="70" r="9" fill="#5D8A62" opacity="0.5"/>
+            <circle cx="250" cy="50" r="7" fill="#6B9B70" opacity="0.5"/>
+            <circle cx="360" cy="65" r="10" fill="#5D8A62" opacity="0.5"/>
+            <circle cx="400" cy="80" r="8" fill="#6B9B70" opacity="0.5"/>
+
+            <!-- North arrow -->
+            <circle cx="448" cy="32" r="18" fill="var(--forest)" opacity="0.7"/>
+            <text x="448" y="27" font-family="'DM Mono', monospace" font-size="10" fill="#F5EDD7" text-anchor="middle" font-weight="bold">N</text>
+            <polygon points="448,30 444,42 448,40 452,42" fill="#F5EDD7" opacity="0.8"/>
+          </svg>
+        </div>
+
+        <!-- Neighborhood notes -->
+        <div class="reveal reveal-delay-2">
+          <h4 style="font-family:var(--font-mono); font-size:0.68rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--terracotta); margin-bottom:1rem;">In the Neighborhood</h4>
+
+          <div class="neighborhood-note">
+            <div class="neighborhood-icon">☕</div>
+            <div>
+              <strong style="font-family:var(--font-display); font-size:1rem; display:block;">Benton Harbor Coffee Collective</strong>
+              <span style="font-size:0.85rem; color:var(--forest-mid);">A half block down Maple. Great coffee before or after your visit.</span>
+            </div>
+          </div>
+
+          <div class="neighborhood-note">
+            <div class="neighborhood-icon">🍞</div>
+            <div>
+              <strong style="font-family:var(--font-display); font-size:1rem; display:block;">Wildflower Bakehouse</strong>
+              <span style="font-size:0.85rem; color:var(--forest-mid);">Around the corner on 3rd Street. Open Fri–Sun mornings. Worth the detour.</span>
+            </div>
+          </div>
+
+          <div class="neighborhood-note">
+            <div class="neighborhood-icon">🎨</div>
+            <div>
+              <strong style="font-family:var(--font-display); font-size:1rem; display:block;">Arts District</strong>
+              <span style="font-size:0.85rem; color:var(--forest-mid);">We're right in the middle of Benton Harbor's arts district. Several galleries are walkable from our front door.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== STOREFRONT ILLUSTRATION ========== -->
+<section style="background:var(--parchment); padding: clamp(3rem,5vw,5rem) 0; overflow:hidden;" aria-hidden="true">
+  <div class="container">
+    <div style="text-align:center; max-width:680px; margin:0 auto;" class="reveal">
+      <!-- Storefront SVG illustration -->
+      <svg viewBox="0 0 680 340" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:640px;" role="img" aria-label="Illustration of the Juniper Lane storefront on Maple Street">
+        <!-- Sky / Background -->
+        <rect width="680" height="340" fill="#D0E3D2" rx="24"/>
+
+        <!-- Sidewalk -->
+        <rect x="0" y="270" width="680" height="70" rx="0" fill="#EAD9BC"/>
+        <rect x="0" y="270" width="680" height="6" fill="#D4BF96"/>
+
+        <!-- Building facade -->
+        <rect x="100" y="80" width="480" height="200" fill="#E8C87A" rx="2"/>
+
+        <!-- Brick texture (simplified) -->
+        <rect x="100" y="80" width="480" height="200" fill="url(#brickPattern)" opacity="0.15" rx="2"/>
+
+        <!-- Storefront base -->
+        <rect x="100" y="220" width="480" height="60" fill="#B85A37"/>
+
+        <!-- Awning -->
+        <path d="M90 140 L590 140 L590 168 L90 168 Z" fill="#3A5438"/>
+        <path d="M90 168 L100 182 L590 182 L600 168 Z" fill="#2C4A2E"/>
+        <!-- Awning scallops -->
+        <path d="M90 182 C98 182 98 190 106 190 C114 190 114 182 122 182 C130 182 130 190 138 190 C146 190 146 182 154 182 C162 182 162 190 170 190 C178 190 178 182 186 182 C194 182 194 190 202 190 C210 190 210 182 218 182 C226 182 226 190 234 190 C242 190 242 182 250 182 C258 182 258 190 266 190 C274 190 274 182 282 182 C290 182 290 190 298 190 C306 190 306 182 314 182 C322 182 322 190 330 190 C338 190 338 182 346 182 C354 182 354 190 362 190 C370 190 370 182 378 182 C386 182 386 190 394 190 C402 190 402 182 410 182 C418 182 418 190 426 190 C434 190 434 182 442 182 C450 182 450 190 458 190 C466 190 466 182 474 182 C482 182 482 190 490 190 C498 190 498 182 506 182 C514 182 514 190 522 190 C530 190 530 182 538 182 C546 182 546 190 554 190 C562 190 562 182 570 182 C578 182 578 190 586 190 L600 168 L600 182 L90 182 Z" fill="#243520"/>
+
+        <!-- Shop sign on awning -->
+        <rect x="240" y="146" width="200" height="24" rx="4" fill="rgba(245,237,215,0.15)"/>
+        <text x="340" y="162" font-family="Cormorant Garamond, serif" font-size="13" fill="#F5EDD7" text-anchor="middle" font-style="italic" letter-spacing="1">Juniper Lane</text>
+
+        <!-- Large display windows -->
+        <!-- Left window -->
+        <rect x="120" y="198" width="160" height="80" rx="2" fill="rgba(200,230,210,0.4)" stroke="#5D8A62" stroke-width="2"/>
+        <line x1="200" y1="198" x2="200" y2="278" stroke="#5D8A62" stroke-width="1.5"/>
+        <line x1="120" y1="238" x2="280" y2="238" stroke="#5D8A62" stroke-width="1"/>
+
+        <!-- Right window -->
+        <rect x="400" y="198" width="160" height="80" rx="2" fill="rgba(200,230,210,0.4)" stroke="#5D8A62" stroke-width="2"/>
+        <line x1="480" y1="198" x2="480" y2="278" stroke="#5D8A62" stroke-width="1.5"/>
+        <line x1="400" y1="238" x2="560" y2="238" stroke="#5D8A62" stroke-width="1"/>
+
+        <!-- Plants in left window -->
+        <!-- Trailing pothos -->
+        <path d="M160 225 C150 215 135 218 132 225 C130 230 136 236 144 234Z" fill="#5D8A62"/>
+        <path d="M168 218 C175 210 188 212 188 220 C188 226 180 230 172 227Z" fill="#6B9B70"/>
+        <path d="M155 238 C145 230 130 234 129 242 C128 248 136 252 146 249Z" fill="#88B38D"/>
+        <path d="M165 222 C165 215 162 206 165 198" stroke="#3A5438" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+
+        <!-- Tall plant left window -->
+        <rect x="238" y="218" width="10" height="56" rx="4" fill="#6B9B70"/>
+        <rect x="234" y="228" width="8" height="46" rx="3" fill="#5D8A62" transform="rotate(-7 238 228)"/>
+        <rect x="242" y="230" width="8" height="44" rx="3" fill="#88B38D" transform="rotate(6 246 230)"/>
+        <rect x="230" y="270" width="28" height="8" rx="2" fill="#B85A37"/>
+
+        <!-- Plants in right window -->
+        <!-- Succulent arrangement -->
+        <circle cx="440" cy="248" r="14" fill="#5D8A62"/>
+        <circle cx="440" cy="248" r="9" fill="#6B9B70"/>
+        <circle cx="440" cy="248" r="5" fill="#88B38D"/>
+        <circle cx="424" cy="254" r="9" fill="#88B38D"/>
+        <circle cx="458" cy="252" r="10" fill="#6B9B70"/>
+        <rect x="420" y="262" width="48" height="12" rx="3" fill="#C4933A"/>
+
+        <!-- Candle in right window -->
+        <rect x="490" y="240" width="14" height="30" rx="3" fill="#F5EDD7" stroke="#E8D5B2" stroke-width="1"/>
+        <path d="M497 240 C497 232 500 226 502 223 C504 226 504 232 497 240Z" fill="#C4933A"/>
+        <circle cx="497" cy="233" r="5" fill="rgba(196,147,58,0.15)"/>
+
+        <!-- Greeting card display in right window -->
+        <rect x="516" y="222" width="22" height="30" rx="2" fill="white" stroke="#E8D5B2" stroke-width="1"/>
+        <rect x="520" y="226" width="14" height="1.5" fill="#D0E3D2"/>
+        <rect x="520" y="230" width="14" height="1.5" fill="#D0E3D2"/>
+        <rect x="520" y="234" width="10" height="1.5" fill="#D0E3D2"/>
+        <path d="M524 220 C522 218 518 219 518 222 C518 225 524 226 524 229 C524 232 520 233 518 231" stroke="#B85A37" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+
+        <!-- Door -->
+        <rect x="300" y="210" width="80" height="70" rx="2" fill="#5D3A1A"/>
+        <rect x="304" y="214" width="72" height="62" rx="1" fill="#3A2410" stroke="#7A5233" stroke-width="1"/>
+        <rect x="308" y="218" width="30" height="54" rx="1" fill="rgba(200,230,210,0.25)" stroke="#7A5233" stroke-width="0.5"/>
+        <rect x="342" y="218" width="30" height="54" rx="1" fill="rgba(200,230,210,0.25)" stroke="#7A5233" stroke-width="0.5"/>
+        <!-- Door handles -->
+        <circle cx="342" cy="248" r="3" fill="#C4933A"/>
+        <circle cx="338" cy="248" r="3" fill="#C4933A"/>
+        <!-- OPEN sign -->
+        <rect x="318" y="230" width="44" height="14" rx="3" fill="#5D8A62"/>
+        <text x="340" y="241" font-family="'DM Mono', monospace" font-size="8" fill="#F5EDD7" text-anchor="middle" letter-spacing="2">OPEN</text>
+
+        <!-- Potted plants flanking door -->
+        <!-- Left pot -->
+        <path d="M278 277 L274 258 Q274 254 278 254 L294 254 Q298 254 298 258 L294 277 Z" fill="#B85A37"/>
+        <ellipse cx="286" cy="277" rx="10" ry="3" fill="#C4933A"/>
+        <path d="M286 254 C286 245 282 236 284 228" stroke="#3A5438" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M283 240 C274 232 264 234 264 241 C264 248 274 252 282 248Z" fill="#5D8A62"/>
+        <path d="M287 232 C296 224 306 226 306 233 C306 240 296 244 288 240Z" fill="#6B9B70"/>
+
+        <!-- Right pot -->
+        <path d="M382 277 L378 258 Q378 254 382 254 L398 254 Q402 254 402 258 L398 277 Z" fill="#B85A37"/>
+        <ellipse cx="390" cy="277" rx="10" ry="3" fill="#C4933A"/>
+        <path d="M390 254 C390 245 386 236 388 228" stroke="#3A5438" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M387 240 C378 232 368 234 368 241 C368 248 378 252 386 248Z" fill="#5D8A62"/>
+        <path d="M391 232 C400 224 410 226 410 233 C410 240 400 244 392 240Z" fill="#6B9B70"/>
+
+        <!-- Sidewalk details -->
+        <!-- A-frame sign on sidewalk -->
+        <path d="M60 270 L80 340 L100 270 Z" fill="none" stroke="#5D8A62" stroke-width="3"/>
+        <rect x="62" y="292" width="36" height="22" fill="#5D8A62"/>
+        <text x="80" y="301" font-family="Cormorant Garamond, serif" font-size="7" fill="#F5EDD7" text-anchor="middle" font-style="italic">Now Open</text>
+        <text x="80" y="310" font-family="'DM Mono', monospace" font-size="5.5" fill="#D0E3D2" text-anchor="middle">Wed–Sat 10–6</text>
+
+        <!-- Street trees -->
+        <rect x="36" y="228" width="8" height="42" fill="#7A5233"/>
+        <circle cx="40" cy="210" r="30" fill="#5D8A62" opacity="0.7"/>
+        <circle cx="40" cy="205" r="22" fill="#6B9B70" opacity="0.5"/>
+
+        <rect x="632" y="232" width="8" height="38" fill="#7A5233"/>
+        <circle cx="636" cy="214" r="28" fill="#5D8A62" opacity="0.7"/>
+        <circle cx="636" cy="210" r="20" fill="#6B9B70" opacity="0.5"/>
+
+        <!-- Address number on building -->
+        <text x="340" y="130" font-family="'DM Mono', monospace" font-size="18" fill="#C4933A" text-anchor="middle" font-weight="bold" opacity="0.6">214</text>
+
+        <!-- Clouds -->
+        <ellipse cx="500" cy="40" rx="55" ry="22" fill="rgba(255,255,255,0.4)"/>
+        <ellipse cx="540" cy="38" rx="40" ry="18" fill="rgba(255,255,255,0.35)"/>
+        <ellipse cx="480" cy="38" rx="30" ry="14" fill="rgba(255,255,255,0.3)"/>
+        <ellipse cx="160" cy="35" rx="45" ry="18" fill="rgba(255,255,255,0.35)"/>
+        <ellipse cx="140" cy="34" rx="30" ry="14" fill="rgba(255,255,255,0.3)"/>
+      </svg>
+      <p style="font-family:var(--font-display); font-style:italic; font-size:1.1rem; color:var(--forest-mid); margin-top:1.25rem;">214 Maple Street · Benton Harbor, Michigan · Est. 2018</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== NEWSLETTER ========== -->
+<section class="newsletter-section" aria-labelledby="newsletter-heading">
+  <div class="container">
+    <div class="newsletter-section-grid">
+      <div class="reveal">
+        <span class="eyebrow" style="color:var(--sage-light); display:block; margin-bottom:0.75rem;">Stay Connected</span>
+        <h2 id="newsletter-heading" style="color:var(--cream); font-size:clamp(2rem, 4vw, 3rem); line-height:1.15;">Get our<br><em style="font-style:italic; color:var(--sage-light)">monthly letter.</em></h2>
+        <div class="section-divider" style="margin-top:1.25rem; background:var(--terracotta);"></div>
+        <p style="margin-top:1.25rem; font-size:1rem; color:rgba(245,237,215,0.7); line-height:1.75; max-width:380px;">New plant arrivals, workshop dates, care tips, and the occasional note about what's happening at the shop. About once a month. Easy to unsubscribe. Worth having in your inbox.</p>
+        <div style="margin-top:2rem; display:flex; flex-direction:column; gap:0.75rem;">
+          <div style="display:flex; align-items:center; gap:0.6rem; font-size:0.88rem; color:rgba(245,237,215,0.6);">
+            <span style="width:5px;height:5px;background:var(--terracotta);border-radius:50%;flex-shrink:0;"></span>
+            Workshop dates go to subscribers first
+          </div>
+          <div style="display:flex; align-items:center; gap:0.6rem; font-size:0.88rem; color:rgba(245,237,215,0.6);">
+            <span style="width:5px;height:5px;background:var(--terracotta);border-radius:50%;flex-shrink:0;"></span>
+            New plant announcements and seasonal arrivals
+          </div>
+          <div style="display:flex; align-items:center; gap:0.6rem; font-size:0.88rem; color:rgba(245,237,215,0.6);">
+            <span style="width:5px;height:5px;background:var(--terracotta);border-radius:50%;flex-shrink:0;"></span>
+            Real care tips, not generic advice
+          </div>
+          <div style="display:flex; align-items:center; gap:0.6rem; font-size:0.88rem; color:rgba(245,237,215,0.6);">
+            <span style="width:5px;height:5px;background:var(--terracotta);border-radius:50%;flex-shrink:0;"></span>
+            No spam, no selling your information
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal reveal-delay-2">
+        <div style="background:rgba(245,237,215,0.06); border:1px solid rgba(245,237,215,0.12); border-radius:var(--radius-xl); padding:2.5rem;">
+          <h3 style="font-family:var(--font-display); font-size:1.8rem; color:var(--cream); margin-bottom:0.5rem; font-weight:400;">Join the list.</h3>
+          <p style="font-size:0.88rem; color:rgba(245,237,215,0.55); margin-bottom:1.75rem;">Drop your email below. That's all it takes.</p>
+          <div class="newsletter-wrap">
+            <form class="newsletter-form" aria-label="Newsletter signup" style="gap:1rem;">
+              <div>
+                <label for="visit-name" style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:rgba(245,237,215,0.5); display:block; margin-bottom:0.4rem;">First name (optional)</label>
+                <input type="text" id="visit-name" placeholder="Your name" autocomplete="given-name" style="width:100%; padding:0.75rem 1rem; background:rgba(245,237,215,0.08); border:1px solid rgba(245,237,215,0.2); border-radius:var(--radius-pill); color:var(--cream); font-family:var(--font-body); font-size:0.9rem; outline:none; transition:border-color 0.2s;">
+              </div>
+              <div>
+                <label for="visit-email" style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:rgba(245,237,215,0.5); display:block; margin-bottom:0.4rem;">Email address</label>
+                <input type="email" id="visit-email" placeholder="your@email.com" required autocomplete="email">
+              </div>
+              <button type="submit" style="margin-top:0.5rem;">Subscribe to the Newsletter</button>
+            </form>
+            <div class="newsletter-success" role="status">You're on the list. Welcome to the Juniper Lane community!</div>
+          </div>
+          <p style="font-size:0.75rem; color:rgba(245,237,215,0.3); margin-top:1.25rem; line-height:1.6;">By subscribing, you agree to receive occasional emails from Juniper Lane. We'll never share your information. Unsubscribe any time.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== CTA ========== -->
+<div class="cta-band">
+  <div class="container" style="position:relative;z-index:2;">
+    <h2>See you on Maple Street.</h2>
+    <p class="lead">Wednesday through Saturday, 10am–6pm. Sunday, 11am–4pm.<br>We'd love to help you find your next plant.</p>
+    <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+      <a href="tel:+12695550193" class="btn-white">
+        <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        (269) 555-0193
+      </a>
+      <a href="shop.html" class="btn btn-secondary" style="background:transparent; color:var(--white); border-color:rgba(255,255,255,0.5);">Browse the Shop</a>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="site-logo" style="margin-bottom:0.75rem; display:inline-flex;">
+          <svg class="logo-mark" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+            <circle cx="18" cy="18" r="17" fill="rgba(93,138,98,0.3)" stroke="#5D8A62" stroke-width="1.5"/>
+            <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#88B38D"/>
+            <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#5D8A62"/>
+          </svg>
+          <span>
+            <span class="logo-text">Juniper Lane</span>
+            <span class="logo-sub">Plant Shop &amp; Gifts</span>
+          </span>
+        </a>
+        <p class="footer-tagline">A warm neighborhood shop rooted in Benton Harbor since 2018.</p>
+      </div>
+      <div>
+        <div class="footer-heading">Explore</div>
+        <ul class="footer-links">
+          <li><a href="shop.html">Shop</a></li>
+          <li><a href="workshops.html">Workshops</a></li>
+          <li><a href="plant-care.html">Plant Care Tips</a></li>
+          <li><a href="events.html">Private Events</a></li>
+          <li><a href="visit.html">Visit Us</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-heading">Find Us</div>
+        <div class="footer-info">
+          <strong>214 Maple Street</strong><br>
+          Benton Harbor, MI 49022<br><br>
+          <strong>Wed–Sat</strong> 10am–6pm<br>
+          <strong>Sunday</strong> 11am–4pm<br>
+          Mon &amp; Tue: Closed<br><br>
+          <a href="tel:+12695550193" style="color:var(--sage-light);">(269) 555-0193</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-heading">Stay in the Loop</div>
+        <p style="font-size:0.85rem; color:rgba(245,237,215,0.6); margin-bottom:1rem; line-height:1.6;">New plants, workshop dates, and shop news.</p>
+        <div class="newsletter-wrap">
+          <form class="newsletter-form" aria-label="Newsletter signup">
+            <input type="email" placeholder="your@email.com" required autocomplete="email">
+            <button type="submit">Subscribe</button>
+          </form>
+          <div class="newsletter-success" role="status">You're on the list. See you soon!</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-copy">© 2025 Juniper Lane · 214 Maple Street, Benton Harbor, MI</span>
+      <span class="footer-copy">Made with care in Michigan</span>
+    </div>
+  </div>
+</footer>
+
+<a href="tel:+12695550193" class="mobile-phone-bar" aria-label="Call Juniper Lane">
+  <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+    <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  Call Us · (269) 555-0193
+</a>
+
+<script src="main.js"></script>
+</body>
+</html>

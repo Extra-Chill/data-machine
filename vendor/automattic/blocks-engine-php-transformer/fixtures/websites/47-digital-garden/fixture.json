@@ -1,0 +1,11 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "digital-garden",
+    "notes",
+    "blog",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 3
+}

@@ -1,0 +1,176 @@
+/* =========================================================
+   Tideglass — docs.html + about.html page styling
+   ========================================================= */
+
+.page-wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 36px 22px 80px;
+}
+
+.page-hero { margin-bottom: 8px; }
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+.page-wrap h1 {
+  font-size: clamp(30px, 5vw, 46px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+  color: var(--ink);
+}
+.page-wrap h1 em { color: var(--accent); font-style: normal; }
+.lead {
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--ink);
+  max-width: 64ch;
+}
+.lead code, .prose code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.88em;
+  color: var(--accent);
+  background: var(--panel);
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+.prose { font-size: 16px; line-height: 1.7; color: var(--ink); }
+.prose h2 {
+  font-size: 24px;
+  margin: 42px 0 12px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.prose h3 { font-size: 18px; margin: 26px 0 8px; color: var(--ink); }
+.prose p { max-width: 70ch; }
+.prose ul { max-width: 70ch; }
+.prose a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* feature grid (about) */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 28px 0;
+}
+.feature {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.feature h3 { margin: 10px 0 6px; font-size: 16px; }
+.feature p { margin: 0; font-size: 14.5px; color: var(--ink-dim); line-height: 1.55; }
+.feature svg { width: 30px; height: 30px; color: var(--accent); }
+
+/* code blocks */
+.code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--ink);
+  margin: 16px 0;
+}
+.code .c-cmd { color: var(--accent); }
+.code .c-com { color: var(--ink-dim); }
+
+/* docs: command index + cards */
+.cmd-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 20px 0 30px;
+}
+.cmd-index a {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 4px 9px;
+}
+.cmd-index a:hover { border-color: var(--accent); color: var(--accent); }
+
+.man-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+  margin: 14px 0;
+  scroll-margin-top: 78px;
+}
+.man-card h2 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  margin: 0 0 2px;
+  color: var(--accent);
+}
+.man-card .summary { color: var(--ink-dim); font-size: 14px; margin: 0 0 12px; }
+.man-card .syn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13.5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 11px;
+  display: inline-block;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.man-card .desc {
+  font-size: 14.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+.man-card .ex-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ink-dim); margin: 14px 0 4px;
+}
+.man-card .ex {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  color: var(--accent-2);
+}
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--bg-2);
+  padding: 14px 18px;
+  border-radius: 0 10px 10px 0;
+  margin: 24px 0;
+  color: var(--ink);
+}
+.callout b { color: var(--accent); }
+
+.bigcta {
+  display: inline-block;
+  margin-top: 8px;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+  text-decoration: none;
+  padding: 11px 20px;
+  border-radius: 9px;
+}
+.bigcta:hover { filter: brightness(1.08); }
+
+.kv { list-style: none; padding: 0; margin: 18px 0; }
+.kv li { display: flex; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.kv .k { width: 150px; flex: none; color: var(--ink-dim); font-size: 14px; }
+.kv .v { color: var(--ink); font-size: 14px; }

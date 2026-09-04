@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SignalForge changelog — release notes and version history for CLI and API.">
+  <title>Changelog — SignalForge Docs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="mobile-nav-toggle" id="navToggle" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <div class="overlay" id="overlay"></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <a href="index.html">
+          <svg class="sidebar-logo-mark" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="7" fill="#111512"/>
+            <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#2a352a"/>
+            <polyline points="3,16 7,16 9,10 11,22 13,16 16,16 18,8 20,24 22,16 29,16"
+              stroke="#3efb6a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="sidebar-logo-text">
+            <span class="sidebar-logo-name">SignalForge</span>
+            <span class="sidebar-logo-sub">docs</span>
+          </div>
+        </a>
+      </div>
+      <div class="sidebar-version">
+        <span class="status-dot live"></span>
+        <span class="sidebar-status-text">all systems operational</span>
+        <span class="sidebar-version-badge">v0.9.2</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <span class="nav-section-label">Docs</span>
+          <a class="nav-link" href="index.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+            Home
+          </a>
+          <a class="nav-link" href="overview.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.5"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1"/></svg>
+            Product Overview
+          </a>
+          <a class="nav-link" href="getting-started.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12L6 4l3 5 2-3 3 6"/></svg>
+            Getting Started
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Guides</span>
+          <a class="nav-link" href="incident-workflow.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2l1.5 4h4l-3.2 2.3 1.2 3.9L8 10l-3.5 2.2 1.2-3.9L2.5 6H6.5z"/></svg>
+            Incident Workflow
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Reference</span>
+          <a class="nav-link" href="api-reference.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="1.5"/><path d="M5 5V4a3 3 0 016 0v1"/><path d="M6 9h4M8 8v2"/></svg>
+            API Reference
+          </a>
+          <a class="nav-link" href="changelog.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2" width="11" height="13" rx="1.5"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>
+            Changelog
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Help</span>
+          <a class="nav-link" href="support.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 10.5v.5M8 5.5a1.5 1.5 0 011.5 1.5c0 1-1.5 1.5-1.5 2.5"/></svg>
+            Support
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        <a href="changelog.html">Releases</a>
+        <a href="support.html">Discord</a>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-breadcrumb">
+          <a href="index.html">Docs</a>
+          <span class="sep">/</span>
+          <span class="current">Changelog</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="topbar-search-btn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+            <span class="topbar-search-text">Search docs</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="page-header">
+          <div class="page-tag" style="color: var(--amber);">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="2" width="11" height="13" rx="1.5"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>
+            Changelog
+          </div>
+          <h1>Release notes</h1>
+          <p class="page-desc">
+            Version history for the SignalForge CLI and REST API. Subscribe to releases on <a href="https://github.com/signalforge/signalforge/releases">GitHub</a>.
+          </p>
+        </div>
+
+        <!-- v0.9.2 -->
+        <div class="changelog-entry" id="v092">
+          <div class="changelog-meta">
+            <div class="changelog-version">v0.9.2</div>
+            <div class="changelog-date">2024-03-10</div>
+            <div class="changelog-type-badge badge-patch">patch</div>
+          </div>
+          <div class="changelog-body">
+            <div class="changelog-title">Webhook retry logic + signal deduplication fix</div>
+
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>Webhook exponential backoff.</strong> Failed webhook deliveries are now retried with exponential backoff: 1s, 5s, 30s, 5m, 30m. Max 5 attempts per delivery. Delivery status is visible in your webhook log at <code>GET /v1/webhooks/{id}/deliveries</code>.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-fix">FIX</span>
+              <span class="change-text"><strong>Signal deduplication edge case.</strong> A race condition in the dedup layer could cause a second <code>signal.fired</code> event to be dispatched when monitors recovered and immediately re-failed within a single check window. This is now handled correctly.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-imp">IMP</span>
+              <span class="change-text"><strong>CLI <code>status</code> command latency.</strong> Reduced <code>signalforge status</code> response time by ~60% by moving monitor state reads to a read replica. Status checks now consistently complete in under 200ms.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-fix">FIX</span>
+              <span class="change-text"><strong>YAML interpolation for nested env vars.</strong> Environment variable references inside nested YAML keys (e.g., <code>destinations.url</code>) were not being interpolated in v0.9.1. Fixed.</span>
+            </div>
+
+            <div class="code-block" style="margin-top: 1rem;">
+              <div class="code-block-header">
+                <span class="code-block-filename">Upgrade</span>
+                <span class="code-block-lang">bash</span>
+                <button class="copy-btn">copy</button>
+              </div>
+              <pre><span class="hl-prompt">$</span> <span class="hl-cmd">npm</span> <span class="hl-arg">update</span> <span class="hl-flag">-g</span> <span class="hl-arg">@signalforge/cli</span>
+<span class="hl-comment"># or</span>
+<span class="hl-prompt">$</span> <span class="hl-cmd">brew</span> <span class="hl-arg">upgrade</span> <span class="hl-arg">signalforge</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- v0.9.1 -->
+        <div class="changelog-entry" id="v091">
+          <div class="changelog-meta">
+            <div class="changelog-version">v0.9.1</div>
+            <div class="changelog-date">2024-02-22</div>
+            <div class="changelog-type-badge badge-patch">patch</div>
+          </div>
+          <div class="changelog-body">
+            <div class="changelog-title">SSL monitor improvements + CLI UX polish</div>
+
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>SSL certificate chain validation.</strong> SSL monitors now verify the full certificate chain, not just the leaf certificate. Invalid intermediate CA configurations are now surfaced as a <code>cert_chain_invalid</code> signal.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-imp">IMP</span>
+              <span class="change-text"><strong><code>signalforge monitor sync --dry-run</code>.</strong> New flag shows a diff of proposed changes without applying them. Useful for CI validation.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-imp">IMP</span>
+              <span class="change-text"><strong>Better <code>signalforge init</code> output.</strong> Clearer prompts, workspace name validation, and a generated starter <code>signalforge.yml</code> that includes comments and examples.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-fix">FIX</span>
+              <span class="change-text"><strong>TCP monitor false positives in <code>eu-west-1</code>.</strong> A DNS caching issue caused TCP monitors to occasionally resolve to stale IPs from our EU probe network. Resolved by pinning probe TTL to 30s.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- v0.9.0 -->
+        <div class="changelog-entry" id="v090">
+          <div class="changelog-meta">
+            <div class="changelog-version">v0.9.0</div>
+            <div class="changelog-date">2024-01-30</div>
+            <div class="changelog-type-badge badge-release">release</div>
+          </div>
+          <div class="changelog-body">
+            <div class="changelog-title">Alert Rules Engine — composable multi-signal rules</div>
+
+            <p style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+              The biggest feature release since launch. The Alert Rules Engine lets you compose rules from multiple signal types using AND/OR logic, enabling powerful incident correlation patterns.
+            </p>
+
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>Alert Rules Engine.</strong> Define rules in <code>signalforge.yml</code> under the <code>rules:</code> key. Rules support <code>any_critical</code>, <code>all_critical</code>, <code>any_warning</code> combinators across multiple monitors. Multi-service outage detection is now a first-class primitive.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>Maintenance windows.</strong> Schedule maintenance windows via CLI or API. Signals during a maintenance window are recorded but not dispatched. Windows support one-off and recurring (cron) schedules.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>Signal acknowledgment API.</strong> <code>POST /v1/signals/{id}/acknowledge</code> lets you programmatically acknowledge signals and suppress repeat notifications. The CLI command is <code>signalforge ack &lt;signal_id&gt;</code>.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>Post-mortem generator.</strong> <code>signalforge postmortem --signal &lt;id&gt; --format markdown</code> generates a structured post-mortem template pre-populated with the signal timeline.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-imp">IMP</span>
+              <span class="change-text"><strong>Multi-region probes.</strong> All monitor types now support up to 4 concurrent probe regions (previously HTTP-only). Configure via the <code>regions</code> array in your monitor definition.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-dep">DEP</span>
+              <span class="change-text"><strong><code>notify</code> top-level key deprecated.</strong> The v0.8.x <code>notify:</code> top-level key in <code>signalforge.yml</code> is deprecated in favor of per-monitor <code>alert:</code> blocks and top-level <code>rules:</code>. It will be removed in v1.0.0. Run <code>signalforge migrate</code> to auto-upgrade your config.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- v0.8.5 -->
+        <div class="changelog-entry" id="v085">
+          <div class="changelog-meta">
+            <div class="changelog-version">v0.8.5</div>
+            <div class="changelog-date">2023-12-14</div>
+            <div class="changelog-type-badge badge-patch">patch</div>
+          </div>
+          <div class="changelog-body">
+            <div class="changelog-title">DNS monitor type + latency percentile improvements</div>
+
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>DNS monitor type.</strong> Monitor DNS resolution for any hostname. Validates record type (A, AAAA, CNAME, MX, TXT), expected value, and alerts on resolution failure or value mismatch.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-imp">IMP</span>
+              <span class="change-text"><strong>Latency percentile tracking.</strong> HTTP monitors now track and expose p50, p75, p95, and p99 latency. All four percentiles are available in the signal payload and API response. Previously only p95 was tracked.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-fix">FIX</span>
+              <span class="change-text"><strong>Body content check with JSON responses.</strong> The <code>body_contains</code> assertion was incorrectly failing on responses with compressed JSON bodies (e.g. when the server returns <code>Content-Encoding: gzip</code>). Fixed.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- v0.8.0 -->
+        <div class="changelog-entry" id="v080">
+          <div class="changelog-meta">
+            <div class="changelog-version">v0.8.0</div>
+            <div class="changelog-date">2023-11-01</div>
+            <div class="changelog-type-badge badge-release">release</div>
+          </div>
+          <div class="changelog-body">
+            <div class="changelog-title">Public launch — HTTP + TCP monitoring, webhook delivery</div>
+
+            <p style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+              Initial public release of SignalForge. This release establishes the core monitoring primitives that all future versions build on.
+            </p>
+
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>HTTP monitor.</strong> Schedule HTTP/HTTPS checks with configurable status, body, and latency assertions. Check intervals down to 30s (10s on paid plans).</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>TCP monitor.</strong> TCP port reachability checks with connection timeout tracking.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>SSL monitor.</strong> TLS certificate validity and expiry tracking with 30-day, 14-day, and 7-day warning thresholds.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>Webhook delivery.</strong> Deliver signal payloads to any HTTPS endpoint. Signed with HMAC-SHA256.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>Slack and PagerDuty integrations.</strong> First-party destination types with structured message formatting.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>CLI (<code>@signalforge/cli</code>).</strong> Config-as-code via <code>signalforge.yml</code>. Commands: <code>init</code>, <code>auth</code>, <code>monitor sync</code>, <code>status</code>, <code>signals</code>, <code>test-alert</code>.</span>
+            </div>
+            <div class="changelog-change">
+              <span class="change-type change-new">NEW</span>
+              <span class="change-text"><strong>REST API v1.</strong> Manage monitors and read signal history programmatically. Full API reference available at <a href="api-reference.html">api-reference</a>.</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding: 2rem 0; text-align: center;">
+          <p style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">
+            Older versions are archived on <a href="https://github.com/signalforge/signalforge/releases">GitHub Releases</a>.
+          </p>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-left">SignalForge v0.9.2 · MIT License</div>
+        <div class="footer-links">
+          <a href="api-reference.html">API</a>
+          <a href="changelog.html">Changelog</a>
+          <a href="support.html">Support</a>
+          <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>

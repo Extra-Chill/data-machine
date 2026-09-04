@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backpressure, or How to Say No Before You Fall Over — Cold Start</title>
+<meta name="description" content="Unbounded queues are not resilience — they're a slow-motion outage with extra latency. A practical look at backpressure, load shedding, and the art of failing on purpose.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cold Start" href="../index.xml">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="shell shell--wide masthead__inner">
+    <a class="brand" href="../index.html" aria-label="Cold Start — home">
+      <svg class="brand__mark" width="30" height="30" viewBox="0 0 32 32" role="img" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#c2410c"/>
+        <path d="M16 6c1.6 3.4 1 5.6-.8 7.6-2 2.2-2.6 4.4-1.4 7.2-3-1.4-4.4-4.2-3.6-7.4C11 17 13 18 13.2 20.4 14.6 18 13.4 15.4 16 6Z" fill="#fde7d8"/>
+        <circle cx="20.5" cy="20" r="2.3" fill="#fdba74"/>
+      </svg>
+      <span class="brand__text">
+        <span class="brand__name">Cold Start</span>
+        <span class="brand__tag">storage &amp; distributed systems</span>
+      </span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="../index.html">Home</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../about.html">About</a>
+      <a class="nav__rss" href="../index.xml" aria-label="RSS feed" title="RSS feed">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="13" r="1.6"/><path d="M2 7.3a6.7 6.7 0 0 1 6.7 6.7H6.5A4.5 4.5 0 0 0 2 9.5z"/><path d="M2 3a11 11 0 0 1 11 11h-2.2A8.8 8.8 0 0 0 2 5.2z"/></svg>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <article class="article shell">
+    <header class="article__header">
+      <div class="article__meta">
+        <a class="series-badge" href="../tags.html">Operational Reality</a>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <time datetime="2024-05-07">May 7, 2024</time>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <span>9 min read</span>
+      </div>
+      <h1 class="article__title">Backpressure, or How to Say No Before You Fall Over</h1>
+      <p class="article__dek">Unbounded queues are not resilience — they're a slow-motion outage with extra latency. A practical look at backpressure, load shedding, and the art of failing on purpose.</p>
+      <div class="byline">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#0e7490,#22d3ee)">DO</span>
+        <span>
+          <span class="byline__name">Devin Osei</span><br>
+          <span class="byline__role">Staff SRE · Toronto</span>
+        </span>
+      </div>
+    </header>
+
+    <div class="prose">
+      <p>There's a seductive lie in software design that goes: <em>if a component is too busy, just add a queue.</em> The queue absorbs the burst, the slow consumer catches up later, everyone's happy. It works beautifully in the demo. Then it meets real traffic, the queue grows without bound, latency climbs into the stratosphere, memory runs out, and the whole thing falls over.</p>
+      <p>The missing concept is <strong>backpressure</strong>: the ability of an overloaded system to push back on its producers and say <em>slow down, I can't take more right now.</em> A system without backpressure doesn't get more resilient under load. It just fails later, and worse.</p>
+
+      <h2 id="littles-law">Little's Law is not optional</h2>
+      <p>Before any of the patterns, the physics. <strong>Little's Law</strong> says:</p>
+      <pre><code>L = λ × W</code></pre>
+      <p>The number of requests in your system (<code>L</code>) equals the arrival rate (<code>λ</code>) times the average time each spends in the system (<code>W</code>). It's not a guideline; it's arithmetic. You can't cheat it.</p>
+      <p>The implication is brutal and clarifying: <strong>if arrivals outpace your service rate, the only variable left to absorb the difference is time-in-system — i.e., latency — and queue depth.</strong> Both grow without bound until something physical stops them (memory, timeouts, the heat death of the universe). A queue doesn't fix an overload; it converts it into latency and then into a crash.</p>
+      <blockquote><p>An unbounded queue is just a memory leak with good PR.</p></blockquote>
+
+      <h2 id="bound-everything">Bound everything</h2>
+      <p>Rule one of backpressure: <strong>every queue has a limit.</strong> When the limit is hit, something has to give, and you get to choose what:</p>
+      <ul>
+        <li><strong>Block the producer</strong> — the producer waits until there's room. This propagates backpressure <em>upstream</em>, which is exactly what you want in a pipeline. The slowness flows back to the source, which can then slow its own intake.</li>
+        <li><strong>Reject the request</strong> — return a <code>503</code> or <code>429</code> immediately. The producer finds out <em>now</em>, while it can still do something useful, instead of after a 30-second timeout.</li>
+        <li><strong>Drop the oldest</strong> — in some streaming workloads, stale data is worthless, so you'd rather discard old items than reject new ones.</li>
+      </ul>
+      <p>What you must <em>not</em> do is the implicit fourth option: let the queue grow until the OOM killer makes the decision for you. The OOM killer is not a load-shedding strategy.</p>
+      <p>Each choice propagates differently, and the right one depends on the shape of the work:</p>
+      <table>
+        <thead>
+          <tr><th>Strategy</th><th>What the producer sees</th><th>Best for</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Block the producer</td><td>A slow call</td><td>Pipelines where the source can slow down</td></tr>
+          <tr><td>Reject (<code>503</code>/<code>429</code>)</td><td>A fast error</td><td>Request/response APIs with retrying clients</td></tr>
+          <tr><td>Drop oldest</td><td>Silence (data lost)</td><td>Streaming where stale data is worthless</td></tr>
+          <tr><td>Let it grow (don't)</td><td>Eventually, a crash</td><td>Nothing — this is the default you must remove</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="bounded-concurrency">Bounded concurrency: the semaphore</h2>
+      <p>The cleanest way to bound work in flight is a <strong>concurrency limit</strong> — a semaphore that caps how many operations run at once. If the limit is full, new work either waits or is rejected.</p>
+      <pre><code><span class="k">import</span> asyncio
+
+semaphore = asyncio.Semaphore(<span class="n">50</span>)  <span class="c"># at most 50 concurrent calls</span>
+
+<span class="k">async def</span> <span class="f">handle</span>(request):
+    <span class="k">if</span> semaphore.locked() <span class="k">and</span> semaphore._value == <span class="n">0</span>:
+        <span class="k">raise</span> TooBusy()  <span class="c"># shed load instead of queueing forever</span>
+    <span class="k">async with</span> semaphore:
+        <span class="k">return await</span> do_work(request)</code></pre>
+      <p>The hard question is <em>what number?</em> Pick it too low and you waste capacity; too high and you're back to unbounded behavior. The right value follows from Little's Law again: it's roughly the concurrency at which latency starts climbing nonlinearly — your system's actual saturation point. Find it with a load test, not a guess. Better yet, make it <strong>adaptive</strong>: systems like Netflix's concurrency-limits library adjust the limit at runtime based on observed latency, the same way TCP congestion control adjusts its window.</p>
+
+      <h2 id="load-shedding">Load shedding: choose what to drop</h2>
+      <p>When you're genuinely over capacity, you <em>will</em> drop work. The only question is whether you drop it deliberately or chaotically. Deliberate dropping is <strong>load shedding</strong>, and the key insight is that not all requests are equal:</p>
+      <ul>
+        <li>A health check from a load balancer is cheap and important — never shed it.</li>
+        <li>A request that's already been waiting 29 seconds against a 30-second timeout is <strong>dead on arrival</strong>; doing the work just wastes capacity on a result nobody will receive. Shed it.</li>
+        <li>A low-priority batch job can wait; an interactive user request can't.</li>
+      </ul>
+      <p>Shedding the right things keeps the system useful under overload instead of uniformly broken. The cruelest failure mode is one where every request gets <em>just enough</em> service to consume resources but <em>not enough</em> to succeed — a system busily doing nothing. Good load shedding prevents exactly that.</p>
+
+      <h2 id="deadline-propagation">The deadline propagation trick</h2>
+      <p>One of my favorite cheap wins: propagate <strong>deadlines</strong> through the call chain. When a request enters with a 5-second budget, every downstream call inherits the remaining time. If a call would take a service past the deadline, it doesn't even start — it returns immediately, because the caller has already given up.</p>
+      <p>gRPC does this natively with deadlines that flow across service boundaries. The effect is that work for doomed requests gets cancelled early, freeing capacity for requests that can still succeed. It's backpressure expressed as time rather than count, and it composes beautifully across a distributed system.</p>
+
+      <h2 id="buffers-not-solutions">Queues are buffers, not solutions</h2>
+      <p>None of this means queues are bad. A bounded queue is a wonderful <strong>buffer</strong> — it smooths out short bursts so you don't reject work you could easily have handled a moment later. The distinction is:</p>
+      <ul>
+        <li>A <strong>buffer</strong> absorbs <em>transient</em> mismatches between arrival and service rate. It's small, bounded, and drains quickly.</li>
+        <li>A <strong>dam</strong> is what you've built when the queue is large and the consumer is <em>chronically</em> slower than the producer. It doesn't smooth anything; it just delays the failure and makes it bigger.</li>
+      </ul>
+      <p>If your queue depth has a healthy sawtooth — filling during bursts, draining between them — it's a buffer doing its job. If queue depth trends monotonically upward, you don't have a backpressure problem you can tune away. You have a capacity problem, and the queue is hiding it from you until the crash.</p>
+
+      <h2 id="the-mindset-shift">The mindset shift</h2>
+      <p>The hardest part of backpressure isn't technical. It's accepting that <strong>a fast <code>503</code> is a better outcome than a slow timeout.</strong> Engineers hate returning errors; it feels like giving up. But under genuine overload, an honest, immediate "no" lets the caller retry elsewhere, fail over, or degrade gracefully. A queue that swallows the request and produces a timeout 30 seconds later gives the caller nothing but wasted time.</p>
+      <blockquote><p>Saying no quickly is a feature. The systems that stay up under load are the ones that learned to refuse work <em>before</em> they fell over, not after.</p></blockquote>
+      <p>Bound your queues. Limit your concurrency. Shed deliberately. Propagate deadlines. And make peace with the <code>503</code> — it's the sound of a system protecting itself.</p>
+
+      <hr>
+      <p><em>Devin Osei keeps databases honest in Toronto. Next time you add a queue, ask him where the limit is.</em></p>
+    </div>
+
+    <footer class="article-footer">
+      <div class="tag-row">
+        <a class="tag" href="../tags.html#reliability">reliability</a>
+        <a class="tag" href="../tags.html#distributed-systems">distributed-systems</a>
+        <a class="tag" href="../tags.html#sre">sre</a>
+        <a class="tag" href="../tags.html#queues">queues</a>
+        <a class="tag" href="../tags.html#performance">performance</a>
+      </div>
+      <div class="author-box">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#0e7490,#22d3ee)">DO</span>
+        <p class="author-box__body">
+          <span class="author-box__name">Devin Osei</span><br>
+          <span class="author-box__bio">Staff SRE · Toronto. Keeps databases honest. Recovering Kubernetes operator, current believer in boring infrastructure and very loud alerts.</span>
+        </p>
+      </div>
+      <nav class="post-nav" aria-label="More posts">
+        <a href="idempotency-keys.html">
+          <span class="dir">← Previous</span>
+          <span class="ttl">Idempotency Keys</span>
+        </a>
+        <a class="next" href="consensus-without-tears.html">
+          <span class="dir">Next →</span>
+          <span class="ttl">Consensus Without Tears</span>
+        </a>
+      </nav>
+    </footer>
+  </article>
+</main>
+
+<footer class="site-foot">
+  <div class="shell shell--wide site-foot__inner">
+    <p>&copy; 2024 Cold Start · Built with <a href="https://gohugo.io/">Hugo</a> · One pager-induced essay at a time.</p>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="../about.html">About</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../index.xml">RSS</a>
+      <a href="https://github.com/coldstart-dev">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

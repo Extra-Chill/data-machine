@@ -1,0 +1,396 @@
+/* First Light — Tomas Hidalgo
+   A site about land, work, attention, and quiet things.
+   No grid. No cards. No icons. Just type.
+*/
+
+:root {
+  --ink: #1a1916;
+  --paper: #faf7ef;
+  --muted: #6a665e;
+  --rule: #d4ccba;
+  --ochre: #b08838;
+
+  --measure: 40rem;          /* ~640px */
+  --measure-wide: 46rem;
+
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1.7;
+  font-variation-settings: "opsz" 14, "wght" 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* ——— Layout shell ——— */
+
+.shell {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 6rem;
+}
+
+.shell--wide {
+  max-width: var(--measure-wide);
+}
+
+/* ——— Site head ——— */
+
+.masthead {
+  margin-bottom: 4rem;
+  padding-bottom: 0;
+}
+
+.masthead a.site-title {
+  font-family: var(--font-serif);
+  font-variation-settings: "opsz" 16, "wght" 500;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+.masthead a.site-title:hover {
+  color: var(--ochre);
+}
+
+/* ——— Links ——— */
+
+a {
+  color: var(--ochre);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  text-underline-offset: 3px;
+  transition: color 120ms ease;
+}
+
+a:hover {
+  color: var(--ink);
+}
+
+/* ——— Typography ——— */
+
+h1, h2, h3, h4 {
+  font-family: var(--font-serif);
+  font-variation-settings: "opsz" 32, "wght" 500;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 1.65rem;
+  font-variation-settings: "opsz" 36, "wght" 500;
+  margin-bottom: 0.5rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  font-variation-settings: "opsz" 20, "wght" 600;
+  margin-top: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+h3 {
+  font-size: 1rem;
+  font-variation-settings: "opsz" 16, "wght" 600;
+  margin-top: 2rem;
+  margin-bottom: 0.25rem;
+}
+
+p {
+  margin: 0 0 1.2rem 0;
+}
+
+p + p {
+  margin-top: 0;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 3rem auto;
+  width: 4rem;
+}
+
+blockquote {
+  margin: 1.5rem 0;
+  padding-left: 1.25rem;
+  border-left: 1px solid var(--rule);
+  color: var(--muted);
+  font-style: italic;
+}
+
+em {
+  font-style: italic;
+}
+
+strong {
+  font-variation-settings: "opsz" 14, "wght" 600;
+}
+
+/* ——— Meta block (mono) ——— */
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+
+.meta a {
+  color: var(--muted);
+  border-bottom-color: var(--rule);
+}
+
+.meta a:hover {
+  color: var(--ink);
+}
+
+/* ——— Index essay list ——— */
+
+.essay-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.essay-list li {
+  padding: 1.4rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.essay-list li:first-child {
+  padding-top: 0;
+}
+
+.essay-list li:last-child {
+  border-bottom: none;
+}
+
+.essay-list .title {
+  display: block;
+  font-size: 1.1rem;
+  font-variation-settings: "opsz" 18, "wght" 500;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: none;
+  margin-bottom: 0.25rem;
+}
+
+.essay-list .title:hover {
+  color: var(--ochre);
+}
+
+.essay-list .dek {
+  display: block;
+  color: var(--muted);
+  font-size: 0.98rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.essay-list .meta {
+  display: block;
+}
+
+/* ——— Year group headers in archive ——— */
+
+.year-group {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 3rem 0 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.year-group:first-of-type {
+  margin-top: 0;
+}
+
+/* ——— Bottom nav ——— */
+
+.bottom-nav {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+.bottom-nav a {
+  color: var(--ink);
+  border-bottom: 1px solid var(--rule);
+  margin-right: 1.25rem;
+}
+
+.bottom-nav a:hover {
+  color: var(--ochre);
+  border-bottom-color: var(--ochre);
+}
+
+/* ——— Essay page ——— */
+
+.essay-head {
+  margin-bottom: 2.5rem;
+}
+
+.essay-head h1 {
+  font-size: 1.9rem;
+  font-variation-settings: "opsz" 40, "wght" 500;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.005em;
+}
+
+.essay-head .meta {
+  margin-top: 0.5rem;
+}
+
+.essay-body {
+  font-size: 1.0625rem;
+  line-height: 1.78;
+}
+
+.essay-body p {
+  margin-bottom: 1.35rem;
+}
+
+/* Drop cap on first paragraph */
+.essay-body > p:first-of-type::first-letter {
+  font-family: var(--font-serif);
+  font-variation-settings: "opsz" 60, "wght" 500;
+  font-size: 3.6rem;
+  line-height: 0.9;
+  float: left;
+  padding: 0.32rem 0.55rem 0 0;
+  color: var(--ink);
+}
+
+.essay-body > p:first-of-type {
+  margin-top: 0;
+}
+
+.essay-foot {
+  margin-top: 4rem;
+}
+
+.essay-foot .colophon {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 1.5rem;
+}
+
+.essay-foot .subscribe {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.essay-foot .subscribe a {
+  color: var(--ink);
+  border-bottom-color: var(--rule);
+}
+
+.essay-foot .subscribe a:hover {
+  color: var(--ochre);
+  border-bottom-color: var(--ochre);
+}
+
+/* ——— About + Now pages ——— */
+
+.page-head {
+  margin-bottom: 2rem;
+}
+
+.page-head h1 {
+  font-size: 1.4rem;
+  font-variation-settings: "opsz" 22, "wght" 500;
+  margin-bottom: 0.25rem;
+}
+
+.page-body {
+  font-size: 1.03rem;
+  line-height: 1.75;
+}
+
+.page-body p {
+  margin-bottom: 1.25rem;
+}
+
+.page-body h2 {
+  font-size: 1.02rem;
+  margin-top: 2rem;
+  margin-bottom: 0.4rem;
+  font-variation-settings: "opsz" 16, "wght" 600;
+}
+
+/* ——— Site foot (one tiny line) ——— */
+
+.site-foot {
+  margin-top: 5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.site-foot a {
+  color: var(--muted);
+  border-bottom-color: var(--rule);
+}
+
+.site-foot a:hover {
+  color: var(--ink);
+}
+
+/* ——— Selection ——— */
+
+::selection {
+  background: var(--ochre);
+  color: var(--paper);
+}
+
+/* ——— Print ——— */
+
+@media print {
+  html {
+    background: #fff;
+    color: #000;
+    font-size: 12pt;
+  }
+  .masthead, .bottom-nav, .site-foot {
+    display: none;
+  }
+  a {
+    color: #000;
+    border-bottom: none;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "docs",
+    "design-system",
+    "component-library",
+    "mdx",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 3
+}

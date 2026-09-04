@@ -1,0 +1,11 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "data-viz",
+    "charts",
+    "studio",
+    "canvas",
+    "app"
+  ],
+  "complexity": 4
+}

@@ -1,0 +1,13 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "magazine",
+    "editorial",
+    "news",
+    "blog",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

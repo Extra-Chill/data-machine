@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Forkbench, the live code playground</title>
+  <meta name="description" content="Forkbench is a fully client-side code playground. Edit HTML, CSS, and JavaScript and watch it run live in a sandboxed iframe with a captured console.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="is-page">
+
+  <header class="page-header">
+    <div class="inner">
+      <a href="index.html" class="logo" aria-label="Forkbench home">
+        <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M6 9 L2 16 L6 23" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M26 9 L30 16 L26 23" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M19 6 L13 26" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <span class="logo-word">Fork<b>bench</b></span>
+      </a>
+      <nav class="page-nav" aria-label="Primary">
+        <a href="index.html">Editor</a>
+        <a href="templates.html">Templates</a>
+        <a href="about.html" class="active" aria-current="page">About</a>
+        <a href="index.html" class="cta">Open editor →</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero page-wrap">
+      <p class="eyebrow">What is this?</p>
+      <h1>Write the front end. <em>Watch it run.</em></h1>
+      <p class="lead">Forkbench is an in-browser code playground. You type HTML, CSS, and JavaScript into three editor panes, and a sandboxed preview re-runs your code live as you go. There's a captured console for your <code style="color:var(--accent)">console.log()</code> calls and runtime errors, draggable layout, autosave, shareable links, and one-click export. The entire thing runs client-side — open <code style="color:var(--accent)">index.html</code> and it just works.</p>
+    </section>
+
+    <section class="section page-wrap">
+      <h2>What's inside</h2>
+      <p class="sub">Everything is hand-built vanilla JavaScript — no editor library, no framework, no build step.</p>
+      <div class="about-grid">
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/><line x1="13" y1="4" x2="11" y2="20"/></svg>
+          <h3>A real editor</h3>
+          <p>A textarea with a syntax-highlighted overlay, line numbers, tab-to-indent, bracket and quote auto-pairing, and a current-line highlight — written from scratch.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8M12 18v2"/></svg>
+          <h3>Live sandboxed preview</h3>
+          <p>Your three sources are assembled into an <code>iframe</code> with <code>srcdoc</code> and a <code>sandbox</code> attribute, debounced so it re-runs smoothly as you type.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="4 7 9 12 4 17"/><line x1="12" y1="17" x2="20" y2="17"/></svg>
+          <h3>Captured console</h3>
+          <p>A tiny shim inside the preview forwards <code>console.log/warn/error</code> and uncaught errors to a console panel over <code>postMessage</code>.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="8" height="18" rx="1.5"/><rect x="13" y="3" width="8" height="18" rx="1.5"/></svg>
+          <h3>Rearrangeable layout</h3>
+          <p>Drag the splitters, switch between side-by-side and stacked, and toggle individual panes on or off. Keyboard-resizable too.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg>
+          <h3>Autosave &amp; sharing</h3>
+          <p>Your pen autosaves to <code>localStorage</code>. Share encodes the whole pen into the URL hash; export downloads a single combined HTML file.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          <h3>Starter templates</h3>
+          <p>Six ready-to-run pens — a CSS aurora, a canvas sketch, an SVG clock, a to-do app and more — one click from the <a href="templates.html" style="color:var(--accent)">gallery</a>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section page-wrap">
+      <h2>How a run actually happens</h2>
+      <p class="sub">Four steps, all in the browser, every time you (auto-)run.</p>
+      <div class="steps">
+        <div class="step"><div><h3>You edit a pane</h3><p>An <code>input</code> event updates the pen object and, with auto-run on, schedules a debounced run 600&nbsp;ms later.</p></div></div>
+        <div class="step"><div><h3>The document is assembled</h3><p>HTML, a <code>&lt;style&gt;</code> from your CSS, the console shim, and your JS are stitched into one document string.</p></div></div>
+        <div class="step"><div><h3>The iframe re-runs</h3><p>Assigning <code>iframe.srcdoc</code> tears down and recreates the preview document, cleanly restarting timers and animation loops.</p></div></div>
+        <div class="step"><div><h3>Output flows back</h3><p>The shim posts each console call to the parent window, which renders it in the console panel with level-based styling and filters.</p></div></div>
+      </div>
+    </section>
+
+    <section class="section page-wrap">
+      <h2>Keyboard shortcuts</h2>
+      <p class="sub">The editor is fully keyboard-driven.</p>
+      <table class="kbd-table">
+        <tbody>
+          <tr><td><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd></td><td>Run the pen now (also clears the console)</td></tr>
+          <tr><td><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>S</kbd></td><td>Force-save the pen to local storage</td></tr>
+          <tr><td><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>K</kbd></td><td>Clear the console</td></tr>
+          <tr><td><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></td><td>Focus the HTML / CSS / JS pane</td></tr>
+          <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd></td><td>Indent / dedent (works on a selection too)</td></tr>
+          <tr><td><kbd>(</kbd> <kbd>[</kbd> <kbd>{</kbd> <kbd>"</kbd> <kbd>'</kbd> <kbd>`</kbd></td><td>Auto-pair, or wrap the current selection</td></tr>
+          <tr><td><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd></td><td>Resize a focused splitter</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section page-wrap">
+      <h2>Common questions</h2>
+      <div class="faq">
+        <details open>
+          <summary>Where is my code stored?</summary>
+          <p>Only in your own browser. The current pen is autosaved to <code>localStorage</code>, and shared links carry the code in the URL itself. Nothing is sent to a server — there isn't one.</p>
+        </details>
+        <details>
+          <summary>Is the preview safe?</summary>
+          <p>Your JavaScript runs inside a sandboxed <code>&lt;iframe&gt;</code>. It can script, show modals, and submit forms within itself, but it is isolated from the Forkbench app shell. The only channel between them is the console <code>postMessage</code> bridge.</p>
+        </details>
+        <details>
+          <summary>Can I use an external library?</summary>
+          <p>Add a <code>&lt;script src="…"&gt;</code> tag in the HTML pane and it will load inside the preview, just like a normal page — assuming you're online. The editor itself ships with zero dependencies.</p>
+        </details>
+        <details>
+          <summary>What does Export give me?</summary>
+          <p>A single self-contained <code>.html</code> file with your CSS inlined in a <code>&lt;style&gt;</code> and your JS in a <code>&lt;script&gt;</code> — open it anywhere, no Forkbench required.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <div class="inner">
+      <span>© <span id="year">2026</span> Forkbench · Built with vanilla HTML, CSS &amp; JS. No frameworks were harmed.</span>
+      <span><a href="index.html">Editor</a> · <a href="templates.html">Templates</a></span>
+    </div>
+  </footer>
+
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

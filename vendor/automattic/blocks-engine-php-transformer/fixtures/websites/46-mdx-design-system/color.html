@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Color · Halo UI</title>
+  <meta name="description" content="The Halo UI palette, semantic color roles, and the WCAG AA contrast rules every Lumen Labs product must follow." />
+  <link rel="stylesheet" href="css/halo.css" />
+</head>
+<body>
+  <div class="sidebar-backdrop"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <a class="sidebar__brand" href="index.html">Halo&nbsp;UI</a>
+      <p class="sidebar__version">v2.4.0 · MIT · @halo-ui/react</p>
+      <nav class="nav-group" aria-label="Overview"><p class="nav-group__title">Overview</p><a class="nav-link" href="index.html">Halo UI</a></nav>
+      <nav class="nav-group" aria-label="Foundations"><p class="nav-group__title">Foundations</p><a class="nav-link" href="color.html">Color</a><a class="nav-link" href="typography.html">Typography</a></nav>
+      <nav class="nav-group" aria-label="Components"><p class="nav-group__title">Components</p><a class="nav-link" href="button.html">Button</a><a class="nav-link" href="input.html">Input</a><a class="nav-link" href="modal.html">Modal</a><a class="nav-link" href="card.html">Card</a></nav>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn mobile-nav-toggle" id="nav-toggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <span class="topbar__crumb">Foundations / <strong>Color</strong></span>
+        <span class="topbar__spacer"></span>
+        <button class="search-btn" data-palette-open aria-label="Search documentation"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><span class="search-btn__text">Search docs…</span><kbd>⌘K</kbd></button>
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle color theme"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke-linecap="round"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 14.5A8 8 0 119.5 4a6.5 6.5 0 0010.5 10.5z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/lumen-labs/halo-ui" target="_blank" rel="noopener" aria-label="GitHub repository"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0112 6.8c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.58.69.48A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"/></svg></a>
+      </header>
+
+      <article class="doc">
+        <header class="doc__header">
+          <p class="doc__eyebrow">Foundations</p>
+          <h1>Color</h1>
+          <p class="doc__lede">The Halo UI palette, semantic color roles, and the contrast rules every product must follow.</p>
+          <span class="badge badge--stable">stable</span>
+        </header>
+
+        <p>Color in Halo UI is expressed in two layers. The <strong>base palette</strong> is a fixed set of perceptually-even ramps. <strong>Semantic roles</strong> map those ramps to meaning — <code>surface</code>, <code>text</code>, <code>border</code>, <code>brand</code>, <code>danger</code> — so a product never references a raw hex value directly.</p>
+
+        <h2 id="brand-ramp">Brand ramp</h2>
+        <p>Indigo is the Lumen Labs brand color. The <code>600</code> step is the default interactive fill; <code>700</code> is its hover state; <code>100</code> is the soft background used by <code>soft</code> variants.</p>
+        <div class="swatch-grid">
+          <figure class="swatch"><div class="swatch__chip" style="background:#e0e1fb;color:#0b0d17"><span class="swatch__hex">#E0E1FB</span></div><figcaption class="swatch__meta"><span class="swatch__name">indigo/100</span><code class="swatch__token">--halo-color-indigo-100</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#a5a8f4;color:#0b0d17"><span class="swatch__hex">#A5A8F4</span></div><figcaption class="swatch__meta"><span class="swatch__name">indigo/300</span><code class="swatch__token">--halo-color-indigo-300</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#6366f1;color:#f4f5fb"><span class="swatch__hex">#6366F1</span></div><figcaption class="swatch__meta"><span class="swatch__name">indigo/500</span><code class="swatch__token">--halo-color-indigo-500</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#4f46e5;color:#f4f5fb"><span class="swatch__hex">#4F46E5</span></div><figcaption class="swatch__meta"><span class="swatch__name">indigo/600</span><code class="swatch__token">--halo-color-indigo-600</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#4338ca;color:#f4f5fb"><span class="swatch__hex">#4338CA</span></div><figcaption class="swatch__meta"><span class="swatch__name">indigo/700</span><code class="swatch__token">--halo-color-indigo-700</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#272461;color:#f4f5fb"><span class="swatch__hex">#272461</span></div><figcaption class="swatch__meta"><span class="swatch__name">indigo/900</span><code class="swatch__token">--halo-color-indigo-900</code></figcaption></figure>
+        </div>
+
+        <h2 id="status-ramps">Status ramps</h2>
+        <p>Status colors are never used decoratively. Reserve them for the meaning they encode: success, caution, and error.</p>
+        <div class="swatch-grid">
+          <figure class="swatch"><div class="swatch__chip" style="background:#10b981;color:#0b0d17"><span class="swatch__hex">#10B981</span></div><figcaption class="swatch__meta"><span class="swatch__name">emerald/500</span><code class="swatch__token">--halo-color-emerald-500</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#047857;color:#f4f5fb"><span class="swatch__hex">#047857</span></div><figcaption class="swatch__meta"><span class="swatch__name">emerald/700</span><code class="swatch__token">--halo-color-emerald-700</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#f59e0b;color:#0b0d17"><span class="swatch__hex">#F59E0B</span></div><figcaption class="swatch__meta"><span class="swatch__name">amber/500</span><code class="swatch__token">--halo-color-amber-500</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#b45309;color:#f4f5fb"><span class="swatch__hex">#B45309</span></div><figcaption class="swatch__meta"><span class="swatch__name">amber/700</span><code class="swatch__token">--halo-color-amber-700</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#f43f5e;color:#f4f5fb"><span class="swatch__hex">#F43F5E</span></div><figcaption class="swatch__meta"><span class="swatch__name">rose/500</span><code class="swatch__token">--halo-color-rose-500</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#be123c;color:#f4f5fb"><span class="swatch__hex">#BE123C</span></div><figcaption class="swatch__meta"><span class="swatch__name">rose/700</span><code class="swatch__token">--halo-color-rose-700</code></figcaption></figure>
+        </div>
+
+        <h2 id="neutrals">Neutrals</h2>
+        <p>The neutral ramp carries text, surfaces, and borders. It is very slightly cool-tinted (a touch of indigo) so it never reads as muddy beside the brand.</p>
+        <div class="swatch-grid">
+          <figure class="swatch"><div class="swatch__chip" style="background:#ffffff;color:#0b0d17;box-shadow:inset 0 0 0 1px #eef0f6"><span class="swatch__hex">#FFFFFF</span></div><figcaption class="swatch__meta"><span class="swatch__name">slate/0</span><code class="swatch__token">--halo-color-slate-0</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#eef0f6;color:#0b0d17"><span class="swatch__hex">#EEF0F6</span></div><figcaption class="swatch__meta"><span class="swatch__name">slate/100</span><code class="swatch__token">--halo-color-slate-100</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#c3c8d9;color:#0b0d17"><span class="swatch__hex">#C3C8D9</span></div><figcaption class="swatch__meta"><span class="swatch__name">slate/300</span><code class="swatch__token">--halo-color-slate-300</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#7c849c;color:#f4f5fb"><span class="swatch__hex">#7C849C</span></div><figcaption class="swatch__meta"><span class="swatch__name">slate/500</span><code class="swatch__token">--halo-color-slate-500</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#3d4256;color:#f4f5fb"><span class="swatch__hex">#3D4256</span></div><figcaption class="swatch__meta"><span class="swatch__name">slate/700</span><code class="swatch__token">--halo-color-slate-700</code></figcaption></figure>
+          <figure class="swatch"><div class="swatch__chip" style="background:#0b0d17;color:#f4f5fb"><span class="swatch__hex">#0B0D17</span></div><figcaption class="swatch__meta"><span class="swatch__name">slate/900</span><code class="swatch__token">--halo-color-slate-900</code></figcaption></figure>
+        </div>
+
+        <h2 id="semantic-roles">Semantic roles</h2>
+        <p>Components consume roles, not ramp steps. This indirection is what lets a single theme swap recolor the whole system.</p>
+        <table>
+          <thead><tr><th>Role</th><th>Light theme</th><th>Dark theme</th></tr></thead>
+          <tbody>
+            <tr><td><code>--halo-surface</code></td><td><code>slate/0</code></td><td><code>slate/900</code></td></tr>
+            <tr><td><code>--halo-surface-raised</code></td><td><code>slate/0</code></td><td><code>#14172a</code></td></tr>
+            <tr><td><code>--halo-text</code></td><td><code>slate/900</code></td><td><code>slate/100</code></td></tr>
+            <tr><td><code>--halo-text-muted</code></td><td><code>slate/500</code></td><td><code>slate/300</code></td></tr>
+            <tr><td><code>--halo-border</code></td><td><code>slate/100</code></td><td><code>#262a40</code></td></tr>
+            <tr><td><code>--halo-brand</code></td><td><code>indigo/600</code></td><td><code>indigo/500</code></td></tr>
+            <tr><td><code>--halo-danger</code></td><td><code>rose/700</code></td><td><code>rose/500</code></td></tr>
+          </tbody>
+        </table>
+
+        <aside class="callout callout--warning" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 6v3.2M8 11v.4" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Never hard-code hex</p><div class="callout__content">If you find yourself writing <code>color: #4f46e5</code> in a product, that's a bug. Use <code>var(--halo-brand)</code>. Hard-coded values break theming and silently fail the high-contrast theme audit.</div></div>
+        </aside>
+
+        <h2 id="contrast-requirements">Contrast requirements</h2>
+        <p>Every text/background pairing in a Halo UI product must meet <strong>WCAG 2.2 AA</strong>: 4.5:1 for body text, 3:1 for large text (≥ 24px, or 19px bold) and for the focus ring against adjacent colors. The token build runs a contrast check on every semantic pairing and fails CI if a combination drops below threshold.</p>
+
+        <div class="dodont">
+          <div class="dodont__card dodont__card--do"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>Do</span><p>Pair <code>--halo-text</code> on <code>--halo-surface</code> (16.1:1) for body copy.</p></div>
+          <div class="dodont__card dodont__card--dont"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>Don't</span><p>Put <code>slate/500</code> text on a <code>slate/100</code> background — that's only 3.0:1 and fails AA for body text.</p></div>
+        </div>
+
+        <aside class="callout callout--info" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 5.5v.5" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Note</p><div class="callout__content">Want the full numeric matrix? Run <code>pnpm tokens:build</code> and open <code>tokens/report/contrast.html</code> — it grades all 612 role pairings.</div></div>
+        </aside>
+      </article>
+
+      <aside class="toc" aria-label="On this page">
+        <p class="toc__title">On this page</p>
+        <ul>
+          <li class="toc__item toc__item--h2"><a href="#brand-ramp">Brand ramp</a></li>
+          <li class="toc__item toc__item--h2"><a href="#status-ramps">Status ramps</a></li>
+          <li class="toc__item toc__item--h2"><a href="#neutrals">Neutrals</a></li>
+          <li class="toc__item toc__item--h2"><a href="#semantic-roles">Semantic roles</a></li>
+          <li class="toc__item toc__item--h2"><a href="#contrast-requirements">Contrast requirements</a></li>
+        </ul>
+      </aside>
+
+      <footer class="doc-footer">
+        <div>Halo UI v2.4.0 · MIT License · Built with Astro + MDX</div>
+        <div class="doc-footer__links"><a href="https://github.com/lumen-labs/halo-ui">GitHub</a><a href="typography.html">Typography →</a></div>
+      </footer>
+    </div>
+  </div>
+
+  <div class="palette-backdrop" id="palette">
+    <div class="palette" role="dialog" aria-label="Search documentation">
+      <div class="palette__input-wrap"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input class="palette__input" type="text" placeholder="Search components, tokens, foundations…" aria-label="Search" autocomplete="off" spellcheck="false" /></div>
+      <div class="palette__results"></div>
+      <div class="palette__hint"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+    </div>
+  </div>
+  <script src="js/halo.js"></script>
+</body>
+</html>

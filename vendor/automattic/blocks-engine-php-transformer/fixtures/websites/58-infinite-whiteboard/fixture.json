@@ -1,0 +1,11 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "whiteboard",
+    "diagramming",
+    "canvas",
+    "app",
+    "productivity"
+  ],
+  "complexity": 4
+}

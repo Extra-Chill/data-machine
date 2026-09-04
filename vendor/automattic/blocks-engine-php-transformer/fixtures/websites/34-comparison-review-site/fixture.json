@@ -1,0 +1,13 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "review",
+    "comparison",
+    "blog",
+    "affiliate",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

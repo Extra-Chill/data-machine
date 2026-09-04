@@ -1,0 +1,12 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "docs",
+    "documentation",
+    "content-collection",
+    "has-nav",
+    "multipage",
+    "sidebar"
+  ],
+  "complexity": 3
+}

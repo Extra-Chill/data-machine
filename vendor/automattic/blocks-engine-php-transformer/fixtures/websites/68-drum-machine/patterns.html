@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kits &amp; Grooves — Pulseforge RB-16 Drum Machine</title>
+  <meta name="description" content="Browse the Pulseforge RB-16 factory kits (808, 909, Acoustic, LoFi, Trap, Industrial) and grooves (four-on-the-floor, boom-bap, breakbeat, trap roll and more). Audition each one right in the page, then load it into the machine.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Pulseforge home">
+      <span class="logo-mark">Pulseforge<span class="dot">◉</span></span>
+      <span class="logo-sub">Rhythm Machines</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Machine</a>
+      <a href="patterns.html" class="active">Kits &amp; Grooves</a>
+      <a href="about.html">How it works</a>
+      <a href="index.html" class="nav-cta">Open the machine</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+  </header>
+
+  <main class="wrap content-page">
+
+    <div class="page-hero">
+      <p class="eyebrow">RB-16 · Sound Library</p>
+      <h1 class="page-title">Kits &amp; <em>grooves.</em></h1>
+      <p class="page-lead">Everything here is synthesized on the fly — no audio files anywhere. Tap a voice to hear it, or hit a groove to loop it right in the page. Open the machine to program your own.</p>
+    </div>
+
+    <section class="lib-section">
+      <h2 class="sec-title">Drum voices</h2>
+      <p class="sec-lead">Ten voices, each built from oscillators and filtered noise. Tap to audition them on the bright 909 kit.</p>
+      <div class="voice-grid">
+        <button class="voice-card" data-voice-demo="kick"><span class="vc-dot" style="--c:#ff5c7c"></span><b>Kick</b><span class="vc-desc">Pitch-swept sine + click</span></button>
+        <button class="voice-card" data-voice-demo="snare"><span class="vc-dot" style="--c:#ffc857"></span><b>Snare</b><span class="vc-desc">Tone body + filtered noise</span></button>
+        <button class="voice-card" data-voice-demo="clap"><span class="vc-dot" style="--c:#ffa14a"></span><b>Clap</b><span class="vc-desc">Three noise bursts + tail</span></button>
+        <button class="voice-card" data-voice-demo="rim"><span class="vc-dot" style="--c:#9be15d"></span><b>Rimshot</b><span class="vc-desc">Detuned square pulses</span></button>
+        <button class="voice-card" data-voice-demo="closed"><span class="vc-dot" style="--c:#5ad7ff"></span><b>Closed Hat</b><span class="vc-desc">Six squares + highpass</span></button>
+        <button class="voice-card" data-voice-demo="open"><span class="vc-dot" style="--c:#56c2ff"></span><b>Open Hat</b><span class="vc-desc">Long metallic noise</span></button>
+        <button class="voice-card" data-voice-demo="lowtom"><span class="vc-dot" style="--c:#c084fc"></span><b>Low Tom</b><span class="vc-desc">Falling sine + noise</span></button>
+        <button class="voice-card" data-voice-demo="hitom"><span class="vc-dot" style="--c:#d8a0ff"></span><b>High Tom</b><span class="vc-desc">Falling sine + noise</span></button>
+        <button class="voice-card" data-voice-demo="cowbell"><span class="vc-dot" style="--c:#ffe066"></span><b>Cowbell</b><span class="vc-desc">Two squares + bandpass</span></button>
+        <button class="voice-card" data-voice-demo="cymbal"><span class="vc-dot" style="--c:#7ee8c0"></span><b>Crash</b><span class="vc-desc">Dense inharmonic squares</span></button>
+      </div>
+    </section>
+
+    <section class="lib-section">
+      <h2 class="sec-title">Factory kits</h2>
+      <p class="sec-lead">Each kit re-tunes every voice. The same beat sounds completely different across kits — that's the point of a drum machine.</p>
+      <div class="kit-grid" id="kit-cards"></div>
+    </section>
+
+    <section class="lib-section" id="grooves">
+      <h2 class="sec-title">Factory grooves</h2>
+      <p class="sec-lead">Press a groove to loop it in the browser. Each loops with its own tempo, swing and kit. Press again to stop.</p>
+      <div class="groove-grid" id="groove-cards"></div>
+    </section>
+
+    <section class="cta-band">
+      <h2>Make your own</h2>
+      <p>Pick a kit, tweak the voices, draw a beat across sixteen steps and chain patterns into a song — all in the browser, all synthesized live.</p>
+      <a href="index.html" class="btn btn-primary">◉ Open the RB-16</a>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-bottom" style="border:none;padding-top:0;">
+        <p class="footer-copy">© <span data-year>2026</span> Pulseforge Instruments · Built on the open web</p>
+        <div class="footer-legal"><a href="index.html">Machine</a><a href="about.html">How it works</a><a href="mailto:hello@pulseforge.audio">Contact</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/engine.js"></script>
+  <script src="js/kits.js"></script>
+  <script src="js/site.js"></script>
+  <script>
+    // Render kit + groove cards from the shared data.
+    (function () {
+      var K = window.PulseforgeKits;
+      if (!K) return;
+      var kitHost = document.getElementById('kit-cards');
+      K.KITS.forEach(function (kit) {
+        var card = document.createElement('article');
+        card.className = 'kit-card';
+        var voices = Object.keys(kit.params || {}).length;
+        card.innerHTML =
+          '<div class="kit-card-top"><h3>' + kit.name + '</h3><span class="kit-tag">' + kit.id.toUpperCase() + '</span></div>' +
+          '<p>' + kit.blurb + '</p>' +
+          '<p class="kit-meta mono">' + voices + ' voices re-tuned</p>' +
+          '<a class="card-link" href="index.html">Load in the machine →</a>';
+        kitHost.appendChild(card);
+      });
+
+      var grooveHost = document.getElementById('groove-cards');
+      K.GROOVES.forEach(function (gr) {
+        var card = document.createElement('article');
+        card.className = 'groove-card';
+        // mini 16-step preview of the kick + snare + hat lanes
+        var lanes = ['kick', 'snare', 'closed'];
+        var mini = lanes.map(function (id) {
+          var cells = '';
+          var pat = gr.grid[id] || '';
+          for (var i = 0; i < 16; i++) {
+            var ch = pat[i] || '-';
+            var on = (ch === 'x' || ch === 'X' || ch === 'o' || ch === 'O' || ch === 'A');
+            cells += '<span class="mc' + (on ? ' on' : '') + (i % 4 === 0 ? ' beat' : '') + '"></span>';
+          }
+          return '<div class="mini-lane"><span class="ml-lab">' + id.slice(0, 2).toUpperCase() + '</span><div class="ml-cells">' + cells + '</div></div>';
+        }).join('');
+        card.innerHTML =
+          '<div class="groove-card-top"><h3>' + gr.name + '</h3>' +
+          '<button class="audition-btn" data-groove="' + gr.id + '" aria-label="Audition ' + gr.name + '"><span class="pl"></span><span class="lbl">Play</span></button></div>' +
+          '<p>' + gr.blurb + '</p>' +
+          '<div class="mini-grid">' + mini + '</div>' +
+          '<p class="groove-meta mono">' + gr.bpm + ' BPM' + (gr.swing ? ' · ' + Math.round(gr.swing * 100) + '% swing' : '') + ' · ' + gr.kit.toUpperCase() + ' kit</p>';
+        grooveHost.appendChild(card);
+      });
+    })();
+  </script>
+</body>
+</html>

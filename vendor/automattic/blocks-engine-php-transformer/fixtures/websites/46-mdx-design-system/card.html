@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Card · Halo UI</title>
+  <meta name="description" content="The Halo UI Card — a flexible raised surface that groups related content and actions. Props, guidelines, and accessibility." />
+  <link rel="stylesheet" href="css/halo.css" />
+</head>
+<body>
+  <div class="sidebar-backdrop"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <a class="sidebar__brand" href="index.html">Halo&nbsp;UI</a>
+      <p class="sidebar__version">v2.4.0 · MIT · @halo-ui/react</p>
+      <nav class="nav-group" aria-label="Overview"><p class="nav-group__title">Overview</p><a class="nav-link" href="index.html">Halo UI</a></nav>
+      <nav class="nav-group" aria-label="Foundations"><p class="nav-group__title">Foundations</p><a class="nav-link" href="color.html">Color</a><a class="nav-link" href="typography.html">Typography</a></nav>
+      <nav class="nav-group" aria-label="Components"><p class="nav-group__title">Components</p><a class="nav-link" href="button.html">Button</a><a class="nav-link" href="input.html">Input</a><a class="nav-link" href="modal.html">Modal</a><a class="nav-link" href="card.html">Card</a></nav>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn mobile-nav-toggle" id="nav-toggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <span class="topbar__crumb">Components / <strong>Card</strong></span>
+        <span class="topbar__spacer"></span>
+        <button class="search-btn" data-palette-open aria-label="Search documentation"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><span class="search-btn__text">Search docs…</span><kbd>⌘K</kbd></button>
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle color theme"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke-linecap="round"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 14.5A8 8 0 119.5 4a6.5 6.5 0 0010.5 10.5z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/lumen-labs/halo-ui" target="_blank" rel="noopener" aria-label="GitHub repository"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0112 6.8c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.58.69.48A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"/></svg></a>
+      </header>
+
+      <article class="doc">
+        <header class="doc__header">
+          <p class="doc__eyebrow">Components</p>
+          <h1>Card</h1>
+          <p class="doc__lede">A flexible surface that groups related content and actions into a single visual unit.</p>
+          <span class="badge badge--stable">stable</span>
+        </header>
+
+        <div class="doc__meta">
+          <span>Since <code>1.2.0</code></span>
+          <span>A11y: WCAG 2.2 AA · whole-card link pattern verified</span>
+          <span>Source: <code>packages/react/src/Card/Card.tsx</code></span>
+          <span><a href="https://www.figma.com/file/halo-ui/components" target="_blank" rel="noopener">Figma ↗</a></span>
+        </div>
+
+        <p>A <code>Card</code> is a raised surface that bundles related information — a header, body, and optional footer — into one scannable unit. It's the building block for dashboards, settings panels, and content grids.</p>
+
+        <h2 id="example">Example</h2>
+        <div class="code-preview">
+          <div class="code-preview__stage">
+            <article class="halo-card" style="max-width:320px;width:100%">
+              <header class="halo-card__header"><h3 style="margin:0">Production cluster</h3><span class="badge badge--stable">Healthy</span></header>
+              <div class="halo-card__body"><p style="margin:0">12 nodes · 99.98% uptime over the last 30 days.</p></div>
+              <footer class="halo-card__footer">View metrics →</footer>
+            </article>
+          </div>
+          <div class="code-preview__panel"><div class="code-preview__bar"><span class="code-preview__lang">html</span><button class="code-preview__copy" type="button">Copy</button></div>
+          <pre class="code-preview__code"><code><span class="tok-punc">&lt;</span><span class="tok-tag">article</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-card"</span><span class="tok-punc">&gt;</span>
+  <span class="tok-punc">&lt;</span><span class="tok-tag">header</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-card__header"</span><span class="tok-punc">&gt;</span>
+    <span class="tok-punc">&lt;</span><span class="tok-tag">h3</span><span class="tok-punc">&gt;</span>Production cluster<span class="tok-punc">&lt;/</span><span class="tok-tag">h3</span><span class="tok-punc">&gt;</span>
+    <span class="tok-punc">&lt;</span><span class="tok-tag">span</span> <span class="tok-attr">class</span>=<span class="tok-str">"badge badge--stable"</span><span class="tok-punc">&gt;</span>Healthy<span class="tok-punc">&lt;/</span><span class="tok-tag">span</span><span class="tok-punc">&gt;</span>
+  <span class="tok-punc">&lt;/</span><span class="tok-tag">header</span><span class="tok-punc">&gt;</span>
+  <span class="tok-punc">&lt;</span><span class="tok-tag">div</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-card__body"</span><span class="tok-punc">&gt;</span>
+    <span class="tok-punc">&lt;</span><span class="tok-tag">p</span><span class="tok-punc">&gt;</span>12 nodes · 99.98% uptime over the last 30 days.<span class="tok-punc">&lt;/</span><span class="tok-tag">p</span><span class="tok-punc">&gt;</span>
+  <span class="tok-punc">&lt;/</span><span class="tok-tag">div</span><span class="tok-punc">&gt;</span>
+  <span class="tok-punc">&lt;</span><span class="tok-tag">footer</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-card__footer"</span><span class="tok-punc">&gt;</span>View metrics →<span class="tok-punc">&lt;/</span><span class="tok-tag">footer</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;/</span><span class="tok-tag">article</span><span class="tok-punc">&gt;</span></code></pre></div>
+        </div>
+
+        <h2 id="props">Props</h2>
+        <div class="props-table-wrap" role="region" aria-label="Component props">
+          <table class="props-table">
+            <thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code class="prop-name">elevation</code></td><td><code class="prop-type">'flat' | 'raised'</code></td><td><code class="prop-default">'raised'</code></td><td>Flat draws a border; raised adds a shadow.</td></tr>
+              <tr><td><code class="prop-name">interactive</code></td><td><code class="prop-type">boolean</code></td><td><code class="prop-default">false</code></td><td>Adds hover/focus affordance for clickable cards.</td></tr>
+              <tr><td><code class="prop-name">as</code></td><td><code class="prop-type">ElementType</code></td><td><code class="prop-default">'div'</code></td><td>Polymorphic root element (e.g. article, a).</td></tr>
+              <tr><td><code class="prop-name">padding</code><span class="prop-required" title="Required">*</span></td><td><code class="prop-type">'none' | 'sm' | 'md' | 'lg'</code></td><td><code class="prop-default">'md'</code></td><td>Inner spacing of the card body.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="guidelines">Guidelines</h2>
+        <div class="dodont">
+          <div class="dodont__card dodont__card--do"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>Do</span><p>Keep one clear primary action per card.</p></div>
+          <div class="dodont__card dodont__card--dont"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>Don't</span><p>Nest cards inside cards — flatten the hierarchy instead.</p></div>
+        </div>
+
+        <h2 id="accessibility">Accessibility</h2>
+        <ul>
+          <li>A whole-card link uses the "pseudo-content" pattern: a single <code>&lt;a&gt;</code> stretched over the card with <code>::after</code>, so the entire surface is one accessible target.</li>
+          <li>When <code>interactive</code>, the card is keyboard-focusable and shows the standard <code>--halo-focus-ring</code>.</li>
+        </ul>
+
+        <aside class="callout callout--info" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 5.5v.5" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Note</p><div class="callout__content">For a grid of cards, wrap them in a <code>&lt;ul&gt;</code> of <code>&lt;li&gt;</code> items so screen readers announce the count.</div></div>
+        </aside>
+      </article>
+
+      <aside class="toc" aria-label="On this page">
+        <p class="toc__title">On this page</p>
+        <ul>
+          <li class="toc__item toc__item--h2"><a href="#example">Example</a></li>
+          <li class="toc__item toc__item--h2"><a href="#props">Props</a></li>
+          <li class="toc__item toc__item--h2"><a href="#guidelines">Guidelines</a></li>
+          <li class="toc__item toc__item--h2"><a href="#accessibility">Accessibility</a></li>
+        </ul>
+      </aside>
+
+      <footer class="doc-footer">
+        <div>Halo UI v2.4.0 · MIT License · Built with Astro + MDX</div>
+        <div class="doc-footer__links"><a href="modal.html">← Modal</a><a href="index.html">Home</a></div>
+      </footer>
+    </div>
+  </div>
+
+  <div class="palette-backdrop" id="palette">
+    <div class="palette" role="dialog" aria-label="Search documentation">
+      <div class="palette__input-wrap"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input class="palette__input" type="text" placeholder="Search components, tokens, foundations…" aria-label="Search" autocomplete="off" spellcheck="false" /></div>
+      <div class="palette__results"></div>
+      <div class="palette__hint"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+    </div>
+  </div>
+  <script src="js/halo.js"></script>
+</body>
+</html>

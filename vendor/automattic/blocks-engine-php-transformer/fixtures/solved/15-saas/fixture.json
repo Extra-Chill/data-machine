@@ -1,0 +1,11 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "saas",
+    "landing",
+    "one-pager",
+    "has-nav",
+    "pricing"
+  ],
+  "complexity": 1
+}

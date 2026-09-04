@@ -1,0 +1,36 @@
+{
+  "source": "derived",
+  "tree": [
+    {
+      "block": "core/group",
+      "children": [
+        {
+          "block": "core/heading"
+        },
+        {
+          "block": "core/paragraph"
+        },
+        {
+          "block": "jetpack/contact-form",
+          "children": [
+            {
+              "block": "jetpack/field-name"
+            },
+            {
+              "block": "jetpack/field-email"
+            },
+            {
+              "block": "jetpack/field-select"
+            },
+            {
+              "block": "jetpack/field-textarea"
+            },
+            {
+              "block": "core/button"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

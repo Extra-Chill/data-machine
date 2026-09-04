@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Reviews | Northline Plumbing &amp; Heating — Grand Rapids, MI</title>
+  <meta name="description" content="Read what Grand Rapids homeowners say about Northline Plumbing & Heating. 180+ verified reviews, 4.9-star average. Emergency repairs, water heaters, boiler service.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .review-card-lg {
+      background: var(--c-white);
+      border-radius: var(--r-lg);
+      padding: 2.5rem;
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--t), box-shadow var(--t);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+    .review-card-lg:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+    .review-left { text-align: center; min-width: 120px; }
+    .review-avatar-lg {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: var(--c-navy-mid);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--f-display);
+      font-size: 1.5rem;
+      color: var(--c-copper-glow);
+      margin: 0 auto .75rem;
+    }
+    .reviewer-name {
+      font-family: var(--f-ui);
+      font-weight: 700;
+      font-size: .9rem;
+      color: var(--c-navy);
+    }
+    .reviewer-location {
+      font-size: .78rem;
+      color: var(--c-text-muted);
+      margin-top: .15rem;
+    }
+    .reviewer-service {
+      font-family: var(--f-ui);
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--c-copper);
+      margin-top: .6rem;
+      padding: .3rem .65rem;
+      background: rgba(174,92,24,.08);
+      border-radius: var(--r);
+      display: inline-block;
+    }
+    .review-body .review-stars { margin-bottom: .85rem; }
+    .review-body .review-text { font-size: 1rem; margin-bottom: 0; }
+    .review-date {
+      font-family: var(--f-ui);
+      font-size: .75rem;
+      color: var(--c-text-muted);
+      margin-top: .75rem;
+    }
+    .summary-strip {
+      background: var(--c-navy);
+      border-radius: var(--r-lg);
+      padding: 2.5rem 3rem;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 3rem;
+      align-items: center;
+      margin-bottom: 4rem;
+    }
+    .summary-big {
+      text-align: center;
+    }
+    .summary-score {
+      font-family: var(--f-display);
+      font-size: 5rem;
+      color: var(--c-copper-glow);
+      line-height: 1;
+      display: block;
+    }
+    .summary-stars-row {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+      margin-block: .5rem;
+    }
+    .summary-stars-row svg { width: 24px; height: 24px; color: var(--c-copper-hi); fill: var(--c-copper-hi); }
+    .summary-count {
+      font-family: var(--f-ui);
+      font-size: .82rem;
+      color: rgba(255,255,255,.45);
+    }
+    .summary-bars { flex: 1; }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: .6rem;
+    }
+    .bar-label {
+      font-family: var(--f-ui);
+      font-size: .78rem;
+      font-weight: 600;
+      color: rgba(255,255,255,.55);
+      width: 30px;
+      flex-shrink: 0;
+    }
+    .bar-track {
+      flex: 1;
+      height: 6px;
+      background: rgba(255,255,255,.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: var(--c-copper);
+      border-radius: 3px;
+      transition: width .6s ease;
+    }
+    .bar-pct {
+      font-family: var(--f-ui);
+      font-size: .74rem;
+      color: rgba(255,255,255,.4);
+      width: 30px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .leave-review-box {
+      background: var(--c-cream-dark);
+      border-radius: var(--r-lg);
+      padding: 3rem;
+      text-align: center;
+      border: 2px dashed rgba(174,92,24,.25);
+    }
+    .leave-review-box svg {
+      width: 44px; height: 44px;
+      color: var(--c-copper);
+      margin: 0 auto 1rem;
+    }
+    @media (max-width: 768px) {
+      .review-card-lg {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+      }
+      .review-left { text-align: left; min-width: auto; display: flex; align-items: center; gap: 1rem; }
+      .review-avatar-lg { margin: 0; }
+      .summary-strip { grid-template-columns: 1fr; gap: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ Emergency Banner ═══ -->
+  <div class="emergency-banner" role="alert">
+    <span class="pulse-dot" aria-hidden="true"></span>
+    24/7 Emergency Service &mdash;
+    <a href="tel:6165550182">(616) 555-0182</a>
+  </div>
+
+  <!-- ═══ Site Header ═══ -->
+  <header class="site-header">
+    <nav class="header-inner" aria-label="Main navigation">
+      <a href="index.html" class="site-logo" aria-label="Northline Plumbing and Heating — Go to homepage">
+        <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+          <rect width="44" height="44" rx="5" fill="#ae5c18"/>
+          <path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/>
+        </svg>
+        <div class="logo-text">
+          <span class="logo-name">NORTHLINE</span>
+          <span class="logo-tag">Plumbing &amp; Heating</span>
+        </div>
+      </a>
+      <ul class="site-nav" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="service-areas.html">Service Areas</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="reviews.html" class="active">Reviews</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a href="tel:6165550182" class="nav-phone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          (616) 555-0182
+        </a>
+      </div>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-drawer">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+    <nav id="nav-drawer" class="nav-drawer" aria-label="Mobile navigation">
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="service-areas.html">Service Areas</a>
+      <a href="about.html">About</a>
+      <a href="reviews.html">Reviews</a>
+      <a href="contact.html">Contact</a>
+      <div class="mobile-cta">
+        <a href="tel:6165550182">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          Call Now &mdash; (616) 555-0182
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ═══ Page Hero ═══ -->
+    <section class="page-hero next-white" aria-labelledby="page-title">
+      <div class="page-hero-tex" aria-hidden="true"></div>
+      <div class="container page-hero-content">
+        <p class="label anim">Verified Customer Feedback</p>
+        <div class="divider anim anim-d1"></div>
+        <h1 class="anim anim-d2" id="page-title">What Customers Say</h1>
+        <p class="subtitle anim anim-d3">180+ reviews from Grand Rapids-area homeowners. We don&rsquo;t cherry-pick &mdash; these reflect the full picture of how we work.</p>
+      </div>
+    </section>
+
+    <!-- ═══ Rating Summary ═══ -->
+    <section class="section section--white" aria-labelledby="summary-heading">
+      <div class="container">
+
+        <div class="summary-strip" role="region" aria-labelledby="summary-heading">
+          <div class="summary-big">
+            <span class="summary-score" id="summary-heading" aria-label="4.9 out of 5 stars">4.9</span>
+            <div class="summary-stars-row" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </div>
+            <p class="summary-count">Based on 183 reviews</p>
+          </div>
+
+          <div class="summary-bars" aria-label="Star rating breakdown">
+            <div class="bar-row">
+              <span class="bar-label">5★</span>
+              <div class="bar-track" role="presentation"><div class="bar-fill" style="width:88%"></div></div>
+              <span class="bar-pct">88%</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">4★</span>
+              <div class="bar-track" role="presentation"><div class="bar-fill" style="width:9%"></div></div>
+              <span class="bar-pct">9%</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">3★</span>
+              <div class="bar-track" role="presentation"><div class="bar-fill" style="width:2%"></div></div>
+              <span class="bar-pct">2%</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">2★</span>
+              <div class="bar-track" role="presentation"><div class="bar-fill" style="width:1%"></div></div>
+              <span class="bar-pct">1%</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">1★</span>
+              <div class="bar-track" role="presentation"><div class="bar-fill" style="width:0%"></div></div>
+              <span class="bar-pct">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Individual Reviews ── -->
+        <h2 class="sr-only">Customer Reviews</h2>
+
+        <div style="display:flex; flex-direction:column; gap:1.75rem;" role="list" aria-label="Customer reviews">
+
+          <!-- Review 1 -->
+          <article class="review-card-lg" role="listitem">
+            <div class="review-left">
+              <div class="review-avatar-lg" aria-hidden="true">SM</div>
+              <div>
+                <div class="reviewer-name">Sarah M.</div>
+                <div class="reviewer-location">Cascade Township</div>
+                <div class="reviewer-service">Emergency Repair</div>
+              </div>
+            </div>
+            <div class="review-body">
+              <div class="review-stars" aria-label="5 out of 5 stars">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <p class="review-text">I called Northline at 2am on a Wednesday in February with a burst pipe in our basement. Water was coming in fast and I was panicking. Dave answered on the second ring, asked a few quick questions, and had a technician at our door inside of an hour. He stopped the water, replaced the damaged section, and even helped us set up some towels and showed us where to aim a fan before he left. I could not have been more relieved. This is our family's plumber for life &mdash; no question.</p>
+              <p class="review-date">January 2024</p>
+            </div>
+          </article>
+
+          <!-- Review 2 -->
+          <article class="review-card-lg" role="listitem">
+            <div class="review-left">
+              <div class="review-avatar-lg" aria-hidden="true">TK</div>
+              <div>
+                <div class="reviewer-name">Tom K.</div>
+                <div class="reviewer-location">Kentwood</div>
+                <div class="reviewer-service">Water Heater Replacement</div>
+              </div>
+            </div>
+            <div class="review-body">
+              <div class="review-stars" aria-label="5 out of 5 stars">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <p class="review-text">Our 14-year-old water heater finally gave up the ghost on a Saturday morning &mdash; cold showers all around. I called a couple places and they told me earliest they could get to us was Tuesday or Wednesday. Called Northline, Karen picked up immediately, and they had someone out by 11am same day. The tech explained the options, didn't try to upsell me on the most expensive unit, and had everything installed and running before 2pm. They even hauled away the old tank. I was genuinely shocked at how smooth the whole experience was.</p>
+              <p class="review-date">March 2024</p>
+            </div>
+          </article>
+
+          <!-- Review 3 -->
+          <article class="review-card-lg" role="listitem">
+            <div class="review-left">
+              <div class="review-avatar-lg" aria-hidden="true">JL</div>
+              <div>
+                <div class="reviewer-name">Jennifer L.</div>
+                <div class="reviewer-location">Ada Township</div>
+                <div class="reviewer-service">Long-time Customer</div>
+              </div>
+            </div>
+            <div class="review-body">
+              <div class="review-stars" aria-label="5 out of 5 stars">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <p class="review-text">We&rsquo;ve used Northline for twelve years now. In that time they&rsquo;ve done everything from a simple faucet rebuild to a complete plumbing rough-in for our home addition. Karen in the office is always helpful and responsive. Every technician they&rsquo;ve sent has been professional, clean, and honest about what actually needs to be done versus what can wait. We&rsquo;ve recommended them to at least six or seven friends and neighbors over the years. The consistency over twelve years is what impresses me most &mdash; they don&rsquo;t seem to have off days.</p>
+              <p class="review-date">November 2023</p>
+            </div>
+          </article>
+
+          <!-- Review 4 -->
+          <article class="review-card-lg" role="listitem">
+            <div class="review-left">
+              <div class="review-avatar-lg" aria-hidden="true">MR</div>
+              <div>
+                <div class="reviewer-name">Mike R.</div>
+                <div class="reviewer-location">Walker</div>
+                <div class="reviewer-service">Boiler Service &amp; Repair</div>
+              </div>
+            </div>
+            <div class="review-body">
+              <div class="review-stars" aria-label="5 out of 5 stars">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <p class="review-text">Got three estimates for a boiler tune-up and a persistent pressure leak. Northline wasn&rsquo;t the cheapest, but they were by far the most thorough. Dave came out himself, actually looked at the whole system, and showed me exactly what was causing the pressure drop and why. He didn&rsquo;t try to sell me a new boiler or a bunch of extras I didn&rsquo;t need. Fixed the leak, did the tune-up, charged what he quoted, and gave me a clear rundown of what to watch over the next year. No surprises on the invoice. I&rsquo;ve already booked the annual service for next fall.</p>
+              <p class="review-date">October 2023</p>
+            </div>
+          </article>
+
+          <!-- Review 5 -->
+          <article class="review-card-lg" role="listitem">
+            <div class="review-left">
+              <div class="review-avatar-lg" aria-hidden="true">LP</div>
+              <div>
+                <div class="reviewer-name">Linda P.</div>
+                <div class="reviewer-location">Forest Hills</div>
+                <div class="reviewer-service">Drain Cleaning</div>
+              </div>
+            </div>
+            <div class="review-body">
+              <div class="review-stars" aria-label="5 out of 5 stars">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <p class="review-text">We had a recurring slow drain in our kitchen that two other companies "fixed" &mdash; it came back both times within a few months. Northline came out, ran their camera, and showed me a root intrusion about 40 feet out that nobody had seen. Cleared it properly with hydrojetting and treated the roots. That was 14 months ago and we haven&rsquo;t had a problem since. Sometimes you get what you pay for, and this was worth every penny.</p>
+              <p class="review-date">August 2023</p>
+            </div>
+          </article>
+
+        </div>
+
+        <!-- Leave a Review -->
+        <div class="leave-review-box mt-lg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          <h3 style="font-size:1.4rem; margin-bottom:.5rem;">Had Work Done by Northline?</h3>
+          <p style="color:var(--c-text-mid); max-width:50ch; margin-inline:auto; margin-bottom:1.5rem;">We&rsquo;d love to hear about your experience. Reviews help other Grand Rapids homeowners make confident decisions &mdash; and they help us stay accountable.</p>
+          <a href="contact.html" class="btn btn-copper">Share Your Experience</a>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══ Emergency CTA ═══ -->
+    <section class="cta-section" aria-label="Contact call to action">
+      <div class="container">
+        <p class="cta-label">Join 5,200+ Happy Customers</p>
+        <h2 class="cta-headline">Ready to Experience<br>the Northline Difference?</h2>
+        <a href="tel:6165550182" class="cta-phone">(616) 555-0182</a>
+        <p class="cta-sub">Or <a href="contact.html" style="color:rgba(255,255,255,.85); text-decoration:underline;">request a scheduled visit</a> online.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══ Footer ═══ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="site-logo" style="text-decoration:none;">
+            <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true"><rect width="44" height="44" rx="5" fill="#ae5c18"/><path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/></svg>
+            <div class="logo-text"><span class="logo-name">NORTHLINE</span><span class="logo-tag">Plumbing &amp; Heating</span></div>
+          </a>
+          <p class="footer-about">Family-owned and operated since 1987. Serving Grand Rapids and surrounding communities with honest, dependable plumbing and heating work.</p>
+          <div class="footer-license">Licensed &amp; Insured in Michigan<br>Plumbing #PC-2847-GR &middot; HVAC #HV-1193-MI</div>
+        </div>
+        <div class="footer-col">
+          <h4>Services</h4>
+          <ul>
+            <li><a href="services.html#emergency">Emergency Repairs</a></li>
+            <li><a href="services.html#water-heaters">Water Heaters</a></li>
+            <li><a href="services.html#boilers">Boiler Service</a></li>
+            <li><a href="services.html#rough-in">Bathroom Rough-In</a></li>
+            <li><a href="services.html#drains">Drain Cleaning</a></li>
+            <li><a href="services.html#sewer">Sewer Lines</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="service-areas.html">Service Areas</a></li>
+            <li><a href="reviews.html">Reviews</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contact</h4>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            <a href="tel:6165550182">(616) 555-0182</a>
+          </div>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Mon–Sat: 7am–7pm<br>24/7 Emergency Dispatch</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2024 Northline Plumbing &amp; Heating LLC. All rights reserved.</p>
+        <p>Licensed &amp; Insured &middot; State of Michigan</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="nav.js"></script>
+</body>
+</html>

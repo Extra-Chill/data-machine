@@ -1,0 +1,67 @@
+{
+  "id": "figma-transformer-fixture-matrix",
+  "description": "Figma transformer fixture matrix rig. Runs large local .fig fixtures through the PHP transformer and captures HTML/result artifacts for fidelity review.",
+  "components": {
+    "blocks-engine": {
+      "path": "${package.root}/../../..",
+      "branch": "trunk",
+      "extensions": {
+        "nodejs": {}
+      }
+    }
+  },
+  "resources": {
+    "paths": [
+      "${components.blocks-engine.path}"
+    ]
+  },
+  "bench": {
+    "default_component": "blocks-engine",
+    "iterations": 1,
+    "warmup_iterations": 0,
+    "path_inputs": [
+      "--path",
+      "bench_env.FIGMA_FIXTURE_MATRIX_FIXTURE",
+      "bench_env.FIGMA_FIXTURE_MATRIX_FIXTURES",
+      "bench_env.FIGMA_FIXTURE_MATRIX_OUTPUT_DIR"
+    ],
+    "result_gates": {
+      "failed_fixture_count": { "lte": 0 }
+    }
+  },
+  "bench_workloads": {
+    "nodejs": [
+      {
+        "path": "${components.blocks-engine.path}/figma-transformer/bench/figma-fixture-matrix.bench.mjs"
+      }
+    ]
+  },
+  "bench_profiles": {
+    "smoke": ["figma-fixture-matrix"],
+    "fixture-matrix": ["figma-fixture-matrix"]
+  },
+  "pipeline": {
+    "check": [
+      {
+        "kind": "check",
+        "label": "Figma fixture matrix runner exists",
+        "file": "${components.blocks-engine.path}/figma-transformer/scripts/figma-fixture-matrix.php"
+      },
+      {
+        "kind": "command",
+        "label": "Figma fixture matrix CLI loads",
+        "cwd": "${components.blocks-engine.path}",
+        "command": "php figma-transformer/scripts/figma-fixture-matrix.php --help"
+      }
+    ],
+    "up": [
+      {
+        "kind": "command",
+        "label": "Run Figma fixture matrix",
+        "cwd": "${components.blocks-engine.path}",
+        "command": "php figma-transformer/scripts/figma-fixture-matrix.php"
+      }
+    ],
+    "down": []
+  }
+}

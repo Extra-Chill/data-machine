@@ -1,0 +1,436 @@
+{
+  "version": 1,
+  "derivation": "DLA region-audit + region-census over source HTML and explicit placed-region corpus",
+  "oracle": {
+    "commit": "1e393c535850ee1a9482f83459f779d0e225b027",
+    "paths": {
+      "regionAudit": "src/lib/replicate/region-audit.ts",
+      "regionCensus": "src/lib/replicate/region-census.ts",
+      "sectionSelector": "src/lib/replicate/section-selector.ts"
+    },
+    "blobs": {
+      "regionAudit": "3e4bff0205056183fb3b09612df6caf5018a844f",
+      "regionCensus": "c447895fe50d42395ea4a4b8786467bef9eeabda",
+      "sectionSelector": "a900bd3d4fe719af039faf9c586b17ae19403c38"
+    }
+  },
+  "cases": [
+    {
+      "id": "home-header-body-footer",
+      "input": {
+        "id": "home-header-body-footer",
+        "page": "home",
+        "entryUrl": "index.html",
+        "sourceHtml": "<!doctype html><html><body><header id=\"mast\"><nav class=\"main-menu\"><a href=\"/\">Home</a><a href=\"/shop\">Shop</a></nav></header><main id=\"content\"><section class=\"hero\"><h1>Welcome</h1><p>Useful body copy long enough for actionability.</p><img src=\"hero.jpg\"></section></main><footer><a href=\"/privacy\">Privacy</a><a href=\"/contact\">Contact</a></footer></body></html>",
+        "placed": [
+          {
+            "kind": "header_part",
+            "role": "header",
+            "selector": "header#mast"
+          },
+          {
+            "kind": "page_body_section",
+            "selector": "main#content"
+          },
+          {
+            "kind": "footer_part",
+            "role": "footer",
+            "selector": "footer:nth-of-type(1)"
+          }
+        ]
+      },
+      "rootSelector": "header#mast",
+      "rootRole": "header",
+      "census": [
+        {
+          "role": "header",
+          "tag": "header",
+          "selector": "header#mast",
+          "textLength": 8,
+          "mediaCount": 0,
+          "linkCount": 2
+        },
+        {
+          "role": "main",
+          "tag": "main",
+          "selector": "main#content",
+          "textLength": 54,
+          "mediaCount": 1,
+          "linkCount": 0
+        },
+        {
+          "role": "footer",
+          "tag": "footer",
+          "selector": "footer:nth-of-type(1)",
+          "textLength": 14,
+          "mediaCount": 0,
+          "linkCount": 2
+        }
+      ],
+      "report": {
+        "page": "home",
+        "entryUrl": "index.html",
+        "assignments": [
+          {
+            "landmark": {
+              "role": "header",
+              "tag": "header",
+              "selector": "header#mast",
+              "textLength": 8,
+              "mediaCount": 0,
+              "linkCount": 2
+            },
+            "kind": "header_part"
+          },
+          {
+            "landmark": {
+              "role": "main",
+              "tag": "main",
+              "selector": "main#content",
+              "textLength": 54,
+              "mediaCount": 1,
+              "linkCount": 0
+            },
+            "kind": "page_body_section"
+          },
+          {
+            "landmark": {
+              "role": "footer",
+              "tag": "footer",
+              "selector": "footer:nth-of-type(1)",
+              "textLength": 14,
+              "mediaCount": 0,
+              "linkCount": 2
+            },
+            "kind": "footer_part"
+          }
+        ],
+        "unassignedRegions": [],
+        "counts": {
+          "sourceLandmarks": {
+            "header": 1,
+            "main": 1,
+            "footer": 1
+          },
+          "assigned": 3,
+          "unassigned": 0,
+          "nonActionable": 0
+        }
+      }
+    },
+    {
+      "id": "dropped-complementary-rail",
+      "input": {
+        "id": "dropped-complementary-rail",
+        "page": "home",
+        "entryUrl": "index.html",
+        "sourceHtml": "<html><body><main id=\"content\"><p>Main article text is present and placed in the page body.</p></main><aside class=\"rail\"><a href=\"/a\">Alpha</a><a href=\"/b\">Beta</a><p>Related links with enough rail text.</p></aside></body></html>",
+        "placed": [
+          {
+            "kind": "page_body_section",
+            "selector": "main#content"
+          }
+        ]
+      },
+      "rootSelector": "main#content",
+      "rootRole": "main",
+      "census": [
+        {
+          "role": "main",
+          "tag": "main",
+          "selector": "main#content",
+          "textLength": 57,
+          "mediaCount": 0,
+          "linkCount": 0
+        },
+        {
+          "role": "aside",
+          "tag": "aside",
+          "selector": "aside.rail",
+          "textLength": 45,
+          "mediaCount": 0,
+          "linkCount": 2
+        }
+      ],
+      "report": {
+        "page": "home",
+        "entryUrl": "index.html",
+        "assignments": [
+          {
+            "landmark": {
+              "role": "main",
+              "tag": "main",
+              "selector": "main#content",
+              "textLength": 57,
+              "mediaCount": 0,
+              "linkCount": 0
+            },
+            "kind": "page_body_section"
+          },
+          {
+            "landmark": {
+              "role": "aside",
+              "tag": "aside",
+              "selector": "aside.rail",
+              "textLength": 45,
+              "mediaCount": 0,
+              "linkCount": 2
+            },
+            "kind": "unassigned"
+          }
+        ],
+        "unassignedRegions": [
+          {
+            "role": "aside",
+            "tag": "aside",
+            "selector": "aside.rail",
+            "textLength": 45,
+            "mediaCount": 0,
+            "linkCount": 2
+          }
+        ],
+        "counts": {
+          "sourceLandmarks": {
+            "main": 1,
+            "aside": 1
+          },
+          "assigned": 1,
+          "unassigned": 1,
+          "nonActionable": 0
+        }
+      }
+    },
+    {
+      "id": "non-actionable-skip-nav",
+      "input": {
+        "id": "non-actionable-skip-nav",
+        "page": "home",
+        "entryUrl": "index.html",
+        "sourceHtml": "<html><body><nav class=\"skip\"><a href=\"#main\">Skip</a></nav><main id=\"main\"><p>Primary copy remains long enough to be actionable.</p></main></body></html>",
+        "placed": [
+          {
+            "kind": "page_body_section",
+            "selector": "main#main"
+          }
+        ]
+      },
+      "rootSelector": "nav.skip",
+      "rootRole": "nav",
+      "census": [
+        {
+          "role": "nav",
+          "tag": "nav",
+          "selector": "nav.skip",
+          "textLength": 4,
+          "mediaCount": 0,
+          "linkCount": 1
+        },
+        {
+          "role": "main",
+          "tag": "main",
+          "selector": "main#main",
+          "textLength": 50,
+          "mediaCount": 0,
+          "linkCount": 0
+        }
+      ],
+      "report": {
+        "page": "home",
+        "entryUrl": "index.html",
+        "assignments": [
+          {
+            "landmark": {
+              "role": "nav",
+              "tag": "nav",
+              "selector": "nav.skip",
+              "textLength": 4,
+              "mediaCount": 0,
+              "linkCount": 1
+            },
+            "kind": "non_actionable"
+          },
+          {
+            "landmark": {
+              "role": "main",
+              "tag": "main",
+              "selector": "main#main",
+              "textLength": 50,
+              "mediaCount": 0,
+              "linkCount": 0
+            },
+            "kind": "page_body_section"
+          }
+        ],
+        "unassignedRegions": [],
+        "counts": {
+          "sourceLandmarks": {
+            "nav": 1,
+            "main": 1
+          },
+          "assigned": 1,
+          "unassigned": 0,
+          "nonActionable": 1
+        }
+      }
+    },
+    {
+      "id": "repeated-section-selector-exactness",
+      "input": {
+        "id": "repeated-section-selector-exactness",
+        "page": "services",
+        "entryUrl": "services/index.html",
+        "sourceHtml": "<html><body><section><h2>First</h2><p>First section copy long enough to audit.</p></section><section><h2>Second</h2><p>Second section copy long enough to audit.</p></section></body></html>",
+        "placed": [
+          {
+            "kind": "page_body_section",
+            "selector": "section:nth-of-type(1)"
+          }
+        ]
+      },
+      "rootSelector": "section:nth-of-type(1)",
+      "rootRole": "section",
+      "census": [
+        {
+          "role": "section",
+          "tag": "section",
+          "selector": "section:nth-of-type(1)",
+          "textLength": 45,
+          "mediaCount": 0,
+          "linkCount": 0
+        },
+        {
+          "role": "section",
+          "tag": "section",
+          "selector": "section:nth-of-type(2)",
+          "textLength": 47,
+          "mediaCount": 0,
+          "linkCount": 0
+        }
+      ],
+      "report": {
+        "page": "services",
+        "entryUrl": "services/index.html",
+        "assignments": [
+          {
+            "landmark": {
+              "role": "section",
+              "tag": "section",
+              "selector": "section:nth-of-type(1)",
+              "textLength": 45,
+              "mediaCount": 0,
+              "linkCount": 0
+            },
+            "kind": "page_body_section"
+          },
+          {
+            "landmark": {
+              "role": "section",
+              "tag": "section",
+              "selector": "section:nth-of-type(2)",
+              "textLength": 47,
+              "mediaCount": 0,
+              "linkCount": 0
+            },
+            "kind": "unassigned"
+          }
+        ],
+        "unassignedRegions": [
+          {
+            "role": "section",
+            "tag": "section",
+            "selector": "section:nth-of-type(2)",
+            "textLength": 47,
+            "mediaCount": 0,
+            "linkCount": 0
+          }
+        ],
+        "counts": {
+          "sourceLandmarks": {
+            "section": 2
+          },
+          "assigned": 1,
+          "unassigned": 1,
+          "nonActionable": 0
+        }
+      }
+    },
+    {
+      "id": "role-qualified-aside-match",
+      "input": {
+        "id": "role-qualified-aside-match",
+        "page": "about",
+        "entryUrl": "about/index.html",
+        "sourceHtml": "<html><body><aside class=\"rail\"><a href=\"/team\">Team</a><a href=\"/careers\">Careers</a><p>People rail content.</p></aside><main><p>About page body content remains in the page template.</p></main></body></html>",
+        "placed": [
+          {
+            "kind": "header_part",
+            "role": "aside",
+            "selector": "aside.rail"
+          },
+          {
+            "kind": "page_body_section",
+            "selector": "main:nth-of-type(1)"
+          }
+        ]
+      },
+      "rootSelector": "aside.rail",
+      "rootRole": "aside",
+      "census": [
+        {
+          "role": "aside",
+          "tag": "aside",
+          "selector": "aside.rail",
+          "textLength": 31,
+          "mediaCount": 0,
+          "linkCount": 2
+        },
+        {
+          "role": "main",
+          "tag": "main",
+          "selector": "main:nth-of-type(1)",
+          "textLength": 53,
+          "mediaCount": 0,
+          "linkCount": 0
+        }
+      ],
+      "report": {
+        "page": "about",
+        "entryUrl": "about/index.html",
+        "assignments": [
+          {
+            "landmark": {
+              "role": "aside",
+              "tag": "aside",
+              "selector": "aside.rail",
+              "textLength": 31,
+              "mediaCount": 0,
+              "linkCount": 2
+            },
+            "kind": "header_part"
+          },
+          {
+            "landmark": {
+              "role": "main",
+              "tag": "main",
+              "selector": "main:nth-of-type(1)",
+              "textLength": 53,
+              "mediaCount": 0,
+              "linkCount": 0
+            },
+            "kind": "page_body_section"
+          }
+        ],
+        "unassignedRegions": [],
+        "counts": {
+          "sourceLandmarks": {
+            "aside": 1,
+            "main": 1
+          },
+          "assigned": 2,
+          "unassigned": 0,
+          "nonActionable": 0
+        }
+      }
+    }
+  ]
+}

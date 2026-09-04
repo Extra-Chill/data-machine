@@ -1,0 +1,19 @@
+{
+  "source": "ideal",
+  "_note": "IDEAL: a testimonials/review grid should render each review as a core/quote inside its column, not loose paragraphs. The current deterministic reconstruct emits paragraphs, so this fixture scores <100 — an honest fidelity gap, not a regression. Baseline is pinned to the current best.",
+  "tree": [
+    {
+      "block": "core/group",
+      "children": [
+        { "block": "core/heading", "contains": "Loved by studio teams" },
+        {
+          "block": "core/columns",
+          "children": [
+            { "block": "core/column", "children": [{ "block": "core/quote" }] },
+            { "block": "core/column", "children": [{ "block": "core/quote" }] }
+          ]
+        }
+      ]
+    }
+  ]
+}

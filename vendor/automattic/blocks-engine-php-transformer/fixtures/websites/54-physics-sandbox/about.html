@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How the physics works — Tumble Lab</title>
+  <meta name="description" content="An explainer of the Tumble Lab physics engine: position-based Verlet integration, iterative constraint relaxation for ropes and cloth, collision response and the spatial-hash broadphase — with SVG diagrams.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Tumble Lab home">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">
+        <span class="logo-name">Tumble<b>·</b>Lab</span>
+        <span class="logo-sub">Verlet Physics Toy</span>
+      </span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="sandbox.html">Sandbox</a>
+      <a href="scenes.html">Scenes</a>
+      <a href="about.html" class="active">How it works</a>
+      <a href="sandbox.html" class="nav-cta">Launch ▸</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="wrap">
+    <article class="prose">
+      <p class="section-eyebrow">Under the hood</p>
+      <h1 class="section-title">How Tumble Lab simulates the world</h1>
+      <p class="section-lead">
+        There's no Box2D, no matter.js, no WebAssembly. The whole engine is about 350 lines of
+        vanilla JavaScript in <code>js/engine.js</code>. Here's exactly how it keeps hundreds of
+        balls, ropes and cloth panels moving believably at 60&nbsp;FPS.
+      </p>
+
+      <h2>1. Position-based Verlet integration</h2>
+      <p>
+        Most game engines store a position <span class="var">x</span> and a velocity
+        <span class="var">v</span>. Tumble Lab stores a <em>current</em> position and a
+        <em>previous</em> position instead. Velocity is never stored — it's <em>implied</em> by the
+        gap between the two. This is <strong>position Verlet</strong>, and it's wonderfully stable:
+        constraints that move a particle automatically change its velocity for free.
+      </p>
+      <div class="formula">
+<span class="c">// velocity is implicit: v = x − xₚᵣₑᵥ</span>
+vx = (x − prevX) * (1 − airFriction)
+vy = (y − prevY) * (1 − airFriction)
+
+prevX = x;  prevY = y
+x += vx + gravityX · dt²
+y += vy + gravityY · dt²
+      </div>
+      <figure class="diagram">
+        <svg viewBox="0 0 520 150" role="img" aria-label="Verlet step diagram">
+          <rect width="520" height="150" fill="#0d101c" rx="8"/>
+          <circle cx="90" cy="100" r="9" fill="#5d6394"/>
+          <text x="90" y="130" fill="#9aa0c8" font-size="12" text-anchor="middle" font-family="monospace">xₚᵣₑᵥ</text>
+          <circle cx="230" cy="80" r="10" fill="#6cf2c8"/>
+          <text x="230" y="55" fill="#6cf2c8" font-size="12" text-anchor="middle" font-family="monospace">x (now)</text>
+          <circle cx="380" cy="64" r="10" fill="#ffd166" opacity="0.55"/>
+          <text x="392" y="42" fill="#ffd166" font-size="12" text-anchor="middle" font-family="monospace">next</text>
+          <line x1="99" y1="98" x2="221" y2="83" stroke="#5cc8ff" stroke-width="2" marker-end="url(#ar)"/>
+          <line x1="240" y1="78" x2="372" y2="66" stroke="#5cc8ff" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+          <text x="160" y="78" fill="#5cc8ff" font-size="11" font-family="monospace">v</text>
+          <text x="305" y="58" fill="#5cc8ff" font-size="11" font-family="monospace">v + g·dt²</text>
+          <defs>
+            <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0 0 L6 3 L0 6 Z" fill="#5cc8ff"/>
+            </marker>
+          </defs>
+        </svg>
+        <figcaption>The next step reuses the implied velocity, then adds gravity.</figcaption>
+      </figure>
+
+      <h2>2. Constraints: the glue for ropes &amp; cloth</h2>
+      <p>
+        A rope is just a chain of particles joined by <strong>distance constraints</strong>. Each
+        constraint has a rest length; if the two endpoints drift too far apart or too close, the
+        constraint nudges them back along the line between them, splitting the correction by mass.
+        Pinned particles have infinite mass, so they don't move — that's how a flag stays attached
+        to its pole.
+      </p>
+      <div class="formula">
+delta   = b − a
+d       = ‖delta‖
+diff    = (d − restLength) / d
+<span class="c">// move each end proportionally to its inverse mass</span>
+a += delta · 0.5 · stiffness · diff
+b −= delta · 0.5 · stiffness · diff
+      </div>
+      <figure class="diagram">
+        <svg viewBox="0 0 520 160" role="img" aria-label="Cloth constraint grid diagram">
+          <rect width="520" height="160" fill="#0d101c" rx="8"/>
+          <g stroke="#5cc8ff" stroke-width="1.5" opacity="0.7">
+            <path d="M120 40 H400 M120 80 H400 M120 120 H400"/>
+            <path d="M120 40 V120 M190 40 V120 M260 40 V120 M330 40 V120 M400 40 V120"/>
+          </g>
+          <g fill="#5cc8ff">
+            <circle cx="120" cy="40" r="5"/><circle cx="190" cy="40" r="5"/><circle cx="260" cy="40" r="5"/><circle cx="330" cy="40" r="5"/><circle cx="400" cy="40" r="5"/>
+            <circle cx="120" cy="80" r="4"/><circle cx="190" cy="80" r="4"/><circle cx="260" cy="80" r="4"/><circle cx="330" cy="80" r="4"/><circle cx="400" cy="80" r="4"/>
+            <circle cx="120" cy="120" r="4"/><circle cx="190" cy="120" r="4"/><circle cx="260" cy="120" r="4"/><circle cx="330" cy="120" r="4"/><circle cx="400" cy="120" r="4"/>
+          </g>
+          <g fill="#fff"><circle cx="120" cy="40" r="3"/><circle cx="260" cy="40" r="3"/><circle cx="400" cy="40" r="3"/></g>
+          <text x="455" y="44" fill="#fff" font-size="11" font-family="monospace">pinned</text>
+          <text x="430" y="84" fill="#5cc8ff" font-size="11" font-family="monospace">free</text>
+        </svg>
+        <figcaption>Cloth = a grid of particles wired horizontally &amp; vertically. White nodes are pinned (infinite mass).</figcaption>
+      </figure>
+      <p>
+        One pass of constraint-solving doesn't fully satisfy every link at once — moving particle A
+        to please one constraint can violate its neighbour. So the solver runs the whole list
+        several times per frame (the <strong>Solver passes</strong> slider). More passes means a
+        stiffer rope and a less stretchy cloth, at the cost of CPU.
+      </p>
+
+      <h2>3. Tearing</h2>
+      <p>
+        Each constraint can carry a <em>tear ratio</em>. When a thread is stretched beyond, say,
+        4× its rest length, it permanently breaks and stops solving. That single check is the
+        entire "tearable cloth" feature — pull hard enough and the fabric rips along the weakest
+        seam.
+      </p>
+
+      <h2>4. Collisions &amp; the broadphase</h2>
+      <p>
+        Balls push each other apart when they overlap. Checking every pair would be O(n²) — slow
+        for hundreds of bodies. Instead each frame builds a <strong>uniform spatial hash</strong>:
+        the canvas is diced into cells, every particle is filed into its cell, and we only test a
+        particle against bodies in its own cell and the eight neighbours.
+      </p>
+      <div class="formula">
+overlap = (rₐ + r_b) − distance
+<span class="c">// push apart along the contact normal, weighted by inverse mass</span>
+a -= normal · (invMassₐ / total) · overlap
+b += normal · (invMass_b / total) · overlap
+      </div>
+      <figure class="diagram">
+        <svg viewBox="0 0 520 160" role="img" aria-label="Spatial hash broadphase diagram">
+          <rect width="520" height="160" fill="#0d101c" rx="8"/>
+          <g stroke="rgba(255,255,255,0.12)" stroke-width="1">
+            <path d="M40 20 H480 M40 60 H480 M40 100 H480 M40 140 H480"/>
+            <path d="M40 20 V140 M128 20 V140 M216 20 V140 M304 20 V140 M392 20 V140 M480 20 V140"/>
+          </g>
+          <rect x="128" y="60" width="88" height="40" fill="rgba(108,242,200,0.12)"/>
+          <rect x="40" y="20" width="264" height="120" fill="none" stroke="#6cf2c8" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <circle cx="172" cy="80" r="13" fill="#6cf2c8"/>
+          <circle cx="100" cy="48" r="11" fill="#ff6b8b"/>
+          <circle cx="250" cy="115" r="12" fill="#5cc8ff"/>
+          <circle cx="430" cy="50" r="12" fill="#5d6394"/>
+          <text x="430" y="90" fill="#5d6394" font-size="11" text-anchor="middle" font-family="monospace">skipped</text>
+          <text x="172" y="150" fill="#6cf2c8" font-size="11" text-anchor="middle" font-family="monospace">test 3×3 cells only</text>
+        </svg>
+        <figcaption>Only bodies in the green 3×3 neighbourhood are tested against the central ball.</figcaption>
+      </figure>
+
+      <h2>5. Walls, restitution &amp; friction</h2>
+      <p>
+        The canvas edges are hard walls. When a particle pokes through one, we snap it back to the
+        boundary and reflect its implied velocity, scaled by the <strong>Bounciness</strong>
+        (restitution) value. The tangential component is scaled down to fake surface friction, so
+        balls eventually stop skidding and come to rest.
+      </p>
+
+      <h2>6. Rigid-ish boxes</h2>
+      <p>
+        A crate is four corner particles wired into a square — four edge constraints plus two
+        diagonals. The diagonals are what stop it collapsing into a parallelogram, giving you a
+        box that's rigid enough to stack but soft enough to crumple a little on a hard landing.
+        It's a cheap trick that behaves remarkably like a real rigid body.
+      </p>
+
+      <h2>Accessibility &amp; performance</h2>
+      <ul>
+        <li>Respects <code>prefers-reduced-motion</code>: trails off, fewer particles, starts paused.</li>
+        <li>Every control is keyboard reachable; the canvas is focusable and documents its shortcuts.</li>
+        <li>A fixed, clamped timestep keeps the simulation stable whether you run at 30 or 144&nbsp;FPS.</li>
+        <li>Your last-used gravity, bounce, friction, spawn type and visuals are saved to <code>localStorage</code>.</li>
+      </ul>
+
+      <p style="margin-top:2rem;">
+        <a href="sandbox.html" class="btn btn-primary">Go break something →</a>
+      </p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div>© <span data-year>2026</span> Tumble Lab — a hand-written physics toy. No engines were used.</div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="sandbox.html">Sandbox</a>
+      <a href="scenes.html">Scenes</a>
+      <a href="about.html">How it works</a>
+    </nav>
+  </footer>
+
+  <script src="js/nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+/* style.css - Hank's Tool Rental */
+/* originally by Dale, 2007 */
+/* updated by Hank ?? */
+
+body { font-family: Arial, Helvetica, sans-serif; color: #003366; background-color: #FFFFFF; margin: 0px; }
+body { font-size: 12px; }
+BODY { background: #FFFFFF url(images/tile-bg.gif); }
+
+a { color: #0000FF; text-decoration: underline; }
+a:visited { color: #800080; }
+a:hover { color: #FF0000 !important; text-decoration: underline !important; }
+A:HOVER { color: #CC6633 !important; }
+
+table { border-collapse: separate; }
+td { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #003366; }
+
+.header { background-color: #003366; color: #FFFFFF; }
+.sidebar { background-color: #FFCC99 !important; width: 180px; }
+.maincontent { background-color: #FFFFFF !important; }
+
+#new { color: #FF0000; font-weight: bold; background-color: #FFFF00; }
+.new { color: red; font-weight: bold; }
+#new { background-color: yellow !important; }
+
+h1, h2, h3 { font-family: "Times New Roman", serif; color: #003366; }
+H1 { color: #CC6633 !important; }
+
+.button { background-color: #FFCC99; border: 2px solid #003366; padding: 4px 12px; color: #003366; font-weight: bold; }
+.button:hover { background-color: #CC6633; color: #FFFFFF; }
+
+.price { color: #CC6633; font-weight: bold; }
+.deposit { color: #003366; font-style: italic; }
+
+hr { color: #000080; height: 2px; }
+HR { border-color: #003366; }
+
+img { border: 0; }
+img.bordered { border: 1px solid #003366 !important; }
+
+.footer { background-color: #003366; color: #FFCC99; font-size: 10px; }
+.footer a { color: #FFFFFF; }
+
+/* added by Hank 11/2018 - make NEW tags pop more */
+.NEW, .new-tag { color: #FF0000 !important; background: #FFFF00 !important; font-weight: bold !important; padding: 2px; }
+
+/* added by Hank 3/2022 - hours table */
+.hours-closed { color: #FF0000; font-weight: bold; font-size: 14px; }

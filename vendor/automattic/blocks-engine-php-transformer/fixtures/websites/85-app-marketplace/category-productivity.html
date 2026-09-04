@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productivity Apps — StackShelf Marketplace</title>
+  <meta name="description" content="Browse productivity, workflow, editorial, and operations apps in the StackShelf marketplace.">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to app results</a>
+  <header class="site-header">
+    <nav class="nav container" aria-label="Primary navigation">
+      <a class="brand" href="index.html" aria-label="StackShelf home"><span class="brand-mark" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M4 5.5 12 2l8 3.5-8 3.5-8-3.5Zm0 6 8 3.5 8-3.5v7L12 22l-8-3.5v-7Z"/></svg></span>StackShelf</a>
+      <div class="nav-links"><a href="category-productivity.html" aria-current="page">Categories</a><a href="index.html#editors">Editor's picks</a><a href="index.html#compare">Compare</a><a href="index.html#pricing">Pricing</a></div>
+      <div class="nav-actions"><a class="btn btn-soft btn-small" href="index.html">Back home</a><a class="btn btn-primary btn-small" href="app-detail.html">Install FlowBoard</a></div>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="container crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span>Productivity</span></div>
+    <section class="section page-title">
+      <div class="container">
+        <span class="eyebrow">Category shelf</span>
+        <h1>Productivity apps for complex teams.</h1>
+        <p>Filter production-tested workflow tools by job, price, rating, and team size. The controls work as progressive enhancement; every card remains reachable without JavaScript.</p>
+      </div>
+    </section>
+
+    <section class="section" aria-label="Productivity app directory">
+      <div class="container layout-with-sidebar">
+        <aside class="card filter-panel" aria-labelledby="filter-title">
+          <h2 id="filter-title">Filter apps</h2>
+          <form>
+            <fieldset class="facet-group">
+              <legend>Use case</legend>
+              <label class="facet"><input type="checkbox" value="workflow" data-facet> Workflow</label>
+              <label class="facet"><input type="checkbox" value="content" data-facet> Content</label>
+              <label class="facet"><input type="checkbox" value="ops" data-facet> Operations</label>
+              <label class="facet"><input type="checkbox" value="analytics" data-facet> Analytics</label>
+            </fieldset>
+            <fieldset class="facet-group">
+              <legend>Team size</legend>
+              <label class="facet"><input type="checkbox" value="solo" data-facet> Solo builders</label>
+              <label class="facet"><input type="checkbox" value="team" data-facet> Teams</label>
+              <label class="facet"><input type="checkbox" value="enterprise" data-facet> Portfolio teams</label>
+            </fieldset>
+            <label class="range-row">Maximum monthly price <input type="range" min="0" max="150" value="80"> <span>$80 or less</span></label>
+          </form>
+        </aside>
+
+        <div>
+          <div class="toolbar">
+            <p><strong>48 apps</strong> in Productivity</p>
+            <label>Sort <select data-sort aria-label="Sort app cards"><option value="downloads">Most installed</option><option value="rating">Highest rated</option><option value="price">Lowest price</option></select></label>
+          </div>
+          <div class="app-grid" data-card-grid>
+            <article class="card card-elevated app-card" data-card data-tags="workflow team enterprise" data-rating="4.9" data-price="19" data-downloads="2400000">
+              <span class="sale-badge">Editor's choice</span>
+              <div class="card-header"><span class="app-icon"><svg width="30" height="30" viewBox="0 0 32 32"><path fill="#3b5bdb" d="M7 6h18v20H7z"/><path fill="#fff" d="M10 10h12v3H10zm0 5h8v3h-8zm0 5h11v3H10z"/></svg></span><div><h2>FlowBoard Pro</h2><div class="byline">by Northstar Labs</div></div></div>
+              <div class="card-body"><div class="rating-row"><span class="stars">★★★★★</span><strong>4.9</strong><span>8,412 reviews</span></div><p class="line-clamp">Release lanes, stakeholder approvals, automated briefs, dependency cards, and launch reminders.</p><div class="chip-row"><span class="chip">Workflow</span><span class="chip">Teams</span><span class="chip">Automation</span></div><div class="meta-row"><span class="price-badge">$19/mo</span><a class="btn btn-small btn-primary" href="app-detail.html" aria-label="View FlowBoard Pro details">Details</a></div></div>
+            </article>
+            <article class="card app-card" data-card data-tags="content team" data-rating="4.7" data-price="12" data-downloads="610000">
+              <div class="card-header"><span class="app-icon"><svg width="30" height="30" viewBox="0 0 32 32"><circle fill="#ffb833" cx="16" cy="16" r="11"/><path fill="#171614" d="M15 8h2v16h-2zm-7 7h16v2H8z"/></svg></span><div><h2>BriefSmith</h2><div class="byline">by Orchard Tools</div></div></div>
+              <div class="card-body"><div class="rating-row"><span class="stars">★★★★☆</span><strong>4.7</strong><span>2,208 reviews</span></div><p class="line-clamp">Content brief scoring, internal link prompts, SERP notes, schema hints, and outline templates.</p><div class="chip-row"><span class="chip">Content</span><span class="chip">SEO</span></div><div class="meta-row"><span class="price-badge">$12/mo</span><a class="btn btn-small" href="app-detail.html" aria-label="View BriefSmith details">Details</a></div></div>
+            </article>
+            <article class="card card-gradient app-card" data-card data-tags="ops enterprise" data-rating="4.8" data-price="49" data-downloads="330000">
+              <div class="card-header"><span class="app-icon"><svg width="30" height="30" viewBox="0 0 32 32"><path fill="#fff" d="M6 6h20v4H6zm0 8h20v4H6zm0 8h20v4H6z"/></svg></span><div><h2>Runbook Studio</h2><div class="byline muted">by Uptime Guild</div></div></div>
+              <div class="card-body"><div class="rating-row"><span class="stars">★★★★★</span><strong>4.8</strong><span>944 reviews</span></div><p class="line-clamp">Operational cards for incident checklists, release sign-offs, owners, and postmortem notes.</p><div class="chip-row"><span class="chip">Ops</span><span class="chip">Runbooks</span></div><div class="meta-row"><span class="price-badge">$49/mo</span><a class="btn btn-small" href="app-detail.html" aria-label="View Runbook Studio details">Details</a></div></div>
+            </article>
+            <article class="card app-card" data-card data-tags="analytics team" data-rating="4.5" data-price="24" data-downloads="780000">
+              <span class="sale-badge">Sale</span><div class="card-header"><span class="app-icon"><svg width="30" height="30" viewBox="0 0 32 32"><path fill="#fb6f92" d="M7 24h4V12H7zm7 0h4V7h-4zm7 0h4V15h-4z"/></svg></span><div><h2>MetricPatch</h2><div class="byline">by Signal Orchard</div></div></div>
+              <div class="card-body"><div class="rating-row"><span class="stars">★★★★☆</span><strong>4.5</strong><span>1,130 reviews</span></div><p class="line-clamp">Campaign dashboards with annotation cards, threshold alerts, and stakeholder-ready weekly summaries.</p><div class="chip-row"><span class="chip">Analytics</span><span class="chip">Reports</span></div><div class="meta-row"><span class="price-badge">$24/mo</span><a class="btn btn-small" href="app-detail.html" aria-label="View MetricPatch details">Details</a></div></div>
+            </article>
+            <article class="card image-top app-card" data-card data-tags="workflow solo" data-rating="4.4" data-price="0" data-downloads="270000">
+              <div class="image-top-art"><svg width="72" height="72" viewBox="0 0 72 72"><rect x="10" y="12" width="52" height="42" rx="12" fill="#fff"/><path d="M20 25h32M20 36h22M20 47h28" stroke="#3b5bdb" stroke-width="5" stroke-linecap="round"/></svg></div>
+              <div class="card-body"><h2>NoteHarbor</h2><div class="byline">by Paper Kite</div><div class="rating-row"><span class="stars">★★★★☆</span><strong>4.4</strong><span>801 reviews</span></div><p class="line-clamp">Reusable project notes, client handoff templates, and launch-day annotations.</p><div class="chip-row"><span class="chip">Workflow</span><span class="chip">Solo</span></div><div class="meta-row"><span class="price-badge">Free</span><a class="btn btn-small" href="app-detail.html" aria-label="View NoteHarbor details">Details</a></div></div>
+            </article>
+            <article class="card app-card" data-card data-tags="content enterprise" data-rating="4.6" data-price="89" data-downloads="190000">
+              <div class="card-header"><span class="app-icon"><svg width="30" height="30" viewBox="0 0 32 32"><path fill="#243a99" d="M4 7h24v18H4z"/><path fill="#dafff1" d="M8 11h16v3H8zm0 5h10v3H8z"/></svg></span><div><h2>PolicyPress</h2><div class="byline">by Archive House</div></div></div>
+              <div class="card-body"><div class="rating-row"><span class="stars">★★★★☆</span><strong>4.6</strong><span>512 reviews</span></div><p class="line-clamp">Governance workflows for regulated content, legal approvals, retention status, and audit exports.</p><div class="chip-row"><span class="chip">Content</span><span class="chip">Enterprise</span></div><div class="meta-row"><span class="price-badge">$89/mo</span><a class="btn btn-small" href="app-detail.html" aria-label="View PolicyPress details">Details</a></div></div>
+            </article>
+          </div>
+          <nav class="pagination" aria-label="Pagination"><a href="category-productivity.html" aria-current="page">1</a><a href="category-productivity.html">2</a><a href="category-productivity.html">3</a><a href="category-productivity.html" aria-label="Next page">Next</a></nav>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="footer"><div class="container footer-grid"><strong>StackShelf</strong><a href="index.html">Home</a><a href="app-detail.html">FlowBoard Pro</a><a href="category-productivity.html">Productivity</a></div></footer>
+</body>
+</html>

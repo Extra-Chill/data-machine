@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="midnight">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keystroke — Typing Speed Test</title>
+  <meta name="description" content="Keystroke is a fast, hand-built typing speed test: live WPM, accuracy, a per-second chart, a virtual keyboard, and a problem-key heatmap.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="2" y="8" width="28" height="18" rx="4" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="2"/>
+        <rect x="6" y="12" width="4" height="4" rx="1" fill="var(--accent)"/>
+        <rect x="12" y="12" width="4" height="4" rx="1" fill="var(--muted)"/>
+        <rect x="18" y="12" width="4" height="4" rx="1" fill="var(--muted)"/>
+        <rect x="10" y="18" width="12" height="4" rx="1.5" fill="var(--accent)"/>
+      </svg>
+      Key<span>stroke</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false">≡</button>
+    <nav class="site-nav">
+      <a href="index.html" class="active">Test</a>
+      <a href="stats.html">Stats</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1 class="page-title">Typing speed test</h1>
+    <p class="lede">Type the text below. Stats update live; finish a run to see your per-second curve, consistency, and personal best. Just start typing — the timer begins on your first keypress.</p>
+
+    <!-- option bar -->
+    <div class="option-bar" id="option-bar">
+      <div class="opt-group">
+        <span class="label">mode</span>
+        <button class="opt-btn" data-mode="time">time</button>
+        <button class="opt-btn" data-mode="words">words</button>
+        <button class="opt-btn" data-mode="quote">quote</button>
+      </div>
+      <span class="opt-divider"></span>
+      <div class="opt-group" id="sub-duration">
+        <span class="label">secs</span>
+        <button class="opt-btn" data-duration="15">15</button>
+        <button class="opt-btn" data-duration="30">30</button>
+        <button class="opt-btn" data-duration="60">60</button>
+        <button class="opt-btn" data-duration="120">120</button>
+      </div>
+      <div class="opt-group" id="sub-words">
+        <span class="label">words</span>
+        <button class="opt-btn" data-wordcount="10">10</button>
+        <button class="opt-btn" data-wordcount="25">25</button>
+        <button class="opt-btn" data-wordcount="50">50</button>
+        <button class="opt-btn" data-wordcount="100">100</button>
+      </div>
+      <span class="opt-divider"></span>
+      <label class="opt-check"><input type="checkbox" id="opt-punct"> punctuation</label>
+      <label class="opt-check"><input type="checkbox" id="opt-num"> numbers</label>
+      <span class="opt-divider"></span>
+      <div class="opt-group">
+        <span class="label">theme</span>
+        <select class="opt-select" id="opt-theme">
+          <option value="midnight">midnight</option>
+          <option value="paper">paper</option>
+          <option value="forest">forest</option>
+          <option value="sunset">sunset</option>
+        </select>
+      </div>
+      <label class="opt-check"><input type="checkbox" id="opt-sound"> sound</label>
+    </div>
+
+    <!-- live stats -->
+    <div class="live-stats" id="live-stats">
+      <div class="stat"><b id="stat-wpm">0</b><small>wpm</small></div>
+      <div class="stat dim"><b id="stat-acc">100%</b><small>accuracy</small></div>
+      <div class="stat dim"><b id="stat-time">30</b><small>time</small></div>
+      <div class="stat dim"><b id="stat-err">0</b><small>errors</small></div>
+      <span class="best-badge" id="best-badge">no record yet</span>
+    </div>
+    <div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
+
+    <!-- test surface -->
+    <section class="test-area" id="test-area" tabindex="-1">
+      <textarea id="field" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Typing input"></textarea>
+      <div class="words-wrap">
+        <div class="words" id="words" aria-hidden="true"></div>
+        <div class="caret" id="caret"></div>
+        <div class="focus-note" id="focus-note" hidden>Click or press any key to resume</div>
+      </div>
+      <div class="hint-row">
+        <span><kbd>Tab</kbd> new test</span>
+        <span><kbd>Esc</kbd> reset</span>
+        <span><kbd>Backspace</kbd> fix mistakes</span>
+      </div>
+    </section>
+
+    <!-- results -->
+    <section class="results" id="results" hidden>
+      <div class="results-grid">
+        <div class="results-figures">
+          <div class="fig big"><b id="r-wpm">0</b><small>words per minute</small></div>
+          <div class="fig"><b id="r-acc">0%</b><small>accuracy</small></div>
+          <div class="fig sub"><b id="r-raw">0</b><small>raw wpm</small></div>
+          <div class="fig sub"><b id="r-cons">0%</b><small>consistency</small></div>
+          <div class="fig sub"><b id="r-chars">0/0</b><small>correct / keys</small></div>
+          <div class="fig sub"><b id="r-time">0s</b><small>duration · <span id="r-mode">—</span></small></div>
+        </div>
+        <div class="chart-card">
+          <h3>Words per minute, second by second</h3>
+          <canvas id="r-chart"></canvas>
+        </div>
+      </div>
+      <p class="best-line" id="r-best">—</p>
+      <div class="result-actions">
+        <button class="btn primary" id="btn-next">Next test <kbd>↵</kbd></button>
+        <button class="btn" id="btn-restart">Repeat</button>
+        <a class="btn" href="stats.html">View stats →</a>
+      </div>
+    </section>
+
+    <!-- virtual keyboard -->
+    <div class="keyboard" id="keyboard" aria-hidden="true"></div>
+    <div class="kb-legend">
+      <span><i style="background:#ff6b81"></i> pinky</span>
+      <span><i style="background:#ffa86b"></i> ring</span>
+      <span><i style="background:#ffd166"></i> middle</span>
+      <span><i style="background:#8ce99a"></i>/<i style="background:#66d9e8"></i> index</span>
+      <span><i style="background:#74c0fc"></i> middle</span>
+      <span><i style="background:#b197fc"></i> ring</span>
+      <span><i style="background:#f783ac"></i> pinky</span>
+      <span><i style="background:var(--bad)"></i> most-missed (heatmap)</span>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand" href="index.html">Key<span>stroke</span></a>
+    <span class="muted">A hand-built typing trainer — no frameworks, no trackers. Everything stays in your browser.</span>
+    <span class="muted" style="margin-left:auto">© <span data-year>2026</span></span>
+  </footer>
+
+  <script src="js/words.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/site.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/keyboard.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

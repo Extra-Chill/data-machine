@@ -1,0 +1,13 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "product-launch",
+    "automotive",
+    "immersive",
+    "has-form",
+    "has-nav",
+    "multipage",
+    "scroll-animation"
+  ],
+  "complexity": 3
+}

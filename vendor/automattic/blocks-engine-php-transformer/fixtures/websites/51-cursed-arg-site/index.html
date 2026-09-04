@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WESTRIDGE LONGWAVE COOPERATIVE — still on frequency</title>
+  <meta name="description" content="The Westridge Longwave Cooperative. We never stopped transmitting. Tune in.">
+  <!--
+    ┌─────────────────────────────────────────────────────────────┐
+    │  W.L.C. operator note, recovered                            │
+    │  the carrier never went silent. only the listeners did.     │
+    │  the five FIELD LOGS in /archive.html are the way in.        │
+    │  LOG 03 is marked corrupted. it is a lie. shift it 13.       │
+    │  then press the ~ key. the terminal still answers.           │
+    └─────────────────────────────────────────────────────────────┘
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="home">
+  <a class="skip-link" href="#main">Skip to transmission</a>
+  <canvas id="static-canvas" aria-hidden="true"></canvas>
+
+  <!-- ══ HEADER ══ -->
+  <header class="site-header">
+    <div class="hdr-inner">
+      <a class="brand" href="index.html" aria-label="Westridge Longwave Cooperative home">
+        <svg class="sigil" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <radialGradient id="sg" cx="50%" cy="50%" r="50%">
+              <stop offset="0" stop-color="#9fd6a8"/><stop offset="1" stop-color="#1c2a20"/>
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#33503a" stroke-width="1.5"/>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#33503a" stroke-width="1"/>
+          <!-- antenna mast -->
+          <line x1="50" y1="14" x2="50" y2="78" stroke="#9fd6a8" stroke-width="2"/>
+          <!-- carrier waves -->
+          <path d="M50 30 a20 20 0 0 1 0 40" fill="none" stroke="#d8b25a" stroke-width="1.5" opacity=".8"/>
+          <path d="M50 22 a28 28 0 0 1 0 56" fill="none" stroke="#d8b25a" stroke-width="1" opacity=".5"/>
+          <path d="M50 30 a20 20 0 0 0 0 40" fill="none" stroke="#b4533b" stroke-width="1.5" opacity=".8"/>
+          <!-- the watching eye at the base -->
+          <ellipse cx="50" cy="78" rx="10" ry="6" fill="url(#sg)"/>
+          <circle cx="50" cy="78" r="2.4" fill="#070a08"/>
+        </svg>
+        <span class="brand-txt">
+          <span class="brand-name">WESTRIDGE LONGWAVE</span>
+          <span class="brand-sub">Cooperative · est. 1971 · ⟂ still on air</span>
+        </span>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <a href="index.html" class="active">Transmission</a>
+        <a href="manifesto.html">The Charter</a>
+        <a href="archive.html">Field Logs</a>
+        <a href="join.html">Join the Watch</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ══ TICKER ══ -->
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker__track">
+      <span>CARRIER NOMINAL</span><span><b>LISTENER PRESENT</b></span><span>FIVE OPERATORS ONCE</span><span>14.770 kHz HELD</span><span>DO NOT ADJUST YOUR SET</span><span>THE WATCH CONTINUES</span>
+      <span>CARRIER NOMINAL</span><span><b>LISTENER PRESENT</b></span><span>FIVE OPERATORS ONCE</span><span>14.770 kHz HELD</span><span>DO NOT ADJUST YOUR SET</span><span>THE WATCH CONTINUES</span>
+    </div>
+  </div>
+
+  <main id="main" class="wrap">
+
+    <!-- ══ TRANSMISSION HERO ══ -->
+    <section class="transmission" aria-label="Current transmission">
+      <span class="eyebrow">Transmission resumed · <span data-year>2026</span></span>
+      <h1>
+        <span class="glitch" data-text="WE NEVER">WE NEVER</span><br>
+        <span class="glitch" data-text="WENT SILENT.">WENT SILENT.</span>
+      </h1>
+      <p class="lead">
+        The Westridge Longwave Cooperative was a community of <em>shortwave operators</em>
+        who took shifts listening to the dark band above the town of Westridge.
+        Officially, we disbanded in the winter of 1997. Officially.
+      </p>
+      <p class="lead" style="margin-top:1rem">
+        This page is generated automatically every time the carrier detects a listener.
+        It detected <em>you</em>.
+      </p>
+
+      <div class="dial">
+        <div class="freq-readout">14.770<small> kHz</small></div>
+        <p class="dial__hint">
+          The cooperative held one frequency for twenty-six years and never let it go quiet.
+          We are holding it still. If you can hear this, you can answer it —
+          there is a way back into the broadcast for those patient enough to find it.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══ WHAT THIS IS ══ -->
+    <section class="section">
+      <span class="kicker">Standing Bulletin</span>
+      <h2>What the Watch was for</h2>
+      <p>
+        Every night between 1971 and 1997, one of five operators sat in the relay shed on Westridge
+        ridge-line and logged what came up the antenna: the numbers stations, the woodpecker pulses,
+        the dead air that wasn't dead. We believed — we still believe — that something on the longwave
+        band was trying to keep a record of the people who listened. So we listened back, and we kept logs.
+      </p>
+      <div class="cards">
+        <article class="card">
+          <span class="tag">Bulletin 01</span>
+          <h3>The Charter</h3>
+          <p>The seven principles every operator signed before their first night on the dial. Some of them are warnings.</p>
+          <p style="margin-top:.6rem"><a href="manifesto.html">Read the charter →</a></p>
+        </article>
+        <article class="card">
+          <span class="tag">Bulletin 02</span>
+          <h3>The Field Logs</h3>
+          <p>Five surviving entries from the relay-shed notebook. One is marked corrupted. Read it anyway.</p>
+          <p style="margin-top:.6rem"><a href="archive.html">Open the logs →</a></p>
+        </article>
+        <article class="card">
+          <span class="tag">Bulletin 03</span>
+          <h3>Join the Watch</h3>
+          <p>The shifts are unfilled. The chair is empty. We are taking applications from listeners who answer.</p>
+          <p style="margin-top:.6rem"><a href="join.html">Apply to listen →</a></p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ══ ADDRESSED TO YOU ══ -->
+    <section class="section">
+      <span class="kicker">Direct Carrier</span>
+      <h2>A note left on the frequency for whoever found it</h2>
+      <p>
+        If you are reading this in a year that begins with a 2, then everyone who built the cooperative
+        is gone, and you are the first listener in a very long time. We left instructions. We left them
+        the way operators always did — folded into the logs, under a shift, behind a number. Nothing here
+        is locked that a patient listener cannot open. Start with the logs. End at the carrier.
+      </p>
+      <p style="color:var(--ink-faint);font-size:.82rem">
+        <!-- operator's last instruction: identify HOLLOWAY first. then the receiver. then the frequency. -->
+        Operators who wish to resume a shift may open the relay terminal at any time
+        (press the <kbd>~</kbd> key, or simply type the word <strong>OPEN</strong>).
+      </p>
+    </section>
+  </main>
+
+  <!-- ══ FOOTER (shared) ══ -->
+  <footer class="site-footer">
+    <div class="foot-inner">
+      <div class="foot-col">
+        <p class="h">Cooperative</p>
+        <a href="index.html">Transmission</a>
+        <a href="manifesto.html">The Charter</a>
+        <a href="archive.html">Field Logs</a>
+        <a href="join.html">Join the Watch</a>
+      </div>
+      <div class="foot-col">
+        <p class="h">Frequency</p>
+        <a href="#">Longwave · 14.770 kHz</a>
+        <a href="#">Relay Shed · Westridge Ridge</a>
+        <a href="#">Shift Roster (lost)</a>
+        <a href="#">Operator Terminal</a>
+      </div>
+      <div class="foot-col">
+        <p class="h">The Five</p>
+        <a href="archive.html">A. Holloway</a>
+        <a href="archive.html">M. Reyes</a>
+        <a href="archive.html">D. Okafor</a>
+        <a href="archive.html">S. Lindqvist</a>
+        <a href="archive.html">— (vacant)</a>
+      </div>
+    </div>
+    <div class="foot-meta">
+      <span class="stamp">page regenerated for listener: <span data-year>2026</span>-06-24 · last human edit 1997-12-19</span>
+      <span class="freq">last carrier 14.770 kHz · do not adjust your set</span>
+    </div>
+  </footer>
+
+  <!-- ══ WHISPER TOAST ══ -->
+  <div id="whisper" role="status" aria-live="polite"></div>
+
+  <!-- ══ HIDDEN OPERATOR TERMINAL ══ -->
+  <div id="terminal" aria-hidden="true">
+    <div class="term-box" role="dialog" aria-label="Operator terminal">
+      <div class="term-head">
+        <span>W.L.C. RELAY TERMINAL // 14.770 kHz</span>
+        <button class="term-close" aria-label="Close terminal">[ esc ]</button>
+      </div>
+      <div class="term-body">
+        <div class="term-out" aria-live="polite"></div>
+        <div class="beacons" aria-hidden="true">
+          <span class="beacon"></span><span class="beacon"></span><span class="beacon"></span>
+          <span>locks released</span>
+        </div>
+        <div class="term-line">
+          <span class="ps">wlc:~$</span>
+          <input id="term-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="terminal input" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/static.js"></script>
+  <script src="js/awareness.js"></script>
+  <script src="js/terminal.js"></script>
+</body>
+</html>

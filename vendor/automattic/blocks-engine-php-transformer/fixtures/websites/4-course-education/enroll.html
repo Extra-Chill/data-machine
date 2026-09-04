@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enroll — Practical Grant Writing</title>
+  <meta name="description" content="Reserve your seat in the September 10 cohort of Practical Grant Writing. $489 per seat. Enrollment closes September 3.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400;1,700&family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <nav class="nav-inner" aria-label="Main navigation">
+      <a href="index.html" class="nav-logo" aria-label="Practical Grant Writing — Home">
+        <svg class="nav-logo__icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="5" y="2" width="17" height="23" rx="2" fill="rgba(43,72,64,0.1)" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="9" y1="8" x2="18" y2="8" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+          <line x1="9" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+          <line x1="9" y1="16" x2="14" y2="16" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+          <path d="M19 19.5 L28 10.5 L25.5 8 L16.5 17 Z" fill="currentColor" opacity="0.7"/>
+          <path d="M16.5 17 L19 19.5 L17 20.5 Z" fill="currentColor" opacity="0.5"/>
+        </svg>
+        <div class="nav-logo__text">
+          Practical Grant Writing
+          <span>by Elena Park</span>
+        </div>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links" role="list">
+        <li><a href="curriculum.html">Curriculum</a></li>
+        <li><a href="instructor.html">Instructor</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="faq.html">FAQ</a></li>
+        <li><a href="enroll.html" class="nav-cta">Enroll Now</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ── PAGE HERO ── -->
+    <section class="page-hero" aria-labelledby="page-title">
+      <div class="container page-hero__inner">
+        <span class="page-hero__eyebrow">September 10 cohort · Enrollment closes September 3</span>
+        <h1 class="page-hero__title" id="page-title">Enroll in Practical Grant Writing</h1>
+        <p class="page-hero__desc">Reserve your seat below. We'll confirm your enrollment and send you everything you need within one business day.</p>
+      </div>
+    </section>
+
+    <!-- ── ENROLL FORM ── -->
+    <section class="section" aria-labelledby="form-title">
+      <div class="container">
+        <div class="enroll-layout">
+
+          <!-- Form -->
+          <div class="enroll-form-card reveal">
+            <h2 id="form-title">Your enrollment</h2>
+            <p class="form-intro">Fill out the form below to reserve your seat in the September 10 cohort. If you're applying for a scholarship, check the box at the bottom and we'll review your application within five business days.</p>
+
+            <form id="enroll-form" novalidate aria-label="Enrollment form">
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="first-name">First name <span aria-hidden="true" style="color:var(--clay);">*</span></label>
+                  <input class="form-input" type="text" id="first-name" name="first-name" required autocomplete="given-name" placeholder="Maria">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="last-name">Last name <span aria-hidden="true" style="color:var(--clay);">*</span></label>
+                  <input class="form-input" type="text" id="last-name" name="last-name" required autocomplete="family-name" placeholder="Thornton">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="email">Email address <span aria-hidden="true" style="color:var(--clay);">*</span></label>
+                <input class="form-input" type="email" id="email" name="email" required autocomplete="email" placeholder="maria@organizationname.org">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="org">Organization name <span aria-hidden="true" style="color:var(--clay);">*</span></label>
+                <input class="form-input" type="text" id="org" name="org" required autocomplete="organization" placeholder="Chicago Food Pantry Network">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="role">Your role <span aria-hidden="true" style="color:var(--clay);">*</span></label>
+                <select class="form-select" id="role" name="role" required>
+                  <option value="" disabled selected>Select your role</option>
+                  <option value="development-coordinator">Development Coordinator</option>
+                  <option value="program-manager">Program Manager</option>
+                  <option value="executive-director">Executive Director</option>
+                  <option value="development-director">Development Director</option>
+                  <option value="grants-manager">Grants Manager</option>
+                  <option value="communications">Communications Staff</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="grant-experience">Grant writing experience</label>
+                <select class="form-select" id="grant-experience" name="grant-experience">
+                  <option value="" disabled selected>Select an option</option>
+                  <option value="none">No prior experience</option>
+                  <option value="some">1–2 years of experience</option>
+                  <option value="moderate">3–5 years of experience</option>
+                  <option value="extensive">6+ years of experience</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="hear-about">How did you hear about this course?</label>
+                <select class="form-select" id="hear-about" name="hear-about">
+                  <option value="" disabled selected>Select an option</option>
+                  <option value="colleague">Colleague or word of mouth</option>
+                  <option value="social">Social media</option>
+                  <option value="email">Email newsletter</option>
+                  <option value="search">Web search</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="goals">What do you most want to learn? <span style="color:var(--ink-light); font-size:0.6rem; letter-spacing:0; text-transform:none; font-family:var(--font-body);">(optional)</span></label>
+                <textarea class="form-textarea" id="goals" name="goals" placeholder="e.g. I've been writing grants for three years but always struggle with the outcomes section…"></textarea>
+              </div>
+
+              <hr style="border:none; border-top:1px solid var(--parchment); margin:1.5rem 0;">
+
+              <div class="form-group">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="scholarship" name="scholarship" value="yes" style="width:17px; height:17px; border:1.5px solid var(--parchment); border-radius:3px; margin-top:3px; accent-color:var(--forest); cursor:pointer;">
+                  <label class="form-check-label" for="scholarship">
+                    <strong style="color:var(--ink);">I'd like to apply for a scholarship seat.</strong> Our organization has an annual budget under $500,000 and serves a community that has historically had limited access to private philanthropy. I understand that scholarship seats are limited and we'll be notified within five business days.
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group" id="scholarship-details-group" style="display:none;">
+                <label class="form-label" for="scholarship-details">Tell us about your organization <span aria-hidden="true" style="color:var(--clay);">*</span></label>
+                <textarea class="form-textarea" id="scholarship-details" name="scholarship-details" placeholder="Briefly describe your organization's mission, the community you serve, your approximate annual budget, and why this course would be beneficial…" style="min-height:120px;"></textarea>
+              </div>
+
+              <div class="form-group">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="terms" name="terms" required style="width:17px; height:17px; border:1.5px solid var(--parchment); border-radius:3px; margin-top:3px; accent-color:var(--forest); cursor:pointer;">
+                  <label class="form-check-label" for="terms">
+                    I understand that enrollment is confirmed upon payment, that full refunds are available until September 3, and that recordings and materials will be accessible within 24 hours of each session. <span aria-hidden="true" style="color:var(--clay);">*</span>
+                  </label>
+                </div>
+              </div>
+
+              <button type="submit" class="form-submit">Submit enrollment — $489</button>
+              <div class="form-success" role="alert">
+                Thank you! We'll confirm your enrollment and send payment instructions within one business day.
+              </div>
+
+              <p style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.06em; color:var(--ink-light); text-align:center; margin-top:1rem; line-height:1.6;">This form submits your enrollment request. Payment and final confirmation will be handled via email. Questions? Email courses@evalcourses.org</p>
+
+            </form>
+          </div>
+
+          <!-- Sidebar -->
+          <aside class="enroll-sidebar" aria-label="Enrollment details">
+
+            <div class="cohort-card">
+              <h3>September 10 cohort</h3>
+              <div class="cohort-details">
+                <div class="cohort-detail">
+                  <span class="cohort-detail-label">Course start</span>
+                  <span class="cohort-detail-value">September 10, 2024</span>
+                </div>
+                <div class="cohort-detail">
+                  <span class="cohort-detail-label">Enrollment closes</span>
+                  <span class="cohort-detail-value">September 3, 2024</span>
+                </div>
+                <div class="cohort-detail">
+                  <span class="cohort-detail-label">Live sessions</span>
+                  <span class="cohort-detail-value">Tuesdays, 1–2:30pm ET<br>Sept 10 through Oct 15</span>
+                </div>
+                <div class="cohort-detail">
+                  <span class="cohort-detail-label">Price</span>
+                  <span class="cohort-detail-value">$489 per seat</span>
+                </div>
+                <div class="cohort-detail">
+                  <span class="cohort-detail-label">Scholarships</span>
+                  <span class="cohort-detail-value">3 spots available</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="includes-card">
+              <h3>Your enrollment includes</h3>
+              <ul class="includes-list">
+                <li>6 live sessions with Elena Park</li>
+                <li>All session recordings — permanent access</li>
+                <li>6 weekly practical worksheets</li>
+                <li>Reusable grant template kit</li>
+                <li>Cohort community access</li>
+                <li>Certificate of completion</li>
+              </ul>
+            </div>
+
+            <blockquote style="background:var(--forest); color:var(--cream); border-radius:var(--radius-lg); padding:1.75rem 2rem; position:relative; overflow:hidden;">
+              <div aria-hidden="true" style="font-family:var(--font-display); font-size:7rem; line-height:1; color:rgba(255,255,255,0.07); position:absolute; top:-1rem; left:1rem; user-select:none;">&ldquo;</div>
+              <p style="font-family:var(--font-display); font-style:italic; font-size:1rem; line-height:1.55; margin-bottom:1rem; position:relative; z-index:1; color:rgba(247,242,232,0.9);">"This is the class I wish I'd had five years into my development career."</p>
+              <footer style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--sage-light);">Maria T. — Development Coordinator</footer>
+            </blockquote>
+
+            <div style="background:var(--cream-deep); border:1px solid var(--parchment); border-radius:var(--radius-lg); padding:1.5rem;">
+              <p style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.13em; text-transform:uppercase; color:var(--sage); margin-bottom:0.75rem;">Questions?</p>
+              <p style="font-size:0.9rem; color:var(--ink-mid); line-height:1.65; margin-bottom:0.625rem;">We respond to every email within one business day.</p>
+              <p style="font-family:var(--font-mono); font-size:0.875rem; color:var(--forest);">courses@evalcourses.org</p>
+            </div>
+
+          </aside>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-grid">
+      <div>
+        <a href="index.html" class="footer-logo" aria-label="Home">
+          <svg width="22" height="22" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="5" y="2" width="17" height="23" rx="2" fill="rgba(247,242,232,0.1)" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="9" y1="8" x2="18" y2="8" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+            <line x1="9" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+            <path d="M19 19.5 L28 10.5 L25.5 8 L16.5 17 Z" fill="currentColor" opacity="0.65"/>
+          </svg>
+          <span class="footer-logo__name">Practical Grant Writing</span>
+        </a>
+        <p class="footer-tagline">A six-week online course for nonprofit professionals who write grants without a full team. Taught by Elena Park.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Course</h4>
+        <ul>
+          <li><a href="curriculum.html">Curriculum</a></li>
+          <li><a href="instructor.html">Instructor</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="pricing.html#scholarships">Scholarships</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Info</h4>
+        <ul>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="enroll.html">Enroll</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2024 Eval Course Education. All rights reserved.</p>
+      <span class="footer-cohort-badge">Next cohort: September 10 &middot; Enrollment closes September 3</span>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+  <script>
+    // Show/hide scholarship details textarea
+    var scholarshipCheck = document.getElementById('scholarship');
+    var scholarshipGroup = document.getElementById('scholarship-details-group');
+    if (scholarshipCheck && scholarshipGroup) {
+      scholarshipCheck.addEventListener('change', function () {
+        scholarshipGroup.style.display = this.checked ? 'block' : 'none';
+        var textarea = document.getElementById('scholarship-details');
+        if (textarea) {
+          textarea.required = this.checked;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

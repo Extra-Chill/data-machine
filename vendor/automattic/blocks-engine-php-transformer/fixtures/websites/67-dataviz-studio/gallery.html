@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery — Plotweaver</title>
+  <meta name="description" content="A gallery of preset chart + dataset combinations built in Plotweaver. Open any one straight into the studio to edit the data and configuration.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='16' width='4' height='11' rx='1' fill='%236ee7ff'/%3E%3Crect x='13' y='9' width='4' height='18' rx='1' fill='%23a78bfa'/%3E%3Crect x='21' y='13' width='4' height='14' rx='1' fill='%23fb7185'/%3E%3Cpath d='M5 8 L13 12 L21 5 L28 9' fill='none' stroke='%236ee7ff' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body data-theme="dark">
+
+<header class="topbar">
+  <a class="brand" href="index.html" aria-label="Plotweaver home">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="5" y="16" width="4" height="11" rx="1" fill="#6ee7ff"/>
+      <rect x="13" y="9" width="4" height="18" rx="1" fill="#a78bfa"/>
+      <rect x="21" y="13" width="4" height="14" rx="1" fill="#fb7185"/>
+      <path d="M5 8 L13 12 L21 5 L28 9" fill="none" stroke="#6ee7ff" stroke-width="2"/>
+    </svg>
+    <span class="brand-name">Plot<b>weaver</b><span class="brand-sub">DataViz Studio</span></span>
+  </a>
+  <nav class="top-nav" aria-label="Primary">
+    <a href="index.html">Studio</a>
+    <a href="gallery.html" class="active">Gallery</a>
+    <a href="about.html">About</a>
+  </nav>
+  <div class="top-spacer"></div>
+  <button class="ctrl" id="themeToggle" aria-label="Toggle color theme">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+    <span class="tlabel">Dark</span>
+  </button>
+</header>
+
+<main class="gallery">
+  <h1>Chart Gallery</h1>
+  <p class="lede">Nine preset chart + dataset combinations, each rendered live by Plotweaver's own canvas engine. Open any one straight into the studio to remix the data, swap the chart type, or change the palette.</p>
+  <div class="gal-grid" id="galGrid"></div>
+</main>
+
+<script src="js/data.js"></script>
+<script src="js/chart.js"></script>
+<script src="js/model.js"></script>
+<script src="js/presets.js"></script>
+<script src="js/gallery.js"></script>
+</body>
+</html>

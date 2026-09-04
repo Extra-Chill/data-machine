@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Noisewright Studio — Generative Art &amp; Creative Technology</title>
+  <meta name="description" content="Noisewright is a generative-art and creative-technology studio building data-driven installations, code-based identity systems, and live algorithmic commissions.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ══════════════ HEADER ══════════════ -->
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Noisewright Studio home">
+      <span class="logo-mark">Noisewright<span class="logo-dot">.</span></span>
+      <span class="logo-sub">Generative Studio</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Index</a>
+      <a href="work.html">Work</a>
+      <a href="studio.html">Studio</a>
+      <a href="contact.html" class="nav-cta">Commission</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- ══════════════ HERO ══════════════ -->
+    <section class="hero" aria-label="Noisewright Studio">
+      <canvas id="hero-canvas" aria-hidden="true"></canvas>
+      <div class="hero-veil" aria-hidden="true"></div>
+
+      <div class="hero-meta" aria-hidden="true">
+        <div>field: <b>perlin-advected</b></div>
+        <div>particles: <b>live</b></div>
+        <div>seed: <b>0x20260624</b></div>
+        <div>fps: <b>60</b></div>
+      </div>
+
+      <div class="hero-inner">
+        <p class="hero-eyebrow">Generative art &amp; creative technology · Lisbon / Remote</p>
+        <h1 class="hero-title">
+          <span class="hero-line"><span>We write</span></span>
+          <span class="hero-line"><span><em>noise</em> into form.</span></span>
+        </h1>
+        <p class="hero-sub">
+          Noisewright builds data-driven installations, code-based identity systems, and
+          living algorithmic artworks. Every pixel above is generated in your browser, right now —
+          no two visitors see the same frame.
+        </p>
+        <div class="hero-actions">
+          <a href="work.html" class="btn btn-primary">See the work <span class="btn-arrow">→</span></a>
+          <a href="contact.html" class="btn btn-outline">Start a commission</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ MARQUEE ══════════════ -->
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span class="marquee-item">Flow Fields <span>✳</span></span>
+        <span class="marquee-item">Generative Identity <span>✳</span></span>
+        <span class="marquee-item">Data Sculpture <span>✳</span></span>
+        <span class="marquee-item">Real-Time Shaders <span>✳</span></span>
+        <span class="marquee-item">Plotter Drawings <span>✳</span></span>
+        <span class="marquee-item">Live Installations <span>✳</span></span>
+        <span class="marquee-item">Flow Fields <span>✳</span></span>
+        <span class="marquee-item">Generative Identity <span>✳</span></span>
+        <span class="marquee-item">Data Sculpture <span>✳</span></span>
+        <span class="marquee-item">Real-Time Shaders <span>✳</span></span>
+        <span class="marquee-item">Plotter Drawings <span>✳</span></span>
+        <span class="marquee-item">Live Installations <span>✳</span></span>
+      </div>
+    </div>
+
+    <!-- ══════════════ MANIFESTO ══════════════ -->
+    <section class="section section--soft" aria-labelledby="intro-heading">
+      <div class="wrap manifesto">
+        <div class="reveal">
+          <p class="manifesto-label">[ 00 — The premise ]</p>
+        </div>
+        <p class="manifesto-body" id="intro-heading">
+          We treat <em>code as a material</em> — something with grain and resistance, something
+          you sculpt rather than command. A noise function is our clay; a random seed is our chisel.
+          We build systems that <em>make their own decisions</em>, then we tune the rules until the
+          machine surprises us. The result is never a single image. It is a space of images —
+          a living thing that keeps drawing itself long after we have left the room.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══════════════ SELECTED WORK ══════════════ -->
+    <section class="section" aria-labelledby="work-heading">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">01</span> / Selected work</p>
+            <h2 class="section-title" id="work-heading">Systems that <em>draw themselves</em></h2>
+          </div>
+          <a href="work.html" class="section-link">All projects →</a>
+        </div>
+
+        <div class="works-grid">
+          <article class="work-card big reveal">
+            <div class="work-thumb">
+              <canvas data-thumb="field" data-seed="101" aria-hidden="true"></canvas>
+              <button class="work-regen" aria-label="Regenerate preview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg>
+                Regenerate
+              </button>
+            </div>
+            <div class="work-body">
+              <div class="work-tags"><span class="work-tag">Installation</span><span class="work-tag">Flow field</span><span class="work-tag">12m LED wall</span></div>
+              <h3 class="work-name">Tidal Memory</h3>
+              <p class="work-meta">Oceanário de Lisboa · 2025 · Permanent</p>
+              <p class="work-desc">A 12-metre LED wall fed by live tide-gauge data from the Tagus estuary. Particle currents bend toward the real, present height of the water outside.</p>
+            </div>
+          </article>
+
+          <article class="work-card reveal reveal-d1">
+            <div class="work-thumb">
+              <canvas data-thumb="orbits" data-seed="202" aria-hidden="true"></canvas>
+              <button class="work-regen" aria-label="Regenerate preview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg>
+                Regenerate
+              </button>
+            </div>
+            <div class="work-body">
+              <div class="work-tags"><span class="work-tag">Identity</span><span class="work-tag">Logo system</span></div>
+              <h3 class="work-name">Helio Foundation</h3>
+              <p class="work-meta">Brand identity · 2024</p>
+              <p class="work-desc">A logomark with infinite legitimate variants — every grant recipient receives a unique, deterministically-seeded mark.</p>
+            </div>
+          </article>
+
+          <article class="work-card reveal reveal-d2">
+            <div class="work-thumb">
+              <canvas data-thumb="voronoi" data-seed="303" aria-hidden="true"></canvas>
+              <button class="work-regen" aria-label="Regenerate preview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg>
+                Regenerate
+              </button>
+            </div>
+            <div class="work-body">
+              <div class="work-tags"><span class="work-tag">Print</span><span class="work-tag">Plotter</span></div>
+              <h3 class="work-name">Cell Census</h3>
+              <p class="work-meta">Edition of 200 · AxiDraw · 2024</p>
+              <p class="work-desc">A pen-plotted series where each print maps a different city's residential density into a Voronoi field of ink.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ INTERACTIVE LAB ══════════════ -->
+    <section class="section section--soft" aria-labelledby="lab-heading">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">02</span> / The lab</p>
+            <h2 class="section-title" id="lab-heading">Drive the <em>algorithm</em></h2>
+          </div>
+          <p class="mono" style="max-width:30ch;">Move the sliders. The drawing re-renders live — this is how we develop every piece.</p>
+        </div>
+
+        <div class="lab">
+          <div class="lab-stage">
+            <canvas id="lab-canvas" aria-label="Live generative pattern controlled by the sliders below"></canvas>
+          </div>
+          <div class="lab-controls">
+            <div class="lab-control">
+              <label for="lab-density">Density <b id="lab-density-val">28</b></label>
+              <input type="range" id="lab-density" min="6" max="60" value="28">
+            </div>
+            <div class="lab-control">
+              <label for="lab-twist">Twist <b id="lab-twist-val">5</b></label>
+              <input type="range" id="lab-twist" min="0" max="20" value="5">
+            </div>
+            <div class="lab-control">
+              <label for="lab-scale">Turbulence <b id="lab-scale-val">2.4</b></label>
+              <input type="range" id="lab-scale" min="0.5" max="6" step="0.1" value="2.4">
+            </div>
+            <div class="lab-control">
+              <label>Palette</label>
+              <div class="lab-palette" role="group" aria-label="Palette">
+                <button class="lab-swatch active" style="background:#6cf2c8" aria-label="Mint palette"></button>
+                <button class="lab-swatch" style="background:#ff6b8b" aria-label="Coral palette"></button>
+                <button class="lab-swatch" style="background:#8a7bff" aria-label="Violet palette"></button>
+                <button class="lab-swatch" style="background:#ffd166" aria-label="Amber palette"></button>
+              </div>
+            </div>
+            <button class="btn btn-outline" id="lab-regen" type="button">New seed ⟳</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ CAPABILITIES ══════════════ -->
+    <section class="section" aria-labelledby="cap-heading">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">03</span> / Capabilities</p>
+            <h2 class="section-title" id="cap-heading">What we make</h2>
+          </div>
+        </div>
+
+        <div class="cap-grid reveal">
+          <div class="cap">
+            <p class="cap-num">01</p>
+            <div class="cap-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="#6cf2c8" stroke-width="1.4"><path d="M4 36c8-16 12-16 20 0s12 16 20 0"/><path d="M4 24c8-16 12-16 20 0s12 16 20 0" opacity="0.5"/></svg>
+            </div>
+            <h3 class="cap-title">Live installations</h3>
+            <p class="cap-desc">Real-time, sensor-and-data-driven artworks for galleries, lobbies, and public space — built to run unattended for years.</p>
+          </div>
+          <div class="cap">
+            <p class="cap-num">02</p>
+            <div class="cap-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="#8a7bff" stroke-width="1.4"><circle cx="24" cy="24" r="6"/><circle cx="24" cy="24" r="14" opacity="0.6"/><circle cx="24" cy="24" r="20" opacity="0.3"/></svg>
+            </div>
+            <h3 class="cap-title">Generative identity</h3>
+            <p class="cap-desc">Brand systems that aren't a single logo but an entire grammar — infinite, on-brand variations from one parametric source.</p>
+          </div>
+          <div class="cap">
+            <p class="cap-num">03</p>
+            <div class="cap-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="#ff6b8b" stroke-width="1.4"><path d="M8 40 L24 8 L40 40 Z"/><path d="M16 40 L24 24 L32 40" opacity="0.5"/></svg>
+            </div>
+            <h3 class="cap-title">Data sculpture</h3>
+            <p class="cap-desc">Turning datasets into objects and prints — pen-plotter editions, CNC reliefs, and 3D-printed forms grown from numbers.</p>
+          </div>
+          <div class="cap">
+            <p class="cap-num">04</p>
+            <div class="cap-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="#ffd166" stroke-width="1.4"><rect x="8" y="8" width="14" height="14"/><rect x="26" y="8" width="14" height="14" opacity="0.6"/><rect x="8" y="26" width="14" height="14" opacity="0.6"/><rect x="26" y="26" width="14" height="14" opacity="0.3"/></svg>
+            </div>
+            <h3 class="cap-title">Web experiences</h3>
+            <p class="cap-desc">Performant canvas and WebGL work for the browser — launch sites, generative drops, and interactive editorial.</p>
+          </div>
+          <div class="cap">
+            <p class="cap-num">05</p>
+            <div class="cap-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="#6cf2c8" stroke-width="1.4"><path d="M24 4 L44 16 L44 32 L24 44 L4 32 L4 16 Z"/><path d="M24 4 L24 44 M4 16 L44 32 M44 16 L4 32" opacity="0.4"/></svg>
+            </div>
+            <h3 class="cap-title">Workshops &amp; R&amp;D</h3>
+            <p class="cap-desc">Teaching teams to think in systems — from intro creative-coding sessions to embedded research residencies.</p>
+          </div>
+          <div class="cap">
+            <p class="cap-num">06</p>
+            <div class="cap-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="#8a7bff" stroke-width="1.4"><path d="M6 24 Q24 4 42 24 Q24 44 6 24Z"/><circle cx="24" cy="24" r="5"/></svg>
+            </div>
+            <h3 class="cap-title">Tooling &amp; libraries</h3>
+            <p class="cap-desc">We open-source the engines we build — small, dependency-free libraries for noise, color, and plotter output.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ STATS ══════════════ -->
+    <section class="section section--soft" aria-label="Studio numbers">
+      <div class="wrap stats reveal">
+        <div><div class="stat-num"><span data-count="9">9</span></div><div class="stat-label">Years running</div></div>
+        <div><div class="stat-num"><span data-count="140" data-suffix="+">140+</span></div><div class="stat-label">Commissions shipped</div></div>
+        <div><div class="stat-num"><span data-count="11">11</span></div><div class="stat-label">Permanent installs</div></div>
+        <div><div class="stat-num"><span data-count="6">6</span></div><div class="stat-label">People in the studio</div></div>
+      </div>
+    </section>
+
+    <!-- ══════════════ CTA ══════════════ -->
+    <section class="cta" aria-labelledby="cta-heading">
+      <canvas id="cta-canvas" aria-hidden="true"></canvas>
+      <div class="cta-inner wrap">
+        <h2 class="cta-title" id="cta-heading">Have a surface that <em>should be alive?</em></h2>
+        <p class="cta-sub">A wall, a screen, a brand, a dataset, a question. Tell us what it is and what it should feel like — we'll write the system that gets you there.</p>
+        <a href="contact.html" class="btn btn-primary">Start a commission <span class="btn-arrow">→</span></a>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════════ FOOTER ══════════════ -->
+  <footer class="site-footer" role="contentinfo">
+    <canvas id="footer-canvas" aria-hidden="true"></canvas>
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Noisewright<span class="logo-dot">.</span></div>
+          <p class="footer-brand-desc">A generative-art and creative-technology studio. We write noise into form — for walls, brands, browsers, and the occasional pen plotter.</p>
+        </div>
+        <nav class="footer-col" aria-label="Studio links">
+          <p class="footer-col-title">Studio</p>
+          <ul>
+            <li><a href="work.html">Selected work</a></li>
+            <li><a href="studio.html">About the studio</a></li>
+            <li><a href="studio.html">Process</a></li>
+            <li><a href="studio.html">The team</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Service links">
+          <p class="footer-col-title">Services</p>
+          <ul>
+            <li><a href="work.html">Installations</a></li>
+            <li><a href="work.html">Generative identity</a></li>
+            <li><a href="work.html">Data sculpture</a></li>
+            <li><a href="contact.html">Workshops</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Connect links">
+          <p class="footer-col-title">Connect</p>
+          <ul>
+            <li><a href="contact.html">Commission us</a></li>
+            <li><a href="mailto:studio@noisewright.art">studio@noisewright.art</a></li>
+            <li><a href="#">Instagram</a></li>
+            <li><a href="#">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Noisewright Studio Lda · Lisbon, Portugal</p>
+        <div class="footer-legal">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Colophon</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/generative.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

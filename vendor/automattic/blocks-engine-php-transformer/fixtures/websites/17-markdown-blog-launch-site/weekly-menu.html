@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>This Week's Dinner Menu — Northstar Pantry</title>
+  <meta name="description" content="A sample week of Northstar Pantry dinners: Sheet Pan Lemon Herb Chicken, Black Bean Tacos, Salmon, Pasta e Fagioli, and more. Real food for real families.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ===== Menu hero ===== */
+    .menu-hero {
+      background: var(--cream);
+      padding: clamp(3rem, 7vw, 6rem) 0 clamp(2.5rem, 5vw, 4.5rem);
+    }
+    .menu-hero h1 {
+      font-size: var(--text-5xl);
+      max-width: 16ch;
+      margin-bottom: var(--s5);
+    }
+    .menu-hero p {
+      font-size: var(--text-lg);
+      max-width: 56ch;
+      margin-bottom: var(--s8);
+    }
+    .menu-stats {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s4);
+      flex-wrap: wrap;
+      font-family: var(--font-hand);
+      font-size: var(--text-xl);
+      color: var(--sage-dark);
+    }
+    .menu-stats .divider {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--terracotta);
+    }
+    .menu-hero__link {
+      margin-top: var(--s6);
+      font-size: var(--text-base);
+      color: var(--text-medium);
+    }
+    .menu-hero__link a {
+      color: var(--terracotta);
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-decoration-thickness: 1px;
+    }
+    .menu-hero__link a:hover { color: var(--terracotta-dark); }
+
+    /* ===== Week layout (per brief) ===== */
+    .menu-week { display: flex; flex-direction: column; gap: 1.5rem; }
+    .menu-card { background: var(--cream); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; display: flex; flex-direction: column; gap: 1rem; transition: box-shadow 280ms ease, transform 280ms ease; }
+    .menu-card:hover { box-shadow: 0 8px 32px rgba(44,31,18,0.13); transform: translateY(-2px); }
+    .menu-card--featured { background: var(--parchment); border-color: var(--parchment-dark, #D8C8A8); }
+    .menu-card--sunday { background: var(--sage-muted); border-color: rgba(107,124,90,0.28); }
+    .menu-card__day { font-family: var(--font-hand); font-size: 1.1rem; color: var(--terracotta); font-weight: 600; }
+    .menu-card__title { font-family: var(--font-display); font-size: clamp(1.5rem, 3vw, 2.25rem); font-weight: 600; color: var(--text-dark); line-height: 1.15; }
+    .menu-card__note { font-size: 0.9375rem; color: var(--text-medium); line-height: 1.7; max-width: 60ch; }
+    .menu-card__tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .menu-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    @media (max-width: 700px) { .menu-grid, .menu-grid-3 { grid-template-columns: 1fr; } }
+
+    /* Featured card decorative layout */
+    .menu-card--featured .menu-card__head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--s6);
+    }
+    .menu-deco {
+      flex-shrink: 0;
+      width: 64px;
+      height: 64px;
+      color: var(--terracotta);
+      opacity: 0.85;
+    }
+    @media (max-width: 560px) { .menu-deco { display: none; } }
+
+    /* ===== Shopping list ===== */
+    .shop-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--s10) var(--s12);
+    }
+    .shop-list__section h4 {
+      font-family: var(--font-body);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--terracotta);
+      padding-bottom: var(--s3);
+      margin-bottom: var(--s4);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: var(--s2);
+    }
+    .shop-list__section ul { display: flex; flex-direction: column; gap: var(--s3); }
+    .shop-list__section li {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--s3);
+      font-size: var(--text-sm);
+      color: var(--text-medium);
+      line-height: 1.5;
+    }
+    .shop-list__section li::before {
+      content: '';
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+      margin-top: 3px;
+      border: 1.5px solid var(--border-strong);
+      border-radius: 4px;
+    }
+    @media (max-width: 640px) { .shop-list { grid-template-columns: 1fr; } }
+
+    /* ===== CTA ===== */
+    .menu-cta { background: var(--terracotta); text-align: center; }
+    .menu-cta h2 { color: var(--warm-white); margin-bottom: var(--s5); }
+    .menu-cta p { color: rgba(251,246,238,0.82); margin-inline: auto; margin-bottom: var(--s8); font-size: var(--text-lg); }
+    .menu-cta .btn-row { display: inline-flex; gap: var(--s4); flex-wrap: wrap; justify-content: center; }
+    .btn-white { background: var(--warm-white); color: var(--terracotta); box-shadow: 0 2px 10px rgba(44,31,18,0.18); }
+    .btn-white:hover { background: #fff; transform: translateY(-2px); box-shadow: 0 4px 20px rgba(44,31,18,0.24); }
+    .btn-outline-white { background: transparent; color: var(--warm-white); border: 1.5px solid rgba(251,246,238,0.55); }
+    .btn-outline-white:hover { background: rgba(251,246,238,0.12); border-color: var(--warm-white); transform: translateY(-2px); }
+  </style>
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <div class="container">
+      <nav class="nav-inner" aria-label="Main navigation">
+        <a href="index.html" class="nav-logo" aria-label="Northstar Pantry — Home">
+          <svg class="nav-logo__mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M20 2L23 16.2L37 20L23 23.8L20 38L17 23.8L3 20L17 16.2Z" fill="currentColor"/>
+            <circle cx="20" cy="20" r="3.5" fill="white" opacity="0.5"/>
+          </svg>
+          <div class="nav-logo__text">
+            <span class="nav-logo__name">Northstar</span>
+            <span class="nav-logo__sub">Pantry</span>
+          </div>
+        </a>
+        <ul class="nav-links" role="list">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="how-it-works.html">How It Works</a></li>
+          <li><a href="weekly-menu.html">This Week's Menu</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="founder-story.html">Our Story</a></li>
+        </ul>
+        <div class="nav-actions">
+          <a href="pricing.html" class="btn btn-primary">Join Waitlist</a>
+          <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">
+            <span></span><span></span><span></span>
+          </button>
+        </div>
+      </nav>
+    </div>
+  </header>
+  <div class="mobile-menu" role="dialog" aria-label="Navigation menu">
+    <nav>
+      <ul class="mobile-menu__links" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="how-it-works.html">How It Works</a></li>
+        <li><a href="weekly-menu.html">This Week's Menu</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="founder-story.html">Our Story</a></li>
+        <li><a href="pantry-staples.html">Pantry Guide</a></li>
+      </ul>
+      <div class="mobile-menu__footer">
+        <a href="pricing.html" class="btn btn-primary btn-lg">Join the Waitlist</a>
+      </div>
+    </nav>
+  </div>
+
+  <main id="main">
+
+    <!-- ===== HERO ===== -->
+    <section class="menu-hero">
+      <div class="container">
+        <span class="eyebrow reveal">Sample week · June 2024</span>
+        <h1 class="reveal" data-delay="100">This week's dinner plan</h1>
+        <p class="reveal" data-delay="200">Seven nights, sorted. Here's a taste of what Northstar Pantry members received this week. Mix and match — the shopping list works regardless of the order you cook them.</p>
+        <div class="menu-stats reveal" data-delay="200" role="group" aria-label="Plan summary">
+          <span>7 dinners</span>
+          <span class="divider" aria-hidden="true"></span>
+          <span>1 shopping list</span>
+          <span class="divider" aria-hidden="true"></span>
+          <span>~45 min avg</span>
+        </div>
+        <p class="menu-hero__link reveal" data-delay="200">Want your own plan? <a href="pricing.html">Join the waitlist →</a></p>
+      </div>
+    </section>
+
+    <!-- ===== THE FULL WEEK ===== -->
+    <section class="bg-warm-white">
+      <div class="container">
+        <div class="section-head centered">
+          <span class="eyebrow reveal">Monday through Sunday</span>
+          <h2 class="section-title reveal" data-delay="100">The full week of dinners</h2>
+        </div>
+
+        <div class="menu-week">
+
+          <!-- Monday — Featured -->
+          <article class="menu-card menu-card--featured reveal" data-delay="0">
+            <div class="menu-card__head">
+              <div>
+                <span class="menu-card__day">Monday</span>
+                <h3 class="menu-card__title">Sheet Pan Lemon-Herb Chicken</h3>
+              </div>
+              <svg class="menu-deco" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="32" cy="32" r="22" fill="currentColor" opacity="0.12"/>
+                <circle cx="32" cy="32" r="22" stroke="currentColor" stroke-width="2"/>
+                <path d="M32 12 L32 52 M12 32 L52 32 M18 18 L46 46 M46 18 L18 46" stroke="currentColor" stroke-width="1.5" opacity="0.55"/>
+                <circle cx="32" cy="32" r="5" fill="currentColor" opacity="0.5"/>
+              </svg>
+            </div>
+            <p class="menu-card__note">Golden-skinned chicken thighs with a bright lemon-garlic marinade, roasted alongside broccoli, cherry tomatoes, and sliced onions until everything caramelizes at the edges. One pan in the oven, the rest of the evening is yours.</p>
+            <div class="menu-card__tags">
+              <span class="tag tag-terracotta">35 min</span>
+              <span class="tag tag-sage">One pan</span>
+              <span class="tag tag-gold">Family favorite</span>
+            </div>
+          </article>
+
+          <!-- Tuesday + Wednesday -->
+          <div class="menu-grid">
+            <article class="menu-card reveal-left" data-delay="0">
+              <span class="menu-card__day">Tuesday</span>
+              <h3 class="menu-card__title">Pasta e Fagioli</h3>
+              <p class="menu-card__note">This Italian bean-and-pasta soup is the kind of thing that tastes like you've been cooking all day — but it comes together in about 30 minutes from pantry staples. Thick, savory, and deeply satisfying on a weeknight.</p>
+              <div class="menu-card__tags">
+                <span class="tag tag-sage">30 min</span>
+                <span class="tag tag-terracotta">Pantry staple</span>
+                <span class="tag tag-sage">Vegetarian</span>
+              </div>
+            </article>
+
+            <article class="menu-card reveal-right" data-delay="100">
+              <span class="menu-card__day">Wednesday</span>
+              <h3 class="menu-card__title">Black Bean &amp; Sweet Potato Tacos with Lime Crema</h3>
+              <p class="menu-card__note">Roasted sweet potatoes with smoky cumin, hearty black beans, pickled red onion, and a quick lime crema over warm corn tortillas. A taco night the whole family can customize at the table.</p>
+              <div class="menu-card__tags">
+                <span class="tag tag-sage">25 min</span>
+                <span class="tag tag-sage">Vegetarian</span>
+                <span class="tag tag-gold">Build-your-own</span>
+              </div>
+            </article>
+          </div>
+
+          <!-- Thursday + Friday + Saturday -->
+          <div class="menu-grid-3">
+            <article class="menu-card reveal" data-delay="0">
+              <span class="menu-card__day">Thursday</span>
+              <h3 class="menu-card__title">Skillet Salmon with Garlic Butter Green Beans</h3>
+              <p class="menu-card__note">Crispy-skinned salmon fillets pan-seared in a cast iron, finished with a butter, garlic, and lemon pan sauce. Served alongside green beans blistered in the same skillet. Twenty minutes, restaurant quality.</p>
+              <div class="menu-card__tags">
+                <span class="tag tag-terracotta">20 min</span>
+                <span class="tag tag-sage">Gluten-free</span>
+                <span class="tag tag-sage">High protein</span>
+              </div>
+            </article>
+
+            <article class="menu-card reveal" data-delay="100">
+              <span class="menu-card__day">Friday</span>
+              <h3 class="menu-card__title">Homemade Pizza Night</h3>
+              <p class="menu-card__note">No delivery box required. We include a simple no-knead dough recipe (made Wednesday, rested in the fridge), two sauce options — classic San Marzano and a white garlic base — and a list of topping ideas. Kids pick their half. Parents pick theirs.</p>
+              <div class="menu-card__tags">
+                <span class="tag tag-gold">Fun night</span>
+                <span class="tag tag-terracotta">45 min active</span>
+                <span class="tag tag-sage">Kid-friendly</span>
+              </div>
+            </article>
+
+            <article class="menu-card reveal" data-delay="200">
+              <span class="menu-card__day">Saturday</span>
+              <h3 class="menu-card__title">Slow Cooker Beef &amp; Barley Stew</h3>
+              <p class="menu-card__note">Load the slow cooker before your Saturday morning errands and come home to something that smells incredible. Chuck roast, barley, root vegetables, and a red wine broth — deeply warming and perfect for a lazy evening.</p>
+              <div class="menu-card__tags">
+                <span class="tag tag-sage">15 min prep</span>
+                <span class="tag tag-terracotta">Slow cooker</span>
+                <span class="tag tag-gold">Weekend project</span>
+              </div>
+            </article>
+          </div>
+
+          <!-- Sunday — full width, sage-muted -->
+          <article class="menu-card menu-card--sunday reveal" data-delay="0">
+            <span class="menu-card__day">Sunday</span>
+            <h3 class="menu-card__title">Simple Roast Chicken with Pan-Dripping Gravy</h3>
+            <p class="menu-card__note">The crown of the week. A whole bird, well-seasoned, roasted simply. The pan drippings become a quick gravy that elevates plain sides into something memorable. Bonus: the carcass makes Monday's soup stock if you're into that.</p>
+            <div class="menu-card__tags">
+              <span class="tag tag-terracotta">1 hr 20 min</span>
+              <span class="tag tag-sage">Classic</span>
+              <span class="tag tag-gold">Beginner-friendly</span>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SHOPPING LIST TEASER ===== -->
+    <section class="bg-cream">
+      <div class="container">
+        <div class="section-head centered">
+          <span class="eyebrow reveal">The list that goes with it</span>
+          <h2 class="section-title reveal" data-delay="100">One trip. One list.</h2>
+          <p class="section-subtitle reveal" data-delay="200">Every Northstar Pantry plan comes with a complete shopping list, pre-organized by grocery section. Here's a condensed preview of what this week's list looks like.</p>
+        </div>
+
+        <div class="card card--white reveal-scale" data-delay="100">
+          <div class="shop-list">
+
+            <div class="shop-list__section">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3c0 4-3 6-3 9a3 3 0 006 0c0-3-3-5-3-9z"/><path d="M12 21v-6"/></svg>
+                Produce
+              </h4>
+              <ul>
+                <li>Cherry tomatoes</li>
+                <li>Broccoli</li>
+                <li>Sweet potato (2 large)</li>
+                <li>Green beans</li>
+                <li>Yellow onion</li>
+                <li>Lemons (3)</li>
+                <li>Garlic</li>
+              </ul>
+            </div>
+
+            <div class="shop-list__section">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12a8 8 0 0116 0v0a8 8 0 01-16 0z"/><path d="M9 12h6"/></svg>
+                Protein
+              </h4>
+              <ul>
+                <li>Chicken thighs (bone-in, 8 pieces)</li>
+                <li>Salmon fillets (4 × 6oz)</li>
+                <li>Chuck roast (2 lbs)</li>
+                <li>Whole chicken (3.5–4 lbs)</li>
+              </ul>
+            </div>
+
+            <div class="shop-list__section">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 3v4h6V3"/></svg>
+                Pantry
+              </h4>
+              <ul>
+                <li>Crushed tomatoes</li>
+                <li>White beans (canned)</li>
+                <li>Black beans (canned)</li>
+                <li>Pearl barley</li>
+                <li>Ditalini pasta</li>
+                <li>Corn tortillas</li>
+                <li>Pizza flour</li>
+              </ul>
+            </div>
+
+            <div class="shop-list__section">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12l-1 7H7L6 3z"/><path d="M7 10v11h10V10"/></svg>
+                Dairy &amp; Fridge
+              </h4>
+              <ul>
+                <li>Sour cream</li>
+                <li>Unsalted butter</li>
+                <li>Parmesan</li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CTA ===== -->
+    <section class="menu-cta">
+      <div class="container container--narrow">
+        <h2 class="reveal">Ready for your own weekly plan?</h2>
+        <p class="reveal" data-delay="100">Join the early access list. We'll build a plan around your family.</p>
+        <div class="btn-row reveal" data-delay="200">
+          <a href="pricing.html" class="btn btn-white btn-lg">See Pricing</a>
+          <a href="how-it-works.html" class="btn btn-outline-white btn-lg">How It Works</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="nav-logo" aria-label="Northstar Pantry">
+            <svg class="nav-logo__mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M20 2L23 16.2L37 20L23 23.8L20 38L17 23.8L3 20L17 16.2Z" fill="currentColor"/>
+              <circle cx="20" cy="20" r="3.5" fill="var(--brown)" opacity="0.5"/>
+            </svg>
+            <div class="nav-logo__text">
+              <span class="nav-logo__name">Northstar</span>
+              <span class="nav-logo__sub">Pantry</span>
+            </div>
+          </a>
+          <p class="footer-tagline">Weekly dinner plans for busy families who love good food and sane evenings.</p>
+          <form class="newsletter-form newsletter-form--dark mt-8" aria-label="Newsletter signup">
+            <input type="email" placeholder="your@email.com" required aria-label="Email address">
+            <button type="submit" class="btn btn-primary">Subscribe</button>
+          </form>
+          <p class="newsletter-success">You're in! We'll be in touch soon.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Explore</h4>
+          <ul>
+            <li><a href="how-it-works.html">How It Works</a></li>
+            <li><a href="weekly-menu.html">This Week's Menu</a></li>
+            <li><a href="pricing.html">Plans &amp; Pricing</a></li>
+            <li><a href="founder-story.html">Our Story</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Resources</h4>
+          <ul>
+            <li><a href="pantry-staples.html">Pantry Staples Guide</a></li>
+            <li><a href="weekly-menu.html">Sample Menu Archive</a></li>
+            <li><a href="how-it-works.html#faq">FAQ</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <ul>
+            <li><a href="mailto:hello@northstarpantry.com">hello@northstarpantry.com</a></li>
+            <li><a href="#">Instagram</a></li>
+            <li><a href="#">Pinterest</a></li>
+            <li><a href="#">Newsletter</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2024 Northstar Pantry. Made with care for families everywhere.</p>
+        <div class="footer-bottom-links">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

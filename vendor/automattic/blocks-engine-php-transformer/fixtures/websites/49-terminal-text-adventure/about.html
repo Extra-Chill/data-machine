@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About &amp; How to Play — THE WAKING DEPTH · Saltwire Interactive</title>
+  <meta name="description" content="How to play THE WAKING DEPTH, the command reference, and credits for Saltwire Interactive, an indie interactive-fiction studio.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="brand" aria-label="Saltwire Interactive home">
+      <span class="glyph">▚ SALTWIRE</span>
+      <span class="studio">Interactive Fiction Studio</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Play</a>
+      <a href="story.html">World Bible</a>
+      <a href="about.html" class="active">About / How to Play</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <h1>About &amp; How to Play</h1>
+    <p class="lede">
+      THE WAKING DEPTH is a short, complete, parser-driven interactive fiction —
+      the kind of game you play by <em>typing what you want to do</em>. It runs
+      entirely in your browser, in a terminal we built to feel like the half-dead
+      console of a coastal lighthouse at three in the morning. No accounts, no
+      downloads, no leaving the room. Just you, a prompt, and the dark.
+    </p>
+
+    <h2>How to play</h2>
+    <p>
+      You move through the lighthouse by typing simple instructions. The parser
+      understands plain verb-and-noun commands and a generous pile of synonyms.
+      You don't have to guess fancy phrasing — <strong>TAKE CROWBAR</strong>,
+      <strong>GO NORTH</strong>, <strong>READ JOURNAL</strong>, and
+      <strong>USE OILCAN ON LAMP</strong> all do exactly what they say.
+    </p>
+    <ul>
+      <li>Stuck? Type <strong>LOOK</strong> to re-read the room, or
+        <strong>EXAMINE</strong> anything that catches your eye.</li>
+      <li>Type <strong>INVENTORY</strong> (or just <strong>I</strong>) to see what
+        you're carrying.</li>
+      <li>Type <strong>SCORE</strong> for a live checklist of your objectives.</li>
+      <li>Press <strong>↑ / ↓</strong> in the prompt to scroll through commands
+        you've already typed.</li>
+      <li>The game <strong>autosaves</strong> every move. You can also
+        <strong>SAVE</strong>, <strong>LOAD</strong>, and <strong>RESTART</strong>
+        from the buttons above the screen or by typing those words.</li>
+    </ul>
+
+    <div class="callout">
+      <p><strong>Accessibility.</strong> If your system requests reduced motion,
+      the CRT scanlines, power-on flicker, and typewriter reveal all switch off
+      automatically — the full text appears at once and the cursor stops blinking.
+      The whole game is keyboard-operable and the transcript is announced to
+      screen readers.</p>
+    </div>
+
+    <h2>Command reference</h2>
+    <table class="cmd-table">
+      <tr><td>LOOK · L</td><td>Describe your surroundings again.</td></tr>
+      <tr><td>EXAMINE · X · INSPECT</td><td>Look closely at a thing or feature.</td></tr>
+      <tr><td>READ</td><td>Read text on books, journals, charts.</td></tr>
+      <tr><td>TAKE · GET · GRAB</td><td>Pick something up. TAKE ALL grabs everything loose.</td></tr>
+      <tr><td>DROP</td><td>Put something down.</td></tr>
+      <tr><td>INVENTORY · I</td><td>List what you're carrying.</td></tr>
+      <tr><td>N S E W · UP · DOWN · GO</td><td>Move. Bare directions work too.</td></tr>
+      <tr><td>OPEN · CLOSE</td><td>Open or close containers.</td></tr>
+      <tr><td>UNLOCK</td><td>Unlock something with a key you hold.</td></tr>
+      <tr><td>PRY · FORCE</td><td>Lever something open with a tool.</td></tr>
+      <tr><td>USE &lt;a&gt; ON &lt;b&gt;</td><td>Combine or apply items. FILL, FIT, POUR, TURN map here too.</td></tr>
+      <tr><td>LIGHT · STRIKE</td><td>Set a flame to something flammable.</td></tr>
+      <tr><td>MAP</td><td>Refresh the explored-rooms map in the side panel.</td></tr>
+      <tr><td>SCORE</td><td>Show score, moves, and the objective checklist.</td></tr>
+      <tr><td>SAVE · LOAD · RESTART</td><td>Manage your game (stored in this browser).</td></tr>
+      <tr><td>HELP · ?</td><td>Show the in-game command list.</td></tr>
+    </table>
+
+    <h2>The studio</h2>
+    <p>
+      <strong>Saltwire Interactive</strong> is a two-person interactive-fiction
+      studio working out of a converted net-loft in Cape Wrack, Nova Scotia. We
+      make small, strange, hand-written games about the coast — about fog, debt,
+      drowned chapels, radio static, and the particular loneliness of keeping a
+      light burning for people you will never meet. We write everything by hand in
+      a parser engine we maintain ourselves; no procedural text, no asset store,
+      no filler. If a sentence is in one of our games, somebody at the kitchen
+      table chose every word of it.
+    </p>
+
+    <ul class="boxlist">
+      <li><b>Maren Holloway</b> — writing &amp; design. Former marine archivist;
+        once spent a season cataloguing a lighthouse's logbooks and never quite
+        came back from it.</li>
+      <li><b>Idris Quay</b> — engine &amp; systems. Builds the parser, the world
+        model, and the CRT we trap you inside. Believes a good error message is a
+        line of dialogue.</li>
+    </ul>
+
+    <h3>Other works</h3>
+    <ul>
+      <li><em>The Fog Tax</em> (2024) — a debt-collector walks a coast that keeps
+        rearranging itself behind him.</li>
+      <li><em>Static at the Net-Loft</em> (2025) — a numbers-station mystery told
+        entirely through a tuning dial.</li>
+      <li><em>THE WAKING DEPTH</em> (2026) — this one. Our shortest and, we think,
+        our meanest.</li>
+    </ul>
+
+    <h2>Hints &amp; the solution</h2>
+    <p>
+      THE WAKING DEPTH is fully winnable and fairly clued — your grandmother's
+      <em>journal</em> and <em>tide chart</em>, both upstairs, tell you almost
+      everything you need. But if the lamp won't wake and the night is wearing
+      thin, the answers are below.
+    </p>
+
+    <details class="spoiler">
+      <summary>Gentle hints (tap to reveal)</summary>
+      <ul>
+        <li>You can't get into the lighthouse the polite way. The boards over the
+          door want <em>leverage</em> — and there's iron in the boathouse.</li>
+        <li>The biscuit tin in the kitchen rattles. Open it.</li>
+        <li>The cabinet in the watch room needs a small brass key. Read the
+          journal to learn where it was hidden.</li>
+        <li>The lamp wants three things in order: fuel, a working regulator, and
+          a flame. You'll find all three before you climb to the top.</li>
+        <li>The safe combination is the year the lamp was first lit. It's written
+          in two places upstairs.</li>
+      </ul>
+    </details>
+
+    <details class="spoiler">
+      <summary>Full winning walkthrough (heavy spoilers)</summary>
+      <ol>
+        <li>west</li>
+        <li>take all <span style="color:var(--phosphor-faint)">(crowbar, rope, oil can)</span></li>
+        <li>east</li>
+        <li>north <span style="color:var(--phosphor-faint)">(shore path)</span></li>
+        <li>north <span style="color:var(--phosphor-faint)">(lighthouse door)</span></li>
+        <li>pry door</li>
+        <li>north <span style="color:var(--phosphor-faint)">(into the foyer)</span></li>
+        <li>west <span style="color:var(--phosphor-faint)">(kitchen)</span></li>
+        <li>take matches</li>
+        <li>open tin</li>
+        <li>take key</li>
+        <li>east <span style="color:var(--phosphor-faint)">(back to foyer)</span></li>
+        <li>up <span style="color:var(--phosphor-faint)">(keeper's quarters)</span></li>
+        <li>read journal <span style="color:var(--phosphor-faint)">(learn where the key was, and the cabinet)</span></li>
+        <li>read chart <span style="color:var(--phosphor-faint)">(learn the year: 1891)</span></li>
+        <li>up <span style="color:var(--phosphor-faint)">(watch room)</span></li>
+        <li>unlock cabinet <span style="color:var(--phosphor-faint)">(brass key — reveals logbook + valve handle)</span></li>
+        <li>take valve handle</li>
+        <li>up <span style="color:var(--phosphor-faint)">(lamp room)</span></li>
+        <li>use oilcan on lamp</li>
+        <li>use valve handle on lamp</li>
+        <li>light lamp <span style="color:var(--phosphor-faint)">— THE LAMP IS LIT. You win.</span></li>
+      </ol>
+    </details>
+
+    <p style="margin-top:2rem;"><a href="index.html">&larr; Back to the terminal</a> &nbsp;·&nbsp; <a href="story.html">Read the world bible &rarr;</a></p>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <span>© <span data-year>2026</span> Saltwire Interactive — Cape Wrack, NS.</span>
+    <span><a href="index.html">Play</a> · <a href="story.html">World Bible</a></span>
+  </footer>
+
+  <script>
+    document.querySelectorAll("[data-year]").forEach(function (e) { e.textContent = new Date().getFullYear(); });
+  </script>
+</body>
+</html>

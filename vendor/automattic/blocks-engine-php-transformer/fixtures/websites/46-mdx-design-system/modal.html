@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Modal · Halo UI</title>
+  <meta name="description" content="The Halo UI Modal — a focused overlay dialog with focus trap and Escape-to-close. Live playground, props, and behavior." />
+  <link rel="stylesheet" href="css/halo.css" />
+</head>
+<body>
+  <div class="sidebar-backdrop"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <a class="sidebar__brand" href="index.html">Halo&nbsp;UI</a>
+      <p class="sidebar__version">v2.4.0 · MIT · @halo-ui/react</p>
+      <nav class="nav-group" aria-label="Overview"><p class="nav-group__title">Overview</p><a class="nav-link" href="index.html">Halo UI</a></nav>
+      <nav class="nav-group" aria-label="Foundations"><p class="nav-group__title">Foundations</p><a class="nav-link" href="color.html">Color</a><a class="nav-link" href="typography.html">Typography</a></nav>
+      <nav class="nav-group" aria-label="Components"><p class="nav-group__title">Components</p><a class="nav-link" href="button.html">Button</a><a class="nav-link" href="input.html">Input</a><a class="nav-link" href="modal.html">Modal</a><a class="nav-link" href="card.html">Card</a></nav>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn mobile-nav-toggle" id="nav-toggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <span class="topbar__crumb">Components / <strong>Modal</strong></span>
+        <span class="topbar__spacer"></span>
+        <button class="search-btn" data-palette-open aria-label="Search documentation"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><span class="search-btn__text">Search docs…</span><kbd>⌘K</kbd></button>
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle color theme"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke-linecap="round"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 14.5A8 8 0 119.5 4a6.5 6.5 0 0010.5 10.5z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/lumen-labs/halo-ui" target="_blank" rel="noopener" aria-label="GitHub repository"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0112 6.8c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.58.69.48A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"/></svg></a>
+      </header>
+
+      <article class="doc">
+        <header class="doc__header">
+          <p class="doc__eyebrow">Components</p>
+          <h1>Modal</h1>
+          <p class="doc__lede">A focused overlay that interrupts the workflow to require a response before continuing.</p>
+          <span class="badge badge--beta">beta</span>
+        </header>
+
+        <div class="doc__meta">
+          <span>Since <code>2.1.0</code></span>
+          <span>A11y: WCAG 2.2 AA · focus-trap + Escape verified</span>
+          <span>Source: <code>packages/react/src/Modal/Modal.tsx</code></span>
+          <span><a href="https://www.figma.com/file/halo-ui/components" target="_blank" rel="noopener">Figma ↗</a></span>
+        </div>
+
+        <p>A <code>Modal</code> is a dialog rendered above the page that <strong>traps focus</strong> and demands a decision before the user can return to the underlying content. Use it sparingly — it interrupts. For non-blocking messages, prefer a <code>Toast</code> or inline banner.</p>
+
+        <aside class="callout callout--warning" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 6v3.2M8 11v.4" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Beta</p><div class="callout__content">Modal is in <strong>beta</strong> (since 2.1.0). The API is stable, but the <code>dismissOnOverlay</code> default may change to <code>false</code> in 3.0 — set it explicitly.</div></div>
+        </aside>
+
+        <h2 id="live-example">Live example</h2>
+        <p>The trigger below opens a real modal rendered into a portal. Focus moves to the dialog, Tab is trapped inside it, and Escape closes it.</p>
+        <div class="code-preview">
+          <div class="code-preview__stage" data-modal-demo>
+            <button type="button" class="halo-button halo-button--solid halo-button--danger" data-modal-open><span class="halo-button__label">Delete workspace</span></button>
+          </div>
+          <div class="code-preview__panel"><div class="code-preview__bar"><span class="code-preview__lang">tsx</span><button class="code-preview__copy" type="button">Copy</button></div>
+          <pre class="code-preview__code"><code><span class="tok-key">import</span> { Modal, Button } <span class="tok-key">from</span> <span class="tok-str">'@halo-ui/react'</span>
+
+<span class="tok-key">function</span> <span class="tok-fn">ConfirmDelete</span>() {
+  <span class="tok-key">const</span> [open, setOpen] = <span class="tok-fn">useState</span>(<span class="tok-key">false</span>)
+  <span class="tok-key">return</span> (
+    <span class="tok-punc">&lt;&gt;</span>
+      <span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">tone</span>=<span class="tok-str">"danger"</span> <span class="tok-attr">onClick</span>={() =&gt; <span class="tok-fn">setOpen</span>(<span class="tok-key">true</span>)}<span class="tok-punc">&gt;</span>
+        Delete workspace
+      <span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+      <span class="tok-punc">&lt;</span><span class="tok-tag">Modal</span> <span class="tok-attr">open</span>={open} <span class="tok-attr">onClose</span>={() =&gt; <span class="tok-fn">setOpen</span>(<span class="tok-key">false</span>)}
+             <span class="tok-attr">title</span>=<span class="tok-str">"Delete workspace?"</span><span class="tok-punc">&gt;</span>
+        <span class="tok-punc">&lt;</span><span class="tok-tag">p</span><span class="tok-punc">&gt;</span>This permanently removes all 14 projects.<span class="tok-punc">&lt;/</span><span class="tok-tag">p</span><span class="tok-punc">&gt;</span>
+        <span class="tok-punc">&lt;</span><span class="tok-tag">Modal.Footer</span><span class="tok-punc">&gt;</span>
+          <span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">variant</span>=<span class="tok-str">"ghost"</span> <span class="tok-attr">onClick</span>={close}<span class="tok-punc">&gt;</span>Cancel<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+          <span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">tone</span>=<span class="tok-str">"danger"</span> <span class="tok-attr">onClick</span>={confirm}<span class="tok-punc">&gt;</span>Delete<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+        <span class="tok-punc">&lt;/</span><span class="tok-tag">Modal.Footer</span><span class="tok-punc">&gt;</span>
+      <span class="tok-punc">&lt;/</span><span class="tok-tag">Modal</span><span class="tok-punc">&gt;</span>
+    <span class="tok-punc">&lt;/&gt;</span>
+  )
+}</code></pre></div>
+        </div>
+
+        <h2 id="anatomy">Anatomy</h2>
+        <p>A modal has a <strong>title</strong> (the accessible name), a <strong>body</strong>, and a <strong>footer</strong> for actions. The overlay (scrim) dims and blocks the page behind it.</p>
+
+        <h2 id="props">Props</h2>
+        <div class="props-table-wrap" role="region" aria-label="Component props">
+          <table class="props-table">
+            <thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code class="prop-name">open</code><span class="prop-required" title="Required">*</span></td><td><code class="prop-type">boolean</code></td><td><code class="prop-default">false</code></td><td>Controls visibility. Modal is fully controlled.</td></tr>
+              <tr><td><code class="prop-name">onClose</code><span class="prop-required" title="Required">*</span></td><td><code class="prop-type">() =&gt; void</code></td><td><span class="prop-empty">—</span></td><td>Called on Escape, overlay click, or close button.</td></tr>
+              <tr><td><code class="prop-name">title</code><span class="prop-required" title="Required">*</span></td><td><code class="prop-type">string</code></td><td><span class="prop-empty">—</span></td><td>Accessible name; wired to aria-labelledby.</td></tr>
+              <tr><td><code class="prop-name">size</code></td><td><code class="prop-type">'sm' | 'md' | 'lg' | 'fullscreen'</code></td><td><code class="prop-default">'md'</code></td><td>Max-width of the dialog panel.</td></tr>
+              <tr><td><code class="prop-name">dismissOnOverlay</code></td><td><code class="prop-type">boolean</code></td><td><code class="prop-default">true</code></td><td>Whether clicking the scrim closes the modal.</td></tr>
+              <tr><td><code class="prop-name">initialFocus</code></td><td><code class="prop-type">RefObject&lt;HTMLElement&gt;</code></td><td><span class="prop-empty">—</span></td><td>Element focused when the modal opens.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="behavior">Behavior</h2>
+        <p>When a modal opens, Halo UI:</p>
+        <ol>
+          <li>Saves the currently focused element to restore later.</li>
+          <li>Moves focus to <code>initialFocus</code>, or the first focusable child, or the dialog.</li>
+          <li>Sets <code>aria-hidden="true"</code> and <code>inert</code> on everything outside the dialog.</li>
+          <li>Traps Tab / Shift+Tab within the dialog.</li>
+          <li>On close, restores focus to the element from step 1.</li>
+        </ol>
+        <div class="halo-codeblock"><div class="halo-codeblock__bar"><span class="halo-codeblock__lang">tsx</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="tok-com">// Focus is restored to the trigger automatically on close.</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Modal</span> <span class="tok-attr">open</span>={open} <span class="tok-attr">onClose</span>={close} <span class="tok-attr">title</span>=<span class="tok-str">"Settings"</span> <span class="tok-attr">initialFocus</span>={firstFieldRef}<span class="tok-punc">&gt;</span>
+  …
+<span class="tok-punc">&lt;/</span><span class="tok-tag">Modal</span><span class="tok-punc">&gt;</span></code></pre></div>
+
+        <h2 id="guidelines">Guidelines</h2>
+        <div class="dodont">
+          <div class="dodont__card dodont__card--do"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>Do</span><p>Use a modal for a single, blocking decision the user must resolve now.</p></div>
+          <div class="dodont__card dodont__card--dont"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>Don't</span><p>Stack modals on top of modals — close one before opening the next.</p></div>
+        </div>
+        <div class="dodont">
+          <div class="dodont__card dodont__card--do"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>Do</span><p>Make the destructive action clearly labeled ("Delete", not "OK").</p></div>
+          <div class="dodont__card dodont__card--dont"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>Don't</span><p>Auto-open a modal on page load to show marketing content.</p></div>
+        </div>
+
+        <h2 id="accessibility">Accessibility</h2>
+        <ul>
+          <li>Renders <code>role="dialog"</code> with <code>aria-modal="true"</code>.</li>
+          <li><code>title</code> becomes the dialog's <code>aria-labelledby</code>; body text can be referenced via <code>aria-describedby</code>.</li>
+          <li><strong>Escape</strong> closes the dialog; focus is trapped while open and restored on close.</li>
+          <li>The scrim has <code>pointer-events</code> enabled so the inert page behind cannot be interacted with — this is what makes it truly modal.</li>
+        </ul>
+
+        <aside class="callout callout--danger" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M6 6l4 4M10 6l-4 4" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Don't trap users</p><div class="callout__content">A modal must always offer a way out — a visible close button, Escape, or a Cancel action. Never remove all three.</div></div>
+        </aside>
+      </article>
+
+      <aside class="toc" aria-label="On this page">
+        <p class="toc__title">On this page</p>
+        <ul>
+          <li class="toc__item toc__item--h2"><a href="#live-example">Live example</a></li>
+          <li class="toc__item toc__item--h2"><a href="#anatomy">Anatomy</a></li>
+          <li class="toc__item toc__item--h2"><a href="#props">Props</a></li>
+          <li class="toc__item toc__item--h2"><a href="#behavior">Behavior</a></li>
+          <li class="toc__item toc__item--h2"><a href="#guidelines">Guidelines</a></li>
+          <li class="toc__item toc__item--h2"><a href="#accessibility">Accessibility</a></li>
+        </ul>
+      </aside>
+
+      <footer class="doc-footer">
+        <div>Halo UI v2.4.0 · MIT License · Built with Astro + MDX</div>
+        <div class="doc-footer__links"><a href="input.html">← Input</a><a href="card.html">Card →</a></div>
+      </footer>
+    </div>
+  </div>
+
+  <div class="palette-backdrop" id="palette">
+    <div class="palette" role="dialog" aria-label="Search documentation">
+      <div class="palette__input-wrap"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input class="palette__input" type="text" placeholder="Search components, tokens, foundations…" aria-label="Search" autocomplete="off" spellcheck="false" /></div>
+      <div class="palette__results"></div>
+      <div class="palette__hint"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+    </div>
+  </div>
+  <script src="js/halo.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "source": "derived",
+  "tree": [
+    {
+      "block": "core/group",
+      "children": [
+        {
+          "block": "core/heading"
+        },
+        {
+          "block": "core/paragraph"
+        },
+        {
+          "block": "core/buttons",
+          "children": [
+            {
+              "block": "core/button"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

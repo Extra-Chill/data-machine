@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Examples — Fluxnode Procedural Texture Editor</title>
+  <meta name="description" content="Open ready-made Fluxnode graphs: a warped sunset gradient, a posterized circuit weave, an animated aurora, and a topographic contour map. Each loads live into the node editor.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/page.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%237c5cff'/><circle cx='9' cy='16' r='3' fill='none' stroke='white' stroke-width='2'/><circle cx='23' cy='16' r='3' fill='none' stroke='white' stroke-width='2'/><path d='M12 16h8' stroke='white' stroke-width='2'/></svg>">
+</head>
+<body class="page-body">
+
+  <header class="site-header">
+    <a class="brand" href="about.html" aria-label="Fluxnode home" style="text-decoration:none;color:var(--txt);display:flex;align-items:center;gap:9px;font-weight:800;">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#7c5cff"/>
+        <circle cx="9" cy="16" r="3" fill="none" stroke="#fff" stroke-width="2"/>
+        <circle cx="23" cy="16" r="3" fill="none" stroke="#fff" stroke-width="2"/>
+        <path d="M12 16h8" stroke="#fff" stroke-width="2"/>
+      </svg>
+      <span>Fluxnode</span>
+    </a>
+    <nav class="site-nav">
+      <a href="about.html">About</a>
+      <a href="examples.html" class="is-current" aria-current="page">Examples</a>
+      <a href="index.html" class="nav-cta">Open editor</a>
+    </nav>
+  </header>
+
+  <section class="page-hero">
+    <div class="wrap">
+      <span class="eyebrow">Starter graphs</span>
+      <h1>Open a graph and start re-wiring.</h1>
+      <p class="lead">Each thumbnail below is rendered right now in your browser by the same evaluation engine the editor uses — there are no image files here. Click any card to load that graph live into the node editor. Loading replaces your current flow (it's autosaved first).</p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="ex-grid">
+
+      <a class="ex-card" href="index.html?graph=sunset">
+        <canvas class="ex-preview" width="600" height="360" data-seed="sunset" aria-label="Sunset Dunes preview"></canvas>
+        <div class="ex-body">
+          <span class="ex-tag">Gradient · Warp</span>
+          <h3>Sunset Dunes</h3>
+          <p>A two-stop gradient pushed through a noise <em>warp</em>, mixed with an FBM field and a soft threshold for dune-like banding.</p>
+          <div class="ex-meta">7 nodes · gradient → warp → mix → threshold → output</div>
+          <div style="margin-top:10px"><span class="ex-cta">Open in editor →</span></div>
+        </div>
+      </a>
+
+      <a class="ex-card" href="index.html?graph=circuit">
+        <canvas class="ex-preview" width="600" height="360" data-seed="circuit" aria-label="Circuit Weave preview"></canvas>
+        <div class="ex-body">
+          <span class="ex-tag">Checker · Rings</span>
+          <h3>Circuit Weave</h3>
+          <p>A checkerboard screen-blended with radial rings, then posterized to four bands — a glowing teal lattice.</p>
+          <div class="ex-meta">5 nodes · checker × rings → posterize → output</div>
+          <div style="margin-top:10px"><span class="ex-cta">Open in editor →</span></div>
+        </div>
+      </a>
+
+      <a class="ex-card" href="index.html?graph=aurora">
+        <canvas class="ex-preview" width="600" height="360" data-seed="aurora" aria-label="Aurora Flow preview"></canvas>
+        <div class="ex-body">
+          <span class="ex-tag">Animated · Math</span>
+          <h3>Aurora Flow</h3>
+          <p>Two gradients mixed by a <em>sine</em> Math node, then animated through a flowing warp. Open it to watch the warp breathe live.</p>
+          <div class="ex-meta">8 nodes · value → sine → mix → warp(flow) → tint</div>
+          <div style="margin-top:10px"><span class="ex-cta">Open in editor →</span></div>
+        </div>
+      </a>
+
+      <a class="ex-card" href="index.html?graph=topo">
+        <canvas class="ex-preview" width="600" height="360" data-seed="topo" aria-label="Topographic Map preview"></canvas>
+        <div class="ex-body">
+          <span class="ex-tag">Noise · Contours</span>
+          <h3>Topographic Map</h3>
+          <p>One FBM field feeds both a posterizer and a hard threshold; adding them together draws crisp contour lines over elevation bands.</p>
+          <div class="ex-meta">5 nodes · noise → (posterize + threshold) → output</div>
+          <div style="margin-top:10px"><span class="ex-cta">Open in editor →</span></div>
+        </div>
+      </a>
+
+    </div>
+
+    <div class="cta-band">
+      <h2>Or start from an empty canvas.</h2>
+      <p>Press <kbd>Tab</kbd> in the editor to summon the node palette and build your own pipeline from scratch.</p>
+      <a href="index.html" class="btn btn-primary">Open a blank flow</a>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>© 2026 Fluxnode. A fictional product, hand-built in vanilla HTML, CSS &amp; Canvas.</span>
+      <span><a href="about.html">About</a> · <a href="examples.html">Examples</a> · <a href="index.html">Editor</a></span>
+    </div>
+  </footer>
+
+  <script src="js/engine.js"></script>
+  <script src="js/seed.js"></script>
+  <script src="js/preview.js"></script>
+</body>
+</html>

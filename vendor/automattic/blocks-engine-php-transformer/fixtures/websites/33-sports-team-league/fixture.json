@@ -1,0 +1,13 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "sports",
+    "league",
+    "team",
+    "has-nav",
+    "multipage",
+    "schedule",
+    "roster"
+  ],
+  "complexity": 2
+}

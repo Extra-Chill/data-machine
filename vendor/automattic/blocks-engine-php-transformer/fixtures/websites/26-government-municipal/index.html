@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Town of Millbrook, Massachusetts &mdash; Official Municipal Website</title>
+  <meta name="description" content="Official website of the Town of Millbrook, Massachusetts. Pay water bills, apply for permits, view meeting agendas, contact your Select Board, and access town services. Incorporated 1738.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700;8..60,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ═══ Skip Link (first focusable) ═══ -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- ═══ Utility Bar ═══ -->
+  <div class="utility-bar" role="region" aria-label="Site utilities">
+    <div class="utility-bar-inner">
+      <div class="utility-left">
+        <a href="#" aria-label="Translate this site">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg>
+          Translate
+        </a>
+        <a href="#" aria-label="Accessibility options">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="6" r="1.5" fill="currentColor"/><path d="M7 10l5 1.5L17 10M12 11.5V22M9 22l3-7 3 7"/></svg>
+          Accessibility
+        </a>
+        <a href="contact-officials.html">Contact</a>
+        <a href="#" aria-label="Sign up for alerts">Sign up for alerts</a>
+      </div>
+      <div class="utility-right">
+        <span class="visually-hidden">Search the Town of Millbrook website</span>
+        <form class="utility-search" role="search" action="#" method="get">
+          <label for="site-search" class="visually-hidden">Search this site</label>
+          <input type="search" id="site-search" name="q" placeholder="Search town services…" autocomplete="off">
+          <button type="submit">Search</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Site Header ═══ -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="site-logo" aria-label="Town of Millbrook — Go to homepage">
+        <svg class="logo-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Shield outline -->
+          <path d="M32 4 L58 12 L58 30 C58 46 46 56 32 60 C18 56 6 46 6 30 L6 12 Z" fill="#103864" stroke="#082040" stroke-width="2"/>
+          <!-- Inner shield rim -->
+          <path d="M32 8 L54 14 L54 30 C54 44 43 53 32 56 C21 53 10 44 10 30 L10 14 Z" fill="none" stroke="#b08a3a" stroke-width="1.5"/>
+          <!-- Millwheel: outer ring -->
+          <circle cx="32" cy="32" r="14" fill="none" stroke="#f6f1e6" stroke-width="1.5"/>
+          <!-- Millwheel: hub -->
+          <circle cx="32" cy="32" r="3" fill="#b08a3a"/>
+          <!-- Millwheel spokes -->
+          <g stroke="#f6f1e6" stroke-width="1.5">
+            <line x1="32" y1="18" x2="32" y2="46"/>
+            <line x1="18" y1="32" x2="46" y2="32"/>
+            <line x1="22.1" y1="22.1" x2="41.9" y2="41.9"/>
+            <line x1="41.9" y1="22.1" x2="22.1" y2="41.9"/>
+          </g>
+          <!-- Millwheel paddles -->
+          <g fill="#f6f1e6">
+            <rect x="30" y="14" width="4" height="4"/>
+            <rect x="30" y="46" width="4" height="4"/>
+            <rect x="14" y="30" width="4" height="4"/>
+            <rect x="46" y="30" width="4" height="4"/>
+          </g>
+          <!-- River wave at base -->
+          <path d="M14 50 Q20 47 26 50 T38 50 T50 50" fill="none" stroke="#f6f1e6" stroke-width="1.5"/>
+          <!-- Date banner -->
+          <text x="32" y="11" text-anchor="middle" font-family="Georgia, serif" font-size="3.5" fill="#b08a3a" font-weight="700">EST. 1738</text>
+        </svg>
+        <div class="logo-text">
+          <span class="logo-eyebrow">Official Website</span>
+          <span class="logo-name">Town of Millbrook</span>
+          <span class="logo-tag">Massachusetts &middot; Incorporated 1738</span>
+        </div>
+      </a>
+
+      <div class="header-spacer"></div>
+
+      <button class="nav-toggle" aria-label="Open main navigation" aria-expanded="false" aria-controls="nav-drawer">
+        <span></span>
+        Menu
+      </button>
+    </div>
+
+    <!-- ═══ Main Nav (desktop) ═══ -->
+    <nav class="main-nav" aria-label="Primary">
+      <div class="main-nav-inner">
+        <ul class="site-nav" role="list">
+          <li><a href="services.html">Services</a></li>
+          <li><a href="departments.html">Departments</a></li>
+          <li><a href="contact-officials.html">Government</a></li>
+          <li><a href="public-notices.html">Public Notices</a></li>
+          <li><a href="#">Community</a></li>
+          <li><a href="contact-officials.html">Contact</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- ═══ Mobile Drawer ═══ -->
+    <nav id="nav-drawer" class="nav-drawer" aria-label="Mobile navigation">
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="departments.html">Departments</a>
+      <a href="contact-officials.html">Government &amp; Officials</a>
+      <a href="public-notices.html">Public Notices</a>
+      <a href="#">Community</a>
+      <a href="contact-officials.html">Contact</a>
+      <div class="nav-drawer-utility">
+        <a href="#">Translate</a>
+        <a href="#">Accessibility</a>
+        <a href="#">Sign up for alerts</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main-content">
+
+    <!-- ═══ Active Alert Banner ═══ -->
+    <div class="alert" role="alert">
+      <div class="alert-inner">
+        <span class="alert-icon" aria-hidden="true">!</span>
+        <div class="alert-body">
+          <div class="alert-label">Active advisory &mdash; issued <time datetime="2026-06-22T08:00">June 22, 2026 at 8:00 a.m.</time></div>
+          <p class="alert-headline">Boil-water advisory in effect for Harbor District (Zones 3 &amp; 4)</p>
+          <p class="alert-text">
+            Residents and businesses in the Harbor District should boil tap water for at least one minute before drinking, cooking, or making ice. The advisory follows a routine sample that returned elevated turbidity levels. Bottled water is available at the Harbor District Fire Station (47 Wharf Street), 8 a.m.&ndash;8 p.m. daily.
+            <a href="public-notices.html#boil-water">Read full advisory and treatment instructions</a>.
+          </p>
+        </div>
+        <button type="button" class="alert-dismiss" aria-label="Dismiss this alert">Dismiss</button>
+      </div>
+    </div>
+
+    <!-- ═══ "I Want To..." Tile Grid ═══ -->
+    <section class="iwant-section" aria-labelledby="iwant-heading">
+      <div class="container">
+        <div class="iwant-head">
+          <h1 id="iwant-heading">I want to&hellip;</h1>
+          <p>Common resident actions. If you don&rsquo;t see what you need, browse the <a href="services.html">full A&ndash;Z services directory</a> or call Town Hall at <a href="tel:7745550100">(774)&nbsp;555-0100</a>.</p>
+        </div>
+
+        <div class="iwant-grid">
+          <a href="services.html#water-bill" class="iwant-tile">
+            <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5C7 9 5 13 5 16a7 7 0 0 0 14 0c0-3-2-7-7-13.5z"/><path d="M9 16a3 3 0 0 0 3 3"/></svg>
+            <span>Pay my water bill</span>
+            <span class="tile-arrow" aria-hidden="true">&rarr;</span>
+          </a>
+          <a href="services.html#dog-license" class="iwant-tile">
+            <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="9" r="2"/><circle cx="17" cy="9" r="2"/><circle cx="5" cy="14" r="1.5"/><circle cx="19" cy="14" r="1.5"/><path d="M12 13c-3 0-5 2-5 5h10c0-3-2-5-5-5z"/></svg>
+            <span>Renew my dog license</span>
+            <span class="tile-arrow" aria-hidden="true">&rarr;</span>
+          </a>
+          <a href="services.html#pothole" class="iwant-tile">
+            <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l3-12h12l3 12"/><circle cx="7" cy="19" r="2"/><circle cx="17" cy="19" r="2"/></svg>
+            <span>Report a pothole or street issue</span>
+            <span class="tile-arrow" aria-hidden="true">&rarr;</span>
+          </a>
+          <a href="services.html#building-permit" class="iwant-tile">
+            <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-7h6v7"/></svg>
+            <span>Apply for a building permit</span>
+            <span class="tile-arrow" aria-hidden="true">&rarr;</span>
+          </a>
+          <a href="services.html#trash-pickup" class="iwant-tile">
+            <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            <span>View trash &amp; recycling schedule</span>
+            <span class="tile-arrow" aria-hidden="true">&rarr;</span>
+          </a>
+          <a href="services.html#facility-reservation" class="iwant-tile">
+            <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>
+            <span>Reserve a town facility or field</span>
+            <span class="tile-arrow" aria-hidden="true">&rarr;</span>
+          </a>
+          <a href="services.html#polling-place" class="iwant-tile">
+            <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 6 6 1-4.5 4.5L18 20l-6-3-6 3 1.5-6.5L3 9l6-1z"/></svg>
+            <span>Find my polling place</span>
+            <span class="tile-arrow" aria-hidden="true">&rarr;</span>
+          </a>
+          <a href="services.html#records-request" class="iwant-tile">
+            <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+            <span>Submit a public records request</span>
+            <span class="tile-arrow" aria-hidden="true">&rarr;</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Town Services Grid ═══ -->
+    <section class="section section-cream" aria-labelledby="services-heading">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <p class="section-eyebrow">By Category</p>
+            <h2 id="services-heading">Town services</h2>
+          </div>
+          <p class="section-meta"><a href="services.html">Browse all services A&ndash;Z &rarr;</a></p>
+        </div>
+
+        <div class="svc-grid">
+
+          <div class="svc-col">
+            <h3>Permits &amp; Licenses</h3>
+            <ul>
+              <li><a href="services.html#building-permit">Building permits</a></li>
+              <li><a href="services.html#dog-license">Dog licenses</a></li>
+              <li><a href="services.html#marriage-license">Marriage licenses</a></li>
+              <li><a href="services.html#shellfish-permit">Shellfish permits</a></li>
+              <li><a href="services.html#burning-permit">Open burning permits</a></li>
+              <li><a href="services.html#yard-sale">Yard sale permits</a></li>
+              <li><a href="services.html#sidewalk-cafe">Sidewalk cafe permits</a></li>
+            </ul>
+          </div>
+
+          <div class="svc-col">
+            <h3>Taxes, Bills &amp; Records</h3>
+            <ul>
+              <li><a href="services.html#water-bill">Water &amp; sewer bills</a></li>
+              <li><a href="services.html#property-tax">Property tax payments</a></li>
+              <li><a href="services.html#excise-tax">Motor vehicle excise</a></li>
+              <li><a href="services.html#vital-records">Birth, marriage &amp; death certificates</a></li>
+              <li><a href="services.html#records-request">Public records requests</a></li>
+              <li><a href="services.html#assessor-search">Property assessment search</a></li>
+            </ul>
+          </div>
+
+          <div class="svc-col">
+            <h3>Streets, Trash &amp; Property</h3>
+            <ul>
+              <li><a href="services.html#pothole">Report a pothole</a></li>
+              <li><a href="services.html#streetlight">Report a broken streetlight</a></li>
+              <li><a href="services.html#trash-pickup">Trash &amp; recycling pickup</a></li>
+              <li><a href="services.html#bulk-pickup">Bulk-item pickup</a></li>
+              <li><a href="services.html#snow-removal">Snow removal &amp; sidewalk rules</a></li>
+              <li><a href="services.html#tree-warden">Tree trimming &amp; tree warden</a></li>
+            </ul>
+          </div>
+
+          <div class="svc-col">
+            <h3>Voting, Safety &amp; Health</h3>
+            <ul>
+              <li><a href="services.html#voter-registration">Voter registration</a></li>
+              <li><a href="services.html#polling-place">Polling places &amp; ballots</a></li>
+              <li><a href="services.html#absentee-ballot">Absentee &amp; mail ballots</a></li>
+              <li><a href="services.html#flu-clinic">Seasonal flu clinics</a></li>
+              <li><a href="services.html#food-permits">Food establishment permits</a></li>
+              <li><a href="services.html#smoke-alarm">Smoke alarm inspections</a></li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ News & Notices ═══ -->
+    <section class="section" aria-labelledby="news-heading">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <p class="section-eyebrow">From the Town</p>
+            <h2 id="news-heading">News &amp; notices</h2>
+          </div>
+          <p class="section-meta"><a href="public-notices.html">All public notices &rarr;</a></p>
+        </div>
+
+        <ul class="news-list" role="list">
+
+          <li class="news-item">
+            <div class="news-meta">
+              <span class="news-tag tag-public-safety">Public Safety</span>
+              <time datetime="2026-06-22">June 22, 2026</time>
+            </div>
+            <h3><a href="public-notices.html#boil-water">Boil-water advisory issued for Harbor District (Zones 3 &amp; 4)</a></h3>
+            <p>A routine quarterly sample collected on Saturday returned elevated turbidity. Residents in affected zones should boil water for one minute before use until further notice. Bottled water distribution begins at the Harbor District Fire Station.</p>
+          </li>
+
+          <li class="news-item">
+            <div class="news-meta">
+              <span class="news-tag tag-construction">Construction</span>
+              <time datetime="2026-06-19">June 19, 2026</time>
+            </div>
+            <h3><a href="public-notices.html#mill-road">Mill Road bridge repair begins July 6 &mdash; detour via Cobbett Bridge</a></h3>
+            <p>Department of Public Works crews will replace the steel deck on the Mill Road bridge over Cobbett River. The bridge will close to vehicles for approximately eight weeks. Pedestrian crossing remains open on the north sidewalk.</p>
+          </li>
+
+          <li class="news-item">
+            <div class="news-meta">
+              <span class="news-tag tag-meeting">Meeting</span>
+              <time datetime="2026-06-17">June 17, 2026</time>
+            </div>
+            <h3><a href="public-notices.html#select-board-jul1">Select Board to consider FY27 budget amendments on July 1</a></h3>
+            <p>The Select Board will hold a public hearing on five proposed line-item amendments to the FY27 operating budget, including additional funding for storm-drain maintenance and the Council on Aging transportation program.</p>
+          </li>
+
+          <li class="news-item">
+            <div class="news-meta">
+              <span class="news-tag tag-environment">Environment</span>
+              <time datetime="2026-06-15">June 15, 2026</time>
+            </div>
+            <h3><a href="public-notices.html#beach-monitoring">Weekly bacterial monitoring begins at Sand Bar Beach</a></h3>
+            <p>The Health Department&rsquo;s seasonal monitoring program is underway. Sample results are posted every Tuesday by 4 p.m. Beach status flags (green, yellow, red) are updated at the bathhouse and on the town website.</p>
+          </li>
+
+          <li class="news-item">
+            <div class="news-meta">
+              <span class="news-tag tag-elections">Elections</span>
+              <time datetime="2026-06-12">June 12, 2026</time>
+            </div>
+            <h3><a href="public-notices.html#early-voting">Early voting locations and hours for September 8 primary</a></h3>
+            <p>In-person early voting will be available at the Public Library Community Room and at the Harbor District Fire Station from August 22 through September 4. Drop boxes for mail ballots are located at Town Hall and the Library.</p>
+          </li>
+
+          <li class="news-item">
+            <div class="news-meta">
+              <span class="news-tag tag-community">Community</span>
+              <time datetime="2026-06-10">June 10, 2026</time>
+            </div>
+            <h3><a href="#">Summer concert series at Common Park begins Thursday, July 9</a></h3>
+            <p>The Cultural Council&rsquo;s eighteenth annual concert series runs Thursday evenings, July 9 through August 27. Performances begin at 6:30 p.m. on the Bandstand. Free; bring chairs or blankets. Rain location: Memorial Hall.</p>
+          </li>
+
+        </ul>
+      </div>
+    </section>
+
+    <!-- ═══ Upcoming Meetings Table ═══ -->
+    <section class="section section-cream" aria-labelledby="meetings-heading">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <p class="section-eyebrow">Public Meetings</p>
+            <h2 id="meetings-heading">Upcoming meetings</h2>
+          </div>
+          <p class="section-meta">All meetings are open to the public unless noted. <a href="public-notices.html#meetings">View full calendar &rarr;</a></p>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data">
+            <caption>Scheduled public meetings, June 24 &ndash; July 15, 2026</caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Time</th>
+                <th scope="col">Body</th>
+                <th scope="col">Location</th>
+                <th scope="col">Agenda &amp; materials</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><time datetime="2026-06-24">Wed, Jun 24</time></td>
+                <td>7:00 p.m.</td>
+                <td>Planning Board</td>
+                <td>Town Hall, Hearing Room 204</td>
+                <td>
+                  <a href="#" class="pdf-link">Agenda &mdash; 2026-06-24</a>
+                  <div class="muted">Public hearing: 14 Wharf Street site plan</div>
+                </td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-06-25">Thu, Jun 25</time></td>
+                <td>6:30 p.m.</td>
+                <td>Conservation Commission</td>
+                <td>Town Hall, Conference Room A</td>
+                <td>
+                  <a href="#" class="pdf-link">Agenda &mdash; 2026-06-25</a>
+                  <div class="muted">Notice of Intent: Cobbett River bank stabilization</div>
+                </td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-06-29">Mon, Jun 29</time></td>
+                <td>7:00 p.m.</td>
+                <td>Zoning Board of Appeals</td>
+                <td>Town Hall, Hearing Room 204</td>
+                <td>
+                  <a href="#" class="pdf-link">Agenda &mdash; 2026-06-29</a>
+                  <div class="muted">Variance request: 88 Elm Street</div>
+                </td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-07-01">Wed, Jul 1</time></td>
+                <td>6:00 p.m.</td>
+                <td>Select Board</td>
+                <td>Memorial Hall (live-streamed)</td>
+                <td>
+                  <a href="#" class="pdf-link">Agenda &mdash; 2026-07-01</a>
+                  <div class="muted">FY27 budget amendments; appointments</div>
+                </td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-07-06">Mon, Jul 6</time></td>
+                <td>5:30 p.m.</td>
+                <td>Historic District Commission</td>
+                <td>Library, Trustees Room</td>
+                <td>
+                  <a href="#" class="pdf-link">Agenda &mdash; 2026-07-06</a>
+                  <div class="muted">Certificate of Appropriateness: 4 Common St</div>
+                </td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-07-08">Wed, Jul 8</time></td>
+                <td>7:00 p.m.</td>
+                <td>School Committee</td>
+                <td>Millbrook Middle School, Library</td>
+                <td>
+                  <a href="#" class="pdf-link">Agenda &mdash; 2026-07-08</a>
+                  <div class="muted">Superintendent search update</div>
+                </td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-07-09">Thu, Jul 9</time></td>
+                <td>4:00 p.m.</td>
+                <td>Council on Aging</td>
+                <td>Senior Center, Multi-purpose Rm</td>
+                <td>
+                  <a href="#" class="pdf-link">Agenda &mdash; 2026-07-09</a>
+                  <div class="muted">Transportation grant; volunteer drivers</div>
+                </td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-07-13">Mon, Jul 13</time></td>
+                <td>7:00 p.m.</td>
+                <td>Board of Health</td>
+                <td>Town Hall, Conference Room A</td>
+                <td>
+                  <a href="#" class="pdf-link">Agenda &mdash; 2026-07-13</a>
+                  <div class="muted">Septic regulation revisions, second reading</div>
+                </td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-07-15">Wed, Jul 15</time></td>
+                <td>6:00 p.m.</td>
+                <td>Select Board</td>
+                <td>Memorial Hall (live-streamed)</td>
+                <td>
+                  <a href="#" class="pdf-link">Agenda &mdash; 2026-07-15</a>
+                  <div class="muted">Annual liquor license renewals</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="text-small text-muted" style="margin-top: 1rem;">
+          To request a sign-language interpreter, assistive listening device, or other accommodation for any public meeting, contact the Town Clerk&rsquo;s office at <a href="tel:7745550102">(774)&nbsp;555-0102</a> at least 72 hours in advance. Meeting recordings are available on the town&rsquo;s video archive within five business days.
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══ Contact Strip ═══ -->
+    <section class="contact-strip" aria-labelledby="contact-strip-heading">
+      <div class="contact-strip-inner">
+        <div>
+          <p class="page-eyebrow" style="color: var(--gold-pale);">Visit Town Hall</p>
+          <h2 id="contact-strip-heading">1 Cobbett Square, Millbrook, MA 02XXX</h2>
+          <p>Town Hall is open to the public Monday through Friday. The Town Clerk&rsquo;s office maintains expanded hours on Tuesdays until 7:00 p.m. for residents who cannot visit during regular business hours.</p>
+          <p>
+            <a href="#" style="display:inline-block; margin-right:1rem;">Get directions</a>
+            <a href="#">Parking &amp; accessibility</a>
+          </p>
+        </div>
+
+        <div>
+          <h3>General contact</h3>
+          <ul>
+            <li><strong>Main:</strong> <a href="tel:7745550100">(774)&nbsp;555-0100</a></li>
+            <li><strong>TTY:</strong> <a href="tel:7745550199">(774)&nbsp;555-0199</a></li>
+            <li><strong>Email:</strong> <a href="mailto:info@millbrook-ma.gov">info@millbrook-ma.gov</a></li>
+            <li><strong>Emergency:</strong> 911</li>
+            <li><strong>Non-emergency police:</strong> <a href="tel:7745550110">(774)&nbsp;555-0110</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h3>Town Hall hours</h3>
+          <dl class="hours">
+            <dt>Mon</dt><dd>8:30 a.m. &ndash; 4:30 p.m.</dd>
+            <dt>Tue</dt><dd>8:30 a.m. &ndash; 7:00 p.m.</dd>
+            <dt>Wed</dt><dd>8:30 a.m. &ndash; 4:30 p.m.</dd>
+            <dt>Thu</dt><dd>8:30 a.m. &ndash; 4:30 p.m.</dd>
+            <dt>Fri</dt><dd>8:30 a.m. &ndash; 1:00 p.m.</dd>
+            <dt>Sat&ndash;Sun</dt><dd>Closed</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══ Footer ═══ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+
+        <div class="footer-brand">
+          <svg class="footer-seal" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M32 4 L58 12 L58 30 C58 46 46 56 32 60 C18 56 6 46 6 30 L6 12 Z" fill="none" stroke="#f6f1e6" stroke-width="2"/>
+            <circle cx="32" cy="34" r="12" fill="none" stroke="#f6f1e6" stroke-width="1.5"/>
+            <circle cx="32" cy="34" r="2.5" fill="#b08a3a"/>
+            <g stroke="#f6f1e6" stroke-width="1.2">
+              <line x1="32" y1="22" x2="32" y2="46"/>
+              <line x1="20" y1="34" x2="44" y2="34"/>
+              <line x1="23.5" y1="25.5" x2="40.5" y2="42.5"/>
+              <line x1="40.5" y1="25.5" x2="23.5" y2="42.5"/>
+            </g>
+          </svg>
+          <h3>Town of Millbrook</h3>
+          <p>Official municipal website</p>
+          <address>
+            1 Cobbett Square<br>
+            Millbrook, MA 02XXX<br>
+            <a href="tel:7745550100">(774)&nbsp;555-0100</a>
+          </address>
+        </div>
+
+        <div class="footer-col">
+          <h4>Departments</h4>
+          <div class="dept-phones">
+            <div class="dept-line"><span class="dept-name">Town Manager</span><span class="dept-num">555-0101</span></div>
+            <div class="dept-line"><span class="dept-name">Town Clerk</span><span class="dept-num">555-0102</span></div>
+            <div class="dept-line"><span class="dept-name">Tax Collector</span><span class="dept-num">555-0103</span></div>
+            <div class="dept-line"><span class="dept-name">Assessor</span><span class="dept-num">555-0104</span></div>
+            <div class="dept-line"><span class="dept-name">Public Works</span><span class="dept-num">555-0105</span></div>
+            <div class="dept-line"><span class="dept-name">Building &amp; Planning</span><span class="dept-num">555-0106</span></div>
+            <div class="dept-line"><span class="dept-name">Health Dept.</span><span class="dept-num">555-0107</span></div>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <h4>Public Safety</h4>
+          <div class="dept-phones">
+            <div class="dept-line"><span class="dept-name">Emergency</span><span class="dept-num">911</span></div>
+            <div class="dept-line"><span class="dept-name">Police (non-emerg.)</span><span class="dept-num">555-0110</span></div>
+            <div class="dept-line"><span class="dept-name">Fire (non-emerg.)</span><span class="dept-num">555-0111</span></div>
+            <div class="dept-line"><span class="dept-name">Animal Control</span><span class="dept-num">555-0112</span></div>
+            <div class="dept-line"><span class="dept-name">Emergency Mgmt.</span><span class="dept-num">555-0113</span></div>
+            <div class="dept-line"><span class="dept-name">Harbormaster</span><span class="dept-num">555-0114</span></div>
+            <div class="dept-line"><span class="dept-name">Power outages</span><span class="dept-num">800-555-9911</span></div>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <h4>Popular pages</h4>
+          <ul>
+            <li><a href="services.html">A&ndash;Z services</a></li>
+            <li><a href="departments.html">Departments directory</a></li>
+            <li><a href="contact-officials.html">Contact your officials</a></li>
+            <li><a href="public-notices.html">Public notices</a></li>
+            <li><a href="#">Pay a bill online</a></li>
+            <li><a href="#">GIS &amp; town maps</a></li>
+            <li><a href="#">Annual report (FY26)</a></li>
+            <li><a href="#">Town code &amp; bylaws</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <ul>
+            <li><a href="#">Subscribe to alerts</a></li>
+            <li><a href="#">Subscribe to newsletter</a></li>
+            <li><a href="#">Public meeting calendar</a></li>
+            <li><a href="#">Video archive</a></li>
+            <li><a href="#">Job postings</a></li>
+            <li><a href="#">Volunteer for a committee</a></li>
+            <li><a href="#">Report a website issue</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="footer-bottom">
+        <div class="footer-legal">
+          <a href="#">Accessibility statement</a>
+          <a href="#">FOIA / public records</a>
+          <a href="#">Non-discrimination policy</a>
+          <a href="#">Privacy policy</a>
+          <a href="#">Site map</a>
+        </div>
+        <div>
+          &copy; 2026 Town of Millbrook, Massachusetts &middot; <span>Last updated <time datetime="2026-06-22">June 22, 2026</time></span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="nav.js"></script>
+</body>
+</html>

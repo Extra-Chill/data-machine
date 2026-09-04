@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Story &amp; Help — Lumen Leap</title>
+  <meta name="description" content="The story of Lumen Leap, a full how-to-play guide, the design notes behind its hand-built platforming, and credits.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Lumen Leap home">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">
+        <span class="logo-name">Lumen<b>·</b>Leap</span>
+        <span class="logo-sub">A Firefly Platformer</span>
+      </span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="play.html">Play</a>
+      <a href="levels.html">Levels</a>
+      <a href="about.html" class="active">Story &amp; Help</a>
+      <a href="play.html" class="nav-cta">Play now ▸</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="wrap">
+    <div class="prose">
+      <p class="section-eyebrow">The tale of the Dusk Hollow</p>
+      <h1 class="section-title">Story &amp; Help</h1>
+
+      <h2>Once, the Hollow was never dark</h2>
+      <p>
+        Deep in the bramble valley sits the <strong>Dusk Hollow</strong>, a forest that never quite
+        falls to night. For as long as anyone remembers, a chain of great glass lanterns kept the
+        gloom at bay — tended, every evening, by the <strong>lumenflies</strong>: tiny living lights
+        who carried their own glow wherever they went.
+      </p>
+      <p>
+        Then, one long and starless autumn, the lanterns guttered out one by one. The hollow-beetles —
+        grumpy, armoured things who had always grumbled about the brightness — crept up from the roots
+        and made the dark their home. The lumenflies dimmed and scattered, until only one small light
+        was left flickering on a mossy ledge.
+      </p>
+      <p>
+        That light is <strong>Pip</strong>. And Pip has decided that the dark has gone on quite long
+        enough. Lantern by lantern, leap by leap, Pip is going to bring the glow back to the Hollow —
+        if a few cranky beetles get bounced off their ledges along the way, so be it.
+      </p>
+
+      <h2>How to play</h2>
+      <div class="card-soft">
+        <div class="help-grid">
+          <span class="keys"><kbd>←</kbd><kbd>→</kbd> &nbsp;/&nbsp; <kbd>A</kbd><kbd>D</kbd></span>
+          <span class="what">Run Pip left and right. Let go to glide to a stop.</span>
+
+          <span class="keys"><kbd>Space</kbd> &nbsp;/&nbsp; <kbd>↑</kbd> &nbsp;/&nbsp; <kbd>W</kbd></span>
+          <span class="what"><strong>Jump.</strong> Hold the button to jump higher; tap it for a little hop. There is a brief moment of grace after you run off a ledge where you can still jump (coyote time), and the game remembers a jump you press just before landing (jump buffering).</span>
+
+          <span class="keys"><kbd>P</kbd> &nbsp;/&nbsp; <kbd>Esc</kbd></span>
+          <span class="what">Pause and resume the game.</span>
+
+          <span class="keys"><kbd>R</kbd></span>
+          <span class="what">Restart the current level from the start.</span>
+
+          <span class="keys"><kbd>M</kbd></span>
+          <span class="what">Mute or unmute the synthesised sound effects and music.</span>
+
+          <span class="keys"><kbd>Enter</kbd></span>
+          <span class="what">Confirm the highlighted action on any menu (start, next level, retry).</span>
+        </div>
+        <p style="margin:0;color:var(--ink-dim);">
+          On phones and tablets, use the on-screen <strong>◀ ▶</strong> and <strong>⤒ jump</strong>
+          buttons that appear over the game.
+        </p>
+      </div>
+
+      <h3>What's in a level</h3>
+      <ul>
+        <li><strong>Lumens</strong> — small golden lights. Collect them for points; grab every one in a level for a star.</li>
+        <li><strong>Gems</strong> — one rare cyan gem hides off the main path in each world. Worth a big bonus.</li>
+        <li><strong>Beetles</strong> — patrol their ledges back and forth. <em>Land on top</em> to stomp them and bounce; touch them from the side and Pip loses a glimmer.</li>
+        <li><strong>Spikes &amp; pits</strong> — thorns on the ground and hanging from ceilings, plus bottomless gaps. Any of them costs a glimmer.</li>
+        <li><strong>Checkpoint lanterns</strong> — touch one to light it; if you fall, you respawn there instead of the start.</li>
+        <li><strong>Moving platforms</strong> — rune-lit slabs that drift on set paths and carry you along. Ride them across gaps and up the brambles.</li>
+        <li><strong>The goal lantern</strong> — the big glowing lantern at the end. Reach it to relight it and clear the level.</li>
+      </ul>
+      <p>
+        Pip starts each game with <strong>three glimmers</strong> (lives). Lose them all and it's game
+        over — but you can retry the level immediately. Clear a level to unlock the next.
+      </p>
+
+      <h3>Earning stars</h3>
+      <ul>
+        <li>★ — finish the level at all.</li>
+        <li>★★ — also collect every lumen and the gem.</li>
+        <li>★★★ — also clear it in under 45 seconds.</li>
+      </ul>
+
+      <h2>Design notes — why it feels good</h2>
+      <p>
+        Lumen Leap is written entirely in vanilla JavaScript with the built-in Canvas 2D API. There
+        is no game engine, no framework and no asset files — every sprite, tile, lantern and spark is
+        drawn procedurally with paths and gradients, and every sound is generated live with the Web
+        Audio API. It runs straight from <code>index.html</code> over <code>file://</code>.
+      </p>
+      <p>
+        The platforming relies on a handful of well-known "good-feel" techniques, all hand-implemented:
+      </p>
+      <ul>
+        <li><strong>Fixed-timestep loop</strong> with an accumulator, so the physics is deterministic and stable regardless of frame rate.</li>
+        <li><strong>Acceleration &amp; friction</strong> on the ground and lighter control in the air, instead of instant velocity, so movement has weight without feeling sluggish.</li>
+        <li><strong>Variable jump height</strong> — releasing the jump key early cuts Pip's upward speed.</li>
+        <li><strong>Coyote time</strong> and <strong>jump buffering</strong> — small windows of forgiveness that make jumps land the way you expect.</li>
+        <li><strong>Axis-separated AABB tile collision</strong> for clean resolution against the tilemap, plus one-way platforms you can jump up through.</li>
+        <li><strong>A smoothed, bounded camera</strong> with a little look-ahead, over a procedurally drawn parallax sky.</li>
+      </ul>
+
+      <h3>Accessibility &amp; comfort</h3>
+      <p>
+        A <strong>Calm</strong> toggle (and your system's <em>prefers-reduced-motion</em> setting) tones
+        down screen shake, parallax and particles. Sound is fully optional and off-by-one tap away. The
+        whole game is keyboard-playable, and large touch buttons appear on coarse-pointer devices.
+      </p>
+
+      <div class="card-soft">
+        <h3 style="margin-top:0;">Credits</h3>
+        <div class="credit-grid">
+          <div><div class="k">Design &amp; code</div><div class="v">The Lumen Leap workshop</div></div>
+          <div><div class="k">Engine</div><div class="v">Hand-written, Canvas 2D</div></div>
+          <div><div class="k">Audio</div><div class="v">Web Audio synthesis</div></div>
+          <div><div class="k">Type</div><div class="v">Baloo 2 &amp; JetBrains Mono</div></div>
+          <div><div class="k">Art</div><div class="v">100% procedural, 0 image files</div></div>
+          <div><div class="k">Built for</div><div class="v">Modern browsers, file:// friendly</div></div>
+        </div>
+      </div>
+
+      <div class="hero-actions" style="margin:1.6rem 0;">
+        <a href="play.html" class="btn btn-primary">▶ Play Lumen Leap</a>
+        <a href="levels.html" class="btn btn-outline">Choose a level</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div>© <span data-year>2026</span> Lumen Leap — thanks for relighting the Hollow.</div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="index.html">Home</a>
+      <a href="play.html">Play</a>
+      <a href="levels.html">Levels</a>
+    </nav>
+  </footer>
+
+  <script src="js/nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Cart — SOLE SOCIETY</title>
+  <meta name="description" content="Review your SOLE SOCIETY cart, adjust quantities, and check out your verified-authentic sneakers." />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="index.html" aria-label="SOLE SOCIETY home">
+        <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="11" fill="#c6ff00"/><path d="M8 30 Q8 22 16 21 L24 19 Q28 14 33 16 L38 22 Q43 23 41 28 L40 31 Q39 33 36 33 L11 33 Q8 33 8 30 Z" fill="#0c0d10"/><path d="M9 31 L40 28" stroke="#c6ff00" stroke-width="2" fill="none"/></svg>
+        <span class="brand-text">SOLE<b>SOCIETY</b></span>
+      </a>
+      <button class="nav-toggle" data-nav-toggle aria-label="Toggle navigation" aria-expanded="false" aria-controls="site-nav">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn" data-cart-toggle aria-label="Open cart">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 13H7L6 7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 7a3 3 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="cart-badge" data-cart-count data-empty="true">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="cart-page" class="cart-page">
+    <div class="wrap">
+      <p class="eyebrow">Almost yours</p>
+      <h1 style="font-size:clamp(2rem,6vw,3.4rem);margin-bottom:24px">Your Cart</h1>
+
+      <div id="cart-empty" class="cart-empty" hidden>
+        <h2>Your cart is empty</h2>
+        <p>No heat in the bag yet. Let's fix that.</p>
+        <a class="btn btn-accent" href="shop.html">Shop the boutique</a>
+      </div>
+
+      <div class="cart-layout">
+        <div id="cart-lines"><!-- JS injects cart rows --></div>
+        <aside class="cart-summary" id="cart-summary" hidden><!-- JS injects summary --></aside>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="index.html" aria-label="SOLE SOCIETY home" style="margin-bottom:14px"><svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="11" fill="#c6ff00"/><path d="M8 30 Q8 22 16 21 L24 19 Q28 14 33 16 L38 22 Q43 23 41 28 L40 31 Q39 33 36 33 L11 33 Q8 33 8 30 Z" fill="#0c0d10"/></svg><span class="brand-text">SOLE<b>SOCIETY</b></span></a>
+          <p class="footer-blurb">The streetwear sneaker boutique built for drop culture. Verified authentic, shipped fast, no fakes ever.</p>
+        </div>
+        <div><h4>Shop</h4><ul><li><a href="shop.html?category=Running">Running</a></li><li><a href="shop.html?category=Lifestyle">Lifestyle</a></li><li><a href="shop.html?category=Basketball">Basketball</a></li><li><a href="shop.html?category=Skate">Skate</a></li><li><a href="shop.html?category=Limited">Limited</a></li></ul></div>
+        <div><h4>Society</h4><ul><li><a href="about.html">Our story</a></li><li><a href="about.html#authenticity">Authenticity</a></li><li><a href="contact.html">Contact</a></li><li><a href="cart.html">Cart</a></li></ul></div>
+        <div><h4>Support</h4><ul><li><a href="contact.html">Shipping</a></li><li><a href="contact.html">Returns</a></li><li><a href="contact.html">Size guide</a></li><li><a href="contact.html">FAQ</a></li></ul></div>
+      </div>
+      <div class="footer-bottom"><span>&copy; <span data-year>2026</span> SOLE SOCIETY. All rights reserved.</span><span>Demo boutique — not a real store.</span></div>
+    </div>
+  </footer>
+
+  <script src="js/products.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

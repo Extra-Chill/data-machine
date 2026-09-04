@@ -1,0 +1,11 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "marketing",
+    "landing",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

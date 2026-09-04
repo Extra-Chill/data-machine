@@ -1,0 +1,13 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "sports",
+    "lacrosse",
+    "club",
+    "local",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

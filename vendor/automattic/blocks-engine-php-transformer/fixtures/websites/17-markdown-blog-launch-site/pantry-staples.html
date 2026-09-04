@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Northstar Pantry Staples Guide — 24 Ingredients That Change Everything</title>
+  <meta name="description" content="A practical guide to the pantry staples that make weeknight cooking actually work. Build this list once and dinner gets easier every week.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ---- Pantry guide page ---- */
+    .article-top {
+      background: var(--cream);
+      padding-block: clamp(3.5rem, 8vw, 6.5rem);
+    }
+    .article-top .article-title { font-size: clamp(2.3rem, 5.5vw, 4rem); }
+
+    .article-main { padding-block: clamp(3rem, 7vw, 5.5rem); }
+
+    /* Staple lists inside article body */
+    .article-body .staple-list { list-style: none; padding-left: 0; margin-block: var(--s6); }
+    .article-body .staple-list li {
+      list-style: none;
+      padding: var(--s4) 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0;
+      color: var(--text-medium);
+    }
+    .article-body .staple-list li:last-child { border-bottom: none; }
+    .staple-list .staple-name {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: var(--text-xl);
+      color: var(--text-dark);
+      display: block;
+      margin-bottom: var(--s1);
+    }
+    .staple-list .staple-num {
+      color: var(--terracotta);
+      font-family: var(--font-body);
+      font-size: var(--text-sm);
+      font-weight: 600;
+      margin-right: var(--s2);
+    }
+    .staple-list .staple-why { font-size: var(--text-base); line-height: 1.7; }
+
+    .cat-label {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s2);
+      margin-top: var(--s12);
+    }
+
+    /* ---- Checklist build section ---- */
+    .build-section { background: var(--cream); }
+    .checklist-card { background: var(--warm-white); }
+    .checklist-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--s8);
+      margin-block: var(--s8);
+    }
+    .checklist-col h4 {
+      font-family: var(--font-body);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--terracotta);
+      margin-bottom: var(--s4);
+      padding-bottom: var(--s2);
+      border-bottom: 1px solid var(--border);
+    }
+    .checklist-col ul { display: flex; flex-direction: column; gap: var(--s3); }
+    .checklist-col li {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--s3);
+      font-size: var(--text-sm);
+      color: var(--text-medium);
+    }
+    .checklist-col li svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; color: var(--sage); }
+    .build-note { font-size: var(--text-sm); color: var(--text-light); margin-top: var(--s4); }
+
+    /* ---- Related reading ---- */
+    .related-section { background: var(--warm-white); }
+    .related-card { display: flex; flex-direction: column; }
+    .related-card__title {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: var(--s3);
+    }
+    .related-card p { font-size: var(--text-sm); color: var(--text-medium); margin-bottom: var(--s5); flex: 1; }
+
+    /* ---- Newsletter CTA ---- */
+    .cta-band { background: var(--sage); text-align: center; }
+    .cta-band h2 { color: var(--warm-white); font-size: var(--text-4xl); margin-bottom: var(--s4); }
+    .cta-band p { color: rgba(251,246,238,0.86); max-width: 50ch; margin: 0 auto var(--s8); }
+    .cta-band .newsletter-form { margin-inline: auto; }
+    .cta-band .newsletter-success { margin-top: var(--s4); }
+
+    @media (max-width: 640px) {
+      .checklist-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header" role="banner">
+  <div class="container">
+    <nav class="nav-inner" aria-label="Main navigation">
+      <a href="index.html" class="nav-logo" aria-label="Northstar Pantry — Home">
+        <svg class="nav-logo__mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M20 2L23 16.2L37 20L23 23.8L20 38L17 23.8L3 20L17 16.2Z" fill="currentColor"/>
+          <circle cx="20" cy="20" r="3.5" fill="white" opacity="0.5"/>
+        </svg>
+        <div class="nav-logo__text">
+          <span class="nav-logo__name">Northstar</span>
+          <span class="nav-logo__sub">Pantry</span>
+        </div>
+      </a>
+      <ul class="nav-links" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="how-it-works.html">How It Works</a></li>
+        <li><a href="weekly-menu.html">This Week's Menu</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="founder-story.html">Our Story</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="pricing.html" class="btn btn-primary">Join Waitlist</a>
+        <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </nav>
+  </div>
+</header>
+<div class="mobile-menu" role="dialog" aria-label="Navigation menu">
+  <nav>
+    <ul class="mobile-menu__links" role="list">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="how-it-works.html">How It Works</a></li>
+      <li><a href="weekly-menu.html">This Week's Menu</a></li>
+      <li><a href="pricing.html">Pricing</a></li>
+      <li><a href="founder-story.html">Our Story</a></li>
+      <li><a href="pantry-staples.html">Pantry Guide</a></li>
+    </ul>
+    <div class="mobile-menu__footer">
+      <a href="pricing.html" class="btn btn-primary btn-lg">Join the Waitlist</a>
+    </div>
+  </nav>
+</div>
+
+<main role="main">
+
+  <!-- Article header -->
+  <section class="article-top">
+    <div class="container--narrow">
+      <div class="article-header reveal">
+        <div class="article-meta">
+          <span class="tag tag-sage">Pantry Guide</span>
+          <span class="dot">·</span>
+          <time datetime="2024-02-28">February 28, 2024</time>
+          <span class="dot">·</span>
+          <span>12 min read</span>
+        </div>
+        <h1 class="article-title">24 pantry staples that make weeknight cooking actually work</h1>
+        <p class="article-deck">Build this list once. Shop the gaps. Spend the rest of the year cooking better dinners with less panic.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Article body -->
+  <section class="article-main">
+    <div class="container--narrow">
+      <article class="article-body reveal">
+        <p>A well-stocked pantry isn't about having everything. It's about having the right twenty-something things — the ones that quietly unlock dozens of meals. Most overstuffed pantries are full of single-use ingredients bought for one recipe and never touched again. That's not a pantry; that's a graveyard. The goal is a small, deep set of staples you reach for constantly.</p>
+
+        <p>Here's the philosophy we cook by: <strong>buy the pantry once</strong>, or build it gradually over a few trips, and then every week you only shop for fresh ingredients. The base is already home. This single shift cuts both your grocery bill and your decision fatigue, because the hardest part of any weeknight dinner — "what do I even have to work with?" — is already answered before you start.</p>
+
+        <p>It's also the foundation of everything we do at Northstar Pantry. Every recipe we build assumes this base is in your cupboard. If your pantry has these items, the shopping list we send you each week is shorter, cheaper, and faster to shop. So consider this the prerequisite — build it once, and every plan after gets easier.</p>
+
+        <p>Below are 24 staples in five categories, with the specific type to buy and why it earns its shelf space.</p>
+
+        <h2 class="cat-label"><span class="tag tag-terracotta">Category 1</span> Canned &amp; Jarred</h2>
+        <p>The backbone of fast dinners. These don't spoil, they don't judge you, and they turn a bare fridge into a meal.</p>
+        <ul class="staple-list">
+          <li>
+            <span class="staple-name"><span class="staple-num">01</span>Crushed San Marzano tomatoes (28 oz, DOP certified)</span>
+            <span class="staple-why">The difference between okay pasta and great pasta is the tomato. San Marzanos are sweeter and less acidic. Spend the extra dollar.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">02</span>White beans (cannellini, 3–4 cans)</span>
+            <span class="staple-why">The most versatile bean. Pasta e fagioli, white bean soup, smashed with garlic and olive oil as a side. Keep four cans.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">03</span>Chickpeas (3 cans)</span>
+            <span class="staple-why">Roast them crispy for salads, simmer in tomato sauce for shakshuka, blend into hummus. Buy the no-salt-added kind.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">04</span>Coconut milk (full fat, 2 cans)</span>
+            <span class="staple-why">Not just for Thai food. Adds richness to soups, braises, and even oatmeal. Full fat or don't bother.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">05</span>Fish sauce (Red Boat or Tiparos)</span>
+            <span class="staple-why">Don't be afraid of it. A teaspoon in a pan sauce or braise adds a savory depth that tastes like you cooked all day.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">06</span>Dijon mustard</span>
+            <span class="staple-why">A tablespoon into any pan sauce makes it taste finished. Also the base of the world's best vinaigrette.</span>
+          </li>
+        </ul>
+
+        <h2 class="cat-label"><span class="tag tag-gold">Category 2</span> Oils, Vinegars &amp; Acid</h2>
+        <p>Fat carries flavor; acid wakes it up. Get these right and almost everything you cook tastes more alive.</p>
+        <ul class="staple-list">
+          <li>
+            <span class="staple-name"><span class="staple-num">07</span>Good olive oil (everyday + finishing)</span>
+            <span class="staple-why">Two bottles: one decent workhorse for cooking, one nicer one for finishing dishes and salads. Kirkland extra-virgin is genuinely excellent for an everyday bottle.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">08</span>Sherry vinegar or red wine vinegar</span>
+            <span class="staple-why">More complex than white wine vinegar, less harsh than apple cider. Brightens everything.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">09</span>Soy sauce or tamari</span>
+            <span class="staple-why">Tamari is gluten-free and slightly richer. A splash in braises, stir-fries, or even roast chicken glazes.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">10</span>Lemons (always fresh)</span>
+            <span class="staple-why">Not a pantry item technically, but always buy four. A squeeze of lemon at the end of any dish is the most underused trick in home cooking.</span>
+          </li>
+        </ul>
+
+        <div class="pull-quote">
+          <p>"A well-stocked pantry isn't about abundance — it's about the right 24 things that unlock a hundred dinners."</p>
+          <cite>— Northstar Pantry kitchen team</cite>
+        </div>
+
+        <h2 class="cat-label"><span class="tag tag-sage">Category 3</span> Dry Goods &amp; Grains</h2>
+        <p>These are the part of the plate that makes a meal feel like dinner instead of a snack. They keep for months and stretch a little protein a long way.</p>
+        <ul class="staple-list">
+          <li>
+            <span class="staple-name"><span class="staple-num">11</span>Pasta (two shapes: a long and a short)</span>
+            <span class="staple-why">Keep spaghetti and rigatoni. Long pasta for simple sauces, short pasta for chunkier sauces and soups.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">12</span>Pearl barley</span>
+            <span class="staple-why">Underappreciated. Nutty, chewy, filling. Goes into soups, stews, grain bowls. Cooks in 30 minutes.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">13</span>Farro</span>
+            <span class="staple-why">More character than brown rice, faster to cook. Great base for weeknight grain bowls.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">14</span>Panko breadcrumbs</span>
+            <span class="staple-why">For crisping, binding, and topping. Regular breadcrumbs are fine but panko stays crunchier.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">15</span>All-purpose flour (and a small bag of 00 pizza flour)</span>
+            <span class="staple-why">00 flour makes noticeably better pizza and pasta. Worth having a small bag around.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">16</span>Dried red lentils</span>
+            <span class="staple-why">Cook in 20 minutes with no soaking. Make soup, dal, or blend into a sauce base.</span>
+          </li>
+        </ul>
+
+        <h2 class="cat-label"><span class="tag tag-terracotta">Category 4</span> Spices That Actually Matter</h2>
+        <p>Don't try to own every spice. Own these five deeply. A full spice cabinet you never use is worse than a small one you know well — those forgotten jars lose their punch and take up the room your real workhorses need.</p>
+        <ul class="staple-list">
+          <li>
+            <span class="staple-name"><span class="staple-num">17</span>Smoked paprika</span>
+            <span class="staple-why">The flavor backbone of a dozen dinners: chicken thighs, chickpeas, fish, eggs. Buy Spanish, not generic.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">18</span>Cumin (whole and ground)</span>
+            <span class="staple-why">Toast whole seeds in a dry pan to understand why it matters. Ground cumin for quick weeknights.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">19</span>Coriander (ground)</span>
+            <span class="staple-why">Works alongside cumin in almost everything. Floral and citrusy when fresh.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">20</span>Dried chili flakes</span>
+            <span class="staple-why">Calabrian chili paste if you can find it. Regular red pepper flakes otherwise. Heat and flavor, not just heat.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">21</span>Turmeric</span>
+            <span class="staple-why">Anti-inflammatory, yes, but also: it makes everything golden and beautiful. Into soups, rice, eggs.</span>
+          </li>
+        </ul>
+
+        <h2 class="cat-label"><span class="tag tag-gold">Category 5</span> Alliums &amp; Flavor Base</h2>
+        <p>Technically the produce aisle, but they live in the pantry and they start nearly every dinner you'll make. Never run out.</p>
+        <ul class="staple-list">
+          <li>
+            <span class="staple-name"><span class="staple-num">22</span>Yellow onions (always have 4–6)</span>
+            <span class="staple-why">The foundation of 80% of dinners. Always have too many.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">23</span>Garlic (whole bulbs, not pre-minced)</span>
+            <span class="staple-why">Pre-minced garlic in a jar is a lie. Buy whole heads and mince fresh. The difference is real.</span>
+          </li>
+          <li>
+            <span class="staple-name"><span class="staple-num">24</span>Shallots</span>
+            <span class="staple-why">Subtler than onions, slightly sweeter. Essential for pan sauces and vinaigrettes. Keep 4–6 around.</span>
+          </li>
+        </ul>
+
+        <p>That's the whole list. Twenty-four things, five trips to put together if you spread it out, and a kitchen that's ready for almost anything after that. You'll notice none of it is exotic — that's the point. The magic isn't in any single ingredient; it's in always having the base on hand so the only question left is what's fresh this week.</p>
+
+        <p>If you want to see how these staples become actual dinners, take a look at <a href="weekly-menu.html">this week's menu</a> — every recipe is built with this list as the foundation, so the shopping list is short and the cooking is calm.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Build your list -->
+  <section class="build-section">
+    <div class="container--narrow">
+      <div class="section-head reveal">
+        <span class="eyebrow">Make it real</span>
+        <h2 class="section-title">Your pantry starter checklist</h2>
+        <p class="section-subtitle">Print this, shop it over two or three trips, and you're set for the rest of the year.</p>
+      </div>
+
+      <div class="card checklist-card reveal" data-delay="100">
+        <div class="checklist-grid">
+          <div class="checklist-col">
+            <h4>Canned &amp; Jarred</h4>
+            <ul>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>San Marzano tomatoes (28 oz)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Cannellini beans (3–4 cans)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Chickpeas (3 cans)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Full-fat coconut milk (2 cans)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Fish sauce</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Dijon mustard</span>
+              </li>
+            </ul>
+          </div>
+          <div class="checklist-col">
+            <h4>Oils, Vinegars &amp; Acid</h4>
+            <ul>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Olive oil (everyday + finishing)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Sherry or red wine vinegar</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Soy sauce or tamari</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Lemons (always four)</span>
+              </li>
+            </ul>
+          </div>
+          <div class="checklist-col">
+            <h4>Dry Goods &amp; Grains</h4>
+            <ul>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Pasta (one long, one short)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Pearl barley</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Farro</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Panko breadcrumbs</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Flour (AP + small bag 00)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Dried red lentils</span>
+              </li>
+            </ul>
+          </div>
+          <div class="checklist-col">
+            <h4>Spices &amp; Alliums</h4>
+            <ul>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Smoked paprika (Spanish)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Cumin (whole + ground)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Ground coriander</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Dried chili flakes</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Turmeric</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Yellow onions (4–6)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Garlic (whole bulbs)</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.7 5.3 8 14l-4.7-4.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Shallots (4–6)</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <p class="build-note">Northstar Pantry members get a digital version of this list inside every plan — already checked against what each week's menu needs.</p>
+        <a href="pricing.html" class="btn btn-secondary mt-4">See our plans</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Related reading -->
+  <section class="related-section">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="eyebrow">Continue reading</span>
+      </div>
+      <div class="grid-2">
+        <a href="founder-story.html" class="card related-card reveal" data-delay="0">
+          <span class="tag tag-terracotta mb-4">Founder Note</span>
+          <h3 class="related-card__title">Why I Built Northstar Pantry</h3>
+          <p>Sarah Caldwell on solving the family dinner problem from the inside out.</p>
+          <span class="btn btn-ghost">Read the story <span class="arrow">→</span></span>
+        </a>
+        <a href="weekly-menu.html" class="card related-card reveal" data-delay="100">
+          <span class="tag tag-sage mb-4">Sample Week</span>
+          <h3 class="related-card__title">This Week's Dinner Menu</h3>
+          <p>See how these pantry staples become seven actual dinners.</p>
+          <span class="btn btn-ghost">Browse the menu <span class="arrow">→</span></span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Newsletter CTA -->
+  <section class="cta-band">
+    <div class="container--narrow reveal">
+      <h2>Get a new pantry tip every week</h2>
+      <p>Subscribe to the Northstar Pantry newsletter. New meal plans, cooking tips, and pantry ideas every Friday.</p>
+      <form class="newsletter-form newsletter-form--dark" aria-label="Newsletter signup">
+        <input type="email" placeholder="your@email.com" required aria-label="Email address">
+        <button type="submit" class="btn btn-primary">Subscribe</button>
+      </form>
+      <p class="newsletter-success">You're in! We'll be in touch soon.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" aria-label="Northstar Pantry">
+          <svg class="nav-logo__mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M20 2L23 16.2L37 20L23 23.8L20 38L17 23.8L3 20L17 16.2Z" fill="currentColor"/>
+            <circle cx="20" cy="20" r="3.5" fill="var(--brown)" opacity="0.5"/>
+          </svg>
+          <div class="nav-logo__text">
+            <span class="nav-logo__name">Northstar</span>
+            <span class="nav-logo__sub">Pantry</span>
+          </div>
+        </a>
+        <p class="footer-tagline">Weekly dinner plans for busy families who love good food and sane evenings.</p>
+        <form class="newsletter-form newsletter-form--dark mt-8" aria-label="Newsletter signup">
+          <input type="email" placeholder="your@email.com" required aria-label="Email address">
+          <button type="submit" class="btn btn-primary">Subscribe</button>
+        </form>
+        <p class="newsletter-success">You're in! We'll be in touch soon.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Explore</h4>
+        <ul>
+          <li><a href="how-it-works.html">How It Works</a></li>
+          <li><a href="weekly-menu.html">This Week's Menu</a></li>
+          <li><a href="pricing.html">Plans &amp; Pricing</a></li>
+          <li><a href="founder-story.html">Our Story</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="pantry-staples.html">Pantry Staples Guide</a></li>
+          <li><a href="weekly-menu.html">Sample Menu Archive</a></li>
+          <li><a href="how-it-works.html#faq">FAQ</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Connect</h4>
+        <ul>
+          <li><a href="mailto:hello@northstarpantry.com">hello@northstarpantry.com</a></li>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">Pinterest</a></li>
+          <li><a href="#">Newsletter</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2024 Northstar Pantry. Made with care for families everywhere.</p>
+      <div class="footer-bottom-links">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

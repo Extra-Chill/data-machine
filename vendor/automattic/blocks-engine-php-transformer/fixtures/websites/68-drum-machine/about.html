@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How it works — Pulseforge RB-16 Drum Machine</title>
+  <meta name="description" content="How the Pulseforge RB-16 synthesizes its drum voices from oscillators and filtered noise, and how the lookahead Web Audio scheduler keeps timing tight. No samples, no frameworks — just the Web Audio API and Canvas.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Pulseforge home">
+      <span class="logo-mark">Pulseforge<span class="dot">◉</span></span>
+      <span class="logo-sub">Rhythm Machines</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Machine</a>
+      <a href="patterns.html">Kits &amp; Grooves</a>
+      <a href="about.html" class="active">How it works</a>
+      <a href="index.html" class="nav-cta">Open the machine</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+  </header>
+
+  <main class="wrap content-page about">
+
+    <div class="page-hero">
+      <p class="eyebrow">RB-16 · Under the hood</p>
+      <h1 class="page-title">No samples. <em>Every drum is math.</em></h1>
+      <p class="page-lead">The RB-16 doesn't load a single audio file. Each kick, snare and hat is built in real time from oscillators and filtered noise through the Web Audio API, then scheduled against the audio clock so the groove never drifts. Here's how.</p>
+    </div>
+
+    <section class="prose">
+      <h2 id="voices">1 · Synthesizing the voices</h2>
+      <p>A classic analog drum machine doesn't play recordings — it generates each sound electronically. We do the same in JavaScript. Every voice is a tiny graph of <code>OscillatorNode</code>s, a <code>BufferSource</code> of noise, biquad filters and a gain envelope, assembled the instant a hit fires and torn down when it finishes.</p>
+
+      <div class="voice-table">
+        <div class="vt-row vt-head"><span>Voice</span><span>Built from</span><span>Knobs change…</span></div>
+        <div class="vt-row"><span><b style="color:#ff5c7c">Kick</b></span><span>A sine pitch-swept from ~150 Hz down to ~45 Hz, plus an optional triangle "click" transient.</span><span><i>Tune</i> sets start/end pitch, <i>Decay</i> the body length, <i>Tone</i> the click punch.</span></div>
+        <div class="vt-row"><span><b style="color:#ffc857">Snare</b></span><span>A pair of detuned triangles for the body, mixed with high-passed + band-passed noise for the rattle.</span><span><i>Tone</i> balances body vs. noise; <i>Tune</i> shifts both up or down.</span></div>
+        <div class="vt-row"><span><b style="color:#ffa14a">Clap</b></span><span>Band-passed noise re-triggered three times ~12 ms apart, then a diffuse tail — the trick that makes a clap sound like many hands.</span><span><i>Decay</i> stretches the tail, <i>Tune</i> moves the bandpass.</span></div>
+        <div class="vt-row"><span><b style="color:#5ad7ff">Hats &amp; Crash</b></span><span>Six (or eight) square oscillators at inharmonic ratios through a bandpass + highpass — the metallic, pitchless shimmer.</span><span><i>Decay</i> is open vs. closed; <i>Tone</i> the brightness.</span></div>
+        <div class="vt-row"><span><b style="color:#c084fc">Toms</b></span><span>A falling sine with a short noise attack.</span><span><i>Tune</i> picks the drum size; <i>Decay</i> the sustain.</span></div>
+        <div class="vt-row"><span><b style="color:#ffe066">Cowbell / Rim</b></span><span>Two detuned squares through a sharp bandpass (cowbell) or two fast square blips (rim).</span><span><i>Tune</i> the pitch, <i>Decay</i> the ring.</span></div>
+      </div>
+
+      <p>Because nothing is pre-recorded, a "kit" is just a table of numbers. Loading the <b>808</b> kit instead of the <b>909</b> only changes those numbers — the synthesis code is identical, the result is a totally different machine.</p>
+
+      <h2 id="scheduler">2 · The lookahead scheduler</h2>
+      <p>The hard part of any sequencer isn't making sound — it's making sound <em>on time</em>. A naïve <code>setInterval</code> that fires a drum every beat will stutter the moment the browser is busy laying out the page or running garbage collection. <code>setTimeout</code> and <code>requestAnimationFrame</code> are simply not accurate enough for music.</p>
+      <p>So the RB-16 uses the pattern Chris Wilson described in <i>"A Tale of Two Clocks"</i>: a coarse JavaScript timer that only ever <b>schedules ahead</b>, and the rock-solid audio clock (<code>AudioContext.currentTime</code>) that decides when notes actually play.</p>
+
+      <pre class="code"><code>// a 25 ms timer just looks ahead ~100 ms and enqueues notes
+setInterval(function () {
+  while (nextNoteTime &lt; ctx.currentTime + SCHEDULE_AHEAD) {
+    scheduleStep(step, nextNoteTime);   // fire drums AT nextNoteTime
+    nextNoteTime += secondsPerStep();   // advance the musical clock
+    step = (step + 1) % steps;
+  }
+}, 25);</code></pre>
+
+      <p>Every drum is started with an exact timestamp — <code>osc.start(nextNoteTime)</code> — so even if the JavaScript timer wakes up a few milliseconds late, the audio still plays sample-accurately. The grid highlight is the only thing driven by wall-clock time, queued and flushed as each step's moment arrives, so the visuals can be loose while the <em>sound</em> stays tight.</p>
+
+      <div class="diagram" aria-label="Scheduler diagram">
+        <div class="dg-clock">
+          <span class="dg-lab">JS timer · 25 ms</span>
+          <div class="dg-track"><span class="dg-tick"></span><span class="dg-tick"></span><span class="dg-tick"></span><span class="dg-tick"></span><span class="dg-tick"></span></div>
+        </div>
+        <div class="dg-arrow">looks ahead → enqueues at exact times →</div>
+        <div class="dg-clock audio">
+          <span class="dg-lab">Audio clock · sample-accurate</span>
+          <div class="dg-track">
+            <span class="dg-note a"></span><span class="dg-note"></span><span class="dg-note a"></span><span class="dg-note"></span>
+            <span class="dg-note a"></span><span class="dg-note"></span><span class="dg-note a"></span><span class="dg-note"></span>
+          </div>
+        </div>
+      </div>
+
+      <h2>3 · Swing, accents &amp; song mode</h2>
+      <p><b>Swing</b> simply delays every odd 16th-note by a fraction of a step, pushing the off-beats late for that human, behind-the-beat shuffle. <b>Accents</b> and <b>ghost notes</b> are per-step velocities (1.2 / 0.55) that scale each hit's gain — shift-click a cell to cycle them. <b>Song mode</b> chains pattern banks A–D into a track: when a pattern finishes its repeats, the scheduler swaps in the next bank's grid between bars, so the chain plays seamlessly.</p>
+
+      <h2>4 · The mix bus</h2>
+      <p>Every voice runs through its own track gain (for level, mute and solo), summed into a bus, gently soft-clipped by a <code>WaveShaper</code> "drive", then through a <code>DynamicsCompressor</code> acting as a limiter so a busy beat or a panic stab never clips your speakers. An <code>AnalyserNode</code> taps the master output to feed the canvas visualizer.</p>
+
+      <div class="chain-vis" aria-label="Signal chain">
+        <span class="cv-node">voices</span><span class="cv-arr">→</span>
+        <span class="cv-node">track gain<br><i>level · mute · solo</i></span><span class="cv-arr">→</span>
+        <span class="cv-node">bus</span><span class="cv-arr">→</span>
+        <span class="cv-node">drive<br><i>soft clip</i></span><span class="cv-arr">→</span>
+        <span class="cv-node">master</span><span class="cv-arr">→</span>
+        <span class="cv-node">limiter</span><span class="cv-arr">→</span>
+        <span class="cv-node">analyser</span><span class="cv-arr">→</span>
+        <span class="cv-node out">speakers</span>
+      </div>
+
+      <h2 id="specs">5 · Specs &amp; accessibility</h2>
+      <ul class="spec-list">
+        <li><b>Engine</b> — Web Audio API. No samples, no libraries, no build step. Open <code>index.html</code> over <code>file://</code> and it runs.</li>
+        <li><b>Voices</b> — 10 synthesized drums; each with Tune / Decay / Tone / Level.</li>
+        <li><b>Sequencer</b> — 16 steps, adjustable 4–16 steps per bar, 40–240 BPM, swing to 60%, per-step accents &amp; ghosts.</li>
+        <li><b>Arranger</b> — 4 pattern banks + a chain-based song mode.</li>
+        <li><b>Persistence</b> — kits &amp; beats saved to <code>localStorage</code>; export / import a song as JSON.</li>
+        <li><b>Accessibility</b> — fully keyboard-operable, ARIA-labelled controls, and the visualizer calms its motion under <code>prefers-reduced-motion</code>.</li>
+        <li><b>Audio policy</b> — the <code>AudioContext</code> is created on your first click, per the browser autoplay rules; if Web Audio is unavailable the UI degrades gracefully.</li>
+      </ul>
+
+      <div class="team" id="team">
+        <h2>The makers</h2>
+        <p>Pulseforge is a two-person studio that builds playable instruments for the open web — no plugins, no downloads, no accounts. The RB-16 is our love letter to the rhythm boxes that shaped a half-century of music.</p>
+      </div>
+
+      <p class="back-cta"><a href="index.html" class="btn btn-primary">◉ Open the RB-16</a> <a href="patterns.html" class="btn btn-outline">Browse kits &amp; grooves</a></p>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-bottom" style="border:none;padding-top:0;">
+        <p class="footer-copy">© <span data-year>2026</span> Pulseforge Instruments · Built on the open web</p>
+        <div class="footer-legal"><a href="index.html">Machine</a><a href="patterns.html">Kits &amp; Grooves</a><a href="mailto:hello@pulseforge.audio">Contact</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+</body>
+</html>

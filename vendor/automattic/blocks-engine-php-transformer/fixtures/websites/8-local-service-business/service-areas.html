@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service Areas | Northline Plumbing &amp; Heating — Greater Grand Rapids, MI</title>
+  <meta name="description" content="Northline Plumbing & Heating serves Grand Rapids, Kentwood, Wyoming, Walker, Ada, Cascade, Grandville, Jenison, Byron Center, Caledonia, Rockford, and Forest Hills.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .area-region {
+      margin-bottom: 3.5rem;
+    }
+    .area-region-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--c-cream-dark);
+    }
+    .area-region-header h2 { font-size: 1.6rem; margin: 0; }
+    .area-region-dot {
+      width: 14px;
+      height: 14px;
+      background: var(--c-copper);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .area-grid-5 {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1rem;
+    }
+    .neighborhood-chip {
+      background: var(--c-white);
+      border: 1.5px solid var(--c-cream-dark);
+      border-radius: var(--r);
+      padding: .65rem 1rem;
+      font-family: var(--f-ui);
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--c-text-mid);
+      transition: all var(--t);
+      cursor: default;
+    }
+    .neighborhood-chip:hover {
+      border-color: var(--c-copper);
+      color: var(--c-navy);
+      background: rgba(174,92,24,0.05);
+    }
+    .response-banner {
+      background: var(--c-navy-mid);
+      border-radius: var(--r-lg);
+      padding: 2.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 2rem;
+      margin-bottom: 4rem;
+      border-left: 5px solid var(--c-copper);
+    }
+    .response-item { text-align: center; }
+    .response-num {
+      font-family: var(--f-display);
+      font-size: 2.5rem;
+      color: var(--c-copper-glow);
+      display: block;
+      line-height: 1;
+    }
+    .response-label {
+      font-family: var(--f-ui);
+      font-size: .74rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      margin-top: .4rem;
+      display: block;
+    }
+    .not-listed-box {
+      background: var(--c-cream-dark);
+      border-radius: var(--r-lg);
+      padding: 2.5rem;
+      text-align: center;
+      margin-top: 3rem;
+    }
+    .not-listed-box svg {
+      width: 40px;
+      height: 40px;
+      color: var(--c-copper);
+      margin: 0 auto 1rem;
+    }
+    @media (max-width: 1024px) {
+      .area-grid-5 { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .area-grid-5 { grid-template-columns: repeat(2, 1fr); }
+      .response-banner { grid-template-columns: 1fr; gap: 1.5rem; }
+    }
+    @media (max-width: 480px) {
+      .area-grid-5 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ Emergency Banner ═══ -->
+  <div class="emergency-banner" role="alert">
+    <span class="pulse-dot" aria-hidden="true"></span>
+    24/7 Emergency Service &mdash;
+    <a href="tel:6165550182">(616) 555-0182</a>
+  </div>
+
+  <!-- ═══ Site Header ═══ -->
+  <header class="site-header">
+    <nav class="header-inner" aria-label="Main navigation">
+      <a href="index.html" class="site-logo" aria-label="Northline Plumbing and Heating — Go to homepage">
+        <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+          <rect width="44" height="44" rx="5" fill="#ae5c18"/>
+          <path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/>
+        </svg>
+        <div class="logo-text">
+          <span class="logo-name">NORTHLINE</span>
+          <span class="logo-tag">Plumbing &amp; Heating</span>
+        </div>
+      </a>
+      <ul class="site-nav" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="service-areas.html" class="active">Service Areas</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="reviews.html">Reviews</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a href="tel:6165550182" class="nav-phone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          (616) 555-0182
+        </a>
+      </div>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-drawer">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+    <nav id="nav-drawer" class="nav-drawer" aria-label="Mobile navigation">
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="service-areas.html">Service Areas</a>
+      <a href="about.html">About</a>
+      <a href="reviews.html">Reviews</a>
+      <a href="contact.html">Contact</a>
+      <div class="mobile-cta">
+        <a href="tel:6165550182">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          Call Now &mdash; (616) 555-0182
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ═══ Page Hero ═══ -->
+    <section class="page-hero next-white" aria-labelledby="page-title">
+      <div class="page-hero-tex" aria-hidden="true"></div>
+      <div class="container page-hero-content">
+        <p class="label anim">Coverage Area</p>
+        <div class="divider anim anim-d1"></div>
+        <h1 class="anim anim-d2" id="page-title">We Come to You</h1>
+        <p class="subtitle anim anim-d3">Our trucks are staged throughout Greater Grand Rapids so we can respond quickly to any neighborhood we serve. Emergency or scheduled &mdash; we&rsquo;re close by.</p>
+      </div>
+    </section>
+
+    <!-- ═══ Main Content ═══ -->
+    <section class="section section--white" aria-label="Service area details">
+      <div class="container">
+
+        <!-- Response Stats -->
+        <div class="response-banner" role="region" aria-label="Response time information">
+          <div class="response-item">
+            <span class="response-num">&lt;60</span>
+            <span class="response-label">Minute Emergency Response<br>in Grand Rapids proper</span>
+          </div>
+          <div class="response-item">
+            <span class="response-num">12+</span>
+            <span class="response-label">Communities Served<br>across the metro</span>
+          </div>
+          <div class="response-item">
+            <span class="response-num">24/7</span>
+            <span class="response-label">Emergency Dispatch<br>every day of the year</span>
+          </div>
+        </div>
+
+        <!-- Map + Description -->
+        <div class="about-split" style="gap:4rem; margin-bottom:4rem;">
+          <div>
+            <p class="label">Our Home Base</p>
+            <div class="divider"></div>
+            <h2 style="font-size:clamp(1.6rem,3.5vw,2.4rem);">Greater Grand Rapids<br>Metro Area</h2>
+            <p style="margin-top:.75rem; color:var(--c-text-mid);">Northline is based on Leonard Street NW in Grand Rapids &mdash; right in the middle of the metro area. Our central location means we can reach most of our service area within 30&ndash;45 minutes under normal conditions.</p>
+            <p style="color:var(--c-text-mid);">For after-hours emergencies, we have technicians staged in different parts of the metro to minimize drive time. If you&rsquo;re not sure we cover your address, call and ask &mdash; we&rsquo;re flexible for established customers and willing to discuss coverage for first-time callers outside our normal boundary.</p>
+            <div class="mt-md">
+              <div class="flex-gap-md flex-wrap">
+                <div class="hero-trust-item" style="color:var(--c-text-mid);">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--c-copper);"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  4417 Leonard St NW, Grand Rapids
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schematic map -->
+          <div class="map-area" aria-label="Schematic map of Grand Rapids service area">
+            <svg class="map-bg" viewBox="0 0 400 360" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <!-- Grid lines -->
+              <line x1="0" y1="60"  x2="400" y2="60"  stroke="rgba(174,92,24,0.15)" stroke-width="1"/>
+              <line x1="0" y1="120" x2="400" y2="120" stroke="rgba(174,92,24,0.15)" stroke-width="1"/>
+              <line x1="0" y1="180" x2="400" y2="180" stroke="rgba(174,92,24,0.15)" stroke-width="1"/>
+              <line x1="0" y1="240" x2="400" y2="240" stroke="rgba(174,92,24,0.15)" stroke-width="1"/>
+              <line x1="0" y1="300" x2="400" y2="300" stroke="rgba(174,92,24,0.15)" stroke-width="1"/>
+              <line x1="80"  y1="0" x2="80"  y2="360" stroke="rgba(174,92,24,0.15)" stroke-width="1"/>
+              <line x1="160" y1="0" x2="160" y2="360" stroke="rgba(174,92,24,0.15)" stroke-width="1"/>
+              <line x1="240" y1="0" x2="240" y2="360" stroke="rgba(174,92,24,0.15)" stroke-width="1"/>
+              <line x1="320" y1="0" x2="320" y2="360" stroke="rgba(174,92,24,0.15)" stroke-width="1"/>
+              <!-- Grand River (wavy line) -->
+              <path d="M60 90 Q120 110 160 95 Q200 80 240 100 Q280 120 340 105" fill="none" stroke="rgba(100,168,230,0.3)" stroke-width="3" stroke-linecap="round"/>
+              <!-- Service area boundary (rough oval) -->
+              <ellipse cx="200" cy="190" rx="170" ry="145" fill="rgba(174,92,24,0.07)" stroke="rgba(174,92,24,0.25)" stroke-width="1.5" stroke-dasharray="5 4"/>
+              <!-- City dots -->
+              <circle cx="200" cy="170" r="14" fill="rgba(174,92,24,0.25)" stroke="rgba(174,92,24,0.6)" stroke-width="2"/>
+              <circle cx="200" cy="170" r="5" fill="#ae5c18"/>
+              <!-- Surrounding towns -->
+              <circle cx="230" cy="235" r="7" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+              <circle cx="155" cy="235" r="7" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+              <circle cx="130" cy="170" r="7" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+              <circle cx="280" cy="155" r="7" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+              <circle cx="165" cy="285" r="7" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+              <circle cx="250" cy="290" r="7" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+              <circle cx="200" cy="120" r="7" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+              <circle cx="320" cy="200" r="7" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+            </svg>
+            <div class="map-area-content">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;color:var(--c-copper-glow);margin:0 auto 1rem;" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <p style="font-family:var(--f-display); font-size:1.3rem; color:var(--c-white); margin-bottom:.35rem;">Grand Rapids Metro</p>
+              <p style="font-family:var(--f-ui); font-size:.78rem; color:rgba(255,255,255,.5); letter-spacing:.08em; text-transform:uppercase;">Greater Grand Rapids Region &middot; Kent County</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Areas by Region -->
+        <div class="area-region">
+          <div class="area-region-header">
+            <div class="area-region-dot" aria-hidden="true"></div>
+            <h2>City of Grand Rapids</h2>
+          </div>
+          <div class="area-grid-5" role="list" aria-label="Grand Rapids neighborhoods served">
+            <div class="neighborhood-chip" role="listitem">Downtown</div>
+            <div class="neighborhood-chip" role="listitem">East Hills</div>
+            <div class="neighborhood-chip" role="listitem">Eastown</div>
+            <div class="neighborhood-chip" role="listitem">Heritage Hill</div>
+            <div class="neighborhood-chip" role="listitem">Midtown</div>
+            <div class="neighborhood-chip" role="listitem">Creston</div>
+            <div class="neighborhood-chip" role="listitem">West Grand</div>
+            <div class="neighborhood-chip" role="listitem">Westside</div>
+            <div class="neighborhood-chip" role="listitem">Wealthy Street</div>
+            <div class="neighborhood-chip" role="listitem">Belknap Lookout</div>
+            <div class="neighborhood-chip" role="listitem">Roosevelt Park</div>
+            <div class="neighborhood-chip" role="listitem">Garfield Park</div>
+            <div class="neighborhood-chip" role="listitem">Ottawa Hills</div>
+            <div class="neighborhood-chip" role="listitem">Ridgemoor</div>
+            <div class="neighborhood-chip" role="listitem">Leonard Street Corridor</div>
+          </div>
+        </div>
+
+        <div class="area-region">
+          <div class="area-region-header">
+            <div class="area-region-dot" aria-hidden="true"></div>
+            <h2>South &amp; Southeast</h2>
+          </div>
+          <div class="area-grid-5" role="list" aria-label="South and southeast communities served">
+            <div class="neighborhood-chip" role="listitem">Kentwood</div>
+            <div class="neighborhood-chip" role="listitem">Wyoming</div>
+            <div class="neighborhood-chip" role="listitem">Byron Center</div>
+            <div class="neighborhood-chip" role="listitem">Caledonia</div>
+            <div class="neighborhood-chip" role="listitem">Gaines Township</div>
+            <div class="neighborhood-chip" role="listitem">Alto</div>
+            <div class="neighborhood-chip" role="listitem">Dutton</div>
+            <div class="neighborhood-chip" role="listitem">Cutlerville</div>
+          </div>
+        </div>
+
+        <div class="area-region">
+          <div class="area-region-header">
+            <div class="area-region-dot" aria-hidden="true"></div>
+            <h2>East &amp; Northeast</h2>
+          </div>
+          <div class="area-grid-5" role="list" aria-label="East and northeast communities served">
+            <div class="neighborhood-chip" role="listitem">Ada Township</div>
+            <div class="neighborhood-chip" role="listitem">Cascade Township</div>
+            <div class="neighborhood-chip" role="listitem">Forest Hills</div>
+            <div class="neighborhood-chip" role="listitem">Knapp&rsquo;s Corner</div>
+            <div class="neighborhood-chip" role="listitem">Rockford</div>
+            <div class="neighborhood-chip" role="listitem">Belmont</div>
+            <div class="neighborhood-chip" role="listitem">Cannonsburg</div>
+            <div class="neighborhood-chip" role="listitem">Lowell (partial)</div>
+          </div>
+        </div>
+
+        <div class="area-region">
+          <div class="area-region-header">
+            <div class="area-region-dot" aria-hidden="true"></div>
+            <h2>West &amp; Northwest</h2>
+          </div>
+          <div class="area-grid-5" role="list" aria-label="West and northwest communities served">
+            <div class="neighborhood-chip" role="listitem">Walker</div>
+            <div class="neighborhood-chip" role="listitem">Grandville</div>
+            <div class="neighborhood-chip" role="listitem">Jenison</div>
+            <div class="neighborhood-chip" role="listitem">Georgetown Township</div>
+            <div class="neighborhood-chip" role="listitem">Standale</div>
+            <div class="neighborhood-chip" role="listitem">Hudsonville (partial)</div>
+          </div>
+        </div>
+
+        <!-- Not Listed -->
+        <div class="not-listed-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+          <h3 style="font-size:1.4rem; margin-bottom:.5rem;">Don&rsquo;t See Your Town?</h3>
+          <p style="color:var(--c-text-mid); max-width:50ch; margin-inline:auto;">We&rsquo;re often able to serve customers just outside our standard area, especially for scheduled work. Give us a call and we&rsquo;ll let you know &mdash; usually the answer is yes.</p>
+          <div class="mt-md">
+            <a href="tel:6165550182" class="btn btn-copper">Call (616) 555-0182</a>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══ Per-City Detail ═══ -->
+    <section class="section section--cream" aria-labelledby="cities-heading">
+      <div class="container">
+        <div class="section-hd center">
+          <p class="label">Key Communities</p>
+          <div class="divider center"></div>
+          <h2 id="cities-heading">Serving These Communities<br>Every Day</h2>
+        </div>
+
+        <div class="grid-3">
+
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <h3>Grand Rapids</h3>
+            <p>Our home base. We know every neighborhood from Heritage Hill's older homes to the newer construction on the south end. Fastest response times in the city, including East Hills, Eastown, and Creston.</p>
+          </article>
+
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <h3>Kentwood</h3>
+            <p>We do heavy volume in Kentwood, especially water heater work and drain cleaning in the area's ranch homes. Most service calls are handled same day.</p>
+          </article>
+
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <h3>Ada &amp; Cascade</h3>
+            <p>Active in both communities for boiler service and larger custom home projects. We understand the specific plumbing challenges in Ada's older farmhouses and Cascade's newer developments.</p>
+          </article>
+
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <h3>Walker</h3>
+            <p>Strong customer base in Walker, particularly for sewer line work and bathroom additions. Walker's mix of 1960s homes and newer subdivisions keeps our team busy year-round.</p>
+          </article>
+
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <h3>Grandville &amp; Jenison</h3>
+            <p>Serving these communities for over 30 years. Common work includes aging cast iron drain replacement, tankless water heater upgrades, and emergency repairs in the area's growing neighborhoods.</p>
+          </article>
+
+          <article class="service-card">
+            <div class="service-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <h3>Rockford &amp; Belmont</h3>
+            <p>Our northernmost regular service communities. We handle both municipal water and well systems in this area. Rockford and Belmont customers receive full emergency coverage.</p>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Emergency CTA ═══ -->
+    <section class="cta-section" aria-label="Emergency contact">
+      <div class="container">
+        <p class="cta-label">Ready When You Are</p>
+        <h2 class="cta-headline">Not Sure We Cover<br>Your Address?</h2>
+        <a href="tel:6165550182" class="cta-phone">(616) 555-0182</a>
+        <p class="cta-sub">Call and ask &mdash; we&rsquo;ll give you a straight answer. No runaround.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══ Footer ═══ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="site-logo" style="text-decoration:none;">
+            <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true"><rect width="44" height="44" rx="5" fill="#ae5c18"/><path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/></svg>
+            <div class="logo-text"><span class="logo-name">NORTHLINE</span><span class="logo-tag">Plumbing &amp; Heating</span></div>
+          </a>
+          <p class="footer-about">Family-owned and operated since 1987. Serving Grand Rapids and surrounding communities with honest, dependable plumbing and heating work.</p>
+          <div class="footer-license">Licensed &amp; Insured in Michigan<br>Plumbing #PC-2847-GR &middot; HVAC #HV-1193-MI</div>
+        </div>
+        <div class="footer-col">
+          <h4>Services</h4>
+          <ul>
+            <li><a href="services.html#emergency">Emergency Repairs</a></li>
+            <li><a href="services.html#water-heaters">Water Heaters</a></li>
+            <li><a href="services.html#boilers">Boiler Service</a></li>
+            <li><a href="services.html#rough-in">Bathroom Rough-In</a></li>
+            <li><a href="services.html#drains">Drain Cleaning</a></li>
+            <li><a href="services.html#sewer">Sewer Lines</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="service-areas.html">Service Areas</a></li>
+            <li><a href="reviews.html">Reviews</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contact</h4>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            <a href="tel:6165550182">(616) 555-0182</a>
+          </div>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Mon–Sat: 7am–7pm<br>24/7 Emergency Dispatch</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2024 Northline Plumbing &amp; Heating LLC. All rights reserved.</p>
+        <p>Licensed &amp; Insured &middot; State of Michigan</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="nav.js"></script>
+</body>
+</html>

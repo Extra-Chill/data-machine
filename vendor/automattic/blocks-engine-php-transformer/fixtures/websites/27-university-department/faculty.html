@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Faculty directory for the Department of Earth, Atmospheric & Marine Sciences at Brennan University — 38 faculty and research staff across earth sciences, atmospheric chemistry, oceanography, and climate.">
+  <title>Faculty &amp; Research Staff &mdash; EAMS &middot; Brennan University</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400..700;1,400..700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <div class="utility-bar">
+      <div class="container">
+        <span>Brennan University &middot; College of Science &middot; <span class="small-caps">est.&nbsp;1947</span></span>
+        <nav aria-label="Utility">
+          <a href="https://brennan.example.edu/">Brennan.edu</a>
+          <a href="https://brennan.example.edu/library/">Library</a>
+          <a href="https://brennan.example.edu/portal/">myBrennan</a>
+          <a href="https://brennan.example.edu/giving/eams/">Give to EAMS</a>
+        </nav>
+      </div>
+    </div>
+    <div class="brand-bar">
+      <div class="container">
+        <a href="index.html" aria-label="EAMS home" style="display:flex; align-items:center; gap:18px; border-bottom:0;">
+          <svg class="crest" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="crestNavy" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#2a3a5e"/>
+                <stop offset="1" stop-color="#08152a"/>
+              </linearGradient>
+            </defs>
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z" fill="url(#crestNavy)" stroke="#b08938" stroke-width="1.5"/>
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+            <rect x="20" y="52" width="24" height="6" fill="#8c3a2a"/>
+            <text x="32" y="56.6" text-anchor="middle" font-family="Inter,sans-serif" font-size="4.4" font-weight="600" fill="#ecd9a8" letter-spacing="0.3">EAMS</text>
+          </svg>
+          <span class="brand-text">
+            <span class="brand-institution">Brennan University</span>
+            <span class="brand-department">Earth, Atmospheric <span class="amp">&amp;</span> Marine Sciences</span>
+          </span>
+        </a>
+        <button class="nav-toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Toggle menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="faculty.html">Faculty</a></li>
+            <li><a href="programs.html">Programs</a></li>
+            <li><a href="courses.html">Courses</a></li>
+            <li><a href="research.html">Research</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="events.html">Events</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-head">
+    <div class="container">
+      <div class="breadcrumb">
+        <a href="index.html">EAMS</a> <span class="sep">/</span> <span>Faculty &amp; research staff</span>
+      </div>
+      <span class="eyebrow">Directory</span>
+      <h1>Faculty &amp; research staff</h1>
+      <p class="lede">Thirty-eight scholars across earth sciences, atmospheric chemistry, marine ecology, paleoclimate, and earth-systems modeling. Most teach undergraduate courses every semester and advise PhD students from their own labs.</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding-top:32px;">
+
+    <!-- Filter chips (visual only) -->
+    <div class="filter-chips" role="group" aria-label="Filter by research area">
+      <button class="chip active" aria-pressed="true" type="button">All <span class="count">38</span></button>
+      <button class="chip" aria-pressed="false" type="button">Earth Sciences <span class="count">9</span></button>
+      <button class="chip" aria-pressed="false" type="button">Atmospheric Sciences <span class="count">7</span></button>
+      <button class="chip" aria-pressed="false" type="button">Marine Sciences <span class="count">10</span></button>
+      <button class="chip" aria-pressed="false" type="button">Climate &amp; Paleoclimate <span class="count">8</span></button>
+      <button class="chip" aria-pressed="false" type="button">Interdisciplinary &amp; modeling <span class="count">4</span></button>
+    </div>
+
+    <p style="font-family:var(--font-sans); font-size:.85rem; color:var(--slate);">
+      Listings are organized by faculty rank. Office numbers refer to Mendel Hall; field-station and shared-lab assignments are noted parenthetically. Most office hours are by appointment during the summer.
+    </p>
+
+    <!-- =========================================================
+         FULL PROFESSORS
+         ========================================================= -->
+    <section class="faculty-group" aria-labelledby="profs-heading">
+      <h2 id="profs-heading">Professors <span class="count">11 faculty</span></h2>
+
+      <div class="faculty-grid">
+
+        <article class="faculty-card" id="prof-mahalingam">
+          <div class="headshot h1" role="img" aria-label="Portrait of Asha Mahalingam, dark hair, against a soft brick-toned background"></div>
+          <div>
+            <h3>Asha Mahalingam</h3>
+            <div class="title">Department Chair &middot; Henry C. Brennan Professor of Physical Oceanography</div>
+            <div class="area">Physical oceanography &middot; AMOC variability &middot; tracer chemistry</div>
+            <p class="summary">Mahalingam's lab uses tracer chemistry and bottom-mounted moorings to reconstruct overturning circulation in the western North Atlantic over the past 200 years. Recent work focuses on the seasonal cycle of the Labrador Current and its sensitivity to Greenland meltwater pulses.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-415</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>mahalingam@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0142</span></dd>
+              <dt>Hours</dt><dd>Tues 2&ndash;4 PM, Thurs 10&ndash;11 AM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-coastal">Coastal Resilience program &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-kasprzak">
+          <div class="headshot h2" role="img" aria-label="Portrait of Theodore Kasprzak, gray beard, wearing a flannel shirt against a sandstone background"></div>
+          <div>
+            <h3>Theodore Kasprzak</h3>
+            <div class="title">Eleanor Hartwell Professor of Sedimentary Geology</div>
+            <div class="area">Sedimentology &middot; basin analysis &middot; coastal stratigraphy</div>
+            <p class="summary">Kasprzak studies how shallow-marine sediments record sea-level change on decadal to millennial timescales. His group has logged more than 3,000 m of vibracore from the Gulf of Maine and now operates a permanent stratigraphic monitoring transect across the Cobbett Bay barrier-island system.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-318</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>kasprzak@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0119</span></dd>
+              <dt>Hours</dt><dd>Mon &amp; Wed 1&ndash;3 PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-coastal">Coastal Resilience &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-tan">
+          <div class="headshot h3" role="img" aria-label="Portrait of Wei-Ling Tan, short dark hair, wearing a navy blazer against a parchment background"></div>
+          <div>
+            <h3>Wei-Ling Tan</h3>
+            <div class="title">Professor of Atmospheric Sciences</div>
+            <div class="area">Synoptic meteorology &middot; heat waves &middot; mid-latitude dynamics</div>
+            <p class="summary">Tan's research focuses on the dynamics of persistent mid-latitude weather regimes &mdash; blocking highs, heat domes, and the stalled jet patterns associated with North Atlantic SST anomalies. She maintains the Brennan reanalysis composite catalog and co-runs the department's public-facing forecasting seminar.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-512</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>wtan@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0188</span></dd>
+              <dt>Hours</dt><dd>Wed 3&ndash;5 PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-atmos">Atmospheric Chemistry &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-adeyemi">
+          <div class="headshot h4" role="img" aria-label="Portrait of Babatunde Adeyemi, close-cropped hair, wearing a charcoal sweater"></div>
+          <div>
+            <h3>Babatunde Adeyemi</h3>
+            <div class="title">Professor of Atmospheric Chemistry</div>
+            <div class="area">Aerosol&ndash;cloud interactions &middot; coastal boundary layer</div>
+            <p class="summary">The Adeyemi group operates a four-station coastal aerosol observatory along the Massachusetts Bay sea-breeze front, combining cavity-ringdown spectroscopy with airborne sampling to characterize secondary organic aerosol from marine sources. Recent NSF support extends the network southward to Buzzards Bay.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-507</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>adeyemi@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0163</span></dd>
+              <dt>Hours</dt><dd>Thurs 1&ndash;3 PM &amp; by appt.</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-atmos">Atmospheric Chemistry &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-rasmussen">
+          <div class="headshot h5" role="img" aria-label="Portrait of Inga Rasmussen, silver hair pulled back, wearing a green field jacket"></div>
+          <div>
+            <h3>Inga Rasmussen</h3>
+            <div class="title">Professor of Paleoclimate</div>
+            <div class="area">Stable isotopes &middot; lacustrine records &middot; Holocene hydroclimate</div>
+            <p class="summary">Rasmussen reconstructs Holocene hydroclimate from lake sediments in the northeastern US and the Faroe Islands, using carbonate &delta;<sup>18</sup>O and biomarker hydrogen isotopes. Her group has produced the longest continuous varve record from a New England lake (8,400 years, Lake Atticut).</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-322</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>rasmussen@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0107</span></dd>
+              <dt>Hours</dt><dd>Mon 10&nbsp;AM&ndash;noon</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-paleo">Paleoclimate &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-okonkwo">
+          <div class="headshot h6" role="img" aria-label="Portrait of Daniel Okonkwo, short hair, wearing a tweed jacket and tie"></div>
+          <div>
+            <h3>Daniel Okonkwo</h3>
+            <div class="title">Professor of Marine Geochemistry</div>
+            <div class="area">Trace metals &middot; sediment-water interface &middot; estuarine biogeochemistry</div>
+            <p class="summary">Okonkwo investigates how trace metals (Mn, Fe, U) cycle across the sediment-water interface in estuaries undergoing eutrophication recovery. His lab developed the open-source <code>fluxprofile</code> code now used in 40+ estuarine programs worldwide.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-209</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>dokonkwo@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0211</span></dd>
+              <dt>Hours</dt><dd>Tues &amp; Thurs 11&nbsp;AM&ndash;12:30&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-marine">Marine Ecology &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-petrov">
+          <div class="headshot h7" role="img" aria-label="Portrait of Mikhail Petrov, dark hair and glasses, wearing a black turtleneck"></div>
+          <div>
+            <h3>Mikhail Petrov</h3>
+            <div class="title">Professor of Geodynamics</div>
+            <div class="area">Continental tectonics &middot; numerical modeling &middot; lithospheric deformation</div>
+            <p class="summary">Petrov develops finite-element models of slow lithospheric deformation, with applications to passive-margin subsidence and the long-wavelength uplift of the Iberian Peninsula. He directs the department's <em>tectos</em> computational cluster (1,200 cores).</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-408</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>petrov@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0177</span></dd>
+              <dt>Hours</dt><dd>Wed 2&ndash;4&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-modeling">Earth Systems Modeling &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-volponi">
+          <div class="headshot h8" role="img" aria-label="Portrait of Renata Volponi, curly auburn hair, wearing a coral blazer"></div>
+          <div>
+            <h3>Renata Volponi</h3>
+            <div class="title">Professor of Marine Biology</div>
+            <div class="area">Benthic invertebrates &middot; bivalve ecology &middot; marine heatwaves</div>
+            <p class="summary">Volponi runs a 22-year time series of intertidal community composition at five rocky-shore stations between Cape Ann and Mount Desert Island. Her lab's work on the 2012 and 2018 marine heatwaves has shaped how regional fisheries managers think about post-disturbance recovery in cold-temperate systems.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-214</span> Mendel Hall <small>(also Cobbett Marine Lab)</small></dd>
+              <dt>Email</dt><dd>volponi@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0156</span></dd>
+              <dt>Hours</dt><dd>Mon &amp; Wed 3&ndash;4:30&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-marine">Marine Ecology &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-ito">
+          <div class="headshot h9" role="img" aria-label="Portrait of Haruki Ito, short dark hair, wearing a dark blue button-up"></div>
+          <div>
+            <h3>Haruki Ito</h3>
+            <div class="title">Professor of Volcanology and Igneous Petrology</div>
+            <div class="area">Arc volcanism &middot; melt inclusions &middot; eruption forecasting</div>
+            <p class="summary">Ito combines melt-inclusion geochemistry with thermodynamic modeling to understand pre-eruptive volatile behavior in arc systems. His group's work at Sakurajima and Soufri&egrave;re Hills has been cited in operational forecasting protocols by both JMA and the Montserrat Volcano Observatory.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-401</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>ito@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0192</span></dd>
+              <dt>Hours</dt><dd>Tues 1&ndash;3&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-modeling">Earth Systems Modeling &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-deboer">
+          <div class="headshot h10" role="img" aria-label="Portrait of Hendrik de Boer, balding with a trim beard, wearing a white lab coat"></div>
+          <div>
+            <h3>Hendrik de Boer</h3>
+            <div class="title">Professor of Hydrology</div>
+            <div class="area">Groundwater &middot; coastal aquifers &middot; saltwater intrusion</div>
+            <p class="summary">de Boer studies coastal aquifer dynamics under combined stress from sea-level rise and groundwater pumping. His group operates a 28-well monitoring network across the Cobbett Bay watershed and has helped four Cape Cod towns redesign their wellfield management plans.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-306</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>deboer@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0148</span></dd>
+              <dt>Hours</dt><dd>Wed 10&nbsp;AM&ndash;noon</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-coastal">Coastal Resilience &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-marchetti">
+          <div class="headshot h11" role="img" aria-label="Portrait of Lucia Marchetti, dark hair pulled back, wearing a rust-orange sweater"></div>
+          <div>
+            <h3>Lucia Marchetti</h3>
+            <div class="title">Professor of Marine Ecology</div>
+            <div class="area">Plankton dynamics &middot; ocean color &middot; biogeochemical&ndash;ecosystem coupling</div>
+            <p class="summary">Marchetti links satellite ocean-color products to in-situ plankton-community measurements in the Gulf of Maine. Her group's algorithm for distinguishing diatom and dinoflagellate blooms from MODIS reflectance is now incorporated into the NOAA Northeast HAB warning system.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-220</span> Mendel Hall <small>(also Cobbett Marine Lab)</small></dd>
+              <dt>Email</dt><dd>marchetti@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0204</span></dd>
+              <dt>Hours</dt><dd>Thurs 2&ndash;4&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-marine">Marine Ecology &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- =========================================================
+         ASSOCIATE PROFESSORS
+         ========================================================= -->
+    <section class="faculty-group" aria-labelledby="assoc-heading">
+      <h2 id="assoc-heading">Associate Professors <span class="count">9 faculty</span></h2>
+
+      <div class="faculty-grid">
+
+        <article class="faculty-card" id="prof-two-hawk-s">
+          <div class="headshot h12" role="img" aria-label="Portrait of Sarah Two-Hawk, dark braided hair, wearing a fieldwork vest"></div>
+          <div>
+            <h3>Sarah Two-Hawk</h3>
+            <div class="title">Associate Professor of Glaciology</div>
+            <div class="area">Ice-sheet dynamics &middot; Greenland outlet glaciers &middot; firn modeling</div>
+            <p class="summary">Two-Hawk combines GPS and InSAR observations with thermomechanical ice-flow models to study the response of Greenland's outlet glaciers to subglacial hydrology. Her group has run three field seasons at Helheim and Kangerlussuaq.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-516</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>stwohawk@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0224</span></dd>
+              <dt>Hours</dt><dd>Tues 10&nbsp;AM&ndash;noon</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-paleo">Paleoclimate &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-yamada">
+          <div class="headshot h1" role="img" aria-label="Portrait of Kenji Yamada, dark glasses and short hair, wearing a fleece pullover"></div>
+          <div>
+            <h3>Kenji Yamada</h3>
+            <div class="title">Associate Professor of Atmospheric Sciences</div>
+            <div class="area">Climate modeling &middot; cloud parameterization &middot; tropical convection</div>
+            <p class="summary">Yamada develops next-generation convection parameterizations for the Community Earth System Model, focusing on how shallow-to-deep transitions over warm oceans are represented at coarse resolution. He chairs the department's high-performance computing committee.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-505</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>yamada@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0152</span></dd>
+              <dt>Hours</dt><dd>Wed 1&ndash;3&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-modeling">Earth Systems Modeling &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-singh">
+          <div class="headshot h2" role="img" aria-label="Portrait of Priya Singh, long dark hair, wearing a deep red blouse"></div>
+          <div>
+            <h3>Priya Singh</h3>
+            <div class="title">Associate Professor of Marine Microbiology</div>
+            <div class="area">Microbial biogeochemistry &middot; nitrogen cycling &middot; oxygen-minimum zones</div>
+            <p class="summary">Singh studies the microbial communities that drive nitrogen loss from oxygen-minimum zones, with field programs in the eastern tropical North Pacific and the Arabian Sea. Her lab specializes in stable-isotope tracer techniques for measuring anammox and denitrification rates at sea.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-218</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>psingh@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0173</span></dd>
+              <dt>Hours</dt><dd>Mon 2&ndash;4&nbsp;PM &amp; by appt.</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-marine">Marine Ecology &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-jensen">
+          <div class="headshot h3" role="img" aria-label="Portrait of Maren Jensen, blonde shoulder-length hair, wearing a charcoal blazer"></div>
+          <div>
+            <h3>Maren Jensen</h3>
+            <div class="title">Associate Professor of Atmospheric Chemistry</div>
+            <div class="area">Reactive nitrogen &middot; rural-urban gradients &middot; precipitation chemistry</div>
+            <p class="summary">Jensen's group quantifies how reactive nitrogen species evolve along rural-to-urban transects in the northeast US, combining tower observations, mobile sampling, and a long-running precipitation chemistry record at the Cobbett Point station.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-510</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>mjensen@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0183</span></dd>
+              <dt>Hours</dt><dd>Thurs 10&nbsp;AM&ndash;noon</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-atmos">Atmospheric Chemistry &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-ndlovu">
+          <div class="headshot h4" role="img" aria-label="Portrait of Thandiwe Ndlovu, short braided hair, wearing a mustard cardigan"></div>
+          <div>
+            <h3>Thandiwe Ndlovu</h3>
+            <div class="title">Associate Professor of Structural Geology</div>
+            <div class="area">Brittle deformation &middot; fault zones &middot; earthquake geology</div>
+            <p class="summary">Ndlovu integrates field structural mapping with paleoseismic trenching to reconstruct earthquake histories along intraplate fault systems in the eastern US and southern Africa. Her recent work on the central Virginia seismic zone has reshaped regional hazard estimates.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-314</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>ndlovu@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0131</span></dd>
+              <dt>Hours</dt><dd>Tues 1&ndash;3&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-modeling">Earth Systems Modeling &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-kowalczyk">
+          <div class="headshot h5" role="img" aria-label="Portrait of Pawel Kowalczyk, short brown hair, wearing a forest-green vest"></div>
+          <div>
+            <h3>Pawel Kowalczyk</h3>
+            <div class="title">Associate Professor of Paleobiology</div>
+            <div class="area">Marine paleoecology &middot; Cenozoic mollusks &middot; mass-extinction recovery</div>
+            <p class="summary">Kowalczyk studies the ecological assembly of marine communities after the Cretaceous&ndash;Paleogene extinction, using assemblage-level statistics on Cenozoic mollusk faunas. He runs the department's paleontology teaching collection (over 32,000 specimens).</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-204</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>kowalczyk@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0166</span></dd>
+              <dt>Hours</dt><dd>Wed 11&nbsp;AM&ndash;1&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-paleo">Paleoclimate &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-arroyo">
+          <div class="headshot h6" role="img" aria-label="Portrait of Sofia Arroyo, dark curly hair, wearing a teal field shirt"></div>
+          <div>
+            <h3>Sofia Arroyo</h3>
+            <div class="title">Associate Professor of Coastal Engineering &amp; Geomorphology</div>
+            <div class="area">Salt marshes &middot; coastal sediment transport &middot; nature-based defenses</div>
+            <p class="summary">Arroyo's group studies how New England salt marshes maintain elevation under accelerating sea-level rise, with paired field-monitoring and numerical modeling at three reference sites. Her work informs both Massachusetts CZM policy and the Town of Brennan's shoreline management plan.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-216</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>arroyo@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0179</span></dd>
+              <dt>Hours</dt><dd>Mon 1&ndash;3&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-coastal">Coastal Resilience &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-okonkwo-lin">
+          <div class="headshot h7" role="img" aria-label="Portrait of Ezra Okonkwo-Lin, short hair, wearing a slate-blue button-up"></div>
+          <div>
+            <h3>Ezra Okonkwo-Lin</h3>
+            <div class="title">Associate Professor of Physical Oceanography</div>
+            <div class="area">Mesoscale dynamics &middot; satellite altimetry &middot; Gulf Stream variability</div>
+            <p class="summary">Okonkwo-Lin combines satellite altimetry and Argo float profiles to quantify mesoscale eddy heat transport along the Gulf Stream extension. He teaches the department's introductory oceanography sequence and is on sabbatical at IFREMER in 2026&ndash;27.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-412</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>okonkwolin@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0190</span></dd>
+              <dt>Hours</dt><dd>On sabbatical 2026&ndash;27</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-coastal">Coastal Resilience &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-novak">
+          <div class="headshot h8" role="img" aria-label="Portrait of Marta Novak, shoulder-length brown hair, wearing a navy turtleneck"></div>
+          <div>
+            <h3>Marta Novak</h3>
+            <div class="title">Associate Professor of Environmental Data Science</div>
+            <div class="area">Machine learning for geoscience &middot; data assimilation &middot; reproducible workflows</div>
+            <p class="summary">Novak applies machine-learning methods to atmospheric and oceanographic time series, with a focus on uncertainty quantification and physically constrained models. She directs the Professional Master's in Environmental Data Science.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-414</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>novak@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0226</span></dd>
+              <dt>Hours</dt><dd>Tues 3&ndash;5&nbsp;PM &amp; Fri 10&ndash;11&nbsp;AM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-modeling">Earth Systems Modeling &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- =========================================================
+         ASSISTANT PROFESSORS
+         ========================================================= -->
+    <section class="faculty-group" aria-labelledby="asst-heading">
+      <h2 id="asst-heading">Assistant Professors <span class="count">8 faculty</span></h2>
+
+      <div class="faculty-grid">
+
+        <article class="faculty-card" id="prof-cho">
+          <div class="headshot h9" role="img" aria-label="Portrait of Hye-jin Cho, dark bobbed hair, wearing a soft pink sweater"></div>
+          <div>
+            <h3>Hye-jin Cho</h3>
+            <div class="title">Assistant Professor of Polar Oceanography</div>
+            <div class="area">Sea ice &middot; under-ice mixing &middot; Southern Ocean</div>
+            <p class="summary">Cho studies the interaction of sea ice and the upper ocean in the Weddell and Ross seas, using autonomous under-ice profilers and ship-based microstructure observations. She joined EAMS in 2024 after a postdoc at NIWA.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-410</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>cho@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0233</span></dd>
+              <dt>Hours</dt><dd>Mon 10&nbsp;AM&ndash;noon</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-marine">Marine Ecology &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-darko">
+          <div class="headshot h10" role="img" aria-label="Portrait of Kwame Darko, short hair, wearing a maroon Brennan sweatshirt"></div>
+          <div>
+            <h3>Kwame Darko</h3>
+            <div class="title">Assistant Professor of Hydroclimatology</div>
+            <div class="area">Tropical rainfall &middot; West African monsoon &middot; remote sensing</div>
+            <p class="summary">Darko works at the interface of precipitation remote sensing and surface hydrology, with a focus on the West African Sahel. He is currently building a regional precipitation dataset that merges GPM satellite estimates with the EAMS-led ground-validation network.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-518</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>darko@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0239</span></dd>
+              <dt>Hours</dt><dd>Wed 2&ndash;4&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-atmos">Atmospheric Chemistry &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-bhatt">
+          <div class="headshot h11" role="img" aria-label="Portrait of Anjali Bhatt, long dark hair, wearing a deep teal blouse"></div>
+          <div>
+            <h3>Anjali Bhatt</h3>
+            <div class="title">Assistant Professor of Marine Geophysics</div>
+            <div class="area">Seismic stratigraphy &middot; gas hydrates &middot; passive margins</div>
+            <p class="summary">Bhatt uses high-resolution seismic reflection profiling to study gas-hydrate systems along the US Atlantic margin. Her group operates the department's portable streamer array, which has logged over 4,200 line-km of shallow seismic data since 2023.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-211</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>bhatt@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0241</span></dd>
+              <dt>Hours</dt><dd>Tues 11&nbsp;AM&ndash;1&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-coastal">Coastal Resilience &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-leblanc">
+          <div class="headshot h12" role="img" aria-label="Portrait of Hugo LeBlanc, short brown hair and beard, wearing a flannel shirt"></div>
+          <div>
+            <h3>Hugo LeBlanc</h3>
+            <div class="title">Assistant Professor of Soil Biogeochemistry</div>
+            <div class="area">Carbon storage &middot; coastal wetlands &middot; soil microbial ecology</div>
+            <p class="summary">LeBlanc studies how coastal wetland soils store and release carbon under changing inundation regimes, integrating field manipulations at the Cobbett Marsh long-term study site with laboratory incubations and microbial-community sequencing.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-310</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>leblanc@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0247</span></dd>
+              <dt>Hours</dt><dd>Thurs 11&nbsp;AM&ndash;1&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-coastal">Coastal Resilience &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-rivera">
+          <div class="headshot h1" role="img" aria-label="Portrait of Cristina Rivera, long dark hair, wearing a coral fieldwork shirt"></div>
+          <div>
+            <h3>Cristina Rivera</h3>
+            <div class="title">Assistant Professor of Geomorphology</div>
+            <div class="area">Rivers &middot; sediment routing &middot; cosmogenic nuclide dating</div>
+            <p class="summary">Rivera reconstructs late-Pleistocene to Holocene erosion histories of small mountainous catchments using <sup>10</sup>Be cosmogenic nuclide measurements on river-borne sediment. She is building a regional erosion-rate compilation for the northern Appalachians.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-308</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>rivera@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0254</span></dd>
+              <dt>Hours</dt><dd>Mon 3&ndash;5&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-paleo">Paleoclimate &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-hassan">
+          <div class="headshot h2" role="img" aria-label="Portrait of Yasmin Hassan, head wrap and warm smile, wearing a deep purple blouse"></div>
+          <div>
+            <h3>Yasmin Hassan</h3>
+            <div class="title">Assistant Professor of Atmospheric Dynamics</div>
+            <div class="area">Stratospheric polar vortex &middot; sudden warming events &middot; teleconnections</div>
+            <p class="summary">Hassan studies stratosphere&ndash;troposphere coupling and the propagation of polar-vortex disturbances into surface weather. Her group develops idealized GCM experiments to isolate the dynamical drivers of sudden stratospheric warmings.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-514</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>hassan@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0261</span></dd>
+              <dt>Hours</dt><dd>Wed 10&nbsp;AM&ndash;noon</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-atmos">Atmospheric Chemistry &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-bjornsdottir">
+          <div class="headshot h3" role="img" aria-label="Portrait of Helga Bj&ouml;rnsd&oacute;ttir, blonde braided hair, wearing a thick wool sweater"></div>
+          <div>
+            <h3>Helga Bj&ouml;rnsd&oacute;ttir</h3>
+            <div class="title">Assistant Professor of Marine Chemistry</div>
+            <div class="area">Dissolved organic matter &middot; photochemistry &middot; coastal carbon</div>
+            <p class="summary">Bj&ouml;rnsd&oacute;ttir studies the photochemical fate of terrestrially derived dissolved organic matter in coastal waters, with field programs in the Gulf of Maine and along the southwestern Icelandic shelf. She joined EAMS in fall 2025.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-212</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>bjornsdottir@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0268</span></dd>
+              <dt>Hours</dt><dd>Tues 2&ndash;4&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-marine">Marine Ecology &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-mcallister">
+          <div class="headshot h4" role="img" aria-label="Portrait of Owen McAllister, red hair, wearing a navy zip-up"></div>
+          <div>
+            <h3>Owen McAllister</h3>
+            <div class="title">Assistant Professor of Mineral Physics</div>
+            <div class="area">High-pressure experiments &middot; lower-mantle minerals &middot; deep Earth water cycle</div>
+            <p class="summary">McAllister runs a diamond-anvil cell laboratory to measure the elastic properties of hydrous mantle minerals at high pressure. His group's recent results on the storage capacity of ringwoodite have fed into ongoing debates about deep-Earth water budgets.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-406</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>mcallister@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0273</span></dd>
+              <dt>Hours</dt><dd>Thurs 3&ndash;5&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="research.html#area-modeling">Earth Systems Modeling &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- =========================================================
+         LECTURERS, RESEARCH SCIENTISTS, EMERITI
+         ========================================================= -->
+    <section class="faculty-group" aria-labelledby="staff-heading">
+      <h2 id="staff-heading">Lecturers, research scientists &amp; emeriti <span class="count">10 faculty</span></h2>
+
+      <div class="faculty-grid">
+
+        <article class="faculty-card" id="prof-park">
+          <div class="headshot h5" role="img" aria-label="Portrait of Soo-Yeon Park, dark hair, wearing a charcoal turtleneck"></div>
+          <div>
+            <h3>Soo-Yeon Park</h3>
+            <div class="title">Senior Lecturer in Earth Sciences</div>
+            <div class="area">Undergraduate teaching &middot; mineralogy &middot; field methods</div>
+            <p class="summary">Park coordinates the undergraduate field-methods sequence and the Mendel Hall teaching collections (rocks, minerals, and thin sections). She advises about half of all Earth Sciences majors.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-202</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>spark@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0144</span></dd>
+              <dt>Hours</dt><dd>Mon&ndash;Thurs 1&ndash;2:30&nbsp;PM</dd>
+              <dt>Profile</dt><dd><a href="programs.html#undergraduate">Undergraduate advising &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-keating">
+          <div class="headshot h6" role="img" aria-label="Portrait of Aoife Keating, red hair, wearing a hunter-green field shirt"></div>
+          <div>
+            <h3>Aoife Keating</h3>
+            <div class="title">Senior Lecturer in Atmospheric Sciences</div>
+            <div class="area">Forecasting practicum &middot; broadcast meteorology &middot; classroom teaching</div>
+            <p class="summary">Keating teaches the long-running EAMS 2415 Forecasting Practicum and supervises the student-run Brennan Weather Service. She is a regular on-air commentator for the regional NPR station.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-509</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>keating@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0158</span></dd>
+              <dt>Hours</dt><dd>Daily 4&ndash;5&nbsp;PM (lab)</dd>
+              <dt>Profile</dt><dd><a href="courses.html#eams-2415">EAMS 2415 &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-ben-ari">
+          <div class="headshot h7" role="img" aria-label="Portrait of Noam Ben-Ari, salt-and-pepper hair, wearing a slate-blue button-up"></div>
+          <div>
+            <h3>Noam Ben-Ari</h3>
+            <div class="title">Lecturer in Environmental Studies</div>
+            <div class="area">Environmental policy &middot; coastal-zone management &middot; case-based teaching</div>
+            <p class="summary">Ben-Ari co-coordinates the joint BA in Environmental Studies with the Department of Public Policy and teaches EAMS 1310 Environment &amp; Society. He spent twelve years at MassDEP before joining the department in 2019.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-118</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>benari@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0136</span></dd>
+              <dt>Hours</dt><dd>Tues &amp; Thurs 9&ndash;10:30&nbsp;AM</dd>
+              <dt>Profile</dt><dd><a href="courses.html#eams-1310">EAMS 1310 &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-greene">
+          <div class="headshot h8" role="img" aria-label="Portrait of Reginald Greene, gray hair, wearing wire-rim glasses and a wool blazer"></div>
+          <div>
+            <h3>Reginald Greene</h3>
+            <div class="title">Senior Research Scientist</div>
+            <div class="area">R/V <em>Cobbett Bay</em> chief scientist &middot; CTD calibration &middot; sea-going operations</div>
+            <p class="summary">Greene oversees seagoing operations for the R/V <em>Cobbett Bay</em>, coordinates the department's calibration laboratory, and serves as chief scientist on most multi-investigator cruises. He has logged 1,840 days at sea since 1994.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-106</span> Mendel Hall <small>(Cobbett Marine Lab when at sea)</small></dd>
+              <dt>Email</dt><dd>greene@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0128</span></dd>
+              <dt>Hours</dt><dd>By appointment</dd>
+              <dt>Profile</dt><dd><a href="research.html#labs">Cobbett Marine Laboratory &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-shao">
+          <div class="headshot h9" role="img" aria-label="Portrait of Min Shao, short dark hair, wearing a white lab coat"></div>
+          <div>
+            <h3>Min Shao</h3>
+            <div class="title">Research Scientist</div>
+            <div class="area">Mass spectrometry &middot; atmospheric organic chemistry &middot; instrument development</div>
+            <p class="summary">Shao directs the shared mass spectrometry facility in Mendel Hall, including the department's high-resolution AMS and CIMS instruments. She trains every incoming atmospheric-chemistry graduate student on the suite.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-503</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>mshao@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0185</span></dd>
+              <dt>Hours</dt><dd>By appointment &middot; instrument bookings via lab calendar</dd>
+              <dt>Profile</dt><dd><a href="research.html#labs">Coastal Aerosol Observatory &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-fitzgerald">
+          <div class="headshot h10" role="img" aria-label="Portrait of Cormac FitzGerald, gray beard, wearing a heavy field coat"></div>
+          <div>
+            <h3>Cormac FitzGerald</h3>
+            <div class="title">Research Scientist</div>
+            <div class="area">Field geology &middot; structural mapping &middot; field-camp logistics</div>
+            <p class="summary">FitzGerald runs the four-week summer field camp at the Brennan Geological Reserve in central Maine, where most Earth Sciences majors complete their capstone mapping project. He has co-authored 14 papers on Appalachian tectonics with department colleagues.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-114</span> Mendel Hall <small>(Reserve when in season)</small></dd>
+              <dt>Email</dt><dd>fitzgerald@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0124</span></dd>
+              <dt>Hours</dt><dd>By appointment</dd>
+              <dt>Profile</dt><dd><a href="courses.html#eams-4910">EAMS 4910 Summer Field Camp &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-lindberg">
+          <div class="headshot h11" role="img" aria-label="Portrait of Astrid Lindberg, gray-blonde hair pulled back, wearing a navy field shirt"></div>
+          <div>
+            <h3>Astrid Lindberg</h3>
+            <div class="title">Research Scientist</div>
+            <div class="area">Phytoplankton taxonomy &middot; HAB monitoring &middot; microscopy</div>
+            <p class="summary">Lindberg is the staff phytoplankton taxonomist for the Cobbett Marine Laboratory. She runs the regional harmful-algal-bloom identification queue for state agencies and trains all marine-ecology graduate students in microscopy.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd>Cobbett Marine Lab, room <span class="mono">C-208</span></dd>
+              <dt>Email</dt><dd>lindberg@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0299</span></dd>
+              <dt>Hours</dt><dd>Tues &amp; Thurs 1&ndash;3&nbsp;PM (CML)</dd>
+              <dt>Profile</dt><dd><a href="research.html#labs">Cobbett Marine Laboratory &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-mendoza">
+          <div class="headshot h12" role="img" aria-label="Portrait of Esteban Mendoza, dark hair, wearing wire-rim glasses and a charcoal sweater"></div>
+          <div>
+            <h3>Esteban Mendoza</h3>
+            <div class="title">Lecturer in Environmental Data Science</div>
+            <div class="area">Geospatial analysis &middot; R &amp; Python for scientists &middot; reproducible research</div>
+            <p class="summary">Mendoza teaches the department's required graduate-level methods courses in geospatial analysis and reproducible computing. He maintains the EAMS open-data portal.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-416</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>mendoza@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0290</span></dd>
+              <dt>Hours</dt><dd>Mon &amp; Wed 11&nbsp;AM&ndash;noon</dd>
+              <dt>Profile</dt><dd><a href="courses.html#eams-5510">EAMS 5510 &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-acheson">
+          <div class="headshot h1" role="img" aria-label="Portrait of Elizabeth Acheson, white hair, wearing pearl earrings and a tweed jacket"></div>
+          <div>
+            <h3>Elizabeth Acheson</h3>
+            <div class="title">Professor Emerita of Mineralogy</div>
+            <div class="area">Carbonate mineralogy &middot; biomineralization (formerly active)</div>
+            <p class="summary">Acheson chaired the department from 1998 to 2007 and was foundational in establishing the modern stable-isotope facility. She remains active as a curator of the Mendel Hall mineral collection and informally advises several graduate students.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-201</span> Mendel Hall (curatorial)</dd>
+              <dt>Email</dt><dd>acheson@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0103</span></dd>
+              <dt>Hours</dt><dd>Wed afternoons by appointment</dd>
+              <dt>Profile</dt><dd>Department history &mdash; contact for departmental archives</dd>
+            </dl>
+          </div>
+        </article>
+
+        <article class="faculty-card" id="prof-thurston">
+          <div class="headshot h2" role="img" aria-label="Portrait of Harold Thurston, white beard, wearing a brown corduroy jacket"></div>
+          <div>
+            <h3>Harold Thurston</h3>
+            <div class="title">Professor Emeritus of Marine Geology</div>
+            <div class="area">Submarine geomorphology &middot; deep-sea sedimentation (formerly active)</div>
+            <p class="summary">Thurston joined the department in 1976 and was instrumental in the 2008 reorganization that combined Geology, Atmospheric, and Marine programs into the present EAMS. He continues to publish on Gulf of Maine bathymetry and co-teaches EAMS 4220 Submarine Geology in alternate spring semesters.</p>
+            <dl class="contact">
+              <dt>Office</dt><dd><span class="mono">M-219</span> Mendel Hall</dd>
+              <dt>Email</dt><dd>thurston@eams.brennan.edu</dd>
+              <dt>Phone</dt><dd><span class="mono">+1 (617) 555-0101</span></dd>
+              <dt>Hours</dt><dd>Thurs 2&ndash;4&nbsp;PM (when in residence)</dd>
+              <dt>Profile</dt><dd><a href="courses.html#eams-4220">EAMS 4220 &rarr;</a></dd>
+            </dl>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <div class="notice" role="note">
+      <strong>Looking for someone not listed?</strong> Postdoctoral researchers and graduate students are listed on individual lab pages linked from the <a href="research.html">Research</a> overview. For department administrative staff (graduate program coordinator, financial administrator, building manager), see the <a href="contact.html#staff">Contact</a> page.
+    </div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <svg class="crest" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z" fill="#14233f" stroke="#b08938" stroke-width="1.5"/>
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+          </svg>
+          <p><strong style="color:var(--paper);">Department of Earth, Atmospheric &amp; Marine Sciences</strong><br>
+            Brennan University &middot; Mendel Hall<br>
+            415 Brennan Avenue<br>
+            Brennan, Massachusetts 02143</p>
+        </div>
+        <div>
+          <h4>Academics</h4>
+          <ul>
+            <li><a href="programs.html#undergraduate">Undergraduate</a></li>
+            <li><a href="programs.html#masters">Master's</a></li>
+            <li><a href="programs.html#phd">PhD</a></li>
+            <li><a href="programs.html#minors">Minors</a></li>
+            <li><a href="courses.html">Course catalog</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>People &amp; research</h4>
+          <ul>
+            <li><a href="faculty.html">Faculty directory</a></li>
+            <li><a href="research.html#labs">Labs &amp; centers</a></li>
+            <li><a href="research.html#publications">Publications</a></li>
+            <li><a href="research.html#grants">Funded projects</a></li>
+            <li><a href="contact.html#staff">Department staff</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Visit &amp; connect</h4>
+          <ul>
+            <li><a href="contact.html">Contact</a></li>
+            <li><a href="events.html">Events &amp; seminars</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="https://brennan.example.edu/giving/eams/">Make a gift</a></li>
+            <li><a href="https://brennan.example.edu/library/eams/">Hartwell Library</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2008&ndash;2026 The Trustees of Brennan University. All rights reserved.</span>
+        <span class="established">Academic year <span data-academic-year>2025&ndash;2026</span> &middot; Department reorganized 2008 &middot; Established 1947</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>

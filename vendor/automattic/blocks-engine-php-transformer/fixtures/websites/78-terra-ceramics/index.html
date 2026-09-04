@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terra &amp; Form — Handmade Ceramics</title>
+  <meta name="description" content="Terra &amp; Form is a small studio making hand-thrown stoneware for everyday rituals — tableware, mugs, vases, bowls and quiet decorative objects.">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main" style="position:absolute;left:-999px;">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap site-header__inner">
+      <a class="brand" href="index.html" aria-label="Terra and Form, home">
+        <svg class="brand__mark" viewBox="0 0 40 40" aria-hidden="true">
+          <circle cx="20" cy="20" r="19" fill="none" stroke="#2c2c29" stroke-width="1.2"/>
+          <path d="M14 13 Q12 24 17 30 L23 30 Q28 24 26 13 Q20 10 14 13 Z" fill="#b07a5c"/>
+          <ellipse cx="20" cy="13" rx="6" ry="1.8" fill="#7e8a6f"/>
+        </svg>
+        <span class="brand__name">Terra &amp; Form<small>Handmade Ceramics</small></span>
+      </a>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="siteNav">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="#2c2c29" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+      </button>
+
+      <nav class="site-nav" id="siteNav" aria-label="Primary">
+        <ul>
+          <li><a href="index.html" aria-current="page">Home</a></li>
+          <li><a href="shop.html">Shop</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="header__tools">
+        <button class="icon-btn" id="cartButton" aria-label="Open cart">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1.2 11a2 2 0 0 1-2 1.8H9.2a2 2 0 0 1-2-1.8L6 7Z" fill="none" stroke="#2c2c29" stroke-width="1.3"/><path d="M9 7a3 3 0 0 1 6 0" fill="none" stroke="#2c2c29" stroke-width="1.3"/></svg>
+          <span class="cart-badge" data-cart-count data-empty="true">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="wrap hero__inner">
+        <div class="hero__copy">
+          <p class="eyebrow">Small-batch stoneware</p>
+          <h1 class="hero__title">Objects made <em>by hand</em>, for everyday rituals.</h1>
+          <p class="hero__lede">Each piece is thrown on the wheel in our studio, glazed in muted earthtones, and made to be used — morning coffee, an evening meal, a single stem on the sill.</p>
+          <div class="hero__actions">
+            <a class="btn btn--solid btn--lg" href="shop.html">Shop the studio</a>
+            <a class="btn btn--quiet btn--lg" href="about.html">Our process</a>
+          </div>
+        </div>
+        <div class="hero__stage">
+          <svg viewBox="0 0 200 220" role="img" aria-label="A hand-thrown pedestal vase on a plinth">
+            <path d="M70 44 L66 70 Q44 92 44 124 Q44 158 100 160 Q156 158 156 124 Q156 92 134 70 L130 44 Z" fill="#efe7d8" stroke="#2c2c29" stroke-width="1.2"/>
+            <rect x="92" y="160" width="16" height="10" fill="#cbbda4"/>
+            <path d="M78 172 L122 172 L132 186 L68 186 Z" fill="#f7f3ec" stroke="#2c2c29" stroke-width="1.1"/>
+            <ellipse cx="100" cy="44" rx="30" ry="8" fill="#cbbda4"/>
+            <ellipse cx="100" cy="44" rx="30" ry="6.5" fill="#f4ece0"/>
+            <path d="M62 118 Q100 126 138 118" fill="none" stroke="#cbbda4" stroke-width="1.4" opacity="0.7"/>
+          </svg>
+          <span class="hero__pedestal" aria-hidden="true"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURED -->
+    <section class="section">
+      <div class="wrap">
+        <div class="section__head">
+          <div>
+            <p class="eyebrow">New in the studio</p>
+            <h2 class="section__title">Latest <em>pieces</em></h2>
+          </div>
+          <a class="linklike" href="shop.html">View all pieces &rarr;</a>
+        </div>
+        <div class="grid" id="featuredGrid"><!-- featured cards injected --></div>
+      </div>
+    </section>
+
+    <!-- COLLECTIONS -->
+    <section class="section section--tint">
+      <div class="wrap">
+        <div class="section__head">
+          <div>
+            <p class="eyebrow">Browse by form</p>
+            <h2 class="section__title">Collections</h2>
+          </div>
+        </div>
+        <div class="collections">
+          <a class="collection" href="shop.html?category=Tableware">
+            <span class="collection__art"><svg viewBox="0 0 120 90" aria-hidden="true"><ellipse cx="60" cy="55" rx="46" ry="15" fill="#e3d8c5" stroke="#2c2c29" stroke-width="1"/><ellipse cx="60" cy="51" rx="46" ry="13" fill="#efe7d8"/><ellipse cx="60" cy="51" rx="28" ry="8" fill="#d6c3a5" opacity="0.6"/></svg></span>
+            <h3 class="collection__name">Tableware</h3>
+            <p class="collection__count">Plates &amp; platters</p>
+          </a>
+          <a class="collection" href="shop.html?category=Mugs &amp; Cups">
+            <span class="collection__art"><svg viewBox="0 0 120 90" aria-hidden="true"><path d="M44 24 L44 70 Q44 76 50 76 L78 76 Q84 76 84 70 L84 24 Z" fill="#a7b09a" stroke="#2c2c29" stroke-width="1"/><path d="M84 36 Q104 38 104 52 Q104 66 84 64" fill="none" stroke="#2c2c29" stroke-width="4" stroke-linecap="round"/></svg></span>
+            <h3 class="collection__name">Mugs &amp; Cups</h3>
+            <p class="collection__count">For coffee &amp; tea</p>
+          </a>
+          <a class="collection" href="shop.html?category=Vases">
+            <span class="collection__art"><svg viewBox="0 0 120 90" aria-hidden="true"><path d="M52 12 L50 34 Q36 46 36 62 Q36 80 60 82 Q84 80 84 62 Q84 46 70 34 L68 12 Z" fill="#b07a5c" stroke="#2c2c29" stroke-width="1"/><ellipse cx="60" cy="12" rx="8" ry="2.5" fill="#8a5a40"/></svg></span>
+            <h3 class="collection__name">Vases</h3>
+            <p class="collection__count">For stems &amp; branches</p>
+          </a>
+          <a class="collection" href="shop.html?category=Decor">
+            <span class="collection__art"><svg viewBox="0 0 120 90" aria-hidden="true"><path d="M48 18 L40 56 Q38 80 60 84 Q82 80 80 56 L70 18 Q60 12 48 18 Z" fill="#b9b6ad" stroke="#2c2c29" stroke-width="1"/><path d="M60 14 L60 84" stroke="#8a857a" stroke-width="1" opacity="0.5"/></svg></span>
+            <h3 class="collection__name">Decor</h3>
+            <p class="collection__count">Objects for the shelf</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROCESS -->
+    <section class="section">
+      <div class="wrap">
+        <div class="section__head">
+          <div>
+            <p class="eyebrow">From the wheel</p>
+            <h2 class="section__title">The maker's <em>process</em></h2>
+            <p class="section__intro">Nothing here is mass-produced. Every piece passes through the same slow sequence of hands, heat, and time.</p>
+          </div>
+        </div>
+        <div class="process">
+          <div class="process__step">
+            <span class="process__num">i.</span>
+            <h3>Throwing</h3>
+            <p>We wedge local stoneware and throw each form on the wheel — centring, opening, and pulling the walls until the shape feels right in the hand.</p>
+          </div>
+          <div class="process__step">
+            <span class="process__num">ii.</span>
+            <h3>Trimming &amp; drying</h3>
+            <p>Once leather-hard, each piece is trimmed, footed, and left to dry slowly before its first bisque firing to a stable, porous state.</p>
+          </div>
+          <div class="process__step">
+            <span class="process__num">iii.</span>
+            <h3>Glaze &amp; fire</h3>
+            <p>We mix our own muted glazes and fire to 1240&deg;C. The kiln has the final word — small variations are kept, not corrected.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTER -->
+    <section class="section section--tint">
+      <div class="wrap newsletter">
+        <p class="eyebrow">Studio letter</p>
+        <h2 class="section__title">First look at new <em>kiln loads</em></h2>
+        <p class="section__intro" style="margin-inline:auto;">Small batches sell quickly. Join the list for early access, restock notes, and the occasional studio second.</p>
+        <form class="newsletter__form" id="newsletterForm" onsubmit="event.preventDefault(); this.reset(); this.querySelector('button').textContent='Subscribed';">
+          <label class="field__label" for="newsletterEmail" style="position:absolute;left:-999px;">Email address</label>
+          <input type="email" id="newsletterEmail" name="email" placeholder="you@example.com" required>
+          <button type="submit" class="btn btn--solid">Subscribe</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer__grid">
+      <div class="footer__brand">
+        <a class="brand" href="index.html" aria-label="Terra and Form, home">
+          <svg class="brand__mark" viewBox="0 0 40 40" aria-hidden="true">
+            <circle cx="20" cy="20" r="19" fill="none" stroke="#2c2c29" stroke-width="1.2"/>
+            <path d="M14 13 Q12 24 17 30 L23 30 Q28 24 26 13 Q20 10 14 13 Z" fill="#b07a5c"/>
+            <ellipse cx="20" cy="13" rx="6" ry="1.8" fill="#7e8a6f"/>
+          </svg>
+          <span class="brand__name">Terra &amp; Form</span>
+        </a>
+        <p class="footer__about">A small ceramics studio making hand-thrown stoneware for the table and the home. Made to order, made to last.</p>
+      </div>
+      <div class="footer__col">
+        <h4>Shop</h4>
+        <ul>
+          <li><a href="shop.html?category=Tableware">Tableware</a></li>
+          <li><a href="shop.html?category=Mugs &amp; Cups">Mugs &amp; Cups</a></li>
+          <li><a href="shop.html?category=Vases">Vases</a></li>
+          <li><a href="shop.html?category=Bowls">Bowls</a></li>
+          <li><a href="shop.html?category=Decor">Decor</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Studio</h4>
+        <ul>
+          <li><a href="about.html">Our story</a></li>
+          <li><a href="about.html#process">Materials &amp; process</a></li>
+          <li><a href="contact.html">Visit the studio</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Care</h4>
+        <ul>
+          <li><a href="about.html#ethos">Made to order</a></li>
+          <li><a href="contact.html">Lead times</a></li>
+          <li><a href="contact.html">Wholesale</a></li>
+          <li><a href="cart.html">Your cart</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="wrap footer__bottom">
+      <span>&copy; <span data-year>2026</span> Terra &amp; Form. Hand-thrown in the studio.</span>
+      <span>Free shipping on orders over $150</span>
+    </div>
+  </footer>
+
+  <script src="js/products.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

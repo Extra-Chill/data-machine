@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Remote Roost — an opinionated remote-only job board</title>
+  <meta name="description" content="Founded in 2018 by Mira Voss and Henrik Eklund after both got burned by 'remote-friendly' jobs that were actually hybrid. Independent, profitable, four people.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="site-header" role="banner">
+  <div class="site-header__inner">
+    <a href="index.html" class="brand" aria-label="Remote Roost — home">
+      <svg class="brand__mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="2" y="2" width="28" height="28" rx="6" fill="#1a5a5a"/>
+        <path d="M9 22 Q9 14 16 14 Q23 14 23 22 L23 24 L9 24 Z" fill="#f4ecda"/>
+        <circle cx="13" cy="18" r="1.6" fill="#1a5a5a"/>
+        <circle cx="19" cy="18" r="1.6" fill="#1a5a5a"/>
+        <path d="M14 10 L16 6 L18 10 Z" fill="#d97333"/>
+      </svg>
+      <span class="brand__name">Remote <span>Roost</span></span>
+    </a>
+    <nav class="main-nav" role="navigation" aria-label="Primary">
+      <a href="jobs.html">Browse jobs</a>
+      <a href="companies.html">Companies</a>
+      <a href="post-a-job.html">Post a job</a>
+      <a href="resources.html">Resources</a>
+      <a href="about.html" class="is-current">About</a>
+    </nav>
+    <div class="nav-actions">
+      <a href="post-a-job.html" class="btn btn--primary btn--sm">Post a job</a>
+    </div>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-controls="mobile-nav" aria-expanded="false">
+      <span class="nav-toggle__bars" aria-hidden="true"></span>
+    </button>
+  </div>
+  <div id="mobile-nav" class="mobile-nav">
+    <a href="jobs.html">Browse jobs</a>
+    <a href="companies.html">Companies</a>
+    <a href="post-a-job.html">Post a job</a>
+    <a href="resources.html">Resources</a>
+    <a href="about.html">About</a>
+    <a href="post-a-job.html" class="btn btn--primary btn--block">Post a job</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="hero hero--compact">
+    <div class="container">
+      <span class="eyebrow">About</span>
+      <h1>An opinionated, independent, remote-only job board.</h1>
+      <p class="hero__dek">Four people in Berlin and Lisbon, profitable since 2021, no investors, no plans to "scale up the platform side." Just a job board run by people who actually do remote work.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOUNDING STORY
+       ============================================================ -->
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <span class="eyebrow">Our story</span>
+        <h2>How it started</h2>
+      </div>
+
+      <div class="story-block">
+        <p>Remote Roost started in late 2018 because Mira and Henrik were both, in different ways, burned by the same thing. Mira had left a strong design role in Stockholm for what was advertised as a fully-remote senior position at a US fintech — only to find out, three weeks in, that "remote" meant "fly to San Francisco for two weeks a quarter and the all-hands isn't on Zoom for the people who aren't there." Henrik had taken a Berlin-based "remote-friendly" engineering role and discovered the friendly part stopped at the office door: the decisions all happened in the corridor outside the standup.</p>
+        <p>They were complaining to each other over coffee in Lisbon — both having ended up there, separately, between jobs — and realized two things at once. First, every existing remote job board was indiscriminate. They took any posting that had the word "remote" in it, including the bait. Second, the kinds of companies that <em>do</em> get remote work right were getting drowned out by everyone else.</p>
+        <p>So they did the small, obvious thing. They started a tiny job board with one rule: every listing got read by a human before it went live, and listings that didn't meet a minimum bar (real salary band, real location requirement, no hybrid sneak-in) got rejected. The first month had 11 listings. The first year had 380. We're now at 147 active listings on any given day, around 4,500 a year, and we still read every one before it goes live.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TEAM
+       ============================================================ -->
+  <section class="section section--cream">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">The team</span>
+        <h2>Four humans, two cities, one Slack workspace</h2>
+        <p>We have stayed deliberately small. Adding the fifth person took us 18 months of debate.</p>
+      </div>
+
+      <div class="team-grid">
+
+        <article class="team-card">
+          <div class="photo-block pb--teal team-card__photo" aria-label="Portrait photo of Mira Voss, co-founder">Mira Voss</div>
+          <h3 class="team-card__name">Mira Voss</h3>
+          <p class="team-card__role">Co-founder · Editorial &amp; design</p>
+          <p class="team-card__bio">Ran design teams at three remote-first startups before this. Reads every listing that comes in for design, product, marketing, and customer roles. Based in Lisbon. Has strong opinions about typography and salary transparency. Owns the brand and the front-end.</p>
+        </article>
+
+        <article class="team-card">
+          <div class="photo-block pb--amber team-card__photo" aria-label="Portrait photo of Henrik Eklund, co-founder">Henrik Eklund</div>
+          <h3 class="team-card__name">Henrik Eklund</h3>
+          <p class="team-card__role">Co-founder · Engineering &amp; ops</p>
+          <p class="team-card__bio">Backend engineer for a decade before starting this. Reads every engineering, data, and infra listing. Built the Rails monolith that runs the site (and will defend that choice). Based in Berlin. Handles invoicing, taxes, and the unglamorous half of running a business.</p>
+        </article>
+
+        <article class="team-card">
+          <div class="photo-block pb--moss team-card__photo" aria-label="Portrait photo of Vera Okoye, editorial reviewer">Vera Okoye</div>
+          <h3 class="team-card__name">Vera Okoye</h3>
+          <p class="team-card__role">Senior Editorial Reviewer</p>
+          <p class="team-card__bio">Joined in 2022. Backs up Mira and Henrik on listing review — splits the queue with them so nothing waits more than a business day. Writes most of the Resources essays. Has worked in operations at three EOR companies, which means she catches compliance issues we'd miss. Based in Lagos, deeply async.</p>
+        </article>
+
+        <article class="team-card">
+          <div class="photo-block pb--berry team-card__photo" aria-label="Portrait photo of Sam Hyde-Patel, customer and community">Sam Hyde-Patel</div>
+          <h3 class="team-card__name">Sam Hyde-Patel</h3>
+          <p class="team-card__role">Customer &amp; community</p>
+          <p class="team-card__bio">Joined in 2024 — the long-debated fifth hire. Handles employer support, candidate questions, the newsletter, and the Mastodon presence. Previously ran community at a developer-tools startup. Based in Bristol. Closes more tickets in a week than the rest of us combined.</p>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       EDITORIAL STANDARDS (re-used pattern)
+       ============================================================ -->
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <span class="eyebrow">Editorial standards</span>
+        <h2>What gets listed, and what doesn't</h2>
+        <p>The version of this on the <a href="post-a-job.html">post-a-job page</a> is for employers. This is the same rules, framed for you, the job-seeker. If we ever post something that breaks these, write to us and we'll pull it.</p>
+      </div>
+
+      <div class="editorial-standards">
+        <div class="editorial-col">
+          <h3>Every listing has</h3>
+          <ul>
+            <li>A real salary range (band, not the word "competitive").</li>
+            <li>A specific location requirement (region, country, or timezone window).</li>
+            <li>A statement of the hiring process (at minimum: number of stages).</li>
+            <li>A reachable human at the company's domain.</li>
+            <li>Confirmation that the role is fully remote — not hybrid, not "mostly remote."</li>
+          </ul>
+        </div>
+        <div class="editorial-col">
+          <h3 class="bad">We reject (about 14% of submissions)</h3>
+          <ul class="bad">
+            <li>"Remote-friendly" or "remote in [specific city]" postings.</li>
+            <li>Postings hiding the salary band behind a recruiter call.</li>
+            <li>Unpaid take-home work over 3 hours.</li>
+            <li>Vague or fictional locations.</li>
+            <li>Listings from staffing agencies posting for unnamed clients.</li>
+            <li>Companies with a documented pattern of bait-and-switch.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       STATS
+       ============================================================ -->
+  <section class="section">
+    <div class="container">
+      <div class="about-stats">
+        <div class="about-stats__item">
+          <span class="about-stats__num">28,000+</span>
+          <span class="about-stats__label">Jobs posted since 2018</span>
+        </div>
+        <div class="about-stats__item">
+          <span class="about-stats__num">3,840</span>
+          <span class="about-stats__label">Companies hosted over the years</span>
+        </div>
+        <div class="about-stats__item">
+          <span class="about-stats__num">1,200+</span>
+          <span class="about-stats__label">Reader-submitted success stories</span>
+        </div>
+        <div class="about-stats__item">
+          <span class="about-stats__num">14%</span>
+          <span class="about-stats__label">Of submitted listings we reject</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       OPINION PIECE
+       ============================================================ -->
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="opinion">
+        <span class="eyebrow">Our take</span>
+        <h2>Remote work, eight years in</h2>
+        <p>The thing we got wrong in 2018 was assuming the world was on a one-way trip to remote-first. The thing the world got wrong in 2022 was concluding it wasn't. The actual shape is messier and, we think, more interesting: most companies are now hybrid in a way that punishes the people who are remote, a meaningful minority are fully distributed and getting good at it, and the gap between those two groups is widening every year.</p>
+        <p>Our bet is that the second group keeps winning the talent fight — slowly, unevenly, and not in the categories the breathless thinkpieces usually cover. It shows up in lower attrition at fully-distributed companies than at "RTO three days a week" ones. It shows up in the salary spread for senior engineers: the top 25% of remote-only roles now pay more than the median in-office role in the same city. It shows up in who runs the design system at companies you've heard of — increasingly, it's somebody who hasn't met any of their coworkers in person in a year.</p>
+        <p>What we hear from candidates is that the second-order effects are what surprised them. Remote work didn't give them an extra commute hour — it gave them the ability to take their kid to school, do their job, pick the kid up, and not feel like a worse parent or a worse employee. It didn't make them "more productive" in some legible way. It made them less constantly tired. That's a real thing, and the companies we list are, we think, the ones who treat it as a real thing.</p>
+        <p>The companies that have figured this out are not the loud ones. They are not "thought leaders." They are mostly companies between 20 and 200 people, often profitable, often boring on the outside, that decided early to write things down, to run meetings as if half the room weren't in the room, and to make decisions in places where decisions are findable later. The boring stuff. The stuff that scales without theatrics.</p>
+        <p>What we'd like to see less of, from candidates and from companies both: pretending async is a synonym for "no meetings ever" or "you can work whenever." It is neither. Async is "decisions are written down, handoffs are explicit, and your presence in real time is not the unit of trust." That requires a lot of work. Most companies that claim to be async are not, in fact, async. Most companies that <em>are</em> async don't make a big deal about it.</p>
+        <p>What we'd like to see more of, from the press: stop interviewing the same six CEOs about whether remote work is "over." Talk to the people doing it. Talk to the people hiring for it. Talk to the people who left in-office jobs and would not go back. It's not a debate, it's a labor-market shift, and the people on the ground stopped arguing about it a long time ago. They're just getting on with it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PRESS
+       ============================================================ -->
+  <section class="section section--cream">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <span class="eyebrow">Press</span>
+        <h2>People have said nice things</h2>
+      </div>
+
+      <div class="press-grid">
+
+        <div class="press-card">
+          <blockquote>"The job board that finally treats candidates like adults — salary bands, real hiring process info, and a stated bias against bait postings."</blockquote>
+          <cite>— The New Worker, March 2024</cite>
+        </div>
+
+        <div class="press-card">
+          <blockquote>"Tiny operation, oversized influence. Remote Roost is to remote-only job listings what Pitchfork was to indie music in 2003 — opinionated, occasionally wrong, impossible to ignore."</blockquote>
+          <cite>— Distributed Magazine, October 2023</cite>
+        </div>
+
+        <div class="press-card">
+          <blockquote>"In a category that has gotten unbearably noisy, this is the rare site I send to friends without caveats."</blockquote>
+          <cite>— Tracy Wen, Lenny's Newsletter, July 2025</cite>
+        </div>
+
+        <div class="press-card">
+          <blockquote>"The editorial review is the entire product. The fact that they reject 14% of postings is the reason the other 86% are worth reading."</blockquote>
+          <cite>— Stratechery (Daily Update), November 2025</cite>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CONTACT
+       ============================================================ -->
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <span class="eyebrow">Contact</span>
+        <h2>Reach us</h2>
+        <p>Three ways. All three reach real people. We aim to reply within one business day, usually faster.</p>
+      </div>
+
+      <div class="featured-grid" style="grid-template-columns:repeat(3,1fr);">
+
+        <div class="featured-card">
+          <div class="featured-card__role">General &amp; press</div>
+          <p>For partnership, press, podcasts, advice on a posting, or anything else.</p>
+          <a href="mailto:hello@remoteroost.example" class="link-arrow">hello@remoteroost.example</a>
+        </div>
+
+        <div class="featured-card">
+          <div class="featured-card__role">Job-seeker support</div>
+          <p>Question about a listing, problem applying, or want to flag a company doing something we should know about.</p>
+          <a href="mailto:candidates@remoteroost.example" class="link-arrow">candidates@remoteroost.example</a>
+        </div>
+
+        <div class="featured-card">
+          <div class="featured-card__role">Employer support</div>
+          <p>Listing question, editorial review status, billing question, or you want to upgrade a post to Featured.</p>
+          <a href="mailto:employers@remoteroost.example" class="link-arrow">employers@remoteroost.example</a>
+        </div>
+
+      </div>
+
+      <p style="margin-top:32px;text-align:center;color:var(--rr-slate);">
+        Or find us at <a href="#">@remoteroost@mastodon.social</a>, on <a href="#">Bluesky</a>, or via the <a href="#">weekly newsletter</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       OUR HISTORY — TIMELINE
+       ============================================================ -->
+  <section class="section section--cream">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <span class="eyebrow">Timeline</span>
+        <h2>How we got here</h2>
+        <p>Eight years compressed into the highlights worth noting.</p>
+      </div>
+
+      <dl class="faq-list">
+        <dt><span class="mono" style="color:var(--rr-teal);">2018</span> · Founded</dt>
+        <dd>Mira and Henrik launch a one-page WordPress site from a Lisbon coffee shop. 11 listings in month one. No revenue model yet — listings are free.</dd>
+
+        <dt><span class="mono" style="color:var(--rr-teal);">2019</span> · First paid listing</dt>
+        <dd>A Belgian SaaS company asks if they can pay to be featured. We invent the pricing on the spot ($150) and a business model accidentally appears. 380 listings this year.</dd>
+
+        <dt><span class="mono" style="color:var(--rr-teal);">2020</span> · The COVID year</dt>
+        <dd>Volume goes up 4×. We also reject a record number of listings — companies that had been hybrid suddenly claim to be "remote-first." We write the first version of the editorial rubric this year.</dd>
+
+        <dt><span class="mono" style="color:var(--rr-teal);">2021</span> · Profitable</dt>
+        <dd>First fully-profitable year. Mira moves to working on this full-time. We move off WordPress to a Rails app Henrik writes evenings and weekends. (We still apologize for the WordPress era when asked.)</dd>
+
+        <dt><span class="mono" style="color:var(--rr-teal);">2022</span> · Vera joins</dt>
+        <dd>First hire. The review queue had been backing up to 3 days and the quality bar was slipping. Vera halves the queue time within a month.</dd>
+
+        <dt><span class="mono" style="color:var(--rr-teal);">2023</span> · The RTO year</dt>
+        <dd>Big-company return-to-office mandates push a wave of candidates toward remote-only boards. Volume doubles again. We deliberately do not raise prices.</dd>
+
+        <dt><span class="mono" style="color:var(--rr-teal);">2024</span> · Sam joins; Pro Pack launches</dt>
+        <dd>Hire #2 (the long-debated fifth person). Launch the Pro Pack tier for companies hiring 3+ roles in a quarter. Quietly add invoice billing for European customers.</dd>
+
+        <dt><span class="mono" style="color:var(--rr-teal);">2025</span> · 28,000th listing</dt>
+        <dd>We hit 28,000 lifetime listings posted. Newsletter crosses 4,500 subscribers. We turn down a third acquisition inquiry without taking the meeting.</dd>
+
+        <dt><span class="mono" style="color:var(--rr-teal);">2026</span> · You are here</dt>
+        <dd>147 listings active today. Still four people. Still in Berlin and Lisbon (and now Lagos and Bristol). Still rejecting about 14% of submissions.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       THINGS WE DON'T DO
+       ============================================================ -->
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="opinion">
+        <span class="eyebrow">For the record</span>
+        <h2>Things we don't do, and won't</h2>
+        <p>The clearest way to describe a small business is by what it has decided not to be. Here is what Remote Roost will not become, even when asked nicely.</p>
+        <p>We don't take a cut of salaries. We don't take referral fees. We don't have an in-house recruiting arm and we never will — the moment we have a stake in who gets hired, our incentives stop aligning with candidates'. We don't run banner ads or sponsored listings dressed up as content. The "Featured" badge is the only paid placement on the site and it is clearly labeled.</p>
+        <p>We don't use AI to screen applicants and we don't sell our reader data. The newsletter list has never been shared. Job-seeker accounts are anonymous unless you opt in. We don't store applications — when you click apply, you go to the company's own URL or email. We are not a middleman in the hiring process and we don't want to be.</p>
+        <p>We don't take meetings about getting acquired. We've had three serious inquiries — two from larger job boards, one from a recruiting platform. Each one made it clear that being independent is the whole point. The site exists because we, personally, wanted it to exist. Selling it would defeat the thing.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="site-footer__cols">
+      <div class="site-footer__about">
+        <a href="index.html" class="brand" aria-label="Remote Roost — home">
+          <svg class="brand__mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2" y="2" width="28" height="28" rx="6" fill="#1a5a5a"/>
+            <path d="M9 22 Q9 14 16 14 Q23 14 23 22 L23 24 L9 24 Z" fill="#f4ecda"/>
+            <circle cx="13" cy="18" r="1.6" fill="#1a5a5a"/>
+            <circle cx="19" cy="18" r="1.6" fill="#1a5a5a"/>
+            <path d="M14 10 L16 6 L18 10 Z" fill="#d97333"/>
+          </svg>
+          <span class="brand__name">Remote <span>Roost</span></span>
+        </a>
+        <p>Real remote jobs at companies that get it. Independent, vetted, founded in 2018 by two burned-out hybrid refugees.</p>
+      </div>
+      <div class="site-footer__col">
+        <h6>Browse</h6>
+        <ul>
+          <li><a href="jobs.html">All jobs</a></li>
+          <li><a href="jobs.html">Engineering</a></li>
+          <li><a href="jobs.html">Design</a></li>
+          <li><a href="jobs.html">Product</a></li>
+          <li><a href="companies.html">Companies</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h6>For employers</h6>
+        <ul>
+          <li><a href="post-a-job.html">Post a job</a></li>
+          <li><a href="post-a-job.html">Pricing</a></li>
+          <li><a href="post-a-job.html">Editorial standards</a></li>
+          <li><a href="post-a-job.html">Featured slots</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h6>About</h6>
+        <ul>
+          <li><a href="about.html">Our story</a></li>
+          <li><a href="about.html">Team</a></li>
+          <li><a href="resources.html">Resources</a></li>
+          <li><a href="about.html">Contact</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h6>Legal</h6>
+        <ul>
+          <li><a href="#">Terms</a></li>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Cookies</a></li>
+          <li><a href="#">DMCA</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="site-footer__bottom">
+      <span>© 2018–2026 Remote Roost Ltd. Made by humans in Berlin &amp; Lisbon.</span>
+      <div class="site-footer__social" aria-label="Social links">
+        <a href="#" aria-label="Mastodon">Mt</a>
+        <a href="#" aria-label="LinkedIn">In</a>
+        <a href="#" aria-label="Bluesky">Bs</a>
+        <a href="#" aria-label="RSS">Rs</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

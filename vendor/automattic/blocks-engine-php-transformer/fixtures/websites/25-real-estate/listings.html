@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Listings — Heron &amp; Oak</title>
+  <meta name="description" content="Current Hudson Valley listings from Heron &amp; Oak: historic homes, working farms, river-view properties, and live/work conversions in Rhinebeck, Hudson, Catskill, New Paltz, Kingston, Saugerties, and Beacon.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ══ Navigation ══════════════════════════════════════════════ -->
+<header class="site-header" id="site-header">
+  <nav class="nav container" aria-label="Primary">
+    <a href="index.html" class="nav__logo" aria-label="Heron &amp; Oak home">
+      <svg class="nav__logo-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="36" height="36" rx="2" fill="#46553a"/>
+        <path d="M9 27 Q11 22 14 21 L17 16 L20 18 L23 14 Q26 14 27 11" stroke="#efece4" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+        <circle cx="27" cy="11" r="1.3" fill="#efece4"/>
+        <path d="M14 21 L14 28 M17 22 L17 28" stroke="#efece4" stroke-width="1" stroke-linecap="round"/>
+        <line x1="7" y1="29.5" x2="29" y2="29.5" stroke="#d4dccb" stroke-width="0.6" opacity="0.7"/>
+      </svg>
+      <span class="nav__logo-text">Heron &amp; Oak</span>
+    </a>
+
+    <button class="nav__toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="navLinks">
+      <span></span><span></span><span></span>
+    </button>
+
+    <ul class="nav__links" id="navLinks">
+      <li><a href="index.html" class="nav__link">Home</a></li>
+      <li><a href="listings.html" class="nav__link active">Listings</a></li>
+      <li><a href="agents.html" class="nav__link">Agents</a></li>
+      <li><a href="contact.html" class="nav__link">Contact</a></li>
+      <li><a href="contact.html#inquire" class="btn btn--primary btn--sm">Schedule a Visit</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- ══ Page title ══════════════════════════════════════════════ -->
+<section class="page-title">
+  <div class="container">
+    <span class="eyebrow page-title__eyebrow">12 current properties · Updated weekly</span>
+    <h1>The current inventory.</h1>
+    <p>Every listing here is one we have walked through, asked questions about, and decided we could explain to a buyer with a straight face. Filter by what matters; reach out about what doesn't fit the boxes.</p>
+  </div>
+</section>
+
+<!-- ══ Filter bar ══════════════════════════════════════════════ -->
+<section class="section section--tight" aria-label="Filter listings">
+  <div class="container">
+    <div class="filter-bar" role="toolbar" aria-label="Listing filters">
+      <span class="filter-label">Refine</span>
+
+      <button class="chip active" data-group="status" type="button">All Statuses <span class="chip__caret">▾</span></button>
+      <button class="chip" data-group="status" type="button">For Sale</button>
+      <button class="chip" data-group="status" type="button">Coming Soon</button>
+      <button class="chip" data-group="status" type="button">Under Contract</button>
+      <button class="chip" data-group="status" type="button">Sold</button>
+
+      <button class="chip" data-group="price" type="button">Price: Any <span class="chip__caret">▾</span></button>
+      <button class="chip" data-group="beds" type="button">Beds: Any <span class="chip__caret">▾</span></button>
+      <button class="chip" data-group="type" type="button">Type: Any <span class="chip__caret">▾</span></button>
+      <button class="chip" data-group="town" type="button">Town: Any <span class="chip__caret">▾</span></button>
+    </div>
+
+    <!-- ══ Listings grid ══════════════════════════════════════ -->
+    <div class="listings-grid reveal-stagger">
+
+      <!-- 1 — featured -->
+      <article class="card">
+        <a href="218-river-road-rhinebeck.html" class="card__media" aria-label="View 218 River Road, Rhinebeck">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-farmhouse-front" role="img" aria-label="Cream farmhouse on a gravel approach, twin maples flanking the porch, October light"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$2,275,000</div>
+          <h3 class="card__address">218 River Road</h3>
+          <div class="card__town">Rhinebeck, NY</div>
+          <ul class="card__specs">
+            <li>4 BD</li><li>3.5 BA</li><li>3,480 sqft</li><li>8.4 ac</li>
+          </ul>
+          <p class="card__dek">A 1925 farmhouse on the orchard side of the village. Pond, barn studio, original everything where it counts.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Eleanor Whitfield</strong></span>
+            <span class="mono">MLS H24-1108</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 2 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 47 Warren Street, Hudson">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-hudson-row" role="img" aria-label="Warren Street rowhouse, cream stucco façade, second-floor window box, weekend afternoon"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$1,395,000</div>
+          <h3 class="card__address">47 Warren Street</h3>
+          <div class="card__town">Hudson, NY</div>
+          <ul class="card__specs">
+            <li>3 BD</li><li>2 BA</li><li>2,140 sqft</li>
+          </ul>
+          <p class="card__dek">Four stories with the ground-floor retail bay still intact. Live above, lease below, or take the whole thing.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Owen Sato</strong></span>
+            <span class="mono">MLS H24-0941</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 3 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 112 Mill Road, New Paltz">
+          <div class="card__badge"><span class="badge badge--coming-soon">Coming Soon</span></div>
+          <div class="photo photo--ratio-4x3 scene-cottage" role="img" aria-label="Stone-and-shingle cottage at the back of a clearing, lilacs in bloom"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$865,000</div>
+          <h3 class="card__address">112 Mill Road</h3>
+          <div class="card__town">New Paltz, NY</div>
+          <ul class="card__specs">
+            <li>3 BD</li><li>2 BA</li><li>1,820 sqft</li><li>2.1 ac</li>
+          </ul>
+          <p class="card__dek">A 1908 stone cottage with a recently rebuilt kitchen wing. Spring-fed pond at the back of the lot.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Maya Bertrand-Cole</strong></span>
+            <span class="mono">MLS H24-1187</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 4 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 9 Old Post Road, Catskill">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-victorian" role="img" aria-label="An 1887 Queen Anne with corner turret and wraparound porch, painted moss green"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$1,160,000</div>
+          <h3 class="card__address">9 Old Post Road</h3>
+          <div class="card__town">Catskill, NY</div>
+          <ul class="card__specs">
+            <li>5 BD</li><li>3 BA</li><li>3,260 sqft</li><li>0.8 ac</li>
+          </ul>
+          <p class="card__dek">An 1887 Queen Anne with the porch ceiling still painted haint blue and an attic studio with northern light.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Theo Ortega</strong></span>
+            <span class="mono">MLS H24-1064</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 5 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 33 Spring Street, Saugerties">
+          <div class="card__badge"><span class="badge badge--under-contract">Under Contract</span></div>
+          <div class="photo photo--ratio-4x3 scene-bungalow" role="img" aria-label="Tan Craftsman bungalow with deep eaves and a stone chimney"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$745,000</div>
+          <h3 class="card__address">33 Spring Street</h3>
+          <div class="card__town">Saugerties, NY</div>
+          <ul class="card__specs">
+            <li>3 BD</li><li>2 BA</li><li>1,640 sqft</li>
+          </ul>
+          <p class="card__dek">A 1924 Craftsman with the built-in bookcase still standing and a detached studio out back.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Camille Reyes-Hahn</strong></span>
+            <span class="mono">MLS H24-0902</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 6 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 88 Tinker Street, Beacon">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-loft" role="img" aria-label="Converted manufacturing loft, twelve-foot steel windows, brick column down the centerline"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$1,495,000</div>
+          <h3 class="card__address">88 Tinker Street</h3>
+          <div class="card__town">Beacon, NY</div>
+          <ul class="card__specs">
+            <li>2 BD</li><li>2 BA</li><li>2,380 sqft</li>
+          </ul>
+          <p class="card__dek">A live/work loft conversion in a former hat factory. Twelve-foot ceilings, an industrial elevator, a small interior courtyard.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Jonah Becker</strong></span>
+            <span class="mono">MLS H24-1051</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 7 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 6 Carriage Lane, Tivoli">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-orchard" role="img" aria-label="A pale yellow Greek Revival at the edge of an apple orchard, gravel turn-around in front"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$1,825,000</div>
+          <h3 class="card__address">6 Carriage Lane</h3>
+          <div class="card__town">Tivoli, NY</div>
+          <ul class="card__specs">
+            <li>4 BD</li><li>3 BA</li><li>2,940 sqft</li><li>4.6 ac</li>
+          </ul>
+          <p class="card__dek">An 1842 Greek Revival at the edge of a small commercial orchard. Original side-light entry, summer kitchen converted to a den.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Eleanor Whitfield</strong></span>
+            <span class="mono">MLS H24-1112</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 8 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 41 Allen Street, Kingston">
+          <div class="card__badge"><span class="badge badge--sold">Sold</span></div>
+          <div class="photo photo--ratio-4x3 scene-stairs" role="img" aria-label="Federal-era brick townhouse on a quiet Kingston block, dogwoods in the front bed"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$985,000</div>
+          <h3 class="card__address">41 Allen Street</h3>
+          <div class="card__town">Kingston, NY</div>
+          <ul class="card__specs">
+            <li>4 BD</li><li>2.5 BA</li><li>2,280 sqft</li>
+          </ul>
+          <p class="card__dek">A Federal-era brick townhouse in the Rondout, closed in twelve days, three over ask. We list a happy ending.</p>
+          <div class="card__agent">
+            <span>Sold by <strong>Owen Sato</strong></span>
+            <span class="mono">MLS H24-0786</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 9 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 207 Roe Jan Road, Hillsdale">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-cabin" role="img" aria-label="A timber-frame cabin tucked into a hillside, smoke from the chimney, snow line halfway up"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$685,000</div>
+          <h3 class="card__address">207 Roe Jan Road</h3>
+          <div class="card__town">Hillsdale, NY</div>
+          <ul class="card__specs">
+            <li>3 BD</li><li>2 BA</li><li>1,560 sqft</li><li>11.2 ac</li>
+          </ul>
+          <p class="card__dek">A timber-frame on a wooded hillside above the Roeliff Jansen. Trails to a swimming hole. Year-round road.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Theo Ortega</strong></span>
+            <span class="mono">MLS H24-1199</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 10 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 18 Elmendorf Avenue, Kingston">
+          <div class="card__badge"><span class="badge badge--coming-soon">Coming Soon</span></div>
+          <div class="photo photo--ratio-4x3 scene-mid-century" role="img" aria-label="A low mid-century house on a sloped lot, deep eaves, sliders to a flagstone patio"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$1,095,000</div>
+          <h3 class="card__address">18 Elmendorf Avenue</h3>
+          <div class="card__town">Kingston, NY</div>
+          <ul class="card__specs">
+            <li>3 BD</li><li>2 BA</li><li>2,260 sqft</li><li>1.4 ac</li>
+          </ul>
+          <p class="card__dek">A 1958 mid-century by a local architect, restored carefully — terrazzo intact, kitchen rebuilt to spec.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Maya Bertrand-Cole</strong></span>
+            <span class="mono">MLS H24-1224</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 11 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 4 Mount Merino Road, Hudson">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-river" role="img" aria-label="River-view farmhouse on the bluff above the Hudson, late autumn, hawthorn trees in the foreground"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$4,200,000</div>
+          <h3 class="card__address">4 Mount Merino Road</h3>
+          <div class="card__town">Hudson, NY</div>
+          <ul class="card__specs">
+            <li>5 BD</li><li>4 BA</li><li>4,920 sqft</li><li>22.0 ac</li>
+          </ul>
+          <p class="card__dek">A bluff-edge property looking directly across the river at the Catskills. Pasture, pond, an honest barn, a small folly.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Eleanor Whitfield</strong></span>
+            <span class="mono">MLS H24-0822</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 12 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 22 Pleasant Street, Beacon">
+          <div class="card__badge"><span class="badge badge--under-contract">Under Contract</span></div>
+          <div class="photo photo--ratio-4x3 scene-porch" role="img" aria-label="A pale-blue side-gabled cottage with a long covered porch, hydrangeas to either side of the steps"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$925,000</div>
+          <h3 class="card__address">22 Pleasant Street</h3>
+          <div class="card__town">Beacon, NY</div>
+          <ul class="card__specs">
+            <li>3 BD</li><li>2 BA</li><li>1,780 sqft</li>
+          </ul>
+          <p class="card__dek">A side-gabled cottage three blocks from the Beacon train, with a porch that runs the length of the house.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Jonah Becker</strong></span>
+            <span class="mono">MLS H24-1018</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- ══ Pagination ════════════════════════════════════════ -->
+    <nav class="pagination" aria-label="Listings pagination">
+      <a href="#" aria-label="Previous page">‹</a>
+      <span class="current" aria-current="page">1</span>
+      <a href="#">2</a>
+      <a href="#">3</a>
+      <span class="ellipsis">…</span>
+      <a href="#">7</a>
+      <a href="#" aria-label="Next page">›</a>
+    </nav>
+
+  </div>
+</section>
+
+<!-- ══ Footer ══════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <div class="footer-brand">
+          <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect width="36" height="36" rx="2" fill="#46553a"/>
+            <path d="M9 27 Q11 22 14 21 L17 16 L20 18 L23 14 Q26 14 27 11" stroke="#efece4" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+            <circle cx="27" cy="11" r="1.3" fill="#efece4"/>
+            <path d="M14 21 L14 28 M17 22 L17 28" stroke="#efece4" stroke-width="1" stroke-linecap="round"/>
+          </svg>
+          <span>Heron &amp; Oak</span>
+        </div>
+        <p class="footer-tagline">Houses with a past. Brokers with a plan. Boutique Hudson Valley real estate — historic homes, working farms, river-view properties, live/work conversions.</p>
+        <div class="footer-address">
+          12 Mill Street, 2nd Floor<br>
+          Rhinebeck, NY 12572<br>
+          (845) 555-0142
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Brokerage</h4>
+        <ul>
+          <li><a href="listings.html">All Listings</a></li>
+          <li><a href="agents.html">The Collective</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="contact.html#offices">Offices</a></li>
+          <li><a href="contact.html#faq">FAQ</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>By Town</h4>
+        <ul>
+          <li><a href="listings.html?town=rhinebeck">Rhinebeck</a></li>
+          <li><a href="listings.html?town=hudson">Hudson</a></li>
+          <li><a href="listings.html?town=catskill">Catskill</a></li>
+          <li><a href="listings.html?town=new-paltz">New Paltz</a></li>
+          <li><a href="listings.html?town=kingston">Kingston</a></li>
+          <li><a href="listings.html?town=beacon">Beacon</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Stay Posted</h4>
+        <ul>
+          <li><a href="index.html#newsletter-heading">Field Notes Letter</a></li>
+          <li><a href="contact.html#inquire">Buyer Inquiry</a></li>
+          <li><a href="contact.html#inquire">Seller Consultation</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <span>&copy; 2014–2026 Heron &amp; Oak Realty LLC · Licensed Real Estate Brokerage, NYS</span>
+      <span>Equal Housing Opportunity · Fair Housing Notice</span>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

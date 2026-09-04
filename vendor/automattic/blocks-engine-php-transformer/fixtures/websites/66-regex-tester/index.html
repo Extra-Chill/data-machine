@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relay — Regex Lab</title>
+  <meta name="description" content="Relay is an in-browser regular-expression playground: live match highlighting, capture groups, a plain-English explainer, an SVG railroad diagram, and replace / split modes — all client-side.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/lab.css">
+</head>
+<body class="is-app">
+
+  <!-- ══════════════ HEADER ══════════════ -->
+  <header class="app-header" role="banner">
+    <div class="brandbar">
+      <a href="index.html" class="logo" aria-label="Relay home">
+        <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="7" cy="16" r="3.4" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <circle cx="25" cy="16" r="3.4" fill="none" stroke="var(--accent)" stroke-width="2.2"/>
+          <path d="M10.4 16 H21.6" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M14 9 q4 7 0 14" fill="none" stroke="var(--accent-3)" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <span class="logo-word">Re<b>lay</b></span>
+        <span class="logo-sub">regex lab</span>
+      </a>
+
+      <nav class="top-nav" aria-label="Primary">
+        <a href="index.html" class="active" aria-current="page">Lab</a>
+        <a href="cheatsheet.html">Cheatsheet</a>
+        <a href="about.html">About</a>
+      </nav>
+
+      <div class="head-actions">
+        <button class="tbtn ghost" id="btn-copy-pattern" type="button" title="Copy /pattern/flags">Copy regex</button>
+        <button class="tbtn ghost" id="btn-share" type="button" title="Copy a shareable link (state lives in the URL)">Share link</button>
+        <button class="tbtn ghost danger" id="btn-reset" type="button" title="Reset everything to the default example">Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════ WORKSPACE ══════════════ -->
+  <main class="lab" id="lab">
+
+    <!-- LEFT: library rail -->
+    <aside class="rail" aria-label="Pattern library">
+      <div class="rail-block">
+        <h2 class="rail-title">Example patterns</h2>
+        <div class="lib-list" id="lib-list" role="list"></div>
+      </div>
+      <div class="rail-block">
+        <h2 class="rail-title">Sample texts</h2>
+        <div class="sample-list" id="sample-list"></div>
+      </div>
+      <div class="rail-foot">
+        <div class="stat"><span class="stat-num" id="stat-matches">0</span><span class="stat-lbl">matches</span></div>
+        <div class="stat"><span class="stat-num" id="stat-groups">0</span><span class="stat-lbl">captures</span></div>
+      </div>
+    </aside>
+
+    <!-- CENTER: pattern + test text -->
+    <section class="center" aria-label="Pattern and test text">
+
+      <div class="pattern-bar">
+        <span class="slash">/</span>
+        <input id="pattern" class="pattern-input" type="text" spellcheck="false"
+               autocomplete="off" autocapitalize="off" autocorrect="off"
+               aria-label="Regular expression pattern" placeholder="type a regex…">
+        <span class="slash">/</span>
+        <div class="flags" role="group" aria-label="Regex flags">
+          <button class="flag" data-flag="g" type="button" aria-pressed="false" title="global — find all matches">g</button>
+          <button class="flag" data-flag="i" type="button" aria-pressed="false" title="ignore case">i</button>
+          <button class="flag" data-flag="m" type="button" aria-pressed="false" title="multiline — ^ and $ match line edges">m</button>
+          <button class="flag" data-flag="s" type="button" aria-pressed="false" title="dotAll — . matches newlines">s</button>
+          <button class="flag" data-flag="u" type="button" aria-pressed="false" title="unicode">u</button>
+          <button class="flag" data-flag="y" type="button" aria-pressed="false" title="sticky — anchor at lastIndex">y</button>
+        </div>
+        <button class="tbtn ghost mini" id="btn-clear" type="button" title="Clear the pattern">clear</button>
+      </div>
+      <p class="pattern-error" id="pattern-error" role="alert" hidden></p>
+
+      <div class="text-wrap">
+        <div class="text-head">
+          <span class="th-label">Test text</span>
+          <span class="th-hint">Matches highlight live. Hover a match in the panel to flash it here.</span>
+        </div>
+        <div class="editor-host">
+          <div class="overlay" id="overlay" aria-hidden="true"></div>
+          <textarea id="test-text" class="test-text" spellcheck="false"
+                    autocomplete="off" autocapitalize="off" autocorrect="off"
+                    aria-label="Test text"></textarea>
+        </div>
+      </div>
+
+      <!-- REPLACE / SPLIT -->
+      <div class="replace-zone" id="replace-wrap">
+        <div class="rep-tabs" role="tablist" aria-label="Transform mode">
+          <button class="rep-tab is-active" data-rep="replace" role="tab" aria-selected="true">Replace</button>
+          <button class="rep-tab" data-rep="split" role="tab" aria-selected="false">Split</button>
+          <span class="rep-help">use <code>$1</code>, <code>$&lt;name&gt;</code>, <code>$&amp;</code>, <code>$`</code>, <code>$'</code></span>
+        </div>
+        <div class="rep-row" id="replace-row">
+          <input id="replace-input" class="replace-input" type="text" spellcheck="false"
+                 autocomplete="off" aria-label="Replacement string" placeholder="replacement…">
+        </div>
+        <div class="rep-out-wrap" id="replace-out-wrap">
+          <pre class="replace-out" id="replace-out" aria-label="Replaced output"></pre>
+        </div>
+        <div class="split-out" id="split-out" hidden aria-label="Split parts"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: matches / explain / diagram -->
+    <section class="inspector" aria-label="Inspector">
+      <div class="insp-tabs" role="tablist" aria-label="Inspector view">
+        <button class="mode-tab is-active" data-mode="matches" role="tab" aria-selected="true">
+          Matches <span class="tab-badge" id="match-count">0</span>
+        </button>
+        <button class="mode-tab" data-mode="explain" role="tab" aria-selected="false">Explain</button>
+        <button class="mode-tab" data-mode="diagram" role="tab" aria-selected="false">Diagram</button>
+        <span class="insp-time" id="match-time">0 ms</span>
+      </div>
+
+      <p class="guard-note" id="guard-note" role="status" hidden></p>
+
+      <div class="insp-body">
+        <div class="pane" id="pane-matches" role="tabpanel">
+          <ul class="match-list" id="match-list"></ul>
+        </div>
+
+        <div class="pane" id="pane-explain" role="tabpanel" hidden>
+          <p class="pane-intro">Token-by-token breakdown, parsed from your pattern into an AST.</p>
+          <ul class="explain-list" id="explain-list"></ul>
+        </div>
+
+        <div class="pane" id="pane-diagram" role="tabpanel" hidden>
+          <p class="pane-intro">SVG railroad diagram — read it left to right. Boxes are groups; loops are quantifiers; stacked branches are alternation.</p>
+          <div class="railroad-scroll">
+            <div class="railroad" id="railroad"></div>
+          </div>
+          <div class="rr-legend" aria-hidden="true">
+            <span><i class="sw rr-lit"></i>literal</span>
+            <span><i class="sw rr-meta"></i>meta / class</span>
+            <span><i class="sw rr-cap"></i>group</span>
+            <span><i class="sw rr-look"></i>lookaround</span>
+            <span><i class="sw rr-anchor"></i>anchor</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ══════════════ STATUS BAR ══════════════ -->
+  <footer class="statusbar" role="contentinfo">
+    <span class="sb-item">Relay v3.2</span>
+    <span class="sb-item">real <code>RegExp</code> engine · hand-written AST</span>
+    <span class="sb-spacer"></span>
+    <span class="sb-item kbd-hint">⌘/Ctrl + / focus pattern · ⌘/Ctrl + Enter re-run</span>
+    <span class="sb-item">state saved to URL + localStorage</span>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/library-data.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/explain.js"></script>
+  <script src="js/railroad.js"></script>
+  <script src="js/matcher.js"></script>
+  <script src="js/highlight.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "markdown-editor",
+    "writing",
+    "app",
+    "productivity",
+    "editor"
+  ],
+  "complexity": 4
+}

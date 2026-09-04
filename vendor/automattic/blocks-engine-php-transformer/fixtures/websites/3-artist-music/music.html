@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music — Mara Vale</title>
+  <meta name="description" content="Between the Fog and the Fire — the new EP from Mara Vale. Stream on Spotify, Bandcamp, and Apple Music.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400;1,600;1,700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&family=Courier+Prime:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ── Release hero ──────────────────────────────────────── */
+    .release-hero {
+      padding: 5rem var(--pad) 4rem;
+      max-width: var(--max-w);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 5rem;
+      align-items: start;
+    }
+
+    .cover-large {
+      width: 100%;
+      aspect-ratio: 1;
+      display: block;
+      box-shadow:
+        0 0 120px rgba(184, 85, 42, 0.25),
+        0 60px 100px rgba(0,0,0,0.7);
+      position: sticky;
+      top: calc(var(--nav-h) + 2rem);
+    }
+
+    .release-info { padding-top: 0.5rem; }
+
+    .release-info .label { margin-bottom: 1.5rem; }
+
+    .release-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      font-style: italic;
+      color: var(--bone);
+      line-height: 1.05;
+      margin-bottom: 0.5rem;
+    }
+
+    .release-artist {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ember);
+      margin-bottom: 2rem;
+    }
+
+    .release-about {
+      color: var(--bone-dim);
+      font-style: italic;
+      margin-bottom: 1rem;
+      font-size: 1.1rem;
+    }
+
+    .release-meta {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--fog);
+      line-height: 2.2;
+      margin-bottom: 2.5rem;
+      border-top: 1px solid rgba(230,216,197,0.08);
+      border-bottom: 1px solid rgba(230,216,197,0.08);
+      padding: 1rem 0;
+    }
+
+    /* ── Tracklist (music page full) ───────────────────────── */
+    .full-tracklist {
+      list-style: none;
+      margin-bottom: 3rem;
+    }
+
+    .full-tracklist li {
+      display: grid;
+      grid-template-columns: 2rem 1fr auto;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 1.1rem 1rem;
+      margin: 0 -1rem;
+      border-bottom: 1px solid rgba(230, 216, 197, 0.07);
+      cursor: default;
+      transition: background 0.2s ease;
+    }
+    .full-tracklist li:first-child {
+      border-top: 1px solid rgba(230, 216, 197, 0.07);
+    }
+    .full-tracklist li:hover {
+      background: rgba(230, 216, 197, 0.03);
+    }
+
+    .tl-num {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      color: var(--fog);
+      letter-spacing: 0.06em;
+      text-align: right;
+    }
+    .tl-info { min-width: 0; }
+    .tl-title {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-style: italic;
+      color: var(--bone);
+      display: block;
+    }
+    .tl-note {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--fog);
+      margin-top: 0.15rem;
+      display: block;
+    }
+    .tl-dur {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      color: var(--fog);
+      white-space: nowrap;
+    }
+
+    /* ── Credits ─────────────────────────────────────────── */
+    .credits {
+      margin-top: 1rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(230,216,197,0.08);
+    }
+    .credits h4 {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ember);
+      margin-bottom: 1rem;
+      font-weight: 400;
+    }
+    .credits p {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      color: var(--fog);
+      line-height: 2;
+      max-width: 100%;
+    }
+
+    /* ── Full-bleed quote banner ─────────────────────────── */
+    .music-quote-banner {
+      padding: 5rem var(--pad);
+      background: rgba(184, 85, 42, 0.05);
+      border-top: 1px solid rgba(230,216,197,0.07);
+      border-bottom: 1px solid rgba(230,216,197,0.07);
+      text-align: center;
+      margin-top: 5rem;
+    }
+    .music-quote-banner blockquote {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: clamp(1.2rem, 2.5vw, 2rem);
+      color: var(--bone-dim);
+      max-width: 750px;
+      margin: 0 auto 1rem;
+      line-height: 1.5;
+    }
+    .music-quote-banner cite {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--fog);
+      font-style: normal;
+    }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 1024px) {
+      .release-hero { grid-template-columns: 340px 1fr; gap: 3.5rem; }
+      .cover-large { position: static; }
+    }
+    @media (max-width: 768px) {
+      .release-hero { grid-template-columns: 1fr; gap: 2.5rem; }
+      .cover-large { max-width: 280px; margin: 0 auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-bg" aria-hidden="true"></div>
+
+  <nav class="site-nav" role="navigation" aria-label="Main navigation">
+    <a href="index.html" class="nav-logo">Mara <em>Vale</em></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="music.html" class="active">Music</a></li>
+      <li><a href="tour.html">Tour</a></li>
+      <li><a href="merch.html">Merch</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <ul class="nav-mobile">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="music.html">Music</a></li>
+    <li><a href="tour.html">Tour</a></li>
+    <li><a href="merch.html">Merch</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+
+  <main>
+    <div class="release-hero">
+      <!-- Large EP cover -->
+      <div class="pl pl-d1">
+        <svg class="cover-large" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Between the Fog and the Fire EP cover art">
+          <defs>
+            <linearGradient id="bg-l" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1c0e0a"/><stop offset="60%" stop-color="#130809"/><stop offset="100%" stop-color="#0a0507"/>
+            </linearGradient>
+            <radialGradient id="fire-l" cx="68%" cy="65%" r="55%">
+              <stop offset="0%"   stop-color="#c4581a" stop-opacity="0.72"/>
+              <stop offset="40%"  stop-color="#8b3210" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#c4581a" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="fog-l" cx="32%" cy="38%" r="48%">
+              <stop offset="0%"   stop-color="#4a6a84" stop-opacity="0.48"/>
+              <stop offset="60%"  stop-color="#2a4055" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#4a6a84" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="ec-l" cx="50%" cy="52%" r="30%">
+              <stop offset="0%"   stop-color="#e8702a" stop-opacity="0.14"/>
+              <stop offset="100%" stop-color="#e8702a" stop-opacity="0"/>
+            </radialGradient>
+            <filter id="vsoft-l"><feGaussianBlur stdDeviation="22"/></filter>
+            <filter id="soft-l"><feGaussianBlur stdDeviation="8"/></filter>
+          </defs>
+          <rect width="500" height="500" fill="url(#bg-l)"/>
+          <ellipse cx="160" cy="190" rx="220" ry="170" fill="url(#fog-l)" filter="url(#vsoft-l)"/>
+          <ellipse cx="340" cy="310" rx="240" ry="200" fill="url(#fire-l)" filter="url(#vsoft-l)"/>
+          <ellipse cx="250" cy="260" rx="120" ry="100" fill="url(#ec-l)"/>
+          <path d="M0 340 Q30 300 65 320 Q90 300 120 280 Q145 260 175 295 Q200 315 230 270 Q255 235 285 260 Q310 280 335 255 Q360 230 390 250 Q415 265 440 235 Q465 210 500 228 L500 500 L0 500 Z" fill="#160b09" opacity="0.96"/>
+          <path d="M0 380 Q40 355 80 368 Q110 358 145 372 Q175 365 210 380 Q240 388 275 375 Q305 365 340 378 Q370 368 405 380 Q440 370 470 378 L500 376 L500 500 L0 500 Z" fill="#100708" opacity="0.98"/>
+          <path d="M-10 220 Q70 210 160 225 Q250 240 340 218 Q420 200 510 215" stroke="rgba(100,140,170,0.18)" stroke-width="32" fill="none" filter="url(#soft-l)"/>
+          <path d="M-10 260 Q80 248 180 262 Q270 275 370 255 Q440 242 510 258" stroke="rgba(90,125,155,0.13)" stroke-width="24" fill="none" filter="url(#soft-l)"/>
+          <path d="M228 318 Q224 295 227 275 Q229 260 232 250 Q234 244 237 240 Q240 236 244 238 Q248 240 247 248 Q246 256 244 265 Q241 280 243 300 Q244 315 240 330 Z" fill="#0e0607" opacity="0.85"/>
+          <ellipse cx="240" cy="232" rx="11" ry="12" fill="#100708" opacity="0.75"/>
+          <path d="M225 295 Q210 305 215 325 Q220 342 238 338 Q252 334 250 318 Q248 305 235 300 Z" fill="#110808" opacity="0.7"/>
+          <line x1="246" y1="260" x2="270" y2="310" stroke="#0e0607" stroke-width="3" opacity="0.65"/>
+          <circle cx="310" cy="285" r="1.8" fill="#e8803a" opacity="0.85"/>
+          <circle cx="328" cy="268" r="1.2" fill="#f09040" opacity="0.7"/>
+          <circle cx="345" cy="278" r="1.5" fill="#e06828" opacity="0.9"/>
+          <circle cx="295" cy="262" r="1"   fill="#d86020" opacity="0.6"/>
+          <circle cx="360" cy="260" r="0.9" fill="#f0a050" opacity="0.75"/>
+          <circle cx="338" cy="252" r="1.1" fill="#e87030" opacity="0.65"/>
+          <circle cx="320" cy="248" r="0.8" fill="#f08838" opacity="0.8"/>
+          <circle cx="60"  cy="60"  r="0.7" fill="rgba(230,210,180,0.5)"/>
+          <circle cx="130" cy="40"  r="0.5" fill="rgba(230,210,180,0.4)"/>
+          <circle cx="200" cy="80"  r="0.6" fill="rgba(230,210,180,0.3)"/>
+          <circle cx="310" cy="55"  r="0.8" fill="rgba(230,210,180,0.5)"/>
+          <circle cx="390" cy="35"  r="0.5" fill="rgba(230,210,180,0.35)"/>
+          <circle cx="450" cy="70"  r="0.7" fill="rgba(230,210,180,0.4)"/>
+          <text x="28"  y="458" font-family="Georgia, serif" font-style="italic" font-size="19" fill="#c4a07a" opacity="0.88" letter-spacing="0.5">Between the Fog</text>
+          <text x="28"  y="483" font-family="Georgia, serif" font-style="italic" font-size="19" fill="#c4a07a" opacity="0.88" letter-spacing="0.5">and the Fire</text>
+          <text x="480" y="30"  font-family="Georgia, serif" font-size="9.5" fill="#7a6050" opacity="0.75" text-anchor="end" letter-spacing="3.5">MARA VALE</text>
+          <rect x="14" y="14" width="472" height="472" fill="none" stroke="rgba(196,160,112,0.14)" stroke-width="1"/>
+          <rect x="19" y="19" width="462" height="462" fill="none" stroke="rgba(196,160,112,0.07)" stroke-width="0.5"/>
+        </svg>
+      </div>
+
+      <!-- Release info -->
+      <div class="release-info">
+        <div class="label pl pl-d1">New EP</div>
+        <h1 class="release-title pl pl-d2">Between the Fog<br>and the Fire</h1>
+        <p class="release-artist pl pl-d2">Mara Vale</p>
+
+        <p class="release-about pl pl-d3">Recorded over two days in a wood-heated cabin outside of Asheville, NC — no click track, no second takes. What you hear is what happened.</p>
+        <p class="release-about pl pl-d3" style="margin-top: 0.5rem;">Six songs about leaving, staying, and the hours that don't have names yet.</p>
+
+        <div class="release-meta pl pl-d3">
+          <div>Released &mdash; March 1, 2026</div>
+          <div>Format &mdash; Digital / Limited Vinyl (300 pressed)</div>
+          <div>Label &mdash; Self-Released</div>
+          <div>Recorded &mdash; Asheville, NC</div>
+        </div>
+
+        <!-- Streaming links -->
+        <div class="stream-links pl pl-d4" style="margin-bottom: 2.5rem;">
+          <a href="#" class="stream-btn" aria-label="Listen on Spotify">
+            <!-- Spotify icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M7 15.5C9.5 14 13.5 13.8 16.5 15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M6.5 12.5C9.5 10.5 14.5 10.2 18 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M6 9.5C9.5 7 15.5 6.8 19 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+            Spotify
+          </a>
+          <a href="#" class="stream-btn" aria-label="Listen on Bandcamp">
+            <!-- Bandcamp icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="2" y="2" width="20" height="20" rx="3" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M5 16l5-8h4l-5 8z" fill="currentColor" opacity="0.85"/>
+              <path d="M10 16l5-8h4l-5 8z" fill="currentColor" opacity="0.5"/>
+            </svg>
+            Bandcamp
+          </a>
+          <a href="#" class="stream-btn" aria-label="Listen on Apple Music">
+            <!-- Apple Music icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="12" cy="13" r="3.5" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M15.5 10V7l3-1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Apple Music
+          </a>
+          <a href="#" class="stream-btn" aria-label="Listen on YouTube Music">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="2" y="4" width="20" height="16" rx="4" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M10 9l5 3-5 3V9z" fill="currentColor" opacity="0.8"/>
+            </svg>
+            YouTube
+          </a>
+        </div>
+
+        <!-- Tracklist -->
+        <ul class="full-tracklist pl pl-d5" aria-label="Full tracklist">
+          <li>
+            <span class="tl-num">01</span>
+            <span class="tl-info">
+              <span class="tl-title">Kindling</span>
+            </span>
+            <span class="tl-dur">3:42</span>
+          </li>
+          <li>
+            <span class="tl-num">02</span>
+            <span class="tl-info">
+              <span class="tl-title">Glass Hour</span>
+            </span>
+            <span class="tl-dur">4:15</span>
+          </li>
+          <li>
+            <span class="tl-num">03</span>
+            <span class="tl-info">
+              <span class="tl-title">Saltwater Dark</span>
+              <span class="tl-note">Single</span>
+            </span>
+            <span class="tl-dur">5:08</span>
+          </li>
+          <li>
+            <span class="tl-num">04</span>
+            <span class="tl-info">
+              <span class="tl-title">Moth Season</span>
+            </span>
+            <span class="tl-dur">3:58</span>
+          </li>
+          <li>
+            <span class="tl-num">05</span>
+            <span class="tl-info">
+              <span class="tl-title">Almost Morning</span>
+            </span>
+            <span class="tl-dur">4:33</span>
+          </li>
+          <li>
+            <span class="tl-num">06</span>
+            <span class="tl-info">
+              <span class="tl-title">Between the Fog and the Fire</span>
+            </span>
+            <span class="tl-dur">6:21</span>
+          </li>
+        </ul>
+
+        <!-- Credits -->
+        <div class="credits pl pl-d6">
+          <h4>Credits</h4>
+          <p>
+            Mara Vale — vocals, acoustic guitar, piano<br>
+            Recorded &amp; mixed by Asha Hollis at Ridgeline Studio, Asheville NC<br>
+            Mastered by Tomás Reyes at The Well, Nashville TN<br>
+            Photography by Clare Duvall<br>
+            Artwork by Mara Vale
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pull quote -->
+    <div class="music-quote-banner reveal">
+      <blockquote>"Vale possesses the rare gift of making an entire room feel like a private conversation. Six songs. None of them overstay their welcome. All of them linger long after."</blockquote>
+      <cite>— No Depression</cite>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-logo">Mara Vale</div>
+    <ul class="footer-links">
+      <li><a href="music.html">Music</a></li>
+      <li><a href="tour.html">Tour</a></li>
+      <li><a href="merch.html">Merch</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+    <p class="footer-copy">&copy; 2026 Mara Vale. All rights reserved.</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

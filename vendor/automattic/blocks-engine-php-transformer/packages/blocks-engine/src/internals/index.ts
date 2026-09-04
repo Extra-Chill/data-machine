@@ -1,0 +1,21 @@
+export { isRawConvertible, UNWRAP_SELECTOR } from '../raw-convertible.js';
+export { escapeHtml, escapeHtmlAttr, escapeHtmlText } from '../escape.js';
+export { serializeBlockAttrs } from '../serialize.js';
+export { buildEmbedBlock, guessEmbedProvider } from '../embed.js';
+export { sanitize } from '../sanitize.js';
+export { blockMarkupRoundtrips, scanForInjection } from '../validate.js';
+export { validateBlockMarkup } from '../validate-block-markup.js';
+export { walkBlocks } from '../block-tree.js';
+export { validateBlockContract } from '../block-contract.js';
+export { verifyComposedOutput } from '../output-verify.js';
+export { heuristicBlocks } from '../heuristics.js';
+export { genericHtmlToBlocks } from '../catalog.js';
+export { composeFromRecipes } from '../recipe-table.js';
+export { PIPELINE_ISLAND_OPENER, PIPELINE_ISLAND_NAME } from '../block-policy.js';
+export { FALLBACK_INVENTORY_CAP } from '../report/schema.js';
+export { assertConvertReport } from '../report/contract.js';
+
+export type { VerifyResult } from '../output-verify.js';
+export type { HeuristicResult } from '../heuristics.js';
+export type { ParsedBlock } from '../block-tree.js';
+export type { BlockContractIssue } from '../block-contract.js';

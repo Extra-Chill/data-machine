@@ -1,0 +1,22 @@
+mara:
+  name: Mara Quintero
+  title: Principal Engineer, Storage
+  bio: >-
+    Mara has spent fifteen years building and breaking storage systems. She
+    writes Cold Start between on-call shifts and maintains an unhealthy
+    affection for write-ahead logs.
+  location: Lisbon, Portugal
+  links:
+    github: https://github.com/maraq
+    mastodon: https://hachyderm.io/@mara
+
+devin:
+  name: Devin Osei
+  title: Staff SRE
+  bio: >-
+    Devin keeps databases honest. Recovering Kubernetes operator, current
+    believer in boring infrastructure and very loud alerts.
+  location: Toronto, Canada
+  links:
+    github: https://github.com/devinosei
+    mastodon: https://hachyderm.io/@devin

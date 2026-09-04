@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Input · Halo UI</title>
+  <meta name="description" content="The Halo UI Input — a single-line text field. States, validation, props, and label association." />
+  <link rel="stylesheet" href="css/halo.css" />
+</head>
+<body>
+  <div class="sidebar-backdrop"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <a class="sidebar__brand" href="index.html">Halo&nbsp;UI</a>
+      <p class="sidebar__version">v2.4.0 · MIT · @halo-ui/react</p>
+      <nav class="nav-group" aria-label="Overview"><p class="nav-group__title">Overview</p><a class="nav-link" href="index.html">Halo UI</a></nav>
+      <nav class="nav-group" aria-label="Foundations"><p class="nav-group__title">Foundations</p><a class="nav-link" href="color.html">Color</a><a class="nav-link" href="typography.html">Typography</a></nav>
+      <nav class="nav-group" aria-label="Components"><p class="nav-group__title">Components</p><a class="nav-link" href="button.html">Button</a><a class="nav-link" href="input.html">Input</a><a class="nav-link" href="modal.html">Modal</a><a class="nav-link" href="card.html">Card</a></nav>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn mobile-nav-toggle" id="nav-toggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <span class="topbar__crumb">Components / <strong>Input</strong></span>
+        <span class="topbar__spacer"></span>
+        <button class="search-btn" data-palette-open aria-label="Search documentation"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><span class="search-btn__text">Search docs…</span><kbd>⌘K</kbd></button>
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle color theme"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke-linecap="round"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 14.5A8 8 0 119.5 4a6.5 6.5 0 0010.5 10.5z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/lumen-labs/halo-ui" target="_blank" rel="noopener" aria-label="GitHub repository"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0112 6.8c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.58.69.48A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"/></svg></a>
+      </header>
+
+      <article class="doc">
+        <header class="doc__header">
+          <p class="doc__eyebrow">Components</p>
+          <h1>Input</h1>
+          <p class="doc__lede">A single-line text field for collecting short, free-form values inside a form.</p>
+          <span class="badge badge--stable">stable</span>
+        </header>
+
+        <div class="doc__meta">
+          <span>Since <code>1.0.0</code></span>
+          <span>A11y: WCAG 2.2 AA · label + error association verified</span>
+          <span>Source: <code>packages/react/src/Input/Input.tsx</code></span>
+          <span><a href="https://www.figma.com/file/halo-ui/components" target="_blank" rel="noopener">Figma ↗</a></span>
+        </div>
+
+        <p><code>Input</code> is the workhorse form control for short text: names, emails, search terms, amounts. It always pairs with a visible <code>Label</code> — placeholder text is never a substitute for a label.</p>
+
+        <h2 id="anatomy">Anatomy</h2>
+        <p>A field is a <strong>label</strong>, the <strong>input box</strong>, and an optional <strong>hint</strong> or <strong>error</strong> message beneath it. The hint and error share one live region so only one shows at a time.</p>
+        <div class="code-preview">
+          <div class="code-preview__stage">
+            <div class="halo-field" style="max-width:340px;width:100%">
+              <label class="halo-label" for="demo-email">Work email</label>
+              <input id="demo-email" class="halo-input" type="email" placeholder="you@company.com" />
+              <p class="halo-hint">We'll only use this for billing receipts.</p>
+            </div>
+          </div>
+          <div class="code-preview__panel"><div class="code-preview__bar"><span class="code-preview__lang">html</span><button class="code-preview__copy" type="button">Copy</button></div>
+          <pre class="code-preview__code"><code><span class="tok-punc">&lt;</span><span class="tok-tag">div</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-field"</span><span class="tok-punc">&gt;</span>
+  <span class="tok-punc">&lt;</span><span class="tok-tag">label</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-label"</span> <span class="tok-attr">for</span>=<span class="tok-str">"email"</span><span class="tok-punc">&gt;</span>Work email<span class="tok-punc">&lt;/</span><span class="tok-tag">label</span><span class="tok-punc">&gt;</span>
+  <span class="tok-punc">&lt;</span><span class="tok-tag">input</span> <span class="tok-attr">id</span>=<span class="tok-str">"email"</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-input"</span> <span class="tok-attr">type</span>=<span class="tok-str">"email"</span>
+         <span class="tok-attr">placeholder</span>=<span class="tok-str">"you@company.com"</span> <span class="tok-punc">/&gt;</span>
+  <span class="tok-punc">&lt;</span><span class="tok-tag">p</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-hint"</span><span class="tok-punc">&gt;</span>We'll only use this for billing receipts.<span class="tok-punc">&lt;/</span><span class="tok-tag">p</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;/</span><span class="tok-tag">div</span><span class="tok-punc">&gt;</span></code></pre></div>
+        </div>
+
+        <h2 id="states">States</h2>
+        <p>Every input has resting, focus, filled, error, and disabled states. Error state sets <code>aria-invalid</code> and wires the message via <code>aria-describedby</code>.</p>
+        <div class="code-preview">
+          <div class="code-preview__stage">
+            <div class="preview-stack">
+              <input class="halo-input" placeholder="Resting" readonly />
+              <div class="halo-field"><input class="halo-input is-error" value="not-an-email" aria-invalid="true" aria-describedby="demo-err" readonly /><p id="demo-err" class="halo-error">Enter a valid email address.</p></div>
+              <input class="halo-input" value="Filled value" readonly />
+              <input class="halo-input" placeholder="Disabled" disabled />
+            </div>
+          </div>
+          <div class="code-preview__panel"><div class="code-preview__bar"><span class="code-preview__lang">html</span><button class="code-preview__copy" type="button">Copy</button></div>
+          <pre class="code-preview__code"><code><span class="tok-punc">&lt;</span><span class="tok-tag">input</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-input"</span> <span class="tok-attr">placeholder</span>=<span class="tok-str">"Resting"</span> <span class="tok-punc">/&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">input</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-input is-error"</span> <span class="tok-attr">aria-invalid</span>=<span class="tok-str">"true"</span> <span class="tok-punc">/&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">input</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-input"</span> <span class="tok-attr">value</span>=<span class="tok-str">"Filled value"</span> <span class="tok-punc">/&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">input</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-input"</span> <span class="tok-attr">placeholder</span>=<span class="tok-str">"Disabled"</span> <span class="tok-attr">disabled</span> <span class="tok-punc">/&gt;</span></code></pre></div>
+        </div>
+
+        <aside class="callout callout--warning" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 6v3.2M8 11v.4" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Placeholders aren't labels</p><div class="callout__content">Placeholder text disappears on focus and fails contrast at most browser defaults. Always render a persistent <code>&lt;label&gt;</code>; use the placeholder only for a format example like <code>MM / YY</code>.</div></div>
+        </aside>
+
+        <h2 id="props">Props</h2>
+        <div class="props-table-wrap" role="region" aria-label="Component props">
+          <table class="props-table">
+            <thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code class="prop-name">type</code></td><td><code class="prop-type">'text' | 'email' | 'password' | 'number' | 'search' | 'tel' | 'url'</code></td><td><code class="prop-default">'text'</code></td><td>Native input type; drives keyboard + validation.</td></tr>
+              <tr><td><code class="prop-name">size</code></td><td><code class="prop-type">'sm' | 'md' | 'lg'</code></td><td><code class="prop-default">'md'</code></td><td>Control height and font size.</td></tr>
+              <tr><td><code class="prop-name">invalid</code></td><td><code class="prop-type">boolean</code></td><td><code class="prop-default">false</code></td><td>Applies error styling and sets aria-invalid.</td></tr>
+              <tr><td><code class="prop-name">iconStart</code></td><td><code class="prop-type">ReactNode</code></td><td><span class="prop-empty">—</span></td><td>Leading adornment, e.g. a search glyph.</td></tr>
+              <tr><td><code class="prop-name">prefix</code></td><td><code class="prop-type">string</code></td><td><span class="prop-empty">—</span></td><td>Static text fused to the left, e.g. "https://".</td></tr>
+              <tr><td><code class="prop-name">disabled</code></td><td><code class="prop-type">boolean</code></td><td><code class="prop-default">false</code></td><td>Non-interactive, dimmed, removed from tab order.</td></tr>
+              <tr><td><code class="prop-name">required</code><span class="prop-required" title="Required">*</span></td><td><code class="prop-type">boolean</code></td><td><code class="prop-default">false</code></td><td>Marks the field required for native + ARIA validation.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="validation">Validation</h2>
+        <p>Validate on blur, not on every keystroke — interrupting someone mid-typing is hostile. Re-validate live only <em>after</em> the first error is shown.</p>
+        <div class="halo-codeblock"><div class="halo-codeblock__bar"><span class="halo-codeblock__lang">tsx</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="tok-key">import</span> { Input, Field } <span class="tok-key">from</span> <span class="tok-str">'@halo-ui/react'</span>
+
+<span class="tok-punc">&lt;</span><span class="tok-tag">Field</span>
+  <span class="tok-attr">label</span>=<span class="tok-str">"Work email"</span>
+  <span class="tok-attr">error</span>={touched &amp;&amp; !<span class="tok-fn">isValidEmail</span>(value) ? <span class="tok-str">'Enter a valid email.'</span> : undefined}
+<span class="tok-punc">&gt;</span>
+  <span class="tok-punc">&lt;</span><span class="tok-tag">Input</span> <span class="tok-attr">type</span>=<span class="tok-str">"email"</span> <span class="tok-attr">value</span>={value} <span class="tok-attr">onBlur</span>={() =&gt; <span class="tok-fn">setTouched</span>(<span class="tok-key">true</span>)} <span class="tok-punc">/&gt;</span>
+<span class="tok-punc">&lt;/</span><span class="tok-tag">Field</span><span class="tok-punc">&gt;</span></code></pre></div>
+
+        <h2 id="guidelines">Guidelines</h2>
+        <div class="dodont">
+          <div class="dodont__card dodont__card--do"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>Do</span><p>Size the field to its expected content — a 2-digit field shouldn't be 400px.</p></div>
+          <div class="dodont__card dodont__card--dont"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>Don't</span><p>Disable copy/paste on password or one-time-code fields.</p></div>
+        </div>
+
+        <h2 id="accessibility">Accessibility</h2>
+        <ul>
+          <li>The <code>&lt;label&gt;</code> is programmatically associated via <code>htmlFor</code> / <code>id</code>.</li>
+          <li>Errors use <code>aria-describedby</code> and a <code>role="alert"</code> live region so they're announced the moment they appear.</li>
+          <li>The focus ring matches the Button's <code>--halo-focus-ring</code> for a consistent, AA-contrast indicator.</li>
+          <li>Required fields are marked in the label text <em>and</em> with the <code>required</code> attribute — never with color alone.</li>
+        </ul>
+
+        <aside class="callout callout--info" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 5.5v.5" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Note</p><div class="callout__content">Need multi-line input? Use the <code>Textarea</code> component — it shares this field anatomy and styling.</div></div>
+        </aside>
+      </article>
+
+      <aside class="toc" aria-label="On this page">
+        <p class="toc__title">On this page</p>
+        <ul>
+          <li class="toc__item toc__item--h2"><a href="#anatomy">Anatomy</a></li>
+          <li class="toc__item toc__item--h2"><a href="#states">States</a></li>
+          <li class="toc__item toc__item--h2"><a href="#props">Props</a></li>
+          <li class="toc__item toc__item--h2"><a href="#validation">Validation</a></li>
+          <li class="toc__item toc__item--h2"><a href="#guidelines">Guidelines</a></li>
+          <li class="toc__item toc__item--h2"><a href="#accessibility">Accessibility</a></li>
+        </ul>
+      </aside>
+
+      <footer class="doc-footer">
+        <div>Halo UI v2.4.0 · MIT License · Built with Astro + MDX</div>
+        <div class="doc-footer__links"><a href="button.html">← Button</a><a href="modal.html">Modal →</a></div>
+      </footer>
+    </div>
+  </div>
+
+  <div class="palette-backdrop" id="palette">
+    <div class="palette" role="dialog" aria-label="Search documentation">
+      <div class="palette__input-wrap"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input class="palette__input" type="text" placeholder="Search components, tokens, foundations…" aria-label="Search" autocomplete="off" spellcheck="false" /></div>
+      <div class="palette__results"></div>
+      <div class="palette__hint"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+    </div>
+  </div>
+  <script src="js/halo.js"></script>
+</body>
+</html>

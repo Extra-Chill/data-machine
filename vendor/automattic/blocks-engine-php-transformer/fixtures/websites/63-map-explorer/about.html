@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Vaelora Atlas</title>
+  <meta name="description" content="About the Vaelora Atlas: the fictional archipelago it maps, and the hand-built vanilla-JS slippy-map explorer behind it — pan, zoom, layers, routing and search, no map libraries or tiles.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 10 L14 6 L22 10 L26 8 V24 L18 28 L10 24 L6 26 Z' fill='none' stroke='%2334d0c4' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='17' r='2' fill='%2334d0c4'/%3E%3C/svg%3E">
+</head>
+<body data-theme="dark">
+
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="Vaelora Atlas home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M6 10 L14 6 L22 10 L26 8 V24 L18 28 L10 24 L6 26 Z" fill="none" stroke="#34d0c4" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="16" cy="17" r="2" fill="#34d0c4"/>
+      </svg>
+      <span>
+        <span class="brand-name">Vaelora<b>Atlas</b></span><br>
+        <span class="brand-sub">Survey of the Archipelago</span>
+      </span>
+    </a>
+    <nav class="top-nav" aria-label="Primary">
+      <a href="index.html">Map</a>
+      <a href="gazetteer.html">Gazetteer</a>
+      <a href="about.html" class="active">About</a>
+    </nav>
+    <div class="top-spacer"></div>
+    <button class="ctrl" id="themeToggle" aria-label="Toggle colour theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      <span class="tlabel">Dark</span>
+    </button>
+  </header>
+
+  <div class="content-body">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <span class="eyebrow">About</span>
+        <h1>A republic of three islands, drawn by hand</h1>
+        <p>Vaelora is an invented archipelago nation in the warm northern sea. This atlas is a fully interactive map of it — and a small demonstration that a real pan-and-zoom mapping experience can be built from nothing but vanilla HTML, CSS and JavaScript.</p>
+      </div>
+
+      <section class="about-section">
+        <h2>The nation of Vaelora</h2>
+        <p>Vaelora spans three islands. <b>Maelan</b>, the largest, holds four of the six provinces: the terraced vineyards of <b>Sundermark</b>, the harbour metropolis of <b>Aevenport</b>, the reed-marshes of <b>Morrowfen</b>, and the rain-soaked western forests of <b>Kelvarne</b>. Off the south-east lies the young volcanic island of <b>Taleth</b>, crowned by smoking Mount Vey; and far to the north, the windswept skerries of <b>Orrin Holm</b> guard the approaches with a single iron lighthouse.</p>
+        <p>The republic is stitched together by the <b>Vaeloran Tramway</b> — three coloured lines (Amber, Teal and Violet) meeting at Aeven Quay — and the old <b>Coast Highway</b>, Route 1, which runs the length of Maelan. None of these places exist; every coastline, river, road and station below was drawn coordinate by coordinate.</p>
+
+        <svg class="about-map" id="aboutMap" viewBox="0 0 1000 700" role="img" aria-label="Overview map of the Vaeloran archipelago"></svg>
+      </section>
+
+      <section class="about-section">
+        <h2>The map engine</h2>
+        <p>The explorer is a genuine "slippy map" with no Leaflet, Mapbox, D3 or tiles of any kind. The world is a fixed 1000×700 coordinate space; the camera is described by a view rectangle that becomes the SVG <span class="kbd">viewBox</span>, so the browser maps world coordinates to the screen for us while panning and zooming stay mathematically exact.</p>
+        <ul class="feat">
+          <li><b>Pan &amp; zoom</b><span>Pointer-drag to pan; wheel / pinch to zoom centred on the cursor; double-click to zoom in. The view is clamped to bounds and a min/max zoom.</span></li>
+          <li><b>Toggleable layers</b><span>Regions, water, roads, the tramway, points of interest, labels and a coordinate grid can each be shown or hidden independently.</span></li>
+          <li><b>Decluttered labels</b><span>Labels appear by zoom level and are removed by screen-space collision so the map never overcrowds.</span></li>
+          <li><b>Hit-testing</b><span>Custom point-in-polygon and nearest-point tests power hover highlighting, tooltips and click-to-select — no invisible DOM overlays.</span></li>
+          <li><b>Route planner</b><span>Pick two tram stations and Dijkstra's algorithm walks the line graph to draw the shortest path, with distance, stop count and interchanges.</span></li>
+          <li><b>Search &amp; fly-to</b><span>A filterable list of every place animates the camera to the selection with an eased fly-to.</span></li>
+          <li><b>Minimap &amp; scale</b><span>An overview inset shows the live viewport rectangle; a scale bar and lat/long readout track the cursor.</span></li>
+          <li><b>Persistence</b><span>Your theme, layer choices and last viewport are saved to <span class="kbd">localStorage</span> and restored on return.</span></li>
+        </ul>
+      </section>
+
+      <section class="about-section">
+        <h2>Vaelora by the numbers</h2>
+        <div class="fact-grid">
+          <div class="fact"><div class="fv" id="factPop">—</div><div class="fk">total population</div></div>
+          <div class="fact"><div class="fv">6</div><div class="fk">regions</div></div>
+          <div class="fact"><div class="fv">3</div><div class="fk">islands</div></div>
+          <div class="fact"><div class="fv" id="factStations">—</div><div class="fk">tram stations</div></div>
+          <div class="fact"><div class="fv">3</div><div class="fk">tram lines</div></div>
+          <div class="fact"><div class="fv">~120</div><div class="fk">km, east to west</div></div>
+        </div>
+      </section>
+
+      <section class="about-section">
+        <h2>Controls</h2>
+        <ul class="feat">
+          <li><b>Mouse / touch</b><span>Drag to pan · wheel or pinch to zoom · double-click to zoom in (shift double-click to zoom out) · click a feature for details.</span></li>
+          <li><b>Keyboard</b><span><span class="kbd">↑↓←→</span> pan · <span class="kbd">+</span> / <span class="kbd">−</span> zoom · <span class="kbd">0</span> fit · <span class="kbd">Esc</span> close panel · <span class="kbd">Enter</span> on a focused feature opens it.</span></li>
+          <li><b>Minimap</b><span>Click or drag inside the overview inset to recenter the main map.</span></li>
+        </ul>
+        <p><a class="gc-cta" href="index.html" style="font-size:14px">Open the map &nbsp;→</a></p>
+      </section>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/render.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const STORE = 'vaelora.state.v1', D = window.VAELORA;
+    function readTheme(){ try { return (JSON.parse(localStorage.getItem(STORE)||'{}').theme)||'dark'; } catch(e){ return 'dark'; } }
+    function writeTheme(t){ try { const s=JSON.parse(localStorage.getItem(STORE)||'{}'); s.theme=t; localStorage.setItem(STORE,JSON.stringify(s)); } catch(e){} }
+    function applyTheme(t){ document.body.setAttribute('data-theme',t); writeTheme(t); const l=document.querySelector('#themeToggle .tlabel'); if(l) l.textContent = t==='dark'?'Dark':'Light'; }
+    applyTheme(readTheme());
+    document.getElementById('themeToggle').addEventListener('click', ()=> applyTheme(document.body.getAttribute('data-theme')==='dark'?'light':'dark'));
+
+    // static overview map (reuse the renderer, no interaction)
+    window.MapRenderer(document.getElementById('aboutMap'));
+
+    // facts
+    const pop = D.regions.reduce((s,r)=>s+r.pop,0);
+    document.getElementById('factPop').textContent = (pop/1000000).toFixed(2) + 'M';
+    document.getElementById('factStations').textContent = D.stations.length;
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mara Vale — Eval Artist Music</title>
+  <meta name="description" content="Mara Vale is an independent singer-songwriter. New EP 'Between the Fog and the Fire' — out now.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400;1,600;1,700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&family=Courier+Prime:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ── Hero ─────────────────────────────────────────────── */
+    .hero {
+      min-height: calc(100svh - var(--nav-h));
+      display: flex;
+      align-items: center;
+      padding: 4rem var(--pad) 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .hero-label { margin-bottom: 1.6rem; }
+
+    .hero-name {
+      font-family: var(--font-display);
+      font-size: clamp(5rem, 13vw, 13rem);
+      font-weight: 700;
+      font-style: italic;
+      line-height: 0.92;
+      letter-spacing: -0.02em;
+      color: var(--bone);
+      margin-bottom: 2rem;
+    }
+
+    .hero-ep {
+      font-family: var(--font-display);
+      font-size: clamp(1.2rem, 2.2vw, 1.8rem);
+      font-style: italic;
+      color: var(--bone-dim);
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.01em;
+    }
+
+    .hero-sub {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--fog);
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    /* EP cover art */
+    .hero-art {
+      position: relative;
+    }
+
+    .ep-cover {
+      width: 100%;
+      max-width: 380px;
+      aspect-ratio: 1;
+      display: block;
+      box-shadow:
+        0 0 80px rgba(184, 85, 42, 0.2),
+        0 40px 80px rgba(0,0,0,0.6);
+    }
+
+    /* Decorative vertical rule left of name */
+    .hero-text {
+      position: relative;
+    }
+
+    /* Scroll indicator */
+    .scroll-hint {
+      position: absolute;
+      bottom: 2.5rem;
+      left: var(--pad);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--fog);
+      opacity: 0;
+      animation: fadeUp 1s var(--ease-expo) 1.1s forwards;
+    }
+    .scroll-hint::before {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 36px;
+      background: linear-gradient(to bottom, transparent, var(--fog));
+    }
+
+    /* ── Press quote ──────────────────────────────────────── */
+    .press-section {
+      padding: 5rem var(--pad);
+      border-top: 1px solid rgba(230, 216, 197, 0.07);
+      border-bottom: 1px solid rgba(230, 216, 197, 0.07);
+      background: rgba(184, 85, 42, 0.03);
+    }
+
+    .press-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .press-quote {
+      font-family: var(--font-display);
+      font-size: clamp(1.5rem, 3.5vw, 2.8rem);
+      font-style: italic;
+      font-weight: 300;
+      color: var(--bone);
+      line-height: 1.35;
+      margin-bottom: 1.75rem;
+      position: relative;
+    }
+
+    .press-quote::before {
+      content: '\201C';
+      position: absolute;
+      top: -0.5rem;
+      left: -0.5rem;
+      font-size: 6rem;
+      color: var(--ember);
+      opacity: 0.2;
+      font-family: var(--font-display);
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .press-source {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--fog);
+    }
+    .press-source em {
+      font-style: italic;
+      color: var(--bone-dim);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    /* ── Tour Preview ─────────────────────────────────────── */
+    .tour-preview {
+      padding: 5rem var(--pad);
+    }
+    .tour-preview-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+    }
+    .section-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 2rem;
+      margin-bottom: 3rem;
+      flex-wrap: wrap;
+    }
+
+    .tour-row-preview {
+      display: grid;
+      grid-template-columns: 90px 1fr auto;
+      align-items: center;
+      gap: 2rem;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid rgba(230, 216, 197, 0.08);
+      transition: background 0.2s ease;
+    }
+    .tour-row-preview:hover {
+      background: rgba(230, 216, 197, 0.02);
+    }
+
+    .tour-date-block {
+      font-family: var(--font-mono);
+      text-align: right;
+    }
+    .tour-date-block .month {
+      display: block;
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ember);
+    }
+    .tour-date-block .day {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 2.2rem;
+      font-style: italic;
+      color: var(--bone);
+      line-height: 1;
+    }
+
+    .tour-venue-info .city {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-style: italic;
+      color: var(--bone);
+    }
+    .tour-venue-info .venue {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--fog);
+      margin-top: 0.15rem;
+    }
+
+    /* ── EP Teaser ────────────────────────────────────────── */
+    .ep-teaser {
+      padding: 5rem var(--pad);
+      background: rgba(0,0,0,0.2);
+      border-top: 1px solid rgba(230, 216, 197, 0.06);
+    }
+    .ep-teaser-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 5rem;
+      align-items: start;
+    }
+
+    .ep-cover-sm {
+      width: 100%;
+      aspect-ratio: 1;
+      display: block;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(184,85,42,0.1);
+    }
+
+    .tracklist {
+      list-style: none;
+      margin-top: 1rem;
+    }
+    .tracklist li {
+      display: flex;
+      align-items: baseline;
+      gap: 1.25rem;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid rgba(230, 216, 197, 0.07);
+      transition: border-color 0.2s ease;
+    }
+    .tracklist li:hover { border-color: rgba(230, 216, 197, 0.2); }
+    .tracklist li:last-child { border-bottom: none; }
+
+    .track-num {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--fog);
+      min-width: 1.5rem;
+      letter-spacing: 0.08em;
+    }
+    .track-title {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-style: italic;
+      color: var(--bone);
+      flex: 1;
+    }
+    .track-dur {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      color: var(--fog);
+      letter-spacing: 0.08em;
+    }
+
+    .ep-meta {
+      margin-top: 2rem;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--fog);
+      line-height: 2;
+    }
+
+    /* ── Newsletter ───────────────────────────────────────── */
+    .newsletter-section {
+      padding: 5rem var(--pad) 6rem;
+      border-top: 1px solid rgba(230, 216, 197, 0.07);
+    }
+    .newsletter-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+    .newsletter-inner h2 {
+      font-style: italic;
+      margin-bottom: 0.75rem;
+    }
+    .newsletter-inner p {
+      color: var(--bone-dim);
+      font-style: italic;
+      margin-bottom: 0;
+      font-size: 1.05rem;
+    }
+    .newsletter-right p.fine-print {
+      margin-top: 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--fog);
+      font-style: normal;
+      max-width: 100%;
+    }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 1024px) {
+      .hero-inner { grid-template-columns: 1fr 300px; gap: 3rem; }
+      .ep-teaser-inner { grid-template-columns: 200px 1fr; gap: 3rem; }
+    }
+
+    @media (max-width: 768px) {
+      .hero-inner {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+      }
+      .hero-art { order: -1; max-width: 260px; margin: 0 auto; }
+      .ep-cover  { max-width: 260px; }
+      .hero-name { font-size: clamp(4rem, 18vw, 7rem); }
+
+      .tour-row-preview { grid-template-columns: 70px 1fr; }
+      .tour-row-preview .btn { display: none; }
+
+      .ep-teaser-inner {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+      }
+      .ep-cover-sm { max-width: 220px; }
+
+      .newsletter-inner { grid-template-columns: 1fr; gap: 2rem; }
+
+      .scroll-hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-bg" aria-hidden="true"></div>
+
+  <!-- Navigation -->
+  <nav class="site-nav" role="navigation" aria-label="Main navigation">
+    <a href="index.html" class="nav-logo">Mara <em>Vale</em></a>
+    <ul class="nav-links">
+      <li><a href="index.html" class="active">Home</a></li>
+      <li><a href="music.html">Music</a></li>
+      <li><a href="tour.html">Tour</a></li>
+      <li><a href="merch.html">Merch</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <ul class="nav-mobile" aria-label="Mobile navigation">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="music.html">Music</a></li>
+    <li><a href="tour.html">Tour</a></li>
+    <li><a href="merch.html">Merch</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero" aria-label="Artist introduction">
+      <div class="hero-inner">
+        <div class="hero-text">
+          <div class="label hero-label pl pl-d1">New EP — Out Now</div>
+          <h1 class="hero-name pl pl-d2">Mara<br>Vale</h1>
+          <p class="hero-ep pl pl-d3">Between the Fog<br>and the Fire</p>
+          <p class="hero-sub pl pl-d4">6 tracks &nbsp;·&nbsp; Recorded in Asheville, NC</p>
+          <div class="hero-ctas pl pl-d5">
+            <a href="music.html" class="btn btn-primary"><span>Listen Now</span></a>
+            <a href="tour.html" class="btn btn-secondary"><span>Tour Dates</span></a>
+          </div>
+        </div>
+
+        <!-- EP Cover Art — inline SVG -->
+        <div class="hero-art pl pl-d4">
+          <svg class="ep-cover" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Between the Fog and the Fire — EP cover art">
+            <defs>
+              <linearGradient id="bg-h" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#1c0e0a"/>
+                <stop offset="60%" stop-color="#130809"/>
+                <stop offset="100%" stop-color="#0a0507"/>
+              </linearGradient>
+              <radialGradient id="fire-h" cx="68%" cy="65%" r="55%">
+                <stop offset="0%"   stop-color="#c4581a" stop-opacity="0.7"/>
+                <stop offset="40%"  stop-color="#8b3210" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#c4581a" stop-opacity="0"/>
+              </radialGradient>
+              <radialGradient id="fog-h" cx="32%" cy="38%" r="48%">
+                <stop offset="0%"   stop-color="#4a6a84" stop-opacity="0.45"/>
+                <stop offset="60%"  stop-color="#2a4055" stop-opacity="0.2"/>
+                <stop offset="100%" stop-color="#4a6a84" stop-opacity="0"/>
+              </radialGradient>
+              <radialGradient id="ember-center-h" cx="50%" cy="52%" r="30%">
+                <stop offset="0%"   stop-color="#e8702a" stop-opacity="0.12"/>
+                <stop offset="100%" stop-color="#e8702a" stop-opacity="0"/>
+              </radialGradient>
+              <filter id="glow-h" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="18" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <filter id="soft-h">
+                <feGaussianBlur stdDeviation="8"/>
+              </filter>
+              <filter id="verysft-h">
+                <feGaussianBlur stdDeviation="22"/>
+              </filter>
+            </defs>
+
+            <!-- Background -->
+            <rect width="500" height="500" fill="url(#bg-h)"/>
+
+            <!-- Atmosphere layers -->
+            <ellipse cx="160" cy="190" rx="220" ry="170" fill="url(#fog-h)" filter="url(#verysft-h)"/>
+            <ellipse cx="340" cy="310" rx="240" ry="200" fill="url(#fire-h)" filter="url(#verysft-h)"/>
+            <ellipse cx="250" cy="260" rx="120" ry="100" fill="url(#ember-center-h)"/>
+
+            <!-- Horizon / landscape silhouette -->
+            <path d="M0 340 Q30 300 65 320 Q90 300 120 280 Q145 260 175 295 Q200 315 230 270 Q255 235 285 260 Q310 280 335 255 Q360 230 390 250 Q415 265 440 235 Q465 210 500 228 L500 500 L0 500 Z"
+                  fill="#160b09" opacity="0.96"/>
+            <path d="M0 380 Q40 355 80 368 Q110 358 145 372 Q175 365 210 380 Q240 388 275 375 Q305 365 340 378 Q370 368 405 380 Q440 370 470 378 L500 376 L500 500 L0 500 Z"
+                  fill="#100708" opacity="0.98"/>
+
+            <!-- Fog wisps (horizontal strokes) -->
+            <path d="M-10 220 Q70 210 160 225 Q250 240 340 218 Q420 200 510 215"
+                  stroke="rgba(100,140,170,0.18)" stroke-width="32" fill="none" filter="url(#soft-h)"/>
+            <path d="M-10 260 Q80 248 180 262 Q270 275 370 255 Q440 242 510 258"
+                  stroke="rgba(90,125,155,0.13)" stroke-width="24" fill="none" filter="url(#soft-h)"/>
+            <path d="M-10 190 Q60 182 140 192 Q200 200 280 185 Q350 172 510 188"
+                  stroke="rgba(110,150,180,0.1)" stroke-width="18" fill="none" filter="url(#soft-h)"/>
+
+            <!-- Seated figure silhouette -->
+            <!-- Body -->
+            <path d="M228 318 Q224 295 227 275 Q229 260 232 250 Q234 244 237 240 Q240 236 244 238 Q248 240 247 248 Q246 256 244 265 Q241 280 243 300 Q244 315 240 330 Z"
+                  fill="#0e0607" opacity="0.85"/>
+            <!-- Head -->
+            <ellipse cx="240" cy="232" rx="11" ry="12" fill="#100708" opacity="0.75"/>
+            <!-- Guitar suggestion (arc) -->
+            <path d="M225 295 Q210 305 215 325 Q220 342 238 338 Q252 334 250 318 Q248 305 235 300 Z"
+                  fill="#110808" opacity="0.7"/>
+            <!-- Guitar neck -->
+            <line x1="246" y1="260" x2="270" y2="310" stroke="#0e0607" stroke-width="3" opacity="0.65"/>
+
+            <!-- Embers / sparks -->
+            <circle cx="310" cy="285" r="1.8" fill="#e8803a" opacity="0.85"/>
+            <circle cx="328" cy="268" r="1.2" fill="#f09040" opacity="0.7"/>
+            <circle cx="345" cy="278" r="1.5" fill="#e06828" opacity="0.9"/>
+            <circle cx="295" cy="262" r="1" fill="#d86020" opacity="0.6"/>
+            <circle cx="360" cy="260" r="0.9" fill="#f0a050" opacity="0.75"/>
+            <circle cx="338" cy="252" r="1.1" fill="#e87030" opacity="0.65"/>
+            <circle cx="320" cy="248" r="0.8" fill="#f08838" opacity="0.8"/>
+
+            <!-- Stars/dust (upper portion) -->
+            <circle cx="60"  cy="60"  r="0.7" fill="rgba(230,210,180,0.5)"/>
+            <circle cx="130" cy="40"  r="0.5" fill="rgba(230,210,180,0.4)"/>
+            <circle cx="200" cy="80"  r="0.6" fill="rgba(230,210,180,0.3)"/>
+            <circle cx="310" cy="55"  r="0.8" fill="rgba(230,210,180,0.5)"/>
+            <circle cx="390" cy="35"  r="0.5" fill="rgba(230,210,180,0.35)"/>
+            <circle cx="450" cy="70"  r="0.7" fill="rgba(230,210,180,0.4)"/>
+            <circle cx="80"  cy="120" r="0.4" fill="rgba(230,210,180,0.3)"/>
+            <circle cx="420" cy="100" r="0.5" fill="rgba(230,210,180,0.35)"/>
+
+            <!-- Text: EP title -->
+            <text x="28" y="458" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="19" fill="#c4a07a" opacity="0.88" letter-spacing="0.5">Between the Fog</text>
+            <text x="28" y="483" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="19" fill="#c4a07a" opacity="0.88" letter-spacing="0.5">and the Fire</text>
+
+            <!-- Artist name top -->
+            <text x="480" y="30" font-family="Georgia, 'Times New Roman', serif" font-size="9.5" fill="#7a6050" opacity="0.75" text-anchor="end" letter-spacing="3.5">MARA VALE</text>
+
+            <!-- Decorative border -->
+            <rect x="14" y="14" width="472" height="472" fill="none" stroke="rgba(196,160,112,0.14)" stroke-width="1"/>
+            <rect x="19" y="19" width="462" height="462" fill="none" stroke="rgba(196,160,112,0.07)" stroke-width="0.5"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="scroll-hint" aria-hidden="true">Scroll</div>
+    </section>
+
+    <!-- Press Quote -->
+    <section class="press-section" aria-label="Press">
+      <div class="press-inner">
+        <blockquote class="press-quote reveal">
+          Mara Vale sings like she's remembering something you've already forgotten. Devastating and necessary.
+        </blockquote>
+        <p class="press-source reveal reveal-d1">— <em>The Fader</em></p>
+      </div>
+    </section>
+
+    <!-- Tour Preview -->
+    <section class="tour-preview" aria-label="Upcoming shows">
+      <div class="tour-preview-inner">
+        <div class="section-header reveal">
+          <div>
+            <div class="label" style="margin-bottom: 1rem;">On the Road</div>
+            <h2 style="font-style:italic;">Upcoming<br>Shows</h2>
+          </div>
+          <a href="tour.html" class="btn btn-secondary" style="align-self:flex-end;"><span>All Dates</span></a>
+        </div>
+
+        <div class="tour-row-preview reveal reveal-d1">
+          <div class="tour-date-block">
+            <span class="month">Mar</span>
+            <span class="day">8</span>
+          </div>
+          <div class="tour-venue-info">
+            <div class="city">Portland, OR</div>
+            <div class="venue">The Moth House</div>
+          </div>
+          <a href="tour.html" class="btn btn-secondary btn-sm"><span>Tickets</span></a>
+        </div>
+
+        <div class="tour-row-preview reveal reveal-d2">
+          <div class="tour-date-block">
+            <span class="month">Mar</span>
+            <span class="day">12</span>
+          </div>
+          <div class="tour-venue-info">
+            <div class="city">Seattle, WA</div>
+            <div class="venue">Typewriter Records Listening Room</div>
+          </div>
+          <a href="tour.html" class="btn btn-secondary btn-sm"><span>Tickets</span></a>
+        </div>
+
+        <div class="tour-row-preview reveal reveal-d3">
+          <div class="tour-date-block">
+            <span class="month">Mar</span>
+            <span class="day">16</span>
+          </div>
+          <div class="tour-venue-info">
+            <div class="city">San Francisco, CA</div>
+            <div class="venue">The Parlour</div>
+          </div>
+          <a href="tour.html" class="btn btn-secondary btn-sm"><span>Tickets</span></a>
+        </div>
+
+        <div style="margin-top:2rem;" class="reveal reveal-d4">
+          <a href="tour.html" class="btn btn-primary"><span>View All 5 Dates</span></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- EP Teaser -->
+    <section class="ep-teaser" aria-label="New release">
+      <div class="ep-teaser-inner">
+        <!-- Smaller cover -->
+        <div class="reveal">
+          <svg class="ep-cover-sm" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EP cover art — Between the Fog and the Fire">
+            <defs>
+              <linearGradient id="bg-s" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#1c0e0a"/>
+                <stop offset="100%" stop-color="#0a0507"/>
+              </linearGradient>
+              <radialGradient id="fire-s" cx="68%" cy="65%" r="55%">
+                <stop offset="0%"   stop-color="#c4581a" stop-opacity="0.7"/>
+                <stop offset="100%" stop-color="#c4581a" stop-opacity="0"/>
+              </radialGradient>
+              <radialGradient id="fog-s" cx="32%" cy="38%" r="48%">
+                <stop offset="0%"   stop-color="#4a6a84" stop-opacity="0.45"/>
+                <stop offset="100%" stop-color="#4a6a84" stop-opacity="0"/>
+              </radialGradient>
+              <filter id="vsoft-s"><feGaussianBlur stdDeviation="22"/></filter>
+              <filter id="soft-s"><feGaussianBlur stdDeviation="8"/></filter>
+            </defs>
+            <rect width="500" height="500" fill="url(#bg-s)"/>
+            <ellipse cx="160" cy="190" rx="220" ry="170" fill="url(#fog-s)" filter="url(#vsoft-s)"/>
+            <ellipse cx="340" cy="310" rx="240" ry="200" fill="url(#fire-s)" filter="url(#vsoft-s)"/>
+            <path d="M0 340 Q30 300 65 320 Q90 300 120 280 Q145 260 175 295 Q200 315 230 270 Q255 235 285 260 Q310 280 335 255 Q360 230 390 250 Q415 265 440 235 Q465 210 500 228 L500 500 L0 500 Z" fill="#160b09" opacity="0.96"/>
+            <path d="M0 380 Q40 355 80 368 Q110 358 145 372 Q175 365 210 380 Q240 388 275 375 Q305 365 340 378 Q370 368 405 380 L500 376 L500 500 L0 500 Z" fill="#100708" opacity="0.98"/>
+            <path d="M-10 220 Q70 210 160 225 Q250 240 340 218 Q420 200 510 215" stroke="rgba(100,140,170,0.18)" stroke-width="32" fill="none" filter="url(#soft-s)"/>
+            <path d="M228 318 Q224 295 227 275 Q229 260 232 250 Q234 244 237 240 Q240 236 244 238 Q247 240 247 248 Q246 256 244 265 Q241 280 243 300 Q244 315 240 330 Z" fill="#0e0607" opacity="0.85"/>
+            <ellipse cx="240" cy="232" rx="11" ry="12" fill="#100708" opacity="0.75"/>
+            <circle cx="310" cy="285" r="1.8" fill="#e8803a" opacity="0.85"/>
+            <circle cx="328" cy="268" r="1.2" fill="#f09040" opacity="0.7"/>
+            <circle cx="345" cy="278" r="1.5" fill="#e06828" opacity="0.9"/>
+            <text x="28" y="458" font-family="Georgia, serif" font-style="italic" font-size="19" fill="#c4a07a" opacity="0.88" letter-spacing="0.5">Between the Fog</text>
+            <text x="28" y="483" font-family="Georgia, serif" font-style="italic" font-size="19" fill="#c4a07a" opacity="0.88" letter-spacing="0.5">and the Fire</text>
+            <text x="480" y="30" font-family="Georgia, serif" font-size="9.5" fill="#7a6050" opacity="0.75" text-anchor="end" letter-spacing="3.5">MARA VALE</text>
+            <rect x="14" y="14" width="472" height="472" fill="none" stroke="rgba(196,160,112,0.14)" stroke-width="1"/>
+          </svg>
+        </div>
+
+        <div>
+          <div class="label reveal" style="margin-bottom: 1.25rem;">New EP</div>
+          <h2 class="reveal reveal-d1" style="font-style:italic; margin-bottom: 0.5rem;">Between the Fog<br>and the Fire</h2>
+          <p class="reveal reveal-d2" style="color: var(--bone-dim); font-style: italic; margin-bottom: 0.35rem; margin-top: 0.5rem;">Recorded in two days in a wood-heated cabin outside of Asheville, NC.</p>
+          <p class="reveal reveal-d2" style="color: var(--fog); font-size: 0.9rem; margin-bottom: 2rem;">No click track. No second takes. What you hear is what happened.</p>
+
+          <ul class="tracklist reveal reveal-d3" aria-label="Tracklist">
+            <li>
+              <span class="track-num">01</span>
+              <span class="track-title">Kindling</span>
+              <span class="track-dur">3:42</span>
+            </li>
+            <li>
+              <span class="track-num">02</span>
+              <span class="track-title">Glass Hour</span>
+              <span class="track-dur">4:15</span>
+            </li>
+            <li>
+              <span class="track-num">03</span>
+              <span class="track-title">Saltwater Dark</span>
+              <span class="track-dur">5:08</span>
+            </li>
+            <li>
+              <span class="track-num">04</span>
+              <span class="track-title">Moth Season</span>
+              <span class="track-dur">3:58</span>
+            </li>
+            <li>
+              <span class="track-num">05</span>
+              <span class="track-title">Almost Morning</span>
+              <span class="track-dur">4:33</span>
+            </li>
+            <li>
+              <span class="track-num">06</span>
+              <span class="track-title">Between the Fog and the Fire</span>
+              <span class="track-dur">6:21</span>
+            </li>
+          </ul>
+
+          <div class="reveal reveal-d4" style="margin-top:2.5rem;">
+            <a href="music.html" class="btn btn-primary" style="margin-right: 1rem;"><span>Full Release Page</span></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Newsletter -->
+    <section class="newsletter-section" aria-label="Newsletter signup">
+      <div class="newsletter-inner">
+        <div class="reveal">
+          <div class="label" style="margin-bottom: 1.25rem;">Stay Close</div>
+          <h2 style="font-style: italic;">Get the word<br>before it's out.</h2>
+          <p style="margin-top: 1rem;">New music, tour announcements, and notes from the road — direct to your inbox. No noise.</p>
+        </div>
+        <div class="newsletter-right reveal reveal-d2">
+          <form class="newsletter-form" action="#" method="post" novalidate>
+            <input type="email" name="email" placeholder="your@email.com" autocomplete="email" required aria-label="Email address">
+            <button type="submit">Subscribe</button>
+          </form>
+          <p class="fine-print">No spam. Unsubscribe anytime.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-logo">Mara Vale</div>
+    <ul class="footer-links">
+      <li><a href="music.html">Music</a></li>
+      <li><a href="tour.html">Tour</a></li>
+      <li><a href="merch.html">Merch</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+    <p class="footer-copy">&copy; 2026 Mara Vale. All rights reserved.</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

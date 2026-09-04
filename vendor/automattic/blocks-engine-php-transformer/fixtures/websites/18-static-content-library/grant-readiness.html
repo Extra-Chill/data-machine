@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grant Readiness Guide — Civic Signal</title>
+  <meta name="description" content="Six-section guide to landing your first neighborhood grant: organizational foundations, funder research, building your case, proposal writing, funder relationships, and a grant calendar template.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .grant-header {
+      background: var(--forest);
+      padding-block: clamp(var(--sp-12), 6vw, var(--sp-20));
+      position: relative;
+      overflow: hidden;
+    }
+    .grant-header::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(245,240,232,0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .grant-header-inner { position: relative; z-index: 1; }
+    .grant-header h1 { color: var(--cream); margin-bottom: var(--sp-4); font-size: clamp(var(--text-3xl), 5vw, var(--text-5xl)); }
+    .grant-header p { color: rgba(245,240,232,0.72); font-size: var(--text-lg); max-width: 600px; }
+
+    /* Readiness checklist widget */
+    .readiness-check {
+      background: var(--paper);
+      border: var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--sp-5);
+      margin-bottom: var(--sp-6);
+    }
+    .readiness-check-title {
+      font-family: var(--font-ui);
+      font-size: var(--text-xs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: var(--sp-4);
+      padding-bottom: var(--sp-3);
+      border-bottom: var(--border);
+    }
+    .rc-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--sp-3);
+      padding: var(--sp-3) 0;
+      border-bottom: 1px solid var(--sand);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+    }
+    .rc-item:last-child { border-bottom: none; }
+    .rc-yes { color: var(--forest-mid); flex-shrink: 0; margin-top: 1px; }
+    .rc-maybe { color: var(--gold); flex-shrink: 0; margin-top: 1px; }
+    .rc-no { color: var(--amber); flex-shrink: 0; margin-top: 1px; }
+
+    /* Section anchors */
+    .guide-section {
+      padding-top: var(--sp-8);
+      margin-bottom: var(--sp-10);
+    }
+
+    .guide-section h2 {
+      padding-bottom: var(--sp-4);
+      border-bottom: 2px solid var(--forest);
+      margin-bottom: var(--sp-6);
+    }
+
+    /* Funder research matrix */
+    .funder-matrix {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--text-sm);
+      margin: var(--sp-6) 0;
+    }
+    .funder-matrix th {
+      background: var(--forest);
+      color: var(--cream);
+      padding: var(--sp-3) var(--sp-4);
+      text-align: left;
+      font-family: var(--font-ui);
+      font-size: var(--text-xs);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .funder-matrix td {
+      padding: var(--sp-3) var(--sp-4);
+      border-bottom: var(--border);
+      vertical-align: top;
+      color: var(--ink-light);
+      line-height: 1.5;
+    }
+    .funder-matrix tr:last-child td { border-bottom: none; }
+    .funder-matrix tr:nth-child(even) td { background: var(--cream); }
+
+    /* Grant calendar */
+    .grant-calendar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--sp-4);
+      margin: var(--sp-6) 0;
+    }
+    .gc-quarter {
+      background: var(--paper);
+      border: var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--sp-4);
+    }
+    .gc-quarter-label {
+      font-family: var(--font-ui);
+      font-size: var(--text-xs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: var(--sp-3);
+      padding-bottom: var(--sp-2);
+      border-bottom: 2px solid var(--amber);
+    }
+    .gc-item {
+      font-size: var(--text-sm);
+      color: var(--ink-light);
+      line-height: 1.5;
+      padding: var(--sp-2) 0;
+      border-bottom: 1px solid var(--sand);
+    }
+    .gc-item:last-child { border-bottom: none; }
+    .gc-item-label {
+      font-family: var(--font-ui);
+      font-size: var(--text-xs);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    @media (max-width: 900px) {
+      .grant-calendar { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .grant-calendar { grid-template-columns: 1fr; }
+      .funder-matrix { font-size: var(--text-xs); }
+      .funder-matrix td, .funder-matrix th { padding: var(--sp-2) var(--sp-3); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====== NAVIGATION ====== -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="container nav-inner">
+    <a href="index.html" class="nav-logo" aria-label="Civic Signal Home">
+      <div class="nav-logo-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg>
+      </div>
+      <div class="nav-logo-text">
+        <span class="nav-logo-name">Civic Signal</span>
+        <span class="nav-logo-sub">Resource Library</span>
+      </div>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="resources.html" class="nav-link">All Resources</a>
+      <a href="about.html" class="nav-link">About</a>
+      <a href="outreach-checklist.html" class="nav-link">Outreach</a>
+      <a href="grant-readiness.html" class="nav-link active">Grants</a>
+    </div>
+    <div class="nav-cta">
+      <button class="btn btn-primary" data-print>Print Guide</button>
+    </div>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+<div class="nav-drawer" id="nav-drawer">
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="resources.html" class="nav-link">All Resources</a>
+  <a href="about.html" class="nav-link">About</a>
+  <a href="outreach-checklist.html" class="nav-link">Outreach Checklist</a>
+  <a href="meeting-agenda.html" class="nav-link">Meeting Agenda Template</a>
+  <a href="grant-readiness.html" class="nav-link">Grant Readiness Guide</a>
+  <a href="case-study-roslindale.html" class="nav-link">Case Study</a>
+</div>
+
+<!-- ====== PAGE HEADER ====== -->
+<header class="grant-header" role="banner">
+  <div class="container grant-header-inner">
+    <nav aria-label="Breadcrumb" class="breadcrumbs" style="padding-top: 0; margin-bottom: var(--sp-5);">
+      <a href="index.html" style="color: rgba(245,240,232,0.5);">Home</a>
+      <span class="breadcrumbs-sep" aria-hidden="true">/</span>
+      <a href="resources.html" style="color: rgba(245,240,232,0.5);">Resources</a>
+      <span class="breadcrumbs-sep" aria-hidden="true">/</span>
+      <span class="breadcrumbs-current" style="color: var(--sage);">Grant Readiness Guide</span>
+    </nav>
+    <span class="resource-badge badge-funding" style="margin-bottom: var(--sp-3); display: inline-flex;">Funding</span>
+    <h1>Grant Readiness Guide</h1>
+    <p>You don't have to be large to get funded — but you do have to be ready. This guide walks through the six things every neighborhood organization needs before they write a single word of a grant proposal.</p>
+    <div style="display: flex; gap: var(--sp-3); margin-top: var(--sp-6); flex-wrap: wrap;">
+      <button class="btn btn-outline-light" data-print>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4V2H12V4M4 12H2V7H14V12H12M4 10H12V14H4V10Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        Print Guide
+      </button>
+      <a href="case-study-roslindale.html" class="btn btn-outline-light" style="opacity: 0.7;">See it in action: Roslindale Case Study →</a>
+    </div>
+  </div>
+</header>
+
+<!-- ====== MAIN CONTENT ====== -->
+<section class="section section--cream" aria-label="Grant readiness guide content">
+  <div class="container">
+    <div class="sidebar-layout">
+
+      <!-- Main guide content -->
+      <main class="article-body">
+
+        <!-- Section 1 -->
+        <div class="guide-section" id="section-1" data-section>
+          <h2>1. Are You Grant-Ready? An Honest Self-Assessment</h2>
+          <p>Most organizations that apply for grants before they're ready get rejected — not because their work isn't valuable, but because they can't demonstrate it yet. Before you write a single proposal, run through this readiness checklist honestly.</p>
+
+          <div class="readiness-check" role="list" aria-label="Grant readiness checklist">
+            <p class="readiness-check-title">Organizational Foundation Checklist</p>
+            <div class="rc-item" role="listitem">
+              <svg class="rc-yes" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="Required"><circle cx="8" cy="8" r="7" fill="var(--forest-mid)" opacity="0.15"/><path d="M5 8L7 10L11 6" stroke="var(--forest-mid)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span><strong>501(c)(3) status or a fiscal sponsor</strong> — Most foundations require this. If you're not incorporated yet, find a fiscal sponsor (an existing nonprofit willing to administer grants on your behalf).</span>
+            </div>
+            <div class="rc-item" role="listitem">
+              <svg class="rc-yes" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="Required"><circle cx="8" cy="8" r="7" fill="var(--forest-mid)" opacity="0.15"/><path d="M5 8L7 10L11 6" stroke="var(--forest-mid)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span><strong>A board of directors with at least three members</strong> — Funders want governance accountability. A one-person organization rarely gets funded.</span>
+            </div>
+            <div class="rc-item" role="listitem">
+              <svg class="rc-yes" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="Required"><circle cx="8" cy="8" r="7" fill="var(--forest-mid)" opacity="0.15"/><path d="M5 8L7 10L11 6" stroke="var(--forest-mid)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span><strong>A checking account in the organization's name</strong> — Not a personal account. Most funders won't cut a check to an individual, even a well-intentioned one.</span>
+            </div>
+            <div class="rc-item" role="listitem">
+              <svg class="rc-maybe" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="Helpful"><circle cx="8" cy="8" r="7" fill="var(--gold)" opacity="0.15"/><path d="M8 5V8" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="10.5" r="0.75" fill="var(--gold)"/></svg>
+              <span><strong>At least one completed project you can point to</strong> — Even a small success (a clean-up day, a community survey, a public meeting) shows you can execute. It doesn't need to be big.</span>
+            </div>
+            <div class="rc-item" role="listitem">
+              <svg class="rc-maybe" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="Helpful"><circle cx="8" cy="8" r="7" fill="var(--gold)" opacity="0.15"/><path d="M8 5V8" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="10.5" r="0.75" fill="var(--gold)"/></svg>
+              <span><strong>A written mission statement and one-paragraph organizational summary</strong> — You'll use these in every proposal. Get them right before you start applying.</span>
+            </div>
+            <div class="rc-item" role="listitem">
+              <svg class="rc-maybe" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="Helpful"><circle cx="8" cy="8" r="7" fill="var(--gold)" opacity="0.15"/><path d="M8 5V8" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="10.5" r="0.75" fill="var(--gold)"/></svg>
+              <span><strong>Documentation of community need</strong> — Data, survey results, or documented feedback from neighborhood outreach. This becomes your needs statement. (<a href="outreach-checklist.html" style="color: var(--amber);">Outreach data helps enormously here.</a>)</span>
+            </div>
+            <div class="rc-item" role="listitem">
+              <svg class="rc-no" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="Not required but nice"><circle cx="8" cy="8" r="7" fill="var(--amber)" opacity="0.15"/><path d="M6 10L10 6M10 10L6 6" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span><strong>Prior grant experience</strong> — Not required for first-time applicants. Many funders specifically look for emerging organizations. Don't let inexperience stop you from applying to the right funders.</span>
+            </div>
+          </div>
+
+          <div class="callout callout--tip">
+            <div class="callout-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="var(--forest-mid)" stroke-width="1.5"/><path d="M10 6V10.5" stroke="var(--forest-mid)" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="13.5" r="1" fill="var(--forest-mid)"/></svg>
+            </div>
+            <div>
+              <p class="callout-title">Not ready yet? Don't wait.</p>
+              <p>If you're missing something on this list, start working on it now — but don't wait for everything to be perfect before you start researching funders. The research takes months and you can do it in parallel with building your organizational infrastructure.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2 -->
+        <div class="guide-section" id="section-2" data-section>
+          <h2>2. Finding the Right Funders</h2>
+          <p>Applying to the wrong funders is the most common grant-writing mistake. A well-matched application to a small, well-aligned funder will almost always outperform a generic application to a large, misaligned foundation.</p>
+
+          <h3>Where to Research</h3>
+          <ul>
+            <li><strong>Candid (candid.org)</strong> — The largest database of U.S. foundations. Many libraries offer free access. Search by geography, focus area, and giving size.</li>
+            <li><strong>990 filings on ProPublica Nonprofit Explorer</strong> — Every foundation files a Form 990-PF annually, which lists every grant they made. This is the most reliable research tool available.</li>
+            <li><strong>Your own community</strong> — Who funded similar projects nearby? Ask peer organizations. Their 990s are public too.</li>
+            <li><strong>Local community foundations</strong> — Almost every region has a community foundation that funds neighborhood-level work. These are often your best first grants.</li>
+            <li><strong>Government sources</strong> — CDBG (Community Development Block Grant) funds flow through cities and counties and specifically target neighborhood organizations.</li>
+          </ul>
+
+          <h3>What to Look For in a Funder</h3>
+          <table class="funder-matrix" aria-label="Funder research criteria">
+            <thead>
+              <tr>
+                <th>Criteria</th>
+                <th>What to Find</th>
+                <th>Red Flags</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Geographic focus</strong></td>
+                <td>Explicitly funds your city, county, or neighborhood</td>
+                <td>National funder with no local history; different state</td>
+              </tr>
+              <tr>
+                <td><strong>Issue alignment</strong></td>
+                <td>Their priority areas match what you do</td>
+                <td>Vague "community" focus with no specifics; mission drift in recent 990s</td>
+              </tr>
+              <tr>
+                <td><strong>Typical grant size</strong></td>
+                <td>Their average grant is within range of what you need</td>
+                <td>You're asking for 10x their typical grant; or you're asking for far less than their minimum</td>
+              </tr>
+              <tr>
+                <td><strong>Eligibility</strong></td>
+                <td>They fund 501(c)(3) orgs or accept fiscal sponsorship</td>
+                <td>They only fund established nonprofits with 5+ year track records</td>
+              </tr>
+              <tr>
+                <td><strong>Recent grantees</strong></td>
+                <td>You know or can connect with past grantees</td>
+                <td>No grantees like you in size, geography, or issue area</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Section 3 -->
+        <div class="guide-section" id="section-3" data-section>
+          <h2>3. Building Your Case</h2>
+          <p>Before you write a proposal, you need to be able to answer four questions clearly. If you can't answer all four, your proposal will be weak regardless of how well it's written.</p>
+
+          <h4>Question 1: What is the problem?</h4>
+          <p>Describe the specific, documented need in your community. Use data when you have it (census data, survey results, city reports), but also use human-scale descriptions. "14% of households in our ZIP code are food-insecure" is strong data. "Our outreach team spoke with 87 families who reported skipping meals in the past month" is stronger combined with it.</p>
+
+          <h4>Question 2: Who else is working on it?</h4>
+          <p>Funders want to know you're not duplicating existing services. Name the other organizations working on related issues in your community — and explain clearly what gap your organization fills that they don't.</p>
+
+          <h4>Question 3: What will you do, specifically?</h4>
+          <p>Avoid vague language like "raise awareness" or "support the community." Be specific: "We will host six community meetings over three months, each attended by 30–50 residents, resulting in a written neighborhood plan to be submitted to the city planning department by March 15th."</p>
+
+          <h4>Question 4: How will you know it worked?</h4>
+          <p>This is your evaluation plan. It doesn't need to be sophisticated — it needs to be honest. List the outcomes you expect (not activities), and describe how you'll measure each one. A simple before/after survey, attendance counts, and documented decisions are often enough for neighborhood-scale grants.</p>
+
+          <blockquote>
+            <p>"The strongest proposals we fund don't necessarily have the most polished writing. They're the ones where we can tell the people writing them actually know the neighborhood and have a clear plan."</p>
+            <cite>— Program Officer, regional community foundation (from a Civic Signal interview)</cite>
+          </blockquote>
+        </div>
+
+        <!-- Section 4 -->
+        <div class="guide-section" id="section-4" data-section>
+          <h2>4. Elements of a Strong Proposal</h2>
+          <p>Most grant proposals — regardless of funder — ask for the same basic information, organized in similar ways. Here's what each section needs to accomplish.</p>
+
+          <h3>Executive Summary (1 paragraph)</h3>
+          <p>State who you are, what you're asking for, what it will fund, and what the outcome will be. Write this last, after all other sections are done. Funders often read only this and the budget before deciding whether to keep reading.</p>
+
+          <h3>Organizational Background (1–2 paragraphs)</h3>
+          <p>Brief history, mission, key accomplishments, governance structure. Lead with what you've done, not who you are. Funders are investing in capacity — show them you have it.</p>
+
+          <h3>Statement of Need (2–3 paragraphs)</h3>
+          <p>Document the community need with data and human detail. Cite sources. Reference your <a href="outreach-checklist.html" style="color: var(--amber);">outreach data</a> if you have it — showing that you went door-to-door and heard directly from residents is more compelling than a census table alone.</p>
+
+          <h3>Project Description (3–5 paragraphs)</h3>
+          <p>What will you do, when, and who's responsible? Include a timeline with milestones. Be specific about activities, participants, and locations. If you're collaborating with other organizations, name them and describe each party's role.</p>
+
+          <h3>Evaluation Plan (1–2 paragraphs)</h3>
+          <p>List your outcomes (changes, not activities) and describe how you'll measure each. Keep it honest — funders don't expect academic rigor from neighborhood organizations, but they do expect you to know the difference between an output (30 people attended) and an outcome (20 of those people became active members and attended all subsequent meetings).</p>
+
+          <h3>Budget</h3>
+          <p>Line-item budgets organized by category (Personnel, Fringe/Benefits, Supplies, Printing, Consultant Fees, Indirect Costs). Every line needs to be justified. Include in-kind contributions (donated space, volunteer labor) — these show that your community has skin in the game and that the grant is leveraging local resources, not replacing them.</p>
+
+          <div class="callout callout--warning">
+            <div class="callout-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L18 17H2L10 3Z" stroke="var(--gold)" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8V12" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14.5" r="0.75" fill="var(--gold)"/></svg>
+            </div>
+            <div>
+              <p class="callout-title">Common Proposal Mistakes</p>
+              <p><strong>Don't</strong> describe your activities as outcomes. "We will host six meetings" is an activity. "Residents will develop a written plan submitted to the city" is an outcome. <strong>Don't</strong> apply for more than you need. <strong>Don't</strong> leave budget lines unexplained. <strong>Don't</strong> submit a generic proposal — funders can tell when the "community" described in your needs statement is somewhere else.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5 -->
+        <div class="guide-section" id="section-5" data-section>
+          <h2>5. Building Funder Relationships</h2>
+          <p>Grants are not lotteries. They're relationships. The organizations that get funded reliably — year after year — treat funders as partners, not ATMs.</p>
+
+          <h4>Before You Apply</h4>
+          <p>If the funder allows it, call or email before submitting. Introduce yourself briefly, ask if your project is a good fit, and ask what they'd want to see emphasized. This is not begging — it's what sophisticated grant-seekers do. A program officer who has already talked with you is far more likely to champion your proposal.</p>
+
+          <h4>After You Apply</h4>
+          <p>Thank them promptly, and keep them in the loop with brief updates even if they haven't responded yet. If you do something newsworthy — a big community event, a policy win, an award — let them know. You're building a relationship with a person who will eventually move on to another job and bring their opinion of your organization with them.</p>
+
+          <h4>After You're Funded</h4>
+          <p>Report on time, every time. Send interim and final reports that are honest about what went differently than planned — funders expect reality, not perfection. Acknowledge the funder publicly (in meeting handouts, your newsletter, <a href="meeting-agenda.html" style="color: var(--amber);">meeting agendas</a>) — this is how you stay fundable long-term.</p>
+
+          <h4>When You're Rejected</h4>
+          <p>Ask for feedback. Not all funders will provide it, but some will — and it's invaluable. Thank them anyway. Many funded organizations were rejected their first time applying to a funder, then tried again the following year with a stronger proposal built on the feedback they received.</p>
+        </div>
+
+        <!-- Section 6 -->
+        <div class="guide-section" id="section-6" data-section>
+          <h2>6. Your Grant Calendar Template</h2>
+          <p>Organizations that apply for grants on an ad-hoc basis almost always lose to organizations that plan their grant activity in advance. A grant calendar shows you — at a glance — what you're working on, what's due, and what's coming up in the next cycle.</p>
+          <p>Below is a template you can adapt to your year. Most foundation cycles run annually or biannually; community foundations often have quarterly rounds. Build your calendar around the deadlines of your target funders.</p>
+
+          <div class="grant-calendar" aria-label="Grant calendar template">
+            <div class="gc-quarter">
+              <div class="gc-quarter-label">Q1 · Jan–Mar</div>
+              <div class="gc-item">
+                <span class="gc-item-label">Research</span>
+                Identify 6–10 new prospective funders from 990 research; update existing list
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Relationship</span>
+                Reach out to 2–3 program officers for introductory calls
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Due dates</span>
+                Note all spring deadlines from your prospective funder list
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Reporting</span>
+                File year-end reports for grants received last calendar year
+              </div>
+            </div>
+            <div class="gc-quarter">
+              <div class="gc-quarter-label">Q2 · Apr–Jun</div>
+              <div class="gc-item">
+                <span class="gc-item-label">Apply</span>
+                Submit spring cycle proposals; track submissions in a log
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Stewardship</span>
+                Host site visits from interested funders; send project updates
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Plan ahead</span>
+                Identify fall deadlines; start drafting narratives for new funders
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Board</span>
+                Present grant pipeline to board; note any funding gaps
+              </div>
+            </div>
+            <div class="gc-quarter">
+              <div class="gc-quarter-label">Q3 · Jul–Sep</div>
+              <div class="gc-item">
+                <span class="gc-item-label">Awards</span>
+                Spring decisions arrive; acknowledge awards and begin agreements
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Apply</span>
+                Submit fall cycle proposals; tailor narratives per funder
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Interim reports</span>
+                File mid-year progress reports for active grants
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Research</span>
+                Identify any new funders that emerged from summer convenings
+              </div>
+            </div>
+            <div class="gc-quarter">
+              <div class="gc-quarter-label">Q4 · Oct–Dec</div>
+              <div class="gc-item">
+                <span class="gc-item-label">Awards</span>
+                Fall decisions arrive; plan budget accordingly
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Stewardship</span>
+                Year-end funder appreciation; thank-you letters, annual report
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Plan</span>
+                Draft next year's grant calendar; review this year's outcomes data
+              </div>
+              <div class="gc-item">
+                <span class="gc-item-label">Renew</span>
+                Reach out to current funders about renewal timing and priorities
+              </div>
+            </div>
+          </div>
+
+          <div class="callout callout--action">
+            <div class="callout-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2L12.5 7.5H18L13.5 11L15.5 17L10 14L4.5 17L6.5 11L2 7.5H7.5L10 2Z" stroke="var(--amber)" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <p class="callout-title">See it in action</p>
+              <p>The Roslindale Community Garden Network raised $85,000 over 18 months using a grant strategy that closely mirrors this framework — starting with a community foundation and expanding from there. <a href="case-study-roslindale.html" style="color: var(--forest); font-weight: 600; text-decoration: underline; text-underline-offset: 2px;">Read the full case study →</a></p>
+            </div>
+          </div>
+        </div>
+
+      </main>
+
+      <!-- Sidebar TOC -->
+      <aside class="sidebar" aria-label="Table of contents and related resources">
+        <div class="sidebar-card" style="margin-bottom: var(--sp-4);">
+          <p class="sidebar-card-title">In This Guide</p>
+          <nav aria-label="Table of contents">
+            <ol class="toc-list">
+              <li class="toc-item"><a href="#section-1"><span class="toc-num">1</span> Are You Ready? Self-Assessment</a></li>
+              <li class="toc-item"><a href="#section-2"><span class="toc-num">2</span> Finding the Right Funders</a></li>
+              <li class="toc-item"><a href="#section-3"><span class="toc-num">3</span> Building Your Case</a></li>
+              <li class="toc-item"><a href="#section-4"><span class="toc-num">4</span> Elements of a Strong Proposal</a></li>
+              <li class="toc-item"><a href="#section-5"><span class="toc-num">5</span> Funder Relationships</a></li>
+              <li class="toc-item"><a href="#section-6"><span class="toc-num">6</span> Your Grant Calendar</a></li>
+            </ol>
+          </nav>
+        </div>
+
+        <div class="sidebar-card" style="margin-bottom: var(--sp-4);">
+          <p class="sidebar-card-title">Quick Reference</p>
+          <div style="display: flex; flex-direction: column; gap: var(--sp-3);">
+            <div style="padding: var(--sp-3); background: var(--cream); border-radius: var(--r);">
+              <p style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--forest-mid); margin-bottom: var(--sp-1);">Typical grant amounts</p>
+              <p style="font-size: var(--text-sm); color: var(--muted); margin: 0; line-height: 1.5;">Community foundations: $1,000–$25,000<br>CDBG: $5,000–$50,000<br>State/regional: $10,000–$100,000+</p>
+            </div>
+            <div style="padding: var(--sp-3); background: var(--cream); border-radius: var(--r);">
+              <p style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--forest-mid); margin-bottom: var(--sp-1);">Turnaround time</p>
+              <p style="font-size: var(--text-sm); color: var(--muted); margin: 0; line-height: 1.5;">Application to decision: 3–6 months<br>Award to first payment: 1–3 months<br>Plan for 6–9 months total</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-card">
+          <p class="sidebar-card-title">Related Resources</p>
+          <div class="toc-list">
+            <div class="toc-item"><a href="outreach-checklist.html"><span class="toc-num">→</span> Outreach Checklist</a></div>
+            <div class="toc-item"><a href="meeting-agenda.html"><span class="toc-num">→</span> Meeting Agenda Template</a></div>
+            <div class="toc-item"><a href="case-study-roslindale.html"><span class="toc-num">→</span> Case Study: Roslindale</a></div>
+            <div class="toc-item"><a href="resources.html?filter=funding"><span class="toc-num">→</span> All Funding Resources</a></div>
+          </div>
+        </div>
+
+        <div class="sidebar-card" style="margin-top: var(--sp-4); background: var(--gold-pale); border-color: var(--gold);">
+          <p class="sidebar-card-title" style="color: #8a6218;">Written by</p>
+          <p style="font-size: var(--text-sm); color: var(--ink-light); margin-bottom: var(--sp-2); line-height: 1.55;">Jerome Whitfield, Civic Signal's Grants &amp; Development Director, with review by program officers from three regional foundations.</p>
+          <a href="about.html#team" class="arrow-link" style="font-size: var(--text-xs);">Meet the team <svg class="arrow" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ====== RELATED ====== -->
+<section class="section section--sand" aria-labelledby="related-heading" style="padding-block: var(--sp-12);">
+  <div class="container">
+    <div class="related-section">
+      <h2 id="related-heading" style="font-size: var(--text-2xl); margin-bottom: var(--sp-2);">Connect This With Your Other Work</h2>
+      <p style="color: var(--muted); margin-bottom: var(--sp-6);">A strong grant application draws on community outreach data and documented meeting activity. These tools feed directly into what you need.</p>
+      <div class="related-grid">
+        <a href="outreach-checklist.html" class="related-card">
+          <span class="resource-badge badge-outreach related-card-badge">Outreach</span>
+          <h3 class="related-card-title">Community Outreach Checklist</h3>
+          <p class="related-card-desc">The community input data you collect during outreach becomes the documented need in your grant application. Don't start writing a proposal without it.</p>
+        </a>
+        <a href="meeting-agenda.html" class="related-card">
+          <span class="resource-badge badge-meetings related-card-badge">Meetings</span>
+          <h3 class="related-card-title">Meeting Agenda Template</h3>
+          <p class="related-card-desc">Meeting minutes document your governance and community engagement — two things funders look for. Use a consistent agenda to build a clear record.</p>
+        </a>
+        <a href="case-study-roslindale.html" class="related-card">
+          <span class="resource-badge badge-projects related-card-badge">Projects</span>
+          <h3 class="related-card-title">Case Study: Roslindale</h3>
+          <p class="related-card-desc">See exactly how one organization used outreach data and a community foundation relationship to raise $85,000 over 18 months.</p>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FOOTER ====== -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" style="margin-bottom: var(--sp-4); display: inline-flex;">
+          <div class="nav-logo-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg></div>
+          <div class="nav-logo-text"><span class="nav-logo-name">Civic Signal</span><span class="nav-logo-sub">Resource Library</span></div>
+        </a>
+        <p>Publishing practical toolkits for neighborhood organizers, free of charge and free of jargon.</p>
+      </div>
+      <div>
+        <span class="footer-col-title">Resources</span>
+        <div class="footer-links">
+          <a href="outreach-checklist.html" class="footer-link">Outreach Checklist</a>
+          <a href="meeting-agenda.html" class="footer-link">Meeting Agenda Template</a>
+          <a href="grant-readiness.html" class="footer-link">Grant Readiness Guide</a>
+          <a href="case-study-roslindale.html" class="footer-link">Case Study: Roslindale</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Topics</span>
+        <div class="footer-links">
+          <a href="resources.html?filter=outreach" class="footer-link">Outreach</a>
+          <a href="resources.html?filter=meetings" class="footer-link">Meetings</a>
+          <a href="resources.html?filter=funding" class="footer-link">Funding</a>
+          <a href="resources.html?filter=projects" class="footer-link">Projects</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Organization</span>
+        <div class="footer-links">
+          <a href="about.html" class="footer-link">About Civic Signal</a>
+          <a href="about.html#newsletter" class="footer-link">Newsletter</a>
+          <a href="resources.html" class="footer-link">All Resources</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-legal">© 2024 Civic Signal. Free to use and adapt with attribution.</p>
+      <div class="footer-bottom-links">
+        <a href="index.html">Home</a>
+        <a href="resources.html">Resources</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Donate — Keep the Library Open: Vote Yes on Measure L</title>
+  <meta name="description" content="Support the campaign to keep our library open. Donations fund yard signs, outreach calls, and voter education in the final hours before June 18.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* ===== DONATE PAGE ===== */
+
+    .donate-layout {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: clamp(2rem, 5vw, 4rem);
+      align-items: start;
+    }
+
+    /* Impact items */
+    .impact-list {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: .875rem;
+      margin-block: 1.75rem;
+    }
+    .impact-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      background: var(--white);
+      border: 1px solid var(--cream-dark);
+      border-radius: var(--radius-md);
+      border-left: 4px solid var(--amber);
+      box-shadow: var(--shadow-sm);
+    }
+    .impact-item__amount {
+      font-family: var(--font-display);
+      font-size: 1.375rem;
+      font-weight: 700;
+      color: var(--amber);
+      white-space: nowrap;
+      line-height: 1;
+      min-width: 56px;
+      padding-top: .1rem;
+    }
+    .impact-item__label {
+      font-size: .9375rem;
+      color: var(--ink-faded);
+      line-height: 1.5;
+      margin: 0;
+    }
+    .impact-item__label strong { color: var(--ink); }
+
+    /* Important note about donations */
+    .donation-note {
+      background: var(--forest-pale);
+      border: 1px solid rgba(45,90,61,.2);
+      border-left: 4px solid var(--forest);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      padding: 1.25rem 1.5rem;
+      margin-top: 2rem;
+    }
+    .donation-note h4 {
+      font-size: 1rem;
+      color: var(--forest);
+      margin-bottom: .5rem;
+    }
+    .donation-note p {
+      font-size: .9375rem;
+      color: var(--ink-faded);
+      margin-bottom: 0;
+    }
+
+    /* Donate form card */
+    .donate-card {
+      background: var(--white);
+      border: 1px solid var(--cream-dark);
+      border-radius: var(--radius-md);
+      padding: 2.25rem;
+      box-shadow: var(--shadow-md);
+      position: sticky;
+      top: calc(var(--header-h) + 2rem);
+    }
+    .donate-card__heading {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: .375rem;
+    }
+    .donate-card__sub {
+      font-size: .9375rem;
+      color: var(--ink-faded);
+      margin-bottom: 1.75rem;
+    }
+
+    /* Custom amount */
+    .custom-amount-wrapper {
+      position: relative;
+      margin-top: .75rem;
+    }
+    .custom-amount-wrapper::before {
+      content: '$';
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: var(--font-display);
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--ink-muted);
+    }
+    .custom-amount-wrapper input {
+      padding-left: 2rem;
+      font-family: var(--font-display);
+      font-size: 1.125rem;
+      font-weight: 700;
+    }
+
+    /* Form secure note */
+    .secure-note {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-family: var(--font-mono);
+      font-size: .62rem;
+      letter-spacing: .06em;
+      color: var(--ink-muted);
+      margin-top: .875rem;
+      justify-content: center;
+    }
+    .secure-note svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    /* Success state */
+    .donate-success {
+      display: none;
+      text-align: center;
+    }
+    .donate-success__icon {
+      width: 64px;
+      height: 64px;
+      background: var(--amber);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+      color: var(--ink);
+      font-size: 1.75rem;
+    }
+    .donate-success h3 { color: var(--ink); margin-bottom: .625rem; }
+    .donate-success p  { font-size: .9375rem; color: var(--ink-faded); margin-bottom: .5rem; }
+
+    /* Testimonial strip */
+    .testimonial-strip {
+      background: var(--ink);
+      padding: 3rem 0;
+    }
+    .testimonial-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+    }
+    .testimonial-item {
+      border-left: 3px solid var(--amber);
+      padding-left: 1.25rem;
+    }
+    .testimonial-item p {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-style: italic;
+      color: rgba(247,237,214,.8);
+      line-height: 1.55;
+      margin-bottom: .75rem;
+    }
+    .testimonial-item cite {
+      font-family: var(--font-mono);
+      font-size: .62rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--amber);
+      font-style: normal;
+    }
+
+    @media (max-width: 900px) {
+      .donate-layout { grid-template-columns: 1fr; }
+      .donate-card { position: static; }
+      .testimonial-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="election-bar" role="alert">
+    <strong>Election Day: June 18, 2026.</strong> Polls open 7am–8pm. &nbsp;
+    <a href="faq.html#where-to-vote">Find your polling place &rarr;</a>
+  </div>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="site-logo" aria-label="Keep the Library Open — Home">
+        <span class="site-logo__icon" aria-hidden="true">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 7C4 7 10 5.5 15 9C20 5.5 26 7 26 7V23C26 23 20 21.5 15 23C10 21.5 4 23 4 23V7Z" fill="currentColor" opacity=".18"/>
+            <path d="M15 9V23" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M4 7C4 7 10 5.5 15 9C20 5.5 26 7 26 7V23C26 23 20 21.5 15 23C10 21.5 4 23 4 23V7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="site-logo__text">
+          Keep the Library Open
+          <span>Vote Yes on Measure L</span>
+        </span>
+      </a>
+      <button class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="Toggle navigation">
+        <span class="nav-toggle__bar"></span>
+        <span class="nav-toggle__bar"></span>
+        <span class="nav-toggle__bar"></span>
+      </button>
+      <nav aria-label="Main navigation">
+        <ul class="nav-menu" id="nav-menu" role="list">
+          <li><a href="index.html"          class="nav-link">Home</a></li>
+          <li><a href="the-measure.html"    class="nav-link">The Measure</a></li>
+          <li><a href="endorsements.html"   class="nav-link">Supporters</a></li>
+          <li><a href="volunteer.html"      class="nav-link">Volunteer</a></li>
+          <li><a href="donate.html"         class="nav-link active">Donate</a></li>
+          <li><a href="faq.html"            class="nav-link">FAQ</a></li>
+          <li><a href="faq.html#where-to-vote" class="nav-cta">Vote YES — June&nbsp;18</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Page Hero -->
+  <div class="page-hero" aria-labelledby="page-title">
+    <div class="container">
+      <span class="page-hero__eyebrow">Support the Campaign</span>
+      <h1 id="page-title">Help Us Reach Every Voter</h1>
+      <p>Campaign donations fund yard signs, outreach calls, printing, and the
+      paid staff that coordinate volunteers in the final stretch. Every dollar
+      goes directly to getting out the yes vote on June 18.</p>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <section class="section">
+    <div class="container donate-layout">
+
+      <!-- Left: impact info -->
+      <div>
+        <hr class="divider">
+        <h2 class="reveal" style="margin-bottom:1.25rem;">What your donation does</h2>
+
+        <ul class="impact-list reveal d1" role="list">
+          <li class="impact-item">
+            <span class="impact-item__amount">$25</span>
+            <p class="impact-item__label"><strong>Prints 100 door-hangers</strong> for the remaining neighborhoods we haven't yet reached</p>
+          </li>
+          <li class="impact-item">
+            <span class="impact-item__amount">$50</span>
+            <p class="impact-item__label"><strong>Funds two hours of paid phone banking</strong> — reaching up to 60 undecided voters</p>
+          </li>
+          <li class="impact-item">
+            <span class="impact-item__amount">$100</span>
+            <p class="impact-item__label"><strong>Puts a yard sign</strong> and a full precinct mailer in our highest-turnout neighborhoods</p>
+          </li>
+          <li class="impact-item">
+            <span class="impact-item__amount">$250</span>
+            <p class="impact-item__label"><strong>Covers our Election Day coordination costs</strong> — poll greeter supplies, printed materials, and volunteer check-in</p>
+          </li>
+        </ul>
+
+        <!-- Important context -->
+        <div class="donation-note reveal d2">
+          <h4>Important: Donations vs. public funding</h4>
+          <p>
+            Campaign donations fund <em>voter outreach</em> — not the library itself.
+            They help us communicate, organize, and get people to the polls.
+            Once Measure L passes, <em>public funding</em> will sustain library operations.
+            Private donations alone, however generous, cannot replace the stable recurring
+            public funding that covers 12 full-time staff positions and daily operations.
+            That's why passing Measure L matters so much.
+          </p>
+        </div>
+
+        <!-- Endorsement quote -->
+        <div class="pullquote reveal d3" style="margin-top:2.5rem;">
+          <p>"We've knocked hundreds of doors. Every time we talk to a neighbor about what the library means to them, they vote yes. We just need to reach them."</p>
+          <cite>&mdash; Dolores Vargas, Campaign Volunteer Coordinator</cite>
+        </div>
+
+        <!-- Volunteer alternative -->
+        <div class="card reveal" style="margin-top:2rem;">
+          <h4 style="margin-bottom:.5rem;font-size:1rem;">Can't donate right now?</h4>
+          <p style="font-size:.9375rem;margin-bottom:1.125rem;">Volunteering is equally valuable — especially in the final 24 hours before polls open. We need poll greeters and social media volunteers.</p>
+          <a href="volunteer.html" class="btn btn--primary btn--sm">Sign up to volunteer &rarr;</a>
+        </div>
+
+      </div>
+
+      <!-- Right: donation form -->
+      <aside>
+        <div class="donate-card">
+
+          <div id="donate-wrapper">
+            <p class="donate-card__heading">Make a Donation</p>
+            <p class="donate-card__sub">Contributions are used for voter education and outreach activities. Not tax-deductible.</p>
+
+            <form id="donate-form" novalidate aria-label="Donation form">
+
+              <div class="form-group">
+                <label class="form-label">Select an amount</label>
+                <div class="amount-grid">
+                  <label class="amount-label">
+                    <input type="radio" name="amount" value="25">
+                    <span class="amount-label__inner">
+                      <span class="amount-label__num">$25</span>
+                      <span class="amount-label__desc">Door-hangers</span>
+                    </span>
+                  </label>
+                  <label class="amount-label">
+                    <input type="radio" name="amount" value="50" checked>
+                    <span class="amount-label__inner">
+                      <span class="amount-label__num">$50</span>
+                      <span class="amount-label__desc">Phone banking</span>
+                    </span>
+                  </label>
+                  <label class="amount-label">
+                    <input type="radio" name="amount" value="100">
+                    <span class="amount-label__inner">
+                      <span class="amount-label__num">$100</span>
+                      <span class="amount-label__desc">Yard sign + mailer</span>
+                    </span>
+                  </label>
+                  <label class="amount-label">
+                    <input type="radio" name="amount" value="250">
+                    <span class="amount-label__inner">
+                      <span class="amount-label__num">$250</span>
+                      <span class="amount-label__desc">Election Day</span>
+                    </span>
+                  </label>
+                  <label class="amount-label" style="grid-column: span 2;">
+                    <input type="radio" name="amount" value="other">
+                    <span class="amount-label__inner">
+                      <span class="amount-label__num">Other</span>
+                      <span class="amount-label__desc">Name your amount</span>
+                    </span>
+                  </label>
+                </div>
+
+                <div class="custom-amount-wrapper" id="custom-amount-row" style="display:none;">
+                  <input type="number" id="d-custom" name="custom-amount" class="form-input" placeholder="Enter amount" min="1" aria-label="Custom donation amount">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="d-name">Full name <span style="color:var(--rust)">*</span></label>
+                <input type="text" id="d-name" name="name" class="form-input" placeholder="Your name" required autocomplete="name">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="d-email">Email address <span style="color:var(--rust)">*</span></label>
+                <input type="email" id="d-email" name="email" class="form-input" placeholder="you@example.com" required autocomplete="email">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="d-employer">Employer (required by campaign finance law)</label>
+                <input type="text" id="d-employer" name="employer" class="form-input" placeholder="Company name or 'Self-employed'" autocomplete="organization">
+              </div>
+
+              <button type="submit" class="btn btn--amber" style="width:100%;justify-content:center;font-size:.875rem;padding:1rem;">
+                Donate Now &rarr;
+              </button>
+              <div class="secure-note">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Secure form &mdash; your information is protected
+              </div>
+            </form>
+          </div><!-- /donate-wrapper -->
+
+          <!-- Success -->
+          <div class="donate-success" id="donate-success" role="alert" aria-live="polite">
+            <div class="donate-success__icon" aria-hidden="true">&#x2665;</div>
+            <h3>Thank you for your support!</h3>
+            <p>Your contribution to the Keep the Library Open campaign will help us reach voters in the final hours before June 18.</p>
+            <p style="margin-top:.75rem;font-style:italic;">Don't forget to vote tomorrow &mdash; and bring a friend!</p>
+            <a href="faq.html#where-to-vote" class="btn btn--primary btn--sm" style="margin-top:1.25rem;">Find my polling place &rarr;</a>
+          </div>
+
+        </div>
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- Testimonial strip -->
+  <div class="testimonial-strip">
+    <div class="container">
+      <div class="testimonial-grid">
+        <div class="testimonial-item reveal">
+          <p>"I gave $50 and spent two hours making calls. Best thing I've done for this town in years."</p>
+          <cite>James Whitmore, Whitmore Bakery</cite>
+        </div>
+        <div class="testimonial-item reveal d2">
+          <p>"My kids grew up in that library. Donating was the easiest decision I've made this year."</p>
+          <cite>Sarah Kim, Westside PTA President</cite>
+        </div>
+        <div class="testimonial-item reveal d3">
+          <p>"I'm retired and on a fixed income. I gave $25. Every dollar counts when the stakes are this high."</p>
+          <cite>Dolores Vargas, Friends of the Library</cite>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA Strip -->
+  <div class="cta-strip">
+    <div class="container">
+      <h2 class="reveal">The election is tomorrow, June 18.</h2>
+      <p class="reveal d1">Whether you donate, volunteer, or simply show up — your action in the next 24 hours is what decides this.</p>
+      <div class="reveal d2" style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+        <a href="faq.html#where-to-vote" class="btn btn--amber btn--lg">Find My Polling Place</a>
+        <a href="volunteer.html"          class="btn btn--outline-light btn--lg">Volunteer</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <span class="footer-brand__name">Keep the Library Open</span>
+          <p class="footer-brand__tagline">A community campaign to protect library services in Evergreen.</p>
+          <span class="footer-stamp">Vote YES — June 18</span>
+        </div>
+        <div>
+          <p class="footer-col__heading">Campaign Pages</p>
+          <ul class="footer-links">
+            <li><a href="the-measure.html">The Measure</a></li>
+            <li><a href="endorsements.html">Supporters</a></li>
+            <li><a href="volunteer.html">Volunteer</a></li>
+            <li><a href="donate.html">Donate</a></li>
+            <li><a href="faq.html">FAQ</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="footer-col__heading">Election Info</p>
+          <ul class="footer-links">
+            <li><a href="faq.html#where-to-vote">Find your polling place</a></li>
+            <li><a href="faq.html#cost">What it costs</a></li>
+            <li><a href="faq.html#if-fails">If Measure L fails</a></li>
+            <li><a href="faq.html#partisan">Is this partisan?</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>Paid for by the Committee to Keep the Library Open, FPPC #2026-441892. Not an official government communication.</p>
+        <p>Evergreen Public Library Campaign &mdash; 2026</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /* Nav toggle */
+    const toggle = document.getElementById('nav-toggle');
+    const menu   = document.getElementById('nav-menu');
+    toggle.addEventListener('click', () => {
+      const open = menu.classList.toggle('open');
+      toggle.classList.toggle('open', open);
+      toggle.setAttribute('aria-expanded', String(open));
+    });
+    menu.querySelectorAll('.nav-link, .nav-cta').forEach(link => {
+      link.addEventListener('click', () => {
+        menu.classList.remove('open');
+        toggle.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    /* Show/hide custom amount field */
+    document.querySelectorAll('[name="amount"]').forEach(radio => {
+      radio.addEventListener('change', function(){
+        const row = document.getElementById('custom-amount-row');
+        row.style.display = this.value === 'other' ? 'block' : 'none';
+        if(this.value === 'other') document.getElementById('d-custom').focus();
+      });
+    });
+
+    /* Donate form submission */
+    document.getElementById('donate-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      const name  = document.getElementById('d-name').value.trim();
+      const email = document.getElementById('d-email').value.trim();
+      const amt   = document.querySelector('[name="amount"]:checked');
+      if(!name){ alert('Please enter your name.'); return; }
+      if(!email || !email.includes('@')){ alert('Please enter a valid email address.'); return; }
+      if(!amt){ alert('Please select a donation amount.'); return; }
+      if(amt.value === 'other'){
+        const custom = document.getElementById('d-custom').value;
+        if(!custom || parseFloat(custom) < 1){ alert('Please enter a valid donation amount.'); return; }
+      }
+
+      document.getElementById('donate-wrapper').style.display = 'none';
+      const success = document.getElementById('donate-success');
+      success.style.display = 'block';
+      success.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    /* Scroll reveals */
+    const revealEls = document.querySelectorAll('.reveal, .reveal-up');
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); }});
+    }, { threshold: 0.1 });
+    revealEls.forEach(el => obs.observe(el));
+  </script>
+</body>
+</html>

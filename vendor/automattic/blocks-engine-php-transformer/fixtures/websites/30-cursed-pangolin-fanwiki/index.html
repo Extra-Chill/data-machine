@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<!--
+  The Honorable and Imaginary Order of the Velvet Pangolin
+  Foundational document & fan-wiki. Begun 14-Feb-1998 by Geoffrey Wickering.
+  Last edited: 23-Jun-2026 by Vault-Warden Eduardo.
+  Edit count: 4,712. Editor count: 31. Banned editors: 4.
+
+  PLEASE READ Pangolin_Wiki:Policy BEFORE EDITING.
+
+  Notes from prior maintainers, preserved for archaeological purposes:
+   - Geoffrey 2003: "I added the &lt;script&gt; tag in the body. DO NOT REMOVE."
+   - Mavis 2007:    "Started migrating to CSS. Stopped halfway. Sorry."
+   - Reginald 2011: "Re-added the &lt;font&gt; tags Mavis removed. They are HERITAGE."
+   - Tilda 2014:    "Added ARIA. Some of it is wrong on purpose to match a 2009 Order pamphlet."
+   - CodeFriend 2024: "I tried to refactor this. I failed. May the Pangolin protect you."
+-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" vocab="https://schema.org/" typeof="Organization" resource="#velvet-pangolin">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="hand-coded since 1998, latterly assisted by FrontPage, Dreamweaver, Sublime, and one (1) emacs user">
+<meta name="description" content="The official wiki of the Honorable and Imaginary Order of the Velvet Pangolin, est. Bristol 1894.">
+<meta name="keywords" content="pangolin, order, velvet, scalebearer, bristol, 1894, mystical, semi-secret, fan-wiki">
+<meta name="author" content="The Scalebearers, collectively">
+<meta name="robots" content="index, follow, noarchive">
+<meta property="og:title" content="The Honorable &amp; Imaginary Order of the Velvet Pangolin">
+<meta property="og:description" content="Est. 1894. Bristol. Possibly real. Possibly not.">
+<meta property="og:type" content="organization">
+<title>The Honorable &amp; Imaginary Order of the Velvet Pangolin :: Foundational Document :: Sanctum :: 1894&ndash;2026</title>
+<base href="./">
+<link rel="stylesheet" type="text/css" href="style.css">
+<link rel="stylesheet" type="text/css" href="style.css?v=2026.06.23-FINAL-final-v3">
+<link rel="icon" href="images/sigil-favicon.ico" type="image/x-icon">
+<link rel="alternate stylesheet" type="text/css" href="style-print.css" title="Print">
+<link rel="canonical" href="https://velvetpangolin.example/sanctum/">
+
+<style type="text/css">
+/* inline overrides — Geoffrey 2009 — DO NOT MOVE TO EXTERNAL */
+#emergency-override { background: #FF69B4 !important; }
+.do-not-touch { color: #B22222 !important; font-weight: bold; }
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "The Honorable and Imaginary Order of the Velvet Pangolin",
+  "alternateName": ["The Order", "The Velvet Pangolin", "H.I.O.V.P."],
+  "foundingDate": "1894-06-14",
+  "foundingLocation": {
+    "@type": "Place",
+    "name": "The Hanged Drayman public house, Corn Street, Bristol, England"
+  },
+  "founders": [
+    { "@type": "Person", "name": "Reginald T. Pemberton, Esq.", "jobTitle": "Civil Servant (Cardiff)" },
+    { "@type": "Person", "name": "Cornelia P. Hawthorne", "jobTitle": "Civil Servant (Bristol)" },
+    { "@type": "Person", "name": "Aldous M. Penrose", "jobTitle": "Civil Servant (Glamorgan)" },
+    { "@type": "Person", "name": "[The Fourth]", "jobTitle": "Embalmer (Clifton)" }
+  ],
+  "slogan": "Per scalas ad astra",
+  "memberOf": { "@type": "Organization", "name": "Bristol Pangolin Webring" }
+}
+</script>
+
+<script type="text/vbscript">
+' added 2002 by Reginald for IE6 compatibility. NEVER REMOVED.
+' If you are reading this, you are using IE. The Pangolin sees you.
+Sub WelcomeIE
+  MsgBox "Welcome, Scalebearer. The Order recognizes Internet Explorer."
+End Sub
+</script>
+
+<script>
+  // added 2003 by Geoffrey, please don't remove --Geoffrey
+  // (Mavis says this script does nothing. she is wrong.)
+  var pangolinHasSeen = true;
+  function rollScale(el){ if(el && el.style){ el.style.transform = 'rotate(' + (Math.random()*8-4) + 'deg)'; } }
+</script>
+
+<noscript>
+  <style>.requires-js { display: none; } .no-js-only { display: block; }</style>
+</noscript>
+</head>
+
+<frameset rows="92,*" frameborder="1" border="2" framespacing="0" bordercolor="#3A1B47">
+  <frame src="frames/header.html" name="topbar" scrolling="no" noresize="noresize" marginheight="0" marginwidth="0" frameborder="0">
+  <frameset cols="180,*" frameborder="1" border="2">
+    <frame src="frames/sidebar.html" name="oracle" scrolling="auto" marginheight="4" marginwidth="4">
+    <frame src="#main-content" name="main" scrolling="yes" marginheight="0" marginwidth="0">
+  </frameset>
+
+  <noframes>
+  <body onload="rollScale(document.getElementById('sigil-svg'));" bgcolor="#F0EAD2" text="#1F1F1F" link="#B22222" vlink="#8B5A8E" alink="#C49934">
+
+  <!--[if IE 6]>
+    <div class="ie-alert" style="background:#ffe;border:3px ridge #C49934;padding:8px;color:#B22222;font-family:'MS Sans Serif',sans-serif;">
+      <b>Notice:</b> You appear to be using Internet Explorer 6. The Order welcomes you,
+      but the Sacred Sigil will not render correctly. Please consider upgrading to
+      Netscape Navigator 7 or, if you are feeling brave, Mozilla Firebird.
+      &mdash; <i>The Webmaster, 2004</i>
+    </div>
+  <![endif]-->
+
+  <!--[if lt IE 9]>
+    <script src="https://example.invalid/html5shiv.js"></script>
+  <![endif]-->
+
+  <!--
+    The following section is the table-layout page shell. It was authored in 2001 by
+    Reginald using a since-deleted copy of Macromedia Dreamweaver 4. Multiple attempts
+    have been made to refactor this into semantic HTML. All attempts have been
+    rolled back by Geoffrey, who insists the table is "the bones of the cathedral."
+    Discussion: see /talk-page.html#tables. Do not refactor without a Convocation vote.
+    This comment is intentionally extremely long because the decision behind it
+    represents over two decades of internal Order politics and the editor who
+    inherits this document deserves to know exactly what they are walking into.
+    In 2007 there was a brief moment when the table-shell was replaced with
+    CSS positioning, which broke the page in Internet Explorer 6 (still required
+    by Vault-Warden Beatrix, who refused to upgrade her PowerBook G3). After three
+    days of escalating emails, six phone calls to a man named Trevor who claimed
+    to be "an internet expert", and one heated exchange at the 113th Annual
+    Convocation in Swansea, the table was restored. Reginald has, on every
+    anniversary of this incident, sent the entire mailing list a reminder. Please
+    do not provoke another reminder. The table stays. Long live the table.
+  -->
+
+  <a name="top"></a>
+
+  <table class="shell" id="page-shell" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F0EAD2">
+  <tbody>
+  <tr>
+    <td class="shell-left" valign="top" bgcolor="#3A1B47" rowspan="2">
+      <!-- left rail: a smaller table inside the cell (nesting depth 2) -->
+      <table border="0" cellpadding="4" cellspacing="0" width="100%">
+        <tr><td>
+          <font face="Cinzel,serif" color="#C49934" size="3">
+            <b>&loz; THE&nbsp;SANCTUM &loz;</b>
+          </font>
+          <hr noshade size="1" color="#C49934">
+          <font face="Trebuchet MS,sans-serif" color="#F0EAD2" size="2">
+            <a href="#what-is" style="color:#FF69B4">&raquo; What Is The Order?</a><br>
+            <a href="#founders" style="color:#FF69B4">&raquo; Founders</a><br>
+            <a href="#tenets" style="color:#FF69B4">&raquo; The Twelve Tenets</a><br>
+            <a href="#ranks" style="color:#FF69B4">&raquo; Hierarchy</a><br>
+            <a href="#sigil" style="color:#FF69B4">&raquo; The Sigil</a><br>
+            <a href="#convocations" style="color:#FF69B4">&raquo; Convocations</a><br>
+            <a href="#roster" style="color:#FF69B4">&raquo; Roster</a><br>
+            <a href="#apply" style="color:#FF69B4">&raquo; Apply</a><br>
+            <a href="#library" style="color:#FF69B4">&raquo; Library</a><br>
+            <a href="#pronouncements" style="color:#FF69B4">&raquo; Pronouncements</a><br>
+            <a href="#oath" style="color:#FF69B4">&raquo; The Oath</a><br>
+            <a href="#codex" style="color:#FF69B4">&raquo; Codex</a><br>
+            <a href="#correspondence" style="color:#FF69B4">&raquo; Correspondence</a><br>
+            <a href="#bestiary" style="color:#FF69B4">&raquo; Bestiary</a><br>
+            <a href="#acks" style="color:#FF69B4">&raquo; Acknowledgements</a><br>
+          </font>
+          <br>
+          <!-- INSIDE A TABLE CELL, A MENU. menu/menuitem are deprecated. -->
+          <menu type="toolbar">
+            <menuitem label="Save" icon="images/save.gif" onclick="alert('The Vault saves itself.')">Save</menuitem>
+            <menuitem label="Print" icon="images/print.gif">Print</menuitem>
+            <menuitem label="Archive" icon="images/archive.gif">Archive</menuitem>
+          </menu>
+          <dir>
+            <li>old menu link 1</li>
+            <li>old menu link 2</li>
+            <li>old menu link 3</li>
+          </dir>
+        </td></tr>
+      </table>
+    </td>
+
+    <td class="shell-main" valign="top">
+
+      <!-- ====================================================
+           HEADER BAND: logo + marquee motto
+           ==================================================== -->
+      <center>
+      <div id="banner" role="banner">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%"><tr>
+          <td width="120" valign="middle" align="center">
+            <!-- SACRED SIGIL: inline SVG with gradients, filters, animation, foreignObject -->
+            <svg id="sigil-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="110" height="110" role="img" aria-labelledby="sigil-title sigil-desc">
+              <title id="sigil-title">The Sacred Sigil of the Velvet Pangolin</title>
+              <desc id="sigil-desc">A copper pangolin coiled in a perfect sphere, encircled by twelve scales.</desc>
+              <defs>
+                <radialGradient id="copperGrad" cx="35%" cy="30%" r="80%">
+                  <stop offset="0%" stop-color="#f6d28a"></stop>
+                  <stop offset="55%" stop-color="#b87333"></stop>
+                  <stop offset="100%" stop-color="#3a1b0a"></stop>
+                </radialGradient>
+                <linearGradient id="velvetGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#3A1B47"></stop>
+                  <stop offset="100%" stop-color="#1F1F1F"></stop>
+                </linearGradient>
+                <filter id="shimmer" x="-20%" y="-20%" width="140%" height="140%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="14" result="noise"></feTurbulence>
+                  <feDisplacementMap in="SourceGraphic" in2="noise" scale="3"></feDisplacementMap>
+                </filter>
+                <mask id="circleMask">
+                  <rect width="200" height="200" fill="black"></rect>
+                  <circle cx="100" cy="100" r="78" fill="white"></circle>
+                </mask>
+              </defs>
+
+              <circle cx="100" cy="100" r="92" fill="url(#velvetGrad)"></circle>
+              <g mask="url(#circleMask)" filter="url(#shimmer)">
+                <circle cx="100" cy="100" r="78" fill="url(#copperGrad)"></circle>
+                <!-- twelve scales arranged in a ring -->
+                <g id="scale-ring">
+                  <ellipse cx="100" cy="32" rx="9" ry="14" fill="#7a4520" opacity="0.9"></ellipse>
+                  <ellipse cx="134" cy="42" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(30 134 42)"></ellipse>
+                  <ellipse cx="158" cy="66" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(60 158 66)"></ellipse>
+                  <ellipse cx="168" cy="100" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(90 168 100)"></ellipse>
+                  <ellipse cx="158" cy="134" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(120 158 134)"></ellipse>
+                  <ellipse cx="134" cy="158" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(150 134 158)"></ellipse>
+                  <ellipse cx="100" cy="168" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(180 100 168)"></ellipse>
+                  <ellipse cx="66" cy="158" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(210 66 158)"></ellipse>
+                  <ellipse cx="42" cy="134" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(240 42 134)"></ellipse>
+                  <ellipse cx="32" cy="100" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(270 32 100)"></ellipse>
+                  <ellipse cx="42" cy="66" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(300 42 66)"></ellipse>
+                  <ellipse cx="66" cy="42" rx="9" ry="14" fill="#7a4520" opacity="0.9" transform="rotate(330 66 42)"></ellipse>
+                  <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="44s" repeatCount="indefinite"></animateTransform>
+                </g>
+                <!-- central coiled pangolin (stylized) -->
+                <path d="M100,60 q40,0 40,40 q0,40 -40,40 q-40,0 -40,-40 q0,-40 40,-40 z" fill="#6b3f1a" stroke="#1F1F1F" stroke-width="2"></path>
+                <path d="M100,76 q24,0 24,24 q0,24 -24,24 q-24,0 -24,-24 q0,-24 24,-24 z" fill="#b87333" opacity="0.8"></path>
+                <circle cx="116" cy="90" r="3" fill="#1F1F1F"></circle>
+              </g>
+
+              <!-- foreignObject with real HTML inside SVG -->
+              <foreignObject x="20" y="172" width="160" height="22">
+                <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:'Cinzel',serif;color:#C49934;text-align:center;font-size:10px;letter-spacing:2px;text-shadow:0 0 4px #000;">
+                  PER&nbsp;SCALAS&nbsp;AD&nbsp;ASTRA
+                </div>
+              </foreignObject>
+
+              <!-- SMIL animation: the scale shimmer pulse -->
+              <animate xlink:href="#sigil-svg" attributeName="opacity" values="1;0.92;1" dur="6s" repeatCount="indefinite"></animate>
+            </svg>
+          </td>
+          <td valign="middle" align="left">
+            <H1 style="margin:0;">The Honorable &amp; Imaginary Order</H1>
+            <H4 style="margin:2px 0 0 0;color:#C49934">of the Velvet Pangolin</H4>
+            <H6 style="margin:6px 0 0 0;">&loz; est. Bristol &middot; MDCCCXCIV &middot; M.E. &loz;</H6>
+            <p style="margin:6px 0 0 0;font-size:11px;color:#666;">
+              <ruby>名誉と空想の天穿山甲会<rp>(</rp><rt>めいよとくうそうのてんせんざんこうかい</rt><rp>)</rp></ruby>
+              &middot;
+              <span lang="grc">Τὸ τοῦ Βελουδίνου Φολιδωτοῦ Τάγμα</span>
+              &middot;
+              <span lang="ar" dir="rtl">رتبة آكِل النمل الحرشفية المخملية</span>
+            </p>
+          </td>
+          <td width="80" valign="middle" align="right">
+            <!-- pretend animated badge -->
+            <div style="display:inline-block;border:3px outset #C49934;background:linear-gradient(#fff8e0,#C49934);padding:6px 10px;font-family:Impact;color:#3A1B47;font-size:10px;letter-spacing:1px;">
+              SEAL&nbsp;OF<br>THE&nbsp;VAULT
+            </div>
+          </td>
+        </tr></table>
+      </div>
+      </center>
+
+      <div class="motto-bar">
+        <marquee behavior="alternate" direction="up" scrollamount="2" height="22" width="100%" bgcolor="#000000">
+          <font color="#00FF00" face="Courier New">&loz; PER SCALAS AD ASTRA &mdash; By Scales To The Stars &mdash; SCALEBEARERS RISE &loz;</font>
+        </marquee>
+      </div>
+
+      <!-- the official meta inside body. yes, in the body. -->
+      <meta name="section-author" content="Geoffrey Wickering" itemprop="author">
+
+      <!-- ====================================================
+           SECTION 1: WHAT IS THE ORDER?
+           ==================================================== -->
+      <SECTION id="what-is" itemscope itemtype="https://schema.org/Organization" itemid="#velvet-pangolin">
+        <H2 itemprop="name">&sect; I. What Is The Order?</H2>
+
+        <!-- the !important war battlefield (caption rule, from style.css) -->
+        <p class="sigil-caption" style="font-style:italic">A note on color of the sigil caption: contested since 2017.</p>
+
+        <div class="about-section">
+        <FONT face="Times New Roman" size="4" color="#3A1B47">
+        The <B>Honorable and Imaginary Order of the Velvet Pangolin</B> &mdash;
+        hereafter abbreviated as <acronym title="Honorable and Imaginary Order of the Velvet Pangolin">H.I.O.V.P.</acronym>
+        or, colloquially, <ABBR title="The Order">The&nbsp;Order</ABBR> &mdash;
+        was founded on the evening of <time datetime="1894-06-14" itemprop="foundingDate">14 June 1894</time>
+        in the <I>snug</I> of <em>The Hanged Drayman</em>, a public house on Corn Street, Bristol,
+        by three civil servants and one embalmer over the course of an evening that
+        is recorded in the original minutes as &laquo;<U>protracted</U>&raquo;.
+        </FONT>
+        </div>
+
+        <p>The Order's stated purpose, ratified that same evening and unchanged for one hundred and thirty-two years,
+          is the <strong>contemplation, veneration, and cataloguing</strong> of the pangolin in all of its eight
+          recognised and three rumoured species, together with the maintenance of <em>The&nbsp;Vault</em>
+          &mdash; a collection of pangolin-adjacent ephemera kept at an undisclosed address in Bristol
+          and known only to the <order-rank tier="vault-warden">Vault-Warden</order-rank> of the day.</p>
+
+        <p lang="la">Motto officialis: <em>Per&nbsp;scalas&nbsp;ad&nbsp;astra</em>
+          (by scales, to the stars). Adopted 1894. Translated by founder <ITEMPROP itemprop="founder">Reginald T. Pemberton</ITEMPROP>
+          from a (now-discredited) Sufi aphorism that he had encountered in Cardiff.</p>
+
+        <p lang="ar" dir="rtl">المثل الأصلي للنظام مأخوذ من قول صوفي: &laquo;الحرشفة تحفظ الجوهر&raquo;.</p>
+
+        <p>The Order is described in its own foundational documents as &laquo;<i>semi-secret</i>&raquo;,
+          a designation which has caused considerable confusion. The current <order-rank tier="vault-warden">Vault-Warden</order-rank>
+          has clarified that this means: the existence of the Order is public, but its
+          membership, holdings, meeting locations, oath, sigil derivation, scale-polishing
+          schedule, financial accounts, and the identity of <span class="do-not-touch">[The Fourth]</span> are not.</p>
+
+        <p>
+          <font face="Cinzel,serif" color="#B22222" size="4">In&nbsp;spec&shy;ta&shy;bil&shy;i&shy;tas</font>
+          (a fake Latin word coined by founder Pemberton, meaning approximately
+          "the quality of not being looked at") is the central virtue of the Order.
+          The word is conventionally written with soft hyphens between syllables;
+          attentive readers will note its proper splitting as
+          <span>in<wbr>spec<wbr>ta<wbr>bil<wbr>i<wbr>tas</span>.
+        </p>
+
+        <p><big>Encoded greeting to all visitors:</big>
+          <font color="#3A1B47">&#65;&#108;&#108; &#104;&#97;&#105;&#108; &#116;&#104;&#101; &#80;&#97;&#110;&#103;&#111;&#108;&#105;&#110;.</font>
+        </p>
+
+        <noscript>
+          <div class="no-js-only" style="border:2px solid #B22222;padding:10px;background:#fff8e0">
+            <b>NOTICE TO JAVASCRIPT-DISABLED VISITORS:</b> Welcome, fellow traditionalist.
+            The Vault-Warden notes that one (1) script tag on this page exists to set
+            the variable <code>pangolinHasSeen</code> to <code>true</code>. You are
+            missing nothing of consequence. Below is a static form for petitioning
+            membership; please mail the completed form to the address in <a href="#acks">Acknowledgements</a>.
+            <form action="mailto:scalebearer@velvetpangolin.example" method="post" enctype="text/plain">
+              <label>Your name: <input type="text" name="petitioner"></label><br>
+              <label>Reason: <textarea name="reason" rows="3" cols="30"></textarea></label><br>
+              <input type="submit" value="Mail Petition">
+            </form>
+          </div>
+        </noscript>
+
+        <!-- a TITLE inside the body, in addition to the head -->
+        <title>What Is The Order? &mdash; section title for screen-reader users in 2002</title>
+
+        <!-- a stray meta inside body, immediately adjacent to the author it refers to -->
+        <meta name="author" content="Geoffrey Wickering" itemprop="author">
+
+        <p style="font-size:12px;color:#666">
+          <em>Editor's note (Geoffrey, 2009):</em> this section has been re-written eighteen times.
+          The current text is the seventeenth-and-a-half revision; the half is owed to Mavis,
+          who replaced &laquo;<i>semi-secret</i>&raquo; with &laquo;<i>quietly known</i>&raquo;
+          in 2008 and was reverted within the hour. The original wording, drafted at the Drayman
+          in 1894 and surviving in the original founding minutes, was simply: &laquo;<i>not for everyone</i>&raquo;.
+        </p>
+
+      </SECTION>
+
+      <!-- ====================================================
+           SECTION 2: FOUNDING MEMBERS
+           ==================================================== -->
+      <Section id="founders" class="mystical" itemscope itemtype="https://schema.org/Organization">
+        <H2>&sect; II. The Four Founders, June 1894</H2>
+
+        <meta name="section-author" content="Reginald Quill, Esq.">
+        <p>The four founders, gathered at <em>The Hanged Drayman</em> on the eve of the Summer
+          Solstice 1894, are recorded thus. Portraits are sepia placeholders &mdash;
+          the originals were lost in the <S>fire</S> <ins>"event"</ins> of 1923.</p>
+
+        <Dl id="founders-list">
+          <Dt itemprop="founder" itemscope itemtype="https://schema.org/Person">
+            <figure style="display:inline-block;margin:0 12px 0 0;vertical-align:top;">
+              <div style="width:96px;height:120px;background:linear-gradient(135deg,#8B5A8E,#3A1B47);border:3px solid #C49934;"></div>
+              <figcaption style="font-family:'Cinzel',serif;color:#C49934;font-size:10px;text-align:center;max-width:96px;">
+                <span itemprop="name">Reginald T. Pemberton, Esq.</span><br>
+                <small lang="la"><i>Inspectabilitatem colo</i></small>
+              </figcaption>
+            </figure>
+            <span itemprop="name">Reginald T. Pemberton, Esq.</span> &mdash;
+            <span itemprop="jobTitle">Civil Servant (Cardiff)</span>
+          </Dt>
+          <DD>Author of the original motto. First to suggest the pangolin as totem.
+            Reportedly arrived at the Drayman already in possession of a small box of copper-coloured scales,
+            "for reasons he declined to elaborate upon." His <span lang="la"><em>inspectabilitatem colo</em></span>
+            became the unofficial second motto of the Order.</DD>
+
+          <dt itemprop="founder" itemscope itemtype="https://schema.org/Person">
+            <figure style="display:inline-block;margin:0 12px 0 0;vertical-align:top;">
+              <div style="width:96px;height:120px;background:linear-gradient(135deg,#C49934,#6a4818);border:3px solid #C49934;"></div>
+              <figcaption style="font-family:'Cinzel',serif;color:#C49934;font-size:10px;text-align:center;max-width:96px;">
+                <span itemprop="name">Cornelia P. Hawthorne</span><br>
+                <small lang="grc"><i>&pi;&#7770;&sigma;&alpha; &phi;&omicron;&lambda;&#7984;&sigmaf;</i></small>
+              </figcaption>
+            </figure>
+            <span itemprop="name">Cornelia P. Hawthorne</span> &mdash;
+            <span itemprop="jobTitle">Civil Servant (Bristol)</span>
+          </dt>
+          <dd>First Vault-Warden (1894&ndash;1917). Authored the original Twelve Tenets in
+            a single night, apparently while annoyed. Her Greek epigram
+            <em lang="grc">πᾶσα φολίς</em> ("every scale") is inscribed on the inside lid of the Vault.</dd>
+
+          <DT itemprop="founder" itemscope itemtype="https://schema.org/Person">
+            <figure style="display:inline-block;margin:0 12px 0 0;vertical-align:top;">
+              <div style="width:96px;height:120px;background:linear-gradient(135deg,#355E3B,#1a2f1c);border:3px solid #C49934;"></div>
+              <figcaption style="font-family:'Cinzel',serif;color:#C49934;font-size:10px;text-align:center;max-width:96px;">
+                <span itemprop="name">Aldous M. Penrose</span><br>
+                <small lang="la"><i>Silentium aurum</i></small>
+              </figcaption>
+            </figure>
+            <span itemprop="name">Aldous M. Penrose</span> &mdash;
+            <span itemprop="jobTitle">Civil Servant (Glamorgan)</span>
+          </DT>
+          <dd>The quietest founder. Contributed the Order's rule of <em>discretion in correspondence</em>
+            (Tenet IX, originally Tenet VII). Believed by some to have been the actual author of
+            the foundational document; this has never been confirmed and Vault-Warden Hawthorne
+            denied it sharply in writing in 1909.</dd>
+
+          <dt itemprop="founder" itemscope itemtype="https://schema.org/Person">
+            <figure style="display:inline-block;margin:0 12px 0 0;vertical-align:top;">
+              <div style="width:96px;height:120px;background:linear-gradient(135deg,#1F1F1F,#000);border:3px solid #C49934;"></div>
+              <figcaption style="font-family:'Cinzel',serif;color:#C49934;font-size:10px;text-align:center;max-width:96px;">
+                <span itemprop="name">[The Fourth]</span><br>
+                <small lang="la"><i>Nomen non scribitur</i></small>
+              </figcaption>
+            </figure>
+            <span itemprop="name">[The Fourth]</span> &mdash;
+            <span itemprop="jobTitle">Embalmer (Clifton)</span>
+          </dt>
+          <dd>The Embalmer. The Fourth. By tradition unnamed in Order documents
+            (cf. Tenet III). The talk page has, on several occasions, accidentally
+            published his given name; the Vault-Warden has each time
+            quietly redacted the entry. See <a href="talk-page.html#embalmer">/talk-page.html#embalmer</a>
+            for the latest such incident.</dd>
+        </Dl>
+
+      </Section>
+
+      <!-- ====================================================
+           SECTION 3: THE TWELVE TENETS
+           ==================================================== -->
+      <section id="tenets">
+        <h2>&sect; III. The Twelve Tenets</h2>
+        <p>The Tenets were drafted by Cornelia Hawthorne on the night of 14 June 1894 in the parlour
+          of <em>The Hanged Drayman</em>. They have been renumbered <strong>twice</strong> (1923, 1971)
+          and the original numbering survives only in the Cardiff Archive. The current numbering follows.</p>
+
+        <ol class="tenets-list">
+          <li>
+            <strong>Of the Scale.</strong> The scale is the unit of the world. Every scale, however small,
+            participates in the Whole. To diminish a scale is to diminish the Whole.
+            <details>
+              <summary>Doctrinal commentary (1971 revision)</summary>
+              <p>Hawthorne's original draft is terse. The 1971 commentary, attributed to Vault-Warden
+                Wycliffe, expands: "By 'scale' we mean not the keratinous plate of the pangolin alone, but
+                the measure of any thing &mdash; weight, importance, length of song. To weigh a thing falsely
+                is therefore a heresy."</p>
+            </details>
+          </li>
+
+          <li>
+            <strong>Of the Coil.</strong> When threatened, the pangolin coils. So too the Order. We are at our
+            most invulnerable when we present no aperture.
+            <details>
+              <summary>Doctrinal commentary</summary>
+              <p>This tenet has been invoked at least twice (1947, 2003) to justify the Order's refusal to
+                participate in external inquiries. The latter case is documented at <a href="talk-page.html#lost-1947">/talk-page.html#lost-1947</a>.</p>
+            </details>
+          </li>
+
+          <li>
+            <strong>Of the Nameless.</strong> Certain Scalebearers shall remain nameless in our records.
+            The Fourth was the first. Others have followed and will follow. This is not a punishment;
+            it is a privilege.
+            <details>
+              <summary>Doctrinal commentary</summary>
+              <p>"The privilege of namelessness" is, by tradition, conferred upon any member who
+                requests it formally, in writing, at a Convocation, and who can produce three Adept-Custodians
+                willing to vouch for them. As of 2026 there are eleven nameless members.</p>
+            </details>
+          </li>
+
+          <li>
+            <strong>Of the Threshold.</strong> A door once crossed cannot be uncrossed. Mind the door.
+            <details><summary>Commentary</summary><p>Originally a literal instruction about the back door
+              of <em>The Hanged Drayman</em>, which sticks. Has since acquired metaphorical weight.</p></details>
+          </li>
+
+          <li>
+            <strong>Of the Vault.</strong> What is in the Vault stays in the Vault. What leaves the Vault
+            must return to the Vault.
+            <details><summary>Commentary</summary><p>The single most-litigated Tenet in the Order's history.
+              See Geoffrey-vs-Beatrix, 2014, and the subsequent "Sacred Sigil Glass Case Incident."</p></details>
+          </li>
+
+          <li>
+            <strong>Of the Convocation.</strong> The Order shall meet annually. The Order shall make a quorum
+            of three. The Order shall not meet in February.
+            <details><summary>Commentary</summary><p>The February prohibition was added in 1923 after the
+              foundational text was amended; no surviving member knows why.</p></details>
+          </li>
+
+          <li>
+            <strong>Of the Scale-Polishing.</strong> Each Scalebearer shall polish at least one scale each
+            month, in silence, with cloth provided.
+            <details><summary>Commentary</summary><p>The provided cloth is, by tradition, a square of velvet
+              cut from the lining of the original Vault-curtain. No replacement curtain has been authorised.</p></details>
+          </li>
+
+          <li>
+            <strong>Of the Quiet Hour.</strong> Between three and four o'clock in the afternoon, on the
+            second Tuesday of each month, the Scalebearer shall observe silence.
+            <details><summary>Commentary</summary><p>Compliance is on the honour system. Geoffrey has,
+              by his own admission, never managed an unbroken Quiet Hour.</p></details>
+          </li>
+
+          <li>
+            <strong>Of Discretion in Correspondence.</strong> Order business shall not be conducted by
+            postcard. (1923 amendment: nor by telegram.) (1971 amendment: nor by facsimile.)
+            (1998 amendment: nor by electronic mail unless encrypted with the cipher in Appendix C.)
+            (2014 amendment: amendment to 1998 amendment rescinded; encryption optional.)
+            <details><summary>Commentary</summary><p>The cipher in Appendix C is ROT-13. This was not
+              widely understood until 2002.</p></details>
+          </li>
+
+          <li>
+            <strong>Of Welcome.</strong> The novice is to be welcomed. The novice is to be tested.
+            The novice is not to be rushed.
+            <details><summary>Commentary</summary><p>Average time from initial petition to confirmation
+              as Initiate, per Vault records: 4.3 years. Geoffrey's was 9.</p></details>
+          </li>
+
+          <li>
+            <strong>Of the Sigil.</strong> The Sigil shall be rendered in copper and velvet, and shall
+            contain twelve scales in a ring. No other rendering is authoritative.
+            <details>
+              <summary>Doctrinal commentary &mdash; the Sacred Doctrine, deepest reveal</summary>
+              <table border="1" cellpadding="6" cellspacing="0" style="background:#fff8e0;border:2px ridge #C49934;width:100%;">
+                <tr><td>
+                  <figure style="margin:0;">
+                    <figcaption><b>The Sacred Pangolin Doctrine</b> (as recorded in the 1923 revision)</figcaption>
+                    <dl>
+                      <dt>Layer the First: Of Appearance</dt>
+                      <dd>"The sigil shall appear as a pangolin coiled."
+                        <details>
+                          <summary>Layer the Second: Of Geometry</summary>
+                          <p>"The coiling shall be that of a logarithmic spiral, with constant phi."</p>
+                          <p>See also: <a href="#geometry">&sect; Sacred Geometry, below</a>.</p>
+                        </details>
+                      </dd>
+                    </dl>
+                  </figure>
+                </td></tr>
+              </table>
+            </details>
+          </li>
+
+          <li>
+            <strong>Of Returning.</strong> All Scalebearers, at end, return to the Vault.
+            <details><summary>Commentary</summary><p>Interpreted variously since 1894. Currently
+              taken to mean a symbolic return of one's polishing cloth to the Vault upon
+              death or departure from the Order. Beatrix, formerly Vault-Warden, has assembled
+              a notably large collection of cloths.</p></details>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ====================================================
+           SECTION 4: HIERARCHY (NESTED DL OF DOOM)
+           ==================================================== -->
+      <section id="ranks">
+        <h4>&sect; IV. Hierarchy of Initiation Ranks</h4>
+        <p>The Order recognises six ranks. Each rank contains sub-ranks. Each sub-rank contains
+          conditions. Each condition contains an exception. Each exception contains a footnote. Each
+          footnote contains, at minimum, one (1) reference to an unresolved Convocation vote.
+          The full hierarchy follows. <em>Mind the depth.</em></p>
+
+        <dl>
+          <dt><order-rank tier="initiate">Initiate</order-rank></dt>
+          <dd>
+            One who has petitioned and been accepted, but not yet polished.
+            <dl>
+              <dt>Initiate, First Quarter</dt>
+              <dd>0&ndash;3 months. Has not yet been issued a polishing cloth.
+                <dl>
+                  <dt>Initiate, First Quarter, Provisional</dt>
+                  <dd>Awaiting background check by the Vault-Warden.
+                    <dl>
+                      <dt>Initiate, First Quarter, Provisional, Bristol-Resident</dt>
+                      <dd>Subject to in-person interview at The Hanged Drayman.
+                        <dl>
+                          <dt>Initiate, First Quarter, Provisional, Bristol-Resident, Pub-Approved</dt>
+                          <dd>Cleared by the landlord. May proceed to confirmation.
+                            <dl>
+                              <dt>Initiate, First Quarter, Provisional, Bristol-Resident, Pub-Approved, Conditionally-Cloth-Bearing</dt>
+                              <dd>Issued a probationary cloth (cotton, not velvet) pending full confirmation.
+                                <dl>
+                                  <dt>&hellip;, Cloth-Bearing, Awaiting-Convocation</dt>
+                                  <dd>Final step before Scalebearer status. Median wait: 18 months.</dd>
+                                </dl>
+                              </dd>
+                            </dl>
+                          </dd>
+                        </dl>
+                      </dd>
+                    </dl>
+                  </dd>
+                </dl>
+              </dt>
+            </dl>
+          </dd>
+
+          <dt><order-rank tier="scalebearer">Scalebearer</order-rank></dt>
+          <dd>
+            A confirmed member. Has performed the Initiation Oath and received the velvet cloth.
+            <dl>
+              <dt>Scalebearer, Active</dt>
+              <dd>Polishes monthly. Attends Convocations.
+                <dl>
+                  <dt>Scalebearer, Active, Decade-Holder</dt>
+                  <dd>Ten or more consecutive years of compliance.</dd>
+                </dl>
+              </dd>
+              <dt>Scalebearer, Lapsed</dt>
+              <dd>Has missed two or more polishings. May be reinstated by Convocation vote.</dd>
+              <dt>Scalebearer, Quiet</dt>
+              <dd>Has invoked Tenet VIII as continuous standing. Communicates with the Order
+                only via written correspondence.</dd>
+            </dl>
+          </dd>
+
+          <dt><order-rank tier="adept">Adept</order-rank></dt>
+          <dd>
+            A Scalebearer of demonstrable depth. Eligible to vote on Tenet interpretation.
+            <dl>
+              <dt>Adept, Lay</dt>
+              <dd>The default. Reads, polishes, attends.</dd>
+              <dt>Adept-in-Training</dt>
+              <dd>Apprenticed to an Adept-Custodian. Receives weekly correspondence in cipher.</dd>
+            </dl>
+          </dd>
+
+          <dt><order-rank tier="custodian">Adept-Custodian</order-rank></dt>
+          <dd>
+            Custodian of a specific holding (a relic, a book, a ledger, a postal box).
+            Membership is by appointment of the Vault-Warden.
+            <dl>
+              <dt>Adept-Custodian of the Lesser Holdings</dt>
+              <dd>Pamphlets, correspondence, the smaller cloths.</dd>
+              <dt>Adept-Custodian of the Greater Holdings</dt>
+              <dd>The Doctrine itself, the founding minutes, the Original Box of Scales.
+                <dl>
+                  <dt>Custodian of the Original Box</dt>
+                  <dd>A title held by one person at any time. Currently: Adept-Custodian Pemberton
+                    (great-great-nephew of Reginald T. Pemberton, Esq., founder).
+                    <dl>
+                      <dt>Box-Polishing Conditions (1894)</dt>
+                      <dd>The Box shall be polished only with the velvet cloth, only on the
+                        anniversary of its acquisition, and only in the presence of at least
+                        two witnesses, at least one of whom must be a Vault-Warden.</dd>
+                    </dl>
+                  </dd>
+                </dl>
+              </dd>
+            </dl>
+          </dd>
+
+          <dt><order-rank tier="vault-warden">Vault-Warden</order-rank></dt>
+          <dd>
+            The single, supreme, ceremonial-and-administrative office of the Order. Held for life,
+            or until honourable resignation, or until removal by unanimous Convocation vote
+            (which has never occurred).
+            <dl>
+              <dt>Vault-Warden, Acting</dt>
+              <dd>Appointed in the event of the Vault-Warden's temporary indisposition.</dd>
+              <dt>Vault-Warden, Emeritus</dt>
+              <dd>A Vault-Warden who has honourably resigned. Currently: Beatrix.</dd>
+            </dl>
+          </dd>
+
+          <dt><order-rank tier="pangolin-equal">Pangolin-Equal</order-rank></dt>
+          <dd>
+            A title of singular honour, conferred by acclamation at a Convocation. As of 2026 there have
+            been three legitimately bestowed Pangolin-Equals in the entire 132-year history of the Order,
+            and approximately fourteen self-declared ones (see <a href="talk-page.html#rank-creep">/talk-page.html#rank-creep</a>).
+          </dd>
+        </dl>
+
+        <p><font color="#B22222" size="2"><i>Footnote on rank-creep:</i> The Vault-Warden's office reminds
+          members that <strong>self-promotion is not recognized</strong> regardless of how long ago it occurred
+          or how convincingly the title appears on the petitioner's correspondence card.</font></p>
+      </section>
+
+      <!-- ====================================================
+           SECTION 5: THE SACRED SIGIL + MathML GEOMETRY
+           ==================================================== -->
+      <section id="sigil" class="mystical">
+        <h2>&sect; V. The Sacred Sigil</h2>
+        <p>The Sigil, as authorized in Tenet XI, comprises twelve scales arranged in a ring about a
+          coiled pangolin. The geometry of the coil is governed by the equations below. These were
+          first derived by founder Hawthorne on the back of a draughtsman's blotter in 1894, and
+          re-derived (with corrections) by Vault-Warden Wycliffe in 1971.</p>
+
+        <a name="geometry"></a>
+        <h6 id="geometry">&loz; Sacred Geometry of the Coil &loz;</h6>
+
+        <div class="geometry-section">
+          <p>The coil of the pangolin in the Sigil is a logarithmic spiral whose radius
+            grows according to the golden ratio &phi;:</p>
+
+          <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+            <mrow>
+              <mi>r</mi><mo>(</mo><mi>&theta;</mi><mo>)</mo>
+              <mo>=</mo>
+              <msub><mi>r</mi><mn>0</mn></msub>
+              <msup>
+                <mi>&phi;</mi>
+                <mfrac>
+                  <mrow><mn>2</mn><mi>&theta;</mi></mrow>
+                  <mi>&pi;</mi>
+                </mfrac>
+              </msup>
+            </mrow>
+          </math>
+
+          <p>The total "scale curvature" &kappa;<sub>s</sub> of a single scale,
+            integrated over its arc, is given by:</p>
+
+          <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+            <mrow>
+              <msub><mi>&kappa;</mi><mi>s</mi></msub>
+              <mo>=</mo>
+              <munderover>
+                <mo>&int;</mo>
+                <mn>0</mn>
+                <mfrac><mi>&pi;</mi><mn>6</mn></mfrac>
+              </munderover>
+              <msqrt>
+                <mrow>
+                  <mn>1</mn>
+                  <mo>+</mo>
+                  <msup>
+                    <mfenced>
+                      <mfrac>
+                        <mrow><mi>d</mi><mi>r</mi></mrow>
+                        <mrow><mi>d</mi><mi>&theta;</mi></mrow>
+                      </mfrac>
+                    </mfenced>
+                    <mn>2</mn>
+                  </msup>
+                </mrow>
+              </msqrt>
+              <mspace width="0.2em"/>
+              <mi>d</mi><mi>&theta;</mi>
+            </mrow>
+          </math>
+
+          <p>And the Sigil-wide constant, the &laquo;Pangolin Number&raquo; &Pi;<sub>p</sub>,
+            is the matrix product of the twelve individual scale curvatures arranged radially:</p>
+
+          <math display="block" xmlns="http://www.w3.org/1998/Math/MathML">
+            <mrow>
+              <msub><mi>&Pi;</mi><mi>p</mi></msub>
+              <mo>=</mo>
+              <mfenced open="|" close="|">
+                <mtable>
+                  <mtr>
+                    <mtd><msub><mi>&kappa;</mi><mn>1</mn></msub></mtd>
+                    <mtd><msub><mi>&kappa;</mi><mn>2</mn></msub></mtd>
+                    <mtd><mo>&hellip;</mo></mtd>
+                    <mtd><msub><mi>&kappa;</mi><mn>12</mn></msub></mtd>
+                  </mtr>
+                  <mtr>
+                    <mtd><msup><mi>&phi;</mi><mn>1</mn></msup></mtd>
+                    <mtd><msup><mi>&phi;</mi><mn>2</mn></msup></mtd>
+                    <mtd><mo>&hellip;</mo></mtd>
+                    <mtd><msup><mi>&phi;</mi><mn>12</mn></msup></mtd>
+                  </mtr>
+                </mtable>
+              </mfenced>
+            </mrow>
+          </math>
+
+          <p style="font-size:11px;color:#888;font-style:italic">
+            (Wycliffe's 1971 derivation contains a notorious sign error in the &theta;-domain of
+            the integral. The error has been preserved in all subsequent printings on the
+            grounds that "correcting it would be presumptuous." See Convocation minutes, 1973.)
+          </p>
+        </div>
+
+      </section>
+
+      <!-- ====================================================
+           SECTION 6: ANNUAL CONVOCATIONS TABLE
+           ==================================================== -->
+      <section id="convocations">
+        <h3>&sect; VI. Annual Convocations Since 1894</h3>
+        <p>Reverse-chronological list of every Convocation the Order has held. The numbering
+          starts at 1894 and decreases. (Yes, this is unusual.)</p>
+
+        <ol reversed start="2026" style="font-family:'Cinzel',serif;color:#3A1B47">
+          <li><strong>2026, Bristol</strong> &mdash; 132nd Convocation. Quorum: 14. Resolution: re-affirmation of Tenet III.</li>
+          <li><strong>2025, Cardiff</strong> &mdash; Quorum: 11. Notable: the &laquo;Cloth Renumbering Question&raquo;.</li>
+          <li><strong>2024, Bristol</strong> &mdash; Quorum: 13. Resolution: page protected against IP 86.32.144.219.</li>
+          <li><strong>2023, Swansea</strong> &mdash; Quorum: 9. Notable: capitalization of "scalebearer" finally settled.</li>
+          <li><strong>2022, Bristol</strong> &mdash; Quorum: 12. Resolution: classic.html preserved as heritage.</li>
+          <li><strong>2021, postponed (pandemic, virtual)</strong> &mdash; Quorum: 7. Notable: the Convocation that everyone forgot to mute.</li>
+          <li><strong>2020, postponed</strong> &mdash; not held in person; minutes by post.</li>
+          <li><strong>1894, Bristol</strong> &mdash; The First Convocation. Quorum: 4. Resolution: everything.</li>
+        </ol>
+
+        <p>The full table of Holdings recorded at each Convocation follows. The visual rhombi
+          you will see in certain cells indicate <em>decades of silence</em> &mdash; periods during
+          which the Order recorded only that &laquo;<i>no business was conducted</i>&raquo;.</p>
+
+        <table class="doctrine">
+          <caption><b>The Order's Holdings, by Convocation Era</b> (excerpted)</caption>
+          <colgroup>
+            <col style="width:14%">
+            <col style="width:18%">
+            <col style="width:10%">
+            <col style="width:30%">
+            <col style="width:28%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Year(s)</th>
+              <th scope="col">Location</th>
+              <th scope="col">Quorum</th>
+              <th scope="col">Holding(s) Added</th>
+              <th scope="col">Notable Resolution</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td rowspan="3"><b>1894&ndash;1922</b></td>
+              <td>Bristol</td>
+              <td>4</td>
+              <td>The Original Box of Scales (1894), Founding Minutes (1894), The Velvet Curtain (1897)</td>
+              <td>Ratification of the Twelve Tenets.</td>
+            </tr>
+            <tr>
+              <td>Cardiff</td>
+              <td>7</td>
+              <td>The Lesser Ledger (1905)</td>
+              <td>Tenet IX renumbering (later reverted).</td>
+            </tr>
+            <tr>
+              <th scope="row">[inline TH in TBODY]</th>
+              <td>9</td>
+              <td>The Cardiff Postal Box (1908)</td>
+              <td>Petitions handled by post going forward.</td>
+            </tr>
+
+            <tr>
+              <td><b>1923</b></td>
+              <td>Bristol</td>
+              <td>11</td>
+              <td>Doctrine, First Printed Edition</td>
+              <td>February prohibition adopted. Reason unrecorded.</td>
+            </tr>
+
+            <tr>
+              <td class="rhombus" rowspan="2"><b>1924&ndash;1946</b></td>
+              <td colspan="2" class="silence">decades of silence</td>
+              <td class="silence">no minutes survive in legible form</td>
+              <td class="silence">&hellip;</td>
+            </tr>
+            <tr>
+              <td colspan="2" class="silence">decades of silence</td>
+              <td class="silence">&hellip;</td>
+              <td class="silence">&hellip;</td>
+            </tr>
+
+            <tr>
+              <td><b>1947</b></td>
+              <td>[unrecorded]</td>
+              <td>?</td>
+              <td colspan="2" class="silence">&laquo;The Lost Convocation&raquo; &mdash; see <a href="talk-page.html#lost-1947" style="color:#FF69B4">discussion</a>.</td>
+            </tr>
+
+            <tr>
+              <td rowspan="2"><b>1948&ndash;1970</b></td>
+              <td>Bristol &amp; Cardiff (alternating)</td>
+              <td>5&ndash;14</td>
+              <td>
+                Various pamphlets, member portraits.
+                <table border="1" cellpadding="3" cellspacing="0">
+                  <tr><td><i>Sub-holdings:</i></td><td>
+                    <table border="1" cellpadding="2">
+                      <tr><td>1953 cloth (frayed)</td></tr>
+                      <tr><td>1961 ledger (annotated)</td></tr>
+                      <tr><td>1969 scale (loose)</td>
+                        <td>
+                          <table border="0">
+                            <tr><td>provenance:</td>
+                              <td>
+                                <table border="1" bgcolor="#fff8e0">
+                                  <tr><td>Reginald's box, drawer 3</td>
+                                    <td>
+                                      <table border="1" cellpadding="1" bgcolor="#fff">
+                                        <tr><td>sub-drawer 3a</td></tr>
+                                        <tr><td>tag &laquo;1969-loose&raquo;</td></tr>
+                                      </table>
+                                    </td>
+                                  </tr>
+                                  <tr><td colspan="2">tagged "1969"</td></tr>
+                                </table>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td></tr>
+                </table>
+              </td>
+              <td>Ordinary business.</td>
+            </tr>
+            <tr>
+              <td>Bristol</td>
+              <td>14</td>
+              <td>The Greater Ledger</td>
+              <td>1971 Renumbering of Tenets (still controversial).</td>
+            </tr>
+
+            <tr>
+              <td class="rhombus"><b>1971&ndash;1997</b></td>
+              <td>Bristol / Swansea / Cardiff</td>
+              <td>6&ndash;18</td>
+              <td>Numerous pamphlets, the &laquo;Greensleeves Tape&raquo; (1979)</td>
+              <td>Adoption of cassette correspondence (Tenet IX amendment).</td>
+            </tr>
+
+            <tr>
+              <td><b>1998</b></td>
+              <td>Bristol (with web extension)</td>
+              <td>12 + 1 (online)</td>
+              <td>This very web site, authored by Geoffrey Wickering.</td>
+              <td>Adoption of electronic mail (Tenet IX 1998 amendment).</td>
+            </tr>
+
+            <tr>
+              <td><b>2020&ndash;2021</b></td>
+              <td>postponed / virtual</td>
+              <td>7&ndash;9</td>
+              <td>none recorded</td>
+              <td>Resolution to "never again use that videoconference platform."</td>
+            </tr>
+
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5" style="text-align:right;font-style:italic;color:#666">
+                Compiled by Vault-Warden Eduardo, last revised June 2026.
+                <th scope="row">[stray TH in TFOOT]</th>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <!-- ====================================================
+           SECTION 7: MEMBERSHIP ROSTER (multi-script)
+           ==================================================== -->
+      <section id="roster">
+        <H2>&sect; VII. Membership Roster (Public Listing, Abridged)</H2>
+        <p>The following Scalebearers have consented to public listing. Many do not appear,
+          and that is by design. Names are rendered in each member's preferred script.</p>
+
+        <div class="roster">
+          <div class="member" itemscope itemtype="https://schema.org/Person">
+            <strong itemprop="name">Geoffrey Wickering</strong>
+            <span class="userbox" style="background:#B22222;color:#fff;padding:1px 6px;font-size:11px;">Adept-Custodian</span><br>
+            <small>Bristol &middot; <bdi>+44&nbsp;117&nbsp;496&nbsp;0188</bdi> &middot;
+              <bdi>Member&nbsp;ID:&nbsp;HIOVP-0247</bdi></small>
+          </div>
+
+          <div class="member" lang="ar" dir="rtl" itemscope itemtype="https://schema.org/Person">
+            <strong itemprop="name">صلاح بن قاسم الحرشفي</strong>
+            <span class="userbox" style="background:#355E3B;color:#fff;padding:1px 6px;font-size:11px;">Scalebearer</span><br>
+            <small>دمشق &middot; <bdi>+963&nbsp;11&nbsp;555&nbsp;0142</bdi> &middot;
+              <bdi>Member&nbsp;ID:&nbsp;HIOVP-0412</bdi></small>
+          </div>
+
+          <div class="member" lang="ja" itemscope itemtype="https://schema.org/Person">
+            <strong itemprop="name">穿山甲 鱗子</strong>
+            <span class="userbox" style="background:#8B5A8E;color:#fff;padding:1px 6px;font-size:11px;">Adept</span><br>
+            <small>京都 &middot; <ruby>鱗子<rt>うろこ・こ</rt></ruby> &middot;
+              <bdi>Member&nbsp;ID:&nbsp;HIOVP-0531</bdi></small>
+          </div>
+
+          <div class="member" lang="he" itemscope itemtype="https://schema.org/Person">
+            <strong itemprop="name"><bdo dir="rtl">שרה בת לאה הקשקשנית</bdo></strong>
+            <span class="userbox" style="background:#C49934;color:#000;padding:1px 6px;font-size:11px;">Initiate</span><br>
+            <small>ירושלים &middot; <bdi>+972&nbsp;2&nbsp;555&nbsp;0177</bdi> &middot;
+              <bdi>Member&nbsp;ID:&nbsp;HIOVP-0619</bdi></small>
+          </div>
+
+          <div class="member" lang="grc" itemscope itemtype="https://schema.org/Person">
+            <strong itemprop="name">Ἀριστοκλῆς ὁ Φολιδωτοφίλος</strong>
+            <span class="userbox" style="background:#3A1B47;color:#C49934;padding:1px 6px;font-size:11px;">Pangolin-Equal&nbsp;(hon.)</span><br>
+            <small>Ἀθῆναι &middot; <bdi>Member&nbsp;ID:&nbsp;HIOVP-0001</bdi> (posthumous, retroactive)</small>
+          </div>
+
+          <div class="member" itemscope itemtype="https://schema.org/Person">
+            <strong itemprop="name">Mavis of Wales</strong>
+            <span class="userbox" style="background:#B22222;color:#fff;padding:1px 6px;font-size:11px;">Adept</span><br>
+            <small>Swansea &middot; <bdi>+44&nbsp;1792&nbsp;555&nbsp;0103</bdi> &middot;
+              <bdi>Member&nbsp;ID:&nbsp;HIOVP-0188</bdi></small>
+          </div>
+
+          <div class="member" itemscope itemtype="https://schema.org/Person">
+            <strong itemprop="name">[The Fourth]</strong>
+            <span class="userbox" style="background:#1F1F1F;color:#C49934;padding:1px 6px;font-size:11px;">Founder&nbsp;(nameless)</span><br>
+            <small>Clifton &middot; <bdi>&mdash;</bdi> &middot; <bdi>Member&nbsp;ID:&nbsp;HIOVP-0004</bdi></small>
+          </div>
+
+          <div class="member" itemscope itemtype="https://schema.org/Person">
+            <strong itemprop="name">SCALEFRIEND_88</strong>
+            <span class="userbox" style="background:#888;color:#fff;padding:1px 6px;font-size:11px;">De-Scaled (2019)</span><br>
+            <small>[location withheld] &middot; <bdi>Member&nbsp;ID:&nbsp;HIOVP-0388</bdi></small>
+          </div>
+        </div>
+
+        <p lang="grc" style="margin-top:14px;font-family:'Cardo',serif;color:#3A1B47">
+          <em>&laquo;Πᾶσα φολίς, μία τάξις.&raquo;</em> &mdash; Cornelia Hawthorne, 1894 (attrib.)
+        </p>
+        <p lang="la">
+          <em>Inspectabilitas custos est. Vide non visi. Audi non auditi.</em>
+        </p>
+      </section>
+
+      <!-- ====================================================
+           SECTION 8: APPLY TO JOIN — FORM CHAOS
+           ==================================================== -->
+      <section id="apply">
+        <h2>&sect; VIII. Petition for Membership</h2>
+        <p>Complete the form below and submit by post, fax, telegram, e-mail, or in person
+          at <em>The Hanged Drayman</em>, Corn Street, Bristol, between the hours of 1500 and
+          1600 on the second Tuesday of any month not falling in February.</p>
+
+        <form class="chaos-form" name="petitionForm" id="petitionForm" onsubmit="alert('Your petition has been received by the Vault. Please allow 4.3 years for review.'); return false;">
+          <fieldset>
+            <legend>&loz; Petitioner Identity &loz;</legend>
+            <label>Full name (as it appears on your principal correspondence)
+              <input type="text" name="full_name" size="40" required placeholder="e.g. Reginald T. Pemberton, Esq.">
+            </label>
+            <label>Preferred form of address
+              <select name="address_form">
+                <optgroup label="Civilian">
+                  <option>Mr.</option><option>Mrs.</option><option>Ms.</option><option>Mx.</option><option>Dr.</option>
+                </optgroup>
+                <optgroup label="Ecclesiastical">
+                  <option>Rev.</option><option>Ven.</option>
+                </optgroup>
+                <optgroup label="Order-Specific">
+                  <option>Scalebearer</option><option>Adept</option><option>Adept-Custodian</option>
+                </optgroup>
+              </select>
+            </label>
+            <label>Electronic mail address
+              <input type="email" name="email" size="40" placeholder="petitioner@example.example">
+            </label>
+            <label>Personal website (if any)
+              <input type="url" name="url" size="40" placeholder="https://&hellip;">
+            </label>
+            <label>Telephone (will not be called &mdash; this is for the Vault's records only)
+              <input type="tel" name="phone" pattern="[+0-9\s\-]+" size="20">
+            </label>
+
+            <fieldset>
+              <legend>&loz; Demographic Information (optional, encrypted) &loz;</legend>
+              <label>Year you first encountered The Order
+                <input type="number" name="year_encountered" min="1894" max="2026" step="0.5" value="2024">
+              </label>
+              <label>Approximate age
+                <input type="range" name="age" min="14" max="120" value="42">
+              </label>
+              <label>Preferred date for initial interview
+                <input type="date" name="interview_date" min="2026-07-01" max="2030-12-31">
+              </label>
+              <label>Preferred time
+                <input type="time" name="interview_time" min="15:00" max="16:00" step="900">
+              </label>
+              <label>Or, precise moment (rare)
+                <input type="datetime-local" name="interview_dt">
+              </label>
+              <label>Month of birth
+                <input type="month" name="birth_month">
+              </label>
+              <label>Week of conscious awakening to the Pangolin
+                <input type="week" name="awakening_week">
+              </label>
+              <label>Preferred sigil tincture
+                <input type="color" name="sigil_color" value="#B87333">
+              </label>
+            </fieldset>
+          </fieldset>
+
+          <fieldset>
+            <legend>&loz; Membership Details &loz;</legend>
+            <label>Pangolin species you most identify with
+              <input list="species-list" name="species">
+              <datalist id="species-list">
+                <option value="Manis crassicaudata">Indian pangolin</option>
+                <option value="Manis pentadactyla">Chinese pangolin</option>
+                <option value="Manis javanica">Sunda pangolin</option>
+                <option value="Manis culionensis">Philippine pangolin</option>
+                <option value="Smutsia gigantea">Giant ground pangolin</option>
+                <option value="Smutsia temminckii">Ground pangolin</option>
+                <option value="Phataginus tetradactyla">Long-tailed pangolin</option>
+                <option value="Phataginus tricuspis">White-bellied pangolin</option>
+                <option value="Manis velutina (unconfirmed)">The Velvet Pangolin (cryptid)</option>
+              </datalist>
+            </label>
+            <label>Rank(s) you have informally adopted in advance of recognition
+              <select name="self_rank" multiple size="5">
+                <optgroup label="Permitted">
+                  <option>Initiate</option>
+                  <option>Scalebearer</option>
+                </optgroup>
+                <optgroup label="Discouraged">
+                  <option>Adept</option>
+                  <option>Adept-Custodian</option>
+                  <option>Vault-Warden</option>
+                  <option>Pangolin-Equal</option>
+                </optgroup>
+              </select>
+            </label>
+
+            <label>Have you read the Doctrine?
+              <input type="checkbox" name="doctrine_read">
+            </label>
+            <label>Which printing?
+              <label><input type="radio" name="printing" value="1923"> 1923 (first)</label>
+              <label><input type="radio" name="printing" value="1973"> 1973 (revised)</label>
+              <label><input type="radio" name="printing" value="1998"> 1998 (web)</label>
+              <label><input type="radio" name="printing" value="bootleg"> Bootleg PDF</label>
+              <label><input type="radio" name="printing" value="none" checked> I have not</label>
+            </label>
+
+            <label>Membership petition (max 500 words)
+              <textarea name="petition" rows="6" cols="60" placeholder="Why do you seek to join? Be sincere. The Vault detects insincerity."></textarea>
+            </label>
+
+            <label>Attach a photograph of yourself with a pangolin (any species)
+              <input type="file" name="photo" accept="image/*">
+            </label>
+            <label>Search the existing membership for someone who might vouch for you
+              <input type="search" name="voucher_search" placeholder="e.g. Mavis of Wales">
+            </label>
+            <label>Pangolin-related password you would like to use for member-only pages
+              <input type="password" name="member_password" minlength="8">
+            </label>
+            <label>Confidence in your application (will not be shown to the Vault-Warden):
+              <progress id="confidence" max="100" value="62">62%</progress>
+            </label>
+            <label>Your scale-polish proficiency, self-assessed:
+              <meter min="0" max="10" low="3" high="7" optimum="9" value="6">6 of 10</meter>
+            </label>
+            <label>Compute a numerical score (purely ceremonial):
+              <input type="number" id="score-a" value="7" oninput="document.getElementById('total-score').value = (+this.value) + (+document.getElementById('score-b').value)">
+              <input type="number" id="score-b" value="12" oninput="document.getElementById('total-score').value = (+this.value) + (+document.getElementById('score-a').value)">
+              =
+              <output id="total-score" for="score-a score-b">19</output>
+            </label>
+
+            <!-- inner form (invalid; parser will drop it) -->
+            <form action="#nested" method="post">
+              <label>Inner form! &laquo;Optional secondary petition&raquo; <input type="text" name="secondary"></label>
+            </form>
+          </fieldset>
+
+          <fieldset>
+            <legend>&loz; Cryptographic Identity (Deprecated) &loz;</legend>
+            <label>Generate a key pair for ceremonial signing (deprecated, but the Order still uses it):
+              <keygen name="ceremonialKey" challenge="velvet-pangolin-challenge-1894" keytype="RSA">
+            </label>
+            <input type="hidden" name="csrf_token" value="VELVET-PANGOLIN-1894-MANUAL-TOKEN">
+          </fieldset>
+
+          <fieldset>
+            <legend>&loz; Submission &loz;</legend>
+            <input type="submit" value="&loz; Submit Petition &loz;">
+            <button type="button">Save Draft</button>
+            <input type="reset" value="Clear Form">
+            <input type="image" src="images/submit-button.gif" alt="[CEREMONIAL SUBMIT BUTTON]" name="ceremonial_submit">
+          </fieldset>
+        </form>
+
+        <!-- the 1999 form-by-email pattern -->
+        <form action="mailto:scalebearer@velvetpangolin.example" method="post" enctype="text/plain" class="chaos-form" style="margin-top:18px">
+          <legend><b>Alternative: Petition by E-Mail</b></legend>
+          <p>If your browser does not support the form above, you may submit a petition
+            directly by electronic mail using this simplified version:</p>
+          <label>Name <input type="text" name="name" size="30"></label><br>
+          <label>Why you seek to join <textarea name="reason" rows="3" cols="40"></textarea></label><br>
+          <input type="submit" value="Mail Petition">
+        </form>
+
+        <!-- a form with no action and no method -->
+        <form class="chaos-form" style="margin-top:18px;background:#fff">
+          <legend><b>Anonymous Suggestion Box</b></legend>
+          <p>A form with no <code>action</code> and no <code>method</code>. The Order will
+            receive your suggestion telepathically, as is traditional.</p>
+          <label>Suggestion <textarea name="suggestion" rows="3" cols="40"></textarea></label><br>
+          <input type="submit" value="Transmit">
+        </form>
+
+        <!-- isindex (extinct) -->
+        <isindex prompt="Or, simply type your petition here:&nbsp;">
+      </section>
+
+      <!-- ====================================================
+           SECTION 9: LIBRARY OF HOLDINGS (picture jungle)
+           ==================================================== -->
+      <section id="library">
+        <h2>&sect; IX. Library of Holdings</h2>
+        <p>A selection of the Order's rare items, with their idiosyncratically specific
+          source-rendering preferences. Image sources will not resolve; the gallery is
+          presented for connoisseurship of the markup itself.</p>
+
+        <div class="library-grid">
+          <figure>
+            <picture>
+              <source srcset="images/sigil-darkglow.avif" type="image/avif"
+                media="(prefers-color-scheme: dark) and (min-resolution: 2dppx) and (color-gamut: p3) and (min-width: 720px)">
+              <source srcset="images/sigil-darkglow.webp" type="image/webp"
+                media="(prefers-color-scheme: dark)">
+              <source srcset="images/sigil-lightleaf.jxl" type="image/jxl"
+                media="(prefers-color-scheme: light) and (prefers-reduced-motion: no-preference)">
+              <source srcset="images/sigil-reduced.png" type="image/png"
+                media="(prefers-reduced-motion: reduce)">
+              <img src="images/sigil-fallback.jpg" alt="The Sacred Sigil, in copper and velvet"
+                width="240" height="180" loading="lazy" decoding="async">
+            </picture>
+            <figcaption><b>Holding I.</b> &mdash; The Sigil (digital reproduction, 2003)</figcaption>
+          </figure>
+
+          <figure>
+            <picture>
+              <source srcset="images/scalebox-3x.avif 3x, images/scalebox-2x.avif 2x, images/scalebox.avif 1x" type="image/avif">
+              <source srcset="images/scalebox.webp" type="image/webp" media="(color-gamut: srgb)">
+              <img src="images/scalebox.jpg" alt="The Original Box of Scales, sepia photograph (1894)" width="240" height="180" loading="lazy">
+            </picture>
+            <figcaption><b>Holding II.</b> &mdash; The Original Box of Scales (acquired Bristol, 1894).
+              <small>Currently held by Adept-Custodian Pemberton.</small></figcaption>
+          </figure>
+
+          <figure>
+            <picture>
+              <source srcset="images/cloth.avif" type="image/avif"
+                media="(prefers-reduced-data: no-preference) and (min-width: 480px)">
+              <source srcset="images/cloth-lite.jpg" type="image/jpeg"
+                media="(prefers-reduced-data: reduce)">
+              <img src="images/cloth.jpg" alt="The Velvet Curtain, fragment (1897)" width="240" height="180" loading="lazy">
+            </picture>
+            <figcaption><b>Holding III.</b> &mdash; The Velvet Curtain (fragment). Source of all polishing cloths.</figcaption>
+          </figure>
+
+          <figure>
+            <picture>
+              <source srcset="images/ledger.avif" type="image/avif" media="(orientation: landscape)">
+              <source srcset="images/ledger-port.avif" type="image/avif" media="(orientation: portrait)">
+              <img src="images/ledger.jpg" alt="The Lesser Ledger, open to p. 14 (1905)" width="240" height="180" loading="lazy">
+            </picture>
+            <figcaption><b>Holding IV.</b> &mdash; The Lesser Ledger (1905), with annotations.</figcaption>
+          </figure>
+
+          <figure>
+            <picture>
+              <source srcset="images/greensleeves.avif" type="image/avif" media="(max-resolution: 1dppx)">
+              <source srcset="images/greensleeves@2x.avif 2x, images/greensleeves.avif 1x" type="image/avif">
+              <img src="images/greensleeves.jpg" alt="The Greensleeves Tape (1979), cassette" width="240" height="180" loading="lazy">
+            </picture>
+            <figcaption><b>Holding V.</b> &mdash; The Greensleeves Tape (1979). Disputed musicology.</figcaption>
+          </figure>
+
+          <figure>
+            <picture>
+              <source srcset="images/cardiff-pb.avif" type="image/avif"
+                media="(min-monochrome: 8)">
+              <img src="images/cardiff-pb.jpg" alt="Cardiff Postal Box, 1908" width="240" height="180" loading="lazy">
+            </picture>
+            <figcaption><b>Holding VI.</b> &mdash; The Cardiff Postal Box (1908). Still receives mail.</figcaption>
+          </figure>
+        </div>
+
+        <h3>An aside: a pangolin in ASCII</h3>
+        <pre class="ascii-pangolin"><code>
+              .----.   .---.
+             /  ..  \ /  ..\
+            |  o..o |  o..  |          PANGOLIN-IN-RESIDENCE
+             \      / \    /          ( see Tenet I &amp; XI )
+              \____/   \__/
+            ___|__|_____|__|___
+           /  ((  ))  ((  ))   \\___    "per scalas ad astra"
+          ((    ))  ((    ))    \___\
+           \  ((  ))  ((  ))   /
+            \_____|__|_____|___/
+                /  /    \  \
+               '__'      '__'
+        </code></pre>
+
+        <h3>Plaintext (do not edit anything after this line)</h3>
+        <xmp>
+        <h1>This will not be rendered as HTML</h1>
+        It is preserved as plaintext per the 1894 convention of
+        printing important text in monospaced ink.
+          &amp; &lt; &gt; &quot; &copy;
+        </xmp>
+
+        <listing>
+        Original listing of Vault holdings, 1894:
+          1. one (1) box of scales
+          2. one (1) velvet curtain (purchased 1897)
+          3. one (1) ledger
+          4. one (1) draughtsman's blotter (Hawthorne)
+          5. miscellaneous correspondence
+        </listing>
+      </section>
+
+      <!-- ====================================================
+           SECTION 10: PRONOUNCEMENTS (nested blockquote chain)
+           ==================================================== -->
+      <section id="pronouncements">
+        <H2>&sect; X. Pronouncements of the Order</H2>
+        <p>The Order's official position on certain matters is established by a recursive chain of
+          citations &mdash; each pronouncement cites its predecessor. The chain below is read from
+          outermost (most recent) to innermost (1894).</p>
+
+        <blockquote cite="https://velvetpangolin.example/pronouncements/2026">
+          <p><b>2026 Pronouncement:</b> Upon the matter of the Velvet Pangolin's existence:
+            &laquo;The Velvet Pangolin is real to those for whom realness is operative.&raquo;</p>
+          <blockquote cite="https://velvetpangolin.example/pronouncements/2014">
+            <p><b>2014:</b> Building upon the 1998 Pronouncement, which held:
+              &laquo;Realness is operative for those who accept it as such.&raquo;</p>
+            <blockquote cite="https://velvetpangolin.example/pronouncements/1998">
+              <p><b>1998:</b> Reaffirming the 1971 Pronouncement, which held:
+                &laquo;Acceptance is sufficient.&raquo;</p>
+              <blockquote cite="https://velvetpangolin.example/pronouncements/1971">
+                <p><b>1971:</b> Drawing upon the 1947 Pronouncement (the only known artifact of that Convocation), which held:
+                  &laquo;Sufficiency is in the seeing.&raquo;</p>
+                <blockquote cite="https://velvetpangolin.example/pronouncements/1923">
+                  <p><b>1923:</b> Which itself extended the 1908 Pronouncement:
+                    &laquo;Seeing is partial.&raquo;</p>
+                  <blockquote cite="https://velvetpangolin.example/pronouncements/1908">
+                    <p><b>1908:</b> Citing Hawthorne's 1897 dictum:
+                      &laquo;Partial seeing is the natural state.&raquo;</p>
+                    <blockquote cite="https://velvetpangolin.example/pronouncements/1897">
+                      <p><b>1897:</b> Drawn from Pemberton's 1894 marginalia:
+                        &laquo;The state is the scale.&raquo;</p>
+                      <blockquote cite="https://velvetpangolin.example/pronouncements/1894">
+                        <p><b>1894:</b> Hawthorne, in the original draft Tenets:
+                          &laquo;Per scalas ad astra.&raquo;</p>
+                      </blockquote>
+                    </blockquote>
+                  </blockquote>
+                </blockquote>
+              </blockquote>
+            </blockquote>
+          </blockquote>
+        </blockquote>
+
+        <p style="font-size:11px;color:#666;font-style:italic">Some Scalebearers, including Geoffrey,
+        have argued that this entire pronouncement-chain is circular. The Vault-Warden's office has
+        responded that a circle is also a coil, and that coiling is doctrinally sound (cf. Tenet II).</p>
+      </section>
+
+      <!-- ====================================================
+           SECTION 11: INITIATION OATH (dialog open)
+           ==================================================== -->
+      <section id="oath">
+        <H2>&sect; XI. The Initiation Oath</H2>
+
+        <dialog open aria-labelledby="oath-heading" aria-describedby="oath-text-noid" tabindex="999">
+          <h3 id="oath-heading">The Oath of the Velvet Pangolin</h3>
+          <p id="oath-text">
+            <em>I,</em> _________________ <em>, in the sight of the Sigil and the Vault, and within the
+              hearing (real or imagined) of the Pangolin, do solemnly affirm:</em>
+          </p>
+          <ol>
+            <li>That I shall hold the Twelve Tenets above my own convenience.</li>
+            <li>That I shall polish my scale in silence, with cloth provided.</li>
+            <li>That I shall not, under any provocation, divulge the contents of the Vault.</li>
+            <li>That I shall mind the door.</li>
+            <li>That I shall not conduct Order business in February.</li>
+            <li>That I shall, at the end, return.</li>
+          </ol>
+          <p style="text-align:center;font-family:'Cinzel',serif;color:#C49934">
+            <em>Per&nbsp;scalas&nbsp;ad&nbsp;astra.</em>
+          </p>
+          <form method="dialog">
+            <button type="submit" class="web2-button">I so affirm.</button>
+          </form>
+        </dialog>
+      </section>
+
+      <!-- ====================================================
+           SECTION 12: CUSTOM ELEMENTS CODEX
+           ==================================================== -->
+      <section id="codex" class="vault-panel" aria-expanded="true" aria-expanded="false">
+        <div>
+          <h3>&sect; XII. The Codex of Sacred Elements</h3>
+          <p>The Order has, in the years since 2019, adopted a small vocabulary of custom HTML
+            elements for use in its written materials. These elements are not defined by any
+            script; their meaning is purely doctrinal. The Vault-Warden has ruled that they
+            shall appear in the DOM as a sign of fidelity to the form.</p>
+
+          <p>Scales of the recognized tinctures:
+            <pangolin-scale color="copper"></pangolin-scale>
+            <pangolin-scale color="silver"></pangolin-scale>
+            <pangolin-scale color="onyx"></pangolin-scale>
+            <pangolin-scale color="gilt"></pangolin-scale>
+            (in approved doctrinal order)
+          </p>
+
+          <p>Glyphs of the sacred runes:
+            <sacred-glyph rune="alpha"></sacred-glyph>
+            <sacred-glyph rune="seventh"></sacred-glyph>
+            <sacred-glyph rune="thirteenth"></sacred-glyph>
+            <sacred-glyph rune="omega"></sacred-glyph>
+          </p>
+
+          <p>Ranks, in ascending order:
+            <order-rank tier="initiate">Initiate</order-rank>
+            <order-rank tier="scalebearer">Scalebearer</order-rank>
+            <order-rank tier="adept">Adept</order-rank>
+            <order-rank tier="custodian">Custodian</order-rank>
+            <order-rank tier="vault-warden">Vault-Warden</order-rank>
+            <order-rank tier="pangolin-equal">Pangolin-Equal</order-rank>
+          </p>
+        </div>
+
+        <div>
+          <h3>A &lt;template&gt; for Future Initiate Cards</h3>
+          <p>The following is a template for an initiate card, to be cloned by a script that
+            has been "in development" since 2021:</p>
+
+          <template id="initiate-card-template">
+            <article class="modern-card">
+              <h3>Welcome, <slot name="name">Initiate</slot></h3>
+              <p>Rank conferred: <slot name="rank">Initiate</slot></p>
+              <p>Cloth issued: <slot name="cloth">cotton (probationary)</slot></p>
+              <p>Member ID: <slot name="member-id">HIOVP-XXXX</slot></p>
+              <p><code>per scalas ad astra</code></p>
+            </article>
+          </template>
+
+          <p style="font-size:11px;color:#888;font-style:italic">
+            (The CSS for the template above is in <code>style.css</code> under
+            &laquo;the great refactor&raquo;. The script that would clone the template has
+            been waiting for &laquo;another Convocation vote&raquo; for five years.)
+          </p>
+
+          <!-- applet, deprecated but technically valid markup -->
+          <applet code="PangolinScroller.class" width="320" height="60" alt="[scrolling pangolin applet — requires Java]">
+            <param name="text" value="Welcome, Scalebearer">
+            <param name="speed" value="3">
+            <param name="color" value="#C49934">
+            Your browser does not support Java applets. Please install
+            <a href="https://www.java.com">the Java Runtime</a>.
+          </applet>
+
+          <!-- a marquee just because -->
+          <marquee scrollamount="2" behavior="scroll" direction="right" loop="infinite" style="background:#000;color:#00FF00;font-family:'Courier New'">
+            &loz; SCALEBEARERS RISE &loz; THE CODEX IS COMPLETE &loz; THE PANGOLIN SEES &loz;
+          </marquee>
+
+          <!-- nested anchor, invalid -->
+          <p><a href="#oath">Read the Oath
+            <a href="#tenets" style="color:#FF69B4">(or, if not ready, the Tenets first)</a>
+          </a></p>
+
+          <!-- empty element with content (browsers will tolerate) -->
+          <p>A doctrinal reminder: <br>scalebearer manifesto</br> &mdash; observe the form.</p>
+
+          <!-- self-closing div, p -->
+          <div /> <p />
+
+          <!-- bdo reversed paragraph -->
+          <bdo dir="rtl"><p>This paragraph has been reversed in tribute to the 1947 Lost Convocation, the records of which were also, in their way, reversed.</p></bdo>
+
+          <!-- consecutive lang-different paragraphs -->
+          <p lang="la"><em>Vide non visi.</em></p>
+          <p lang="grc"><em>βλέπε μὴ βλεπόμενος.</em></p>
+
+          <!-- a name anchor + modern id together -->
+          <a name="rite-of-spring"></a>
+          <p id="rite-of-spring">The Rite of Spring is observed each March on a date determined by
+            the Vault-Warden. It is not, despite repeated rumours, related to the Stravinsky composition.</p>
+        </div>
+
+        <!-- another inline meta -->
+        <meta name="codex-author" content="CodeFriend_2014, with corrections by Reginald">
+      </section>
+
+      <!-- ====================================================
+           SECTION 12b: HISTORICAL CORRESPONDENCE
+           ==================================================== -->
+      <section id="correspondence">
+        <h6>&sect; XII.b Selected Historical Correspondence</h6>
+        <p>The Order's correspondence files are voluminous. The following are excerpted for
+          their representative quality. Original spellings, formatting, and typographical
+          conventions have been preserved exactly. Errors are theirs, not ours.</p>
+
+        <article style="border:1px solid #888;padding:12px;margin:8px 0;background:#fff8e0;font-family:'Lucida Handwriting',cursive;">
+          <header style="font-family:Georgia,serif;border-bottom:1px dotted #888;padding-bottom:4px;margin-bottom:6px;font-style:italic;color:#666;">
+            <small>Letter from Cornelia Hawthorne to Reginald Pemberton, 22 Sept 1894</small>
+          </header>
+          <p style="font-style:italic;color:#3A1B47;">Dear Pemberton, &mdash;</p>
+          <p>The matter of the curtain (velvet, hunter-green, twelve yards) is settled.
+          Mr. Penrose has arranged for its conveyance from the Bristol drapers&rsquo; on
+          Thursday next. I find your suggestion that the cloth be cut in advance of the
+          Convocation <s>premature</s> <ins>injudicious</ins>; let us await the assembled
+          membership before the first cut, as is fitting. The Fourth has communicated his assent
+          by means of <strike>a written note</strike> <ins>a wordless gesture in the snug</ins>;
+          I should not like to misrepresent him. &mdash; <i>C.P.H.</i></p>
+        </article>
+
+        <article style="border:1px solid #888;padding:12px;margin:8px 0;background:#fff8e0;font-family:'Courier New',monospace;font-size:13px;">
+          <header style="font-family:Georgia,serif;border-bottom:1px dotted #888;padding-bottom:4px;margin-bottom:6px;font-style:italic;color:#666;">
+            <small>Telegram, A. Penrose to C. Hawthorne, 11 Nov 1923 (intercepted by the Vault-Warden)</small>
+          </header>
+          <p>FEBRUARY PROHIBITION ADOPTED STOP REASON CLASSIFIED STOP DO NOT PRESS STOP &mdash; A.M.P.</p>
+        </article>
+
+        <article style="border:1px solid #888;padding:12px;margin:8px 0;background:#1F1F1F;color:#00FF00;font-family:'Courier New',monospace;font-size:12px;">
+          <header style="font-family:Georgia,serif;border-bottom:1px dotted #C49934;padding-bottom:4px;margin-bottom:6px;font-style:italic;color:#C49934;">
+            <small>E-mail, geoffrey.w@velvetpangolin.example to all@velvetpangolin.example, 04 Aug 1998 03:14 GMT</small>
+          </header>
+<pre style="white-space:pre-wrap;margin:0;font-family:inherit;color:inherit;background:none;border:none;padding:0;">From: geoffrey.w@velvetpangolin.example
+To:   all@velvetpangolin.example
+Subj: WE ARE ON THE WEB!!!
+Date: Tue, 04 Aug 1998 03:14:22 +0000
+
+Scalebearers,
+
+I am pleased to announce that the Order is officially on the World Wide Web.
+The address is http://www.angelfire.com/~velvetpangolin/ -- please bookmark
+it!! I have used FrontPage Express. It is BEAUTIFUL.
+
+Per scalas ad astra,
+-- Geoffrey</pre>
+        </article>
+
+        <article style="border:1px solid #888;padding:12px;margin:8px 0;background:#fff;font-family:'Trebuchet MS',sans-serif;">
+          <header style="border-bottom:1px dotted #888;padding-bottom:4px;margin-bottom:6px;font-style:italic;color:#666;">
+            <small>SMS, Vault-Warden Beatrix to Geoffrey, 14 Feb 2014</small>
+          </header>
+          <p>geoffrey it is FEBRUARY.<br>do not.<br>do NOT.<br>I see your draft.<br>delete it.</p>
+        </article>
+
+        <article style="border:1px solid #888;padding:12px;margin:8px 0;background:#fff8e0;font-family:Georgia,serif;">
+          <header style="border-bottom:1px dotted #888;padding-bottom:4px;margin-bottom:6px;font-style:italic;color:#666;">
+            <small>Postcard, [The Fourth] to the Vault-Warden, undated (1909?)</small>
+          </header>
+          <p style="text-align:center;font-family:'Lucida Handwriting',cursive;color:#3A1B47;font-size:18px;">
+            &mdash;
+          </p>
+          <p style="font-size:11px;color:#888;text-align:center;font-style:italic">
+            (The postcard is otherwise blank. It is held in the Vault. Its meaning has been
+            the subject of three Convocations and at least one academic paper. Consensus has
+            not been reached.)
+          </p>
+        </article>
+      </section>
+
+      <!-- ====================================================
+           SECTION 12c: A LITTLE BESTIARY (web-2.0 cards)
+           ==================================================== -->
+      <section id="bestiary">
+        <h2>&sect; XII.c The Bestiary of Recognized Pangolins</h2>
+        <p>The Order officially recognises eight extant species and three "rumoured" species of pangolin.
+          They are catalogued here in glossy <em>web-2.0 cards</em> by Mavis (2007), which she did not
+          finish styling, and which Geoffrey will not allow to be removed.</p>
+
+        <div class="web2-card">
+          <h3 style="margin-top:0">Manis crassicaudata &mdash; Indian pangolin</h3>
+          <p>Found across the Indian subcontinent. Known for its especially broad scales,
+          which Hawthorne (1894) identified as the &laquo;archetypal&raquo; pangolin form.
+          The Order's Original Box of Scales is believed to be of this species.</p>
+          <a class="web2-button" href="#">Read more &raquo;</a>
+        </div>
+
+        <div class="web2-card">
+          <h3 style="margin-top:0">Smutsia gigantea &mdash; Giant ground pangolin</h3>
+          <p>The largest pangolin. Documented by founder Penrose in a 1903 monograph as
+          &laquo;the species most deserving of veneration on size alone&raquo;. The monograph
+          has been quietly disputed by every Vault-Warden since.</p>
+          <a class="web2-button" href="#">Read more &raquo;</a>
+        </div>
+
+        <div class="web2-card">
+          <h3 style="margin-top:0">Phataginus tricuspis &mdash; White-bellied pangolin</h3>
+          <p>The pangolin most often photographed and least often understood. The Order
+          maintains a polite but distant relationship with this species.</p>
+          <a class="web2-button" href="#">Read more &raquo;</a>
+        </div>
+
+        <div class="gloss-strip" aria-hidden="true"></div>
+
+        <h4>The Three Rumoured Species</h4>
+
+        <div class="modern-card">
+          <h3>Manis velutina &mdash; The Velvet Pangolin</h3>
+          <div>
+            <p>The Order's namesake. Described in a single 1893 traveller's account (Pemberton, unpublished)
+            as &laquo;coppered, velveted of skin, of a size between hare and badger, seen at twilight
+            near the harbour&raquo;. No subsequent confirmation.</p>
+          </div>
+          <div>
+            <p>Habitat: <em>"the harbour at twilight"</em> (sic).<br>
+            Status: <strong>cryptid &mdash; revered</strong>.<br>
+            Vault holdings: one (1) alleged scale, kept in a sealed glass capsule.
+            <br>
+            <a class="web2-button" href="#">View Scale</a>
+            </p>
+          </div>
+        </div>
+
+        <div class="modern-card">
+          <h3>Manis chthonia &mdash; The Subterranean Pangolin</h3>
+          <div><p>Reported only in the Cardiff Schism documents (1922&ndash;1924). The Vault-Warden's office
+            does not recognise the Cardiff Schism as a doctrinal authority and therefore does not
+            recognise <em>M. chthonia</em>; the entry is retained here for completeness.</p></div>
+          <div><p>Status: <strong>repudiated</strong>.<br>
+          The Cardiff documents themselves are held under glass at the Greater Holdings, with a
+          warning label affixed by Vault-Warden Beatrix in 1991.</p></div>
+        </div>
+
+        <div class="modern-card">
+          <h3>Manis nemorosus &mdash; The Wood-Wandering Pangolin</h3>
+          <div><p>Mentioned in passing in a 1947 letter (sender unknown) that mysteriously survived
+            the broader 1947 archival loss. The letter has been transcribed below in <code>&lt;pre&gt;</code>;
+            its origin remains, like the Convocation of 1947 itself, unresolved.</p></div>
+          <div>
+<pre style="background:#fff;color:#3A1B47;border:1px dashed #888;padding:8px;font-family:'Courier New',monospace;font-size:11px;white-space:pre-wrap;">
+  &laquo;...and on the third night I saw it, between the elm and the oak,
+  a small armoured shape, neither rolling nor fleeing. It looked at me
+  with the patience of a thing that has been looked at before. I did
+  not approach. I do not know who you are, Vault-Warden, but you
+  should know it was there. &mdash; [signature trimmed]&raquo;
+</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================
+           SECTION 13: PRONOUNCEMENTS' LATIN EPIGRAM SCROLL
+           ==================================================== -->
+      <SECTION id="epigrams">
+        <H4>&sect; XIII. Selected Epigrams in Three Tongues</H4>
+        <CENTER>
+        <FONT face="Cinzel,serif" size="5" color="#3A1B47">
+        <I lang="la">Inspectabilitas custos est.</I><BR>
+        <SMALL lang="grc">βλέπε μὴ βλεπόμενος.</SMALL><BR>
+        <SMALL lang="ar" dir="rtl">الحرشفة تحفظ الجوهر</SMALL>
+        </FONT>
+        </CENTER>
+
+        <basefont face="Times New Roman" size="3" color="#3A1B47">
+
+        <!-- IE-specific dead element -->
+        <bgsound src="audio/oath-bell.mid" loop="-1">
+
+        <P>Member Beatrix, before her honourable resignation, was fond of attributing the central
+        epigram to the Embalmer. There is no evidence for this. There is, equally, no evidence
+        against it. The matter is &laquo;coiled&raquo; in the language of Tenet II.</P>
+
+        <P><tt>tt-text-preserved-from-1998:</tt> <tt>&laquo;The pangolin sees you. The pangolin sees you. The pangolin sees you.&raquo;</tt>
+        &mdash; Geoffrey, in the first version of this page, repeated three times for reasons
+        Geoffrey will not disclose.</P>
+      </SECTION>
+
+      <!-- ====================================================
+           SECTION 14: ACKNOWLEDGEMENTS
+           ==================================================== -->
+      <section id="acks">
+        <h2>&sect; XIV. Acknowledgements &amp; Correspondence</h2>
+        <p>The compilers of this document gratefully acknowledge the patient labour of three
+          generations of Scalebearers, and the rather less patient labour of the Vault-Warden's office.</p>
+
+        <address class="correspondence">
+          The Vault-Warden's Office<br>
+          c/o The Hanged Drayman<br>
+          Corn Street<br>
+          Bristol, BS1 1HQ<br>
+          England<br>
+          <br>
+          (correspondence by post preferred &mdash; if e-mail must be used:<br>
+          <a href="mailto:vault-warden@velvetpangolin.example">vault-warden@velvetpangolin.example</a>)
+        </address>
+
+        <p style="font-size:11px;color:#888;text-align:center">
+          With thanks to: Geoffrey Wickering, Mavis of Wales, Reginald Quill Esq., the Embalmer (anon.),
+          NewInitiate Tilda (now Adept-Custodian Tilda), CodeFriend 2014, Adept-Custodian Pemberton, and
+          the late Vault-Warden Beatrix.
+        </p>
+      </section>
+
+      <!-- ====================================================
+           FOOTER
+           ==================================================== -->
+      <div id="footer">
+        <p>
+          &copy; 1998&ndash;2026 &middot;
+          &#169; 1998&ndash;2026 &middot;
+          &#xA9; 1998&ndash;2026
+          &middot; The Honorable &amp; Imaginary Order of the Velvet Pangolin.
+        </p>
+        <p style="font-family:'Courier New',monospace;font-size:11px">
+          this page is rendered in four (4) frames; if you see only this footer, your browser
+          may not support &lt;frameset&gt;. <a href="frames/header.html">[header]</a>
+          <a href="frames/sidebar.html">[sidebar]</a>
+          <a href="index.html">[main]</a>
+        </p>
+        <p>
+          <a href="classic.html">&laquo; Visit Geoffrey's 1998 Tribute Page &raquo;</a>
+          &middot;
+          <a href="talk-page.html">&laquo; Discussion &raquo;</a>
+          &middot;
+          <a href="#top">&laquo; Top of Sanctum &raquo;</a>
+        </p>
+        <p style="font-size:10px;color:#555">
+          Best viewed in Netscape Navigator 4.7, Internet Explorer 6, Mozilla Firebird 0.7,
+          Lynx, or any browser produced between 1998 and 2014 inclusive.
+        </p>
+        <!-- The pangolin sees this comment -->
+      </div>
+
+      <!-- another stray <title> in body, for archival completeness -->
+      <title>Sanctum &mdash; end of document title #2</title>
+
+      <!-- HUGE explanatory comment from 2007 (preserved) -->
+      <!--
+        On the question of whether to use <i> or <em> for the Latin and Greek epigrams
+        throughout this document: in the year 2007 a long thread on the talk page
+        concluded, after seven days of intermittent emailing among Reginald, Mavis, and
+        Geoffrey, that <i> was the correct choice for "epigrams in classical tongues"
+        because the convention pre-dated semantic HTML and because Reginald's father
+        had used <i> in the original 1998 HTML. Three years later, in 2010, Mavis
+        attempted to swap them all for <em> on the grounds that <em> is the semantic
+        replacement; this change was rolled back within four hours by Geoffrey, who
+        reminded the thread that the 2007 decision had been "final, in writing, and
+        attested by all three signatories." In 2014, NewInitiate_Tilda raised the
+        question again on grounds of accessibility; the matter was tabled to the
+        Annual Convocation and has not been revisited. The decision currently stands:
+        <i> for classical-tongue epigrams, <em> for all other emphasis. Editors who
+        are about to "fix" this are asked to read the talk page first, especially
+        Mavis's 2010 redaction, before opening another flame war. The Vault-Warden's
+        office considers this matter SETTLED, with the implicit threat of de-scaling
+        any editor who unilaterally reverses it. Thank you. &mdash;Reginald, 2014, on
+        the tenth anniversary of the original decision.
+      -->
+
+      <!-- <h1>This was removed in 2014 because Greta complained</h1> -->
+
+    </td>
+
+    <td class="shell-right" valign="top" bgcolor="#C49934" rowspan="2">
+      <h6 style="color:#3A1B47;margin-top:0">&loz; ANNOUNCEMENTS &loz;</h6>
+      <font face="Comic Sans MS" size="2" color="#1F1F1F">
+        <b>132nd Convocation</b> &mdash; Bristol, July 2026. <em>Quorum already met!</em>
+      </font>
+      <hr>
+      <font face="Comic Sans MS" size="2" color="#1F1F1F">
+        <b>Polishing Cloth Renewal</b> &mdash; if your cloth has frayed, mail it (do not
+        burn it) to the Vault-Warden for replacement.
+      </font>
+      <hr>
+      <font face="Comic Sans MS" size="2" color="#1F1F1F">
+        <b>Vandalism Notice</b> &mdash; the article remains semi-protected. See
+        <a href="talk-page.html#vandalism" style="color:#3A1B47">talk page</a>.
+      </font>
+      <hr>
+      <p style="text-align:center"><img src="images/under-construction.gif" width="88" height="31" alt="[under construction]" border="0"></p>
+      <p style="text-align:center;font-size:10px">
+        <a href="#top" style="color:#3A1B47">&laquo; back to top &raquo;</a>
+      </p>
+    </td>
+
+  </tr>
+
+  <!-- second row of the page-shell table is intentionally minimal -->
+  <tr>
+    <td class="shell-main">
+      <p style="text-align:center;font-size:11px;color:#666;font-family:'Lucida Console'">
+        &mdash; end of the table-shell page body &mdash; <br>
+        if you can see this row, the rowspan above did not absorb it. that is fine.
+      </p>
+    </td>
+  </tr>
+
+  </tbody>
+  </table>
+
+  </body>
+
+  </noframes>
+</frameset>
+
+</html>
+
+<!-- Below this point, a second invalid <html> is appended. Some parsers tolerate this; we preserve it for archaeological reasons. -->
+<html>
+<head><title>SECONDARY HTML &mdash; SHOULD NOT BE RENDERED</title></head>
+<body>
+<p>If you can see this, your browser has tolerated a second &lt;html&gt; element. The Order salutes your liberality. The Vault notes your IP.</p>
+<p>&mdash; The Webmaster, archived 2009.</p>
+
+<!-- and after the secondary html, plaintext. anything after this is consumed. -->
+<plaintext>
+This is &lt;plaintext&gt; content. From this point onward in the document, no further
+HTML tags will be parsed. The Order has chosen this moment to fall silent.
+This text was appended by Geoffrey in 2001 on the occasion of his thirtieth
+year as a Scalebearer, and has been preserved untouched as a digital relic.
+Anything appearing below this line, real or apparent, is by tradition
+considered &laquo;in the Vault&raquo;, which is to say: present, but not for examination.
+</body>
+</html>

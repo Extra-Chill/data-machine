@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hearth Bistro | Wood-fired cooking, four seasons</title>
+  <meta name="description" content="Hearth Bistro cooks over a live oak fire. Set menus that follow the seasons, natural wine, and a counter facing the hearth.">
+  <style>
+    :root{
+      --ink:#211e1b;
+      --cream:#f4ede2;
+      --primary:#b4533a;
+      --olive:#6b6b45;
+      --heading:Georgia, 'Times New Roman', serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui, sans-serif;background:var(--cream);color:var(--ink);line-height:1.55}
+    .wrap{max-width:1120px;margin-inline:auto;padding-inline:clamp(1.25rem,4vw,2.5rem)}
+
+    .site-header{border-bottom:1px solid rgba(33,30,27,.14)}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding-block:1rem}
+    .nav ul{display:flex;gap:1.5rem;list-style:none;margin:0;padding:0}
+    .nav a{color:inherit;text-decoration:none}
+    .brand{font-family:var(--heading);font-size:1.25rem;letter-spacing:.02em}
+
+    .eyebrow{margin:0 0 14px;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)}
+
+    /* Hero: copy column + full-height media column + band, like a two-fold restaurant hero. */
+    .hero{display:grid;gap:0}
+    .hero-copy{
+      background:var(--ink);
+      color:var(--cream);
+      padding:54px 56px;
+      margin-top:-118px;
+      max-width:44rem;
+    }
+    .hero-copy h1{font-family:var(--heading);font-size:clamp(2.2rem,6vw,3.6rem);line-height:1.02;margin:0 0 1rem}
+    .hero-lede{max-width:52ch;margin:0}
+    .hero-media{position:relative;order:2;margin-top:clamp(2.25rem,5vw,3.5rem)}
+    .hero-media img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;filter:saturate(1.02) contrast(1.02)}
+    .hero-band{order:3;background:var(--primary);color:var(--cream);padding:1.25rem clamp(1.25rem,4vw,2.5rem)}
+    .hero-band p{margin:0}
+
+    @media (min-width:960px){
+      .hero{grid-template-columns:1.05fr .95fr}
+      .hero-intro{padding-top:clamp(8.5rem,14vw,10.5rem)}
+      .hero-media{order:0;grid-column:2;grid-row:1 / span 2;margin-top:0;align-self:stretch;height:100%}
+      .hero-media img{height:100%;width:100%;aspect-ratio:auto;min-height:100%}
+      .hero-band{grid-column:1;grid-row:2}
+    }
+
+    #menu{padding-block:clamp(3.5rem,8vw,6rem)}
+    .menu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:34px;margin-top:2.25rem}
+    .menu-grid h3{font-family:var(--heading);margin:0 0 .5rem}
+    .menu-grid p{margin:0}
+
+    .site-footer{border-top:1px solid rgba(33,30,27,.14);padding-block:2rem;font-size:.85rem}
+  </style>
+</head>
+<body>
+  <header class="site-header"><nav class="nav wrap" aria-label="Main navigation"><a class="brand" href="#top">Hearth Bistro</a><ul role="list"><li><a href="#menu">Menu</a></li><li><a href="#visit">Visit</a></li></ul></nav></header>
+  <main id="top">
+    <section class="hero">
+      <div class="hero-intro wrap">
+        <p class="eyebrow">Wood-fired kitchen</p>
+        <div class="hero-copy">
+          <h1>Cooked over oak, plated by season.</h1>
+          <p class="hero-lede">A single hearth, a short menu, and whatever the farms brought in this week. Counter seats face the fire.</p>
+        </div>
+      </div>
+      <div class="hero-media">
+        <img src="images/hearth-fire.jpg" alt="Live oak fire in the open hearth with trout resting on the grate">
+      </div>
+      <div class="hero-band">
+        <p>Hearth hours: Wednesday through Sunday, from five.</p>
+      </div>
+    </section>
+
+    <section id="menu" class="wrap">
+      <p class="eyebrow">This season</p>
+      <h2 class="hero-copy" style="all:unset;font-family:var(--heading);font-size:clamp(1.7rem,5.6vw,3rem);line-height:.95;letter-spacing:-.03em;text-transform:uppercase;display:block;max-width:18ch;">Fire, seasons, tables.</h2>
+      <div class="menu-grid">
+        <article><h3>From the hearth</h3><p>Whole trout, charred spring onions, brown-butter vinaigrette.</p></article>
+        <article><h3>From the garden</h3><p>Grilled little gems, smoked yogurt, rye crumbs.</p></article>
+        <article><h3>From the cellar</h3><p>Natural wines farmed without herbicide, poured young.</p></article>
+      </div>
+    </section>
+  </main>
+  <footer id="visit" class="site-footer"><div class="wrap"><p>14 Ash Lane &middot; Reservations by phone &middot; Closed Monday and Tuesday</p></div></footer>
+</body>
+</html>

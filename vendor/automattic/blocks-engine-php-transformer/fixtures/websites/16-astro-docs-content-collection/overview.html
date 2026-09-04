@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SignalForge product overview — architecture, core concepts, and how it integrates with your platform.">
+  <title>Product Overview — SignalForge Docs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="mobile-nav-toggle" id="navToggle" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <div class="overlay" id="overlay"></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <a href="index.html">
+          <svg class="sidebar-logo-mark" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="7" fill="#111512"/>
+            <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#2a352a"/>
+            <polyline points="3,16 7,16 9,10 11,22 13,16 16,16 18,8 20,24 22,16 29,16"
+              stroke="#3efb6a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="sidebar-logo-text">
+            <span class="sidebar-logo-name">SignalForge</span>
+            <span class="sidebar-logo-sub">docs</span>
+          </div>
+        </a>
+      </div>
+      <div class="sidebar-version">
+        <span class="status-dot live"></span>
+        <span class="sidebar-status-text">all systems operational</span>
+        <span class="sidebar-version-badge">v0.9.2</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <span class="nav-section-label">Docs</span>
+          <a class="nav-link" href="index.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+            Home
+          </a>
+          <a class="nav-link" href="overview.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.5"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1"/></svg>
+            Product Overview
+          </a>
+          <a class="nav-link" href="getting-started.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12L6 4l3 5 2-3 3 6"/></svg>
+            Getting Started
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Guides</span>
+          <a class="nav-link" href="incident-workflow.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2l1.5 4h4l-3.2 2.3 1.2 3.9L8 10l-3.5 2.2 1.2-3.9L2.5 6H6.5z"/></svg>
+            Incident Workflow
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Reference</span>
+          <a class="nav-link" href="api-reference.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="1.5"/><path d="M5 5V4a3 3 0 016 0v1"/><path d="M6 9h4M8 8v2"/></svg>
+            API Reference
+          </a>
+          <a class="nav-link" href="changelog.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2" width="11" height="13" rx="1.5"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>
+            Changelog
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Help</span>
+          <a class="nav-link" href="support.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 10.5v.5M8 5.5a1.5 1.5 0 011.5 1.5c0 1-1.5 1.5-1.5 2.5"/></svg>
+            Support
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        <a href="changelog.html">Releases</a>
+        <a href="support.html">Discord</a>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-breadcrumb">
+          <a href="index.html">Docs</a>
+          <span class="sep">/</span>
+          <span class="current">Product Overview</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="topbar-search-btn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+            <span class="topbar-search-text">Search docs</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="content-with-toc">
+          <div class="main-content">
+            <div class="page-header">
+              <div class="page-tag">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.5"/></svg>
+                Product Overview
+              </div>
+              <h1>How SignalForge works</h1>
+              <p class="page-desc">
+                SignalForge is a lightweight observability layer for API reliability. It sits outside your stack, runs scheduled checks, and routes structured signals to wherever your team responds to them.
+              </p>
+            </div>
+
+            <!-- Architecture Diagram -->
+            <h2 id="architecture">Architecture</h2>
+            <p>SignalForge's architecture is deliberately minimal. There are no agents to deploy inside your infrastructure — only your configured monitors polling from our edge network, emitting signals when thresholds are crossed.</p>
+
+            <!-- SVG Architecture Diagram -->
+            <svg class="arch-diagram" viewBox="0 0 700 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SignalForge architecture diagram">
+              <!-- Background -->
+              <rect width="700" height="320" rx="10" fill="#0c0f0d" stroke="#1e261e"/>
+
+              <!-- Label: Your Infrastructure -->
+              <text x="30" y="28" fill="#3d4f3d" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.5" text-transform="uppercase">YOUR INFRASTRUCTURE</text>
+              <rect x="20" y="35" width="200" height="250" rx="8" fill="#0f1211" stroke="#1e261e" stroke-dasharray="4 3"/>
+
+              <!-- API Boxes -->
+              <rect x="38" y="60" width="160" height="40" rx="5" fill="#141715" stroke="#2a352a"/>
+              <text x="82" y="76" fill="#c8d8c8" font-family="JetBrains Mono, monospace" font-size="9.5">payments-api</text>
+              <text x="82" y="92" fill="#475047" font-family="JetBrains Mono, monospace" font-size="8">:443  /v1/health</text>
+              <circle cx="58" cy="80" r="5" fill="#173322" stroke="rgba(62,251,106,0.3)"/>
+              <circle cx="58" cy="80" r="3" fill="#3efb6a"/>
+
+              <rect x="38" y="116" width="160" height="40" rx="5" fill="#141715" stroke="#2a352a"/>
+              <text x="82" y="132" fill="#c8d8c8" font-family="JetBrains Mono, monospace" font-size="9.5">catalog-api</text>
+              <text x="82" y="148" fill="#475047" font-family="JetBrains Mono, monospace" font-size="8">:443  /health</text>
+              <circle cx="58" cy="136" r="5" fill="#173322" stroke="rgba(62,251,106,0.3)"/>
+              <circle cx="58" cy="136" r="3" fill="#3efb6a"/>
+
+              <rect x="38" y="172" width="160" height="40" rx="5" fill="#141715" stroke="#2a352a"/>
+              <text x="82" y="188" fill="#c8d8c8" font-family="JetBrains Mono, monospace" font-size="9.5">auth-service</text>
+              <text x="82" y="204" fill="#475047" font-family="JetBrains Mono, monospace" font-size="8">:443  /ping</text>
+              <circle cx="58" cy="192" r="5" fill="#2e1010" stroke="rgba(240,64,64,0.3)"/>
+              <circle cx="58" cy="192" r="3" fill="#f04040"/>
+
+              <rect x="38" y="228" width="160" height="40" rx="5" fill="#141715" stroke="#2a352a"/>
+              <text x="82" y="244" fill="#c8d8c8" font-family="JetBrains Mono, monospace" font-size="9.5">webhooks-api</text>
+              <text x="82" y="260" fill="#475047" font-family="JetBrains Mono, monospace" font-size="8">:443  /health</text>
+              <circle cx="58" cy="248" r="5" fill="#173322" stroke="rgba(62,251,106,0.3)"/>
+              <circle cx="58" cy="248" r="3" fill="#3efb6a"/>
+
+              <!-- Arrows to SignalForge -->
+              <path d="M200 80 L280 80" stroke="#2a352a" stroke-width="1.5" marker-end="url(#arrow)"/>
+              <path d="M200 136 L280 136" stroke="#2a352a" stroke-width="1.5" marker-end="url(#arrow)"/>
+              <path d="M200 192 L280 192" stroke="#f04040" stroke-width="1.5" stroke-dasharray="3 2" marker-end="url(#arrow-red)"/>
+              <path d="M200 248 L280 248" stroke="#2a352a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+              <!-- Arrow markers -->
+              <defs>
+                <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                  <path d="M0,0 L0,6 L6,3 z" fill="#2a352a"/>
+                </marker>
+                <marker id="arrow-red" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                  <path d="M0,0 L0,6 L6,3 z" fill="#f04040"/>
+                </marker>
+                <marker id="arrow-green" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                  <path d="M0,0 L0,6 L6,3 z" fill="#3efb6a"/>
+                </marker>
+              </defs>
+
+              <!-- SignalForge Engine -->
+              <rect x="278" y="50" width="148" height="230" rx="8" fill="#111512" stroke="#3efb6a" stroke-opacity="0.4"/>
+              <text x="352" y="76" fill="#3efb6a" font-family="JetBrains Mono, monospace" font-size="9" text-anchor="middle" letter-spacing="1">SIGNALFORGE</text>
+              <text x="352" y="91" fill="#3d4f3d" font-family="JetBrains Mono, monospace" font-size="8" text-anchor="middle">edge network</text>
+
+              <!-- waveform inside engine -->
+              <polyline points="295,160 305,160 310,145 315,175 320,160 327,160 332,138 337,182 342,160 352,160 357,148 362,172 367,160 375,160 380,155 385,165 395,160 405,160"
+                stroke="#3efb6a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.7"/>
+
+              <rect x="292" y="192" width="116" height="28" rx="4" fill="#173322" stroke="rgba(62,251,106,0.2)"/>
+              <text x="350" y="207" fill="#3efb6a" font-family="JetBrains Mono, monospace" font-size="8.5" text-anchor="middle">Monitor Scheduler</text>
+              <text x="350" y="219" fill="#3d4f3d" font-family="JetBrains Mono, monospace" font-size="7" text-anchor="middle">30s · 60s · 5m intervals</text>
+
+              <rect x="292" y="232" width="116" height="28" rx="4" fill="#0d2333" stroke="rgba(72,176,232,0.2)"/>
+              <text x="350" y="247" fill="#48b0e8" font-family="JetBrains Mono, monospace" font-size="8.5" text-anchor="middle">Alert Rules Engine</text>
+              <text x="350" y="259" fill="#3d4f3d" font-family="JetBrains Mono, monospace" font-size="7" text-anchor="middle">AND · OR · threshold logic</text>
+
+              <!-- Arrows to Destinations -->
+              <path d="M426 80 L500 80" stroke="#3efb6a" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arrow-green)"/>
+              <path d="M426 136 L500 136" stroke="#3efb6a" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arrow-green)"/>
+              <path d="M426 192 L500 192" stroke="#f04040" stroke-width="1.5" stroke-opacity="0.8" marker-end="url(#arrow-red)"/>
+              <path d="M426 248 L500 248" stroke="#3efb6a" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arrow-green)"/>
+
+              <!-- Destinations -->
+              <text x="505" y="28" fill="#3d4f3d" font-family="JetBrains Mono, monospace" font-size="10" letter-spacing="1.5">DESTINATIONS</text>
+
+              <rect x="500" y="35" width="170" height="250" rx="8" fill="#0f1211" stroke="#1e261e" stroke-dasharray="4 3"/>
+
+              <rect x="514" y="60" width="140" height="40" rx="5" fill="#141715" stroke="#2a352a"/>
+              <text x="535" y="78" fill="#748874" font-family="JetBrains Mono, monospace" font-size="8.5">Slack</text>
+              <text x="535" y="92" fill="#475047" font-family="JetBrains Mono, monospace" font-size="7.5">#platform-alerts</text>
+              <rect x="518" y="68" width="14" height="14" rx="2" fill="#4a1040"/>
+              <text x="521" y="79" fill="#e06090" font-family="monospace" font-size="9">#</text>
+
+              <rect x="514" y="116" width="140" height="40" rx="5" fill="#141715" stroke="#2a352a"/>
+              <text x="535" y="134" fill="#748874" font-family="JetBrains Mono, monospace" font-size="8.5">PagerDuty</text>
+              <text x="535" y="148" fill="#475047" font-family="JetBrains Mono, monospace" font-size="7.5">on-call rotation</text>
+              <rect x="518" y="124" width="14" height="14" rx="2" fill="#1a0a30"/>
+              <text x="521" y="135" fill="#7848c0" font-family="monospace" font-size="9">P</text>
+
+              <rect x="514" y="172" width="140" height="40" rx="5" fill="#141715" stroke="#f04040" stroke-opacity="0.4"/>
+              <text x="535" y="190" fill="#c85050" font-family="JetBrains Mono, monospace" font-size="8.5">Webhook (HTTP)</text>
+              <text x="535" y="204" fill="#475047" font-family="JetBrains Mono, monospace" font-size="7.5">your-api.com/hooks</text>
+              <rect x="518" y="180" width="14" height="14" rx="2" fill="#2e1010"/>
+              <text x="521" y="191" fill="#f04040" font-family="monospace" font-size="8">!</text>
+
+              <rect x="514" y="228" width="140" height="40" rx="5" fill="#141715" stroke="#2a352a"/>
+              <text x="535" y="246" fill="#748874" font-family="JetBrains Mono, monospace" font-size="8.5">Email</text>
+              <text x="535" y="260" fill="#475047" font-family="JetBrains Mono, monospace" font-size="7.5">ops@your-company.com</text>
+              <rect x="518" y="236" width="14" height="14" rx="2" fill="#0d1820"/>
+              <text x="521" y="247" fill="#48b0e8" font-family="monospace" font-size="9">@</text>
+            </svg>
+
+            <p>SignalForge polls your endpoints from a distributed edge network. You define what to check, how often, and what constitutes failure. The engine handles scheduling, deduplication, and routing — your infrastructure only sees inbound HTTP probes.</p>
+
+            <!-- Core Concepts -->
+            <h2 id="concepts">Core concepts</h2>
+
+            <div class="concept-grid">
+              <div class="concept-card">
+                <div class="concept-card-label" style="color: var(--accent);">Concept 01</div>
+                <div class="concept-card-title" id="signals">Signal</div>
+                <p>A typed observation emitted when a monitor check completes. A signal carries a <code>type</code> (e.g. <code>status_not_2xx</code>), a measured <code>value</code>, the configured <code>threshold</code>, <code>severity</code>, and metadata about the environment. Signals are the primitive unit in SignalForge.</p>
+              </div>
+
+              <div class="concept-card">
+                <div class="concept-card-label" style="color: var(--blue);">Concept 02</div>
+                <div class="concept-card-title" id="monitors">Monitor</div>
+                <p>A scheduled check definition. Monitors specify <em>what</em> to probe (HTTP endpoint, TCP port, or custom Lua probe), <em>how often</em>, and how to validate the response (status code, body regex, latency threshold). Defined in YAML and synced via CLI.</p>
+              </div>
+
+              <div class="concept-card">
+                <div class="concept-card-label" style="color: var(--amber);">Concept 03</div>
+                <div class="concept-card-title" id="alert-rules">Alert Rule</div>
+                <p>A composable condition that determines when a signal triggers a notification. Rules support AND/OR logic across multiple signal types, consecutive-failure thresholds, and scheduled maintenance windows. Attach multiple destinations per rule.</p>
+              </div>
+
+              <div class="concept-card">
+                <div class="concept-card-label" style="color: var(--red);">Concept 04</div>
+                <div class="concept-card-title">Webhook</div>
+                <p>SignalForge can deliver signal payloads to any HTTPS endpoint via HTTP POST. Webhook payloads are signed with HMAC-SHA256. Use webhooks to integrate with Slack apps, custom dashboards, or your own incident management system.</p>
+              </div>
+            </div>
+
+            <!-- Monitor types -->
+            <h2 id="monitor-types">Monitor types</h2>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Signal types emitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>http</code></td>
+                    <td>HTTP/HTTPS endpoint check. Validates status code, response body, and latency.</td>
+                    <td><code>status_not_2xx</code>, <code>latency_p95_exceeded</code>, <code>body_mismatch</code></td>
+                  </tr>
+                  <tr>
+                    <td><code>tcp</code></td>
+                    <td>TCP port reachability and connection time check.</td>
+                    <td><code>tcp_timeout</code>, <code>connection_refused</code></td>
+                  </tr>
+                  <tr>
+                    <td><code>ssl</code></td>
+                    <td>TLS certificate validity and expiry check.</td>
+                    <td><code>cert_expiry_warning</code>, <code>cert_expiry_critical</code>, <code>cert_invalid</code></td>
+                  </tr>
+                  <tr>
+                    <td><code>dns</code></td>
+                    <td>DNS resolution check. Validates record type, value, and TTL.</td>
+                    <td><code>dns_resolution_failed</code>, <code>dns_value_mismatch</code></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Signal lifecycle -->
+            <h2 id="signal-lifecycle">Signal lifecycle</h2>
+
+            <p>Every signal moves through a defined lifecycle. Understanding this model helps you write accurate alert rules and build reliable integrations.</p>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>State</th><th>Description</th><th>Triggers notification?</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>firing</code></td>
+                    <td>Threshold crossed. Signal is active and unacknowledged.</td>
+                    <td>Yes — on first transition</td>
+                  </tr>
+                  <tr>
+                    <td><code>acknowledged</code></td>
+                    <td>An operator has acknowledged the alert. Suppresses repeat notifications.</td>
+                    <td>No (unless re-escalation configured)</td>
+                  </tr>
+                  <tr>
+                    <td><code>resolved</code></td>
+                    <td>Monitor returned to healthy state. Recovery signal emitted.</td>
+                    <td>Yes — <code>*_recovered</code> signal</td>
+                  </tr>
+                  <tr>
+                    <td><code>muted</code></td>
+                    <td>In a maintenance window. Signals are recorded but not dispatched.</td>
+                    <td>No</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Integration guide teaser -->
+            <h2 id="integrations">How it integrates</h2>
+            <p>SignalForge is designed to plug into your existing on-call toolchain, not replace it. Common patterns:</p>
+
+            <ul>
+              <li><strong>PagerDuty integration</strong> — route <code>severity: critical</code> signals to your PagerDuty service key via webhook. PagerDuty handles escalation and on-call rotation.</li>
+              <li><strong>Slack alerts</strong> — configure a Slack incoming webhook destination for <code>severity: warning</code> signals to post to your team channel.</li>
+              <li><strong>Custom dashboards</strong> — poll <code>GET /v1/signals</code> to populate a Grafana panel or internal status board.</li>
+              <li><strong>CI/CD gating</strong> — use the CLI's <code>signalforge status --fail-on-critical</code> flag to block deployments when a critical signal is active.</li>
+            </ul>
+
+            <div class="callout tip">
+              <div class="callout-icon">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2a4.5 4.5 0 010 9H6v2h4M6 13h4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="6" r="1"/></svg>
+              </div>
+              <div class="callout-body">
+                <span class="callout-title">Team size sweet spot</span>
+                <p>SignalForge is designed for platform teams of 2–15 engineers who need reliable API monitoring without the overhead of a full observability stack. If you're running a large dedicated SRE team, you may want to evaluate it alongside Datadog or Grafana Cloud.</p>
+              </div>
+            </div>
+
+            <p style="margin-top: 2rem;">
+              Ready to set it up? <a href="getting-started.html">Go to Getting Started →</a>
+            </p>
+          </div>
+
+          <!-- TOC -->
+          <aside>
+            <div class="toc-aside">
+              <span class="toc-label">On this page</span>
+              <ul class="toc-list">
+                <li><a href="#architecture">Architecture</a></li>
+                <li><a href="#concepts">Core concepts</a></li>
+                <li><a href="#signals">  Signal</a></li>
+                <li><a href="#monitors">  Monitor</a></li>
+                <li><a href="#alert-rules">  Alert Rule</a></li>
+                <li><a href="#monitor-types">Monitor types</a></li>
+                <li><a href="#signal-lifecycle">Signal lifecycle</a></li>
+                <li><a href="#integrations">How it integrates</a></li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-left">SignalForge v0.9.2 · MIT License</div>
+        <div class="footer-links">
+          <a href="api-reference.html">API</a>
+          <a href="changelog.html">Changelog</a>
+          <a href="support.html">Support</a>
+          <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>

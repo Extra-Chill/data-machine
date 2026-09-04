@@ -1,0 +1,22 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "fitness",
+    "gym",
+    "has-form",
+    "pricing",
+    "carousel",
+    "stretched-links"
+  ],
+  "capabilities": [
+    "forms",
+    "local-css",
+    "runtime-js"
+  ],
+  "risk_profile": "medium",
+  "complexity": 3,
+  "quality_budgets": {
+    "max_unacceptable_findings": 0,
+    "visual_mismatch_ratio": 0.1
+  }
+}

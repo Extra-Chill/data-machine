@@ -1,0 +1,145 @@
+/* =========================================================
+   BOUNDLESS — page.css
+   Marketing/content pages (templates.html, about.html). Reuses the
+   design tokens from app.css and adds a full-page scrolling layout
+   with a shared site header.
+   ========================================================= */
+
+.page-body {
+  min-height: 100vh;
+  overflow: auto;
+  display: block;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, #eaf1fe 0%, transparent 60%),
+    radial-gradient(900px 500px at 0% 110%, #e8fbf2 0%, transparent 55%),
+    var(--bg);
+}
+
+/* shared header (non-editor) */
+.site-header {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: 0 clamp(16px, 4vw, 48px); height: 60px;
+  background: rgba(255,255,255,0.82); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.site-header .brand { font-size: 1.1rem; }
+.site-nav { display: flex; align-items: center; gap: 4px; }
+.site-nav a {
+  font-size: 0.88rem; font-weight: 600; color: var(--ink-soft);
+  text-decoration: none; padding: 8px 13px; border-radius: 9px;
+}
+.site-nav a:hover { background: #eef2f8; color: var(--ink); }
+.site-nav a.is-current { color: var(--accent-d); background: #eaf1fe; }
+.site-nav .nav-cta {
+  background: var(--accent); color: #fff; margin-left: 6px;
+}
+.site-nav .nav-cta:hover { background: var(--accent-d); color: #fff; }
+
+.wrap { max-width: 1140px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 48px); }
+
+/* ── Hero / page header ──────────────────────────────── */
+.page-hero { padding: clamp(48px, 8vw, 90px) 0 28px; }
+.eyebrow {
+  display: inline-block; font-size: 0.74rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-d);
+  background: #eaf1fe; padding: 5px 12px; border-radius: 999px; margin-bottom: 16px;
+}
+.page-hero h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.05;
+  letter-spacing: -0.03em; margin: 0 0 14px; max-width: 18ch;
+}
+.page-hero p.lead {
+  font-size: clamp(1.02rem, 2vw, 1.2rem); color: var(--ink-soft);
+  max-width: 60ch; margin: 0 0 24px; line-height: 1.6;
+}
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: inherit; font-weight: 600; font-size: 0.92rem;
+  border-radius: 11px; padding: 12px 20px; cursor: pointer;
+  text-decoration: none; border: 1px solid transparent;
+}
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 14px rgba(59,130,246,0.32); }
+.btn-primary:hover { background: var(--accent-d); }
+.btn-ghost { background: #fff; color: var(--ink); border-color: var(--line-2); }
+.btn-ghost:hover { background: var(--panel-2); }
+
+/* ── Template gallery ────────────────────────────────── */
+.tpl-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 22px; padding: 30px 0 70px;
+}
+.tpl-card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; overflow: hidden; text-decoration: none; color: inherit;
+  box-shadow: var(--shadow-sm); transition: transform 0.18s ease, box-shadow 0.18s ease;
+  display: flex; flex-direction: column;
+}
+.tpl-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: var(--line-2); }
+.tpl-preview { aspect-ratio: 16 / 10; background: #f1f4fa; border-bottom: 1px solid var(--line); display: block; width: 100%; }
+.tpl-body { padding: 16px 18px 18px; }
+.tpl-body h3 { margin: 0 0 5px; font-size: 1.05rem; letter-spacing: -0.01em; }
+.tpl-body p { margin: 0 0 12px; font-size: 0.86rem; color: var(--ink-soft); line-height: 1.5; }
+.tpl-tag { font-size: 0.72rem; font-weight: 600; color: var(--accent-d); background: #eaf1fe; padding: 3px 9px; border-radius: 999px; }
+.tpl-cta { margin-top: 12px; font-size: 0.84rem; font-weight: 600; color: var(--accent-d); display: inline-flex; align-items: center; gap: 5px; }
+.tpl-card:hover .tpl-cta { gap: 9px; }
+
+/* ── About content ───────────────────────────────────── */
+.feature-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px; padding: 14px 0 50px;
+}
+.feature {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 22px; box-shadow: var(--shadow-sm);
+}
+.feature .ic {
+  width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
+  background: #eaf1fe; margin-bottom: 14px;
+}
+.feature .ic svg { width: 22px; height: 22px; stroke: var(--accent-d); fill: none; stroke-width: 1.8; }
+.feature h3 { margin: 0 0 7px; font-size: 1.05rem; letter-spacing: -0.01em; }
+.feature p { margin: 0; font-size: 0.9rem; color: var(--ink-soft); line-height: 1.6; }
+
+.section-head { padding: 26px 0 6px; }
+.section-head h2 { font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.02em; margin: 0 0 8px; }
+.section-head p { color: var(--ink-soft); margin: 0; max-width: 60ch; line-height: 1.6; }
+
+.prose { max-width: 70ch; padding: 8px 0 40px; }
+.prose p { font-size: 1rem; line-height: 1.75; color: var(--ink-soft); margin: 0 0 18px; }
+.prose h2 { font-size: 1.4rem; letter-spacing: -0.02em; margin: 34px 0 12px; color: var(--ink); }
+.prose strong { color: var(--ink); font-weight: 600; }
+.prose ul { padding-left: 1.2em; color: var(--ink-soft); line-height: 1.7; }
+.prose li { margin-bottom: 8px; }
+.prose code { font-family: var(--mono); font-size: 0.86em; background: #eef2f8; padding: 2px 6px; border-radius: 5px; color: var(--ink); }
+
+.cta-band {
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  border-radius: 22px; padding: clamp(30px, 6vw, 56px);
+  margin: 30px 0 70px; color: #fff; text-align: center;
+}
+.cta-band h2 { font-size: clamp(1.5rem, 4vw, 2.3rem); margin: 0 0 12px; letter-spacing: -0.02em; }
+.cta-band p { color: #dbeafe; margin: 0 0 22px; font-size: 1.05rem; }
+.cta-band .btn-primary { background: #fff; color: var(--accent-d); }
+.cta-band .btn-primary:hover { background: #eaf1fe; }
+
+.specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 10px 0 50px; }
+.spec { background: var(--panel); padding: 20px; }
+.spec .num { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.03em; color: var(--accent-d); }
+.spec .lbl { font-size: 0.82rem; color: var(--ink-soft); margin-top: 4px; }
+
+.site-footer {
+  border-top: 1px solid var(--line); padding: 30px 0;
+  font-size: 0.84rem; color: var(--ink-faint);
+}
+.site-footer .wrap { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
+.site-footer a { color: var(--ink-soft); text-decoration: none; }
+.site-footer a:hover { color: var(--accent-d); }
+
+@media (max-width: 560px) {
+  .site-nav a:not(.nav-cta):not(.is-current) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tpl-card { transition: none; }
+}

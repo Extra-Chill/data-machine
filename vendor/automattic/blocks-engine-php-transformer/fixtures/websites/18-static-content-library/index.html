@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Civic Signal — Resource Library for Neighborhood Organizers</title>
+  <meta name="description" content="Free, practical toolkits for neighborhood organizers who run outreach campaigns, public meetings, grant applications, and community improvement projects.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ====== NAVIGATION ====== -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="container nav-inner">
+    <a href="index.html" class="nav-logo" aria-label="Civic Signal Home">
+      <div class="nav-logo-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="10" cy="10" r="3" fill="white"/>
+          <path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/>
+          <path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/>
+          <path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+        </svg>
+      </div>
+      <div class="nav-logo-text">
+        <span class="nav-logo-name">Civic Signal</span>
+        <span class="nav-logo-sub">Resource Library</span>
+      </div>
+    </a>
+    <div class="nav-links" role="list">
+      <a href="index.html" class="nav-link active" role="listitem">Home</a>
+      <a href="resources.html" class="nav-link" role="listitem">All Resources</a>
+      <a href="about.html" class="nav-link" role="listitem">About</a>
+      <a href="outreach-checklist.html" class="nav-link" role="listitem">Outreach</a>
+      <a href="grant-readiness.html" class="nav-link" role="listitem">Grants</a>
+    </div>
+    <div class="nav-cta">
+      <a href="resources.html" class="btn btn-primary">Browse Resources</a>
+    </div>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile drawer -->
+<div class="nav-drawer" id="nav-drawer" role="dialog" aria-label="Mobile navigation">
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="resources.html" class="nav-link">All Resources</a>
+  <a href="about.html" class="nav-link">About</a>
+  <a href="outreach-checklist.html" class="nav-link">Outreach Checklist</a>
+  <a href="meeting-agenda.html" class="nav-link">Meeting Agenda Template</a>
+  <a href="grant-readiness.html" class="nav-link">Grant Readiness Guide</a>
+  <a href="case-study-roslindale.html" class="nav-link">Case Study</a>
+</div>
+
+<!-- ====== HERO ====== -->
+<section class="hero" aria-labelledby="hero-headline">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Free Tools for Community Builders</p>
+    <h1 class="hero-headline" id="hero-headline">
+      Tools for the work<br>of <em>building community.</em>
+    </h1>
+    <p class="hero-lead">
+      Civic Signal publishes free, practical toolkits for neighborhood organizers — whether you're knocking on doors, running a public meeting, applying for your first grant, or managing a community project from start to finish.
+    </p>
+
+    <form class="hero-search hero-search-form" role="search" aria-label="Search resources">
+      <input
+        type="search"
+        class="hero-search-input"
+        placeholder="Search checklists, templates, guides…"
+        aria-label="Search resources"
+      >
+      <button type="submit" class="hero-search-btn" aria-label="Search">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10 10L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Search
+      </button>
+    </form>
+
+    <div class="hero-topics" aria-label="Browse by topic">
+      <span class="hero-topics-label">Topics:</span>
+      <a href="resources.html?filter=outreach" class="topic-pill">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M6 1L8 4H11L9 6.5L10 10L6 8L2 10L3 6.5L1 4H4L6 1Z"/></svg>
+        Outreach
+      </a>
+      <a href="resources.html?filter=meetings" class="topic-pill">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="1" y="2" width="10" height="9" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M1 5H11" stroke="currentColor" stroke-width="1.2"/><path d="M4 1V3M8 1V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Meetings
+      </a>
+      <a href="resources.html?filter=funding" class="topic-pill">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3V9M4.5 4.5H7C7.5 4.5 8 5 8 5.5C8 6 7.5 6.5 7 6.5H5C4.5 6.5 4 7 4 7.5C4 8 4.5 8.5 5 8.5H7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Funding
+      </a>
+      <a href="resources.html?filter=projects" class="topic-pill">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Projects
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ====== STATS BAR ====== -->
+<div class="stats-bar" aria-label="Library at a glance">
+  <div class="container stats-inner">
+    <div class="stat-item">
+      <span class="stat-number">12</span>
+      <span class="stat-label">Free Resources</span>
+    </div>
+    <div class="stat-divider" aria-hidden="true"></div>
+    <div class="stat-item">
+      <span class="stat-number">4</span>
+      <span class="stat-label">Topic Areas</span>
+    </div>
+    <div class="stat-divider" aria-hidden="true"></div>
+    <div class="stat-item">
+      <span class="stat-number">100%</span>
+      <span class="stat-label">Free to Use</span>
+    </div>
+    <div class="stat-divider" aria-hidden="true"></div>
+    <div class="stat-item">
+      <span class="stat-number">2,400+</span>
+      <span class="stat-label">Organizers Served</span>
+    </div>
+  </div>
+</div>
+
+<!-- ====== FEATURED RESOURCES ====== -->
+<section class="section section--paper" aria-labelledby="featured-heading">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Featured Resources</p>
+        <h2 id="featured-heading">Start Here</h2>
+      </div>
+      <a href="resources.html" class="arrow-link">
+        View all resources
+        <svg class="arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+
+    <div class="grid-2 stagger" style="margin-bottom: var(--sp-6);">
+      <!-- Card 1 -->
+      <a href="outreach-checklist.html" class="resource-card reveal" aria-label="Community Outreach Checklist">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-outreach">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M5 0.5L6.5 3H9.5L7.5 5L8 8.5L5 7L2 8.5L2.5 5L0.5 3H3.5L5 0.5Z"/></svg>
+            Outreach
+          </span>
+          <span class="resource-time">~15 min to set up</span>
+        </div>
+        <h3 class="resource-card-title">Community Outreach Checklist</h3>
+        <p class="resource-card-desc">A phase-by-phase guide covering planning, materials, team mobilization, field work, and follow-up data entry. Includes a progress tracker you can use in the browser.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Interactive Checklist</span>
+          <span class="arrow-link">Open
+            <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </a>
+
+      <!-- Card 2 -->
+      <a href="meeting-agenda.html" class="resource-card reveal" aria-label="Public Meeting Agenda Template">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-meetings">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><rect x="0.5" y="1.5" width="9" height="8" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M0.5 4H9.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 0.5V2.5M7 0.5V2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Meetings
+          </span>
+          <span class="resource-time">Print-ready</span>
+        </div>
+        <h3 class="resource-card-title">Public Meeting Agenda Template</h3>
+        <p class="resource-card-desc">A complete, fill-in agenda for neighborhood meetings — with timed blocks, a public comment period, action item capture, and tips for keeping things on track.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Fillable Template</span>
+          <span class="arrow-link">Open
+            <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </a>
+
+      <!-- Card 3 -->
+      <a href="grant-readiness.html" class="resource-card reveal" aria-label="Grant Readiness Guide">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-funding">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M5 2.5V7.5M3.5 3.5H6C6.5 3.5 7 4 7 4.5C7 5 6.5 5.5 6 5.5H4C3.5 5.5 3 6 3 6.5C3 7 3.5 7.5 4 7.5H6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Funding
+          </span>
+          <span class="resource-time">~30 min read</span>
+        </div>
+        <h3 class="resource-card-title">Grant Readiness Guide</h3>
+        <p class="resource-card-desc">Six sections covering organizational foundations, funder research, building your case, proposal elements, funder relationships, and a grant calendar template to keep your pipeline organized.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">In-Depth Guide</span>
+          <span class="arrow-link">Open
+            <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </a>
+
+      <!-- Card 4 -->
+      <a href="case-study-roslindale.html" class="resource-card reveal" aria-label="Case Study: Roslindale Community Garden Network">
+        <div class="resource-card-meta">
+          <span class="resource-badge badge-projects">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Projects
+          </span>
+          <span class="resource-time">Boston, MA · 2021–2023</span>
+        </div>
+        <h3 class="resource-card-title">Case Study: Roslindale Community Garden Network</h3>
+        <p class="resource-card-desc">How a small steering committee turned four vacant lots into a thriving garden network — raising $85,000, signing on three nonprofit partners, and connecting 120 families to growing plots.</p>
+        <div class="resource-card-footer">
+          <span class="resource-card-type">Case Study</span>
+          <span class="arrow-link">Read
+            <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+      </a>
+    </div>
+
+    <div style="text-align: center;">
+      <a href="resources.html" class="btn btn-outline">See All 12 Resources</a>
+    </div>
+  </div>
+</section>
+
+<!-- ====== TOPIC AREAS ====== -->
+<section class="section section--cream" aria-labelledby="topics-heading">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Browse by Topic</p>
+        <h2 id="topics-heading">Four Areas of Practice</h2>
+      </div>
+    </div>
+
+    <div class="topic-grid stagger">
+      <a href="resources.html?filter=outreach" class="topic-card reveal" aria-label="Outreach resources">
+        <div class="topic-icon topic-icon--outreach" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L15 8H21L16 12L18 19L12 15L6 19L8 12L3 8H9L12 2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <p class="topic-card-name">Outreach</p>
+        <p class="topic-card-desc">Door-knocking, community surveys, tabling, phone banking, and the follow-up work that turns contacts into participants.</p>
+        <span class="topic-card-count">3 resources</span>
+      </a>
+
+      <a href="resources.html?filter=meetings" class="topic-card reveal" aria-label="Meetings resources">
+        <div class="topic-icon topic-icon--meetings" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M3 9H21" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M8 2V5M16 2V5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M7 13H12M7 17H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="topic-card-name">Meetings</p>
+        <p class="topic-card-desc">Agendas, facilitation frameworks, minute-taking, and conflict resolution techniques for productive public gatherings.</p>
+        <span class="topic-card-count">3 resources</span>
+      </a>
+
+      <a href="resources.html?filter=funding" class="topic-card reveal" aria-label="Funding resources">
+        <div class="topic-icon topic-icon--funding" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 6V18M9 8.5H14C15 8.5 16 9.5 16 10.5C16 11.5 15 12.5 14 12.5H10C9 12.5 8 13.5 8 14.5C8 15.5 9 16.5 10 16.5H15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="topic-card-name">Funding</p>
+        <p class="topic-card-desc">Grant readiness, proposal writing, budget planning, and funder relationship strategies for neighborhood-scale nonprofits.</p>
+        <span class="topic-card-count">3 resources</span>
+      </a>
+
+      <a href="resources.html?filter=projects" class="topic-card reveal" aria-label="Projects resources">
+        <div class="topic-icon topic-icon--projects" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M3 9H21" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+          </svg>
+        </div>
+        <p class="topic-card-name">Projects</p>
+        <p class="topic-card-desc">Community improvement planning, partnership agreements, project timelines, and lessons from real neighborhood success stories.</p>
+        <span class="topic-card-count">3 resources</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ====== SPOTLIGHT: CASE STUDY TEASER ====== -->
+<section class="section section--sand" aria-labelledby="spotlight-heading">
+  <div class="container">
+    <div class="grid-2" style="align-items: center; gap: var(--sp-12);">
+      <div class="reveal">
+        <p class="kicker">Field Notes</p>
+        <h2 id="spotlight-heading">From vacant lots to growing community</h2>
+        <p style="color: var(--muted); margin-bottom: var(--sp-5);">
+          In 2021, a five-person steering committee in Boston's Roslindale neighborhood set out to convert four neglected lots into community gardens. By 2023, they had raised $85,000, built three nonprofit partnerships, and connected 120 families to growing plots — without a paid staff member.
+        </p>
+        <p style="color: var(--muted); margin-bottom: var(--sp-6);">
+          Their toolkit: the same outreach checklist, meeting agenda, and grant readiness framework you'll find in this library. Read how they put it all together.
+        </p>
+        <div style="display: flex; gap: var(--sp-4); flex-wrap: wrap;">
+          <a href="case-study-roslindale.html" class="btn btn-primary">Read the Case Study</a>
+          <a href="outreach-checklist.html" class="btn btn-outline">View Outreach Checklist</a>
+        </div>
+      </div>
+      <div class="reveal" aria-hidden="true" style="display: flex; justify-content: center;">
+        <!-- Decorative illustration -->
+        <svg width="340" height="280" viewBox="0 0 340 280" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Community garden illustration">
+          <!-- Ground -->
+          <rect x="20" y="210" width="300" height="50" rx="4" fill="#7a9e8a" opacity="0.25"/>
+          <!-- Plot 1 -->
+          <rect x="40" y="170" width="60" height="45" rx="3" fill="#4a7a62" opacity="0.35"/>
+          <rect x="44" y="174" width="52" height="37" rx="2" fill="#7a9e8a" opacity="0.4"/>
+          <!-- Plot 2 -->
+          <rect x="115" y="170" width="60" height="45" rx="3" fill="#4a7a62" opacity="0.35"/>
+          <rect x="119" y="174" width="52" height="37" rx="2" fill="#7a9e8a" opacity="0.4"/>
+          <!-- Plot 3 -->
+          <rect x="190" y="170" width="60" height="45" rx="3" fill="#4a7a62" opacity="0.35"/>
+          <rect x="194" y="174" width="52" height="37" rx="2" fill="#7a9e8a" opacity="0.4"/>
+          <!-- Plot 4 -->
+          <rect x="265" y="170" width="55" height="45" rx="3" fill="#4a7a62" opacity="0.35"/>
+          <rect x="269" y="174" width="47" height="37" rx="2" fill="#7a9e8a" opacity="0.4"/>
+          <!-- Plants in plots -->
+          <ellipse cx="70" cy="180" rx="10" ry="12" fill="#1c3a2f" opacity="0.5"/>
+          <ellipse cx="55" cy="185" rx="7" ry="9" fill="#2d5c46" opacity="0.5"/>
+          <ellipse cx="85" cy="183" rx="8" ry="10" fill="#1c3a2f" opacity="0.4"/>
+          <ellipse cx="145" cy="180" rx="9" ry="11" fill="#2d5c46" opacity="0.5"/>
+          <ellipse cx="162" cy="184" rx="7" ry="8" fill="#1c3a2f" opacity="0.45"/>
+          <ellipse cx="220" cy="181" rx="10" ry="12" fill="#1c3a2f" opacity="0.5"/>
+          <ellipse cx="205" cy="185" rx="6" ry="8" fill="#2d5c46" opacity="0.4"/>
+          <ellipse cx="292" cy="180" rx="9" ry="11" fill="#2d5c46" opacity="0.5"/>
+          <ellipse cx="307" cy="183" rx="7" ry="9" fill="#1c3a2f" opacity="0.45"/>
+          <!-- Path between plots -->
+          <rect x="105" y="170" width="10" height="45" fill="#e2d8c5" opacity="0.6"/>
+          <rect x="180" y="170" width="10" height="45" fill="#e2d8c5" opacity="0.6"/>
+          <rect x="255" y="170" width="10" height="45" fill="#e2d8c5" opacity="0.6"/>
+          <!-- Sign post -->
+          <rect x="156" y="90" width="88" height="60" rx="4" fill="#1c3a2f"/>
+          <path d="M164 100H228" stroke="#c75b2e" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+          <path d="M164 112H220" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+          <path d="M164 122H210" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+          <path d="M164 132H215" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+          <path d="M190 155V210" stroke="#1c3a2f" stroke-width="3" stroke-linecap="round"/>
+          <!-- Stars / highlights -->
+          <circle cx="60" cy="140" r="4" fill="#c9972c" opacity="0.4"/>
+          <circle cx="280" cy="130" r="5" fill="#c75b2e" opacity="0.3"/>
+          <circle cx="170" cy="70" r="3" fill="#4a7a62" opacity="0.4"/>
+          <!-- People silhouettes -->
+          <circle cx="100" cy="222" r="8" fill="#1c3a2f" opacity="0.3"/>
+          <rect x="96" y="228" width="8" height="14" rx="3" fill="#1c3a2f" opacity="0.3"/>
+          <circle cx="240" cy="220" r="8" fill="#1c3a2f" opacity="0.3"/>
+          <rect x="236" y="226" width="8" height="14" rx="3" fill="#1c3a2f" opacity="0.3"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== QUICK LINKS BAND ====== -->
+<section class="section--dark section--tight" aria-labelledby="quicklinks-heading">
+  <div class="container">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); padding-bottom: var(--sp-6); border-bottom: 1px solid rgba(255,255,255,0.12); margin-bottom: var(--sp-6);">
+      <h2 id="quicklinks-heading" style="font-size: var(--text-xl); margin: 0; color: var(--cream);">Jump to a tool</h2>
+      <a href="resources.html" class="arrow-link" style="color: var(--sage);">All resources <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </div>
+    <div class="grid-4 stagger">
+      <a href="outreach-checklist.html" class="resource-list-item reveal" style="border-color: rgba(255,255,255,0.08);">
+        <div class="resource-list-icon badge-outreach">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M10 2L12.5 7H18L13.5 10.5L15 16L10 13L5 16L6.5 10.5L2 7H7.5L10 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="resource-list-title" style="color: var(--cream);">Outreach Checklist</div>
+          <div class="resource-list-desc" style="color: rgba(245,240,232,0.5);">Track every phase of a community outreach campaign</div>
+        </div>
+      </a>
+      <a href="meeting-agenda.html" class="resource-list-item reveal" style="border-color: rgba(255,255,255,0.08);">
+        <div class="resource-list-icon badge-meetings">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <rect x="2.5" y="3.5" width="15" height="13.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M2.5 7.5H17.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 2V4M13 2V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="resource-list-title" style="color: var(--cream);">Meeting Agenda Template</div>
+          <div class="resource-list-desc" style="color: rgba(245,240,232,0.5);">Fillable agenda you can print or share digitally</div>
+        </div>
+      </a>
+      <a href="grant-readiness.html" class="resource-list-item reveal" style="border-color: rgba(255,255,255,0.08);">
+        <div class="resource-list-icon badge-funding">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 5V15M7.5 7H12C13 7 14 7.75 14 9C14 10.25 13 11 12 11H8C7 11 6 11.75 6 13C6 14.25 7 15 8 15H12.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="resource-list-title" style="color: var(--cream);">Grant Readiness Guide</div>
+          <div class="resource-list-desc" style="color: rgba(245,240,232,0.5);">Six-section guide to landing your first neighborhood grant</div>
+        </div>
+      </a>
+      <a href="case-study-roslindale.html" class="resource-list-item reveal" style="border-color: rgba(255,255,255,0.08);">
+        <div class="resource-list-icon badge-projects">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M4 10L8 14L16 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="resource-list-title" style="color: var(--cream);">Case Study: Roslindale</div>
+          <div class="resource-list-desc" style="color: rgba(245,240,232,0.5);">A two-year neighborhood garden project in Boston</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ====== CTA BANNER ====== -->
+<section class="cta-banner" aria-labelledby="cta-heading">
+  <div class="cta-banner-inner">
+    <p class="kicker" style="color: var(--gold);">Join the Community</p>
+    <h2 id="cta-heading">Get new tools when they drop.</h2>
+    <p>We publish new resources every month — checklists, templates, guides, and case studies built with input from organizers across the country. It's free.</p>
+    <div class="cta-buttons">
+      <a href="about.html#newsletter" class="btn btn-primary">Subscribe to Updates</a>
+      <a href="about.html" class="btn btn-outline-light">About Civic Signal</a>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FOOTER ====== -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" style="margin-bottom: var(--sp-4); display: inline-flex;">
+          <div class="nav-logo-mark">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg>
+          </div>
+          <div class="nav-logo-text">
+            <span class="nav-logo-name">Civic Signal</span>
+            <span class="nav-logo-sub">Resource Library</span>
+          </div>
+        </a>
+        <p>Publishing practical toolkits for neighborhood organizers, free of charge and free of jargon. Built by community, for community.</p>
+      </div>
+      <div>
+        <span class="footer-col-title">Resources</span>
+        <div class="footer-links">
+          <a href="outreach-checklist.html" class="footer-link">Outreach Checklist</a>
+          <a href="meeting-agenda.html" class="footer-link">Meeting Agenda Template</a>
+          <a href="grant-readiness.html" class="footer-link">Grant Readiness Guide</a>
+          <a href="case-study-roslindale.html" class="footer-link">Case Study: Roslindale</a>
+          <a href="resources.html" class="footer-link">All Resources →</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Topics</span>
+        <div class="footer-links">
+          <a href="resources.html?filter=outreach" class="footer-link">Outreach</a>
+          <a href="resources.html?filter=meetings" class="footer-link">Meetings</a>
+          <a href="resources.html?filter=funding" class="footer-link">Funding</a>
+          <a href="resources.html?filter=projects" class="footer-link">Projects</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Organization</span>
+        <div class="footer-links">
+          <a href="about.html" class="footer-link">About Civic Signal</a>
+          <a href="about.html#team" class="footer-link">Our Team</a>
+          <a href="about.html#newsletter" class="footer-link">Newsletter</a>
+          <a href="about.html#contribute" class="footer-link">Contribute a Resource</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-legal">© 2024 Civic Signal. All resources are free to use and adapt with attribution.</p>
+      <div class="footer-bottom-links">
+        <a href="about.html">About</a>
+        <a href="resources.html">Resources</a>
+        <a href="about.html#contribute">Contribute</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

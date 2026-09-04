@@ -1,0 +1,83 @@
+---
+/**
+ * DocsLayout — the shell every MDX page renders into.
+ *
+ * Provides the persistent left sidebar, top bar with command-palette search,
+ * the article column, and the auto-generated on-page table of contents from
+ * the page's h2/h3 headings.
+ */
+import { getCollection } from 'astro:content';
+import SearchPalette from '@components/SearchPalette.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  group: string;
+  status?: string;
+  headings: { depth: number; slug: string; text: string }[];
+}
+
+const { title, description, group, status = 'stable', headings } = Astro.props;
+const allDocs = (await getCollection('docs')).sort(
+  (a, b) => a.data.order - b.data.order,
+);
+const groups = ['Overview', 'Foundations', 'Components'];
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · Halo UI</title>
+    <meta name="description" content={description} />
+    <link rel="stylesheet" href="/css/halo.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <a class="sidebar__brand" href="/">Halo UI</a>
+        {
+          groups.map((g) => (
+            <nav class="nav-group" aria-label={g}>
+              <p class="nav-group__title">{g}</p>
+              {allDocs
+                .filter((d) => d.data.group === g)
+                .map((d) => (
+                  <a class="nav-link" href={`/${d.slug}/`}>
+                    {d.data.title}
+                  </a>
+                ))}
+            </nav>
+          ))
+        }
+      </aside>
+      <main class="content">
+        <SearchPalette />
+        <article class="doc">
+          <header class="doc__header">
+            <p class="doc__eyebrow">{group}</p>
+            <h1>{title}</h1>
+            <p class="doc__lede">{description}</p>
+            <span class={`badge badge--${status}`}>{status}</span>
+          </header>
+          <slot />
+        </article>
+        <aside class="toc" aria-label="On this page">
+          <p class="toc__title">On this page</p>
+          <ul>
+            {
+              toc.map((h) => (
+                <li class={`toc__item toc__item--h${h.depth}`}>
+                  <a href={`#${h.slug}`}>{h.text}</a>
+                </li>
+              ))
+            }
+          </ul>
+        </aside>
+      </main>
+    </div>
+    <script src="/js/halo.js"></script>
+  </body>
+</html>

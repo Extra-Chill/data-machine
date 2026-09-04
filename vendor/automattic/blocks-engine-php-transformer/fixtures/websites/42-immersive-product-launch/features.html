@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLTA AURA One — Features &amp; Engineering</title>
+  <meta name="description" content="A deep look at the engineering of the VOLTA AURA One: axial-flux powertrain, structural battery, adaptive suspension, AuraOS and the AuraDock charging network.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="loader" role="status" aria-live="polite" aria-label="Loading">
+    <div class="loader-inner">
+      <div class="loader-mark"><span>V</span><span>O</span><span>L</span><span>T</span><span>A</span></div>
+      <div class="loader-sub">Features</div>
+      <div class="loader-bar"><i></i></div>
+      <div class="loader-pct">000</div>
+    </div>
+  </div>
+
+  <div class="scroll-progress" aria-hidden="true"></div>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="VOLTA home">
+      <span class="logo-mark">VOLTA</span>
+      <span class="logo-sub">Aura One</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Launch</a>
+      <a href="features.html">Features</a>
+      <a href="specs.html">Specs</a>
+      <a href="reserve.html" class="nav-cta">Reserve</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- PAGE HERO -->
+    <section class="page-hero">
+      <div class="wrap">
+        <p class="eyebrow reveal">The build</p>
+        <h1 class="split" data-split>How it was made.</h1>
+        <p class="reveal" data-delay="2">Every system on the AURA One was designed by the same small team, in the same building, to do one thing: make an electric motorcycle that rewards a real rider. Here is what is underneath the paint.</p>
+      </div>
+    </section>
+
+    <!-- FEATURE: powertrain -->
+    <section class="section">
+      <div class="wrap feature">
+        <div class="feature-media reveal">
+          <svg viewBox="0 0 340 280" aria-label="Axial-flux motor torque curve">
+            <line x1="46" y1="240" x2="320" y2="240" stroke="#2a3044" stroke-width="2"/>
+            <line x1="46" y1="40" x2="46" y2="240" stroke="#2a3044" stroke-width="2"/>
+            <!-- torque (flat) -->
+            <path d="M46,90 L210,90 L320,150" fill="none" stroke="#c4ff3d" stroke-width="3"/>
+            <!-- power (rising) -->
+            <path d="M46,240 C140,230 200,120 320,96" fill="none" stroke="#6f7bff" stroke-width="3" stroke-dasharray="6 5"/>
+            <text x="56" y="80" font-family="Space Mono" font-size="11" fill="#c4ff3d">Torque</text>
+            <text x="220" y="120" font-family="Space Mono" font-size="11" fill="#6f7bff">Power</text>
+            <text x="180" y="266" text-anchor="middle" font-family="Space Mono" font-size="10" fill="#9aa3bd">motor speed →</text>
+          </svg>
+        </div>
+        <div class="feature-copy reveal" data-delay="2">
+          <p class="eyebrow">01 · Powertrain</p>
+          <h2>Torque from the first millisecond.</h2>
+          <p>The AURA-DRIVE is an oil-cooled axial-flux motor — the same architecture used in hypercars — making it shorter, lighter and denser than the radial motors most e-bikes use. Full torque is on tap the instant you twist the throttle, and it stays flat to 80 mph.</p>
+          <ul class="feature-list">
+            <li>110 kW peak, 65 kW continuous output</li>
+            <li>408 lb-ft of torque at the crankshaft</li>
+            <li>97.3% drivetrain efficiency, measured on the dyno</li>
+            <li>Single-speed reduction with a sealed wet clutch</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURE: battery -->
+    <section class="section">
+      <div class="wrap feature flip">
+        <div class="feature-media reveal">
+          <svg viewBox="0 0 340 240" aria-label="Structural battery pack diagram">
+            <rect x="40" y="70" width="260" height="100" rx="14" fill="#171b2b" stroke="#6f7bff" stroke-width="2"/>
+            <g fill="#c4ff3d" opacity="0.85">
+              <rect x="54" y="84" width="20" height="72" rx="3"/>
+              <rect x="80" y="84" width="20" height="72" rx="3"/>
+              <rect x="106" y="84" width="20" height="72" rx="3"/>
+              <rect x="132" y="84" width="20" height="72" rx="3"/>
+              <rect x="158" y="84" width="20" height="72" rx="3"/>
+              <rect x="184" y="84" width="20" height="72" rx="3"/>
+              <rect x="210" y="84" width="20" height="72" rx="3"/>
+              <rect x="236" y="84" width="20" height="72" rx="3"/>
+              <rect x="262" y="84" width="20" height="72" rx="3"/>
+            </g>
+            <text x="170" y="200" text-anchor="middle" font-family="Space Mono" font-size="12" fill="#9aa3bd">21.5 kWh · 1,800-cycle warranty</text>
+          </svg>
+        </div>
+        <div class="feature-copy reveal" data-delay="2">
+          <p class="eyebrow">02 · Energy</p>
+          <h2>The battery is the frame.</h2>
+          <p>Instead of hanging cells in a box, we made the 21.5 kWh pack a stressed member of the chassis. That removes weight, drops the centre of gravity to crankshaft height, and gives the AURA One its uncanny low-speed balance.</p>
+          <ul class="feature-list">
+            <li>Liquid-cooled NMC cells, automotive grade</li>
+            <li>171 miles EPA-equivalent, 89 miles at sustained 70 mph</li>
+            <li>1,800 cycles to 80% capacity, 8-year warranty</li>
+            <li>IP67 sealed — ride it through the storm</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- INTERACTIVE COLOUR CONFIGURATOR (re-used module) -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head center reveal">
+          <p class="eyebrow" style="justify-content:center">03 · Finishes</p>
+          <h2>Reactive colour, on demand.</h2>
+          <p>The acid-lime accent system is a paint-and-anodise process you can spec across five bodies. Try it.</p>
+        </div>
+        <div class="configurator" data-configurator data-base-price="14900">
+          <div class="config-stage reveal" style="--cfg-glow:rgba(111,123,255,.4)">
+            <svg class="config-bike" viewBox="0 0 900 460" role="img" aria-label="AURA One configurator preview"
+                 style="--bike-body:#27305c;--bike-body-2:#3a447a;--bike-body-d:#161c38;--bike-accent:#6f7bff">
+              <ellipse cx="450" cy="412" rx="300" ry="18" fill="#000" opacity="0.4"/>
+              <circle cx="235" cy="330" r="84" fill="#0b0d14" stroke="var(--bike-accent)" stroke-width="6"/>
+              <circle cx="235" cy="330" r="40" fill="#10131c" stroke="var(--bike-accent)" stroke-width="2"/>
+              <circle cx="690" cy="330" r="84" fill="#0b0d14" stroke="var(--bike-accent)" stroke-width="6"/>
+              <circle cx="690" cy="330" r="40" fill="#10131c" stroke="var(--bike-accent)" stroke-width="2"/>
+              <path d="M235,330 L420,300 L520,318 L690,330" fill="none" stroke="#1a1f2e" stroke-width="14" stroke-linecap="round"/>
+              <rect x="395" y="262" width="130" height="78" rx="14" fill="var(--bike-body-d)" stroke="var(--bike-accent)" stroke-width="2"/>
+              <rect x="408" y="276" width="104" height="10" rx="5" fill="var(--bike-accent)" opacity="0.85"/>
+              <path d="M340,250 C360,205 430,188 510,200 C540,205 555,225 545,250 C520,262 380,266 340,250 Z" fill="var(--bike-body-2)" stroke="#0c0f18" stroke-width="2"/>
+              <path d="M360,232 C400,214 470,210 520,224" fill="none" stroke="var(--bike-accent)" stroke-width="2.5"/>
+              <path d="M230,256 C260,242 360,244 380,250 C384,260 360,268 320,270 C280,272 240,268 230,256 Z" fill="#1c2030" stroke="#05060a" stroke-width="2"/>
+              <ellipse cx="694" cy="228" rx="13" ry="15" fill="var(--bike-accent)"/>
+              <path d="M560,250 L660,300 M690,330 L672,236" stroke="#2a3044" stroke-width="9" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="config-controls reveal" data-delay="2">
+            <h3>AURA One</h3>
+            <p class="cfg-price" data-cfg-price>$14,900</p>
+            <p class="cfg-name" data-cfg-name>Finish &mdash; <b>Midnight Indigo</b></p>
+            <div class="swatch-row" role="group" aria-label="Colourway"></div>
+            <a href="reserve.html" class="btn btn-primary magnetic">Take this finish to checkout <span class="arrow">→</span></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURE: chassis -->
+    <section class="section">
+      <div class="wrap feature">
+        <div class="feature-media reveal">
+          <svg viewBox="0 0 340 240" aria-label="Adaptive suspension response">
+            <line x1="40" y1="120" x2="300" y2="120" stroke="#2a3044" stroke-width="2"/>
+            <!-- road bumps -->
+            <path d="M40,120 Q70,80 100,120 Q130,160 160,120 Q190,70 220,120 Q250,165 280,120 L300,120" fill="none" stroke="#6f7bff" stroke-width="2.5" opacity="0.6"/>
+            <!-- damped output (smoother) -->
+            <path d="M40,120 Q70,108 100,120 Q130,132 160,120 Q190,106 220,120 Q250,133 280,120 L300,120" fill="none" stroke="#c4ff3d" stroke-width="3"/>
+            <text x="56" y="70" font-family="Space Mono" font-size="11" fill="#6f7bff">road input</text>
+            <text x="56" y="186" font-family="Space Mono" font-size="11" fill="#c4ff3d">at the seat</text>
+          </svg>
+        </div>
+        <div class="feature-copy reveal" data-delay="2">
+          <p class="eyebrow">04 · Chassis</p>
+          <h2>Suspension that thinks.</h2>
+          <p>Front and rear, electronically-controlled dampers adjust 500 times a second. Sport firms the rear under throttle; Comfort soaks up broken city tarmac; Track lets you dial compression and rebound by the click in the AuraOS app.</p>
+          <ul class="feature-list">
+            <li>Semi-active 43 mm inverted fork, 4.7 in travel</li>
+            <li>Monoshock with remote reservoir, full adjustability</li>
+            <li>Forged-aluminium swingarm, lap-tested at Anglesey</li>
+            <li>Radial 4-piston front calipers, regen-blended braking</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURE: software -->
+    <section class="section">
+      <div class="wrap feature flip">
+        <div class="feature-media reveal">
+          <svg viewBox="0 0 320 280" aria-label="AuraOS dashboard mock">
+            <rect x="30" y="40" width="260" height="170" rx="16" fill="#0c0e16" stroke="#2a3044" stroke-width="2"/>
+            <path d="M70,180 A90,90 0 0 1 250,180" fill="none" stroke="#171b2b" stroke-width="14"/>
+            <path d="M70,180 A90,90 0 0 1 205,108" fill="none" stroke="#c4ff3d" stroke-width="14" stroke-linecap="round"/>
+            <text x="160" y="150" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="40" fill="#fff">68</text>
+            <text x="160" y="172" text-anchor="middle" font-family="Space Mono" font-size="10" fill="#9aa3bd">MPH</text>
+            <rect x="60" y="196" width="60" height="6" rx="3" fill="#6f7bff"/>
+            <rect x="200" y="196" width="60" height="6" rx="3" fill="#c4ff3d"/>
+          </svg>
+        </div>
+        <div class="feature-copy reveal" data-delay="2">
+          <p class="eyebrow">05 · Software</p>
+          <h2>AuraOS, over the air.</h2>
+          <p>The bike gets better while it sleeps. Charge-aware navigation routes you past AuraDock stations, theft alerts ping your phone, and ride modes update over the air. Your circuit telemetry syncs to the app the moment you pit.</p>
+          <ul class="feature-list">
+            <li>Over-the-air updates for ride modes and features</li>
+            <li>Charge-aware navigation with live range mapping</li>
+            <li>Circuit telemetry: lap times, lean angle, g-force</li>
+            <li>Geofencing, theft tracking and remote immobilise</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="section">
+      <div class="wrap">
+        <div class="cta-band reveal">
+          <p class="eyebrow" style="justify-content:center">Ready when you are</p>
+          <h2>Read the full spec sheet.</h2>
+          <p>Every number, dimension and warranty figure — laid out and compared against the bikes you are cross-shopping.</p>
+          <a href="specs.html" class="btn btn-primary magnetic" data-strength="0.4">View specifications <span class="arrow">→</span></a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <span class="logo-mark">VOLTA</span>
+          <p>Electric motorcycles designed and assembled in Portland, Oregon. Built for the people who actually ride.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Machine</h4>
+          <a href="features.html">Features</a>
+          <a href="specs.html">Specifications</a>
+          <a href="reserve.html">Reserve</a>
+          <a href="index.html">Colourways</a>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <a href="#">Our story</a>
+          <a href="#">Newsroom</a>
+          <a href="#">Careers</a>
+          <a href="#">Showrooms</a>
+        </div>
+        <div class="footer-col">
+          <h4>Support</h4>
+          <a href="#">VoltaCare</a>
+          <a href="#">Charging network</a>
+          <a href="#">Owner's manual</a>
+          <a href="#">Contact</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 VOLTA Motorworks, Inc. All rights reserved. EPA-equivalent figures; actual range varies.</span>
+        <div class="socials">
+          <a href="#" aria-label="Instagram">Instagram</a>
+          <a href="#" aria-label="YouTube">YouTube</a>
+          <a href="#" aria-label="X">X</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+  <script src="js/configurator.js"></script>
+</body>
+</html>

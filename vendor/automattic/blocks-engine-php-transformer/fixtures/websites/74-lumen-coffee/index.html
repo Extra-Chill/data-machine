@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumen Coffee Roasters — Small-Batch Specialty Coffee</title>
+<meta name="description" content="Lumen Coffee Roasters — small-batch, ethically sourced specialty coffee roasted to order. Single origins, blends, espresso and brew gear.">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="brand" href="index.html" aria-label="Lumen Coffee Roasters home">
+      <svg class="brand__mark" viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="22" fill="#2b1d16"/>
+        <circle cx="24" cy="24" r="11" fill="none" stroke="#c2703d" stroke-width="2.5"/>
+        <g stroke="#f5ece0" stroke-width="2.2" stroke-linecap="round">
+          <path d="M24 9v4M24 35v4M9 24h4M35 24h4M13.4 13.4l2.8 2.8M31.8 31.8l2.8 2.8M13.4 34.6l2.8-2.8M31.8 16.2l2.8-2.8"/>
+        </g>
+        <path d="M24 19c3 2 3 6 0 8-3-2-3-6 0-8z" fill="#c2703d"/>
+      </svg>
+      <span class="brand__name">Lumen<small>Coffee Roasters</small></span>
+    </a>
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      <a href="index.html" aria-current="page">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="about.html">About</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn nav-toggle" id="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false" aria-controls="primary-nav">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-btn" type="button" data-open-drawer aria-label="Open cart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6h15l-1.5 9h-12z" stroke-linejoin="round"/><path d="M6 6 5 3H2" stroke-linecap="round"/><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/></svg>
+        <span class="cart-badge" data-cart-badge hidden>0</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero__inner">
+      <div class="hero__copy">
+        <p class="eyebrow">Roasted to order · Shipped fresh</p>
+        <h1 class="hero__title">Coffee with <em>clarity</em>, in every cup.</h1>
+        <p class="hero__lead">We source single-origin lots from growers we know by name, then roast in small batches to let each coffee's true character shine through.</p>
+        <div class="hero__cta">
+          <a class="btn btn--solid btn--lg" href="shop.html">Shop the Roastery</a>
+          <a class="btn btn--ghost btn--lg" href="about.html">Our Story</a>
+        </div>
+        <div class="hero__stats">
+          <div class="hero__stat"><strong>14</strong><span>Origins</span></div>
+          <div class="hero__stat"><strong>48h</strong><span>Roast to ship</span></div>
+          <div class="hero__stat"><strong>100%</strong><span>Traceable</span></div>
+        </div>
+      </div>
+      <div class="hero__art" aria-hidden="true">
+        <svg viewBox="0 0 360 360">
+          <defs>
+            <linearGradient id="cupG" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" stop-color="#3a2820"/><stop offset="1" stop-color="#2b1d16"/>
+            </linearGradient>
+          </defs>
+          <circle cx="180" cy="180" r="150" fill="#ece0cf"/>
+          <circle cx="180" cy="180" r="150" fill="none" stroke="#c2703d" stroke-width="2" stroke-dasharray="4 8" opacity="0.6"/>
+          <!-- saucer -->
+          <ellipse cx="180" cy="278" rx="120" ry="22" fill="#d8c4a8"/>
+          <ellipse cx="180" cy="274" rx="120" ry="20" fill="#fbf6ee"/>
+          <!-- cup -->
+          <path d="M96 168 L264 168 L246 256 Q243 276 220 276 L140 276 Q117 276 114 256 Z" fill="url(#cupG)"/>
+          <ellipse cx="180" cy="168" rx="84" ry="20" fill="#1c120c"/>
+          <ellipse cx="180" cy="166" rx="72" ry="15" fill="#6f4326"/>
+          <ellipse cx="180" cy="166" rx="44" ry="9" fill="#8c5a34"/>
+          <!-- handle -->
+          <path d="M264 188 Q316 190 312 224 Q308 258 250 252" fill="none" stroke="#2b1d16" stroke-width="16"/>
+          <!-- steam -->
+          <g fill="none" stroke="#c2703d" stroke-width="4" stroke-linecap="round" opacity="0.75">
+            <path d="M150 148 q-14 -22 0 -44 q14 -22 0 -44"/>
+            <path d="M210 148 q-14 -22 0 -44 q14 -22 0 -44"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURED -->
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">This week at the roastery</p>
+        <h2>Featured coffees &amp; gear</h2>
+        <p>A rotating selection of the lots we're most excited about right now.</p>
+      </div>
+      <div class="product-grid featured-grid" id="featured-grid"></div>
+      <div class="text-center mt-32"><a class="btn btn--ghost btn--lg" href="shop.html">Browse all products</a></div>
+    </div>
+  </section>
+
+  <!-- STORY TEASER -->
+  <section class="section section--cream">
+    <div class="wrap split">
+      <div class="split__art" aria-hidden="true">
+        <svg viewBox="0 0 320 320">
+          <circle cx="160" cy="160" r="150" fill="#fbf6ee"/>
+          <path d="M80 120 Q160 70 240 120 L230 230 Q160 270 90 230 Z" fill="#7a8b5a" opacity="0.25"/>
+          <!-- coffee branch -->
+          <path d="M160 250 C150 200 150 150 160 90" fill="none" stroke="#5a3a28" stroke-width="6" stroke-linecap="round"/>
+          <g fill="#7a8b5a">
+            <path d="M160 200 C130 195 120 175 130 160 C160 165 170 185 160 200z"/>
+            <path d="M160 200 C190 195 200 175 190 160 C160 165 150 185 160 200z"/>
+            <path d="M160 160 C132 156 122 138 132 124 C160 128 169 146 160 160z"/>
+            <path d="M160 160 C188 156 198 138 188 124 C160 128 151 146 160 160z"/>
+          </g>
+          <g fill="#c2703d">
+            <circle cx="138" cy="182" r="11"/><circle cx="182" cy="182" r="11"/>
+            <circle cx="140" cy="144" r="10"/><circle cx="180" cy="144" r="10"/>
+            <circle cx="160" cy="110" r="10"/>
+          </g>
+        </svg>
+      </div>
+      <div class="split__copy">
+        <p class="eyebrow">Our story</p>
+        <h2>A roastery built on relationships.</h2>
+        <p>Lumen began in 2014 with a single drum roaster and a stubborn belief: that great coffee starts long before the beans reach the hopper. We pay above Fair Trade, visit our farms each harvest, and roast every batch by taste, not by timer.</p>
+        <p>The result is coffee that's bright, honest, and unmistakably ours — the kind you'll want to share.</p>
+        <a class="btn btn--solid" href="about.html">Meet the team</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROCESS -->
+  <section class="section section--espresso">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Bean to cup</p>
+        <h2>Our process</h2>
+        <p>Four deliberate steps stand between the cherry on the tree and the cup on your table.</p>
+      </div>
+      <div class="steps">
+        <div class="step"><div class="step__num">1</div><h3>Source</h3><p>We buy direct from farms and co-ops, building long-term partnerships that reward quality.</p></div>
+        <div class="step"><div class="step__num">2</div><h3>Roast</h3><p>Small batches on a vintage drum roaster, profiled to highlight each lot's natural sweetness.</p></div>
+        <div class="step"><div class="step__num">3</div><h3>Rest</h3><p>Beans degas for a few days so the flavors settle and the crema pours thick and stable.</p></div>
+        <div class="step"><div class="step__num">4</div><h3>Ship</h3><p>Packed in valve-sealed bags within 48 hours of roasting and sent straight to your door.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NEWSLETTER -->
+  <section class="section">
+    <div class="wrap">
+      <div class="newsletter">
+        <h2>Get first dibs on fresh crops</h2>
+        <p>Join the list for new releases, brewing notes, and the occasional subscriber-only lot.</p>
+        <form class="newsletter__form" data-newsletter novalidate>
+          <label class="sr-only" for="nl-home-email" style="position:absolute;left:-9999px;">Email address</label>
+          <input id="nl-home-email" type="email" name="email" placeholder="you@example.com" required>
+          <button class="btn btn--cream" type="submit">Subscribe</button>
+        </form>
+        <p class="form-status" data-newsletter-status hidden></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- FOOTER (shared) -->
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <span class="brand__name">Lumen<small>Coffee Roasters</small></span>
+        <p>Small-batch specialty coffee, roasted to order in the heart of the city since 2014.</p>
+      </div>
+      <div><h4>Shop</h4><ul>
+        <li><a href="shop.html?category=single-origin">Single Origin</a></li>
+        <li><a href="shop.html?category=blend">Blends</a></li>
+        <li><a href="shop.html?category=espresso">Espresso</a></li>
+        <li><a href="shop.html?category=gear">Brew Gear</a></li>
+      </ul></div>
+      <div><h4>Company</h4><ul>
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html">Contact</a></li>
+        <li><a href="shop.html">All Products</a></li>
+      </ul></div>
+      <div><h4>Visit</h4><ul>
+        <li>114 Kindling Lane</li>
+        <li>Riverbend, OR 97000</li>
+        <li><a href="contact.html">Store hours</a></li>
+      </ul></div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; <span data-year>2026</span> Lumen Coffee Roasters. All rights reserved.</span>
+      <span>Crafted with care · Brewed with intent</span>
+    </div>
+  </div>
+</footer>
+
+<!-- CART DRAWER (shared) -->
+<div class="scrim" id="drawer-scrim" hidden></div>
+<aside class="drawer" id="cart-drawer" aria-label="Shopping cart" aria-hidden="true">
+  <div class="drawer__head">
+    <h2>Your Cart</h2>
+    <button class="drawer__close" type="button" data-close-drawer aria-label="Close cart">&times;</button>
+  </div>
+  <div class="drawer__body">
+    <p class="drawer__empty" data-drawer-empty>Your cart is empty.<br>Time to find your next favorite coffee.</p>
+    <ul class="cart-lines" data-drawer-list></ul>
+  </div>
+  <div class="drawer__foot" data-drawer-foot hidden>
+    <div class="drawer__subtotal"><span>Subtotal</span><strong data-drawer-subtotal>$0.00</strong></div>
+    <a class="btn btn--ghost btn--block" href="cart.html">View Cart</a>
+    <p class="drawer__note">Free shipping on orders over $45.</p>
+  </div>
+</aside>
+
+<!-- PRODUCT MODAL (shared) -->
+<div class="modal" id="product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title" hidden>
+  <div class="modal__dialog">
+    <button class="modal__close" type="button" data-close-modal aria-label="Close details">&times;</button>
+    <div id="product-modal-body"></div>
+  </div>
+</div>
+
+<script src="js/products.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

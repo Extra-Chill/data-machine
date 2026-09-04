@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voltrove Filament One — Play the Synth in Your Browser</title>
+  <meta name="description" content="The Voltrove Filament One is a playable browser synthesizer with a polyphonic keyboard, ADSR, resonant filter, delay, a step sequencer and a live oscilloscope. Click to enable sound and play.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── Audio gate ── -->
+  <div class="audio-gate" id="audio-gate" role="dialog" aria-label="Enable sound">
+    <div class="gate-card">
+      <div class="gate-pulse" aria-hidden="true"></div>
+      <h2>Plug in the Filament One</h2>
+      <p>Browsers won’t start audio until you ask. Click below to power up the synth — then play with your mouse, touch, or computer keyboard (the <b>A&ndash;K</b> row is the white keys).</p>
+      <button class="btn btn-primary" id="enable-audio">⏻ Enable sound &amp; play</button>
+    </div>
+  </div>
+
+  <!-- ── Header ── -->
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Voltrove home">
+      <span class="logo-mark">Voltrove<span class="dot">●</span></span>
+      <span class="logo-sub">Software Instruments</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html" class="active">Play</a>
+      <a href="patches.html">Patches</a>
+      <a href="about.html">How it works</a>
+      <a href="patches.html" class="nav-cta">Browse sounds</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+  </header>
+
+  <main class="instrument wrap">
+
+    <div class="page-hero">
+      <p class="eyebrow">Voltrove · Filament One · v2.4</p>
+      <h1 class="page-title">A whole synth, <em>in your browser.</em></h1>
+      <p class="page-lead">No download, no plugin. The Filament One is a two-oscillator subtractive synthesizer with an analog-style resonant filter, ADSR envelopes, a feedback delay, a step sequencer, and a live oscilloscope. Everything below makes real sound through the Web Audio API. Press a key.</p>
+    </div>
+
+    <div class="rack">
+      <div class="rack-bar">
+        <div class="rack-brand">
+          <span class="badge">Filament One</span>
+          <span class="model">Subtractive Synthesizer</span>
+        </div>
+        <div class="rack-status">
+          <span class="led" id="engine-status">stand by</span>
+        </div>
+      </div>
+
+      <div class="rack-body">
+
+        <!-- Visualizer -->
+        <div class="viz-wrap">
+          <span class="viz-tag">Oscilloscope · Spectrum — live output</span>
+          <canvas id="viz-canvas" aria-label="Live audio waveform and frequency spectrum"></canvas>
+        </div>
+
+        <!-- Patch / master bar -->
+        <div class="patch-bar">
+          <div class="group">
+            <input type="text" id="patch-name" placeholder="Name this patch…" aria-label="Patch name">
+            <button class="btn-sm" id="patch-save">Save patch</button>
+            <button class="btn-sm" id="patch-init">Init</button>
+            <button class="btn-sm" id="patch-random">Randomise</button>
+          </div>
+          <div class="sep" aria-hidden="true"></div>
+          <button class="btn-sm btn-panic" id="panic" title="All notes off (Esc)">⏹ Panic</button>
+          <p class="patch-status" id="patch-status" role="status" aria-live="polite"></p>
+        </div>
+
+        <!-- Sound design panels -->
+        <div class="panels">
+          <div class="panel-card osc">
+            <h3>Oscillators</h3>
+            <div class="ctl">
+              <label for="ctrl-osca">Osc A waveform</label>
+              <select id="ctrl-osca">
+                <option value="sawtooth">Sawtooth</option>
+                <option value="square">Square</option>
+                <option value="triangle">Triangle</option>
+                <option value="sine">Sine</option>
+              </select>
+            </div>
+            <div class="ctl">
+              <label for="ctrl-oscb">Osc B waveform</label>
+              <select id="ctrl-oscb">
+                <option value="square">Square</option>
+                <option value="sawtooth">Sawtooth</option>
+                <option value="triangle">Triangle</option>
+                <option value="sine">Sine</option>
+              </select>
+            </div>
+            <div class="ctl">
+              <label for="ctrl-octb">Osc B octave</label>
+              <select id="ctrl-octb">
+                <option value="-24">−2</option>
+                <option value="-12">−1</option>
+                <option value="0">0</option>
+                <option value="12">+1</option>
+                <option value="24">+2</option>
+              </select>
+            </div>
+            <div class="ctl">
+              <label for="ctrl-mixb">Osc B mix <b id="ctrl-mixb-val">35%</b></label>
+              <input type="range" id="ctrl-mixb" min="0" max="1" step="0.01" value="0.35">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-detune">Detune <b id="ctrl-detune-val">8 ct</b></label>
+              <input type="range" id="ctrl-detune" min="0" max="40" step="1" value="8">
+            </div>
+          </div>
+
+          <div class="panel-card filter">
+            <h3>Filter (lowpass)</h3>
+            <div class="ctl">
+              <label for="ctrl-cutoff">Cutoff <b id="ctrl-cutoff-val">2400 Hz</b></label>
+              <input type="range" id="ctrl-cutoff" min="80" max="12000" step="10" value="2400">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-res">Resonance (Q) <b id="ctrl-res-val">4.0</b></label>
+              <input type="range" id="ctrl-res" min="0.5" max="20" step="0.1" value="4">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-filterenv">Filter envelope <b id="ctrl-filterenv-val">1800 Hz</b></label>
+              <input type="range" id="ctrl-filterenv" min="0" max="6000" step="50" value="1800">
+            </div>
+          </div>
+
+          <div class="panel-card adsr">
+            <h3>Amp envelope (ADSR)</h3>
+            <div class="ctl">
+              <label for="ctrl-attack">Attack <b id="ctrl-attack-val">10 ms</b></label>
+              <input type="range" id="ctrl-attack" min="0.001" max="2" step="0.001" value="0.01">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-decay">Decay <b id="ctrl-decay-val">180 ms</b></label>
+              <input type="range" id="ctrl-decay" min="0.005" max="2" step="0.005" value="0.18">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-sustain">Sustain <b id="ctrl-sustain-val">55%</b></label>
+              <input type="range" id="ctrl-sustain" min="0" max="1" step="0.01" value="0.55">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-release">Release <b id="ctrl-release-val">320 ms</b></label>
+              <input type="range" id="ctrl-release" min="0.005" max="3" step="0.005" value="0.32">
+            </div>
+          </div>
+
+          <div class="panel-card fx">
+            <h3>Drive &amp; delay</h3>
+            <div class="ctl">
+              <label for="ctrl-drive">Drive <b id="ctrl-drive-val">12%</b></label>
+              <input type="range" id="ctrl-drive" min="0" max="1" step="0.01" value="0.12">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-delaytime">Delay time <b id="ctrl-delaytime-val">270 ms</b></label>
+              <input type="range" id="ctrl-delaytime" min="0.02" max="1" step="0.01" value="0.27">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-delayfb">Feedback <b id="ctrl-delayfb-val">32%</b></label>
+              <input type="range" id="ctrl-delayfb" min="0" max="0.85" step="0.01" value="0.32">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-delaymix">Delay mix <b id="ctrl-delaymix-val">25%</b></label>
+              <input type="range" id="ctrl-delaymix" min="0" max="0.7" step="0.01" value="0.25">
+            </div>
+            <div class="ctl">
+              <label for="ctrl-volume">Master volume <b id="ctrl-volume-val">70%</b></label>
+              <input type="range" id="ctrl-volume" min="0" max="1" step="0.01" value="0.7">
+            </div>
+          </div>
+        </div>
+
+        <!-- Patch presets -->
+        <p class="subhead">Factory patches — click to load into the synth</p>
+        <div class="chip-row" id="patch-presets"></div>
+
+        <p class="subhead">Your saved patches (stored in this browser)</p>
+        <div class="chip-row" id="user-patches"></div>
+
+        <!-- Keyboard -->
+        <div class="kb-section" style="margin-top:1.4rem;">
+          <div class="kb-toolbar">
+            <span class="label">Keyboard</span>
+            <div class="octave-ctl">
+              <button id="oct-down" aria-label="Octave down">−</button>
+              <span id="octave-label">C4</span>
+              <button id="oct-up" aria-label="Octave up">+</button>
+            </div>
+            <span class="kb-hint-text">Play with <b>A&ndash;K</b> (white) &amp; <b>W E T Y U</b> (black). Use <b>← →</b> to shift octave.</span>
+          </div>
+          <div id="keyboard" role="group" aria-label="On-screen piano keyboard"></div>
+        </div>
+
+        <!-- Sequencer -->
+        <div class="seq-section" style="margin-top:1.2rem;">
+          <div class="seq-head">
+            <h3>Step Sequencer</h3>
+            <div class="transport">
+              <button class="btn-play" id="seq-play"><span class="tri" aria-hidden="true"></span><span class="label">Play</span></button>
+              <div class="field"><label for="seq-bpm">BPM</label><input type="range" id="seq-bpm" min="40" max="200" step="1" value="124"><b id="seq-bpm-val">124</b></div>
+              <div class="field"><label for="seq-swing">Swing</label><input type="range" id="seq-swing" min="0" max="0.5" step="0.01" value="0"><b id="seq-swing-val">0%</b></div>
+            </div>
+          </div>
+          <div class="seq-grid" id="seq-grid"></div>
+          <div class="seq-foot">
+            <span class="subhead">Patterns:</span>
+            <div class="chip-row" id="seq-presets" style="margin:0;"></div>
+            <button class="btn-sm" id="seq-clear" style="margin-left:auto;">Clear grid</button>
+          </div>
+        </div>
+
+      </div><!-- /rack-body -->
+    </div><!-- /rack -->
+
+    <p class="mono" style="margin-top:1rem;text-align:center;">Tip: hit <b>Space</b> to start/stop the sequencer, <b>Esc</b> to panic. Built entirely with the Web Audio API — no samples, every sound is synthesized live.</p>
+
+  </main>
+
+  <!-- ── Footer ── -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Voltrove<span class="dot" style="color:var(--mint)">●</span></div>
+          <p class="footer-brand-desc">A tiny instrument studio building playable synthesizers that live entirely in the browser. No installs, no accounts — just the open web making sound.</p>
+        </div>
+        <nav class="footer-col" aria-label="Instrument">
+          <p class="footer-col-title">Instrument</p>
+          <ul>
+            <li><a href="index.html">Play the Filament One</a></li>
+            <li><a href="patches.html">Patch library</a></li>
+            <li><a href="patches.html#patterns">Rhythm patterns</a></li>
+            <li><a href="about.html">Signal chain</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Studio">
+          <p class="footer-col-title">Studio</p>
+          <ul>
+            <li><a href="about.html">About Voltrove</a></li>
+            <li><a href="about.html#team">The makers</a></li>
+            <li><a href="about.html#specs">Specs</a></li>
+            <li><a href="mailto:hello@voltrove.audio">hello@voltrove.audio</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="More">
+          <p class="footer-col-title">More</p>
+          <ul>
+            <li><a href="#">Changelog</a></li>
+            <li><a href="#">MIDI roadmap</a></li>
+            <li><a href="#">Mastodon</a></li>
+            <li><a href="#">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Voltrove Instruments · Built on the open web</p>
+        <div class="footer-legal"><a href="#">Privacy</a><a href="#">Terms</a><a href="about.html">Colophon</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/engine.js"></script>
+  <script src="js/patches.js"></script>
+  <script src="js/sequencer.js"></script>
+  <script src="js/visualizer.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>On Tending a Digital Garden — Mara's Garden</title>
+  <meta name="description" content="A note from Mara Okonkwo's digital garden on distributed systems, note-taking, stoicism, and gardening.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/garden.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-leaf" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 28 C16 18 8 14 5 6 C16 6 24 12 24 22 C24 25 21 28 16 28 Z" fill="#3a7d52" opacity=".9"/>
+          <path d="M16 28 C16 20 19 13 24 8" fill="none" stroke="#fbf9f3" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="16" cy="28" r="2" fill="#b08b2e"/>
+        </svg>
+        <h1><a href="index.html">Mara's Garden</a></h1>
+      </div>
+      <p class="brand-tag">a digital garden by Mara Okonkwo</p>
+
+      <div class="search-box">
+        <span class="s-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="note-search" placeholder="Search notes  (press /)" aria-label="Search notes" autocomplete="off">
+        <ul class="search-results" id="search-results" aria-live="polite"></ul>
+      </div>
+
+      <nav aria-label="Garden navigation">
+      <p class="nav-section">Home</p>
+      <ul class="nav-list"><li><a href="index.html" class=""><span class="ripe">🌱</span><span>Start Here · MOC</span></a></li>
+      <li><a href="tags.html" class=""><span class="ripe">🏷️</span><span>Tags &amp; Index</span></a></li></ul>
+      
+        <p class="nav-section">Distributed Systems</p>
+        <ul class="nav-list">
+          <li><a href="idempotency-is-a-superpower.html" class=""><span class="ripe">🌳</span><span>Idempotency Is a Superpower</span></a></li>
+          <li><a href="the-two-generals-problem.html" class=""><span class="ripe">🌿</span><span>The Two Generals Problem</span></a></li>
+          <li><a href="why-i-stopped-trusting-wall-clocks.html" class=""><span class="ripe">🌿</span><span>Why I Stopped Trusting Wall Clocks</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Knowledge &amp; Notes</p>
+        <ul class="nav-list">
+          <li><a href="on-tending-a-digital-garden.html" class="current"><span class="ripe">🌳</span><span>On Tending a Digital Garden</span></a></li>
+          <li><a href="evergreen-notes.html" class=""><span class="ripe">🌳</span><span>Evergreen Notes</span></a></li>
+          <li><a href="book-how-to-take-smart-notes.html" class=""><span class="ripe">🌿</span><span>Book — How to Take Smart Notes</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Stoicism</p>
+        <ul class="nav-list">
+          <li><a href="the-dichotomy-of-control.html" class=""><span class="ripe">🌳</span><span>The Dichotomy of Control</span></a></li>
+          <li><a href="amor-fati.html" class=""><span class="ripe">🌿</span><span>Amor Fati</span></a></li>
+        </ul>
+      
+        <p class="nav-section">The Garden</p>
+        <ul class="nav-list">
+          <li><a href="compost-is-a-distributed-system.html" class=""><span class="ripe">🌿</span><span>Compost Is a Distributed System</span></a></li>
+          <li><a href="three-sisters-planting.html" class=""><span class="ripe">🌰</span><span>Three Sisters Planting</span></a></li>
+        </ul>
+      </nav>
+
+      <button class="theme-toggle" type="button" aria-pressed="false">☾ <span>Dark</span></button>
+    </aside>
+    <main class="content" id="main">
+      <article class="note">
+        <p class="breadcrumb"><a href="index.html">🌱 Garden</a> &nbsp;›&nbsp; On Tending a Digital Garden</p>
+        <h1>On Tending a Digital Garden</h1>
+        <div class="note-meta">
+          <span class="ripeness evergreen">🌳 Evergreen</span>
+          <span class="dot"></span>
+          <span>planted Nov 4, 2023</span>
+          <span class="dot"></span>
+          <span>tended May 30, 2026</span>
+        </div>
+        <div class="tag-list"><a class="tag" href="tags.html#evergreen">#evergreen</a><a class="tag" href="tags.html#meta">#meta</a><a class="tag" href="tags.html#pkm">#pkm</a><a class="tag" href="tags.html#writing">#writing</a></div>
+        <div class="prose">
+
+<p>A digital garden is the opposite of a blog. A blog is a <em>stream</em> — reverse-chronological, performative, optimized for the moment of publishing and then forgotten. A garden is a <em>topology</em> — a web of notes that grow, get pruned, and link to each other, optimized for being revisited.</p>
+<p>I started this place because my <a class="internal" data-slug="evergreen-notes" href="evergreen-notes.html">Evergreen Notes</a> were dying in a private vault. Notes want to be linked, and links want to be walked. Keeping them private was like growing tomatoes in a sealed jar.</p>
+<h2 id="three-rules">The three rules I actually follow <a class="anchor" href="#three-rules">#</a></h2>
+<ol>
+  <li><strong>Plant ugly.</strong> A note can go public the day it's a single sentence. The 🌰 seedling tag is permission to be wrong in public.</li>
+  <li><strong>Link before you file.</strong> I never sort a note into a folder. I connect it to two or three others and let the structure emerge. This is the core idea I stole from <a class="internal" data-slug="book-how-to-take-smart-notes" href="book-how-to-take-smart-notes.html">Book — How to Take Smart Notes</a>.</li>
+  <li><strong>Tend on a schedule, not on inspiration.</strong> Twenty minutes on Sunday. Re-read one old note, fix one link, pull one weed.</li>
+</ol>
+<h2 id="states">Why "growth states" beat folders <a class="anchor" href="#states">#</a></h2>
+<p>Folders force a note to live in exactly one place. But <a class="internal" data-slug="compost-is-a-distributed-system" href="compost-is-a-distributed-system.html">Compost Is a Distributed System</a> is <em>equally</em> a gardening note and a systems note — forcing it into one bin loses the most interesting thing about it: that it's both.</p>
+<p>Growth states ("seedling / budding / evergreen") describe a note's <em>confidence</em>, which is the dimension I actually want to track. A folder tells you where something is filed. A ripeness tag tells you whether to trust it.</p>
+<h2 id="stoic">The Stoic angle <a class="anchor" href="#stoic">#</a></h2>
+<p>There's a reason this practice agrees with me. Tending a garden is an exercise in <a class="internal" data-slug="the-dichotomy-of-control" href="the-dichotomy-of-control.html">The Dichotomy of Control</a>: I control whether I show up on Sunday and whether I link honestly. I do <em>not</em> control whether anyone reads it, whether a note ages well, or whether the idea was good. Detaching from the outcome is exactly what makes it sustainable.</p>
+        </div>
+
+      <section class="backlinks" aria-labelledby="bl-h">
+        <h2 id="bl-h">Linked references</h2>
+        <p class="bl-sub">5 notes link to this one.</p>
+        <ul>
+        <li><a class="internal" data-slug="index" href="index.html">Start Here</a><div class="bl-ctx">The MOC introduces growth states and points here for the why.</div></li>
+        <li><a class="internal" data-slug="evergreen-notes" href="evergreen-notes.html">Evergreen Notes</a><div class="bl-ctx">Calls this "the load-bearing concept behind this whole" gardening practice.</div></li>
+        <li><a class="internal" data-slug="book-how-to-take-smart-notes" href="book-how-to-take-smart-notes.html">Book — How to Take Smart Notes</a><div class="bl-ctx">"Don't take notes about what you read" — the book this practice is built on.</div></li>
+        <li><a class="internal" data-slug="the-dichotomy-of-control" href="the-dichotomy-of-control.html">The Dichotomy of Control</a><div class="bl-ctx">Mentions that tending a garden is itself an exercise in the dichotomy.</div></li>
+        <li><a class="internal" data-slug="compost-is-a-distributed-system" href="compost-is-a-distributed-system.html">Compost Is a Distributed System</a><div class="bl-ctx">Cites tending-the-garden on why a note may be both a gardening note and a systems note.</div></li>
+        </ul>
+      </section>
+      </article>
+    </main>
+
+    <aside class="right-rail">
+      <div class="rail-card">
+        <p class="rail-title">On this page</p>
+        <ul class="toc">
+          <li class=""><a href="#three-rules">The three rules I actually follow</a></li>
+          <li class=""><a href="#states">Why "growth states" beat folders</a></li>
+          <li class=""><a href="#stoic">The Stoic angle</a></li>
+        </ul>
+      </div>
+      <div class="rail-card">
+        <p class="rail-title">Graph view</p>
+        <svg id="graph" class="graph-svg" data-current="on-tending-a-digital-garden" role="img" aria-label="Graph of how notes in the garden connect"></svg>
+        <p class="graph-hint">Hover a node to spotlight its links. Click to jump.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-foot">
+    <span>🌱 Mara's Garden · tended on Sundays · last commit Jun 19, 2026</span>
+    <span>Built with <a href="quartz.config.ts">Quartz 4</a> from the markdown in <code style="font-family:var(--font-mono);font-size:.8rem">notes/</code> · <a href="https://github.com">source</a></span>
+  </footer>
+  <script src="js/garden.js"></script>
+</body>
+</html>

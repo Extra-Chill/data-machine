@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Merch — Mara Vale</title>
+  <meta name="description" content="Official Mara Vale merch — tees, totes, vinyl, and pins.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400;1,600;1,700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&family=Courier+Prime:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ── Merch layout ─────────────────────────────────────── */
+    .merch-content {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 3rem var(--pad) 6rem;
+    }
+
+    .merch-intro {
+      max-width: 55ch;
+      margin-bottom: 3.5rem;
+    }
+    .merch-intro p {
+      color: var(--bone-dim);
+      font-style: italic;
+    }
+
+    /* ── Merch grid ──────────────────────────────────────── */
+    .merch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 2px;
+    }
+
+    .merch-card {
+      background: rgba(230, 216, 197, 0.025);
+      border: 1px solid rgba(230, 216, 197, 0.07);
+      overflow: hidden;
+      transition: border-color 0.25s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .merch-card:hover {
+      border-color: rgba(230, 216, 197, 0.16);
+    }
+
+    /* Item visual (CSS art) */
+    .merch-visual {
+      aspect-ratio: 4 / 3;
+      position: relative;
+      overflow: hidden;
+      background: var(--deep);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Tee visual */
+    .visual-tee {
+      background: linear-gradient(145deg, #1e1410 0%, #150d09 100%);
+    }
+    .tee-shape {
+      width: 72%;
+      position: relative;
+    }
+
+    /* Tote visual */
+    .visual-tote {
+      background: linear-gradient(145deg, #1a1208 0%, #120e06 100%);
+    }
+
+    /* Vinyl visual */
+    .visual-vinyl {
+      background: radial-gradient(circle at 30% 30%, #2a1a10, #0f0809);
+    }
+
+    /* Pin visual */
+    .visual-pins {
+      background: linear-gradient(145deg, #16100a 0%, #0d0808 100%);
+      flex-direction: row;
+      gap: 1rem;
+    }
+
+    /* Card body */
+    .merch-body {
+      padding: 1.5rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .merch-tag {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ember);
+      margin-bottom: 0.5rem;
+    }
+
+    .merch-name {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-style: italic;
+      color: var(--bone);
+      margin-bottom: 0.35rem;
+    }
+
+    .merch-desc {
+      font-family: var(--font-body);
+      font-size: 0.88rem;
+      color: var(--fog);
+      line-height: 1.55;
+      flex: 1;
+      margin-bottom: 1.5rem;
+      max-width: 100%;
+    }
+
+    .merch-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .merch-price {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: var(--bone);
+    }
+
+    .merch-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .qty-control {
+      display: flex;
+      align-items: center;
+      border: 1px solid rgba(230, 216, 197, 0.15);
+    }
+    .qty-btn {
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: var(--bone-dim);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+    .qty-btn:hover { color: var(--bone); background: rgba(230,216,197,0.06); }
+    .qty-display {
+      width: 32px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--bone);
+      border-left: 1px solid rgba(230,216,197,0.12);
+      border-right: 1px solid rgba(230,216,197,0.12);
+      line-height: 30px;
+    }
+
+    .add-to-cart {
+      padding: 0.5rem 1rem;
+      background: transparent;
+      border: 1px solid rgba(230,216,197,0.2);
+      color: var(--bone-dim);
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      transition: all 0.22s ease;
+    }
+    .add-to-cart:hover {
+      background: rgba(184, 85, 42, 0.15);
+      border-color: var(--ember);
+      color: var(--bone);
+    }
+
+    .merch-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.55rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border: 1px solid rgba(184, 85, 42, 0.5);
+      color: var(--ember);
+      padding: 0.2rem 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── SVG art for items ──────────────────────────────── */
+
+    /* ── Shipping note ───────────────────────────────────── */
+    .merch-shipping {
+      max-width: var(--max-w);
+      margin: 3rem auto 0;
+      padding: 0 var(--pad);
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .merch-shipping p {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      color: var(--fog);
+      max-width: 100%;
+    }
+    .merch-shipping p strong {
+      color: var(--bone-dim);
+      font-weight: 400;
+    }
+
+    /* ── Responsive ─────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .merch-grid { grid-template-columns: 1fr 1fr; gap: 1px; }
+      .merch-actions { flex-wrap: wrap; }
+    }
+    @media (max-width: 400px) {
+      .merch-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-bg" aria-hidden="true"></div>
+
+  <nav class="site-nav" role="navigation" aria-label="Main navigation">
+    <a href="index.html" class="nav-logo">Mara <em>Vale</em></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="music.html">Music</a></li>
+      <li><a href="tour.html">Tour</a></li>
+      <li><a href="merch.html" class="active">Merch</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <ul class="nav-mobile">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="music.html">Music</a></li>
+    <li><a href="tour.html">Tour</a></li>
+    <li><a href="merch.html">Merch</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+
+  <main>
+    <div class="page-header">
+      <div class="label pl pl-d1">The Shop</div>
+      <h1 class="pl pl-d2">Carry<br>something<br><em>home.</em></h1>
+    </div>
+
+    <div class="merch-content">
+      <div class="merch-intro pl pl-d3">
+        <p>Everything here was made with the record in mind. The vinyl especially — 300 pressed, hand-numbered, and not coming back once they're gone.</p>
+      </div>
+
+      <div class="merch-grid">
+
+        <!-- Item 1: Tee -->
+        <article class="merch-card reveal">
+          <div class="merch-visual visual-tee" aria-hidden="true">
+            <svg viewBox="0 0 300 220" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="tee-glow" cx="50%" cy="40%" r="50%">
+                  <stop offset="0%" stop-color="#c4581a" stop-opacity="0.15"/>
+                  <stop offset="100%" stop-color="#c4581a" stop-opacity="0"/>
+                </radialGradient>
+              </defs>
+              <rect width="300" height="220" fill="#1e1410"/>
+              <ellipse cx="150" cy="100" rx="130" ry="90" fill="url(#tee-glow)"/>
+              <!-- T-shirt shape -->
+              <path d="M90 60 L60 45 L35 75 L65 85 L65 175 L235 175 L235 85 L265 75 L240 45 L210 60 Q190 50 150 50 Q110 50 90 60 Z"
+                    fill="#2a1a0f" stroke="rgba(196,160,112,0.2)" stroke-width="1.5"/>
+              <!-- Print: EP title text on tee -->
+              <text x="150" y="108" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#c4a07a" opacity="0.9" text-anchor="middle" letter-spacing="0.5">Between the</text>
+              <text x="150" y="126" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#c4a07a" opacity="0.9" text-anchor="middle" letter-spacing="0.5">Fog and the Fire</text>
+              <text x="150" y="145" font-family="Georgia, serif" font-size="8" fill="#7a6050" opacity="0.75" text-anchor="middle" letter-spacing="4">MARA VALE</text>
+            </svg>
+          </div>
+          <div class="merch-body">
+            <div class="merch-tag">Apparel</div>
+            <div class="merch-name">EP Heavyweight Tee</div>
+            <p class="merch-desc">100% ring-spun cotton, washed black. EP title and artist name printed in ash on the front chest. Runs slightly large.</p>
+            <div class="merch-footer">
+              <div class="merch-price">$30</div>
+              <div class="merch-actions">
+                <div class="qty-control" aria-label="Quantity">
+                  <button class="qty-btn" data-dir="down" aria-label="Decrease quantity">−</button>
+                  <span class="qty-display" aria-live="polite">1</span>
+                  <button class="qty-btn" data-dir="up" aria-label="Increase quantity">+</button>
+                </div>
+                <button class="add-to-cart">Add</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 2: Tote -->
+        <article class="merch-card reveal reveal-d1">
+          <div class="merch-visual visual-tote" aria-hidden="true">
+            <svg viewBox="0 0 300 220" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="tote-glow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#c49040" stop-opacity="0.1"/>
+                  <stop offset="100%" stop-color="#c49040" stop-opacity="0"/>
+                </radialGradient>
+              </defs>
+              <rect width="300" height="220" fill="#1a1208"/>
+              <ellipse cx="150" cy="110" rx="100" ry="80" fill="url(#tote-glow)"/>
+              <!-- Tote bag shape -->
+              <rect x="85" y="80" width="130" height="115" rx="3" fill="#c8b480" stroke="none"/>
+              <!-- Handles -->
+              <path d="M110 80 Q110 55 120 50 Q130 45 140 45 Q150 45 155 50 Q165 55 165 80" fill="none" stroke="#a89060" stroke-width="5" stroke-linecap="round"/>
+              <path d="M145 80 Q145 55 155 50 Q165 45 175 45 Q185 45 190 50 Q200 55 200 80" fill="none" stroke="#a89060" stroke-width="5" stroke-linecap="round"/>
+              <!-- Embroidered moth on tote -->
+              <!-- Wing left -->
+              <path d="M140 140 Q125 128 118 135 Q115 143 125 148 Q130 150 138 148 Z" fill="#2a1a0f" opacity="0.7"/>
+              <!-- Wing right -->
+              <path d="M160 140 Q175 128 182 135 Q185 143 175 148 Q170 150 162 148 Z" fill="#2a1a0f" opacity="0.7"/>
+              <!-- Wing lower left -->
+              <path d="M138 148 Q128 158 122 165 Q120 170 130 170 Q140 170 142 160 Z" fill="#2a1a0f" opacity="0.55"/>
+              <!-- Wing lower right -->
+              <path d="M162 148 Q172 158 178 165 Q180 170 170 170 Q160 170 158 160 Z" fill="#2a1a0f" opacity="0.55"/>
+              <!-- Body -->
+              <line x1="150" y1="135" x2="150" y2="170" stroke="#2a1a0f" stroke-width="2.5" opacity="0.8"/>
+              <!-- Antennae -->
+              <path d="M150 135 Q144 125 138 120" stroke="#2a1a0f" stroke-width="1.5" fill="none" opacity="0.7"/>
+              <path d="M150 135 Q156 125 162 120" stroke="#2a1a0f" stroke-width="1.5" fill="none" opacity="0.7"/>
+              <circle cx="138" cy="119" r="2" fill="#2a1a0f" opacity="0.7"/>
+              <circle cx="162" cy="119" r="2" fill="#2a1a0f" opacity="0.7"/>
+              <!-- "MARA VALE" text on tote -->
+              <text x="150" y="115" font-family="Georgia, serif" font-size="8" fill="#2a1a0f" opacity="0.6" text-anchor="middle" letter-spacing="3">MARA VALE</text>
+            </svg>
+          </div>
+          <div class="merch-body">
+            <div class="merch-tag">Accessories</div>
+            <div class="merch-name">Embroidered Canvas Tote</div>
+            <p class="merch-desc">Natural canvas with a moth embroidered in dark thread. Reinforced handles. 15" × 16" with a 4" gusset. Screen-printed inside lining.</p>
+            <div class="merch-footer">
+              <div class="merch-price">$22</div>
+              <div class="merch-actions">
+                <div class="qty-control" aria-label="Quantity">
+                  <button class="qty-btn" data-dir="down" aria-label="Decrease">−</button>
+                  <span class="qty-display" aria-live="polite">1</span>
+                  <button class="qty-btn" data-dir="up" aria-label="Increase">+</button>
+                </div>
+                <button class="add-to-cart">Add</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 3: Vinyl -->
+        <article class="merch-card reveal reveal-d2">
+          <div class="merch-visual visual-vinyl" aria-hidden="true">
+            <svg viewBox="0 0 300 220" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="vinyl-disc" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"   stop-color="#2a1a12"/>
+                  <stop offset="35%"  stop-color="#180e0b"/>
+                  <stop offset="36%"  stop-color="#1d1310"/>
+                  <stop offset="50%"  stop-color="#150d09"/>
+                  <stop offset="51%"  stop-color="#1a1009"/>
+                  <stop offset="70%"  stop-color="#110809"/>
+                  <stop offset="71%"  stop-color="#160c09"/>
+                  <stop offset="100%" stop-color="#0e0708"/>
+                </radialGradient>
+                <radialGradient id="vinyl-label" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"   stop-color="#c4581a" stop-opacity="0.9"/>
+                  <stop offset="70%"  stop-color="#8b3210" stop-opacity="0.85"/>
+                  <stop offset="100%" stop-color="#5a1e08"/>
+                </radialGradient>
+                <filter id="vinyl-sheen">
+                  <feGaussianBlur stdDeviation="0.5"/>
+                </filter>
+              </defs>
+              <rect width="300" height="220" fill="radial-gradient(circle at 30% 30%, #2a1a10, #0f0809)"/>
+              <rect width="300" height="220" fill="#1a0e09"/>
+
+              <!-- Vinyl sleeve (in background, offset) -->
+              <rect x="60" y="15" width="130" height="130" rx="3" fill="#c4a07a" opacity="0.12" transform="rotate(-5 125 80)"/>
+              <rect x="62" y="17" width="126" height="126" rx="2" fill="#c4a07a" opacity="0.06" transform="rotate(-5 125 80)"/>
+
+              <!-- Vinyl disc -->
+              <circle cx="165" cy="115" r="92" fill="url(#vinyl-disc)"/>
+              <!-- Groove rings (subtle) -->
+              <circle cx="165" cy="115" r="88" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+              <circle cx="165" cy="115" r="80" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>
+              <circle cx="165" cy="115" r="72" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+              <circle cx="165" cy="115" r="60" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>
+              <circle cx="165" cy="115" r="48" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+              <!-- Label -->
+              <circle cx="165" cy="115" r="32" fill="url(#vinyl-label)"/>
+              <circle cx="165" cy="115" r="28" fill="none" stroke="rgba(196,160,112,0.2)" stroke-width="0.8"/>
+              <!-- Center hole -->
+              <circle cx="165" cy="115" r="4" fill="#0a0506"/>
+              <!-- Label text -->
+              <text x="165" y="110" font-family="Georgia, serif" font-style="italic" font-size="6.5" fill="rgba(230,210,180,0.85)" text-anchor="middle" letter-spacing="0.3">Mara Vale</text>
+              <text x="165" y="120" font-family="Georgia, serif" font-size="5" fill="rgba(230,210,180,0.65)" text-anchor="middle" letter-spacing="1.5">SIDE A</text>
+
+              <!-- Sheen highlight on disc -->
+              <ellipse cx="140" cy="82" rx="30" ry="16" fill="rgba(255,255,255,0.025)" transform="rotate(-30 140 82)"/>
+            </svg>
+          </div>
+          <div class="merch-body">
+            <div class="merch-badge">Limited / 300 Pressed</div>
+            <div class="merch-tag">Vinyl</div>
+            <div class="merch-name">EP on Vinyl</div>
+            <p class="merch-desc">Black wax, hand-numbered sleeve. Includes digital download card. Mastered specifically for vinyl at 45RPM. No repress planned.</p>
+            <div class="merch-footer">
+              <div class="merch-price">$28</div>
+              <div class="merch-actions">
+                <div class="qty-control" aria-label="Quantity">
+                  <button class="qty-btn" data-dir="down" aria-label="Decrease">−</button>
+                  <span class="qty-display" aria-live="polite">1</span>
+                  <button class="qty-btn" data-dir="up" aria-label="Increase">+</button>
+                </div>
+                <button class="add-to-cart">Add</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 4: Enamel pins -->
+        <article class="merch-card reveal reveal-d3">
+          <div class="merch-visual visual-pins" aria-hidden="true">
+            <svg viewBox="0 0 300 220" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <rect width="300" height="220" fill="#16100a"/>
+              <!-- Pin 1: Moth -->
+              <g transform="translate(70, 110)">
+                <ellipse cx="0" cy="0" rx="34" ry="34" fill="#1e1410" stroke="#c4a07a" stroke-width="1.5"/>
+                <!-- Moth wings -->
+                <path d="M0,0 Q-20,-16 -22,-8 Q-20,2 -10,4 Z" fill="#c4581a" opacity="0.85"/>
+                <path d="M0,0 Q20,-16 22,-8 Q20,2 10,4 Z" fill="#c4581a" opacity="0.85"/>
+                <path d="M-10,4 Q-18,14 -14,20 Q-8,22 -4,14 Z" fill="#b84818" opacity="0.75"/>
+                <path d="M10,4 Q18,14 14,20 Q8,22 4,14 Z" fill="#b84818" opacity="0.75"/>
+                <line x1="0" y1="-4" x2="0" y2="20" stroke="#c4a07a" stroke-width="1.5" opacity="0.8"/>
+                <path d="M0,-4 Q-6,-12 -10,-16" stroke="#c4a07a" stroke-width="1" fill="none" opacity="0.7"/>
+                <path d="M0,-4 Q6,-12 10,-16" stroke="#c4a07a" stroke-width="1" fill="none" opacity="0.7"/>
+                <circle cx="-10" cy="-17" r="1.8" fill="#c4a07a" opacity="0.8"/>
+                <circle cx="10" cy="-17" r="1.8" fill="#c4a07a" opacity="0.8"/>
+              </g>
+              <!-- Pin 2: Flame -->
+              <g transform="translate(150, 110)">
+                <ellipse cx="0" cy="0" rx="34" ry="34" fill="#1e1410" stroke="#c4a07a" stroke-width="1.5"/>
+                <path d="M0,18 Q-12,10 -10,-2 Q-8,-12 0,-18 Q4,-10 2,-4 Q8,-14 12,-20 Q18,-8 14,0 Q20,-4 18,6 Q16,14 8,18 Z" fill="#c4581a" opacity="0.9"/>
+                <path d="M0,18 Q-6,12 -4,4 Q-2,-2 0,-6 Q2,0 0,6 Q4,4 6,10 Q4,14 0,18 Z" fill="#e8a060" opacity="0.8"/>
+                <circle cx="0" cy="4" r="4" fill="#f0c080" opacity="0.6"/>
+              </g>
+              <!-- Pin 3: Fog wave / crescent -->
+              <g transform="translate(230, 110)">
+                <ellipse cx="0" cy="0" rx="34" ry="34" fill="#1e1410" stroke="#c4a07a" stroke-width="1.5"/>
+                <!-- Crescent moon -->
+                <circle cx="0" cy="0" r="18" fill="#4a6a84" opacity="0.75"/>
+                <circle cx="8" cy="-4" r="15" fill="#1e1410"/>
+                <!-- Stars -->
+                <circle cx="-12" cy="-12" r="1.5" fill="#c4d0e0" opacity="0.8"/>
+                <circle cx="-6"  cy="-18" r="1"   fill="#c4d0e0" opacity="0.7"/>
+                <circle cx="2"   cy="-20" r="1.2" fill="#c4d0e0" opacity="0.65"/>
+                <!-- Fog wisps below crescent -->
+                <path d="M-16,8 Q-8,5 0,8 Q8,11 16,8" stroke="rgba(100,140,180,0.5)" stroke-width="2.5" fill="none"/>
+                <path d="M-12,14 Q-4,11 4,14 Q12,17 14,14" stroke="rgba(100,140,180,0.35)" stroke-width="2" fill="none"/>
+              </g>
+              <!-- Label: 3-pin set -->
+              <text x="150" y="175" font-family="Georgia, serif" font-size="8" fill="#7a6050" opacity="0.7" text-anchor="middle" letter-spacing="2">SET OF THREE</text>
+            </svg>
+          </div>
+          <div class="merch-body">
+            <div class="merch-tag">Accessories</div>
+            <div class="merch-name">Moth, Flame &amp; Moon Pin Set</div>
+            <p class="merch-desc">Three hard enamel pins with gold metal fill. Moth (1.5"), Flame (1.25"), and Crescent Moon (1.25"). Backing card designed by Mara.</p>
+            <div class="merch-footer">
+              <div class="merch-price">$18</div>
+              <div class="merch-actions">
+                <div class="qty-control" aria-label="Quantity">
+                  <button class="qty-btn" data-dir="down" aria-label="Decrease">−</button>
+                  <span class="qty-display" aria-live="polite">1</span>
+                  <button class="qty-btn" data-dir="up" aria-label="Increase">+</button>
+                </div>
+                <button class="add-to-cart">Add</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Item 5: Signed CD -->
+        <article class="merch-card reveal reveal-d1">
+          <div class="merch-visual" style="background: radial-gradient(circle at 35% 45%, #1e120c, #0f0709);" aria-hidden="true">
+            <svg viewBox="0 0 300 220" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="cd-shine" cx="38%" cy="35%" r="60%">
+                  <stop offset="0%"  stop-color="rgba(200,180,140,0.18)"/>
+                  <stop offset="50%" stop-color="rgba(180,120,80,0.08)"/>
+                  <stop offset="100%" stop-color="rgba(100,70,50,0)"/>
+                </radialGradient>
+                <radialGradient id="cd-disc-r" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"   stop-color="#2a1e15"/>
+                  <stop offset="30%"  stop-color="#1a1009"/>
+                  <stop offset="60%"  stop-color="#22160e"/>
+                  <stop offset="100%" stop-color="#110a07"/>
+                </radialGradient>
+              </defs>
+              <rect width="300" height="220" fill="#1c1008"/>
+              <!-- CD disc -->
+              <circle cx="150" cy="110" r="80" fill="url(#cd-disc-r)"/>
+              <circle cx="150" cy="110" r="80" fill="url(#cd-shine)"/>
+              <!-- Iridescent rainbow-ish rings via opacity layers -->
+              <circle cx="150" cy="110" r="75" fill="none" stroke="rgba(80,160,200,0.06)" stroke-width="8"/>
+              <circle cx="150" cy="110" r="62" fill="none" stroke="rgba(200,80,60,0.05)" stroke-width="6"/>
+              <circle cx="150" cy="110" r="51" fill="none" stroke="rgba(120,200,80,0.04)" stroke-width="5"/>
+              <!-- Label circle -->
+              <circle cx="150" cy="110" r="35" fill="#c4581a" opacity="0.9"/>
+              <circle cx="150" cy="110" r="31" fill="none" stroke="rgba(196,160,112,0.25)" stroke-width="0.8"/>
+              <circle cx="150" cy="110" r="6" fill="#0f0709"/>
+              <!-- Label text -->
+              <text x="150" y="106" font-family="Georgia, serif" font-style="italic" font-size="7" fill="rgba(230,210,180,0.9)" text-anchor="middle">Mara Vale</text>
+              <text x="150" y="118" font-family="Georgia, serif" font-size="5.5" fill="rgba(230,210,180,0.65)" text-anchor="middle" letter-spacing="0.8">BETWEEN THE FOG</text>
+              <!-- Signed text annotation -->
+              <text x="150" y="195" font-family="Georgia, serif" font-style="italic" font-size="9" fill="#c4a07a" opacity="0.75" text-anchor="middle">— signed</text>
+            </svg>
+          </div>
+          <div class="merch-body">
+            <div class="merch-badge">Hand-Signed</div>
+            <div class="merch-tag">Physical</div>
+            <div class="merch-name">Signed EP on CD</div>
+            <p class="merch-desc">The full EP on disc, hand-signed by Mara on the inside cover. Includes a handwritten note. Shipped in a protective sleeve.</p>
+            <div class="merch-footer">
+              <div class="merch-price">$15</div>
+              <div class="merch-actions">
+                <div class="qty-control" aria-label="Quantity">
+                  <button class="qty-btn" data-dir="down" aria-label="Decrease">−</button>
+                  <span class="qty-display" aria-live="polite">1</span>
+                  <button class="qty-btn" data-dir="up" aria-label="Increase">+</button>
+                </div>
+                <button class="add-to-cart">Add</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      </div><!-- /merch-grid -->
+
+      <!-- Shipping note -->
+      <div class="merch-shipping reveal" style="margin-top: 3rem; padding: 0;">
+        <p><strong>Shipping:</strong> Orders ship within 5–7 business days from Portland, OR. US only at this time. For international inquiries, email <a href="contact.html" style="color: var(--bone-dim); text-decoration: underline; text-underline-offset: 3px;">hello@maravale.com</a>.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-logo">Mara Vale</div>
+    <ul class="footer-links">
+      <li><a href="music.html">Music</a></li>
+      <li><a href="tour.html">Tour</a></li>
+      <li><a href="merch.html">Merch</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+    <p class="footer-copy">&copy; 2026 Mara Vale. All rights reserved.</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beyond the Block — How are you going to do THIS in the block editor?</title>
+  <meta name="description" content="Beyond the Block is a manifesto and live showcase for the web that lives past page-builders: real-time canvas, audio synthesis, physics, generative art and scroll-choreographed storytelling — every claim proved by demonstration.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23c6ff3a'/><text x='16' y='23' font-family='monospace' font-size='20' font-weight='700' text-anchor='middle' fill='%2307060d'>&gt;</text></svg>">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="scroll-progress" aria-hidden="true"></div>
+
+  <!-- ══════════ HEADER ══════════ -->
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Beyond the Block — home">
+      <span class="logo-mark">Beyond the <b>Block</b></span>
+      <span class="logo-sub">A web that does more</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html" class="active">Manifesto</a>
+      <a href="possible.html">What's Possible</a>
+      <a href="about.html">Colophon</a>
+      <a href="possible.html#demos" class="nav-cta">See the demos →</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main id="main">
+
+    <!-- ══════════ HERO ══════════ -->
+    <section class="hero" aria-label="Beyond the Block">
+      <canvas id="hero-canvas" aria-hidden="true"></canvas>
+      <div class="hero-veil" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <p class="hero-eyebrow">A friendly provocation for builders <span class="blink">▮</span></p>
+        <h1>
+          How are you going to do<br>
+          <span class="this">THIS</span> in the <span class="grad">block editor?</span>
+        </h1>
+        <p class="hero-sub">
+          That background isn't a stock loop — it's a flow field of a few hundred particles,
+          drawn live in your browser, bending toward your cursor. Move your mouse over it.
+          We'll wait. Then keep scrolling: everything on this page is hand-coded proof.
+        </p>
+        <div class="hero-actions">
+          <a href="#showcase" class="btn btn-primary">Poke the demos <span class="btn-arrow">↓</span></a>
+          <a href="#manifesto" class="btn btn-outline">Read the argument</a>
+        </div>
+      </div>
+      <div class="hero-scroll" aria-hidden="true">
+        <div class="mouse"></div>
+        <span>scroll</span>
+      </div>
+    </section>
+
+    <!-- ══════════ MARQUEE ══════════ -->
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span class="marquee-item">Real-time canvas <b>✳</b></span>
+        <span class="marquee-item">Web Audio <b>✳</b></span>
+        <span class="marquee-item">Physics <b>✳</b></span>
+        <span class="marquee-item">Generative art <b>✳</b></span>
+        <span class="marquee-item">Scroll choreography <b>✳</b></span>
+        <span class="marquee-item">Stateful interaction <b>✳</b></span>
+        <span class="marquee-item">Real-time canvas <b>✳</b></span>
+        <span class="marquee-item">Web Audio <b>✳</b></span>
+        <span class="marquee-item">Physics <b>✳</b></span>
+        <span class="marquee-item">Generative art <b>✳</b></span>
+        <span class="marquee-item">Scroll choreography <b>✳</b></span>
+        <span class="marquee-item">Stateful interaction <b>✳</b></span>
+      </div>
+    </div>
+
+    <!-- ══════════ MANIFESTO ══════════ -->
+    <section class="section section--soft" id="manifesto" aria-labelledby="man-h">
+      <div class="wrap manifesto">
+        <p class="manifesto-label reveal">[ The thesis ]</p>
+        <p class="manifesto-body reveal" id="man-h">
+          Page-builders are <em>wonderful</em>. For an about page, a pricing table, a blog —
+          drag, drop, ship, done. We mean it. But somewhere between
+          <span class="strike">stack of static rectangles</span> and
+          <em>a thing that responds, computes, remembers and surprises</em>,
+          the blocks run out. This site is everything that lives in that gap.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══════════ ARGUMENT — three pillars (kinetic) ══════════ -->
+    <section class="section" aria-labelledby="pillars-h">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">01</span> / The case, briefly</p>
+            <h2 class="section-title" id="pillars-h">A block describes content.<br>The web can <em>run a program.</em></h2>
+          </div>
+        </div>
+        <div class="demo-grid">
+          <article class="demo span-4 reveal">
+            <div class="demo-body">
+              <h3>It computes</h3>
+              <p class="demo-caption">A block stores what you typed. A program decides what to draw <b>sixty times a second</b> based on your cursor, the clock, and a little math. There's no "live particle field" block — because the answer is different every frame.</p>
+            </div>
+          </article>
+          <article class="demo span-4 reveal reveal-d1">
+            <div class="demo-body">
+              <h3>It has state</h3>
+              <p class="demo-caption">Score, position, history, audio context, a physics world. Blocks are <b>stateless rectangles</b>; apps remember. The moment your page needs to know "what happened a second ago," you've left the grid.</p>
+            </div>
+          </article>
+          <article class="demo span-4 reveal reveal-d2">
+            <div class="demo-body">
+              <h3>It talks back</h3>
+              <p class="demo-caption">Drag, fling, strum, type, scroll — and the page <b>answers in real time</b>. Not a hover color change. A simulation reacting to <em>you</em>. That conversation is the whole point of the open web.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ SHOWCASE — live demos ══════════ -->
+    <section class="section section--soft" id="showcase" aria-labelledby="show-h">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">02</span> / Exhibit A through F</p>
+            <h2 class="section-title" id="show-h">Six small things a block <em>can't</em> be</h2>
+          </div>
+          <p class="mono" style="max-width:32ch;color:var(--ink-dim);">All running right now, on this page, in plain JavaScript. Touch them.</p>
+        </div>
+
+        <div class="demo-grid">
+
+          <!-- physics -->
+          <article class="demo span-6" data-demo="physics">
+            <div class="demo-stage">
+              <span class="demo-badge">Canvas · Physics</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <canvas aria-label="Interactive bouncing-ball physics toy. Drag a ball to fling it."></canvas>
+            </div>
+            <div class="demo-body">
+              <h3>1 · Fling some gravity</h3>
+              <p class="demo-caption">A verlet-integrated physics world with collisions and walls. <b>Grab a ball and throw it.</b> It carries momentum because the page is actually simulating, not animating a fixed clip.</p>
+              <div class="demo-controls">
+                <button class="chip" data-act="shake">Shake the jar</button>
+                <button class="chip" data-act="add">+6 balls</button>
+              </div>
+              <p class="demo-hint">Drag-and-fling with a mouse or finger</p>
+            </div>
+          </article>
+
+          <!-- synth -->
+          <article class="demo span-6" data-demo="synth">
+            <div class="demo-stage">
+              <span class="demo-badge">Web Audio</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <div class="keys" role="group" aria-label="Eight-note synthesizer keyboard"></div>
+            </div>
+            <div class="demo-body">
+              <h3>2 · A synth made of math</h3>
+              <p class="demo-caption">No audio files. Each note is an <b>oscillator generated on the fly</b> with its own envelope. Press the keys, or play your <span class="kbd">A&nbsp;S&nbsp;D&nbsp;F&nbsp;G&nbsp;H&nbsp;J&nbsp;K</span> row.</p>
+              <div class="demo-controls">
+                <button class="chip active" data-wave="triangle">triangle</button>
+                <button class="chip" data-wave="sine">sine</button>
+                <button class="chip" data-wave="square">square</button>
+                <button class="chip" data-wave="sawtooth">saw</button>
+                <button class="chip" data-act="arp">▶ arpeggio</button>
+              </div>
+              <p class="demo-hint">Sound starts on first interaction (browser policy)</p>
+            </div>
+          </article>
+
+          <!-- generative art -->
+          <article class="demo span-6" data-demo="genart">
+            <div class="demo-stage">
+              <span class="demo-badge">Generative</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <canvas aria-label="Generative artwork. Click to generate a new one."></canvas>
+            </div>
+            <div class="demo-body">
+              <h3>3 · Art with a seed, not a file</h3>
+              <p class="demo-caption">Every render is a fresh, deterministic composition from a random seed — <b>seed <span data-seed-label class="mono">0x00000000</span></b>. There are billions. You'll likely never see this exact one again.</p>
+              <div class="demo-controls">
+                <button class="chip" data-act="reroll">⟳ Roll a new seed</button>
+              </div>
+              <p class="demo-hint">Click the canvas to regenerate</p>
+            </div>
+          </article>
+
+          <!-- type-react -->
+          <article class="demo span-6" data-demo="typereact">
+            <div class="demo-stage">
+              <span class="demo-badge">Realtime input</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <canvas aria-hidden="true"></canvas>
+              <div class="type-stage">
+                <input type="text" maxlength="40" placeholder="type something…" aria-label="Type to make letters burst into particles">
+              </div>
+            </div>
+            <div class="demo-body">
+              <h3>4 · Type, and watch it react</h3>
+              <p class="demo-caption">Every keystroke <b>spawns a burst of particles</b> with gravity. The page is listening to your input event-by-event and rendering the consequence. A text block just… holds text.</p>
+              <p class="demo-hint">Start typing in the field above</p>
+            </div>
+          </article>
+
+          <!-- magnetic dots -->
+          <article class="demo span-6" data-demo="magnet">
+            <div class="demo-stage">
+              <span class="demo-badge">Cursor-reactive</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <canvas aria-label="A lattice of dots that repels or attracts your cursor."></canvas>
+            </div>
+            <div class="demo-body">
+              <h3>5 · A surface that feels your cursor</h3>
+              <p class="demo-caption">A lattice of points springs away from your pointer and snaps back. <b>Custom-cursor / magnetic UI</b> is a whole craft — and it's pure per-frame vector math, not a setting in a panel.</p>
+              <div class="demo-controls">
+                <button class="chip active" data-mode="repel">repel</button>
+                <button class="chip" data-mode="attract">attract</button>
+              </div>
+              <p class="demo-hint">Move your cursor across the field</p>
+            </div>
+          </article>
+
+          <!-- attractor -->
+          <article class="demo span-6" data-demo="attractor">
+            <div class="demo-stage">
+              <span class="demo-badge">Math · Dataviz</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <canvas aria-label="A strange attractor visualization with an adjustable parameter."></canvas>
+            </div>
+            <div class="demo-body">
+              <h3>6 · Drive a strange attractor</h3>
+              <p class="demo-caption">Thousands of points plotting a Clifford attractor, redrawn live. <b>Drag the slider</b> to warp the equation and the whole structure reorganizes. This is interactive data, not a picture of data.</p>
+              <div class="ctl-row">
+                <label for="attr-k">parameter k <b data-attr-val>1.60</b></label>
+                <input type="range" id="attr-k" min="0" max="2.4" step="0.01" value="1.6">
+              </div>
+              <p class="demo-hint">Slide to mutate the equation</p>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ SCROLL-CHOREOGRAPHED STORY ══════════ -->
+    <section class="story" aria-label="Scroll-choreographed argument">
+      <div class="story-rail" aria-hidden="true">
+        <canvas id="story-canvas"></canvas>
+      </div>
+      <div class="story-steps">
+        <div class="story-step">
+          <p class="step-k">03 / scroll choreography</p>
+          <h3>Scroll isn't a page break.<br>It's a <em>timeline.</em></h3>
+          <p>The constellation behind these words is reading your scroll position. Keep going — it assembles as you read. This whole section is one canvas reacting to one number: how far down you are.</p>
+        </div>
+        <div class="story-step">
+          <p class="step-k">03 / scroll choreography</p>
+          <h3>Scattered points<br>find their <em>order.</em></h3>
+          <p>A block editor can place things in a column. It cannot say "between 30% and 60% of the way down this section, rotate a 3D point cloud and draw the links as they get close." That's a function of scroll, evaluated every frame.</p>
+        </div>
+        <div class="story-step">
+          <p class="step-k">03 / scroll choreography</p>
+          <h3>The story <em>and</em><br>the visual are one.</h3>
+          <p>Progressive reveal, parallax, pinned scenes, scrubbed animation — the grammar of modern editorial storytelling. None of it is content you stack. It's behavior you write. The dial in the corner is your progress.</p>
+        </div>
+        <div class="story-step">
+          <p class="step-k">03 / scroll choreography</p>
+          <h3>So… how <em>would</em><br>you do this?</h3>
+          <p>You wouldn't, in blocks. And that's fine — blocks were never for this. The point is only that "more" exists, it's open, it runs in every browser, and it's built by hand. Like this page was.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ CTA ══════════ -->
+    <section class="cta" aria-labelledby="cta-h">
+      <canvas id="cta-canvas" aria-hidden="true"></canvas>
+      <div class="cta-inner wrap">
+        <h2 id="cta-h">Blocks for the <em>content.</em><br>Code for the <em>magic.</em></h2>
+        <p>Use the right tool for each job — and when the job is an experience that listens, computes, and surprises, remember that the browser has always been able to do far more than fill in rectangles.</p>
+        <a href="possible.html" class="btn btn-primary">See what's possible <span class="btn-arrow">→</span></a>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════ FOOTER ══════════ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Beyond the <b>Block</b></div>
+          <p class="footer-brand-desc">A good-humored manifesto and living showcase for the part of the web that lives past page-builders. Every pixel here is hand-written, framework-free, and runs from a single folder.</p>
+        </div>
+        <nav class="footer-col" aria-label="Site links">
+          <p class="footer-col-title">The site</p>
+          <ul>
+            <li><a href="index.html">Manifesto</a></li>
+            <li><a href="possible.html">What's Possible</a></li>
+            <li><a href="about.html">Colophon</a></li>
+            <li><a href="#showcase">Live demos</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Demo links">
+          <p class="footer-col-title">Exhibits</p>
+          <ul>
+            <li><a href="#showcase">Physics toy</a></li>
+            <li><a href="#showcase">Web Audio synth</a></li>
+            <li><a href="#showcase">Generative art</a></li>
+            <li><a href="#showcase">Strange attractor</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="More links">
+          <p class="footer-col-title">In the same spirit</p>
+          <ul>
+            <li><a href="possible.html#compare">Blocks vs. code</a></li>
+            <li><a href="about.html#how">How this was built</a></li>
+            <li><a href="about.html#colophon">Colophon</a></li>
+            <li><a href="possible.html#demos">Tiny previews</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Beyond the Block · Made by hand, no framework, with affection for blocks</p>
+        <div class="footer-legal">
+          <a href="about.html">Colophon</a>
+          <a href="possible.html">Possible</a>
+          <a href="index.html#manifesto">Thesis</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/engine.js"></script>
+  <script src="js/demos.js"></script>
+  <script src="js/story.js"></script>
+</body>
+</html>

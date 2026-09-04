@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tickets &amp; Registration — Field Notes Live 2026 · Asheville, NC</title>
+  <meta name="description" content="Register for Field Notes Live 2026. Early bird tickets are $180 through September 1. Standard $240. Student/Community $95. Sponsor packages starting at $750.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,700;1,9..144,900&family=Lora:ital,wght@0,400;0,600;1,400&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* Ticket page specific tweaks */
+    .deadline-banner {
+      background: linear-gradient(90deg, var(--ochre), var(--ochre-light));
+      color: var(--forest);
+      text-align: center;
+      padding: var(--sp-sm) var(--sp-lg);
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+    .deadline-banner a { color: var(--forest); text-decoration: underline; }
+    .reg-note {
+      background-color: var(--parchment);
+      border-radius: var(--r-md);
+      padding: var(--sp-md) var(--sp-lg);
+      font-size: 0.88rem;
+      color: var(--bark);
+      line-height: 1.6;
+      border-left: 3px solid var(--ochre);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Early Bird Banner -->
+  <div class="deadline-banner" role="alert">
+    Early Bird pricing ends September 1, 2026 — Save $60 on full registration. <a href="#register">Register below.</a>
+  </div>
+
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a href="index.html" class="nav-logo" aria-label="Field Notes Live — Home">
+        <svg class="nav-logo-icon" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="19" cy="19" r="18" stroke="#c4892a" stroke-width="1.5"/>
+          <path d="M7 27 C10 20, 14 17, 19 18 C24 19, 28 15, 31 10" stroke="#7aaa84" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M5 31 Q9 24 14 25 Q19 26 22 22 Q25 18 31 19" stroke="#b0ceb0" stroke-width="1" fill="none" stroke-linecap="round" stroke-dasharray="2 2"/>
+          <path d="M7 33 L7 24 M5 29 L9 29" stroke="#c4892a" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="nav-logo-text">
+          <span class="nav-logo-title">Field Notes Live</span>
+          <span class="nav-logo-sub">Oct 18–19 · Asheville, NC</span>
+        </span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="schedule.html">Schedule</a>
+        <a href="speakers.html">Speakers</a>
+        <a href="tickets.html" class="active">Tickets</a>
+        <a href="travel.html">Travel &amp; Venue</a>
+        <a href="faq.html">FAQ</a>
+        <a href="#register" class="nav-cta">Register Now</a>
+      </nav>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+    <a href="schedule.html">Schedule</a>
+    <a href="speakers.html">Speakers</a>
+    <a href="tickets.html">Tickets</a>
+    <a href="travel.html">Travel &amp; Venue</a>
+    <a href="faq.html">FAQ</a>
+    <a href="#register" class="mobile-nav-cta">Register Now</a>
+  </nav>
+
+  <main>
+
+    <!-- Page Hero -->
+    <section class="page-hero" aria-label="Tickets page header">
+      <svg class="page-hero-ridge" viewBox="0 0 1440 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="none">
+        <path d="M0 55 C240 10, 480 60, 720 30 C960 0, 1200 60, 1440 38 L1440 80 L0 80Z" fill="#f5ead8"/>
+      </svg>
+      <div class="container page-hero-inner">
+        <div class="page-hero-label">Registration · October 18–19, 2026</div>
+        <h1>Join us in<br><em>Asheville.</em></h1>
+        <p>Three ticket tiers to make the conference accessible for everyone — from full-time professionals to students and community members just getting started. Early bird pricing ends September 1.</p>
+        <div style="margin-top: var(--sp-lg); display: flex; gap: var(--sp-md); flex-wrap: wrap;">
+          <span class="badge badge-ochre">Early Bird Ends Sept 1</span>
+          <span class="badge" style="background: rgba(245,234,216,0.15); color: var(--fern);">Student Rate Available</span>
+          <span class="badge" style="background: rgba(245,234,216,0.15); color: var(--fern);">Group Discounts Available</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ticket Pricing -->
+    <section class="section topo-bg" aria-labelledby="tickets-heading">
+      <div class="container">
+        <div class="section-header text-center">
+          <div class="section-label center">Ticket Tiers</div>
+          <h2 class="section-heading" id="tickets-heading">Choose your registration.</h2>
+          <p class="section-intro">All tickets include both conference days, lunches, and the evening reception. The Early Bird includes the printed Field Notes workbook and priority workshop selection.</p>
+        </div>
+
+        <div class="ticket-grid reveal" style="max-width: 1000px; margin-inline: auto;">
+
+          <!-- Student/Community -->
+          <div class="ticket-card">
+            <div class="ticket-header">
+              <div class="ticket-tier">Student / Community</div>
+              <div class="ticket-name">Field Learner</div>
+              <div class="ticket-price-wrap">
+                <span class="ticket-price-dollar">$</span>
+                <span class="ticket-price">95</span>
+                <span class="ticket-price-note">any time</span>
+              </div>
+            </div>
+            <div class="ticket-body">
+              <p class="ticket-desc">For enrolled students, volunteers, community members, and those employed by nonprofits earning under $40k/year. ID or affiliation verification may be requested.</p>
+              <ul class="ticket-features">
+                <li class="ticket-feature">Both conference days (Oct 18–19)</li>
+                <li class="ticket-feature">All sessions, workshops, and field tracks</li>
+                <li class="ticket-feature">Both lunches included</li>
+                <li class="ticket-feature">Evening gear swap reception</li>
+                <li class="ticket-feature">Coffee and snacks throughout</li>
+              </ul>
+            </div>
+            <div class="ticket-footer">
+              <a href="#register" class="btn btn-forest">Register — $95</a>
+            </div>
+          </div>
+
+          <!-- Early Bird -->
+          <div class="ticket-card featured">
+            <div class="ticket-badge">Best Value · Ends Sept 1</div>
+            <div class="ticket-header">
+              <div class="ticket-tier">Early Bird Registration</div>
+              <div class="ticket-name">Early Registrant</div>
+              <div class="ticket-price-wrap">
+                <span class="ticket-price-dollar">$</span>
+                <span class="ticket-price">180</span>
+                <span class="ticket-price-note">through September 1 only</span>
+              </div>
+            </div>
+            <div class="ticket-body">
+              <p class="ticket-desc">Lock in the lowest full-access rate. Available through September 1, 2026. Includes everything in the standard ticket plus workbook and priority session selection.</p>
+              <ul class="ticket-features">
+                <li class="ticket-feature">Both conference days (Oct 18–19)</li>
+                <li class="ticket-feature">All sessions, workshops, and field tracks</li>
+                <li class="ticket-feature">Both lunches included</li>
+                <li class="ticket-feature">Evening gear swap reception</li>
+                <li class="ticket-feature">Coffee and snacks throughout</li>
+                <li class="ticket-feature">Printed Field Notes workbook</li>
+                <li class="ticket-feature">Priority workshop selection (opens Aug 15)</li>
+              </ul>
+            </div>
+            <div class="ticket-footer">
+              <a href="#register" class="btn btn-primary">Register Early — $180</a>
+            </div>
+          </div>
+
+          <!-- Standard -->
+          <div class="ticket-card">
+            <div class="ticket-header">
+              <div class="ticket-tier">Standard Registration</div>
+              <div class="ticket-name">Full Attendee</div>
+              <div class="ticket-price-wrap">
+                <span class="ticket-price-dollar">$</span>
+                <span class="ticket-price">240</span>
+                <span class="ticket-price-note">after September 1</span>
+              </div>
+            </div>
+            <div class="ticket-body">
+              <p class="ticket-desc">Full conference access. Available after September 1, 2026, or if early bird capacity is reached before the deadline.</p>
+              <ul class="ticket-features">
+                <li class="ticket-feature">Both conference days (Oct 18–19)</li>
+                <li class="ticket-feature">All sessions, workshops, and field tracks</li>
+                <li class="ticket-feature">Both lunches included</li>
+                <li class="ticket-feature">Evening gear swap reception</li>
+                <li class="ticket-feature">Coffee and snacks throughout</li>
+                <li class="ticket-feature">Printed Field Notes workbook</li>
+              </ul>
+            </div>
+            <div class="ticket-footer">
+              <a href="#register" class="btn btn-forest">Register — $240</a>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Group and scholarship notes -->
+        <div style="max-width: 800px; margin: var(--sp-xl) auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-md);">
+          <div class="reg-note">
+            <strong style="color: var(--forest);">Group Discount (5+)</strong><br>
+            Groups of 5 or more from the same organization receive 15% off standard or early bird pricing. Contact us at <a href="mailto:hello@fieldnoteslive.org">hello@fieldnoteslive.org</a> for a group code.
+          </div>
+          <div class="reg-note">
+            <strong style="color: var(--forest);">Scholarship Assistance</strong><br>
+            A limited number of partial scholarships are available for educators who cannot otherwise attend. Apply by August 1 via the registration form below.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Registration Form -->
+    <section class="section section-parchment" id="register" aria-labelledby="reg-form-heading">
+      <div class="container">
+        <div style="max-width: 760px; margin-inline: auto;">
+          <div class="section-header">
+            <div class="section-label">Registration Form</div>
+            <h2 class="section-heading" id="reg-form-heading">Reserve your spot.</h2>
+            <p class="section-intro">Fill out the form below to complete your registration. A confirmation email will be sent within one business day. Payment processed securely on the next step.</p>
+          </div>
+          <form class="reg-form reveal" action="#" method="post" aria-label="Conference registration form" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="first-name">First Name *</label>
+                <input type="text" id="first-name" name="first_name" class="form-input" placeholder="Maria" required autocomplete="given-name">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="last-name">Last Name *</label>
+                <input type="text" id="last-name" name="last_name" class="form-input" placeholder="Ramirez" required autocomplete="family-name">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="email">Email Address *</label>
+                <input type="email" id="email" name="email" class="form-input" placeholder="you@organization.org" required autocomplete="email">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="phone">Phone (optional)</label>
+                <input type="tel" id="phone" name="phone" class="form-input" placeholder="(828) 555-0100" autocomplete="tel">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="org">Organization / Affiliation *</label>
+                <input type="text" id="org" name="organization" class="form-input" placeholder="Blue Ridge Trail Conservancy" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="role">Your Role</label>
+                <input type="text" id="role" name="role" class="form-input" placeholder="Program Director">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="ticket-type">Ticket Type *</label>
+                <select id="ticket-type" name="ticket_type" class="form-select" required>
+                  <option value="">— Select a ticket —</option>
+                  <option value="early-bird">Early Bird — $180 (through Sept 1)</option>
+                  <option value="standard">Standard — $240</option>
+                  <option value="student">Student / Community — $95</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="dietary">Dietary Needs</label>
+                <select id="dietary" name="dietary" class="form-select">
+                  <option value="none">No restrictions</option>
+                  <option value="vegetarian">Vegetarian</option>
+                  <option value="vegan">Vegan</option>
+                  <option value="gf">Gluten-free</option>
+                  <option value="gf-veg">GF + Vegetarian</option>
+                  <option value="other">Other (please note in comments)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group full" style="margin-bottom: var(--sp-md);">
+              <label class="form-label" for="workshop-pref">Workshop Preference (optional)</label>
+              <select id="workshop-pref" name="workshop_pref" class="form-select">
+                <option value="">— I'll decide closer to the conference —</option>
+                <option value="trail-interp">A1: Trail Interpretation (Maya Torres)</option>
+                <option value="risk">A2: Risk Assessment Practicum (Ben Okafor)</option>
+                <option value="grants">A3: Grant Strategies (Petra Novak)</option>
+              </select>
+            </div>
+            <div class="form-group full" style="margin-bottom: var(--sp-md);">
+              <label class="form-label" for="scholarship">Scholarship Request</label>
+              <select id="scholarship" name="scholarship" class="form-select">
+                <option value="no">No, I do not need scholarship assistance</option>
+                <option value="partial">Yes, I'd like to apply for partial scholarship assistance</option>
+              </select>
+            </div>
+            <div class="form-group full" style="margin-bottom: var(--sp-xl);">
+              <label class="form-label" for="notes">Additional Notes or Accessibility Needs</label>
+              <textarea id="notes" name="notes" class="form-input" rows="3" style="resize: vertical;" placeholder="Accessibility accommodations, questions, or anything we should know..."></textarea>
+            </div>
+            <div style="display: flex; gap: var(--sp-md); align-items: center; flex-wrap: wrap;">
+              <button type="submit" class="btn btn-primary btn-lg">Continue to Payment</button>
+              <p style="font-size: 0.82rem; color: var(--bark); margin: 0;">Secure checkout via Stripe. You'll be redirected after submitting.</p>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sponsor Packages -->
+    <section class="section section-dark topo-bg-light" id="sponsors" aria-labelledby="sponsors-heading">
+      <div class="container">
+        <div class="section-header text-center">
+          <div class="section-label center">For Organizations &amp; Brands</div>
+          <h2 class="section-heading" id="sponsors-heading">Sponsor Field Notes Live.</h2>
+          <p class="section-intro" style="color: var(--fern);">Reach 250+ outdoor educators, park staff, trail stewards, and conservation nonprofits over two days in Asheville. Four sponsor tiers, each designed to match your organization's goals and budget.</p>
+        </div>
+
+        <div class="sponsor-grid reveal">
+
+          <div class="sponsor-card bronze">
+            <div class="sponsor-header">
+              <div style="font-family: var(--font-ui); font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: var(--sp-xs); opacity: 0.85;">Trail Blazer</div>
+              <div class="sponsor-tier-name">Bronze</div>
+              <div class="sponsor-price">$750</div>
+              <div class="sponsor-price-sub">+ additional available</div>
+            </div>
+            <div class="sponsor-body">
+              <ul class="sponsor-features">
+                <li>Logo in printed conference program</li>
+                <li>1 complimentary full registration</li>
+                <li>Exhibitor table in the Pavilion (both days)</li>
+                <li>Logo on signage at venue</li>
+                <li>Social media mention (1 post)</li>
+              </ul>
+              <div style="margin-top: var(--sp-lg);">
+                <a href="mailto:sponsors@fieldnoteslive.org?subject=Trail Blazer Sponsor Inquiry" class="btn btn-forest" style="width: 100%; justify-content: center;">Inquire</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="sponsor-card silver">
+            <div class="sponsor-header">
+              <div style="font-family: var(--font-ui); font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: var(--sp-xs); opacity: 0.85;">Summit</div>
+              <div class="sponsor-tier-name">Silver</div>
+              <div class="sponsor-price">$1,500</div>
+              <div class="sponsor-price-sub">+ additional available</div>
+            </div>
+            <div class="sponsor-body">
+              <ul class="sponsor-features">
+                <li>All Trail Blazer benefits</li>
+                <li>2 complimentary registrations</li>
+                <li>Logo on conference website (with link)</li>
+                <li>Featured exhibitor placement in Pavilion</li>
+                <li>Social media mention (3 posts across platforms)</li>
+                <li>Pre-conference email shoutout to attendee list</li>
+              </ul>
+              <div style="margin-top: var(--sp-lg);">
+                <a href="mailto:sponsors@fieldnoteslive.org?subject=Summit Sponsor Inquiry" class="btn btn-forest" style="width: 100%; justify-content: center;">Inquire</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="sponsor-card gold">
+            <div class="sponsor-header">
+              <div style="font-family: var(--font-ui); font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: var(--sp-xs); color: var(--ochre);">Ridgeline</div>
+              <div class="sponsor-tier-name">Gold</div>
+              <div class="sponsor-price">$3,000</div>
+              <div class="sponsor-price-sub">limited availability</div>
+            </div>
+            <div class="sponsor-body">
+              <ul class="sponsor-features">
+                <li>All Summit benefits</li>
+                <li>4 complimentary registrations</li>
+                <li>5-minute speaking slot in Sponsor Demo Hour</li>
+                <li>Sponsor banner in Main Hall (Day Two)</li>
+                <li>Logo on event signage throughout venue</li>
+                <li>Half-page ad in conference program</li>
+                <li>Post-event attendee survey data summary</li>
+              </ul>
+              <div style="margin-top: var(--sp-lg);">
+                <a href="mailto:sponsors@fieldnoteslive.org?subject=Ridgeline Sponsor Inquiry" class="btn btn-forest" style="width: 100%; justify-content: center;">Inquire</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="sponsor-card platinum">
+            <div class="sponsor-header">
+              <div style="font-family: var(--font-ui); font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: var(--sp-xs); color: var(--ochre);">Canopy</div>
+              <div class="sponsor-tier-name" style="color: var(--ochre-light);">Platinum</div>
+              <div class="sponsor-price" style="color: var(--ochre-light);">$5,000</div>
+              <div class="sponsor-price-sub">1 available · contact us</div>
+            </div>
+            <div class="sponsor-body">
+              <ul class="sponsor-features">
+                <li>All Ridgeline benefits</li>
+                <li>6 complimentary registrations</li>
+                <li><strong>Keynote naming right</strong> ("Day Two Opening Keynote presented by…")</li>
+                <li>Exclusive hosting of Friday Evening Reception</li>
+                <li>Full-page ad in conference program (inside front cover)</li>
+                <li>10-minute speaking slot in Sponsor Demo Hour</li>
+                <li>Prominent banner at main entrance and amphitheater</li>
+                <li>Year-round logo on conference website</li>
+              </ul>
+              <div style="margin-top: var(--sp-lg);">
+                <a href="mailto:sponsors@fieldnoteslive.org?subject=Canopy Platinum Sponsor Inquiry" class="btn btn-primary" style="width: 100%; justify-content: center;">Contact Us</a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div style="text-align: center; margin-top: var(--sp-xl);">
+          <p style="color: var(--fern); font-size: 0.95rem; margin-bottom: var(--sp-md);">Questions about sponsorship? We're happy to discuss custom packages.</p>
+          <a href="mailto:sponsors@fieldnoteslive.org" class="btn btn-outline">sponsors@fieldnoteslive.org</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="container">
+        <h2>Questions before you register?</h2>
+        <p>Check the FAQ or reach out directly — we'll reply within one business day.</p>
+        <div class="cta-btns">
+          <a href="faq.html" class="btn btn-primary btn-lg">Read the FAQ</a>
+          <a href="mailto:hello@fieldnoteslive.org" class="btn btn-outline">Email Us</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a href="index.html" class="nav-logo" style="text-decoration: none;">
+            <svg class="nav-logo-icon" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="19" cy="19" r="18" stroke="#c4892a" stroke-width="1.5"/>
+              <path d="M7 27 C10 20, 14 17, 19 18 C24 19, 28 15, 31 10" stroke="#7aaa84" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <path d="M5 31 Q9 24 14 25 Q19 26 22 22 Q25 18 31 19" stroke="#b0ceb0" stroke-width="1" fill="none" stroke-linecap="round" stroke-dasharray="2 2"/>
+            </svg>
+            <span class="nav-logo-text">
+              <span class="nav-logo-title">Field Notes Live</span>
+              <span class="nav-logo-sub">2026 Conference</span>
+            </span>
+          </a>
+          <p>Teaching Outside in a Changing Climate. October 18–19, 2026 · Asheville, NC.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Conference</h4>
+          <ul>
+            <li><a href="schedule.html">Full Schedule</a></li>
+            <li><a href="speakers.html">Speakers</a></li>
+            <li><a href="tickets.html">Tickets</a></li>
+            <li><a href="tickets.html#sponsors">Sponsor Packages</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Attend</h4>
+          <ul>
+            <li><a href="travel.html">Travel &amp; Venue</a></li>
+            <li><a href="travel.html#lodging">Lodging</a></li>
+            <li><a href="travel.html#accessibility">Accessibility</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Info</h4>
+          <ul>
+            <li><a href="faq.html">FAQ</a></li>
+            <li><a href="faq.html#refunds">Refund Policy</a></li>
+            <li><a href="mailto:hello@fieldnoteslive.org">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Field Notes Live Conference. Asheville, NC.</span>
+        <span>Riverbend Learning Center · Oct 18–19</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

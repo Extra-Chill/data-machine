@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hudson Valley Hockey Conference — U18 AA Junior Hockey · 2026-27 Season</title>
+  <meta name="description" content="Official home of the Hudson Valley Hockey Conference. Eight teams, one cup. Standings, schedules, stats, news, and rosters from the U18 AA junior hockey league serving the Hudson Valley, NY.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;700&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a href="index.html" class="nav-logo" aria-label="Hudson Valley Hockey Conference — Home">
+        <svg class="nav-logo-icon" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="21" cy="21" r="20" fill="#1a4870" stroke="#c89a2a" stroke-width="1.5"/>
+          <path d="M10 17 L21 9 L32 17 L32 28 L21 34 L10 28 Z" stroke="#fff" stroke-width="1.4" fill="none"/>
+          <path d="M14 22 C16 19, 19 19, 21 21 C23 23, 26 23, 28 20" stroke="#c89a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+          <circle cx="21" cy="26" r="1.8" fill="#b8252a"/>
+        </svg>
+        <span class="nav-logo-text">
+          <span class="nav-logo-title">HVHC</span>
+          <span class="nav-logo-sub">Hudson Valley Hockey · U18 AA</span>
+        </span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="standings.html">Standings</a>
+        <a href="schedule.html">Schedule</a>
+        <a href="teams.html">Teams</a>
+        <a href="leaderboard.html">Leaders</a>
+        <a href="news.html">News</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+    <a href="standings.html">Standings</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="teams.html">Teams</a>
+    <a href="leaderboard.html">Leaders</a>
+    <a href="news.html">News</a>
+    <a href="contact.html">Contact</a>
+  </nav>
+
+  <main>
+
+    <!-- ── Hero ────────────────────────────────────────── -->
+    <section class="hero" aria-label="League hero">
+      <div class="container hero-inner">
+        <svg class="hero-logo" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-label="HVHC league crest">
+          <circle cx="100" cy="100" r="96" fill="#0c2845" stroke="#c89a2a" stroke-width="4"/>
+          <circle cx="100" cy="100" r="78" fill="none" stroke="#c89a2a" stroke-width="1" stroke-dasharray="2 3"/>
+          <path d="M40 70 L100 30 L160 70 L160 130 L100 170 L40 130 Z" fill="#1a4870" stroke="#fff" stroke-width="2"/>
+          <path d="M50 95 C65 80, 85 80, 100 95 C115 110, 135 110, 150 95" stroke="#c89a2a" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path d="M50 115 C65 100, 85 100, 100 115 C115 130, 135 130, 150 115" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+          <circle cx="100" cy="130" r="5" fill="#b8252a"/>
+          <text x="100" y="58" text-anchor="middle" fill="#fff" font-family="Oswald, sans-serif" font-size="14" font-weight="700" letter-spacing="2">HVHC</text>
+          <text x="100" y="158" text-anchor="middle" fill="#c89a2a" font-family="Oswald, sans-serif" font-size="8" letter-spacing="3">EST. 1998</text>
+        </svg>
+        <div>
+          <span class="hero-kicker">2026-27 Season Preview</span>
+          <h1>Hudson Valley<br>Hockey Conference</h1>
+          <p class="hero-tagline">Eight towns. One cup. The Hudson Valley's premier U18 AA junior hockey league returns October 11 for its 28th season.</p>
+          <dl class="hero-meta">
+            <div class="hero-meta-item">
+              <strong>Oct 11</strong>
+              Opening night faceoff
+            </div>
+            <div class="hero-meta-item">
+              <strong>168</strong>
+              Regular-season games
+            </div>
+            <div class="hero-meta-item">
+              <strong>March 21</strong>
+              Cup Final, Roxbury
+            </div>
+          </dl>
+          <div class="hero-cta">
+            <a href="schedule.html" class="btn btn-primary">View 2026-27 Schedule</a>
+            <a href="teams.html" class="btn btn-secondary" style="color:#fff;border-color:#fff;">Meet the Teams</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Top of standings preview ────────────────────── -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <span class="kicker">Final standings · 2025-26</span>
+            <h2>Top of the Table</h2>
+          </div>
+          <a href="standings.html" class="section-link">Full standings →</a>
+        </div>
+
+        <div class="table-scroll">
+          <table class="standings-mini" aria-label="Top five teams from the 2025-26 regular season">
+            <thead>
+              <tr>
+                <th scope="col" class="num">#</th>
+                <th scope="col">Team</th>
+                <th scope="col" class="num">GP</th>
+                <th scope="col" class="num">W</th>
+                <th scope="col" class="num">L</th>
+                <th scope="col" class="num">OTL</th>
+                <th scope="col" class="num">Pts</th>
+                <th scope="col" class="num">Diff</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="cup-holder">
+                <td class="rank rank-1">1</td>
+                <td><a class="team-chip" href="team-roxbury-roar.html"><span class="team-dot team-dot-roar" aria-hidden="true"></span>Roxbury Roar</a></td>
+                <td class="num">42</td>
+                <td class="num">31</td>
+                <td class="num">8</td>
+                <td class="num">3</td>
+                <td class="num"><strong>65</strong></td>
+                <td class="num">+78</td>
+              </tr>
+              <tr>
+                <td class="rank">2</td>
+                <td><span class="team-chip"><span class="team-dot team-dot-bluefins" aria-hidden="true"></span>Beacon Bluefins</span></td>
+                <td class="num">42</td>
+                <td class="num">28</td>
+                <td class="num">11</td>
+                <td class="num">3</td>
+                <td class="num"><strong>59</strong></td>
+                <td class="num">+54</td>
+              </tr>
+              <tr>
+                <td class="rank">3</td>
+                <td><span class="team-chip"><span class="team-dot team-dot-kingpins" aria-hidden="true"></span>Kingston Kingpins</span></td>
+                <td class="num">42</td>
+                <td class="num">25</td>
+                <td class="num">13</td>
+                <td class="num">4</td>
+                <td class="num"><strong>54</strong></td>
+                <td class="num">+31</td>
+              </tr>
+              <tr>
+                <td class="rank">4</td>
+                <td><span class="team-chip"><span class="team-dot team-dot-crusaders" aria-hidden="true"></span>Catskill Crusaders</span></td>
+                <td class="num">42</td>
+                <td class="num">22</td>
+                <td class="num">15</td>
+                <td class="num">5</td>
+                <td class="num"><strong>49</strong></td>
+                <td class="num">+12</td>
+              </tr>
+              <tr>
+                <td class="rank">5</td>
+                <td><span class="team-chip"><span class="team-dot team-dot-northstars" aria-hidden="true"></span>New Paltz Northstars</span></td>
+                <td class="num">42</td>
+                <td class="num">21</td>
+                <td class="num">17</td>
+                <td class="num">4</td>
+                <td class="num"><strong>46</strong></td>
+                <td class="num">+4</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="last-updated">Final regular-season standings posted March 14, 2026. Roxbury defeated Beacon 4-2 in the Cup Final on March 21.</p>
+      </div>
+    </section>
+
+    <!-- ── Game of the Week (preseason exhibition) ─────── -->
+    <section class="section section-ice">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <span class="kicker">Marquee Matchup · 2026-27 Preseason</span>
+            <h2>Game of the Week</h2>
+          </div>
+          <a href="schedule.html" class="section-link">Full preseason →</a>
+        </div>
+
+        <article class="matchup-card">
+          <div class="matchup-banner">
+            <span class="game-of-week">Cup Rematch · Exhibition</span>
+            <time datetime="2026-10-04T19:30" class="date">Sat, Oct 4 · 7:30 PM</time>
+          </div>
+          <div class="matchup-body">
+            <div class="matchup-team">
+              <div class="team-logo-block team-dot-bluefins" role="img" aria-label="Beacon Bluefins navy and silver logo"></div>
+              <div class="team-name">Beacon Bluefins</div>
+              <div class="team-record">2025-26: 28-11-3 · Runners-up</div>
+            </div>
+            <div class="matchup-vs" aria-hidden="true">@</div>
+            <div class="matchup-team">
+              <div class="team-logo-block team-dot-roar" role="img" aria-label="Roxbury Roar red and gold logo"></div>
+              <div class="team-name">Roxbury Roar</div>
+              <div class="team-record">2025-26: 31-8-3 · Cup champions</div>
+            </div>
+          </div>
+          <div class="matchup-meta">
+            <div><strong>Venue:</strong> Roxbury Memorial Arena</div>
+            <div><strong>Capacity:</strong> 1,840</div>
+            <div><strong>Broadcast:</strong> WKZE 98.1 FM · HVHC Live stream</div>
+            <div><strong>Tickets:</strong> $8 adult / $4 youth · gate sale only</div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ── Top Scorers strip ───────────────────────────── -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <span class="kicker">Final 2025-26 Stats</span>
+            <h2>Top Scorers</h2>
+          </div>
+          <a href="leaderboard.html" class="section-link">Full leaderboard →</a>
+        </div>
+
+        <div class="scorers-strip">
+          <article class="scorer-card">
+            <span class="rank-badge">#1</span>
+            <div class="headshot headshot-warm" role="img" aria-label="Headshot of Mateusz Kowalczyk"></div>
+            <div class="player-name">M. Kowalczyk</div>
+            <div class="player-team">Roxbury Roar · C</div>
+            <div class="stat-line">
+              <div class="stat-block"><span class="stat-num">38</span><span class="stat-lbl">G</span></div>
+              <div class="stat-block"><span class="stat-num">52</span><span class="stat-lbl">A</span></div>
+              <div class="stat-block"><span class="stat-num">90</span><span class="stat-lbl">P</span></div>
+            </div>
+          </article>
+
+          <article class="scorer-card">
+            <span class="rank-badge">#2</span>
+            <div class="headshot headshot-cool" role="img" aria-label="Headshot of Théo Lavoie"></div>
+            <div class="player-name">T. Lavoie</div>
+            <div class="player-team">Beacon Bluefins · RW</div>
+            <div class="stat-line">
+              <div class="stat-block"><span class="stat-num">41</span><span class="stat-lbl">G</span></div>
+              <div class="stat-block"><span class="stat-num">38</span><span class="stat-lbl">A</span></div>
+              <div class="stat-block"><span class="stat-num">79</span><span class="stat-lbl">P</span></div>
+            </div>
+          </article>
+
+          <article class="scorer-card">
+            <span class="rank-badge">#3</span>
+            <div class="headshot headshot-rust" role="img" aria-label="Headshot of Diego Restrepo"></div>
+            <div class="player-name">D. Restrepo</div>
+            <div class="player-team">Kingston Kingpins · C</div>
+            <div class="stat-line">
+              <div class="stat-block"><span class="stat-num">28</span><span class="stat-lbl">G</span></div>
+              <div class="stat-block"><span class="stat-num">48</span><span class="stat-lbl">A</span></div>
+              <div class="stat-block"><span class="stat-num">76</span><span class="stat-lbl">P</span></div>
+            </div>
+          </article>
+
+          <article class="scorer-card">
+            <span class="rank-badge">#4</span>
+            <div class="headshot headshot-olive" role="img" aria-label="Headshot of Owen Brennan"></div>
+            <div class="player-name">O. Brennan</div>
+            <div class="player-team">Roxbury Roar · LW</div>
+            <div class="stat-line">
+              <div class="stat-block"><span class="stat-num">33</span><span class="stat-lbl">G</span></div>
+              <div class="stat-block"><span class="stat-num">40</span><span class="stat-lbl">A</span></div>
+              <div class="stat-block"><span class="stat-num">73</span><span class="stat-lbl">P</span></div>
+            </div>
+          </article>
+
+          <article class="scorer-card">
+            <span class="rank-badge">#5</span>
+            <div class="headshot headshot-bronze" role="img" aria-label="Headshot of Aleksander Petrov"></div>
+            <div class="player-name">A. Petrov</div>
+            <div class="player-team">Catskill Crusaders · D</div>
+            <div class="stat-line">
+              <div class="stat-block"><span class="stat-num">18</span><span class="stat-lbl">G</span></div>
+              <div class="stat-block"><span class="stat-num">53</span><span class="stat-lbl">A</span></div>
+              <div class="stat-block"><span class="stat-num">71</span><span class="stat-lbl">P</span></div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Latest news ─────────────────────────────────── -->
+    <section class="section section-cream">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <span class="kicker">Around the League · Offseason</span>
+            <h2>Latest News</h2>
+          </div>
+          <a href="news.html" class="section-link">All stories →</a>
+        </div>
+
+        <div class="news-grid">
+          <article class="news-card">
+            <div class="news-thumb news-thumb-red" role="img" aria-label="Roxbury Roar red and gold championship celebration banner"></div>
+            <div class="news-body">
+              <span class="news-tag">League News</span>
+              <h3><a href="news.html#cup-banner">Roxbury to raise third Cup banner on October 11</a></h3>
+              <p class="news-dek">The Roar will unfurl the 2026 Lewis Cup banner before their home opener against Catskill, the club's third championship in eleven seasons.</p>
+              <div class="news-meta">By Hal Reinhart · Jun 18, 2026</div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-ice" role="img" aria-label="Hockey puck on ice in dramatic blue lighting"></div>
+            <div class="news-body">
+              <span class="news-tag">Trades</span>
+              <h3><a href="news.html#kingston-trade">Kingpins land Bluefins blueliner Bergeron in swap for two picks</a></h3>
+              <p class="news-dek">Kingston shores up its right side bringing in two-way defenseman Pascal Bergeron from Beacon for 2027 first- and third-round selections.</p>
+              <div class="news-meta">By Margie Costanza · Jun 12, 2026</div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-green" role="img" aria-label="Green ice rink scoreboard graphic with crossed sticks"></div>
+            <div class="news-body">
+              <span class="news-tag">Profile</span>
+              <h3><a href="news.html#kowalczyk-mvp">Kowalczyk named back-to-back league MVP</a></h3>
+              <p class="news-dek">The 17-year-old Roxbury center becomes the first player in HVHC history to repeat as MVP, capping a 90-point season at the junior level.</p>
+              <div class="news-meta">By Dom Reilly · Jun 6, 2026</div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-gold" role="img" aria-label="Gold-colored hockey trophy with engraved nameplate"></div>
+            <div class="news-body">
+              <span class="news-tag">League News</span>
+              <h3><a href="news.html#realignment">League scraps two-division format for 2026-27</a></h3>
+              <p class="news-dek">After two years of unbalanced schedules, the HVHC reverts to a single-table eight-team format with a 42-game slate, commissioner Boyle announced.</p>
+              <div class="news-meta">By Margie Costanza · May 28, 2026</div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Upcoming schedule strip ─────────────────────── -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <span class="kicker">Opening Stretch · 2026-27</span>
+            <h2>First Five Games</h2>
+          </div>
+          <a href="schedule.html" class="section-link">Full schedule →</a>
+        </div>
+
+        <div class="schedule-strip">
+          <article class="game-card">
+            <div class="game-date"><time datetime="2026-10-04T19:30">Sat, Oct 4 · 7:30 PM</time></div>
+            <div class="game-teams">Beacon @ Roxbury</div>
+            <div class="game-venue">Exhibition · Roxbury Memorial Arena</div>
+          </article>
+          <article class="game-card">
+            <div class="game-date"><time datetime="2026-10-11T19:00">Sun, Oct 11 · 7:00 PM</time></div>
+            <div class="game-teams">Catskill @ Roxbury</div>
+            <div class="game-venue">Opening Night · Banner raising</div>
+          </article>
+          <article class="game-card">
+            <div class="game-date"><time datetime="2026-10-11T17:30">Sun, Oct 11 · 5:30 PM</time></div>
+            <div class="game-teams">Hudson @ Kingston</div>
+            <div class="game-venue">Kingston Ice Garden</div>
+          </article>
+          <article class="game-card">
+            <div class="game-date"><time datetime="2026-10-14T19:00">Wed, Oct 14 · 7:00 PM</time></div>
+            <div class="game-teams">Saugerties @ New Paltz</div>
+            <div class="game-venue">New Paltz Rec Center</div>
+          </article>
+          <article class="game-card">
+            <div class="game-date"><time datetime="2026-10-17T17:30">Sat, Oct 17 · 5:30 PM</time></div>
+            <div class="game-teams">Rhinebeck @ Beacon</div>
+            <div class="game-venue">Beacon Riverfront Arena</div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Sponsors ─────────────────────────────────────── -->
+    <section class="section-tight section-cream">
+      <div class="container">
+        <div class="section-head" style="border-bottom:0;padding-bottom:0;margin-bottom:18px;">
+          <div>
+            <span class="kicker">Official Partners</span>
+            <h2 style="font-size:1.4rem;">Sponsors</h2>
+          </div>
+          <a href="contact.html" class="section-link">Become a partner →</a>
+        </div>
+        <div class="sponsors-strip">
+          <div class="sponsor-block">Catskill Mountain Bank<small>Title Sponsor</small></div>
+          <div class="sponsor-block">Hudson Valley Toyota<small>Game of the Week</small></div>
+          <div class="sponsor-block">Northern Pines Maple<small>Official Maple Syrup</small></div>
+          <div class="sponsor-block">Bauer Sports New Paltz<small>Equipment Partner</small></div>
+          <div class="sponsor-block">Roosters Sports Grill<small>Postgame Partner</small></div>
+          <div class="sponsor-block">Riverbend Physical Therapy<small>Medical Partner</small></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── Footer ──────────────────────────────────────────── -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="nav-logo" aria-label="HVHC home">
+            <svg class="nav-logo-icon" viewBox="0 0 42 42" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="21" cy="21" r="20" fill="#1a4870" stroke="#c89a2a" stroke-width="1.5"/>
+              <path d="M10 17 L21 9 L32 17 L32 28 L21 34 L10 28 Z" stroke="#fff" stroke-width="1.4" fill="none"/>
+              <path d="M14 22 C16 19, 19 19, 21 21 C23 23, 26 23, 28 20" stroke="#c89a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+            </svg>
+            <span class="nav-logo-text">
+              <span class="nav-logo-title">HVHC</span>
+              <span class="nav-logo-sub">U18 AA Junior Hockey · Est. 1998</span>
+            </span>
+          </a>
+          <p>Hudson Valley Hockey Conference is a non-profit U18 AA junior hockey league sanctioned by USA Hockey and serving the Hudson Valley region of New York since 1998.</p>
+          <div class="footer-social" aria-label="Social media">
+            <a href="#" aria-label="Facebook">FB</a>
+            <a href="#" aria-label="Instagram">IG</a>
+            <a href="#" aria-label="YouTube">YT</a>
+            <a href="#" aria-label="RSS feed">RSS</a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4>League</h4>
+          <ul>
+            <li><a href="standings.html">Standings</a></li>
+            <li><a href="schedule.html">Schedule</a></li>
+            <li><a href="leaderboard.html">Stat Leaders</a></li>
+            <li><a href="teams.html">Team Directory</a></li>
+            <li><a href="news.html">News Archive</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Teams</h4>
+          <ul>
+            <li><a href="team-roxbury-roar.html">Roxbury Roar</a></li>
+            <li><a href="teams.html">Beacon Bluefins</a></li>
+            <li><a href="teams.html">Catskill Crusaders</a></li>
+            <li><a href="teams.html">New Paltz Northstars</a></li>
+            <li><a href="teams.html">All 8 teams →</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Office</h4>
+          <ul>
+            <li>14 Liberty St<br>Poughkeepsie, NY 12601</li>
+            <li><a href="tel:8455550118">(845) 555-0118</a></li>
+            <li><a href="mailto:office@hvhc.org">office@hvhc.org</a></li>
+            <li><a href="contact.html">Full contact info →</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <div>© 2026 Hudson Valley Hockey Conference · A 501(c)(3) non-profit organization</div>
+        <div><a href="#">Bylaws</a> · <a href="#">Code of Conduct</a> · <a href="#">Privacy</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

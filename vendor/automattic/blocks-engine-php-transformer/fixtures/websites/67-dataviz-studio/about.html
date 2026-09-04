@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Plotweaver</title>
+  <meta name="description" content="What Plotweaver is, how the from-scratch canvas charting engine works, and a guide to every supported chart type and feature.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='16' width='4' height='11' rx='1' fill='%236ee7ff'/%3E%3Crect x='13' y='9' width='4' height='18' rx='1' fill='%23a78bfa'/%3E%3Crect x='21' y='13' width='4' height='14' rx='1' fill='%23fb7185'/%3E%3Cpath d='M5 8 L13 12 L21 5 L28 9' fill='none' stroke='%236ee7ff' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body data-theme="dark">
+
+<header class="topbar">
+  <a class="brand" href="index.html" aria-label="Plotweaver home">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="5" y="16" width="4" height="11" rx="1" fill="#6ee7ff"/>
+      <rect x="13" y="9" width="4" height="18" rx="1" fill="#a78bfa"/>
+      <rect x="21" y="13" width="4" height="14" rx="1" fill="#fb7185"/>
+      <path d="M5 8 L13 12 L21 5 L28 9" fill="none" stroke="#6ee7ff" stroke-width="2"/>
+    </svg>
+    <span class="brand-name">Plot<b>weaver</b><span class="brand-sub">DataViz Studio</span></span>
+  </a>
+  <nav class="top-nav" aria-label="Primary">
+    <a href="index.html">Studio</a>
+    <a href="gallery.html">Gallery</a>
+    <a href="about.html" class="active">About</a>
+  </nav>
+  <div class="top-spacer"></div>
+  <button class="ctrl" id="themeToggle" aria-label="Toggle color theme">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+    <span class="tlabel">Dark</span>
+  </button>
+</header>
+
+<main class="doc">
+  <h1>Plotweaver</h1>
+  <p class="lede">A data-in, chart-out studio built entirely from scratch — no D3, no Chart.js, no build step. You bring a table; Plotweaver draws every pixel.</p>
+
+  <p>Plotweaver is a single-page charting workbench with three live panels: an editable data grid on the left, a hand-written rendering canvas in the middle, and a configuration column on the right. Change anything in any panel and the chart updates immediately. The whole thing runs from static files — open <code>index.html</code> straight off disk and it works offline.</p>
+
+  <div class="feature-cards">
+    <div class="fcard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+      <h4>Real data editor</h4>
+      <p>Edit cells inline, add or delete rows and columns, rename headers, and cycle a column's inferred type between number, date and string.</p>
+    </div>
+    <div class="fcard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6 4 4 6-8"/></svg>
+      <h4>From-scratch renderer</h4>
+      <p>Every chart is drawn with the Canvas 2D API. Nice-numbered axis ticks, gridlines, legends and hover tooltips are all hand-coded.</p>
+    </div>
+    <div class="fcard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      <h4>Real exports</h4>
+      <p>Download a high-resolution PNG, a genuinely standalone SVG file, or a JSON bundle of the config plus data you can re-import later.</p>
+    </div>
+  </div>
+
+  <h2>The charting engine</h2>
+  <p>The renderer in <code>js/chart.js</code> turns a small view-model — <code>{ labels, series }</code>, a list of <code>{ x, y }</code> points, or a grid of values — into pixels. A few details that make the output trustworthy:</p>
+  <ul>
+    <li><strong>Nice-number axes.</strong> Tick values are chosen with the classic “nice numbers” algorithm so axes land on 1 / 2 / 5 × 10ⁿ boundaries instead of awkward decimals, regardless of the data range.</li>
+    <li><strong>Honest auto-scaling.</strong> Each chart computes its own value extent — including stacked totals and negative values — and the baseline sits at zero whenever the data crosses it.</li>
+    <li><strong>Crisp on any display.</strong> The canvas is sized for the device pixel ratio, so lines and text stay sharp on retina screens.</li>
+    <li><strong>Calm motion.</strong> An optional entrance animation grows bars, sweeps pies and traces lines with an ease-out curve, and is automatically disabled when you prefer reduced motion.</li>
+  </ul>
+
+  <h2>Supported chart types</h2>
+  <ul>
+    <li><strong>Bar</strong> — grouped or stacked, with rounded caps and per-series colors.</li>
+    <li><strong>Line</strong> — multi-series with marker dots and column-wide hover.</li>
+    <li><strong>Area</strong> — gradient fills, optionally stacked.</li>
+    <li><strong>Scatter</strong> — X vs Y with an optional categorical grouping column for color.</li>
+    <li><strong>Pie</strong> &amp; <strong>Donut</strong> — percentage labels and a center total readout on the donut.</li>
+    <li><strong>Radar</strong> — multi-axis spider chart comparing several series across attributes.</li>
+    <li><strong>Heatmap</strong> — a color-graded matrix with in-cell values.</li>
+    <li><strong>Histogram</strong> — automatic binning of a single numeric column.</li>
+  </ul>
+
+  <h2>Working with data</h2>
+  <p>Load one of eight built-in datasets — SaaS revenue, global temperature, market sales, metro population, electricity mix, iris measurements, coffee cupping scores, or monthly rainfall — or paste your own. The CSV/TSV parser in <code>js/data.js</code> handles quoted fields, embedded commas and newlines, escaped quotes, and auto-detects whether your delimiter is a comma, tab or semicolon. It then infers each column's type so the chart can treat dates and numbers correctly.</p>
+
+  <h2>Sharing &amp; persistence</h2>
+  <p>Your current dataset and chart configuration are saved to <code>localStorage</code> and also encoded into the page's URL hash. Hit <em>Share</em> to copy a link that reconstructs the exact chart — data and all — plus an <code>&lt;iframe&gt;</code> embed snippet. The gallery's “Open in studio” links use the same mechanism with a compact preset id.</p>
+
+  <h2>Keyboard &amp; accessibility</h2>
+  <ul>
+    <li>In the grid, <kbd>Tab</kbd> / <kbd>Enter</kbd> and the arrow keys move between cells.</li>
+    <li><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>E</kbd> exports the current chart as PNG.</li>
+    <li>Click any legend swatch to toggle that series on or off; the chart rescales to fit what remains.</li>
+    <li>Controls are focus-visible, the layout reflows to a tabbed single column on narrow screens, and all motion respects <code>prefers-reduced-motion</code>.</li>
+  </ul>
+
+  <p style="margin-top:30px;color:var(--ink-faint);font-size:13px">Plotweaver is a fictional product built as a self-contained demo. All datasets are hand-crafted to be realistic but illustrative.</p>
+</main>
+
+<script>
+  (function () {
+    var saved = localStorage.getItem('plotweaver.theme');
+    if (saved) document.body.dataset.theme = saved;
+    var tg = document.getElementById('themeToggle');
+    var lab = tg.querySelector('.tlabel');
+    lab.textContent = document.body.dataset.theme === 'light' ? 'Light' : 'Dark';
+    tg.onclick = function () {
+      document.body.dataset.theme = document.body.dataset.theme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('plotweaver.theme', document.body.dataset.theme);
+      lab.textContent = document.body.dataset.theme === 'light' ? 'Light' : 'Dark';
+    };
+  })();
+</script>
+</body>
+</html>

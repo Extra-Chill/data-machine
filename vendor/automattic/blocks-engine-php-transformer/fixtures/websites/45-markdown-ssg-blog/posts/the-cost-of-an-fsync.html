@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Cost of an fsync, Measured — Cold Start</title>
+<meta name="description" content="Everyone says fsync is expensive. Few say how expensive, or why the number swings by four orders of magnitude depending on your hardware. A short, numbers-first field note.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cold Start" href="../index.xml">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="shell shell--wide masthead__inner">
+    <a class="brand" href="../index.html" aria-label="Cold Start — home">
+      <svg class="brand__mark" width="30" height="30" viewBox="0 0 32 32" role="img" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#c2410c"/>
+        <path d="M16 6c1.6 3.4 1 5.6-.8 7.6-2 2.2-2.6 4.4-1.4 7.2-3-1.4-4.4-4.2-3.6-7.4C11 17 13 18 13.2 20.4 14.6 18 13.4 15.4 16 6Z" fill="#fde7d8"/>
+        <circle cx="20.5" cy="20" r="2.3" fill="#fdba74"/>
+      </svg>
+      <span class="brand__text">
+        <span class="brand__name">Cold Start</span>
+        <span class="brand__tag">storage &amp; distributed systems</span>
+      </span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="../index.html">Home</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../about.html">About</a>
+      <a class="nav__rss" href="../index.xml" aria-label="RSS feed" title="RSS feed">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="13" r="1.6"/><path d="M2 7.3a6.7 6.7 0 0 1 6.7 6.7H6.5A4.5 4.5 0 0 0 2 9.5z"/><path d="M2 3a11 11 0 0 1 11 11h-2.2A8.8 8.8 0 0 0 2 5.2z"/></svg>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <article class="article shell">
+    <header class="article__header">
+      <div class="article__meta">
+        <a class="series-badge" href="../tags.html">Storage Internals</a>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <time datetime="2024-06-18">Jun 18, 2024</time>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <span>5 min read</span>
+      </div>
+      <h1 class="article__title">The Cost of an fsync, Measured</h1>
+      <p class="article__dek">Everyone says fsync is expensive. Few say how expensive, or why the number swings by four orders of magnitude depending on your hardware. A short, numbers-first field note.</p>
+      <div class="byline">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <span>
+          <span class="byline__name">Mara Quintero</span><br>
+          <span class="byline__role">Principal Engineer, Storage · Lisbon</span>
+        </span>
+      </div>
+    </header>
+
+    <div class="prose">
+      <p>A short one this time — a field note rather than an essay. In the <a href="write-ahead-log.html">write-ahead log post</a> I claimed <code>fsync</code> is "the whole ballgame" for durability performance. A reader asked, reasonably: <em>fine, but how expensive is it actually?</em> The honest answer is "it depends, by about four orders of magnitude," and that range is worth understanding.</p>
+
+      <h2 id="what-fsync-does">What fsync actually does</h2>
+      <p><code>fsync(fd)</code> tells the kernel: <em>do not return until every dirty page for this file, and the file's metadata, is on stable storage.</em> It's a barrier. Your thread blocks until the bytes are durable. Everything about the cost flows from what "durable" requires on your particular hardware.</p>
+
+      <h2 id="the-numbers">The numbers, roughly</h2>
+      <p>These are order-of-magnitude figures from my own benchmarking over the years — treat them as a mental model, not a spec sheet:</p>
+      <table>
+        <thead>
+          <tr><th>Storage</th><th align="right">Per-<code>fsync</code> latency</th><th align="right">Durable writes/sec (single thread)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>7200 RPM HDD</td><td align="right">~8–10 ms</td><td align="right">~100</td></tr>
+          <tr><td>Consumer SSD (no PLP)</td><td align="right">~1–5 ms</td><td align="right">a few hundred to ~1,000</td></tr>
+          <tr><td>Datacenter SSD (with PLP)</td><td align="right">~50–200 µs</td><td align="right">~5,000–20,000</td></tr>
+          <tr><td>Battery-backed RAID cache</td><td align="right">~20–100 µs</td><td align="right">tens of thousands</td></tr>
+          <tr><td><code>fsync</code> lying (cache, no flush)</td><td align="right">~1–10 µs</td><td align="right">"fast" and <strong>wrong</strong></td></tr>
+        </tbody>
+      </table>
+      <p>That last row is the trap. A drive or filesystem that acknowledges <code>fsync</code> before the data is truly durable looks fantastic on benchmarks and loses your data on power failure. The gap between the bottom row and the rows above it is the gap between a benchmark and a database.</p>
+      <p><strong>PLP</strong> — power-loss protection — is the differentiator. Datacenter SSDs ship with capacitors that hold enough charge to flush their internal cache when power drops. That lets them <em>honestly</em> acknowledge <code>fsync</code> as soon as the data hits their cache, because the cache itself is now durable. Consumer drives without PLP must either flush all the way to flash (slow) or cheat (fast, unsafe).</p>
+
+      <h2 id="why-this-dictates-architecture">Why this dictates architecture</h2>
+      <p>Look at the HDD row: ~100 durable writes per second on a single thread. If every transaction does its own <code>fsync</code>, that's your transaction ceiling. A hundred TPS. This single number explains a huge amount of database design:</p>
+      <ul>
+        <li><strong>Group commit</strong> (from the WAL post) exists precisely to break this ceiling by amortizing one <code>fsync</code> across many transactions.</li>
+        <li><strong>The WAL itself</strong> exists so you only pay for <em>sequential</em> <code>fsync</code>s, not a random one per dirtied page.</li>
+        <li><strong><code>fdatasync</code></strong> is preferred over <code>fsync</code> in hot paths because it skips the metadata flush when the file size hasn't changed, shaving a second seek.</li>
+      </ul>
+      <p>Once you know the cost of an <code>fsync</code> on your hardware, you can predict your durable write ceiling with a napkin. That's a powerful thing to be able to do before you've written a line of code.</p>
+
+      <h2 id="the-takeaway">The one-line takeaway</h2>
+      <blockquote><p>Find out your hardware's honest <code>fsync</code> latency before you design anything durable. It's the speed of light for your write path — and if the number looks too good, your storage is probably lying to you.</p></blockquote>
+      <p>Measure it yourself. <code>fio</code> with <code>--fsync=1</code> on the actual disk your database will use, then divide:</p>
+      <pre><code>fio --name=fsynctest --filename=/data/testfile \
+    --rw=write --bs=4k --size=512M \
+    --fsync=1 --direct=1 --runtime=30 --time_based</code></pre>
+      <p>Read the reported <code>iops</code> line — that's your honest durable-write ceiling per thread. Don't trust the spec sheet, and <em>really</em> don't trust the benchmark that didn't flush.</p>
+
+      <hr>
+      <p><em>A short one, as promised. Back to longer essays next time.</em></p>
+    </div>
+
+    <footer class="article-footer">
+      <div class="tag-row">
+        <a class="tag" href="../tags.html#storage">storage</a>
+        <a class="tag" href="../tags.html#durability">durability</a>
+        <a class="tag" href="../tags.html#performance">performance</a>
+        <a class="tag" href="../tags.html#internals">internals</a>
+      </div>
+      <div class="author-box">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <p class="author-box__body">
+          <span class="author-box__name">Mara Quintero</span><br>
+          <span class="author-box__bio">Principal Engineer, Storage · Lisbon. Fifteen years building and breaking storage systems, with an unhealthy affection for write-ahead logs.</span>
+        </p>
+      </div>
+      <nav class="post-nav" aria-label="More posts">
+        <a href="consensus-without-tears.html">
+          <span class="dir">← Previous</span>
+          <span class="ttl">Consensus Without Tears</span>
+        </a>
+        <a class="next" href="../index.html">
+          <span class="dir">More →</span>
+          <span class="ttl">Back to all posts</span>
+        </a>
+      </nav>
+    </footer>
+  </article>
+</main>
+
+<footer class="site-foot">
+  <div class="shell shell--wide site-foot__inner">
+    <p>&copy; 2024 Cold Start · Built with <a href="https://gohugo.io/">Hugo</a> · One pager-induced essay at a time.</p>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="../about.html">About</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../index.xml">RSS</a>
+      <a href="https://github.com/coldstart-dev">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

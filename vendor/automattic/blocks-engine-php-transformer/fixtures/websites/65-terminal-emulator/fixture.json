@@ -1,0 +1,11 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "terminal",
+    "emulator",
+    "developer-tool",
+    "canvas",
+    "app"
+  ],
+  "complexity": 4
+}

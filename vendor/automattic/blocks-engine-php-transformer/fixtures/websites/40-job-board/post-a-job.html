@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post a job — Remote Roost</title>
+  <meta name="description" content="Post a remote job on Remote Roost. Standard ($299), Featured ($499), or Pro Pack (5 jobs for $1,499). Every listing reviewed by a human.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="site-header" role="banner">
+  <div class="site-header__inner">
+    <a href="index.html" class="brand" aria-label="Remote Roost — home">
+      <svg class="brand__mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="2" y="2" width="28" height="28" rx="6" fill="#1a5a5a"/>
+        <path d="M9 22 Q9 14 16 14 Q23 14 23 22 L23 24 L9 24 Z" fill="#f4ecda"/>
+        <circle cx="13" cy="18" r="1.6" fill="#1a5a5a"/>
+        <circle cx="19" cy="18" r="1.6" fill="#1a5a5a"/>
+        <path d="M14 10 L16 6 L18 10 Z" fill="#d97333"/>
+      </svg>
+      <span class="brand__name">Remote <span>Roost</span></span>
+    </a>
+    <nav class="main-nav" role="navigation" aria-label="Primary">
+      <a href="jobs.html">Browse jobs</a>
+      <a href="companies.html">Companies</a>
+      <a href="post-a-job.html" class="is-current">Post a job</a>
+      <a href="resources.html">Resources</a>
+      <a href="about.html">About</a>
+    </nav>
+    <div class="nav-actions">
+      <a href="#post-form" class="btn btn--primary btn--sm">Start a post</a>
+    </div>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-controls="mobile-nav" aria-expanded="false">
+      <span class="nav-toggle__bars" aria-hidden="true"></span>
+    </button>
+  </div>
+  <div id="mobile-nav" class="mobile-nav">
+    <a href="jobs.html">Browse jobs</a>
+    <a href="companies.html">Companies</a>
+    <a href="post-a-job.html">Post a job</a>
+    <a href="resources.html">Resources</a>
+    <a href="about.html">About</a>
+    <a href="#post-form" class="btn btn--primary btn--block">Start a post</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============================================================
+       HERO + "Why post"
+       ============================================================ -->
+  <section class="post-hero">
+    <div class="container">
+      <h1>Hire the right person, faster.</h1>
+      <p>Reach a candidate pool that's already opted into fully-remote roles, already comfortable with async, and already filtering out the bait postings.</p>
+
+      <div class="why-post">
+        <div class="why-post__item">
+          <span class="why-post__num">01</span>
+          <h3>Candidates who actually want remote work</h3>
+          <p>Our readers are people who closed their LinkedIn after the third "remote (must be in SF Mon–Wed)" listing. They aren't here by accident.</p>
+        </div>
+        <div class="why-post__item">
+          <span class="why-post__num">02</span>
+          <h3>Editorial credibility</h3>
+          <p>Every listing is reviewed by a human before it goes live. Salary required. Location required. Hiring process documented. Candidates trust the listings, so applications come in higher-intent.</p>
+        </div>
+        <div class="why-post__item">
+          <span class="why-post__num">03</span>
+          <h3>62,000+ weekly readers</h3>
+          <p>4,800 newsletter subscribers, 38,000 monthly uniques on the site, and a Mastodon presence that punches above its weight. We don't run banner ads, so attention isn't diluted.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       PRICING TIERS
+       ============================================================ -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head section-head--center">
+        <span class="eyebrow">Pricing</span>
+        <h2>Three ways to post</h2>
+        <p>No subscriptions, no per-applicant fees, no upsells once the listing is live. Pick a tier, pay once, listing runs the full window.</p>
+      </div>
+
+      <div class="pricing-grid">
+
+        <article class="pricing-card">
+          <h3>Standard</h3>
+          <div class="pricing-card__price">$299</div>
+          <div class="pricing-card__per">per job · 30 days</div>
+          <ul>
+            <li>Listed in the main jobs feed</li>
+            <li>Listed in your category</li>
+            <li>Included in the weekly newsletter</li>
+            <li>Editorial review (1 business day)</li>
+            <li>Edits allowed for the full 30 days</li>
+            <li>Renewal at 30% off if not filled</li>
+          </ul>
+          <a href="#post-form" class="btn btn--ghost btn--block">Choose Standard</a>
+        </article>
+
+        <article class="pricing-card pricing-card--featured">
+          <h3>Featured</h3>
+          <div class="pricing-card__price">$499</div>
+          <div class="pricing-card__per">per job · 30 days</div>
+          <ul>
+            <li>Everything in Standard</li>
+            <li>Top of homepage "Featured this week"</li>
+            <li>Top of category for the first 7 days</li>
+            <li>Featured badge on the listing</li>
+            <li>Pinned in the newsletter (top 3 slot)</li>
+            <li>Social mention from our Mastodon &amp; Bluesky accounts</li>
+          </ul>
+          <a href="#post-form" class="btn btn--primary btn--block">Choose Featured</a>
+        </article>
+
+        <article class="pricing-card">
+          <h3>Pro Pack</h3>
+          <div class="pricing-card__price">$1,499</div>
+          <div class="pricing-card__per">5 jobs · 90 days</div>
+          <ul>
+            <li>Five Standard posts (use any time within 90 days)</li>
+            <li>Upgrade any single post to Featured for $200</li>
+            <li>Branded company profile page</li>
+            <li>Account manager (real human, named)</li>
+            <li>Quarterly hiring report (applicants, sources, time-to-hire)</li>
+            <li>Invoice billing available</li>
+          </ul>
+          <a href="#post-form" class="btn btn--ghost btn--block">Choose Pro Pack</a>
+        </article>
+
+      </div>
+
+      <!-- ─── Comparison table ───────────────────────── -->
+      <h3 style="margin-top:56px;margin-bottom:8px;font-size:1.2rem;">What's included, side by side</h3>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th style="text-align:center;">Standard</th>
+            <th style="text-align:center;">Featured</th>
+            <th style="text-align:center;">Pro Pack</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="feature">Listed in main feed</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td class="feature">Listing duration</td>
+            <td class="check">30 days</td>
+            <td class="check">30 days</td>
+            <td class="check">30 days each</td>
+          </tr>
+          <tr>
+            <td class="feature">Editorial review</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td class="feature">Included in weekly newsletter</td>
+            <td class="check">✓</td>
+            <td class="check">Pinned top 3</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td class="feature">Homepage feature</td>
+            <td class="dash">—</td>
+            <td class="check">7 days</td>
+            <td class="dash">Per-post upgrade</td>
+          </tr>
+          <tr>
+            <td class="feature">Featured badge</td>
+            <td class="dash">—</td>
+            <td class="check">✓</td>
+            <td class="dash">Per-post upgrade</td>
+          </tr>
+          <tr>
+            <td class="feature">Social mention</td>
+            <td class="dash">—</td>
+            <td class="check">✓</td>
+            <td class="check">Per post</td>
+          </tr>
+          <tr>
+            <td class="feature">Branded company page</td>
+            <td class="dash">—</td>
+            <td class="dash">—</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td class="feature">Account manager</td>
+            <td class="dash">—</td>
+            <td class="dash">—</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td class="feature">Hiring report</td>
+            <td class="dash">—</td>
+            <td class="dash">—</td>
+            <td class="check">Quarterly</td>
+          </tr>
+          <tr>
+            <td class="feature">Invoice billing</td>
+            <td class="dash">—</td>
+            <td class="dash">—</td>
+            <td class="check">✓</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       POST-A-JOB FORM
+       ============================================================ -->
+  <section class="section section--cream" id="post-form">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <span class="eyebrow">Post your job</span>
+        <h2>Tell us about the role</h2>
+        <p>Three short sections — about ten minutes if you've already written the JD. You can save and come back; we email you a link on first save.</p>
+      </div>
+
+      <form data-post-job action="#" method="post">
+
+        <!-- ─── Step 1 ─────────────────────────────── -->
+        <fieldset class="form-section">
+          <div class="step-indicator"><span class="num">Step 1</span> <span class="of">of 3</span> · Company</div>
+          <h2>About your company</h2>
+          <p class="form-section__lede">This populates the sidebar on the listing and the company profile.</p>
+
+          <div class="field">
+            <label for="co-name" class="label">Company name <span class="req">*</span></label>
+            <input id="co-name" class="input" type="text" name="company_name" placeholder="e.g. Cellular" required>
+          </div>
+
+          <div class="field">
+            <label class="label">Company logo <span class="req">*</span>
+              <span class="hint">SVG or PNG, square, at least 256×256. We'll resize.</span>
+            </label>
+            <label class="upload-mock" for="co-logo">
+              <span class="upload-mock__icon">⤴</span>
+              <div class="upload-mock__body">
+                <strong>Click to upload, or drag a file here</strong>
+                <span>Accepted: .svg, .png up to 1 MB</span>
+              </div>
+              <input id="co-logo" type="file" name="company_logo" accept=".svg,.png" style="display:none;">
+            </label>
+          </div>
+
+          <div class="field field--row">
+            <div>
+              <label for="co-size" class="label">Company size <span class="req">*</span></label>
+              <select id="co-size" class="select" name="company_size" required>
+                <option value="">Select…</option>
+                <option>1–10</option>
+                <option>11–25</option>
+                <option>26–50</option>
+                <option>51–100</option>
+                <option>101–250</option>
+                <option>251–500</option>
+                <option>500+</option>
+              </select>
+            </div>
+            <div>
+              <label for="co-stage" class="label">Funding stage</label>
+              <select id="co-stage" class="select" name="company_stage">
+                <option value="">Select…</option>
+                <option>Bootstrapped</option>
+                <option>Seed</option>
+                <option>Series A</option>
+                <option>Series B</option>
+                <option>Series C+</option>
+                <option>Public</option>
+                <option>Non-profit / public sector</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="co-url" class="label">Company website <span class="req">*</span></label>
+            <input id="co-url" class="input" type="url" name="company_url" placeholder="https://yourcompany.com" required>
+          </div>
+
+          <div class="field">
+            <label for="co-desc" class="label">One-sentence description <span class="req">*</span>
+              <span class="hint">Plain-English. "We make X for Y." 140 char max.</span>
+            </label>
+            <input id="co-desc" class="input" type="text" name="company_desc" maxlength="140" required>
+          </div>
+        </fieldset>
+
+        <!-- ─── Step 2 ─────────────────────────────── -->
+        <fieldset class="form-section">
+          <div class="step-indicator"><span class="num">Step 2</span> <span class="of">of 3</span> · Role</div>
+          <h2>About the role</h2>
+          <p class="form-section__lede">The basics that show up at the top of the listing and in the feed.</p>
+
+          <div class="field">
+            <label for="role-title" class="label">Role title <span class="req">*</span></label>
+            <input id="role-title" class="input" type="text" name="role_title" placeholder="e.g. Senior Platform Engineer" required>
+          </div>
+
+          <div class="field field--row">
+            <div>
+              <label for="role-type" class="label">Employment type <span class="req">*</span></label>
+              <select id="role-type" class="select" name="employment_type" required>
+                <option value="">Select…</option>
+                <option>Full-time</option>
+                <option>Part-time</option>
+                <option>Contract</option>
+                <option>Contract-to-hire</option>
+                <option>Internship</option>
+              </select>
+            </div>
+            <div>
+              <label for="role-level" class="label">Experience level <span class="req">*</span></label>
+              <select id="role-level" class="select" name="experience_level" required>
+                <option value="">Select…</option>
+                <option>Junior (0–2 yrs)</option>
+                <option>Mid (3–5 yrs)</option>
+                <option>Senior (6+ yrs)</option>
+                <option>Staff+ (10+ yrs)</option>
+                <option>Manager / Director</option>
+                <option>VP / C-level</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Salary range <span class="req">*</span>
+              <span class="hint">Required. We will not list "competitive" or "DOE." Public-facing as posted.</span>
+            </label>
+            <div class="split-input">
+              <input class="input" type="number" name="salary_min" placeholder="Min (e.g. 175000)" required>
+              <input class="input" type="number" name="salary_max" placeholder="Max (e.g. 225000)" required>
+              <select class="select" name="salary_currency" required>
+                <option>USD</option>
+                <option>EUR</option>
+                <option>GBP</option>
+                <option>CAD</option>
+                <option>AUD</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Location requirement <span class="req">*</span>
+              <span class="hint">Pick all that apply. At least one is required.</span>
+            </label>
+            <div class="check-group">
+              <label class="check-tile"><input type="checkbox" name="region[]" value="worldwide"> Worldwide</label>
+              <label class="check-tile"><input type="checkbox" name="region[]" value="us"> US-only (any state)</label>
+              <label class="check-tile"><input type="checkbox" name="region[]" value="us-ca"> US + Canada</label>
+              <label class="check-tile"><input type="checkbox" name="region[]" value="eu"> EU-only</label>
+              <label class="check-tile"><input type="checkbox" name="region[]" value="eu-uk"> EU + UK</label>
+              <label class="check-tile"><input type="checkbox" name="region[]" value="americas"> Americas (±3h ET)</label>
+              <label class="check-tile"><input type="checkbox" name="region[]" value="emea"> EMEA</label>
+              <label class="check-tile"><input type="checkbox" name="region[]" value="apac"> APAC</label>
+              <label class="check-tile"><input type="checkbox" name="region[]" value="eu-am"> EU + Americas</label>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Visa / relocation</label>
+            <div class="check-group">
+              <label class="check-tile"><input type="checkbox" name="visa"> Visa sponsorship available</label>
+              <label class="check-tile"><input type="checkbox" name="relo"> Relocation budget available</label>
+              <label class="check-tile"><input type="checkbox" name="contractor_ok"> Contractor arrangements OK</label>
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- ─── Step 3 ─────────────────────────────── -->
+        <fieldset class="form-section">
+          <div class="step-indicator"><span class="num">Step 3</span> <span class="of">of 3</span> · Description &amp; application</div>
+          <h2>The job description</h2>
+          <p class="form-section__lede">Markdown supported. Headings: about the role, responsibilities, what we're looking for, benefits, how to apply, expected process.</p>
+
+          <div class="field">
+            <label for="jd" class="label">Full job description <span class="req">*</span>
+              <span class="hint">Aim for 600–1,200 words. Listings under 300 words are auto-flagged for editorial review.</span>
+            </label>
+            <textarea id="jd" class="textarea" name="job_description" rows="14" placeholder="## About the role&#10;&#10;…&#10;&#10;## What you'll do&#10;&#10;- …&#10;&#10;## Benefits&#10;&#10;- …" required></textarea>
+          </div>
+
+          <div class="field field--row">
+            <div>
+              <label for="apply-url" class="label">Application URL</label>
+              <input id="apply-url" class="input" type="url" name="apply_url" placeholder="https://yourcompany.com/jobs/abc">
+            </div>
+            <div>
+              <label for="apply-email" class="label">…or application email</label>
+              <input id="apply-email" class="input" type="email" name="apply_email" placeholder="jobs@yourcompany.com">
+            </div>
+          </div>
+          <p style="margin-top:-12px;color:var(--rr-slate);font-size:0.85rem;">Provide at least one. We'll show whichever you pick.</p>
+
+          <div class="field">
+            <label for="timeline" class="label">Expected timeline
+              <span class="hint">What candidates should expect — first response, total length. We display this prominently.</span>
+            </label>
+            <input id="timeline" class="input" type="text" name="timeline" placeholder="e.g. First reply within 5 days, decision within 2 weeks">
+          </div>
+
+          <div class="field">
+            <label for="contact" class="label">Contact for posting issues <span class="req">*</span>
+              <span class="hint">Who we email if we find a problem with the listing during review. Not shown publicly.</span>
+            </label>
+            <input id="contact" class="input" type="email" name="contact" placeholder="you@yourcompany.com" required>
+          </div>
+        </fieldset>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <button type="submit" class="btn btn--primary btn--lg">Submit for review</button>
+          <button type="button" class="btn btn--ghost btn--lg">Save &amp; finish later</button>
+          <span style="font-size:0.85rem;color:var(--rr-slate);">Reviewed within 1 business day · Charged only after approval</span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       HOW WE VET
+       ============================================================ -->
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <span class="eyebrow">Our editorial bar</span>
+        <h2>How we vet listings</h2>
+        <p>Every listing is reviewed by a human (currently Henrik or Vera) within one business day. We reject roughly 14% of submissions on first pass. Here's the rubric:</p>
+      </div>
+
+      <div class="editorial-standards">
+        <div class="editorial-col">
+          <h3>We require</h3>
+          <ul>
+            <li>A specific salary range. Bands are fine; "competitive" is not.</li>
+            <li>An explicit location requirement (region, country, or timezone window).</li>
+            <li>A statement of the hiring process — at minimum, the number of stages.</li>
+            <li>A real company contact email at the company's domain.</li>
+            <li>The role to be fully remote. Hybrid postings, even "mostly remote," are rejected.</li>
+            <li>A working application URL or email at submission time.</li>
+          </ul>
+        </div>
+        <div class="editorial-col">
+          <h3 class="bad">We reject</h3>
+          <ul class="bad">
+            <li>"Remote-friendly" or "remote in [city]" postings.</li>
+            <li>Postings that hide the salary band behind a recruiter call.</li>
+            <li>Postings that demand unpaid take-home work exceeding 3 hours.</li>
+            <li>Postings with vague or fictional locations ("Anywhere, but we prefer overlap with PT").</li>
+            <li>Listings from staffing agencies posting on behalf of unnamed clients.</li>
+            <li>Listings from companies with a documented pattern of bait-and-switch postings.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TESTIMONIALS
+       ============================================================ -->
+  <section class="section section--cream">
+    <div class="container">
+      <div class="section-head section-head--center">
+        <span class="eyebrow">From the other side</span>
+        <h2>What companies say after hiring</h2>
+      </div>
+
+      <div class="testimonial-row">
+
+        <article class="testimonial-card">
+          <blockquote>The candidates from Remote Roost actually read the listing before applying. That sounds like a low bar, but if you've hired remotely, you know it isn't. We hired our Head of Platform off a Featured post in 19 days.</blockquote>
+          <cite>
+            <div class="photo-block pb--xs pb--ocean" aria-label="Beacon Health logo">BH</div>
+            <span><strong>Priya Anantharaman</strong> · VP Engineering, Beacon Health</span>
+          </cite>
+        </article>
+
+        <article class="testimonial-card">
+          <blockquote>We've posted on every remote-only board. Remote Roost converts the best. The editorial review feels like a friction tax until you realize it's the reason candidates trust the listings — and the reason your inbox isn't full of mismatches.</blockquote>
+          <cite>
+            <div class="photo-block pb--xs pb--moss" aria-label="Beanstalk logo">BS</div>
+            <span><strong>Theo Marchetti</strong> · Co-founder, Beanstalk</span>
+          </cite>
+        </article>
+
+        <article class="testimonial-card">
+          <blockquote>The Pro Pack paid for itself with the first hire. Account manager actually answers in under a day, the quarterly report told us our applicant quality was 4× our other channels, and the team there pushed back when our JD was vague. Helpful.</blockquote>
+          <cite>
+            <div class="photo-block pb--xs pb--berry" aria-label="Fieldwork logo">FW</div>
+            <span><strong>Anya Kowalska</strong> · Head of People, Fieldwork</span>
+          </cite>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FAQ
+       ============================================================ -->
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <span class="eyebrow">FAQ</span>
+        <h2>Employer questions</h2>
+      </div>
+
+      <dl class="faq-list">
+
+        <dt>How long does editorial review take?</dt>
+        <dd>One business day, typically half a day. If we need anything from you (clarification, salary band, location specifics) we email the contact address on the listing.</dd>
+
+        <dt>What happens if my listing gets rejected?</dt>
+        <dd>You aren't charged until the listing is approved. If we reject, we write back with specifics on what would need to change — usually it's one of: missing salary, vague location, or a hybrid requirement we caught. Resubmissions are common.</dd>
+
+        <dt>Can I edit a listing after it's live?</dt>
+        <dd>Yes — edits go live immediately. We do a light second-pass review for any change to salary, location, or hiring process language. If we have concerns, we email you.</dd>
+
+        <dt>Do you take a cut of the salary if I hire?</dt>
+        <dd>No. We charge a flat fee for the listing. We are not a recruiter, do not source candidates ourselves, and have no stake in who you hire.</dd>
+
+        <dt>What's the renewal discount for unfilled roles?</dt>
+        <dd>30% off if you renew within 14 days of the listing closing. We assume that if the role didn't fill, something needed adjusting — and we'd rather you adjust and re-list than pay full price for the same problem twice.</dd>
+
+        <dt>Do you offer non-profit or open-source pricing?</dt>
+        <dd>Yes. 501(c)(3) non-profits and verified open-source projects post free. Email <a href="mailto:hello@remoteroost.example">hello@remoteroost.example</a> with proof of status and we'll send a code.</dd>
+
+      </dl>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="site-footer__cols">
+      <div class="site-footer__about">
+        <a href="index.html" class="brand" aria-label="Remote Roost — home">
+          <svg class="brand__mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2" y="2" width="28" height="28" rx="6" fill="#1a5a5a"/>
+            <path d="M9 22 Q9 14 16 14 Q23 14 23 22 L23 24 L9 24 Z" fill="#f4ecda"/>
+            <circle cx="13" cy="18" r="1.6" fill="#1a5a5a"/>
+            <circle cx="19" cy="18" r="1.6" fill="#1a5a5a"/>
+            <path d="M14 10 L16 6 L18 10 Z" fill="#d97333"/>
+          </svg>
+          <span class="brand__name">Remote <span>Roost</span></span>
+        </a>
+        <p>Real remote jobs at companies that get it. Independent, vetted, founded in 2018 by two burned-out hybrid refugees.</p>
+      </div>
+      <div class="site-footer__col">
+        <h6>Browse</h6>
+        <ul>
+          <li><a href="jobs.html">All jobs</a></li>
+          <li><a href="jobs.html">Engineering</a></li>
+          <li><a href="jobs.html">Design</a></li>
+          <li><a href="jobs.html">Product</a></li>
+          <li><a href="companies.html">Companies</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h6>For employers</h6>
+        <ul>
+          <li><a href="post-a-job.html">Post a job</a></li>
+          <li><a href="post-a-job.html">Pricing</a></li>
+          <li><a href="post-a-job.html">Editorial standards</a></li>
+          <li><a href="post-a-job.html">Featured slots</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h6>About</h6>
+        <ul>
+          <li><a href="about.html">Our story</a></li>
+          <li><a href="about.html">Team</a></li>
+          <li><a href="resources.html">Resources</a></li>
+          <li><a href="about.html">Contact</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h6>Legal</h6>
+        <ul>
+          <li><a href="#">Terms</a></li>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Cookies</a></li>
+          <li><a href="#">DMCA</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="site-footer__bottom">
+      <span>© 2018–2026 Remote Roost Ltd. Made by humans in Berlin &amp; Lisbon.</span>
+      <div class="site-footer__social" aria-label="Social links">
+        <a href="#" aria-label="Mastodon">Mt</a>
+        <a href="#" aria-label="LinkedIn">In</a>
+        <a href="#" aria-label="Bluesky">Bs</a>
+        <a href="#" aria-label="RSS">Rs</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

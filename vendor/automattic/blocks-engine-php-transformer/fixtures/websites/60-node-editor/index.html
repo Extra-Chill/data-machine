@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Fluxnode — Procedural Texture Node Editor</title>
+  <meta name="description" content="Fluxnode is a node-based visual editor for procedural textures. Wire gradients, noise, and filters into a live pipeline that renders to a preview as you edit.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%237c5cff'/><circle cx='9' cy='16' r='3' fill='none' stroke='white' stroke-width='2'/><circle cx='23' cy='16' r='3' fill='none' stroke='white' stroke-width='2'/><path d='M12 16h8' stroke='white' stroke-width='2'/></svg>">
+</head>
+<body class="editor-body">
+
+  <!-- ══════════════ TOP BAR ══════════════ -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <a class="brand" href="about.html" aria-label="About Fluxnode">
+        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="#7c5cff"/>
+          <circle cx="9" cy="16" r="3" fill="none" stroke="#fff" stroke-width="2"/>
+          <circle cx="23" cy="16" r="3" fill="none" stroke="#fff" stroke-width="2"/>
+          <path d="M12 16h8" stroke="#fff" stroke-width="2"/>
+        </svg>
+        <span>Fluxnode</span>
+      </a>
+
+      <div class="file-wrap">
+        <button id="menu-btn" class="topbar-btn" aria-haspopup="true" aria-expanded="false">File ▾</button>
+        <div id="file-menu" class="file-menu" role="menu">
+          <button id="mi-new" role="menuitem">New empty flow</button>
+          <button id="mi-sunset" role="menuitem">Load “Sunset Dunes”</button>
+          <a href="examples.html" role="menuitem" class="menu-link">Browse examples…</a>
+          <hr>
+          <button id="mi-export-png" role="menuitem">Export preview as PNG</button>
+          <button id="mi-export-json" role="menuitem">Export flow (JSON)</button>
+          <button id="mi-import-json" role="menuitem">Import flow (JSON)…</button>
+          <hr>
+          <button id="mi-clear" role="menuitem" class="danger">Clear flow</button>
+        </div>
+      </div>
+
+      <span id="doc-name" class="doc-name" contenteditable="true" spellcheck="false" title="Rename flow">Untitled flow</span>
+      <button id="add-btn" class="topbar-btn" title="Add a node (Tab)">＋ Add node</button>
+    </div>
+
+    <nav class="topbar-nav">
+      <a href="index.html" class="is-current" aria-current="page">Editor</a>
+      <a href="examples.html">Examples</a>
+      <a href="about.html">About</a>
+      <button id="help-btn" class="topbar-btn ghost" title="Keyboard shortcuts (?)">?</button>
+    </nav>
+
+    <div class="topbar-right">
+      <span id="save-status" class="save-status">All changes saved</span>
+    </div>
+  </header>
+
+  <!-- ══════════════ STAGE ══════════════ -->
+  <main id="stage" class="stage" aria-label="Node graph canvas">
+    <canvas id="grid" aria-hidden="true"></canvas>
+    <svg id="wires" aria-hidden="true"></svg>
+    <div id="world"></div>
+    <div id="marquee"></div>
+
+    <!-- onboarding hint -->
+    <div id="hint" class="hint">Scroll to zoom · Space-drag to pan · Drag a port to wire · Press <kbd>Tab</kbd> to add a node · <kbd>?</kbd> for help</div>
+
+    <!-- bottom-left: minimap -->
+    <div class="hud-left">
+      <div class="minimap-wrap" aria-hidden="true">
+        <canvas id="minimap" width="200" height="132"></canvas>
+      </div>
+    </div>
+
+    <!-- bottom-centre: evaluation HUD -->
+    <div id="eval-hud" class="eval-hud" role="status" aria-live="polite">
+      <span class="pill"><span class="led"></span><b id="eval-state">live</b></span>
+      <span>·</span>
+      <span><b id="eval-count">0</b> nodes</span>
+      <span>·</span>
+      <span>sorted <b id="eval-sorted">0</b></span>
+    </div>
+
+    <!-- bottom-right: zoom HUD -->
+    <div class="zoom-hud" role="group" aria-label="Zoom controls">
+      <button id="zoom-out" title="Zoom out (Ctrl -)">−</button>
+      <button id="zoom-label" class="zoom-label" title="Reset to 100% (Ctrl 0)">100%</button>
+      <button id="zoom-in" title="Zoom in (Ctrl +)">+</button>
+      <span class="hud-sep"></span>
+      <button id="zoom-fit" class="fit" title="Zoom to fit (2)">Fit</button>
+    </div>
+  </main>
+
+  <!-- add-node palette + context menu (positioned in JS) -->
+  <div id="palette" class="palette" role="menu" aria-label="Add node"></div>
+  <div id="ctx" class="ctx" role="menu" aria-label="Context menu"></div>
+
+  <!-- hidden import input -->
+  <input type="file" id="import-file" accept="application/json,.json" hidden>
+
+  <!-- toast -->
+  <div id="toast" role="alert"></div>
+
+  <!-- ══════════════ SHORTCUTS DIALOG ══════════════ -->
+  <div id="shortcuts" class="modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <div class="modal-card">
+      <button class="modal-close" data-close aria-label="Close">×</button>
+      <h2>Keyboard &amp; mouse</h2>
+      <p class="sub">Fluxnode is a live dataflow editor — every change re-evaluates the graph and re-renders the preview.</p>
+      <div class="sc-grid">
+        <div><h3>Graph</h3>
+          <dl>
+            <dt><kbd>Tab</kbd></dt><dd>Open add-node palette</dd>
+            <dt><kbd>Del</kbd></dt><dd>Delete selection / wire</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>D</kbd></dt><dd>Duplicate selection</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>A</kbd></dt><dd>Select all nodes</dd>
+            <dt>Right-click</dt><dd>Context menu</dd>
+          </dl>
+        </div>
+        <div><h3>Wiring</h3>
+          <dl>
+            <dt>Drag port</dt><dd>Out → In to connect</dd>
+            <dt>Drag from In</dt><dd>Detach / re-route a wire</dd>
+            <dt>Click wire</dt><dd>Select it, then <kbd>Del</kbd></dd>
+            <dt>—</dt><dd>Cycles &amp; type-mismatches blocked</dd>
+          </dl>
+        </div>
+        <div><h3>Navigate</h3>
+          <dl>
+            <dt>Scroll</dt><dd>Zoom to cursor</dd>
+            <dt><kbd>Space</kbd>-drag</dt><dd>Pan canvas</dd>
+            <dt>Drag empty</dt><dd>Box-select</dd>
+            <dt><kbd>2</kbd> / <kbd>F</kbd></dt><dd>Zoom to fit</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>0</kbd></dt><dd>Reset zoom</dd>
+            <dt><kbd>?</kbd></dt><dd>This dialog</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/engine.js"></script>
+  <script src="js/seed.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

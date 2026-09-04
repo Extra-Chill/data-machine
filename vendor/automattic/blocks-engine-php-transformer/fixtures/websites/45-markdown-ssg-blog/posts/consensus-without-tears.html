@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consensus Without Tears: What Raft Actually Promises — Cold Start</title>
+<meta name="description" content="Distributed consensus has a reputation for being impossibly hard. Raft made it merely difficult. Here's the mental model that makes Raft click — and the operational truths the papers leave out.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cold Start" href="../index.xml">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="shell shell--wide masthead__inner">
+    <a class="brand" href="../index.html" aria-label="Cold Start — home">
+      <svg class="brand__mark" width="30" height="30" viewBox="0 0 32 32" role="img" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#c2410c"/>
+        <path d="M16 6c1.6 3.4 1 5.6-.8 7.6-2 2.2-2.6 4.4-1.4 7.2-3-1.4-4.4-4.2-3.6-7.4C11 17 13 18 13.2 20.4 14.6 18 13.4 15.4 16 6Z" fill="#fde7d8"/>
+        <circle cx="20.5" cy="20" r="2.3" fill="#fdba74"/>
+      </svg>
+      <span class="brand__text">
+        <span class="brand__name">Cold Start</span>
+        <span class="brand__tag">storage &amp; distributed systems</span>
+      </span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="../index.html">Home</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../about.html">About</a>
+      <a class="nav__rss" href="../index.xml" aria-label="RSS feed" title="RSS feed">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="13" r="1.6"/><path d="M2 7.3a6.7 6.7 0 0 1 6.7 6.7H6.5A4.5 4.5 0 0 0 2 9.5z"/><path d="M2 3a11 11 0 0 1 11 11h-2.2A8.8 8.8 0 0 0 2 5.2z"/></svg>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <article class="article shell">
+    <header class="article__header">
+      <div class="article__meta">
+        <a class="series-badge" href="../tags.html">Distributed Systems</a>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <time datetime="2024-05-28">May 28, 2024</time>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <span>11 min read</span>
+      </div>
+      <h1 class="article__title">Consensus Without Tears: What Raft Actually Promises</h1>
+      <p class="article__dek">Distributed consensus has a reputation for being impossibly hard. Raft made it merely difficult. Here's the mental model that makes Raft click — and the operational truths the papers leave out.</p>
+      <div class="byline">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <span>
+          <span class="byline__name">Mara Quintero</span><br>
+          <span class="byline__role">Principal Engineer, Storage · Lisbon</span>
+        </span>
+      </div>
+    </header>
+
+    <div class="prose">
+      <p>For years, distributed consensus meant Paxos, and Paxos meant a paper so famously opaque that its author wrote a <em>second</em> paper just to explain the first one. Then in 2014, Diego Ongaro and John Ousterhout published Raft with an explicit design goal of <strong>understandability</strong>, and the field exhaled.</p>
+      <p>Raft still isn't <em>easy</em>. But it's understandable, and that's a genuine achievement. Let me give you the mental model I wish I'd had when I started, and then the operational reality that the paper, being a paper, doesn't dwell on.</p>
+
+      <h2 id="the-problem">The problem, stated plainly</h2>
+      <p>You have a value that needs to live on multiple machines so it survives any one of them dying. The machines must agree on that value — and on the <em>order</em> of changes to it — even though:</p>
+      <ul>
+        <li>Machines crash and restart at arbitrary times.</li>
+        <li>The network drops, delays, duplicates, and reorders messages.</li>
+        <li>There is no shared clock you can trust.</li>
+      </ul>
+      <p>That last point is the killer. Without a shared clock, "which write happened first?" has no objective answer. Consensus is, fundamentally, the art of manufacturing agreement on order out of a system that has no inherent order.</p>
+      <p>The theoretical bad news is <strong>FLP impossibility</strong>: in a fully asynchronous system with even one faulty process, no consensus algorithm can guarantee it will <em>always</em> terminate. Raft doesn't break FLP — it sidesteps it by relying on timeouts and accepting that during certain failures, it'll pause progress rather than make a wrong decision. <em>Safety over liveness, always.</em></p>
+      <p>A Raft node is always in exactly one of three states, and the whole protocol is the choreography of moving between them:</p>
+      <table>
+        <thead>
+          <tr><th>State</th><th>Sends</th><th>Receives</th><th>Transitions to</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Follower</td><td>nothing</td><td><code>AppendEntries</code>, vote requests</td><td>Candidate (on election timeout)</td></tr>
+          <tr><td>Candidate</td><td>vote requests</td><td>votes</td><td>Leader (majority) or Follower (sees newer term)</td></tr>
+          <tr><td>Leader</td><td><code>AppendEntries</code> (heartbeats + entries)</td><td>acks</td><td>Follower (sees a higher term)</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="the-three-ideas">The three ideas</h2>
+      <p>Raft decomposes consensus into three subproblems, and understanding each in isolation is the whole trick.</p>
+
+      <h3 id="leader-election">1. Leader election</h3>
+      <p>At any time, exactly one node is the <strong>leader</strong>; the rest are <strong>followers</strong>. All writes go through the leader. This is a deliberate simplification — instead of every node negotiating with every other node (the Paxos nightmare), you elect a single coordinator and route everything through it.</p>
+      <p>Each node has an election timer. If a follower doesn't hear from the leader before its timer fires, it assumes the leader is dead, increments the <strong>term</strong> (a logical clock — a monotonically increasing integer), and becomes a <strong>candidate</strong> asking for votes. A node votes for the first valid candidate it sees in a given term, and a candidate that wins a <strong>majority</strong> becomes leader.</p>
+      <p>The elegant detail: election timeouts are <strong>randomized</strong>. If they were fixed, every follower would time out simultaneously, all become candidates at once, split the vote, and fail to elect anyone — repeatedly. Randomization makes one node usually time out first and win cleanly. (Notice this is the same jitter idea from <a href="retries-make-outages-worse.html">the retries post</a>. Randomization breaking up synchronized herds is a recurring theme in this business.)</p>
+
+      <h3 id="log-replication">2. Log replication</h3>
+      <p>Once elected, the leader takes client writes, appends them to its own log, and ships them to followers via <code>AppendEntries</code> messages. A log entry is considered <strong>committed</strong> once a majority of nodes have it durably stored. Only then does the leader apply it to the state machine and tell the client "done."</p>
+      <pre><code>Leader log:   [ x=1 | y=2 | x=3 | z=9 ]
+                                  ▲
+                            commit index (majority have through here)</code></pre>
+      <p>The majority requirement is the heart of it. With <code>2f+1</code> nodes you can tolerate <code>f</code> failures, because any two majorities must overlap in at least one node — and that overlapping node carries the committed history forward. This is why consensus clusters are almost always odd-sized: 3, 5, 7. A 4-node cluster tolerates the same single failure as a 3-node one while needing more nodes to agree. Even sizes buy you nothing but coordination cost.</p>
+
+      <h3 id="safety">3. Safety</h3>
+      <p>The subtle guarantees that make it <em>correct</em>:</p>
+      <ul>
+        <li><strong>Election restriction:</strong> a candidate can only win if its log is at least as up-to-date as the voter's. This guarantees a new leader already has every committed entry — you can never elect a leader that's missing committed history.</li>
+        <li><strong>Log matching:</strong> if two logs contain an entry with the same index and term, they're identical up to that point. Followers reject <code>AppendEntries</code> that don't line up, forcing the leader to back up and re-sync.</li>
+      </ul>
+      <p>Together these ensure that once an entry is committed, it's in the log of every future leader, forever. That's the promise: <strong>committed means durable across leadership changes.</strong></p>
+
+      <h2 id="what-the-paper-doesnt-emphasize">What the paper doesn't emphasize</h2>
+      <p>The algorithm is correct. Operating it is where the real lessons live.</p>
+      <p><strong>A majority must be alive to make progress.</strong> This is the one that surprises people. A 3-node cluster that loses 2 nodes doesn't run read-only — it stops accepting writes entirely, because it can't form a majority. Availability for <em>writes</em> requires a live quorum. If you need to survive losing two nodes, you need a 5-node cluster, full stop.</p>
+      <p><strong>Consensus is slow on purpose.</strong> Every committed write requires a network round trip to a majority and a durable <code>fsync</code> on each of them (yes — the <a href="write-ahead-log.html">write-ahead log</a> again, this time replicated). This is <em>much</em> slower than a local write. People reach for Raft reflexively and then act shocked at the latency. Use consensus for the things that genuinely need it — cluster membership, leader locks, configuration, small critical metadata — not for your high-throughput data path.</p>
+      <p><strong>The leader is a bottleneck and a blast radius.</strong> All writes funnel through one node. That's a throughput ceiling, and when the leader dies, you eat an election timeout (typically 150–300 ms) of unavailability before a new one takes over. Tune those timeouts: too short and a brief network blip triggers needless elections; too long and failover drags.</p>
+      <p><strong>Membership changes are genuinely dangerous.</strong> Adding or removing nodes while the cluster is live can, done naively, briefly create <em>two</em> disjoint majorities — split brain, the exact thing consensus exists to prevent. Raft handles this with <strong>joint consensus</strong>, a careful two-phase transition. If your implementation hand-rolls membership changes, read that section three times.</p>
+
+      <h2 id="when-you-need-it">When you actually need it</h2>
+      <p>Be honest about whether you need consensus at all. You need it when you require <strong>strong consistency with automatic failover</strong> — a single source of truth that stays correct and keeps serving even as individual machines die. etcd, Consul, CockroachDB, and the control planes of countless systems are built on exactly this.</p>
+      <p>You <em>don't</em> need it when eventual consistency is fine, or when a single primary with async replicas (and a human in the failover loop) meets your durability bar. Consensus is a powerful, expensive tool. Reaching for it when you don't need strong consistency is how you end up with a slow system <em>and</em> a complicated one.</p>
+      <blockquote><p>Raft's gift wasn't a new capability — Paxos could already do everything Raft does. Its gift was making the capability <em>teachable</em>, so that ordinary engineers could build, operate, and debug consensus systems without a PhD. That's not a small thing. Understandability is a feature.</p></blockquote>
+
+      <hr>
+      <p><em>This wraps the spring run of posts. If there's a distributed systems topic you want torn apart, tell me: <a href="mailto:mara@coldstart.dev">mara@coldstart.dev</a>.</em></p>
+    </div>
+
+    <footer class="article-footer">
+      <div class="tag-row">
+        <a class="tag" href="../tags.html#distributed-systems">distributed-systems</a>
+        <a class="tag" href="../tags.html#consensus">consensus</a>
+        <a class="tag" href="../tags.html#raft">raft</a>
+        <a class="tag" href="../tags.html#internals">internals</a>
+      </div>
+      <div class="author-box">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <p class="author-box__body">
+          <span class="author-box__name">Mara Quintero</span><br>
+          <span class="author-box__bio">Principal Engineer, Storage · Lisbon. Fifteen years building and breaking storage systems, with an unhealthy affection for write-ahead logs.</span>
+        </p>
+      </div>
+      <nav class="post-nav" aria-label="More posts">
+        <a href="backpressure.html">
+          <span class="dir">← Previous</span>
+          <span class="ttl">Backpressure</span>
+        </a>
+        <a class="next" href="the-cost-of-an-fsync.html">
+          <span class="dir">Next →</span>
+          <span class="ttl">The Cost of an fsync, Measured</span>
+        </a>
+      </nav>
+    </footer>
+  </article>
+</main>
+
+<footer class="site-foot">
+  <div class="shell shell--wide site-foot__inner">
+    <p>&copy; 2024 Cold Start · Built with <a href="https://gohugo.io/">Hugo</a> · One pager-induced essay at a time.</p>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="../about.html">About</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../index.xml">RSS</a>
+      <a href="https://github.com/coldstart-dev">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

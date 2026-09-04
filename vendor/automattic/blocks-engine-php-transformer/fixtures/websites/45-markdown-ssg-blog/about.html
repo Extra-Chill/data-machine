@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About — Cold Start</title>
+<meta name="description" content="Who writes Cold Start, why it exists, and what you can expect from it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cold Start" href="index.xml">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="shell shell--wide masthead__inner">
+    <a class="brand" href="index.html" aria-label="Cold Start — home">
+      <svg class="brand__mark" width="30" height="30" viewBox="0 0 32 32" role="img" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#c2410c"/>
+        <path d="M16 6c1.6 3.4 1 5.6-.8 7.6-2 2.2-2.6 4.4-1.4 7.2-3-1.4-4.4-4.2-3.6-7.4C11 17 13 18 13.2 20.4 14.6 18 13.4 15.4 16 6Z" fill="#fde7d8"/>
+        <circle cx="20.5" cy="20" r="2.3" fill="#fdba74"/>
+      </svg>
+      <span class="brand__text">
+        <span class="brand__name">Cold Start</span>
+        <span class="brand__tag">storage &amp; distributed systems</span>
+      </span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="tags.html">Archive</a>
+      <a href="about.html">About</a>
+      <a class="nav__rss" href="index.xml" aria-label="RSS feed" title="RSS feed">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="13" r="1.6"/><path d="M2 7.3a6.7 6.7 0 0 1 6.7 6.7H6.5A4.5 4.5 0 0 0 2 9.5z"/><path d="M2 3a11 11 0 0 1 11 11h-2.2A8.8 8.8 0 0 0 2 5.2z"/></svg>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <article class="page shell">
+    <h1 class="page__title">About Cold Start</h1>
+    <div class="prose">
+      <h2>Why this blog exists</h2>
+      <p>Most writing about software engineering lives at one of two altitudes. Way up high, you get think-pieces about culture, hiring, and the death of whatever was popular last year. Way down low, you get API docs and Stack Overflow answers. The middle layer — <em>how do real systems actually behave, and why</em> — is weirdly under-served.</p>
+      <p>Cold Start lives in that middle layer. The name comes from the worst kind of incident: the one where everything is down, the caches are empty, and you have to bring a system back from nothing while it's getting hammered with traffic. The cold start is where your design decisions finally get graded.</p>
+
+      <h2>What you'll find here</h2>
+      <ul>
+        <li><strong>Storage internals.</strong> Write-ahead logs, LSM trees, B-trees, page caches, and what "fsync" really costs you.</li>
+        <li><strong>Distributed systems, honestly.</strong> Consensus, replication, and the failure modes the papers gloss over.</li>
+        <li><strong>Operational reality.</strong> Backpressure, retries, timeouts, and the boring work of staying up.</li>
+        <li><strong>Post-incident notes.</strong> Sanitized, fictionalized, but grounded in the kinds of failures that actually happen.</li>
+      </ul>
+
+      <h2>Who writes it</h2>
+      <p>Cold Start is written mostly by <strong>Mara Quintero</strong>, a principal storage engineer based in Lisbon, with occasional guest posts from <strong>Devin Osei</strong>, a staff SRE in Toronto. Between us we've operated databases that you've probably indirectly used and broken a few you haven't.</p>
+      <p>We are not selling anything. There's no course, no newsletter funnel, no "book a call." If a post helped you avoid a 2 a.m. page, that's the entire business model.</p>
+
+      <h2>Get in touch</h2>
+      <p>Corrections are welcome and credited. Email <a href="mailto:mara@coldstart.dev">mara@coldstart.dev</a> or find us on <a href="https://hachyderm.io/@coldstart">Mastodon</a>. Code samples on <a href="https://github.com/coldstart-dev">GitHub</a>.</p>
+
+      <blockquote><p>The reward for operating a reliable system is that nobody notices it. The penalty for operating an unreliable one is that everybody does.</p></blockquote>
+    </div>
+
+    <div class="article-footer">
+      <div class="author-box">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <p class="author-box__body">
+          <span class="author-box__name">Mara Quintero</span><br>
+          <span class="author-box__bio">Principal Engineer, Storage · Lisbon. Fifteen years building and breaking storage systems, with an unhealthy affection for write-ahead logs.</span>
+        </p>
+      </div>
+    </div>
+  </article>
+</main>
+
+<footer class="site-foot">
+  <div class="shell shell--wide site-foot__inner">
+    <p>&copy; 2024 Cold Start · Built with <a href="https://gohugo.io/">Hugo</a> · One pager-induced essay at a time.</p>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="about.html">About</a>
+      <a href="tags.html">Archive</a>
+      <a href="index.xml">RSS</a>
+      <a href="https://github.com/coldstart-dev">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

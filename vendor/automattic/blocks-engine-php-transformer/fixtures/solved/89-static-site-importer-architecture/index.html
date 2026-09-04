@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="How Static Site Importer and Blocks Engine turn static website artifacts into native, editable WordPress block themes.">
+  <title>Static Site Importer | From HTML to native WordPress</title>
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to architecture</a>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Static Site Importer architecture home">
+      <span class="brand-mark" aria-hidden="true">S</span>
+      <span>Static Site Importer</span>
+    </a>
+    <nav aria-label="Page sections">
+      <a href="#pipeline">Pipeline</a>
+      <a href="#ownership">Ownership</a>
+      <a href="#quality">Quality</a>
+      <a class="nav-action" href="#maintenance">Maintenance model</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span> Architecture overview</p>
+        <h1>From arbitrary HTML to <em>native WordPress.</em></h1>
+        <p class="lede">A deterministic conversion stack turns static website artifacts into editable pages and a conventional block theme. Each layer has one job, every handoff is inspectable, and quality evidence flows back into the transformer.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#pipeline">Follow the pipeline</a>
+          <a class="button secondary" href="https://github.com/Automattic/static-site-importer">View the importer</a>
+        </div>
+      </div>
+      <div class="hero-visual" aria-label="Simplified conversion flow from HTML through Blocks Engine and Static Site Importer to WordPress">
+        <div class="artifact-card source-card">
+          <span class="card-label">Input</span>
+          <strong>index.html</strong>
+          <span>styles.css</span>
+          <span>assets/</span>
+        </div>
+        <div class="flow-line" aria-hidden="true"><span>compile</span></div>
+        <div class="artifact-card engine-card">
+          <span class="card-label">Contract</span>
+          <strong>Site Plan v2</strong>
+          <span>blocks + routes</span>
+          <span>theme writes</span>
+        </div>
+        <div class="flow-line" aria-hidden="true"><span>materialize</span></div>
+        <div class="artifact-card wp-card">
+          <span class="card-label">WordPress</span>
+          <strong>Editable site</strong>
+          <span>native pages</span>
+          <span>block theme</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="principles" aria-label="Architecture principles">
+      <article><span>01</span><div><h2>HTML is the interchange format</h2><p>Generators can produce the web format they already understand. The conversion layer handles WordPress structure.</p></div></article>
+      <article><span>02</span><div><h2>Contracts separate responsibilities</h2><p>Blocks Engine describes the desired site. Static Site Importer performs WordPress mutations.</p></div></article>
+      <article><span>03</span><div><h2>Evidence drives improvement</h2><p>Fallbacks, editor validity, and visual differences become attributable findings instead of hidden compromises.</p></div></article>
+    </section>
+
+    <section class="section pipeline-section" id="pipeline">
+      <header class="section-heading">
+        <p class="eyebrow"><span></span> The conversion pipeline</p>
+        <h2>Four bounded stages. One inspectable result.</h2>
+        <p>No product-specific prompt has to understand block serialization, theme files, or WordPress mutation order.</p>
+      </header>
+
+      <ol class="pipeline">
+        <li class="stage stage-input">
+          <div class="stage-number">1</div>
+          <div class="stage-copy">
+            <p class="stage-owner">Source artifact</p>
+            <h3>Accept normal web inputs</h3>
+            <p>A single HTML document, an HTML and asset tree, a ZIP, Markdown content, or a generated website artifact enters through a bounded intake path. Figma follows the same architecture after its own transformer produces a static HTML artifact.</p>
+            <ul class="chips" aria-label="Supported source examples"><li>HTML</li><li>CSS</li><li>Assets</li><li>Markdown</li><li>Site artifact v1</li></ul>
+          </div>
+          <div class="stage-output"><span>Produces</span><strong>Normalized source tree</strong></div>
+        </li>
+        <li class="stage stage-engine">
+          <div class="stage-number">2</div>
+          <div class="stage-copy">
+            <p class="stage-owner">Blocks Engine</p>
+            <h3>Compile semantics, structure, and assets</h3>
+            <p>The generic artifact compiler separates document chrome from page content, maps representable HTML semantics to block markup, assigns canonical routes, declares assets and runtime requirements, and records conversion diagnostics.</p>
+            <ul class="check-list"><li>Core block conversion</li><li>Shared header and footer extraction</li><li>Asset and script declarations</li><li>Quality and fallback diagnostics</li></ul>
+          </div>
+          <div class="stage-output"><span>Produces</span><strong><code>wordpress-site-plan/v2</code></strong></div>
+        </li>
+        <li class="stage stage-importer">
+          <div class="stage-number">3</div>
+          <div class="stage-copy">
+            <p class="stage-owner">Static Site Importer</p>
+            <h3>Materialize the canonical plan</h3>
+            <p>The WordPress layer validates the destination before mutation, resolves declared asset tokens, writes the block theme, creates or updates pages, applies ordered site operations, prepares declared dependencies, and records exactly what changed.</p>
+            <ul class="check-list"><li>Pages store body blocks in <code>post_content</code></li><li>Theme parts own shared chrome</li><li>Templates render <code>core/post-content</code></li><li>Receipt records pages, files, and operations</li></ul>
+          </div>
+          <div class="stage-output"><span>Produces</span><strong>WordPress site + receipt</strong></div>
+        </li>
+        <li class="stage stage-proof">
+          <div class="stage-number">4</div>
+          <div class="stage-copy">
+            <p class="stage-owner">Fixture matrix and validation providers</p>
+            <h3>Measure the result in the real editor</h3>
+            <p>The imported site is evaluated as a WordPress site, not as a successful function call. Browser rendering, editor validity, native block composition, missing assets, runtime behavior, and visual parity are collected as separate evidence.</p>
+            <ul class="check-list"><li>Frontend and mobile rendering</li><li>Editor-open and block-validity checks</li><li>Native versus fallback composition</li><li>Source-to-WordPress visual comparison</li></ul>
+          </div>
+          <div class="stage-output feedback"><span>Feeds back</span><strong>Attributed findings</strong></div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="section contract-section" id="contract">
+      <div class="contract-copy">
+        <p class="eyebrow"><span></span> The stable handoff</p>
+        <h2>The plan says what. The materializer decides where.</h2>
+        <p><code>blocks-engine/wordpress-site-plan/v2</code> is destination-independent. It contains canonical block markup and desired-state operations without guessing a deployed theme URL or reaching into WordPress.</p>
+        <blockquote>Blocks Engine never writes WordPress state. Static Site Importer never reverse-engineers compiler intent.</blockquote>
+      </div>
+      <div class="contract-grid" aria-label="WordPress site plan contents">
+        <article><span class="contract-icon">Aa</span><h3>Pages</h3><p>Canonical routes, hierarchy, reconciliation identities, and editable block markup.</p></article>
+        <article><span class="contract-icon">{ }</span><h3>Theme writes</h3><p>Templates, parts, styles, configuration, scripts, and materializable assets.</p></article>
+        <article><span class="contract-icon">-&gt;</span><h3>Operations</h3><p>Ordered page creation and reading-setting intent applied verbatim by consumers.</p></article>
+        <article><span class="contract-icon">OK</span><h3>Quality</h3><p>Explicit pass state, metrics, diagnostics, and fallback evidence for policy decisions.</p></article>
+      </div>
+    </section>
+
+    <section class="section ownership-section" id="ownership">
+      <header class="section-heading compact">
+        <p class="eyebrow"><span></span> Clear ownership</p>
+        <h2>Every concern has one home.</h2>
+      </header>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Owns</th><th>Does not own</th></tr></thead>
+          <tbody>
+            <tr><th>Generating product or agent</th><td>Content, visual intent, source artifact</td><td>WordPress block serialization or filesystem mutation</td></tr>
+            <tr><th>Figma transformer</th><td><code>.fig</code> scenegraph to static HTML, CSS, assets, and parity diagnostics</td><td>HTML-to-block conversion or WordPress writes</td></tr>
+            <tr><th>Blocks Engine</th><td>Generic artifact compilation, block conversion, diagnostics, and Site Plan v2</td><td>Destination URLs, WordPress APIs, or product orchestration</td></tr>
+            <tr><th>Static Site Importer</th><td>Safe intake, WordPress preflight, materialization, reconciliation, reports, and receipts</td><td>Product prompt strategy or browser-validation infrastructure</td></tr>
+            <tr><th>Validation provider</th><td>Runtime, editor, screenshot, and visual-comparison evidence</td><td>Reinterpreting or silently repairing the import</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section quality-section" id="quality">
+      <div class="quality-intro">
+        <p class="eyebrow"><span></span> Quality is an output</p>
+        <h2>“Imported” is not the finish line.</h2>
+        <p>A useful result is editable, valid, complete, and visually faithful. The matrix keeps those dimensions separate so a green process exit cannot disguise a broken page.</p>
+      </div>
+      <div class="scorecard">
+        <article><span class="score">01</span><h3>Native</h3><p>Semantic content becomes core blocks whenever the editor can represent it faithfully.</p></article>
+        <article><span class="score">02</span><h3>Valid</h3><p>Serialized blocks open without recovery prompts or invalid-block warnings.</p></article>
+        <article><span class="score">03</span><h3>Complete</h3><p>Assets, links, scripts, routes, dependencies, and shared chrome survive materialization.</p></article>
+        <article><span class="score">04</span><h3>Faithful</h3><p>Desktop and mobile rendering are compared against the source artifact.</p></article>
+      </div>
+      <div class="fallback-model">
+        <div><span class="signal green"></span><strong>Convertible</strong><p>Improve the generic transformer until the shape maps cleanly to native blocks.</p></div>
+        <div><span class="signal amber"></span><strong>Core capability gap</strong><p>Promote recurring, evidenced patterns to a typed companion-block candidate.</p></div>
+        <div><span class="signal purple"></span><strong>Intentional runtime</strong><p>Preserve genuinely dynamic behavior as an attributed runtime island.</p></div>
+        <div><span class="signal red"></span><strong>Unresolved fallback</strong><p>Treat visible <code>core/html</code> as a quality finding, not invisible success.</p></div>
+      </div>
+    </section>
+
+    <section class="section maintenance-section" id="maintenance">
+      <div class="maintenance-card">
+        <div class="maintenance-copy">
+          <p class="eyebrow light"><span></span> Maintenance model</p>
+          <h2>Core evolves. The corpus tells us what to change.</h2>
+          <p>The system is maintained as generic conversion capabilities and versioned contracts, not a growing set of templates for individual sites. When Gutenberg gains a useful block or attribute, Blocks Engine can adopt it and replay the same fixture corpus.</p>
+        </div>
+        <ol class="maintenance-loop">
+          <li><span>1</span><div><strong>Observe</strong><p>A fixture exposes a fallback, invalid block, missing behavior, or visual mismatch.</p></div></li>
+          <li><span>2</span><div><strong>Attribute</strong><p>Evidence separates transformer defects, real Gutenberg gaps, runtime islands, and style drift.</p></div></li>
+          <li><span>3</span><div><strong>Improve upstream</strong><p>The owning generic layer gains a semantic rule, contract capability, or typed block.</p></div></li>
+          <li><span>4</span><div><strong>Replay</strong><p>The full corpus proves the improvement and protects every previously solved site.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section questions-section" id="questions">
+      <header class="section-heading compact">
+        <p class="eyebrow"><span></span> Architecture questions</p>
+        <h2>The short answers.</h2>
+      </header>
+      <div class="questions">
+        <details open><summary>Is the conversion a list of hard-coded site rules?</summary><p>No. Conversion logic targets reusable HTML semantics, CSS and layout patterns, block capabilities, and typed artifact contracts. The fixture corpus is evidence and regression coverage; fixture identity is not an input to conversion.</p></details>
+        <details><summary>What happens as Gutenberg adds or changes blocks?</summary><p>The Blocks Engine mapping layer adopts the new core capability, then the corpus is replayed to measure native conversion, editor validity, and parity. The destination-independent site-plan boundary keeps that change out of product callers and materializers.</p></details>
+        <details><summary>Why generate HTML before blocks?</summary><p>HTML and CSS are broadly understood by design tools, browsers, generators, and language models. Keeping generation and conversion separate lets each improve independently while the fixture matrix measures the complete path.</p></details>
+        <details><summary>When is a custom block justified?</summary><p>Only after recurring fixture evidence shows that core blocks have no faithful semantic or behavioral path. The candidate then needs a typed schema, explicit runtime owner, provider decision, and acceptance evidence.</p></details>
+      </div>
+    </section>
+
+    <section class="closing">
+      <p class="eyebrow light"><span></span> The goal</p>
+      <h2>Generate freely. Convert deterministically. Edit natively.</h2>
+      <p>The architecture turns every import into both a WordPress site and a measurement of what the block platform can express next.</p>
+      <div class="closing-links"><a class="button inverted" href="https://github.com/Automattic/blocks-engine">Explore Blocks Engine</a><a href="https://github.com/Automattic/static-site-importer">Static Site Importer on GitHub <span aria-hidden="true">↗</span></a></div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand footer-brand" href="#top"><span class="brand-mark" aria-hidden="true">S</span><span>Static Site Importer</span></a>
+    <p>Architecture fixture for the Blocks Engine conversion corpus.</p>
+    <a href="#top">Back to top ↑</a>
+  </footer>
+</body>
+</html>

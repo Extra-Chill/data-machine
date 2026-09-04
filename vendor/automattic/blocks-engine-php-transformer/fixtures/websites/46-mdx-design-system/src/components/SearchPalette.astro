@@ -1,0 +1,51 @@
+---
+/**
+ * SearchPalette — the ⌘K command palette + top bar.
+ *
+ * The search index is built at compile time from the `docs` content
+ * collection and serialized into the runtime so search works on the static
+ * output with no server.
+ */
+import { getCollection } from 'astro:content';
+
+const docs = await getCollection('docs');
+const index = docs.map((d) => ({
+  title: d.data.title,
+  group: d.data.group,
+  page: `/${d.slug}/`,
+  excerpt: d.data.description,
+  tags: d.data.tags,
+}));
+---
+
+<header class="topbar">
+  <button class="icon-btn mobile-nav-toggle" id="nav-toggle" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  </button>
+  <span class="topbar__spacer"></span>
+  <button class="search-btn" data-palette-open aria-label="Search documentation">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5" /><path d="M11 11l3 3" /></svg>
+    <span class="search-btn__text">Search docs…</span>
+    <kbd>⌘K</kbd>
+  </button>
+  <button class="icon-btn" id="theme-toggle" aria-label="Toggle color theme"></button>
+</header>
+
+<div class="palette-backdrop" id="palette">
+  <div class="palette" role="dialog" aria-label="Search documentation">
+    <div class="palette__input-wrap">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5" /><path d="M11 11l3 3" /></svg>
+      <input class="palette__input" type="text" placeholder="Search components, tokens, foundations…" aria-label="Search" />
+    </div>
+    <div class="palette__results"></div>
+    <div class="palette__hint">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span>
+    </div>
+  </div>
+</div>
+
+<script is:inline define:vars={{ index }}>
+  window.__HALO_SEARCH_INDEX__ = index;
+</script>

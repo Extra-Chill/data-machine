@@ -1,0 +1,11 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "real-estate",
+    "listings",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

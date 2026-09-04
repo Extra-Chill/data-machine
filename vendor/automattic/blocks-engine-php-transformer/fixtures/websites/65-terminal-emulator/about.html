@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Tideglass, the browser-only shell</title>
+  <meta name="description" content="Tideglass is a fictional web terminal: a fully client-side Unix-style shell with a virtual filesystem, real pipes and redirects, and zero servers. Here's the story and how it works.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/page.css">
+</head>
+<body class="is-page" data-scheme="harbor">
+
+  <header class="app-header" role="banner">
+    <a href="index.html" class="brand" aria-label="Tideglass home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="2" y="4" width="28" height="24" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M7 12 L11 16 L7 20" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="14" y1="20" x2="22" y2="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-word">Tide<b>glass</b></span>
+    </a>
+    <nav class="app-nav" aria-label="Primary">
+      <a href="index.html">Terminal</a>
+      <a href="docs.html">Docs</a>
+      <a href="about.html" class="active" aria-current="page">About</a>
+    </nav>
+  </header>
+
+  <main class="page-wrap">
+    <section class="page-hero">
+      <p class="eyebrow">What is this?</p>
+      <h1>A whole Unix shell that runs on <em>nothing but a browser tab.</em></h1>
+      <p class="lead">Tideglass is a fictional product with very real code. It's a Unix-style command line — prompt, blinking cursor, history, tab completion — backed by a virtual filesystem that lives entirely in memory and persists to <code>localStorage</code>. There is no server. There is no backend to call. You open <code>index.html</code> over <code>file://</code> and you get a shell.</p>
+    </section>
+
+    <section class="prose">
+      <div class="feature-grid">
+        <div class="feature">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7 L9 7 L11 9 L21 9 L21 19 L3 19 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <h3>A real filesystem</h3>
+          <p>A tree of directories and files — a home dir, projects, logs, configs — seeded with believable content and mutated by actual commands.</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6 L9 12 L4 18 M11 18 L20 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h3>Pipes &amp; redirects</h3>
+          <p>A hand-written parser tokenizes quotes, splits pipelines, and applies <code>&gt;</code> / <code>&gt;&gt;</code> / <code>&lt;</code>. <code>grep</code>, <code>wc</code>, <code>sort</code> and friends actually compose.</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 9 L10 12 L7 15 M13 15 L17 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h3>Line editing</h3>
+          <p>History with <kbd>↑</kbd>/<kbd>↓</kbd> and <kbd>Ctrl</kbd>+<kbd>R</kbd> reverse search, <kbd>Tab</kbd> completion for commands and paths, and the readline keys (<kbd>Ctrl</kbd>+<kbd>A/E/U/K/W</kbd>).</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4 A8 8 0 0 1 12 20 Z" fill="currentColor"/></svg>
+          <h3>Themes &amp; CRT</h3>
+          <p>Five color schemes (Harbor, Amber, Phosphor, Paper, Grape), adjustable font size, and a scanline CRT mode that politely disables itself if you prefer reduced motion.</p>
+        </div>
+      </div>
+
+      <h2>Why "Tideglass"?</h2>
+      <p>The seeded filesystem belongs to <b>mara</b>, who keeps a harbor's tide gauges talking to the modern world. Her main project, <code>tidewatch</code>, turns a crusty fixed-width serial protocol into clean JSON lines. There is a recurring 03:14 pressure spike on gauge #4 that she swears is not the tide. Poke around <code>/home/mara</code> and you'll find her notes, logs, and a lighthouse she keeps meaning to photograph.</p>
+
+      <p>It's a small world, but a complete one — the kind of thing that's genuinely awkward to build with page-builder blocks, and almost trivial with a few hundred lines of vanilla JavaScript.</p>
+
+      <h2>How it actually works</h2>
+      <ul>
+        <li><b>fs.js</b> — the virtual filesystem: a nested object literal expanded into live nodes, with <code>resolve</code>, <code>glob</code>, and mutations that persist to <code>localStorage</code>.</li>
+        <li><b>parser.js</b> — tokenizes a line honoring single/double quotes, splits on pipes, pulls out redirections, and expands <code>$VAR</code> / <code>$?</code>.</li>
+        <li><b>commands.js</b> — every command as a small pure-ish function that takes <code>{argv, stdin, env}</code> and returns <code>{out, err, status}</code>. Pipelines just thread <code>stdin</code> through.</li>
+        <li><b>shell.js</b> — the terminal UI: the custom caret, scrollback, the readline-style editor, tab completion, the runner that wires redirects and pipes together, the tour, and the themes.</li>
+      </ul>
+
+      <pre class="code"><span class="c-com"># count the markdown files under projects, for real:</span>
+<span class="c-cmd">find</span> projects -name "*.md" | <span class="c-cmd">wc</span> -l
+
+<span class="c-com"># short-circuit: only cat if the dir change succeeds</span>
+<span class="c-cmd">cd</span> projects/tidewatch &amp;&amp; <span class="c-cmd">cat</span> README.md | <span class="c-cmd">head</span> -3</pre>
+
+      <div class="callout">
+        <b>Psst.</b> There are a couple of things hiding in here. Try <code>sl</code> when you meant <code>ls</code>, run <code>matrix</code>, and see what <code>rm -rf /</code> says. The brave should read <code>/home/mara/notes/standup.txt</code>.
+      </div>
+
+      <h2>The fine print</h2>
+      <ul class="kv">
+        <li><span class="k">Version</span><span class="v">Tideglass 1.4.0 "harborlight"</span></li>
+        <li><span class="k">Runs on</span><span class="v">Any modern browser, including straight from <code>file://</code></span></li>
+        <li><span class="k">Dependencies</span><span class="v">None. No frameworks, no build step, no CDN JavaScript.</span></li>
+        <li><span class="k">Data</span><span class="v">Stays in your browser's localStorage. Nothing leaves the tab.</span></li>
+        <li><span class="k">Storage keys</span><span class="v"><code>tideglass.fs.v1</code>, <code>.env.v1</code>, <code>.history.v1</code>, <code>.prefs.v1</code></span></li>
+        <li><span class="k">License</span><span class="v">Imaginary, but generous.</span></li>
+      </ul>
+
+      <p style="margin-top:32px"><a class="bigcta" href="index.html">Open the terminal →</a></p>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>Tideglass v1.4 · a fictional product, built in vanilla HTML/CSS/JS</span>
+    <span>No servers were contacted in the making of this shell.</span>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heron &amp; Oak — Hudson Valley Real Estate</title>
+  <meta name="description" content="Heron &amp; Oak is a boutique Hudson Valley brokerage representing historic homes, working farms, river-view properties, and creative live/work conversions in Rhinebeck, Hudson, Beacon, Kingston, and beyond.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ══ Navigation ══════════════════════════════════════════════ -->
+<header class="site-header" id="site-header">
+  <nav class="nav container" aria-label="Primary">
+    <a href="index.html" class="nav__logo" aria-label="Heron &amp; Oak home">
+      <svg class="nav__logo-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="36" height="36" rx="2" fill="#46553a"/>
+        <!-- Stylized heron + branch -->
+        <path d="M9 27 Q11 22 14 21 L17 16 L20 18 L23 14 Q26 14 27 11" stroke="#efece4" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+        <circle cx="27" cy="11" r="1.3" fill="#efece4"/>
+        <path d="M14 21 L14 28 M17 22 L17 28" stroke="#efece4" stroke-width="1" stroke-linecap="round"/>
+        <line x1="7" y1="29.5" x2="29" y2="29.5" stroke="#d4dccb" stroke-width="0.6" opacity="0.7"/>
+      </svg>
+      <span class="nav__logo-text">Heron &amp; Oak</span>
+    </a>
+
+    <button class="nav__toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="navLinks">
+      <span></span><span></span><span></span>
+    </button>
+
+    <ul class="nav__links" id="navLinks">
+      <li><a href="index.html" class="nav__link active">Home</a></li>
+      <li><a href="listings.html" class="nav__link">Listings</a></li>
+      <li><a href="agents.html" class="nav__link">Agents</a></li>
+      <li><a href="contact.html" class="nav__link">Contact</a></li>
+      <li><a href="contact.html#inquire" class="btn btn--primary btn--sm">Schedule a Visit</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- ══ Hero (featured listing spread) ══════════════════════════ -->
+<section class="hero" aria-label="Featured listing">
+  <div class="container">
+    <div class="hero__grid">
+      <div class="hero__media reveal">
+        <div class="badge badge--for-sale">For Sale</div>
+        <div class="photo scene-farmhouse-hero" role="img" aria-label="1925 farmhouse exterior, late afternoon, side view from the orchard with the pond visible in the foreground"></div>
+      </div>
+
+      <div class="hero__content reveal">
+        <span class="eyebrow hero__eyebrow">Featured · Rhinebeck, NY</span>
+        <h1 class="hero__title">A farmhouse with<br>more than its share<br>of <em>quiet</em>.</h1>
+        <div class="hero__price">$2,275,000</div>
+        <div class="hero__address">218 River Road · Rhinebeck</div>
+
+        <p class="hero__dek">
+          Eight and a half acres, a half-mile gravel drive, and a 1925 farmhouse that still has the original wide-plank floors, the original sash weights, and the kind of front porch that asks you to sit down. Pond, barn-turned-studio, mature orchard.
+        </p>
+
+        <ul class="hero__specs">
+          <li>4 BD</li>
+          <li>3.5 BA</li>
+          <li>3,480 sqft</li>
+          <li>8.4 ac</li>
+          <li>Built 1925</li>
+        </ul>
+
+        <div class="hero__actions">
+          <a href="218-river-road-rhinebeck.html" class="btn btn--primary btn--lg">View Listing</a>
+          <a href="contact.html#inquire" class="btn btn--outline btn--lg">Schedule a Showing</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Tagline strip ═══════════════════════════════════════════ -->
+<section class="tagline-strip" aria-label="Brand tagline">
+  <div class="container">
+    <h2>Houses with a past. <em>Brokers with a plan.</em></h2>
+  </div>
+</section>
+
+<!-- ══ Signature Listings ══════════════════════════════════════ -->
+<section class="section" aria-labelledby="signature-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="label">Signature Listings</span>
+      <h2 id="signature-heading">Six houses we are watching closely.</h2>
+      <div class="divider"></div>
+      <p>A short list, curated by the agent collective — properties we know intimately, with stories worth the walkthrough. The full inventory lives on the <a href="listings.html">listings page</a>.</p>
+    </div>
+
+    <div class="grid grid--3 reveal-stagger">
+
+      <!-- 1 -->
+      <article class="card">
+        <a href="218-river-road-rhinebeck.html" class="card__media" aria-label="View 218 River Road, Rhinebeck">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-farmhouse-front" role="img" aria-label="Cream farmhouse front elevation, three-bay, copper roof, hedge row to the right"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$2,275,000</div>
+          <h3 class="card__address">218 River Road</h3>
+          <div class="card__town">Rhinebeck, NY</div>
+          <ul class="card__specs">
+            <li>4 BD</li><li>3.5 BA</li><li>3,480 sqft</li><li>8.4 ac</li>
+          </ul>
+          <p class="card__dek">A 1925 farmhouse on the orchard side of the village. Pond, barn studio, original everything where it counts.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Eleanor Whitfield</strong></span>
+            <span class="mono">MLS H24-1108</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 2 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 47 Warren Street, Hudson">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-hudson-row" role="img" aria-label="Warren Street rowhouse, cream stucco, second-floor window box, late spring"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$1,395,000</div>
+          <h3 class="card__address">47 Warren Street</h3>
+          <div class="card__town">Hudson, NY</div>
+          <ul class="card__specs">
+            <li>3 BD</li><li>2 BA</li><li>2,140 sqft</li>
+          </ul>
+          <p class="card__dek">A four-story rowhouse with the ground-floor retail bay still intact. Live above, lease below, or take the whole thing.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Owen Sato</strong></span>
+            <span class="mono">MLS H24-0941</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 3 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View Mill Road, New Paltz">
+          <div class="card__badge"><span class="badge badge--coming-soon">Coming Soon</span></div>
+          <div class="photo photo--ratio-4x3 scene-cottage" role="img" aria-label="Stone-and-shingle cottage in a clearing, low afternoon light, lilacs in bloom"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$865,000</div>
+          <h3 class="card__address">112 Mill Road</h3>
+          <div class="card__town">New Paltz, NY</div>
+          <ul class="card__specs">
+            <li>3 BD</li><li>2 BA</li><li>1,820 sqft</li><li>2.1 ac</li>
+          </ul>
+          <p class="card__dek">A 1908 stone cottage with a recently rebuilt kitchen wing. Spring-fed pond at the back of the lot.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Maya Bertrand-Cole</strong></span>
+            <span class="mono">MLS H24-1187</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 4 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 9 Old Post Road, Catskill">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-victorian" role="img" aria-label="Victorian-era house with turret and wraparound porch, painted moss green, magnolia tree to the side"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$1,160,000</div>
+          <h3 class="card__address">9 Old Post Road</h3>
+          <div class="card__town">Catskill, NY</div>
+          <ul class="card__specs">
+            <li>5 BD</li><li>3 BA</li><li>3,260 sqft</li><li>0.8 ac</li>
+          </ul>
+          <p class="card__dek">An 1887 Queen Anne with the porch ceiling still painted haint blue and an attic studio with northern light.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Theo Ortega</strong></span>
+            <span class="mono">MLS H24-1064</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 5 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 33 Spring Street, Saugerties">
+          <div class="card__badge"><span class="badge badge--under-contract">Under Contract</span></div>
+          <div class="photo photo--ratio-4x3 scene-bungalow" role="img" aria-label="Tan bungalow with deep eaves and stone chimney, front garden in early summer"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$745,000</div>
+          <h3 class="card__address">33 Spring Street</h3>
+          <div class="card__town">Saugerties, NY</div>
+          <ul class="card__specs">
+            <li>3 BD</li><li>2 BA</li><li>1,640 sqft</li>
+          </ul>
+          <p class="card__dek">A 1924 Craftsman bungalow with a built-in bookcase still standing and a detached studio out back.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Camille Reyes-Hahn</strong></span>
+            <span class="mono">MLS H24-0902</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 6 -->
+      <article class="card">
+        <a href="listings.html" class="card__media" aria-label="View 88 Tinker Street, Beacon">
+          <div class="card__badge"><span class="badge badge--for-sale">For Sale</span></div>
+          <div class="photo photo--ratio-4x3 scene-loft" role="img" aria-label="Converted manufacturing loft with tall steel windows and exposed brick, late-day sun crossing the floor"></div>
+        </a>
+        <div class="card__body">
+          <div class="card__price">$1,495,000</div>
+          <h3 class="card__address">88 Tinker Street</h3>
+          <div class="card__town">Beacon, NY</div>
+          <ul class="card__specs">
+            <li>2 BD</li><li>2 BA</li><li>2,380 sqft</li>
+          </ul>
+          <p class="card__dek">A live/work loft conversion in a former hat factory. Twelve-foot ceilings, an industrial elevator, a courtyard.</p>
+          <div class="card__agent">
+            <span>Listed by <strong>Jonah Becker</strong></span>
+            <span class="mono">MLS H24-1051</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <div class="center mt-2xl">
+      <a href="listings.html" class="btn btn--ghost btn--lg">See All Listings</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Market Notes (editorial) ════════════════════════════════ -->
+<section class="section section--bone" aria-labelledby="notes-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="label">Market Notes</span>
+      <h2 id="notes-heading">What we are seeing this quarter.</h2>
+      <div class="divider"></div>
+      <p>Short field reports from the agent collective. We file these from kitchens, gravel drives, and the occasional Amtrak station.</p>
+    </div>
+
+    <div class="editorial-grid reveal-stagger">
+      <article class="editorial-item">
+        <div class="editorial-item__kicker">Inventory · Q2 Field Notes</div>
+        <h3 class="editorial-item__title">Listings up north of Hudson, finally.</h3>
+        <p class="editorial-item__excerpt">
+          For two years, the corridor from Hudson up through Catskill and Athens behaved like a vault — almost nothing trading, prices held by sellers waiting for a number that never quite arrived. That changed in April. Six new listings on Warren and one of the better Athens river-block houses are now in play, and pricing has come down to within negotiating distance of last year's comps.
+        </p>
+        <div class="editorial-item__byline">Eleanor Whitfield · 6 min read</div>
+      </article>
+
+      <article class="editorial-item">
+        <div class="editorial-item__kicker">Old Houses · Practice</div>
+        <h3 class="editorial-item__title">Reading a slate roof from the driveway.</h3>
+        <p class="editorial-item__excerpt">
+          You can learn most of what you need to know about the state of an old roof before you ever climb on it. Look at where the slates are missing, look at where they have been replaced with the wrong color, look for the dark stain that means flashing has failed at a chimney. We walk through what to look for, and how to bring it up with a seller without scaring everyone off.
+        </p>
+        <div class="editorial-item__byline">Owen Sato · 8 min read</div>
+      </article>
+
+      <article class="editorial-item">
+        <div class="editorial-item__kicker">Land · Hudson Valley</div>
+        <h3 class="editorial-item__title">The case for the smaller working farm.</h3>
+        <p class="editorial-item__excerpt">
+          We have spent the last year showing more buyers a 6-to-12 acre property than any other category. People want enough land for a small orchard, a few animals, an honest vegetable garden — and they want it close enough to a village that bread is still a walk. The good news: this is more available, and more affordable, than the listings pages suggest.
+        </p>
+        <div class="editorial-item__byline">Maya Bertrand-Cole · 5 min read</div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Agent Collective Preview ════════════════════════════════ -->
+<section class="section" aria-labelledby="agents-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="label">The Agent Collective</span>
+      <h2 id="agents-heading">Six brokers. One brokerage. Every house treated like the only house.</h2>
+      <div class="divider"></div>
+      <p>We are a small bench by design. Every listing gets the attention of someone who has been doing this in the Hudson Valley for at least a decade — and every buyer gets a broker who actually picks up the phone.</p>
+    </div>
+
+    <div class="agent-strip reveal-stagger">
+      <article class="agent-card">
+        <div class="agent-card__photo photo scene-portrait-1" role="img" aria-label="Portrait of Eleanor Whitfield, principal broker, seated on a porch step, dark linen jacket"></div>
+        <h3 class="agent-card__name"><a href="agents.html#eleanor">Eleanor Whitfield</a></h3>
+        <div class="agent-card__title">Principal Broker</div>
+        <p class="agent-card__meta">Rhinebeck · Red Hook · Tivoli</p>
+      </article>
+
+      <article class="agent-card">
+        <div class="agent-card__photo photo scene-portrait-2" role="img" aria-label="Portrait of Owen Sato, associate broker, leaning against a brick rowhouse façade"></div>
+        <h3 class="agent-card__name"><a href="agents.html#owen">Owen Sato</a></h3>
+        <div class="agent-card__title">Associate Broker</div>
+        <p class="agent-card__meta">Hudson · Catskill · Athens</p>
+      </article>
+
+      <article class="agent-card">
+        <div class="agent-card__photo photo scene-portrait-3" role="img" aria-label="Portrait of Maya Bertrand-Cole, salesperson, standing in a sunlit kitchen with stone counters"></div>
+        <h3 class="agent-card__name"><a href="agents.html#maya">Maya Bertrand-Cole</a></h3>
+        <div class="agent-card__title">Salesperson</div>
+        <p class="agent-card__meta">New Paltz · Gardiner · Stone Ridge</p>
+      </article>
+
+      <article class="agent-card">
+        <div class="agent-card__photo photo scene-portrait-4" role="img" aria-label="Portrait of Theo Ortega, associate broker, on the steps of a Catskill Victorian"></div>
+        <h3 class="agent-card__name"><a href="agents.html#theo">Theo Ortega</a></h3>
+        <div class="agent-card__title">Associate Broker</div>
+        <p class="agent-card__meta">Catskill · Saugerties · Woodstock</p>
+      </article>
+    </div>
+
+    <div class="center mt-2xl">
+      <a href="agents.html" class="btn btn--ghost btn--lg">Meet the Collective</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Newsletter ══════════════════════════════════════════════ -->
+<section class="newsletter" aria-labelledby="newsletter-heading">
+  <div class="newsletter__inner reveal">
+    <span class="label">Field Notes · Monthly</span>
+    <h3 id="newsletter-heading">The valley, by mail.</h3>
+    <p>A short letter on the first Saturday of the month. New listings, the houses we wish were still for sale, and the occasional opinion on a porch repair.</p>
+    <form class="newsletter__form js-form" novalidate>
+      <label class="sr-only" for="news-email">Email address</label>
+      <input id="news-email" type="email" placeholder="your@email.com" required>
+      <button type="submit" class="btn btn--primary">Subscribe</button>
+    </form>
+    <div class="form-notice" role="status" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ══ Footer ══════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <div class="footer-brand">
+          <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect width="36" height="36" rx="2" fill="#46553a"/>
+            <path d="M9 27 Q11 22 14 21 L17 16 L20 18 L23 14 Q26 14 27 11" stroke="#efece4" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+            <circle cx="27" cy="11" r="1.3" fill="#efece4"/>
+            <path d="M14 21 L14 28 M17 22 L17 28" stroke="#efece4" stroke-width="1" stroke-linecap="round"/>
+          </svg>
+          <span>Heron &amp; Oak</span>
+        </div>
+        <p class="footer-tagline">Houses with a past. Brokers with a plan. Boutique Hudson Valley real estate — historic homes, working farms, river-view properties, live/work conversions.</p>
+        <div class="footer-address">
+          12 Mill Street, 2nd Floor<br>
+          Rhinebeck, NY 12572<br>
+          (845) 555-0142
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Brokerage</h4>
+        <ul>
+          <li><a href="listings.html">All Listings</a></li>
+          <li><a href="agents.html">The Collective</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="contact.html#offices">Offices</a></li>
+          <li><a href="contact.html#faq">FAQ</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>By Town</h4>
+        <ul>
+          <li><a href="listings.html?town=rhinebeck">Rhinebeck</a></li>
+          <li><a href="listings.html?town=hudson">Hudson</a></li>
+          <li><a href="listings.html?town=catskill">Catskill</a></li>
+          <li><a href="listings.html?town=new-paltz">New Paltz</a></li>
+          <li><a href="listings.html?town=kingston">Kingston</a></li>
+          <li><a href="listings.html?town=beacon">Beacon</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Stay Posted</h4>
+        <ul>
+          <li><a href="#newsletter-heading">Field Notes Letter</a></li>
+          <li><a href="contact.html#inquire">Buyer Inquiry</a></li>
+          <li><a href="contact.html#inquire">Seller Consultation</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <span>&copy; 2014–2026 Heron &amp; Oak Realty LLC · Licensed Real Estate Brokerage, NYS</span>
+      <span>Equal Housing Opportunity · Fair Housing Notice</span>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

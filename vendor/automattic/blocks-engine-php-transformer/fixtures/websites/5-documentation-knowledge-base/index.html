@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PocketRoute Docs — Help &amp; Documentation</title>
+  <meta name="description" content="Find answers, guides, and API documentation for PocketRoute — route planning for small delivery teams.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Noise grain overlay (CSS handles it via ::before) -->
+
+<!-- ─── HEADER ─────────────────────────────────────────── -->
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo" aria-label="PocketRoute home">
+      <span class="logo-icon">
+        <svg width="26" height="20" viewBox="0 0 26 20" fill="none" aria-hidden="true">
+          <circle cx="3.5" cy="16" r="3" fill="currentColor"/>
+          <circle cx="22.5" cy="4" r="3" fill="currentColor"/>
+          <path d="M6 14.5 C10 9, 16 11, 20 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <circle cx="10.8" cy="11.2" r="1.2" fill="currentColor" opacity="0.5"/>
+          <circle cx="15.5" cy="9.8" r="1.2" fill="currentColor" opacity="0.5"/>
+        </svg>
+      </span>
+      <span class="logo-wordmark">
+        <span>PocketRoute</span>
+        <span>Documentation</span>
+      </span>
+    </a>
+
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="index.html" class="active">Home</a>
+      <a href="getting-started.html">Getting Started</a>
+      <a href="release-notes.html">Releases</a>
+      <a href="api-docs.html">API</a>
+      <a href="contact.html">Support</a>
+    </nav>
+
+    <div class="header-right">
+      <span class="version-badge">v2.4.1</span>
+      <a href="#" class="btn-open-app">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+        </svg>
+        <span>Open App</span>
+      </a>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" id="nav-toggle">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Mobile nav drawer -->
+<div class="nav-overlay" id="nav-overlay" aria-hidden="true"></div>
+<nav class="nav-drawer" id="nav-drawer" aria-label="Mobile navigation">
+  <div class="nav-drawer-links">
+    <a href="index.html" class="active">Home</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="troubleshooting.html">Troubleshooting</a>
+    <a href="release-notes.html">Release Notes</a>
+    <a href="api-docs.html">API Docs</a>
+    <a href="contact.html">Contact Support</a>
+  </div>
+</nav>
+
+<!-- ─── HERO ───────────────────────────────────────────── -->
+<section class="hero" aria-labelledby="hero-heading">
+  <div class="hero-eyebrow" role="doc-subtitle">PocketRoute Help Center</div>
+
+  <h1 id="hero-heading" class="animate-in">
+    Find answers <em>fast.</em>
+  </h1>
+
+  <p class="hero-sub animate-in animate-in-delay-1">
+    Search guides, troubleshooting articles, and API docs for PocketRoute's delivery team tools.
+  </p>
+
+  <div class="search-wrap animate-in animate-in-delay-2">
+    <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="11" cy="11" r="8"/>
+      <path d="m21 21-4.35-4.35"/>
+    </svg>
+    <input
+      type="search"
+      class="search-input"
+      id="hero-search"
+      placeholder="Search help articles…"
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="Search help articles"
+    >
+    <span class="search-shortcut" aria-hidden="true">⌘K</span>
+  </div>
+
+  <div class="hero-links animate-in animate-in-delay-3" role="navigation" aria-label="Quick links">
+    <span>Quick links:</span>
+    <a href="getting-started.html">Getting Started</a>
+    <span class="hero-sep" aria-hidden="true">·</span>
+    <a href="troubleshooting.html">Troubleshooting</a>
+    <span class="hero-sep" aria-hidden="true">·</span>
+    <a href="api-docs.html">API Reference</a>
+    <span class="hero-sep" aria-hidden="true">·</span>
+    <a href="release-notes.html">Release Notes</a>
+    <span class="hero-sep" aria-hidden="true">·</span>
+    <a href="contact.html">Contact Support</a>
+  </div>
+</section>
+
+<!-- ─── MAIN CONTENT ────────────────────────────────────── -->
+<main>
+  <div class="container">
+
+    <!-- Getting Started -->
+    <section class="section" aria-labelledby="gs-heading">
+      <div class="section-header">
+        <div>
+          <p class="section-title">Start here</p>
+          <h2 class="section-title-accent" id="gs-heading">Getting Started</h2>
+        </div>
+        <a href="getting-started.html" class="section-link">
+          Full guide
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <div class="card-grid card-grid-4">
+        <a href="getting-started.html#install" class="card card-link" aria-label="Install PocketRoute on your device">
+          <div class="card-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="5" y="2" width="14" height="20" rx="2"/>
+              <line x1="12" y1="18" x2="12.01" y2="18"/>
+            </svg>
+          </div>
+          <h3>Install the App</h3>
+          <p>iOS &amp; Android setup, device requirements, permissions.</p>
+        </a>
+
+        <a href="getting-started.html#first-route" class="card card-link" aria-label="Create your first delivery route">
+          <div class="card-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/>
+              <path d="M7 17C11 12 13 12 17 7"/>
+              <circle cx="12" cy="12.5" r="1.2" fill="currentColor" stroke="none" opacity="0.5"/>
+            </svg>
+          </div>
+          <h3>Your First Route</h3>
+          <p>Add stops, optimize order, and dispatch to your drivers.</p>
+        </a>
+
+        <a href="getting-started.html#team" class="card card-link" aria-label="Set up your delivery team">
+          <div class="card-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+          </div>
+          <h3>Invite Your Team</h3>
+          <p>Add drivers, set permissions, and configure notifications.</p>
+        </a>
+
+        <a href="getting-started.html#billing" class="card card-link" aria-label="Set up billing for your account">
+          <div class="card-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="1" y="4" width="22" height="16" rx="2"/>
+              <line x1="1" y1="10" x2="23" y2="10"/>
+            </svg>
+          </div>
+          <h3>Set Up Billing</h3>
+          <p>Choose a plan, enter payment details, and understand limits.</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- Browse All Topics (searchable) -->
+    <section class="section" aria-labelledby="topics-heading">
+      <div class="section-header">
+        <div>
+          <p class="section-title">Browse</p>
+          <h2 class="section-title-accent" id="topics-heading">Help Topics</h2>
+        </div>
+      </div>
+
+      <!-- All article cards — filtered by search -->
+      <div id="search-results-area">
+
+        <!-- Setup -->
+        <div class="category-group" id="group-setup" data-category="setup">
+          <div class="category-group-header">
+            <span class="category-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M20 12h-2M17.66 17.66l-1.41-1.41M12 20v-2M6.34 17.66l1.41-1.41M4 12H2M7.76 6.34L6.35 4.93M12 4V2"/>
+              </svg>
+            </span>
+            <span class="category-group-title">Setup &amp; Installation</span>
+          </div>
+          <div class="articles-grid" role="list">
+            <a href="getting-started.html#install" class="search-item" role="listitem"
+               data-title="installing pocketroute on ios and android" data-category="setup" data-tags="install app mobile device download">
+              Installing PocketRoute on iOS and Android
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="connecting your gps tracking device" data-category="setup" data-tags="gps tracker hardware vehicle bluetooth">
+              Connecting Your GPS Tracking Device
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="setting up delivery zones and boundaries" data-category="setup" data-tags="zones geofence territory region boundary">
+              Setting Up Delivery Zones and Boundaries
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="importing addresses from csv or spreadsheet" data-category="setup" data-tags="import csv excel spreadsheet addresses bulk upload">
+              Importing Addresses from a CSV or Spreadsheet
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="configuring notification preferences" data-category="setup" data-tags="notifications alerts push email sms">
+              Configuring Notification Preferences
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="integrating with your existing dispatch system" data-category="setup" data-tags="integration dispatch erp api connect third-party">
+              Integrating with Your Existing Dispatch System
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Routing -->
+        <div class="category-group" id="group-routing" data-category="routing">
+          <div class="category-group-header">
+            <span class="category-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/>
+                <path d="M7 17C11 12 13 12 17 7"/>
+              </svg>
+            </span>
+            <span class="category-group-title">Routing</span>
+          </div>
+          <div class="articles-grid" role="list">
+            <a href="getting-started.html#first-route" class="search-item" role="listitem"
+               data-title="creating and assigning your first route" data-category="routing" data-tags="route create assign driver dispatch">
+              Creating and Assigning Your First Route
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="optimizing multi-stop routes automatically" data-category="routing" data-tags="optimize multi-stop order sequence algorithm">
+              Optimizing Multi-Stop Routes Automatically
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="setting time windows for deliveries" data-category="routing" data-tags="time window schedule deadline appointment">
+              Setting Time Windows for Deliveries
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="using real-time traffic-aware routing" data-category="routing" data-tags="traffic live real-time avoid congestion maps">
+              Using Real-Time Traffic-Aware Routing
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="handling failed deliveries and re-routing" data-category="routing" data-tags="failed delivery attempt missed reroute exception">
+              Handling Failed Deliveries and Re-Routing
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="exporting completed route reports" data-category="routing" data-tags="export report pdf csv history completed deliveries">
+              Exporting Completed Route Reports
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Team Management -->
+        <div class="category-group" id="group-team" data-category="team management">
+          <div class="category-group-header">
+            <span class="category-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+              </svg>
+            </span>
+            <span class="category-group-title">Team Management</span>
+          </div>
+          <div class="articles-grid" role="list">
+            <a href="getting-started.html#team" class="search-item" role="listitem"
+               data-title="inviting drivers to your team" data-category="team management" data-tags="invite driver add team member email">
+              Inviting Drivers to Your Team
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="setting driver permissions and access levels" data-category="team management" data-tags="permissions roles access admin driver dispatcher">
+              Setting Driver Permissions and Access Levels
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="monitoring live driver locations on the map" data-category="team management" data-tags="live map location tracking real-time driver monitor">
+              Monitoring Live Driver Locations on the Map
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="managing driver schedules and shifts" data-category="team management" data-tags="schedule shift hours availability driver calendar">
+              Managing Driver Schedules and Shifts
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="removing a driver from your account" data-category="team management" data-tags="remove driver delete offboard terminate">
+              Removing a Driver from Your Account
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="getting-started.html" class="search-item" role="listitem"
+               data-title="setting up driver performance tracking" data-category="team management" data-tags="performance analytics metrics kpi speed delivery rate">
+              Setting Up Driver Performance Tracking
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Billing -->
+        <div class="category-group" id="group-billing" data-category="billing">
+          <div class="category-group-header">
+            <span class="category-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="1" y="4" width="22" height="16" rx="2"/>
+                <line x1="1" y1="10" x2="23" y2="10"/>
+              </svg>
+            </span>
+            <span class="category-group-title">Billing &amp; Subscriptions</span>
+          </div>
+          <div class="articles-grid" role="list">
+            <a href="contact.html" class="search-item" role="listitem"
+               data-title="upgrading or downgrading your subscription" data-category="billing" data-tags="upgrade downgrade plan subscription change tier">
+              Upgrading or Downgrading Your Subscription
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="contact.html" class="search-item" role="listitem"
+               data-title="understanding your route and driver limits" data-category="billing" data-tags="limits routes drivers quota plan restrictions">
+              Understanding Your Route and Driver Limits
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="contact.html" class="search-item" role="listitem"
+               data-title="viewing and downloading invoices" data-category="billing" data-tags="invoice receipt download billing history payment">
+              Viewing and Downloading Invoices
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="contact.html" class="search-item" role="listitem"
+               data-title="updating your payment method" data-category="billing" data-tags="payment card update credit debit billing">
+              Updating Your Payment Method
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="contact.html" class="search-item" role="listitem"
+               data-title="canceling your pocketroute subscription" data-category="billing" data-tags="cancel subscription end account close">
+              Canceling Your PocketRoute Subscription
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Troubleshooting -->
+        <div class="category-group" id="group-troubleshooting" data-category="troubleshooting">
+          <div class="category-group-header">
+            <span class="category-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </span>
+            <span class="category-group-title">Troubleshooting</span>
+          </div>
+          <div class="articles-grid" role="list">
+            <a href="troubleshooting.html" class="search-item" role="listitem"
+               data-title="drivers not receiving route assignments" data-category="troubleshooting" data-tags="drivers notification assignment missing push alert fix">
+              Drivers Not Receiving Route Assignments
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="troubleshooting.html" class="search-item" role="listitem"
+               data-title="app crashes when loading large routes" data-category="troubleshooting" data-tags="crash bug app freeze large route stops memory">
+              App Crashes When Loading Large Routes
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="troubleshooting.html" class="search-item" role="listitem"
+               data-title="gps location not updating in real time" data-category="troubleshooting" data-tags="gps location update stuck freeze not moving real-time">
+              GPS Location Not Updating in Real Time
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="troubleshooting.html" class="search-item" role="listitem"
+               data-title="route optimization taking longer than expected" data-category="troubleshooting" data-tags="slow optimization timeout loading long wait performance">
+              Route Optimization Taking Longer Than Expected
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="troubleshooting.html" class="search-item" role="listitem"
+               data-title="address import failing with format errors" data-category="troubleshooting" data-tags="import fail csv error format address invalid column header">
+              Address Import Failing with Format Errors
+              <svg class="search-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- No results message -->
+        <div id="no-results" role="status" aria-live="polite">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; display: block; opacity: 0.3;" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <strong>No articles found</strong>
+          Try different keywords, or <a href="contact.html">contact support</a> for help.
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Two-column: Popular articles + API/Releases preview -->
+    <section class="section" aria-labelledby="popular-heading">
+      <div class="card-grid card-grid-2" style="gap: 32px; align-items: start;">
+
+        <div>
+          <div class="section-header" style="margin-bottom: 16px;">
+            <div>
+              <p class="section-title">Most viewed</p>
+              <h2 class="section-title-accent" id="popular-heading">Popular Troubleshooting</h2>
+            </div>
+            <a href="troubleshooting.html" class="section-link">
+              All articles
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+          <div class="popular-section">
+            <nav class="popular-list" aria-label="Popular troubleshooting articles">
+              <a href="troubleshooting.html" class="popular-item">
+                <span class="popular-num" aria-hidden="true">01</span>
+                <span class="popular-title">Drivers Not Receiving Route Assignments</span>
+                <span class="popular-tag tag-bug">Bug Fix</span>
+              </a>
+              <a href="troubleshooting.html" class="popular-item">
+                <span class="popular-num" aria-hidden="true">02</span>
+                <span class="popular-title">GPS Location Not Updating in Real Time</span>
+                <span class="popular-tag tag-bug">Bug Fix</span>
+              </a>
+              <a href="troubleshooting.html" class="popular-item">
+                <span class="popular-num" aria-hidden="true">03</span>
+                <span class="popular-title">Address Import Failing with Format Errors</span>
+                <span class="popular-tag tag-setup">Setup</span>
+              </a>
+              <a href="troubleshooting.html" class="popular-item">
+                <span class="popular-num" aria-hidden="true">04</span>
+                <span class="popular-title">Route Optimization Taking Longer Than Expected</span>
+                <span class="popular-tag tag-perf">Performance</span>
+              </a>
+              <a href="troubleshooting.html" class="popular-item">
+                <span class="popular-num" aria-hidden="true">05</span>
+                <span class="popular-title">App Crashes When Loading Large Routes</span>
+                <span class="popular-tag tag-bug">Bug Fix</span>
+              </a>
+            </nav>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-header" style="margin-bottom: 16px;">
+            <div>
+              <p class="section-title">Developers</p>
+              <h2 class="section-title-accent">API &amp; Releases</h2>
+            </div>
+          </div>
+
+          <!-- API preview card -->
+          <div class="card" style="margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <div class="card-icon teal" style="margin-bottom: 0; width: 32px; height: 32px;" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                </svg>
+              </div>
+              <h3 style="font-size: 0.95rem; margin-bottom: 0;">Developer API</h3>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">RESTful API for route creation, driver management, and webhook events. Auth via API key.</p>
+            <div class="code-block" style="margin: 0;">
+              <div class="code-block-header" style="padding: 7px 12px;">
+                <span class="code-block-lang">curl</span>
+              </div>
+              <pre><code class="block" style="font-size: 0.75rem; padding: 12px 14px;"><span class="c-method">GET</span> <span class="c-url">/v1/routes</span> <span class="c-comment">-H "Authorization: Bearer $KEY"</span></code></pre>
+            </div>
+            <a href="api-docs.html" style="display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 0.82rem; font-weight: 700; color: var(--teal); margin-top: 14px;">
+              View full API reference
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+
+          <!-- Latest release card -->
+          <div class="card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <div class="card-icon" style="margin-bottom: 0; width: 32px; height: 32px;" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+              </div>
+              <h3 style="font-size: 0.95rem; margin-bottom: 0;">Latest Release</h3>
+              <span class="version-badge" style="margin-left: auto;">v2.4.1</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">Released June 3, 2025 — Improved stop clustering, faster route recalculation, and fixed a GPS drift issue on Android 14.</p>
+            <a href="release-notes.html" style="display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 0.82rem; font-weight: 700; color: var(--accent);">
+              View all release notes
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div><!-- /container -->
+</main>
+
+<!-- ─── FOOTER ─────────────────────────────────────────── -->
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="index.html" class="site-logo">
+        <span class="logo-icon">
+          <svg width="22" height="18" viewBox="0 0 26 20" fill="none" aria-hidden="true">
+            <circle cx="3.5" cy="16" r="3" fill="currentColor"/>
+            <circle cx="22.5" cy="4" r="3" fill="currentColor"/>
+            <path d="M6 14.5 C10 9, 16 11, 20 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <circle cx="10.8" cy="11.2" r="1.2" fill="currentColor" opacity="0.5"/>
+            <circle cx="15.5" cy="9.8" r="1.2" fill="currentColor" opacity="0.5"/>
+          </svg>
+        </span>
+        <span class="logo-wordmark">
+          <span>PocketRoute</span>
+        </span>
+      </a>
+      <p class="footer-desc">Route planning for small delivery teams. Built for the real world.</p>
+    </div>
+
+    <div class="footer-links">
+      <div class="footer-col">
+        <h4>Documentation</h4>
+        <ul>
+          <li><a href="getting-started.html">Getting Started</a></li>
+          <li><a href="index.html#group-routing">Routing</a></li>
+          <li><a href="index.html#group-team">Team Management</a></li>
+          <li><a href="index.html#group-billing">Billing</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="api-docs.html">API Reference</a></li>
+          <li><a href="api-docs.html#auth">Authentication</a></li>
+          <li><a href="api-docs.html#webhooks">Webhooks</a></li>
+          <li><a href="release-notes.html">Release Notes</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Support</h4>
+        <ul>
+          <li><a href="troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="contact.html">Contact Support</a></li>
+          <li><a href="contact.html#community">Community Forum</a></li>
+          <li><a href="contact.html#status">Service Status</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <p>&copy; 2025 PocketRoute, Inc. All rights reserved.</p>
+    <div class="footer-bottom-links">
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+      <a href="#">Security</a>
+    </div>
+  </div>
+</footer>
+
+<!-- ─── SCRIPTS ────────────────────────────────────────── -->
+<script>
+  // ── Mobile nav toggle
+  const navToggle = document.getElementById('nav-toggle');
+  const navDrawer = document.getElementById('nav-drawer');
+  const navOverlay = document.getElementById('nav-overlay');
+
+  function openNav() {
+    navDrawer.classList.add('open');
+    navOverlay.classList.add('open');
+    navToggle.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeNav() {
+    navDrawer.classList.remove('open');
+    navOverlay.classList.remove('open');
+    navToggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+  }
+
+  navToggle.addEventListener('click', () => {
+    const isOpen = navDrawer.classList.contains('open');
+    isOpen ? closeNav() : openNav();
+  });
+
+  navOverlay.addEventListener('click', closeNav);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeNav();
+  });
+
+  // ── Client-side search filter
+  const searchInput = document.getElementById('hero-search');
+  const searchItems = document.querySelectorAll('.search-item');
+  const categoryGroups = document.querySelectorAll('.category-group');
+  const noResults = document.getElementById('no-results');
+
+  searchInput.addEventListener('input', function () {
+    const query = this.value.toLowerCase().trim();
+
+    if (!query) {
+      searchItems.forEach(item => (item.style.display = ''));
+      categoryGroups.forEach(group => (group.style.display = ''));
+      noResults.style.display = 'none';
+      return;
+    }
+
+    let anyVisible = false;
+
+    searchItems.forEach(item => {
+      const title    = (item.dataset.title    || '').toLowerCase();
+      const category = (item.dataset.category || '').toLowerCase();
+      const tags     = (item.dataset.tags     || '').toLowerCase();
+
+      const matches = title.includes(query) || category.includes(query) || tags.includes(query);
+      item.style.display = matches ? '' : 'none';
+      if (matches) anyVisible = true;
+    });
+
+    categoryGroups.forEach(group => {
+      const visible = group.querySelectorAll('.search-item:not([style*="display: none"])');
+      group.style.display = visible.length === 0 ? 'none' : '';
+    });
+
+    noResults.style.display = anyVisible ? 'none' : 'block';
+  });
+
+  // ── Keyboard shortcut Cmd+K / Ctrl+K to focus search
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+    }
+  });
+</script>
+</body>
+</html>

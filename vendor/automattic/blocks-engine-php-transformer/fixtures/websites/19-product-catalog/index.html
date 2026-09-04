@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hollow &amp; Grain — Handmade Kitchen Woodwork</title>
+  <meta name="description" content="Small-batch cutting boards, serving trays, and spice racks made by hand in Bellingham, WA. Hollow &amp; Grain.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ══ Navigation ══════════════════════════════════════════════ -->
+<header class="site-header" id="site-header">
+  <nav class="nav container">
+    <a href="index.html" class="nav__logo" aria-label="Hollow &amp; Grain home">
+      <!-- Logo mark -->
+      <svg class="nav__logo-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="36" height="36" rx="3" fill="rgba(250,244,228,0.08)"/>
+        <path d="M8 10 L8 26 M8 18 L16 18 M16 10 L16 26" stroke="#FAF4E4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 10 Q28 10 28 18 Q28 26 20 26 L20 10Z" stroke="#FAF4E4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <line x1="7" y1="29" x2="29" y2="29" stroke="rgba(212,168,74,0.6)" stroke-width="0.75"/>
+      </svg>
+      <span class="nav__logo-text">Hollow &amp; Grain</span>
+    </a>
+
+    <button class="nav__toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <ul class="nav__links" id="navLinks">
+      <li><a href="index.html" class="nav__link active">Home</a></li>
+      <li><a href="shop.html" class="nav__link">Shop</a></li>
+      <li><a href="custom.html" class="nav__link">Custom</a></li>
+      <li><a href="care.html" class="nav__link">Care</a></li>
+      <li><a href="about.html" class="nav__link">About</a></li>
+      <li><a href="about.html#inquire" class="btn btn--sm btn--oak">Inquire</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- ══ Hero ════════════════════════════════════════════════════ -->
+<section class="hero" aria-label="Hero">
+  <div class="hero__content">
+    <div class="hero__eyebrow">Bellingham, WA · Est. 2016</div>
+    <h1 class="hero__title">
+      Made for your<br>
+      kitchen. <em>Built</em><br>
+      to last.
+    </h1>
+    <p class="hero__subtitle">
+      We make cutting boards, serving trays, and kitchen pieces by hand — one at a time, in our small Pacific Northwest workshop. Every piece is finished with food-safe oils and sent out ready to work.
+    </p>
+    <div class="hero__actions">
+      <a href="shop.html" class="btn btn--primary btn--lg">Shop the Collection</a>
+      <a href="custom.html" class="btn btn--outline btn--lg">Custom Orders</a>
+    </div>
+  </div>
+
+  <div class="hero__visual">
+    <div class="hero__visual-bg" aria-hidden="true"></div>
+    <!-- Hero product illustration: Shoreline end-grain board -->
+    <svg viewBox="0 0 420 340" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Shoreline end-grain cutting board illustration" style="max-width:420px;width:100%">
+      <defs>
+        <pattern id="hero-endgrain" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+          <rect width="14" height="14" fill="#3D2010"/>
+          <rect x="2" y="2" width="10" height="10" rx="0.5" fill="#4A2818"/>
+          <rect x="14" y="0" width="14" height="14" fill="#B89040"/>
+          <rect x="16" y="2" width="10" height="10" rx="0.5" fill="#C4A050"/>
+          <rect x="0" y="14" width="14" height="14" fill="#B89040"/>
+          <rect x="2" y="16" width="10" height="10" rx="0.5" fill="#C4A050"/>
+          <rect x="14" y="14" width="14" height="14" fill="#3D2010"/>
+          <rect x="16" y="16" width="10" height="10" rx="0.5" fill="#4A2818"/>
+        </pattern>
+        <filter id="hero-shadow" x="-10%" y="-10%" width="120%" height="130%">
+          <feDropShadow dx="6" dy="12" stdDeviation="18" flood-color="rgba(26,12,6,0.38)" flood-opacity="1"/>
+        </filter>
+        <clipPath id="board-clip">
+          <rect x="28" y="22" width="308" height="234" rx="10"/>
+        </clipPath>
+        <linearGradient id="sheen" x1="28" y1="22" x2="336" y2="256" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.12)"/>
+          <stop offset="50%" stop-color="rgba(255,255,255,0)"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0.08)"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Handle -->
+      <rect x="300" y="98" width="88" height="82" rx="41" fill="#3D2010" filter="url(#hero-shadow)"/>
+      <rect x="302" y="100" width="84" height="78" rx="39" fill="#5C3220"/>
+      <rect x="310" y="108" width="68" height="62" rx="31" fill="#4A2818"/>
+      <ellipse cx="344" cy="139" rx="22" ry="18" fill="rgba(255,255,255,0.05)"/>
+
+      <!-- Board body -->
+      <rect x="28" y="22" width="308" height="234" rx="10" fill="#3D2010" filter="url(#hero-shadow)"/>
+      <rect x="28" y="22" width="308" height="234" rx="10" fill="url(#hero-endgrain)" clip-path="url(#board-clip)"/>
+
+      <!-- Juice groove -->
+      <rect x="46" y="40" width="272" height="198" rx="5" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="3"/>
+      <rect x="47" y="41" width="272" height="198" rx="4.5" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+      <!-- Sheen highlight -->
+      <rect x="28" y="22" width="308" height="234" rx="10" fill="url(#sheen)"/>
+
+      <!-- Board edge -->
+      <rect x="28" y="22" width="308" height="234" rx="10" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="1.5"/>
+
+      <!-- Rubber feet -->
+      <circle cx="52" cy="240" r="7" fill="#1E0C06"/>
+      <circle cx="52" cy="240" r="4" fill="#2A1008" opacity="0.8"/>
+      <circle cx="280" cy="240" r="7" fill="#1E0C06"/>
+      <circle cx="280" cy="240" r="4" fill="#2A1008" opacity="0.8"/>
+      <circle cx="52" cy="40" r="7" fill="#1E0C06"/>
+      <circle cx="52" cy="40" r="4" fill="#2A1008" opacity="0.8"/>
+      <circle cx="280" cy="40" r="7" fill="#1E0C06"/>
+      <circle cx="280" cy="40" r="4" fill="#2A1008" opacity="0.8"/>
+
+      <!-- Oil finish sheen overlay -->
+      <rect x="28" y="22" width="140" height="80" rx="10" fill="rgba(255,255,255,0.04)" clip-path="url(#board-clip)"/>
+
+      <!-- Label ribbon -->
+      <rect x="0" y="288" width="420" height="52" fill="transparent"/>
+      <text x="28" y="308" font-family="'DM Mono', monospace" font-size="9" fill="rgba(92,50,32,0.5)" letter-spacing="2">SHORELINE END-GRAIN · BLACK WALNUT + HARD MAPLE · $145</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ══ Feature Strip ════════════════════════════════════════════ -->
+<div class="feature-strip" role="complementary" aria-label="Workshop promises">
+  <div class="container">
+    <div class="feature-item">
+      <svg class="feature-item__icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M14 4 L4 10 L4 22 L14 24 L24 22 L24 10 Z" stroke="rgba(250,244,228,0.65)" stroke-width="1.2" fill="none"/>
+        <path d="M4 10 L14 14 L24 10" stroke="rgba(250,244,228,0.45)" stroke-width="1" fill="none"/>
+        <line x1="14" y1="14" x2="14" y2="24" stroke="rgba(250,244,228,0.45)" stroke-width="1"/>
+      </svg>
+      <div class="feature-item__text">
+        <strong>Made by hand</strong>
+        <span>Every piece shaped, sanded, and finished ourselves</span>
+      </div>
+    </div>
+    <div class="feature-item">
+      <svg class="feature-item__icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="14" cy="14" r="9" stroke="rgba(250,244,228,0.65)" stroke-width="1.2"/>
+        <path d="M14 8 L14 14 L19 17" stroke="rgba(250,244,228,0.65)" stroke-width="1.2" stroke-linecap="round"/>
+        <circle cx="14" cy="14" r="2" fill="rgba(250,244,228,0.3)"/>
+      </svg>
+      <div class="feature-item__text">
+        <strong>2–3 week turnaround</strong>
+        <span>Ships UPS Ground · local pickup in Bellingham</span>
+      </div>
+    </div>
+    <div class="feature-item">
+      <svg class="feature-item__icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M6 20 Q14 6 22 20" stroke="rgba(250,244,228,0.65)" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <ellipse cx="14" cy="20" rx="8" ry="3" stroke="rgba(250,244,228,0.45)" stroke-width="1"/>
+        <line x1="14" y1="4" x2="14" y2="8" stroke="rgba(250,244,228,0.4)" stroke-width="1"/>
+      </svg>
+      <div class="feature-item__text">
+        <strong>Responsibly sourced</strong>
+        <span>Regional mills · sustainably harvested timber</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Featured Products ════════════════════════════════════════ -->
+<section class="section" aria-labelledby="featured-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="label">The Collection</span>
+      <h2 id="featured-heading">A few current pieces</h2>
+      <div class="divider"></div>
+      <p>Each piece is made to order. We keep a small number in stock — inquire to check availability or to talk through a custom build.</p>
+    </div>
+
+    <div class="product-grid reveal-stagger">
+
+      <!-- Product 1: Shoreline -->
+      <article class="product-card">
+        <div class="product-card__illus" aria-hidden="true">
+          <svg viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="eg1" x="0" y="0" width="22" height="22" patternUnits="userSpaceOnUse">
+                <rect width="11" height="11" fill="#3D2010"/><rect x="2" y="2" width="7" height="7" rx="0.5" fill="#4A2818"/>
+                <rect x="11" y="0" width="11" height="11" fill="#B08838"/><rect x="13" y="2" width="7" height="7" rx="0.5" fill="#C09848"/>
+                <rect x="0" y="11" width="11" height="11" fill="#B08838"/><rect x="2" y="13" width="7" height="7" rx="0.5" fill="#C09848"/>
+                <rect x="11" y="11" width="11" height="11" fill="#3D2010"/><rect x="13" y="13" width="7" height="7" rx="0.5" fill="#4A2818"/>
+              </pattern>
+              <filter id="s1"><feDropShadow dx="3" dy="6" stdDeviation="10" flood-color="rgba(26,12,6,0.3)"/></filter>
+              <clipPath id="bc1"><rect x="18" y="14" width="216" height="164" rx="7"/></clipPath>
+            </defs>
+            <!-- Handle -->
+            <rect x="210" y="72" width="54" height="56" rx="27" fill="#3D2010"/>
+            <rect x="212" y="74" width="50" height="52" rx="25" fill="#523018"/>
+            <!-- Board -->
+            <rect x="18" y="14" width="216" height="164" rx="7" fill="#3D2010" filter="url(#s1)"/>
+            <rect x="18" y="14" width="216" height="164" rx="7" fill="url(#eg1)" clip-path="url(#bc1)"/>
+            <rect x="30" y="26" width="192" height="140" rx="4" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="2"/>
+            <rect x="18" y="14" width="216" height="164" rx="7" fill="none" stroke="rgba(0,0,0,0.2)" stroke-width="1"/>
+            <rect x="18" y="14" width="100" height="60" rx="7" fill="rgba(255,255,255,0.05)" clip-path="url(#bc1)"/>
+          </svg>
+        </div>
+        <div class="product-card__body">
+          <span class="product-card__wood">Black Walnut + Hard Maple</span>
+          <h3 class="product-card__name">Shoreline</h3>
+          <p class="product-card__desc">End-grain butcher block with alternating walnut and maple strips. Juice groove perimeter, non-slip rubber feet. 12 × 16 × 1¾".</p>
+          <div class="product-card__footer">
+            <span class="product-card__price">$145</span>
+            <a href="product.html" class="btn btn--outline btn--sm">Inquire</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Product 2: Harvest Tray -->
+      <article class="product-card">
+        <div class="product-card__illus" aria-hidden="true">
+          <svg viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="tray-g" x1="30" y1="55" x2="220" y2="145" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#5C3220"/>
+                <stop offset="50%" stop-color="#4A2818"/>
+                <stop offset="100%" stop-color="#3D2010"/>
+              </linearGradient>
+              <filter id="s2"><feDropShadow dx="3" dy="8" stdDeviation="12" flood-color="rgba(26,12,6,0.32)"/></filter>
+            </defs>
+            <!-- Left handle (maple) -->
+            <ellipse cx="42" cy="100" rx="22" ry="35" fill="#B8902A" filter="url(#s2)"/>
+            <ellipse cx="42" cy="100" rx="18" ry="30" fill="#C8A040"/>
+            <ellipse cx="42" cy="100" rx="10" ry="18" fill="#3D2010"/>
+            <!-- Right handle (maple) -->
+            <ellipse cx="238" cy="100" rx="22" ry="35" fill="#B8902A" filter="url(#s2)"/>
+            <ellipse cx="238" cy="100" rx="18" ry="30" fill="#C8A040"/>
+            <ellipse cx="238" cy="100" rx="10" ry="18" fill="#3D2010"/>
+            <!-- Tray body -->
+            <rect x="50" y="55" width="180" height="90" rx="5" fill="url(#tray-g)" filter="url(#s2)"/>
+            <!-- Grain lines -->
+            <line x1="60" y1="70" x2="220" y2="70" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            <line x1="60" y1="82" x2="220" y2="82" stroke="rgba(255,255,255,0.05)" stroke-width="0.75"/>
+            <line x1="60" y1="94" x2="220" y2="94" stroke="rgba(255,255,255,0.05)" stroke-width="0.75"/>
+            <line x1="60" y1="106" x2="220" y2="106" stroke="rgba(255,255,255,0.04)" stroke-width="0.75"/>
+            <line x1="60" y1="118" x2="220" y2="118" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+            <line x1="60" y1="130" x2="220" y2="130" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+            <!-- Rim highlight -->
+            <rect x="50" y="55" width="180" height="90" rx="5" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="1.5"/>
+            <rect x="55" y="60" width="170" height="80" rx="3" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+            <!-- Sheen -->
+            <rect x="50" y="55" width="80" height="40" rx="5" fill="rgba(255,255,255,0.06)"/>
+          </svg>
+        </div>
+        <div class="product-card__body">
+          <span class="product-card__wood">Black Walnut + Maple Handles</span>
+          <h3 class="product-card__name">Harvest</h3>
+          <p class="product-card__desc">Walnut serving tray with turned maple handle caps. Perfect for breakfast spreads or charcuterie boards. 18 × 11".</p>
+          <div class="product-card__footer">
+            <span class="product-card__price">$120</span>
+            <a href="about.html#inquire" class="btn btn--outline btn--sm">Inquire</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Product 3: Corner Keep Rack -->
+      <article class="product-card">
+        <div class="product-card__illus" aria-hidden="true">
+          <svg viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="base-g" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#5C3220"/>
+                <stop offset="100%" stop-color="#3D2010"/>
+              </radialGradient>
+              <filter id="s3"><feDropShadow dx="2" dy="8" stdDeviation="12" flood-color="rgba(26,12,6,0.35)"/></filter>
+            </defs>
+            <!-- Rotating base -->
+            <ellipse cx="140" cy="170" rx="58" ry="16" fill="#2A1408" filter="url(#s3)"/>
+            <ellipse cx="140" cy="165" rx="58" ry="14" fill="#3D2010"/>
+            <ellipse cx="140" cy="163" rx="55" ry="11" fill="#4A2818"/>
+            <!-- Center post -->
+            <rect x="134" y="80" width="12" height="90" rx="4" fill="#3D2010"/>
+            <rect x="136" y="80" width="8" height="90" rx="3" fill="#5C3220"/>
+            <!-- Upper tier platform -->
+            <ellipse cx="140" cy="96" rx="56" ry="14" fill="#3D2010" filter="url(#s3)"/>
+            <ellipse cx="140" cy="94" rx="56" ry="12" fill="#4A2818"/>
+            <ellipse cx="140" cy="92" rx="53" ry="9" fill="#5C3220"/>
+            <!-- Lower tier platform -->
+            <ellipse cx="140" cy="130" rx="68" ry="16" fill="#3D2010" filter="url(#s3)"/>
+            <ellipse cx="140" cy="128" rx="68" ry="14" fill="#4A2818"/>
+            <ellipse cx="140" cy="126" rx="65" ry="11" fill="#5C3220"/>
+            <!-- Jars on upper tier (small circles) -->
+            <circle cx="108" cy="82" r="8" fill="#7A9060"/><circle cx="108" cy="82" r="6" fill="#8AA070"/><circle cx="108" cy="78" r="6" fill="#A8C090"/>
+            <circle cx="124" cy="80" r="8" fill="#8A7040"/><circle cx="124" cy="80" r="6" fill="#9A8050"/><circle cx="124" cy="76" r="6" fill="#B89860"/>
+            <circle cx="140" cy="79" r="8" fill="#604030"/><circle cx="140" cy="79" r="6" fill="#704840"/><circle cx="140" cy="75" r="6" fill="#906050"/>
+            <circle cx="156" cy="80" r="8" fill="#506840"/><circle cx="156" cy="80" r="6" fill="#607850"/><circle cx="156" cy="76" r="6" fill="#80A070"/>
+            <circle cx="172" cy="82" r="8" fill="#8A6020"/><circle cx="172" cy="82" r="6" fill="#9A7030"/><circle cx="172" cy="78" r="6" fill="#B89050"/>
+            <!-- Jars on lower tier -->
+            <circle cx="94" cy="115" r="9" fill="#7A9060"/><circle cx="94" cy="115" r="7" fill="#8AA070"/><circle cx="94" cy="110" r="7" fill="#A8C090"/>
+            <circle cx="112" cy="113" r="9" fill="#604030"/><circle cx="112" cy="113" r="7" fill="#704840"/><circle cx="112" cy="108" r="7" fill="#906050"/>
+            <circle cx="130" cy="112" r="9" fill="#506840"/><circle cx="130" cy="112" r="7" fill="#607850"/><circle cx="130" cy="107" r="7" fill="#80A070"/>
+            <circle cx="148" cy="112" r="9" fill="#8A6020"/><circle cx="148" cy="112" r="7" fill="#9A7030"/><circle cx="148" cy="107" r="7" fill="#B89050"/>
+            <circle cx="166" cy="113" r="9" fill="#7A9060"/><circle cx="166" cy="113" r="7" fill="#8AA070"/><circle cx="166" cy="108" r="7" fill="#A8C090"/>
+            <circle cx="184" cy="115" r="9" fill="#8A7040"/><circle cx="184" cy="115" r="7" fill="#9A8050"/><circle cx="184" cy="110" r="7" fill="#B89860"/>
+          </svg>
+        </div>
+        <div class="product-card__body">
+          <span class="product-card__wood">Black Walnut</span>
+          <h3 class="product-card__name">Corner Keep</h3>
+          <p class="product-card__desc">Two-tier rotating countertop spice rack. Holds 24 standard jars. Mortise-and-tenon base with smooth-turning center post.</p>
+          <div class="product-card__footer">
+            <span class="product-card__price">$155</span>
+            <a href="about.html#inquire" class="btn btn--outline btn--sm">Inquire</a>
+          </div>
+        </div>
+      </article>
+
+    </div><!-- /product-grid -->
+
+    <div class="text-center mt-2xl reveal">
+      <a href="shop.html" class="btn btn--primary">View Full Collection</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Category Cards ═══════════════════════════════════════════ -->
+<section class="section section--parchment" aria-labelledby="categories-heading">
+  <div class="container">
+    <div class="section-header section-header--center reveal">
+      <span class="label">Browse by Category</span>
+      <h2 id="categories-heading">What we make</h2>
+      <div class="divider divider--center"></div>
+    </div>
+
+    <div class="category-grid reveal-stagger">
+
+      <!-- Category: Cutting Boards -->
+      <a href="shop.html?filter=cutting-boards" class="category-card" aria-label="Shop Cutting Boards">
+        <div class="category-card__bg" aria-hidden="true">
+          <svg viewBox="0 0 400 530" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%">
+            <rect width="400" height="530" fill="#3D2010"/>
+            <defs>
+              <pattern id="cat-eg" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+                <rect width="15" height="15" fill="#4A2818"/>
+                <rect x="15" y="0" width="15" height="15" fill="#8B6820"/>
+                <rect x="0" y="15" width="15" height="15" fill="#8B6820"/>
+                <rect x="15" y="15" width="15" height="15" fill="#4A2818"/>
+              </pattern>
+            </defs>
+            <!-- Large board -->
+            <rect x="40" y="120" width="280" height="220" rx="10" fill="url(#cat-eg)" opacity="0.85"/>
+            <rect x="40" y="120" width="280" height="220" rx="10" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="2"/>
+            <!-- Medium board -->
+            <rect x="80" y="360" width="220" height="150" rx="8" fill="#5C3220" opacity="0.7"/>
+            <line x1="90" y1="380" x2="290" y2="380" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+            <line x1="90" y1="396" x2="290" y2="396" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            <line x1="90" y1="412" x2="290" y2="412" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            <line x1="90" y1="428" x2="290" y2="428" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <rect x="80" y="360" width="220" height="150" rx="8" fill="none" stroke="rgba(0,0,0,0.2)" stroke-width="1.5"/>
+            <!-- Handle suggestion -->
+            <rect x="295" y="190" width="65" height="80" rx="32" fill="#3D2010" opacity="0.9"/>
+            <!-- Grain overlay -->
+            <rect width="400" height="530" fill="rgba(30,12,6,0.12)"/>
+          </svg>
+        </div>
+        <div class="category-card__overlay" aria-hidden="true"></div>
+        <div class="category-card__content">
+          <span class="category-card__count">3 styles available</span>
+          <h3 class="category-card__title">Cutting<br>Boards</h3>
+          <span class="category-card__link">Shop boards &rarr;</span>
+        </div>
+      </a>
+
+      <!-- Category: Serving Trays -->
+      <a href="shop.html?filter=serving-trays" class="category-card" aria-label="Shop Serving Trays">
+        <div class="category-card__bg" aria-hidden="true">
+          <svg viewBox="0 0 400 530" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%">
+            <rect width="400" height="530" fill="#2A1408"/>
+            <!-- Large tray body -->
+            <rect x="60" y="155" width="280" height="140" rx="8" fill="#5C3220"/>
+            <line x1="75" y1="175" x2="325" y2="175" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+            <line x1="75" y1="191" x2="325" y2="191" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="75" y1="207" x2="325" y2="207" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="75" y1="223" x2="325" y2="223" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+            <line x1="75" y1="239" x2="325" y2="239" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+            <line x1="75" y1="255" x2="325" y2="255" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+            <line x1="75" y1="271" x2="325" y2="271" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+            <!-- Handles -->
+            <ellipse cx="50" cy="225" rx="24" ry="40" fill="#B89040"/>
+            <ellipse cx="50" cy="225" rx="18" ry="32" fill="#C8A050"/>
+            <ellipse cx="50" cy="225" rx="10" ry="20" fill="#2A1408"/>
+            <ellipse cx="350" cy="225" rx="24" ry="40" fill="#B89040"/>
+            <ellipse cx="350" cy="225" rx="18" ry="32" fill="#C8A050"/>
+            <ellipse cx="350" cy="225" rx="10" ry="20" fill="#2A1408"/>
+            <!-- Tray rim -->
+            <rect x="60" y="155" width="280" height="140" rx="8" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="2"/>
+            <rect x="68" y="163" width="264" height="124" rx="5" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+            <!-- Second tray (live edge) -->
+            <path d="M70 340 Q72 332 78 336 Q85 328 92 334 Q98 326 106 332 Q114 324 122 330 Q130 322 138 328 Q145 320 152 326 L152 470 Q138 474 122 472 Q106 476 90 472 Q74 474 70 470 Z" fill="#8A8070" opacity="0.7"/>
+            <line x1="80" y1="360" x2="148" y2="360" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            <line x1="80" y1="375" x2="148" y2="375" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <rect width="400" height="530" fill="rgba(20,8,2,0.1)"/>
+          </svg>
+        </div>
+        <div class="category-card__overlay" aria-hidden="true"></div>
+        <div class="category-card__content">
+          <span class="category-card__count">3 styles available</span>
+          <h3 class="category-card__title">Serving<br>Trays</h3>
+          <span class="category-card__link">Shop trays &rarr;</span>
+        </div>
+      </a>
+
+      <!-- Category: Spice Racks -->
+      <a href="shop.html?filter=spice-racks" class="category-card" aria-label="Shop Spice Racks">
+        <div class="category-card__bg" aria-hidden="true">
+          <svg viewBox="0 0 400 530" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%">
+            <rect width="400" height="530" fill="#1E0C06"/>
+            <!-- Rack frame sides -->
+            <rect x="60" y="80" width="18" height="370" rx="4" fill="#5C3220"/>
+            <rect x="322" y="80" width="18" height="370" rx="4" fill="#5C3220"/>
+            <!-- Three shelves -->
+            <rect x="58" y="150" width="284" height="14" rx="3" fill="#4A2818"/>
+            <rect x="58" y="250" width="284" height="14" rx="3" fill="#4A2818"/>
+            <rect x="58" y="350" width="284" height="14" rx="3" fill="#4A2818"/>
+            <!-- Shelf highlights -->
+            <rect x="58" y="150" width="284" height="4" rx="2" fill="rgba(255,255,255,0.08)"/>
+            <rect x="58" y="250" width="284" height="4" rx="2" fill="rgba(255,255,255,0.08)"/>
+            <rect x="58" y="350" width="284" height="4" rx="2" fill="rgba(255,255,255,0.08)"/>
+            <!-- Wall mount brackets -->
+            <rect x="100" y="75" width="14" height="30" rx="2" fill="#6B3D24"/>
+            <rect x="286" y="75" width="14" height="30" rx="2" fill="#6B3D24"/>
+            <circle cx="107" cy="78" r="4" fill="#3D2010"/>
+            <circle cx="293" cy="78" r="4" fill="#3D2010"/>
+            <!-- Jars top shelf -->
+            <rect x="80" y="112" width="22" height="36" rx="4" fill="#7A9060"/><rect x="82" y="110" width="18" height="8" rx="2" fill="#9AB080"/>
+            <rect x="110" y="116" width="22" height="32" rx="4" fill="#8A7040"/><rect x="112" y="114" width="18" height="8" rx="2" fill="#A89058"/>
+            <rect x="140" y="110" width="22" height="38" rx="4" fill="#604030"/><rect x="142" y="108" width="18" height="8" rx="2" fill="#806050"/>
+            <rect x="170" y="114" width="22" height="34" rx="4" fill="#506840"/><rect x="172" y="112" width="18" height="8" rx="2" fill="#708858"/>
+            <rect x="200" y="112" width="22" height="36" rx="4" fill="#8A6020"/><rect x="202" y="110" width="18" height="8" rx="2" fill="#AA8038"/>
+            <rect x="230" y="116" width="22" height="32" rx="4" fill="#7A9060"/><rect x="232" y="114" width="18" height="8" rx="2" fill="#9AB080"/>
+            <rect x="260" y="110" width="22" height="38" rx="4" fill="#604030"/><rect x="262" y="108" width="18" height="8" rx="2" fill="#806050"/>
+            <!-- Jars middle shelf -->
+            <rect x="80" y="212" width="22" height="36" rx="4" fill="#8A6020"/><rect x="82" y="210" width="18" height="8" rx="2" fill="#AA8038"/>
+            <rect x="110" y="215" width="22" height="33" rx="4" fill="#7A9060"/><rect x="112" y="213" width="18" height="8" rx="2" fill="#9AB080"/>
+            <rect x="140" y="210" width="22" height="38" rx="4" fill="#8A7040"/><rect x="142" y="208" width="18" height="8" rx="2" fill="#A89058"/>
+            <rect x="170" y="213" width="22" height="35" rx="4" fill="#506840"/><rect x="172" y="211" width="18" height="8" rx="2" fill="#708858"/>
+            <rect x="200" y="211" width="22" height="37" rx="4" fill="#604030"/><rect x="202" y="209" width="18" height="8" rx="2" fill="#806050"/>
+            <rect x="230" y="215" width="22" height="33" rx="4" fill="#7A9060"/><rect x="232" y="213" width="18" height="8" rx="2" fill="#9AB080"/>
+            <rect x="260" y="212" width="22" height="36" rx="4" fill="#8A6020"/><rect x="262" y="210" width="18" height="8" rx="2" fill="#AA8038"/>
+            <!-- Jars bottom shelf -->
+            <rect x="80" y="312" width="22" height="36" rx="4" fill="#506840"/><rect x="82" y="310" width="18" height="8" rx="2" fill="#708858"/>
+            <rect x="110" y="314" width="22" height="34" rx="4" fill="#604030"/><rect x="112" y="312" width="18" height="8" rx="2" fill="#806050"/>
+            <rect x="140" y="311" width="22" height="37" rx="4" fill="#8A7040"/><rect x="142" y="309" width="18" height="8" rx="2" fill="#A89058"/>
+            <rect x="170" y="312" width="22" height="36" rx="4" fill="#7A9060"/><rect x="172" y="310" width="18" height="8" rx="2" fill="#9AB080"/>
+            <rect x="200" y="313" width="22" height="35" rx="4" fill="#8A6020"/><rect x="202" y="311" width="18" height="8" rx="2" fill="#AA8038"/>
+            <rect x="230" y="311" width="22" height="37" rx="4" fill="#604030"/><rect x="232" y="309" width="18" height="8" rx="2" fill="#806050"/>
+            <rect x="260" y="312" width="22" height="36" rx="4" fill="#506840"/><rect x="262" y="310" width="18" height="8" rx="2" fill="#708858"/>
+            <rect width="400" height="530" fill="rgba(10,4,0,0.15)"/>
+          </svg>
+        </div>
+        <div class="category-card__overlay" aria-hidden="true"></div>
+        <div class="category-card__content">
+          <span class="category-card__count">2 styles available</span>
+          <h3 class="category-card__title">Spice<br>Racks</h3>
+          <span class="category-card__link">Shop racks &rarr;</span>
+        </div>
+      </a>
+
+    </div><!-- /category-grid -->
+  </div>
+</section>
+
+<!-- ══ Workshop Split ═══════════════════════════════════════════ -->
+<div class="workshop-split">
+  <div class="workshop-split__visual" aria-hidden="true">
+    <!-- Workshop illustration: plane + shaving -->
+    <svg viewBox="0 0 360 280" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:340px;width:100%">
+      <!-- Workbench surface -->
+      <rect x="0" y="200" width="360" height="80" fill="#2A1408"/>
+      <line x1="0" y1="200" x2="360" y2="200" stroke="rgba(250,244,228,0.12)" stroke-width="1"/>
+      <line x1="0" y1="212" x2="360" y2="212" stroke="rgba(250,244,228,0.05)" stroke-width="1"/>
+      <line x1="0" y1="224" x2="360" y2="224" stroke="rgba(250,244,228,0.04)" stroke-width="1"/>
+      <!-- Wood plank being worked -->
+      <rect x="40" y="162" width="280" height="44" rx="4" fill="#5C3220"/>
+      <line x1="55" y1="172" x2="308" y2="172" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <line x1="55" y1="182" x2="308" y2="182" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+      <line x1="55" y1="192" x2="308" y2="192" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+      <rect x="40" y="162" width="280" height="44" rx="4" fill="none" stroke="rgba(0,0,0,0.2)" stroke-width="1"/>
+      <!-- Hand plane -->
+      <rect x="110" y="130" width="140" height="36" rx="6" fill="#B89040"/>
+      <rect x="114" y="133" width="132" height="30" rx="4" fill="#C8A050"/>
+      <rect x="118" y="136" width="32" height="24" rx="3" fill="#A07830"/>
+      <rect x="115" y="162" width="8" height="6" rx="1" fill="#7A5820"/>
+      <!-- Tote/handle on plane -->
+      <path d="M195 130 Q210 110 220 130" fill="#8B4A20" stroke="#6B3810" stroke-width="1"/>
+      <path d="M198 130 Q211 115 218 130" fill="#9B5A28"/>
+      <!-- Knob -->
+      <ellipse cx="148" cy="132" rx="12" ry="8" fill="#8B4A20"/>
+      <ellipse cx="148" cy="130" rx="10" ry="6" fill="#9B5A28"/>
+      <!-- Wood shaving curling off -->
+      <path d="M110 162 Q90 140 60 145 Q40 148 38 162" stroke="rgba(212,168,74,0.6)" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M110 162 Q100 150 80 155 Q65 158 60 165" stroke="rgba(212,168,74,0.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <!-- Sawdust -->
+      <circle cx="55" cy="168" r="2" fill="rgba(212,168,74,0.4)"/>
+      <circle cx="72" cy="175" r="1.5" fill="rgba(212,168,74,0.3)"/>
+      <circle cx="88" cy="170" r="1" fill="rgba(212,168,74,0.25)"/>
+      <!-- Grain lines on bench -->
+      <line x1="60" y1="215" x2="300" y2="215" stroke="rgba(250,244,228,0.04)" stroke-width="1"/>
+      <line x1="60" y1="230" x2="300" y2="230" stroke="rgba(250,244,228,0.03)" stroke-width="1"/>
+      <!-- H&G stamp/brand -->
+      <rect x="286" y="174" width="28" height="24" rx="2" fill="rgba(250,244,228,0.07)" stroke="rgba(250,244,228,0.15)" stroke-width="0.75"/>
+      <text x="291" y="188" font-family="serif" font-size="9" fill="rgba(250,244,228,0.35)" font-style="italic">H&G</text>
+    </svg>
+  </div>
+  <div class="workshop-split__text">
+    <span class="label">The Workshop</span>
+    <h2>Eight years of<br><em>slow work</em></h2>
+    <p>The workshop started in 2016 with a single walnut slab and a set of hand planes. Eight years later, we still make every piece ourselves — no production line, no shortcuts.</p>
+    <p>We source lumber from regional mills and sustainably harvested private timberlands in the Pacific Northwest. When you buy from Hollow &amp; Grain, you're getting something made slowly, on purpose.</p>
+    <a href="about.html" class="btn btn--outline">Our Story</a>
+  </div>
+</div>
+
+<!-- ══ Custom Orders CTA ════════════════════════════════════════ -->
+<div class="cta-banner" aria-label="Custom orders callout">
+  <div class="container" style="position:relative;z-index:1">
+    <span class="label">Custom Work</span>
+    <h2>Have something<br>specific in mind?</h2>
+    <p>We love custom orders. A set of boards for your restaurant kitchen, a tray sized just right for your sideboard, a gift for someone who really cooks — we can make it.</p>
+    <div class="cta-banner__actions">
+      <a href="custom.html" class="btn btn--oak btn--lg">Start a Custom Order</a>
+      <a href="about.html#inquire" class="btn btn--ghost btn--lg">Get in Touch</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Footer ═══════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>
+      <div class="footer__logo">
+        <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="36" height="36" rx="3" fill="rgba(250,244,228,0.06)"/>
+          <path d="M8 10 L8 26 M8 18 L16 18 M16 10 L16 26" stroke="rgba(250,244,228,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M20 10 Q28 10 28 18 Q28 26 20 26 L20 10Z" stroke="rgba(250,244,228,0.6)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          <line x1="7" y1="29" x2="29" y2="29" stroke="rgba(212,168,74,0.5)" stroke-width="0.75"/>
+        </svg>
+        <span class="footer__logo-text">Hollow &amp; Grain</span>
+      </div>
+      <p class="footer__tagline">Handmade kitchen pieces built for a lifetime of daily use. Bellingham, WA.</p>
+    </div>
+    <div>
+      <p class="footer__heading">Pages</p>
+      <ul class="footer__nav-list">
+        <li><a href="shop.html">Shop the Collection</a></li>
+        <li><a href="custom.html">Custom Orders</a></li>
+        <li><a href="care.html">Care Instructions</a></li>
+        <li><a href="about.html">About &amp; Inquire</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="footer__heading">Contact</p>
+      <p class="footer__contact-item">hello@hollowandgrain.com</p>
+      <p class="footer__contact-item">Bellingham, WA 98225</p>
+      <p class="footer__contact-item" style="margin-top:1rem;font-size:0.875rem">Pickup by appointment.<br>Ships UPS Ground, US only.</p>
+    </div>
+  </div>
+  <div class="footer__bottom">
+    <div class="container">
+      <p class="footer__copy">&copy; 2024 Hollow &amp; Grain. All rights reserved.</p>
+      <p class="footer__copy">Inquiry-only catalog &mdash; no live checkout.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

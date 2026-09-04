@@ -1,0 +1,7 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": ["law-firm", "professional-services", "has-form", "has-nav", "dropdowns", "testimonials", "faq"],
+  "capabilities": ["forms", "local-css", "runtime-js"],
+  "risk_profile": "medium",
+  "complexity": 2
+}

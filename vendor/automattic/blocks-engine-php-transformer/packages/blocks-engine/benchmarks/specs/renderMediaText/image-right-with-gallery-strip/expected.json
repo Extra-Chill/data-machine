@@ -1,0 +1,20 @@
+{
+  "source": "ideal",
+  "_note": "IDEAL (structural gap -> <100): a plain image-beside-text feature row should be a single core/media-text (image = media side, heading/paragraph/buttons = text side), per block-runner's rule 'never core/columns for this'. The current deterministic reconstruct emits core/columns instead, so the media-text node misses — an honest fidelity gap, not a regression. The gallery strip below the row is faithful.",
+  "tree": [
+    {
+      "block": "core/group",
+      "children": [
+        { "block": "core/media-text", "contains": "Media beside structured copy" },
+        {
+          "block": "core/gallery",
+          "children": [
+            { "block": "core/image", "contains": "strip.jpg" },
+            { "block": "core/image", "contains": "strip.jpg" },
+            { "block": "core/image", "contains": "strip.jpg" }
+          ]
+        }
+      ]
+    }
+  ]
+}

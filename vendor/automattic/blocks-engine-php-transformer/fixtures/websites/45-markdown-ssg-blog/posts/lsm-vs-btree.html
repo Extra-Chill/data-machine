@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LSM Trees vs. B-Trees: A Bet About Your Workload — Cold Start</title>
+<meta name="description" content="B-trees and LSM trees aren't competitors so much as opposite wagers on whether you read more than you write. Understanding the bet tells you which to reach for.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cold Start" href="../index.xml">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="shell shell--wide masthead__inner">
+    <a class="brand" href="../index.html" aria-label="Cold Start — home">
+      <svg class="brand__mark" width="30" height="30" viewBox="0 0 32 32" role="img" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#c2410c"/>
+        <path d="M16 6c1.6 3.4 1 5.6-.8 7.6-2 2.2-2.6 4.4-1.4 7.2-3-1.4-4.4-4.2-3.6-7.4C11 17 13 18 13.2 20.4 14.6 18 13.4 15.4 16 6Z" fill="#fde7d8"/>
+        <circle cx="20.5" cy="20" r="2.3" fill="#fdba74"/>
+      </svg>
+      <span class="brand__text">
+        <span class="brand__name">Cold Start</span>
+        <span class="brand__tag">storage &amp; distributed systems</span>
+      </span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="../index.html">Home</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../about.html">About</a>
+      <a class="nav__rss" href="../index.xml" aria-label="RSS feed" title="RSS feed">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="13" r="1.6"/><path d="M2 7.3a6.7 6.7 0 0 1 6.7 6.7H6.5A4.5 4.5 0 0 0 2 9.5z"/><path d="M2 3a11 11 0 0 1 11 11h-2.2A8.8 8.8 0 0 0 2 5.2z"/></svg>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <article class="article shell">
+    <header class="article__header">
+      <div class="article__meta">
+        <a class="series-badge" href="../tags.html">Storage Internals</a>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <time datetime="2024-03-04">Mar 4, 2024</time>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <span>9 min read</span>
+      </div>
+      <h1 class="article__title">LSM Trees vs. B-Trees: A Bet About Your Workload</h1>
+      <p class="article__dek">B-trees and LSM trees aren't competitors so much as opposite wagers on whether you read more than you write. Understanding the bet tells you which to reach for.</p>
+      <div class="byline">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <span>
+          <span class="byline__name">Mara Quintero</span><br>
+          <span class="byline__role">Principal Engineer, Storage · Lisbon</span>
+        </span>
+      </div>
+    </header>
+
+    <div class="prose">
+      <p>If the <a href="write-ahead-log.html">write-ahead log</a> is how a database stays durable, the <strong>storage layout</strong> is how it decides what to be good at. And the two dominant layouts — the B-tree and the log-structured merge tree — make nearly opposite bets.</p>
+      <p>You can summarize the whole debate in one sentence: <em>B-trees optimize for reads and pay on writes; LSM trees optimize for writes and pay on reads.</em> Everything else is detail. Let's get into the detail anyway.</p>
+
+      <h2 id="the-btree-bet">The B-tree bet: writes are rare, reads are everything</h2>
+      <p>The B-tree (really the B+tree) has run the database world for fifty years because it's a beautiful fit for spinning disks and read-heavy workloads. The data lives sorted, in fixed-size pages, in a shallow balanced tree. Looking up a key is a handful of page reads — <code>O(log n)</code> with a comfortably large base.</p>
+      <p>The cost shows up on writes. To update a key, you find its page, modify it, and eventually write that page back. But pages are, say, 8 KB. If you change a single 100-byte row, you still rewrite the whole 8 KB page. That's <strong>write amplification</strong>, and under a random-write workload it compounds: scattered updates dirty pages all over the tree, each flush forcing a full-page write.</p>
+      <p>B-trees also suffer <strong>fragmentation</strong> and need to update in place, which makes them write to the same physical locations repeatedly — historically rough on flash endurance.</p>
+      <p>So the B-tree's wager is: <em>I'll assume you read far more than you write, and I'll make reads cheap and predictable.</em> For an OLTP system serving lots of point lookups, that's a great bet. Postgres, MySQL/InnoDB, and SQLite all make it.</p>
+
+      <h2 id="the-lsm-bet">The LSM bet: absorb writes now, sort them out later</h2>
+      <p>The log-structured merge tree starts from the opposite premise: <em>writes are the bottleneck, so never do a random write at all.</em></p>
+      <p>Every write goes into an in-memory sorted structure called the <strong>memtable</strong> (usually a skip list or balanced tree). It's also appended to a WAL for durability. Reads check the memtable first. When the memtable fills up, it's frozen and flushed to disk <strong>sequentially</strong> as an immutable, sorted file called an <strong>SSTable</strong> (Sorted String Table).</p>
+      <pre><code>write ─▶ memtable (in RAM, sorted) ─┐
+                                     ├─▶ flush ─▶ SSTable L0 ─▶ compaction ─▶ L1 ─▶ L2 ...
+write ─▶ WAL (durability) ──────────┘</code></pre>
+      <p>Crucially, you never modify an SSTable. Updates and deletes are just <em>new</em> writes — a delete is a special marker called a <strong>tombstone</strong>. The newest value wins. This means writes are always sequential appends, which is exactly what both spinning disks and SSDs love.</p>
+      <p>The catch is reads. A key might live in the memtable, or in <em>any</em> of the SSTables on disk. A naive read would have to check all of them. Two mechanisms rescue this:</p>
+      <ul>
+        <li><strong>Bloom filters</strong> — a tiny probabilistic index per SSTable that can say "definitely not here" without touching the file. They turn most negative lookups into a memory check.</li>
+        <li><strong>Compaction</strong> — a background process that merges SSTables together, discarding overwritten values and tombstones, keeping the number of files bounded.</li>
+      </ul>
+
+      <h2 id="compaction">Compaction is where the bodies are buried</h2>
+      <p>Compaction is the LSM tree's defining feature and its biggest operational liability. It's the price you deferred at write time, coming due later.</p>
+      <p>There are two main strategies, and choosing between them is choosing your pain:</p>
+      <table>
+        <thead>
+          <tr><th></th><th>Leveled compaction</th><th>Tiered (size-tiered) compaction</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Read amplification</strong></td><td>low</td><td>higher</td></tr>
+          <tr><td><strong>Write amplification</strong></td><td>higher</td><td>lower</td></tr>
+          <tr><td><strong>Space amplification</strong></td><td>low</td><td>higher (transient duplicates)</td></tr>
+          <tr><td><strong>Good for</strong></td><td>read-heavy, space-constrained</td><td>write-heavy, space to spare</td></tr>
+        </tbody>
+      </table>
+      <p>RocksDB defaults to leveled; Cassandra historically defaulted to tiered. Neither is wrong — they're tuned for different bets within the LSM family.</p>
+      <p>The operational gotcha: compaction competes with your live traffic for disk I/O and CPU. If write volume outruns compaction's ability to keep up, the number of L0 files grows, read amplification spikes, and latency falls off a cliff. This shows up in real life as a database that's been fine for months and then mysteriously falls over under a traffic spike. The culprit is almost always <strong>write stalls</strong> triggered by compaction debt.</p>
+
+      <h2 id="which-do-you-pick">So which do you pick?</h2>
+      <p>Don't pick in the abstract. Pick by interrogating your workload:</p>
+      <ol>
+        <li><strong>What's your read/write ratio?</strong> Mostly reads → lean B-tree. Mostly writes → lean LSM.</li>
+        <li><strong>Are your writes random or sequential by key?</strong> Heavy random inserts (time-series, event logs, IoT) are the LSM sweet spot.</li>
+        <li><strong>How tight is your space budget?</strong> LSM with tiered compaction can use a lot of transient extra space. B-trees are more predictable.</li>
+        <li><strong>Can you tolerate latency tails from compaction?</strong> If p99 matters more than throughput, the B-tree's steadier behavior may win.</li>
+      </ol>
+      <p>A useful gut check: most general-purpose <strong>relational</strong> databases pick B-trees because OLTP is read-skewed and latency-sensitive. Most <strong>write-heavy NoSQL and time-series</strong> stores (Cassandra, ScyllaDB, RocksDB-backed systems, InfluxDB) pick LSM because ingestion is the hard part.</p>
+
+      <h2 id="the-honest-summary">The honest summary</h2>
+      <p>There is no free lunch in storage. The <strong>RUM conjecture</strong> makes it formal: you can optimize at most two of <strong>R</strong>ead overhead, <strong>U</strong>pdate overhead, and <strong>M</strong>emory (space) overhead — improving one of the three tends to cost you another.</p>
+      <blockquote><p>A B-tree spends write effort to make reads cheap. An LSM tree defers write effort to make writes cheap, then pays it back during compaction.</p></blockquote>
+      <p>Neither is "better." They're different answers to the question <em>what is this system going to spend most of its time doing?</em> Answer that honestly and the choice usually makes itself.</p>
+
+      <hr>
+      <p><em>Next up: why your retry logic is probably making outages worse, not better.</em></p>
+    </div>
+
+    <footer class="article-footer">
+      <div class="tag-row">
+        <a class="tag" href="../tags.html#storage">storage</a>
+        <a class="tag" href="../tags.html#databases">databases</a>
+        <a class="tag" href="../tags.html#internals">internals</a>
+        <a class="tag" href="../tags.html#performance">performance</a>
+      </div>
+      <div class="author-box">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <p class="author-box__body">
+          <span class="author-box__name">Mara Quintero</span><br>
+          <span class="author-box__bio">Principal Engineer, Storage · Lisbon. Fifteen years building and breaking storage systems, with an unhealthy affection for write-ahead logs.</span>
+        </p>
+      </div>
+      <nav class="post-nav" aria-label="More posts">
+        <a href="write-ahead-log.html">
+          <span class="dir">← Previous</span>
+          <span class="ttl">The Write-Ahead Log Is the Database</span>
+        </a>
+        <a class="next" href="retries-make-outages-worse.html">
+          <span class="dir">Next →</span>
+          <span class="ttl">Your Retries Are Making the Outage Worse</span>
+        </a>
+      </nav>
+    </footer>
+  </article>
+</main>
+
+<footer class="site-foot">
+  <div class="shell shell--wide site-foot__inner">
+    <p>&copy; 2024 Cold Start · Built with <a href="https://gohugo.io/">Hugo</a> · One pager-induced essay at a time.</p>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="../about.html">About</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../index.xml">RSS</a>
+      <a href="https://github.com/coldstart-dev">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

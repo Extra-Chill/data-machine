@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact — Lumen Coffee Roasters</title>
+<meta name="description" content="Get in touch with Lumen Coffee Roasters. Store hours, location, and a contact form for wholesale, events and general questions.">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="brand" href="index.html" aria-label="Lumen Coffee Roasters home">
+      <svg class="brand__mark" viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="22" fill="#2b1d16"/>
+        <circle cx="24" cy="24" r="11" fill="none" stroke="#c2703d" stroke-width="2.5"/>
+        <g stroke="#f5ece0" stroke-width="2.2" stroke-linecap="round">
+          <path d="M24 9v4M24 35v4M9 24h4M35 24h4M13.4 13.4l2.8 2.8M31.8 31.8l2.8 2.8M13.4 34.6l2.8-2.8M31.8 16.2l2.8-2.8"/>
+        </g>
+        <path d="M24 19c3 2 3 6 0 8-3-2-3-6 0-8z" fill="#c2703d"/>
+      </svg>
+      <span class="brand__name">Lumen<small>Coffee Roasters</small></span>
+    </a>
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="about.html">About</a>
+      <a href="contact.html" aria-current="page">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn nav-toggle" id="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false" aria-controls="primary-nav">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-btn" type="button" data-open-drawer aria-label="Open cart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6h15l-1.5 9h-12z" stroke-linejoin="round"/><path d="M6 6 5 3H2" stroke-linecap="round"/><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/></svg>
+        <span class="cart-badge" data-cart-badge hidden>0</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="page-hero">
+    <div class="wrap">
+      <h1>Say hello</h1>
+      <p>Questions about a coffee, wholesale, or hosting an event? Drop us a line — we read every message.</p>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="wrap contact-layout">
+      <div>
+        <h2 style="margin-top:0;">Send us a message</h2>
+        <form id="contact-form" novalidate>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="cf-name">Name</label>
+              <input id="cf-name" name="name" type="text" autocomplete="name" required>
+            </div>
+            <div class="form-field">
+              <label for="cf-email">Email</label>
+              <input id="cf-email" name="email" type="email" autocomplete="email" required>
+            </div>
+            <div class="form-field full">
+              <label for="cf-subject">Subject</label>
+              <input id="cf-subject" name="subject" type="text">
+            </div>
+            <div class="form-field full">
+              <label for="cf-message">Message</label>
+              <textarea id="cf-message" name="message" rows="6" required></textarea>
+            </div>
+          </div>
+          <button class="btn btn--solid btn--lg" type="submit">Send message</button>
+          <p class="form-status" id="contact-status" role="status" hidden></p>
+        </form>
+      </div>
+
+      <div>
+        <div class="info-card">
+          <h3>Visit the roastery</h3>
+          <p style="margin:0 0 6px;">114 Kindling Lane<br>Riverbend, OR 97000</p>
+          <p style="margin:0;"><a href="mailto:hello@lumencoffee.example">hello@lumencoffee.example</a><br><a href="tel:+15035550142">(503) 555-0142</a></p>
+        </div>
+        <div class="info-card">
+          <h3>Store hours</h3>
+          <ul class="hours">
+            <li><span>Monday – Friday</span><span>7:00am – 6:00pm</span></li>
+            <li><span>Saturday</span><span>8:00am – 5:00pm</span></li>
+            <li><span>Sunday</span><span>8:00am – 2:00pm</span></li>
+            <li><span>Holidays</span><span>Reduced hours</span></li>
+          </ul>
+        </div>
+        <div class="map-illustration" role="img" aria-label="Stylized map showing the Lumen roastery location near the river and Kindling Lane.">
+          <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet">
+            <rect width="400" height="240" fill="#ece0cf"/>
+            <!-- river -->
+            <path d="M0 60 C120 40 160 130 280 110 C340 100 380 150 400 140 L400 240 L0 240 Z" fill="#7a8b5a" opacity="0.28"/>
+            <path d="M0 60 C120 40 160 130 280 110 C340 100 380 150 400 140" fill="none" stroke="#7a8b5a" stroke-width="3" opacity="0.5"/>
+            <!-- roads -->
+            <path d="M40 0 L120 240" stroke="#fbf6ee" stroke-width="14"/>
+            <path d="M0 150 L400 120" stroke="#fbf6ee" stroke-width="14"/>
+            <path d="M280 0 L320 240" stroke="#fbf6ee" stroke-width="10"/>
+            <!-- blocks -->
+            <rect x="150" y="40" width="40" height="34" rx="4" fill="#d8c4a8"/>
+            <rect x="210" y="160" width="46" height="36" rx="4" fill="#d8c4a8"/>
+            <rect x="60" y="180" width="34" height="30" rx="4" fill="#d8c4a8"/>
+            <!-- pin -->
+            <g transform="translate(196 96)">
+              <path d="M0 0 C-18 -22 -14 -48 0 -48 C14 -48 18 -22 0 0z" fill="#c2703d"/>
+              <circle cx="0" cy="-30" r="8" fill="#fbf6ee"/>
+            </g>
+            <text x="206" y="70" font-family="Georgia, serif" font-size="12" fill="#3a2418">Kindling Ln</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <span class="brand__name">Lumen<small>Coffee Roasters</small></span>
+        <p>Small-batch specialty coffee, roasted to order in the heart of the city since 2014.</p>
+      </div>
+      <div><h4>Shop</h4><ul>
+        <li><a href="shop.html?category=single-origin">Single Origin</a></li>
+        <li><a href="shop.html?category=blend">Blends</a></li>
+        <li><a href="shop.html?category=espresso">Espresso</a></li>
+        <li><a href="shop.html?category=gear">Brew Gear</a></li>
+      </ul></div>
+      <div><h4>Company</h4><ul>
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html">Contact</a></li>
+        <li><a href="shop.html">All Products</a></li>
+      </ul></div>
+      <div><h4>Visit</h4><ul>
+        <li>114 Kindling Lane</li>
+        <li>Riverbend, OR 97000</li>
+        <li><a href="contact.html">Store hours</a></li>
+      </ul></div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; <span data-year>2026</span> Lumen Coffee Roasters. All rights reserved.</span>
+      <span>Crafted with care · Brewed with intent</span>
+    </div>
+  </div>
+</footer>
+
+<div class="scrim" id="drawer-scrim" hidden></div>
+<aside class="drawer" id="cart-drawer" aria-label="Shopping cart" aria-hidden="true">
+  <div class="drawer__head">
+    <h2>Your Cart</h2>
+    <button class="drawer__close" type="button" data-close-drawer aria-label="Close cart">&times;</button>
+  </div>
+  <div class="drawer__body">
+    <p class="drawer__empty" data-drawer-empty>Your cart is empty.<br>Time to find your next favorite coffee.</p>
+    <ul class="cart-lines" data-drawer-list></ul>
+  </div>
+  <div class="drawer__foot" data-drawer-foot hidden>
+    <div class="drawer__subtotal"><span>Subtotal</span><strong data-drawer-subtotal>$0.00</strong></div>
+    <a class="btn btn--ghost btn--block" href="cart.html">View Cart</a>
+    <p class="drawer__note">Free shipping on orders over $45.</p>
+  </div>
+</aside>
+
+<div class="modal" id="product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title" hidden>
+  <div class="modal__dialog">
+    <button class="modal__close" type="button" data-close-modal aria-label="Close details">&times;</button>
+    <div id="product-modal-body"></div>
+  </div>
+</div>
+
+<script src="js/products.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

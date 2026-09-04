@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="News from the Department of Earth, Atmospheric & Marine Sciences at Brennan University — awards, hires, fieldwork, grants, and student stories.">
+  <title>News &mdash; EAMS &middot; Brennan University</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400..700;1,400..700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <div class="utility-bar">
+      <div class="container">
+        <span>Brennan University &middot; College of Science &middot; <span class="small-caps">est.&nbsp;1947</span></span>
+        <nav aria-label="Utility">
+          <a href="https://brennan.example.edu/">Brennan.edu</a>
+          <a href="https://brennan.example.edu/library/">Library</a>
+          <a href="https://brennan.example.edu/portal/">myBrennan</a>
+          <a href="https://brennan.example.edu/giving/eams/">Give to EAMS</a>
+        </nav>
+      </div>
+    </div>
+    <div class="brand-bar">
+      <div class="container">
+        <a href="index.html" aria-label="EAMS home" style="display:flex; align-items:center; gap:18px; border-bottom:0;">
+          <svg class="crest" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <defs><linearGradient id="crestNavy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3a5e"/><stop offset="1" stop-color="#08152a"/></linearGradient></defs>
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z" fill="url(#crestNavy)" stroke="#b08938" stroke-width="1.5"/>
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+            <rect x="20" y="52" width="24" height="6" fill="#8c3a2a"/>
+            <text x="32" y="56.6" text-anchor="middle" font-family="Inter,sans-serif" font-size="4.4" font-weight="600" fill="#ecd9a8" letter-spacing="0.3">EAMS</text>
+          </svg>
+          <span class="brand-text">
+            <span class="brand-institution">Brennan University</span>
+            <span class="brand-department">Earth, Atmospheric <span class="amp">&amp;</span> Marine Sciences</span>
+          </span>
+        </a>
+        <button class="nav-toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Toggle menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="faculty.html">Faculty</a></li>
+            <li><a href="programs.html">Programs</a></li>
+            <li><a href="courses.html">Courses</a></li>
+            <li><a href="research.html">Research</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="events.html">Events</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-head">
+    <div class="container">
+      <div class="breadcrumb">
+        <a href="index.html">EAMS</a> <span class="sep">/</span> <span>News</span>
+      </div>
+      <span class="eyebrow">Department news</span>
+      <h1>News &amp; updates</h1>
+      <p class="lede">Field reports, grant awards, faculty hires, student honors, and departmental updates &mdash; the latest 15 items, with a paginated archive going back to 2009.</p>
+    </div>
+  </section>
+
+  <main class="container" style="padding-top:32px;">
+
+    <div class="filter-chips" role="group" aria-label="Filter by category">
+      <button class="chip active" aria-pressed="true" type="button">All <span class="count">15</span></button>
+      <button class="chip" aria-pressed="false" type="button">Awards <span class="count">3</span></button>
+      <button class="chip" aria-pressed="false" type="button">Field Reports <span class="count">3</span></button>
+      <button class="chip" aria-pressed="false" type="button">Hires <span class="count">2</span></button>
+      <button class="chip" aria-pressed="false" type="button">Grants <span class="count">3</span></button>
+      <button class="chip" aria-pressed="false" type="button">Student News <span class="count">2</span></button>
+      <button class="chip" aria-pressed="false" type="button">Department Updates <span class="count">2</span></button>
+    </div>
+
+    <section aria-label="News articles">
+
+      <article class="news-card" id="cruise-2026">
+        <div class="photo-block ocean" role="img" aria-label="A research vessel at dawn with an orange-and-yellow CTD rosette suspended from the gantry crane"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-field">Field Reports</span>
+            <time datetime="2026-05-22">May 22, 2026</time>
+          </div>
+          <h3>Spring cruise returns with 14 sediment cores from the western North Atlantic shelf</h3>
+          <p class="dek">The 18-day cruise aboard the R/V <em>Cobbett Bay</em> wrapped operations off the Scotian Shelf last week, recovering the longest piston cores ever pulled from the Wilkinson Basin. Co-led by Prof. Kasprzak and senior research scientist Reginald Greene, the cruise carried twelve graduate students and four undergraduates on rotating watches.</p>
+          <a class="more" href="#">Read full report &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card" id="adeyemi-grant">
+        <div class="photo-block atmosphere" role="img" aria-label="An atmospheric observatory tower with instruments and a clear pre-dawn sky behind it"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-grants">Grants</span>
+            <time datetime="2026-05-08">May 8, 2026</time>
+          </div>
+          <h3>Adeyemi lab awarded $3.1M NSF grant to extend coastal aerosol observatory</h3>
+          <p class="dek">The four-year award funds three new instrumented towers along the Massachusetts Bay sea-breeze front and a graduate-student-led data portal. Prof. Adeyemi leads the project; co-PIs Maren Jensen and research scientist Min Shao manage the chemistry and mass-spectrometry components, respectively.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card" id="two-hawk-packard">
+        <div class="photo-block paleo" role="img" aria-label="A close-up of striped sediment core layers under a fluorescent lab lamp"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-awards">Awards</span>
+            <time datetime="2026-04-30">April 30, 2026</time>
+          </div>
+          <h3>PhD candidate Maya Two-Hawk named Packard Climate Fellow</h3>
+          <p class="dek">Two-Hawk, advised by Prof. Rasmussen, will use the three-year fellowship to extend her isotope work on Holocene drought cycles in the Gulf of Maine. She is the second EAMS graduate student to receive this fellowship in the past five years.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block ice" role="img" aria-label="A glacier outlet meeting fjord water with a research helicopter on a distant snow patch"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-field">Field Reports</span>
+            <time datetime="2026-04-18">April 18, 2026</time>
+          </div>
+          <h3>Two-Hawk lab completes successful third field season at Helheim Glacier</h3>
+          <p class="dek">Sarah Two-Hawk's glaciology group returned in early April from a six-week field campaign in southeast Greenland, where they installed three additional GPS stations and recovered a year of borehole-pressure data. Two students &mdash; Bea Schultz and Owen Niemi &mdash; were on their first polar field season.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block classroom" role="img" aria-label="Two researchers in the Mendel Hall mass-spectrometry suite operating an instrument console"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-hires">Hires</span>
+            <time datetime="2026-04-02">April 2, 2026</time>
+          </div>
+          <h3>EAMS welcomes Owen McAllister, assistant professor of mineral physics</h3>
+          <p class="dek">Dr. McAllister joins EAMS this fall after a postdoc at Carnegie's Earth and Planets Laboratory. He will build out a new diamond-anvil cell facility in M-406 Mendel Hall, focused on the high-pressure elasticity of hydrous mantle minerals.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block ocean" role="img" aria-label="A glossy cover image of the journal Nature Geoscience"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-awards">Awards</span>
+            <time datetime="2026-03-21">March 21, 2026</time>
+          </div>
+          <h3>Mahalingam lab's overturning paper featured on the cover of <em>Nature Geoscience</em></h3>
+          <p class="dek">The April issue features the Mahalingam group's eight-year mooring record and 200-year reconstruction of overturning in the western North Atlantic. The paper is accompanied by a News &amp; Views commentary describing the regional record as &ldquo;a long-awaited complement to RAPID.&rdquo;</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block field" role="img" aria-label="A small group of students wading through a salt marsh creek carrying corers and clipboards"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-students">Student News</span>
+            <time datetime="2026-03-08">March 8, 2026</time>
+          </div>
+          <h3>Undergraduate research showcase: 19 EAMS seniors present thesis work</h3>
+          <p class="dek">The annual senior research showcase ran for four hours in the Mendel Hall atrium last Friday. Topics ranged from a re-analysis of the 2018 Northeast cold snap to a comparison of secondary organic aerosol yields at the Cobbett Point tower. Three theses were nominated for the College of Science Hartwell Prize.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block forest" role="img" aria-label="A pair of researchers standing at the edge of a forested salt marsh holding a small instrument"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-grants">Grants</span>
+            <time datetime="2026-02-19">February 19, 2026</time>
+          </div>
+          <h3>Cobbett Marsh Observatory renewed for five years by NSF LTREB program</h3>
+          <p class="dek">The renewal extends 16 years of continuous monitoring at three reference transects in the Cobbett Marsh system. Prof. Sofia Arroyo leads the project; co-PIs include Profs. LeBlanc and de Boer. The Trustees of Reservations co-manage the site.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block brick" role="img" aria-label="A maple-shaded plaza in front of a brick academic building with students on the steps"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-dept">Department Updates</span>
+            <time datetime="2026-02-04">February 4, 2026</time>
+          </div>
+          <h3>Mendel Hall east wing accessibility upgrades complete</h3>
+          <p class="dek">The east-wing renovation, begun in May 2025, is finished. New work includes a fully accessible side entrance from Brennan Avenue, two redesigned classrooms on the first floor, and a new shared graduate-student commons (M-115). The building is fully open during normal hours.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block atmosphere" role="img" aria-label="A satellite-derived map showing tropical rainfall patterns over West Africa"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-grants">Grants</span>
+            <time datetime="2026-01-22">January 22, 2026</time>
+          </div>
+          <h3>Darko lab receives NASA New Investigator award for West African precipitation validation</h3>
+          <p class="dek">Asst. Prof. Kwame Darko has been awarded a three-year NASA New Investigator grant ($612,000) to build a regional satellite precipitation dataset for the West African Sahel, combining GPM satellite estimates with ground stations operated by the EAMS-led validation network.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block lab" role="img" aria-label="A pair of researchers in a server room operating a control terminal"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-dept">Department Updates</span>
+            <time datetime="2025-12-15">December 15, 2025</time>
+          </div>
+          <h3><em>tectos</em> compute cluster expanded to 1,200 cores</h3>
+          <p class="dek">The latest round of upgrades to the department's HPC cluster brings the total to 1,200 cores and 4.8 PB of scratch storage. The expansion was funded by a combination of departmental investment and a $480K NSF MRI award. Allocations open to all EAMS researchers; submit requests via Prof. Petrov.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block classroom" role="img" aria-label="A professor at a microscope teaching a small group of students"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-hires">Hires</span>
+            <time datetime="2025-11-28">November 28, 2025</time>
+          </div>
+          <h3>Helga Bj&ouml;rnsd&oacute;ttir joins the marine chemistry group</h3>
+          <p class="dek">Asst. Prof. Bj&ouml;rnsd&oacute;ttir began her appointment in marine chemistry on November 1. Her research focuses on the photochemical fate of terrestrially-derived dissolved organic matter in coastal waters; she ran a field program in southwestern Iceland during her postdoc at the University of Bergen.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block ocean" role="img" aria-label="A coastal aquaculture lease with floating bivalve longlines under a clear sky"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-field">Field Reports</span>
+            <time datetime="2025-11-08">November 8, 2025</time>
+          </div>
+          <h3>Volponi lab completes 22nd year of intertidal community monitoring</h3>
+          <p class="dek">The fall sampling round of the long-running intertidal community survey wrapped in mid-October. The 2025 surveys note continued northward range expansion of two southern barnacle species first detected at Cape Ann in 2017. A summary paper is in revision at <em>Marine Ecology Progress Series</em>.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block field" role="img" aria-label="A student presenting a research poster in a brightly lit room"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-students">Student News</span>
+            <time datetime="2025-10-19">October 19, 2025</time>
+          </div>
+          <h3>EAMS PhD candidate wins best student talk at AGU Fall Meeting</h3>
+          <p class="dek">Felipe Cardoso (now PhD 2025, advised by Prof. Okonkwo) won the Outstanding Student Presentation Award in the Ocean Sciences division at last December's AGU Fall Meeting. The talk presented his mechanistic model of trace-metal cycling in eutrophic estuaries, since published in <em>GCA</em>.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+      <article class="news-card">
+        <div class="photo-block atmosphere" role="img" aria-label="An exterior view of a small atmospheric observation hut on a granite point"></div>
+        <div>
+          <div class="news-meta">
+            <span class="tag cat-awards">Awards</span>
+            <time datetime="2025-09-30">September 30, 2025</time>
+          </div>
+          <h3>Prof. Tan elected fellow of the American Meteorological Society</h3>
+          <p class="dek">Professor Wei-Ling Tan has been elected a fellow of the AMS for &ldquo;contributions to the dynamics of mid-latitude blocking and persistent weather regimes.&rdquo; She is the third EAMS faculty member to be named an AMS fellow in the past decade.</p>
+          <a class="more" href="#">Read &rarr;</a>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- Pagination mockup -->
+    <nav class="pagination" aria-label="News archive pagination">
+      <span class="current" aria-current="page">1</span>
+      <a href="#">2</a>
+      <a href="#">3</a>
+      <a href="#">4</a>
+      <span class="ellipsis">&hellip;</span>
+      <a href="#">28</a>
+      <a href="#" aria-label="Next page">Next &rarr;</a>
+    </nav>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <svg class="crest" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z" fill="#14233f" stroke="#b08938" stroke-width="1.5"/>
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+          </svg>
+          <p><strong style="color:var(--paper);">Department of Earth, Atmospheric &amp; Marine Sciences</strong><br>
+            Brennan University &middot; Mendel Hall<br>
+            415 Brennan Avenue<br>
+            Brennan, Massachusetts 02143</p>
+        </div>
+        <div>
+          <h4>Academics</h4>
+          <ul>
+            <li><a href="programs.html#undergraduate">Undergraduate</a></li>
+            <li><a href="programs.html#masters">Master's</a></li>
+            <li><a href="programs.html#phd">PhD</a></li>
+            <li><a href="programs.html#minors">Minors</a></li>
+            <li><a href="courses.html">Course catalog</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>People &amp; research</h4>
+          <ul>
+            <li><a href="faculty.html">Faculty directory</a></li>
+            <li><a href="research.html#labs">Labs &amp; centers</a></li>
+            <li><a href="research.html#publications">Publications</a></li>
+            <li><a href="research.html#grants">Funded projects</a></li>
+            <li><a href="contact.html#staff">Department staff</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Visit &amp; connect</h4>
+          <ul>
+            <li><a href="contact.html">Contact</a></li>
+            <li><a href="events.html">Events &amp; seminars</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="https://brennan.example.edu/giving/eams/">Make a gift</a></li>
+            <li><a href="https://brennan.example.edu/library/eams/">Hartwell Library</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2008&ndash;2026 The Trustees of Brennan University. All rights reserved.</span>
+        <span class="established">Academic year <span data-academic-year>2025&ndash;2026</span> &middot; Department reorganized 2008 &middot; Established 1947</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>

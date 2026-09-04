@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Research at EAMS — five thematic areas, named centers and labs, recent publications, and a list of currently funded projects at Brennan University.">
+  <title>Research &mdash; EAMS &middot; Brennan University</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400..700;1,400..700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <div class="utility-bar">
+      <div class="container">
+        <span>Brennan University &middot; College of Science &middot; <span class="small-caps">est.&nbsp;1947</span></span>
+        <nav aria-label="Utility">
+          <a href="https://brennan.example.edu/">Brennan.edu</a>
+          <a href="https://brennan.example.edu/library/">Library</a>
+          <a href="https://brennan.example.edu/portal/">myBrennan</a>
+          <a href="https://brennan.example.edu/giving/eams/">Give to EAMS</a>
+        </nav>
+      </div>
+    </div>
+    <div class="brand-bar">
+      <div class="container">
+        <a href="index.html" aria-label="EAMS home" style="display:flex; align-items:center; gap:18px; border-bottom:0;">
+          <svg class="crest" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <defs><linearGradient id="crestNavy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3a5e"/><stop offset="1" stop-color="#08152a"/></linearGradient></defs>
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z" fill="url(#crestNavy)" stroke="#b08938" stroke-width="1.5"/>
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+            <rect x="20" y="52" width="24" height="6" fill="#8c3a2a"/>
+            <text x="32" y="56.6" text-anchor="middle" font-family="Inter,sans-serif" font-size="4.4" font-weight="600" fill="#ecd9a8" letter-spacing="0.3">EAMS</text>
+          </svg>
+          <span class="brand-text">
+            <span class="brand-institution">Brennan University</span>
+            <span class="brand-department">Earth, Atmospheric <span class="amp">&amp;</span> Marine Sciences</span>
+          </span>
+        </a>
+        <button class="nav-toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Toggle menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="faculty.html">Faculty</a></li>
+            <li><a href="programs.html">Programs</a></li>
+            <li><a href="courses.html">Courses</a></li>
+            <li><a href="research.html">Research</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="events.html">Events</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-head">
+    <div class="container">
+      <div class="breadcrumb">
+        <a href="index.html">EAMS</a> <span class="sep">/</span> <span>Research</span>
+      </div>
+      <span class="eyebrow">Research</span>
+      <h1>What we work on</h1>
+      <p class="lede">Department research is organized around five thematic areas and is carried out through six named labs and centers. Faculty regularly cross between areas; almost every active project has at least one secondary affiliation.</p>
+    </div>
+  </section>
+
+  <div class="container">
+    <div class="with-sidebar">
+
+      <aside class="subsection-nav" aria-label="Research sections">
+        <h4>On this page</h4>
+        <ul>
+          <li><a href="#areas">Research areas</a></li>
+          <li><a href="#area-coastal">&middot; Coastal Resilience</a></li>
+          <li><a href="#area-atmos">&middot; Atmospheric Chemistry</a></li>
+          <li><a href="#area-paleo">&middot; Paleoclimate</a></li>
+          <li><a href="#area-marine">&middot; Marine Ecology</a></li>
+          <li><a href="#area-modeling">&middot; Earth Systems Modeling</a></li>
+          <li><a href="#labs">Centers &amp; labs</a></li>
+          <li><a href="#publications">Recent publications</a></li>
+          <li><a href="#grants">Grants &amp; projects</a></li>
+        </ul>
+      </aside>
+
+      <main>
+
+        <!-- =======================================
+             RESEARCH AREAS
+             ======================================= -->
+        <section id="areas">
+          <h2 style="border-bottom:3px double var(--brennan-navy); padding-bottom:6px;">Research areas</h2>
+
+          <article class="research-area" id="area-coastal">
+            <div class="row">
+              <div class="area-photo">
+                <div class="photo-block coastal large" role="img"
+                  aria-label="An aerial view of a New England salt marsh with meandering tidal creeks, fringed by a barrier beach and the open Atlantic beyond"
+                  data-caption="Cobbett Marsh long-term study site"></div>
+              </div>
+              <div class="area-body">
+                <h2 style="margin-top:0;">Coastal Resilience</h2>
+                <p>The largest thematic area in the department, anchored by the Cobbett Bay observing system. Faculty work across the spectrum from physical drivers (sea-level rise, storm surge, sediment supply) to ecological response (marsh stability, intertidal communities) to municipal adaptation planning. The recent <em>Nature Geoscience</em> AMOC paper grew out of this group.</p>
+                <div class="area-meta-grid">
+                  <div>
+                    <h4>Featured labs</h4>
+                    <ul>
+                      <li>AMOC &amp; Western Boundary Group</li>
+                      <li>Cobbett Marsh Observatory</li>
+                      <li>Salt Marsh Geomorphology Lab</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4>Affiliated faculty</h4>
+                    <ul>
+                      <li><a href="faculty.html#prof-mahalingam">Mahalingam</a></li>
+                      <li><a href="faculty.html#prof-kasprzak">Kasprzak</a></li>
+                      <li><a href="faculty.html#prof-arroyo">Arroyo</a></li>
+                      <li><a href="faculty.html#prof-deboer">de Boer</a></li>
+                      <li><a href="faculty.html#prof-leblanc">LeBlanc</a></li>
+                      <li><a href="faculty.html#prof-bhatt">Bhatt</a></li>
+                      <li><a href="faculty.html#prof-okonkwo-lin">Okonkwo-Lin</a></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="research-area" id="area-atmos">
+            <div class="row">
+              <div class="area-photo">
+                <div class="photo-block atmosphere large" role="img"
+                  aria-label="A coastal atmospheric observatory at dawn, with a 30-meter instrumented tower against a banded pink and pale-blue sky"
+                  data-caption="Cobbett Point observatory, sea-breeze front"></div>
+              </div>
+              <div class="area-body">
+                <h2 style="margin-top:0;">Atmospheric Chemistry</h2>
+                <p>EAMS atmospheric chemists operate one of the most heavily instrumented coastal-aerosol observatories on the US East Coast. Research spans gas-phase chemistry (NOx, ozone, VOCs), aerosol-cloud interactions, and the photochemistry of dissolved organic matter at the air-sea interface. The group runs a shared mass-spectrometry suite that is open to graduate students across the department.</p>
+                <div class="area-meta-grid">
+                  <div>
+                    <h4>Featured labs</h4>
+                    <ul>
+                      <li>Coastal Aerosol Observatory</li>
+                      <li>Reactive Nitrogen Lab</li>
+                      <li>Hartwell Mass Spectrometry Facility</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4>Affiliated faculty</h4>
+                    <ul>
+                      <li><a href="faculty.html#prof-adeyemi">Adeyemi</a></li>
+                      <li><a href="faculty.html#prof-jensen">Jensen</a></li>
+                      <li><a href="faculty.html#prof-tan">Tan</a></li>
+                      <li><a href="faculty.html#prof-hassan">Hassan</a></li>
+                      <li><a href="faculty.html#prof-darko">Darko</a></li>
+                      <li><a href="faculty.html#prof-shao">Shao (RS)</a></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="research-area" id="area-paleo">
+            <div class="row">
+              <div class="area-photo">
+                <div class="photo-block paleo large" role="img"
+                  aria-label="A close-up of a finely laminated sediment core, alternating dark organic-rich layers and pale carbonate layers running across the frame"
+                  data-caption="Holocene varves, Lake Atticut record"></div>
+              </div>
+              <div class="area-body">
+                <h2 style="margin-top:0;">Paleoclimate</h2>
+                <p>The paleoclimate group reconstructs Holocene and Pleistocene climate from lakes, marine sediments, ice cores, and cosmogenic-nuclide-dated landforms. The Rasmussen group's eight-thousand-year varve record from Lake Atticut anchors a regional reconstruction of northeastern US drought variability. The glaciology subgroup runs ongoing fieldwork in southeast Greenland.</p>
+                <div class="area-meta-grid">
+                  <div>
+                    <h4>Featured labs</h4>
+                    <ul>
+                      <li>Lake Sediment &amp; Isotope Lab</li>
+                      <li>Glaciology Group</li>
+                      <li>Cosmogenic Nuclide Lab (shared)</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4>Affiliated faculty</h4>
+                    <ul>
+                      <li><a href="faculty.html#prof-rasmussen">Rasmussen</a></li>
+                      <li><a href="faculty.html#prof-two-hawk-s">Two-Hawk (S.)</a></li>
+                      <li><a href="faculty.html#prof-kowalczyk">Kowalczyk</a></li>
+                      <li><a href="faculty.html#prof-rivera">Rivera</a></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="research-area" id="area-marine">
+            <div class="row">
+              <div class="area-photo">
+                <div class="photo-block ocean large" role="img"
+                  aria-label="A diver in the cold-temperate Gulf of Maine kelp forest, holding a quadrat over a kelp-encrusted rocky reef"
+                  data-caption="Volponi Lab intertidal monitoring, Cape Ann"></div>
+              </div>
+              <div class="area-body">
+                <h2 style="margin-top:0;">Marine Ecology</h2>
+                <p>The marine ecology group studies community-level responses of cold-temperate marine systems to disturbance &mdash; marine heatwaves, eutrophication recovery, and the long-running northward range expansion of southern species. The 22-year intertidal time series anchors much of the group's work. Most students do at least one field season at the Cobbett Marine Laboratory.</p>
+                <div class="area-meta-grid">
+                  <div>
+                    <h4>Featured labs</h4>
+                    <ul>
+                      <li>Cobbett Marine Laboratory</li>
+                      <li>Plankton Dynamics Group</li>
+                      <li>Polar Oceanography Lab</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4>Affiliated faculty</h4>
+                    <ul>
+                      <li><a href="faculty.html#prof-volponi">Volponi</a></li>
+                      <li><a href="faculty.html#prof-marchetti">Marchetti</a></li>
+                      <li><a href="faculty.html#prof-singh">Singh</a></li>
+                      <li><a href="faculty.html#prof-cho">Cho</a></li>
+                      <li><a href="faculty.html#prof-bjornsdottir">Bj&ouml;rnsd&oacute;ttir</a></li>
+                      <li><a href="faculty.html#prof-lindberg">Lindberg (RS)</a></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="research-area" id="area-modeling">
+            <div class="row">
+              <div class="area-photo">
+                <div class="photo-block lab large" role="img"
+                  aria-label="A row of racks of compute servers with blue status lights in a cool, dimly lit machine room"
+                  data-caption="The tectos cluster, Mendel Hall basement"></div>
+              </div>
+              <div class="area-body">
+                <h2 style="margin-top:0;">Earth Systems Modeling</h2>
+                <p>A cross-cutting area that includes numerical modeling of geodynamics, atmospheric and ocean dynamics, and machine-learning approaches to earth-system data. The group runs the <em>tectos</em> high-performance computing cluster (1,200 cores; 4.8 PB scratch storage) and coordinates the department's contribution to the Community Earth System Model.</p>
+                <div class="area-meta-grid">
+                  <div>
+                    <h4>Featured facilities</h4>
+                    <ul>
+                      <li><em>tectos</em> HPC cluster</li>
+                      <li>Mineral Physics Lab</li>
+                      <li>Environmental Data Science Group</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4>Affiliated faculty</h4>
+                    <ul>
+                      <li><a href="faculty.html#prof-petrov">Petrov</a></li>
+                      <li><a href="faculty.html#prof-yamada">Yamada</a></li>
+                      <li><a href="faculty.html#prof-novak">Novak</a></li>
+                      <li><a href="faculty.html#prof-ito">Ito</a></li>
+                      <li><a href="faculty.html#prof-ndlovu">Ndlovu</a></li>
+                      <li><a href="faculty.html#prof-mcallister">McAllister</a></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <!-- =======================================
+             CENTERS & LABS
+             ======================================= -->
+        <section id="labs" style="margin-top:64px;">
+          <h2 style="border-bottom:3px double var(--brennan-navy); padding-bottom:6px;">Centers and labs</h2>
+          <p>Most named labs occupy dedicated space in Mendel Hall; the Cobbett Marine Laboratory is housed in a separate department-owned building on Cobbett Point, 25 minutes from main campus by department shuttle.</p>
+
+          <div class="lab-grid" style="margin-top:24px;">
+
+            <article class="lab">
+              <div class="photo-block ocean" role="img" aria-label="The R/V Cobbett Bay tied up at a wooden pier with a coastal town behind it"></div>
+              <div>
+                <h3>Cobbett Marine Laboratory</h3>
+                <div class="lab-meta">Director: Prof. Volponi &middot; Cobbett Point, MA</div>
+                <p>The department's coastal marine field station, including dock facilities for the R/V <em>Cobbett Bay</em>, a 60-seat seminar room, a flow-through seawater system, and ten faculty-and-student labs. Open year-round.</p>
+              </div>
+            </article>
+
+            <article class="lab">
+              <div class="photo-block atmosphere" role="img" aria-label="An instrumented atmospheric observatory tower with weather sensors and aerosol inlets"></div>
+              <div>
+                <h3>Coastal Aerosol Observatory</h3>
+                <div class="lab-meta">PI: Prof. Adeyemi &middot; Cobbett Point + 3 satellite stations</div>
+                <p>Four-station instrumented coastal aerosol observatory, with continuous measurements of size distribution, composition, and optical properties. Data are publicly served through the EAMS open-data portal with a 6-month embargo.</p>
+              </div>
+            </article>
+
+            <article class="lab">
+              <div class="photo-block paleo" role="img" aria-label="A core-storage room with stacks of long plastic-wrapped sediment cores on numbered shelves"></div>
+              <div>
+                <h3>Lake Sediment &amp; Isotope Lab</h3>
+                <div class="lab-meta">PI: Prof. Rasmussen &middot; M-322 Mendel Hall</div>
+                <p>The department's lake-coring and paleoclimate laboratory, including dedicated GC-IRMS and TIMS instruments, a refrigerated core archive, and a varve-counting microscope suite. Holds 1,800+ archived cores from across the northeastern US and the North Atlantic islands.</p>
+              </div>
+            </article>
+
+            <article class="lab">
+              <div class="photo-block lab" role="img" aria-label="A laboratory bench with three mass-spectrometer instruments, vacuum lines, and a researcher in a white coat operating a control panel"></div>
+              <div>
+                <h3>Hartwell Mass Spectrometry Facility</h3>
+                <div class="lab-meta">Director: Min Shao, RS &middot; M-503 Mendel Hall</div>
+                <p>Shared facility housing the department's high-resolution AMS, a soft-ionization CIMS, a multi-collector ICP-MS, and three GC-IRMS instruments. Open to all EAMS investigators and external academic users.</p>
+              </div>
+            </article>
+
+            <article class="lab">
+              <div class="photo-block field" role="img" aria-label="A wooden walkway through a salt marsh with several measurement towers in the distance"></div>
+              <div>
+                <h3>Cobbett Marsh Observatory</h3>
+                <div class="lab-meta">PI: Prof. Arroyo &middot; Cobbett Marsh, MA</div>
+                <p>Long-term study site for salt-marsh dynamics, in operation since 2009. Continuous monitoring of tides, water level, sediment accretion, salinity, and vegetation composition at three transects. Co-managed with The Trustees of Reservations.</p>
+              </div>
+            </article>
+
+            <article class="lab">
+              <div class="photo-block lab" role="img" aria-label="A diamond-anvil cell apparatus on an optical bench, surrounded by laser-alignment optics"></div>
+              <div>
+                <h3>Mineral Physics Lab</h3>
+                <div class="lab-meta">PI: Prof. McAllister &middot; M-406 Mendel Hall</div>
+                <p>High-pressure mineral physics laboratory equipped with two diamond-anvil cells, a Raman microspectrometer, and shared time on the Argonne synchrotron. Focused on lower-mantle phase relations and the deep-Earth water cycle.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- =======================================
+             RECENT PUBLICATIONS
+             ======================================= -->
+        <section id="publications" style="margin-top:64px;">
+          <h2 style="border-bottom:3px double var(--brennan-navy); padding-bottom:6px;">Recent publications</h2>
+          <p>Selected from the past 18 months. EAMS authors in <strong>bold</strong>. For a complete list, see individual <a href="faculty.html">faculty pages</a>.</p>
+
+          <ol class="pub-list">
+            <li>
+              <span class="pub-authors"><strong>Mahalingam, A.</strong>, Brooks, A., <strong>Okonkwo-Lin, E.</strong>, &amp; Greene, R. (2026).</span>
+              <span class="pub-title">A 200-year regional reconstruction of overturning circulation in the western North Atlantic from moored observations and tracer chemistry.</span>
+              <span class="pub-venue">Nature Geoscience, 19(4), 387&ndash;394.</span>
+              <span class="pub-doi">doi:10.1038/s41561-026-01432-x</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Adeyemi, B.</strong>, Holloway, M., <strong>Jensen, M.</strong>, &amp; <strong>Shao, M.</strong> (2026).</span>
+              <span class="pub-title">Sea-breeze frontal nucleation: a four-year tower record from the Massachusetts coast.</span>
+              <span class="pub-venue">Journal of Geophysical Research: Atmospheres, 131(7), e2025JD042811.</span>
+              <span class="pub-doi">doi:10.1029/2025JD042811</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Rasmussen, I.</strong>, Park, Y., &amp; Stevens, K.&nbsp;L. (2026).</span>
+              <span class="pub-title">Eight thousand years of summer drought variability in the northeastern United States from varved lake sediments.</span>
+              <span class="pub-venue">Quaternary Science Reviews, 348, 109017.</span>
+              <span class="pub-doi">doi:10.1016/j.quascirev.2026.109017</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Volponi, R.</strong>, Zhao, M.&nbsp;L., &amp; Williams, T.&nbsp;A. (2026).</span>
+              <span class="pub-title">Two decades of intertidal community change in the Gulf of Maine: persistent winners, episodic losers.</span>
+              <span class="pub-venue">Marine Ecology Progress Series, 736, 41&ndash;57.</span>
+              <span class="pub-doi">doi:10.3354/meps14721</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Yamada, K.</strong>, Raman, P., &amp; Donovan, T.&nbsp;R. (2026).</span>
+              <span class="pub-title">A scale-aware mass-flux closure for shallow convection in coarse-resolution climate models.</span>
+              <span class="pub-venue">Journal of Climate, 39(11), 3221&ndash;3239.</span>
+              <span class="pub-doi">doi:10.1175/JCLI-D-25-0518.1</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Two-Hawk, S.</strong>, Lindqvist, J., &amp; Hellmann, U. (2025).</span>
+              <span class="pub-title">Subglacial meltwater pulses control summer acceleration at Helheim Glacier: A joint GPS-InSAR inversion.</span>
+              <span class="pub-venue">The Cryosphere, 19(8), 2841&ndash;2860.</span>
+              <span class="pub-doi">doi:10.5194/tc-19-2841-2025</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Singh, P.</strong>, Hassan, J., &amp; Liu, Q. (2025).</span>
+              <span class="pub-title">Anammox dominates fixed-nitrogen loss across a thirty-year record from the eastern tropical North Pacific.</span>
+              <span class="pub-venue">Limnology and Oceanography, 70(9), 1894&ndash;1911.</span>
+              <span class="pub-doi">doi:10.1002/lno.12745</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Arroyo, S.</strong>, <strong>LeBlanc, H.</strong>, &amp; Washington, A. (2025).</span>
+              <span class="pub-title">Coupled stress in New England salt marshes: how inundation, salinity, and ice scour combine to drive elevation loss.</span>
+              <span class="pub-venue">Estuaries and Coasts, 48(5), 1023&ndash;1041.</span>
+              <span class="pub-doi">doi:10.1007/s12237-025-01462-9</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Marchetti, L.</strong>, Zhao, M.&nbsp;L., &amp; <strong>Lindberg, A.</strong> (2025).</span>
+              <span class="pub-title">A MODIS-derived bloom-classification algorithm for cold-temperate shelves: validation against twenty years of Gulf of Maine HAB monitoring.</span>
+              <span class="pub-venue">Remote Sensing of Environment, 311, 114319.</span>
+              <span class="pub-doi">doi:10.1016/j.rse.2025.114319</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Petrov, M.</strong> &amp; Hartmann, J. (2025).</span>
+              <span class="pub-title">Long-wavelength uplift of the Iberian Peninsula since the late Miocene: a finite-element reappraisal.</span>
+              <span class="pub-venue">Earth and Planetary Science Letters, 642, 118739.</span>
+              <span class="pub-doi">doi:10.1016/j.epsl.2025.118739</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Okonkwo, D.</strong>, Cardoso, F., &amp; <strong>Bj&ouml;rnsd&oacute;ttir, H.</strong> (2025).</span>
+              <span class="pub-title">Manganese cycling across the sediment-water interface in eutrophic estuaries: a global synthesis.</span>
+              <span class="pub-venue">Geochimica et Cosmochimica Acta, 387, 84&ndash;103.</span>
+              <span class="pub-doi">doi:10.1016/j.gca.2025.05.012</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Tan, W.-L.</strong>, &amp; Donato, S. (2025).</span>
+              <span class="pub-title">North Atlantic SST anomalies and the persistence of mid-latitude blocking, 1979&ndash;2024.</span>
+              <span class="pub-venue">Geophysical Research Letters, 52(14), e2025GL112508.</span>
+              <span class="pub-doi">doi:10.1029/2025GL112508</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Ndlovu, T.</strong>, Engel, T., &amp; <strong>Petrov, M.</strong> (2025).</span>
+              <span class="pub-title">Paleoseismic evidence for late-Holocene rupture on the central Virginia seismic zone.</span>
+              <span class="pub-venue">Bulletin of the Seismological Society of America, 115(3), 1456&ndash;1473.</span>
+              <span class="pub-doi">doi:10.1785/0120240328</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Hassan, Y.</strong> &amp; <strong>Tan, W.-L.</strong> (2025).</span>
+              <span class="pub-title">Surface signatures of sudden stratospheric warming events: a wave-resolving GCM study.</span>
+              <span class="pub-venue">Journal of the Atmospheric Sciences, 82(6), 1311&ndash;1329.</span>
+              <span class="pub-doi">doi:10.1175/JAS-D-24-0184.1</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>de Boer, H.</strong>, <strong>Bhatt, A.</strong>, &amp; Reilly, M. (2025).</span>
+              <span class="pub-title">Saltwater intrusion in the Cobbett Bay aquifer under combined sea-level rise and pumping: a 50-year forward projection.</span>
+              <span class="pub-venue">Water Resources Research, 61(4), e2024WR037512.</span>
+              <span class="pub-doi">doi:10.1029/2024WR037512</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Cho, H.-j.</strong>, Walker, R., &amp; <strong>Singh, P.</strong> (2025).</span>
+              <span class="pub-title">Under-ice mixed-layer dynamics observed by autonomous profilers in the Weddell Sea.</span>
+              <span class="pub-venue">Journal of Physical Oceanography, 55(8), 1841&ndash;1860.</span>
+              <span class="pub-doi">doi:10.1175/JPO-D-24-0252.1</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Rivera, C.</strong> &amp; Vargas, S. (2025).</span>
+              <span class="pub-title">Late-Pleistocene catchment-averaged erosion rates of the northern Appalachians from <sup>10</sup>Be cosmogenic nuclides.</span>
+              <span class="pub-venue">Geology, 53(7), 691&ndash;695.</span>
+              <span class="pub-doi">doi:10.1130/G52441.1</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Ito, H.</strong>, Yamamoto, S., &amp; <strong>McAllister, O.</strong> (2024).</span>
+              <span class="pub-title">Pre-eruptive volatile evolution at Sakurajima from melt-inclusion compositions: implications for short-term forecasting.</span>
+              <span class="pub-venue">Earth and Planetary Science Letters, 638, 118611.</span>
+              <span class="pub-doi">doi:10.1016/j.epsl.2024.118611</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Novak, M.</strong>, Donovan, T.&nbsp;R., &amp; Patel, R. (2024).</span>
+              <span class="pub-title">Physically constrained neural-network bias correction for high-resolution coastal sea-surface temperature forecasts.</span>
+              <span class="pub-venue">Geoscientific Model Development, 17(22), 9011&ndash;9032.</span>
+              <span class="pub-doi">doi:10.5194/gmd-17-9011-2024</span>
+            </li>
+            <li>
+              <span class="pub-authors"><strong>Kowalczyk, P.</strong> &amp; Beaumont, E. (2024).</span>
+              <span class="pub-title">Ecological assembly of Paleocene molluscan faunas on the US Atlantic margin.</span>
+              <span class="pub-venue">Paleobiology, 50(4), 612&ndash;631.</span>
+              <span class="pub-doi">doi:10.1017/pab.2024.42</span>
+            </li>
+          </ol>
+        </section>
+
+        <!-- =======================================
+             GRANTS & FUNDED PROJECTS
+             ======================================= -->
+        <section id="grants" style="margin-top:64px;">
+          <h2 style="border-bottom:3px double var(--brennan-navy); padding-bottom:6px;">Grants &amp; funded projects</h2>
+          <p>A selection of currently active externally funded projects. The full portfolio includes 61 active awards totaling $24.6M in annual research expenditures (FY 2025).</p>
+
+          <table class="grants-table">
+            <caption class="sr-only">Currently active externally funded research projects in EAMS</caption>
+            <thead>
+              <tr>
+                <th scope="col">Project</th>
+                <th scope="col">PI</th>
+                <th scope="col">Funder</th>
+                <th scope="col">Period</th>
+                <th scope="col" style="text-align:right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Coastal aerosol observatory expansion to Buzzards Bay</strong><br><span class="funder">Three new instrumented towers and a graduate-student-led data portal along the Massachusetts Bay sea-breeze front.</span></td>
+                <td class="pi">Adeyemi (lead); Jensen, Shao</td>
+                <td>NSF AGS</td>
+                <td>2026&ndash;2030</td>
+                <td class="amount">$3,114,000</td>
+              </tr>
+              <tr>
+                <td><strong>Continuous monitoring of overturning at the subpolar western boundary</strong><br><span class="funder">Continuation of the seven-mooring K-array, including a planned 2027 deep redeployment.</span></td>
+                <td class="pi">Mahalingam</td>
+                <td>NSF OCE</td>
+                <td>2024&ndash;2029</td>
+                <td class="amount">$2,478,500</td>
+              </tr>
+              <tr>
+                <td><strong>Cobbett Marsh Observatory long-term study site renewal</strong><br><span class="funder">Renewal of the 16-year sediment-accretion, salinity, and vegetation monitoring at three transects.</span></td>
+                <td class="pi">Arroyo (lead); LeBlanc, de Boer</td>
+                <td>NSF LTREB</td>
+                <td>2025&ndash;2030</td>
+                <td class="amount">$1,892,000</td>
+              </tr>
+              <tr>
+                <td><strong>Helheim Glacier subglacial hydrology integrative observatory</strong><br><span class="funder">GPS + InSAR + borehole pressure measurements across three field seasons.</span></td>
+                <td class="pi">Two-Hawk (S.)</td>
+                <td>NSF OPP</td>
+                <td>2024&ndash;2028</td>
+                <td class="amount">$2,210,000</td>
+              </tr>
+              <tr>
+                <td><strong>Bloom classification from satellite ocean color: extension to dinoflagellate species</strong><br><span class="funder">Joint effort with NOAA Northeast HAB program.</span></td>
+                <td class="pi">Marchetti (lead); Lindberg</td>
+                <td>NOAA NCCOS</td>
+                <td>2025&ndash;2028</td>
+                <td class="amount">$847,000</td>
+              </tr>
+              <tr>
+                <td><strong>Reactive nitrogen along the I-95 corridor: tower observations and source attribution</strong><br><span class="funder">Continuation of the rural-to-urban transect project, extended to include winter sampling.</span></td>
+                <td class="pi">Jensen</td>
+                <td>EPA STAR</td>
+                <td>2024&ndash;2027</td>
+                <td class="amount">$1,142,000</td>
+              </tr>
+              <tr>
+                <td><strong>Holocene drought variability in the northeastern US</strong><br><span class="funder">Extension of the Lake Atticut record with three additional varved-lake records in Maine and Vermont.</span></td>
+                <td class="pi">Rasmussen</td>
+                <td>NSF P4Climate</td>
+                <td>2023&ndash;2026</td>
+                <td class="amount">$612,000</td>
+              </tr>
+              <tr>
+                <td><strong>Mineral physics of the deep-Earth water cycle</strong><br><span class="funder">High-pressure elasticity measurements of hydrous ringwoodite using a diamond-anvil cell.</span></td>
+                <td class="pi">McAllister</td>
+                <td>NSF EAR</td>
+                <td>2024&ndash;2027</td>
+                <td class="amount">$748,000</td>
+              </tr>
+              <tr>
+                <td><strong>Coastal Resilience Capacity-Building Initiative</strong><br><span class="funder">Outreach and applied work with five Massachusetts coastal towns; tied to the Pro MS capstone.</span></td>
+                <td class="pi">Novak (lead); Arroyo, Ben-Ari</td>
+                <td>Packard Foundation</td>
+                <td>2025&ndash;2028</td>
+                <td class="amount">$1,485,000</td>
+              </tr>
+              <tr>
+                <td><strong>Volatile evolution at active arc volcanoes: lessons for short-term eruption forecasting</strong><br><span class="funder">Field campaigns at Sakurajima and Soufri&egrave;re Hills; mass-spectrometric melt-inclusion work in M-503.</span></td>
+                <td class="pi">Ito</td>
+                <td>NSF EAR</td>
+                <td>2023&ndash;2026</td>
+                <td class="amount">$904,000</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <svg class="crest" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z" fill="#14233f" stroke="#b08938" stroke-width="1.5"/>
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+          </svg>
+          <p><strong style="color:var(--paper);">Department of Earth, Atmospheric &amp; Marine Sciences</strong><br>
+            Brennan University &middot; Mendel Hall<br>
+            415 Brennan Avenue<br>
+            Brennan, Massachusetts 02143</p>
+        </div>
+        <div>
+          <h4>Academics</h4>
+          <ul>
+            <li><a href="programs.html#undergraduate">Undergraduate</a></li>
+            <li><a href="programs.html#masters">Master's</a></li>
+            <li><a href="programs.html#phd">PhD</a></li>
+            <li><a href="programs.html#minors">Minors</a></li>
+            <li><a href="courses.html">Course catalog</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>People &amp; research</h4>
+          <ul>
+            <li><a href="faculty.html">Faculty directory</a></li>
+            <li><a href="research.html#labs">Labs &amp; centers</a></li>
+            <li><a href="research.html#publications">Publications</a></li>
+            <li><a href="research.html#grants">Funded projects</a></li>
+            <li><a href="contact.html#staff">Department staff</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Visit &amp; connect</h4>
+          <ul>
+            <li><a href="contact.html">Contact</a></li>
+            <li><a href="events.html">Events &amp; seminars</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="https://brennan.example.edu/giving/eams/">Make a gift</a></li>
+            <li><a href="https://brennan.example.edu/library/eams/">Hartwell Library</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2008&ndash;2026 The Trustees of Brennan University. All rights reserved.</span>
+        <span class="established">Academic year <span data-academic-year>2025&ndash;2026</span> &middot; Department reorganized 2008 &middot; Established 1947</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "fixture_class": "ecommerce/catalog",
+  "tags": [
+    "ecommerce",
+    "sneakers",
+    "has-cart",
+    "add-to-cart",
+    "size-selector",
+    "filters",
+    "sorting",
+    "mini-cart",
+    "multipage",
+    "localstorage",
+    "marquee"
+  ],
+  "capabilities": [
+    "commerce-products",
+    "checkout",
+    "forms"
+  ],
+  "complexity": 3
+}

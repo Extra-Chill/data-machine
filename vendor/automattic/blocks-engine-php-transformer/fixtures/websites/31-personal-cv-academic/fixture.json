@@ -1,0 +1,12 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "cv",
+    "resume",
+    "academic",
+    "personal",
+    "one-pager",
+    "has-nav"
+  ],
+  "complexity": 1
+}

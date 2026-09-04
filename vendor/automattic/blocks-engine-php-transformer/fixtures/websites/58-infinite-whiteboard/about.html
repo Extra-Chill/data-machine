@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Boundless Infinite Whiteboard</title>
+  <meta name="description" content="Boundless is an infinite-canvas whiteboard and diagramming tool. Learn how its pan/zoom engine, attached connectors, undo history, and local-first storage work.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/page.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%233b82f6'/><circle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='2.5'/><circle cx='16' cy='16' r='2' fill='white'/></svg>">
+</head>
+<body class="page-body">
+
+  <header class="site-header">
+    <a class="brand" href="about.html" aria-label="Boundless home">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#3b82f6"/>
+        <circle cx="16" cy="16" r="7.5" fill="none" stroke="#fff" stroke-width="2.4"/>
+        <circle cx="16" cy="16" r="2.2" fill="#fff"/>
+      </svg>
+      <span>Boundless</span>
+    </a>
+    <nav class="site-nav">
+      <a href="about.html" class="is-current" aria-current="page">About</a>
+      <a href="templates.html">Templates</a>
+      <a href="index.html" class="nav-cta">Open board</a>
+    </nav>
+  </header>
+
+  <section class="page-hero">
+    <div class="wrap">
+      <span class="eyebrow">The canvas with no edges</span>
+      <h1>Boundless is where teams think out loud.</h1>
+      <p class="lead">An infinite, pan-and-zoom whiteboard for diagrams, roadmaps, and live brainstorms. Drop shapes, link them with connectors that stay attached, sketch freehand, and zoom from a single sticky note out to your whole quarter — all in the browser, all yours.</p>
+      <div class="hero-actions">
+        <a href="index.html" class="btn btn-primary">Open the board →</a>
+        <a href="templates.html" class="btn btn-ghost">Browse templates</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="specs">
+      <div class="spec"><div class="num">∞</div><div class="lbl">Canvas size — pan forever</div></div>
+      <div class="spec"><div class="num">5–1200%</div><div class="lbl">Zoom-to-cursor range</div></div>
+      <div class="spec"><div class="num">7</div><div class="lbl">Tools: shapes, notes, pen, text, arrows</div></div>
+      <div class="spec"><div class="num">80</div><div class="lbl">Steps of undo history</div></div>
+    </div>
+
+    <div class="section-head">
+      <h2>What makes it feel alive</h2>
+      <p>Boundless is built on a real world↔screen camera transform, an object model, and an undo stack — the kind of app you'd never assemble out of page blocks.</p>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 12h6m6 0h6M12 3v6m0 6v6"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <h3>True infinite canvas</h3>
+        <p>Scroll to zoom toward your cursor, space-drag or two-finger pan, and the dotted grid scales with you. The math keeps the point under your pointer perfectly fixed.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M5 17C9 17 9 7 14 7"/><circle cx="4" cy="18" r="2"/><circle cx="16" cy="6" r="2"/></svg></div>
+        <h3>Connectors that stick</h3>
+        <p>Draw an arrow from one shape to another and it docks to their borders. Move either shape and the connector re-routes itself, instantly, every frame.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M9 7L5 11l4 4M5 11h9a5 5 0 010 10h-3"/></svg></div>
+        <h3>Real undo &amp; history</h3>
+        <p>Every edit — move, resize, recolor, delete — is a reversible step. <code>Ctrl+Z</code> and <code>Ctrl+Shift+Z</code> walk a true 80-deep snapshot history.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div>
+        <h3>Smart snapping</h3>
+        <p>Drag a shape and it snaps to the edges and centers of its neighbours, with magenta guide lines. Hold <code>Alt</code> to move freely.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg></div>
+        <h3>Local-first &amp; portable</h3>
+        <p>Your board autosaves to this browser as you work. Export the whole thing to PNG for sharing, or to JSON to back up and re-import anywhere.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 15l4-4 3 3 4-5 5 6"/></svg></div>
+        <h3>Minimap &amp; zoom-to-fit</h3>
+        <p>A live minimap shows the whole board and your viewport; click it to jump. Press <code>2</code> to frame everything, or zoom to a selection.</p>
+      </div>
+    </div>
+
+    <div class="prose">
+      <h2>How the engine works</h2>
+      <p>Everything you see is drawn to a single HTML <code>&lt;canvas&gt;</code> on every frame. The <strong>camera</strong> is just three numbers — an x/y offset and a zoom — and two functions convert between <em>world</em> coordinates (where shapes actually live) and <em>screen</em> pixels. To zoom toward the cursor, Boundless records the world point under your mouse, changes the zoom, then nudges the offset so that same world point lands back under the cursor.</p>
+      <p>Each object is a plain, serializable record: a rectangle, ellipse, sticky note, text label, freehand stroke, or connector. Because they're just data, the entire board can be snapshotted for <strong>undo</strong>, saved to <code>localStorage</code>, and round-tripped through JSON. Connectors don't store fixed endpoints — they store the <em>ids</em> of the shapes they link, and recompute their docking points against each shape's current bounds every render. That's why they stay attached.</p>
+
+      <h2>Why you'd never build this in a page builder</h2>
+      <p>Boundless is a stateful, pointer-driven application: a transform matrix, hit-testing, a marquee, resize handles, an undo stack, snapping, an inline text editor, autosave, and export — all coordinating in real time. It's the opposite of a content page. There are no sections to stack and no posts to publish; there's one live surface that responds to every gesture. That's the whole point.</p>
+
+      <h2>Get started</h2>
+      <ul>
+        <li>Open the <a href="index.html">board</a> — it loads a sample product roadmap so you're never staring at a blank page.</li>
+        <li>Pick a <a href="templates.html">template</a> for kanban, mind-mapping, or flowcharts.</li>
+        <li>Press <strong>?</strong> on the board to see every keyboard shortcut.</li>
+      </ul>
+    </div>
+
+    <div class="cta-band">
+      <h2>Ready to spread out?</h2>
+      <p>Your first board is already waiting on the canvas.</p>
+      <a href="index.html" class="btn btn-primary">Open Boundless →</a>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>© 2026 Boundless. A fictional product, hand-built in vanilla HTML, CSS &amp; Canvas.</span>
+      <span><a href="about.html">About</a> · <a href="templates.html">Templates</a> · <a href="index.html">Board</a></span>
+    </div>
+  </footer>
+
+</body>
+</html>

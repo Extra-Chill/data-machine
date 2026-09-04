@@ -1,0 +1,12 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "content-library",
+    "resources",
+    "nonprofit",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

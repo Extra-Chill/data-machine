@@ -1,0 +1,12 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "nonprofit",
+    "campaign",
+    "advocacy",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

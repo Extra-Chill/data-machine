@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Start Here — Mara's Garden</title>
+  <meta name="description" content="A note from Mara Okonkwo's digital garden on distributed systems, note-taking, stoicism, and gardening.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/garden.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-leaf" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 28 C16 18 8 14 5 6 C16 6 24 12 24 22 C24 25 21 28 16 28 Z" fill="#3a7d52" opacity=".9"/>
+          <path d="M16 28 C16 20 19 13 24 8" fill="none" stroke="#fbf9f3" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="16" cy="28" r="2" fill="#b08b2e"/>
+        </svg>
+        <h1><a href="index.html">Mara's Garden</a></h1>
+      </div>
+      <p class="brand-tag">a digital garden by Mara Okonkwo</p>
+
+      <div class="search-box">
+        <span class="s-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="note-search" placeholder="Search notes  (press /)" aria-label="Search notes" autocomplete="off">
+        <ul class="search-results" id="search-results" aria-live="polite"></ul>
+      </div>
+
+      <nav aria-label="Garden navigation">
+      <p class="nav-section">Home</p>
+      <ul class="nav-list"><li><a href="index.html" class="current"><span class="ripe">🌱</span><span>Start Here · MOC</span></a></li>
+      <li><a href="tags.html" class=""><span class="ripe">🏷️</span><span>Tags &amp; Index</span></a></li></ul>
+      
+        <p class="nav-section">Distributed Systems</p>
+        <ul class="nav-list">
+          <li><a href="idempotency-is-a-superpower.html" class=""><span class="ripe">🌳</span><span>Idempotency Is a Superpower</span></a></li>
+          <li><a href="the-two-generals-problem.html" class=""><span class="ripe">🌿</span><span>The Two Generals Problem</span></a></li>
+          <li><a href="why-i-stopped-trusting-wall-clocks.html" class=""><span class="ripe">🌿</span><span>Why I Stopped Trusting Wall Clocks</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Knowledge &amp; Notes</p>
+        <ul class="nav-list">
+          <li><a href="on-tending-a-digital-garden.html" class=""><span class="ripe">🌳</span><span>On Tending a Digital Garden</span></a></li>
+          <li><a href="evergreen-notes.html" class=""><span class="ripe">🌳</span><span>Evergreen Notes</span></a></li>
+          <li><a href="book-how-to-take-smart-notes.html" class=""><span class="ripe">🌿</span><span>Book — How to Take Smart Notes</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Stoicism</p>
+        <ul class="nav-list">
+          <li><a href="the-dichotomy-of-control.html" class=""><span class="ripe">🌳</span><span>The Dichotomy of Control</span></a></li>
+          <li><a href="amor-fati.html" class=""><span class="ripe">🌿</span><span>Amor Fati</span></a></li>
+        </ul>
+      
+        <p class="nav-section">The Garden</p>
+        <ul class="nav-list">
+          <li><a href="compost-is-a-distributed-system.html" class=""><span class="ripe">🌿</span><span>Compost Is a Distributed System</span></a></li>
+          <li><a href="three-sisters-planting.html" class=""><span class="ripe">🌰</span><span>Three Sisters Planting</span></a></li>
+        </ul>
+      </nav>
+
+      <button class="theme-toggle" type="button" aria-pressed="false">☾ <span>Dark</span></button>
+    </aside>
+    <main class="content" id="main">
+      <div class="home-main">
+        <h1>🌱 Mara's Garden</h1>
+        <p class="lede">A <strong>digital garden</strong> — a slow, public, perpetually-unfinished collection of notes I keep for myself and occasionally tend in the open. Nothing here is a polished "blog post." The right way to read this is to <em>wander</em>.</p>
+        <div class="prose">
+          <blockquote><p>A garden is not a finished thing. It is a relationship.</p></blockquote>
+          <h2 id="organized">How this place is organized</h2>
+          <p>I sort notes by ripeness rather than topic. See <a class="internal" data-slug="on-tending-a-digital-garden" href="on-tending-a-digital-garden.html">On Tending a Digital Garden</a> for why I work this way.</p>
+          <div class="ripeness-key">
+            <span><span class="ripeness seedling">🌰 Seedling</span> — fleeting, half-formed</span>
+            <span><span class="ripeness budding">🌿 Budding</span> — actively worked on</span>
+            <span><span class="ripeness evergreen">🌳 Evergreen</span> — tended for years</span>
+          </div>
+          <h2 id="maps">Maps of content</h2>
+          <div class="moc-grid">
+            <div class="moc-card">
+            <h3>Distributed systems</h3>
+            <p class="moc-desc">The day job and the obsession.</p>
+            <ul><li><a href="idempotency-is-a-superpower.html"><span class="ripe">🌳</span><span>Idempotency Is a Superpower</span></a></li><li><a href="the-two-generals-problem.html"><span class="ripe">🌿</span><span>The Two Generals Problem</span></a></li><li><a href="why-i-stopped-trusting-wall-clocks.html"><span class="ripe">🌿</span><span>Why I Stopped Trusting Wall Clocks</span></a></li></ul>
+          </div>
+            <div class="moc-card">
+            <h3>Knowledge &amp; note-taking</h3>
+            <p class="moc-desc">How I think about thinking.</p>
+            <ul><li><a href="on-tending-a-digital-garden.html"><span class="ripe">🌳</span><span>On Tending a Digital Garden</span></a></li><li><a href="evergreen-notes.html"><span class="ripe">🌳</span><span>Evergreen Notes</span></a></li><li><a href="book-how-to-take-smart-notes.html"><span class="ripe">🌿</span><span>Book — How to Take Smart Notes</span></a></li></ul>
+          </div>
+            <div class="moc-card">
+            <h3>Stoicism</h3>
+            <p class="moc-desc">The operating system for the meat computer.</p>
+            <ul><li><a href="the-dichotomy-of-control.html"><span class="ripe">🌳</span><span>The Dichotomy of Control</span></a></li><li><a href="amor-fati.html"><span class="ripe">🌿</span><span>Amor Fati</span></a></li></ul>
+          </div>
+            <div class="moc-card">
+            <h3>The actual garden</h3>
+            <p class="moc-desc">Dirt under the fingernails.</p>
+            <ul><li><a href="compost-is-a-distributed-system.html"><span class="ripe">🌿</span><span>Compost Is a Distributed System</span></a></li><li><a href="three-sisters-planting.html"><span class="ripe">🌰</span><span>Three Sisters Planting</span></a></li></ul>
+          </div>
+          </div>
+          <h2 id="throughline">The throughline</h2>
+          <p>If there's one idea connecting all of this, it's that <strong>resilient systems and a resilient mind are built the same way</strong>: assume failure, embrace what you can't control, and design for graceful degradation. The clearest expression of that is <a class="internal" data-slug="the-dichotomy-of-control" href="the-dichotomy-of-control.html">The Dichotomy of Control</a>, which I keep finding hiding inside engineering problems like <a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a>.</p>
+          <p>Wander on. Tug any thread — or open the <a href="tags.html">tags &amp; index</a>.</p>
+        </div>
+      </div>
+    </main>
+
+    <aside class="right-rail">
+      <div class="rail-card">
+        <p class="rail-title">On this page</p>
+        <ul class="toc">
+          <li class=""><a href="#organized">How this is organized</a></li>
+          <li class=""><a href="#maps">Maps of content</a></li>
+          <li class=""><a href="#throughline">The throughline</a></li>
+        </ul>
+      </div>
+      <div class="rail-card">
+        <p class="rail-title">Graph view</p>
+        <svg id="graph" class="graph-svg" data-current="index" role="img" aria-label="Graph of how notes in the garden connect"></svg>
+        <p class="graph-hint">Hover a node to spotlight its links. Click to jump.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-foot">
+    <span>🌱 Mara's Garden · tended on Sundays · last commit Jun 19, 2026</span>
+    <span>Built with <a href="quartz.config.ts">Quartz 4</a> from the markdown in <code style="font-family:var(--font-mono);font-size:.8rem">notes/</code> · <a href="https://github.com">source</a></span>
+  </footer>
+  <script src="js/garden.js"></script>
+</body>
+</html>

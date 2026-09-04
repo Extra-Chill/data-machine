@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Colophon — Beyond the Block</title>
+  <meta name="description" content="How Beyond the Block was built: hand-coded vanilla HTML, CSS and JavaScript, no framework, no build step, runs from a single folder. The ultimate flex.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23c6ff3a'/><text x='16' y='23' font-family='monospace' font-size='20' font-weight='700' text-anchor='middle' fill='%2307060d'>&gt;</text></svg>">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="scroll-progress" aria-hidden="true"></div>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Beyond the Block — home">
+      <span class="logo-mark">Beyond the <b>Block</b></span>
+      <span class="logo-sub">A web that does more</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Manifesto</a>
+      <a href="possible.html">What's Possible</a>
+      <a href="about.html" class="active">Colophon</a>
+      <a href="index.html#showcase" class="nav-cta">Back to demos →</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main id="main">
+
+    <!-- ══════════ PAGE HERO ══════════ -->
+    <section class="page-hero">
+      <div class="wrap">
+        <p class="eyebrow">Colophon · How this was made</p>
+        <h1>The whole thing is<br><em>just files.</em></h1>
+        <p class="lede">No framework. No bundler. No <code>npm install</code>. No build step at all. You could download this folder, double-click <code>index.html</code>, and every particle, every note, every physics ball would run from your hard drive, offline. That constraint <strong>is</strong> the argument — so here's exactly how it's put together.</p>
+      </div>
+    </section>
+
+    <!-- ══════════ THE FLEX — live byte counter ══════════ -->
+    <section class="section section--soft" aria-labelledby="flex-h">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">01</span> / The receipts</p>
+            <h2 class="section-title" id="flex-h">Counted live, in the page</h2>
+          </div>
+        </div>
+        <p class="byte-counter" id="byte-counter" aria-live="polite">measuring…</p>
+        <p class="lede" style="margin-top:14px;">That number is this site's own hand-written source, fetched and measured by JavaScript running right now. The mid-2020s average web page ships several megabytes. Everything you've experienced here — the flow field, the synth, the physics, the scroll story — fits in a rounding error, because there's no framework tax to pay.</p>
+        <noscript><p class="lede" style="color:var(--amber);">(The live counter needs JavaScript — which is rather the point.)</p></noscript>
+      </div>
+    </section>
+
+    <!-- ══════════ HOW IT'S BUILT ══════════ -->
+    <section class="section" id="how" aria-labelledby="how-h">
+      <div class="wrap prose">
+        <p class="section-index"><span class="accent">02</span> / Under the hood</p>
+        <h2 id="how-h" style="font-size:clamp(1.9rem,4.4vw,3.1rem);letter-spacing:-.03em;">Three folders, zero dependencies</h2>
+
+        <p>The site is three HTML pages sharing one stylesheet and three small JavaScript modules. That's the entire dependency graph. Here is what each piece does and why it exists.</p>
+
+        <h3>The structure</h3>
+        <ul>
+          <li><code>index.html</code> — the manifesto and the six headline live demos</li>
+          <li><code>possible.html</code> — the capability catalogue, mini previews, and the honest scorecard</li>
+          <li><code>about.html</code> — this colophon (the flex)</li>
+          <li><code>css/style.css</code> — every style, hand-written, custom-property themed</li>
+          <li><code>js/engine.js</code> — shared chrome plus reusable primitives: a seeded RNG, a value-noise field, HiDPI canvas fitting, and an on-screen render loop</li>
+          <li><code>js/demos.js</code> — the interactive widgets, each self-mounting onto a <code>data-demo</code> element</li>
+          <li><code>js/story.js</code> — the scroll-choreographed constellation scene</li>
+        </ul>
+
+        <h3>The techniques on display</h3>
+        <ul>
+          <li><strong>Flow-field particles</strong> — a few hundred agents advected through a value-noise field on the <code>&lt;canvas&gt;</code> 2D context, steered toward your cursor.</li>
+          <li><strong>Verlet physics</strong> — position-based dynamics with pairwise collision resolution and drag-to-fling, in about sixty lines.</li>
+          <li><strong>Web Audio synthesis</strong> — every note is two detuned oscillators with an exponential gain envelope, summed through a master gain. No audio files exist in this project.</li>
+          <li><strong>Seeded generative art</strong> — a <code>mulberry32</code> PRNG means each artwork is reproducible from a 32-bit seed, so "billions of pieces" is literally true.</li>
+          <li><strong>Scroll choreography</strong> — an <code>IntersectionObserver</code> activates steps while a sticky canvas reads scroll progress to assemble a 3D point cloud.</li>
+          <li><strong>Custom cursor &amp; magnetic fields</strong> — pointer events feed a spring system; the bespoke cursor uses <code>mix-blend-mode: difference</code> so it reads on any background.</li>
+        </ul>
+
+        <h3>The bit we're proud of</h3>
+        <p>Every animation respects <code>prefers-reduced-motion</code>. If your system asks for calm, the flow field paints a single static frame, the physics settles instantly, the marquees stop, and the demos still <em>show</em> what they are — they just don't move. Accessibility isn't a separate mode bolted on; it's a branch inside each module. Render loops also pause when their canvas scrolls off-screen, so the page doesn't cook your battery.</p>
+
+        <p class="callout">If a website is the message, then <em>hand-building one</em> that does all this — in plain files, offline-capable, framework-free — is the whole argument, delivered without saying a word.</p>
+      </div>
+    </section>
+
+    <!-- ══════════ COLOPHON FACTS ══════════ -->
+    <section class="section section--soft" id="colophon" aria-labelledby="colo-h">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">03</span> / Colophon</p>
+            <h2 class="section-title" id="colo-h">Set in plain text</h2>
+          </div>
+        </div>
+        <dl class="colophon-grid reveal">
+          <div><dt>Typefaces</dt><dd><b>Space Grotesk</b> &amp; JetBrains Mono</dd></div>
+          <div><dt>Build tool</dt><dd>A <b>text editor.</b> That's it.</dd></div>
+          <div><dt>Framework</dt><dd>None. <b>Vanilla</b> everything.</dd></div>
+          <div><dt>Dependencies</dt><dd><b>Zero</b> JS libraries</dd></div>
+          <div><dt>Rendering</dt><dd>Canvas 2D &amp; <b>Web Audio</b></dd></div>
+          <div><dt>Images shipped</dt><dd><b>Zero.</b> All drawn in code</dd></div>
+          <div><dt>Runs offline</dt><dd><b>Yes</b> — open via file://</dd></div>
+          <div><dt>Reduced motion</dt><dd>Fully <b>respected</b></dd></div>
+        </dl>
+
+        <div class="prose" style="margin-top:36px;">
+          <h3>A genuine word for the blocks</h3>
+          <p>We'll say it one more time, plainly: page-builders and block editors are some of the best things to happen to the web. They put publishing in the hands of people who shouldn't have to learn a render loop to launch a bakery. Most of the web should be blocks. We are fans.</p>
+          <p>This little site only exists to wave from the other side of the fence — to point at the <em>more</em> that the browser has always quietly offered, and to do it the cheekiest way we know how: by being made of exactly the stuff it's bragging about. Thanks for poking the demos. Now go build something that listens back.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ CTA ══════════ -->
+    <section class="cta" aria-labelledby="cta-h">
+      <canvas id="cta-canvas" aria-hidden="true"></canvas>
+      <div class="cta-inner wrap">
+        <h2 id="cta-h">Go ahead — <em>poke it again.</em></h2>
+        <p>The demos don't get tired. Head back to the showcase, fling some balls, play a chord, and roll a few hundred generative artworks no one has ever seen.</p>
+        <a href="index.html#showcase" class="btn btn-primary">Back to the demos <span class="btn-arrow">→</span></a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Beyond the <b>Block</b></div>
+          <p class="footer-brand-desc">A good-humored manifesto and living showcase for the part of the web that lives past page-builders. Every pixel here is hand-written, framework-free, and runs from a single folder.</p>
+        </div>
+        <nav class="footer-col" aria-label="Site links">
+          <p class="footer-col-title">The site</p>
+          <ul>
+            <li><a href="index.html">Manifesto</a></li>
+            <li><a href="possible.html">What's Possible</a></li>
+            <li><a href="about.html">Colophon</a></li>
+            <li><a href="index.html#showcase">Live demos</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Colophon links">
+          <p class="footer-col-title">Colophon</p>
+          <ul>
+            <li><a href="#how">How it's built</a></li>
+            <li><a href="#colophon">Colophon facts</a></li>
+            <li><a href="#flex-h">The byte count</a></li>
+            <li><a href="possible.html#compare">Scorecard</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="More links">
+          <p class="footer-col-title">Spirit</p>
+          <ul>
+            <li><a href="index.html#manifesto">The thesis</a></li>
+            <li><a href="possible.html">What's possible</a></li>
+            <li><a href="index.html#showcase">Six exhibits</a></li>
+            <li><a href="possible.html#demos">Tiny previews</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Beyond the Block · Made by hand, no framework, with affection for blocks</p>
+        <div class="footer-legal">
+          <a href="index.html">Manifesto</a>
+          <a href="possible.html">Possible</a>
+          <a href="#colophon">Colophon</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/engine.js"></script>
+  <script src="js/about.js"></script>
+</body>
+</html>

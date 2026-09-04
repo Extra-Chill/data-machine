@@ -1,0 +1,23 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "architecture",
+    "static-site-importer",
+    "blocks-engine",
+    "wordpress",
+    "pipeline",
+    "documentation",
+    "single-page"
+  ],
+  "capabilities": [
+    "local-css",
+    "tables",
+    "details"
+  ],
+  "risk_profile": "low",
+  "complexity": 3,
+  "quality_budgets": {
+    "max_unacceptable_findings": 0,
+    "visual_mismatch_ratio": 0
+  }
+}

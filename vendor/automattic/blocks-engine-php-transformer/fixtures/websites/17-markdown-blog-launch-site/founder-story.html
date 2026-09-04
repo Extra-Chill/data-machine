@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Why I Started Northstar Pantry — Sarah Caldwell</title>
+  <meta name="description" content="Northstar Pantry founder Sarah Caldwell on why a restaurant-trained chef decided to solve the family dinner problem from the inside out.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ---- Founder story page ---- */
+    .article-top {
+      background: var(--cream);
+      padding-block: clamp(3.5rem, 8vw, 6.5rem);
+    }
+    .article-top .article-title { font-size: clamp(2.3rem, 5.5vw, 4rem); }
+
+    .author-card {
+      display: flex;
+      align-items: center;
+      gap: clamp(1.25rem, 3vw, 2rem);
+      margin-top: var(--s10);
+      flex-wrap: wrap;
+    }
+    .author-portrait {
+      width: 96px;
+      height: 96px;
+      flex-shrink: 0;
+      border-radius: var(--r-full);
+      box-shadow: var(--shadow);
+    }
+    .author-card__body { flex: 1; min-width: 230px; }
+    .author-card__name {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-weight: 600;
+      color: var(--text-dark);
+      line-height: 1.1;
+    }
+    .author-card__role {
+      font-family: var(--font-hand);
+      font-size: var(--text-lg);
+      color: var(--terracotta);
+      margin-bottom: var(--s2);
+    }
+    .author-card__bio {
+      font-size: var(--text-sm);
+      color: var(--text-medium);
+      max-width: 46ch;
+      margin-bottom: var(--s3);
+    }
+
+    .article-main { padding-block: clamp(3rem, 7vw, 5.5rem); }
+    .article-body .signoff {
+      font-family: var(--font-hand);
+      font-size: var(--text-2xl);
+      color: var(--terracotta);
+      margin-top: var(--s8);
+      line-height: 1.3;
+    }
+
+    /* ---- Related links ---- */
+    .related-section { background: var(--cream); }
+    .related-card { display: flex; flex-direction: column; }
+    .related-card__title {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: var(--s3);
+    }
+    .related-card p { font-size: var(--text-sm); color: var(--text-medium); margin-bottom: var(--s5); flex: 1; }
+    .related-card .btn-ghost { font-weight: 500; align-self: flex-start; }
+
+    /* ---- Newsletter CTA ---- */
+    .cta-band { background: var(--terracotta); text-align: center; }
+    .cta-band h2 { color: var(--warm-white); font-size: var(--text-4xl); margin-bottom: var(--s4); }
+    .cta-band p { color: rgba(251,246,238,0.86); max-width: 48ch; margin: 0 auto var(--s8); }
+    .cta-band .newsletter-form { margin-inline: auto; }
+    .cta-band .newsletter-success { margin-top: var(--s4); }
+
+    @media (max-width: 560px) {
+      .author-card { flex-direction: column; align-items: flex-start; text-align: left; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header" role="banner">
+  <div class="container">
+    <nav class="nav-inner" aria-label="Main navigation">
+      <a href="index.html" class="nav-logo" aria-label="Northstar Pantry — Home">
+        <svg class="nav-logo__mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M20 2L23 16.2L37 20L23 23.8L20 38L17 23.8L3 20L17 16.2Z" fill="currentColor"/>
+          <circle cx="20" cy="20" r="3.5" fill="white" opacity="0.5"/>
+        </svg>
+        <div class="nav-logo__text">
+          <span class="nav-logo__name">Northstar</span>
+          <span class="nav-logo__sub">Pantry</span>
+        </div>
+      </a>
+      <ul class="nav-links" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="how-it-works.html">How It Works</a></li>
+        <li><a href="weekly-menu.html">This Week's Menu</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="founder-story.html">Our Story</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="pricing.html" class="btn btn-primary">Join Waitlist</a>
+        <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </nav>
+  </div>
+</header>
+<div class="mobile-menu" role="dialog" aria-label="Navigation menu">
+  <nav>
+    <ul class="mobile-menu__links" role="list">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="how-it-works.html">How It Works</a></li>
+      <li><a href="weekly-menu.html">This Week's Menu</a></li>
+      <li><a href="pricing.html">Pricing</a></li>
+      <li><a href="founder-story.html">Our Story</a></li>
+      <li><a href="pantry-staples.html">Pantry Guide</a></li>
+    </ul>
+    <div class="mobile-menu__footer">
+      <a href="pricing.html" class="btn btn-primary btn-lg">Join the Waitlist</a>
+    </div>
+  </nav>
+</div>
+
+<main role="main">
+
+  <!-- Article header -->
+  <section class="article-top">
+    <div class="container--narrow">
+      <div class="article-header reveal">
+        <div class="article-meta">
+          <span class="tag tag-terracotta">Founder Note</span>
+          <span class="dot">·</span>
+          <time datetime="2024-03-15">March 15, 2024</time>
+          <span class="dot">·</span>
+          <span>8 min read</span>
+        </div>
+        <h1 class="article-title">Why I built Northstar Pantry (and why it took leaving a restaurant kitchen to do it)</h1>
+        <p class="article-deck">I spent ten years cooking professionally. Then I had kids, and I couldn't figure out what was for dinner.</p>
+      </div>
+
+      <div class="card card--parchment reveal" data-delay="100">
+        <div class="author-card">
+          <svg class="author-portrait" viewBox="0 0 96 96" role="img" aria-label="Stylized portrait of Sarah Caldwell" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="portraitBg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#EDE0C4"/>
+                <stop offset="1" stop-color="#D8C8A8"/>
+              </linearGradient>
+            </defs>
+            <circle cx="48" cy="48" r="48" fill="url(#portraitBg)"/>
+            <path d="M16 92c0-18 14-30 32-30s32 12 32 30Z" fill="#6B7C5A"/>
+            <path d="M22 92c0-13 11-22 26-22s26 9 26 22Z" fill="#8A9C78"/>
+            <circle cx="48" cy="40" r="17" fill="#C4522A" opacity="0.92"/>
+            <path d="M31 38c0-11 7-19 17-19s17 8 17 19c0 2-1 4-2 5-1-9-7-13-15-13s-14 4-15 13c-1-1-2-3-2-5Z" fill="#9B3A1A"/>
+          </svg>
+          <div class="author-card__body">
+            <p class="author-card__name">Sarah Caldwell</p>
+            <p class="author-card__role">Founder</p>
+            <p class="author-card__bio">Former sous chef, now a mom of three in Burlington, Vermont. I believe good food and sane evenings aren't mutually exclusive.</p>
+            <a href="how-it-works.html" class="btn btn-ghost">More about how we work <span class="arrow">→</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Article body -->
+  <section class="article-main">
+    <div class="container--narrow">
+      <article class="article-body reveal" data-delay="0">
+        <p>It was a Tuesday in February. I'd just finished my first day back from a restaurant consulting gig — a full day on my feet, tasting, plating, reworking a menu for a place that was about to reopen. I came through my own front door at 6:30pm feeling like a professional, and three small humans looked up at me wanting dinner.</p>
+
+        <p>Milo is nine. Nora is seven. Theo was barely a toddler and mostly an opinion with legs. They were hungry. I opened the fridge, stared into it, and found absolutely nothing that resembled a plan. Half an onion. Yogurt. A bag of spinach going slippery at the edges. I closed the fridge and ordered pizza. Again.</p>
+
+        <p>Here's the part that stung. I'd spent ten years cooking professionally. I'd led a line, run hundreds of services, planned menus for two hundred covers a night without flinching. I could mise out a station in my sleep. And I could not, on a Tuesday, in my own kitchen, figure out dinner for my own kids.</p>
+
+        <h2>The skills didn't transfer</h2>
+
+        <p>I used to think professional cooks must have home cooking handled. We don't — or at least, not automatically. Restaurant cooking is about speed, repetition, and enormous prep done hours before anyone sits down. Someone hands you the ingredients. The menu is already decided. Your job is execution.</p>
+
+        <p>Home cooking is a completely different problem. It's about what you actually have in the house. It's about who's tired and who's melting down and whether anyone will eat mushrooms tonight (in my house: no one, ever). The hard part isn't the cooking. The hard part is everything that happens before the cooking — and nobody had taught me that, because in a restaurant, somebody else does it.</p>
+
+        <blockquote>I could plan a menu for two hundred covers. I could not plan dinner for Tuesday.</blockquote>
+
+        <h2>The accidental spreadsheet</h2>
+
+        <p>So I started writing things down. First a folder in my notes app — family recipes, the dinners that actually worked, the ones my kids didn't revolt against. Then a spreadsheet, because the notes got messy. I started sequencing things: if I roast a chicken Sunday, the meat carries into Monday, the carcass becomes Tuesday's stock.</p>
+
+        <p>I mentioned it to my sister in Chicago, who has two kids and the same 5pm problem, and she asked me to send it to her. Then she sent it to a friend. That friend asked to be added. By October I had a Google Doc going out to thirty-four families every Friday, and I was updating it by hand at 10pm with a glass of wine, half-asleep, fixing typos in next week's shopping list.</p>
+
+        <p>It was unsustainable and I loved it. Because it was working — not just for me, but for people I'd never met.</p>
+
+        <div class="pull-quote">
+          <p>"The problem was never the recipes. It was the infrastructure — the weekly thinking that nobody wants to do at 5pm."</p>
+          <cite>— Sarah Caldwell, Founder</cite>
+        </div>
+
+        <h2>The thing I finally understood</h2>
+
+        <p>The internet has infinite free recipes. That has never been the bottleneck. You don't lie awake wishing you knew one more way to cook chicken thighs.</p>
+
+        <p>What's actually missing is the weekly infrastructure. What do we cook this week, and in what order? How do we shop for all of it in one trip instead of four? How do we make Tuesday — always the worst night — less of a crisis? That's not a cooking problem. It's a planning problem. And planning is a skill, a real one, that almost nobody enjoys doing at the end of a long day.</p>
+
+        <h2>What Northstar Pantry actually is</h2>
+
+        <p>It's not a recipe blog. It's not a meal kit with a cardboard box on your porch. It's not another app demanding your attention. It's a thinking service.</p>
+
+        <p>Every Friday, my small team and I build you a thoughtful week of dinners. We sequence them so Monday's roast chicken feeds Tuesday's rice bowl. We write shopping lists that already assume what most pantries have. We keep the timing realistic for parents who are genuinely tired, not for some imaginary cook with three free hours and a clean counter.</p>
+
+        <p>And here's what it isn't: I am not trying to make every night an event. That's the fantasy that makes most meal plans collapse by Wednesday. Some nights are pasta from the pantry. Some nights are scrambled eggs and toast and that's dinner, full stop. Every week we plan includes <strong>flex nights</strong> — built-in space for the evening that falls apart, because it will.</p>
+
+        <h2>Why we call it Northstar</h2>
+
+        <p>When you're standing in the 5pm chaos — kids loud, fridge bare, brain empty — you don't need a map and you don't need a lecture on nutrition. You need a fixed point. One clear answer to one question: where are we going tonight?</p>
+
+        <p>A north star isn't a route. It's a direction you can trust when everything else is moving. That's the whole idea.</p>
+
+        <h2>We're keeping it small, on purpose</h2>
+
+        <p>This spring we're opening to a small group of founding families. Small is deliberate. I want to hear how the plan lands in your actual kitchen, what falls flat, what your kids reject, where the timing's wrong. I want to iterate with real people, not scale past them.</p>
+
+        <p>If you've read this far, I have a hunch you're exactly the kind of family we built this for. Come find us.</p>
+
+        <p class="signoff">— Sarah</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Related links -->
+  <section class="related-section">
+    <div class="container">
+      <div class="section-head centered reveal">
+        <span class="eyebrow">Keep going</span>
+        <h2 class="section-title">Continue exploring</h2>
+      </div>
+      <div class="grid-3">
+        <a href="how-it-works.html" class="card related-card reveal" data-delay="0">
+          <h3 class="related-card__title">How It Works</h3>
+          <p>See exactly how we build your weekly plan, from menu to shopping list.</p>
+          <span class="btn btn-ghost">Read <span class="arrow">→</span></span>
+        </a>
+        <a href="weekly-menu.html" class="card related-card reveal" data-delay="100">
+          <h3 class="related-card__title">This Week's Menu</h3>
+          <p>Browse a sample week of Northstar dinners, sequenced and shoppable.</p>
+          <span class="btn btn-ghost">Read <span class="arrow">→</span></span>
+        </a>
+        <a href="pantry-staples.html" class="card related-card reveal" data-delay="200">
+          <h3 class="related-card__title">Pantry Staples Guide</h3>
+          <p>The 24 ingredients that make every week easier and every list shorter.</p>
+          <span class="btn btn-ghost">Read <span class="arrow">→</span></span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Newsletter CTA -->
+  <section class="cta-band">
+    <div class="container--narrow reveal">
+      <h2>Get the early access invite</h2>
+      <p>When we open to founding families, you'll be the first to know.</p>
+      <form class="newsletter-form newsletter-form--dark" aria-label="Early access signup">
+        <input type="email" placeholder="your@email.com" required aria-label="Email address">
+        <button type="submit" class="btn btn-primary">Notify Me</button>
+      </form>
+      <p class="newsletter-success">You're in! We'll be in touch soon.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" aria-label="Northstar Pantry">
+          <svg class="nav-logo__mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M20 2L23 16.2L37 20L23 23.8L20 38L17 23.8L3 20L17 16.2Z" fill="currentColor"/>
+            <circle cx="20" cy="20" r="3.5" fill="var(--brown)" opacity="0.5"/>
+          </svg>
+          <div class="nav-logo__text">
+            <span class="nav-logo__name">Northstar</span>
+            <span class="nav-logo__sub">Pantry</span>
+          </div>
+        </a>
+        <p class="footer-tagline">Weekly dinner plans for busy families who love good food and sane evenings.</p>
+        <form class="newsletter-form newsletter-form--dark mt-8" aria-label="Newsletter signup">
+          <input type="email" placeholder="your@email.com" required aria-label="Email address">
+          <button type="submit" class="btn btn-primary">Subscribe</button>
+        </form>
+        <p class="newsletter-success">You're in! We'll be in touch soon.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Explore</h4>
+        <ul>
+          <li><a href="how-it-works.html">How It Works</a></li>
+          <li><a href="weekly-menu.html">This Week's Menu</a></li>
+          <li><a href="pricing.html">Plans &amp; Pricing</a></li>
+          <li><a href="founder-story.html">Our Story</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="pantry-staples.html">Pantry Staples Guide</a></li>
+          <li><a href="weekly-menu.html">Sample Menu Archive</a></li>
+          <li><a href="how-it-works.html#faq">FAQ</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Connect</h4>
+        <ul>
+          <li><a href="mailto:hello@northstarpantry.com">hello@northstarpantry.com</a></li>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">Pinterest</a></li>
+          <li><a href="#">Newsletter</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2024 Northstar Pantry. Made with care for families everywhere.</p>
+      <div class="footer-bottom-links">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

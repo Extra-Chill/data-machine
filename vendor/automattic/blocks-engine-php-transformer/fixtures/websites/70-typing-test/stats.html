@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="midnight">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keystroke — Your Stats</title>
+  <meta name="description" content="Your typing history: WPM over time, personal bests per mode, and a heatmap of the keys you miss most.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="2" y="8" width="28" height="18" rx="4" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="2"/>
+        <rect x="6" y="12" width="4" height="4" rx="1" fill="var(--accent)"/>
+        <rect x="12" y="12" width="4" height="4" rx="1" fill="var(--muted)"/>
+        <rect x="18" y="12" width="4" height="4" rx="1" fill="var(--muted)"/>
+        <rect x="10" y="18" width="12" height="4" rx="1.5" fill="var(--accent)"/>
+      </svg>
+      Key<span>stroke</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false">≡</button>
+    <nav class="site-nav">
+      <a href="index.html">Test</a>
+      <a href="stats.html" class="active">Stats</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1 class="page-title">Your stats</h1>
+    <p class="lede">Every completed run is stored locally in your browser — nothing leaves this device. Here's how you're trending.</p>
+
+    <div class="tiles">
+      <div class="tile"><b id="s-runs">0</b><small>runs logged</small></div>
+      <div class="tile"><b id="s-avg">0</b><small>avg wpm</small></div>
+      <div class="tile"><b id="s-best">0</b><small>best wpm</small></div>
+      <div class="tile"><b id="s-acc">0%</b><small>avg accuracy</small></div>
+    </div>
+
+    <div class="panel">
+      <h2>WPM over time</h2>
+      <p class="muted" id="history-empty" hidden>No runs yet — head to the <a href="index.html">test</a> and bank a few.</p>
+      <canvas id="history-chart" style="width:100%;height:260px"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>Personal bests by mode</h2>
+      <table>
+        <thead><tr><th>Mode</th><th>Best WPM</th><th>Accuracy</th><th>When</th></tr></thead>
+        <tbody id="bests-body"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Problem keys</h2>
+      <p class="muted" style="margin-top:-.3rem">The keys you mistype most often, hottest first. Drill these and your accuracy climbs fast.</p>
+      <div class="problem-keys" id="problem-keys"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Recent runs</h2>
+      <table>
+        <thead><tr><th>When</th><th>Mode</th><th>WPM</th><th>Raw</th><th>Acc</th><th>Consist.</th></tr></thead>
+        <tbody id="history-body"></tbody>
+      </table>
+      <div style="margin-top:1rem">
+        <button class="btn" id="btn-clear-history">Clear history</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand" href="index.html">Key<span>stroke</span></a>
+    <span class="muted">A hand-built typing trainer — no frameworks, no trackers. Everything stays in your browser.</span>
+    <span class="muted" style="margin-left:auto">© <span data-year>2026</span></span>
+  </footer>
+
+  <script src="js/storage.js"></script>
+  <script src="js/site.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/stats.js"></script>
+</body>
+</html>

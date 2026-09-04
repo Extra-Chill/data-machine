@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tonebox — How the Filters Work</title>
+  <meta name="description" content="A plain-language tour of how Tonebox processes pixels: point adjustments, HSL hue/saturation, convolution kernels (blur, sharpen, Sobel edge, emboss) and how the live RGB histogram is built.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/page.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23111827'/><circle cx='12' cy='13' r='5' fill='%23f43f5e'/><circle cx='20' cy='13' r='5' fill='%2334d399' opacity='0.85'/><circle cx='16' cy='20' r='5' fill='%2360a5fa' opacity='0.85'/></svg>">
+</head>
+<body class="page-body">
+
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Tonebox home">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#111827"/>
+        <circle cx="12" cy="13" r="5" fill="#f43f5e"/>
+        <circle cx="20" cy="13" r="5" fill="#34d399" opacity="0.85"/>
+        <circle cx="16" cy="20" r="5" fill="#60a5fa" opacity="0.85"/>
+      </svg>
+      <span>Tonebox</span>
+    </a>
+    <nav class="site-nav">
+      <a href="index.html">Editor</a>
+      <a href="gallery.html">Gallery</a>
+      <a href="about.html" class="is-current" aria-current="page">About</a>
+      <a href="index.html" class="btn nav-cta">Open editor</a>
+    </nav>
+  </header>
+
+  <section class="page-hero wrap">
+    <span class="eyebrow">Under the hood</span>
+    <h1>It's just arithmetic on a million little numbers.</h1>
+    <p class="lead">Tonebox does no magic. Every edit reads the image as a flat array of red, green, blue and alpha bytes, runs some math, and writes the result back with <code>putImageData</code>. This page walks through exactly what that math is — point adjustments, color-space conversions, convolution kernels and the histogram.</p>
+    <div class="hero-actions">
+      <a href="index.html" class="btn btn-primary">Try it in the editor →</a>
+      <a href="gallery.html" class="btn btn-ghost">See the sample gallery</a>
+    </div>
+  </section>
+
+  <div class="feature-grid wrap">
+    <div class="feature">
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 12h16M4 7h16M4 17h16"/></svg></div>
+      <h3>Non-destructive</h3>
+      <p>Sliders never touch the original pixels. Every change recomputes the whole image from the pristine source, so any adjustment can be dragged straight back to zero.</p>
+    </div>
+    <div class="feature">
+      <div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 14l4-4 4 4 4-5 4 4"/></svg></div>
+      <h3>Real convolution</h3>
+      <p>Blur, sharpen, edge-detect and emboss run a genuine NxN kernel over every pixel, sampling neighbours and clamping at the image edges — no CSS filter shortcuts.</p>
+    </div>
+    <div class="feature">
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M5 20V10M10 20V4M15 20v-7M20 20v-12"/></svg></div>
+      <h3>Live histogram</h3>
+      <p>After each edit the RGB and luma distributions are counted into 256 buckets per channel and drawn to a canvas, so you can watch tones shift as you work.</p>
+    </div>
+  </div>
+
+  <main class="wrap prose">
+
+    <h2>1. The image is an array</h2>
+    <p>A canvas <code>ImageData</code> object holds one <code>Uint8ClampedArray</code>. For a <strong>W × H</strong> image it has <strong>W × H × 4</strong> entries — four bytes per pixel in the order <code>R, G, B, A</code>, row by row from the top-left. The "Clamped" part matters: any value you write outside <code>0…255</code> is automatically pinned to the nearest valid byte, which saves a lot of manual clamping (though we still clamp explicitly where intermediate math can overflow).</p>
+    <p>To get the value of pixel <code>(x, y)</code> you compute its base index <code>i = (y * W + x) * 4</code>, then read <code>data[i]</code>, <code>data[i+1]</code>, <code>data[i+2]</code> for red, green and blue.</p>
+
+    <h2>2. Point adjustments</h2>
+    <p>A <strong>point</strong> operation maps each pixel using only its own value — no neighbours involved. Tonebox runs them in a fixed order so they compose predictably:</p>
+    <ul>
+      <li><strong>Exposure / gamma</strong> raises each channel to a power: <code>out = 255 · (in / 255) ^ γ</code>. We precompute a 256-entry lookup table so the expensive <code>pow</code> only runs 256 times, not once per pixel.</li>
+      <li><strong>Brightness</strong> simply adds a constant to every channel.</li>
+      <li><strong>Contrast</strong> pushes values away from (or toward) the mid-gray pivot 128 using the classic factor <code>(259·(c+255)) / (255·(259−c))</code>.</li>
+      <li><strong>Temperature &amp; tint</strong> nudge the red/blue balance (warm ↔ cool) and the green/magenta balance.</li>
+      <li><strong>Grayscale, sepia, invert, threshold</strong> are all <em>mixes</em> toward a target — luma, a sepia matrix, the inverse, or pure black/white — so the slider can sit anywhere between off and full.</li>
+    </ul>
+
+    <h3>Luma — the "brightness" of a pixel</h3>
+    <p>Several filters need a single brightness number for a color. We use the Rec. 601 weighting, which matches how the eye perceives each channel:</p>
+    <p><code>Y = 0.299·R + 0.587·G + 0.114·B</code></p>
+    <p>Green dominates because our eyes are most sensitive to it; blue barely counts. The same formula feeds the threshold filter and the luma histogram.</p>
+
+    <h2>3. Hue &amp; saturation live in HSL</h2>
+    <p>You can't rotate a hue by adding to RGB. Instead Tonebox converts each pixel to <strong>HSL</strong> (hue, saturation, lightness), changes hue or saturation there, then converts back:</p>
+    <ul>
+      <li><strong>Hue rotate</strong> adds degrees to <code>H</code> and wraps around the 360° color wheel.</li>
+      <li><strong>Saturation</strong> multiplies <code>S</code>, clamped to <code>0…1</code>, so colors get more vivid or wash out to gray.</li>
+    </ul>
+    <p>The conversion is only done when hue or saturation is actually non-zero — otherwise we skip it entirely to keep dragging other sliders fast.</p>
+
+    <h2>4. Convolution kernels</h2>
+    <p>A <strong>convolution</strong> replaces each pixel with a weighted blend of itself and its neighbours. The weights form a small grid called a <em>kernel</em>. For a 3×3 kernel we visit the 9 pixels around the target, multiply each by its weight, sum them, divide by a normalizing <em>divisor</em>, and optionally add a <em>bias</em>.</p>
+
+    <p>Two details make it correct: we read neighbours from an untouched <strong>copy</strong> of the source (so a pixel we already changed doesn't pollute the next one), and at the borders we <strong>clamp</strong> the sample coordinate to the edge instead of reading off the image.</p>
+
+    <div class="diagram">
+      <h4>Kernels Tonebox ships</h4>
+      <div class="kernel-row">
+        <div class="kernel" aria-label="Gaussian blur kernel">
+          <span>1</span><span>2</span><span>1</span>
+          <span>2</span><span class="c">4</span><span>2</span>
+          <span>1</span><span>2</span><span>1</span>
+        </div>
+        <p class="kernel-cap"><b>Gaussian blur</b> — neighbours are averaged with the center weighted highest, then divided by 16. Softens noise and detail.</p>
+      </div>
+      <div class="kernel-row" style="margin-top:18px">
+        <div class="kernel" aria-label="Sharpen kernel">
+          <span class="pos">0</span><span class="neg">−1</span><span class="pos">0</span>
+          <span class="neg">−1</span><span class="c">5</span><span class="neg">−1</span>
+          <span class="pos">0</span><span class="neg">−1</span><span class="pos">0</span>
+        </div>
+        <p class="kernel-cap"><b>Sharpen</b> — amplifies the center and subtracts its neighbours (divisor 1), so edges and fine texture pop. The weights sum to 1, keeping overall brightness steady.</p>
+      </div>
+      <div class="kernel-row" style="margin-top:18px">
+        <div class="kernel" aria-label="Emboss kernel">
+          <span class="neg">−2</span><span class="neg">−1</span><span>0</span>
+          <span class="neg">−1</span><span class="c">1</span><span class="pos">1</span>
+          <span>0</span><span class="pos">1</span><span class="pos">2</span>
+        </div>
+        <p class="kernel-cap"><b>Emboss</b> — a directional gradient with a <code>+128</code> bias so flat areas become mid-gray and edges turn into raised/recessed ridges.</p>
+      </div>
+    </div>
+
+    <h3>Sobel edge detection</h3>
+    <p>The <strong>edge-detect</strong> filter is special: it runs <em>two</em> kernels — one finding horizontal change (<code>Gx</code>), one vertical (<code>Gy</code>) — on the luma of the image, then combines them as <code>magnitude = √(Gx² + Gy²)</code>. Bright pixels in the result mark where the image changes fastest: the outlines of objects. The <em>Inkline</em> preset chains Sobel with an invert to give dark lines on white, like a pen sketch.</p>
+
+    <h2>5. Building the histogram</h2>
+    <p>A histogram counts how many pixels fall at each brightness level. Tonebox keeps four arrays of 256 integers — red, green, blue and luma. It walks the (already edited) pixel buffer once, incrementing <code>red[R]</code>, <code>green[G]</code>, <code>blue[B]</code> and <code>luma[Y]</code> for every pixel.</p>
+    <p>To draw it we map each bucket to an x-position and its (log-scaled) count to a bar height. In RGB mode the three channels are painted with the <code>screen</code> blend mode so overlapping regions brighten toward white — exactly how a camera's RGB histogram reads. A histogram bunched on the left means a dark image; pushed right means bright; a narrow spike means low contrast.</p>
+
+    <div class="diagram">
+      <h4>A histogram is just a tally (live demo)</h4>
+      <div class="histbars" id="demo-bars" aria-hidden="true"></div>
+      <p class="kernel-cap" style="margin-top:12px">Each bar is one brightness bucket; taller means more pixels at that tone. This demo is generated in code on page load.</p>
+    </div>
+
+    <h2>6. Why this is hard in a page builder</h2>
+    <p>None of this fits a block-based CMS. There is no "Sobel" block, no slider that re-reads a million bytes 60 times a second, no canvas history stack. Tonebox is a single-purpose <strong>application</strong> — state, a render loop, pixel buffers and an undo tree — that happens to live at a URL. That's the whole point of the demo.</p>
+
+    <div class="cta-band">
+      <h2>Go push some pixels</h2>
+      <p>Everything described here is one click away.</p>
+      <a href="index.html" class="btn btn-primary">Open the editor</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>Tonebox — a fictional client-side image editor. Built with vanilla canvas, no libraries.</span>
+      <span><a href="gallery.html">Gallery</a> · <a href="index.html">Editor</a></span>
+    </div>
+  </footer>
+
+  <script>
+  // tiny generated histogram-shape demo (a soft bell + a spike)
+  (function () {
+    const host = document.getElementById('demo-bars');
+    const N = 48;
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1);
+      const bell = Math.exp(-Math.pow((t - 0.45) * 3.0, 2));
+      const spike = t > 0.82 && t < 0.88 ? 0.7 : 0;
+      const h = Math.max(4, (bell * 0.85 + spike) * 100);
+      const bar = document.createElement('i');
+      bar.style.height = h + '%';
+      host.appendChild(bar);
+    }
+  })();
+  </script>
+</body>
+</html>

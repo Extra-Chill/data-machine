@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Idempotency Keys: The Cheapest Insurance in Distributed Systems — Cold Start</title>
+<meta name="description" content="A small, boring pattern that quietly prevents double-charges, duplicate orders, and a whole category of 2 a.m. pages. Here's how to implement idempotency keys correctly.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cold Start" href="../index.xml">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="shell shell--wide masthead__inner">
+    <a class="brand" href="../index.html" aria-label="Cold Start — home">
+      <svg class="brand__mark" width="30" height="30" viewBox="0 0 32 32" role="img" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#c2410c"/>
+        <path d="M16 6c1.6 3.4 1 5.6-.8 7.6-2 2.2-2.6 4.4-1.4 7.2-3-1.4-4.4-4.2-3.6-7.4C11 17 13 18 13.2 20.4 14.6 18 13.4 15.4 16 6Z" fill="#fde7d8"/>
+        <circle cx="20.5" cy="20" r="2.3" fill="#fdba74"/>
+      </svg>
+      <span class="brand__text">
+        <span class="brand__name">Cold Start</span>
+        <span class="brand__tag">storage &amp; distributed systems</span>
+      </span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="../index.html">Home</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../about.html">About</a>
+      <a class="nav__rss" href="../index.xml" aria-label="RSS feed" title="RSS feed">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="13" r="1.6"/><path d="M2 7.3a6.7 6.7 0 0 1 6.7 6.7H6.5A4.5 4.5 0 0 0 2 9.5z"/><path d="M2 3a11 11 0 0 1 11 11h-2.2A8.8 8.8 0 0 0 2 5.2z"/></svg>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <article class="article shell">
+    <header class="article__header">
+      <div class="article__meta">
+        <a class="series-badge" href="../tags.html">Operational Reality</a>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <time datetime="2024-04-16">Apr 16, 2024</time>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <span>8 min read</span>
+      </div>
+      <h1 class="article__title">Idempotency Keys: The Cheapest Insurance in Distributed Systems</h1>
+      <p class="article__dek">A small, boring pattern that quietly prevents double-charges, duplicate orders, and a whole category of 2 a.m. pages. Here's how to implement idempotency keys correctly.</p>
+      <div class="byline">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <span>
+          <span class="byline__name">Mara Quintero</span><br>
+          <span class="byline__role">Principal Engineer, Storage · Lisbon</span>
+        </span>
+      </div>
+    </header>
+
+    <div class="prose">
+      <p>In <a href="retries-make-outages-worse.html">the post on retries</a> I waved my hands at idempotency keys as the thing that makes retrying a payment safe. Several people emailed asking how they actually work. They deserve a real answer, because this is one of those patterns that looks trivial and is full of sharp edges.</p>
+      <p>The premise is simple. The network is unreliable, so requests will get sent more than once — by retries, by impatient users mashing a button, by flaky mobile connections. An <strong>idempotency key</strong> lets the server recognize "I've already seen this exact request" and return the original result instead of doing the work twice.</p>
+      <p>The implementation is where it gets interesting.</p>
+
+      <h2 id="the-naive-version">The naive version, and why it's not enough</h2>
+      <p>The first thing everyone reaches for:</p>
+      <pre><code><span class="c">-- Check if we've seen this key</span>
+<span class="k">SELECT</span> result <span class="k">FROM</span> idempotency_keys <span class="k">WHERE</span> key = $1;
+<span class="c">-- If not found, do the work, then:</span>
+<span class="k">INSERT INTO</span> idempotency_keys (key, result) <span class="k">VALUES</span> ($1, $2);</code></pre>
+      <p>This has a race condition you could drive a truck through. Two copies of the same request arrive simultaneously. Both run the <code>SELECT</code>, both find nothing, both proceed to do the work, both insert. Congratulations, you've double-charged the customer <em>and</em> you have a duplicate-key error to clean up.</p>
+      <p>The check and the claim have to be <strong>atomic</strong>. You can't look first and act later.</p>
+
+      <h2 id="claim-first">The correct version: claim first, atomically</h2>
+      <p>The fix is to insert the key <em>before</em> doing the work, in a way that fails loudly if someone else already claimed it:</p>
+      <pre><code><span class="k">INSERT INTO</span> idempotency_keys (key, status, created_at)
+<span class="k">VALUES</span> ($1, <span class="s">'in_progress'</span>, now())
+<span class="k">ON CONFLICT</span> (key) <span class="k">DO NOTHING</span>
+<span class="k">RETURNING</span> key;</code></pre>
+      <p>If the <code>RETURNING</code> gives you a row, you won the race — you own this key, go do the work. If it gives you nothing, someone else owns it. Now you have a <em>second</em> question: is that other request still running, or did it finish?</p>
+      <p>This is the part people skip, and it's the part that matters.</p>
+
+      <h2 id="the-state-machine">The state machine</h2>
+      <p>An idempotency key is not a boolean. It's a small state machine, because the first request can be in three meaningfully different states when a duplicate arrives:</p>
+      <table>
+        <thead>
+          <tr><th>Status</th><th>Meaning</th><th>What the duplicate should do</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>in_progress</code></td><td>Original is still running</td><td>Wait and poll, or return <code>409 Conflict</code></td></tr>
+          <tr><td><code>completed</code></td><td>Original finished successfully</td><td>Return the <strong>stored response</strong>, verbatim</td></tr>
+          <tr><td><code>failed</code></td><td>Original failed cleanly</td><td>Safe to retry the operation</td></tr>
+        </tbody>
+      </table>
+      <p>The <code>in_progress</code> case is the subtle one. A duplicate that arrives mid-flight must <em>not</em> start the work again, and it also can't return a result that doesn't exist yet. The honest answer is to make the client wait — either by blocking briefly and polling, or by returning a <code>409</code> that says "this is being processed, try again shortly."</p>
+      <p>You also need a <strong>lease timeout</strong>. If the process holding an <code>in_progress</code> key crashes, that key is stuck forever and the customer can never complete their action. Stamp each claim with an expiry; if a key has been <code>in_progress</code> longer than, say, 60 seconds, treat it as abandoned and reclaimable.</p>
+
+      <h2 id="store-the-response">Store the response, not just the fact</h2>
+      <p>A mistake I've seen in production more than once: the system records that a key was used but doesn't store <em>what it returned</em>. So when the duplicate arrives, the server knows "yep, did that already" but can't tell the client what happened. The client, having gotten a useless answer, retries with a <em>new</em> key — and now you've done the work twice anyway.</p>
+      <p>Store the full response body and status code against the key. When a duplicate of a <code>completed</code> request arrives, replay that stored response exactly. From the client's perspective, the retry is indistinguishable from the original succeeding. That's the entire point.</p>
+
+      <h2 id="scope">Scope and key generation</h2>
+      <p>Two decisions that bite teams later:</p>
+      <p><strong>Who generates the key?</strong> The <em>client</em>, ideally — usually a UUID generated once per logical operation and reused across retries of that operation. If the server generates it, the server can't dedupe the very first duplicate, because the client didn't have a key to send the first time. Stripe, for instance, has clients pass an <code>Idempotency-Key</code> header.</p>
+      <p><strong>What's the key's scope?</strong> A key should be unique per <em>intent</em>, not per <em>payload</em>. But you also want to defend against a client reusing a key for a genuinely different request (a bug, or worse). A good practice is to store a hash of the request body alongside the key and reject mismatches with a <code>422</code>: same key + different body means something is wrong, and silently returning the old result would be a lie.</p>
+
+      <h2 id="expiry">Expiry: keys are not forever</h2>
+      <p>The <code>idempotency_keys</code> table grows without bound if you let it. Keys only need to live as long as a client might plausibly retry — usually 24 to 72 hours is plenty. Set a TTL and reap old keys. Just make sure the TTL comfortably exceeds your longest retry window, or you'll expire a key right before a legitimate retry and reopen the double-execution hole you closed.</p>
+
+      <h2 id="putting-it-together">Putting it together</h2>
+      <p>The full lifecycle, end to end:</p>
+      <ol>
+        <li>Client generates a key, sends it with the request.</li>
+        <li>Server atomically claims the key as <code>in_progress</code> (with a lease).</li>
+        <li><strong>Won the claim?</strong> Do the work, store the response, mark <code>completed</code>.</li>
+        <li><strong>Lost the claim?</strong> Inspect the existing key's state:
+          <ul>
+            <li><code>completed</code> → replay stored response.</li>
+            <li><code>in_progress</code> (lease valid) → tell client to wait / <code>409</code>.</li>
+            <li><code>in_progress</code> (lease expired) or <code>failed</code> → reclaim and retry.</li>
+          </ul>
+        </li>
+        <li>A reaper deletes keys past their TTL.</li>
+      </ol>
+      <p>That's it. A few dozen lines and one extra table.</p>
+      <blockquote><p>Idempotency keys are insurance. You pay a small, boring premium on every write, and in exchange you never have to explain to a customer why they were charged twice. It's the best deal in distributed systems.</p></blockquote>
+      <p>The pattern is unglamorous, which is exactly why it's underused. Nobody gets promoted for shipping idempotency keys. But the engineer who <em>didn't</em> ship them is the one writing the incident report.</p>
+
+      <hr>
+      <p><em>Have a war story about a missing idempotency key? I collect them — <a href="mailto:mara@coldstart.dev">mara@coldstart.dev</a>.</em></p>
+    </div>
+
+    <footer class="article-footer">
+      <div class="tag-row">
+        <a class="tag" href="../tags.html#distributed-systems">distributed-systems</a>
+        <a class="tag" href="../tags.html#reliability">reliability</a>
+        <a class="tag" href="../tags.html#apis">apis</a>
+        <a class="tag" href="../tags.html#patterns">patterns</a>
+      </div>
+      <div class="author-box">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <p class="author-box__body">
+          <span class="author-box__name">Mara Quintero</span><br>
+          <span class="author-box__bio">Principal Engineer, Storage · Lisbon. Fifteen years building and breaking storage systems, with an unhealthy affection for write-ahead logs.</span>
+        </p>
+      </div>
+      <nav class="post-nav" aria-label="More posts">
+        <a href="retries-make-outages-worse.html">
+          <span class="dir">← Previous</span>
+          <span class="ttl">Your Retries Are Making the Outage Worse</span>
+        </a>
+        <a class="next" href="backpressure.html">
+          <span class="dir">Next →</span>
+          <span class="ttl">Backpressure</span>
+        </a>
+      </nav>
+    </footer>
+  </article>
+</main>
+
+<footer class="site-foot">
+  <div class="shell shell--wide site-foot__inner">
+    <p>&copy; 2024 Cold Start · Built with <a href="https://gohugo.io/">Hugo</a> · One pager-induced essay at a time.</p>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="../about.html">About</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../index.xml">RSS</a>
+      <a href="https://github.com/coldstart-dev">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "fixture_class": "ecommerce/catalog",
+  "tags": [
+    "ecommerce",
+    "coffee",
+    "has-cart",
+    "add-to-cart",
+    "filters",
+    "sorting",
+    "product-variants",
+    "mini-cart",
+    "multipage",
+    "localstorage"
+  ],
+  "capabilities": [
+    "commerce-products",
+    "checkout",
+    "forms"
+  ],
+  "complexity": 3
+}

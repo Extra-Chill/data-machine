@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VOLTA AURA One — Reserve Your Launch Edition</title>
+  <meta name="description" content="Reserve the VOLTA AURA One with a fully-refundable $500 deposit. Choose your trim, colourway and add-ons and see your build price update live.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="loader" role="status" aria-live="polite" aria-label="Loading">
+    <div class="loader-inner">
+      <div class="loader-mark"><span>V</span><span>O</span><span>L</span><span>T</span><span>A</span></div>
+      <div class="loader-sub">Reserve</div>
+      <div class="loader-bar"><i></i></div>
+      <div class="loader-pct">000</div>
+    </div>
+  </div>
+
+  <div class="scroll-progress" aria-hidden="true"></div>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="VOLTA home">
+      <span class="logo-mark">VOLTA</span>
+      <span class="logo-sub">Aura One</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Launch</a>
+      <a href="features.html">Features</a>
+      <a href="specs.html">Specs</a>
+      <a href="reserve.html" class="nav-cta">Reserve</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+
+    <section class="page-hero">
+      <div class="wrap">
+        <p class="eyebrow reveal">Launch Edition · limited to 1,000</p>
+        <h1 class="split" data-split>Reserve yours.</h1>
+        <p class="reveal" data-delay="2">A fully-refundable $500 deposit secures your place in the build queue. Configure your AURA One below — the price summary updates as you go.</p>
+      </div>
+    </section>
+
+    <section class="section-sm">
+      <div class="wrap reserve-grid">
+
+        <!-- ── FORM ── -->
+        <div class="form-card reveal">
+          <form class="reserve-form" novalidate>
+
+            <!-- TRIM -->
+            <fieldset style="border:none;margin-bottom:2rem">
+              <legend class="eyebrow" style="margin-bottom:1rem">Choose your trim</legend>
+              <div class="opt-grid">
+                <button type="button" class="opt sel" data-model="core" aria-pressed="true">
+                  <span>
+                    <span class="opt-name">AURA One Core</span>
+                    <span class="opt-desc">3.4s 0–60 · 171 mi · 112 mph</span>
+                  </span>
+                  <span class="opt-price">$14,900</span>
+                  <input type="radio" name="trim" value="core" checked>
+                </button>
+                <button type="button" class="opt" data-model="rs" aria-pressed="false">
+                  <span>
+                    <span class="opt-name">AURA One RS</span>
+                    <span class="opt-desc">2.6s 0–60 · carbon wheels · 118 mph</span>
+                  </span>
+                  <span class="opt-price">$18,900</span>
+                  <input type="radio" name="trim" value="rs">
+                </button>
+              </div>
+            </fieldset>
+
+            <!-- COLOURWAY -->
+            <fieldset style="border:none;margin-bottom:2rem">
+              <legend class="eyebrow" style="margin-bottom:1rem">Choose your finish</legend>
+              <p class="cfg-name" data-reserve-cwname style="margin-bottom:1rem">Finish &mdash; <b>Midnight Indigo</b></p>
+              <div class="swatch-row" data-reserve-swatches role="group" aria-label="Colourway"></div>
+            </fieldset>
+
+            <!-- ADD-ONS -->
+            <fieldset style="border:none;margin-bottom:2rem">
+              <legend class="eyebrow" style="margin-bottom:1rem">Add-ons (optional)</legend>
+              <div class="opt-grid">
+                <button type="button" class="opt" data-addon="charger" aria-pressed="false">
+                  <span><span class="opt-name">AuraDock 7kW</span><span class="opt-desc">Home fast charger</span></span>
+                  <span class="opt-price">+$1,200</span>
+                  <input type="checkbox" name="addon-charger">
+                </button>
+                <button type="button" class="opt" data-addon="care" aria-pressed="false">
+                  <span><span class="opt-name">VoltaCare 4-yr</span><span class="opt-desc">Extended coverage</span></span>
+                  <span class="opt-price">+$1,900</span>
+                  <input type="checkbox" name="addon-care">
+                </button>
+                <button type="button" class="opt" data-addon="luggage" aria-pressed="false">
+                  <span><span class="opt-name">Aero panniers</span><span class="opt-desc">Quick-release luggage</span></span>
+                  <span class="opt-price">+$640</span>
+                  <input type="checkbox" name="addon-luggage">
+                </button>
+                <button type="button" class="opt" data-addon="sound" aria-pressed="false">
+                  <span><span class="opt-name">Drive soundtrack</span><span class="opt-desc">Synthetic motor note</span></span>
+                  <span class="opt-price">+$290</span>
+                  <input type="checkbox" name="addon-sound">
+                </button>
+              </div>
+            </fieldset>
+
+            <!-- DETAILS -->
+            <fieldset style="border:none">
+              <legend class="eyebrow" style="margin-bottom:1.2rem">Your details</legend>
+              <div class="field">
+                <label for="name">Full name <span class="req">*</span></label>
+                <input type="text" id="name" name="name" autocomplete="name" placeholder="Jordan Rivera">
+                <span class="err-msg"></span>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="email">Email <span class="req">*</span></label>
+                  <input type="email" id="email" name="email" autocomplete="email" placeholder="you@example.com">
+                  <span class="err-msg"></span>
+                </div>
+                <div class="field">
+                  <label for="phone">Phone</label>
+                  <input type="tel" id="phone" name="phone" autocomplete="tel" placeholder="(503) 555-0142">
+                  <span class="err-msg"></span>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="zip">Delivery ZIP <span class="req">*</span></label>
+                  <input type="text" id="zip" name="zip" inputmode="numeric" autocomplete="postal-code" placeholder="97214">
+                  <span class="err-msg"></span>
+                </div>
+                <div class="field">
+                  <label for="showroom">Pickup showroom</label>
+                  <select id="showroom" name="showroom">
+                    <option>Portland, OR (flagship)</option>
+                    <option>Los Angeles, CA</option>
+                    <option>Austin, TX</option>
+                    <option>Brooklyn, NY</option>
+                    <option>Home delivery (+$0)</option>
+                  </select>
+                </div>
+              </div>
+            </fieldset>
+
+            <button type="submit" class="btn btn-primary magnetic" style="width:100%;justify-content:center;margin-top:1rem">
+              Place refundable $500 deposit <span class="arrow">→</span>
+            </button>
+            <p class="sum-note">By reserving you agree to VOLTA's terms. Your deposit is fully refundable until your build is scheduled.</p>
+          </form>
+
+          <!-- SUCCESS -->
+          <div class="form-success" role="status" aria-live="polite">
+            <div class="check" aria-hidden="true">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#07080c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <h3>You're in the queue.</h3>
+            <p>Reservation <b data-ref>VLT-XXXXX</b> · <span data-success-detail></span></p>
+            <p style="margin-top:1rem">A confirmation is on its way to your inbox. We'll reach out as your build slot approaches.</p>
+          </div>
+        </div>
+
+        <!-- ── SUMMARY ── -->
+        <aside class="summary reveal" data-delay="2" aria-label="Order summary">
+          <div class="sum-bike">
+            <svg class="config-bike" viewBox="0 0 900 460" role="img" aria-label="Your AURA One"
+                 style="--bike-body:#27305c;--bike-body-2:#3a447a;--bike-body-d:#161c38;--bike-accent:#6f7bff">
+              <ellipse cx="450" cy="412" rx="300" ry="16" fill="#000" opacity="0.4"/>
+              <circle cx="235" cy="330" r="80" fill="#0b0d14" stroke="var(--bike-accent)" stroke-width="6"/>
+              <circle cx="235" cy="330" r="38" fill="#10131c" stroke="var(--bike-accent)" stroke-width="2"/>
+              <circle cx="690" cy="330" r="80" fill="#0b0d14" stroke="var(--bike-accent)" stroke-width="6"/>
+              <circle cx="690" cy="330" r="38" fill="#10131c" stroke="var(--bike-accent)" stroke-width="2"/>
+              <path d="M235,330 L420,300 L520,318 L690,330" fill="none" stroke="#1a1f2e" stroke-width="13" stroke-linecap="round"/>
+              <rect x="395" y="266" width="126" height="72" rx="12" fill="var(--bike-body-d)" stroke="var(--bike-accent)" stroke-width="2"/>
+              <rect x="408" y="278" width="100" height="9" rx="4" fill="var(--bike-accent)" opacity="0.85"/>
+              <path d="M340,252 C360,208 430,192 510,204 C540,209 555,228 545,252 C520,262 380,266 340,252 Z" fill="var(--bike-body-2)" stroke="#0c0f18" stroke-width="2"/>
+              <path d="M360,234 C400,216 470,212 520,226" fill="none" stroke="var(--bike-accent)" stroke-width="2.5"/>
+              <ellipse cx="694" cy="230" rx="12" ry="14" fill="var(--bike-accent)"/>
+              <path d="M560,252 L660,300 M690,330 L672,238" stroke="#2a3044" stroke-width="8" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h3>Your build</h3>
+          <div class="sum-line" data-line="model"><span>AURA One Core</span><span>$14,900</span></div>
+          <div class="sum-line" data-line="color"><span>Midnight Indigo</span><span>Included</span></div>
+          <div data-sum-addons></div>
+          <div class="sum-total">
+            <span class="lbl">Build price</span>
+            <span class="amt" data-sum-total>$14,900</span>
+          </div>
+          <div class="sum-line" style="border:none;margin-top:.6rem">
+            <span>Due today (refundable)</span>
+            <span data-sum-deposit>$500</span>
+          </div>
+          <p class="sum-note">Balance is due before delivery. Price excludes taxes, registration and destination ($395).</p>
+        </aside>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <span class="logo-mark">VOLTA</span>
+          <p>Electric motorcycles designed and assembled in Portland, Oregon. Built for the people who actually ride.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Machine</h4>
+          <a href="features.html">Features</a>
+          <a href="specs.html">Specifications</a>
+          <a href="reserve.html">Reserve</a>
+          <a href="index.html">Colourways</a>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <a href="#">Our story</a>
+          <a href="#">Newsroom</a>
+          <a href="#">Careers</a>
+          <a href="#">Showrooms</a>
+        </div>
+        <div class="footer-col">
+          <h4>Support</h4>
+          <a href="#">VoltaCare</a>
+          <a href="#">Charging network</a>
+          <a href="#">Owner's manual</a>
+          <a href="#">Contact</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 VOLTA Motorworks, Inc. All rights reserved. EPA-equivalent figures; actual range varies.</span>
+        <div class="socials">
+          <a href="#" aria-label="Instagram">Instagram</a>
+          <a href="#" aria-label="YouTube">YouTube</a>
+          <a href="#" aria-label="X">X</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+  <script src="js/configurator.js"></script>
+  <script src="js/reserve.js"></script>
+</body>
+</html>

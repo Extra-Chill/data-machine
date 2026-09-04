@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three Sisters Planting — Mara's Garden</title>
+  <meta name="description" content="A note from Mara Okonkwo's digital garden on distributed systems, note-taking, stoicism, and gardening.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/garden.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-leaf" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 28 C16 18 8 14 5 6 C16 6 24 12 24 22 C24 25 21 28 16 28 Z" fill="#3a7d52" opacity=".9"/>
+          <path d="M16 28 C16 20 19 13 24 8" fill="none" stroke="#fbf9f3" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="16" cy="28" r="2" fill="#b08b2e"/>
+        </svg>
+        <h1><a href="index.html">Mara's Garden</a></h1>
+      </div>
+      <p class="brand-tag">a digital garden by Mara Okonkwo</p>
+
+      <div class="search-box">
+        <span class="s-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="note-search" placeholder="Search notes  (press /)" aria-label="Search notes" autocomplete="off">
+        <ul class="search-results" id="search-results" aria-live="polite"></ul>
+      </div>
+
+      <nav aria-label="Garden navigation">
+      <p class="nav-section">Home</p>
+      <ul class="nav-list"><li><a href="index.html" class=""><span class="ripe">🌱</span><span>Start Here · MOC</span></a></li>
+      <li><a href="tags.html" class=""><span class="ripe">🏷️</span><span>Tags &amp; Index</span></a></li></ul>
+      
+        <p class="nav-section">Distributed Systems</p>
+        <ul class="nav-list">
+          <li><a href="idempotency-is-a-superpower.html" class=""><span class="ripe">🌳</span><span>Idempotency Is a Superpower</span></a></li>
+          <li><a href="the-two-generals-problem.html" class=""><span class="ripe">🌿</span><span>The Two Generals Problem</span></a></li>
+          <li><a href="why-i-stopped-trusting-wall-clocks.html" class=""><span class="ripe">🌿</span><span>Why I Stopped Trusting Wall Clocks</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Knowledge &amp; Notes</p>
+        <ul class="nav-list">
+          <li><a href="on-tending-a-digital-garden.html" class=""><span class="ripe">🌳</span><span>On Tending a Digital Garden</span></a></li>
+          <li><a href="evergreen-notes.html" class=""><span class="ripe">🌳</span><span>Evergreen Notes</span></a></li>
+          <li><a href="book-how-to-take-smart-notes.html" class=""><span class="ripe">🌿</span><span>Book — How to Take Smart Notes</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Stoicism</p>
+        <ul class="nav-list">
+          <li><a href="the-dichotomy-of-control.html" class=""><span class="ripe">🌳</span><span>The Dichotomy of Control</span></a></li>
+          <li><a href="amor-fati.html" class=""><span class="ripe">🌿</span><span>Amor Fati</span></a></li>
+        </ul>
+      
+        <p class="nav-section">The Garden</p>
+        <ul class="nav-list">
+          <li><a href="compost-is-a-distributed-system.html" class=""><span class="ripe">🌿</span><span>Compost Is a Distributed System</span></a></li>
+          <li><a href="three-sisters-planting.html" class="current"><span class="ripe">🌰</span><span>Three Sisters Planting</span></a></li>
+        </ul>
+      </nav>
+
+      <button class="theme-toggle" type="button" aria-pressed="false">☾ <span>Dark</span></button>
+    </aside>
+    <main class="content" id="main">
+      <article class="note">
+        <p class="breadcrumb"><a href="index.html">🌱 Garden</a> &nbsp;›&nbsp; Three Sisters Planting</p>
+        <h1>Three Sisters Planting</h1>
+        <div class="note-meta">
+          <span class="ripeness seedling">🌰 Seedling</span>
+          <span class="dot"></span>
+          <span>planted Jun 18, 2026</span>
+          <span class="dot"></span>
+          <span>tended Jun 18, 2026</span>
+        </div>
+        <div class="tag-list"><a class="tag" href="tags.html#seedling">#seedling</a><a class="tag" href="tags.html#gardening">#gardening</a></div>
+        <div class="prose">
+
+<p>🌰 <em>Seedling. Captured fast after a conversation at the seed swap — may be half-remembered, revisit before I plant in spring.</em></p>
+<p>The "Three Sisters" is a companion-planting technique from several Indigenous North American agricultural traditions: <strong>corn, beans, and squash</strong> grown together in the same mound, each doing a job the others can't.</p>
+<ul>
+  <li><strong>Corn</strong> grows tall and gives the beans a pole to climb. (Infrastructure.)</li>
+  <li><strong>Beans</strong> fix nitrogen from the air into the soil, feeding the heavy-feeding corn. (They pay rent.)</li>
+  <li><strong>Squash</strong> sprawls low with big leaves, shading out weeds and keeping moisture in. (Ground cover / DOS protection.)</li>
+</ul>
+<h2 id="why">Why this is in <em>this</em> garden <a class="anchor" href="#why">#</a></h2>
+<p>Because it's a system where <strong>cooperation removes the need for an external coordinator</strong> — no trellis to build, no fertilizer to truck in, less weeding. That's the exact lesson from <a class="internal" data-slug="compost-is-a-distributed-system" href="compost-is-a-distributed-system.html">Compost Is a Distributed System</a>: the most robust design is the one that needs the least central management. Three plants, no manager, more food than any of them alone.</p>
+<h2 id="verify">To verify before I trust this note <a class="anchor" href="#verify">#</a></h2>
+<ul class="task-list">
+  <li><input type="checkbox" disabled> Actual spacing / mound size (I think ~12 in. between corn seeds?)</li>
+  <li><input type="checkbox" disabled> Timing — corn first, then beans once corn is ~6 in.? Confirm.</li>
+  <li><input type="checkbox" disabled> Which bean varieties climb vs. bush (bush beans won't use the corn).</li>
+</ul>
+<p>When I've actually grown it once, this graduates to 🌿 budding.</p>
+        </div>
+
+      <section class="backlinks" aria-labelledby="bl-h">
+        <h2 id="bl-h">Linked references</h2>
+        <p class="bl-sub">3 notes link to this one.</p>
+        <ul>
+        <li><a class="internal" data-slug="index" href="index.html">Start Here</a><div class="bl-ctx">Listed under The actual garden as a seedling.</div></li>
+        <li><a class="internal" data-slug="amor-fati" href="amor-fati.html">Amor Fati</a><div class="bl-ctx">Used as the example of a planting that may fail to a late frost.</div></li>
+        <li><a class="internal" data-slug="compost-is-a-distributed-system" href="compost-is-a-distributed-system.html">Compost Is a Distributed System</a><div class="bl-ctx">Shares the "robust because it needs no coordination" lesson.</div></li>
+        </ul>
+      </section>
+      </article>
+    </main>
+
+    <aside class="right-rail">
+      <div class="rail-card">
+        <p class="rail-title">On this page</p>
+        <ul class="toc">
+          <li class=""><a href="#why">Why this is in this garden</a></li>
+          <li class=""><a href="#verify">To verify before I trust this</a></li>
+        </ul>
+      </div>
+      <div class="rail-card">
+        <p class="rail-title">Graph view</p>
+        <svg id="graph" class="graph-svg" data-current="three-sisters-planting" role="img" aria-label="Graph of how notes in the garden connect"></svg>
+        <p class="graph-hint">Hover a node to spotlight its links. Click to jump.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-foot">
+    <span>🌱 Mara's Garden · tended on Sundays · last commit Jun 19, 2026</span>
+    <span>Built with <a href="quartz.config.ts">Quartz 4</a> from the markdown in <code style="font-family:var(--font-mono);font-size:.8rem">notes/</code> · <a href="https://github.com">source</a></span>
+  </footer>
+  <script src="js/garden.js"></script>
+</body>
+</html>

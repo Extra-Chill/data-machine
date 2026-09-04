@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Step-by-step incident runbook for SignalForge — detect, triage, escalate, resolve, and post-mortem.">
+  <title>Incident Workflow — SignalForge Docs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="mobile-nav-toggle" id="navToggle" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <div class="overlay" id="overlay"></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <a href="index.html">
+          <svg class="sidebar-logo-mark" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="7" fill="#111512"/>
+            <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#2a352a"/>
+            <polyline points="3,16 7,16 9,10 11,22 13,16 16,16 18,8 20,24 22,16 29,16"
+              stroke="#3efb6a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="sidebar-logo-text">
+            <span class="sidebar-logo-name">SignalForge</span>
+            <span class="sidebar-logo-sub">docs</span>
+          </div>
+        </a>
+      </div>
+      <div class="sidebar-version">
+        <span class="status-dot live"></span>
+        <span class="sidebar-status-text">all systems operational</span>
+        <span class="sidebar-version-badge">v0.9.2</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <span class="nav-section-label">Docs</span>
+          <a class="nav-link" href="index.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+            Home
+          </a>
+          <a class="nav-link" href="overview.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.5"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1"/></svg>
+            Product Overview
+          </a>
+          <a class="nav-link" href="getting-started.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12L6 4l3 5 2-3 3 6"/></svg>
+            Getting Started
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Guides</span>
+          <a class="nav-link" href="incident-workflow.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2l1.5 4h4l-3.2 2.3 1.2 3.9L8 10l-3.5 2.2 1.2-3.9L2.5 6H6.5z"/></svg>
+            Incident Workflow
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Reference</span>
+          <a class="nav-link" href="api-reference.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="1.5"/><path d="M5 5V4a3 3 0 016 0v1"/><path d="M6 9h4M8 8v2"/></svg>
+            API Reference
+          </a>
+          <a class="nav-link" href="changelog.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2" width="11" height="13" rx="1.5"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>
+            Changelog
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Help</span>
+          <a class="nav-link" href="support.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 10.5v.5M8 5.5a1.5 1.5 0 011.5 1.5c0 1-1.5 1.5-1.5 2.5"/></svg>
+            Support
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        <a href="changelog.html">Releases</a>
+        <a href="support.html">Discord</a>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-breadcrumb">
+          <a href="index.html">Docs</a>
+          <span class="sep">/</span>
+          <span class="current">Incident Workflow</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="topbar-search-btn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+            <span class="topbar-search-text">Search docs</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="content-with-toc">
+          <div class="main-content">
+            <div class="page-header">
+              <div class="page-tag" style="color: var(--red);">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2l1.5 4h4l-3.2 2.3 1.2 3.9L8 10l-3.5 2.2 1.2-3.9L2.5 6H6.5z"/></svg>
+                Incident Workflow
+              </div>
+              <h1>Incident runbook</h1>
+              <p class="page-desc">
+                A blameless, step-by-step process for detecting, triaging, escalating, resolving, and learning from API incidents caught by SignalForge.
+              </p>
+            </div>
+
+            <div class="callout critical">
+              <div class="callout-icon">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2L1 14h14L8 2z" stroke-linejoin="round"/><path d="M8 7v3M8 12v.5"/></svg>
+              </div>
+              <div class="callout-body">
+                <span class="callout-title">Under active incident?</span>
+                <p>Skip to <a href="#triage" style="color: var(--red);">Phase 2: Triage</a> immediately. First responder: acknowledge the alert before reading any further.</p>
+              </div>
+            </div>
+
+            <!-- Overview -->
+            <h2 id="overview">Incident lifecycle overview</h2>
+            <p>SignalForge organizes incident response into five phases. Each phase has a clear owner, timebox, and exit criteria. The phases are sequential but may overlap during fast-moving incidents.</p>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>#</th><th>Phase</th><th>Owner</th><th>Timebox</th><th>Exit criteria</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>1</code></td>
+                    <td><strong>Detect</strong></td>
+                    <td>Automated (SignalForge)</td>
+                    <td>&lt; 2 min</td>
+                    <td>Alert delivered to on-call channel</td>
+                  </tr>
+                  <tr>
+                    <td><code>2</code></td>
+                    <td><strong>Triage</strong></td>
+                    <td>First responder</td>
+                    <td>&lt; 5 min</td>
+                    <td>Severity confirmed, IC assigned</td>
+                  </tr>
+                  <tr>
+                    <td><code>3</code></td>
+                    <td><strong>Escalate</strong></td>
+                    <td>Incident commander</td>
+                    <td>&lt; 10 min</td>
+                    <td>Stakeholders notified, war room open</td>
+                  </tr>
+                  <tr>
+                    <td><code>4</code></td>
+                    <td><strong>Resolve</strong></td>
+                    <td>Incident commander</td>
+                    <td>Variable</td>
+                    <td>Service restored, signal resolved</td>
+                  </tr>
+                  <tr>
+                    <td><code>5</code></td>
+                    <td><strong>Post-mortem</strong></td>
+                    <td>Team</td>
+                    <td>&lt; 48 hr</td>
+                    <td>Post-mortem doc published, action items filed</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Phase 1 -->
+            <h2 id="detect">Phase 1 — Detect</h2>
+            <div class="runbook-phase">
+              <div class="runbook-phase-header">
+                <div class="phase-number phase-1">1</div>
+                <div class="phase-title">Detection (automated)</div>
+                <div class="phase-time">T+0:00 → T+2:00</div>
+              </div>
+              <div class="runbook-phase-body">
+                <p>SignalForge handles detection automatically. When a monitor check fails, the engine evaluates your alert rules and dispatches signals to configured destinations. A typical critical signal looks like this:</p>
+
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-filename">Slack alert — #platform-alerts</span>
+                    <span class="code-block-lang">text</span>
+                  </div>
+                  <pre><span class="hl-t">[CRITICAL]</span> <span class="hl-v">payments-api-health</span> <span class="hl-o">→</span> <span class="hl-t">status_not_2xx</span>
+
+<span class="hl-p">Monitor:</span>   <span class="hl-v">Payments API Health</span>
+<span class="hl-p">Value:</span>     <span class="hl-n">HTTP 503</span>
+<span class="hl-p">Threshold:</span> <span class="hl-v">2xx</span>
+<span class="hl-p">Failures:</span>  <span class="hl-n">2 consecutive</span> <span class="hl-o">(</span><span class="hl-v">after_failures: 2</span><span class="hl-o">)</span>
+<span class="hl-p">Regions:</span>   <span class="hl-v">us-east-1, eu-west-1</span>
+<span class="hl-p">Started:</span>   <span class="hl-v">2024-03-12T14:32:18Z</span>
+<span class="hl-p">Signal ID:</span> <span class="hl-v">sig_01HXK9F2J8</span>
+
+<span class="hl-out">→ View in dashboard: app.signalforge.io/signals/sig_01HXK9F2J8</span>
+<span class="hl-out">→ Acknowledge: signalforge ack sig_01HXK9F2J8</span></pre>
+                </div>
+
+                <p><strong>What happens automatically:</strong></p>
+                <ul class="checklist">
+                  <li><span class="check-box"></span>Monitor probe fails from configured regions</li>
+                  <li><span class="check-box"></span>Consecutive-failure threshold crossed (configurable via <code>after_failures</code>)</li>
+                  <li><span class="check-box"></span>Alert rule evaluated — severity determined</li>
+                  <li><span class="check-box"></span>Signal dispatched to all matching destinations (Slack, PagerDuty, webhook)</li>
+                  <li><span class="check-box"></span>Deduplication applied — you get one alert per signal, not one per check</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Phase 2 -->
+            <h2 id="triage">Phase 2 — Triage</h2>
+            <div class="runbook-phase">
+              <div class="runbook-phase-header">
+                <div class="phase-number phase-2">2</div>
+                <div class="phase-title">Triage</div>
+                <div class="phase-time">T+0:00 → T+5:00</div>
+              </div>
+              <div class="runbook-phase-body">
+                <p>The first responder (on-call engineer) triages within 5 minutes of the alert. Goal: understand what's broken, how bad it is, and whether to escalate.</p>
+
+                <h4>Triage checklist</h4>
+                <ul class="checklist">
+                  <li><span class="check-box"></span>Acknowledge the alert: <code>signalforge ack &lt;signal_id&gt;</code> or click Acknowledge in the dashboard</li>
+                  <li><span class="check-box"></span>Confirm signal is real (not a probe flap) — check <code>consecutive_failures</code> count and region spread</li>
+                  <li><span class="check-box"></span>Pull recent signal history: <code>signalforge signals --monitor payments-api-health --limit 20</code></li>
+                  <li><span class="check-box"></span>Check correlated monitors — is it isolated or are multiple services affected?</li>
+                  <li><span class="check-box"></span>Classify severity: <strong>critical</strong> (customer impact now) vs. <strong>warning</strong> (degraded, not broken)</li>
+                  <li><span class="check-box"></span>Post triage status to #platform-incidents Slack channel</li>
+                </ul>
+
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-filename">Triage commands</span>
+                    <span class="code-block-lang">bash</span>
+                    <button class="copy-btn">copy</button>
+                  </div>
+                  <pre><span class="hl-c"># Acknowledge a signal</span>
+<span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">ack</span> <span class="hl-arg">sig_01HXK9F2J8</span>
+<span class="hl-out">✓ Signal sig_01HXK9F2J8 acknowledged</span>
+
+<span class="hl-c"># Get recent signal history for a monitor</span>
+<span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">signals</span> <span class="hl-flag">--monitor</span> <span class="hl-arg">payments-api-health</span> <span class="hl-flag">--limit</span> <span class="hl-arg">10</span>
+
+<span class="hl-out">TIME (UTC)           TYPE                  SEVERITY  VALUE      DURATION</span>
+<span class="hl-out">──────────────────────────────────────────────────────────────────────</span>
+<span class="hl-out">2024-03-12 14:32:18  status_not_2xx        CRITICAL  HTTP 503   ongoing</span>
+<span class="hl-out">2024-03-12 09:14:03  latency_p95_exceeded  WARNING   2,342ms    8m 12s</span>
+<span class="hl-out">2024-03-11 22:01:55  status_not_2xx        CRITICAL  HTTP 502   2m 44s</span>
+
+<span class="hl-c"># Check all active signals across workspace</span>
+<span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">signals</span> <span class="hl-flag">--state</span> <span class="hl-arg">firing</span>
+
+<span class="hl-out">sig_01HXK9F2J8  payments-api-health  status_not_2xx  CRITICAL  2m ago</span></pre>
+                </div>
+
+                <div class="callout info">
+                  <div class="callout-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 5.5v.5"/></svg></div>
+                  <div class="callout-body">
+                    <span class="callout-title">Single-region vs multi-region failures</span>
+                    <p>A failure in only one region often indicates a network or DNS issue rather than an application problem. A failure in all regions almost always means the service itself is down. Check the <code>regions</code> array in the signal payload before assuming full outage.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Phase 3 -->
+            <h2 id="escalation">Phase 3 — Escalate</h2>
+            <div class="runbook-phase">
+              <div class="runbook-phase-header">
+                <div class="phase-number phase-3">3</div>
+                <div class="phase-title">Escalation</div>
+                <div class="phase-time">T+5:00 → T+15:00</div>
+              </div>
+              <div class="runbook-phase-body">
+                <p>Escalation criteria depend on severity and time-to-acknowledge. SignalForge auto-escalates via your alert rule configuration if the signal is unacknowledged after a configurable timeout (default: 10 minutes for critical).</p>
+
+                <h4>Manual escalation path</h4>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Severity</th><th>Immediate action</th><th>Auto-escalate after</th><th>Escalation target</th></tr></thead>
+                    <tbody>
+                      <tr>
+                        <td><span class="method-badge method-delete">critical</span></td>
+                        <td>Page on-call via PagerDuty</td>
+                        <td>10 min unacknowledged</td>
+                        <td>Engineering manager</td>
+                      </tr>
+                      <tr>
+                        <td><span class="method-badge method-patch">warning</span></td>
+                        <td>Post to #platform-alerts</td>
+                        <td>30 min unresolved</td>
+                        <td>On-call engineer</td>
+                      </tr>
+                      <tr>
+                        <td><span class="method-badge method-get">info</span></td>
+                        <td>Record in signal history</td>
+                        <td>Never (no escalation)</td>
+                        <td>—</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h4>War room checklist (critical only)</h4>
+                <ul class="checklist">
+                  <li><span class="check-box"></span>Assign Incident Commander (IC) — typically the most senior engineer on-call</li>
+                  <li><span class="check-box"></span>Open Zoom/Slack huddle in #incident-live channel</li>
+                  <li><span class="check-box"></span>IC posts initial incident summary: time of detection, affected service, customer impact estimate</li>
+                  <li><span class="check-box"></span>Notify Customer Success if customer-facing impact is confirmed</li>
+                  <li><span class="check-box"></span>Begin timeline doc — log every action with UTC timestamp</li>
+                  <li><span class="check-box"></span>Add maintenance window if needed: <code>signalforge maintenance create --monitor payments-api-health --duration 60m</code></li>
+                </ul>
+
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-filename">Example escalation rule in signalforge.yml</span>
+                    <span class="code-block-lang">yaml</span>
+                    <button class="copy-btn">copy</button>
+                  </div>
+                  <pre><span class="hl-p">rules</span><span class="hl-o">:</span>
+  <span class="hl-o">-</span> <span class="hl-p">id</span><span class="hl-o">:</span> <span class="hl-s">payments-critical-escalation</span>
+    <span class="hl-p">when</span><span class="hl-o">:</span>
+      <span class="hl-p">signal_type</span><span class="hl-o">:</span> <span class="hl-v">status_not_2xx</span>
+      <span class="hl-p">monitor_id</span><span class="hl-o">:</span> <span class="hl-v">payments-api-health</span>
+      <span class="hl-p">severity</span><span class="hl-o">:</span> <span class="hl-v">critical</span>
+    <span class="hl-p">notify</span><span class="hl-o">:</span>
+      <span class="hl-o">-</span> <span class="hl-p">channel</span><span class="hl-o">:</span> <span class="hl-v">pagerduty-oncall</span>
+        <span class="hl-p">immediately</span><span class="hl-o">:</span> <span class="hl-v">true</span>
+      <span class="hl-o">-</span> <span class="hl-p">channel</span><span class="hl-o">:</span> <span class="hl-v">pagerduty-manager</span>
+        <span class="hl-p">after_unacked_minutes</span><span class="hl-o">:</span> <span class="hl-n">10</span>
+      <span class="hl-o">-</span> <span class="hl-p">channel</span><span class="hl-o">:</span> <span class="hl-v">slack-platform</span>
+        <span class="hl-p">immediately</span><span class="hl-o">:</span> <span class="hl-v">true</span></pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Phase 4 -->
+            <h2 id="resolve">Phase 4 — Resolve</h2>
+            <div class="runbook-phase">
+              <div class="runbook-phase-header">
+                <div class="phase-number phase-4">4</div>
+                <div class="phase-title">Resolution</div>
+                <div class="phase-time">Variable</div>
+              </div>
+              <div class="runbook-phase-body">
+                <p>Resolution happens when the underlying issue is fixed and SignalForge detects that the monitor is healthy again. The engine emits a <code>*_recovered</code> signal and notifies the same destinations as the original alert.</p>
+
+                <h4>Resolution checklist</h4>
+                <ul class="checklist">
+                  <li><span class="check-box"></span>Confirm fix is deployed or rollback is complete</li>
+                  <li><span class="check-box"></span>Wait for SignalForge to auto-detect recovery (usually within one monitor interval)</li>
+                  <li><span class="check-box"></span>Or manually verify: <code>signalforge status --monitor payments-api-health</code></li>
+                  <li><span class="check-box"></span>Confirm <code>status_recovered</code> signal appears in signal history</li>
+                  <li><span class="check-box"></span>Post all-clear message to #platform-incidents with: time resolved, duration, brief impact summary</li>
+                  <li><span class="check-box"></span>Close PagerDuty incident if applicable</li>
+                  <li><span class="check-box"></span>Remove maintenance window if one was created: <code>signalforge maintenance end --monitor payments-api-health</code></li>
+                </ul>
+
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-filename">Confirming recovery</span>
+                    <span class="code-block-lang">bash</span>
+                    <button class="copy-btn">copy</button>
+                  </div>
+                  <pre><span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">signals</span> <span class="hl-flag">--monitor</span> <span class="hl-arg">payments-api-health</span> <span class="hl-flag">--limit</span> <span class="hl-arg">5</span>
+
+<span class="hl-out">TIME (UTC)           TYPE                SEVERITY  VALUE    DURATION</span>
+<span class="hl-out">─────────────────────────────────────────────────────────────────</span>
+<span class="hl-out">2024-03-12 14:36:50  status_recovered    INFO      HTTP 200  —</span>
+<span class="hl-out">2024-03-12 14:32:18  status_not_2xx      CRITICAL  HTTP 503  4m 32s</span>
+
+<span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">status</span> <span class="hl-flag">--monitor</span> <span class="hl-arg">payments-api-health</span>
+
+<span class="hl-out">payments-api-health   ● OK   14s ago   downtime today: 4m 32s</span></pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Phase 5 -->
+            <h2 id="postmortem">Phase 5 — Post-mortem</h2>
+            <div class="runbook-phase">
+              <div class="runbook-phase-header">
+                <div class="phase-number phase-5">5</div>
+                <div class="phase-title">Blameless Post-mortem</div>
+                <div class="phase-time">Within 48 hours</div>
+              </div>
+              <div class="runbook-phase-body">
+                <p>For any <strong>critical</strong> incident, file a blameless post-mortem within 48 hours. SignalForge automatically generates a signal timeline to anchor the document.</p>
+
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-filename">Generate timeline for post-mortem</span>
+                    <span class="code-block-lang">bash</span>
+                    <button class="copy-btn">copy</button>
+                  </div>
+                  <pre><span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-arg">postmortem</span> <span class="hl-flag">--signal</span> <span class="hl-arg">sig_01HXK9F2J8</span> <span class="hl-flag">--format</span> <span class="hl-arg">markdown</span>
+
+<span class="hl-out"># Post-mortem: payments-api-health — 2024-03-12</span>
+<span class="hl-out"></span>
+<span class="hl-out">## Timeline</span>
+<span class="hl-out">- 14:32:18Z  SignalForge detected HTTP 503 (region: us-east-1)</span>
+<span class="hl-out">- 14:32:48Z  SignalForge confirmed HTTP 503 (region: eu-west-1)</span>
+<span class="hl-out">- 14:32:49Z  Critical alert dispatched (Slack + PagerDuty)</span>
+<span class="hl-out">- 14:33:22Z  Signal acknowledged by @jamie</span>
+<span class="hl-out">- 14:35:00Z  Rollback initiated (deploy d4b8a92)</span>
+<span class="hl-out">- 14:36:50Z  HTTP 200 restored — signal resolved</span>
+<span class="hl-out">- Total downtime: 4m 32s</span></pre>
+                </div>
+
+                <h4>Post-mortem document template</h4>
+                <ul class="checklist">
+                  <li><span class="check-box"></span><strong>Summary</strong> — 2–3 sentence description of what happened and its impact</li>
+                  <li><span class="check-box"></span><strong>Timeline</strong> — generated via <code>signalforge postmortem --signal &lt;id&gt;</code></li>
+                  <li><span class="check-box"></span><strong>Root cause</strong> — what actually caused the failure (code, config, infrastructure, external dep)</li>
+                  <li><span class="check-box"></span><strong>Detection quality</strong> — did SignalForge catch it before a customer? How quickly?</li>
+                  <li><span class="check-box"></span><strong>What went well</strong> — response time, communication, tooling</li>
+                  <li><span class="check-box"></span><strong>What could improve</strong> — gaps in coverage, slow response, missing runbook steps</li>
+                  <li><span class="check-box"></span><strong>Action items</strong> — specific, owned, time-boxed tasks to prevent recurrence</li>
+                </ul>
+
+                <div class="callout tip">
+                  <div class="callout-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2a4.5 4.5 0 010 9H6v2h4" stroke-linecap="round"/><circle cx="8" cy="6" r="1"/></svg></div>
+                  <div class="callout-body">
+                    <span class="callout-title">Blameless means finding the system failure</span>
+                    <p>A good post-mortem asks "what in our system allowed this to happen?" not "who made the mistake?" People operate in the systems we build. Fix the system.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Signal reference -->
+            <h2 id="signal-reference">Signal reference for on-call</h2>
+            <p>Quick reference for interpreting the most common production signals:</p>
+
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Signal type</th><th>Meaning</th><th>First thing to check</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><code>status_not_2xx</code></td>
+                    <td>HTTP endpoint returned non-2xx status</td>
+                    <td>Error logs, recent deploys, upstream dependencies</td>
+                  </tr>
+                  <tr>
+                    <td><code>latency_p95_exceeded</code></td>
+                    <td>95th percentile response time above threshold</td>
+                    <td>Database slow queries, N+1 queries, cold cache</td>
+                  </tr>
+                  <tr>
+                    <td><code>tcp_timeout</code></td>
+                    <td>TCP connection timed out — port unreachable</td>
+                    <td>Security group / firewall rules, network path</td>
+                  </tr>
+                  <tr>
+                    <td><code>cert_expiry_critical</code></td>
+                    <td>TLS certificate expires in &lt; 7 days</td>
+                    <td>Certificate renewal process, auto-renew configuration</td>
+                  </tr>
+                  <tr>
+                    <td><code>body_mismatch</code></td>
+                    <td>Response body didn't match expected content</td>
+                    <td>Maintenance page served, wrong environment, routing error</td>
+                  </tr>
+                  <tr>
+                    <td><code>dns_resolution_failed</code></td>
+                    <td>DNS lookup failed for monitored hostname</td>
+                    <td>DNS propagation, zone file changes, registrar issues</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+          <!-- TOC -->
+          <aside>
+            <div class="toc-aside">
+              <span class="toc-label">On this page</span>
+              <ul class="toc-list">
+                <li><a href="#overview">Lifecycle overview</a></li>
+                <li><a href="#detect">Phase 1 — Detect</a></li>
+                <li><a href="#triage">Phase 2 — Triage</a></li>
+                <li><a href="#escalation">Phase 3 — Escalate</a></li>
+                <li><a href="#resolve">Phase 4 — Resolve</a></li>
+                <li><a href="#postmortem">Phase 5 — Post-mortem</a></li>
+                <li><a href="#signal-reference">Signal reference</a></li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-left">SignalForge v0.9.2 · MIT License</div>
+        <div class="footer-links">
+          <a href="api-reference.html">API</a>
+          <a href="changelog.html">Changelog</a>
+          <a href="support.html">Support</a>
+          <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>

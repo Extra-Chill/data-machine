@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compost Is a Distributed System — Mara's Garden</title>
+  <meta name="description" content="A note from Mara Okonkwo's digital garden on distributed systems, note-taking, stoicism, and gardening.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/garden.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-leaf" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 28 C16 18 8 14 5 6 C16 6 24 12 24 22 C24 25 21 28 16 28 Z" fill="#3a7d52" opacity=".9"/>
+          <path d="M16 28 C16 20 19 13 24 8" fill="none" stroke="#fbf9f3" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="16" cy="28" r="2" fill="#b08b2e"/>
+        </svg>
+        <h1><a href="index.html">Mara's Garden</a></h1>
+      </div>
+      <p class="brand-tag">a digital garden by Mara Okonkwo</p>
+
+      <div class="search-box">
+        <span class="s-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="note-search" placeholder="Search notes  (press /)" aria-label="Search notes" autocomplete="off">
+        <ul class="search-results" id="search-results" aria-live="polite"></ul>
+      </div>
+
+      <nav aria-label="Garden navigation">
+      <p class="nav-section">Home</p>
+      <ul class="nav-list"><li><a href="index.html" class=""><span class="ripe">🌱</span><span>Start Here · MOC</span></a></li>
+      <li><a href="tags.html" class=""><span class="ripe">🏷️</span><span>Tags &amp; Index</span></a></li></ul>
+      
+        <p class="nav-section">Distributed Systems</p>
+        <ul class="nav-list">
+          <li><a href="idempotency-is-a-superpower.html" class=""><span class="ripe">🌳</span><span>Idempotency Is a Superpower</span></a></li>
+          <li><a href="the-two-generals-problem.html" class=""><span class="ripe">🌿</span><span>The Two Generals Problem</span></a></li>
+          <li><a href="why-i-stopped-trusting-wall-clocks.html" class=""><span class="ripe">🌿</span><span>Why I Stopped Trusting Wall Clocks</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Knowledge &amp; Notes</p>
+        <ul class="nav-list">
+          <li><a href="on-tending-a-digital-garden.html" class=""><span class="ripe">🌳</span><span>On Tending a Digital Garden</span></a></li>
+          <li><a href="evergreen-notes.html" class=""><span class="ripe">🌳</span><span>Evergreen Notes</span></a></li>
+          <li><a href="book-how-to-take-smart-notes.html" class=""><span class="ripe">🌿</span><span>Book — How to Take Smart Notes</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Stoicism</p>
+        <ul class="nav-list">
+          <li><a href="the-dichotomy-of-control.html" class=""><span class="ripe">🌳</span><span>The Dichotomy of Control</span></a></li>
+          <li><a href="amor-fati.html" class=""><span class="ripe">🌿</span><span>Amor Fati</span></a></li>
+        </ul>
+      
+        <p class="nav-section">The Garden</p>
+        <ul class="nav-list">
+          <li><a href="compost-is-a-distributed-system.html" class="current"><span class="ripe">🌿</span><span>Compost Is a Distributed System</span></a></li>
+          <li><a href="three-sisters-planting.html" class=""><span class="ripe">🌰</span><span>Three Sisters Planting</span></a></li>
+        </ul>
+      </nav>
+
+      <button class="theme-toggle" type="button" aria-pressed="false">☾ <span>Dark</span></button>
+    </aside>
+    <main class="content" id="main">
+      <article class="note">
+        <p class="breadcrumb"><a href="index.html">🌱 Garden</a> &nbsp;›&nbsp; Compost Is a Distributed System</p>
+        <h1>Compost Is a Distributed System</h1>
+        <div class="note-meta">
+          <span class="ripeness budding">🌿 Budding</span>
+          <span class="dot"></span>
+          <span>planted Apr 22, 2025</span>
+          <span class="dot"></span>
+          <span>tended Jun 15, 2026</span>
+        </div>
+        <div class="tag-list"><a class="tag" href="tags.html#budding">#budding</a><a class="tag" href="tags.html#gardening">#gardening</a><a class="tag" href="tags.html#distributed-systems">#distributed-systems</a></div>
+        <div class="prose">
+
+<p>I did not expect my compost bin to teach me systems design, but here we are. A compost pile is a self-organizing, fault-tolerant, eventually-consistent distributed system, and once you see it you can't unsee it. This is the note that most embodies why I keep a garden the way I do — see <a class="internal" data-slug="on-tending-a-digital-garden" href="on-tending-a-digital-garden.html">On Tending a Digital Garden</a> on why a note is allowed to be <em>both</em> a gardening note and a systems note.</p>
+<h2 id="map">The mapping <a class="anchor" href="#map">#</a></h2>
+<table>
+  <thead><tr><th>Compost</th><th>Distributed system</th></tr></thead>
+  <tbody>
+    <tr><td>Billions of microbes, no boss</td><td>Nodes with no central coordinator</td></tr>
+    <tr><td>Bacteria, fungi, worms, each doing one job</td><td>Microservices, single responsibility</td></tr>
+    <tr><td>You add scraps in any order</td><td>Commutative, order-independent operations</td></tr>
+    <tr><td>Pile converges to dark crumbly soil</td><td><strong>Eventual consistency</strong></td></tr>
+    <tr><td>A rotten patch doesn't kill the pile</td><td><strong>Graceful degradation / fault tolerance</strong></td></tr>
+  </tbody>
+</table>
+<h2 id="idem">Idempotency in the bin <a class="anchor" href="#idem">#</a></h2>
+<p>Here's the one that delights me. Composting is <strong>idempotent</strong> in exactly the sense from <a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a>: if you toss the same banana peel in twice (you forgot you already did it), the pile doesn't break. The end state — soil — is the same. There's no "this scrap was processed twice" corruption, because the operation's <em>effect</em> is convergent, not counted. The bin doesn't need an idempotency key because decomposition is naturally convergent. Software has to <em>engineer</em> what the compost gets for free.</p>
+<h2 id="noclock">No global clock <a class="anchor" href="#noclock">#</a></h2>
+<p>A compost pile also has no <a class="internal" data-slug="why-i-stopped-trusting-wall-clocks" href="why-i-stopped-trusting-wall-clocks.html">Why I Stopped Trusting Wall Clocks</a> problem and no <a class="internal" data-slug="the-two-generals-problem" href="the-two-generals-problem.html">The Two Generals Problem</a>, and the reason is instructive: <strong>it never needs global agreement.</strong> Each microbe acts on local information only. There's no moment where the whole pile must "decide" anything in unison. The hardest problems in distributed systems all come from <em>requiring</em> coordination; the compost is robust precisely because it requires none.</p>
+<p>The engineering lesson, stolen from a bucket of worms: <em>the cheapest way to solve a coordination problem is to redesign the system so it doesn't need coordination.</em></p>
+<h2 id="do">What to actually do (the gardening note part) <a class="anchor" href="#do">#</a></h2>
+<ul>
+  <li><strong>Carbon : nitrogen ≈ 30:1.</strong> "Browns" (leaves, cardboard) to "greens" (scraps, grass). Too much nitrogen → ammonia stink. Too much carbon → nothing happens.</li>
+  <li><strong>Turn it</strong> to re-introduce oxygen; anaerobic pockets are the rotten-node failures.</li>
+  <li><strong>Patience.</strong> Three to six months. You cannot rush eventual consistency.</li>
+</ul>
+<p>This patience, by the way, is pure <a class="internal" data-slug="amor-fati" href="amor-fati.html">Amor Fati</a> applied to soil — you don't resent the six months, you trust the process and let the microbes mingle, which is the same mingling Ahrens describes for notes in <a class="internal" data-slug="book-how-to-take-smart-notes" href="book-how-to-take-smart-notes.html">Book — How to Take Smart Notes</a>.</p>
+        </div>
+
+      <section class="backlinks" aria-labelledby="bl-h">
+        <h2 id="bl-h">Linked references</h2>
+        <p class="bl-sub">5 notes link to this one.</p>
+        <ul>
+        <li><a class="internal" data-slug="index" href="index.html">Start Here</a><div class="bl-ctx">Listed (with a wink) under The actual garden.</div></li>
+        <li><a class="internal" data-slug="on-tending-a-digital-garden" href="on-tending-a-digital-garden.html">On Tending a Digital Garden</a><div class="bl-ctx">Used as the example of a note that is both gardening and systems.</div></li>
+        <li><a class="internal" data-slug="book-how-to-take-smart-notes" href="book-how-to-take-smart-notes.html">Book — How to Take Smart Notes</a><div class="bl-ctx">"Letting ideas mingle" is credited as the reason this note exists.</div></li>
+        <li><a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a><div class="bl-ctx">The compost bin is cited as a real-world idempotent system.</div></li>
+        <li><a class="internal" data-slug="three-sisters-planting" href="three-sisters-planting.html">Three Sisters Planting</a><div class="bl-ctx">Reuses the "robust because it needs no coordination" lesson.</div></li>
+        </ul>
+      </section>
+      </article>
+    </main>
+
+    <aside class="right-rail">
+      <div class="rail-card">
+        <p class="rail-title">On this page</p>
+        <ul class="toc">
+          <li class=""><a href="#map">The mapping</a></li>
+          <li class=""><a href="#idem">Idempotency in the bin</a></li>
+          <li class=""><a href="#noclock">No global clock</a></li>
+          <li class=""><a href="#do">What to actually do</a></li>
+        </ul>
+      </div>
+      <div class="rail-card">
+        <p class="rail-title">Graph view</p>
+        <svg id="graph" class="graph-svg" data-current="compost-is-a-distributed-system" role="img" aria-label="Graph of how notes in the garden connect"></svg>
+        <p class="graph-hint">Hover a node to spotlight its links. Click to jump.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-foot">
+    <span>🌱 Mara's Garden · tended on Sundays · last commit Jun 19, 2026</span>
+    <span>Built with <a href="quartz.config.ts">Quartz 4</a> from the markdown in <code style="font-family:var(--font-mono);font-size:.8rem">notes/</code> · <a href="https://github.com">source</a></span>
+  </footer>
+  <script src="js/garden.js"></script>
+</body>
+</html>

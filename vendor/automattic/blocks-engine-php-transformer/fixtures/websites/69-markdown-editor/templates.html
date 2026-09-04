@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Templates — Inkwell Markdown Studio</title>
+  <meta name="description" content="Starter documents for Inkwell: a project README, a blog post, meeting notes, and a ready-to-present slide deck. Load one into the editor with a click.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/markdown.css">
+  <link rel="stylesheet" href="css/page.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%238a7bff'/%3E%3Cpath d='M9 22 L9 10 L16 19 L23 10 L23 22' fill='none' stroke='white' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body class="is-page" data-layout="split">
+
+  <header class="app-header" role="banner">
+    <a href="index.html" class="brand" aria-label="Inkwell home">
+      <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="7" fill="var(--accent)"/>
+        <path d="M9 22 L9 10 L16 19 L23 10 L23 22" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+      <span>Ink<b>well</b></span>
+      <span class="brand-sub">studio</span>
+    </a>
+    <span class="tb-spacer" style="flex:1"></span>
+    <nav class="page-nav" aria-label="Primary">
+      <a href="index.html">Editor</a>
+      <a href="templates.html" class="active" aria-current="page">Templates</a>
+      <a href="about.html">About</a>
+      <a href="index.html" class="hbtn primary" style="text-decoration:none">Open editor →</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="page-hero">
+      <p class="eyebrow">Starter documents</p>
+      <h1>Begin from a blank page — <em>or don't.</em></h1>
+      <p class="lead">Pick a template to drop a complete, real document into the editor. Every one is hand-written Markdown you can mangle into your own. Loading a template creates a new document in your library; your existing notes are never touched.</p>
+    </section>
+
+    <section class="template-grid" id="template-grid"></section>
+
+    <section class="page-cta">
+      <h2>Prefer a clean slate?</h2>
+      <p>Open the editor and start typing. The live preview, outline, and word count are all waiting.</p>
+      <a href="index.html" class="hbtn primary big">Open the editor →</a>
+    </section>
+  </main>
+
+  <footer class="page-foot">
+    <span>Inkwell — a hand-built Markdown studio. No frameworks, no server, no build step.</span>
+    <span><a href="about.html">How it works</a></span>
+  </footer>
+
+  <script src="js/markdown.js"></script>
+  <script src="js/seed-data.js"></script>
+  <script>
+    (function () {
+      var grid = document.getElementById('template-grid');
+      var icons = {
+        readme: '<rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
+        blog: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+        meeting: '<path d="M16 21v-2a4 4 0 0 0-8 0v2"/><circle cx="12" cy="7" r="4"/>',
+        slides: '<rect x="3" y="4" width="18" height="13" rx="2"/><line x1="9" y1="21" x2="15" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'
+      };
+      window.InkwellSeed.TEMPLATES.forEach(function (t) {
+        var preview = window.Inkwell.render(t.body.split('\n').slice(0, 14).join('\n')).html;
+        var card = document.createElement('article');
+        card.className = 'template-card';
+        card.innerHTML =
+          '<div class="tc-head">' +
+            '<svg class="tc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">' + (icons[t.id] || '') + '</svg>' +
+            '<div><h3>' + t.name + '</h3>' +
+            '<div class="tc-tags">' + t.tags.map(function (x) { return '<span class="tc-tag">' + x + '</span>'; }).join('') + '</div></div>' +
+          '</div>' +
+          '<p class="tc-desc">' + t.desc + '</p>' +
+          '<div class="tc-preview markdown-body"><div class="tc-preview-inner">' + preview + '</div></div>' +
+          '<button class="hbtn primary tc-load" type="button">Use this template →</button>';
+        card.querySelector('.tc-load').addEventListener('click', function () {
+          try {
+            sessionStorage.setItem('inkwell.loadTemplate', JSON.stringify({ name: t.name, body: t.body }));
+          } catch (e) {}
+          window.location.href = 'index.html';
+        });
+        grid.appendChild(card);
+      });
+    })();
+  </script>
+</body>
+</html>

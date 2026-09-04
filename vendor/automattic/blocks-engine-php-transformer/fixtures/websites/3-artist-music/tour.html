@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tour — Mara Vale</title>
+  <meta name="description" content="Mara Vale tour dates — house shows and listening-room dates, spring 2026.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400;1,600;1,700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&family=Courier+Prime:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ── Tour layout ─────────────────────────────────────── */
+    .tour-content {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 0 var(--pad) 6rem;
+    }
+
+    .tour-intro {
+      padding: 1.5rem 0 3.5rem;
+      max-width: 55ch;
+    }
+    .tour-intro p {
+      color: var(--bone-dim);
+      font-style: italic;
+      font-size: 1.1rem;
+    }
+
+    /* ── Show card ──────────────────────────────────────── */
+    .show-list {
+      list-style: none;
+    }
+
+    .show-item {
+      display: grid;
+      grid-template-columns: 100px 1fr auto;
+      align-items: center;
+      gap: 2.5rem;
+      padding: 2.2rem 1.5rem;
+      margin: 0 -1.5rem;
+      border-bottom: 1px solid rgba(230, 216, 197, 0.08);
+      transition: background 0.22s ease;
+      position: relative;
+    }
+
+    .show-item:first-child {
+      border-top: 1px solid rgba(230, 216, 197, 0.08);
+    }
+
+    .show-item:hover {
+      background: rgba(230, 216, 197, 0.025);
+    }
+
+    /* Date block */
+    .show-date {
+      text-align: center;
+      border-right: 1px solid rgba(230, 216, 197, 0.1);
+      padding-right: 2rem;
+    }
+    .show-date .weekday {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--fog);
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+    .show-date .month {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ember);
+      display: block;
+    }
+    .show-date .day {
+      font-family: var(--font-display);
+      font-size: 3rem;
+      font-style: italic;
+      color: var(--bone);
+      line-height: 0.95;
+      display: block;
+    }
+    .show-date .year {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      color: var(--fog);
+      letter-spacing: 0.1em;
+      display: block;
+      margin-top: 0.2rem;
+    }
+
+    /* Venue info */
+    .show-info {}
+    .show-info .city-name {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      font-style: italic;
+      color: var(--bone);
+      line-height: 1.1;
+    }
+    .show-info .state {
+      color: var(--bone-dim);
+    }
+    .show-info .venue-name {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--fog);
+      margin-top: 0.35rem;
+      display: block;
+    }
+    .show-info .show-note {
+      display: inline-block;
+      margin-top: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ember);
+      border: 1px solid rgba(184, 85, 42, 0.4);
+      padding: 0.2rem 0.6rem;
+    }
+
+    /* Ticket action */
+    .show-action {
+      text-align: right;
+      min-width: 120px;
+    }
+    .show-action .btn {
+      white-space: nowrap;
+    }
+    .show-action .sold-out {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--fog);
+      text-decoration: line-through;
+    }
+
+    /* ── House show note ──────────────────────────────────── */
+    .house-show-note {
+      margin-top: 4rem;
+      padding: 2rem 2.5rem;
+      border: 1px solid rgba(230, 216, 197, 0.1);
+      background: rgba(184, 85, 42, 0.04);
+      position: relative;
+    }
+    .house-show-note::before {
+      content: '✦';
+      position: absolute;
+      top: -0.6rem;
+      left: 2rem;
+      background: var(--ink);
+      padding: 0 0.5rem;
+      color: var(--ember);
+      font-size: 0.7rem;
+    }
+    .house-show-note p {
+      font-family: var(--font-body);
+      font-style: italic;
+      color: var(--bone-dim);
+      font-size: 1rem;
+    }
+    .house-show-note p strong {
+      color: var(--bone);
+      font-style: normal;
+      font-weight: 400;
+    }
+
+    /* ── Booking CTA ─────────────────────────────────────── */
+    .tour-booking-cta {
+      margin-top: 4rem;
+      padding: 3.5rem 0 0;
+      border-top: 1px solid rgba(230,216,197,0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+    .tour-booking-cta p {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 1.3rem;
+      color: var(--bone-dim);
+      max-width: 40ch;
+    }
+
+    /* ── Responsive ─────────────────────────────────────── */
+    @media (max-width: 700px) {
+      .show-item {
+        grid-template-columns: 80px 1fr;
+        gap: 1.5rem;
+      }
+      .show-date { padding-right: 1.25rem; }
+      .show-date .day { font-size: 2.2rem; }
+      .show-action { display: none; }
+      .show-info .city-name { font-size: 1.3rem; }
+    }
+
+    @media (max-width: 480px) {
+      .show-item {
+        grid-template-columns: 70px 1fr;
+        gap: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-bg" aria-hidden="true"></div>
+
+  <nav class="site-nav" role="navigation" aria-label="Main navigation">
+    <a href="index.html" class="nav-logo">Mara <em>Vale</em></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="music.html">Music</a></li>
+      <li><a href="tour.html" class="active">Tour</a></li>
+      <li><a href="merch.html">Merch</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <ul class="nav-mobile">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="music.html">Music</a></li>
+    <li><a href="tour.html">Tour</a></li>
+    <li><a href="merch.html">Merch</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+
+  <main>
+    <div class="page-header">
+      <div class="label pl pl-d1">Spring 2026</div>
+      <h1 class="pl pl-d2">On<br>the Road</h1>
+      <p class="pl pl-d3">House shows, listening rooms, and intimate spaces — the way it should be.</p>
+    </div>
+
+    <div class="tour-content">
+      <div class="tour-intro pl pl-d4">
+        <p>These are small rooms on purpose. Fifty seats, a good chair, and no opening act. Tickets are limited and go fast — if you see a show near you, don't wait.</p>
+      </div>
+
+      <ul class="show-list" aria-label="Tour dates">
+
+        <li class="show-item reveal">
+          <div class="show-date" aria-label="Saturday, March 8">
+            <span class="weekday">Sat</span>
+            <span class="month">Mar</span>
+            <span class="day">8</span>
+            <span class="year">2026</span>
+          </div>
+          <div class="show-info">
+            <div class="city-name">Portland, <span class="state">OR</span></div>
+            <span class="venue-name">The Moth House</span>
+            <span class="show-note">House Show</span>
+          </div>
+          <div class="show-action">
+            <a href="#" class="btn btn-primary btn-sm"><span>Get Tickets</span></a>
+          </div>
+        </li>
+
+        <li class="show-item reveal reveal-d1">
+          <div class="show-date" aria-label="Wednesday, March 12">
+            <span class="weekday">Wed</span>
+            <span class="month">Mar</span>
+            <span class="day">12</span>
+            <span class="year">2026</span>
+          </div>
+          <div class="show-info">
+            <div class="city-name">Seattle, <span class="state">WA</span></div>
+            <span class="venue-name">Typewriter Records Listening Room</span>
+          </div>
+          <div class="show-action">
+            <a href="#" class="btn btn-primary btn-sm"><span>Get Tickets</span></a>
+          </div>
+        </li>
+
+        <li class="show-item reveal reveal-d2">
+          <div class="show-date" aria-label="Sunday, March 16">
+            <span class="weekday">Sun</span>
+            <span class="month">Mar</span>
+            <span class="day">16</span>
+            <span class="year">2026</span>
+          </div>
+          <div class="show-info">
+            <div class="city-name">San Francisco, <span class="state">CA</span></div>
+            <span class="venue-name">The Parlour</span>
+          </div>
+          <div class="show-action">
+            <a href="#" class="btn btn-secondary btn-sm"><span>Waitlist</span></a>
+          </div>
+        </li>
+
+        <li class="show-item reveal reveal-d3">
+          <div class="show-date" aria-label="Wednesday, March 19">
+            <span class="weekday">Wed</span>
+            <span class="month">Mar</span>
+            <span class="day">19</span>
+            <span class="year">2026</span>
+          </div>
+          <div class="show-info">
+            <div class="city-name">Los Angeles, <span class="state">CA</span></div>
+            <span class="venue-name">Owl &amp; Lantern</span>
+            <span class="show-note">Listening Room</span>
+          </div>
+          <div class="show-action">
+            <a href="#" class="btn btn-primary btn-sm"><span>Get Tickets</span></a>
+          </div>
+        </li>
+
+        <li class="show-item reveal reveal-d4">
+          <div class="show-date" aria-label="Sunday, March 23">
+            <span class="weekday">Sun</span>
+            <span class="month">Mar</span>
+            <span class="day">23</span>
+            <span class="year">2026</span>
+          </div>
+          <div class="show-info">
+            <div class="city-name">Tucson, <span class="state">AZ</span></div>
+            <span class="venue-name">Coyote House Sessions</span>
+            <span class="show-note">House Show</span>
+          </div>
+          <div class="show-action">
+            <a href="#" class="btn btn-primary btn-sm"><span>Get Tickets</span></a>
+          </div>
+        </li>
+
+      </ul>
+
+      <!-- House show note -->
+      <div class="house-show-note reveal">
+        <p><strong>What to expect:</strong> House shows are BYOB, cash-at-door (suggested $15–20). You'll find the exact address in your confirmation email a few days before the show. These are seated events — please arrive 20 minutes early.</p>
+      </div>
+
+      <!-- Booking CTA -->
+      <div class="tour-booking-cta reveal">
+        <p>Want to bring Mara to your city or venue? Get in touch.</p>
+        <a href="contact.html" class="btn btn-primary"><span>Booking Inquiries</span></a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-logo">Mara Vale</div>
+    <ul class="footer-links">
+      <li><a href="music.html">Music</a></li>
+      <li><a href="tour.html">Tour</a></li>
+      <li><a href="merch.html">Merch</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+    <p class="footer-copy">&copy; 2026 Mara Vale. All rights reserved.</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slow Burn Stories — Hour-long conversations with people who built something from nothing</title>
+  <meta name="description" content="A weekly interview podcast hosted by Cassia Romero. Founders, artists, scientists, organizers — patient, unhurried conversations with the people quietly building things that matter.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a href="index.html" class="nav-logo" aria-label="Slow Burn Stories — Home">
+        <svg class="nav-logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="20" cy="20" r="18.5" stroke="#d97333" stroke-width="1.2"/>
+          <circle cx="20" cy="20" r="14" fill="#2d1f3a"/>
+          <path d="M14 13 L14 27 L26 20 Z" fill="#d97333"/>
+          <path d="M20 4 Q22 7 20 10 Q18 7 20 4 Z" fill="#d97333" opacity="0.55"/>
+          <circle cx="20" cy="20" r="1.6" fill="#f3ead9"/>
+        </svg>
+        <span class="nav-logo-text">
+          <span class="nav-logo-title">Slow Burn Stories</span>
+          <span class="nav-logo-sub">A podcast · with Cassia Romero</span>
+        </span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="index.html">Home</a>
+        <a href="episodes.html">Episodes</a>
+        <a href="about.html">About</a>
+        <a href="subscribe.html">Subscribe</a>
+        <a href="subscribe.html#support" class="nav-cta">Support the Show</a>
+      </nav>
+
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+    <a href="index.html">Home</a>
+    <a href="episodes.html">Episodes</a>
+    <a href="about.html">About</a>
+    <a href="subscribe.html">Subscribe</a>
+    <a href="subscribe.html#support" class="mobile-nav-cta">Support the Show</a>
+  </nav>
+
+  <main>
+
+    <!-- ── Latest-Episode Hero ──────────────────────────── -->
+    <section class="hero" aria-label="Latest episode">
+      <div class="container">
+        <div class="hero-grid">
+          <div class="hero-text">
+            <div class="hero-eyebrow-row">
+              <span class="eyebrow">New this week · Tuesday, June 17</span>
+            </div>
+            <h1 class="hero-title">Building a tool library<br>from a single<br><em>donated drill.</em></h1>
+            <p class="hero-guest">A conversation with Marcus Haines, founder of Foundry Row</p>
+            <p class="hero-dek">Marcus spent four years turning a rented Oakland garage into a tool-lending nonprofit serving four East Bay neighborhoods. We talk about the slow part — the part nobody photographs — and the suggestion from a single member that quietly reshaped the entire model.</p>
+            <div class="hero-meta">
+              <span><span class="dot"></span>Season 3 · Ep 14</span>
+              <span><span class="dot"></span>1 hr 12 min</span>
+              <span><span class="dot"></span>Released Tuesday</span>
+            </div>
+            <div class="hero-ctas" style="margin-top: var(--sp-lg);">
+              <a href="episode-014-marcus-haines.html" class="btn btn-primary btn-lg">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+                Listen to Episode 14
+              </a>
+              <a href="episode-014-marcus-haines.html#transcript" class="btn btn-outline-cream btn-lg">Read transcript</a>
+            </div>
+          </div>
+
+          <div class="hero-art-wrap">
+            <a href="episode-014-marcus-haines.html" class="artwork" aria-label="Listen to episode 14">
+              <div class="artwork-inner">
+                <div class="artwork-top">
+                  <span>S3 · Ep 14</span>
+                  <span>72:14</span>
+                </div>
+                <div>
+                  <div class="artwork-title">Building a tool library from<br>a <em>donated drill.</em></div>
+                </div>
+                <div class="artwork-bottom">
+                  <span>Marcus Haines</span>
+                  <span>Foundry Row</span>
+                </div>
+              </div>
+              <button class="play-orb" aria-label="Play latest episode" type="button">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+              </button>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Tagline Strip ──────────────────────────────── -->
+    <section class="tagline-strip" aria-label="Show tagline">
+      <div class="container">
+        <div class="tagline-strip-inner">
+          <span><span class="ember">★</span> Hour-long conversations with people who built something from nothing</span>
+          <span>New episodes · Tuesdays · 6am PT</span>
+          <span class="ember">Currently · Season 3</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Featured Episodes Strip ────────────────────── -->
+    <section class="featured-strip section-cream">
+      <div class="container">
+        <div class="section-header-row">
+          <div>
+            <span class="eyebrow">Editor's picks</span>
+            <h2>Three to start with.</h2>
+            <p class="section-subtitle">If you've never listened before — and you've got a long drive or a slow Sunday afternoon ahead — start with one of these.</p>
+          </div>
+          <a href="episodes.html" class="btn btn-outline">Browse all episodes →</a>
+        </div>
+
+        <div class="episode-cards">
+          <article class="episode-card">
+            <div class="artwork artwork-sm" aria-label="Episode 11 artwork — Annette Wei">
+              <div class="artwork-inner">
+                <div class="artwork-top"><span>S3 · 11</span><span>68:42</span></div>
+                <div class="artwork-title">Eighteen years of <em>bees.</em></div>
+                <div class="artwork-bottom"><span>Annette Wei</span><span></span></div>
+              </div>
+            </div>
+            <div class="ep-meta">
+              <span>S3 · Ep 11</span>
+              <span>·</span>
+              <span class="ember">May 27</span>
+            </div>
+            <h3 class="ep-title"><a href="episodes.html#s3-11">What eighteen years of beekeeping taught me about risk</a></h3>
+            <p class="ep-guest">with Annette Wei, second-generation apiarist</p>
+            <p class="ep-dek">Annette inherited her father's bees at twenty-three and almost lost the whole apiary in her first winter. We talk about what changed after she stopped trying to control everything.</p>
+            <div class="ep-foot">
+              <span class="ep-duration mono">1 hr 08 min</span>
+              <button class="play-btn-mini" aria-label="Play episode 11" type="button">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+              </button>
+            </div>
+          </article>
+
+          <article class="episode-card">
+            <div class="artwork artwork-sm" aria-label="Episode 7 artwork — Hideo Maruyama">
+              <div class="artwork-inner">
+                <div class="artwork-top"><span>S3 · 07</span><span>74:11</span></div>
+                <div class="artwork-title">The economist who makes <em>teacups.</em></div>
+                <div class="artwork-bottom"><span>Hideo Maruyama</span><span></span></div>
+              </div>
+            </div>
+            <div class="ep-meta">
+              <span>S3 · Ep 07</span>
+              <span>·</span>
+              <span class="ember">Apr 15</span>
+            </div>
+            <h3 class="ep-title"><a href="episodes.html#s3-07">The economist who quit to make hand-thrown teacups</a></h3>
+            <p class="ep-guest">with Hideo Maruyama, potter</p>
+            <p class="ep-dek">Hideo spent eleven years modeling supply chains at the World Bank. He now sells teacups at a Berkeley farmers' market for $48 each. He thinks he's still doing economics.</p>
+            <div class="ep-foot">
+              <span class="ep-duration mono">1 hr 14 min</span>
+              <button class="play-btn-mini" aria-label="Play episode 7" type="button">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+              </button>
+            </div>
+          </article>
+
+          <article class="episode-card">
+            <div class="artwork artwork-sm" aria-label="Episode 4 artwork — Devon Asante-Klein">
+              <div class="artwork-inner">
+                <div class="artwork-top"><span>S2 · 18</span><span>69:33</span></div>
+                <div class="artwork-title">The library that won't <em>shush.</em></div>
+                <div class="artwork-bottom"><span>Devon Asante-Klein</span><span></span></div>
+              </div>
+            </div>
+            <div class="ep-meta">
+              <span>S2 · Ep 18</span>
+              <span>·</span>
+              <span class="ember">Jan 14</span>
+            </div>
+            <h3 class="ep-title"><a href="episodes.html#s2-18">The library that decided to stop asking people to be quiet</a></h3>
+            <p class="ep-guest">with Devon Asante-Klein, branch librarian</p>
+            <p class="ep-dek">Devon runs a small branch in West Sacramento that gave up on silence five years ago. The waiting list for cardholders has tripled. We talk about who libraries are actually for.</p>
+            <div class="ep-foot">
+              <span class="ep-duration mono">1 hr 09 min</span>
+              <button class="play-btn-mini" aria-label="Play episode 18 of season 2" type="button">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+              </button>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Recent Episodes List ───────────────────────── -->
+    <section class="section paper-bg">
+      <div class="container">
+        <div class="section-header-row">
+          <div>
+            <span class="eyebrow">Recently released</span>
+            <h2>The last six weeks.</h2>
+          </div>
+          <a href="episodes.html" class="btn btn-outline btn-sm">See full archive →</a>
+        </div>
+
+        <ol class="episode-list">
+          <li class="episode-row">
+            <div class="ep-num">14<span class="ep-num-sub">S3</span></div>
+            <div class="ep-body">
+              <span class="ep-title-line"><a href="episode-014-marcus-haines.html">Building a tool library from a single donated drill</a></span>
+              <span class="ep-meta-line">with <em>Marcus Haines</em> · Foundry Row</span>
+              <span class="ep-desc">Four years, four neighborhoods, one quietly radical membership model that arrived as a suggestion in the comments of a Patreon post.</span>
+            </div>
+            <span class="ep-duration mono">1:12:14</span>
+            <span class="ep-date">Jun 17</span>
+            <button class="play-btn-mini" aria-label="Play episode 14" type="button">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+            </button>
+          </li>
+
+          <li class="episode-row">
+            <div class="ep-num">13<span class="ep-num-sub">S3</span></div>
+            <div class="ep-body">
+              <span class="ep-title-line"><a href="episodes.html#s3-13">The neighborhood watch that became a mutual aid network</a></span>
+              <span class="ep-meta-line">with <em>Renata Okonkwo-Lima</em> · East Boston Resilience Hub</span>
+              <span class="ep-desc">It started with a phone tree during a blackout. Five years later, they run a free pantry, a tool share, and a once-a-month repair clinic. Renata is still uncomfortable with the word "leader."</span>
+            </div>
+            <span class="ep-duration mono">1:06:48</span>
+            <span class="ep-date">Jun 10</span>
+            <button class="play-btn-mini" aria-label="Play episode 13" type="button">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+            </button>
+          </li>
+
+          <li class="episode-row">
+            <div class="ep-num">12<span class="ep-num-sub">S3</span></div>
+            <div class="ep-body">
+              <span class="ep-title-line"><a href="episodes.html#s3-12">A small press, a single typeface, and twelve books a year</a></span>
+              <span class="ep-meta-line">with <em>Junie Coltrane</em> · Quailfeather Editions</span>
+              <span class="ep-desc">Junie publishes literature in translation from a converted laundry room in Providence. She sets every book in the same revival of Janson. She finally explains why.</span>
+            </div>
+            <span class="ep-duration mono">1:18:02</span>
+            <span class="ep-date">Jun 3</span>
+            <button class="play-btn-mini" aria-label="Play episode 12" type="button">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+            </button>
+          </li>
+
+          <li class="episode-row">
+            <div class="ep-num">11<span class="ep-num-sub">S3</span></div>
+            <div class="ep-body">
+              <span class="ep-title-line"><a href="episodes.html#s3-11">What eighteen years of beekeeping taught me about risk</a></span>
+              <span class="ep-meta-line">with <em>Annette Wei</em> · second-generation apiarist</span>
+              <span class="ep-desc">A conversation about colony collapse, family inheritance, and what it actually means to share weather data with twelve other Sonoma County beekeepers over coffee.</span>
+            </div>
+            <span class="ep-duration mono">1:08:31</span>
+            <span class="ep-date">May 27</span>
+            <button class="play-btn-mini" aria-label="Play episode 11" type="button">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+            </button>
+          </li>
+
+          <li class="episode-row">
+            <div class="ep-num">10<span class="ep-num-sub">S3</span></div>
+            <div class="ep-body">
+              <span class="ep-title-line"><a href="episodes.html#s3-10">Twenty years of weather data, kept by hand</a></span>
+              <span class="ep-meta-line">with <em>Esme Tarkanian</em> · phenology researcher</span>
+              <span class="ep-desc">Esme has filled fifty-seven notebooks watching one acre in the Mendocino foothills. Last year a Cal undergrad asked if she'd digitize them. She said no, then yes, then no again. We talk about why.</span>
+            </div>
+            <span class="ep-duration mono">1:11:55</span>
+            <span class="ep-date">May 20</span>
+            <button class="play-btn-mini" aria-label="Play episode 10" type="button">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+            </button>
+          </li>
+
+          <li class="episode-row">
+            <div class="ep-num">09<span class="ep-num-sub">S3</span></div>
+            <div class="ep-body">
+              <span class="ep-title-line"><a href="episodes.html#s3-09">Running a 14-seat restaurant for thirty-one years</a></span>
+              <span class="ep-meta-line">with <em>Frank Beaumont-Pasco</em> · chef-owner, Casita Bira</span>
+              <span class="ep-desc">Frank has cooked the same menu, with seasonal substitutions, since 1993. The waitlist is six months. He's never advertised. He is, gently, the most stubborn person I've ever interviewed.</span>
+            </div>
+            <span class="ep-duration mono">1:21:09</span>
+            <span class="ep-date">May 13</span>
+            <button class="play-btn-mini" aria-label="Play episode 9" type="button">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+            </button>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ── About the Show Teaser ──────────────────────── -->
+    <section class="section section-cream">
+      <div class="container">
+        <div class="about-teaser">
+          <div class="photo-block photo-cassia" aria-label="Portrait of Cassia Romero at her studio desk, late afternoon light">
+            <div style="position:absolute;bottom:1rem;left:1rem;font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.15em;text-transform:uppercase;color:#f3ead9;opacity:0.85;">Cassia · Studio · 03/24</div>
+          </div>
+
+          <div>
+            <span class="eyebrow">About the show</span>
+            <h2>Patience is a production value.</h2>
+            <p>I started Slow Burn Stories in the spring of 2022 because I was tired of interviews that felt like they were on a schedule. I'd spent eight years as a magazine editor — every conversation timed, every quote pre-approved, every story polished until it lost the part I actually liked.</p>
+            <p>So I built a studio in my garage, bought one good microphone, and started calling people whose work I admired. The deal was simple: an hour minimum. No promo cycle, no book to plug, no clock. Just the long version of whatever they wanted to tell me.</p>
+            <p>Three years and 64 episodes in, the deal has held. Thank you for being here.</p>
+            <p class="signature">— Cassia</p>
+            <a href="about.html" class="btn btn-outline">Read the full story</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Subscribe Strip ────────────────────────────── -->
+    <section class="section section-plum" aria-labelledby="subscribe-heading">
+      <div class="container">
+        <div class="section-header-row">
+          <div>
+            <span class="eyebrow">Get every Tuesday</span>
+            <h2 id="subscribe-heading">Listen wherever you keep<br>your podcasts.</h2>
+            <p class="section-subtitle" style="color: rgba(243,234,217,0.78);">New episodes drop at 6am Pacific. The RSS feed is the same one I've used since episode one — no platform-exclusive nonsense.</p>
+          </div>
+          <a href="subscribe.html" class="btn btn-outline-cream">All ways to subscribe →</a>
+        </div>
+
+        <div class="platforms-grid">
+          <a href="subscribe.html#apple" class="platform-btn">
+            <span class="platform-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.5a10.5 10.5 0 1 0 0 21 10.5 10.5 0 0 0 0-21Zm0 4.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Zm0 6a4 4 0 0 1 4 4v1.2a6.5 6.5 0 0 1-8 0v-1.2a4 4 0 0 1 4-4Z"/></svg>
+            </span>
+            <span class="platform-btn-text">
+              <span class="label">Listen on</span>
+              <span class="name">Apple Podcasts</span>
+            </span>
+          </a>
+          <a href="subscribe.html#spotify" class="platform-btn">
+            <span class="platform-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 10c3-1 7-1 10 1M7.5 13c2.5-.8 6-.8 8.5.7M8 16c2-.6 4.5-.6 6.5.5" stroke="#2d1f3a" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>
+            </span>
+            <span class="platform-btn-text">
+              <span class="label">Listen on</span>
+              <span class="name">Spotify</span>
+            </span>
+          </a>
+          <a href="subscribe.html#overcast" class="platform-btn">
+            <span class="platform-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="11"/><circle cx="12" cy="12" r="6" fill="none" stroke="#2d1f3a" stroke-width="1.5"/><path d="M12 8v4l3 1" stroke="#2d1f3a" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
+            </span>
+            <span class="platform-btn-text">
+              <span class="label">Listen on</span>
+              <span class="name">Overcast</span>
+            </span>
+          </a>
+          <a href="subscribe.html#pocketcasts" class="platform-btn">
+            <span class="platform-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="11"/><circle cx="12" cy="12" r="6" fill="none" stroke="#2d1f3a" stroke-width="1.5"/><path d="M12 6a6 6 0 0 1 6 6" stroke="#2d1f3a" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+            </span>
+            <span class="platform-btn-text">
+              <span class="label">Listen on</span>
+              <span class="name">Pocket Casts</span>
+            </span>
+          </a>
+          <a href="subscribe.html#rss" class="platform-btn">
+            <span class="platform-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="18" r="2.5"/><path d="M4 10a10 10 0 0 1 10 10M4 4a16 16 0 0 1 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            </span>
+            <span class="platform-btn-text">
+              <span class="label">Open the</span>
+              <span class="name">RSS Feed</span>
+            </span>
+          </a>
+          <a href="subscribe.html#youtube" class="platform-btn">
+            <span class="platform-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10 9v6l5-3-5-3Z" fill="#2d1f3a"/></svg>
+            </span>
+            <span class="platform-btn-text">
+              <span class="label">Watch on</span>
+              <span class="name">YouTube</span>
+            </span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Newsletter ─────────────────────────────────── -->
+    <section class="section paper-bg">
+      <div class="container">
+        <div class="newsletter">
+          <div>
+            <span class="eyebrow">A note in your inbox</span>
+            <h3>The Tuesday email.</h3>
+            <p>Each week I send a short note with the new episode, what I cut out and why, and one or two things I read or watched that I can't stop thinking about. No tracking, no upsells. You can unsubscribe with one click and I will not be mad.</p>
+            <p class="mono" style="font-size:0.78rem; color: var(--slate); letter-spacing:0.08em;">9,400+ readers · sent Tuesday at 8am PT</p>
+          </div>
+
+          <form class="form-stack" data-mock-submit aria-label="Newsletter signup form">
+            <div class="form-row">
+              <label for="news-name">First name</label>
+              <input type="text" id="news-name" name="first_name" placeholder="Cassia" autocomplete="given-name">
+            </div>
+            <div class="form-row">
+              <label for="news-email">Email address</label>
+              <input type="email" id="news-email" name="email" placeholder="you@somewhere.com" required autocomplete="email">
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Subscribe to the email</button>
+              <span class="helper" data-form-msg></span>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Footer ──────────────────────────────────────── -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a href="index.html" class="nav-logo" style="text-decoration: none;">
+            <svg class="nav-logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="20" cy="20" r="18.5" stroke="#d97333" stroke-width="1.2"/>
+              <circle cx="20" cy="20" r="14" fill="#2d1f3a"/>
+              <path d="M14 13 L14 27 L26 20 Z" fill="#d97333"/>
+              <circle cx="20" cy="20" r="1.6" fill="#f3ead9"/>
+            </svg>
+            <span class="nav-logo-text">
+              <span class="nav-logo-title">Slow Burn Stories</span>
+              <span class="nav-logo-sub">Independent · Listener-supported</span>
+            </span>
+          </a>
+          <p>Hour-long conversations with people who built something from nothing. Hosted by Cassia Romero. Recorded in a converted garage studio in Oakland, California.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>The Show</h4>
+          <ul>
+            <li><a href="episodes.html">All Episodes</a></li>
+            <li><a href="episodes.html#season-3">Season 3</a></li>
+            <li><a href="episodes.html#season-2">Season 2</a></li>
+            <li><a href="episodes.html#season-1">Season 1</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Listen</h4>
+          <ul>
+            <li><a href="subscribe.html#apple">Apple Podcasts</a></li>
+            <li><a href="subscribe.html#spotify">Spotify</a></li>
+            <li><a href="subscribe.html#overcast">Overcast</a></li>
+            <li><a href="subscribe.html#rss">RSS Feed</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Show</h4>
+          <ul>
+            <li><a href="about.html">About the show</a></li>
+            <li><a href="about.html#team">Credits &amp; team</a></li>
+            <li><a href="subscribe.html#support">Support the show</a></li>
+            <li><a href="mailto:hello@slowburnstories.fm">Get in touch</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© 2026 Slow Burn Stories · Oakland, CA</span>
+        <span>Made on stolen Ohlone land · Listener-funded</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

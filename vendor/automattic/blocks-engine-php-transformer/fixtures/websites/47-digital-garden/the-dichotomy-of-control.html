@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Dichotomy of Control — Mara's Garden</title>
+  <meta name="description" content="A note from Mara Okonkwo's digital garden on distributed systems, note-taking, stoicism, and gardening.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/garden.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-leaf" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 28 C16 18 8 14 5 6 C16 6 24 12 24 22 C24 25 21 28 16 28 Z" fill="#3a7d52" opacity=".9"/>
+          <path d="M16 28 C16 20 19 13 24 8" fill="none" stroke="#fbf9f3" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="16" cy="28" r="2" fill="#b08b2e"/>
+        </svg>
+        <h1><a href="index.html">Mara's Garden</a></h1>
+      </div>
+      <p class="brand-tag">a digital garden by Mara Okonkwo</p>
+
+      <div class="search-box">
+        <span class="s-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="note-search" placeholder="Search notes  (press /)" aria-label="Search notes" autocomplete="off">
+        <ul class="search-results" id="search-results" aria-live="polite"></ul>
+      </div>
+
+      <nav aria-label="Garden navigation">
+      <p class="nav-section">Home</p>
+      <ul class="nav-list"><li><a href="index.html" class=""><span class="ripe">🌱</span><span>Start Here · MOC</span></a></li>
+      <li><a href="tags.html" class=""><span class="ripe">🏷️</span><span>Tags &amp; Index</span></a></li></ul>
+      
+        <p class="nav-section">Distributed Systems</p>
+        <ul class="nav-list">
+          <li><a href="idempotency-is-a-superpower.html" class=""><span class="ripe">🌳</span><span>Idempotency Is a Superpower</span></a></li>
+          <li><a href="the-two-generals-problem.html" class=""><span class="ripe">🌿</span><span>The Two Generals Problem</span></a></li>
+          <li><a href="why-i-stopped-trusting-wall-clocks.html" class=""><span class="ripe">🌿</span><span>Why I Stopped Trusting Wall Clocks</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Knowledge &amp; Notes</p>
+        <ul class="nav-list">
+          <li><a href="on-tending-a-digital-garden.html" class=""><span class="ripe">🌳</span><span>On Tending a Digital Garden</span></a></li>
+          <li><a href="evergreen-notes.html" class=""><span class="ripe">🌳</span><span>Evergreen Notes</span></a></li>
+          <li><a href="book-how-to-take-smart-notes.html" class=""><span class="ripe">🌿</span><span>Book — How to Take Smart Notes</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Stoicism</p>
+        <ul class="nav-list">
+          <li><a href="the-dichotomy-of-control.html" class="current"><span class="ripe">🌳</span><span>The Dichotomy of Control</span></a></li>
+          <li><a href="amor-fati.html" class=""><span class="ripe">🌿</span><span>Amor Fati</span></a></li>
+        </ul>
+      
+        <p class="nav-section">The Garden</p>
+        <ul class="nav-list">
+          <li><a href="compost-is-a-distributed-system.html" class=""><span class="ripe">🌿</span><span>Compost Is a Distributed System</span></a></li>
+          <li><a href="three-sisters-planting.html" class=""><span class="ripe">🌰</span><span>Three Sisters Planting</span></a></li>
+        </ul>
+      </nav>
+
+      <button class="theme-toggle" type="button" aria-pressed="false">☾ <span>Dark</span></button>
+    </aside>
+    <main class="content" id="main">
+      <article class="note">
+        <p class="breadcrumb"><a href="index.html">🌱 Garden</a> &nbsp;›&nbsp; The Dichotomy of Control</p>
+        <h1>The Dichotomy of Control</h1>
+        <div class="note-meta">
+          <span class="ripeness evergreen">🌳 Evergreen</span>
+          <span class="dot"></span>
+          <span>planted Dec 1, 2023</span>
+          <span class="dot"></span>
+          <span>tended Jun 1, 2026</span>
+        </div>
+        <div class="tag-list"><a class="tag" href="tags.html#evergreen">#evergreen</a><a class="tag" href="tags.html#stoicism">#stoicism</a><a class="tag" href="tags.html#philosophy">#philosophy</a></div>
+        <div class="prose">
+
+<p>The opening line of Epictetus' <em>Enchiridion</em>:</p>
+<blockquote><p>"Some things are within our power, while others are not. Within our power are opinion, motivation, desire, aversion... not within our power are our body, our property, reputation, office."</p></blockquote>
+<p>That's it. That's the whole foundation of Stoicism, and arguably the most useful sentence anyone has ever handed me. The discipline is just: <strong>figure out which bucket a thing is in, and invest your energy accordingly.</strong></p>
+<h2 id="middle">The trap is the middle category <a class="anchor" href="#middle">#</a></h2>
+<p>The naive version sorts the world into "mine" and "not mine." But the sharp version (Epictetus is precise here) is about <em>the verb</em>, not the noun. You don't control your <strong>reputation</strong> — that lives in other people's heads. You <em>do</em> control the <strong>honest work</strong> that earns it. Confusing the two is the source of essentially all avoidable suffering: chasing outcomes (not up to you) instead of efforts (up to you).</p>
+<h2 id="engineer">Why an engineer keeps quoting a slave from 100 AD <a class="anchor" href="#engineer">#</a></h2>
+<p>Because distributed systems <em>are</em> the dichotomy of control, formalized.</p>
+<ul>
+  <li>You <strong>cannot control</strong> whether the network delivers your message — that's <a class="internal" data-slug="the-two-generals-problem" href="the-two-generals-problem.html">The Two Generals Problem</a>, proven impossible.</li>
+  <li>You <strong>can control</strong> whether your system is <em>harmed</em> by non-delivery — which is exactly what <a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a> buys you.</li>
+</ul>
+<p>Good engineering and Stoic practice are the same motion: identify the uncontrollable (packet loss, clock drift, other people's opinions), stop fighting it, and instead design your <em>response</em> to be robust to it. "Make the operation safe to retry" is just "focus on what is up to you," compiled down to code. See also <a class="internal" data-slug="why-i-stopped-trusting-wall-clocks" href="why-i-stopped-trusting-wall-clocks.html">Why I Stopped Trusting Wall Clocks</a> — you can't control the clocks, so don't depend on them.</p>
+<h2 id="everyday">The everyday version <a class="anchor" href="#everyday">#</a></h2>
+<p>When something goes wrong, I run one query:</p>
+<ol>
+  <li>Is this up to me? → Act. Now. Fully.</li>
+  <li>Is this not up to me? → Drop it. Completely. Including the <em>wanting</em> it to be different.</li>
+</ol>
+<p>Step 2 is where the freedom is, and it's the hardest. <a class="internal" data-slug="amor-fati" href="amor-fati.html">Amor Fati</a> is the advanced move: not merely <em>accepting</em> the uncontrollable but actively <em>loving</em> it.</p>
+        </div>
+
+      <section class="backlinks" aria-labelledby="bl-h">
+        <h2 id="bl-h">Linked references</h2>
+        <p class="bl-sub">5 notes link to this one.</p>
+        <ul>
+        <li><a class="internal" data-slug="index" href="index.html">Start Here</a><div class="bl-ctx">The MOC calls it the clearest expression of the garden's throughline.</div></li>
+        <li><a class="internal" data-slug="on-tending-a-digital-garden" href="on-tending-a-digital-garden.html">On Tending a Digital Garden</a><div class="bl-ctx">The Stoic-angle section frames gardening as an exercise in the dichotomy.</div></li>
+        <li><a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a><div class="bl-ctx">Closes with this as its "Stoic footnote."</div></li>
+        <li><a class="internal" data-slug="the-two-generals-problem" href="the-two-generals-problem.html">The Two Generals Problem</a><div class="bl-ctx">Recognizing an impossibility early is called a kind of the dichotomy.</div></li>
+        <li><a class="internal" data-slug="amor-fati" href="amor-fati.html">Amor Fati</a><div class="bl-ctx">Named as the foundation the love-of-fate note builds on.</div></li>
+        </ul>
+      </section>
+      </article>
+    </main>
+
+    <aside class="right-rail">
+      <div class="rail-card">
+        <p class="rail-title">On this page</p>
+        <ul class="toc">
+          <li class=""><a href="#middle">The trap is the middle category</a></li>
+          <li class=""><a href="#engineer">Why an engineer keeps quoting a slave</a></li>
+          <li class=""><a href="#everyday">The everyday version</a></li>
+        </ul>
+      </div>
+      <div class="rail-card">
+        <p class="rail-title">Graph view</p>
+        <svg id="graph" class="graph-svg" data-current="the-dichotomy-of-control" role="img" aria-label="Graph of how notes in the garden connect"></svg>
+        <p class="graph-hint">Hover a node to spotlight its links. Click to jump.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-foot">
+    <span>🌱 Mara's Garden · tended on Sundays · last commit Jun 19, 2026</span>
+    <span>Built with <a href="quartz.config.ts">Quartz 4</a> from the markdown in <code style="font-family:var(--font-mono);font-size:.8rem">notes/</code> · <a href="https://github.com">source</a></span>
+  </footer>
+  <script src="js/garden.js"></script>
+</body>
+</html>

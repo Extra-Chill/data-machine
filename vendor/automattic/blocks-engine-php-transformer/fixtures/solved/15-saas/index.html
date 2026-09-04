@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relay Atlas — The Living Launch Map for Distributed Teams</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=IBM+Plex+Mono:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+/* ─── TOKENS ─────────────────────────────────────────── */
+:root {
+  --ink:        #050D1A;
+  --ink-mid:    #0C1A30;
+  --ink-light:  #112240;
+  --amber:      #E8A020;
+  --amber-dim:  #A36E12;
+  --amber-glow: rgba(232,160,32,0.12);
+  --cyan:       #2DD4C8;
+  --cyan-dim:   rgba(45,212,200,0.18);
+  --mist:       #8FA3BF;
+  --fog:        #4A6280;
+  --white:      #F0EDE6;
+  --white-dim:  rgba(240,237,230,0.65);
+  --white-faint:rgba(240,237,230,0.08);
+  --red:        #E85050;
+  --green:      #3ECA7A;
+  --font-disp:  'Playfair Display', Georgia, serif;
+  --font-mono:  'IBM Plex Mono', 'Courier New', monospace;
+  --font-body:  'Lora', Georgia, serif;
+  --r:          6px;
+  --r-lg:       12px;
+  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── RESET ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--ink);
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.65;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+img { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+ul { list-style: none; }
+
+/* ─── TOPO BACKGROUND ────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23112240' stroke-width='0.5'%3E%3Cpath d='M0 20 Q20 10 40 20 Q60 30 80 20'/%3E%3Cpath d='M0 40 Q20 30 40 40 Q60 50 80 40'/%3E%3Cpath d='M0 60 Q20 50 40 60 Q60 70 80 60'/%3E%3Cpath d='M20 0 Q10 20 20 40 Q30 60 20 80'/%3E%3Cpath d='M40 0 Q30 20 40 40 Q50 60 40 80'/%3E%3Cpath d='M60 0 Q50 20 60 40 Q70 60 60 80'/%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 0;
+}
+body > * { position: relative; z-index: 1; }
+
+/* ─── UTILITY ────────────────────────────────────────── */
+.container { max-width: 1160px; margin: 0 auto; padding: 0 28px; }
+.tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--amber); border: 1px solid var(--amber-dim);
+  background: var(--amber-glow); padding: 4px 12px; border-radius: 100px;
+}
+.tag::before { content: '◆'; font-size: 7px; }
+.section-head { text-align: center; margin-bottom: 64px; }
+.section-head .tag { margin-bottom: 20px; }
+.section-head h2 {
+  font-family: var(--font-disp); font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700; line-height: 1.15; color: var(--white); margin-bottom: 16px;
+}
+.section-head p { color: var(--mist); font-size: 18px; max-width: 520px; margin: 0 auto; }
+
+/* ─── REVEAL ANIMATIONS ──────────────────────────────── */
+.reveal {
+  opacity: 0; transform: translateY(28px);
+  transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+}
+.reveal.visible { opacity: 1; transform: none; }
+
+/* ─── NAV ────────────────────────────────────────────── */
+header {
+  position: sticky; top: 0; z-index: 100;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(5,13,26,0.88);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+nav {
+  display: flex; align-items: center; gap: 0;
+  height: 60px; max-width: 1160px; margin: 0 auto; padding: 0 28px;
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px; margin-right: auto;
+  font-family: var(--font-disp); font-size: 1.2rem; font-weight: 700;
+  color: var(--white); letter-spacing: -0.01em;
+}
+.nav-logo svg { flex-shrink: 0; }
+.nav-links {
+  display: flex; align-items: center; gap: 2px;
+}
+.nav-links a {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 400;
+  letter-spacing: 0.05em; color: var(--mist); padding: 6px 14px;
+  border-radius: var(--r); transition: color 0.2s, background 0.2s;
+}
+.nav-links a:hover { color: var(--white); background: var(--white-faint); }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 9px 20px; border-radius: var(--r);
+  border: none; cursor: pointer; transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--amber); color: var(--ink);
+  box-shadow: 0 0 24px rgba(232,160,32,0.3);
+}
+.btn-primary:hover {
+  background: #f0ac22;
+  box-shadow: 0 0 36px rgba(232,160,32,0.5);
+  transform: translateY(-1px);
+}
+.btn-ghost {
+  background: transparent; color: var(--white);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.btn-ghost:hover {
+  border-color: rgba(255,255,255,0.4);
+  background: var(--white-faint);
+  transform: translateY(-1px);
+}
+.nav-cta { margin-left: 24px; }
+
+/* ─── HERO ───────────────────────────────────────────── */
+#hero {
+  padding: 100px 0 80px;
+  position: relative;
+  overflow: hidden;
+}
+#hero::before {
+  content: '';
+  position: absolute;
+  top: -200px; left: 50%; transform: translateX(-50%);
+  width: 900px; height: 600px;
+  background: radial-gradient(ellipse at center, rgba(232,160,32,0.08) 0%, transparent 65%);
+  pointer-events: none;
+}
+#hero::after {
+  content: '';
+  position: absolute;
+  top: 40%; right: -100px;
+  width: 400px; height: 400px;
+  background: radial-gradient(ellipse at center, rgba(45,212,200,0.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+.hero-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+  max-width: 1160px; margin: 0 auto; padding: 0 28px;
+}
+.hero-text { position: relative; }
+.hero-eyebrow {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 28px;
+}
+.hero-eyebrow .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--green); }
+  50% { opacity: 0.7; box-shadow: 0 0 20px var(--green); }
+}
+.hero-eyebrow span {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--green);
+}
+.hero-text h1 {
+  font-family: var(--font-disp);
+  font-size: clamp(2.6rem, 5vw, 4rem);
+  font-weight: 900; line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--white);
+  margin-bottom: 24px;
+}
+.hero-text h1 em {
+  font-style: italic; color: var(--amber);
+}
+.hero-text p {
+  font-size: 18px; line-height: 1.7;
+  color: var(--mist); margin-bottom: 40px;
+  max-width: 440px;
+}
+.hero-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hero-social-proof {
+  margin-top: 52px; padding-top: 32px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+}
+.hero-social-proof .avatars {
+  display: flex;
+}
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--ink);
+  margin-left: -8px; overflow: hidden;
+  background: var(--ink-light);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--amber);
+}
+.avatar:first-child { margin-left: 0; }
+.hero-social-proof span {
+  font-family: var(--font-mono); font-size: 11px; color: var(--mist);
+  letter-spacing: 0.03em;
+}
+
+/* ─── HERO MAP MOCKUP ────────────────────────────────── */
+.hero-mockup {
+  position: relative;
+}
+.map-frame {
+  background: var(--ink-mid);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(232,160,32,0.08),
+    0 40px 80px rgba(0,0,0,0.6),
+    0 0 60px rgba(232,160,32,0.05);
+  animation: float 6s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.map-titlebar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  background: rgba(12,26,48,0.8);
+}
+.titlebar-dots { display: flex; gap: 5px; }
+.titlebar-dots span {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.titlebar-dots span:nth-child(1) { background: #FF5F57; }
+.titlebar-dots span:nth-child(2) { background: #FFBD2E; }
+.titlebar-dots span:nth-child(3) { background: #28CA41; }
+.titlebar-label {
+  font-family: var(--font-mono); font-size: 10px; color: var(--fog);
+  margin-left: 8px; letter-spacing: 0.05em;
+}
+.map-toolbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: rgba(12,26,48,0.5);
+}
+.toolbar-tab {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 3px;
+  color: var(--fog);
+}
+.toolbar-tab.active {
+  background: var(--amber-glow); color: var(--amber);
+  border: 1px solid var(--amber-dim);
+}
+.map-body { padding: 20px 16px; }
+.map-svg-wrap { width: 100%; }
+
+/* ─── PRODUCT SECTION ────────────────────────────────── */
+#product {
+  padding: 120px 0;
+  position: relative;
+}
+#product::before {
+  content: '';
+  position: absolute;
+  left: -200px; top: 30%;
+  width: 600px; height: 600px;
+  background: radial-gradient(ellipse, rgba(45,212,200,0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+.product-grid {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 60px;
+  align-items: start;
+}
+.launch-map-container {
+  background: var(--ink-mid);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.lm-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.lm-title {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--white); letter-spacing: 0.08em; text-transform: uppercase;
+}
+.lm-meta {
+  display: flex; gap: 10px;
+}
+.lm-meta span {
+  font-family: var(--font-mono); font-size: 10px; color: var(--fog);
+  border: 1px solid rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 3px;
+}
+.lm-body { padding: 24px; }
+
+/* Map SVG nodes */
+.map-node rect, .map-node path { transition: all 0.3s; }
+.map-node:hover rect { filter: brightness(1.2); }
+
+/* Status pills */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 100px;
+}
+.status-done { background: rgba(62,202,122,0.15); color: var(--green); border: 1px solid rgba(62,202,122,0.3); }
+.status-active { background: rgba(232,160,32,0.12); color: var(--amber); border: 1px solid rgba(232,160,32,0.3); }
+.status-blocked { background: rgba(232,80,80,0.12); color: var(--red); border: 1px solid rgba(232,80,80,0.3); }
+.status-planned { background: rgba(255,255,255,0.06); color: var(--fog); border: 1px solid rgba(255,255,255,0.1); }
+
+/* Sidebar */
+.product-sidebar {}
+.sidebar-block {
+  background: var(--ink-mid);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.sidebar-block-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar-block-title {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  color: var(--mist); letter-spacing: 0.1em; text-transform: uppercase;
+}
+.sidebar-block-body { padding: 14px 18px; }
+.signal-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.signal-item:last-child { border-bottom: none; }
+.signal-icon {
+  width: 26px; height: 26px; border-radius: 5px;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+.signal-text p {
+  font-family: var(--font-mono); font-size: 10px; color: var(--white); margin-bottom: 2px;
+}
+.signal-text span {
+  font-family: var(--font-mono); font-size: 9px; color: var(--fog);
+}
+.decision-item {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.decision-item:last-child { border-bottom: none; }
+.decision-item p {
+  font-family: var(--font-mono); font-size: 10px; color: var(--white); margin-bottom: 4px;
+}
+.decision-item .who {
+  font-size: 9px; color: var(--fog);
+}
+.product-caption { margin-top: 32px; }
+.product-caption h3 {
+  font-family: var(--font-disp); font-size: 1.6rem; font-weight: 700;
+  color: var(--white); margin-bottom: 12px;
+}
+.product-caption p { color: var(--mist); font-size: 16px; line-height: 1.6; }
+
+/* ─── BENEFITS ───────────────────────────────────────── */
+#benefits {
+  padding: 120px 0;
+  position: relative;
+}
+.benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+.benefit-card {
+  background: var(--ink-mid);
+  padding: 40px 36px;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.3s;
+}
+.benefit-card:hover { background: var(--ink-light); }
+.benefit-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  opacity: 0; transition: opacity 0.3s;
+}
+.benefit-card:hover::before { opacity: 1; }
+.benefit-num {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--amber-dim); letter-spacing: 0.1em;
+  margin-bottom: 20px;
+}
+.benefit-icon {
+  width: 48px; height: 48px; margin-bottom: 20px;
+}
+.benefit-card h3 {
+  font-family: var(--font-disp); font-size: 1.25rem; font-weight: 700;
+  color: var(--white); margin-bottom: 12px;
+}
+.benefit-card p { color: var(--mist); font-size: 15px; line-height: 1.6; }
+
+/* ─── INTEGRATIONS ───────────────────────────────────── */
+#integrations {
+  padding: 100px 0;
+  position: relative;
+}
+#integrations::after {
+  content: '';
+  position: absolute;
+  right: -100px; top: 50%; transform: translateY(-50%);
+  width: 500px; height: 500px;
+  background: radial-gradient(ellipse, rgba(232,160,32,0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+.integrations-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  margin-top: 60px;
+}
+.integration-card {
+  background: var(--ink-mid);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: var(--r-lg);
+  padding: 28px 20px;
+  text-align: center;
+  transition: all 0.3s;
+  cursor: default;
+}
+.integration-card:hover {
+  border-color: rgba(232,160,32,0.25);
+  background: var(--ink-light);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+.integration-logo {
+  width: 40px; height: 40px; margin: 0 auto 12px;
+}
+.integration-name {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+  letter-spacing: 0.06em; color: var(--mist);
+}
+
+/* ─── USE CASES ──────────────────────────────────────── */
+#use-cases {
+  padding: 120px 0;
+}
+.use-cases-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.use-case-card {
+  background: var(--ink-mid);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-lg);
+  padding: 40px 36px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+.use-case-card:hover {
+  border-color: rgba(45,212,200,0.2);
+  box-shadow: 0 0 40px rgba(45,212,200,0.05);
+}
+.use-case-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 120px; height: 120px;
+  background: radial-gradient(ellipse at bottom right, rgba(45,212,200,0.06), transparent);
+  pointer-events: none;
+}
+.persona-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--cyan); margin-bottom: 20px;
+}
+.persona-tag::before { content: '//'; color: var(--fog); }
+.use-case-card h3 {
+  font-family: var(--font-disp); font-size: 1.3rem; font-weight: 700;
+  color: var(--white); margin-bottom: 16px; line-height: 1.25;
+}
+.use-case-card p { color: var(--mist); font-size: 15px; line-height: 1.65; margin-bottom: 28px; }
+.use-case-result {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--green);
+  padding: 10px 14px;
+  background: rgba(62,202,122,0.07);
+  border: 1px solid rgba(62,202,122,0.15);
+  border-radius: var(--r);
+}
+.use-case-result::before { content: '✓'; }
+
+/* ─── TESTIMONIAL ────────────────────────────────────── */
+#testimonial {
+  padding: 100px 0;
+  position: relative;
+}
+#testimonial::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent, rgba(232,160,32,0.03), transparent);
+  pointer-events: none;
+}
+.testimonial-inner {
+  max-width: 760px; margin: 0 auto; text-align: center;
+}
+.quote-mark {
+  font-family: var(--font-disp); font-size: 6rem; line-height: 0.5;
+  color: var(--amber); opacity: 0.35; margin-bottom: 24px; display: block;
+}
+.testimonial-inner blockquote {
+  font-family: var(--font-disp); font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+  font-style: italic; font-weight: 400;
+  line-height: 1.5; color: var(--white);
+  margin-bottom: 40px;
+}
+.testimonial-attr {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+}
+.attr-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--ink-light);
+  border: 2px solid var(--amber-dim);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--amber);
+}
+.attr-info strong {
+  display: block; font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  color: var(--white); margin-bottom: 2px;
+}
+.attr-info span { font-family: var(--font-mono); font-size: 11px; color: var(--fog); }
+
+/* ─── PRICING ────────────────────────────────────────── */
+#pricing {
+  padding: 120px 0;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.pricing-card {
+  background: var(--ink-mid);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-lg);
+  padding: 40px 36px;
+  position: relative;
+  transition: all 0.3s;
+}
+.pricing-card:hover { transform: translateY(-4px); }
+.pricing-card.featured {
+  background: linear-gradient(145deg, var(--ink-light) 0%, rgba(232,160,32,0.06) 100%);
+  border-color: rgba(232,160,32,0.35);
+  box-shadow: 0 0 0 1px rgba(232,160,32,0.15), 0 20px 60px rgba(0,0,0,0.3);
+}
+.featured-badge {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  background: var(--amber); color: var(--ink);
+  padding: 4px 14px; border-radius: 100px;
+}
+.tier-name {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--mist); margin-bottom: 12px;
+}
+.tier-price {
+  display: flex; align-items: baseline; gap: 4px; margin-bottom: 6px;
+}
+.tier-price .amount {
+  font-family: var(--font-disp); font-size: 2.8rem; font-weight: 900;
+  color: var(--white); line-height: 1;
+}
+.tier-price .currency {
+  font-family: var(--font-mono); font-size: 1rem; color: var(--fog); align-self: flex-start; margin-top: 6px;
+}
+.tier-price .period {
+  font-family: var(--font-mono); font-size: 11px; color: var(--fog);
+}
+.tier-desc {
+  font-size: 14px; color: var(--mist); margin-bottom: 28px; padding-bottom: 28px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+}
+.tier-features {
+  margin-bottom: 32px;
+}
+.tier-features li {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--mist);
+  padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+  line-height: 1.4;
+}
+.tier-features li:last-child { border-bottom: none; }
+.tier-features li::before {
+  content: '—'; color: var(--amber-dim); flex-shrink: 0; margin-top: 1px;
+}
+.tier-cta { width: 100%; justify-content: center; }
+.btn-outline {
+  background: transparent; color: var(--white);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.btn-outline:hover { border-color: rgba(255,255,255,0.4); background: var(--white-faint); }
+
+/* ─── FINAL CTA ──────────────────────────────────────── */
+#final-cta {
+  padding: 140px 0;
+  position: relative;
+  text-align: center;
+  overflow: hidden;
+}
+#final-cta::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 700px; height: 400px;
+  background: radial-gradient(ellipse, rgba(232,160,32,0.12) 0%, transparent 65%);
+  pointer-events: none;
+}
+.cta-inner { position: relative; z-index: 1; }
+.cta-inner h2 {
+  font-family: var(--font-disp);
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  font-weight: 900; line-height: 1.1;
+  color: var(--white); margin-bottom: 20px;
+}
+.cta-inner h2 em { font-style: italic; color: var(--amber); }
+.cta-inner p {
+  font-size: 18px; color: var(--mist); max-width: 480px; margin: 0 auto 40px;
+}
+.cta-actions { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.btn-lg { padding: 14px 32px; font-size: 13px; }
+
+/* ─── FOOTER ─────────────────────────────────────────── */
+footer {
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding: 48px 0;
+}
+.footer-inner {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;
+}
+.footer-logo {
+  font-family: var(--font-disp); font-size: 1rem; font-weight: 700;
+  color: var(--fog);
+}
+.footer-links {
+  display: flex; gap: 24px;
+}
+.footer-links a {
+  font-family: var(--font-mono); font-size: 11px; color: var(--fog);
+  letter-spacing: 0.05em;
+  transition: color 0.2s;
+}
+.footer-links a:hover { color: var(--mist); }
+.footer-copy {
+  font-family: var(--font-mono); font-size: 10px; color: var(--fog); letter-spacing: 0.05em;
+}
+
+/* ─── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero-inner { grid-template-columns: 1fr; }
+  .hero-mockup { display: none; }
+  .product-grid { grid-template-columns: 1fr; }
+  .benefits-grid { grid-template-columns: 1fr 1fr; }
+  .use-cases-grid { grid-template-columns: 1fr; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .integrations-grid { grid-template-columns: repeat(3, 1fr); }
+  .nav-links { display: none; }
+}
+@media (max-width: 600px) {
+  .benefits-grid { grid-template-columns: 1fr; }
+  .integrations-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ─── PAGE LOAD ANIMATION ────────────────────────────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hero-eyebrow  { animation: fade-up 0.6s var(--ease-out) 0.1s both; }
+.hero-text h1  { animation: fade-up 0.7s var(--ease-out) 0.2s both; }
+.hero-text p   { animation: fade-up 0.7s var(--ease-out) 0.35s both; }
+.hero-actions  { animation: fade-up 0.7s var(--ease-out) 0.48s both; }
+.hero-social-proof { animation: fade-up 0.7s var(--ease-out) 0.6s both; }
+.hero-mockup   { animation: fade-up 0.9s var(--ease-out) 0.4s both; }
+
+/* node pulse */
+@keyframes node-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.pulse { animation: node-pulse 2.5s ease-in-out infinite; }
+.pulse-2 { animation: node-pulse 2.5s ease-in-out 0.8s infinite; }
+.pulse-3 { animation: node-pulse 2.5s ease-in-out 1.6s infinite; }
+
+/* line draw */
+@keyframes draw {
+  from { stroke-dashoffset: 300; }
+  to   { stroke-dashoffset: 0; }
+}
+.draw-line {
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+  animation: draw 1.5s var(--ease-out) 1s forwards;
+}
+</style>
+</head>
+<body>
+
+<!-- ─── NAV ──────────────────────────────────────────── -->
+<header>
+  <nav>
+    <a href="#" class="nav-logo" aria-label="Relay Atlas home">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <circle cx="14" cy="14" r="13" stroke="#E8A020" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="7" stroke="#E8A020" stroke-width="1" opacity="0.5"/>
+        <circle cx="14" cy="14" r="2.5" fill="#E8A020"/>
+        <line x1="14" y1="1" x2="14" y2="5" stroke="#E8A020" stroke-width="1.5"/>
+        <line x1="14" y1="23" x2="14" y2="27" stroke="#E8A020" stroke-width="1.5"/>
+        <line x1="1" y1="14" x2="5" y2="14" stroke="#E8A020" stroke-width="1.5"/>
+        <line x1="23" y1="14" x2="27" y2="14" stroke="#E8A020" stroke-width="1.5"/>
+      </svg>
+      Relay Atlas
+    </a>
+    <ul class="nav-links" role="list">
+      <li><a href="#product">Product</a></li>
+      <li><a href="#benefits">Features</a></li>
+      <li><a href="#integrations">Integrations</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+    </ul>
+    <a href="#final-cta" class="btn btn-primary nav-cta">Get Early Access</a>
+  </nav>
+</header>
+
+<!-- ─── HERO ──────────────────────────────────────────── -->
+<section id="hero" aria-label="Hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <div class="hero-eyebrow">
+        <div class="dot" aria-hidden="true"></div>
+        <span>Now in open beta</span>
+      </div>
+      <h1>Every launch.<br><em>One living map.</em></h1>
+      <p>Relay Atlas turns your distributed team's scattered decisions, tasks, and customer signals into a single source of truth — so nothing slips between time zones when it counts.</p>
+      <div class="hero-actions">
+        <a href="#final-cta" class="btn btn-primary btn-lg">Start for free</a>
+        <a href="#product" class="btn btn-ghost btn-lg">See how it works</a>
+      </div>
+      <div class="hero-social-proof">
+        <div class="avatars" aria-hidden="true">
+          <div class="avatar">PM</div>
+          <div class="avatar">EL</div>
+          <div class="avatar">CS</div>
+          <div class="avatar">DS</div>
+          <div class="avatar">+</div>
+        </div>
+        <span>Trusted by 1,200+ teams shipping faster</span>
+      </div>
+    </div>
+
+    <div class="hero-mockup" aria-hidden="true">
+      <div class="map-frame">
+        <div class="map-titlebar">
+          <div class="titlebar-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <span class="titlebar-label">relay-atlas · Q3 Launch Map</span>
+        </div>
+        <div class="map-toolbar">
+          <div class="toolbar-tab active">Map</div>
+          <div class="toolbar-tab">Timeline</div>
+          <div class="toolbar-tab">Signals</div>
+          <div class="toolbar-tab">Decisions</div>
+        </div>
+        <div class="map-body">
+          <svg viewBox="0 0 440 280" class="map-svg-wrap" role="img" aria-label="Launch map showing workflow stages">
+            <defs>
+              <filter id="glow-amber">
+                <feGaussianBlur stdDeviation="3" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <filter id="glow-cyan">
+                <feGaussianBlur stdDeviation="2" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+
+            <!-- Connection lines -->
+            <line x1="110" y1="60" x2="170" y2="60" stroke="#1a3050" stroke-width="1.5" stroke-dasharray="4 3" class="draw-line"/>
+            <line x1="270" y1="60" x2="330" y2="60" stroke="#1a3050" stroke-width="1.5" stroke-dasharray="4 3" class="draw-line"/>
+            <line x1="220" y1="90" x2="220" y2="130" stroke="#1a3050" stroke-width="1.5" stroke-dasharray="4 3" class="draw-line"/>
+            <line x1="110" y1="170" x2="170" y2="170" stroke="#E8A020" stroke-width="1.5" filter="url(#glow-amber)" class="draw-line"/>
+            <line x1="270" y1="170" x2="330" y2="170" stroke="#1a3050" stroke-width="1.5" stroke-dasharray="4 3" class="draw-line"/>
+
+            <!-- Row 1 nodes -->
+            <!-- Discovery -->
+            <g class="map-node">
+              <rect x="20" y="36" width="90" height="48" rx="6" fill="#0C1A30" stroke="#3ECA7A" stroke-width="1.5"/>
+              <text x="65" y="55" text-anchor="middle" fill="#3ECA7A" font-family="IBM Plex Mono" font-size="8" font-weight="600">DISCOVERY</text>
+              <rect x="30" y="62" width="30" height="8" rx="3" fill="rgba(62,202,122,0.15)"/>
+              <text x="45" y="69" text-anchor="middle" fill="#3ECA7A" font-family="IBM Plex Mono" font-size="6">Done</text>
+            </g>
+
+            <!-- Design -->
+            <g class="map-node">
+              <rect x="170" y="36" width="100" height="48" rx="6" fill="#0C1A30" stroke="#3ECA7A" stroke-width="1.5"/>
+              <text x="220" y="55" text-anchor="middle" fill="#3ECA7A" font-family="IBM Plex Mono" font-size="8" font-weight="600">DESIGN</text>
+              <rect x="180" y="62" width="30" height="8" rx="3" fill="rgba(62,202,122,0.15)"/>
+              <text x="195" y="69" text-anchor="middle" fill="#3ECA7A" font-family="IBM Plex Mono" font-size="6">Done</text>
+            </g>
+
+            <!-- Dev -->
+            <g class="map-node pulse">
+              <rect x="330" y="36" width="100" height="48" rx="6" fill="#112240" stroke="#E8A020" stroke-width="1.5" filter="url(#glow-amber)"/>
+              <text x="380" y="55" text-anchor="middle" fill="#E8A020" font-family="IBM Plex Mono" font-size="8" font-weight="600">ENGINEERING</text>
+              <rect x="340" y="62" width="36" height="8" rx="3" fill="rgba(232,160,32,0.15)"/>
+              <text x="358" y="69" text-anchor="middle" fill="#E8A020" font-family="IBM Plex Mono" font-size="6">Active</text>
+            </g>
+
+            <!-- Row 2 middle -->
+            <g class="map-node pulse-2">
+              <rect x="170" y="130" width="100" height="48" rx="6" fill="#1a0f0f" stroke="#E85050" stroke-width="1.5"/>
+              <text x="220" y="149" text-anchor="middle" fill="#E85050" font-family="IBM Plex Mono" font-size="8" font-weight="600">API REVIEW</text>
+              <rect x="180" y="156" width="38" height="8" rx="3" fill="rgba(232,80,80,0.15)"/>
+              <text x="199" y="163" text-anchor="middle" fill="#E85050" font-family="IBM Plex Mono" font-size="6">Blocked</text>
+            </g>
+
+            <!-- Row 3 -->
+            <!-- QA -->
+            <g class="map-node">
+              <rect x="20" y="146" width="90" height="48" rx="6" fill="#0C1A30" stroke="#2DD4C8" stroke-width="1.5" filter="url(#glow-cyan)"/>
+              <text x="65" y="165" text-anchor="middle" fill="#2DD4C8" font-family="IBM Plex Mono" font-size="8" font-weight="600">QA &amp; TESTING</text>
+              <rect x="30" y="172" width="36" height="8" rx="3" fill="rgba(45,212,200,0.15)"/>
+              <text x="48" y="179" text-anchor="middle" fill="#2DD4C8" font-family="IBM Plex Mono" font-size="6">Active</text>
+            </g>
+
+            <!-- Launch -->
+            <g class="map-node">
+              <rect x="330" y="146" width="100" height="48" rx="6" fill="#0C1A30" stroke="#4A6280" stroke-width="1.5" stroke-dasharray="5 3"/>
+              <text x="380" y="165" text-anchor="middle" fill="#4A6280" font-family="IBM Plex Mono" font-size="8" font-weight="600">LAUNCH</text>
+              <rect x="340" y="172" width="40" height="8" rx="3" fill="rgba(255,255,255,0.05)"/>
+              <text x="360" y="179" text-anchor="middle" fill="#4A6280" font-family="IBM Plex Mono" font-size="6">Planned</text>
+            </g>
+
+            <!-- Timeline rail -->
+            <rect x="20" y="228" width="410" height="28" rx="5" fill="#0C1A30" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+            <rect x="20" y="228" width="185" height="28" rx="5" fill="rgba(232,160,32,0.08)" stroke="rgba(232,160,32,0.2)" stroke-width="1"/>
+            <text x="30" y="247" fill="#4A6280" font-family="IBM Plex Mono" font-size="8">Jul 1</text>
+            <text x="108" y="247" fill="#E8A020" font-family="IBM Plex Mono" font-size="8">Today</text>
+            <line x1="147" y1="228" x2="147" y2="256" stroke="#E8A020" stroke-width="1.5"/>
+            <circle cx="147" cy="224" r="3" fill="#E8A020"/>
+            <text x="368" y="247" fill="#4A6280" font-family="IBM Plex Mono" font-size="8">Sep 30</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PRODUCT ───────────────────────────────────────── -->
+<section id="product" aria-label="Product walkthrough">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">How it works</div>
+      <h2>Your launch, as a living document</h2>
+      <p>Relay Atlas ingests signals from your tools and surfaces the whole picture — dependencies, blockers, and customer context — in one map.</p>
+    </div>
+    <div class="product-grid">
+      <div class="launch-map-container reveal">
+        <div class="lm-header">
+          <span class="lm-title">Compass Pro v2.4 — Launch Map</span>
+          <div class="lm-meta">
+            <span>14 nodes</span>
+            <span>3 active</span>
+            <span>1 blocked</span>
+          </div>
+        </div>
+        <div class="lm-body">
+          <svg viewBox="0 0 620 380" width="100%" role="img" aria-label="Detailed launch map product mockup">
+            <defs>
+              <filter id="glow2">
+                <feGaussianBlur stdDeviation="4" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+
+            <!-- Phase labels -->
+            <text x="10" y="16" fill="#4A6280" font-family="IBM Plex Mono" font-size="9" font-weight="600" letter-spacing="0.1em">PHASE 1 — FOUNDATIONS</text>
+            <line x1="10" y1="20" x2="610" y2="20" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+
+            <!-- Row 1 -->
+            <g class="map-node">
+              <rect x="10" y="28" width="120" height="54" rx="6" fill="#0C1A30" stroke="#3ECA7A" stroke-width="1.5"/>
+              <text x="70" y="49" text-anchor="middle" fill="#8FA3BF" font-family="IBM Plex Mono" font-size="9" font-weight="600">User Research</text>
+              <rect x="20" y="58" width="42" height="12" rx="3" fill="rgba(62,202,122,0.15)"/>
+              <text x="41" y="67" text-anchor="middle" fill="#3ECA7A" font-family="IBM Plex Mono" font-size="8">✓ Done</text>
+            </g>
+            <line x1="130" y1="55" x2="165" y2="55" stroke="#1a3050" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <g class="map-node">
+              <rect x="165" y="28" width="120" height="54" rx="6" fill="#0C1A30" stroke="#3ECA7A" stroke-width="1.5"/>
+              <text x="225" y="49" text-anchor="middle" fill="#8FA3BF" font-family="IBM Plex Mono" font-size="9" font-weight="600">Problem Brief</text>
+              <rect x="175" y="58" width="42" height="12" rx="3" fill="rgba(62,202,122,0.15)"/>
+              <text x="196" y="67" text-anchor="middle" fill="#3ECA7A" font-family="IBM Plex Mono" font-size="8">✓ Done</text>
+            </g>
+            <line x1="285" y1="55" x2="320" y2="55" stroke="#1a3050" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <g class="map-node">
+              <rect x="320" y="28" width="130" height="54" rx="6" fill="#0C1A30" stroke="#3ECA7A" stroke-width="1.5"/>
+              <text x="385" y="49" text-anchor="middle" fill="#8FA3BF" font-family="IBM Plex Mono" font-size="9" font-weight="600">Spec &amp; Wireframes</text>
+              <rect x="330" y="58" width="42" height="12" rx="3" fill="rgba(62,202,122,0.15)"/>
+              <text x="351" y="67" text-anchor="middle" fill="#3ECA7A" font-family="IBM Plex Mono" font-size="8">✓ Done</text>
+            </g>
+
+            <text x="10" y="108" fill="#4A6280" font-family="IBM Plex Mono" font-size="9" font-weight="600" letter-spacing="0.1em">PHASE 2 — BUILD</text>
+            <line x1="10" y1="112" x2="610" y2="112" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+
+            <g class="map-node pulse">
+              <rect x="10" y="120" width="130" height="54" rx="6" fill="#112240" stroke="#E8A020" stroke-width="1.5" filter="url(#glow2)"/>
+              <text x="75" y="141" text-anchor="middle" fill="#8FA3BF" font-family="IBM Plex Mono" font-size="9" font-weight="600">Frontend Dev</text>
+              <rect x="20" y="150" width="52" height="12" rx="3" fill="rgba(232,160,32,0.15)"/>
+              <text x="46" y="159" text-anchor="middle" fill="#E8A020" font-family="IBM Plex Mono" font-size="8">In Progress</text>
+            </g>
+            <line x1="140" y1="147" x2="175" y2="147" stroke="#E8A020" stroke-width="1.5" opacity="0.5"/>
+            <g class="map-node pulse-2">
+              <rect x="175" y="120" width="130" height="54" rx="6" fill="#112240" stroke="#E8A020" stroke-width="1.5" filter="url(#glow2)"/>
+              <text x="240" y="141" text-anchor="middle" fill="#8FA3BF" font-family="IBM Plex Mono" font-size="9" font-weight="600">Backend APIs</text>
+              <rect x="185" y="150" width="52" height="12" rx="3" fill="rgba(232,160,32,0.15)"/>
+              <text x="211" y="159" text-anchor="middle" fill="#E8A020" font-family="IBM Plex Mono" font-size="8">In Progress</text>
+            </g>
+            <line x1="305" y1="147" x2="340" y2="147" stroke="#1a3050" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <g class="map-node">
+              <rect x="340" y="120" width="130" height="54" rx="6" fill="#1a0f0f" stroke="#E85050" stroke-width="1.5"/>
+              <text x="405" y="141" text-anchor="middle" fill="#8FA3BF" font-family="IBM Plex Mono" font-size="9" font-weight="600">Auth Integration</text>
+              <rect x="350" y="150" width="48" height="12" rx="3" fill="rgba(232,80,80,0.15)"/>
+              <text x="374" y="159" text-anchor="middle" fill="#E85050" font-family="IBM Plex Mono" font-size="8">Blocked</text>
+            </g>
+            <!-- Blocker note -->
+            <rect x="490" y="118" width="120" height="58" rx="4" fill="rgba(232,80,80,0.07)" stroke="rgba(232,80,80,0.25)" stroke-width="1"/>
+            <text x="550" y="135" text-anchor="middle" fill="#E85050" font-family="IBM Plex Mono" font-size="8" font-weight="600">⚠ BLOCKER</text>
+            <text x="500" y="149" fill="#8FA3BF" font-family="IBM Plex Mono" font-size="8">OAuth tokens</text>
+            <text x="500" y="161" fill="#8FA3BF" font-family="IBM Plex Mono" font-size="8">pending Legal</text>
+            <text x="500" y="170" fill="#4A6280" font-family="IBM Plex Mono" font-size="7">Owner: @jamie</text>
+
+            <text x="10" y="202" fill="#4A6280" font-family="IBM Plex Mono" font-size="9" font-weight="600" letter-spacing="0.1em">PHASE 3 — VALIDATE</text>
+            <line x1="10" y1="206" x2="610" y2="206" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+
+            <g class="map-node pulse-3">
+              <rect x="10" y="214" width="130" height="54" rx="6" fill="#0C1A30" stroke="#2DD4C8" stroke-width="1.5"/>
+              <text x="75" y="235" text-anchor="middle" fill="#8FA3BF" font-family="IBM Plex Mono" font-size="9" font-weight="600">Internal QA</text>
+              <rect x="20" y="244" width="52" height="12" rx="3" fill="rgba(45,212,200,0.15)"/>
+              <text x="46" y="253" text-anchor="middle" fill="#2DD4C8" font-family="IBM Plex Mono" font-size="8">In Progress</text>
+            </g>
+            <g class="map-node">
+              <rect x="175" y="214" width="130" height="54" rx="6" fill="#0C1A30" stroke="#4A6280" stroke-width="1" stroke-dasharray="4 3"/>
+              <text x="240" y="235" text-anchor="middle" fill="#4A6280" font-family="IBM Plex Mono" font-size="9" font-weight="600">Beta Rollout</text>
+              <rect x="185" y="244" width="44" height="12" rx="3" fill="rgba(255,255,255,0.05)"/>
+              <text x="207" y="253" text-anchor="middle" fill="#4A6280" font-family="IBM Plex Mono" font-size="8">Planned</text>
+            </g>
+            <g class="map-node">
+              <rect x="340" y="214" width="130" height="54" rx="6" fill="#0C1A30" stroke="#4A6280" stroke-width="1" stroke-dasharray="4 3"/>
+              <text x="405" y="235" text-anchor="middle" fill="#4A6280" font-family="IBM Plex Mono" font-size="9" font-weight="600">GA Launch</text>
+              <rect x="350" y="244" width="44" height="12" rx="3" fill="rgba(255,255,255,0.05)"/>
+              <text x="372" y="253" text-anchor="middle" fill="#4A6280" font-family="IBM Plex Mono" font-size="8">Planned</text>
+            </g>
+
+            <!-- Timeline -->
+            <rect x="10" y="296" width="600" height="20" rx="4" fill="#0C1A30" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <rect x="10" y="296" width="270" height="20" rx="4" fill="rgba(232,160,32,0.07)" stroke="rgba(232,160,32,0.15)" stroke-width="1"/>
+            <line x1="240" y1="292" x2="240" y2="320" stroke="#E8A020" stroke-width="1.5"/>
+            <circle cx="240" cy="290" r="4" fill="#E8A020"/>
+            <text x="15" y="310" fill="#4A6280" font-family="IBM Plex Mono" font-size="8">Jul 1</text>
+            <text x="220" y="310" fill="#E8A020" font-family="IBM Plex Mono" font-size="8">Today</text>
+            <text x="568" y="310" fill="#4A6280" font-family="IBM Plex Mono" font-size="8">Oct 1</text>
+
+            <!-- Progress bar -->
+            <text x="10" y="348" fill="#4A6280" font-family="IBM Plex Mono" font-size="8">Launch readiness</text>
+            <rect x="10" y="355" width="600" height="8" rx="4" fill="#0C1A30"/>
+            <rect x="10" y="355" width="330" height="8" rx="4" fill="url(#progress-grad)"/>
+            <defs>
+              <linearGradient id="progress-grad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#E8A020"/>
+                <stop offset="100%" stop-color="#2DD4C8"/>
+              </linearGradient>
+            </defs>
+            <text x="615" y="363" fill="#E8A020" font-family="IBM Plex Mono" font-size="9" font-weight="600">55%</text>
+          </svg>
+        </div>
+      </div>
+
+      <div>
+        <div class="sidebar-block reveal">
+          <div class="sidebar-block-header">
+            <span class="sidebar-block-title">Customer Signals</span>
+            <span class="tag" style="font-size:9px">Live</span>
+          </div>
+          <div class="sidebar-block-body">
+            <div class="signal-item">
+              <div class="signal-icon" style="background:rgba(45,212,200,0.1)">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#2DD4C8" stroke-width="1.5"/><path d="M4 7h6M7 4v6" stroke="#2DD4C8" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </div>
+              <div class="signal-text">
+                <p>"Need SSO before we can buy"</p>
+                <span>Intercom · 4 customers · High priority</span>
+              </div>
+            </div>
+            <div class="signal-item">
+              <div class="signal-icon" style="background:rgba(232,160,32,0.1)">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="3" width="10" height="8" rx="2" stroke="#E8A020" stroke-width="1.5"/><path d="M5 6h4M5 8.5h2" stroke="#E8A020" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </div>
+              <div class="signal-text">
+                <p>Churn risk: 2 accounts citing missing API</p>
+                <span>Salesforce · Flagged by CS · $48k ARR</span>
+              </div>
+            </div>
+            <div class="signal-item">
+              <div class="signal-icon" style="background:rgba(62,202,122,0.1)">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-5" stroke="#3ECA7A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="signal-text">
+                <p>Feature request +23 upvotes this week</p>
+                <span>Canny · "Bulk export" · Rising fast</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-block reveal">
+          <div class="sidebar-block-header">
+            <span class="sidebar-block-title">Decision Log</span>
+          </div>
+          <div class="sidebar-block-body">
+            <div class="decision-item">
+              <p>Ship SSO via SAML, not OIDC for Q3</p>
+              <span class="who">@priya-pm · Jun 14 · rationale linked</span>
+            </div>
+            <div class="decision-item">
+              <p>Delay bulk export to v2.5 — scope risk</p>
+              <span class="who">@eng-lead · Jun 10 · approved by @cco</span>
+            </div>
+            <div class="decision-item">
+              <p>Beta invite cap: 500 accounts max</p>
+              <span class="who">@ops · Jun 8 · infra constraint</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-caption reveal">
+          <h3>Signal-to-map in seconds.</h3>
+          <p>Customer churn risks, unresolved decisions, engineering blockers — Relay Atlas connects the dots so your whole team has one version of the truth.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── BENEFITS ──────────────────────────────────────── -->
+<section id="benefits" aria-label="Features and benefits">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">Why teams choose Relay Atlas</div>
+      <h2>Built for teams who ship<br>across time zones</h2>
+    </div>
+    <div class="benefits-grid">
+
+      <div class="benefit-card reveal">
+        <div class="benefit-num">01</div>
+        <svg class="benefit-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="40" height="40" rx="8" fill="rgba(232,160,32,0.08)" stroke="rgba(232,160,32,0.25)" stroke-width="1.5"/>
+          <circle cx="24" cy="24" r="8" stroke="#E8A020" stroke-width="1.5"/>
+          <line x1="24" y1="4" x2="24" y2="14" stroke="#E8A020" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="24" y1="34" x2="24" y2="44" stroke="#E8A020" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="4" y1="24" x2="14" y2="24" stroke="#E8A020" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="34" y1="24" x2="44" y2="24" stroke="#E8A020" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <h3>Launch Map View</h3>
+        <p>Every dependency, phase, owner, and blocker on one canvas. Navigate complexity at a glance — no status update meetings required.</p>
+      </div>
+
+      <div class="benefit-card reveal">
+        <div class="benefit-num">02</div>
+        <svg class="benefit-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="40" height="40" rx="8" fill="rgba(45,212,200,0.06)" stroke="rgba(45,212,200,0.2)" stroke-width="1.5"/>
+          <path d="M14 24 Q20 14 24 24 Q28 34 34 24" stroke="#2DD4C8" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <circle cx="14" cy="24" r="3" fill="#2DD4C8"/>
+          <circle cx="34" cy="24" r="3" fill="#2DD4C8"/>
+        </svg>
+        <h3>Customer Signal Capture</h3>
+        <p>Pull in signals from Intercom, Salesforce, and Canny automatically. Surface the right customer context at the exact node where it's relevant.</p>
+      </div>
+
+      <div class="benefit-card reveal">
+        <div class="benefit-num">03</div>
+        <svg class="benefit-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="40" height="40" rx="8" fill="rgba(62,202,122,0.06)" stroke="rgba(62,202,122,0.2)" stroke-width="1.5"/>
+          <rect x="12" y="16" width="24" height="4" rx="2" fill="rgba(62,202,122,0.3)"/>
+          <rect x="12" y="24" width="18" height="4" rx="2" fill="rgba(62,202,122,0.2)"/>
+          <rect x="12" y="32" width="20" height="4" rx="2" fill="rgba(62,202,122,0.15)"/>
+          <circle cx="36" cy="14" r="6" fill="rgba(62,202,122,0.15)" stroke="#3ECA7A" stroke-width="1.5"/>
+          <text x="36" y="18" text-anchor="middle" fill="#3ECA7A" font-family="IBM Plex Mono" font-size="8" font-weight="700">D</text>
+        </svg>
+        <h3>Decision Log</h3>
+        <p>Every "why" preserved alongside the "what." When someone asks three months later why you chose SAML, the answer is one click away.</p>
+      </div>
+
+      <div class="benefit-card reveal">
+        <div class="benefit-num">04</div>
+        <svg class="benefit-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="40" height="40" rx="8" fill="rgba(232,160,32,0.06)" stroke="rgba(232,160,32,0.2)" stroke-width="1.5"/>
+          <circle cx="16" cy="20" r="5" stroke="#E8A020" stroke-width="1.5"/>
+          <circle cx="32" cy="20" r="5" stroke="#E8A020" stroke-width="1.5"/>
+          <circle cx="24" cy="32" r="5" stroke="#E8A020" stroke-width="1.5"/>
+          <line x1="20" y1="22" x2="28" y2="22" stroke="#E8A020" stroke-width="1" opacity="0.4"/>
+          <line x1="19" y1="24" x2="22" y2="28" stroke="#E8A020" stroke-width="1" opacity="0.4"/>
+          <line x1="29" y1="24" x2="26" y2="28" stroke="#E8A020" stroke-width="1" opacity="0.4"/>
+        </svg>
+        <h3>Async-First Clarity</h3>
+        <p>Designed for teams across Sydney, Berlin, and Bogotá. Relay Atlas replaces morning sync calls with live map updates everyone can read in their own timezone.</p>
+      </div>
+
+      <div class="benefit-card reveal">
+        <div class="benefit-num">05</div>
+        <svg class="benefit-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="40" height="40" rx="8" fill="rgba(232,80,80,0.06)" stroke="rgba(232,80,80,0.2)" stroke-width="1.5"/>
+          <path d="M24 10 L28 20 H38 L30 27 L33 38 L24 32 L15 38 L18 27 L10 20 H20 Z" stroke="#E85050" stroke-width="1.5" fill="rgba(232,80,80,0.1)" stroke-linejoin="round"/>
+        </svg>
+        <h3>Smart Blocker Surfacing</h3>
+        <p>Relay Atlas watches for dependency mismatches and surfaces blockers before they cascade. You'll know about the Legal hold before the sprint ends.</p>
+      </div>
+
+      <div class="benefit-card reveal">
+        <div class="benefit-num">06</div>
+        <svg class="benefit-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="40" height="40" rx="8" fill="rgba(45,212,200,0.06)" stroke="rgba(45,212,200,0.2)" stroke-width="1.5"/>
+          <rect x="10" y="28" width="6" height="12" rx="2" fill="#2DD4C8" opacity="0.4"/>
+          <rect x="20" y="20" width="6" height="20" rx="2" fill="#2DD4C8" opacity="0.65"/>
+          <rect x="30" y="12" width="6" height="28" rx="2" fill="#2DD4C8"/>
+          <path d="M10 26 L23 18 L33 10" stroke="#2DD4C8" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>
+        </svg>
+        <h3>Stakeholder Self-Serve</h3>
+        <p>Executives and investors get a shareable launch URL that's always current. You stop writing status updates; they stop emailing you for them.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── INTEGRATIONS ──────────────────────────────────── -->
+<section id="integrations" aria-label="Integrations">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">Integrations</div>
+      <h2>Plugs into the tools<br>your team already uses</h2>
+      <p>No migrations. No new workflows. Relay Atlas listens to your existing stack and adds the connective tissue.</p>
+    </div>
+    <div class="integrations-grid">
+
+      <!-- Slack -->
+      <div class="integration-card reveal">
+        <svg class="integration-logo" viewBox="0 0 40 40" fill="none" aria-label="Slack">
+          <rect x="15" y="4" width="6" height="14" rx="3" fill="#E01E5A"/>
+          <rect x="4" y="15" width="14" height="6" rx="3" fill="#E01E5A"/>
+          <rect x="19" y="4" width="6" height="14" rx="3" fill="#E01E5A" opacity="0.5" transform="translate(4,0)"/>
+          <rect x="15" y="22" width="6" height="14" rx="3" fill="#36C5F0"/>
+          <rect x="22" y="20" width="14" height="6" rx="3" fill="#36C5F0"/>
+          <rect x="15" y="22" width="6" height="14" rx="3" fill="#36C5F0" opacity="0.5" transform="translate(0,4)"/>
+          <rect x="4" y="15" width="14" height="6" rx="3" fill="#2EB67D" transform="translate(0,4)"/>
+          <rect x="4" y="19" width="6" height="6" rx="3" fill="#2EB67D"/>
+          <rect x="22" y="15" width="14" height="6" rx="3" fill="#ECB22E" transform="translate(0,-4)"/>
+          <rect x="30" y="4" width="6" height="6" rx="3" fill="#ECB22E"/>
+        </svg>
+        <div class="integration-name">Slack</div>
+      </div>
+
+      <!-- Linear -->
+      <div class="integration-card reveal">
+        <svg class="integration-logo" viewBox="0 0 40 40" fill="none" aria-label="Linear">
+          <rect x="4" y="4" width="32" height="32" rx="8" fill="#5E6AD2"/>
+          <path d="M10 30 L30 10" stroke="white" stroke-width="3" stroke-linecap="round"/>
+          <path d="M10 20 L20 10" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+          <path d="M20 30 L30 20" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+        </svg>
+        <div class="integration-name">Linear</div>
+      </div>
+
+      <!-- GitHub -->
+      <div class="integration-card reveal">
+        <svg class="integration-logo" viewBox="0 0 40 40" fill="none" aria-label="GitHub">
+          <circle cx="20" cy="20" r="16" fill="#24292e"/>
+          <path d="M20 8C13.37 8 8 13.37 8 20c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0032 20c0-6.63-5.37-12-12-12z" fill="white"/>
+        </svg>
+        <div class="integration-name">GitHub</div>
+      </div>
+
+      <!-- Notion -->
+      <div class="integration-card reveal">
+        <svg class="integration-logo" viewBox="0 0 40 40" fill="none" aria-label="Notion">
+          <rect x="6" y="4" width="28" height="32" rx="4" fill="white"/>
+          <rect x="10" y="10" width="12" height="2" rx="1" fill="#111"/>
+          <rect x="10" y="15" width="20" height="1.5" rx="0.75" fill="#666"/>
+          <rect x="10" y="19" width="20" height="1.5" rx="0.75" fill="#666"/>
+          <rect x="10" y="23" width="16" height="1.5" rx="0.75" fill="#666"/>
+          <path d="M24 7 L30 10 V22 L24 25 V7Z" fill="#111"/>
+        </svg>
+        <div class="integration-name">Notion</div>
+      </div>
+
+      <!-- Intercom -->
+      <div class="integration-card reveal">
+        <svg class="integration-logo" viewBox="0 0 40 40" fill="none" aria-label="Intercom">
+          <rect x="4" y="4" width="32" height="32" rx="8" fill="#1F8DED"/>
+          <rect x="11" y="13" width="4" height="14" rx="2" fill="white"/>
+          <rect x="18" y="11" width="4" height="16" rx="2" fill="white"/>
+          <rect x="25" y="13" width="4" height="14" rx="2" fill="white"/>
+        </svg>
+        <div class="integration-name">Intercom</div>
+      </div>
+
+      <!-- Figma -->
+      <div class="integration-card reveal">
+        <svg class="integration-logo" viewBox="0 0 40 40" fill="none" aria-label="Figma">
+          <rect x="14" y="4" width="12" height="12" rx="6" fill="#F24E1E"/>
+          <rect x="14" y="16" width="12" height="12" rx="6" fill="#A259FF"/>
+          <rect x="14" y="28" width="12" height="8" rx="4" fill="#0ACF83"/>
+          <rect x="4" y="4" width="10" height="12" rx="5" fill="#FF7262"/>
+          <rect x="4" y="16" width="10" height="12" rx="5" fill="#1ABCFE"/>
+        </svg>
+        <div class="integration-name">Figma</div>
+      </div>
+
+    </div>
+    <p style="text-align:center; margin-top:32px; font-family:var(--font-mono); font-size:12px; color:var(--fog);">+ Salesforce, Jira, Canny, Zendesk, PagerDuty, and 40 more via API</p>
+  </div>
+</section>
+
+<!-- ─── USE CASES ─────────────────────────────────────── -->
+<section id="use-cases" aria-label="Use cases">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">Use cases</div>
+      <h2>Who it's built for</h2>
+      <p>Relay Atlas adapts to every seat at the launch table.</p>
+    </div>
+    <div class="use-cases-grid">
+
+      <div class="use-case-card reveal">
+        <div class="persona-tag">Head of Product</div>
+        <h3>Stop running status update meetings</h3>
+        <p>Priya leads a product org across four time zones. Before Relay Atlas, she spent three hours every Thursday collating status docs. Now her Monday looks different: the map is live, blockers are tagged, and every stakeholder has a link — not a summary she wrote.</p>
+        <div class="use-case-result">Reduced weekly sync time from 3 hrs to 22 min</div>
+      </div>
+
+      <div class="use-case-card reveal">
+        <div class="persona-tag">Engineering Lead</div>
+        <h3>Dependencies that don't surprise you on Friday</h3>
+        <p>Tariq's team ships across two sprints that intersect with design, legal review, and a third-party API integration. When Legal pushed a blocker on OAuth, Relay Atlas surfaced it to Tariq's map node before the Friday retro — giving him a full week to reroute.</p>
+        <div class="use-case-result">Caught 4 cross-team blockers before they became incidents</div>
+      </div>
+
+      <div class="use-case-card reveal">
+        <div class="persona-tag">Customer Success Lead</div>
+        <h3>Know what shipped before your customer asks</h3>
+        <p>Sofia's team handles 200 enterprise accounts that all want to know when the SSO feature ships. Instead of pinging engineering twice a day, she has a pinned launch map that updates automatically — and she can see the exact blocker standing between her customer and their go-live.</p>
+        <div class="use-case-result">CS team fielded 68% fewer internal escalations</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── TESTIMONIAL ───────────────────────────────────── -->
+<section id="testimonial" aria-label="Customer testimonial">
+  <div class="container">
+    <div class="testimonial-inner reveal">
+      <span class="quote-mark" aria-hidden="true">"</span>
+      <blockquote>
+        Relay Atlas gave our distributed team something we didn't know we were missing: a shared reality. Before, every standup started with someone catching up. Now, everyone just knows.
+      </blockquote>
+      <div class="testimonial-attr">
+        <div class="attr-avatar" aria-hidden="true">PM</div>
+        <div class="attr-info">
+          <strong>Priya Mehta</strong>
+          <span>VP Product, Shipwright Labs — 280 person remote-first team</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PRICING ───────────────────────────────────────── -->
+<section id="pricing" aria-label="Pricing">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="tag">Pricing</div>
+      <h2>Simple seats, not seat counting</h2>
+      <p>Every plan includes the core launch map. Upgrade for power, not for people.</p>
+    </div>
+    <div class="pricing-grid">
+
+      <div class="pricing-card reveal">
+        <div class="tier-name">Crew</div>
+        <div class="tier-price">
+          <span class="amount">Free</span>
+        </div>
+        <p class="tier-desc">For small teams learning the ropes. No credit card needed.</p>
+        <ul class="tier-features" role="list">
+          <li>Up to 5 team members</li>
+          <li>3 active launch maps</li>
+          <li>30-day decision log history</li>
+          <li>2 integrations</li>
+          <li>Shareable read-only links</li>
+        </ul>
+        <a href="#final-cta" class="btn btn-outline tier-cta">Start free</a>
+      </div>
+
+      <div class="pricing-card featured reveal">
+        <div class="featured-badge">Most popular</div>
+        <div class="tier-name">Fleet</div>
+        <div class="tier-price">
+          <span class="currency">$</span>
+          <span class="amount">49</span>
+          <span class="period">/mo per workspace</span>
+        </div>
+        <p class="tier-desc">For teams who ship fast and need the full picture. Unlimited seats.</p>
+        <ul class="tier-features" role="list">
+          <li>Unlimited team members</li>
+          <li>Unlimited launch maps</li>
+          <li>Full decision log + exports</li>
+          <li>All integrations included</li>
+          <li>Customer signal ingestion</li>
+          <li>Stakeholder share links (branded)</li>
+          <li>Priority email support</li>
+        </ul>
+        <a href="#final-cta" class="btn btn-primary tier-cta">Start Fleet trial</a>
+      </div>
+
+      <div class="pricing-card reveal">
+        <div class="tier-name">Command</div>
+        <div class="tier-price">
+          <span class="currency">$</span>
+          <span class="amount">149</span>
+          <span class="period">/mo per workspace</span>
+        </div>
+        <p class="tier-desc">For orgs that need control, compliance, and white-glove support.</p>
+        <ul class="tier-features" role="list">
+          <li>Everything in Fleet</li>
+          <li>SSO / SAML</li>
+          <li>Audit log (90-day)</li>
+          <li>Custom fields &amp; map templates</li>
+          <li>Dedicated success manager</li>
+          <li>SLA: 4-hour response</li>
+          <li>Custom data retention</li>
+        </ul>
+        <a href="#final-cta" class="btn btn-outline tier-cta">Talk to sales</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── FINAL CTA ──────────────────────────────────────── -->
+<section id="final-cta" aria-label="Call to action">
+  <div class="container">
+    <div class="cta-inner reveal">
+      <div class="tag" style="margin:0 auto 24px;">Your next launch starts here</div>
+      <h2>Stop managing launches.<br><em>Start mapping them.</em></h2>
+      <p>Join 1,200+ product teams who shipped their last launch with confidence. Free to start, no credit card required.</p>
+      <div class="cta-actions">
+        <a href="#" class="btn btn-primary btn-lg">Create your first map — free</a>
+        <a href="#product" class="btn btn-ghost btn-lg">See a live demo</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ────────────────────────────────────────── -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-logo">Relay Atlas</div>
+      <nav class="footer-links" aria-label="Footer navigation">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Security</a>
+        <a href="#">Status</a>
+        <a href="#">Blog</a>
+        <a href="#">Changelog</a>
+      </nav>
+      <div class="footer-copy">© 2026 Relay Atlas, Inc.</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ─── SCROLL REVEAL ────────────────────────────────────
+(function() {
+  const reveals = document.querySelectorAll('.reveal');
+  if (!reveals.length) return;
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        const siblings = Array.from(el.parentElement.children).filter(c => c.classList.contains('reveal'));
+        const idx = siblings.indexOf(el);
+        el.style.transitionDelay = (idx * 80) + 'ms';
+        el.classList.add('visible');
+        io.unobserve(el);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  reveals.forEach(el => io.observe(el));
+})();
+
+// ─── STICKY NAV SHADOW ────────────────────────────────
+(function() {
+  const header = document.querySelector('header');
+  const onScroll = () => {
+    header.style.borderBottomColor = window.scrollY > 10
+      ? 'rgba(232,160,32,0.12)'
+      : 'rgba(255,255,255,0.06)';
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+</script>
+</body>
+</html>

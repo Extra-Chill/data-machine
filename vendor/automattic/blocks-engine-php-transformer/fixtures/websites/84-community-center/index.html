@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Riverton Community Center | Classes, Rentals, Volunteers</title>
+  <meta name="description" content="Riverton Community Center offers city classes, room rentals, neighborhood events, volunteer programs, and family support resources.">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="topbar">
+      <a class="brand" href="index.html" aria-label="Riverton Community Center home"><span class="brand-mark">RC</span><span>Riverton Center<small>Neighborhood services since 1978</small></span></a>
+      <nav class="main-nav" aria-label="Main navigation"><ul><li><a href="index.html" aria-current="page">Home</a></li><li><a href="classes.html">Classes</a></li><li><a href="rooms.html">Rooms</a></li><li><a href="feedback-volunteer.html">Feedback &amp; Volunteer</a></li></ul></nav>
+      <form class="header-search" role="search" method="get" action="index.html">
+        <label for="site-search-home">Search center programs</label>
+        <input id="site-search-home" name="q" type="search" autocomplete="off" placeholder="Search classes, rooms, forms" aria-describedby="search-help-home">
+        <input type="hidden" name="section" value="all">
+        <input type="hidden" name="audience" value="resident">
+        <button type="submit">Search</button>
+        <p class="help" id="search-help-home">Search stays on this static fixture and carries hidden local filters.</p>
+      </form>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <p class="eyebrow">Riverton Parks &amp; Community Life</p>
+          <h1>A civic home for classes, rooms, meals, and neighbor-powered care.</h1>
+          <p class="lead">The Riverton Community Center helps residents reserve public rooms, register for recreation classes, volunteer at events, and reach the city services desk without leaving the neighborhood.</p>
+          <p><a class="button" href="classes.html">Register for a class</a> <a class="button secondary" href="rooms.html">Book a room</a></p>
+        </div>
+        <aside class="panel hero-card" aria-label="Center snapshot">
+          <div class="mural" aria-hidden="true"></div>
+          <div class="stat-row">
+            <div class="stat"><strong>42</strong>weekly programs</div>
+            <div class="stat"><strong>9</strong>public rooms</div>
+            <div class="stat"><strong>310</strong>active volunteers</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container split">
+        <div>
+          <p class="eyebrow">What residents can do here</p>
+          <h2>Real public-service workflows, not brochure decoration.</h2>
+          <p>The center site intentionally keeps the forms residents expect: a detailed contact request, youth class registration, room booking with upload, event feedback, and volunteer application.</p>
+          <div class="meter-row">
+            <label for="capacity-meter"><strong>Today&apos;s front desk appointment capacity</strong></label>
+            <meter id="capacity-meter" min="0" max="100" low="30" high="75" optimum="55" value="68">68%</meter>
+          </div>
+        </div>
+        <div class="card-grid">
+          <article class="card"><h3>After-school clubs</h3><p>Homework help, robotics, dance, and kitchen basics for grades 3-8.</p></article>
+          <article class="card"><h3>Senior wellness</h3><p>Low-impact movement, health navigation, and Friday lunch reservations.</p></article>
+          <article class="card"><h3>Room rentals</h3><p>Meeting rooms, gym courts, and the teaching kitchen for local organizations.</p></article>
+          <article class="card"><h3>Volunteer crews</h3><p>Event hosts, garden stewards, tech mentors, and emergency pantry support.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="contact-heading">
+      <div class="container form-shell">
+        <p class="eyebrow">Contact the city services desk</p>
+        <h2 id="contact-heading">Ask a question, request a callback, or flag an access need.</h2>
+        <form method="post" action="index.html" aria-describedby="contact-note">
+          <p id="contact-note" class="help">Fields marked required help the front desk route your request during business hours.</p>
+          <div class="form-grid">
+            <div class="field"><label for="contact-name">Full name <span aria-hidden="true">*</span></label><input id="contact-name" name="name" type="text" autocomplete="name" required minlength="2"></div>
+            <div class="field"><label for="contact-email">Email <span aria-hidden="true">*</span></label><input id="contact-email" name="email" type="email" autocomplete="email" required></div>
+            <div class="field"><label for="contact-phone">Phone</label><input id="contact-phone" name="phone" type="tel" autocomplete="tel" pattern="[0-9() .+-]{7,}" aria-describedby="phone-help"><p class="help" id="phone-help">Use digits, spaces, parentheses, plus, or hyphen.</p></div>
+            <div class="field"><label for="contact-subject">Subject <span aria-hidden="true">*</span></label><select id="contact-subject" name="subject" required><option value="">Choose a topic</option><option>Class registration</option><option>Room rental</option><option>Accessibility accommodation</option><option>Volunteer program</option><option>General city services</option></select></div>
+          </div>
+          <div class="field"><label for="contact-message">Message <span aria-hidden="true">*</span></label><textarea id="contact-message" name="message" required minlength="20" aria-describedby="message-help"></textarea><p class="help" id="message-help">Please include dates, program names, and any accommodations you need.</p></div>
+          <div class="honeypot" aria-hidden="true"><label for="contact-website">Website</label><input id="contact-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+          <label class="check"><input type="checkbox" name="consent" value="yes" required> I agree that Riverton Community Center may contact me about this request.</label>
+          <p><button type="submit">Send request</button></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div><h2>Riverton Community Center</h2><p>1400 Maple Street, Riverton. Open weekdays 8 a.m.-9 p.m. and Saturdays 9 a.m.-5 p.m.</p></div>
+      <form class="newsletter" method="post" action="index.html" aria-labelledby="newsletter-home-heading">
+        <div><h3 id="newsletter-home-heading">Get the weekly center bulletin</h3><label for="newsletter-email-home">Email address</label><input id="newsletter-email-home" name="newsletter_email" type="email" autocomplete="email" required></div>
+        <input type="submit" value="Sign up">
+        <fieldset class="interests"><legend>Interests</legend><label><input type="checkbox" name="interests" value="classes"> Classes</label><label><input type="checkbox" name="interests" value="events"> Events</label><label><input type="checkbox" name="interests" value="volunteer"> Volunteer alerts</label></fieldset>
+      </form>
+    </div>
+  </footer>
+  <script src="js/site.js"></script>
+</body>
+</html>

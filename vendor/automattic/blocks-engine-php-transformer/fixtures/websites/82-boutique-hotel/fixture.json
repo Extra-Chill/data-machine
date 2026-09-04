@@ -1,0 +1,7 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": ["hotel", "booking", "rooms", "pricing", "carousel", "language-switcher", "sticky-sidebar"],
+  "capabilities": ["forms", "local-css", "runtime-js", "inline-svg"],
+  "risk_profile": "medium",
+  "complexity": 3
+}

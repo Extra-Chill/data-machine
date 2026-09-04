@@ -1,0 +1,12 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "job-board",
+    "listings",
+    "has-form",
+    "has-nav",
+    "multipage",
+    "has-filter"
+  ],
+  "complexity": 2
+}

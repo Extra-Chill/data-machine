@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact &amp; Request a Visit | Northline Plumbing &amp; Heating — Grand Rapids, MI</title>
+  <meta name="description" content="Schedule plumbing or heating service in Grand Rapids. Call (616) 555-0182 or fill out our request form. 24/7 emergency dispatch available.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .form-card {
+      background: var(--c-white);
+      border-radius: var(--r-lg);
+      padding: 2.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .form-card h2 { font-size: 1.6rem; margin-bottom: .4rem; }
+    .form-card .form-subhead {
+      font-size: .9rem;
+      color: var(--c-text-mid);
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--c-cream-dark);
+    }
+    .form-section-label {
+      font-family: var(--f-ui);
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--c-text-muted);
+      margin-bottom: 1.1rem;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--c-cream-dark);
+      display: block;
+    }
+    .form-section-label:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+    .checkbox-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .5rem .75rem;
+      margin-top: .5rem;
+    }
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      cursor: pointer;
+    }
+    .checkbox-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--c-copper);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .checkbox-item span {
+      font-size: .88rem;
+      color: var(--c-text-mid);
+    }
+    .time-slots {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .6rem;
+    }
+    .time-slot {
+      position: relative;
+    }
+    .time-slot input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .time-slot label {
+      display: block;
+      padding: .6rem;
+      text-align: center;
+      font-family: var(--f-ui);
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--c-text-mid);
+      border: 1.5px solid var(--c-cream-dark);
+      border-radius: var(--r);
+      cursor: pointer;
+      transition: all var(--t);
+      line-height: 1.3;
+    }
+    .time-slot input[type="radio"]:checked + label {
+      border-color: var(--c-copper);
+      background: rgba(174,92,24,.08);
+      color: var(--c-copper);
+    }
+    .time-slot label:hover {
+      border-color: var(--c-copper);
+      color: var(--c-navy);
+    }
+    .form-submit {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--c-cream-dark);
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .form-disclaimer {
+      font-family: var(--f-ui);
+      font-size: .74rem;
+      color: var(--c-text-muted);
+      line-height: 1.5;
+    }
+    #form-success {
+      display: none;
+      text-align: center;
+      padding: 3rem 2rem;
+    }
+    #form-success svg {
+      width: 60px;
+      height: 60px;
+      color: #15803d;
+      margin: 0 auto 1.25rem;
+    }
+    #form-success h3 { font-size: 1.6rem; margin-bottom: .5rem; }
+    #form-success p  { color: var(--c-text-mid); }
+
+    .hours-section {
+      margin-top: 1.5rem;
+    }
+    .hours-grid {
+      margin-top: 1rem;
+    }
+    .hour-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .55rem 0;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      font-size: .88rem;
+    }
+    .hour-row:last-child { border-bottom: none; }
+    .hour-day { color: rgba(255,255,255,.55); }
+    .hour-time { color: rgba(255,255,255,.85); font-weight: 600; font-family: var(--f-ui); font-size: .82rem; }
+    .hour-time.emerg { color: var(--c-copper-glow); }
+    @media (max-width: 768px) {
+      .checkbox-group { grid-template-columns: 1fr; }
+      .time-slots { grid-template-columns: repeat(2, 1fr); }
+      .form-submit { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ Emergency Banner ═══ -->
+  <div class="emergency-banner" role="alert">
+    <span class="pulse-dot" aria-hidden="true"></span>
+    24/7 Emergency Service &mdash;
+    <a href="tel:6165550182">(616) 555-0182</a>
+  </div>
+
+  <!-- ═══ Site Header ═══ -->
+  <header class="site-header">
+    <nav class="header-inner" aria-label="Main navigation">
+      <a href="index.html" class="site-logo" aria-label="Northline Plumbing and Heating — Go to homepage">
+        <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+          <rect width="44" height="44" rx="5" fill="#ae5c18"/>
+          <path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/>
+        </svg>
+        <div class="logo-text">
+          <span class="logo-name">NORTHLINE</span>
+          <span class="logo-tag">Plumbing &amp; Heating</span>
+        </div>
+      </a>
+      <ul class="site-nav" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="service-areas.html">Service Areas</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="reviews.html">Reviews</a></li>
+        <li><a href="contact.html" class="active">Contact</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a href="tel:6165550182" class="nav-phone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          (616) 555-0182
+        </a>
+      </div>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-drawer">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+    <nav id="nav-drawer" class="nav-drawer" aria-label="Mobile navigation">
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="service-areas.html">Service Areas</a>
+      <a href="about.html">About</a>
+      <a href="reviews.html">Reviews</a>
+      <a href="contact.html">Contact</a>
+      <div class="mobile-cta">
+        <a href="tel:6165550182">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          Call Now &mdash; (616) 555-0182
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ═══ Page Hero ═══ -->
+    <section class="page-hero next-white" aria-labelledby="page-title">
+      <div class="page-hero-tex" aria-hidden="true"></div>
+      <div class="container page-hero-content">
+        <p class="label anim">Get in Touch</p>
+        <div class="divider anim anim-d1"></div>
+        <h1 class="anim anim-d2" id="page-title">Contact &amp; Request a Visit</h1>
+        <p class="subtitle anim anim-d3">For emergencies, call directly &mdash; we answer 24/7. For scheduled work, fill out the form and we&rsquo;ll confirm within 2 business hours.</p>
+      </div>
+    </section>
+
+    <!-- ═══ Emergency Banner Section ═══ -->
+    <div style="background:var(--c-red); padding:1.5rem 0; border-bottom:4px solid rgba(0,0,0,.15);" role="complementary" aria-label="Emergency notice">
+      <div class="container" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+        <div style="display:flex; align-items:center; gap:1rem; color:white;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px;flex-shrink:0;" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div>
+            <strong style="font-family:var(--f-display); font-size:1.1rem;">Plumbing Emergency?</strong>
+            <span style="font-family:var(--f-ui); font-size:.88rem; color:rgba(255,255,255,.8); display:block; margin-top:1px;">Don&rsquo;t fill out the form &mdash; call us right now.</span>
+          </div>
+        </div>
+        <a href="tel:6165550182" class="btn btn-outline-white" style="border-color:rgba(255,255,255,.6);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          Call (616) 555-0182
+        </a>
+      </div>
+    </div>
+
+    <!-- ═══ Main Contact Section ═══ -->
+    <section class="section section--white" id="request" aria-labelledby="form-heading">
+      <div class="container">
+        <div class="contact-layout">
+
+          <!-- ── Contact Form ── -->
+          <div>
+            <div class="form-card">
+              <h2 id="form-heading">Request a Visit</h2>
+              <p class="form-subhead">Fill out the form and someone from our office will call to confirm your appointment within 2 business hours. For same-day needs, call us directly.</p>
+
+              <form id="contact-form" novalidate aria-label="Service request form">
+
+                <span class="form-section-label">Your Information</span>
+
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label class="form-label" for="fname">First Name <span aria-hidden="true" style="color:var(--c-red);">*</span></label>
+                    <input class="form-input" type="text" id="fname" name="first_name" placeholder="Jane" required autocomplete="given-name">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="lname">Last Name <span aria-hidden="true" style="color:var(--c-red);">*</span></label>
+                    <input class="form-input" type="text" id="lname" name="last_name" placeholder="Smith" required autocomplete="family-name">
+                  </div>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label class="form-label" for="phone">Phone Number <span aria-hidden="true" style="color:var(--c-red);">*</span></label>
+                    <input class="form-input" type="tel" id="phone" name="phone" placeholder="(616) 555-XXXX" required autocomplete="tel">
+                    <p class="form-note">We&rsquo;ll call this number to confirm.</p>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="email">Email Address</label>
+                    <input class="form-input" type="email" id="email" name="email" placeholder="jane@example.com" autocomplete="email">
+                    <p class="form-note">Optional &mdash; for appointment confirmation.</p>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="address">Service Address <span aria-hidden="true" style="color:var(--c-red);">*</span></label>
+                  <input class="form-input" type="text" id="address" name="address" placeholder="123 Main St, Grand Rapids, MI 49501" required autocomplete="street-address">
+                </div>
+
+                <span class="form-section-label">About Your Service</span>
+
+                <div class="form-group">
+                  <label class="form-label" for="service">Type of Service Needed <span aria-hidden="true" style="color:var(--c-red);">*</span></label>
+                  <select class="form-select" id="service" name="service" required>
+                    <option value="" disabled selected>Select a service&hellip;</option>
+                    <option value="emergency">Emergency Repair</option>
+                    <option value="water-heater">Water Heater (Install or Repair)</option>
+                    <option value="boiler">Boiler Service / Repair</option>
+                    <option value="rough-in">Bathroom Rough-In</option>
+                    <option value="drain">Drain Cleaning</option>
+                    <option value="sewer">Sewer Line Service</option>
+                    <option value="gas">Gas Line Service</option>
+                    <option value="leak">Leak Detection / Repair</option>
+                    <option value="faucet">Faucet / Fixture Repair</option>
+                    <option value="other">Other / Not Sure</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="urgency">Urgency</label>
+                  <select class="form-select" id="urgency" name="urgency">
+                    <option value="scheduled">Scheduled &mdash; I can plan ahead</option>
+                    <option value="soon">Soon &mdash; Within the next few days</option>
+                    <option value="asap">ASAP &mdash; I need help quickly</option>
+                    <option value="emergency">Emergency &mdash; Active problem right now</option>
+                  </select>
+                  <p class="form-note" style="color:var(--c-red);">For active emergencies, please call us directly at (616) 555-0182.</p>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="description">Describe the Problem</label>
+                  <textarea class="form-textarea" id="description" name="description" placeholder="Tell us what&rsquo;s happening &mdash; when did it start, what you&rsquo;ve noticed, any previous repairs on this issue. The more detail, the better we can prepare."></textarea>
+                </div>
+
+                <span class="form-section-label">Preferred Appointment Time</span>
+
+                <p style="font-size:.88rem; color:var(--c-text-mid); margin-bottom:1rem;">We&rsquo;ll do our best to accommodate your preference. We&rsquo;ll call to confirm the exact time.</p>
+
+                <div class="form-group">
+                  <label class="form-label">Preferred Day</label>
+                  <select class="form-select" name="preferred_day">
+                    <option value="" disabled selected>Select a day&hellip;</option>
+                    <option>As soon as possible</option>
+                    <option>Monday</option>
+                    <option>Tuesday</option>
+                    <option>Wednesday</option>
+                    <option>Thursday</option>
+                    <option>Friday</option>
+                    <option>Saturday</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" id="time-label">Preferred Time</label>
+                  <div class="time-slots" role="group" aria-labelledby="time-label">
+                    <div class="time-slot">
+                      <input type="radio" name="preferred_time" id="time-morning" value="morning">
+                      <label for="time-morning">Morning<br><span style="color:var(--c-text-muted);font-weight:400;">7am &ndash; noon</span></label>
+                    </div>
+                    <div class="time-slot">
+                      <input type="radio" name="preferred_time" id="time-afternoon" value="afternoon">
+                      <label for="time-afternoon">Afternoon<br><span style="color:var(--c-text-muted);font-weight:400;">noon &ndash; 4pm</span></label>
+                    </div>
+                    <div class="time-slot">
+                      <input type="radio" name="preferred_time" id="time-evening" value="evening">
+                      <label for="time-evening">Late Afternoon<br><span style="color:var(--c-text-muted);font-weight:400;">4pm &ndash; 7pm</span></label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" style="font-weight:400; text-transform:none; letter-spacing:0; font-size:.88rem; display:flex; align-items:flex-start; gap:.5rem; cursor:pointer;">
+                    <input type="checkbox" name="new_customer" style="margin-top:2px; accent-color:var(--c-copper); flex-shrink:0;">
+                    I am a new customer (first time using Northline)
+                  </label>
+                </div>
+
+                <div class="form-submit">
+                  <button type="submit" class="btn btn-copper" style="font-size:.95rem; padding:1rem 2.25rem;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    Submit Request
+                  </button>
+                  <p class="form-disclaimer">We&rsquo;ll call within 2 business hours to confirm. No payment taken online.</p>
+                </div>
+
+              </form>
+
+              <!-- Success Message -->
+              <div id="form-success" role="status" aria-live="polite">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <h3>Request Received!</h3>
+                <p>Thanks &mdash; we&rsquo;ll call you at the number you provided within 2 business hours to confirm your appointment. If this is urgent, please call us at <a href="tel:6165550182" style="color:var(--c-copper);">(616) 555-0182</a>.</p>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ── Sidebar ── -->
+          <div>
+
+            <div class="contact-sidebar-box">
+              <h3>Contact Information</h3>
+
+              <div class="sidebar-info-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+                <div>
+                  <strong>Phone</strong>
+                  <a href="tel:6165550182">(616) 555-0182</a>
+                </div>
+              </div>
+
+              <div class="sidebar-info-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <div>
+                  <strong>Email</strong>
+                  <a href="mailto:service@northlineplumbing.com">service@northlineplumbing.com</a>
+                </div>
+              </div>
+
+              <div class="sidebar-info-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <div>
+                  <strong>Address</strong>
+                  4417 Leonard St NW<br>Grand Rapids, MI 49534
+                </div>
+              </div>
+
+              <div class="hours-section">
+                <p style="font-family:var(--f-ui); font-size:.72rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--c-copper-glow); margin-bottom:.75rem;">Business Hours</p>
+                <div class="hours-grid">
+                  <div class="hour-row">
+                    <span class="hour-day">Monday &ndash; Friday</span>
+                    <span class="hour-time">7:00 am &ndash; 7:00 pm</span>
+                  </div>
+                  <div class="hour-row">
+                    <span class="hour-day">Saturday</span>
+                    <span class="hour-time">8:00 am &ndash; 5:00 pm</span>
+                  </div>
+                  <div class="hour-row">
+                    <span class="hour-day">Sunday</span>
+                    <span class="hour-time" style="color:rgba(255,255,255,.5);">Emergency only</span>
+                  </div>
+                  <div class="hour-row">
+                    <span class="hour-day">Emergency Dispatch</span>
+                    <span class="hour-time emerg">24/7 &mdash; Always</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Emergency Box -->
+            <div class="emergency-box" role="complementary" aria-label="Emergency service information">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <h4>24/7 Emergency Service</h4>
+              <p>Active pipe leak, no heat, flooding? Call right now. We answer live and dispatch fast.</p>
+              <a href="tel:6165550182" class="em-phone" aria-label="Emergency line: 6 1 6 5 5 5 0 1 8 2">(616) 555-0182</a>
+            </div>
+
+            <!-- Service Area Quick Check -->
+            <div style="background:var(--c-cream-dark); border-radius:var(--r-lg); padding:1.75rem; margin-top:1.5rem;">
+              <p style="font-family:var(--f-ui); font-size:.72rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--c-copper); margin-bottom:.75rem;">Service Area</p>
+              <p style="font-size:.88rem; color:var(--c-text-mid); margin-bottom:1rem;">We serve Grand Rapids and all surrounding communities including Kentwood, Wyoming, Walker, Ada, Cascade, Grandville, Jenison, Rockford, and more.</p>
+              <a href="service-areas.html" class="service-link" style="font-size:.8rem;">
+                View full service area
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </a>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ What to Expect ═══ -->
+    <section class="section section--cream" aria-labelledby="expect-heading">
+      <div class="container">
+        <div class="section-hd center">
+          <p class="label">After You Submit</p>
+          <div class="divider center"></div>
+          <h2 id="expect-heading">What to Expect</h2>
+        </div>
+
+        <div class="grid-4">
+          <div style="text-align:center; padding:1.5rem;">
+            <div style="width:56px;height:56px;background:var(--c-navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;">
+              <span style="font-family:var(--f-display);font-size:1.4rem;color:var(--c-copper-glow);line-height:1;">1</span>
+            </div>
+            <h3 style="font-size:1.05rem; margin-bottom:.5rem;">We Call to Confirm</h3>
+            <p style="font-size:.88rem;color:var(--c-text-mid);">Karen or one of our team calls within 2 business hours to confirm your request and agree on a date and time.</p>
+          </div>
+          <div style="text-align:center; padding:1.5rem;">
+            <div style="width:56px;height:56px;background:var(--c-navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;">
+              <span style="font-family:var(--f-display);font-size:1.4rem;color:var(--c-copper-glow);line-height:1;">2</span>
+            </div>
+            <h3 style="font-size:1.05rem; margin-bottom:.5rem;">30-Minute Heads-Up</h3>
+            <p style="font-size:.88rem;color:var(--c-text-mid);">On the day of your appointment, the technician calls when they&rsquo;re about 30 minutes away.</p>
+          </div>
+          <div style="text-align:center; padding:1.5rem;">
+            <div style="width:56px;height:56px;background:var(--c-navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;">
+              <span style="font-family:var(--f-display);font-size:1.4rem;color:var(--c-copper-glow);line-height:1;">3</span>
+            </div>
+            <h3 style="font-size:1.05rem; margin-bottom:.5rem;">Written Estimate First</h3>
+            <p style="font-size:.88rem;color:var(--c-text-mid);">Before work starts, we give you a written quote. No work begins until you approve the price &mdash; in writing.</p>
+          </div>
+          <div style="text-align:center; padding:1.5rem;">
+            <div style="width:56px;height:56px;background:var(--c-navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;">
+              <span style="font-family:var(--f-display);font-size:1.4rem;color:var(--c-copper-glow);line-height:1;">4</span>
+            </div>
+            <h3 style="font-size:1.05rem; margin-bottom:.5rem;">Done &amp; Clean</h3>
+            <p style="font-size:.88rem;color:var(--c-text-mid);">We do the work, clean up completely, review what was done, and leave you with a copy of the invoice and warranty.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══ Final CTA ═══ -->
+    <section class="cta-section" aria-label="Call to action">
+      <div class="container">
+        <p class="cta-label">Emergency or Scheduled</p>
+        <h2 class="cta-headline">One Number.<br>Always Answered.</h2>
+        <a href="tel:6165550182" class="cta-phone">(616) 555-0182</a>
+        <p class="cta-sub">Northline Plumbing &amp; Heating &mdash; serving Greater Grand Rapids since 1987.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══ Footer ═══ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="site-logo" style="text-decoration:none;">
+            <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true"><rect width="44" height="44" rx="5" fill="#ae5c18"/><path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/></svg>
+            <div class="logo-text"><span class="logo-name">NORTHLINE</span><span class="logo-tag">Plumbing &amp; Heating</span></div>
+          </a>
+          <p class="footer-about">Family-owned and operated since 1987. Serving Grand Rapids and surrounding communities with honest, dependable plumbing and heating work.</p>
+          <div class="footer-license">Licensed &amp; Insured in Michigan<br>Plumbing #PC-2847-GR &middot; HVAC #HV-1193-MI</div>
+        </div>
+        <div class="footer-col">
+          <h4>Services</h4>
+          <ul>
+            <li><a href="services.html#emergency">Emergency Repairs</a></li>
+            <li><a href="services.html#water-heaters">Water Heaters</a></li>
+            <li><a href="services.html#boilers">Boiler Service</a></li>
+            <li><a href="services.html#rough-in">Bathroom Rough-In</a></li>
+            <li><a href="services.html#drains">Drain Cleaning</a></li>
+            <li><a href="services.html#sewer">Sewer Lines</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="service-areas.html">Service Areas</a></li>
+            <li><a href="reviews.html">Reviews</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contact</h4>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            <a href="tel:6165550182">(616) 555-0182</a>
+          </div>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <a href="mailto:service@northlineplumbing.com">service@northlineplumbing.com</a>
+          </div>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Mon–Sat: 7am–7pm<br>24/7 Emergency Dispatch</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2024 Northline Plumbing &amp; Heating LLC. All rights reserved.</p>
+        <p>Licensed &amp; Insured &middot; State of Michigan</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="nav.js"></script>
+</body>
+</html>

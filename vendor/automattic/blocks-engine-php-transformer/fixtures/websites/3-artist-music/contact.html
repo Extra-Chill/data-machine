@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact — Mara Vale</title>
+  <meta name="description" content="Booking, press, and general inquiries for Mara Vale.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400;1,600;1,700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&family=Courier+Prime:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ── Contact layout ─────────────────────────────────────── */
+    .contact-content {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 3rem var(--pad) 6rem;
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 6rem;
+      align-items: start;
+    }
+
+    /* ── Left column: contact blurbs ─────────────────────── */
+    .contact-sidebar {}
+
+    .contact-block {
+      margin-bottom: 3.5rem;
+      padding-bottom: 3.5rem;
+      border-bottom: 1px solid rgba(230, 216, 197, 0.08);
+    }
+    .contact-block:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    .contact-block .label { margin-bottom: 1.1rem; }
+
+    .contact-block h3 {
+      font-style: italic;
+      margin-bottom: 0.75rem;
+      font-size: 1.5rem;
+    }
+
+    .contact-block p {
+      color: var(--bone-dim);
+      font-size: 1rem;
+      line-height: 1.75;
+      margin-bottom: 1.25rem;
+    }
+
+    .contact-email {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      color: var(--bone);
+      border-bottom: 1px solid rgba(230,216,197,0.25);
+      padding-bottom: 2px;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+    .contact-email:hover {
+      color: var(--bone-dim);
+      border-color: rgba(230,216,197,0.5);
+    }
+
+    /* Press kit download */
+    .press-kit-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--bone-dim);
+      border: 1px solid rgba(230,216,197,0.18);
+      padding: 0.55rem 1.1rem;
+      margin-top: 0.5rem;
+      transition: all 0.22s ease;
+    }
+    .press-kit-link:hover {
+      color: var(--bone);
+      border-color: rgba(230,216,197,0.4);
+      background: rgba(230,216,197,0.04);
+    }
+
+    /* Social links */
+    .social-links {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+    .social-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--bone-dim);
+      border: 1px solid rgba(230,216,197,0.15);
+      padding: 0.5rem 0.9rem;
+      transition: all 0.22s ease;
+    }
+    .social-link:hover {
+      color: var(--bone);
+      border-color: rgba(230,216,197,0.35);
+      background: rgba(230,216,197,0.04);
+    }
+
+    /* ── Right column: contact form ───────────────────────── */
+    .contact-form-wrap {}
+
+    .contact-form-wrap h2 {
+      font-style: italic;
+      margin-bottom: 0.5rem;
+    }
+
+    .contact-form-wrap > p {
+      color: var(--bone-dim);
+      font-style: italic;
+      margin-bottom: 2.5rem;
+      font-size: 1rem;
+    }
+
+    /* Form styles */
+    .contact-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-field label {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--fog);
+    }
+
+    .form-field input,
+    .form-field select,
+    .form-field textarea {
+      background: rgba(230, 216, 197, 0.04);
+      border: 1px solid rgba(230, 216, 197, 0.15);
+      color: var(--bone);
+      font-family: var(--font-body);
+      font-size: 0.98rem;
+      padding: 0.8rem 1rem;
+      outline: none;
+      transition: border-color 0.22s ease, background 0.22s ease;
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 0;
+      width: 100%;
+    }
+
+    .form-field input::placeholder,
+    .form-field textarea::placeholder {
+      color: var(--fog);
+    }
+
+    .form-field input:focus,
+    .form-field select:focus,
+    .form-field textarea:focus {
+      border-color: rgba(230, 216, 197, 0.38);
+      background: rgba(230, 216, 197, 0.06);
+    }
+
+    .form-field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b5c50' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+      padding-right: 2.5rem;
+      cursor: pointer;
+    }
+
+    .form-field select option {
+      background: var(--deep);
+      color: var(--bone);
+    }
+
+    .form-field textarea {
+      resize: vertical;
+      min-height: 140px;
+      line-height: 1.65;
+    }
+
+    .form-submit {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+
+    .form-note {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--fog);
+    }
+
+    .submit-btn {
+      padding: 0.85rem 2.5rem;
+      background: var(--ember);
+      color: var(--bone);
+      border: 1px solid var(--ember);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      transition: background 0.22s ease, border-color 0.22s ease;
+    }
+    .submit-btn:hover {
+      background: var(--ember-lt);
+      border-color: var(--ember-lt);
+    }
+
+    /* ── Newsletter section at bottom ───────────────────── */
+    .contact-newsletter {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 4rem var(--pad) 6rem;
+      border-top: 1px solid rgba(230,216,197,0.07);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+    .contact-newsletter h3 { font-style: italic; margin-bottom: 0.75rem; }
+    .contact-newsletter p { color: var(--bone-dim); font-style: italic; font-size: 1rem; }
+
+    /* ── Responsive ─────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .contact-content {
+        grid-template-columns: 1fr;
+        gap: 3.5rem;
+      }
+      .contact-newsletter {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-bg" aria-hidden="true"></div>
+
+  <nav class="site-nav" role="navigation" aria-label="Main navigation">
+    <a href="index.html" class="nav-logo">Mara <em>Vale</em></a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="music.html">Music</a></li>
+      <li><a href="tour.html">Tour</a></li>
+      <li><a href="merch.html">Merch</a></li>
+      <li><a href="contact.html" class="active">Contact</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <ul class="nav-mobile">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="music.html">Music</a></li>
+    <li><a href="tour.html">Tour</a></li>
+    <li><a href="merch.html">Merch</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+
+  <main>
+    <div class="page-header">
+      <div class="label pl pl-d1">Get in Touch</div>
+      <h1 class="pl pl-d2">Say<br>Hello.</h1>
+      <p class="pl pl-d3">For booking, press, and anything in between.</p>
+    </div>
+
+    <div class="contact-content">
+      <!-- Left: Contact info blocks -->
+      <aside class="contact-sidebar">
+
+        <div class="contact-block reveal">
+          <div class="label">Booking</div>
+          <h3>Book a Show</h3>
+          <p>Mara is currently booking house shows, listening rooms, and intimate venue dates through late 2026. All-in guarantees available for verified venues. Rider on request.</p>
+          <a href="mailto:booking@maravale.com" class="contact-email">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M1 5l7 5 7-5" stroke="currentColor" stroke-width="1.3"/>
+            </svg>
+            booking@maravale.com
+          </a>
+        </div>
+
+        <div class="contact-block reveal reveal-d1">
+          <div class="label">Press</div>
+          <h3>Press &amp; Media</h3>
+          <p>For interviews, review copies, or press credentials, please use the form or reach out directly. Full press kit available including bio, hi-res photography, and stems.</p>
+          <a href="mailto:press@maravale.com" class="contact-email" style="margin-bottom: 1rem; display: inline-flex;">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M1 5l7 5 7-5" stroke="currentColor" stroke-width="1.3"/>
+            </svg>
+            press@maravale.com
+          </a>
+          <br>
+          <a href="#" class="press-kit-link" aria-label="Download press kit PDF">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M8 2v9M4 8l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 13h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+            Download Press Kit
+          </a>
+        </div>
+
+        <div class="contact-block reveal reveal-d2">
+          <div class="label">Elsewhere</div>
+          <h3>Follow Along</h3>
+          <p>Show dates, new music, and the occasional late-night voice note.</p>
+          <div class="social-links">
+            <a href="#" class="social-link" aria-label="Instagram">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="17.5" cy="6.5" r="1" fill="currentColor"/>
+              </svg>
+              Instagram
+            </a>
+            <a href="#" class="social-link" aria-label="Bandcamp">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect x="2" y="2" width="20" height="20" rx="3" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M5 16l5-8h4l-5 8z" fill="currentColor" opacity="0.85"/>
+              </svg>
+              Bandcamp
+            </a>
+            <a href="#" class="social-link" aria-label="Spotify">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M7 15.5C9.5 14 13.5 13.8 16.5 15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                <path d="M6.5 12.5C9.5 10.5 14.5 10.2 18 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                <path d="M6 9.5C9.5 7 15.5 6.8 19 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+              Spotify
+            </a>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- Right: Contact form -->
+      <div class="contact-form-wrap reveal">
+        <h2>Send a Message</h2>
+        <p>Fill out the form and I'll get back to you within a few days — usually faster.</p>
+
+        <form class="contact-form" action="#" method="post" novalidate id="contact-form">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="cf-name">Name</label>
+              <input type="text" id="cf-name" name="name" placeholder="Your name" autocomplete="name" required>
+            </div>
+            <div class="form-field">
+              <label for="cf-email">Email</label>
+              <input type="email" id="cf-email" name="email" placeholder="your@email.com" autocomplete="email" required>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="cf-subject">What's this about?</label>
+            <select id="cf-subject" name="subject" required>
+              <option value="" disabled selected>Select a topic</option>
+              <option value="booking">Booking — I want to host or book a show</option>
+              <option value="press">Press — Interview, review copy, or feature</option>
+              <option value="licensing">Licensing / Sync</option>
+              <option value="general">General hello</option>
+              <option value="other">Something else</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="cf-message">Message</label>
+            <textarea id="cf-message" name="message" placeholder="Tell me what's on your mind..." required></textarea>
+          </div>
+
+          <div class="form-submit">
+            <span class="form-note">I read everything personally.</span>
+            <button type="submit" class="submit-btn" id="contact-submit">Send Message</button>
+          </div>
+
+          <!-- Success message (hidden by default) -->
+          <div id="form-success" style="display:none; margin-top: 1.5rem; padding: 1.25rem 1.5rem; border: 1px solid rgba(61, 107, 52, 0.5); background: rgba(61,107,52,0.08);">
+            <p style="font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: #7ab870; max-width: 100%;">Message sent — I'll be in touch soon.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Newsletter at bottom -->
+    <div class="contact-newsletter">
+      <div class="reveal">
+        <div class="label" style="margin-bottom: 1.1rem;">Stay in the Loop</div>
+        <h3>Join the mailing list</h3>
+        <p style="margin-top: 0.75rem;">Show announcements, new music, and dispatches from the road. No noise, no spam.</p>
+      </div>
+      <div class="reveal reveal-d2">
+        <form class="newsletter-form" action="#" method="post" novalidate>
+          <input type="email" name="email" placeholder="your@email.com" autocomplete="email" required aria-label="Email address">
+          <button type="submit">Subscribe</button>
+        </form>
+        <p style="margin-top: 0.85rem; font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fog); max-width: 100%;">No spam. Unsubscribe anytime.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-logo">Mara Vale</div>
+    <ul class="footer-links">
+      <li><a href="music.html">Music</a></li>
+      <li><a href="tour.html">Tour</a></li>
+      <li><a href="merch.html">Merch</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+    <p class="footer-copy">&copy; 2026 Mara Vale. All rights reserved.</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script data-blocks-engine-superseded-by="#contact-form">
+    // Contact form feedback
+    const contactForm = document.getElementById('contact-form');
+    const contactSubmit = document.getElementById('contact-submit');
+    const formSuccess = document.getElementById('form-success');
+
+    if (contactForm) {
+      contactForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const name = contactForm.querySelector('#cf-name').value.trim();
+        const email = contactForm.querySelector('#cf-email').value.trim();
+        const message = contactForm.querySelector('#cf-message').value.trim();
+
+        if (name && email && message) {
+          contactSubmit.textContent = 'Sent';
+          contactSubmit.style.background = '#3d6b34';
+          contactSubmit.style.borderColor = '#3d6b34';
+          formSuccess.style.display = 'block';
+          contactForm.querySelectorAll('input, select, textarea').forEach(el => {
+            el.value = '';
+          });
+        }
+      });
+    }
+  </script>
+</body>
+</html>

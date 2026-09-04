@@ -1,0 +1,23 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "travel",
+    "tours",
+    "has-form",
+    "gallery",
+    "slider",
+    "inline-svg",
+    "stretched-links"
+  ],
+  "capabilities": [
+    "forms",
+    "local-css",
+    "runtime-js"
+  ],
+  "risk_profile": "medium",
+  "complexity": 4,
+  "quality_budgets": {
+    "max_unacceptable_findings": 0,
+    "visual_mismatch_ratio": 0.1
+  }
+}

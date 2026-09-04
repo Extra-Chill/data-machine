@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Case Study: Roslindale Community Garden Network — Civic Signal</title>
+  <meta name="description" content="How five volunteers turned four vacant lots in Boston's Roslindale neighborhood into a thriving community garden network — raising $85,000, building three nonprofit partnerships, and connecting 120 families to growing plots over two years.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .case-hero {
+      background: var(--forest);
+      padding-block: clamp(var(--sp-16), 10vw, var(--sp-24));
+      position: relative;
+      overflow: hidden;
+    }
+    .case-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle at 80% 30%, rgba(201,151,44,0.12) 0%, transparent 60%),
+                        radial-gradient(circle at 20% 70%, rgba(74,122,98,0.2) 0%, transparent 50%);
+    }
+    .case-hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(245,240,232,0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .case-hero-inner { position: relative; z-index: 1; }
+    .case-hero h1 {
+      color: var(--cream);
+      font-size: clamp(var(--text-3xl), 5.5vw, var(--text-6xl));
+      margin-bottom: var(--sp-5);
+      max-width: 800px;
+    }
+    .case-hero h1 em { color: var(--gold); font-style: italic; }
+    .case-hero-lead {
+      color: rgba(245,240,232,0.8);
+      font-size: var(--text-xl);
+      font-weight: 300;
+      max-width: 640px;
+      line-height: 1.65;
+      margin-bottom: var(--sp-8);
+    }
+
+    /* Case study layout */
+    .case-layout {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: var(--sp-10);
+      align-items: start;
+    }
+
+    /* Highlight stats in article */
+    .inline-stat {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--sp-2);
+    }
+    .inline-stat .num {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 900;
+      color: var(--forest);
+    }
+    .inline-stat .label {
+      font-family: var(--font-ui);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    /* Pull quote */
+    .pull-quote {
+      border-left: 4px solid var(--amber);
+      padding: var(--sp-5) var(--sp-6);
+      background: var(--amber-pale);
+      border-radius: 0 var(--r-lg) var(--r-lg) 0;
+      margin: var(--sp-8) 0;
+    }
+    .pull-quote p {
+      font-family: var(--font-display);
+      font-size: clamp(var(--text-lg), 2.5vw, var(--text-2xl));
+      font-style: italic;
+      color: var(--forest);
+      line-height: 1.45;
+      margin-bottom: var(--sp-3);
+    }
+    .pull-quote cite {
+      font-family: var(--font-ui);
+      font-size: var(--text-xs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-style: normal;
+    }
+
+    /* Partner card */
+    .partner-card {
+      background: var(--paper);
+      border: var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--sp-4);
+      margin-bottom: var(--sp-3);
+    }
+    .partner-card-name {
+      font-family: var(--font-display);
+      font-size: var(--text-base);
+      font-weight: 700;
+      color: var(--forest);
+      margin-bottom: var(--sp-1);
+    }
+    .partner-card-role {
+      font-family: var(--font-ui);
+      font-size: var(--text-xs);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: var(--sp-2);
+    }
+    .partner-card-desc {
+      font-size: var(--text-sm);
+      color: var(--muted);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    /* Lesson card */
+    .lesson-card {
+      background: var(--paper);
+      border: var(--border);
+      border-left: 4px solid var(--forest-mid);
+      border-radius: 0 var(--r-lg) var(--r-lg) 0;
+      padding: var(--sp-5);
+      margin-bottom: var(--sp-4);
+    }
+    .lesson-num {
+      font-family: var(--font-ui);
+      font-size: var(--text-xs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--forest-mid);
+      margin-bottom: var(--sp-2);
+    }
+    .lesson-title {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 700;
+      color: var(--forest);
+      margin-bottom: var(--sp-2);
+    }
+    .lesson-body { font-size: var(--text-sm); color: var(--ink-light); line-height: 1.6; margin: 0; }
+
+    @media (max-width: 900px) {
+      .case-layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====== NAVIGATION ====== -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="container nav-inner">
+    <a href="index.html" class="nav-logo" aria-label="Civic Signal Home">
+      <div class="nav-logo-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg>
+      </div>
+      <div class="nav-logo-text">
+        <span class="nav-logo-name">Civic Signal</span>
+        <span class="nav-logo-sub">Resource Library</span>
+      </div>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="resources.html" class="nav-link">All Resources</a>
+      <a href="about.html" class="nav-link">About</a>
+      <a href="outreach-checklist.html" class="nav-link">Outreach</a>
+      <a href="grant-readiness.html" class="nav-link">Grants</a>
+    </div>
+    <div class="nav-cta">
+      <a href="resources.html" class="btn btn-primary">More Case Studies</a>
+    </div>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+<div class="nav-drawer" id="nav-drawer">
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="resources.html" class="nav-link">All Resources</a>
+  <a href="about.html" class="nav-link">About</a>
+  <a href="outreach-checklist.html" class="nav-link">Outreach Checklist</a>
+  <a href="meeting-agenda.html" class="nav-link">Meeting Agenda Template</a>
+  <a href="grant-readiness.html" class="nav-link">Grant Readiness Guide</a>
+  <a href="case-study-roslindale.html" class="nav-link">Case Study</a>
+</div>
+
+<!-- ====== HERO ====== -->
+<header class="case-hero" role="banner">
+  <div class="container case-hero-inner">
+    <nav aria-label="Breadcrumb" class="breadcrumbs" style="padding-top: 0; margin-bottom: var(--sp-5);">
+      <a href="index.html" style="color: rgba(245,240,232,0.5);">Home</a>
+      <span class="breadcrumbs-sep" aria-hidden="true">/</span>
+      <a href="resources.html" style="color: rgba(245,240,232,0.5);">Resources</a>
+      <span class="breadcrumbs-sep" aria-hidden="true">/</span>
+      <span class="breadcrumbs-current" style="color: var(--sage);">Case Study</span>
+    </nav>
+    <div style="display: flex; gap: var(--sp-3); margin-bottom: var(--sp-5); flex-wrap: wrap;">
+      <span class="resource-badge badge-projects">Projects</span>
+      <span style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.06em; color: var(--sage); display: flex; align-items: center; gap: var(--sp-2);">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3V6.5L8.5 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Spring 2021 – Fall 2023
+      </span>
+      <span style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.06em; color: var(--sage); display: flex; align-items: center; gap: var(--sp-2);">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1L7.5 4.5H11.5L8.5 7L9.5 11L6 9L2.5 11L3.5 7L0.5 4.5H4.5L6 1Z" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+        Roslindale, Boston, MA
+      </span>
+    </div>
+    <h1>From <em>four vacant lots</em> to a growing community</h1>
+    <p class="case-hero-lead">How a five-person steering committee turned neglected city lots into a thriving garden network — raising $85,000, signing on three nonprofit partners, and connecting 120 families to growing plots over two years. No staff, no office, no prior grant experience.</p>
+    <div class="outcome-grid" style="margin-top: var(--sp-6);">
+      <div class="outcome-card" style="background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12);">
+        <span class="outcome-number" style="color: var(--gold);">4</span>
+        <span class="outcome-label" style="color: rgba(245,240,232,0.6);">Community gardens established</span>
+      </div>
+      <div class="outcome-card" style="background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12);">
+        <span class="outcome-number" style="color: var(--gold);">120</span>
+        <span class="outcome-label" style="color: rgba(245,240,232,0.6);">Families with garden plots</span>
+      </div>
+      <div class="outcome-card" style="background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12);">
+        <span class="outcome-number" style="color: var(--gold);">$85K</span>
+        <span class="outcome-label" style="color: rgba(245,240,232,0.6);">Raised in grants &amp; donations</span>
+      </div>
+      <div class="outcome-card" style="background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12);">
+        <span class="outcome-number" style="color: var(--gold);">3</span>
+        <span class="outcome-label" style="color: rgba(245,240,232,0.6);">Nonprofit partnerships formed</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ====== MAIN CONTENT ====== -->
+<section class="section section--cream" aria-label="Case study content">
+  <div class="container">
+    <div class="case-layout">
+
+      <!-- Main narrative -->
+      <main class="article-body">
+
+        <!-- Context -->
+        <div id="context" data-section>
+          <h2>Background: A Neighborhood in Transition</h2>
+          <p>Roslindale is a dense, diverse neighborhood in southwest Boston — part triple-decker residential streets, part neighborhood commercial squares. In 2020, like many urban neighborhoods, it was navigating the overlapping strains of a pandemic, housing pressure, and an intensifying conversation about food access and green space that the pandemic had accelerated.</p>
+          <p>Within a six-block radius of Roslindale Square, four parcels of city-owned land sat empty. A former commercial building site, two lots from a mid-2000s redevelopment project that stalled, and one corner property that had been vacant for more than a decade. The lots weren't eyesores — the city kept them mowed — but they were doing nothing for anyone.</p>
+          <p>Maya Chen, a nurse and longtime Roslindale resident, had been growing vegetables in five-gallon buckets on her apartment deck for three years. She wasn't alone. At the height of the pandemic, she started noticing neighbors posting about container gardens, window boxes, and backyard plots in the neighborhood Facebook group. She started asking a question: what would it take to turn those empty lots into gardens?</p>
+        </div>
+
+        <!-- Problem -->
+        <div id="the-problem" data-section style="margin-top: var(--sp-10);">
+          <h2>The Problem Was Bigger Than It Looked</h2>
+          <p>What started as an informal question became a structured project when Maya teamed up with Roberto Santos, a former city planner who'd moved to the neighborhood in 2019, and three other neighbors — a retired teacher, a small business owner, and a youth organizer from a local high school.</p>
+          <p>Their initial research surfaced more than just an appetite for gardens. According to the Greater Boston Food Bank's regional hunger survey, 18% of households in Roslindale's primary ZIP code reported experiencing food insecurity in 2020 — up from 11% in 2018. The neighborhood had one full-service grocery store, served a population of approximately 35,000 residents, and had a substantial percentage of residents with no car access.</p>
+          <p>But the group also knew that food access alone doesn't explain why a community garden takes hold. They'd visited successful projects in Jamaica Plain and Hyde Park. The ones that worked weren't just about growing food — they were about space. A place to be outside, to know your neighbors, to have something that was yours in a neighborhood where most people rent.</p>
+
+          <div class="pull-quote" role="blockquote">
+            <p>"We didn't start by applying for grants. We started by walking around the neighborhood for two months, knocking on doors and asking people what they actually wanted. That's what made everything else possible."</p>
+            <cite>Maya Chen, Project Lead, Roslindale Community Garden Network</cite>
+          </div>
+        </div>
+
+        <!-- Outreach phase -->
+        <div id="outreach" data-section style="margin-top: var(--sp-10);">
+          <h2>Phase 1: Outreach Before Anything Else</h2>
+          <p>Before approaching the city, before writing a grant, before designing a garden layout, the steering committee ran a structured outreach campaign across three weekends in the spring of 2021. Using an early version of what became Civic Signal's <a href="outreach-checklist.html" style="color: var(--amber); text-decoration: underline; text-underline-offset: 2px;">Community Outreach Checklist</a>, they organized 18 volunteers into canvassing pairs and covered 340 households in the target area.</p>
+          <p>The results were clear: 78% of respondents expressed interest in a garden plot if one were available; 62% said they'd be willing to volunteer at least twice per year; 43% said access to fresh vegetables was a real concern for their household. And perhaps most importantly for the grant process that would follow: 91% said they'd heard about at least one of the four vacant lots and had wondered what might be done with them.</p>
+
+          <div class="callout callout--tip">
+            <div class="callout-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="var(--forest-mid)" stroke-width="1.5"/><path d="M10 6V10.5" stroke="var(--forest-mid)" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="13.5" r="1" fill="var(--forest-mid)"/></svg>
+            </div>
+            <div>
+              <p class="callout-title">Outreach data as grant evidence</p>
+              <p>The community survey results became the centerpiece of every grant proposal the group submitted. Roberto Santos, who wrote most of the proposals, says the 78% interest figure was cited in two of their three successful grant applications as the primary evidence of community need.</p>
+            </div>
+          </div>
+
+          <p>The outreach also produced something less quantifiable: a list of 47 people who had asked to stay involved. That list became the steering committee's primary communication list throughout the project — and several members of that group became the first garden plot holders in 2022.</p>
+        </div>
+
+        <!-- Meetings phase -->
+        <div id="meetings" data-section style="margin-top: var(--sp-10);">
+          <h2>Phase 2: Monthly Meetings, One Decision at a Time</h2>
+          <p>Starting in June 2021, the steering committee held monthly public meetings — always at 6:30 PM on a weeknight, always in the same room at the Roslindale branch library, always using a structured agenda. The consistency was deliberate.</p>
+          <p>Roberto Santos adapted a version of Civic Signal's <a href="meeting-agenda.html" style="color: var(--amber); text-decoration: underline; text-underline-offset: 2px;">Public Meeting Agenda Template</a> for each meeting, adding specific action items from the previous month and a standing "community announcements" section that often ran five to ten minutes over but kept people feeling connected to what was happening. Attendance ranged from 12 to 46 people — with the higher numbers on nights when the group had a specific decision to make.</p>
+          <p>Key decisions made through this process included: the naming of the project ("Roslindale Community Garden Network"), the governance structure (a nine-person board with elected plot-holder representation), the plot assignment lottery system, rules around composting and water use, and the terms of the partnership agreements with the three nonprofit partners.</p>
+
+          <blockquote>
+            <p>"We could have decided all of that in a back room in a weekend. But we didn't, and I think that's why it worked. People felt like it was theirs because they were in the room when the decisions happened."</p>
+            <cite>Roberto Santos, Grant Writer &amp; Co-Founder, RCGN</cite>
+          </blockquote>
+        </div>
+
+        <!-- Funding phase -->
+        <div id="funding" data-section style="margin-top: var(--sp-10);">
+          <h2>Phase 3: The Funding Strategy</h2>
+          <p>The group's funding strategy followed the framework now documented in Civic Signal's <a href="grant-readiness.html" style="color: var(--amber); text-decoration: underline; text-underline-offset: 2px;">Grant Readiness Guide</a> — though Roberto had arrived at a similar approach through intuition and advice from a more experienced grant writer at a peer organization.</p>
+          <p>Before applying anywhere, they secured fiscal sponsorship through Roslindale Square Main Streets, an existing 501(c)(3) commercial district organization that agreed to administer grants on their behalf while they built toward independent nonprofit status. That relationship, brokered through a board member of Main Streets who also attended the community meetings, opened doors that would have been closed to a brand-new volunteer group.</p>
+
+          <h3>The Funder Sequence</h3>
+          <p>Rather than applying to everyone at once, the group identified three tiers of funders and worked sequentially:</p>
+          <ol style="list-style: decimal; padding-left: var(--sp-6); margin-bottom: var(--sp-5);">
+            <li style="margin-bottom: var(--sp-3); line-height: 1.7;"><strong>Local first</strong> — a $12,000 seed grant from the Boston Parks Foundation, secured in fall 2021, before the first lot was even cleared. This grant funded soil testing, materials for two raised beds, and a part-time project coordinator at 10 hours/week.</li>
+            <li style="margin-bottom: var(--sp-3); line-height: 1.7;"><strong>Regional second</strong> — Two grants from regional foundations totaling $38,000, applied for in early 2022 after the first two gardens were operational and they had photo documentation, plot-holder testimonials, and clear outcomes to report.</li>
+            <li style="margin-bottom: var(--sp-3); line-height: 1.7;"><strong>Neighborhood donors third</strong> — A neighborhood fundraising campaign in fall 2022, anchored by a harvest dinner at the largest garden site, raised $14,000 from individual donors and a local restaurant that provided the food at cost. The city council member for the district matched the first $5,000.</li>
+          </ol>
+          <p>The remaining $21,000 came from a CDBG sub-grant through the city, awarded in 2023 after the project had two full years of documentation behind it.</p>
+        </div>
+
+        <!-- Timeline -->
+        <div id="timeline" data-section style="margin-top: var(--sp-10);">
+          <h2>Project Timeline</h2>
+          <div class="timeline" role="list" aria-label="Project timeline">
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot" aria-hidden="true"></div>
+              <div class="timeline-date">March 2021</div>
+              <div class="timeline-title">Project Begins</div>
+              <div class="timeline-desc">Maya Chen convenes five neighbors for an initial planning conversation. The group agrees on a structure: a volunteer steering committee with no staff, meeting monthly.</div>
+            </div>
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot" aria-hidden="true"></div>
+              <div class="timeline-date">April–May 2021</div>
+              <div class="timeline-title">Community Outreach Campaign</div>
+              <div class="timeline-desc">Three weekend canvassing events cover 340 households. 47 residents express strong interest in getting involved. Survey data becomes the foundation of the group's grant strategy.</div>
+            </div>
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot" aria-hidden="true"></div>
+              <div class="timeline-date">June 2021</div>
+              <div class="timeline-title">First Public Meeting</div>
+              <div class="timeline-desc">28 people attend the first monthly meeting at the Roslindale library. The group votes to name the project and form a formal steering committee. Roberto Santos joins as grant writer.</div>
+            </div>
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot timeline-dot--milestone" aria-hidden="true"></div>
+              <div class="timeline-date">September 2021</div>
+              <div class="timeline-title">First Grant Awarded — $12,000</div>
+              <div class="timeline-desc">Boston Parks Foundation awards a $12,000 seed grant. The group uses it for soil testing, initial raised beds, and a part-time coordinator. Fiscal sponsorship through Roslindale Square Main Streets is confirmed.</div>
+            </div>
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot" aria-hidden="true"></div>
+              <div class="timeline-date">Winter 2021–2022</div>
+              <div class="timeline-title">Lot Access Negotiations</div>
+              <div class="timeline-desc">After six months of back-and-forth with the city's Parks &amp; Recreation department, the group secures 5-year use agreements for all four lots. The agreements include liability coverage through the city's policy.</div>
+            </div>
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot timeline-dot--milestone" aria-hidden="true"></div>
+              <div class="timeline-date">May 2022</div>
+              <div class="timeline-title">First Gardens Open</div>
+              <div class="timeline-desc">Two of the four garden sites open with 40 raised beds each. A lottery assigns 80 plots to community members, prioritizing residents of nearby buildings. A third partner organization, Urban Sprouts, agrees to run gardening workshops monthly.</div>
+            </div>
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot timeline-dot--milestone" aria-hidden="true"></div>
+              <div class="timeline-date">Summer–Fall 2022</div>
+              <div class="timeline-title">Regional Grants Awarded — $38,000</div>
+              <div class="timeline-desc">Two regional foundation grants totaling $38,000 arrive, based largely on documented outcomes from the first growing season: 80 active plot-holders, 12 community workshops, and a documented produce harvest shared with a local food pantry.</div>
+            </div>
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot" aria-hidden="true"></div>
+              <div class="timeline-date">October 2022</div>
+              <div class="timeline-title">Harvest Dinner Fundraiser — $14,000</div>
+              <div class="timeline-desc">A harvest dinner attended by 120 people raises $14,000 in individual donations and a matched gift from the district city councilor. The event becomes an annual tradition.</div>
+            </div>
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot" aria-hidden="true"></div>
+              <div class="timeline-date">Spring 2023</div>
+              <div class="timeline-title">Two Additional Gardens Open</div>
+              <div class="timeline-desc">The remaining two lots open. Total plot capacity reaches 200, with 120 actively assigned to families. A waitlist of 60 households forms — fueling advocacy for two more sites currently under negotiation.</div>
+            </div>
+
+            <div class="timeline-item reveal" role="listitem">
+              <div class="timeline-dot timeline-dot--milestone" aria-hidden="true"></div>
+              <div class="timeline-date">Fall 2023</div>
+              <div class="timeline-title">CDBG Grant Awarded — $21,000</div>
+              <div class="timeline-desc">A CDBG sub-grant through the city funds a second project coordinator position, expanded composting infrastructure, and an accessibility audit resulting in 12 raised beds designed for wheelchair access.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Outcomes -->
+        <div id="outcomes" data-section style="margin-top: var(--sp-10);">
+          <h2>Outcomes</h2>
+          <div class="outcome-grid" style="margin-bottom: var(--sp-6);">
+            <div class="outcome-card">
+              <span class="outcome-number">4</span>
+              <span class="outcome-label">Community gardens across Roslindale</span>
+            </div>
+            <div class="outcome-card">
+              <span class="outcome-number">120</span>
+              <span class="outcome-label">Active family garden plots</span>
+            </div>
+            <div class="outcome-card">
+              <span class="outcome-number">$85K</span>
+              <span class="outcome-label">Total raised in 2.5 years</span>
+            </div>
+            <div class="outcome-card">
+              <span class="outcome-number">3</span>
+              <span class="outcome-label">Nonprofit partnerships signed</span>
+            </div>
+            <div class="outcome-card">
+              <span class="outcome-number">200+</span>
+              <span class="outcome-label">Volunteer hours per season</span>
+            </div>
+            <div class="outcome-card">
+              <span class="outcome-number">60</span>
+              <span class="outcome-label">Households on the waitlist</span>
+            </div>
+          </div>
+
+          <h3>Partnership Organizations</h3>
+          <div class="partner-card">
+            <div class="partner-card-name">Roslindale Square Main Streets</div>
+            <div class="partner-card-role">Fiscal Sponsor</div>
+            <p class="partner-card-desc">Commercial district organization that served as fiscal sponsor from fall 2021 through 2023, while RCGN pursued its own 501(c)(3) status. The relationship was brokered through a shared board member and required no formal payment — Main Streets considered the partnership a community benefit aligned with their mission.</p>
+          </div>
+          <div class="partner-card">
+            <div class="partner-card-name">Urban Sprouts</div>
+            <div class="partner-card-role">Programming Partner</div>
+            <p class="partner-card-desc">Boston-based urban agriculture organization that provided monthly gardening workshops at all four sites and connected plot-holders to seed libraries and composting resources. The partnership reduced the need for RCGN to develop in-house programming expertise.</p>
+          </div>
+          <div class="partner-card">
+            <div class="partner-card-name">Roslindale Community Food Pantry</div>
+            <div class="partner-card-role">Food Access Partner</div>
+            <p class="partner-card-desc">Arrangement whereby plot-holders can donate surplus produce directly to the food pantry through a weekly drop point installed at the largest garden site. In 2023, garden members donated an estimated 800 pounds of fresh vegetables through this program.</p>
+          </div>
+        </div>
+
+        <!-- Lessons learned -->
+        <div id="lessons" data-section style="margin-top: var(--sp-10);">
+          <h2>Five Lessons from the Field</h2>
+
+          <div class="lesson-card">
+            <div class="lesson-num">Lesson 01</div>
+            <div class="lesson-title">Outreach data is not optional</div>
+            <p class="lesson-body">The 78% interest rate from the community survey didn't just make the grant application stronger — it gave the steering committee the confidence to keep going when the city negotiations stalled. When you've documented that your neighbors want something, "this is hard" stops being a reason to quit.</p>
+          </div>
+
+          <div class="lesson-card">
+            <div class="lesson-num">Lesson 02</div>
+            <div class="lesson-title">The meeting IS the organizing</div>
+            <p class="lesson-body">Every decision made at the monthly public meetings was harder to make than if five people had made it in a living room. But every decision also stuck. There was no one who could come back six months later and say "I didn't know about that" — because the decision had been made in a room where they could have been. Public process is slow and it's worth it.</p>
+          </div>
+
+          <div class="lesson-card">
+            <div class="lesson-num">Lesson 03</div>
+            <div class="lesson-title">Fiscal sponsorship unlocks your first year</div>
+            <p class="lesson-body">Don't wait for 501(c)(3) status before you start fundraising. Find a fiscal sponsor — ideally an organization that shares your values and community — and use their structure while you build yours. The year RCGN spent under Main Streets' umbrella was the year they built the track record that made independent funding possible.</p>
+          </div>
+
+          <div class="lesson-card">
+            <div class="lesson-num">Lesson 04</div>
+            <div class="lesson-title">Sequence your funders</div>
+            <p class="lesson-body">The steering committee resisted the urge to apply to everyone at once. They built documentation at every stage — photos, attendance sheets, testimonials, harvest tallies — and brought increasingly strong evidence to each successive funder. By the time they applied for the CDBG grant, they had two years of proof behind them. This is the opposite of how most volunteer groups approach grant-seeking.</p>
+          </div>
+
+          <div class="lesson-card">
+            <div class="lesson-num">Lesson 05</div>
+            <div class="lesson-title">The waitlist is your advocacy tool</div>
+            <p class="lesson-body">Sixty households on a waitlist is not a failure — it's evidence of demand that justifies the next phase of expansion. RCGN is currently using the waitlist data in conversations with the city about two additional sites. The list didn't exist because they hadn't served everyone; it existed because the community need was larger than their first-phase capacity. That's a story worth telling.</p>
+          </div>
+        </div>
+
+      </main>
+
+      <!-- Sidebar -->
+      <aside class="sidebar" aria-label="Case study navigation and tools">
+        <div class="sidebar-card" style="margin-bottom: var(--sp-4);">
+          <p class="sidebar-card-title">In This Case Study</p>
+          <nav aria-label="Section navigation">
+            <ol class="toc-list">
+              <li class="toc-item"><a href="#context"><span class="toc-num">1</span> Background</a></li>
+              <li class="toc-item"><a href="#the-problem"><span class="toc-num">2</span> The Problem</a></li>
+              <li class="toc-item"><a href="#outreach"><span class="toc-num">3</span> Outreach Phase</a></li>
+              <li class="toc-item"><a href="#meetings"><span class="toc-num">4</span> Monthly Meetings</a></li>
+              <li class="toc-item"><a href="#funding"><span class="toc-num">5</span> Funding Strategy</a></li>
+              <li class="toc-item"><a href="#timeline"><span class="toc-num">6</span> Timeline</a></li>
+              <li class="toc-item"><a href="#outcomes"><span class="toc-num">7</span> Outcomes</a></li>
+              <li class="toc-item"><a href="#lessons"><span class="toc-num">8</span> Lessons Learned</a></li>
+            </ol>
+          </nav>
+        </div>
+
+        <div class="sidebar-card" style="margin-bottom: var(--sp-4);">
+          <p class="sidebar-card-title">Tools Used in This Project</p>
+          <div class="toc-list">
+            <div class="toc-item">
+              <a href="outreach-checklist.html">
+                <span class="toc-num resource-badge badge-outreach" style="font-size: 0.6rem; padding: 2px 6px; margin-top: 1px;">→</span>
+                Outreach Checklist
+              </a>
+            </div>
+            <div class="toc-item">
+              <a href="meeting-agenda.html">
+                <span class="toc-num resource-badge badge-meetings" style="font-size: 0.6rem; padding: 2px 6px; margin-top: 1px;">→</span>
+                Meeting Agenda
+              </a>
+            </div>
+            <div class="toc-item">
+              <a href="grant-readiness.html">
+                <span class="toc-num resource-badge badge-funding" style="font-size: 0.6rem; padding: 2px 6px; margin-top: 1px;">→</span>
+                Grant Readiness Guide
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-card" style="background: var(--forest); border-color: var(--forest);">
+          <p class="sidebar-card-title" style="color: var(--sage); border-color: rgba(255,255,255,0.12);">Project At a Glance</p>
+          <div style="display: flex; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-2);">
+            <div>
+              <span style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage); display: block; margin-bottom: 2px;">Location</span>
+              <span style="font-size: var(--text-sm); color: rgba(245,240,232,0.8);">Roslindale, Boston, MA</span>
+            </div>
+            <div>
+              <span style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage); display: block; margin-bottom: 2px;">Duration</span>
+              <span style="font-size: var(--text-sm); color: rgba(245,240,232,0.8);">Spring 2021 – Fall 2023</span>
+            </div>
+            <div>
+              <span style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage); display: block; margin-bottom: 2px;">Founding Team</span>
+              <span style="font-size: var(--text-sm); color: rgba(245,240,232,0.8);">5 volunteers, no paid staff</span>
+            </div>
+            <div>
+              <span style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage); display: block; margin-bottom: 2px;">First-Year Budget</span>
+              <span style="font-size: var(--text-sm); color: rgba(245,240,232,0.8);">$12,000 (seed grant only)</span>
+            </div>
+            <div>
+              <span style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage); display: block; margin-bottom: 2px;">Total Raised</span>
+              <span style="font-size: var(--text-sm); color: var(--gold); font-weight: 600;">$85,000 over 2.5 years</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: var(--sp-4); background: var(--amber-pale); border: 1px solid var(--amber); border-radius: var(--r-lg); padding: var(--sp-5);">
+          <p style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber); margin-bottom: var(--sp-3);">Start Your Project</p>
+          <p style="font-size: var(--text-sm); color: var(--ink-light); margin-bottom: var(--sp-4); line-height: 1.5;">Ready to start something like this in your neighborhood? The same tools RCGN used are free in this library.</p>
+          <a href="outreach-checklist.html" class="btn btn-primary" style="width: 100%; justify-content: center; margin-bottom: var(--sp-2);">Start with Outreach</a>
+          <a href="resources.html" class="btn btn-outline" style="width: 100%; justify-content: center;">All Resources</a>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+</section>
+
+<!-- ====== CTA BANNER ====== -->
+<section class="cta-banner" aria-labelledby="cta-heading" style="padding-block: var(--sp-16);">
+  <div class="cta-banner-inner">
+    <p class="kicker" style="color: var(--gold);">Your Turn</p>
+    <h2 id="cta-heading">Start where Roslindale started.</h2>
+    <p>The outreach checklist, meeting template, and grant guide that shaped this project are free in the Civic Signal library. Adapt them for your neighborhood.</p>
+    <div class="cta-buttons">
+      <a href="outreach-checklist.html" class="btn btn-primary">Outreach Checklist</a>
+      <a href="resources.html" class="btn btn-outline-light">Browse All Resources</a>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FOOTER ====== -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" style="margin-bottom: var(--sp-4); display: inline-flex;">
+          <div class="nav-logo-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg></div>
+          <div class="nav-logo-text"><span class="nav-logo-name">Civic Signal</span><span class="nav-logo-sub">Resource Library</span></div>
+        </a>
+        <p>Publishing practical toolkits for neighborhood organizers, free of charge and free of jargon.</p>
+      </div>
+      <div>
+        <span class="footer-col-title">Resources</span>
+        <div class="footer-links">
+          <a href="outreach-checklist.html" class="footer-link">Outreach Checklist</a>
+          <a href="meeting-agenda.html" class="footer-link">Meeting Agenda Template</a>
+          <a href="grant-readiness.html" class="footer-link">Grant Readiness Guide</a>
+          <a href="case-study-roslindale.html" class="footer-link">Case Study: Roslindale</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Topics</span>
+        <div class="footer-links">
+          <a href="resources.html?filter=outreach" class="footer-link">Outreach</a>
+          <a href="resources.html?filter=meetings" class="footer-link">Meetings</a>
+          <a href="resources.html?filter=funding" class="footer-link">Funding</a>
+          <a href="resources.html?filter=projects" class="footer-link">Projects</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Organization</span>
+        <div class="footer-links">
+          <a href="about.html" class="footer-link">About Civic Signal</a>
+          <a href="about.html#newsletter" class="footer-link">Newsletter</a>
+          <a href="resources.html" class="footer-link">All Resources</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-legal">© 2024 Civic Signal. Free to use and adapt with attribution.</p>
+      <div class="footer-bottom-links">
+        <a href="index.html">Home</a>
+        <a href="resources.html">Resources</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "fixture_class": "canvas/webgl/audio/runtime-heavy",
+  "tags": [
+    "drum-machine",
+    "web-audio",
+    "audio",
+    "music",
+    "canvas",
+    "sequencer"
+  ],
+  "complexity": 4
+}

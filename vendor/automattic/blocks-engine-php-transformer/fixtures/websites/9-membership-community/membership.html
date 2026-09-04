@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Membership — Common Table</title>
+  <meta name="description" content="Join Common Table. Three membership tiers starting at $8/month. Your first gathering is always free.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Tiers section */
+    .tiers-section {
+      background-color: var(--warm-white);
+    }
+
+    /* Compare table */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin-top: 3rem;
+      background-color: var(--warm-white);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+    .compare-table th {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 1.25rem 1.5rem;
+      text-align: left;
+      background-color: var(--ink);
+      color: var(--cream);
+    }
+    .compare-table th:first-child { width: 40%; }
+    .compare-table th:not(:first-child) { text-align: center; }
+    .compare-table td {
+      padding: 0.9rem 1.5rem;
+      border-bottom: 1px solid var(--parchment);
+      color: var(--ink-light);
+    }
+    .compare-table td:not(:first-child) { text-align: center; }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table tr:nth-child(even) td { background-color: rgba(240,232,212,0.35); }
+    .compare-check { color: var(--sage); font-size: 1.1rem; }
+    .compare-x { color: var(--parchment); font-size: 1rem; }
+    .compare-tc-col { background-color: rgba(192, 90, 54, 0.06) !important; }
+
+    /* Form section */
+    .join-form-section {
+      background: linear-gradient(180deg, var(--cream) 0%, var(--warm-white) 100%);
+    }
+
+    /* What to expect */
+    .expect-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-top: 2.5rem;
+    }
+    @media (max-width: 700px) { .expect-grid { grid-template-columns: 1fr; } }
+
+    .expect-card {
+      text-align: center;
+      padding: 1.75rem 1.25rem;
+      background-color: var(--warm-white);
+      border-radius: var(--radius-lg);
+    }
+    .expect-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      margin: 0 auto 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .expect-card h4 { font-size: 1rem; margin-bottom: 0.4rem; }
+    .expect-card p { font-size: 0.85rem; color: var(--ink-muted); margin: 0; }
+
+    /* Section anchor for hosting */
+    #host { scroll-margin-top: 90px; }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────────────── -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      Common Table
+    </a>
+    <button class="hamburger" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-menu" id="nav-menu" role="list">
+      <li><a href="index.html"       class="nav-link">Home</a></li>
+      <li><a href="gatherings.html"  class="nav-link">Gatherings</a></li>
+      <li><a href="organizers.html"  class="nav-link">Organizers</a></li>
+      <li><a href="stories.html"     class="nav-link">Stories</a></li>
+      <li><a href="membership.html"  class="nav-link">Membership</a></li>
+      <li><a href="faq.html"         class="nav-link">FAQ</a></li>
+      <li><a href="membership.html"  class="nav-cta">Join Us</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+
+<!-- ── PAGE HERO ─────────────────────────────────────────────── -->
+<header class="page-hero">
+  <div class="container">
+    <span class="overline">Find your seat</span>
+    <h1>Membership Levels</h1>
+    <p class="lead">Pick the tier that fits how you want to show up. Every member gets through the door.</p>
+    <p style="font-size:0.9rem; color:var(--terracotta); margin-top:0.75rem; font-family:var(--font-hand);">
+      Your first gathering is always free — membership or not.
+    </p>
+  </div>
+</header>
+
+<!-- ── TIERS ─────────────────────────────────────────────────── -->
+<section class="section tiers-section">
+  <div class="container">
+
+    <div class="tiers-grid" data-stagger="100">
+
+      <!-- Neighbor -->
+      <div class="tier-card">
+        <p class="tier-name">Neighbor</p>
+        <p class="tier-price">$8<sub>/mo</sub></p>
+        <p class="tier-tagline">Just here to eat and meet</p>
+        <ul class="tier-perks">
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Access to all member gatherings
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Monthly neighborhood newsletter
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Member directory access
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Invite a guest to one gathering/month
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Support the community (thank you!)
+          </li>
+        </ul>
+        <a href="#join-form" class="btn btn-outline" style="width:100%; justify-content:center;">Get started</a>
+      </div>
+
+      <!-- Regular (featured) -->
+      <div class="tier-card tier-card--featured">
+        <span class="tier-badge">Most popular</span>
+        <p class="tier-name">Regular</p>
+        <p class="tier-price">$18<sub>/mo</sub></p>
+        <p class="tier-tagline">Shows up, helps out</p>
+        <ul class="tier-perks">
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#FAF7EF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Everything in Neighbor
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#FAF7EF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Host your own gathering (with support)
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#FAF7EF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Early registration for popular events
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#FAF7EF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Seed &amp; book library borrowing
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#FAF7EF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Unlimited guest invitations
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#FAF7EF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Recipe archive &amp; skill share notes
+          </li>
+        </ul>
+        <a href="#join-form" class="btn btn-white" style="width:100%; justify-content:center;">Join as Regular</a>
+      </div>
+
+      <!-- Steward -->
+      <div class="tier-card">
+        <p class="tier-name">Steward</p>
+        <p class="tier-price">$35<sub>/mo</sub></p>
+        <p class="tier-tagline">Part of the foundation</p>
+        <ul class="tier-perks">
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Everything in Regular
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Monthly organizer check-in calls
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Propose and co-design new programs
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Named in the printed newsletter
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Hand-stamped welcome kit (mailed)
+          </li>
+          <li>
+            <span class="tier-check"><svg viewBox="0 0 10 10" fill="none" width="10" height="10"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="#4A6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            Priority booking for event spaces
+          </li>
+        </ul>
+        <a href="#join-form" class="btn btn-sage" style="width:100%; justify-content:center;">Become a Steward</a>
+      </div>
+    </div><!-- /.tiers-grid -->
+
+    <!-- Feature comparison table -->
+    <div class="reveal" style="overflow-x: auto; margin-top: 4rem;">
+      <h3 class="text-center" style="margin-bottom:0.5rem;">Full comparison</h3>
+      <p class="text-center text-muted" style="margin-bottom:0; font-size:0.875rem;">All tiers renew monthly and can be cancelled any time.</p>
+      <table class="compare-table" aria-label="Membership tier comparison">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Neighbor</th>
+            <th style="background-color:#A84828;">Regular</th>
+            <th>Steward</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Monthly price</td>
+            <td>$8</td>
+            <td class="compare-tc-col">$18</td>
+            <td>$35</td>
+          </tr>
+          <tr>
+            <td>Access to all gatherings</td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+            <td class="compare-tc-col"><span class="compare-check" aria-label="Included">✓</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Monthly newsletter</td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+            <td class="compare-tc-col"><span class="compare-check" aria-label="Included">✓</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Member directory</td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+            <td class="compare-tc-col"><span class="compare-check" aria-label="Included">✓</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Host your own gathering</td>
+            <td><span class="compare-x" aria-label="Not included">—</span></td>
+            <td class="compare-tc-col"><span class="compare-check" aria-label="Included">✓</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Early event registration</td>
+            <td><span class="compare-x" aria-label="Not included">—</span></td>
+            <td class="compare-tc-col"><span class="compare-check" aria-label="Included">✓</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Seed &amp; book library</td>
+            <td><span class="compare-x" aria-label="Not included">—</span></td>
+            <td class="compare-tc-col"><span class="compare-check" aria-label="Included">✓</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Unlimited guest invitations</td>
+            <td><span class="compare-x" aria-label="Not included">—</span></td>
+            <td class="compare-tc-col"><span class="compare-check" aria-label="Included">✓</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Organizer check-in calls</td>
+            <td><span class="compare-x" aria-label="Not included">—</span></td>
+            <td class="compare-tc-col"><span class="compare-x" aria-label="Not included">—</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Propose new programs</td>
+            <td><span class="compare-x" aria-label="Not included">—</span></td>
+            <td class="compare-tc-col"><span class="compare-x" aria-label="Not included">—</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Named in newsletter</td>
+            <td><span class="compare-x" aria-label="Not included">—</span></td>
+            <td class="compare-tc-col"><span class="compare-x" aria-label="Not included">—</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+          <tr>
+            <td>Hand-stamped welcome kit</td>
+            <td><span class="compare-x" aria-label="Not included">—</span></td>
+            <td class="compare-tc-col"><span class="compare-x" aria-label="Not included">—</span></td>
+            <td><span class="compare-check" aria-label="Included">✓</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── WHAT TO EXPECT ────────────────────────────────────────── -->
+<section class="section" id="host">
+  <div class="container">
+    <div class="text-center reveal" style="margin-bottom:0;">
+      <span class="overline">After you join</span>
+      <h2>What happens next</h2>
+    </div>
+    <div class="expect-grid" data-stagger="100">
+      <div class="expect-card">
+        <div class="expect-icon" style="background-color:var(--terracotta-pale);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z" stroke="#C05A36" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M2 10h20" stroke="#C05A36" stroke-width="1.5"/>
+            <path d="M8 15h8" stroke="#C05A36" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h4>Welcome email</h4>
+        <p>We'll send you a welcome note from Rosa within 48 hours with everything you need — the member directory, the calendar link, and what to bring to your first gathering.</p>
+      </div>
+      <div class="expect-card">
+        <div class="expect-icon" style="background-color:var(--sage-pale);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" stroke="#4A6741" stroke-width="1.5"/>
+            <path d="M16 2v4M8 2v4M3 10h18" stroke="#4A6741" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="8" cy="16" r="1.5" fill="#4A6741"/>
+            <circle cx="12" cy="16" r="1.5" fill="#4A6741"/>
+            <circle cx="16" cy="16" r="1.5" fill="#4A6741"/>
+          </svg>
+        </div>
+        <h4>First gathering</h4>
+        <p>Pick any upcoming event — you're already on the list. Show up whenever you're ready. Bring a dish if it's a potluck, or just yourself if it's anything else.</p>
+      </div>
+      <div class="expect-card">
+        <div class="expect-icon" style="background-color:var(--gold-pale);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 2L9 9H2l5.5 4L5 20l7-5 7 5-2.5-7L22 9h-7z" stroke="#A07820" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h4>Newsletter</h4>
+        <p>Every month you'll get a print-style newsletter with the upcoming calendar, a recipe from a member, and notes from around the neighborhood. Worth the membership alone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── JOIN FORM ─────────────────────────────────────────────── -->
+<section class="section join-form-section" id="join-form">
+  <div class="container">
+    <div class="text-center reveal" style="margin-bottom:3rem;">
+      <span class="overline">Pull up a chair</span>
+      <h2>Join Common Table</h2>
+      <p class="section-lead mt-sm" style="margin: 0.75rem auto 0;">
+        Fill this out and Rosa will be in touch within 48 hours. We'll sort out payment the old-fashioned way.
+      </p>
+    </div>
+
+    <div class="form-wrap reveal" data-delay="100">
+      <form data-ct-form="join" novalidate>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="fname">First name</label>
+            <input class="form-input" type="text" id="fname" name="fname" placeholder="Your first name" required autocomplete="given-name">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="lname">Last name</label>
+            <input class="form-input" type="text" id="lname" name="lname" placeholder="Your last name" required autocomplete="family-name">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="email">Email address</label>
+          <input class="form-input" type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="address">Street address <span style="font-family:var(--font-body); font-size:0.8rem; color:var(--ink-muted);">(neighborhood check)</span></label>
+          <input class="form-input" type="text" id="address" name="address" placeholder="123 Elm Street" autocomplete="street-address">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="tier">Membership tier</label>
+          <select class="form-select" id="tier" name="tier" required>
+            <option value="" disabled selected>Choose a tier…</option>
+            <option value="neighbor">Neighbor — $8/month</option>
+            <option value="regular">Regular — $18/month (most popular)</option>
+            <option value="steward">Steward — $35/month</option>
+            <option value="not-sure">I'm not sure yet</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="how-hear">How did you hear about us?</label>
+          <select class="form-select" id="how-hear" name="how-hear">
+            <option value="" disabled selected>Choose one…</option>
+            <option value="neighbor">A neighbor told me</option>
+            <option value="flyer">Flyer / poster</option>
+            <option value="gathering">I came to a gathering first</option>
+            <option value="newsletter">I read the newsletter</option>
+            <option value="online">Found it online</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="message">Anything else? <span style="font-family:var(--font-body); font-size:0.8rem; color:var(--ink-muted);">(optional)</span></label>
+          <textarea class="form-textarea" id="message" name="message" placeholder="What brings you to the table? A dish you love to cook, a skill you'd love to share, a book you've been wanting to discuss — tell us anything."></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <button type="submit" class="btn btn-primary btn-lg" style="width:100%; justify-content:center;">
+            Send my membership request →
+          </button>
+        </div>
+
+        <div class="form-success" role="alert">
+          Rosa will be in touch within 48 hours. Welcome to the neighborhood!
+        </div>
+      </form>
+
+      <p style="text-align:center; margin-top:1.25rem; font-size:0.8rem; color:var(--ink-muted);">
+        No online payment required. We'll sort that out over email. Cancel anytime, no questions asked.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+</main>
+
+<!-- ── FOOTER ─────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="index.html" class="footer-brand-logo">
+          <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          Common Table
+        </a>
+        <p class="footer-tagline">A neighborhood membership club for people who love to share food, skills, stories, and a few hours of doing something that matters.</p>
+        <address class="footer-address">48 Elm Street · Portsmith District<br><a href="mailto:hello@commontable.club" style="color:rgba(240,232,212,0.5); text-decoration:none;">hello@commontable.club</a></address>
+      </div>
+      <div>
+        <span class="footer-col-heading">Explore</span>
+        <ul class="footer-links">
+          <li><a href="gatherings.html">Upcoming Gatherings</a></li>
+          <li><a href="organizers.html">Meet the Organizers</a></li>
+          <li><a href="stories.html">Member Stories</a></li>
+          <li><a href="membership.html">Membership Levels</a></li>
+          <li><a href="faq.html">FAQ &amp; Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <span class="footer-col-heading">Get Involved</span>
+        <ul class="footer-links">
+          <li><a href="membership.html">Join the Table</a></li>
+          <li><a href="gatherings.html">RSVP to a Gathering</a></li>
+          <li><a href="membership.html#host">Host Your Own</a></li>
+          <li><a href="faq.html#contact">Send Us a Note</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Common Table · Eval Membership Community</span>
+      <span>Made with care in the neighborhood</span>
+    </div>
+  </div>
+</footer>
+
+<script src="nav.js"></script>
+</body>
+</html>

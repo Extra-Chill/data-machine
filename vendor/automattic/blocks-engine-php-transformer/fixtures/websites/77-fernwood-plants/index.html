@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fernwood Botanicals — Plants &amp; Garden Shop</title>
+  <meta name="description" content="Fernwood Botanicals: a family nursery for happy, healthy houseplants, garden greenery, succulents, pots and tools. Easy-care picks and expert care tips." />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="index.html" aria-label="Fernwood Botanicals home">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M24 44C16 40 7 36 7 22 7 13 14 6 24 6s17 7 17 16c0 14-9 18-17 22Z" fill="#9caf88"/>
+          <path d="M24 42V16" stroke="#2f4a2c" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M24 24C18 22 13 17 13 11c6 0 11 4 13 9 2-6 7-9 13-9 0 6-5 11-11 13" fill="#3f6b3a"/>
+        </svg>
+        Fernwood
+      </a>
+      <button class="nav-toggle" data-nav-toggle aria-label="Toggle menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <nav class="nav" data-nav>
+        <a href="index.html" class="active">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn" data-open-cart aria-label="Open cart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/><path d="M2 3h2.2l2.3 12.3a2 2 0 0 0 2 1.7h8.7a2 2 0 0 0 2-1.6L21 7H6"/></svg>
+          <span class="cart-badge is-empty" data-cart-count>0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div class="hero-copy">
+          <span class="eyebrow">Grown with care since 1994</span>
+          <h1>Bring the<br>outside in.</h1>
+          <p class="lead">Hand-raised houseplants, garden greenery and the tools to help them thrive — delivered happy and healthy to your door.</p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="shop.html">Shop all plants</a>
+            <a class="btn btn-outline" href="#easy-care">Easy-care picks</a>
+          </div>
+          <div class="hero-stats">
+            <div class="stat"><strong>20+</strong><span>plants &amp; goods</span></div>
+            <div class="stat"><strong>30yr</strong><span>family nursery</span></div>
+            <div class="stat"><strong>100%</strong><span>peat-free soil</span></div>
+          </div>
+        </div>
+        <div class="hero-art">
+          <svg viewBox="0 0 400 400" role="img" aria-label="A lush potted plant with broad leaves">
+            <defs>
+              <radialGradient id="hg" cx="50%" cy="38%" r="70%">
+                <stop offset="0%" stop-color="#eef3e6"/><stop offset="100%" stop-color="#d7e3c6"/>
+              </radialGradient>
+            </defs>
+            <path d="M70 250C30 180 100 70 200 78c110 9 150 110 110 188-32 62-180 76-240-16Z" fill="url(#hg)"/>
+            <!-- leaves -->
+            <g stroke="#1f3320" stroke-width="2" fill="none" opacity="0.25">
+              <path d="M200 250V120"/>
+            </g>
+            <path d="M200 250C140 230 110 170 120 120c52 4 78 44 80 96" fill="#3f6b3a"/>
+            <path d="M200 250C260 230 290 170 280 120c-52 4-78 44-80 96" fill="#4a7a45"/>
+            <path d="M200 240C160 200 150 140 175 96c40 22 48 78 25 130" fill="#56864f"/>
+            <path d="M200 240C240 200 250 140 225 96c-40 22-48 78-25 130" fill="#5a9050"/>
+            <path d="M200 235C200 175 215 130 250 104c14 44-6 96-50 118" fill="#6fae5a"/>
+            <path d="M200 235C200 175 185 130 150 104c-14 44 6 96 50 118" fill="#6fae5a"/>
+            <!-- pot -->
+            <path d="M150 250h100l-14 96a8 8 0 0 1-8 7h-48a8 8 0 0 1-8-7Z" fill="#c97a54"/>
+            <path d="M200 250h50l-14 96a8 8 0 0 1-8 7h-28Z" fill="#b15f3c" opacity="0.55"/>
+            <rect x="142" y="234" width="116" height="24" rx="12" fill="#dd9270"/>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- EASY CARE PICKS -->
+    <section class="section" id="easy-care">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">Beginner friendly</span>
+          <h2>Easy-care picks</h2>
+          <p>Forgiving, near-unkillable favorites that thrive on a little neglect. The perfect place to start your jungle.</p>
+        </div>
+        <div class="grid" data-featured-grid></div>
+        <div style="text-align:center; margin-top:34px;">
+          <a class="btn btn-outline" href="shop.html">Browse the full shop</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- SHOP BY CATEGORY -->
+    <section class="section section-tight" style="background:#fff;">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">Find your fit</span>
+          <h2>Shop by category</h2>
+        </div>
+        <div class="cat-grid">
+          <a class="cat-tile c1" href="shop.html?category=Indoor">
+            <svg class="cat-ico" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 80V40" stroke="#2f4a2c" stroke-width="3"/><path d="M50 50C36 46 28 34 30 22c14 0 24 9 26 22 2-13 12-22 26-22 2 12-6 24-20 28" fill="#3f6b3a"/></svg>
+            <h3>Indoor</h3><span>Leafy houseplants</span>
+          </a>
+          <a class="cat-tile c2" href="shop.html?category=Outdoor">
+            <svg class="cat-ico" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="40" r="22" fill="#5a9050"/><path d="M50 62v22" stroke="#2f4a2c" stroke-width="3"/></svg>
+            <h3>Outdoor</h3><span>Garden &amp; patio</span>
+          </a>
+          <a class="cat-tile c3" href="shop.html?category=Succulents &amp; Cacti">
+            <svg class="cat-ico" viewBox="0 0 100 100" aria-hidden="true"><rect x="42" y="30" width="16" height="46" rx="8" fill="#6f9a4a"/><rect x="26" y="44" width="12" height="28" rx="6" fill="#5a8a3f"/><rect x="62" y="40" width="12" height="32" rx="6" fill="#5a8a3f"/></svg>
+            <h3>Succulents</h3><span>&amp; cacti</span>
+          </a>
+          <a class="cat-tile c4" href="shop.html?category=Pots &amp; Planters">
+            <svg class="cat-ico" viewBox="0 0 100 100" aria-hidden="true"><path d="M28 38h44l-7 38a6 6 0 0 1-6 5H41a6 6 0 0 1-6-5Z" fill="#9caf88"/><rect x="24" y="30" width="52" height="12" rx="6" fill="#b3c4a2"/></svg>
+            <h3>Pots &amp; Planters</h3><span>Ceramic &amp; clay</span>
+          </a>
+          <a class="cat-tile c5" href="shop.html?category=Tools">
+            <svg class="cat-ico" viewBox="0 0 100 100" aria-hidden="true"><rect x="46" y="24" width="8" height="30" rx="4" fill="#9caf88"/><path d="M38 54q12 32 24 0Z" fill="#b9b3a7"/></svg>
+            <h3>Tools</h3><span>For green thumbs</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CARE TIPS TEASER -->
+    <section class="section">
+      <div class="wrap">
+        <div class="tips-band">
+          <div class="section-head" style="margin-bottom:30px;">
+            <span class="eyebrow" style="color:#e7b79a;">From the greenhouse</span>
+            <h2>Plant-care tips</h2>
+          </div>
+          <div class="tips-grid">
+            <div class="tip"><div class="tip-ico">💧</div><h3>Water less than you think</h3><p>Most houseplants die from overwatering. Let the top inch of soil dry out before reaching for the can.</p></div>
+            <div class="tip"><div class="tip-ico">☀️</div><h3>Read the light</h3><p>Match each plant to its spot. Bright indirect means near a window but out of harsh direct rays.</p></div>
+            <div class="tip"><div class="tip-ico">🪴</div><h3>Repot in spring</h3><p>Roots circling the pot? Size up by one pot and refresh with peat-free soil as growth wakes up.</p></div>
+            <div class="tip"><div class="tip-ico">🍃</div><h3>Dust the leaves</h3><p>Clean leaves photosynthesize better. Wipe broad foliage monthly with a damp cloth.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTER -->
+    <section class="section section-tight">
+      <div class="wrap">
+        <div class="newsletter">
+          <span class="eyebrow">Join the Fernwood family</span>
+          <h2>Care tips &amp; new arrivals</h2>
+          <p style="color:var(--muted);max-width:46ch;margin:6px auto 0;">Monthly seasonal advice and first dibs on fresh stock. No spam, just greenery.</p>
+          <form data-newsletter novalidate>
+            <label for="news-email" class="sr-only" style="position:absolute;left:-9999px;">Email address</label>
+            <input id="news-email" type="email" placeholder="you@example.com" required />
+            <button class="btn btn-accent" type="submit">Subscribe</button>
+          </form>
+          <p class="form-note" data-news-note hidden></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44C16 40 7 36 7 22 7 13 14 6 24 6s17 7 17 16c0 14-9 18-17 22Z" fill="#9caf88"/><path d="M24 42V16" stroke="#1f3320" stroke-width="2.4" stroke-linecap="round"/><path d="M24 24C18 22 13 17 13 11c6 0 11 4 13 9 2-6 7-9 13-9 0 6-5 11-11 13" fill="#3f6b3a"/></svg>
+            Fernwood Botanicals
+          </div>
+          <p>A family nursery growing happy, healthy plants — and the people who care for them — since 1994.</p>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="shop.html?category=Indoor">Indoor plants</a></li>
+            <li><a href="shop.html?category=Outdoor">Outdoor plants</a></li>
+            <li><a href="shop.html?category=Succulents &amp; Cacti">Succulents &amp; cacti</a></li>
+            <li><a href="shop.html?category=Pots &amp; Planters">Pots &amp; planters</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <ul>
+            <li><a href="about.html">Our story</a></li>
+            <li><a href="about.html#sustainability">Sustainability</a></li>
+            <li><a href="contact.html">Contact</a></li>
+            <li><a href="contact.html#hours">Greenhouse hours</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Visit</h4>
+          <ul>
+            <li>14 Fernwood Lane</li>
+            <li>Mossvale, OR 97000</li>
+            <li><a href="tel:+15035550142">(503) 555-0142</a></li>
+            <li><a href="mailto:hello@fernwood.example">hello@fernwood.example</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; <span data-year>2026</span> Fernwood Botanicals. Grown with care.</span>
+        <span>Peat-free · Plastic-light · Locally rooted</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/products.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

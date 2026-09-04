@@ -1,0 +1,7 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": ["photographer", "portfolio", "gallery", "dark-theme", "lightbox", "masonry", "horizontal-scroll"],
+  "capabilities": ["local-css", "runtime-js"],
+  "risk_profile": "medium",
+  "complexity": 3
+}

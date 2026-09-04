@@ -1,0 +1,10 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "nonprofit",
+    "has-nav",
+    "multipage",
+    "donation"
+  ],
+  "complexity": 2
+}

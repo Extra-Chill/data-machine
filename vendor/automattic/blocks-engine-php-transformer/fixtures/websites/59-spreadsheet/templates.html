@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lattice — Starter Templates</title>
+  <meta name="description" content="Starter spreadsheets for Lattice: monthly budget, freelance invoice, habit tracker and sprint tracker — each seeded with real formulas.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='5' fill='none' stroke='%232f7d5c' stroke-width='2.4'/%3E%3Cpath d='M3 12h26M3 21h26M12 3v26M21 3v26' stroke='%232f7d5c' stroke-width='1.6' opacity='.7'/%3E%3C/svg%3E">
+</head>
+<body class="content" data-theme="light">
+
+  <header class="top-header">
+    <a class="brand" href="index.html" aria-label="Lattice home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="3" y="3" width="26" height="26" rx="5" fill="none" stroke="var(--accent)" stroke-width="2.4"/>
+        <path d="M3 12h26M3 21h26M12 3v26M21 3v26" stroke="var(--accent)" stroke-width="1.4" opacity=".65"/>
+        <rect x="12" y="12" width="9" height="9" fill="var(--accent)" opacity=".22"/>
+      </svg>
+      <span><span class="brand-name">Latt<b>ice</b></span><br><span class="brand-sub">Formula Sheets</span></span>
+    </a>
+    <nav class="top-nav" aria-label="Primary">
+      <a href="index.html">Sheet</a>
+      <a href="templates.html">Templates</a>
+      <a href="about.html">Formula Engine</a>
+    </nav>
+    <div class="header-spacer"></div>
+    <button class="icon-btn" id="themeToggle" aria-label="Toggle color theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg>
+      <span class="t-label">Light</span>
+    </button>
+  </header>
+
+  <main class="page-wrap">
+    <div class="page-hero">
+      <div class="eyebrow">Starter sheets</div>
+      <h1>Templates</h1>
+      <p>Each template is a fully working sheet — totals, percentages, <code>IF</code> flags and live cross-cell formulas already wired up. Pick one and it opens in the editor, ready to change. (This replaces your current sheet, which is autosaved in your browser.)</p>
+    </div>
+
+    <div class="tpl-grid" id="tplGrid"></div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/formula.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const L = window.Lattice;
+    const grid = document.getElementById('tplGrid');
+
+    // small SVG preview generator: draws a tiny grid sketch
+    function preview(seed) {
+      const cells = [];
+      const cols = 6, rows = 5, w = 290, h = 150, cw = w / cols, rh = h / rows;
+      let rects = '';
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const on = ((r * 7 + c * 3 + seed * 5) % 4);
+        let fill = 'var(--panel)';
+        if (r === 0) fill = 'var(--head-bg)';
+        else if (on === 0) fill = 'var(--sel)';
+        else if (on === 1 && c === cols - 1) fill = 'rgba(31,110,156,.12)';
+        rects += `<rect x="${c*cw}" y="${r*rh}" width="${cw-1}" height="${rh-1}" fill="${fill}"/>`;
+        if (r > 0 && (on === 1 || on === 2)) {
+          const bw = (cw - 8) * (0.4 + ((r*c+seed)%5)/8);
+          rects += `<rect x="${c*cw+4}" y="${r*rh+rh/2-2}" width="${bw}" height="4" rx="2" fill="var(--ink-faint)" opacity="${c===cols-1?'.55':'.3'}"/>`;
+        }
+      }
+      // header labels
+      let heads = '';
+      ['A','B','C','D','E','F'].forEach((L_, c) =>
+        heads += `<text x="${c*cw+cw/2}" y="${rh/2+3}" font-size="8" text-anchor="middle" fill="var(--accent)" font-family="monospace">${L_}</text>`);
+      return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${rects}${heads}</svg>`;
+    }
+
+    L.Templates.list.forEach((t, i) => {
+      const card = document.createElement('article');
+      card.className = 'tpl-card';
+      card.innerHTML = `
+        <div class="tpl-preview">${preview(i + 1)}</div>
+        <div class="tpl-body">
+          <h3>${t.title}</h3>
+          <p>${t.desc}</p>
+          <div class="tpl-meta">
+            <span class="tag">${t.rows} rows</span>
+            <span class="tag">${t.cols} cols</span>
+            <span>live formulas</span>
+          </div>
+          <button class="tpl-load" data-id="${t.id}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            Open in editor
+          </button>
+        </div>`;
+      grid.appendChild(card);
+    });
+
+    grid.addEventListener('click', e => {
+      const btn = e.target.closest('.tpl-load');
+      if (!btn) return;
+      const tpl = L.Templates.byId(btn.dataset.id);
+      const model = new L.Model();
+      model.name = tpl.name;
+      model.setMany(tpl.cells);   // compiles + recalcs + persists to localStorage
+      const toast = document.getElementById('toast');
+      toast.textContent = 'Loaded "' + tpl.name + '" — opening editor…';
+      toast.classList.add('show');
+      setTimeout(() => { location.href = 'index.html'; }, 650);
+    });
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SignalForge documentation — monitor API reliability and respond to incidents before customers file tickets.">
+  <title>SignalForge Docs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="mobile-nav-toggle" id="navToggle" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <div class="overlay" id="overlay"></div>
+
+  <div class="layout">
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <a href="index.html">
+          <svg class="sidebar-logo-mark" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="7" fill="#111512"/>
+            <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#2a352a"/>
+            <!-- waveform icon -->
+            <polyline points="3,16 7,16 9,10 11,22 13,16 16,16 18,8 20,24 22,16 29,16"
+              stroke="#3efb6a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="sidebar-logo-text">
+            <span class="sidebar-logo-name">SignalForge</span>
+            <span class="sidebar-logo-sub">docs</span>
+          </div>
+        </a>
+      </div>
+      <div class="sidebar-version">
+        <span class="status-dot live"></span>
+        <span class="sidebar-status-text">all systems operational</span>
+        <span class="sidebar-version-badge">v0.9.2</span>
+      </div>
+      <nav class="sidebar-nav" aria-label="Documentation navigation">
+        <div class="nav-section">
+          <span class="nav-section-label">Docs</span>
+          <a class="nav-link" href="index.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+              <rect x="2" y="2" width="12" height="12" rx="2"/>
+              <path d="M5 6h6M5 9h4"/>
+            </svg>
+            Home
+          </a>
+          <a class="nav-link" href="overview.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="8" cy="8" r="6"/>
+              <circle cx="8" cy="8" r="2.5"/>
+              <path d="M8 2v1M8 13v1M2 8h1M13 8h1"/>
+            </svg>
+            Product Overview
+          </a>
+          <a class="nav-link" href="getting-started.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M2 12L6 4l3 5 2-3 3 6"/>
+            </svg>
+            Getting Started
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Guides</span>
+          <a class="nav-link" href="incident-workflow.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M8 2l1.5 4h4l-3.2 2.3 1.2 3.9L8 10l-3.5 2.2 1.2-3.9L2.5 6H6.5z"/>
+            </svg>
+            Incident Workflow
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Reference</span>
+          <a class="nav-link" href="api-reference.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+              <rect x="2" y="5" width="12" height="8" rx="1.5"/>
+              <path d="M5 5V4a3 3 0 016 0v1"/>
+              <path d="M6 9h4M8 8v2"/>
+            </svg>
+            API Reference
+          </a>
+          <a class="nav-link" href="changelog.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+              <rect x="2.5" y="2" width="11" height="13" rx="1.5"/>
+              <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/>
+            </svg>
+            Changelog
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Help</span>
+          <a class="nav-link" href="support.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="8" cy="8" r="6"/>
+              <path d="M8 10.5v.5M8 5.5a1.5 1.5 0 011.5 1.5c0 1-1.5 1.5-1.5 2.5"/>
+            </svg>
+            Support
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="https://github.com/signalforge/signalforge" target="_blank" rel="noopener">GitHub</a>
+        <a href="changelog.html">Releases</a>
+        <a href="support.html">Discord</a>
+      </div>
+    </aside>
+
+    <!-- ── MAIN AREA ── -->
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-breadcrumb">
+          <span class="current">SignalForge Docs</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="topbar-search-btn" aria-label="Search docs">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="7" cy="7" r="5"/>
+              <path d="M11 11l3 3"/>
+            </svg>
+            <span class="topbar-search-text">Search docs</span>
+            <span class="topbar-search-kbd">⌘K</span>
+          </button>
+          <a href="https://github.com/signalforge/signalforge" target="_blank" rel="noopener" class="topbar-btn" aria-label="GitHub">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"/>
+            </svg>
+          </a>
+        </div>
+      </header>
+
+      <main class="content">
+        <!-- HERO -->
+        <section class="hero">
+          <div class="hero-eyebrow">
+            <span class="status-dot live"></span>
+            <span class="page-tag">Documentation</span>
+          </div>
+          <h1>Monitor. Signal.<br><span class="accent">Resolve fast.</span></h1>
+          <p class="hero-desc">
+            SignalForge helps small platform teams catch API failures before customers do.
+            Define monitors in YAML, compose alert rules, and get actionable signals to wherever your team lives.
+          </p>
+
+          <!-- Search -->
+          <div class="search-container">
+            <input
+              type="search"
+              class="search-input"
+              placeholder="Search docs — monitors, signals, webhooks, API…"
+              aria-label="Search documentation"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <span class="search-icon">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="7" cy="7" r="5"/>
+                <path d="M11 11l3 3" stroke-linecap="round"/>
+              </svg>
+            </span>
+          </div>
+        </section>
+
+        <!-- System Status Bar -->
+        <div class="status-bar" aria-label="System status">
+          <div class="status-item">
+            <span class="status-dot live"></span>
+            <span class="status-label">Status</span>
+            <span class="status-value green">All operational</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Monitors active</span>
+            <span class="status-value">1,247</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Avg uptime (7d)</span>
+            <span class="status-value green">99.94%</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Incidents this week</span>
+            <span class="status-value">3 resolved</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">API version</span>
+            <span class="status-value">v1</span>
+          </div>
+        </div>
+
+        <!-- Quick links -->
+        <section aria-labelledby="quickstart-heading">
+          <h2 id="quickstart-heading" style="margin-top:0; padding-top:0; border-top:none;">Start here</h2>
+
+          <div class="quick-grid">
+            <a class="quick-card" href="getting-started.html"
+               style="--card-accent: #3efb6a; --card-bg: #173322; --card-border: rgba(62,251,106,0.3);">
+              <div class="quick-card-icon">
+                <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <path d="M2 14L5 5l4 6 3-4 4 7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="quick-card-title">Getting Started</div>
+              <div class="quick-card-desc">Install the CLI, define your first monitor, and receive your first signal in under 10 minutes.</div>
+              <div class="quick-card-tag">
+                Quickstart
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 8h10M9 4l4 4-4 4"/>
+                </svg>
+              </div>
+            </a>
+
+            <a class="quick-card" href="overview.html"
+               style="--card-accent: #48b0e8; --card-bg: #0d2333; --card-border: rgba(72,176,232,0.3);">
+              <div class="quick-card-icon">
+                <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <circle cx="9" cy="9" r="7"/>
+                  <circle cx="9" cy="9" r="3"/>
+                  <path d="M9 2v1M9 15v1M2 9h1M15 9h1"/>
+                </svg>
+              </div>
+              <div class="quick-card-title">Product Overview</div>
+              <div class="quick-card-desc">Understand the core architecture — Signals, Monitors, Alert Rules, and Webhooks.</div>
+              <div class="quick-card-tag">
+                Concepts
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 8h10M9 4l4 4-4 4"/>
+                </svg>
+              </div>
+            </a>
+
+            <a class="quick-card" href="incident-workflow.html"
+               style="--card-accent: #f04040; --card-bg: #2e1010; --card-border: rgba(240,64,64,0.3);">
+              <div class="quick-card-icon">
+                <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <path d="M9 3l1.8 4.5h4.8l-3.9 2.8 1.5 4.7L9 12.3l-4.2 2.7 1.5-4.7L2.4 7.5h4.8z"
+                    stroke-linejoin="round" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="quick-card-title">Incident Workflow</div>
+              <div class="quick-card-desc">Step-by-step runbook for triage, escalation, and post-mortem. From alert to resolution.</div>
+              <div class="quick-card-tag">
+                Runbook
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 8h10M9 4l4 4-4 4"/>
+                </svg>
+              </div>
+            </a>
+
+            <a class="quick-card" href="api-reference.html"
+               style="--card-accent: #b07ef0; --card-bg: rgba(176,126,240,0.08); --card-border: rgba(176,126,240,0.3);">
+              <div class="quick-card-icon">
+                <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <rect x="2" y="6" width="14" height="9" rx="1.5"/>
+                  <path d="M6 6V5a3 3 0 016 0v1"/>
+                  <path d="M7 11h4M9 9.5v3"/>
+                </svg>
+              </div>
+              <div class="quick-card-title">API Reference</div>
+              <div class="quick-card-desc">Full REST API with curl examples, request/response schemas, and auth documentation.</div>
+              <div class="quick-card-tag">
+                Reference
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 8h10M9 4l4 4-4 4"/>
+                </svg>
+              </div>
+            </a>
+
+            <a class="quick-card" href="changelog.html"
+               style="--card-accent: #e8a020; --card-bg: #2e1f08; --card-border: rgba(232,160,32,0.3);">
+              <div class="quick-card-icon">
+                <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <rect x="3" y="2.5" width="12" height="14" rx="1.5"/>
+                  <path d="M6 6.5h6M6 9.5h6M6 12.5h4"/>
+                </svg>
+              </div>
+              <div class="quick-card-title">Changelog</div>
+              <div class="quick-card-desc">Release notes and version history. Latest: v0.9.2 — webhook retry logic + dedup fix.</div>
+              <div class="quick-card-tag">
+                v0.9.2 latest
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 8h10M9 4l4 4-4 4"/>
+                </svg>
+              </div>
+            </a>
+
+            <a class="quick-card" href="support.html"
+               style="--card-accent: #748874; --card-bg: #1a1e1b; --card-border: #2a352a;">
+              <div class="quick-card-icon">
+                <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <circle cx="9" cy="9" r="7"/>
+                  <path d="M9 12v.5M9 6.5A2 2 0 0111 8.5c0 1.3-2 1.5-2 3"/>
+                </svg>
+              </div>
+              <div class="quick-card-title">Support</div>
+              <div class="quick-card-desc">Discord community, GitHub issues, and enterprise support contacts.</div>
+              <div class="quick-card-tag">
+                Help
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 8h10M9 4l4 4-4 4"/>
+                </svg>
+              </div>
+            </a>
+          </div>
+        </section>
+
+        <!-- Live signal preview -->
+        <section aria-labelledby="signals-preview">
+          <h2 id="signals-preview">What a signal looks like</h2>
+          <p>When a monitor check fails, SignalForge emits a structured <strong>Signal</strong> — a typed observation with severity, value, threshold, and context. Here are some example signals from a production workspace:</p>
+
+          <div class="signal-card">
+            <div class="signal-severity critical"></div>
+            <div class="signal-meta">
+              <div class="signal-name">payments-api-health → status_not_2xx</div>
+              <div class="signal-detail">HTTP 503 received · threshold: 2xx · consecutive failures: 4 · env: production</div>
+            </div>
+            <span class="signal-timestamp">14:32:18Z</span>
+          </div>
+
+          <div class="signal-card">
+            <div class="signal-severity warning"></div>
+            <div class="signal-meta">
+              <div class="signal-name">catalog-api-latency → latency_p95_exceeded</div>
+              <div class="signal-detail">p95 latency: 2,840ms · threshold: 2,000ms · severity: warning</div>
+            </div>
+            <span class="signal-timestamp">14:31:05Z</span>
+          </div>
+
+          <div class="signal-card">
+            <div class="signal-severity info"></div>
+            <div class="signal-meta">
+              <div class="signal-name">payments-api-health → status_recovered</div>
+              <div class="signal-detail">HTTP 200 received · downtime: 4m 32s · monitor resumed normal operation</div>
+            </div>
+            <span class="signal-timestamp">14:36:50Z</span>
+          </div>
+        </section>
+
+        <!-- Quick CLI preview -->
+        <section aria-labelledby="cli-preview">
+          <h2 id="cli-preview">Quick look: CLI</h2>
+          <p>Install SignalForge globally and start monitoring in two commands.</p>
+
+          <div class="terminal">
+            <div class="terminal-titlebar">
+              <div class="terminal-dot close"></div>
+              <div class="terminal-dot min"></div>
+              <div class="terminal-dot max"></div>
+              <span class="terminal-title">zsh</span>
+            </div>
+            <pre>
+<span class="hl-prompt">$</span> <span class="hl-cmd">npm</span> <span class="hl-flag">install</span> <span class="hl-flag">-g</span> <span class="hl-arg">@signalforge/cli</span>
+
+<span class="hl-out">+ @signalforge/cli@0.9.2</span>
+<span class="hl-out">added 47 packages in 3.2s</span>
+
+<span class="hl-prompt">$</span> <span class="hl-cmd">signalforge</span> <span class="hl-flag">init</span>
+
+<span class="hl-out">✓ Workspace created: acme-platform</span>
+<span class="hl-out">✓ Config written:    signalforge.yml</span>
+<span class="hl-out">✓ API key stored:    ~/.signalforge/credentials</span>
+<span class="hl-out"></span>
+<span class="hl-out">Next: define a monitor and run `signalforge monitor sync`</span>
+</pre>
+          </div>
+
+          <p>Ready to continue? <a href="getting-started.html">Follow the full Getting Started guide →</a></p>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-left">
+          SignalForge v0.9.2 · MIT License · <a href="https://github.com/signalforge/signalforge" style="color: var(--text-muted);">signalforge/signalforge</a>
+        </div>
+        <div class="footer-links">
+          <a href="api-reference.html">API</a>
+          <a href="changelog.html">Changelog</a>
+          <a href="support.html">Support</a>
+          <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

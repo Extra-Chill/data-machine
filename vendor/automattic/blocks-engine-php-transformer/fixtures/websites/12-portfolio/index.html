@@ -1,0 +1,1868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Portfolio — Mira Vale, Creative Director</title>
+  <meta name="description" content="Independent creative director working across brand systems, editorial campaigns, and art-directed product launches.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,700;0,6..96,900;1,6..96,400;1,6..96,700&family=Syne:wght@400;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet">
+  <style>
+    /* =============================================
+       RESET & ROOT
+       ============================================= */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg:          #0C0B09;
+      --bg-surface:  #131210;
+      --bg-raised:   #1C1A15;
+      --cream:       #EDE7D4;
+      --cream-mid:   #B0A899;
+      --cream-dim:   #68625A;
+      --gold:        #C4A35A;
+      --gold-bright: #DDB96C;
+      --gold-dim:    #6A5628;
+      --ember:       #BE4A36;
+
+      --font-display: 'Bodoni Moda', Georgia, serif;
+      --font-ui:      'Syne', sans-serif;
+      --font-mono:    'Syne Mono', 'Courier New', monospace;
+
+      --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--cream);
+      font-family: var(--font-ui);
+      overflow-x: hidden;
+      cursor: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* =============================================
+       GRAIN OVERLAY
+       ============================================= */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-size: 200px 200px;
+    }
+
+    /* =============================================
+       CUSTOM CURSOR
+       ============================================= */
+    .cursor-dot,
+    .cursor-ring {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      top: -40px;
+      left: -40px;
+    }
+
+    .cursor-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--gold);
+      transition: width 0.25s var(--ease-expo), height 0.25s var(--ease-expo), background 0.25s;
+    }
+
+    .cursor-ring {
+      width: 36px;
+      height: 36px;
+      border: 1px solid rgba(196,163,90,0.55);
+      transition: all 0.14s var(--ease-expo);
+      z-index: 9998;
+    }
+
+    body.cursor-hover .cursor-dot {
+      width: 44px;
+      height: 44px;
+      background: transparent;
+      border: 1px solid var(--gold);
+    }
+
+    body.cursor-hover .cursor-ring {
+      opacity: 0;
+    }
+
+    /* =============================================
+       NAVIGATION
+       ============================================= */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 500;
+      padding: 1.6rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.4s, border-color 0.4s, backdrop-filter 0.4s;
+      border-bottom: 1px solid transparent;
+    }
+
+    .nav.scrolled {
+      background: rgba(12,11,9,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom-color: rgba(240,234,216,0.06);
+    }
+
+    .nav-logo {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      font-style: italic;
+      color: var(--cream);
+      text-decoration: none;
+      letter-spacing: 0.04em;
+    }
+
+    .nav-links {
+      list-style: none;
+      display: flex;
+      gap: 2.75rem;
+    }
+
+    .nav-links a {
+      font-family: var(--font-mono);
+      font-size: 0.67rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--cream-mid);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--gold); }
+
+    /* =============================================
+       HERO
+       ============================================= */
+    .hero {
+      min-height: 100vh;
+      padding: 0 3rem 3.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-bg-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(240,234,216,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(240,234,216,0.04) 1px, transparent 1px);
+      background-size: 64px 64px;
+      pointer-events: none;
+    }
+
+    .hero-bg-orb {
+      position: absolute;
+      top: 20%;
+      right: 8%;
+      width: 55vw;
+      height: 55vw;
+      max-width: 800px;
+      max-height: 800px;
+      background: radial-gradient(circle, rgba(196,163,90,0.07) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    .hero-bg-orb-2 {
+      position: absolute;
+      bottom: 5%;
+      left: -10%;
+      width: 40vw;
+      height: 40vw;
+      max-width: 600px;
+      background: radial-gradient(circle, rgba(190,74,54,0.04) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* Eyebrow */
+    .hero-eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      font-family: var(--font-mono);
+      font-size: 0.67rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--gold);
+      opacity: 0;
+      animation: fadeSlideUp 0.9s var(--ease-expo) 0.05s forwards;
+    }
+
+    .hero-eyebrow-line {
+      display: block;
+      width: 44px;
+      height: 1px;
+      background: var(--gold);
+      flex-shrink: 0;
+    }
+
+    /* Name */
+    .hero-name {
+      font-family: var(--font-display);
+      font-size: clamp(5.5rem, 15vw, 17rem);
+      font-weight: 900;
+      line-height: 0.88;
+      letter-spacing: -0.02em;
+      overflow: hidden;
+    }
+
+    .hero-name-row {
+      display: block;
+      overflow: hidden;
+    }
+
+    .hero-name-inner {
+      display: block;
+      transform: translateY(115%);
+      animation: slideUp 1.1s var(--ease-expo) forwards;
+    }
+
+    .hero-name-row:nth-child(1) .hero-name-inner { animation-delay: 0.12s; }
+    .hero-name-row:nth-child(2) .hero-name-inner {
+      animation-delay: 0.26s;
+      padding-left: clamp(2.5rem, 9vw, 12rem);
+      font-style: italic;
+      color: var(--gold);
+    }
+
+    @keyframes slideUp {
+      to { transform: translateY(0); }
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Meta strip below name */
+    .hero-meta {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2rem;
+      align-items: end;
+      margin-top: 3.5rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(240,234,216,0.08);
+      opacity: 0;
+      animation: fadeSlideUp 0.9s var(--ease-expo) 0.55s forwards;
+    }
+
+    .hero-tagline {
+      font-family: var(--font-display);
+      font-size: clamp(1rem, 1.8vw, 1.35rem);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--cream-mid);
+      line-height: 1.55;
+      max-width: 420px;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 3.5rem;
+      align-items: flex-end;
+    }
+
+    .hero-stat-num {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 2.75rem;
+      font-weight: 900;
+      color: var(--cream);
+      line-height: 1;
+    }
+
+    .hero-stat-lbl {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--cream-dim);
+      margin-top: 0.3rem;
+    }
+
+    /* Scroll cue */
+    .hero-scroll {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 2.5rem;
+      opacity: 0;
+      animation: fadeSlideUp 0.9s var(--ease-expo) 0.75s forwards;
+    }
+
+    .hero-scroll span {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--cream-dim);
+    }
+
+    .scroll-line {
+      position: relative;
+      width: 60px;
+      height: 1px;
+      background: var(--cream-dim);
+      overflow: hidden;
+    }
+
+    .scroll-line::after {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      left: -100%;
+      width: 100%;
+      background: var(--gold);
+      animation: sweep 2.2s ease-in-out 1.5s infinite;
+    }
+
+    @keyframes sweep {
+      0%   { left: -100%; }
+      50%  { left: 0; }
+      100% { left: 100%; }
+    }
+
+    /* =============================================
+       SHARED SECTION STYLES
+       ============================================= */
+    section {
+      padding: 8rem 3rem;
+      position: relative;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(240,234,216,0.07);
+    }
+
+    .section-tag {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.25rem, 4.5vw, 4.5rem);
+      font-weight: 700;
+      line-height: 1;
+      color: var(--cream);
+    }
+
+    .section-title em {
+      font-style: italic;
+      color: var(--gold);
+    }
+
+    /* =============================================
+       REVEAL ANIMATION
+       ============================================= */
+    .reveal {
+      opacity: 0;
+      transform: translateY(36px);
+      transition: opacity 0.85s var(--ease-expo), transform 0.85s var(--ease-expo);
+    }
+
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .rev-d1 { transition-delay: 0.1s; }
+    .rev-d2 { transition-delay: 0.2s; }
+    .rev-d3 { transition-delay: 0.3s; }
+    .rev-d4 { transition-delay: 0.4s; }
+    .rev-d5 { transition-delay: 0.5s; }
+
+    /* =============================================
+       WORK SECTION
+       ============================================= */
+    #work { background: var(--bg); }
+
+    .work-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 1.25rem;
+    }
+
+    .work-card {
+      position: relative;
+      background: var(--bg-surface);
+      overflow: hidden;
+      cursor: none;
+    }
+
+    .work-card:nth-child(1) { grid-column: 1 / 7; }
+    .work-card:nth-child(2) { grid-column: 7 / 13; }
+    .work-card:nth-child(3) { grid-column: 1 / 5; }
+    .work-card:nth-child(4) { grid-column: 5 / 9; }
+    .work-card:nth-child(5) { grid-column: 9 / 13; }
+    .work-card:nth-child(6) { grid-column: 1 / 13; }
+
+    .work-thumb {
+      display: block;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .work-thumb svg {
+      display: block;
+      width: 100%;
+      transition: transform 0.7s var(--ease-expo);
+    }
+
+    .work-card:hover .work-thumb svg { transform: scale(1.04); }
+
+    /* Hover overlay */
+    .work-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(10,9,7,0.88);
+      opacity: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 2rem 2rem 1.5rem;
+      transition: opacity 0.4s var(--ease-expo);
+    }
+
+    .work-card:hover .work-overlay { opacity: 1; }
+
+    .ov-client {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      font-weight: 700;
+      font-style: italic;
+      color: var(--gold);
+      line-height: 1.1;
+      margin-bottom: 0.35rem;
+    }
+
+    .ov-type {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--cream-mid);
+      margin-bottom: 0.9rem;
+    }
+
+    .ov-desc {
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: var(--cream-dim);
+    }
+
+    /* Card footer */
+    .work-foot {
+      padding: 1rem 1.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-top: 1px solid rgba(240,234,216,0.05);
+    }
+
+    .wf-name {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--cream);
+    }
+
+    .wf-meta {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      color: var(--cream-dim);
+      text-align: right;
+    }
+
+    /* =============================================
+       CASE STUDY
+       ============================================= */
+    #case-study {
+      background: var(--bg-surface);
+    }
+
+    .cs-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6rem;
+      align-items: start;
+    }
+
+    .cs-visual {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cs-visual svg { display: block; width: 100%; }
+
+    .cs-badge {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.25rem;
+      background: var(--gold);
+      color: var(--bg);
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.75rem;
+    }
+
+    .cs-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.1rem;
+    }
+
+    .cs-heading {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 3.8vw, 3.5rem);
+      font-weight: 900;
+      line-height: 1.05;
+      color: var(--cream);
+      margin-bottom: 1.75rem;
+    }
+
+    .cs-heading em { font-style: italic; color: var(--gold); }
+
+    .cs-body {
+      font-size: 0.92rem;
+      line-height: 1.82;
+      color: var(--cream-mid);
+      margin-bottom: 1.25rem;
+    }
+
+    .cs-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      margin-top: 2.75rem;
+      padding-top: 2.25rem;
+      border-top: 1px solid rgba(240,234,216,0.08);
+    }
+
+    .metric { text-align: center; }
+
+    .m-val {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 2.4rem;
+      font-weight: 900;
+      color: var(--gold-bright);
+      line-height: 1;
+    }
+
+    .m-lbl {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--cream-dim);
+      margin-top: 0.45rem;
+    }
+
+    /* =============================================
+       PROCESS
+       ============================================= */
+    #process { background: var(--bg); }
+
+    .process-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid rgba(240,234,216,0.07);
+    }
+
+    .process-step {
+      padding: 3rem 2.5rem 3rem 2rem;
+      border-right: 1px solid rgba(240,234,216,0.07);
+    }
+
+    .process-step:last-child { border-right: none; }
+
+    .ps-num {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 5rem;
+      font-weight: 900;
+      line-height: 1;
+      color: rgba(196,163,90,0.1);
+      margin-bottom: 1.25rem;
+      user-select: none;
+    }
+
+    .ps-title {
+      font-family: var(--font-display);
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: var(--cream);
+      margin-bottom: 0.9rem;
+      line-height: 1.2;
+    }
+
+    .ps-title em { font-style: italic; color: var(--gold); }
+
+    .ps-body {
+      font-size: 0.87rem;
+      line-height: 1.75;
+      color: var(--cream-dim);
+    }
+
+    /* =============================================
+       CLIENTS
+       ============================================= */
+    #clients {
+      background: var(--bg-surface);
+      padding: 7rem 0;
+      overflow: hidden;
+    }
+
+    .clients-top {
+      padding: 0 3rem 4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid rgba(240,234,216,0.07);
+      margin-bottom: 3.5rem;
+    }
+
+    /* Marquee */
+    .marquee-wrap {
+      overflow: hidden;
+      margin-bottom: 0;
+    }
+
+    .marquee-track {
+      display: flex;
+      white-space: nowrap;
+      animation: marqScroll 22s linear infinite;
+    }
+
+    .marquee-track:hover { animation-play-state: paused; }
+
+    @keyframes marqScroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .marq-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 2.25rem;
+      padding: 0 3rem;
+      font-family: var(--font-display);
+      font-size: clamp(1.6rem, 3vw, 2.5rem);
+      font-weight: 700;
+      color: var(--cream-dim);
+      white-space: nowrap;
+      transition: color 0.25s;
+    }
+
+    .marq-item:hover { color: var(--cream); }
+
+    .marq-dot {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--gold);
+      flex-shrink: 0;
+    }
+
+    /* Client grid */
+    .client-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      margin: 3.5rem 3rem 0;
+      border-top: 1px solid rgba(240,234,216,0.05);
+    }
+
+    .client-item {
+      padding: 2rem 1.75rem;
+      border-right: 1px solid rgba(240,234,216,0.05);
+      border-bottom: 1px solid rgba(240,234,216,0.05);
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-style: italic;
+      color: var(--cream-dim);
+      transition: color 0.25s;
+    }
+
+    .client-item:nth-child(4n)  { border-right: none; }
+    .client-item:nth-last-child(-n+4) { border-bottom: none; }
+    .client-item:hover { color: var(--gold); }
+
+    /* =============================================
+       BIO
+       ============================================= */
+    #bio { background: var(--bg); }
+
+    .bio-inner {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 8rem;
+      align-items: center;
+    }
+
+    .bio-portrait svg { display: block; width: 100%; }
+
+    .bio-portrait-cap {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--cream-dim);
+      margin-top: 1rem;
+    }
+
+    .bio-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.4rem;
+    }
+
+    .bio-heading {
+      font-family: var(--font-display);
+      font-size: clamp(1.9rem, 3.5vw, 3rem);
+      font-weight: 900;
+      line-height: 1.1;
+      color: var(--cream);
+      margin-bottom: 2rem;
+    }
+
+    .bio-pull {
+      font-family: var(--font-display);
+      font-size: clamp(1rem, 1.5vw, 1.2rem);
+      font-style: italic;
+      line-height: 1.75;
+      color: var(--cream-mid);
+      margin-bottom: 1.5rem;
+    }
+
+    .bio-body {
+      font-size: 0.9rem;
+      line-height: 1.82;
+      color: var(--cream-dim);
+      margin-bottom: 2.5rem;
+    }
+
+    .bio-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .bio-tag {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      border: 1px solid var(--gold-dim);
+      padding: 0.38rem 0.9rem;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .bio-tag:hover {
+      background: var(--gold);
+      color: var(--bg);
+    }
+
+    /* =============================================
+       TESTIMONIAL
+       ============================================= */
+    #testimonial {
+      background: var(--bg-raised);
+      padding: 11rem 3rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .test-bg-mark {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .test-bg-mark span {
+      font-family: var(--font-display);
+      font-size: 42vw;
+      font-weight: 900;
+      color: rgba(196,163,90,0.028);
+      line-height: 1;
+    }
+
+    .test-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .test-open {
+      font-family: var(--font-display);
+      font-size: 4.5rem;
+      line-height: 0.5;
+      color: var(--gold);
+      display: block;
+      margin-bottom: 2rem;
+      opacity: 0.7;
+    }
+
+    .test-quote {
+      font-family: var(--font-display);
+      font-size: clamp(1.2rem, 2.4vw, 1.95rem);
+      font-style: italic;
+      font-weight: 400;
+      line-height: 1.65;
+      color: var(--cream);
+      margin-bottom: 3.5rem;
+    }
+
+    .test-attr {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+
+    .test-line {
+      width: 40px;
+      height: 1px;
+      background: var(--gold);
+      opacity: 0.6;
+    }
+
+    .test-name {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+
+    /* =============================================
+       CONTACT
+       ============================================= */
+    #contact {
+      background: var(--bg);
+      padding: 10rem 3rem 10rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .contact-inner { max-width: 900px; }
+
+    .contact-label {
+      font-family: var(--font-mono);
+      font-size: 0.67rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 2rem;
+    }
+
+    .contact-heading {
+      font-family: var(--font-display);
+      font-size: clamp(3.5rem, 8vw, 9rem);
+      font-weight: 900;
+      line-height: 0.92;
+      color: var(--cream);
+      margin-bottom: 4.5rem;
+    }
+
+    .contact-heading em {
+      font-style: italic;
+      color: var(--gold);
+      display: block;
+    }
+
+    .contact-links {
+      display: flex;
+      align-items: center;
+      gap: 3.5rem;
+      flex-wrap: wrap;
+    }
+
+    .contact-email {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-style: italic;
+      color: var(--cream);
+      text-decoration: none;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid var(--gold);
+      transition: color 0.2s;
+    }
+
+    .contact-email:hover { color: var(--gold); }
+
+    .contact-social {
+      display: flex;
+      gap: 2.25rem;
+    }
+
+    .contact-social a {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--cream-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .contact-social a:hover { color: var(--gold); }
+
+    /* Large bg letters */
+    .contact-bg {
+      position: absolute;
+      right: -3rem;
+      bottom: -5rem;
+      font-family: var(--font-display);
+      font-size: clamp(10rem, 24vw, 26rem);
+      font-weight: 900;
+      font-style: italic;
+      color: rgba(196,163,90,0.038);
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* =============================================
+       FOOTER
+       ============================================= */
+    footer {
+      padding: 1.75rem 3rem;
+      border-top: 1px solid rgba(240,234,216,0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer-copy {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.14em;
+      color: var(--cream-dim);
+    }
+
+    .footer-sig {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-style: italic;
+      font-weight: 700;
+      color: var(--cream-dim);
+    }
+
+    /* =============================================
+       RESPONSIVE
+       ============================================= */
+    @media (max-width: 1024px) {
+      .work-card:nth-child(3),
+      .work-card:nth-child(4),
+      .work-card:nth-child(5) { grid-column: span 4; }
+    }
+
+    @media (max-width: 860px) {
+      section { padding: 5rem 1.5rem; }
+      .nav { padding: 1.25rem 1.5rem; }
+      .hero { padding: 0 1.5rem 2rem; }
+
+      .work-card:nth-child(1),
+      .work-card:nth-child(2) { grid-column: 1 / 13; }
+      .work-card:nth-child(3),
+      .work-card:nth-child(4),
+      .work-card:nth-child(5) { grid-column: 1 / 13; }
+      .work-card:nth-child(6) { grid-column: 1 / 13; }
+
+      .cs-inner { grid-template-columns: 1fr; gap: 3rem; }
+      .process-grid { grid-template-columns: 1fr 1fr; }
+      .bio-inner { grid-template-columns: 1fr; gap: 3rem; }
+      .client-grid { grid-template-columns: 1fr 1fr; }
+
+      .hero-meta { grid-template-columns: 1fr; }
+      .hero-stats { justify-content: flex-start; }
+      .section-header { flex-direction: column; gap: 0.5rem; }
+    }
+
+    @media (max-width: 580px) {
+      .process-grid { grid-template-columns: 1fr; }
+      .client-grid { grid-template-columns: 1fr 1fr; }
+      .cs-metrics { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      .hero-stats { gap: 2rem; }
+      .contact-links { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Custom cursor -->
+  <div class="cursor-dot"  id="cDot"  aria-hidden="true"></div>
+  <div class="cursor-ring" id="cRing" aria-hidden="true"></div>
+
+  <!-- ============================================
+       NAVIGATION
+       ============================================ -->
+  <nav class="nav" id="mainNav" role="navigation" aria-label="Main navigation">
+    <a href="#" class="nav-logo" aria-label="Mira Vale — home">MV</a>
+    <ul class="nav-links" role="list">
+      <li><a href="#work">Work</a></li>
+      <li><a href="#process">Process</a></li>
+      <li><a href="#bio">Studio</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+
+  <!-- ============================================
+       HERO
+       ============================================ -->
+  <header class="hero" role="banner">
+    <div class="hero-bg-grid"  aria-hidden="true"></div>
+    <div class="hero-bg-orb"   aria-hidden="true"></div>
+    <div class="hero-bg-orb-2" aria-hidden="true"></div>
+
+    <div>
+      <p class="hero-eyebrow" aria-label="Independent Creative Director">
+        <span class="hero-eyebrow-line"></span>
+        Independent Creative Director
+      </p>
+
+      <h1 class="hero-name">
+        <span class="hero-name-row"><span class="hero-name-inner">Mira</span></span>
+        <span class="hero-name-row"><span class="hero-name-inner">Vale</span></span>
+      </h1>
+
+      <div class="hero-meta">
+        <p class="hero-tagline">
+          Brand systems, editorial campaigns,<br>
+          and art-directed product launches<br>
+          that endure long past the moment.
+        </p>
+        <div class="hero-stats" aria-label="Career highlights">
+          <div>
+            <span class="hero-stat-num">15+</span>
+            <span class="hero-stat-lbl">Years active</span>
+          </div>
+          <div>
+            <span class="hero-stat-num">40+</span>
+            <span class="hero-stat-lbl">Brands shaped</span>
+          </div>
+          <div>
+            <span class="hero-stat-num">3</span>
+            <span class="hero-stat-lbl">Continents</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-scroll" aria-hidden="true">
+        <div class="scroll-line"></div>
+        <span>Scroll to explore</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================
+       WORK GRID  — I
+       ============================================ -->
+  <section id="work" aria-labelledby="work-title">
+    <div class="section-header reveal">
+      <span class="section-tag">I — Selected Work</span>
+      <h2 class="section-title" id="work-title">The <em>Portfolio</em></h2>
+    </div>
+
+    <div class="work-grid" role="list">
+
+      <!-- 1 — Vessel Beauty -->
+      <article class="work-card reveal" role="listitem" aria-label="Vessel Beauty — Brand System Overhaul, 2023">
+        <div class="work-thumb" aria-hidden="true">
+          <svg viewBox="0 0 800 440" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <radialGradient id="vb-bg" cx="45%" cy="35%" r="65%">
+                <stop offset="0%" stop-color="#2A1B0E"/>
+                <stop offset="100%" stop-color="#0C0806"/>
+              </radialGradient>
+              <linearGradient id="vb-bottle-g" x1="0%" y1="0%" x2="60%" y2="100%">
+                <stop offset="0%" stop-color="#DEB96E"/>
+                <stop offset="100%" stop-color="#7A5528"/>
+              </linearGradient>
+            </defs>
+            <rect width="800" height="440" fill="url(#vb-bg)"/>
+            <!-- Subtle grid -->
+            <line x1="0" y1="220" x2="800" y2="220" stroke="rgba(196,163,90,0.07)" stroke-width="0.5"/>
+            <line x1="400" y1="0" x2="400" y2="440" stroke="rgba(196,163,90,0.07)" stroke-width="0.5"/>
+            <!-- Rings -->
+            <circle cx="200" cy="180" r="100" fill="none" stroke="rgba(196,163,90,0.07)" stroke-width="0.5"/>
+            <circle cx="200" cy="180" r="145" fill="none" stroke="rgba(196,163,90,0.04)" stroke-width="0.5"/>
+            <circle cx="620" cy="300" r="70"  fill="none" stroke="rgba(196,163,90,0.07)" stroke-width="0.5"/>
+            <!-- Tall bottle -->
+            <path d="M380 395 L380 210 Q380 195 388 185 L393 158 L403 138 Q408 128 418 128 Q428 128 433 138 L443 158 L448 185 Q456 195 456 210 L456 395 Z" fill="url(#vb-bottle-g)" opacity="0.88"/>
+            <!-- Highlight -->
+            <path d="M390 220 L390 370 Q390 210 395 185" stroke="rgba(255,240,200,0.18)" stroke-width="2" fill="none"/>
+            <!-- Neck -->
+            <rect x="403" y="98" width="30" height="38" rx="5" fill="#C4A35A" opacity="0.9"/>
+            <!-- Cap -->
+            <rect x="399" y="84" width="38" height="18" rx="3" fill="#DEB96E"/>
+            <!-- Label -->
+            <rect x="390" y="255" width="56" height="80" fill="rgba(10,8,4,0.45)"/>
+            <text x="418" y="287" text-anchor="middle" font-family="Georgia,serif" font-size="7.5" fill="rgba(222,185,110,0.95)" letter-spacing="1.5">VESSEL</text>
+            <text x="418" y="301" text-anchor="middle" font-family="Georgia,serif" font-size="4.5" fill="rgba(196,163,90,0.6)" letter-spacing="3">BEAUTY</text>
+            <line x1="396" y1="310" x2="440" y2="310" stroke="rgba(196,163,90,0.25)" stroke-width="0.5"/>
+            <text x="418" y="323" text-anchor="middle" font-family="Georgia,serif" font-size="4" fill="rgba(196,163,90,0.4)" letter-spacing="2">ÉLIXIR NO.4</text>
+            <!-- Shorter bottle offset -->
+            <path d="M490 395 L490 248 Q490 238 497 230 L502 210 L508 198 Q512 192 518 192 Q524 192 528 198 L534 210 L539 230 Q546 238 546 248 L546 395 Z" fill="url(#vb-bottle-g)" opacity="0.62"/>
+            <rect x="502" y="178" width="24" height="18" rx="3" fill="#C4A35A" opacity="0.8"/>
+            <rect x="499" y="168" width="30" height="14" rx="2.5" fill="#DEB96E" opacity="0.85"/>
+            <!-- Rule lines right -->
+            <line x1="600" y1="110" x2="740" y2="110" stroke="rgba(196,163,90,0.25)" stroke-width="0.5"/>
+            <line x1="600" y1="122" x2="700" y2="122" stroke="rgba(196,163,90,0.14)" stroke-width="0.5"/>
+            <line x1="600" y1="134" x2="720" y2="134" stroke="rgba(196,163,90,0.18)" stroke-width="0.5"/>
+            <text x="600" y="106" font-family="Georgia,serif" font-size="8" fill="rgba(196,163,90,0.35)" letter-spacing="3">PRESTIGE SKINCARE</text>
+            <!-- Year -->
+            <text x="740" y="430" text-anchor="end" font-family="monospace" font-size="7" fill="rgba(196,163,90,0.28)" letter-spacing="2">2023</text>
+          </svg>
+        </div>
+        <div class="work-overlay" aria-hidden="true">
+          <p class="ov-client">Vessel Beauty</p>
+          <p class="ov-type">Brand System Overhaul</p>
+          <p class="ov-desc">A complete repositioning from mass-market to prestige skincare — new visual language, packaging art direction, and launch campaign across 12 markets.</p>
+        </div>
+        <div class="work-foot">
+          <span class="wf-name">Vessel Beauty</span>
+          <span class="wf-meta">Brand System / 2023</span>
+        </div>
+      </article>
+
+      <!-- 2 — Nomad Hotels -->
+      <article class="work-card reveal rev-d1" role="listitem" aria-label="Nomad Hotels — Campaign Direction, 2024">
+        <div class="work-thumb" aria-hidden="true">
+          <svg viewBox="0 0 800 440" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="nh-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#0E1520"/>
+                <stop offset="100%" stop-color="#070910"/>
+              </linearGradient>
+            </defs>
+            <rect width="800" height="440" fill="url(#nh-bg)"/>
+            <!-- Vanishing point lines -->
+            <line x1="400" y1="220" x2="0"   y2="0"   stroke="rgba(196,163,90,0.1)"  stroke-width="0.5"/>
+            <line x1="400" y1="220" x2="160" y2="0"   stroke="rgba(196,163,90,0.1)"  stroke-width="0.5"/>
+            <line x1="400" y1="220" x2="320" y2="0"   stroke="rgba(196,163,90,0.1)"  stroke-width="0.5"/>
+            <line x1="400" y1="220" x2="480" y2="0"   stroke="rgba(196,163,90,0.1)"  stroke-width="0.5"/>
+            <line x1="400" y1="220" x2="640" y2="0"   stroke="rgba(196,163,90,0.1)"  stroke-width="0.5"/>
+            <line x1="400" y1="220" x2="800" y2="0"   stroke="rgba(196,163,90,0.1)"  stroke-width="0.5"/>
+            <line x1="400" y1="220" x2="0"   y2="440" stroke="rgba(196,163,90,0.06)" stroke-width="0.5"/>
+            <line x1="400" y1="220" x2="800" y2="440" stroke="rgba(196,163,90,0.06)" stroke-width="0.5"/>
+            <!-- Horizon -->
+            <line x1="0" y1="220" x2="800" y2="220" stroke="rgba(196,163,90,0.12)" stroke-width="0.5"/>
+            <!-- Building -->
+            <rect x="230" y="60" width="340" height="295" fill="rgba(196,163,90,0.03)" stroke="rgba(196,163,90,0.22)" stroke-width="0.5"/>
+            <!-- Window grid -->
+            <g fill="rgba(196,163,90,0.14)">
+              <rect x="248" y="80"  width="22" height="16"/> <rect x="282" y="80"  width="22" height="16"/> <rect x="316" y="80"  width="22" height="16"/>
+              <rect x="350" y="80"  width="22" height="16"/> <rect x="384" y="80"  width="22" height="16"/> <rect x="418" y="80"  width="22" height="16"/>
+              <rect x="452" y="80"  width="22" height="16"/> <rect x="486" y="80"  width="22" height="16"/> <rect x="520" y="80"  width="22" height="16"/>
+              <rect x="248" y="110" width="22" height="16"/> <rect x="282" y="110" width="22" height="16"/> <rect x="350" y="110" width="22" height="16"/>
+              <rect x="384" y="110" width="22" height="16"/> <rect x="452" y="110" width="22" height="16"/> <rect x="520" y="110" width="22" height="16"/>
+              <rect x="248" y="140" width="22" height="16"/> <rect x="316" y="140" width="22" height="16"/> <rect x="384" y="140" width="22" height="16"/>
+              <rect x="418" y="140" width="22" height="16"/> <rect x="486" y="140" width="22" height="16"/> <rect x="520" y="140" width="22" height="16"/>
+              <rect x="248" y="170" width="22" height="16"/> <rect x="282" y="170" width="22" height="16"/> <rect x="350" y="170" width="22" height="16"/>
+              <rect x="418" y="170" width="22" height="16"/> <rect x="452" y="170" width="22" height="16"/> <rect x="520" y="170" width="22" height="16"/>
+              <rect x="248" y="200" width="22" height="16"/> <rect x="316" y="200" width="22" height="16"/> <rect x="384" y="200" width="22" height="16"/>
+              <rect x="452" y="200" width="22" height="16"/> <rect x="486" y="200" width="22" height="16"/>
+            </g>
+            <!-- Lobby -->
+            <rect x="345" y="295" width="110" height="60" fill="rgba(196,163,90,0.06)" stroke="rgba(196,163,90,0.28)" stroke-width="0.5"/>
+            <line x1="400" y1="295" x2="400" y2="355" stroke="rgba(196,163,90,0.2)" stroke-width="0.5"/>
+            <!-- Flag -->
+            <line x1="400" y1="60" x2="400" y2="30" stroke="rgba(196,163,90,0.4)" stroke-width="0.5"/>
+            <polygon points="400,30 424,36 400,42" fill="rgba(196,163,90,0.5)"/>
+            <!-- Masthead -->
+            <text x="400" y="415" text-anchor="middle" font-family="Georgia,serif" font-size="11" fill="rgba(196,163,90,0.45)" letter-spacing="8">NOMAD HOTELS</text>
+            <text x="400" y="432" text-anchor="middle" font-family="monospace"      font-size="6"  fill="rgba(196,163,90,0.25)" letter-spacing="6">WHEREVER YOU ARE</text>
+          </svg>
+        </div>
+        <div class="work-overlay" aria-hidden="true">
+          <p class="ov-client">Nomad Hotels</p>
+          <p class="ov-type">Campaign Direction</p>
+          <p class="ov-desc">A globally-scaled campaign concept across print, OOH, and digital — "Wherever You Are, You're Already Home."</p>
+        </div>
+        <div class="work-foot">
+          <span class="wf-name">Nomad Hotels</span>
+          <span class="wf-meta">Campaign / 2024</span>
+        </div>
+      </article>
+
+      <!-- 3 — Arca Studio -->
+      <article class="work-card reveal" role="listitem" aria-label="Arca Studio — Visual Identity, 2023">
+        <div class="work-thumb" aria-hidden="true">
+          <svg viewBox="0 0 400 440" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+            <rect width="400" height="440" fill="#0E0D0C"/>
+            <!-- Guide grid -->
+            <line x1="200" y1="0"   x2="200" y2="440" stroke="rgba(196,163,90,0.12)" stroke-width="0.5" stroke-dasharray="3 4"/>
+            <line x1="0"   y1="220" x2="400" y2="220" stroke="rgba(196,163,90,0.12)" stroke-width="0.5" stroke-dasharray="3 4"/>
+            <line x1="0"   y1="130" x2="400" y2="130" stroke="rgba(196,163,90,0.07)" stroke-width="0.5" stroke-dasharray="3 4"/>
+            <!-- Big A -->
+            <polygon points="200,35 296,378 258,378 200,205 142,378 104,378"
+              fill="none" stroke="rgba(240,234,216,0.9)" stroke-width="2" stroke-linejoin="round"/>
+            <!-- Crossbar -->
+            <line x1="136" y1="262" x2="264" y2="262" stroke="rgba(240,234,216,0.9)" stroke-width="2"/>
+            <!-- Inner fill tint -->
+            <polygon points="200,35 296,378 258,378 200,205 142,378 104,378"
+              fill="rgba(196,163,90,0.04)"/>
+            <!-- Intersection marks -->
+            <circle cx="200" cy="130" r="3.5" fill="rgba(196,163,90,0.55)"/>
+            <circle cx="136" cy="262" r="3"   fill="rgba(196,163,90,0.4)"/>
+            <circle cx="264" cy="262" r="3"   fill="rgba(196,163,90,0.4)"/>
+            <!-- Corner registration marks -->
+            <line x1="20" y1="20" x2="44" y2="20" stroke="rgba(196,163,90,0.35)" stroke-width="0.75"/>
+            <line x1="20" y1="20" x2="20" y2="44" stroke="rgba(196,163,90,0.35)" stroke-width="0.75"/>
+            <line x1="380" y1="20" x2="356" y2="20" stroke="rgba(196,163,90,0.35)" stroke-width="0.75"/>
+            <line x1="380" y1="20" x2="380" y2="44" stroke="rgba(196,163,90,0.35)" stroke-width="0.75"/>
+            <line x1="20" y1="420" x2="44"  y2="420" stroke="rgba(196,163,90,0.35)" stroke-width="0.75"/>
+            <line x1="20" y1="420" x2="20"  y2="396" stroke="rgba(196,163,90,0.35)" stroke-width="0.75"/>
+            <line x1="380" y1="420" x2="356" y2="420" stroke="rgba(196,163,90,0.35)" stroke-width="0.75"/>
+            <line x1="380" y1="420" x2="380" y2="396" stroke="rgba(196,163,90,0.35)" stroke-width="0.75"/>
+            <!-- Caption -->
+            <text x="20" y="436" font-family="monospace" font-size="7" fill="rgba(240,234,216,0.22)" letter-spacing="3">ARCA STUDIO — IDENTITY</text>
+          </svg>
+        </div>
+        <div class="work-overlay" aria-hidden="true">
+          <p class="ov-client">Arca Studio</p>
+          <p class="ov-type">Visual Identity</p>
+          <p class="ov-desc">A modular identity system built from a single geometric mark — infinitely scalable from business card to building signage.</p>
+        </div>
+        <div class="work-foot">
+          <span class="wf-name">Arca Studio</span>
+          <span class="wf-meta">Identity / 2023</span>
+        </div>
+      </article>
+
+      <!-- 4 — Séquence Magazine -->
+      <article class="work-card reveal rev-d1" role="listitem" aria-label="Séquence Magazine — Editorial Direction, 2022">
+        <div class="work-thumb" aria-hidden="true">
+          <svg viewBox="0 0 400 440" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+            <!-- Magazine cover simulation -->
+            <rect width="400" height="440" fill="#EDE7D4"/>
+            <!-- Full-bleed image area -->
+            <rect x="0"   y="0"   width="240" height="280" fill="#CBBFA8"/>
+            <rect x="250" y="24"  width="140" height="88"  fill="#C0B49C"/>
+            <rect x="250" y="122" width="140" height="148" fill="#D8D0C0"/>
+            <!-- Column divider -->
+            <line x1="240" y1="0" x2="240" y2="440" stroke="#B4AE9E" stroke-width="0.5"/>
+            <line x1="0" y1="280" x2="400" y2="280" stroke="#B4AE9E" stroke-width="0.5"/>
+            <!-- Abstract figure in left image block -->
+            <ellipse cx="120" cy="90" rx="35" ry="42" fill="rgba(80,64,48,0.25)"/>
+            <rect x="88" y="130" width="64" height="148" rx="4" fill="rgba(80,64,48,0.18)"/>
+            <!-- Masthead -->
+            <text x="12" y="30" font-family="Georgia,serif" font-style="italic" font-size="30" fill="#0C0B09" letter-spacing="-0.5">Séquence</text>
+            <line x1="12" y1="36" x2="228" y2="36" stroke="#0C0B09" stroke-width="0.6"/>
+            <text x="12" y="50" font-family="monospace" font-size="5.5" fill="#5A5448" letter-spacing="3">VOL.12 — THE NATURE ISSUE</text>
+            <!-- Cover lines -->
+            <text x="252" y="44" font-family="Georgia,serif" font-style="italic" font-size="10" fill="#3A3228">The Future</text>
+            <text x="252" y="58" font-family="Georgia,serif" font-style="italic" font-size="10" fill="#3A3228">of Stillness</text>
+            <line x1="252" y1="66" x2="384" y2="66" stroke="#9A9080" stroke-width="0.5"/>
+            <text x="252" y="80" font-family="monospace" font-size="5"  fill="#8A8078" letter-spacing="2">INTERVIEW: ELENA SATO</text>
+            <text x="252" y="135" font-family="Georgia,serif" font-style="italic" font-size="9" fill="#3A3228">On slowness</text>
+            <text x="252" y="148" font-family="Georgia,serif" font-style="italic" font-size="9" fill="#3A3228">as resistance</text>
+            <!-- Body text blocks -->
+            <rect x="12"  y="296" width="160" height="5" fill="#3A3228" rx="1"/>
+            <rect x="12"  y="308" width="130" height="3" fill="#8A8278" rx="1"/>
+            <rect x="12"  y="318" width="150" height="3" fill="#8A8278" rx="1"/>
+            <rect x="12"  y="328" width="110" height="3" fill="#8A8278" rx="1"/>
+            <rect x="252" y="296" width="110" height="4" fill="#3A3228" rx="1"/>
+            <rect x="252" y="308" width="95"  height="3" fill="#8A8278" rx="1"/>
+            <rect x="252" y="318" width="115" height="3" fill="#8A8278" rx="1"/>
+            <!-- Issue number watermark -->
+            <text x="388" y="440" text-anchor="end" font-family="Georgia,serif" font-style="italic" font-size="55" fill="rgba(180,170,155,0.35)">12</text>
+          </svg>
+        </div>
+        <div class="work-overlay" aria-hidden="true">
+          <p class="ov-client">Séquence Magazine</p>
+          <p class="ov-type">Editorial Direction</p>
+          <p class="ov-desc">Six-issue tenure as guest editorial director — redesigned grid, masthead, and photography brief for the independent art and culture quarterly.</p>
+        </div>
+        <div class="work-foot">
+          <span class="wf-name">Séquence Mag.</span>
+          <span class="wf-meta">Editorial / 2022</span>
+        </div>
+      </article>
+
+      <!-- 5 — Bloom Botanicals -->
+      <article class="work-card reveal rev-d2" role="listitem" aria-label="Bloom Botanicals — Product Launch, 2024">
+        <div class="work-thumb" aria-hidden="true">
+          <svg viewBox="0 0 400 440" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <radialGradient id="bb-bg" cx="50%" cy="50%" r="55%">
+                <stop offset="0%" stop-color="#172118"/>
+                <stop offset="100%" stop-color="#090D09"/>
+              </radialGradient>
+            </defs>
+            <rect width="400" height="440" fill="url(#bb-bg)"/>
+            <!-- Main stem -->
+            <path d="M200 435 Q196 380 200 330 Q204 275 192 230 Q186 195 198 148 Q202 120 200 90" stroke="rgba(160,190,140,0.65)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <!-- Branch left 1 -->
+            <path d="M194 308 Q168 288 148 270 Q132 258 125 244" stroke="rgba(160,190,140,0.45)" stroke-width="1" fill="none" stroke-linecap="round"/>
+            <!-- Branch right 1 -->
+            <path d="M196 260 Q224 240 248 220 Q262 210 270 198" stroke="rgba(160,190,140,0.45)" stroke-width="1" fill="none" stroke-linecap="round"/>
+            <!-- Branch left 2 (smaller) -->
+            <path d="M196 195 Q172 178 158 162 Q150 152 148 142" stroke="rgba(160,190,140,0.35)" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+            <!-- Leaf shapes -->
+            <path d="M125 244 Q104 224 132 210 Q148 232 125 244Z" fill="rgba(120,165,100,0.38)" stroke="rgba(160,190,140,0.28)" stroke-width="0.5"/>
+            <path d="M270 198 Q292 176 286 202 Q270 210 270 198Z" fill="rgba(120,165,100,0.38)" stroke="rgba(160,190,140,0.28)" stroke-width="0.5"/>
+            <path d="M148 142 Q126 122 155 114 Q165 136 148 142Z" fill="rgba(120,165,100,0.3)"  stroke="rgba(160,190,140,0.22)" stroke-width="0.5"/>
+            <!-- Large leaf upper-left from main -->
+            <path d="M192 230 Q148 192 172 162 Q196 195 192 230Z" fill="rgba(100,150,85,0.32)" stroke="rgba(160,190,140,0.22)" stroke-width="0.5"/>
+            <!-- Flower -->
+            <circle cx="200" cy="82" r="5"   fill="rgba(196,163,90,0.9)"/>
+            <circle cx="200" cy="68" r="3.5" fill="rgba(196,163,90,0.65)"/>
+            <circle cx="188" cy="75" r="3.5" fill="rgba(196,163,90,0.6)"/>
+            <circle cx="212" cy="75" r="3.5" fill="rgba(196,163,90,0.6)"/>
+            <circle cx="190" cy="90" r="3"   fill="rgba(196,163,90,0.5)"/>
+            <circle cx="210" cy="90" r="3"   fill="rgba(196,163,90,0.5)"/>
+            <!-- Scattered spores -->
+            <circle cx="90"  cy="90"  r="1.2" fill="rgba(196,163,90,0.3)"/>
+            <circle cx="320" cy="130" r="1.5" fill="rgba(196,163,90,0.22)"/>
+            <circle cx="60"  cy="280" r="1"   fill="rgba(196,163,90,0.2)"/>
+            <circle cx="355" cy="340" r="2"   fill="rgba(196,163,90,0.15)"/>
+            <circle cx="340" cy="80"  r="1"   fill="rgba(160,190,140,0.25)"/>
+            <circle cx="50"  cy="200" r="1.5" fill="rgba(160,190,140,0.2)"/>
+            <!-- Label -->
+            <text x="200" y="432" text-anchor="middle" font-family="Georgia,serif" font-size="7.5" fill="rgba(160,190,140,0.38)" letter-spacing="5">BLOOM BOTANICALS</text>
+          </svg>
+        </div>
+        <div class="work-overlay" aria-hidden="true">
+          <p class="ov-client">Bloom Botanicals</p>
+          <p class="ov-type">Product Launch Campaign</p>
+          <p class="ov-desc">A sensory-forward launch for an artisanal botanical wellness brand — print, film, and in-store experience direction.</p>
+        </div>
+        <div class="work-foot">
+          <span class="wf-name">Bloom Botanicals</span>
+          <span class="wf-meta">Launch / 2024</span>
+        </div>
+      </article>
+
+      <!-- 6 — Crest Audio (wide) -->
+      <article class="work-card reveal" role="listitem" aria-label="Crest Audio — Art Direction, 2023">
+        <div class="work-thumb" aria-hidden="true">
+          <svg viewBox="0 0 1200 340" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="ca-bg" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#080710"/>
+                <stop offset="50%"  stop-color="#0D0C18"/>
+                <stop offset="100%" stop-color="#080710"/>
+              </linearGradient>
+            </defs>
+            <rect width="1200" height="340" fill="url(#ca-bg)"/>
+            <!-- Frequency bars — left half -->
+            <g>
+              <!-- Heights: 18 38 28 72 50 90 65 110 82 130 98 160 120 180 145 200 162 220 178 195 168 150 130 108 88 65 45 28 16 -->
+              <rect x="52"  y="170" width="7" height="18"  rx="3" fill="rgba(196,163,90,0.38)" transform="translate(0,-9)"/>
+              <rect x="65"  y="170" width="7" height="38"  rx="3" fill="rgba(196,163,90,0.45)" transform="translate(0,-19)"/>
+              <rect x="78"  y="170" width="7" height="28"  rx="3" fill="rgba(196,163,90,0.42)" transform="translate(0,-14)"/>
+              <rect x="91"  y="170" width="7" height="72"  rx="3" fill="rgba(196,163,90,0.55)" transform="translate(0,-36)"/>
+              <rect x="104" y="170" width="7" height="50"  rx="3" fill="rgba(196,163,90,0.48)" transform="translate(0,-25)"/>
+              <rect x="117" y="170" width="7" height="90"  rx="3" fill="rgba(196,163,90,0.6)"  transform="translate(0,-45)"/>
+              <rect x="130" y="170" width="7" height="65"  rx="3" fill="rgba(196,163,90,0.52)" transform="translate(0,-32.5)"/>
+              <rect x="143" y="170" width="7" height="110" rx="3" fill="rgba(196,163,90,0.65)" transform="translate(0,-55)"/>
+              <rect x="156" y="170" width="7" height="82"  rx="3" fill="rgba(196,163,90,0.58)" transform="translate(0,-41)"/>
+              <rect x="169" y="170" width="7" height="130" rx="3" fill="rgba(196,163,90,0.72)" transform="translate(0,-65)"/>
+              <rect x="182" y="170" width="7" height="98"  rx="3" fill="rgba(196,163,90,0.63)" transform="translate(0,-49)"/>
+              <rect x="195" y="170" width="7" height="160" rx="3" fill="rgba(196,163,90,0.82)" transform="translate(0,-80)"/>
+              <rect x="208" y="170" width="7" height="120" rx="3" fill="rgba(196,163,90,0.7)"  transform="translate(0,-60)"/>
+              <rect x="221" y="170" width="7" height="180" rx="3" fill="rgba(196,163,90,0.88)" transform="translate(0,-90)"/>
+              <rect x="234" y="170" width="7" height="145" rx="3" fill="rgba(196,163,90,0.78)" transform="translate(0,-72.5)"/>
+              <rect x="247" y="170" width="7" height="200" rx="3" fill="rgba(196,163,90,0.94)" transform="translate(0,-100)"/>
+              <rect x="260" y="170" width="7" height="162" rx="3" fill="rgba(196,163,90,0.84)" transform="translate(0,-81)"/>
+              <rect x="273" y="170" width="7" height="220" rx="3" fill="rgba(196,163,90,1)"    transform="translate(0,-110)"/>
+              <rect x="286" y="170" width="7" height="178" rx="3" fill="rgba(196,163,90,0.9)"  transform="translate(0,-89)"/>
+              <rect x="299" y="170" width="7" height="195" rx="3" fill="rgba(196,163,90,0.92)" transform="translate(0,-97.5)"/>
+              <rect x="312" y="170" width="7" height="168" rx="3" fill="rgba(196,163,90,0.86)" transform="translate(0,-84)"/>
+              <rect x="325" y="170" width="7" height="148" rx="3" fill="rgba(196,163,90,0.78)" transform="translate(0,-74)"/>
+              <rect x="338" y="170" width="7" height="128" rx="3" fill="rgba(196,163,90,0.7)"  transform="translate(0,-64)"/>
+              <rect x="351" y="170" width="7" height="105" rx="3" fill="rgba(196,163,90,0.62)" transform="translate(0,-52.5)"/>
+              <rect x="364" y="170" width="7" height="82"  rx="3" fill="rgba(196,163,90,0.56)" transform="translate(0,-41)"/>
+              <rect x="377" y="170" width="7" height="62"  rx="3" fill="rgba(196,163,90,0.5)"  transform="translate(0,-31)"/>
+              <rect x="390" y="170" width="7" height="44"  rx="3" fill="rgba(196,163,90,0.44)" transform="translate(0,-22)"/>
+              <rect x="403" y="170" width="7" height="28"  rx="3" fill="rgba(196,163,90,0.4)"  transform="translate(0,-14)"/>
+              <rect x="416" y="170" width="7" height="16"  rx="3" fill="rgba(196,163,90,0.36)" transform="translate(0,-8)"/>
+            </g>
+            <!-- Right half mirror -->
+            <g>
+              <rect x="784" y="170" width="7" height="16"  rx="3" fill="rgba(196,163,90,0.36)" transform="translate(0,-8)"/>
+              <rect x="797" y="170" width="7" height="28"  rx="3" fill="rgba(196,163,90,0.4)"  transform="translate(0,-14)"/>
+              <rect x="810" y="170" width="7" height="44"  rx="3" fill="rgba(196,163,90,0.44)" transform="translate(0,-22)"/>
+              <rect x="823" y="170" width="7" height="62"  rx="3" fill="rgba(196,163,90,0.5)"  transform="translate(0,-31)"/>
+              <rect x="836" y="170" width="7" height="82"  rx="3" fill="rgba(196,163,90,0.56)" transform="translate(0,-41)"/>
+              <rect x="849" y="170" width="7" height="105" rx="3" fill="rgba(196,163,90,0.62)" transform="translate(0,-52.5)"/>
+              <rect x="862" y="170" width="7" height="128" rx="3" fill="rgba(196,163,90,0.7)"  transform="translate(0,-64)"/>
+              <rect x="875" y="170" width="7" height="148" rx="3" fill="rgba(196,163,90,0.78)" transform="translate(0,-74)"/>
+              <rect x="888" y="170" width="7" height="168" rx="3" fill="rgba(196,163,90,0.86)" transform="translate(0,-84)"/>
+              <rect x="901" y="170" width="7" height="195" rx="3" fill="rgba(196,163,90,0.92)" transform="translate(0,-97.5)"/>
+              <rect x="914" y="170" width="7" height="178" rx="3" fill="rgba(196,163,90,0.9)"  transform="translate(0,-89)"/>
+              <rect x="927" y="170" width="7" height="220" rx="3" fill="rgba(196,163,90,1)"    transform="translate(0,-110)"/>
+              <rect x="940" y="170" width="7" height="162" rx="3" fill="rgba(196,163,90,0.84)" transform="translate(0,-81)"/>
+              <rect x="953" y="170" width="7" height="200" rx="3" fill="rgba(196,163,90,0.94)" transform="translate(0,-100)"/>
+              <rect x="966" y="170" width="7" height="145" rx="3" fill="rgba(196,163,90,0.78)" transform="translate(0,-72.5)"/>
+              <rect x="979" y="170" width="7" height="180" rx="3" fill="rgba(196,163,90,0.88)" transform="translate(0,-90)"/>
+              <rect x="992" y="170" width="7" height="120" rx="3" fill="rgba(196,163,90,0.7)"  transform="translate(0,-60)"/>
+              <rect x="1005" y="170" width="7" height="160" rx="3" fill="rgba(196,163,90,0.82)" transform="translate(0,-80)"/>
+              <rect x="1018" y="170" width="7" height="98"  rx="3" fill="rgba(196,163,90,0.63)" transform="translate(0,-49)"/>
+              <rect x="1031" y="170" width="7" height="130" rx="3" fill="rgba(196,163,90,0.72)" transform="translate(0,-65)"/>
+              <rect x="1044" y="170" width="7" height="82"  rx="3" fill="rgba(196,163,90,0.58)" transform="translate(0,-41)"/>
+              <rect x="1057" y="170" width="7" height="110" rx="3" fill="rgba(196,163,90,0.65)" transform="translate(0,-55)"/>
+              <rect x="1070" y="170" width="7" height="65"  rx="3" fill="rgba(196,163,90,0.52)" transform="translate(0,-32.5)"/>
+              <rect x="1083" y="170" width="7" height="90"  rx="3" fill="rgba(196,163,90,0.6)"  transform="translate(0,-45)"/>
+              <rect x="1096" y="170" width="7" height="50"  rx="3" fill="rgba(196,163,90,0.48)" transform="translate(0,-25)"/>
+              <rect x="1109" y="170" width="7" height="72"  rx="3" fill="rgba(196,163,90,0.55)" transform="translate(0,-36)"/>
+              <rect x="1122" y="170" width="7" height="28"  rx="3" fill="rgba(196,163,90,0.42)" transform="translate(0,-14)"/>
+              <rect x="1135" y="170" width="7" height="38"  rx="3" fill="rgba(196,163,90,0.45)" transform="translate(0,-19)"/>
+              <rect x="1148" y="170" width="7" height="18"  rx="3" fill="rgba(196,163,90,0.38)" transform="translate(0,-9)"/>
+            </g>
+            <!-- Center wordmark -->
+            <text x="600" y="185" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="38" fill="rgba(237,231,212,0.94)" letter-spacing="5">Crest</text>
+            <line x1="440" y1="196" x2="760" y2="196" stroke="rgba(196,163,90,0.28)" stroke-width="0.5"/>
+            <text x="600" y="212" text-anchor="middle" font-family="monospace" font-size="7" fill="rgba(196,163,90,0.55)" letter-spacing="8">AUDIO — ART DIRECTION</text>
+            <!-- Subtle circle -->
+            <circle cx="600" cy="170" r="95" fill="none" stroke="rgba(196,163,90,0.07)" stroke-width="0.5"/>
+          </svg>
+        </div>
+        <div class="work-overlay" aria-hidden="true">
+          <p class="ov-client">Crest Audio</p>
+          <p class="ov-type">Art Direction</p>
+          <p class="ov-desc">Brand art direction for a premium headphone launch — product photography brief, campaign typographic system, and retail visual language.</p>
+        </div>
+        <div class="work-foot">
+          <span class="wf-name">Crest Audio</span>
+          <span class="wf-meta">Art Direction / 2023</span>
+        </div>
+      </article>
+
+    </div><!-- /work-grid -->
+  </section>
+
+  <!-- ============================================
+       CASE STUDY  — II
+       ============================================ -->
+  <section id="case-study" aria-labelledby="cs-section-title">
+    <div class="section-header reveal">
+      <span class="section-tag">II — In Depth</span>
+      <h2 class="section-title" id="cs-section-title">Featured <em>Case Study</em></h2>
+    </div>
+
+    <div class="cs-inner">
+
+      <div class="cs-visual reveal">
+        <svg viewBox="0 0 600 480" xmlns="http://www.w3.org/2000/svg" width="100%" aria-label="Vessel Beauty case study visual — product arrangement">
+          <defs>
+            <radialGradient id="cs-bg" cx="38%" cy="30%" r="70%">
+              <stop offset="0%" stop-color="#28180C"/>
+              <stop offset="100%" stop-color="#0A0806"/>
+            </radialGradient>
+            <linearGradient id="cs-g1" x1="0%" y1="0%" x2="65%" y2="100%">
+              <stop offset="0%" stop-color="#EAC878"/>
+              <stop offset="100%" stop-color="#7C5622"/>
+            </linearGradient>
+            <linearGradient id="cs-g2" x1="0%" y1="0%" x2="65%" y2="100%">
+              <stop offset="0%" stop-color="#D4A84E"/>
+              <stop offset="100%" stop-color="#6A4818"/>
+            </linearGradient>
+          </defs>
+          <rect width="600" height="480" fill="url(#cs-bg)"/>
+          <!-- Ghosted "V" behind -->
+          <text x="300" y="380" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="340" fill="rgba(196,163,90,0.05)">V</text>
+          <!-- Tall primary bottle -->
+          <g transform="translate(165,30)">
+            <path d="M0 380 L0 196 Q0 180 9 170 L15 142 L26 120 Q32 108 44 108 Q56 108 62 120 L73 142 L79 170 Q88 180 88 196 L88 380 Z" fill="url(#cs-g1)" opacity="0.88"/>
+            <!-- Highlight streak -->
+            <line x1="12" y1="200" x2="12" y2="360" stroke="rgba(255,240,200,0.16)" stroke-width="2.5"/>
+            <!-- Neck -->
+            <rect x="26" y="80" width="36" height="32" rx="5" fill="#C4A048" opacity="0.9"/>
+            <!-- Cap -->
+            <rect x="21" y="64" width="46" height="20" rx="4" fill="#DEB96E"/>
+            <!-- Label -->
+            <rect x="8" y="230" width="72" height="96" fill="rgba(8,6,4,0.5)"/>
+            <text x="44" y="263" text-anchor="middle" font-family="Georgia,serif" font-size="9"   fill="rgba(234,200,120,0.95)" letter-spacing="1.5">VESSEL</text>
+            <text x="44" y="278" text-anchor="middle" font-family="Georgia,serif" font-size="5.5" fill="rgba(196,163,90,0.65)" letter-spacing="3">BEAUTY</text>
+            <line x1="14" y1="290" x2="74" y2="290" stroke="rgba(196,163,90,0.3)" stroke-width="0.5"/>
+            <text x="44" y="306" text-anchor="middle" font-family="Georgia,serif" font-size="4.5" fill="rgba(196,163,90,0.45)" letter-spacing="2">ÉLIXIR NO.4</text>
+          </g>
+          <!-- Shorter wide bottle -->
+          <g transform="translate(290,80)">
+            <path d="M0 370 L0 218 Q0 204 8 195 L14 172 L22 158 Q28 148 46 148 Q64 148 70 158 L78 172 L84 195 Q92 204 92 218 L92 370 Z" fill="url(#cs-g2)" opacity="0.74"/>
+            <line x1="12" y1="225" x2="12" y2="355" stroke="rgba(255,240,200,0.12)" stroke-width="2"/>
+            <rect x="24" y="124" width="44" height="28" rx="4" fill="#B89040" opacity="0.88"/>
+            <rect x="19" y="110" width="54" height="18" rx="3.5" fill="#D0A858" opacity="0.9"/>
+            <!-- Label -->
+            <rect x="8" y="258" width="76" height="72" fill="rgba(8,6,4,0.45)"/>
+            <text x="46" y="287" text-anchor="middle" font-family="Georgia,serif" font-size="8"   fill="rgba(234,200,120,0.9)"  letter-spacing="1">VESSEL</text>
+            <text x="46" y="300" text-anchor="middle" font-family="Georgia,serif" font-size="5"   fill="rgba(196,163,90,0.6)"  letter-spacing="2.5">BEAUTY</text>
+            <text x="46" y="316" text-anchor="middle" font-family="Georgia,serif" font-size="4"   fill="rgba(196,163,90,0.35)" letter-spacing="2">PRESTIGE</text>
+          </g>
+          <!-- Small vial -->
+          <g transform="translate(138,165)">
+            <rect x="0" y="0" width="24" height="178" rx="5" fill="url(#cs-g1)" opacity="0.58"/>
+            <line x1="6" y1="10" x2="6" y2="168" stroke="rgba(255,240,200,0.1)" stroke-width="1.5"/>
+            <rect x="-2" y="-14" width="28" height="18" rx="3" fill="#C09040" opacity="0.8"/>
+          </g>
+          <!-- Decorative particles -->
+          <circle cx="90"  cy="85"  r="2"   fill="rgba(196,163,90,0.38)"/>
+          <circle cx="510" cy="108" r="1.5" fill="rgba(196,163,90,0.28)"/>
+          <circle cx="75"  cy="390" r="1"   fill="rgba(196,163,90,0.22)"/>
+          <circle cx="530" cy="360" r="2.5" fill="rgba(196,163,90,0.32)"/>
+          <circle cx="455" cy="75"  r="1.5" fill="rgba(196,163,90,0.2)"/>
+          <!-- Rule lines -->
+          <line x1="48" y1="448" x2="200" y2="448" stroke="rgba(196,163,90,0.22)" stroke-width="0.5"/>
+          <line x1="48" y1="454" x2="148" y2="454" stroke="rgba(196,163,90,0.12)" stroke-width="0.5"/>
+          <text x="48" y="470" font-family="monospace" font-size="7" fill="rgba(196,163,90,0.38)" letter-spacing="2">BRAND OVERHAUL — 2023</text>
+        </svg>
+        <span class="cs-badge">Featured Project</span>
+      </div>
+
+      <div class="reveal rev-d2">
+        <p class="cs-label">Vessel Beauty — 2023</p>
+        <h3 class="cs-heading">From mass-market<br><em>to monument.</em></h3>
+        <p class="cs-body">Vessel Beauty had the product. What they lacked was an identity proportional to it — a prestige skincare line trapped inside the visual language of a department store mid-shelf. Warm formulas, cold packaging, no story.</p>
+        <p class="cs-body">Over eight months, I rebuilt the brand from the inside out: a new typographic system that felt hand-pressed and heirloom; an art direction framework for photography that privileged texture and light over clinical perfection; packaging redesign across 14 SKUs; and a global launch campaign anchored on the line <em style="color:var(--cream-mid)">"Made for skin that remembers."</em></p>
+        <p class="cs-body">The result was a brand that looked like it had existed for decades — and launched into 12 international markets with coverage in Vogue, WSJ Magazine, and Monocle.</p>
+        <div class="cs-metrics">
+          <div class="metric">
+            <span class="m-val" data-count="340" data-suffix="+">0</span>
+            <span class="m-lbl">% lift in brand recall</span>
+          </div>
+          <div class="metric">
+            <span class="m-val">$2.1M</span>
+            <span class="m-lbl">earned media at launch</span>
+          </div>
+          <div class="metric">
+            <span class="m-val" data-count="12" data-suffix="">0</span>
+            <span class="m-lbl">markets entered</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================
+       PROCESS  — III
+       ============================================ -->
+  <section id="process" aria-labelledby="process-title">
+    <div class="section-header reveal">
+      <span class="section-tag">III — Method</span>
+      <h2 class="section-title" id="process-title">How <em>I Work</em></h2>
+    </div>
+
+    <div class="process-grid">
+      <div class="process-step reveal">
+        <span class="ps-num" aria-hidden="true">01</span>
+        <h3 class="ps-title"><em>Immerse</em></h3>
+        <p class="ps-body">I start where most creatives stop — obsessively inside the world of the brand. Category audits, cultural mapping, competitive dissection. I need to feel the gap before I can fill it.</p>
+      </div>
+      <div class="process-step reveal rev-d1">
+        <span class="ps-num" aria-hidden="true">02</span>
+        <h3 class="ps-title"><em>Decode</em></h3>
+        <p class="ps-body">Every brand has an unspoken thesis — a core tension or aspiration they can't yet name. I surface it through stakeholder dialogue, audience research, and iterative positioning until the insight crystallizes.</p>
+      </div>
+      <div class="process-step reveal rev-d2">
+        <span class="ps-num" aria-hidden="true">03</span>
+        <h3 class="ps-title"><em>Construct</em></h3>
+        <p class="ps-body">Concept to system. I build the visual and verbal architecture — typography, color, image world, tone — then stress-test it across every touchpoint before a single pixel is finalized.</p>
+      </div>
+      <div class="process-step reveal rev-d3">
+        <span class="ps-num" aria-hidden="true">04</span>
+        <h3 class="ps-title"><em>Amplify</em></h3>
+        <p class="ps-body">Creative direction doesn't end at delivery. I stay close through production, campaign rollout, and first-response analysis — making sure the work lands the way it was imagined, then learning what to carry forward.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       CLIENTS  — IV
+       ============================================ -->
+  <section id="clients" aria-labelledby="clients-title">
+    <div class="clients-top reveal">
+      <span class="section-tag">IV — Trusted By</span>
+      <h2 class="section-title" id="clients-title">The <em>Roster</em></h2>
+    </div>
+
+    <div class="marquee-wrap" aria-hidden="true">
+      <div class="marquee-track">
+        <span class="marq-item">Vessel Beauty<span class="marq-dot"></span></span>
+        <span class="marq-item">Nomad Hotels<span class="marq-dot"></span></span>
+        <span class="marq-item">Arca Studio<span class="marq-dot"></span></span>
+        <span class="marq-item">Séquence Magazine<span class="marq-dot"></span></span>
+        <span class="marq-item">Bloom Botanicals<span class="marq-dot"></span></span>
+        <span class="marq-item">Crest Audio<span class="marq-dot"></span></span>
+        <span class="marq-item">Fable Publishing<span class="marq-dot"></span></span>
+        <span class="marq-item">Meridian Fashion Group<span class="marq-dot"></span></span>
+        <!-- Duplicate for seamless loop -->
+        <span class="marq-item">Vessel Beauty<span class="marq-dot"></span></span>
+        <span class="marq-item">Nomad Hotels<span class="marq-dot"></span></span>
+        <span class="marq-item">Arca Studio<span class="marq-dot"></span></span>
+        <span class="marq-item">Séquence Magazine<span class="marq-dot"></span></span>
+        <span class="marq-item">Bloom Botanicals<span class="marq-dot"></span></span>
+        <span class="marq-item">Crest Audio<span class="marq-dot"></span></span>
+        <span class="marq-item">Fable Publishing<span class="marq-dot"></span></span>
+        <span class="marq-item">Meridian Fashion Group<span class="marq-dot"></span></span>
+      </div>
+    </div>
+
+    <div class="client-grid" role="list" aria-label="Client list">
+      <div class="client-item" role="listitem">Vessel Beauty</div>
+      <div class="client-item" role="listitem">Nomad Hotels</div>
+      <div class="client-item" role="listitem">Arca Studio</div>
+      <div class="client-item" role="listitem">Séquence Magazine</div>
+      <div class="client-item" role="listitem">Bloom Botanicals</div>
+      <div class="client-item" role="listitem">Crest Audio</div>
+      <div class="client-item" role="listitem">Fable Publishing</div>
+      <div class="client-item" role="listitem">Meridian Fashion Group</div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       BIO  — V
+       ============================================ -->
+  <section id="bio" aria-labelledby="bio-title">
+    <div class="section-header reveal">
+      <span class="section-tag">V — Studio</span>
+      <h2 class="section-title">The <em>Director</em></h2>
+    </div>
+
+    <div class="bio-inner">
+      <div class="reveal">
+        <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" width="100%"
+             role="img" aria-label="Abstract portrait of Mira Vale">
+          <defs>
+            <radialGradient id="port-bg" cx="50%" cy="38%" r="62%">
+              <stop offset="0%" stop-color="#201A12"/>
+              <stop offset="100%" stop-color="#0C0A08"/>
+            </radialGradient>
+          </defs>
+          <rect width="300" height="400" fill="url(#port-bg)"/>
+          <!-- Frame double rule -->
+          <rect x="18" y="18" width="264" height="364" fill="none" stroke="rgba(196,163,90,0.22)" stroke-width="0.5"/>
+          <rect x="8"  y="8"  width="284" height="384" fill="none" stroke="rgba(196,163,90,0.08)" stroke-width="0.5"/>
+          <!-- Corner accent marks -->
+          <line x1="18" y1="18" x2="42" y2="18" stroke="rgba(196,163,90,0.55)" stroke-width="1"/>
+          <line x1="18" y1="18" x2="18" y2="42" stroke="rgba(196,163,90,0.55)" stroke-width="1"/>
+          <line x1="282" y1="18" x2="258" y2="18" stroke="rgba(196,163,90,0.55)" stroke-width="1"/>
+          <line x1="282" y1="18" x2="282" y2="42" stroke="rgba(196,163,90,0.55)" stroke-width="1"/>
+          <line x1="18"  y1="382" x2="42"  y2="382" stroke="rgba(196,163,90,0.55)" stroke-width="1"/>
+          <line x1="18"  y1="382" x2="18"  y2="358" stroke="rgba(196,163,90,0.55)" stroke-width="1"/>
+          <line x1="282" y1="382" x2="258" y2="382" stroke="rgba(196,163,90,0.55)" stroke-width="1"/>
+          <line x1="282" y1="382" x2="282" y2="358" stroke="rgba(196,163,90,0.55)" stroke-width="1"/>
+          <!-- Geometric portrait: face oval -->
+          <ellipse cx="150" cy="148" rx="68" ry="80" fill="rgba(196,163,90,0.1)" stroke="rgba(196,163,90,0.28)" stroke-width="0.5"/>
+          <!-- Hair / crown arc -->
+          <path d="M82 138 Q82 56 150 56 Q218 56 218 138" fill="rgba(196,163,90,0.15)" stroke="rgba(196,163,90,0.22)" stroke-width="0.5"/>
+          <!-- Neck -->
+          <rect x="134" y="224" width="32" height="46" fill="rgba(196,163,90,0.08)"/>
+          <!-- Shoulder suggestion -->
+          <path d="M48 285 Q150 265 252 285" fill="rgba(196,163,90,0.06)" stroke="rgba(196,163,90,0.18)" stroke-width="0.5"/>
+          <!-- Eyes: elegant brow-lid lines -->
+          <path d="M112 142 Q122 137 134 140" fill="none" stroke="rgba(237,231,212,0.65)" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M166 140 Q178 137 188 142" fill="none" stroke="rgba(237,231,212,0.65)" stroke-width="1.2" stroke-linecap="round"/>
+          <circle cx="123" cy="144" r="3.5" fill="rgba(237,231,212,0.42)"/>
+          <circle cx="177" cy="144" r="3.5" fill="rgba(237,231,212,0.42)"/>
+          <!-- Nose: minimal -->
+          <path d="M150 158 Q148 170 144 177 Q150 181 156 177 Q152 170 150 158" fill="none" stroke="rgba(237,231,212,0.25)" stroke-width="0.75"/>
+          <!-- Lips -->
+          <path d="M130 192 Q140 187 150 189 Q160 187 170 192 Q160 200 150 199 Q140 200 130 192Z" fill="rgba(196,163,90,0.32)"/>
+          <!-- Body / torso abstraction -->
+          <path d="M48 285 L30 400 L270 400 L252 285 Q150 306 48 285Z" fill="rgba(196,163,90,0.05)"/>
+          <!-- Name inscription -->
+          <text x="150" y="376" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="9" fill="rgba(196,163,90,0.45)" letter-spacing="3.5">MIRA VALE</text>
+        </svg>
+        <p class="bio-portrait-cap">Berlin / London · Available globally</p>
+      </div>
+
+      <div class="reveal rev-d2">
+        <p class="bio-eyebrow">About Mira</p>
+        <h2 class="bio-heading" id="bio-title">Fifteen years<br>of making brands<br>unforgettable.</h2>
+        <p class="bio-pull">"I came up in editorial — Séquence, then Fable — where the work had to be exceptional because the budget wasn't. That scarcity taught me to think before I reach for the lens."</p>
+        <p class="bio-body">Mira Vale is an independent creative director working across brand systems, editorial campaigns, and art-directed product launches. Based between Berlin and London, she works with clients who have something real to say and need the language to say it — at scale, with permanence.</p>
+        <p class="bio-body">Before going independent in 2015, she led creative at Séquence Magazine and served as Senior Art Director at Fable Publishing. Her work has been recognised by D&amp;AD, the Art Directors Club, and Cannes Lions.</p>
+        <div class="bio-tags" role="list" aria-label="Disciplines">
+          <span class="bio-tag" role="listitem">Brand Systems</span>
+          <span class="bio-tag" role="listitem">Art Direction</span>
+          <span class="bio-tag" role="listitem">Editorial Design</span>
+          <span class="bio-tag" role="listitem">Campaign Strategy</span>
+          <span class="bio-tag" role="listitem">Identity Design</span>
+          <span class="bio-tag" role="listitem">Photography Direction</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       TESTIMONIAL
+       ============================================ -->
+  <section id="testimonial" aria-label="Client testimonial">
+    <div class="test-bg-mark" aria-hidden="true"><span>&ldquo;</span></div>
+    <div class="test-inner">
+      <span class="test-open" aria-hidden="true">&ldquo;</span>
+      <blockquote class="test-quote reveal">
+        Working with Mira is like having a second conscience for your brand — she sees what you're trying to be before you've articulated it yourself.
+      </blockquote>
+      <div class="test-attr reveal rev-d1">
+        <div class="test-line"></div>
+        <span class="test-name">Elena Kors &mdash; Creative VP, Vessel Beauty</span>
+        <div class="test-line"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       CONTACT
+       ============================================ -->
+  <section id="contact" aria-labelledby="contact-heading">
+    <div class="contact-inner">
+      <p class="contact-label reveal">Let's Work Together</p>
+      <h2 class="contact-heading reveal" id="contact-heading">
+        Ready to make
+        <em>something<br>remarkable.</em>
+      </h2>
+      <div class="contact-links reveal rev-d2">
+        <a class="contact-email" href="mailto:hello@miravale.co">hello@miravale.co</a>
+        <nav class="contact-social" aria-label="Social links">
+          <a href="#" aria-label="Mira Vale on Instagram">Instagram</a>
+          <a href="#" aria-label="Mira Vale on LinkedIn">LinkedIn</a>
+          <a href="#" aria-label="Mira Vale on Are.na">Are.na</a>
+        </nav>
+      </div>
+    </div>
+    <p class="contact-bg" aria-hidden="true">MV</p>
+  </section>
+
+  <!-- ============================================
+       FOOTER
+       ============================================ -->
+  <footer role="contentinfo">
+    <p class="footer-copy">&copy; 2024 Mira Vale Studio. All rights reserved. Eval Portfolio.</p>
+    <span class="footer-sig" aria-hidden="true">MV</span>
+  </footer>
+
+  <!-- ============================================
+       JAVASCRIPT
+       ============================================ -->
+  <script>
+    /* ---- Custom cursor ---- */
+    const dot  = document.getElementById('cDot');
+    const ring = document.getElementById('cRing');
+    let mx = -80, my = -80, rx = -80, ry = -80;
+
+    document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+    (function loop() {
+      rx += (mx - rx) * 0.13;
+      ry += (my - ry) * 0.13;
+      dot.style.left  = mx + 'px';
+      dot.style.top   = my + 'px';
+      ring.style.left = rx + 'px';
+      ring.style.top  = ry + 'px';
+      requestAnimationFrame(loop);
+    })();
+
+    document.querySelectorAll('a, button, .work-card, .client-item, .process-step, .bio-tag').forEach(el => {
+      el.addEventListener('mouseenter', () => document.body.classList.add('cursor-hover'));
+      el.addEventListener('mouseleave', () => document.body.classList.remove('cursor-hover'));
+    });
+
+    /* ---- Scroll reveal ---- */
+    const revObserver = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('is-visible'); });
+    }, { threshold: 0.1, rootMargin: '0px 0px -48px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => revObserver.observe(el));
+
+    /* ---- Nav state ---- */
+    const nav = document.getElementById('mainNav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 72);
+    }, { passive: true });
+
+    /* ---- Counter animation ---- */
+    const counters = document.querySelectorAll('[data-count]');
+    const ctrObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting || entry.target.dataset.done) return;
+        entry.target.dataset.done = '1';
+        const target = parseInt(entry.target.dataset.count);
+        const suffix = entry.target.dataset.suffix || '';
+        const dur    = 1600;
+        const step   = target / (dur / 16);
+        let cur = 0;
+        const t = setInterval(() => {
+          cur += step;
+          if (cur >= target) { cur = target; clearInterval(t); }
+          entry.target.textContent = Math.floor(cur) + suffix;
+        }, 16);
+      });
+    }, { threshold: 0.6 });
+
+    counters.forEach(el => ctrObserver.observe(el));
+
+    /* ---- Smooth scroll polyfill ---- */
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const tgt = document.querySelector(a.getAttribute('href'));
+        if (tgt) { e.preventDefault(); tgt.scrollIntoView({ behavior: 'smooth' }); }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,475 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+$autoload = __DIR__ . '/../vendor/autoload.php';
+if ( is_readable($autoload) ) {
+    require_once $autoload;
+} else {
+    require_once __DIR__ . '/../figma-transformer.php';
+}
+
+$path = $argv[1] ?? '';
+if ( '' === $path || '--help' === $path || '-h' === $path ) {
+    fwrite(STDERR, "Usage: figma-transformer <path-to-fig-or-scenegraph-json> [--inspect-frames[=<limit>]] [--inspect-kiwi-gate] [--kiwi-gated-decode] [--multi-page] [--frame-ids=<id,id>] [--entry-frame-id=<id>] [--max-pages=<count>] [--output-dir=<dir>] [--omit-asset-content] [--max-canvas-bytes=<bytes>] [--max-nested-fig-bytes=<bytes>] [--max-archive-asset-content-bytes=<bytes>] [--max-zstd-inflated-bytes=<bytes>] [--max-nodes=<count>] [--max-kiwi-message-decode-bytes=<bytes>] [--max-kiwi-selective-message-decode-bytes=<bytes>] [--zstd-command=<path>] [--frame-id=<id>] [--font-css=<css>] [--font-css-file=<path>] [--font-family-css=<family>:<css>] [--font-family-css-file=<family>:<path>] [--render-text-glyph-paths] [--parity-status=<status>] [--parity-report-path=<path>] [--parity-source-screenshot-url=<url>] [--parity-source-screenshot-path=<path>] [--parity-generated-screenshot-artifact=<artifact>] [--parity-diff-image-artifact=<artifact>] [--parity-pixel-mismatch-count=<count>] [--parity-pixel-mismatch-ratio=<ratio>] [--parity-threshold=<ratio>] [--parity-viewport=<width>x<height>] [--parity-dom-boxes-path=<path>] [--parity-layout-report-path=<path>] [--parity-render-evidence-path=<path>] [--parity-layout-mismatch-count=<count>]\n");
+    exit(1);
+}
+
+$options = array();
+$zstdCommand = getenv('FIGMA_TRANSFORMER_ZSTD_COMMAND') ?: null;
+$outputDir = null;
+$inspectKiwiGateMode = false;
+foreach ( array_slice($argv, 2) as $argument ) {
+    if ( ! str_starts_with($argument, '--') ) {
+        continue;
+    }
+
+    $parts = explode('=', substr($argument, 2), 2);
+    $name = $parts[0];
+    $value = $parts[1] ?? '1';
+
+    if ( 'zstd-command' === $name ) {
+        $zstdCommand = $value;
+        continue;
+    }
+
+    if ( 'output-dir' === $name ) {
+        $outputDir = $value;
+        continue;
+    }
+
+    if ( 'inspect-frames' === $name ) {
+        $options['inspect_frames'] = true;
+        if ( is_numeric($value) ) {
+            $options['frame_inspection_limit'] = max(1, (int) $value);
+        }
+        continue;
+    }
+
+    if ( 'inspect-kiwi-gate' === $name ) {
+        $options['inspect_kiwi_gate'] = true;
+        $inspectKiwiGateMode = true;
+        continue;
+    }
+
+    if ( 'kiwi-gated-decode' === $name ) {
+        $options['inspect_kiwi_gate'] = true;
+        continue;
+    }
+
+    if ( 'inspect-frame-limit' === $name ) {
+        $options['frame_inspection_limit'] = max(1, (int) $value);
+        continue;
+    }
+
+    if ( 'omit-asset-content' === $name ) {
+        $options['include_asset_content'] = false;
+        continue;
+    }
+
+    if ( 'max-kiwi-message-decode-bytes' === $name ) {
+        $options['max_kiwi_message_decode_bytes'] = max(0, (int) $value);
+        continue;
+    }
+
+    if ( 'max-kiwi-selective-message-decode-bytes' === $name ) {
+        $options['max_kiwi_selective_message_decode_bytes'] = max(0, (int) $value);
+        continue;
+    }
+
+    if ( 'max-canvas-bytes' === $name ) {
+        $options['max_canvas_bytes'] = max(0, (int) $value);
+        continue;
+    }
+
+    if ( 'max-nested-fig-bytes' === $name ) {
+        $options['max_nested_fig_bytes'] = max(0, (int) $value);
+        continue;
+    }
+
+    if ( 'max-archive-asset-content-bytes' === $name ) {
+        $options['max_archive_asset_content_bytes'] = max(0, (int) $value);
+        continue;
+    }
+
+    if ( 'max-zstd-inflated-bytes' === $name ) {
+        $options['max_zstd_inflated_bytes'] = max(0, (int) $value);
+        continue;
+    }
+
+    if ( 'max-nodes' === $name ) {
+        $options['max_nodes'] = max(0, (int) $value);
+        continue;
+    }
+
+    if ( 'frame-id' === $name ) {
+        $options['frame_id'] = $value;
+        $options['parity']['frame_id'] = $value;
+        continue;
+    }
+
+    if ( 'multi-page' === $name ) {
+        $options['multi_page'] = true;
+        continue;
+    }
+
+    if ( 'frame-ids' === $name ) {
+        $options['frame_ids'] = array_values(array_filter(array_map('trim', explode(',', $value)), static fn (string $id): bool => '' !== $id));
+        continue;
+    }
+
+    if ( 'entry-frame-id' === $name ) {
+        $options['entry_frame_id'] = $value;
+        continue;
+    }
+
+    if ( 'max-pages' === $name ) {
+        $options['max_pages'] = max(1, (int) $value);
+        continue;
+    }
+
+    if ( 'font-css' === $name ) {
+        $options['font_css'] = $value;
+        continue;
+    }
+
+    if ( 'font-css-file' === $name ) {
+        $fontCss = is_readable($value) ? file_get_contents($value) : false;
+        if ( false !== $fontCss ) {
+            $options['font_css'] = $fontCss;
+        }
+        continue;
+    }
+
+    if ( 'font-family-css' === $name ) {
+        $colonPos = strpos($value, ':');
+        if ( false !== $colonPos ) {
+            $familyName = strtolower(trim(substr($value, 0, $colonPos)));
+            $familyCss = trim(substr($value, $colonPos + 1));
+            if ( '' !== $familyName && '' !== $familyCss ) {
+                $options['font_family_overrides'][$familyName] = $familyCss;
+            }
+        }
+        continue;
+    }
+
+    if ( 'font-family-css-file' === $name ) {
+        $colonPos = strpos($value, ':');
+        if ( false !== $colonPos ) {
+            $familyName = strtolower(trim(substr($value, 0, $colonPos)));
+            $filePath = trim(substr($value, $colonPos + 1));
+            if ( '' !== $familyName && '' !== $filePath ) {
+                $familyCss = is_readable($filePath) ? file_get_contents($filePath) : false;
+                if ( false !== $familyCss ) {
+                    $options['font_family_overrides'][$familyName] = $familyCss;
+                }
+            }
+        }
+        continue;
+    }
+
+    if ( 'render-text-glyph-paths' === $name ) {
+        $options['render_text_glyph_paths'] = true;
+        continue;
+    }
+
+    if ( 'parity-frame-id' === $name ) {
+        $options['parity']['frame_id'] = $value;
+        continue;
+    }
+
+    if ( 'parity-viewport' === $name ) {
+        $options['parity']['viewport'] = blocks_engine_figma_transformer_parse_viewport($value);
+        continue;
+    }
+
+    $parityMap = array(
+        'parity-status' => 'status',
+        'parity-reason' => 'reason',
+        'parity-report-path' => 'report_path',
+        'parity-report-artifact' => 'report_artifact',
+        'parity-source-screenshot-url' => 'source_screenshot_url',
+        'parity-source-screenshot-path' => 'source_screenshot_path',
+        'parity-source-screenshot-artifact' => 'source_screenshot_artifact',
+        'parity-generated-screenshot-url' => 'generated_screenshot_url',
+        'parity-generated-screenshot-path' => 'generated_screenshot_path',
+        'parity-generated-screenshot-artifact' => 'generated_screenshot_artifact',
+        'parity-diff-image-url' => 'diff_image_url',
+        'parity-diff-image-path' => 'diff_image_path',
+        'parity-diff-image-artifact' => 'diff_image_artifact',
+        'parity-pixel-mismatch-count' => 'pixel_mismatch_count',
+        'parity-pixel-mismatch-ratio' => 'pixel_mismatch_ratio',
+        'parity-threshold' => 'threshold',
+        'parity-dom-boxes-path' => 'dom_boxes_path',
+        'parity-layout-report-path' => 'layout_report_path',
+        'parity-layout-mismatch-report-path' => 'layout_mismatch_report_path',
+        'parity-render-evidence-path' => 'render_evidence_path',
+        'parity-layout-mismatch-count' => 'layout_mismatch_count',
+    );
+
+    if ( isset($parityMap[$name]) ) {
+        $options['parity'][$parityMap[$name]] = $value;
+    }
+}
+
+if ( is_string($outputDir) && '' !== $outputDir ) {
+    $outputDir = rtrim($outputDir, DIRECTORY_SEPARATOR);
+}
+
+if ( isset($options['parity']['dom_boxes_path']) && is_scalar($options['parity']['dom_boxes_path']) ) {
+    $domBoxes = blocks_engine_figma_transformer_cli_read_json_file((string) $options['parity']['dom_boxes_path']);
+    if ( is_array($domBoxes) ) {
+        $options['generated_dom_boxes'] = $domBoxes;
+    }
+}
+
+if ( isset($options['parity']['render_evidence_path']) && is_scalar($options['parity']['render_evidence_path']) ) {
+    $renderEvidence = blocks_engine_figma_transformer_cli_read_json_file((string) $options['parity']['render_evidence_path']);
+    if ( is_array($renderEvidence) ) {
+        $options['generated_render_evidence'] = $renderEvidence;
+    }
+}
+
+$transformer = blocks_engine_figma_transformer_cli_transformer(is_string($zstdCommand) && '' !== $zstdCommand ? $zstdCommand : null);
+if ( $inspectKiwiGateMode && ! str_ends_with(strtolower($path), '.json') ) {
+    $result = $transformer->inspectKiwiGateFile($path, $options);
+} elseif ( true === ($options['inspect_frames'] ?? false) ) {
+    if ( str_ends_with(strtolower($path), '.json') ) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        $result = $transformer->inspectFramesScenegraph(is_array($decoded) ? $decoded : array(), $options);
+    } else {
+        $result = $transformer->inspectFramesFile($path, $options);
+    }
+} elseif ( str_ends_with(strtolower($path), '.json') ) {
+    $decoded = json_decode((string) file_get_contents($path), true);
+    $result = $transformer->transformScenegraph(is_array($decoded) ? $decoded : array(), $options)->toArray();
+} else {
+    $result = $transformer->transformFile($path, $options)->toArray();
+}
+
+if ( is_string($outputDir) && '' !== $outputDir ) {
+    $writeResult = blocks_engine_figma_transformer_cli_write_output_dir($result, $outputDir);
+    if ( ! empty($writeResult['diagnostics']) ) {
+        $result['diagnostics'] = array_merge($result['diagnostics'] ?? array(), $writeResult['diagnostics']);
+    }
+    $result = blocks_engine_figma_transformer_cli_slim_output_result($result);
+    $result['output'] = $writeResult['output'];
+}
+
+fwrite(STDOUT, blocks_engine_figma_transformer_cli_json_encode($result) . "\n");
+
+/**
+ * @return array<string, int|string>
+ */
+function blocks_engine_figma_transformer_parse_viewport(string $value): array
+{
+    if ( preg_match('/^(\d+)x(\d+)$/', $value, $matches) ) {
+        return array(
+            'width'  => (int) $matches[1],
+            'height' => (int) $matches[2],
+        );
+    }
+
+    return array('label' => $value);
+}
+
+function blocks_engine_figma_transformer_cli_transformer(?string $zstdCommand): Automattic\BlocksEngine\FigmaTransformer\FigmaTransformer
+{
+    if ( null === $zstdCommand ) {
+        return new Automattic\BlocksEngine\FigmaTransformer\FigmaTransformer();
+    }
+
+    $command = array($zstdCommand, '-dc');
+    $zstd = new Automattic\BlocksEngine\FigmaTransformer\Compression\ZstdCapability(
+        new Automattic\BlocksEngine\FigmaTransformer\Compression\ZstdCommandDecoder($command)
+    );
+
+    return new Automattic\BlocksEngine\FigmaTransformer\FigmaTransformer(
+        new Automattic\BlocksEngine\FigmaTransformer\FigFile\FigArchiveReader(
+            new Automattic\BlocksEngine\FigmaTransformer\FigFile\FigKiwiParser($zstd)
+        )
+    );
+}
+
+/**
+ * @param array<string, mixed> $result
+ * @return array{output: array<string, mixed>, diagnostics: array<int, array<string, mixed>>}
+ */
+function blocks_engine_figma_transformer_cli_write_output_dir(array $result, string $outputDir): array
+{
+    $diagnostics = array();
+    $written = array();
+
+    if ( ! is_dir($outputDir) && ! mkdir($outputDir, 0777, true) && ! is_dir($outputDir) ) {
+        return array(
+            'output' => array(
+                'directory' => $outputDir,
+                'files'     => array(),
+            ),
+            'diagnostics' => array(blocks_engine_figma_transformer_cli_diagnostic('figma_transformer_cli_output_dir_create_failed', 'Output directory could not be created.', array('directory' => $outputDir))),
+        );
+    }
+
+    foreach ( $result['files'] ?? array() as $file ) {
+        if ( ! is_array($file) ) {
+            continue;
+        }
+
+        $path = isset($file['path']) && is_scalar($file['path']) ? (string) $file['path'] : '';
+        if ( '' === $path || ! blocks_engine_figma_transformer_cli_safe_output_path($path) ) {
+            $diagnostics[] = blocks_engine_figma_transformer_cli_diagnostic('figma_transformer_cli_output_path_unsafe', 'Generated artifact file path is not safe to write.', array('path' => $path));
+            continue;
+        }
+
+        $target = $outputDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $path);
+        $targetDir = dirname($target);
+        if ( ! is_dir($targetDir) && ! mkdir($targetDir, 0777, true) && ! is_dir($targetDir) ) {
+            $diagnostics[] = blocks_engine_figma_transformer_cli_diagnostic('figma_transformer_cli_output_file_dir_create_failed', 'Generated artifact file directory could not be created.', array('path' => $path, 'directory' => $targetDir));
+            continue;
+        }
+
+        $content = isset($file['content']) && is_scalar($file['content']) ? (string) $file['content'] : '';
+        if ( false === file_put_contents($target, $content) ) {
+            $diagnostics[] = blocks_engine_figma_transformer_cli_diagnostic('figma_transformer_cli_output_file_write_failed', 'Generated artifact file could not be written.', array('path' => $path, 'target' => $target));
+            continue;
+        }
+
+        $written[] = $path;
+    }
+
+    return array(
+        'output' => array(
+            'directory' => $outputDir,
+            'files'     => $written,
+        ),
+        'diagnostics' => $diagnostics,
+    );
+}
+
+/**
+ * @param mixed $files
+ * @return array<int, array<string, mixed>>
+ */
+function blocks_engine_figma_transformer_cli_file_manifest(mixed $files): array
+{
+    $manifest = array();
+
+    foreach ( is_array($files) ? $files : array() as $file ) {
+        if ( ! is_array($file) ) {
+            continue;
+        }
+
+        unset($file['content']);
+        $manifest[] = $file;
+    }
+
+    return $manifest;
+}
+
+/**
+ * @param array<string, mixed> $result
+ * @return array<string, mixed>
+ */
+function blocks_engine_figma_transformer_cli_slim_output_result(array $result): array
+{
+    $result['files'] = blocks_engine_figma_transformer_cli_file_manifest($result['files'] ?? array());
+    $result['assets'] = blocks_engine_figma_transformer_cli_file_manifest($result['assets'] ?? array());
+
+    if ( isset($result['source_reports']['figma']['assets']) ) {
+        $result['source_reports']['figma']['assets'] = blocks_engine_figma_transformer_cli_file_manifest($result['source_reports']['figma']['assets']);
+    }
+
+    $chunks = $result['source_reports']['figma']['archive']['canvas']['chunks'] ?? null;
+    if ( is_array($chunks) ) {
+        foreach ( $chunks as $index => $chunk ) {
+            if ( ! is_array($chunk) ) {
+                continue;
+            }
+
+            $payload = is_array($chunk['payload'] ?? null) ? $chunk['payload'] : array();
+            if ( ! empty($payload) ) {
+                $summary = array_intersect_key($payload, array_flip(array('classification', 'bytes', 'preview_hex', 'kiwi_schema', 'kiwi_message_decode', 'wire', 'json_error')));
+                if ( isset($payload['kiwi_message']) && is_array($payload['kiwi_message']) ) {
+                    $summary['kiwi_message'] = array(
+                        'type'              => $payload['kiwi_message']['type'] ?? null,
+                        'node_change_count' => is_array($payload['kiwi_message']['nodeChanges'] ?? null) ? count($payload['kiwi_message']['nodeChanges']) : null,
+                    );
+                }
+                $result['source_reports']['figma']['archive']['canvas']['chunks'][$index]['payload'] = array_filter($summary, static fn (mixed $value): bool => null !== $value);
+            }
+        }
+    }
+
+    return $result;
+}
+
+function blocks_engine_figma_transformer_cli_safe_output_path(string $path): bool
+{
+    if ( '' === $path || str_starts_with($path, '/') || str_starts_with($path, '\\') || str_contains($path, "\0") ) {
+        return false;
+    }
+
+    foreach ( explode('/', str_replace('\\', '/', $path)) as $part ) {
+        if ( '' === $part || '.' === $part || '..' === $part ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function blocks_engine_figma_transformer_cli_read_json_file(string $path): ?array
+{
+    if ( '' === $path || ! is_readable($path) ) {
+        return null;
+    }
+
+    $decoded = json_decode((string) file_get_contents($path), true);
+    return is_array($decoded) ? $decoded : null;
+}
+
+/**
+ * @param array<string, mixed> $context
+ * @return array<string, mixed>
+ */
+function blocks_engine_figma_transformer_cli_diagnostic(string $code, string $message, array $context = array()): array
+{
+    return array(
+        'severity' => 'warning',
+        'code'     => $code,
+        'message'  => $message,
+        'source'   => 'figma-transformer-cli',
+        'context'  => $context,
+    );
+}
+
+/**
+ * @param array<string, mixed> $result
+ */
+function blocks_engine_figma_transformer_cli_json_encode(array $result): string
+{
+    $encoded = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    if ( is_string($encoded) ) {
+        return $encoded;
+    }
+
+    return json_encode(
+        array(
+            'schema'      => 'blocks-engine/figma-transformer/result/v1',
+            'status'      => 'error',
+            'diagnostics' => array(
+                array(
+                    'code'    => 'figma_transformer_cli_json_encode_failed',
+                    'message' => 'Transform result could not be encoded as JSON.',
+                    'source'  => 'figma-transformer-cli',
+                    'context' => array('json_error' => json_last_error_msg()),
+                ),
+            ),
+        ),
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+    ) ?: '{"status":"error"}';
+}

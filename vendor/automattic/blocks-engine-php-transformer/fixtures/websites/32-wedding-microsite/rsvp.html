@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RSVP — Maya &amp; Devon | Reply by August 1</title>
+  <meta name="description" content="RSVP to Maya and Devon’s wedding on September 19, 2026. Reply by August 1, 2026.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo" aria-label="Maya and Devon — home">
+      <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="20" cy="20" r="19" fill="#f4dcd6" stroke="#a86359" stroke-width="1"/>
+        <text x="20" y="26" text-anchor="middle" font-family="Italianno, cursive" font-size="22" fill="#a86359">M&amp;D</text>
+      </svg>
+      <span>
+        <span class="logo-script">Maya &amp; Devon</span>
+        <span class="logo-sub">09 · 19 · 2026</span>
+      </span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="details.html">Details</a>
+      <a href="rsvp.html">RSVP</a>
+      <a href="travel.html">Travel</a>
+      <a href="registry.html">Registry</a>
+      <a href="photos.html">Photos</a>
+      <a href="faq.html">FAQ</a>
+    </nav>
+    <div class="header-cta">
+      <a href="rsvp.html" class="btn btn-primary btn-sm">RSVP</a>
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav" id="mobile-nav" role="dialog" aria-label="Navigation menu">
+  <div class="mobile-nav-overlay" aria-hidden="true"></div>
+  <div class="mobile-nav-panel">
+    <div class="mobile-nav-script">Maya &amp; Devon</div>
+    <nav class="mobile-nav-links" aria-label="Mobile navigation">
+      <a href="index.html">Home</a>
+      <a href="details.html">Details</a>
+      <a href="rsvp.html">RSVP</a>
+      <a href="travel.html">Travel</a>
+      <a href="registry.html">Registry</a>
+      <a href="photos.html">Photos</a>
+      <a href="faq.html">FAQ</a>
+    </nav>
+    <div class="mobile-nav-info">
+      <div>Please reply by</div>
+      <div><strong>August 1, 2026</strong></div>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<!-- ========== PAGE HEADER ========== -->
+<section class="page-header">
+  <div class="container-narrow">
+    <span class="eyebrow">Please reply by August 1</span>
+    <h1>RSVP</h1>
+    <p class="lead">
+      Fill this out for each adult in your party. If you’re responding for two of you on one form, that’s great — just
+      list both names. We’re using this to plan everything from the seating chart to the burger count, so the more honest
+      and specific you can be, the better.
+    </p>
+  </div>
+</section>
+
+<!-- ========== RSVP FORM ========== -->
+<section class="section-tight">
+  <div class="container-narrow">
+
+    <!-- Success message, hidden by default -->
+    <div class="form-card rsvp-success" hidden role="status" aria-live="polite" style="text-align:center; background: var(--sage-pale)">
+      <span class="welcome-script" style="font-size: 2.4rem">Thank you!</span>
+      <p style="font-family: var(--font-serif); font-size: 1.15rem; margin-top: 0.5rem">
+        Your RSVP is in. We’ll be in touch in early September with shuttle details and any last-minute info.
+      </p>
+      <p><a href="index.html">← Back to the home page</a></p>
+    </div>
+
+    <form class="form-card rsvp-form" method="post" action="#" novalidate aria-labelledby="form-title">
+      <h2 id="form-title" class="sr-only" style="position:absolute; left:-9999px">RSVP form</h2>
+
+      <!-- Names -->
+      <div class="form-group">
+        <label class="field-label" for="rsvp-name">
+          Your name <span class="required" aria-hidden="true">*</span>
+        </label>
+        <span class="helper" id="rsvp-name-helper">First and last, please. If you’re replying for two people, list both.</span>
+        <input
+          class="form-input"
+          type="text"
+          id="rsvp-name"
+          name="guest_name"
+          required
+          aria-required="true"
+          aria-describedby="rsvp-name-helper"
+          placeholder="e.g. Priya Krishnan &amp; Sam Wu"
+          autocomplete="name"
+        >
+      </div>
+
+      <!-- Email -->
+      <div class="form-group">
+        <label class="field-label" for="rsvp-email">
+          Email <span class="required" aria-hidden="true">*</span>
+        </label>
+        <span class="helper" id="rsvp-email-helper">So we can send you shuttle pickup times in September.</span>
+        <input
+          class="form-input"
+          type="email"
+          id="rsvp-email"
+          name="email"
+          required
+          aria-required="true"
+          aria-describedby="rsvp-email-helper"
+          placeholder="you@example.com"
+          autocomplete="email"
+        >
+      </div>
+
+      <!-- Attending radio -->
+      <fieldset class="form-group">
+        <legend class="field-label">
+          Will you join us? <span class="required" aria-hidden="true">*</span>
+        </legend>
+        <div class="radio-group" role="radiogroup" aria-required="true">
+          <label>
+            <input type="radio" name="attending" value="yes" required>
+            <span>
+              <span class="opt-title">Joyfully accepts</span>
+              <span class="opt-desc">Wouldn’t miss it. See you in September.</span>
+            </span>
+          </label>
+          <label>
+            <input type="radio" name="attending" value="no" required>
+            <span>
+              <span class="opt-title">Regretfully declines</span>
+              <span class="opt-desc">We’ll be there in spirit and on the group thread.</span>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Party size + plus one -->
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom: 0">
+          <label class="field-label" for="rsvp-party">
+            Party size <span class="required" aria-hidden="true">*</span>
+          </label>
+          <span class="helper" id="rsvp-party-helper">Including yourself. Check your invitation if you’re unsure who’s included.</span>
+          <select
+            class="form-select"
+            id="rsvp-party"
+            name="party_size"
+            required
+            aria-required="true"
+            aria-describedby="rsvp-party-helper"
+          >
+            <option value="">Select…</option>
+            <option value="1">Just me (1)</option>
+            <option value="2">Me + 1 (2)</option>
+            <option value="3">3 (please confirm with us)</option>
+            <option value="4">4 (please confirm with us)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0">
+          <label class="field-label" for="rsvp-plus-one-name">
+            Plus-one name
+          </label>
+          <span class="helper" id="rsvp-plus-helper">Leave blank if you’re flying solo.</span>
+          <input
+            class="form-input"
+            type="text"
+            id="rsvp-plus-one-name"
+            name="plus_one_name"
+            aria-describedby="rsvp-plus-helper"
+            placeholder="Their full name"
+          >
+        </div>
+      </div>
+
+      <!-- Meal preference (checkboxes for things that apply to each person) -->
+      <fieldset class="form-group">
+        <legend class="field-label">Dietary preferences</legend>
+        <span class="helper" id="rsvp-meal-helper">Select all that apply for anyone in your party. We’ll follow up if we need detail.</span>
+        <div class="check-group" aria-describedby="rsvp-meal-helper">
+          <label>
+            <input type="checkbox" name="diet[]" value="vegetarian">
+            <span class="opt-title">Vegetarian</span>
+          </label>
+          <label>
+            <input type="checkbox" name="diet[]" value="vegan">
+            <span class="opt-title">Vegan</span>
+          </label>
+          <label>
+            <input type="checkbox" name="diet[]" value="gluten_free">
+            <span class="opt-title">Gluten-free</span>
+          </label>
+          <label>
+            <input type="checkbox" name="diet[]" value="dairy_free">
+            <span class="opt-title">Dairy-free</span>
+          </label>
+          <label>
+            <input type="checkbox" name="diet[]" value="kosher">
+            <span class="opt-title">Kosher</span>
+          </label>
+          <label>
+            <input type="checkbox" name="diet[]" value="halal">
+            <span class="opt-title">Halal</span>
+          </label>
+          <label>
+            <input type="checkbox" name="diet[]" value="no_alcohol">
+            <span class="opt-title">Prefer zero-proof drinks all night</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Allergies textarea -->
+      <div class="form-group">
+        <label class="field-label" for="rsvp-allergies">Allergies &amp; restrictions</label>
+        <span class="helper" id="rsvp-allergies-helper">Anything our caterer should know. Be specific — “mild nut allergy” vs. “anaphylactic to tree nuts” matters.</span>
+        <textarea
+          class="form-textarea"
+          id="rsvp-allergies"
+          name="allergies"
+          aria-describedby="rsvp-allergies-helper"
+          placeholder="e.g. tree nuts (severe), shellfish, no raw onions please"
+          rows="3"
+        ></textarea>
+      </div>
+
+      <!-- Song request -->
+      <div class="form-group">
+        <label class="field-label" for="rsvp-song">Song request</label>
+        <span class="helper" id="rsvp-song-helper">One song that will absolutely get you on the dance floor. We’ll do our best.</span>
+        <input
+          class="form-input"
+          type="text"
+          id="rsvp-song"
+          name="song"
+          aria-describedby="rsvp-song-helper"
+          placeholder="Artist — Song title"
+        >
+      </div>
+
+      <!-- Accommodations radio -->
+      <fieldset class="form-group">
+        <legend class="field-label">Do you need any accessibility accommodations?</legend>
+        <span class="helper" id="rsvp-access-helper">No detail is too small. We’d rather over-plan than miss something.</span>
+        <div class="radio-group" aria-describedby="rsvp-access-helper">
+          <label>
+            <input type="radio" name="accommodations" value="none">
+            <span class="opt-title">No, all set</span>
+          </label>
+          <label>
+            <input type="radio" name="accommodations" value="mobility">
+            <span><span class="opt-title">Yes — mobility</span><span class="opt-desc">Wheelchair-accessible seating, golf-cart shuttle, etc.</span></span>
+          </label>
+          <label>
+            <input type="radio" name="accommodations" value="hearing">
+            <span><span class="opt-title">Yes — hearing</span><span class="opt-desc">Front-row ceremony seat, ASL, or captioning needs.</span></span>
+          </label>
+          <label>
+            <input type="radio" name="accommodations" value="sensory">
+            <span><span class="opt-title">Yes — sensory or other</span><span class="opt-desc">Quiet space, lighting, or anything else. We’ll follow up.</span></span>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Anything else textarea -->
+      <div class="form-group">
+        <label class="field-label" for="rsvp-notes">Anything else?</label>
+        <span class="helper" id="rsvp-notes-helper">Travel logistics, a question, a memory — anything. We read every one of these.</span>
+        <textarea
+          class="form-textarea"
+          id="rsvp-notes"
+          name="notes"
+          aria-describedby="rsvp-notes-helper"
+          placeholder="Tell us anything"
+          rows="4"
+        ></textarea>
+      </div>
+
+      <!-- Hidden field -->
+      <input type="hidden" name="invite_code" value="">
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary btn-lg">Send our RSVP</button>
+        <span class="form-deadline-note">
+          Please respond by <strong>August 1, 2026</strong>.
+        </span>
+      </div>
+    </form>
+
+  </div>
+</section>
+
+<!-- ========== HOW TO RSVP / EXPLAINER ========== -->
+<section class="bg-cream" aria-labelledby="how-heading">
+  <div class="container">
+    <div class="center" style="margin-bottom: 2rem">
+      <span class="eyebrow">A few notes</span>
+      <h2 id="how-heading" style="font-style: italic; font-weight: 400">How RSVPing works</h2>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-block">
+        <h3>One form per household</h3>
+        <p>
+          If you and your partner are coming together, fill out a single form and list both names. If you’re bringing a plus-one,
+          please give us their name (we’d like to print it on a place card and not call them “Guest”).
+        </p>
+      </div>
+
+      <div class="info-block">
+        <h3>The deadline is real</h3>
+        <p>
+          The venue needs final headcount on August 8. We’ve given ourselves a one-week buffer for following up with stragglers,
+          so the form closes <strong>August 1</strong>. If you’re a yes, please tell us. If you’re a no, please tell us that too.
+        </p>
+      </div>
+
+      <div class="info-block">
+        <h3>Plus-ones</h3>
+        <p>
+          Plus-ones are listed on the invitation. If your envelope has a name on it, that person is invited. If you’d like to bring
+          someone we didn’t list, just text Maya or Devon — we’ll figure it out. We promise we won’t be weird about it.
+        </p>
+      </div>
+
+      <div class="info-block">
+        <h3>Need to change your RSVP?</h3>
+        <p>
+          Life happens. Email <a href="mailto:hello@mayaanddevon.party">hello@mayaanddevon.party</a> with any changes up until
+          September 10. After that, it gets hard to make adjustments — but tell us anyway, we’d rather know.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ========== FOOTER ========== -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <svg class="footer-monogram" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="30" cy="30" r="28" fill="none" stroke="#f4dcd6" stroke-width="0.6"/>
+      <text x="30" y="40" text-anchor="middle" font-family="Italianno, cursive" font-size="32" fill="#f4dcd6">M&amp;D</text>
+    </svg>
+    <div class="footer-script">Maya &amp; Devon</div>
+    <div class="footer-date">Saturday · September 19 · 2026</div>
+    <nav class="footer-nav" aria-label="Footer navigation">
+      <a href="index.html">Home</a>
+      <a href="details.html">Details</a>
+      <a href="rsvp.html">RSVP</a>
+      <a href="travel.html">Travel</a>
+      <a href="registry.html">Registry</a>
+      <a href="photos.html">Photos</a>
+      <a href="faq.html">FAQ</a>
+    </nav>
+    <p class="footer-fineprint">
+      Stonewall Hill Farm · 412 Hubbell Hill Road · Roxbury, NY 12474<br>
+      Questions? Email us at <a href="mailto:hello@mayaanddevon.party" style="color:#f4dcd6">hello@mayaanddevon.party</a>
+    </p>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

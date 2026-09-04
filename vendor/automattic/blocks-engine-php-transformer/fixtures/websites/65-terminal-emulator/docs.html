@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docs — Tideglass command reference</title>
+  <meta name="description" content="The full command reference for Tideglass: ls, cd, cat, grep, pipes, redirects and more — generated from the same manual pages the in-shell man command uses.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/page.css">
+</head>
+<body class="is-page" data-scheme="harbor">
+
+  <header class="app-header" role="banner">
+    <a href="index.html" class="brand" aria-label="Tideglass home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="2" y="4" width="28" height="24" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M7 12 L11 16 L7 20" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="14" y1="20" x2="22" y2="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-word">Tide<b>glass</b></span>
+    </a>
+    <nav class="app-nav" aria-label="Primary">
+      <a href="index.html">Terminal</a>
+      <a href="docs.html" class="active" aria-current="page">Docs</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-wrap">
+    <section class="page-hero">
+      <p class="eyebrow">Reference</p>
+      <h1>The Tideglass <em>command reference</em></h1>
+      <p class="lead">Every built-in command, with synopsis, description, and examples. These are the same manual pages the in-shell <code>man</code> command reads — there's <span id="cmd-count">…</span> of them. Pipes (<code>|</code>), redirects (<code>&gt;</code> <code>&gt;&gt;</code> <code>&lt;</code>), globs (<code>*</code>), and variables (<code>$VAR</code>, <code>$?</code>) work throughout.</p>
+    </section>
+
+    <section class="prose">
+      <h2>Pipes &amp; redirection</h2>
+      <p>Tideglass parses a real little shell grammar. Commands can be chained with pipes, where the output of one becomes the input of the next, and output can be sent to files:</p>
+      <pre class="code"><span class="c-com"># count how many lines in the access log were 401s</span>
+<span class="c-cmd">cat</span> logs/access.log | <span class="c-cmd">grep</span> 401 | <span class="c-cmd">wc</span> -l
+
+<span class="c-com"># a sorted, de-duplicated frequency table</span>
+<span class="c-cmd">cat</span> words.txt | <span class="c-cmd">sort</span> | <span class="c-cmd">uniq</span> -c | <span class="c-cmd">sort</span> -nr
+
+<span class="c-com"># write and append to files</span>
+<span class="c-cmd">echo</span> "first line"  &gt;  out.txt
+<span class="c-cmd">echo</span> "second line" &gt;&gt; out.txt
+<span class="c-cmd">wc</span> -l &lt; out.txt</pre>
+
+      <div class="callout">
+        <b>Tip:</b> quoting works the way you'd expect. <code>'single quotes'</code> are literal, <code>"double quotes"</code> still expand <code>$variables</code>, and a backslash escapes the next character.
+      </div>
+
+      <h2>Commands</h2>
+      <p>Jump to one, or scroll the cards below.</p>
+      <nav class="cmd-index" id="cmd-index" aria-label="Command index"></nav>
+      <div id="man-list"></div>
+    </section>
+
+    <p style="margin-top:40px"><a class="bigcta" href="index.html">Open the terminal →</a></p>
+  </main>
+
+  <footer class="app-footer">
+    <span>Tideglass v1.4 · a fictional product, built in vanilla HTML/CSS/JS</span>
+    <span>No servers were contacted in the making of this shell.</span>
+  </footer>
+
+  <!-- commands.js defines TG.MAN; docs.js renders it -->
+  <script src="js/commands.js"></script>
+  <script src="js/docs.js"></script>
+</body>
+</html>

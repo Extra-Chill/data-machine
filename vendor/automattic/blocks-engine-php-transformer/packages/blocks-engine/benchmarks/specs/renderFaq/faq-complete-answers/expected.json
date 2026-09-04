@@ -1,0 +1,22 @@
+{
+  "source": "ideal",
+  "_note": "IDEAL (content-anchored, faithful -> 100): an FAQ is a group with its heading then one core/details per question (summary = question, paragraph = answer) — block-runner's faq-accordion archetype. Heading + both question texts asserted.",
+  "tree": [
+    {
+      "block": "core/group",
+      "children": [
+        { "block": "core/heading", "contains": "Frequently Asked Questions" },
+        {
+          "block": "core/details",
+          "contains": "Can I install it myself?",
+          "children": [{ "block": "core/paragraph" }]
+        },
+        {
+          "block": "core/details",
+          "contains": "How fast does it ship?",
+          "children": [{ "block": "core/paragraph" }]
+        }
+      ]
+    }
+  ]
+}

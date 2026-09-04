@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "derivation": "Mechanically generated from DLA src/lib/replicate/page-reconstruct.ts reconstructPagePattern at DLA commit 1e393c5; section renderer markup strips the final reconstruct body newline.",
+  "renderers": {
+    "renderReviewGrid": [
+      {
+        "id": "structured-review-cards-dark-band",
+        "output": {
+          "markup": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"backgroundColor\":\"surface-inverse\",\"textColor\":\"text-inverse\",\"style\":{\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"clamp(32px, 5.00vw, 72px)\",\"bottom\":\"clamp(34px, 5.28vw, 76px)\",\"left\":\"var:preset|spacing|40\",\"right\":\"var:preset|spacing|40\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"constrained\",\"wideSize\":\"1100px\"}} -->\n<section class=\"wp-block-group alignfull has-surface-inverse-background-color has-text-inverse-color has-text-color has-background\" style=\"margin-top:0;margin-bottom:0;padding-top:clamp(32px, 5.00vw, 72px);padding-right:var(--wp--preset--spacing--40);padding-bottom:clamp(34px, 5.28vw, 76px);padding-left:var(--wp--preset--spacing--40)\">\n<!-- wp:heading {\"textAlign\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(18px, 2.5vw, 36px)\",\"lineHeight\":\"1.15\"}},\"level\":2,\"fontFamily\":\"display\",\"textColor\":\"text-inverse\"} -->\n<h2 class=\"wp-block-heading has-text-align-center has-text-inverse-color has-text-color has-display-font-family\" style=\"font-size:clamp(18px, 2.5vw, 36px);line-height:1.15\">Loved by studio teams</h2>\n<!-- /wp:heading -->\n<!-- wp:columns {\"verticalAlignment\":\"center\"} -->\n<div class=\"wp-block-columns are-vertically-aligned-center\">\n<!-- wp:column  -->\n<div class=\"wp-block-column\">\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"accent-primary\"} -->\n<p class=\"has-text-align-center has-accent-primary-color has-text-color\">★★★★★</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"text-inverse\"} -->\n<p class=\"has-text-align-center has-text-inverse-color has-text-color\">The sample wall finally matches how clients actually shop.</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"text-inverse\",\"fontSize\":\"small\"} -->\n<p class=\"has-text-align-center has-text-inverse-color has-text-color has-small-font-size\">Mara Lee</p>\n<!-- /wp:paragraph -->\n</div>\n<!-- /wp:column -->\n<!-- wp:column  -->\n<div class=\"wp-block-column\">\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"accent-primary\"} -->\n<p class=\"has-text-align-center has-accent-primary-color has-text-color\">★★★★★</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"text-inverse\"} -->\n<p class=\"has-text-align-center has-text-inverse-color has-text-color\">Clean ordering, clear photography, and no extra showroom calls.</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"text-inverse\",\"fontSize\":\"small\"} -->\n<p class=\"has-text-align-center has-text-inverse-color has-text-color has-small-font-size\">Jules Park</p>\n<!-- /wp:paragraph -->\n</div>\n<!-- /wp:column -->\n</div>\n<!-- /wp:columns -->\n</section>\n<!-- /wp:group -->",
+          "expectedText": [
+            "Loved by studio teams"
+          ],
+          "bodyText": [
+            "The sample wall finally matches how clients actually shop.",
+            "Mara Lee",
+            "Clean ordering, clear photography, and no extra showroom calls.",
+            "Jules Park"
+          ],
+          "assets": [],
+          "flags": [],
+          "iconAssets": []
+        }
+      },
+      {
+        "id": "body-text-fallback-without-structured-reviews",
+        "output": {
+          "markup": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"style\":{\"color\":{\"background\":\"#eff8f5\"},\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"clamp(25px, 3.89vw, 56px)\",\"bottom\":\"clamp(26px, 4.03vw, 58px)\",\"left\":\"var:preset|spacing|40\",\"right\":\"var:preset|spacing|40\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"constrained\",\"wideSize\":\"1100px\"}} -->\n<section class=\"wp-block-group alignfull has-background\" style=\"margin-top:0;margin-bottom:0;background-color:#eff8f5;padding-top:clamp(25px, 3.89vw, 56px);padding-right:var(--wp--preset--spacing--40);padding-bottom:clamp(26px, 4.03vw, 58px);padding-left:var(--wp--preset--spacing--40)\">\n<!-- wp:heading {\"textAlign\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 2.2vw, 32px)\",\"lineHeight\":\"1.18\"}},\"level\":2,\"fontFamily\":\"display\",\"textColor\":\"text-default\"} -->\n<h2 class=\"wp-block-heading has-text-align-center has-text-default-color has-text-color has-display-font-family\" style=\"font-size:clamp(16px, 2.2vw, 32px);line-height:1.18\">Customer notes</h2>\n<!-- /wp:heading -->\n<!-- wp:columns {\"verticalAlignment\":\"center\"} -->\n<div class=\"wp-block-columns are-vertically-aligned-center\">\n<!-- wp:column  -->\n<div class=\"wp-block-column\">\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"text-muted\",\"fontSize\":\"small\"} -->\n<p class=\"has-text-align-center has-text-muted-color has-text-color has-small-font-size\">4.8 / 5 rating</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"text-default\"} -->\n<p class=\"has-text-align-center has-text-default-color has-text-color\">Installers understood the choices before they arrived.</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"text-default\"} -->\n<p class=\"has-text-align-center has-text-default-color has-text-color\">Avery Stone</p>\n<!-- /wp:paragraph -->\n</div>\n<!-- /wp:column -->\n</div>\n<!-- /wp:columns -->\n</section>\n<!-- /wp:group -->",
+          "expectedText": [
+            "Customer notes"
+          ],
+          "bodyText": [
+            "4.8 / 5 rating",
+            "Installers understood the choices before they arrived.",
+            "Avery Stone"
+          ],
+          "assets": [],
+          "flags": [],
+          "iconAssets": []
+        }
+      },
+      {
+        "id": "placeholder-review-gap",
+        "output": {
+          "markup": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"backgroundColor\":\"surface-raised\",\"style\":{\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"clamp(22px, 3.33vw, 48px)\",\"bottom\":\"clamp(23px, 3.61vw, 52px)\",\"left\":\"var:preset|spacing|40\",\"right\":\"var:preset|spacing|40\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"constrained\",\"wideSize\":\"1100px\"}} -->\n<section class=\"wp-block-group alignfull has-surface-raised-background-color has-background\" style=\"margin-top:0;margin-bottom:0;padding-top:clamp(22px, 3.33vw, 48px);padding-right:var(--wp--preset--spacing--40);padding-bottom:clamp(23px, 3.61vw, 52px);padding-left:var(--wp--preset--spacing--40)\">\n<!-- wp:heading {\"textAlign\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 2.1vw, 30px)\",\"lineHeight\":\"1.2\"}},\"level\":2,\"fontFamily\":\"display\",\"textColor\":\"text-default\"} -->\n<h2 class=\"wp-block-heading has-text-align-center has-text-default-color has-text-color has-display-font-family\" style=\"font-size:clamp(16px, 2.1vw, 30px);line-height:1.2\">Reviews from homeowners</h2>\n<!-- /wp:heading -->\n<!-- wp:columns {\"verticalAlignment\":\"center\"} -->\n<div class=\"wp-block-columns are-vertically-aligned-center\">\n<!-- wp:column  -->\n<div class=\"wp-block-column\">\n<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"text-subtle\"} -->\n<p class=\"has-text-align-center has-text-subtle-color has-text-color\">[reviews not captured]</p>\n<!-- /wp:paragraph -->\n</div>\n<!-- /wp:column -->\n</div>\n<!-- /wp:columns -->\n</section>\n<!-- /wp:group -->",
+          "expectedText": [
+            "Reviews from homeowners"
+          ],
+          "bodyText": [],
+          "assets": [],
+          "flags": [
+            "review-grid#43: review band detected but no verbatim reviews captured — placeholder emitted"
+          ],
+          "iconAssets": []
+        }
+      }
+    ],
+    "renderImageRow": [
+      {
+        "id": "gallery-scroller-mixed-aspect-strip",
+        "output": {
+          "markup": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"style\":{\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"clamp(20px, 3.06vw, 44px)\",\"bottom\":\"clamp(22px, 3.33vw, 48px)\",\"left\":\"var:preset|spacing|40\",\"right\":\"var:preset|spacing|40\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"constrained\",\"wideSize\":\"1100px\"}} -->\n<section class=\"wp-block-group alignfull\" style=\"margin-top:0;margin-bottom:0;padding-top:clamp(20px, 3.06vw, 44px);padding-right:var(--wp--preset--spacing--40);padding-bottom:clamp(22px, 3.33vw, 48px);padding-left:var(--wp--preset--spacing--40)\">\n<!-- wp:heading {\"textAlign\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(17px, 2.4vw, 34px)\",\"lineHeight\":\"1.16\"}},\"level\":2,\"fontFamily\":\"display\",\"textColor\":\"text-default\"} -->\n<h2 class=\"wp-block-heading has-text-align-center has-text-default-color has-text-color has-display-font-family\" style=\"font-size:clamp(17px, 2.4vw, 34px);line-height:1.16\">Recent installs</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph {\"align\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 1.2vw, 17px)\",\"lineHeight\":\"1.55\"}},\"textColor\":\"text-muted\"} -->\n<p class=\"has-text-align-center has-text-muted-color has-text-color\" style=\"font-size:clamp(16px, 1.2vw, 17px);line-height:1.55\">A compact single-row strip keeps mixed aspect ratios intact.</p>\n<!-- /wp:paragraph -->\n<!-- wp:gallery {\"columns\":4,\"imageCrop\":false,\"linkTo\":\"none\",\"sizeSlug\":\"large\",\"className\":\"is-gallery-scroller\"} -->\n<figure class=\"wp-block-gallery has-nested-images columns-4 is-gallery-scroller\">\n<!-- wp:image {\"width\":\"647px\",\"height\":\"302px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/install-wide-1.jpg\" alt=\"Wide install one\" style=\"width:647px;height:302px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"561px\",\"height\":\"302px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/install-wide-2.jpg\" alt=\"Wide install two\" style=\"width:561px;height:302px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"201px\",\"height\":\"302px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/install-tall.jpg\" alt=\"Tall install\" style=\"width:201px;height:302px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"537px\",\"height\":\"302px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/install-wide-3.jpg\" alt=\"Wide install three\" style=\"width:537px;height:302px\"/></figure>\n<!-- /wp:image -->\n</figure>\n<!-- /wp:gallery -->\n</section>\n<!-- /wp:group -->",
+          "expectedText": [
+            "Recent installs"
+          ],
+          "bodyText": [
+            "A compact single-row strip keeps mixed aspect ratios intact."
+          ],
+          "assets": [
+            "http://localhost:8883/wp-content/uploads/2026/05/install-wide-1.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/install-wide-2.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/install-tall.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/install-wide-3.jpg"
+          ],
+          "flags": [],
+          "iconAssets": []
+        }
+      },
+      {
+        "id": "color-block-grid-wrapping-gallery",
+        "output": {
+          "markup": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"style\":{\"color\":{\"background\":\"#e8eff1\"},\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"clamp(27px, 4.17vw, 60px)\",\"bottom\":\"clamp(29px, 4.44vw, 64px)\",\"left\":\"var:preset|spacing|40\",\"right\":\"var:preset|spacing|40\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"constrained\",\"wideSize\":\"1100px\"}} -->\n<section class=\"wp-block-group alignfull has-background\" style=\"margin-top:0;margin-bottom:0;background-color:#e8eff1;padding-top:clamp(27px, 4.17vw, 60px);padding-right:var(--wp--preset--spacing--40);padding-bottom:clamp(29px, 4.44vw, 64px);padding-left:var(--wp--preset--spacing--40)\">\n<!-- wp:heading {\"textAlign\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 2.2vw, 32px)\",\"lineHeight\":\"1.18\"}},\"level\":2,\"fontFamily\":\"display\",\"textColor\":\"text-default\"} -->\n<h2 class=\"wp-block-heading has-text-align-center has-text-default-color has-text-color has-display-font-family\" style=\"font-size:clamp(16px, 2.2vw, 32px);line-height:1.18\">Finish palette</h2>\n<!-- /wp:heading -->\n<!-- wp:gallery {\"columns\":4,\"imageCrop\":true,\"linkTo\":\"none\",\"sizeSlug\":\"large\"} -->\n<figure class=\"wp-block-gallery has-nested-images columns-4 is-cropped\">\n<!-- wp:image {\"width\":\"320px\",\"height\":\"320px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/finish-oak.jpg\" alt=\"Oak finish\" style=\"width:320px;height:320px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"320px\",\"height\":\"320px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/finish-walnut.jpg\" alt=\"Walnut finish\" style=\"width:320px;height:320px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"320px\",\"height\":\"320px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/finish-maple.jpg\" alt=\"Maple finish\" style=\"width:320px;height:320px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"320px\",\"height\":\"320px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/finish-ash.jpg\" alt=\"Ash finish\" style=\"width:320px;height:320px\"/></figure>\n<!-- /wp:image -->\n</figure>\n<!-- /wp:gallery -->\n</section>\n<!-- /wp:group -->",
+          "expectedText": [
+            "Finish palette"
+          ],
+          "bodyText": [],
+          "assets": [
+            "http://localhost:8883/wp-content/uploads/2026/05/finish-oak.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/finish-walnut.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/finish-maple.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/finish-ash.jpg"
+          ],
+          "flags": [],
+          "iconAssets": []
+        }
+      }
+    ]
+  }
+}

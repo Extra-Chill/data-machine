@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sandbox — Tumble Lab</title>
+  <meta name="description" content="The live Tumble Lab physics sandbox. Tune gravity, bounce and friction, spawn balls, boxes, ropes and confetti, and load presets — all rendered in real time.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Tumble Lab home">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">
+        <span class="logo-name">Tumble<b>·</b>Lab</span>
+        <span class="logo-sub">Verlet Physics Toy</span>
+      </span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="sandbox.html" class="active">Sandbox</a>
+      <a href="scenes.html">Scenes</a>
+      <a href="about.html">How it works</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="lab">
+
+    <!-- ══════════════ CONTROL PANEL ══════════════ -->
+    <aside class="lab-panel" aria-label="Simulation controls">
+
+      <div class="panel-group">
+        <h2>Transport</h2>
+        <div class="transport">
+          <button class="btn-t" id="btn-pause" aria-pressed="false">❚❚ Pause</button>
+          <button class="btn-t" id="btn-step">⏭ Step</button>
+          <button class="btn-t" id="btn-reset">↻ Reset</button>
+          <button class="btn-t" id="btn-clear">⌫ Clear</button>
+        </div>
+      </div>
+
+      <div class="panel-group">
+        <h2>Forces</h2>
+        <div class="ctl-row">
+          <label for="ctl-gravity">Gravity strength <span class="val" id="ctl-gravity-val">0.55 g</span></label>
+          <input type="range" id="ctl-gravity" min="0" max="1.6" step="0.01" value="0.55">
+        </div>
+        <div class="ctl-row">
+          <label for="ctl-angle">Gravity direction <span class="val" id="ctl-angle-val">90°</span></label>
+          <input type="range" id="ctl-angle" min="0" max="360" step="1" value="90">
+        </div>
+        <div class="ctl-row">
+          <label for="ctl-restitution">Bounciness <span class="val" id="ctl-restitution-val">55%</span></label>
+          <input type="range" id="ctl-restitution" min="0" max="0.98" step="0.01" value="0.55">
+        </div>
+        <div class="ctl-row">
+          <label for="ctl-friction">Air friction <span class="val" id="ctl-friction-val">1.5%</span></label>
+          <input type="range" id="ctl-friction" min="0" max="0.08" step="0.001" value="0.015">
+        </div>
+        <div class="ctl-row">
+          <label for="ctl-iterations">Solver passes <span class="val" id="ctl-iterations-val">4x</span></label>
+          <input type="range" id="ctl-iterations" min="1" max="10" step="1" value="4">
+        </div>
+      </div>
+
+      <div class="panel-group">
+        <h2>Mouse mode</h2>
+        <div class="chip-row">
+          <button class="chip" data-mode="spawn">Spawn / grab</button>
+          <button class="chip" data-mode="grab">Grab only</button>
+          <button class="chip" data-mode="attract">Attract</button>
+          <button class="chip" data-mode="repel">Repel</button>
+        </div>
+      </div>
+
+      <div class="panel-group">
+        <h2>Spawn type</h2>
+        <div class="chip-row">
+          <button class="chip" data-spawn="ball">● Ball</button>
+          <button class="chip" data-spawn="box">▢ Box</button>
+          <button class="chip" data-spawn="rope">⌇ Rope</button>
+          <button class="chip" data-spawn="confetti">✦ Confetti</button>
+        </div>
+        <div class="ctl-row" style="margin-top:0.8rem;">
+          <label for="ctl-size">Spawn size <span class="val" id="ctl-size-val">14px</span></label>
+          <input type="range" id="ctl-size" min="5" max="34" step="1" value="14">
+        </div>
+      </div>
+
+      <div class="panel-group">
+        <h2>Visuals</h2>
+        <label class="toggle-row">
+          <span>Motion trails</span>
+          <span class="switch"><input type="checkbox" id="ctl-trails"><span class="track"></span></span>
+        </label>
+        <label class="toggle-row">
+          <span>Colour by velocity</span>
+          <span class="switch"><input type="checkbox" id="ctl-velcolor"><span class="track"></span></span>
+        </label>
+      </div>
+
+      <div class="panel-group">
+        <h2>Scene presets</h2>
+        <div class="preset-list">
+          <button class="preset" data-scene="ball-pit"><b>Ball Pit</b><span>elastic bodies under gravity</span></button>
+          <button class="preset" data-scene="rope-bridge"><b>Rope Bridge</b><span>slack span pinned at both ends</span></button>
+          <button class="preset" data-scene="cloth-flag"><b>Cloth Flag</b><span>rippling constraint grid</span></button>
+          <button class="preset" data-scene="cloth-tear"><b>Tearable Cloth</b><span>threads snap when stretched</span></button>
+          <button class="preset" data-scene="box-stack"><b>Box Stack</b><span>soft-rigid crate tower</span></button>
+          <button class="preset" data-scene="zero-g"><b>Zero-G Drift</b><span>gravity off, perfect bounce</span></button>
+          <button class="preset" data-scene="fireworks"><b>Fireworks</b><span>recurring spark bursts</span></button>
+          <button class="preset" data-scene="pendulum-newton"><b>Newton's Cradle</b><span>momentum demo</span></button>
+          <button class="preset" data-scene="sandbox"><b>Empty Sandbox</b><span>start from a clean stage</span></button>
+        </div>
+      </div>
+
+      <div class="panel-group">
+        <h2>Keyboard</h2>
+        <p style="font-family:var(--font-mono);font-size:0.72rem;color:var(--ink-faint);line-height:1.9;">
+          <b style="color:var(--ink-soft)">Space</b> pause · <b style="color:var(--ink-soft)">S</b> step · <b style="color:var(--ink-soft)">R</b> reset<br>
+          <b style="color:var(--ink-soft)">1–4</b> spawn type · <b style="color:var(--ink-soft)">G</b> grab · <b style="color:var(--ink-soft)">A</b> attract
+        </p>
+      </div>
+    </aside>
+
+    <!-- ══════════════ STAGE ══════════════ -->
+    <section class="lab-stage" aria-label="Physics canvas">
+      <canvas id="sim" tabindex="0" aria-label="Interactive physics simulation. Click and drag to spawn and fling bodies."></canvas>
+
+      <div class="hud" aria-hidden="true">
+        <span class="stat">fps <b id="stat-fps">60</b></span>
+        <span class="stat">bodies <b id="stat-bodies">0</b></span>
+        <span class="stat">links <b id="stat-constraints">0</b></span>
+        <span class="stat">hits/step <b id="stat-collisions">0</b></span>
+      </div>
+      <div class="scene-tag" aria-live="polite">scene: <span id="scene-name">Ball Pit</span></div>
+      <div class="stage-help">
+        <b>Drag</b> to fling bodies · <b>grab</b> existing ones · switch to <b>attract / repel</b> to bend the field
+      </div>
+      <div class="rm-note" id="rm-note" hidden>
+        Reduced-motion is on: trails are off and the sim starts paused. Press <b>Space</b> or ▶ Play to run it.
+      </div>
+    </section>
+  </main>
+
+  <script src="js/engine.js"></script>
+  <script src="js/scenes.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/nav.js"></script>
+</body>
+</html>

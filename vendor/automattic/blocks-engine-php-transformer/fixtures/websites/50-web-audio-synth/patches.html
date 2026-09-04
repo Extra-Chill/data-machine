@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patch Library — Voltrove Filament One</title>
+  <meta name="description" content="Browse and audition the Voltrove Filament One factory patches and rhythm patterns, then load any of them straight into the playable synth.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Voltrove home">
+      <span class="logo-mark">Voltrove<span class="dot">●</span></span>
+      <span class="logo-sub">Software Instruments</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Play</a>
+      <a href="patches.html" class="active">Patches</a>
+      <a href="about.html">How it works</a>
+      <a href="index.html" class="nav-cta">Open the synth</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+  </header>
+
+  <main class="wrap">
+    <div class="page-hero">
+      <p class="eyebrow">Sound library</p>
+      <h1 class="page-title">Patches &amp; <em>patterns</em></h1>
+      <p class="page-lead">Hit <b>Audition</b> to hear a patch play a short phrase right on this page — no need to open the synth first. When you find one you like, “Load in synth” drops it straight into the Filament One with every knob set for you.</p>
+    </div>
+
+    <section class="section" aria-labelledby="patches-h" style="padding-top:1rem;">
+      <h2 class="section-title" id="patches-h">Factory <em>patches</em></h2>
+      <p class="section-sub">Eight starting points covering basses, leads, keys and pads. Each one is just a set of synth parameters — nothing is sampled.</p>
+      <div class="card-grid" id="patch-gallery"></div>
+    </section>
+
+    <section class="section" id="patterns" aria-labelledby="patterns-h">
+      <h2 class="section-title" id="patterns-h">Rhythm <em>patterns</em></h2>
+      <p class="section-sub">Drop a beat into the step sequencer. The dotted grid below previews the drum hits; load it to also bring across the tempo and synth line.</p>
+      <div class="card-grid" id="pattern-gallery"></div>
+    </section>
+
+    <div class="cta-strip">
+      <h2>Make your own</h2>
+      <p>Dial in a sound in the synth and hit “Save patch” — it’s stored right in your browser, ready next time.</p>
+      <a href="index.html" class="btn btn-primary">Open the Filament One →</a>
+    </div>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Voltrove<span class="dot" style="color:var(--mint)">●</span></div>
+          <p class="footer-brand-desc">A tiny instrument studio building playable synthesizers that live entirely in the browser.</p>
+        </div>
+        <nav class="footer-col" aria-label="Instrument">
+          <p class="footer-col-title">Instrument</p>
+          <ul>
+            <li><a href="index.html">Play the Filament One</a></li>
+            <li><a href="patches.html">Patch library</a></li>
+            <li><a href="about.html">Signal chain</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Studio">
+          <p class="footer-col-title">Studio</p>
+          <ul>
+            <li><a href="about.html">About Voltrove</a></li>
+            <li><a href="about.html#team">The makers</a></li>
+            <li><a href="mailto:hello@voltrove.audio">hello@voltrove.audio</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="More">
+          <p class="footer-col-title">More</p>
+          <ul>
+            <li><a href="#">Changelog</a></li>
+            <li><a href="#">Mastodon</a></li>
+            <li><a href="#">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Voltrove Instruments · Built on the open web</p>
+        <div class="footer-legal"><a href="#">Privacy</a><a href="#">Terms</a><a href="about.html">Colophon</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/engine.js"></script>
+  <script src="js/patches.js"></script>
+  <script src="js/gallery.js"></script>
+  <script src="js/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Course catalog for the Department of Earth, Atmospheric & Marine Sciences at Brennan University, AY 2026–2027 — 30+ courses across five levels.">
+  <title>Course Catalog &mdash; EAMS &middot; Brennan University</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400..700;1,400..700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <div class="utility-bar">
+      <div class="container">
+        <span>Brennan University &middot; College of Science &middot; <span class="small-caps">est.&nbsp;1947</span></span>
+        <nav aria-label="Utility">
+          <a href="https://brennan.example.edu/">Brennan.edu</a>
+          <a href="https://brennan.example.edu/library/">Library</a>
+          <a href="https://brennan.example.edu/portal/">myBrennan</a>
+          <a href="https://brennan.example.edu/giving/eams/">Give to EAMS</a>
+        </nav>
+      </div>
+    </div>
+    <div class="brand-bar">
+      <div class="container">
+        <a href="index.html" aria-label="EAMS home" style="display:flex; align-items:center; gap:18px; border-bottom:0;">
+          <svg class="crest" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <defs><linearGradient id="crestNavy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3a5e"/><stop offset="1" stop-color="#08152a"/></linearGradient></defs>
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z" fill="url(#crestNavy)" stroke="#b08938" stroke-width="1.5"/>
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+            <rect x="20" y="52" width="24" height="6" fill="#8c3a2a"/>
+            <text x="32" y="56.6" text-anchor="middle" font-family="Inter,sans-serif" font-size="4.4" font-weight="600" fill="#ecd9a8" letter-spacing="0.3">EAMS</text>
+          </svg>
+          <span class="brand-text">
+            <span class="brand-institution">Brennan University</span>
+            <span class="brand-department">Earth, Atmospheric <span class="amp">&amp;</span> Marine Sciences</span>
+          </span>
+        </a>
+        <button class="nav-toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Toggle menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="faculty.html">Faculty</a></li>
+            <li><a href="programs.html">Programs</a></li>
+            <li><a href="courses.html">Courses</a></li>
+            <li><a href="research.html">Research</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="events.html">Events</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-head">
+    <div class="container">
+      <div class="breadcrumb">
+        <a href="index.html">EAMS</a> <span class="sep">/</span> <span>Course catalog</span>
+      </div>
+      <span class="eyebrow">Academic year 2026&ndash;2027</span>
+      <h1>Course catalog</h1>
+      <p class="lede">Thirty-four courses across five levels &mdash; introductory natural-history courses for any Brennan undergraduate, methods-heavy major requirements, and graduate seminars open to advanced undergrads with instructor permission.</p>
+    </div>
+  </section>
+
+  <div class="container">
+    <div class="with-sidebar">
+
+      <aside class="subsection-nav" aria-label="Course levels">
+        <h4>By level</h4>
+        <ul>
+          <li><a href="#level-1000">1000-level &mdash; intro</a></li>
+          <li><a href="#level-2000">2000-level</a></li>
+          <li><a href="#level-3000">3000-level</a></li>
+          <li><a href="#level-4000">4000-level</a></li>
+          <li><a href="#level-5000">5000+ graduate</a></li>
+        </ul>
+        <h4 style="margin-top:24px;">Legend</h4>
+        <ul style="font-size:.82rem;">
+          <li><span class="mono">F</span> &nbsp;Fall semester</li>
+          <li><span class="mono">S</span> &nbsp;Spring semester</li>
+          <li><span class="mono">Su</span> &nbsp;Summer session</li>
+        </ul>
+      </aside>
+
+      <main>
+
+        <p class="notice">
+          <strong>Registration:</strong> Most EAMS courses have a soft cap and may be over-subscribed in fall. Students who plan to use a course toward the major should email the instructor for a permission number. <a href="https://brennan.example.edu/portal/">myBrennan portal &rarr;</a>
+        </p>
+
+        <!-- =======================================
+             1000-LEVEL
+             ======================================= -->
+        <section class="course-group" id="level-1000">
+          <h2>1000-level &middot; Introductory courses</h2>
+          <p class="group-intro">Foundational courses open to all undergraduates and counting toward the College of Science breadth requirement. No prerequisites; high-school chemistry recommended for EAMS 1110.</p>
+
+          <div class="course-list">
+
+            <article class="course" id="eams-1010">
+              <div class="course-header">
+                <span class="course-code">EAMS 1010</span>
+                <h3 class="course-title">Dynamic Earth</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F, S</span>
+                <span><strong>Prereq</strong> none</span>
+              </div>
+              <p class="course-desc">A field- and lab-based introduction to the rocks, processes, and timescales that shape the solid Earth. Topics include plate tectonics, mineral and rock identification, the geologic time scale, and an introduction to surface processes. Three lectures plus a required Saturday field trip.</p>
+              <p class="course-instructor">Typical instructors: Park (F), Kasprzak / Rivera (S)</p>
+            </article>
+
+            <article class="course" id="eams-1020">
+              <div class="course-header">
+                <span class="course-code">EAMS 1020</span>
+                <h3 class="course-title">History of Life and Earth</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> none (EAMS 1010 recommended)</span>
+              </div>
+              <p class="course-desc">A narrative of Earth and life from the Hadean to the Anthropocene, organized around major transitions: the Great Oxidation Event, the Cambrian radiation, the Permian-Triassic extinction, and the rise of mammals. Labs use the Mendel Hall teaching collection of fossils and stratigraphic columns.</p>
+              <p class="course-instructor">Typical instructor: Kowalczyk</p>
+            </article>
+
+            <article class="course" id="eams-1110">
+              <div class="course-header">
+                <span class="course-code">EAMS 1110</span>
+                <h3 class="course-title">Weather and Climate</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F, S</span>
+                <span><strong>Prereq</strong> high-school chemistry</span>
+              </div>
+              <p class="course-desc">How the atmosphere works, from the radiation budget to mesoscale convection. The course covers temperature, humidity, clouds, precipitation, mid-latitude weather systems, and the basic mechanisms of climate change. Weekly weather-map analysis labs.</p>
+              <p class="course-instructor">Typical instructors: Tan (F), Keating (S)</p>
+            </article>
+
+            <article class="course" id="eams-1210">
+              <div class="course-header">
+                <span class="course-code">EAMS 1210</span>
+                <h3 class="course-title">The Marine Environment</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> none</span>
+              </div>
+              <p class="course-desc">An introduction to the ocean as a physical, chemical, and biological system. Topics include ocean circulation, marine ecosystems, biogeochemical cycles, and human impacts (fisheries, plastic, climate). Includes a day-trip to the Cobbett Marine Laboratory.</p>
+              <p class="course-instructor">Typical instructors: Volponi (F, odd years), Marchetti (F, even years)</p>
+            </article>
+
+            <article class="course" id="eams-1310">
+              <div class="course-header">
+                <span class="course-code">EAMS 1310</span>
+                <h3 class="course-title">Environment &amp; Society</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F, S</span>
+                <span><strong>Prereq</strong> none</span>
+              </div>
+              <p class="course-desc">A case-based course on the entanglement of environmental science with public policy and social life. Recent cases include the Cape Wind project, Flint water crisis, the New Bedford harbor cleanup, and offshore aquaculture siting in Maine.</p>
+              <p class="course-instructor">Typical instructor: Ben-Ari</p>
+            </article>
+
+            <article class="course" id="eams-1410">
+              <div class="course-header">
+                <span class="course-code">EAMS 1410</span>
+                <h3 class="course-title">Natural Hazards: Earthquakes, Volcanoes, Floods</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> none</span>
+              </div>
+              <p class="course-desc">A non-laboratory course on the science of natural hazards, with attention to how scientific uncertainty is communicated to the public. Uses recent events (2024 Noto earthquake, 2023 Maui fires, 2018 K&imacr;lauea eruption) as extended case studies.</p>
+              <p class="course-instructor">Typical instructor: Ito</p>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- =======================================
+             2000-LEVEL
+             ======================================= -->
+        <section class="course-group" id="level-2000">
+          <h2>2000-level &middot; Foundational major courses</h2>
+          <p class="group-intro">Required for most EAMS majors. These courses build the methodological foundation &mdash; mineral identification, atmospheric thermodynamics, biological and chemical oceanography &mdash; on which 3000- and 4000-level work depends.</p>
+
+          <div class="course-list">
+
+            <article class="course" id="eams-2110">
+              <div class="course-header">
+                <span class="course-code">EAMS 2110</span>
+                <h3 class="course-title">Mineralogy</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> CHEM 1110, <a href="#eams-1010">EAMS 1010</a></span>
+              </div>
+              <p class="course-desc">Systematic mineralogy: crystal chemistry, classification of rock-forming and ore minerals, hand-specimen identification, and X-ray powder diffraction. Two weekly labs in the Mendel Hall teaching collection.</p>
+              <p class="course-instructor">Typical instructors: McAllister, Park</p>
+            </article>
+
+            <article class="course" id="eams-2120">
+              <div class="course-header">
+                <span class="course-code">EAMS 2120</span>
+                <h3 class="course-title">Optical Mineralogy &amp; Petrology</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> <a href="#eams-2110">EAMS 2110</a></span>
+              </div>
+              <p class="course-desc">Thin-section petrography of igneous, metamorphic, and sedimentary rocks. The course introduces phase equilibria, igneous classification, and basic metamorphic facies analysis. Lab-intensive; students develop a portfolio of annotated thin-section descriptions.</p>
+              <p class="course-instructor">Typical instructor: Ito</p>
+            </article>
+
+            <article class="course" id="eams-2210">
+              <div class="course-header">
+                <span class="course-code">EAMS 2210</span>
+                <h3 class="course-title">Coastal Sedimentary Systems</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S, Su (field session)</span>
+                <span><strong>Prereq</strong> <a href="#eams-1010">EAMS 1010</a> or <a href="#eams-1210">EAMS 1210</a></span>
+              </div>
+              <p class="course-desc">The processes that build, modify, and destroy modern coastlines: tides, waves, longshore transport, marsh accretion, barrier-island migration, and storm response. Required summer field week at the Cobbett Point shoreline monitoring transect.</p>
+              <p class="course-instructor">Typical instructors: Kasprzak, Two-Hawk (S)</p>
+            </article>
+
+            <article class="course" id="eams-2310">
+              <div class="course-header">
+                <span class="course-code">EAMS 2310</span>
+                <h3 class="course-title">Biological Oceanography</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> BIOL 1110 and <a href="#eams-1210">EAMS 1210</a></span>
+              </div>
+              <p class="course-desc">An introduction to marine ecosystems, from primary production to higher trophic levels. Topics include the microbial loop, phytoplankton dynamics, zooplankton communities, fisheries ecology, and the response of marine systems to climate change.</p>
+              <p class="course-instructor">Typical instructor: Volponi</p>
+            </article>
+
+            <article class="course" id="eams-2320">
+              <div class="course-header">
+                <span class="course-code">EAMS 2320</span>
+                <h3 class="course-title">Chemical Oceanography</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> CHEM 1120 and <a href="#eams-1210">EAMS 1210</a></span>
+              </div>
+              <p class="course-desc">The chemistry of seawater: major ions, dissolved gases, the carbonate system, nutrient cycling, and trace metals. Includes a lab component on shipboard analytical methods (Winkler titration, nutrient autoanalyzer, spectrophotometry).</p>
+              <p class="course-instructor">Typical instructors: Okonkwo, Bj&ouml;rnsd&oacute;ttir</p>
+            </article>
+
+            <article class="course" id="eams-2330">
+              <div class="course-header">
+                <span class="course-code">EAMS 2330</span>
+                <h3 class="course-title">Physical Oceanography</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> MATH 2310, PHYS 1220</span>
+              </div>
+              <p class="course-desc">An introduction to ocean dynamics: equations of motion, geostrophy, Ekman transport, wind-driven gyres, thermohaline circulation, and a survey of mesoscale and submesoscale processes. Problem-set-intensive.</p>
+              <p class="course-instructor">Typical instructors: Okonkwo-Lin (when in residence), Mahalingam</p>
+            </article>
+
+            <article class="course" id="eams-2410">
+              <div class="course-header">
+                <span class="course-code">EAMS 2410</span>
+                <h3 class="course-title">Atmospheric Thermodynamics</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> MATH 1320, PHYS 1210</span>
+              </div>
+              <p class="course-desc">The first half of the BS Atmospheric Sciences theory sequence. Topics include ideal gas behavior of the atmosphere, hydrostatic balance, moist thermodynamics, lapse rates, stability, and an introduction to cloud microphysics.</p>
+              <p class="course-instructor">Typical instructor: Yamada</p>
+            </article>
+
+            <article class="course" id="eams-2415">
+              <div class="course-header">
+                <span class="course-code">EAMS 2415</span>
+                <h3 class="course-title">Forecasting Practicum</h3>
+                <span class="course-credits">2 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F, S (may be repeated)</span>
+                <span><strong>Prereq</strong> <a href="#eams-1110">EAMS 1110</a></span>
+              </div>
+              <p class="course-desc">A daily 1-hour map-discussion practicum modeled on operational forecasting offices. Students take turns issuing a 3-day forecast for the Brennan area and a long-range outlook for New England. Counts twice toward the BS Atmospheric Sciences.</p>
+              <p class="course-instructor">Typical instructor: Keating</p>
+            </article>
+
+            <article class="course" id="eams-2420">
+              <div class="course-header">
+                <span class="course-code">EAMS 2420</span>
+                <h3 class="course-title">Atmospheric Dynamics I</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> <a href="#eams-2410">EAMS 2410</a>, MATH 2310</span>
+              </div>
+              <p class="course-desc">The equations governing large-scale atmospheric motion: pressure-gradient force, Coriolis, geostrophic and gradient wind balance, vorticity, and an introduction to quasi-geostrophic theory. Sets up the synoptic and dynamical courses that follow.</p>
+              <p class="course-instructor">Typical instructor: Hassan</p>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- =======================================
+             3000-LEVEL
+             ======================================= -->
+        <section class="course-group" id="level-3000">
+          <h2>3000-level &middot; Intermediate major courses</h2>
+          <p class="group-intro">Discipline-specific courses building on the 2000-level foundation. Most are required for one or more concentrations; many serve as the entry point to the advanced 4000-level seminars.</p>
+
+          <div class="course-list">
+
+            <article class="course" id="eams-3110">
+              <div class="course-header">
+                <span class="course-code">EAMS 3110</span>
+                <h3 class="course-title">Structural Geology</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> <a href="#eams-2120">EAMS 2120</a></span>
+              </div>
+              <p class="course-desc">The geometry and mechanics of rock deformation, from outcrop-scale folds and faults to lithospheric-scale tectonics. Strong field component: three weekend trips through the Appalachians and a required map-and-cross-section project.</p>
+              <p class="course-instructor">Typical instructor: Ndlovu</p>
+            </article>
+
+            <article class="course" id="eams-3120">
+              <div class="course-header">
+                <span class="course-code">EAMS 3120</span>
+                <h3 class="course-title">Sedimentology &amp; Stratigraphy</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> <a href="#eams-2120">EAMS 2120</a> or <a href="#eams-2210">EAMS 2210</a></span>
+              </div>
+              <p class="course-desc">Sediment transport and deposition, sequence stratigraphy, facies analysis, and basin evolution. Required local field trips to Mesozoic outcrops in Connecticut and to modern depositional environments in Cobbett Bay.</p>
+              <p class="course-instructor">Typical instructor: Kasprzak</p>
+            </article>
+
+            <article class="course" id="eams-3130">
+              <div class="course-header">
+                <span class="course-code">EAMS 3130</span>
+                <h3 class="course-title">Geomorphology</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> <a href="#eams-1010">EAMS 1010</a></span>
+              </div>
+              <p class="course-desc">The processes that shape the Earth's surface: weathering, hillslope evolution, fluvial systems, glacial geomorphology, and chemical denudation. Lab work uses LiDAR-derived topography from the Brennan Geological Reserve.</p>
+              <p class="course-instructor">Typical instructor: Rivera</p>
+            </article>
+
+            <article class="course" id="eams-3210">
+              <div class="course-header">
+                <span class="course-code">EAMS 3210</span>
+                <h3 class="course-title">Igneous &amp; Metamorphic Petrology</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> <a href="#eams-2120">EAMS 2120</a></span>
+              </div>
+              <p class="course-desc">Advanced petrology of igneous and metamorphic rocks. Topics include phase diagrams, geothermobarometry, isotope tracers for magma sources, and a survey of major tectonic settings (mid-ocean ridge, arc, continental rift, orogenic belt).</p>
+              <p class="course-instructor">Typical instructor: Ito</p>
+            </article>
+
+            <article class="course" id="eams-3220">
+              <div class="course-header">
+                <span class="course-code">EAMS 3220</span>
+                <h3 class="course-title">Sea-going Methods</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> any 2300-level course; instructor permission</span>
+              </div>
+              <p class="course-desc">A hands-on course in shipboard oceanographic methods: CTD operation, water sampling, sediment coring, and shipboard analytical chemistry. Includes a required 5-day cruise on the R/V <em>Cobbett Bay</em> during fall break.</p>
+              <p class="course-instructor">Typical instructors: Greene, rotating area faculty</p>
+            </article>
+
+            <article class="course" id="eams-3230">
+              <div class="course-header">
+                <span class="course-code">EAMS 3230</span>
+                <h3 class="course-title">Marine Geochemistry</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> <a href="#eams-2320">EAMS 2320</a></span>
+              </div>
+              <p class="course-desc">Quantitative marine geochemistry: residence times, isotopic tracers, sediment-water exchange, and the marine carbon cycle. Includes a 3-week independent project on a published data set from the GEOTRACES program.</p>
+              <p class="course-instructor">Typical instructors: Okonkwo, Bj&ouml;rnsd&oacute;ttir</p>
+            </article>
+
+            <article class="course" id="eams-3310">
+              <div class="course-header">
+                <span class="course-code">EAMS 3310</span>
+                <h3 class="course-title">Climate Change Science &amp; Policy</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> <a href="#eams-1110">EAMS 1110</a> or <a href="#eams-1010">EAMS 1010</a></span>
+              </div>
+              <p class="course-desc">The scientific basis for anthropogenic climate change, paired with the policy mechanisms (Paris Agreement, US Clean Air Act, state-level RGGI) that respond to it. Co-taught with the Department of Public Policy.</p>
+              <p class="course-instructor">Typical instructors: Tan, Ben-Ari, plus PUBP faculty</p>
+            </article>
+
+            <article class="course" id="eams-3410">
+              <div class="course-header">
+                <span class="course-code">EAMS 3410</span>
+                <h3 class="course-title">Atmospheric Dynamics II</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> <a href="#eams-2420">EAMS 2420</a></span>
+              </div>
+              <p class="course-desc">Quasi-geostrophic theory, baroclinic instability, Rossby wave dynamics, and the general circulation of the atmosphere. The course pairs analytical problem sets with computational exercises in <span class="mono">Python</span>.</p>
+              <p class="course-instructor">Typical instructor: Hassan</p>
+            </article>
+
+            <article class="course" id="eams-3420">
+              <div class="course-header">
+                <span class="course-code">EAMS 3420</span>
+                <h3 class="course-title">Synoptic Meteorology</h3>
+                <span class="course-credits">4 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> <a href="#eams-2420">EAMS 2420</a></span>
+              </div>
+              <p class="course-desc">Mid-latitude weather systems: extratropical cyclones, frontal structure, jet streaks, blocking, and severe weather. Case studies use the Brennan reanalysis composite catalog.</p>
+              <p class="course-instructor">Typical instructor: Tan</p>
+            </article>
+
+            <article class="course" id="eams-3430">
+              <div class="course-header">
+                <span class="course-code">EAMS 3430</span>
+                <h3 class="course-title">Atmospheric Chemistry</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> CHEM 1120, <a href="#eams-1110">EAMS 1110</a></span>
+              </div>
+              <p class="course-desc">Photochemistry of the troposphere and stratosphere: OH chemistry, NOx and VOCs, ozone, the sulfur cycle, and an introduction to secondary organic aerosol formation. Lab demonstrations in the Adeyemi group's mass-spectrometry suite.</p>
+              <p class="course-instructor">Typical instructors: Adeyemi, Jensen</p>
+            </article>
+
+            <article class="course" id="eams-3510">
+              <div class="course-header">
+                <span class="course-code">EAMS 3510</span>
+                <h3 class="course-title">Introduction to GIS for Earth Scientists</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F, S</span>
+                <span><strong>Prereq</strong> any 1000-level EAMS course</span>
+              </div>
+              <p class="course-desc">A practical introduction to geographic information systems for earth scientists. Topics include vector and raster data, projections, basic spatial analysis, and the production of publication-quality maps. Software: QGIS and ArcGIS Pro.</p>
+              <p class="course-instructor">Typical instructor: Mendoza</p>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- =======================================
+             4000-LEVEL
+             ======================================= -->
+        <section class="course-group" id="level-4000">
+          <h2>4000-level &middot; Advanced undergraduate courses</h2>
+          <p class="group-intro">Topical advanced courses, mostly taken by juniors and seniors in the major. Most have small enrollment and a substantial independent project. The capstone courses (EAMS 4910 and EAMS 4990) also live at this level.</p>
+
+          <div class="course-list">
+
+            <article class="course" id="eams-4110">
+              <div class="course-header">
+                <span class="course-code">EAMS 4110</span>
+                <h3 class="course-title">Tectonics</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> <a href="#eams-3110">EAMS 3110</a></span>
+              </div>
+              <p class="course-desc">A regional and theoretical course on the assembly and evolution of continents, with case studies from the Appalachians, the European Alps, and the Tibetan plateau. Emphasizes the integration of structural, geochronologic, and geodynamic evidence.</p>
+              <p class="course-instructor">Typical instructors: Ndlovu, Petrov (alternating years)</p>
+            </article>
+
+            <article class="course" id="eams-4220">
+              <div class="course-header">
+                <span class="course-code">EAMS 4220</span>
+                <h3 class="course-title">Submarine Geology</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S (alternating years)</span>
+                <span><strong>Prereq</strong> <a href="#eams-3120">EAMS 3120</a> or <a href="#eams-3220">EAMS 3220</a></span>
+              </div>
+              <p class="course-desc">The geology of the seafloor: mid-ocean ridge systems, deep-sea sedimentation, continental slope instability, and gas hydrates. Includes a multi-week project using multibeam bathymetry from the Gulf of Maine.</p>
+              <p class="course-instructor">Typical instructors: Bhatt, Thurston (when offered)</p>
+            </article>
+
+            <article class="course" id="eams-4310">
+              <div class="course-header">
+                <span class="course-code">EAMS 4310</span>
+                <h3 class="course-title">Marine Ecology</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> <a href="#eams-2310">EAMS 2310</a></span>
+              </div>
+              <p class="course-desc">Population and community ecology in marine systems: rocky intertidal communities, kelp forests, fisheries, marine heatwaves, and the ecology of cold-temperate vs. tropical reefs. Weekly readings from the primary literature.</p>
+              <p class="course-instructor">Typical instructor: Volponi</p>
+            </article>
+
+            <article class="course" id="eams-4320">
+              <div class="course-header">
+                <span class="course-code">EAMS 4320</span>
+                <h3 class="course-title">Estuarine Biogeochemistry</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> <a href="#eams-2320">EAMS 2320</a></span>
+              </div>
+              <p class="course-desc">The coupled physical, chemical, and biological processes that drive nutrient and trace-metal cycling in estuaries. Major case study each year: Cobbett Bay, Long Island Sound, or Chesapeake Bay (rotating).</p>
+              <p class="course-instructor">Typical instructor: Okonkwo</p>
+            </article>
+
+            <article class="course" id="eams-4410">
+              <div class="course-header">
+                <span class="course-code">EAMS 4410</span>
+                <h3 class="course-title">Climate Dynamics</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> <a href="#eams-3410">EAMS 3410</a> or instructor permission</span>
+              </div>
+              <p class="course-desc">The dynamics of the climate system: ocean-atmosphere coupling, ENSO, the monsoon, modes of mid-latitude variability, and an introduction to paleoclimate modeling. Strong python/numpy component.</p>
+              <p class="course-instructor">Typical instructors: Yamada, Tan</p>
+            </article>
+
+            <article class="course" id="eams-4420">
+              <div class="course-header">
+                <span class="course-code">EAMS 4420</span>
+                <h3 class="course-title">Boundary-Layer Meteorology</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> <a href="#eams-2420">EAMS 2420</a></span>
+              </div>
+              <p class="course-desc">The physics of the lowest 1&ndash;2 km of the atmosphere, where most of human exposure to weather occurs. Topics include surface energy balance, turbulence closure, the diurnal cycle, and the marine boundary layer.</p>
+              <p class="course-instructor">Typical instructor: Adeyemi</p>
+            </article>
+
+            <article class="course" id="eams-4510">
+              <div class="course-header">
+                <span class="course-code">EAMS 4510</span>
+                <h3 class="course-title">Paleoclimate</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> <a href="#eams-1110">EAMS 1110</a> or <a href="#eams-1020">EAMS 1020</a></span>
+              </div>
+              <p class="course-desc">Methods and results in paleoclimate reconstruction: ice cores, tree rings, marine sediment isotope records, lake varves, and corals. Students complete a quantitative reconstruction project on a published dataset.</p>
+              <p class="course-instructor">Typical instructor: Rasmussen</p>
+            </article>
+
+            <article class="course" id="eams-4910">
+              <div class="course-header">
+                <span class="course-code">EAMS 4910</span>
+                <h3 class="course-title">Summer Field Camp</h3>
+                <span class="course-credits">6 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> Su (4 weeks)</span>
+                <span><strong>Prereq</strong> <a href="#eams-3110">EAMS 3110</a>, <a href="#eams-3120">EAMS 3120</a></span>
+              </div>
+              <p class="course-desc">The capstone field course for the BA in Earth Sciences. Four weeks based at the Brennan Geological Reserve in central Maine, with students working in pairs to produce a 1:24,000 geologic map and structural interpretation of an assigned quadrangle. Limited enrollment.</p>
+              <p class="course-instructor">Typical instructors: FitzGerald (lead), rotating EAMS faculty</p>
+            </article>
+
+            <article class="course" id="eams-4990">
+              <div class="course-header">
+                <span class="course-code">EAMS 4990</span>
+                <h3 class="course-title">Senior Research Thesis</h3>
+                <span class="course-credits">3 cr. / semester (6 total)</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F &amp; S (two-semester sequence)</span>
+                <span><strong>Prereq</strong> faculty thesis advisor; senior standing</span>
+              </div>
+              <p class="course-desc">An independent two-semester research project, supervised by a faculty advisor and concluding with a public defense in late April. Required for the BS Atmospheric, BS Marine, and joint BA Environmental Studies degrees; optional for the BA Earth Sciences in place of field camp.</p>
+              <p class="course-instructor">Instructor: faculty thesis advisor</p>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- =======================================
+             5000-LEVEL
+             ======================================= -->
+        <section class="course-group" id="level-5000">
+          <h2>5000+ &middot; Graduate courses</h2>
+          <p class="group-intro">Graduate courses, ordinarily taken by master's and PhD students. Advanced undergraduates with the necessary prerequisites may enroll with the instructor's written permission; this is common for 5500-level data-science courses.</p>
+
+          <div class="course-list">
+
+            <article class="course" id="eams-5210">
+              <div class="course-header">
+                <span class="course-code">EAMS 5210</span>
+                <h3 class="course-title">Advanced Marine Geochemistry</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> graduate standing; <a href="#eams-3230">EAMS 3230</a> or equiv.</span>
+              </div>
+              <p class="course-desc">A research-oriented graduate seminar on current problems in marine geochemistry. Each year focuses on a single theme &mdash; recent themes have included reactive iron cycling, anthropogenic carbon storage, and oxygen-minimum-zone biogeochemistry.</p>
+              <p class="course-instructor">Typical instructors: Okonkwo, Singh, Bj&ouml;rnsd&oacute;ttir (rotating)</p>
+            </article>
+
+            <article class="course" id="eams-5220">
+              <div class="course-header">
+                <span class="course-code">EAMS 5220</span>
+                <h3 class="course-title">Coastal Adaptation Science &amp; Policy</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> graduate standing</span>
+              </div>
+              <p class="course-desc">A multi-disciplinary graduate seminar on the science and governance of coastal adaptation. Combines physical-science readings (sea-level rise, marsh dynamics, storm surge) with case studies of municipal adaptation planning in Massachusetts, North Carolina, and Louisiana.</p>
+              <p class="course-instructor">Typical instructors: Arroyo, Ben-Ari</p>
+            </article>
+
+            <article class="course" id="eams-5310">
+              <div class="course-header">
+                <span class="course-code">EAMS 5310</span>
+                <h3 class="course-title">Climate Dynamics (graduate)</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> <a href="#eams-3410">EAMS 3410</a> or equivalent</span>
+              </div>
+              <p class="course-desc">A graduate-level treatment of climate dynamics: the general circulation, modes of internal variability, anthropogenic forcing and the role of feedbacks, and an introduction to the analysis of CMIP-style multi-model ensembles.</p>
+              <p class="course-instructor">Typical instructor: Yamada</p>
+            </article>
+
+            <article class="course" id="eams-5410">
+              <div class="course-header">
+                <span class="course-code">EAMS 5410</span>
+                <h3 class="course-title">Data Assimilation</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> linear algebra; graduate standing</span>
+              </div>
+              <p class="course-desc">Methods for combining observations with dynamical models, from optimal interpolation through 3D-Var, 4D-Var, and ensemble Kalman filters. Required for the Pro MS in Environmental Data Science.</p>
+              <p class="course-instructor">Typical instructors: Novak, Yamada</p>
+            </article>
+
+            <article class="course" id="eams-5510">
+              <div class="course-header">
+                <span class="course-code">EAMS 5510</span>
+                <h3 class="course-title">Reproducible Geoscience Computing</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> graduate standing or instructor permission</span>
+              </div>
+              <p class="course-desc">A required first-year graduate methods course: version control, project organization, environments and dependency management, basic shell scripting, and the production of reproducible figures from raw data. Software-agnostic; examples in both Python and R.</p>
+              <p class="course-instructor">Typical instructor: Mendoza</p>
+            </article>
+
+            <article class="course" id="eams-5520">
+              <div class="course-header">
+                <span class="course-code">EAMS 5520</span>
+                <h3 class="course-title">Geospatial Analysis with R &amp; Python</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> S</span>
+                <span><strong>Prereq</strong> <a href="#eams-5510">EAMS 5510</a> or equivalent</span>
+              </div>
+              <p class="course-desc">Computational geospatial analysis for environmental data scientists: raster and vector processing at scale, spatial statistics, remote-sensing workflows, and the production of publication-quality maps. Project: an end-to-end analysis on a student-chosen dataset.</p>
+              <p class="course-instructor">Typical instructor: Mendoza</p>
+            </article>
+
+            <article class="course" id="eams-5530">
+              <div class="course-header">
+                <span class="course-code">EAMS 5530</span>
+                <h3 class="course-title">Machine Learning for Earth Science</h3>
+                <span class="course-credits">3 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F</span>
+                <span><strong>Prereq</strong> linear algebra; programming in Python</span>
+              </div>
+              <p class="course-desc">Supervised and unsupervised machine learning applied to geoscience problems, with emphasis on the pitfalls specific to earth-science data: spatial autocorrelation, distribution shift, and physical-consistency constraints. Final group project benchmarks methods on a published dataset.</p>
+              <p class="course-instructor">Typical instructor: Novak</p>
+            </article>
+
+            <article class="course" id="eams-5980">
+              <div class="course-header">
+                <span class="course-code">EAMS 5980</span>
+                <h3 class="course-title">Applied Capstone (Pro MS)</h3>
+                <span class="course-credits">6 credits</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> Su</span>
+                <span><strong>Prereq</strong> enrollment in the Pro MS</span>
+              </div>
+              <p class="course-desc">The summer capstone for the Professional MS in Environmental Data Science. Students work in pairs with an external partner (a state agency, NGO, or consulting firm) to deliver a defined analytical product, with a faculty co-supervisor.</p>
+              <p class="course-instructor">Instructors: Novak (coordinator), partner co-supervisors</p>
+            </article>
+
+            <article class="course" id="eams-5990">
+              <div class="course-header">
+                <span class="course-code">EAMS 5990</span>
+                <h3 class="course-title">Thesis Research</h3>
+                <span class="course-credits">variable, 1&ndash;6 cr.</span>
+              </div>
+              <div class="course-meta">
+                <span><strong>Offered</strong> F, S, Su</span>
+                <span><strong>Prereq</strong> graduate standing; thesis advisor</span>
+              </div>
+              <p class="course-desc">Faculty-supervised thesis research credit for master's and pre-candidacy PhD students. Variable credit; students typically enroll for 3&ndash;6 credits per semester during the thesis-writing phase.</p>
+              <p class="course-instructor">Instructor: thesis advisor</p>
+            </article>
+
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <svg class="crest" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z" fill="#14233f" stroke="#b08938" stroke-width="1.5"/>
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+          </svg>
+          <p><strong style="color:var(--paper);">Department of Earth, Atmospheric &amp; Marine Sciences</strong><br>
+            Brennan University &middot; Mendel Hall<br>
+            415 Brennan Avenue<br>
+            Brennan, Massachusetts 02143</p>
+        </div>
+        <div>
+          <h4>Academics</h4>
+          <ul>
+            <li><a href="programs.html#undergraduate">Undergraduate</a></li>
+            <li><a href="programs.html#masters">Master's</a></li>
+            <li><a href="programs.html#phd">PhD</a></li>
+            <li><a href="programs.html#minors">Minors</a></li>
+            <li><a href="courses.html">Course catalog</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>People &amp; research</h4>
+          <ul>
+            <li><a href="faculty.html">Faculty directory</a></li>
+            <li><a href="research.html#labs">Labs &amp; centers</a></li>
+            <li><a href="research.html#publications">Publications</a></li>
+            <li><a href="research.html#grants">Funded projects</a></li>
+            <li><a href="contact.html#staff">Department staff</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Visit &amp; connect</h4>
+          <ul>
+            <li><a href="contact.html">Contact</a></li>
+            <li><a href="events.html">Events &amp; seminars</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="https://brennan.example.edu/giving/eams/">Make a gift</a></li>
+            <li><a href="https://brennan.example.edu/library/eams/">Hartwell Library</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2008&ndash;2026 The Trustees of Brennan University. All rights reserved.</span>
+        <span class="established">Academic year <span data-academic-year>2025&ndash;2026</span> &middot; Department reorganized 2008 &middot; Established 1947</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>

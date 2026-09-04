@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plumbing &amp; Heating Services | Northline — Grand Rapids, MI</title>
+  <meta name="description" content="Full-service plumbing and heating in Grand Rapids: emergency repairs, water heater installation, boiler service, bathroom rough-ins, drain cleaning, sewer, gas lines, and leak detection.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .service-detail {
+      padding-block: 4rem;
+      border-bottom: 1px solid var(--c-cream-dark);
+    }
+    .service-detail:last-child { border-bottom: none; }
+    .service-detail-inner {
+      display: grid;
+      grid-template-columns: 1fr 1.8fr;
+      gap: 3.5rem;
+      align-items: start;
+    }
+    .service-detail-inner.flip { direction: rtl; }
+    .service-detail-inner.flip > * { direction: ltr; }
+    .service-detail-visual {
+      background: var(--c-navy);
+      border-radius: var(--r-lg);
+      padding: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 240px;
+      position: relative;
+      overflow: hidden;
+    }
+    .service-detail-visual::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: repeating-linear-gradient(
+        -45deg, transparent, transparent 15px,
+        rgba(255,255,255,.02) 15px, rgba(255,255,255,.02) 16px
+      );
+    }
+    .service-detail-visual svg {
+      width: 100%;
+      max-width: 160px;
+      height: auto;
+      position: relative;
+      z-index: 1;
+    }
+    .service-detail h2 { margin-bottom: .75rem; }
+    .service-detail .label { margin-bottom: .4rem; }
+    .service-detail p { color: var(--c-text-mid); }
+    .service-includes {
+      margin-top: 1.5rem;
+      padding: 1.5rem;
+      background: var(--c-cream);
+      border-radius: var(--r);
+      border-left: 4px solid var(--c-copper);
+    }
+    .service-includes h4 {
+      font-family: var(--f-ui);
+      font-size: .76rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--c-copper);
+      margin-bottom: .75rem;
+    }
+    .service-includes ul { list-style: none; }
+    .service-includes li {
+      display: flex;
+      align-items: flex-start;
+      gap: .6rem;
+      font-size: .9rem;
+      color: var(--c-text-mid);
+      margin-bottom: .4rem;
+    }
+    .service-includes li svg {
+      width: 14px; height: 14px;
+      color: var(--c-copper);
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+    .service-anchor { scroll-margin-top: calc(var(--nav-h) + var(--banner-h) + 1rem); }
+    @media (max-width: 768px) {
+      .service-detail-inner,
+      .service-detail-inner.flip {
+        grid-template-columns: 1fr;
+        direction: ltr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ Emergency Banner ═══ -->
+  <div class="emergency-banner" role="alert">
+    <span class="pulse-dot" aria-hidden="true"></span>
+    24/7 Emergency Service &mdash;
+    <a href="tel:6165550182">(616) 555-0182</a>
+  </div>
+
+  <!-- ═══ Site Header ═══ -->
+  <header class="site-header">
+    <nav class="header-inner" aria-label="Main navigation">
+      <a href="index.html" class="site-logo" aria-label="Northline Plumbing and Heating — Go to homepage">
+        <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+          <rect width="44" height="44" rx="5" fill="#ae5c18"/>
+          <path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/>
+        </svg>
+        <div class="logo-text">
+          <span class="logo-name">NORTHLINE</span>
+          <span class="logo-tag">Plumbing &amp; Heating</span>
+        </div>
+      </a>
+      <ul class="site-nav" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="services.html" class="active">Services</a></li>
+        <li><a href="service-areas.html">Service Areas</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="reviews.html">Reviews</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a href="tel:6165550182" class="nav-phone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          (616) 555-0182
+        </a>
+      </div>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-drawer">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+    <nav id="nav-drawer" class="nav-drawer" aria-label="Mobile navigation">
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="service-areas.html">Service Areas</a>
+      <a href="about.html">About</a>
+      <a href="reviews.html">Reviews</a>
+      <a href="contact.html">Contact</a>
+      <div class="mobile-cta">
+        <a href="tel:6165550182">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          Call Now &mdash; (616) 555-0182
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ═══ Page Hero ═══ -->
+    <section class="page-hero next-white" aria-labelledby="page-title">
+      <div class="page-hero-tex" aria-hidden="true"></div>
+      <div class="container page-hero-content">
+        <p class="label anim">What We Do</p>
+        <div class="divider anim anim-d1"></div>
+        <h1 class="anim anim-d2" id="page-title">Our Services</h1>
+        <p class="subtitle anim anim-d3">From a dripping faucet to a complete heating system overhaul &mdash; Northline handles it all. Every job backed by a 1-year labor warranty and our no-surprise pricing guarantee.</p>
+      </div>
+    </section>
+
+    <!-- ═══ Quick Navigation ═══ -->
+    <nav class="section--white" aria-label="Jump to service" style="padding-block:1.25rem; border-bottom:2px solid var(--c-cream-dark);">
+      <div class="container">
+        <div style="display:flex; flex-wrap:wrap; gap:.6rem;">
+          <a href="#emergency"    style="font-family:var(--f-ui); font-size:.78rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--c-text-mid); text-decoration:none; padding:.4rem .85rem; border:1.5px solid var(--c-cream-dark); border-radius:var(--r); transition:all var(--t);" onmouseover="this.style.borderColor='var(--c-copper)'; this.style.color='var(--c-copper)';" onmouseout="this.style.borderColor='var(--c-cream-dark)'; this.style.color='var(--c-text-mid)';">Emergency Repairs</a>
+          <a href="#water-heaters" style="font-family:var(--f-ui); font-size:.78rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--c-text-mid); text-decoration:none; padding:.4rem .85rem; border:1.5px solid var(--c-cream-dark); border-radius:var(--r); transition:all var(--t);" onmouseover="this.style.borderColor='var(--c-copper)'; this.style.color='var(--c-copper)';" onmouseout="this.style.borderColor='var(--c-cream-dark)'; this.style.color='var(--c-text-mid)';">Water Heaters</a>
+          <a href="#boilers"      style="font-family:var(--f-ui); font-size:.78rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--c-text-mid); text-decoration:none; padding:.4rem .85rem; border:1.5px solid var(--c-cream-dark); border-radius:var(--r); transition:all var(--t);" onmouseover="this.style.borderColor='var(--c-copper)'; this.style.color='var(--c-copper)';" onmouseout="this.style.borderColor='var(--c-cream-dark)'; this.style.color='var(--c-text-mid)';">Boiler Service</a>
+          <a href="#rough-in"    style="font-family:var(--f-ui); font-size:.78rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--c-text-mid); text-decoration:none; padding:.4rem .85rem; border:1.5px solid var(--c-cream-dark); border-radius:var(--r); transition:all var(--t);" onmouseover="this.style.borderColor='var(--c-copper)'; this.style.color='var(--c-copper)';" onmouseout="this.style.borderColor='var(--c-cream-dark)'; this.style.color='var(--c-text-mid)';">Bathroom Rough-In</a>
+          <a href="#drains"      style="font-family:var(--f-ui); font-size:.78rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--c-text-mid); text-decoration:none; padding:.4rem .85rem; border:1.5px solid var(--c-cream-dark); border-radius:var(--r); transition:all var(--t);" onmouseover="this.style.borderColor='var(--c-copper)'; this.style.color='var(--c-copper)';" onmouseout="this.style.borderColor='var(--c-cream-dark)'; this.style.color='var(--c-text-mid)';">Drain Cleaning</a>
+          <a href="#sewer"       style="font-family:var(--f-ui); font-size:.78rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--c-text-mid); text-decoration:none; padding:.4rem .85rem; border:1.5px solid var(--c-cream-dark); border-radius:var(--r); transition:all var(--t);" onmouseover="this.style.borderColor='var(--c-copper)'; this.style.color='var(--c-copper)';" onmouseout="this.style.borderColor='var(--c-cream-dark)'; this.style.color='var(--c-text-mid)';">Sewer Lines</a>
+          <a href="#gas"         style="font-family:var(--f-ui); font-size:.78rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--c-text-mid); text-decoration:none; padding:.4rem .85rem; border:1.5px solid var(--c-cream-dark); border-radius:var(--r); transition:all var(--t);" onmouseover="this.style.borderColor='var(--c-copper)'; this.style.color='var(--c-copper)';" onmouseout="this.style.borderColor='var(--c-cream-dark)'; this.style.color='var(--c-text-mid)';">Gas Lines</a>
+          <a href="#leaks"       style="font-family:var(--f-ui); font-size:.78rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--c-text-mid); text-decoration:none; padding:.4rem .85rem; border:1.5px solid var(--c-cream-dark); border-radius:var(--r); transition:all var(--t);" onmouseover="this.style.borderColor='var(--c-copper)'; this.style.color='var(--c-copper)';" onmouseover="this.style.borderColor='var(--c-copper)'; this.style.color='var(--c-copper)';" onmouseout="this.style.borderColor='var(--c-cream-dark)'; this.style.color='var(--c-text-mid)';">Leak Detection</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ═══ Service Details ═══ -->
+    <div class="section--white">
+      <div class="container">
+
+        <!-- Emergency -->
+        <div id="emergency" class="service-detail service-anchor">
+          <div class="service-detail-inner">
+            <div class="service-detail-visual" aria-hidden="true">
+              <svg viewBox="0 0 160 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="80" cy="100" r="75" fill="rgba(185,28,28,0.08)" stroke="rgba(185,28,28,0.2)" stroke-width="1.5"/>
+                <path d="M80 35L90 70H125L97 88L107 123L80 105L53 123L63 88L35 70H70L80 35Z" fill="rgba(185,28,28,0.12)" stroke="rgba(185,28,28,0.5)" stroke-width="2"/>
+                <circle cx="80" cy="100" r="20" fill="rgba(185,28,28,0.2)" stroke="rgba(185,28,28,0.6)" stroke-width="2"/>
+                <path d="M75 92l10 16-10-4v10l10-16-10 4V92z" fill="#b91c1c"/>
+                <line x1="80" y1="45" x2="80" y2="55" stroke="rgba(185,28,28,0.4)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="80" y1="145" x2="80" y2="155" stroke="rgba(185,28,28,0.4)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="30" y1="100" x2="40" y2="100" stroke="rgba(185,28,28,0.4)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="120" y1="100" x2="130" y2="100" stroke="rgba(185,28,28,0.4)" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <p class="label">Available 24 Hours, 365 Days</p>
+              <h2>Emergency Plumbing Repairs</h2>
+              <div class="divider"></div>
+              <p>Plumbing emergencies don't wait for business hours. A burst pipe, failed water heater, sewage backup, or major leak can cause serious damage within minutes. That's why Northline keeps a technician on call around the clock — every night, every weekend, every holiday.</p>
+              <p>When you call our emergency line, a live person answers. We give you an honest ETA and arrive ready to work, with a fully-stocked truck. Most emergencies are resolved in a single visit.</p>
+              <div class="service-includes">
+                <h4>Emergency Services Include</h4>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Burst and frozen pipe repair</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Water shutoff and damage control</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Sewage backup emergency clearing</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> No-heat emergency boiler response</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Gas leak isolation (call 911 first if you smell gas)</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Sump pump failure replacement</li>
+                </ul>
+              </div>
+              <div class="mt-md">
+                <a href="tel:6165550182" class="btn btn-red">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+                  Call Emergency Line Now
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Water Heaters -->
+        <div id="water-heaters" class="service-detail service-anchor">
+          <div class="service-detail-inner flip">
+            <div class="service-detail-visual" aria-hidden="true">
+              <svg viewBox="0 0 160 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="40" y="50" width="80" height="130" rx="12" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.4)" stroke-width="2"/>
+                <path d="M55 50 Q80 22 105 50" fill="rgba(174,92,24,0.1)" stroke="rgba(174,92,24,0.3)" stroke-width="2"/>
+                <rect x="68" y="22" width="24" height="28" rx="5" fill="rgba(174,92,24,0.2)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+                <rect x="58" y="18" width="44" height="10" rx="3" fill="rgba(174,92,24,0.5)"/>
+                <circle cx="80" cy="118" r="28" fill="rgba(12,30,46,0.6)" stroke="rgba(174,92,24,0.4)" stroke-width="2"/>
+                <circle cx="80" cy="118" r="18" fill="none" stroke="rgba(174,92,24,0.2)" stroke-width="1"/>
+                <line x1="80" y1="100" x2="80" y2="108" stroke="rgba(174,92,24,0.5)" stroke-width="1.5"/>
+                <line x1="93" y1="104" x2="90" y2="110" stroke="rgba(174,92,24,0.5)" stroke-width="1.5"/>
+                <line x1="97" y1="116" x2="91" y2="116" stroke="rgba(174,92,24,0.5)" stroke-width="1.5"/>
+                <line x1="80" y1="118" x2="91" y2="108" stroke="#ae5c18" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="80" cy="118" r="3" fill="#ae5c18"/>
+                <rect x="58" y="155" width="44" height="10" rx="3" fill="rgba(174,92,24,0.35)"/>
+                <rect x="68" y="165" width="24" height="20" rx="4" fill="rgba(174,92,24,0.2)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <rect x="58" y="183" width="44" height="10" rx="3" fill="rgba(174,92,24,0.5)"/>
+                <circle cx="80" cy="84" r="6" fill="rgba(232,148,78,0.7)"/>
+              </svg>
+            </div>
+            <div>
+              <p class="label">Tank &amp; Tankless</p>
+              <h2>Water Heater Installation &amp; Repair</h2>
+              <div class="divider"></div>
+              <p>Cold showers, rumbling tanks, or rusty water are signs your water heater needs attention. Northline installs, repairs, and replaces both traditional tank-style units and modern tankless systems for greater efficiency.</p>
+              <p>We stock commonly-needed units on our trucks so most straightforward replacements happen same-day. We properly size the new unit for your household, permit the work where required, and haul away the old equipment at no extra charge.</p>
+              <div class="service-includes">
+                <h4>Water Heater Services Include</h4>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Tank-style replacement (all major brands)</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Tankless (on-demand) installation &amp; descaling</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Thermocouple, pilot, and burner repair</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> T&amp;P relief valve replacement</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Anode rod replacement</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Expansion tank installation</li>
+                </ul>
+              </div>
+              <div class="mt-md">
+                <a href="contact.html" class="btn btn-copper">Request a Water Heater Quote</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Boilers -->
+        <div id="boilers" class="service-detail service-anchor">
+          <div class="service-detail-inner">
+            <div class="service-detail-visual" aria-hidden="true">
+              <svg viewBox="0 0 160 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="30" y="40" width="100" height="130" rx="10" fill="rgba(174,92,24,0.12)" stroke="rgba(174,92,24,0.35)" stroke-width="2"/>
+                <rect x="50" y="60" width="60" height="50" rx="6" fill="rgba(12,30,46,0.6)" stroke="rgba(174,92,24,0.3)" stroke-width="1.5"/>
+                <circle cx="72" cy="83" r="14" fill="none" stroke="rgba(174,92,24,0.55)" stroke-width="2"/>
+                <line x1="72" y1="83" x2="80" y2="75" stroke="#ae5c18" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="72" cy="83" r="3" fill="#ae5c18"/>
+                <circle cx="102" cy="83" r="10" fill="none" stroke="rgba(174,92,24,0.45)" stroke-width="1.5"/>
+                <line x1="102" y1="83" x2="108" y2="79" stroke="#ae5c18" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="102" cy="83" r="2" fill="#ae5c18"/>
+                <circle cx="80" cy="120" r="7" fill="rgba(232,148,78,0.75)"/>
+                <path d="M48 130 Q52 120 58 125 Q54 114 62 110 Q64 118 70 122 Q74 112 76 122 Q82 116 84 127 Q74 140 62 138 Q50 140 48 130Z" fill="rgba(232,148,78,0.25)" stroke="rgba(232,148,78,0.5)" stroke-width="1"/>
+                <rect x="30" y="25" width="28" height="15" rx="4" fill="rgba(174,92,24,0.2)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <rect x="102" y="25" width="28" height="15" rx="4" fill="rgba(174,92,24,0.2)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <rect x="10" y="75" width="20" height="15" rx="4" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.3)" stroke-width="1.5"/>
+                <rect x="130" y="75" width="20" height="15" rx="4" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.3)" stroke-width="1.5"/>
+                <rect x="30" y="170" width="100" height="12" rx="4" fill="rgba(174,92,24,0.4)"/>
+              </svg>
+            </div>
+            <div>
+              <p class="label">All Major Brands Serviced</p>
+              <h2>Boiler Maintenance &amp; Repair</h2>
+              <div class="divider"></div>
+              <p>A well-maintained boiler is safe, efficient, and can last 25+ years. Neglected boilers are expensive to run and can become safety hazards. Northline provides annual boiler tune-ups to keep your system running clean through Michigan winters.</p>
+              <p>We service all major boiler brands including Weil-McLain, Burnham, Peerless, Slant/Fin, and U.S. Boiler. Whether you have a cast iron steam boiler in an older home or a modern condensing system, our technicians know the equipment.</p>
+              <div class="service-includes">
+                <h4>Boiler Services Include</h4>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Annual maintenance &amp; tune-up</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Pressure relief valve testing &amp; replacement</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Zone valve and circulator pump repair</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Expansion tank service</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Bleeding and balancing radiators</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Full boiler replacement when needed</li>
+                </ul>
+              </div>
+              <div class="mt-md">
+                <a href="contact.html" class="btn btn-copper">Schedule a Boiler Tune-Up</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bathroom Rough-In -->
+        <div id="rough-in" class="service-detail service-anchor">
+          <div class="service-detail-inner flip">
+            <div class="service-detail-visual" aria-hidden="true">
+              <svg viewBox="0 0 160 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Floor plan style -->
+                <rect x="20" y="20" width="120" height="160" rx="4" fill="none" stroke="rgba(174,92,24,0.3)" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <!-- Toilet -->
+                <ellipse cx="50" cy="60" rx="18" ry="22" fill="rgba(174,92,24,0.1)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+                <rect x="34" y="42" width="32" height="12" rx="3" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <!-- Sink -->
+                <rect x="100" y="35" width="34" height="28" rx="4" fill="rgba(174,92,24,0.1)" stroke="rgba(174,92,24,0.4)" stroke-width="1.5"/>
+                <circle cx="117" cy="49" r="8" fill="none" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <line x1="117" y1="40" x2="117" y2="45" stroke="rgba(174,92,24,0.5)" stroke-width="2" stroke-linecap="round"/>
+                <!-- Drain lines (dashed) -->
+                <line x1="50" y1="82" x2="50" y2="150" stroke="rgba(174,92,24,0.45)" stroke-width="2" stroke-dasharray="4 3"/>
+                <line x1="117" y1="63" x2="117" y2="150" stroke="rgba(174,92,24,0.45)" stroke-width="2" stroke-dasharray="4 3"/>
+                <line x1="50" y1="150" x2="117" y2="150" stroke="rgba(174,92,24,0.45)" stroke-width="2" stroke-dasharray="4 3"/>
+                <line x1="83" y1="150" x2="83" y2="175" stroke="rgba(174,92,24,0.55)" stroke-width="2.5"/>
+                <!-- Main drain circle -->
+                <circle cx="83" cy="175" r="10" fill="rgba(174,92,24,0.15)" stroke="rgba(174,92,24,0.5)" stroke-width="2"/>
+                <!-- Shower / tub area -->
+                <rect x="28" y="100" width="80" height="55" rx="4" fill="rgba(174,92,24,0.07)" stroke="rgba(174,92,24,0.3)" stroke-width="1.5"/>
+                <circle cx="68" cy="127" r="8" fill="rgba(174,92,24,0.12)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <!-- Supply lines -->
+                <line x1="50" y1="82" x2="28" y2="82" stroke="rgba(100,168,230,0.5)" stroke-width="2"/>
+                <line x1="117" y1="63" x2="134" y2="63" stroke="rgba(100,168,230,0.5)" stroke-width="2"/>
+                <text x="80" y="195" text-anchor="middle" font-family="Barlow, sans-serif" font-size="9" fill="rgba(174,92,24,0.6)" font-weight="600" letter-spacing="1">ROUGH-IN PLAN</text>
+              </svg>
+            </div>
+            <div>
+              <p class="label">Additions, Basements &amp; Remodels</p>
+              <h2>Bathroom Rough-In</h2>
+              <div class="divider"></div>
+              <p>Building a basement bathroom, adding a powder room to an addition, or remodeling an existing bath? Northline handles the plumbing rough-in work that must happen before your drywall goes up — getting drain, vent, and supply lines precisely where they need to be.</p>
+              <p>We coordinate directly with your general contractor and can handle the permit pull where required. Our rough-ins pass inspection the first time because we've been doing this work in Grand Rapids for over 37 years.</p>
+              <div class="service-includes">
+                <h4>Rough-In Services Include</h4>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Drain, waste &amp; vent (DWV) installation</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Hot and cold supply line stub-outs</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Toilet flange and wax ring set</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Shower valve and tub drain installation</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Permit coordination</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Fixture trim-out after finish work</li>
+                </ul>
+              </div>
+              <div class="mt-md">
+                <a href="contact.html" class="btn btn-copper">Get a Rough-In Estimate</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drain Cleaning -->
+        <div id="drains" class="service-detail service-anchor">
+          <div class="service-detail-inner">
+            <div class="service-detail-visual" aria-hidden="true">
+              <svg viewBox="0 0 160 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="60" y="20" width="40" height="160" rx="6" fill="rgba(174,92,24,0.12)" stroke="rgba(174,92,24,0.35)" stroke-width="2"/>
+                <rect x="20" y="80" width="120" height="40" rx="6" fill="rgba(174,92,24,0.08)" stroke="rgba(174,92,24,0.3)" stroke-width="1.5"/>
+                <circle cx="80" cy="100" r="18" fill="rgba(12,30,46,0.7)" stroke="rgba(174,92,24,0.5)" stroke-width="2.5"/>
+                <line x1="80" y1="88" x2="80" y2="92" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <line x1="89" y1="91" x2="87" y2="94" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <line x1="92" y1="100" x2="88" y2="100" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <line x1="89" y1="109" x2="87" y2="106" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <line x1="80" y1="112" x2="80" y2="108" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <line x1="71" y1="109" x2="73" y2="106" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <line x1="68" y1="100" x2="72" y2="100" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <line x1="71" y1="91" x2="73" y2="94" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <!-- Spiral representing cable -->
+                <path d="M80 96 Q85 94 84 100 Q83 106 80 104 Q77 102 78 98 Q79 95 82 96" fill="none" stroke="#ae5c18" stroke-width="2.5" stroke-linecap="round"/>
+                <!-- Water droplets along pipe -->
+                <ellipse cx="80" cy="145" rx="5" ry="7" fill="rgba(100,168,230,0.4)"/>
+                <ellipse cx="80" cy="162" rx="4" ry="6" fill="rgba(100,168,230,0.28)"/>
+                <ellipse cx="80" cy="178" rx="3" ry="5" fill="rgba(100,168,230,0.16)"/>
+                <rect x="65" y="20" width="30" height="10" rx="3" fill="rgba(174,92,24,0.4)"/>
+              </svg>
+            </div>
+            <div>
+              <p class="label">Clogs Cleared Fast</p>
+              <h2>Drain Cleaning &amp; Hydrojetting</h2>
+              <div class="divider"></div>
+              <p>A slow drain is an annoyance; a fully-blocked drain is a problem that gets worse every day. Northline clears drains properly — not just punched through, but actually cleaned so they stay clear longer.</p>
+              <p>For severe buildup, tree-root intrusion, or grease-packed commercial lines, we use high-pressure hydrojetting: a 4,000 PSI water stream that scours the pipe wall clean. We also have camera equipment to inspect the line before and after.</p>
+              <div class="service-includes">
+                <h4>Drain Services Include</h4>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Kitchen, bathroom, and floor drain clearing</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Main line cable cleaning</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> High-pressure hydrojetting</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Video drain inspection</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Root intrusion treatment</li>
+                </ul>
+              </div>
+              <div class="mt-md">
+                <a href="contact.html" class="btn btn-copper">Schedule Drain Service</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sewer -->
+        <div id="sewer" class="service-detail service-anchor">
+          <div class="service-detail-inner flip">
+            <div class="service-detail-visual" aria-hidden="true">
+              <svg viewBox="0 0 160 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="60" width="140" height="30" rx="6" fill="rgba(174,92,24,0.12)" stroke="rgba(174,92,24,0.4)" stroke-width="2"/>
+                <rect x="50" y="20" width="30" height="40" rx="5" fill="rgba(174,92,24,0.1)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <rect x="80" y="90" width="30" height="50" rx="5" fill="rgba(174,92,24,0.1)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <!-- Camera in pipe -->
+                <rect x="22" y="68" width="28" height="14" rx="3" fill="rgba(12,30,46,0.8)" stroke="rgba(174,92,24,0.5)" stroke-width="1.5"/>
+                <circle cx="36" cy="75" r="5" fill="none" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <circle cx="36" cy="75" r="2" fill="rgba(174,92,24,0.8)"/>
+                <!-- Cable line -->
+                <line x1="50" y1="75" x2="150" y2="75" stroke="rgba(174,92,24,0.35)" stroke-width="1.5" stroke-dasharray="3 2"/>
+                <!-- Roots -->
+                <path d="M85 60 Q75 48 65 55 Q70 50 78 53 Q72 44 80 42" fill="none" stroke="rgba(46,100,46,0.35)" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M110 60 Q120 48 130 56 Q125 50 118 54 Q124 44 116 42" fill="none" stroke="rgba(46,100,46,0.35)" stroke-width="1.5" stroke-linecap="round"/>
+                <!-- Ground lines -->
+                <line x1="10" y1="58" x2="150" y2="58" stroke="rgba(100,80,40,0.25)" stroke-width="1" stroke-dasharray="5 4"/>
+                <!-- Street level -->
+                <rect x="10" y="148" width="140" height="20" rx="3" fill="rgba(174,92,24,0.08)" stroke="rgba(174,92,24,0.2)" stroke-width="1"/>
+                <text x="80" y="163" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8" fill="rgba(174,92,24,0.5)" font-weight="700" letter-spacing="1.5">CITY MAIN</text>
+              </svg>
+            </div>
+            <div>
+              <p class="label">From Cleanout to Street</p>
+              <h2>Sewer Line Inspection &amp; Repair</h2>
+              <div class="divider"></div>
+              <p>Sewer problems are some of the most disruptive issues a homeowner can face. Slow drains throughout the house, sewage backing up into the lowest fixture, or wet spots in the yard are warning signs your main sewer line needs attention.</p>
+              <p>Northline uses video inspection cameras to pinpoint exactly where the problem is — saving you from unnecessary digging. When repair is needed, we offer both traditional open-cut and, where soil conditions allow, trenchless repair methods.</p>
+              <div class="service-includes">
+                <h4>Sewer Services Include</h4>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Video camera sewer inspection</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Main line clearing and hydrojetting</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Trenchless pipe repair (pipe lining)</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Full sewer line replacement</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Cleanout installation</li>
+                </ul>
+              </div>
+              <div class="mt-md">
+                <a href="contact.html" class="btn btn-copper">Schedule Sewer Inspection</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gas Lines -->
+        <div id="gas" class="service-detail service-anchor">
+          <div class="service-detail-inner">
+            <div class="service-detail-visual" aria-hidden="true">
+              <svg viewBox="0 0 160 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="20" y="70" width="120" height="24" rx="5" fill="rgba(174,92,24,0.12)" stroke="rgba(174,92,24,0.4)" stroke-width="2"/>
+                <rect x="20" y="106" width="120" height="24" rx="5" fill="rgba(174,92,24,0.08)" stroke="rgba(174,92,24,0.3)" stroke-width="1.5"/>
+                <rect x="65" y="20" width="30" height="50" rx="5" fill="rgba(174,92,24,0.1)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <rect x="60" y="130" width="40" height="35" rx="5" fill="rgba(174,92,24,0.1)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <!-- Ball valve -->
+                <circle cx="80" cy="82" r="12" fill="rgba(12,30,46,0.7)" stroke="rgba(174,92,24,0.55)" stroke-width="2"/>
+                <line x1="80" y1="70" x2="80" y2="94" stroke="rgba(174,92,24,0.3)" stroke-width="1" stroke-dasharray="3 2"/>
+                <rect x="73" y="76" width="14" height="12" rx="2" fill="rgba(174,92,24,0.4)"/>
+                <!-- Pressure test gauge -->
+                <circle cx="38" cy="82" r="14" fill="rgba(12,30,46,0.7)" stroke="rgba(174,92,24,0.45)" stroke-width="2"/>
+                <line x1="38" y1="69" x2="38" y2="74" stroke="rgba(174,92,24,0.5)" stroke-width="1.5"/>
+                <line x1="47" y1="73" x2="44" y2="77" stroke="rgba(174,92,24,0.5)" stroke-width="1.5"/>
+                <line x1="51" y1="82" x2="46" y2="82" stroke="rgba(174,92,24,0.5)" stroke-width="1.5"/>
+                <line x1="38" y1="82" x2="46" y2="76" stroke="#ae5c18" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="38" cy="82" r="3" fill="#ae5c18"/>
+                <!-- Warning triangle -->
+                <path d="M118 55 L130 78 L106 78 Z" fill="rgba(255,200,0,0.12)" stroke="rgba(255,200,0,0.45)" stroke-width="1.5"/>
+                <text x="118" y="73" text-anchor="middle" font-size="11" fill="rgba(255,200,0,0.7)">!</text>
+                <text x="80" y="175" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8" fill="rgba(174,92,24,0.5)" font-weight="700" letter-spacing="1.5">GAS PIPING</text>
+              </svg>
+            </div>
+            <div>
+              <p class="label">Licensed Gas Work</p>
+              <h2>Gas Line Services</h2>
+              <div class="divider"></div>
+              <p>Gas line work requires a licensed plumbing contractor — and for good reason. Northline is fully licensed for natural gas piping in Michigan and handles everything from new appliance connections to full gas line replacement.</p>
+              <p>If you smell gas, leave the building immediately and call your gas company and 911. Once the situation is safe, call Northline to locate the leak, make the repair, and pressure-test the line before we leave.</p>
+              <div class="service-includes">
+                <h4>Gas Line Services Include</h4>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Gas line leak detection and repair</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> New appliance connection (dryer, range, fireplace)</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Gas line extension and rerouting</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Pressure testing and certification</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Corroded or undersized pipe replacement</li>
+                </ul>
+              </div>
+              <div class="mt-md">
+                <a href="contact.html" class="btn btn-copper">Request Gas Line Service</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Leak Detection -->
+        <div id="leaks" class="service-detail service-anchor">
+          <div class="service-detail-inner flip">
+            <div class="service-detail-visual" aria-hidden="true">
+              <svg viewBox="0 0 160 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- House outline -->
+                <path d="M20 80 L80 30 L140 80 L140 155 L20 155 Z" fill="rgba(174,92,24,0.06)" stroke="rgba(174,92,24,0.25)" stroke-width="1.5"/>
+                <!-- Pipe inside -->
+                <rect x="40" y="95" width="80" height="14" rx="4" fill="rgba(174,92,24,0.12)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <rect x="73" y="55" width="14" height="54" rx="4" fill="rgba(174,92,24,0.12)" stroke="rgba(174,92,24,0.35)" stroke-width="1.5"/>
+                <!-- Leak drips -->
+                <ellipse cx="95" cy="116" rx="4" ry="5.5" fill="rgba(100,168,230,0.55)"/>
+                <ellipse cx="95" cy="130" rx="3.5" ry="5" fill="rgba(100,168,230,0.38)"/>
+                <ellipse cx="95" cy="143" rx="3" ry="4" fill="rgba(100,168,230,0.22)"/>
+                <!-- Sonar waves (detection) -->
+                <path d="M25 102 Q15 102 15 109 Q15 116 25 116" fill="none" stroke="rgba(174,92,24,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M25 96 Q8 96 8 109 Q8 122 25 122" fill="none" stroke="rgba(174,92,24,0.2)" stroke-width="1.5" stroke-linecap="round"/>
+                <!-- Detection device -->
+                <rect x="25" y="97" width="18" height="24" rx="3" fill="rgba(12,30,46,0.8)" stroke="rgba(174,92,24,0.5)" stroke-width="1.5"/>
+                <circle cx="34" cy="106" r="4" fill="none" stroke="rgba(174,92,24,0.6)" stroke-width="1.5"/>
+                <circle cx="34" cy="106" r="1.5" fill="#ae5c18"/>
+                <rect x="28" y="115" width="12" height="4" rx="1" fill="rgba(174,92,24,0.3)"/>
+              </svg>
+            </div>
+            <div>
+              <p class="label">Find It Before the Damage Spreads</p>
+              <h2>Leak Detection &amp; Repair</h2>
+              <div class="divider"></div>
+              <p>A hidden leak behind a wall or under a concrete slab can cause thousands of dollars in damage before you ever see water. Northline uses electronic listening equipment and thermal imaging to locate leaks without ripping out walls unnecessarily.</p>
+              <p>Once we've pinpointed the source, we give you a clear repair estimate before any work begins. Most hidden leaks can be accessed with minimal disruption — a small access panel rather than a gut renovation.</p>
+              <div class="service-includes">
+                <h4>Leak Detection Services Include</h4>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Electronic acoustic leak detection</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Slab leak location and repair</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> In-wall supply line leaks</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Irrigation and outdoor supply leaks</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Repair after detection — one call, one visit</li>
+                </ul>
+              </div>
+              <div class="mt-md">
+                <a href="contact.html" class="btn btn-copper">Schedule Leak Inspection</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ Emergency CTA ═══ -->
+    <section class="cta-section" aria-label="Emergency contact">
+      <div class="container">
+        <p class="cta-label">Day or Night</p>
+        <h2 class="cta-headline">Need Us Right Now?</h2>
+        <a href="tel:6165550182" class="cta-phone">(616) 555-0182</a>
+        <p class="cta-sub">24/7 dispatch &mdash; live answer. Emergency calls prioritized.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══ Footer ═══ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="site-logo" style="text-decoration:none;">
+            <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true"><rect width="44" height="44" rx="5" fill="#ae5c18"/><path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/></svg>
+            <div class="logo-text"><span class="logo-name">NORTHLINE</span><span class="logo-tag">Plumbing &amp; Heating</span></div>
+          </a>
+          <p class="footer-about">Family-owned and operated since 1987. Serving Grand Rapids and surrounding communities with honest, dependable plumbing and heating work.</p>
+          <div class="footer-license">Licensed &amp; Insured in Michigan<br>Plumbing #PC-2847-GR &middot; HVAC #HV-1193-MI</div>
+        </div>
+        <div class="footer-col">
+          <h4>Services</h4>
+          <ul>
+            <li><a href="#emergency">Emergency Repairs</a></li>
+            <li><a href="#water-heaters">Water Heaters</a></li>
+            <li><a href="#boilers">Boiler Service</a></li>
+            <li><a href="#rough-in">Bathroom Rough-In</a></li>
+            <li><a href="#drains">Drain Cleaning</a></li>
+            <li><a href="#sewer">Sewer Lines</a></li>
+            <li><a href="#gas">Gas Lines</a></li>
+            <li><a href="#leaks">Leak Detection</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="service-areas.html">Service Areas</a></li>
+            <li><a href="reviews.html">Reviews</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contact</h4>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            <a href="tel:6165550182">(616) 555-0182</a>
+          </div>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Mon–Sat: 7am–7pm<br>24/7 Emergency Dispatch</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2024 Northline Plumbing &amp; Heating LLC. All rights reserved.</p>
+        <p>Licensed &amp; Insured &middot; State of Michigan</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="nav.js"></script>
+</body>
+</html>

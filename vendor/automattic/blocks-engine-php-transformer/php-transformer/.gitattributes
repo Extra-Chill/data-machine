@@ -1,0 +1,13 @@
+# Keep Packagist dist archives lean. docs/ and tools/visual-parity/ are
+# intentionally NOT excluded: tests/packaging/install-proof.php declares
+# docs/contracts/* and tools/visual-parity/* as required package files.
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/composer.lock export-ignore
+/homeboy.json export-ignore
+/tests/ export-ignore
+/tools/content-round-trip/ export-ignore
+/tools/corpus-diagnostics/ export-ignore
+/tools/live-wp-parity/ export-ignore
+/tools/static-parity/ export-ignore
+/tools/packagist-split/ export-ignore

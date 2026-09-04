@@ -1,0 +1,26 @@
+@font-face {
+  font-family: "Fixture Sans";
+  src: url("assets/fixture-sans.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Unused Fixture";
+  src: url("assets/unused-fixture.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
+
+body {
+  font-family: "Fixture Sans", system-ui, sans-serif;
+  margin: 0;
+}
+
+main {
+  display: block;
+}
+
+.button {
+  display: inline-block;
+}

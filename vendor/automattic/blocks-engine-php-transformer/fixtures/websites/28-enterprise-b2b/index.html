@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lattice &amp; Spire — The intelligence platform for industrial supply chains</title>
+  <meta name="description" content="Lattice &amp; Spire unifies supply-chain visibility, risk monitoring, supplier onboarding, contract intelligence, and demand forecasting for global manufacturers and industrial distributors.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<!-- ============================================================
+     UTILITY BAR
+     ============================================================ -->
+<div class="utility-bar" role="region" aria-label="Utility navigation">
+  <div class="utility-bar__inner">
+    <a href="https://app.latticeandspire.com/login">Customer login</a>
+    <span class="utility-bar__sep" aria-hidden="true">|</span>
+    <a href="https://partners.latticeandspire.com">Partner login</a>
+    <span class="utility-bar__sep" aria-hidden="true">|</span>
+    <a href="contact.html">Contact sales</a>
+    <span class="utility-bar__lang" aria-label="Language">EN ▾</span>
+  </div>
+</div>
+
+<!-- ============================================================
+     SITE HEADER + MEGA-NAV
+     ============================================================ -->
+<header class="site-header" role="banner">
+  <div class="site-header__inner">
+
+    <a href="index.html" class="brand" aria-label="Lattice and Spire — home">
+      <svg class="brand__mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="3" y="3" width="26" height="26" rx="3" fill="#0c2747"/>
+        <path d="M8 22 L8 10 L13 10 L13 18 L21 18 L21 22 Z" fill="#2bb3c0"/>
+        <path d="M16 6 L24 14 L20 14 L20 22 L16 22 Z" fill="#ffffff" opacity="0.92"/>
+        <circle cx="24" cy="9" r="2" fill="#2bb3c0"/>
+      </svg>
+      <span class="brand__name">Lattice <span>&amp; Spire</span></span>
+    </a>
+
+    <nav class="main-nav" role="navigation" aria-label="Primary">
+
+      <!-- Platform -->
+      <div class="main-nav__item">
+        <a href="platform.html" class="main-nav__link">Platform <span class="main-nav__caret">▾</span></a>
+        <div class="mega-panel mega-panel--wide" role="menu" aria-label="Platform">
+          <div class="mega-grid mega-grid--4">
+            <div>
+              <h6 class="mega-col__title">Capabilities</h6>
+              <a class="mega-link" href="platform.html#supplier-360">Supplier 360<span class="mega-link__desc">Unified supplier master record</span></a>
+              <a class="mega-link" href="platform.html#risk-radar">Risk Radar<span class="mega-link__desc">Disruption monitoring &amp; alerts</span></a>
+              <a class="mega-link" href="platform.html#contract-vault">Contract Vault<span class="mega-link__desc">AI contract intelligence</span></a>
+              <a class="mega-link" href="platform.html#forecast-engine">Forecast Engine<span class="mega-link__desc">Demand &amp; lead-time forecasting</span></a>
+            </div>
+            <div>
+              <h6 class="mega-col__title">Visibility</h6>
+              <a class="mega-link" href="platform.html#network-graph">Network Graph<span class="mega-link__desc">N-tier supplier mapping</span></a>
+              <a class="mega-link" href="platform.html#insights-hub">Insights Hub<span class="mega-link__desc">Spend &amp; performance analytics</span></a>
+              <a class="mega-link" href="platform.html#parts-intelligence">Parts Intelligence<span class="mega-link__desc">Cross-reference 14M+ part numbers</span></a>
+              <a class="mega-link" href="platform.html#esg-tracker">ESG Tracker<span class="mega-link__desc">Scope 3 &amp; CSRD reporting</span></a>
+            </div>
+            <div>
+              <h6 class="mega-col__title">Platform</h6>
+              <a class="mega-link" href="platform.html#integrations">Integrations<span class="mega-link__desc">SAP, Oracle, NetSuite, Coupa, +60</span></a>
+              <a class="mega-link" href="platform.html#api">Developer API<span class="mega-link__desc">REST + GraphQL, webhooks</span></a>
+              <a class="mega-link" href="platform.html#security">Security &amp; trust<span class="mega-link__desc">SOC 2 Type II, ISO 27001, GDPR</span></a>
+              <a class="mega-link" href="platform.html#deployment">Deployment options<span class="mega-link__desc">Multi-tenant or single-tenant VPC</span></a>
+            </div>
+            <div class="mega-feature">
+              <div class="mega-feature__eyebrow">New this quarter</div>
+              <h4>Risk Radar 2.0</h4>
+              <p>Tier-2 and tier-3 supplier event detection now includes geopolitical, financial, and ESG signals across 184 countries.</p>
+              <a href="resources.html" class="link-arrow">Read the release notes</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Solutions -->
+      <div class="main-nav__item">
+        <a href="#" class="main-nav__link">Solutions <span class="main-nav__caret">▾</span></a>
+        <div class="mega-panel mega-panel--wide" role="menu" aria-label="Solutions">
+          <div class="mega-grid mega-grid--4">
+            <div>
+              <h6 class="mega-col__title">By role</h6>
+              <a class="mega-link" href="#">Chief Procurement Officer<span class="mega-link__desc">Category strategy &amp; savings</span></a>
+              <a class="mega-link" href="#">VP Supply Chain<span class="mega-link__desc">End-to-end visibility</span></a>
+              <a class="mega-link" href="#">Director of Operations<span class="mega-link__desc">Throughput &amp; OTIF</span></a>
+              <a class="mega-link" href="#">VP Finance<span class="mega-link__desc">Working capital &amp; risk</span></a>
+              <a class="mega-link" href="#">Sustainability Lead<span class="mega-link__desc">Scope 3 disclosure</span></a>
+            </div>
+            <div>
+              <h6 class="mega-col__title">By use case</h6>
+              <a class="mega-link" href="#">Supplier onboarding</a>
+              <a class="mega-link" href="#">Risk &amp; resilience</a>
+              <a class="mega-link" href="#">Spend analytics</a>
+              <a class="mega-link" href="#">Demand forecasting</a>
+              <a class="mega-link" href="#">Contract renewals</a>
+              <a class="mega-link" href="#">M&amp;A integration</a>
+            </div>
+            <div>
+              <h6 class="mega-col__title">By workflow</h6>
+              <a class="mega-link" href="#">Source-to-contract</a>
+              <a class="mega-link" href="#">Procure-to-pay</a>
+              <a class="mega-link" href="#">Plan-to-deliver</a>
+              <a class="mega-link" href="#">Sustain &amp; report</a>
+              <a class="mega-link" href="#">Audit &amp; compliance</a>
+            </div>
+            <div class="mega-feature">
+              <div class="mega-feature__eyebrow">Featured</div>
+              <h4>The Resilient Procurement playbook</h4>
+              <p>A 38-page operational guide for CPOs operationalizing supplier risk programs in 2026.</p>
+              <a href="resources.html" class="link-arrow">Download the playbook</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Industries -->
+      <div class="main-nav__item">
+        <a href="industries.html" class="main-nav__link">Industries <span class="main-nav__caret">▾</span></a>
+        <div class="mega-panel" role="menu" aria-label="Industries">
+          <div class="mega-grid mega-grid--3">
+            <div>
+              <h6 class="mega-col__title">Manufacturing</h6>
+              <a class="mega-link" href="industries.html#automotive">Automotive</a>
+              <a class="mega-link" href="industries.html#aerospace">Aerospace &amp; Defense</a>
+              <a class="mega-link" href="industries.html#heavy-equipment">Heavy Equipment</a>
+              <a class="mega-link" href="industries.html#chemicals">Chemicals &amp; Materials</a>
+            </div>
+            <div>
+              <h6 class="mega-col__title">Distribution &amp; Process</h6>
+              <a class="mega-link" href="industries.html#distribution">Industrial Distribution</a>
+              <a class="mega-link" href="industries.html#food-bev">Food &amp; Beverage Manufacturing</a>
+              <a class="mega-link" href="#">Energy &amp; Utilities</a>
+              <a class="mega-link" href="#">Pulp, Paper &amp; Packaging</a>
+            </div>
+            <div class="mega-feature">
+              <div class="mega-feature__eyebrow">Industry brief</div>
+              <h4>Aerospace supply-chain outlook 2026</h4>
+              <p>Tier-1 leadtime expansion, titanium constraints, and the rare-earth question.</p>
+              <a href="resources.html" class="link-arrow">Read the brief</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customers (no panel) -->
+      <div class="main-nav__item">
+        <a href="customers.html" class="main-nav__link">Customers</a>
+      </div>
+
+      <!-- Resources -->
+      <div class="main-nav__item">
+        <a href="resources.html" class="main-nav__link">Resources <span class="main-nav__caret">▾</span></a>
+        <div class="mega-panel" role="menu" aria-label="Resources">
+          <div class="mega-grid mega-grid--3">
+            <div>
+              <h6 class="mega-col__title">Learn</h6>
+              <a class="mega-link" href="resources.html">Resource library<span class="mega-link__desc">All whitepapers, reports, briefs</span></a>
+              <a class="mega-link" href="resources.html#webinars">Webinars &amp; events</a>
+              <a class="mega-link" href="resources.html#blog">The Lattice blog</a>
+              <a class="mega-link" href="customers.html">Customer stories</a>
+            </div>
+            <div>
+              <h6 class="mega-col__title">Use</h6>
+              <a class="mega-link" href="#">Help center</a>
+              <a class="mega-link" href="#">Developer docs</a>
+              <a class="mega-link" href="#">Status page</a>
+              <a class="mega-link" href="#">Community forum</a>
+              <a class="mega-link" href="#">Training &amp; certification</a>
+            </div>
+            <div class="mega-feature">
+              <div class="mega-feature__eyebrow">On demand</div>
+              <h4>Reichelt Pump Systems: 9-week deployment</h4>
+              <p>How a 4,200-employee industrial pump maker unified six legacy systems in under 70 days.</p>
+              <a href="case-study-strathmore.html" class="link-arrow">Watch the recording</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pricing (no panel) -->
+      <div class="main-nav__item">
+        <a href="pricing.html" class="main-nav__link">Pricing</a>
+      </div>
+
+      <!-- Company -->
+      <div class="main-nav__item">
+        <a href="#" class="main-nav__link">Company <span class="main-nav__caret">▾</span></a>
+        <div class="mega-panel" role="menu" aria-label="Company">
+          <div class="mega-grid mega-grid--3">
+            <div>
+              <h6 class="mega-col__title">About</h6>
+              <a class="mega-link" href="#">Our story</a>
+              <a class="mega-link" href="#">Leadership</a>
+              <a class="mega-link" href="#">Board &amp; investors</a>
+              <a class="mega-link" href="#">Press &amp; media</a>
+            </div>
+            <div>
+              <h6 class="mega-col__title">Join</h6>
+              <a class="mega-link" href="careers.html">Careers<span class="mega-link__desc">Open roles in Chicago, Frankfurt, Singapore, São Paulo</span></a>
+              <a class="mega-link" href="#">Partners &amp; referrals</a>
+              <a class="mega-link" href="contact.html">Contact us</a>
+            </div>
+            <div class="mega-feature">
+              <div class="mega-feature__eyebrow">We're hiring</div>
+              <h4>32 open roles across 4 offices</h4>
+              <p>Engineering, product, customer success, and go-to-market. Hybrid and remote-eligible positions available.</p>
+              <a href="careers.html" class="link-arrow">See open roles</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </nav>
+
+    <div class="header-actions">
+      <a href="contact.html" class="btn btn--ghost btn--sm">Talk to sales</a>
+      <a href="contact.html" class="btn btn--primary btn--sm">Request a demo</a>
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
+        <span></span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Mobile nav (hierarchical accordion) -->
+  <div class="mobile-nav" id="mobileNav">
+    <div class="mobile-nav__inner">
+      <details class="mobile-nav__group">
+        <summary class="mobile-nav__toggle">Platform</summary>
+        <div class="mobile-nav__panel">
+          <p class="mobile-nav__sub">Capabilities</p>
+          <a href="platform.html#supplier-360">Supplier 360</a>
+          <a href="platform.html#risk-radar">Risk Radar</a>
+          <a href="platform.html#contract-vault">Contract Vault</a>
+          <a href="platform.html#forecast-engine">Forecast Engine</a>
+          <a href="platform.html#network-graph">Network Graph</a>
+          <a href="platform.html#insights-hub">Insights Hub</a>
+          <p class="mobile-nav__sub">Platform</p>
+          <a href="platform.html#integrations">Integrations</a>
+          <a href="platform.html#security">Security &amp; trust</a>
+          <a href="platform.html#api">Developer API</a>
+        </div>
+      </details>
+      <details class="mobile-nav__group">
+        <summary class="mobile-nav__toggle">Solutions</summary>
+        <div class="mobile-nav__panel">
+          <p class="mobile-nav__sub">By role</p>
+          <a href="#">Chief Procurement Officer</a>
+          <a href="#">VP Supply Chain</a>
+          <a href="#">VP Finance</a>
+          <a href="#">Sustainability Lead</a>
+          <p class="mobile-nav__sub">By use case</p>
+          <a href="#">Supplier onboarding</a>
+          <a href="#">Risk &amp; resilience</a>
+          <a href="#">Spend analytics</a>
+        </div>
+      </details>
+      <details class="mobile-nav__group">
+        <summary class="mobile-nav__toggle">Industries</summary>
+        <div class="mobile-nav__panel">
+          <a href="industries.html#automotive">Automotive</a>
+          <a href="industries.html#aerospace">Aerospace &amp; Defense</a>
+          <a href="industries.html#heavy-equipment">Heavy Equipment</a>
+          <a href="industries.html#distribution">Industrial Distribution</a>
+          <a href="industries.html#chemicals">Chemicals &amp; Materials</a>
+          <a href="industries.html#food-bev">Food &amp; Beverage</a>
+        </div>
+      </details>
+      <details class="mobile-nav__group">
+        <summary class="mobile-nav__toggle">Customers</summary>
+        <div class="mobile-nav__panel">
+          <a href="customers.html">All customer stories</a>
+          <a href="case-study-strathmore.html">Strathmore Heavy Industries</a>
+        </div>
+      </details>
+      <details class="mobile-nav__group">
+        <summary class="mobile-nav__toggle">Resources</summary>
+        <div class="mobile-nav__panel">
+          <a href="resources.html">Resource library</a>
+          <a href="resources.html#webinars">Webinars</a>
+          <a href="resources.html#blog">Blog</a>
+          <a href="#">Help center</a>
+          <a href="#">Developer docs</a>
+        </div>
+      </details>
+      <details class="mobile-nav__group">
+        <summary class="mobile-nav__toggle">Pricing</summary>
+        <div class="mobile-nav__panel">
+          <a href="pricing.html">Plans &amp; pricing</a>
+          <a href="pricing.html#calculator">ROI calculator</a>
+        </div>
+      </details>
+      <details class="mobile-nav__group">
+        <summary class="mobile-nav__toggle">Company</summary>
+        <div class="mobile-nav__panel">
+          <a href="#">Our story</a>
+          <a href="#">Leadership</a>
+          <a href="careers.html">Careers</a>
+          <a href="contact.html">Contact us</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============================================================
+     HERO
+     ============================================================ -->
+<section class="hero" aria-label="Lattice and Spire intelligence platform">
+  <div class="container">
+    <div class="hero__inner">
+      <div class="hero__copy">
+        <span class="eyebrow">The intelligence platform for industrial supply chains</span>
+        <h1>Operationalize visibility, risk, and intelligence across every supplier, every part, every contract.</h1>
+        <p class="lede">Lattice &amp; Spire is the category-leading platform global manufacturers use to unify supplier data, monitor disruption, and forecast demand — replacing six legacy tools with one connected system of record.</p>
+        <div class="hero__ctas">
+          <a href="contact.html" class="btn btn--primary btn--lg"><span class="btn-arrow">Request a demo</span></a>
+          <a href="platform.html" class="btn btn--secondary btn--lg">Watch the platform tour</a>
+        </div>
+        <div class="hero__trust">
+          <span class="hero__trust-label">Trusted by</span>
+          <span class="hero__trust-stat"><strong>340+</strong> industrial enterprises</span>
+          <span class="hero__trust-stat"><strong>9 of 10</strong> top heavy-equipment OEMs</span>
+        </div>
+      </div>
+      <div class="hero__visual">
+        <div class="photo photo--hero photo--screenshot" role="img" aria-label="Lattice and Spire supplier-360 dashboard showing risk scores, on-time-in-full performance, and tier-2 exposure for the active supplier network">
+          <span class="photo__caption">supplier-360 / network view</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     CUSTOMER LOGO WALL
+     ============================================================ -->
+<section class="section--sm">
+  <div class="container">
+    <p class="logo-wall__caption">Powering the world's industrials</p>
+    <div class="logo-wall">
+      <div class="logo-block" role="img" aria-label="Strathmore Heavy Industries logo"><span class="logo-block__mark"></span>Strathmore Heavy Industries</div>
+      <div class="logo-block" role="img" aria-label="Reichelt Pump Systems logo"><span class="logo-block__mark"></span>Reichelt Pump Systems</div>
+      <div class="logo-block" role="img" aria-label="Yara Continental logo"><span class="logo-block__mark"></span>Yara Continental</div>
+      <div class="logo-block" role="img" aria-label="Vermillion Steel and Alloy logo"><span class="logo-block__mark"></span>Vermillion Steel &amp; Alloy</div>
+      <div class="logo-block" role="img" aria-label="Aughrim Castings logo"><span class="logo-block__mark"></span>Aughrim Castings</div>
+      <div class="logo-block" role="img" aria-label="Helmstedt Polymers logo"><span class="logo-block__mark"></span>Helmstedt Polymers</div>
+      <div class="logo-block" role="img" aria-label="Marlowe Industrial logo"><span class="logo-block__mark"></span>Marlowe Industrial</div>
+      <div class="logo-block" role="img" aria-label="Drebbel Hydraulics logo"><span class="logo-block__mark"></span>Drebbel Hydraulics</div>
+      <div class="logo-block" role="img" aria-label="Voskhod Bearings logo"><span class="logo-block__mark"></span>Voskhod Bearings</div>
+      <div class="logo-block" role="img" aria-label="Nordhavn Marine Systems logo"><span class="logo-block__mark"></span>Nordhavn Marine</div>
+      <div class="logo-block" role="img" aria-label="Carthage Composites logo"><span class="logo-block__mark"></span>Carthage Composites</div>
+      <div class="logo-block" role="img" aria-label="Quintana Foods Global logo"><span class="logo-block__mark"></span>Quintana Foods Global</div>
+      <div class="logo-block" role="img" aria-label="Westmere Aero logo"><span class="logo-block__mark"></span>Westmere Aero</div>
+      <div class="logo-block" role="img" aria-label="Beltran Quimica logo"><span class="logo-block__mark"></span>Beltran Química</div>
+      <div class="logo-block" role="img" aria-label="Kallstrom Industries logo"><span class="logo-block__mark"></span>Kallström Industries</div>
+      <div class="logo-block" role="img" aria-label="Trent Valley Engineering logo"><span class="logo-block__mark"></span>Trent Valley Engineering</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     VALUE PROPS — 4 columns
+     ============================================================ -->
+<section class="section--cloud">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Built for the people who keep things moving</span>
+      <h2>One platform replaces the spreadsheets, swivel-chairs, and standalone tools that fragment your supply chain.</h2>
+    </div>
+    <div class="value-grid">
+
+      <div class="value-card">
+        <span class="icon-tile" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        </span>
+        <h3>End-to-end visibility</h3>
+        <p>See every supplier, every part, and every shipment across the network — including tier-2 and tier-3 exposure your competitors can't see.</p>
+      </div>
+
+      <div class="value-card">
+        <span class="icon-tile icon-tile--cyan" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 22h20L12 2z"/><path d="M12 9v6M12 18v.5"/></svg>
+        </span>
+        <h3>Disruption you anticipate</h3>
+        <p>Risk Radar flags geopolitical, financial, and ESG signals 6–14 weeks before they reach your line, so procurement leads the response.</p>
+      </div>
+
+      <div class="value-card">
+        <span class="icon-tile" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h5"/></svg>
+        </span>
+        <h3>Contract intelligence at scale</h3>
+        <p>AI parses every MSA, addendum, and rebate clause to surface obligations, renewal windows, and category-level savings.</p>
+      </div>
+
+      <div class="value-card">
+        <span class="icon-tile icon-tile--cyan" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8"/><path d="M14 8h6v6"/></svg>
+        </span>
+        <h3>Forecasting you can defend</h3>
+        <p>Forecast Engine blends historical demand, supplier leadtimes, and external signals — every number traceable to its source.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PLATFORM 3-COL OVERVIEW
+     ============================================================ -->
+<section>
+  <div class="container">
+    <div class="kicker-row">
+      <div>
+        <span class="eyebrow">The platform</span>
+        <h2>Three pillars. One connected system of record.</h2>
+      </div>
+      <a href="platform.html" class="link-arrow">Explore the full platform</a>
+    </div>
+    <div class="platform-3col">
+
+      <div class="platform-card" id="visibility">
+        <span class="icon-tile icon-tile--lg" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M2 12c2.5-4.5 6-7 10-7s7.5 2.5 10 7c-2.5 4.5-6 7-10 7s-7.5-2.5-10-7z"/></svg>
+        </span>
+        <h3>Visibility</h3>
+        <p>Unify supplier data, parts, contracts, and inventory into a single source of truth — refreshed in real time.</p>
+        <ul>
+          <li>Supplier 360 master record across every site</li>
+          <li>Parts intelligence with 14M+ cross-references</li>
+          <li>N-tier network graph including sub-suppliers</li>
+        </ul>
+        <a href="platform.html#visibility" class="link-arrow">Learn more about Visibility</a>
+      </div>
+
+      <div class="platform-card" id="risk">
+        <span class="icon-tile icon-tile--lg icon-tile--cyan" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 4v5c0 5-3.5 8.5-9 9-5.5-.5-9-4-9-9V7l9-4z"/><path d="M9 12l2 2 4-4"/></svg>
+        </span>
+        <h3>Risk</h3>
+        <p>Monitor 184 countries across geopolitical, financial, climate, and ESG signal classes — before disruption reaches your line.</p>
+        <ul>
+          <li>Risk Radar disruption monitoring with alerting</li>
+          <li>Financial-health scoring on every supplier</li>
+          <li>ESG &amp; Scope-3 emissions tracking</li>
+        </ul>
+        <a href="platform.html#risk" class="link-arrow">Learn more about Risk</a>
+      </div>
+
+      <div class="platform-card" id="intelligence">
+        <span class="icon-tile icon-tile--lg" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20V13M22 20V8"/></svg>
+        </span>
+        <h3>Intelligence</h3>
+        <p>Translate enterprise data into decisions — contract obligations, demand forecasts, category benchmarks, all in one place.</p>
+        <ul>
+          <li>Contract Vault with AI clause extraction</li>
+          <li>Forecast Engine for demand &amp; leadtimes</li>
+          <li>Insights Hub with peer benchmarking</li>
+        </ul>
+        <a href="platform.html#intelligence" class="link-arrow">Learn more about Intelligence</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     STAT STRIP — trusted by industrials worldwide
+     ============================================================ -->
+<section class="section--navy">
+  <div class="container">
+    <div class="section-head center">
+      <span class="eyebrow eyebrow--inverted">Trusted by industrials worldwide</span>
+      <h2>The intelligence layer behind some of the most complex supply chains on the planet.</h2>
+    </div>
+    <div class="stat-strip">
+      <div class="stat-strip__item">
+        <span class="stat-strip__num">340<span class="unit">+</span></span>
+        <span class="stat-strip__label">Industrial enterprises run on Lattice &amp; Spire</span>
+      </div>
+      <div class="stat-strip__item">
+        <span class="stat-strip__num">14.2<span class="unit">M</span></span>
+        <span class="stat-strip__label">Parts tracked across the customer base</span>
+      </div>
+      <div class="stat-strip__item">
+        <span class="stat-strip__num">1.8<span class="unit">M</span></span>
+        <span class="stat-strip__label">Suppliers continuously monitored</span>
+      </div>
+      <div class="stat-strip__item">
+        <span class="stat-strip__num">312<span class="unit">%</span></span>
+        <span class="stat-strip__label">Average three-year ROI (Forrester TEI, 2025)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     CUSTOMER SPOTLIGHT
+     ============================================================ -->
+<section>
+  <div class="container">
+    <article class="spotlight">
+      <div class="logo-block spotlight__logo" role="img" aria-label="Strathmore Heavy Industries logo">
+        <span>Strathmore<br>Heavy Industries</span>
+      </div>
+      <div class="spotlight__copy">
+        <span class="eyebrow eyebrow--inverted">Customer story</span>
+        <h2>"In nine weeks, we replaced six tools and gave 340 buyers a single pane of glass."</h2>
+        <p class="spotlight__attrib">Marisol Renteria-Klein — VP Strategic Sourcing, Strathmore Heavy Industries</p>
+        <div class="spotlight__stats">
+          <div class="spotlight__stat"><strong>$14.2M</strong><span>annualized savings</span></div>
+          <div class="spotlight__stat"><strong>73%</strong><span>tier-2 visibility</span></div>
+          <div class="spotlight__stat"><strong>9 weeks</strong><span>to production go-live</span></div>
+        </div>
+        <a href="case-study-strathmore.html" class="btn btn--inverted">Read the Strathmore story <span class="btn-arrow"></span></a>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================
+     SOLUTIONS FOR EVERY ROLE
+     ============================================================ -->
+<section class="section--cloud">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">Solutions for every role</span>
+      <h2>Built for the way industrial teams actually work.</h2>
+      <p>Each pillar of Lattice &amp; Spire is configured for the role that owns it — without forcing IT to maintain three more dashboards.</p>
+    </div>
+    <div class="role-grid">
+
+      <article class="role-card">
+        <div class="photo role-card__photo" role="img" aria-label="Procurement workspace screenshot showing supplier scorecards, category spend, and rebate progress for a global category manager">
+          <span class="photo__caption">procurement workspace</span>
+        </div>
+        <div class="role-card__body">
+          <span class="role-card__eyebrow">Procurement</span>
+          <h3>From order taker to category strategist</h3>
+          <p>Give your category managers a workspace that combines supplier 360, rebate tracking, and spend analytics — without the legacy P2P sprawl.</p>
+          <ul>
+            <li>Supplier consolidation playbook</li>
+            <li>Category-level savings tracking</li>
+            <li>Rebate &amp; tier compliance</li>
+            <li>Sourcing-event command center</li>
+          </ul>
+          <a href="#" class="link-arrow">For procurement teams</a>
+        </div>
+      </article>
+
+      <article class="role-card">
+        <div class="photo role-card__photo" role="img" aria-label="Operations workspace showing on-time-in-full trend, disruption alerts, and plant-level inventory exposure">
+          <span class="photo__caption">operations control tower</span>
+        </div>
+        <div class="role-card__body">
+          <span class="role-card__eyebrow">Operations</span>
+          <h3>From firefighter to forward planner</h3>
+          <p>Operationalize disruption response. Risk Radar flags supplier events before they impact production, and routes mitigation to the right plant team.</p>
+          <ul>
+            <li>Live tier-2 disruption alerts</li>
+            <li>Plant-level inventory exposure</li>
+            <li>OTIF &amp; quality scorecards</li>
+            <li>Dual-source readiness mapping</li>
+          </ul>
+          <a href="#" class="link-arrow">For operations teams</a>
+        </div>
+      </article>
+
+      <article class="role-card">
+        <div class="photo role-card__photo" role="img" aria-label="Finance workspace showing supplier financial-health scores, working-capital impact, and contract obligation calendar">
+          <span class="photo__caption">finance &amp; risk workspace</span>
+        </div>
+        <div class="role-card__body">
+          <span class="role-card__eyebrow">Finance</span>
+          <h3>From cost center to risk partner</h3>
+          <p>Finance gets continuous visibility into supplier health, contract obligations, and working-capital impact — so audit week stops being audit month.</p>
+          <ul>
+            <li>Supplier financial-health scoring</li>
+            <li>Contract obligation calendar</li>
+            <li>Working-capital scenario modelling</li>
+            <li>Auditor-ready evidence trail</li>
+          </ul>
+          <a href="#" class="link-arrow">For finance teams</a>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     INTEGRATIONS MARQUEE
+     ============================================================ -->
+<section class="integration-marquee" aria-labelledby="integrations-head">
+  <div class="container">
+    <div class="kicker-row">
+      <div>
+        <span class="eyebrow">Connects to the stack you already run</span>
+        <h2 id="integrations-head">60+ certified integrations. Zero rip-and-replace.</h2>
+      </div>
+      <a href="platform.html#integrations" class="link-arrow">See all integrations</a>
+    </div>
+    <div class="integration-grid">
+      <div class="logo-block" role="img" aria-label="SAP integration">SAP</div>
+      <div class="logo-block" role="img" aria-label="Oracle ERP integration">Oracle ERP</div>
+      <div class="logo-block" role="img" aria-label="NetSuite integration">NetSuite</div>
+      <div class="logo-block" role="img" aria-label="Coupa integration">Coupa</div>
+      <div class="logo-block" role="img" aria-label="Workday integration">Workday</div>
+      <div class="logo-block" role="img" aria-label="Salesforce integration">Salesforce</div>
+      <div class="logo-block" role="img" aria-label="Snowflake integration">Snowflake</div>
+      <div class="logo-block" role="img" aria-label="Databricks integration">Databricks</div>
+      <div class="logo-block" role="img" aria-label="Microsoft Power BI integration">Power BI</div>
+      <div class="logo-block" role="img" aria-label="Tableau integration">Tableau</div>
+      <div class="logo-block" role="img" aria-label="ServiceNow integration">ServiceNow</div>
+      <div class="logo-block" role="img" aria-label="Jira integration">Jira</div>
+      <div class="logo-block" role="img" aria-label="Microsoft Teams integration">Teams</div>
+      <div class="logo-block" role="img" aria-label="Slack integration">Slack</div>
+      <div class="logo-block" role="img" aria-label="JDA Blue Yonder integration">Blue Yonder</div>
+      <div class="logo-block" role="img" aria-label="Infor integration">Infor</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FEATURED RESOURCES
+     ============================================================ -->
+<section>
+  <div class="container">
+    <div class="kicker-row">
+      <div>
+        <span class="eyebrow">From the resource library</span>
+        <h2>Practical guidance from people who run real supply chains.</h2>
+      </div>
+      <a href="resources.html" class="link-arrow">Browse all resources</a>
+    </div>
+    <div class="resource-grid">
+
+      <article class="resource-card">
+        <div class="photo resource-card__photo" role="img" aria-label="Whitepaper cover: The Resilient Procurement Playbook">
+          <span class="photo__caption">whitepaper · 38pp</span>
+        </div>
+        <div class="resource-card__body">
+          <span class="badge">Whitepaper</span>
+          <h3>The Resilient Procurement Playbook (2026 edition)</h3>
+          <p>A 38-page operational guide for CPOs building durable supplier-risk programs across multi-tier networks.</p>
+          <div class="resource-card__meta">
+            <span>38 pages · PDF</span>
+            <a href="resources.html" class="link-arrow">Download</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="resource-card">
+        <div class="photo resource-card__photo" role="img" aria-label="Webinar still: Reichelt Pump Systems deployment story">
+          <span class="photo__caption">webinar · on-demand</span>
+        </div>
+        <div class="resource-card__body">
+          <span class="badge badge--cyan">Webinar</span>
+          <h3>How Reichelt deployed Lattice &amp; Spire in nine weeks</h3>
+          <p>Stefan Brügger (CIO, Reichelt) walks through a sequenced rollout across three ERPs and 4,200 buyers and planners.</p>
+          <div class="resource-card__meta">
+            <span>52 min · Recorded Mar 2026</span>
+            <a href="resources.html" class="link-arrow">Watch now</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="resource-card">
+        <div class="photo resource-card__photo" role="img" aria-label="Blog post header: Five misconceptions about tier-2 visibility">
+          <span class="photo__caption">blog post</span>
+        </div>
+        <div class="resource-card__body">
+          <span class="badge badge--slate">Blog</span>
+          <h3>Five misconceptions about tier-2 supplier visibility</h3>
+          <p>Why "we map our tier-1s" is not a visibility program — and the four signals that actually predict tier-2 disruption.</p>
+          <div class="resource-card__meta">
+            <span>Devika Ramanathan · Apr 2026</span>
+            <a href="resources.html" class="link-arrow">Read post</a>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     CLOSING CTA BAND
+     ============================================================ -->
+<section class="cta-band" aria-label="See Lattice and Spire in action">
+  <div class="cta-band__inner">
+    <span class="eyebrow eyebrow--inverted">See Lattice &amp; Spire in action</span>
+    <h2>One platform. Every supplier, every part, every decision.</h2>
+    <p>A 30-minute working session with a supply-chain specialist — tailored to your tech stack, your category mix, and your top three operational priorities.</p>
+    <div class="cta-band__ctas">
+      <a href="contact.html" class="btn btn--inverted btn--lg"><span class="btn-arrow">Request a demo</span></a>
+      <a href="pricing.html" class="btn btn--outline-inverted btn--lg">See pricing</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="brand">
+          <svg class="brand__mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="3" y="3" width="26" height="26" rx="3" fill="#ffffff" opacity="0.08"/>
+            <path d="M8 22 L8 10 L13 10 L13 18 L21 18 L21 22 Z" fill="#2bb3c0"/>
+            <path d="M16 6 L24 14 L20 14 L20 22 L16 22 Z" fill="#ffffff" opacity="0.92"/>
+            <circle cx="24" cy="9" r="2" fill="#2bb3c0"/>
+          </svg>
+          <span class="brand__name">Lattice <span>&amp; Spire</span></span>
+        </a>
+        <p>The intelligence platform for industrial supply chains. Headquartered in Chicago, with offices in Frankfurt, Singapore, and São Paulo.</p>
+      </div>
+
+      <div class="footer-col">
+        <h6>Platform</h6>
+        <ul>
+          <li><a href="platform.html#supplier-360">Supplier 360</a></li>
+          <li><a href="platform.html#risk-radar">Risk Radar</a></li>
+          <li><a href="platform.html#contract-vault">Contract Vault</a></li>
+          <li><a href="platform.html#forecast-engine">Forecast Engine</a></li>
+          <li><a href="platform.html#network-graph">Network Graph</a></li>
+          <li><a href="platform.html#insights-hub">Insights Hub</a></li>
+          <li><a href="platform.html#integrations">Integrations</a></li>
+          <li><a href="platform.html#api">Developer API</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h6>Solutions</h6>
+        <ul>
+          <li><a href="#">CPO solutions</a></li>
+          <li><a href="#">Operations solutions</a></li>
+          <li><a href="#">Finance solutions</a></li>
+          <li><a href="#">Sustainability</a></li>
+          <li><a href="#">Supplier onboarding</a></li>
+          <li><a href="#">Risk &amp; resilience</a></li>
+          <li><a href="#">Spend analytics</a></li>
+          <li><a href="#">Demand forecasting</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h6>Industries</h6>
+        <ul>
+          <li><a href="industries.html#automotive">Automotive</a></li>
+          <li><a href="industries.html#aerospace">Aerospace &amp; Defense</a></li>
+          <li><a href="industries.html#heavy-equipment">Heavy Equipment</a></li>
+          <li><a href="industries.html#distribution">Industrial Distribution</a></li>
+          <li><a href="industries.html#chemicals">Chemicals &amp; Materials</a></li>
+          <li><a href="industries.html#food-bev">Food &amp; Beverage</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h6>Resources</h6>
+        <ul>
+          <li><a href="resources.html">Resource library</a></li>
+          <li><a href="resources.html#webinars">Webinars &amp; events</a></li>
+          <li><a href="resources.html#blog">The Lattice blog</a></li>
+          <li><a href="customers.html">Customer stories</a></li>
+          <li><a href="#">Help center</a></li>
+          <li><a href="#">Developer docs</a></li>
+          <li><a href="#">Status page</a></li>
+          <li><a href="#">Training &amp; certification</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h6>Company</h6>
+        <ul>
+          <li><a href="#">Our story</a></li>
+          <li><a href="#">Leadership</a></li>
+          <li><a href="#">Board &amp; investors</a></li>
+          <li><a href="careers.html">Careers</a></li>
+          <li><a href="#">Press &amp; media</a></li>
+          <li><a href="#">Partners</a></li>
+          <li><a href="contact.html">Contact us</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-trust">
+      <span class="footer-trust__label">Independently audited &amp; certified</span>
+      <div class="footer-trust__badges" role="list" aria-label="Compliance certifications">
+        <div class="trust-badge" role="listitem" aria-label="SOC 2 Type II certified">SOC 2<br>Type II</div>
+        <div class="trust-badge" role="listitem" aria-label="ISO 27001 certified">ISO<br>27001</div>
+        <div class="trust-badge" role="listitem" aria-label="ISO 27701 certified">ISO<br>27701</div>
+        <div class="trust-badge" role="listitem" aria-label="GDPR compliant">GDPR</div>
+        <div class="trust-badge" role="listitem" aria-label="HIPAA ready">HIPAA<br>Ready</div>
+        <div class="trust-badge" role="listitem" aria-label="EU U.S. Data Privacy Framework">EU-US<br>DPF</div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div>© 2026 Lattice &amp; Spire, Inc. All rights reserved. 233 N Michigan Ave, Suite 1800, Chicago, IL 60601.</div>
+      <div class="footer-legal">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Cookie preferences</a>
+        <a href="#">Modern slavery statement</a>
+        <a href="#">Trust center</a>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+        <span class="footer-lang">EN ▾</span>
+        <div class="footer-social">
+          <a href="#" aria-label="LinkedIn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h4v16H4zM6 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM10 8h4v2.2c.6-1.1 2-2.4 4.2-2.4 4.5 0 5.3 3 5.3 6.8V20h-4v-4.7c0-1.5-.6-2.8-2.2-2.8s-2.3 1.2-2.3 2.7V20h-4V8z"/></svg>
+          </a>
+          <a href="#" aria-label="X / Twitter">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 3H22l-7.2 8.2L23 21h-6.6l-5.2-6.6L5.2 21H2l7.7-8.8L1.5 3h6.8l4.7 6 5.9-6z"/></svg>
+          </a>
+          <a href="#" aria-label="YouTube">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23 7.2s-.2-1.6-.9-2.3c-.8-.9-1.7-.9-2.2-1C16.5 3.6 12 3.6 12 3.6s-4.5 0-7.9.3c-.5.1-1.4.1-2.2 1C1.2 5.6 1 7.2 1 7.2S.8 9 .8 10.9v1.7C.8 14.4 1 16.3 1 16.3s.2 1.6.9 2.3c.8.9 1.9.9 2.4 1C6.3 19.8 12 20 12 20s4.5 0 7.9-.3c.5-.1 1.4-.1 2.2-1 .7-.7.9-2.3.9-2.3s.2-1.9.2-3.8v-1.7C23.2 9 23 7.2 23 7.2zM9.7 14.6V8.4l5.8 3.1-5.8 3.1z"/></svg>
+          </a>
+          <a href="#" aria-label="GitHub">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.3 1.8 1.3 1.1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.4-1.3-5.4-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

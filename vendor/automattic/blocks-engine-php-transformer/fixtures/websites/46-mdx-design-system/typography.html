@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Typography · Halo UI</title>
+  <meta name="description" content="The Halo UI type scale, Space Grotesk + Inter font stacks, and the rules that keep text legible across every product." />
+  <link rel="stylesheet" href="css/halo.css" />
+</head>
+<body>
+  <div class="sidebar-backdrop"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <a class="sidebar__brand" href="index.html">Halo&nbsp;UI</a>
+      <p class="sidebar__version">v2.4.0 · MIT · @halo-ui/react</p>
+      <nav class="nav-group" aria-label="Overview"><p class="nav-group__title">Overview</p><a class="nav-link" href="index.html">Halo UI</a></nav>
+      <nav class="nav-group" aria-label="Foundations"><p class="nav-group__title">Foundations</p><a class="nav-link" href="color.html">Color</a><a class="nav-link" href="typography.html">Typography</a></nav>
+      <nav class="nav-group" aria-label="Components"><p class="nav-group__title">Components</p><a class="nav-link" href="button.html">Button</a><a class="nav-link" href="input.html">Input</a><a class="nav-link" href="modal.html">Modal</a><a class="nav-link" href="card.html">Card</a></nav>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn mobile-nav-toggle" id="nav-toggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <span class="topbar__crumb">Foundations / <strong>Typography</strong></span>
+        <span class="topbar__spacer"></span>
+        <button class="search-btn" data-palette-open aria-label="Search documentation"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><span class="search-btn__text">Search docs…</span><kbd>⌘K</kbd></button>
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle color theme"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke-linecap="round"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 14.5A8 8 0 119.5 4a6.5 6.5 0 0010.5 10.5z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/lumen-labs/halo-ui" target="_blank" rel="noopener" aria-label="GitHub repository"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0112 6.8c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.58.69.48A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"/></svg></a>
+      </header>
+
+      <article class="doc">
+        <header class="doc__header">
+          <p class="doc__eyebrow">Foundations</p>
+          <h1>Typography</h1>
+          <p class="doc__lede">The Halo UI type scale, font stacks, and the rules that keep text legible across every product.</p>
+          <span class="badge badge--stable">stable</span>
+        </header>
+
+        <p>Halo UI uses a <strong>two-family</strong> system. <strong>Space Grotesk</strong> carries display and headings; <strong>Inter</strong> handles body and UI text. A single monospace family, <strong>JetBrains Mono</strong>, is reserved for code and tabular numerals.</p>
+
+        <h2 id="font-stacks">Font stacks</h2>
+        <div class="halo-codeblock">
+          <div class="halo-codeblock__bar"><span class="halo-codeblock__lang">css</span><button class="copy-btn" type="button">Copy</button></div>
+          <pre><code><span class="tok-attr">--halo-font-display</span><span class="tok-punc">:</span> <span class="tok-str">'Space Grotesk'</span>, system-ui, sans-serif;
+<span class="tok-attr">--halo-font-body</span><span class="tok-punc">:</span>    <span class="tok-str">'Inter'</span>, system-ui, -apple-system, sans-serif;
+<span class="tok-attr">--halo-font-mono</span><span class="tok-punc">:</span>    <span class="tok-str">'JetBrains Mono'</span>, ui-monospace, monospace;</code></pre>
+        </div>
+
+        <aside class="callout callout--info" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 5.5v.5" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Note</p><div class="callout__content">Both webfonts ship as variable fonts and are subset to Latin + Latin-Extended. The combined download is <strong>34&nbsp;kB</strong> woff2, loaded with <code>font-display: swap</code>.</div></div>
+        </aside>
+
+        <h2 id="type-scale">Type scale</h2>
+        <p>The scale is a <strong>1.2 minor-third</strong> ratio anchored at a 16px base. Each step is a named token; product code references the token, never a raw pixel value.</p>
+        <table>
+          <thead><tr><th>Token</th><th>Size / line-height</th><th>Weight</th><th>Usage</th></tr></thead>
+          <tbody>
+            <tr><td><code>display-lg</code></td><td>48 / 52</td><td>600</td><td>Marketing hero</td></tr>
+            <tr><td><code>display-sm</code></td><td>36 / 42</td><td>600</td><td>Page titles</td></tr>
+            <tr><td><code>heading-lg</code></td><td>28 / 36</td><td>600</td><td>Section h2</td></tr>
+            <tr><td><code>heading-sm</code></td><td>22 / 30</td><td>600</td><td>Card / subsection h3</td></tr>
+            <tr><td><code>title</code></td><td>18 / 26</td><td>600</td><td>List + dialog titles</td></tr>
+            <tr><td><code>body</code></td><td>16 / 26</td><td>400</td><td>Default paragraph</td></tr>
+            <tr><td><code>body-sm</code></td><td>14 / 22</td><td>400</td><td>Secondary text, captions</td></tr>
+            <tr><td><code>code</code></td><td>14 / 22</td><td>500</td><td>Inline + block code</td></tr>
+            <tr><td><code>overline</code></td><td>12 / 16</td><td>600</td><td>Eyebrows, all-caps labels</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="live-specimen">Live specimen</h2>
+        <p>This block renders each scale step at its actual token value so you can compare weights and rhythm side by side.</p>
+        <div class="code-preview">
+          <div class="code-preview__stage">
+            <div class="type-specimen">
+              <p class="halo-display-sm">Ship faster, together</p>
+              <p class="halo-heading-lg">A scale you can trust</p>
+              <p class="halo-body">Body copy sits at 16px with a 26px line-height, tuned for sustained reading.</p>
+              <p class="halo-body-sm">Secondary text drops to 14px for density without sacrificing legibility.</p>
+              <p class="halo-code">const ratio = 1.2 // minor third</p>
+            </div>
+          </div>
+          <div class="code-preview__panel">
+            <div class="code-preview__bar"><span class="code-preview__lang">html</span><button class="code-preview__copy" type="button">Copy</button></div>
+            <pre class="code-preview__code"><code><span class="tok-punc">&lt;</span><span class="tok-tag">h1</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-display-sm"</span><span class="tok-punc">&gt;</span>Ship faster, together<span class="tok-punc">&lt;/</span><span class="tok-tag">h1</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">h2</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-heading-lg"</span><span class="tok-punc">&gt;</span>A scale you can trust<span class="tok-punc">&lt;/</span><span class="tok-tag">h2</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">p</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-body"</span><span class="tok-punc">&gt;</span>Body copy sits at 16px with a 26px line-height.<span class="tok-punc">&lt;/</span><span class="tok-tag">p</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">p</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-body-sm"</span><span class="tok-punc">&gt;</span>Secondary text drops to 14px for density.<span class="tok-punc">&lt;/</span><span class="tok-tag">p</span><span class="tok-punc">&gt;</span></code></pre>
+          </div>
+        </div>
+
+        <h2 id="measure-rhythm">Measure &amp; rhythm</h2>
+        <p>Body text should run <strong>60–75 characters</strong> per line. The docs content column is capped at <code>--halo-measure: 68ch</code> for exactly this reason. Vertical rhythm is maintained by spacing tokens (multiples of 4px), not by ad-hoc margins.</p>
+        <div class="dodont">
+          <div class="dodont__card dodont__card--do"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>Do</span><p>Let headings inherit <code>--halo-font-display</code> and body inherit <code>--halo-font-body</code> automatically via the base reset.</p></div>
+          <div class="dodont__card dodont__card--dont"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>Don't</span><p>Set type smaller than <code>body-sm</code> (14px) for any reading content — it fails our minimum legible-size guideline.</p></div>
+        </div>
+
+        <aside class="callout callout--warning" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 6v3.2M8 11v.4" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Respect user zoom</p><div class="callout__content">Always size text in <code>rem</code>, never <code>px</code>, so it scales with the browser's font setting. Halo's tokens emit <code>rem</code> values; if you override them, keep the unit.</div></div>
+        </aside>
+
+        <h2 id="accessibility-notes">Accessibility notes</h2>
+        <ul>
+          <li>Line-height is never below 1.5 for body text (WCAG 1.4.12).</li>
+          <li>Letter-spacing on all-caps <code>overline</code> text is <code>0.06em</code> to preserve readability.</li>
+          <li>We do not rely on weight alone to convey meaning — pair it with size or color role.</li>
+        </ul>
+      </article>
+
+      <aside class="toc" aria-label="On this page">
+        <p class="toc__title">On this page</p>
+        <ul>
+          <li class="toc__item toc__item--h2"><a href="#font-stacks">Font stacks</a></li>
+          <li class="toc__item toc__item--h2"><a href="#type-scale">Type scale</a></li>
+          <li class="toc__item toc__item--h2"><a href="#live-specimen">Live specimen</a></li>
+          <li class="toc__item toc__item--h2"><a href="#measure-rhythm">Measure &amp; rhythm</a></li>
+          <li class="toc__item toc__item--h2"><a href="#accessibility-notes">Accessibility notes</a></li>
+        </ul>
+      </aside>
+
+      <footer class="doc-footer">
+        <div>Halo UI v2.4.0 · MIT License · Built with Astro + MDX</div>
+        <div class="doc-footer__links"><a href="color.html">← Color</a><a href="button.html">Button →</a></div>
+      </footer>
+    </div>
+  </div>
+
+  <div class="palette-backdrop" id="palette">
+    <div class="palette" role="dialog" aria-label="Search documentation">
+      <div class="palette__input-wrap"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input class="palette__input" type="text" placeholder="Search components, tokens, foundations…" aria-label="Search" autocomplete="off" spellcheck="false" /></div>
+      <div class="palette__results"></div>
+      <div class="palette__hint"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+    </div>
+  </div>
+  <script src="js/halo.js"></script>
+</body>
+</html>

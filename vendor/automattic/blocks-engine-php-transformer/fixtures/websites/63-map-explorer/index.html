@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Vaelora Atlas — Interactive Map of the Vaeloran Archipelago</title>
+  <meta name="description" content="A hand-drawn slippy-map explorer of Vaelora, a fictional archipelago nation: pan, zoom, toggle data layers, search places, plan a tram route, and inspect every region, landmark and station.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 10 L14 6 L22 10 L26 8 V24 L18 28 L10 24 L6 26 Z' fill='none' stroke='%2334d0c4' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='17' r='2' fill='%2334d0c4'/%3E%3C/svg%3E">
+</head>
+<body data-theme="dark" class="map-page">
+<div class="app">
+
+  <!-- ══════════ SHARED HEADER ══════════ -->
+  <header class="topbar">
+    <button class="ctrl menu-toggle" id="menuToggle" aria-label="Toggle navigation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <a class="brand" href="index.html" aria-label="Vaelora Atlas home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M6 10 L14 6 L22 10 L26 8 V24 L18 28 L10 24 L6 26 Z" fill="none" stroke="#34d0c4" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="16" cy="17" r="2" fill="#34d0c4"/>
+      </svg>
+      <span>
+        <span class="brand-name">Vaelora<b>Atlas</b></span><br>
+        <span class="brand-sub">Survey of the Archipelago</span>
+      </span>
+    </a>
+    <nav class="top-nav" aria-label="Primary">
+      <a href="index.html" class="active">Map</a>
+      <a href="gazetteer.html">Gazetteer</a>
+      <a href="about.html">About</a>
+    </nav>
+    <div class="top-spacer"></div>
+    <button class="ctrl list-toggle" id="listToggle" aria-label="Toggle places panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+      Places
+    </button>
+    <button class="ctrl" id="themeToggle" aria-label="Toggle colour theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      <span class="tlabel">Dark</span>
+    </button>
+  </header>
+
+  <!-- ══════════ LEFT RAIL ══════════ -->
+  <aside class="rail" id="rail">
+    <div class="rail-scroll">
+
+      <div class="rail-section">
+        <h3>Find a place</h3>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+          <input type="search" id="placeSearch" placeholder="Search regions, landmarks, stations…" aria-label="Search places">
+        </div>
+        <div class="filter-row" role="group" aria-label="Filter places">
+          <button class="filter-chip active" data-filter="all">All</button>
+          <button class="filter-chip" data-filter="region">Regions</button>
+          <button class="filter-chip" data-filter="poi">Places</button>
+          <button class="filter-chip" data-filter="station">Stations</button>
+        </div>
+        <ul class="result-list" id="resultList" aria-label="Search results"></ul>
+      </div>
+
+      <div class="rail-section">
+        <h3>Data layers</h3>
+        <div class="layer-list">
+          <label class="layer-item"><input type="checkbox" class="layer-toggle" data-layer="regions" checked><span class="layer-swatch" style="background:#7fae6b"></span><span class="layer-name">Regions &amp; terrain</span><span class="layer-check"></span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle" data-layer="water" checked><span class="layer-swatch" style="background:#11324a"></span><span class="layer-name">Rivers &amp; lakes</span><span class="layer-check"></span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle" data-layer="roads" checked><span class="layer-swatch" style="background:#e8c06a"></span><span class="layer-name">Roads &amp; trails</span><span class="layer-check"></span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle" data-layer="transit" checked><span class="layer-swatch" style="background:#9b6fe0"></span><span class="layer-name">Tramway &amp; stations</span><span class="layer-check"></span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle" data-layer="poi" checked><span class="layer-swatch" style="background:#5b9dff"></span><span class="layer-name">Points of interest</span><span class="layer-check"></span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle" data-layer="labels" checked><span class="layer-swatch" style="background:#e8f0fb"></span><span class="layer-name">Labels</span><span class="layer-check"></span></label>
+          <label class="layer-item"><input type="checkbox" class="layer-toggle" data-layer="graticule" checked><span class="layer-swatch" style="background:#3a5a78"></span><span class="layer-name">Coordinate grid</span><span class="layer-check"></span></label>
+        </div>
+      </div>
+
+      <div class="rail-section">
+        <h3>Legend</h3>
+        <div class="legend-list">
+          <div class="legend-item"><span class="legend-dot" style="background:#5b9dff"></span>Civic &amp; culture</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#34c4e0"></span>Ports</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#e0712a"></span>Landmarks</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#b07bff"></span>Peaks</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#41d68a"></span>Parks &amp; reserves</div>
+          <div class="legend-item"><span class="legend-line" style="background:#e0a02a"></span>Amber tram line</div>
+          <div class="legend-item"><span class="legend-line" style="background:#1fb6a6"></span>Teal tram line</div>
+          <div class="legend-item"><span class="legend-line" style="background:#9b6fe0"></span>Violet tram line</div>
+          <div class="legend-item"><span class="legend-line" style="background:#e8c06a"></span>National highway</div>
+          <div class="legend-item"><span class="legend-line" style="background:#5f7290; height:2px"></span>Footpath / trail</div>
+        </div>
+      </div>
+
+      <div class="rail-section" style="color:var(--ink-faint); font-size:12px; line-height:1.6">
+        Drag to pan · scroll to zoom · double-click to zoom in.<br>
+        Keyboard: arrows pan, <span class="kbd">+</span>/<span class="kbd">−</span> zoom, <span class="kbd">0</span> resets.
+      </div>
+
+    </div>
+  </aside>
+  <div class="nav-scrim"></div>
+
+  <!-- ══════════ MAP STAGE ══════════ -->
+  <main class="stage">
+    <svg id="mapSvg" role="application" aria-label="Interactive map of Vaelora. Drag to pan, scroll to zoom, use arrow keys to move."></svg>
+
+    <!-- route planner card -->
+    <div class="route-info" id="routeInfo" role="status" aria-live="polite"></div>
+
+    <!-- top-right controls -->
+    <div class="map-controls">
+      <div class="map-btn-group">
+        <button class="map-btn" id="zoomIn" aria-label="Zoom in" title="Zoom in (+)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <button class="map-btn" id="zoomOut" aria-label="Zoom out" title="Zoom out (−)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      </div>
+      <button class="map-btn" id="resetBtn" aria-label="Reset view to fit" title="Zoom to fit (0)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9V4h5M21 9V4h-5M3 15v5h5M21 15v5h-5"/></svg></button>
+      <button class="map-btn" id="routeBtn" aria-label="Plan a tram route" title="Plan a tram route between two stations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5V13a3 3 0 0 0 3 3h6"/></svg></button>
+    </div>
+
+    <!-- bottom-left readouts -->
+    <div class="map-readout">
+      <div class="readout-card">
+        <div class="readout-row">Zoom <b id="zoomVal">1.00×</b></div>
+        <div class="readout-row"><span id="coordReadout">14.200°N 48.000°W</span></div>
+        <div class="readout-row scale-wrap"><span class="scale-bar" id="scaleBar" style="width:110px"></span><span class="scale-label" id="scaleLabel">10 km</span></div>
+      </div>
+    </div>
+
+    <!-- minimap inset -->
+    <div class="minimap">
+      <div class="minimap-head">Overview</div>
+      <svg id="miniSvg" aria-label="Overview minimap showing current viewport"></svg>
+    </div>
+
+    <!-- hover tooltip -->
+    <div class="map-tip" id="mapTip" role="tooltip"></div>
+
+    <!-- detail panel -->
+    <aside class="detail-panel" id="detailPanel" aria-label="Feature details">
+      <div class="panel-head">
+        <span class="ph-title">Details</span>
+        <button class="panel-close" id="panelClose" aria-label="Close details"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+      </div>
+      <div class="panel-body" id="panelBody"></div>
+    </aside>
+  </main>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/mapengine.js"></script>
+<script src="js/render.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

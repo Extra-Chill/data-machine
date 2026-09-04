@@ -1,0 +1,60 @@
+{
+  "name": "automattic/blocks-engine-figma-transformer",
+  "description": "PHP primitives for transforming Figma designs into static HTML website artifacts.",
+  "type": "library",
+  "license": "GPL-3.0-or-later",
+  "authors": [
+    {
+      "name": "Automattic"
+    }
+  ],
+  "keywords": [
+    "figma",
+    "html",
+    "wordpress",
+    "blocks"
+  ],
+  "homepage": "https://github.com/Automattic/blocks-engine/tree/trunk/figma-transformer",
+  "support": {
+    "issues": "https://github.com/Automattic/blocks-engine/issues",
+    "source": "https://github.com/Automattic/blocks-engine/tree/trunk/figma-transformer"
+  },
+  "autoload": {
+    "psr-4": {
+      "Automattic\\BlocksEngine\\FigmaTransformer\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Automattic\\BlocksEngine\\FigmaTransformer\\Tests\\": "tests/"
+    }
+  },
+  "require": {
+    "php": ">=8.1"
+  },
+  "suggest": {
+    "ext-zstd": "Decode zstd-compressed canvas.fig chunks when inspecting .fig archives.",
+    "ext-zip": "Read zipped .fig archives when the extension is not provided by the host PHP build."
+  },
+  "bin": [
+    "bin/figma-transformer",
+    "bin/figma-visual-attribution"
+  ],
+  "scripts": {
+    "test": [
+      "@test:contract"
+    ],
+    "test:contract": "php tests/contract/run.php"
+  },
+  "config": {
+    "platform": {
+      "php": "8.1.0"
+    },
+    "sort-packages": true
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-trunk": "0.1.x-dev"
+    }
+  }
+}

@@ -1,0 +1,168 @@
+[
+  {
+    "id": "raw.smoke-heading-paragraph-table",
+    "op": "rawConvert",
+    "input": "<main><div class=\"wp-block-group\"><h2 class=\"wp-block-heading\">Widget Catalog</h2><p>Three fictional widgets for testing.</p><figure class=\"wp-block-table\"><table><thead><tr><th>Name</th><th>Use</th></tr></thead><tbody><tr><td>Sprocket</td><td>spins</td></tr></tbody></table></figure></div></main>",
+    "expected": {
+      "html": "<!-- wp:heading {\"className\":\"wp-block-heading\"} -->\n<h2 class=\"wp-block-heading\">Widget Catalog</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Three fictional widgets for testing.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:table -->\n<figure class=\"wp-block-table\"><table class=\"has-fixed-layout\"><thead><tr><th>Name</th><th>Use</th></tr></thead><tbody><tr><td>Sprocket</td><td>spins</td></tr></tbody></table></figure>\n<!-- /wp:table -->",
+      "wpHtmlResidue": 0
+    }
+  },
+  {
+    "id": "raw.smoke-spacer-height",
+    "op": "rawConvert",
+    "input": "<div class=\"wp-block-spacer\" style=\"height:48px\"></div><p>After.</p>",
+    "expected": {
+      "html": "<!-- wp:spacer {\"height\":\"48px\"} -->\n<div style=\"height:48px\" aria-hidden=\"true\" class=\"wp-block-spacer\"></div>\n<!-- /wp:spacer -->\n\n<!-- wp:paragraph -->\n<p>After.</p>\n<!-- /wp:paragraph -->",
+      "wpHtmlResidue": 0
+    }
+  },
+  {
+    "id": "raw.smoke-post-meta-strip",
+    "op": "rawConvert",
+    "input": "<main><h1 class=\"wp-block-post-title\">A Quiet Honor</h1><div class=\"wp-block-template-part\"><div class=\"wp-block-post-date\"><time datetime=\"2024-11-11\">Nov 11, 2024</time></div></div><div class=\"wp-block-post-author-name\"><a class=\"wp-block-post-author-name__link\" href=\"/author/poet\">Poet</a></div><p>They leave without fanfare, packing pieces of themselves.</p><div class=\"wp-block-post-terms\"><span class=\"wp-block-post-terms__prefix\">Tags: </span><a href=\"/tag/x\" rel=\"tag\">Sentimental</a></div><a class=\"wp-block-post-navigation-link\" href=\"/prev\"><span class=\"wp-block-post-navigation-link__arrow-previous\">Previous</span>Previous</a></main>",
+    "expected": {
+      "html": "<!-- wp:paragraph -->\n<p>They leave without fanfare, packing pieces of themselves.</p>\n<!-- /wp:paragraph -->",
+      "wpHtmlResidue": 0
+    }
+  },
+  {
+    "id": "raw.sample-wix-div-soup",
+    "op": "rawConvert",
+    "input": "<div id=\"SITE_PAGES\"><div data-mesh-id=\"comp-heroinlineContent\" class=\"wixui-section\"><div data-testid=\"richTextElement\"><h2>Handmade planters</h2><p>Small-batch ceramics for bright windows.</p></div><div class=\"wixui-button\"><a href=\"/shop\">Shop the drop</a></div></div></div>",
+    "expected": {
+      "html": "<!-- wp:html -->\n<div id=\"SITE_PAGES\"><div data-mesh-id=\"comp-heroinlineContent\" class=\"wixui-section\"><div data-testid=\"richTextElement\"><h2>Handmade planters</h2><p>Small-batch ceramics for bright windows.</p></div><div class=\"wixui-button\"><a href=\"/shop\">Shop the drop</a></div></div></div>\n<!-- /wp:html -->",
+      "wpHtmlResidue": 1
+    }
+  },
+  {
+    "id": "raw.sample-squarespace-sqs-block",
+    "op": "rawConvert",
+    "input": "<section class=\"Index-page\"><div class=\"sqs-layout\"><div class=\"sqs-block html-block sqs-block-html\"><div class=\"sqs-block-content\"><h2>Studio notes</h2><p>Glazes are mixed every Friday.</p></div></div></div></section>",
+    "expected": {
+      "html": "<!-- wp:html -->\n<section class=\"Index-page\"><div class=\"sqs-layout\"><div class=\"sqs-block html-block sqs-block-html\"><div class=\"sqs-block-content\"><h2>Studio notes</h2><p>Glazes are mixed every Friday.</p></div></div></div></section>\n<!-- /wp:html -->",
+      "wpHtmlResidue": 1
+    }
+  },
+  {
+    "id": "raw.sample-semantic-section",
+    "op": "rawConvert",
+    "input": "<section><h2>Our process</h2><p>We sketch, throw, glaze, and fire each piece in-house.</p></section>",
+    "expected": {
+      "html": "<!-- wp:html -->\n<section><h2>Our process</h2><p>We sketch, throw, glaze, and fire each piece in-house.</p></section>\n<!-- /wp:html -->",
+      "wpHtmlResidue": 1
+    }
+  },
+  {
+    "id": "canonicalize.smoke-simple-paragraph",
+    "op": "canonicalize",
+    "input": "<!-- wp:paragraph --><p>Hello world</p><!-- /wp:paragraph -->",
+    "expected": {
+      "html": "<!-- wp:paragraph -->\n<p>Hello world</p>\n<!-- /wp:paragraph -->",
+      "changed": true,
+      "fixedIssues": []
+    }
+  },
+  {
+    "id": "canonicalize.smoke-nested-paragraph",
+    "op": "canonicalize",
+    "input": "<!-- wp:paragraph --><p class=\"outer\"><p class=\"inner\">Nested</p></p><!-- /wp:paragraph -->",
+    "expected": {
+      "html": "<!-- wp:paragraph {\"className\":\"outer inner\"} -->\n<p class=\"outer inner\">Nested</p>\n<!-- /wp:paragraph -->",
+      "changed": true,
+      "fixedIssues": [
+        "core/paragraph: Nested paragraph tags detected and removed"
+      ]
+    }
+  },
+  {
+    "id": "canonicalize.smoke-heading-paragraph-composition",
+    "op": "canonicalize",
+    "input": "<!-- wp:heading {\"level\":1} --><h1>Title</h1><!-- /wp:heading -->\n<!-- wp:paragraph --><p>Body text.</p><!-- /wp:paragraph -->",
+    "expected": {
+      "html": "<!-- wp:heading {\"level\":1} -->\n<h1 class=\"wp-block-heading\">Title</h1>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Body text.</p>\n<!-- /wp:paragraph -->",
+      "changed": true,
+      "fixedIssues": []
+    }
+  },
+  {
+    "id": "canonicalize.unknown-jetpack-contact-form-minimal",
+    "op": "canonicalize",
+    "input": "<!-- wp:jetpack/contact-form -->x<!-- /wp:jetpack/contact-form -->",
+    "expected": {
+      "html": "<!-- wp:jetpack/contact-form -->\nx\n<!-- /wp:jetpack/contact-form -->",
+      "changed": true,
+      "fixedIssues": []
+    }
+  },
+  {
+    "id": "canonicalize.unknown-jetpack-contact-form-full",
+    "op": "canonicalize",
+    "input": "<!-- wp:jetpack/contact-form {\"style\":{\"spacing\":{\"padding\":{\"top\":\"16px\",\"right\":\"16px\",\"bottom\":\"16px\",\"left\":\"16px\"}}}} -->\n<div class=\"wp-block-jetpack-contact-form\">\n<!-- wp:jetpack/field-name {\"label\":\"Full name\",\"required\":true,\"width\":50} /-->\n<!-- wp:jetpack/field-email {\"label\":\"Email address\",\"required\":true,\"width\":50} /-->\n<!-- wp:button {\"tagName\":\"button\",\"type\":\"submit\",\"lock\":{\"remove\":true},\"className\":\"form-button-submit is-submit\",\"metadata\":{\"name\":\"Submit button\"}} -->\n<div class=\"wp-block-button form-button-submit is-submit\"><button type=\"submit\" class=\"wp-block-button__link wp-element-button\">Send Message</button></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:jetpack/contact-form -->",
+    "expected": {
+      "html": "<!-- wp:jetpack/contact-form {\"style\":{\"spacing\":{\"padding\":{\"top\":\"16px\",\"right\":\"16px\",\"bottom\":\"16px\",\"left\":\"16px\"}}}} -->\n<div class=\"wp-block-jetpack-contact-form\">\n<!-- wp:jetpack/field-name {\"label\":\"Full name\",\"required\":true,\"width\":50} /-->\n<!-- wp:jetpack/field-email {\"label\":\"Email address\",\"required\":true,\"width\":50} /-->\n<!-- wp:button {\"tagName\":\"button\",\"type\":\"submit\",\"lock\":{\"remove\":true},\"className\":\"form-button-submit is-submit\",\"metadata\":{\"name\":\"Submit button\"}} -->\n<div class=\"wp-block-button form-button-submit is-submit\"><button type=\"submit\" class=\"wp-block-button__link wp-element-button\">Send Message</button></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:jetpack/contact-form -->",
+      "changed": false,
+      "fixedIssues": []
+    }
+  },
+  {
+    "id": "compose.generic-details",
+    "op": "compose",
+    "input": "<details><summary>Q</summary><p>A</p></details>",
+    "expected": "<!-- wp:details -->\n<details class=\"wp-block-details\"><summary>Q</summary><p>A</p></details>\n<!-- /wp:details -->"
+  },
+  {
+    "id": "compose.generic-callout",
+    "op": "compose",
+    "input": "<div class=\"callout\"><h3>Note</h3><p>body</p></div>",
+    "expected": "<!-- wp:group {\"className\":\"wp-block-group is-style-callout\",\"layout\":{\"type\":\"constrained\"}} -->\n<div class=\"wp-block-group is-style-callout\"><h3>Note</h3><p>body</p></div>\n<!-- /wp:group -->"
+  },
+  {
+    "id": "compose.generic-pullquote",
+    "op": "compose",
+    "input": "<blockquote class=\"pullquote\"><p>Big idea</p><cite>Me</cite></blockquote>",
+    "expected": "<!-- wp:pullquote -->\n<figure class=\"wp-block-pullquote\"><blockquote><p>Big idea</p><cite>Me</cite></blockquote></figure>\n<!-- /wp:pullquote -->"
+  },
+  {
+    "id": "compose.generic-buttons",
+    "op": "compose",
+    "input": "<div class=\"btn-group\"><a class=\"button\" href=\"/x\">Go</a><a class=\"btn\" href=\"/y\">More</a></div>",
+    "expected": "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\">\n<!-- wp:button -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" href=\"/x\">Go</a></div>\n<!-- /wp:button -->\n<!-- wp:button -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" href=\"/y\">More</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->"
+  },
+  {
+    "id": "compose.generic-media-text",
+    "op": "compose",
+    "input": "<div class=\"media-text\"><figure><img src=\"https://cdn.test/a.jpg\" alt=\"A\"/></figure><div><h3>Title</h3><p>copy</p></div></div>",
+    "expected": "<!-- wp:media-text {\"mediaType\":\"image\"} -->\n<div class=\"wp-block-media-text is-stacked-on-mobile\"><figure class=\"wp-block-media-text__media\"><img src=\"https://cdn.test/a.jpg\" alt=\"A\"/></figure><div class=\"wp-block-media-text__content\"><h3>Title</h3><p>copy</p></div></div>\n<!-- /wp:media-text -->"
+  },
+  {
+    "id": "compose.sample-youtube-iframe",
+    "op": "compose",
+    "input": "<figure class=\"video\"><iframe src=\"https://www.youtube.com/embed/abc123\"></iframe></figure>",
+    "expected": "<!-- wp:embed {\"url\":\"https://www.youtube.com/embed/abc123\",\"type\":\"video\",\"providerNameSlug\":\"youtube\",\"responsive\":true} -->\n<figure class=\"wp-block-embed is-provider-youtube wp-block-embed-youtube wp-embed-aspect-16-9 wp-has-aspect-ratio\"><div class=\"wp-block-embed__wrapper\">\nhttps://www.youtube.com/embed/abc123\n</div></figure>\n<!-- /wp:embed -->"
+  },
+  {
+    "id": "compose.sample-callout-div",
+    "op": "compose",
+    "input": "<div class=\"notice callout\"><h3>Shipping pause</h3><p>Orders resume Monday.</p></div>",
+    "expected": "<!-- wp:group {\"className\":\"wp-block-group is-style-notice\",\"layout\":{\"type\":\"constrained\"}} -->\n<div class=\"wp-block-group is-style-notice\"><h3>Shipping pause</h3><p>Orders resume Monday.</p></div>\n<!-- /wp:group -->"
+  },
+  {
+    "id": "compose.sample-semantic-section-fallback",
+    "op": "compose",
+    "input": "<section><h2>Our process</h2><p>We sketch, throw, glaze, and fire each piece in-house.</p></section>",
+    "expected": "<!-- wp:html {\"metadata\":{\"name\":\"lib-coverage-island\"}} -->\n<section><h2>Our process</h2><p>We sketch, throw, glaze, and fire each piece in-house.</p></section>\n<!-- /wp:html -->"
+  },
+  {
+    "id": "compose.sample-wix-div-soup-fallback",
+    "op": "compose",
+    "input": "<div id=\"SITE_PAGES\"><div data-mesh-id=\"comp-heroinlineContent\" class=\"wixui-section\"><div data-testid=\"richTextElement\"><h2>Handmade planters</h2><p>Small-batch ceramics for bright windows.</p></div><div class=\"wixui-button\"><a href=\"/shop\">Shop the drop</a></div></div></div>",
+    "expected": "<!-- wp:html {\"metadata\":{\"name\":\"lib-coverage-island\"}} -->\n<div id=\"SITE_PAGES\"><div data-mesh-id=\"comp-heroinlineContent\" class=\"wixui-section\"><div data-testid=\"richTextElement\"><h2>Handmade planters</h2><p>Small-batch ceramics for bright windows.</p></div><div class=\"wixui-button\"><a href=\"/shop\">Shop the drop</a></div></div></div>\n<!-- /wp:html -->"
+  },
+  {
+    "id": "compose.sample-squarespace-sqs-block-fallback",
+    "op": "compose",
+    "input": "<section class=\"Index-page\"><div class=\"sqs-layout\"><div class=\"sqs-block html-block sqs-block-html\"><div class=\"sqs-block-content\"><h2>Studio notes</h2><p>Glazes are mixed every Friday.</p></div></div></div></section>",
+    "expected": "<!-- wp:html {\"metadata\":{\"name\":\"lib-coverage-island\"}} -->\n<section class=\"Index-page\"><div class=\"sqs-layout\"><div class=\"sqs-block html-block sqs-block-html\"><div class=\"sqs-block-content\"><h2>Studio notes</h2><p>Glazes are mixed every Friday.</p></div></div></div></section>\n<!-- /wp:html -->"
+  }
+]

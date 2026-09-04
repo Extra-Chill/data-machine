@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Request an Appointment — Westgate Family Dermatology</title>
+<meta name="description" content="Request an appointment with Westgate Family Dermatology in Beaverton, Oregon. Non-urgent visit request form for new and established patients.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<div class="utility-bar" role="complementary" aria-label="Patient quick links">
+  <div class="utility-inner">
+    <div class="utility-left">
+      <span class="utility-current">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Current patient? Call <a href="tel:+15035551870">(503) 555-1870</a>
+      </span>
+    </div>
+    <div class="utility-right">
+      <a href="patients.html#portal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12a7 7 0 0114 0"/><circle cx="12" cy="9" r="3"/><path d="M5 19a7 7 0 0114 0"/></svg>
+        Patient Portal
+      </a>
+      <a href="patients.html#billing">Pay a bill</a>
+      <a href="patients.html#telehealth">Telehealth visits</a>
+    </div>
+  </div>
+</div>
+
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a class="brand" href="index.html" aria-label="Westgate Family Dermatology, home">
+      <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="32" cy="32" r="30" fill="#d4e4f0" stroke="#103a5c" stroke-width="2"/>
+        <path d="M32 14 C20 14 18 28 24 36 C28 41 36 41 40 36 C46 28 44 14 32 14 Z" fill="#fcfaf2" stroke="#2a5f8a" stroke-width="1.5"/>
+        <path d="M32 22 C28 22 26 28 28 32 C30 35 34 35 36 32 C38 28 36 22 32 22 Z" fill="#6a8a5a"/>
+        <path d="M22 46 L42 46" stroke="#103a5c" stroke-width="2" stroke-linecap="round"/>
+        <path d="M26 50 L38 50" stroke="#103a5c" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span>
+        <span class="brand-name">Westgate Family<br>Dermatology</span>
+        <span class="brand-tag">Beaverton · Est. 2014</span>
+      </span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Primary">
+      <a href="providers.html">Providers</a>
+      <a href="conditions.html">Conditions</a>
+      <a href="services.html">Services</a>
+      <a href="patients.html">For Patients</a>
+      <a href="contact.html">Contact</a>
+      <a class="btn btn-primary btn-sm" href="book-appointment.html">Book Appointment</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span class="bar"></span>
+    </button>
+  </div>
+  <nav id="nav-drawer" class="nav-drawer" aria-label="Mobile">
+    <a href="providers.html">Providers</a>
+    <a href="conditions.html">Conditions</a>
+    <a href="services.html">Services</a>
+    <a href="patients.html">For Patients</a>
+    <a href="contact.html">Contact</a>
+    <a class="btn btn-primary" href="book-appointment.html">Book Appointment</a>
+  </nav>
+</header>
+
+<main id="main">
+
+  <section class="page-header">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="index.html">Home</a><span>›</span>Book an appointment
+      </nav>
+      <span class="eyebrow">Appointment request</span>
+      <h1>Request an appointment.</h1>
+      <p class="lead">Tell us a bit about what's bringing you in and we'll call you within one business day to confirm a time. Visits are typically scheduled 1–6 weeks out depending on the provider and the concern.</p>
+    </div>
+  </section>
+
+  <section class="section section--paper">
+    <div class="container container--narrow">
+
+      <!-- INTRO + URGENT NOTICE -->
+      <div class="form-intro">
+        <h3>This form is for non-urgent appointment requests.</h3>
+        <p>It is not monitored in real time. We respond by phone within one business day. New patient visits are typically scheduled 1–6 weeks out depending on which provider and the type of visit.</p>
+      </div>
+
+      <div class="form-urgent" role="note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div>
+          <strong>For urgent same-day concerns, please call (503) 555-1870.</strong>
+          <p>Suspected infection, worsening surgical site, severe medication reaction, or any clinically urgent dermatologic issue — call us directly. For appropriate concerns, a <a href="patients.html#telehealth">telehealth visit</a> can sometimes be scheduled the same day. For life-threatening emergencies, call 911 or go to the nearest emergency department.</p>
+        </div>
+      </div>
+
+      <!-- APPOINTMENT FORM -->
+      <form class="appt-form" id="appt-form" method="post" action="#" novalidate>
+
+        <!-- PATIENT INFORMATION -->
+        <div class="form-section">
+          <h3>Patient information</h3>
+
+          <div class="form-row">
+            <div class="form-field form-field--wide">
+              <label for="full-name">Patient's full legal name <span class="req" aria-hidden="true">*</span></label>
+              <input type="text" id="full-name" name="full-name" required autocomplete="name" aria-required="true" aria-describedby="full-name-help">
+              <span id="full-name-help" class="helper">As it appears on your insurance card and photo ID.</span>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="dob">Date of birth <span class="req" aria-hidden="true">*</span></label>
+              <input type="date" id="dob" name="dob" required autocomplete="bday" aria-required="true" aria-describedby="dob-help">
+              <span id="dob-help" class="helper">Required to verify identity and check insurance eligibility.</span>
+            </div>
+            <div class="form-field">
+              <label for="phone">Phone (preferred contact) <span class="req" aria-hidden="true">*</span></label>
+              <input type="tel" id="phone" name="phone" required autocomplete="tel" placeholder="(503) 555-0000" aria-required="true" aria-describedby="phone-help">
+              <span id="phone-help" class="helper">We'll call this number within one business day. Please leave a voicemail-ready greeting; we'll always leave a callback message.</span>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field form-field--wide">
+              <label for="email">Email address</label>
+              <input type="email" id="email" name="email" autocomplete="email" aria-describedby="email-help">
+              <span id="email-help" class="helper">Optional. Used only for appointment-related communication. Never used to send medical information — we use our secure portal for that.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- REASON FOR VISIT -->
+        <div class="form-section">
+          <h3>Reason for visit</h3>
+          <div class="form-row form-row--single">
+            <div class="form-field">
+              <label for="reason">Briefly, what's bringing you in? <span class="req" aria-hidden="true">*</span></label>
+              <textarea id="reason" name="reason" rows="5" maxlength="500" required aria-required="true" aria-describedby="reason-help reason-count" placeholder="A few sentences is plenty — e.g., 'I have a mole on my back my husband says has changed shape over the last six months' or 'My acne has not responded to over-the-counter products for the last year.'"></textarea>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
+                <span id="reason-help" class="helper">A short description helps us match you with the right provider and block enough time. Don't include sensitive details you wouldn't want in non-encrypted email.</span>
+                <span id="reason-count" class="char-count" aria-live="polite">0 / 500 characters</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- INSURANCE -->
+        <div class="form-section">
+          <h3>Insurance</h3>
+
+          <div class="form-row form-row--3">
+            <div class="form-field">
+              <label for="insurance-co">Insurance company <span class="req" aria-hidden="true">*</span></label>
+              <input type="text" id="insurance-co" name="insurance-co" required aria-required="true" aria-describedby="insurance-co-help" placeholder="e.g., Regence BlueShield">
+              <span id="insurance-co-help" class="helper">The name on the front of your insurance card.</span>
+            </div>
+            <div class="form-field">
+              <label for="policy-id">Policy / Member ID <span class="req" aria-hidden="true">*</span></label>
+              <input type="text" id="policy-id" name="policy-id" required aria-required="true" aria-describedby="policy-id-help">
+              <span id="policy-id-help" class="helper">From the front of your insurance card.</span>
+            </div>
+            <div class="form-field">
+              <label for="group-num">Group number</label>
+              <input type="text" id="group-num" name="group-num" aria-describedby="group-num-help">
+              <span id="group-num-help" class="helper">If applicable. Often listed below the member ID.</span>
+            </div>
+          </div>
+
+          <p class="tiny muted" style="margin-top:.25rem;">If you're self-pay or your plan isn't listed, write "Self-pay" in the insurance company field and our office will follow up with pricing information. <a href="patients.html#insurance">See accepted plans →</a></p>
+        </div>
+
+        <!-- PROVIDER / SCHEDULING PREFERENCES -->
+        <div class="form-section">
+          <h3>Scheduling preferences</h3>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="provider">Preferred provider</label>
+              <select id="provider" name="provider" aria-describedby="provider-help">
+                <option value="any" selected>No preference — best available</option>
+                <option value="westgate">Dr. Ingrid Westgate, MD (general derm)</option>
+                <option value="tran-whitfield">Dr. Marcus Tran-Whitfield, MD (Mohs &amp; general derm Tuesdays)</option>
+                <option value="aldarova">Phoebe Aldarova, PA-C (general derm)</option>
+              </select>
+              <span id="provider-help" class="helper">If you don't have a preference, our staff will match you with the soonest available appropriate provider.</span>
+            </div>
+            <div class="form-field">
+              <label for="first-visit-select">Have you been seen here before? <span class="req" aria-hidden="true">*</span></label>
+              <select id="first-visit-select" name="first-visit" required aria-required="true" aria-describedby="first-visit-help">
+                <option value="">Please select…</option>
+                <option value="no">No, this would be my first visit</option>
+                <option value="yes">Yes, I'm an established patient</option>
+                <option value="returning">I was a patient previously but it's been more than 2 years</option>
+              </select>
+              <span id="first-visit-help" class="helper">New patient visits are 45 minutes; we block them accordingly.</span>
+            </div>
+          </div>
+
+          <fieldset class="fieldset-clean">
+            <legend>Preferred days <span class="req" aria-hidden="true">*</span></legend>
+            <span class="helper">Select all that work — more flexibility means a sooner appointment.</span>
+            <div class="choice-row" role="group" aria-labelledby="days-helper">
+              <label class="choice"><input type="checkbox" name="day" value="mon"> <span>Monday</span></label>
+              <label class="choice"><input type="checkbox" name="day" value="tue"> <span>Tuesday</span></label>
+              <label class="choice"><input type="checkbox" name="day" value="wed"> <span>Wednesday</span></label>
+              <label class="choice"><input type="checkbox" name="day" value="thu"> <span>Thursday</span></label>
+              <label class="choice"><input type="checkbox" name="day" value="fri"> <span>Friday</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="fieldset-clean" style="margin-top:1.5rem;">
+            <legend>Preferred time of day <span class="req" aria-hidden="true">*</span></legend>
+            <div class="choice-row" role="radiogroup">
+              <label class="choice"><input type="radio" name="time" value="am" required> <span>Morning (8:00 – 11:30)</span></label>
+              <label class="choice"><input type="radio" name="time" value="pm" required> <span>Afternoon (12:00 – 5:00)</span></label>
+              <label class="choice"><input type="radio" name="time" value="either" required> <span>Either works</span></label>
+            </div>
+          </fieldset>
+        </div>
+
+        <!-- REFERRAL -->
+        <div class="form-section">
+          <h3>Referral information</h3>
+
+          <fieldset class="fieldset-clean">
+            <legend>Were you referred to us by another provider? <span class="req" aria-hidden="true">*</span></legend>
+            <span class="helper">If your insurance is an HMO or EPO plan, a referral from your primary care provider may be required for coverage.</span>
+            <div class="choice-row" role="radiogroup">
+              <label class="choice"><input type="radio" name="referred" value="no" required checked> <span>No</span></label>
+              <label class="choice"><input type="radio" name="referred" value="yes" required> <span>Yes — see below</span></label>
+            </div>
+          </fieldset>
+
+          <div id="referrer-wrap" class="form-row" hidden style="margin-top:1.25rem;">
+            <div class="form-field">
+              <label for="referrer-name">Referring provider name</label>
+              <input type="text" id="referrer-name" name="referrer-name" aria-describedby="referrer-name-help" placeholder="e.g., Dr. Sarah Patel, family medicine">
+              <span id="referrer-name-help" class="helper">Name and specialty if known.</span>
+            </div>
+            <div class="form-field">
+              <label for="referrer-clinic">Referring clinic / phone</label>
+              <input type="text" id="referrer-clinic" name="referrer-clinic" aria-describedby="referrer-clinic-help" placeholder="Clinic name or phone number">
+              <span id="referrer-clinic-help" class="helper">So we can request the referral document if needed.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACCOMMODATIONS -->
+        <div class="form-section">
+          <h3>Accessibility &amp; accommodations</h3>
+          <div class="form-row form-row--single">
+            <div class="form-field">
+              <label for="accommodations">Anything we can do to make your visit easier?</label>
+              <textarea id="accommodations" name="accommodations" rows="3" aria-describedby="accommodations-help" placeholder="For example: I'd like a sign language interpreter; I'll need help getting from the parking lot; I prefer a quieter waiting area; I'd like a chaperone for the exam."></textarea>
+              <span id="accommodations-help" class="helper">Optional. We provide language interpretation at no charge, the building is fully ADA-accessible, and we accommodate hearing impairment, mobility, sensory, and other needs. <a href="contact.html#accessibility">More about accessibility →</a></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACKNOWLEDGMENTS -->
+        <div class="form-section">
+          <h3>Before you submit</h3>
+
+          <div class="ack-row">
+            <input type="checkbox" id="ack-arrival" name="ack-arrival" required aria-describedby="ack-arrival-text">
+            <label for="ack-arrival" id="ack-arrival-text">
+              <strong>I understand I should arrive 15 minutes early</strong> for check-in. New patients arriving without completed forms should arrive 30 minutes early.
+            </label>
+          </div>
+
+          <div class="ack-row">
+            <input type="checkbox" id="ack-privacy" name="ack-privacy" required aria-describedby="ack-privacy-text">
+            <label for="ack-privacy" id="ack-privacy-text">
+              <strong>I acknowledge that this form transmits the information above</strong> over a secure connection and that I have read the <a href="patients.html#privacy">HIPAA Notice of Privacy Practices</a>. I understand that this is an appointment request, not a confirmed appointment — confirmation is by phone call from our office.
+            </label>
+          </div>
+
+          <div class="ack-row">
+            <input type="checkbox" id="ack-cancellation" name="ack-cancellation" required aria-describedby="ack-cancellation-text">
+            <label for="ack-cancellation" id="ack-cancellation-text">
+              <strong>I understand the cancellation policy:</strong> a $50 fee applies to cancellations with less than 24 hours' notice and to no-shows, waived for genuine emergencies.
+            </label>
+          </div>
+        </div>
+
+        <!-- SUBMIT -->
+        <div class="form-submit">
+          <p class="submit-note">After submitting, our front desk will call you within one business day to confirm the appointment, verify your insurance, and answer any questions.</p>
+          <button type="submit" class="btn btn-primary btn-lg">Submit appointment request</button>
+        </div>
+      </form>
+
+      <p class="tiny muted" style="margin-top:2rem;text-align:center;">Prefer to call? Reach our front desk at <strong><a href="tel:+15035551870">(503) 555-1870</a></strong>, Monday–Thursday 8 a.m. – 5 p.m. and Friday 8 a.m. – 3 p.m.</p>
+
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="30" fill="#d4e4f0" stroke="#103a5c" stroke-width="2"/>
+          <path d="M32 14 C20 14 18 28 24 36 C28 41 36 41 40 36 C46 28 44 14 32 14 Z" fill="#fcfaf2" stroke="#2a5f8a" stroke-width="1.5"/>
+          <path d="M32 22 C28 22 26 28 28 32 C30 35 34 35 36 32 C38 28 36 22 32 22 Z" fill="#6a8a5a"/>
+        </svg>
+        <p><strong>Westgate Family Dermatology</strong></p>
+        <p>An independent specialty practice serving Beaverton, Hillsboro, and the greater Portland metro since 2014.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Care</h4>
+        <ul class="bare">
+          <li><a href="providers.html">Our providers</a></li>
+          <li><a href="conditions.html">Conditions we treat</a></li>
+          <li><a href="services.html">Services</a></li>
+          <li><a href="services.html#cosmetic">Cosmetic dermatology</a></li>
+          <li><a href="services.html#surgical">Mohs surgery</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Patients</h4>
+        <ul class="bare">
+          <li><a href="patients.html#new-patient">New patient information</a></li>
+          <li><a href="patients.html#insurance">Insurance &amp; billing</a></li>
+          <li><a href="patients.html#portal">Patient portal</a></li>
+          <li><a href="patients.html#telehealth">Telehealth visits</a></li>
+          <li><a href="patients.html#privacy">HIPAA notice</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Visit us</h4>
+        <address>
+          2814 Westgate Boulevard<br>
+          Suite 200<br>
+          Beaverton, OR 97005<br>
+          <a href="tel:+15035551870">(503) 555-1870</a><br>
+          <a href="mailto:hello@westgatederm.example">hello@westgatederm.example</a>
+        </address>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2014–2026 Westgate Family Dermatology, PC. All rights reserved.</span>
+      <nav class="footer-legal" aria-label="Footer">
+        <a href="patients.html#privacy">Privacy &amp; HIPAA</a>
+        <a href="patients.html#rights">Patient rights</a>
+        <a href="patients.html#nondiscrimination">Non-discrimination</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<script src="nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gazetteer — Vaelora Atlas</title>
+  <meta name="description" content="A full gazetteer of the Vaeloran Archipelago: every region, landmark and tram station, with descriptions and a link that jumps straight into the interactive map.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 10 L14 6 L22 10 L26 8 V24 L18 28 L10 24 L6 26 Z' fill='none' stroke='%2334d0c4' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='17' r='2' fill='%2334d0c4'/%3E%3C/svg%3E">
+</head>
+<body data-theme="dark">
+
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="Vaelora Atlas home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M6 10 L14 6 L22 10 L26 8 V24 L18 28 L10 24 L6 26 Z" fill="none" stroke="#34d0c4" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="16" cy="17" r="2" fill="#34d0c4"/>
+      </svg>
+      <span>
+        <span class="brand-name">Vaelora<b>Atlas</b></span><br>
+        <span class="brand-sub">Survey of the Archipelago</span>
+      </span>
+    </a>
+    <nav class="top-nav" aria-label="Primary">
+      <a href="index.html">Map</a>
+      <a href="gazetteer.html" class="active">Gazetteer</a>
+      <a href="about.html">About</a>
+    </nav>
+    <div class="top-spacer"></div>
+    <button class="ctrl" id="themeToggle" aria-label="Toggle colour theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      <span class="tlabel">Dark</span>
+    </button>
+  </header>
+
+  <div class="content-body">
+    <div class="page-wrap">
+      <div class="page-hero">
+        <span class="eyebrow">Gazetteer</span>
+        <h1>Every place in Vaelora</h1>
+        <p>The complete index of the archipelago — six regions across three islands, a dozen landmarks, and fourteen tramway stations. Choose any entry to jump straight into the map, focused on that spot.</p>
+      </div>
+
+      <div class="gaz-controls">
+        <div class="gaz-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+          <input type="search" id="gazSearch" placeholder="Search the gazetteer…" aria-label="Search the gazetteer">
+        </div>
+        <div class="filter-row" role="group" aria-label="Filter gazetteer">
+          <button class="filter-chip active" data-filter="all">All</button>
+          <button class="filter-chip" data-filter="region">Regions</button>
+          <button class="filter-chip" data-filter="poi">Places</button>
+          <button class="filter-chip" data-filter="station">Stations</button>
+        </div>
+      </div>
+
+      <div id="gazContent"></div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/gazetteer.js"></script>
+</body>
+</html>

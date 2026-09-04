@@ -1,0 +1,14 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "small-business",
+    "retail",
+    "plant-shop",
+    "has-form",
+    "has-nav",
+    "multipage",
+    "has-shop",
+    "ecommerce"
+  ],
+  "complexity": 2
+}

@@ -1,0 +1,12 @@
+{
+  "fixture_class": "canvas/webgl/audio/runtime-heavy",
+  "tags": [
+    "interactive",
+    "space",
+    "explorer",
+    "canvas",
+    "animation",
+    "has-nav"
+  ],
+  "complexity": 4
+}

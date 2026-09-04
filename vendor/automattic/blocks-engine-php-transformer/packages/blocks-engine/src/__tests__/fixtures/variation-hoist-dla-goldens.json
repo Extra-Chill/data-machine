@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "derivation": "Mechanically generated from DLA src/lib/replicate/variation-hoist.ts at commit 1e393c535850ee1a9482f83459f779d0e225b027 with blob 62b9cf4c87b62dfc03bffe2e25ffbe4e6109438b.",
+  "oracle": {
+    "commit": "1e393c535850ee1a9482f83459f779d0e225b027",
+    "path": "src/lib/replicate/variation-hoist.ts",
+    "blob": "62b9cf4c87b62dfc03bffe2e25ffbe4e6109438b"
+  },
+  "cases": [
+    {
+      "id": "core-paragraph-hoists-three-matches",
+      "options": {},
+      "variations": [
+        {
+          "slug": "lib-paragraph-color-spacing",
+          "title": "Paragraph color spacing",
+          "blockTypes": [
+            "core/paragraph"
+          ],
+          "styles": {
+            "color": {
+              "text": "#123456"
+            },
+            "spacing": {
+              "padding": {
+                "top": "16px",
+                "bottom": "16px"
+              }
+            }
+          },
+          "count": 3
+        }
+      ],
+      "pages": [
+        {
+          "slug": "home",
+          "markup": "<!-- wp:paragraph {\"className\":\"is-style-lib-paragraph-color-spacing\"} -->\n<p>Alpha</p>\n<!-- /wp:paragraph -->"
+        },
+        {
+          "slug": "about",
+          "markup": "<!-- wp:paragraph {\"className\":\"is-style-lib-paragraph-color-spacing\"} -->\n<p>Beta</p>\n<!-- /wp:paragraph -->"
+        },
+        {
+          "slug": "services",
+          "markup": "<!-- wp:paragraph {\"className\":\"is-style-lib-paragraph-color-spacing\"} -->\n<p>Gamma</p>\n<!-- /wp:paragraph -->"
+        }
+      ],
+      "swappedMarkup": "<!-- wp:paragraph {\"className\":\"is-style-lib-paragraph-color-spacing\"} -->\n<p>Pattern copy</p>\n<!-- /wp:paragraph -->"
+    },
+    {
+      "id": "applies-existing-class-swap",
+      "options": {
+        "minInstances": 2
+      },
+      "variations": [
+        {
+          "slug": "lib-paragraph-typography",
+          "title": "Paragraph typography",
+          "blockTypes": [
+            "core/paragraph"
+          ],
+          "styles": {
+            "typography": {
+              "fontSize": "18px"
+            }
+          },
+          "count": 2
+        }
+      ],
+      "pages": [
+        {
+          "slug": "one",
+          "markup": "<!-- wp:paragraph {\"className\":\"lead is-style-lib-paragraph-typography\"} -->\n<p>One</p>\n<!-- /wp:paragraph -->"
+        },
+        {
+          "slug": "two",
+          "markup": "<!-- wp:paragraph {\"className\":\"lead is-style-lib-paragraph-typography\"} -->\n<p>Two</p>\n<!-- /wp:paragraph -->"
+        }
+      ],
+      "swappedMarkup": "<!-- wp:paragraph {\"className\":\"pattern is-style-lib-paragraph-typography\"} -->\n<p>Reusable pattern</p>\n<!-- /wp:paragraph -->"
+    },
+    {
+      "id": "jetpack-styled-blocks-are-excluded",
+      "options": {},
+      "variations": [],
+      "pages": [
+        {
+          "slug": "contact-a",
+          "markup": "<!-- wp:jetpack/contact-form {\"style\":{\"color\":{\"background\":\"#f0f0f0\"}}} -->\n<div class=\"wp-block-jetpack-contact-form\">A</div>\n<!-- /wp:jetpack/contact-form -->"
+        },
+        {
+          "slug": "contact-b",
+          "markup": "<!-- wp:jetpack/contact-form {\"style\":{\"color\":{\"background\":\"#f0f0f0\"}}} -->\n<div class=\"wp-block-jetpack-contact-form\">B</div>\n<!-- /wp:jetpack/contact-form -->"
+        },
+        {
+          "slug": "contact-c",
+          "markup": "<!-- wp:jetpack/contact-form {\"style\":{\"color\":{\"background\":\"#f0f0f0\"}}} -->\n<div class=\"wp-block-jetpack-contact-form\">C</div>\n<!-- /wp:jetpack/contact-form -->"
+        }
+      ],
+      "swappedMarkup": "<!-- wp:jetpack/contact-form {\"style\":{\"color\":{\"background\":\"#f0f0f0\"}}} -->\n<div class=\"wp-block-jetpack-contact-form\">Pattern contact</div>\n<!-- /wp:jetpack/contact-form -->"
+    },
+    {
+      "id": "serialize-block-attrs-escapes-comment-delimiters",
+      "options": {},
+      "variations": [
+        {
+          "slug": "lib-group-border",
+          "title": "Group border",
+          "blockTypes": [
+            "core/group"
+          ],
+          "styles": {
+            "border": {
+              "color": "#333333",
+              "width": "2px"
+            }
+          },
+          "count": 3
+        }
+      ],
+      "pages": [
+        {
+          "slug": "safe-a",
+          "markup": "<!-- wp:group {\"metadata\":{\"name\":\"Alpha \\u002d\\u002d \\u003cunsafe\\u003e \\u0026 \\u0022quoted\\u0022 value\"},\"className\":\"is-style-lib-group-border\"} -->\n<div class=\"wp-block-group\"><p>A</p></div>\n<!-- /wp:group -->"
+        },
+        {
+          "slug": "safe-b",
+          "markup": "<!-- wp:group {\"metadata\":{\"name\":\"Alpha \\u002d\\u002d \\u003cunsafe\\u003e \\u0026 \\u0022quoted\\u0022 value\"},\"className\":\"is-style-lib-group-border\"} -->\n<div class=\"wp-block-group\"><p>B</p></div>\n<!-- /wp:group -->"
+        },
+        {
+          "slug": "safe-c",
+          "markup": "<!-- wp:group {\"metadata\":{\"name\":\"Alpha \\u002d\\u002d \\u003cunsafe\\u003e \\u0026 \\u0022quoted\\u0022 value\"},\"className\":\"is-style-lib-group-border\"} -->\n<div class=\"wp-block-group\"><p>C</p></div>\n<!-- /wp:group -->"
+        }
+      ],
+      "swappedMarkup": "<!-- wp:group {\"metadata\":{\"name\":\"Alpha \\u002d\\u002d \\u003cunsafe\\u003e \\u0026 \\u0022quoted\\u0022 value\"},\"className\":\"is-style-lib-group-border\"} -->\n<div class=\"wp-block-group\"><p>Pattern</p></div>\n<!-- /wp:group -->"
+    }
+  ]
+}

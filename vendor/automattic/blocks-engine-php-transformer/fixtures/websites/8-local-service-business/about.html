@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Northline Plumbing &amp; Heating | Family-Owned Since 1987 — Grand Rapids, MI</title>
+  <meta name="description" content="Meet the Holstrom family — Grand Rapids plumbers since 1987. Licensed, insured, second-generation family business. Learn why homeowners trust Northline.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .team-card {
+      background: var(--c-white);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--t), box-shadow var(--t);
+    }
+    .team-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+    .team-avatar {
+      height: 200px;
+      background: var(--c-navy-mid);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .team-avatar::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: repeating-linear-gradient(
+        -45deg, transparent, transparent 12px,
+        rgba(255,255,255,.025) 12px, rgba(255,255,255,.025) 13px
+      );
+    }
+    .team-avatar-circle {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: rgba(174,92,24,0.2);
+      border: 3px solid rgba(174,92,24,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+    .team-avatar-circle span {
+      font-family: var(--f-display);
+      font-size: 2rem;
+      color: var(--c-copper-glow);
+    }
+    .team-info {
+      padding: 1.5rem;
+    }
+    .team-name {
+      font-family: var(--f-display);
+      font-size: 1.3rem;
+      color: var(--c-navy);
+      margin-bottom: .2rem;
+    }
+    .team-role {
+      font-family: var(--f-ui);
+      font-size: .74rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--c-copper);
+      margin-bottom: .75rem;
+    }
+    .team-bio { font-size: .9rem; color: var(--c-text-mid); }
+    .timeline {
+      position: relative;
+      padding-left: 2.5rem;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: .5rem;
+      bottom: .5rem;
+      width: 2px;
+      background: var(--c-cream-dark);
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 2.5rem;
+    }
+    .timeline-item:last-child { margin-bottom: 0; }
+    .timeline-dot {
+      position: absolute;
+      left: -2.85rem;
+      top: .4rem;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--c-copper);
+      border: 3px solid var(--c-cream);
+    }
+    .timeline-year {
+      font-family: var(--f-ui);
+      font-weight: 700;
+      font-size: .76rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--c-copper);
+      margin-bottom: .3rem;
+    }
+    .timeline-title {
+      font-family: var(--f-display);
+      font-size: 1.1rem;
+      margin-bottom: .35rem;
+    }
+    .timeline-desc { font-size: .9rem; color: var(--c-text-mid); }
+    .promise-section {
+      background: var(--c-navy);
+      border-radius: var(--r-lg);
+      padding: 3.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .promise-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: repeating-linear-gradient(
+        -45deg, transparent, transparent 18px,
+        rgba(255,255,255,.02) 18px, rgba(255,255,255,.02) 19px
+      );
+    }
+    .promise-section > * { position: relative; z-index: 1; }
+    .big-quote {
+      font-family: var(--f-display);
+      font-size: 5rem;
+      color: rgba(174,92,24,0.2);
+      line-height: .8;
+      display: block;
+      margin-bottom: .5rem;
+    }
+    .promise-text {
+      font-size: 1.4rem;
+      color: var(--c-white);
+      font-style: italic;
+      line-height: 1.5;
+      max-width: 52ch;
+      margin-bottom: 1.5rem;
+    }
+    .promise-attribution {
+      font-family: var(--f-ui);
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--c-copper-glow);
+      letter-spacing: .05em;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ Emergency Banner ═══ -->
+  <div class="emergency-banner" role="alert">
+    <span class="pulse-dot" aria-hidden="true"></span>
+    24/7 Emergency Service &mdash;
+    <a href="tel:6165550182">(616) 555-0182</a>
+  </div>
+
+  <!-- ═══ Site Header ═══ -->
+  <header class="site-header">
+    <nav class="header-inner" aria-label="Main navigation">
+      <a href="index.html" class="site-logo" aria-label="Northline Plumbing and Heating — Go to homepage">
+        <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+          <rect width="44" height="44" rx="5" fill="#ae5c18"/>
+          <path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/>
+        </svg>
+        <div class="logo-text">
+          <span class="logo-name">NORTHLINE</span>
+          <span class="logo-tag">Plumbing &amp; Heating</span>
+        </div>
+      </a>
+      <ul class="site-nav" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="service-areas.html">Service Areas</a></li>
+        <li><a href="about.html" class="active">About</a></li>
+        <li><a href="reviews.html">Reviews</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a href="tel:6165550182" class="nav-phone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          (616) 555-0182
+        </a>
+      </div>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-drawer">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+    <nav id="nav-drawer" class="nav-drawer" aria-label="Mobile navigation">
+      <a href="index.html">Home</a>
+      <a href="services.html">Services</a>
+      <a href="service-areas.html">Service Areas</a>
+      <a href="about.html">About</a>
+      <a href="reviews.html">Reviews</a>
+      <a href="contact.html">Contact</a>
+      <div class="mobile-cta">
+        <a href="tel:6165550182">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          Call Now &mdash; (616) 555-0182
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ═══ Page Hero ═══ -->
+    <section class="page-hero next-white" aria-labelledby="page-title">
+      <div class="page-hero-tex" aria-hidden="true"></div>
+      <div class="container page-hero-content">
+        <p class="label anim">Family-Owned Since 1987</p>
+        <div class="divider anim anim-d1"></div>
+        <h1 class="anim anim-d2" id="page-title">About Northline</h1>
+        <p class="subtitle anim anim-d3">Not a franchise. Not a call center. Just a family that's been doing honest plumbing and heating work in Grand Rapids for 37+ years.</p>
+      </div>
+    </section>
+
+    <!-- ═══ Our Story ═══ -->
+    <section class="section section--white" aria-labelledby="story-heading">
+      <div class="container">
+        <div class="about-split" style="gap:5rem;">
+
+          <div>
+            <p class="label">Our Story</p>
+            <div class="divider"></div>
+            <h2 id="story-heading">Started by One Man<br>With One Truck</h2>
+
+            <p style="margin-top:1rem;">Walt Holstrom grew up in Grand Rapids, apprenticed under his uncle's plumbing shop in the 1970s, and earned his journeyman license in 1979. By 1987, he had enough saved to go out on his own. He bought a used truck, printed some business cards, and started knocking on doors.</p>
+
+            <p style="color:var(--c-text-mid);">Word spread the way it does in tight-knit neighborhoods: someone would call, Walt would show up on time, do the job right, charge what he'd quoted, and leave the place clean. That neighbor would tell a neighbor. Thirty-seven years later, we have four trucks on the road and a waiting list on non-emergency calls.</p>
+
+            <p style="color:var(--c-text-mid);">Walt's son Dave grew up riding along on jobs in middle school and earned his own license in 2003. He and his wife Karen officially took over day-to-day operations in 2011. Walt still comes in a few times a week &mdash; says he can't stay away.</p>
+
+            <p style="color:var(--c-text-mid);">We're not going to tell you we're the biggest plumbing company in Grand Rapids. We're not. But we'd argue we're the most consistent: same faces, same standards, same phone number since the beginning.</p>
+          </div>
+
+          <!-- Timeline -->
+          <div>
+            <p class="label" style="margin-bottom:1.5rem;">Our History</p>
+            <div class="timeline" role="list" aria-label="Company history timeline">
+
+              <div class="timeline-item" role="listitem">
+                <div class="timeline-dot" aria-hidden="true"></div>
+                <div class="timeline-year">1987</div>
+                <div class="timeline-title">Northline Founded</div>
+                <p class="timeline-desc">Walt Holstrom launches Northline with a single truck and a reputation for reliability built over 8 years at another shop.</p>
+              </div>
+
+              <div class="timeline-item" role="listitem">
+                <div class="timeline-dot" aria-hidden="true"></div>
+                <div class="timeline-year">1994</div>
+                <div class="timeline-title">Second Truck on the Road</div>
+                <p class="timeline-desc">Growing demand leads to the first hire beyond Walt himself. Northline adds a second licensed journeyman and a second truck.</p>
+              </div>
+
+              <div class="timeline-item" role="listitem">
+                <div class="timeline-dot" aria-hidden="true"></div>
+                <div class="timeline-year">2003</div>
+                <div class="timeline-title">Dave Earns His License</div>
+                <p class="timeline-desc">After apprenticing through high school and college, Walt's son Dave Holstrom earns his Michigan plumbing contractor license and joins full-time.</p>
+              </div>
+
+              <div class="timeline-item" role="listitem">
+                <div class="timeline-dot" aria-hidden="true"></div>
+                <div class="timeline-year">2008</div>
+                <div class="timeline-title">HVAC License Added</div>
+                <p class="timeline-desc">Northline expands into heating system work, adding boiler service and gas line work to the offering. The HVAC contractor license is issued.</p>
+              </div>
+
+              <div class="timeline-item" role="listitem">
+                <div class="timeline-dot" aria-hidden="true"></div>
+                <div class="timeline-year">2011</div>
+                <div class="timeline-title">Second Generation Takes Over</div>
+                <p class="timeline-desc">Dave and Karen Holstrom step into ownership. Walt remains a part-time presence and advisor.</p>
+              </div>
+
+              <div class="timeline-item" role="listitem">
+                <div class="timeline-dot" aria-hidden="true"></div>
+                <div class="timeline-year">Today</div>
+                <div class="timeline-title">Four Trucks, Same Values</div>
+                <p class="timeline-desc">Still family-run, still same-day emergency service, still answering our own phone. 5,200+ jobs completed across Greater Grand Rapids.</p>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Our Promise ═══ -->
+    <section class="section section--cream-dk" aria-label="Company promise">
+      <div class="container">
+        <div class="promise-section">
+          <span class="big-quote" aria-hidden="true">&ldquo;</span>
+          <p class="promise-text">Treat every customer like a neighbor, not a ticket number. Show up when you say you will. Charge what you quoted. Leave it cleaner than you found it.</p>
+          <p class="promise-attribution">&#8212; Walt Holstrom, Founder &middot; Still on the job since 1987</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Meet the Team ═══ -->
+    <section class="section section--white" aria-labelledby="team-heading">
+      <div class="container">
+        <div class="section-hd center">
+          <p class="label">The People You&rsquo;ll Meet</p>
+          <div class="divider center"></div>
+          <h2 id="team-heading">Our Team</h2>
+          <p>Everyone who comes to your home is a licensed professional &mdash; background-checked, uniformed, and trained to Northline's standards.</p>
+        </div>
+
+        <div class="grid-4">
+
+          <article class="team-card">
+            <div class="team-avatar" aria-hidden="true">
+              <div class="team-avatar-circle"><span>DH</span></div>
+            </div>
+            <div class="team-info">
+              <div class="team-name">Dave Holstrom</div>
+              <div class="team-role">Owner &amp; Master Plumber</div>
+              <p class="team-bio">Licensed since 2003. Dave handles complex jobs, new customer estimates, and the harder calls. You might get him on a 2am emergency — he doesn't mind.</p>
+            </div>
+          </article>
+
+          <article class="team-card">
+            <div class="team-avatar" aria-hidden="true">
+              <div class="team-avatar-circle"><span>KH</span></div>
+            </div>
+            <div class="team-info">
+              <div class="team-name">Karen Holstrom</div>
+              <div class="team-role">Co-Owner &amp; Office Manager</div>
+              <p class="team-bio">Karen runs scheduling, estimates, and billing. She's the reason jobs start on time and invoices are accurate. Also the reason the office has coffee.</p>
+            </div>
+          </article>
+
+          <article class="team-card">
+            <div class="team-avatar" aria-hidden="true">
+              <div class="team-avatar-circle"><span>MT</span></div>
+            </div>
+            <div class="team-info">
+              <div class="team-name">Marcus Townsend</div>
+              <div class="team-role">Journeyman Plumber</div>
+              <p class="team-bio">Licensed journeyman with 14 years of experience. Marcus specializes in older homes and knows the quirks of Grand Rapids' mid-century housing stock.</p>
+            </div>
+          </article>
+
+          <article class="team-card">
+            <div class="team-avatar" aria-hidden="true">
+              <div class="team-avatar-circle"><span>WH</span></div>
+            </div>
+            <div class="team-info">
+              <div class="team-name">Walt Holstrom</div>
+              <div class="team-role">Founder &amp; Part-Time Advisor</div>
+              <p class="team-bio">The man who started it all. Walt still comes in a few days a week. Ask him anything — he's been at this since 1979 and still loves the work.</p>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Our Values ═══ -->
+    <section class="section section--dark" aria-labelledby="values-heading">
+      <div class="container">
+        <div class="section-hd">
+          <p class="label">Why We're Different</p>
+          <div class="divider"></div>
+          <h2 id="values-heading">The Way We Work</h2>
+          <p class="dark-theme" style="color:rgba(255,255,255,.6); margin-top:.5rem;">These aren't marketing bullets. They're things we actually do on every job, every time.</p>
+        </div>
+
+        <div class="value-list" role="list">
+
+          <div class="value-item" role="listitem">
+            <div class="value-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            </div>
+            <div>
+              <h4 style="color:var(--c-white);">Upfront Written Estimates</h4>
+              <p>We give you a written estimate before work starts. The price we quote is the price you pay &mdash; no scope creep without discussion and your approval first.</p>
+            </div>
+          </div>
+
+          <div class="value-item" role="listitem">
+            <div class="value-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <h4 style="color:var(--c-white);">We Show Up on Time</h4>
+              <p>We give you a 2-hour arrival window and call when we're 30 minutes out. If something changes, we call you &mdash; not vice versa.</p>
+            </div>
+          </div>
+
+          <div class="value-item" role="listitem">
+            <div class="value-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            </div>
+            <div>
+              <h4 style="color:var(--c-white);">Background-Checked Technicians</h4>
+              <p>Everyone who enters your home passes a background check. They wear uniforms, drive marked trucks, and carry ID. No surprises at the door.</p>
+            </div>
+          </div>
+
+          <div class="value-item" role="listitem">
+            <div class="value-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+            </div>
+            <div>
+              <h4 style="color:var(--c-white);">Quality Parts, 1-Year Warranty</h4>
+              <p>We use quality parts, not the cheapest thing in the supply house. Every repair carries a 1-year labor warranty. Equipment warranties as applicable.</p>
+            </div>
+          </div>
+
+          <div class="value-item" role="listitem">
+            <div class="value-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div>
+              <h4 style="color:var(--c-white);">We Respect Your Home</h4>
+              <p>Shoe covers on, drop cloths down, work area cleaned up before we leave. We're guests in your home and we act like it.</p>
+            </div>
+          </div>
+
+          <div class="value-item" role="listitem">
+            <div class="value-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+            </div>
+            <div>
+              <h4 style="color:var(--c-white);">No Upselling</h4>
+              <p>We fix what's broken and tell you honestly if something else is worth addressing. We won't push a $4,000 water softener on a service call for a leaky faucet.</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══ Credentials ═══ -->
+    <section class="section section--cream" aria-labelledby="creds-heading">
+      <div class="container">
+        <div class="section-hd center">
+          <p class="label">Licenses &amp; Certifications</p>
+          <div class="divider center"></div>
+          <h2 id="creds-heading">Fully Licensed, Bonded &amp; Insured</h2>
+          <p>We carry all required licenses and insurance so you&rsquo;re protected. Here&rsquo;s what that means for you.</p>
+        </div>
+
+        <div class="cred-grid">
+
+          <div class="cred-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            <div class="cred-badge-title">Plumbing Contractor</div>
+            <div class="cred-badge-val">MI License #PC-2847-GR<br>State of Michigan</div>
+          </div>
+
+          <div class="cred-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"/></svg>
+            <div class="cred-badge-title">HVAC Contractor</div>
+            <div class="cred-badge-val">MI License #HV-1193-MI<br>Heating &amp; Cooling Systems</div>
+          </div>
+
+          <div class="cred-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01"/></svg>
+            <div class="cred-badge-title">General Liability</div>
+            <div class="cred-badge-val">$2M per occurrence<br>$5M aggregate</div>
+          </div>
+
+          <div class="cred-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            <div class="cred-badge-title">Workers&rsquo; Compensation</div>
+            <div class="cred-badge-val">Full coverage for all<br>Northline employees</div>
+          </div>
+
+          <div class="cred-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <div class="cred-badge-title">Bonded</div>
+            <div class="cred-badge-val">Surety bond in force<br>Michigan requirement</div>
+          </div>
+
+          <div class="cred-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <div class="cred-badge-title">24/7 Emergency</div>
+            <div class="cred-badge-val">Licensed tech on call<br>365 days a year</div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══ Emergency CTA ═══ -->
+    <section class="cta-section" aria-label="Contact call to action">
+      <div class="container">
+        <p class="cta-label">Ready to get started?</p>
+        <h2 class="cta-headline">Call the Family<br>Grand Rapids Trusts</h2>
+        <a href="tel:6165550182" class="cta-phone">(616) 555-0182</a>
+        <p class="cta-sub">Or <a href="contact.html" style="color:rgba(255,255,255,.85); text-decoration:underline;">request a visit online</a> and we&rsquo;ll call to confirm.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══ Footer ═══ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="site-logo" style="text-decoration:none;">
+            <svg class="logo-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true"><rect width="44" height="44" rx="5" fill="#ae5c18"/><path d="M9 35V9l16 18V9h10v26l-16-18v18H9z" fill="white"/></svg>
+            <div class="logo-text"><span class="logo-name">NORTHLINE</span><span class="logo-tag">Plumbing &amp; Heating</span></div>
+          </a>
+          <p class="footer-about">Family-owned and operated since 1987. Serving Grand Rapids and surrounding communities with honest, dependable plumbing and heating work.</p>
+          <div class="footer-license">Licensed &amp; Insured in Michigan<br>Plumbing #PC-2847-GR &middot; HVAC #HV-1193-MI</div>
+        </div>
+        <div class="footer-col">
+          <h4>Services</h4>
+          <ul>
+            <li><a href="services.html#emergency">Emergency Repairs</a></li>
+            <li><a href="services.html#water-heaters">Water Heaters</a></li>
+            <li><a href="services.html#boilers">Boiler Service</a></li>
+            <li><a href="services.html#rough-in">Bathroom Rough-In</a></li>
+            <li><a href="services.html#drains">Drain Cleaning</a></li>
+            <li><a href="services.html#sewer">Sewer Lines</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="service-areas.html">Service Areas</a></li>
+            <li><a href="reviews.html">Reviews</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contact</h4>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.27 9.09 19.79 19.79 0 01.2 2.42 2 2 0 012.18 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.55 6.55l1.26-1.26a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            <a href="tel:6165550182">(616) 555-0182</a>
+          </div>
+          <div class="footer-contact-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Mon–Sat: 7am–7pm<br>24/7 Emergency Dispatch</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2024 Northline Plumbing &amp; Heating LLC. All rights reserved.</p>
+        <p>Licensed &amp; Insured &middot; State of Michigan</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="nav.js"></script>
+</body>
+</html>

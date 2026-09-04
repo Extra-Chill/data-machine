@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forkbench — Live Code Playground</title>
+  <meta name="description" content="Forkbench is an in-browser code playground. Write HTML, CSS, and JavaScript and watch it run live in a sandboxed preview with a captured console.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/editor.css">
+</head>
+<body class="is-app">
+
+  <!-- ══════════════ APP HEADER ══════════════ -->
+  <header class="app-header" role="banner">
+    <div class="brandbar">
+      <a href="index.html" class="logo" aria-label="Forkbench home">
+        <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M6 9 L2 16 L6 23" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M26 9 L30 16 L26 23" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M19 6 L13 26" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <span class="logo-word">Fork<b>bench</b></span>
+      </a>
+      <span class="pen-divider" aria-hidden="true">/</span>
+      <input id="pen-title" class="pen-title" value="Untitled pen" aria-label="Pen title" spellcheck="false" autocomplete="off">
+      <span class="save-state" id="save-state" aria-live="polite">saved</span>
+    </div>
+
+    <div class="toolbar" role="toolbar" aria-label="Editor actions">
+      <button class="tbtn tbtn-run" id="btn-run" type="button" title="Run (Ctrl/Cmd + Enter)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5 L19 12 L7 19 Z" fill="currentColor"/></svg>
+        Run
+      </button>
+      <label class="toggle" title="Re-run automatically as you type">
+        <input type="checkbox" id="auto-run" checked>
+        <span class="toggle-track" aria-hidden="true"></span>
+        <span class="toggle-label">Auto-run</span>
+      </label>
+
+      <span class="tb-sep" aria-hidden="true"></span>
+
+      <div class="layout-switch" role="group" aria-label="Layout direction">
+        <button class="tbtn icon-only is-active" id="layout-row" type="button" title="Side-by-side layout" aria-pressed="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="8" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13" y="4" width="8" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button class="tbtn icon-only" id="layout-col" type="button" title="Stacked layout" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="4" y="13" width="16" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
+
+      <div class="pane-toggles" role="group" aria-label="Visible panes">
+        <button class="chip is-on" data-pane="html" type="button" aria-pressed="true">HTML</button>
+        <button class="chip is-on" data-pane="css" type="button" aria-pressed="true">CSS</button>
+        <button class="chip is-on" data-pane="js" type="button" aria-pressed="true">JS</button>
+      </div>
+
+      <span class="tb-sep" aria-hidden="true"></span>
+
+      <a class="tbtn ghost" href="templates.html" title="Browse starter templates">Templates</a>
+      <button class="tbtn ghost" id="btn-fork" type="button" title="Duplicate this pen">Fork</button>
+      <button class="tbtn ghost" id="btn-share" type="button" title="Copy a shareable link">Share</button>
+      <button class="tbtn ghost" id="btn-export" type="button" title="Download combined HTML file">Export</button>
+      <button class="tbtn ghost danger" id="btn-reset" type="button" title="Clear all three panes">Reset</button>
+      <a class="tbtn ghost" href="about.html" title="About Forkbench">?</a>
+    </div>
+  </header>
+
+  <!-- ══════════════ WORKSPACE ══════════════ -->
+  <main class="workspace layout-row" id="workspace">
+
+    <!-- Editor column -->
+    <section class="editors" id="editors" aria-label="Code editors">
+      <div class="editor-pane" data-pane="html" data-lang="html" style="flex-basis:33.34%">
+        <div class="pane-head">
+          <span class="pane-dot html" aria-hidden="true"></span>
+          <span class="pane-name">HTML</span>
+          <span class="pane-stat" data-stat>0 lines</span>
+        </div>
+        <div class="code-host" data-editor></div>
+      </div>
+
+      <div class="vsplitter" data-split="html-css" role="separator" aria-orientation="vertical" aria-label="Resize HTML / CSS" tabindex="0"></div>
+
+      <div class="editor-pane" data-pane="css" data-lang="css" style="flex-basis:33.33%">
+        <div class="pane-head">
+          <span class="pane-dot css" aria-hidden="true"></span>
+          <span class="pane-name">CSS</span>
+          <span class="pane-stat" data-stat>0 lines</span>
+        </div>
+        <div class="code-host" data-editor></div>
+      </div>
+
+      <div class="vsplitter" data-split="css-js" role="separator" aria-orientation="vertical" aria-label="Resize CSS / JS" tabindex="0"></div>
+
+      <div class="editor-pane" data-pane="js" data-lang="js" style="flex-basis:33.33%">
+        <div class="pane-head">
+          <span class="pane-dot js" aria-hidden="true"></span>
+          <span class="pane-name">JS</span>
+          <span class="pane-stat" data-stat>0 lines</span>
+        </div>
+        <div class="code-host" data-editor></div>
+      </div>
+    </section>
+
+    <!-- Main splitter (editors <-> output) -->
+    <div class="msplitter" id="msplitter" role="separator" aria-orientation="horizontal" aria-label="Resize editors / preview" tabindex="0"></div>
+
+    <!-- Output column -->
+    <section class="output" id="output" aria-label="Live preview and console">
+      <div class="preview-wrap">
+        <div class="preview-head">
+          <span class="dot-row" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="preview-url">forkbench://preview/<span id="preview-slug">untitled</span></span>
+          <span class="preview-spacer"></span>
+          <span class="run-flash" id="run-flash" aria-hidden="true">⟳ ran</span>
+        </div>
+        <iframe id="preview" class="preview-frame" title="Live preview" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-pointer-lock"></iframe>
+      </div>
+
+      <div class="osplitter" id="osplitter" role="separator" aria-orientation="horizontal" aria-label="Resize preview / console" tabindex="0"></div>
+
+      <div class="console" id="console-wrap">
+        <div class="console-head">
+          <span class="console-title">Console</span>
+          <span class="console-count" id="console-count">0</span>
+          <div class="console-filters" role="group" aria-label="Console filters">
+            <button class="cfilter is-on" data-level="log" type="button" aria-pressed="true">log</button>
+            <button class="cfilter is-on" data-level="warn" type="button" aria-pressed="true">warn</button>
+            <button class="cfilter is-on" data-level="error" type="button" aria-pressed="true">error</button>
+          </div>
+          <button class="console-clear" id="console-clear" type="button" title="Clear console">Clear</button>
+        </div>
+        <div class="console-log" id="console-log" tabindex="0" aria-label="Console output">
+          <div class="console-empty">No output yet. Use <code>console.log()</code> in your JS, then Run.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ══════════════ STATUS BAR ══════════════ -->
+  <footer class="statusbar" role="contentinfo">
+    <span class="sb-item" id="sb-cursor">Ln 1, Col 1</span>
+    <span class="sb-item" id="sb-lang">HTML</span>
+    <span class="sb-item">Spaces: 2</span>
+    <span class="sb-item">UTF-8</span>
+    <span class="sb-spacer"></span>
+    <span class="sb-item" id="sb-size">0 B</span>
+    <span class="sb-item kbd-hint">⌘/Ctrl + Enter to run · ⌘/Ctrl + S to save</span>
+    <span class="sb-item brand-mini">Forkbench v2.4</span>
+  </footer>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Templates (data only, no markup) -->
+  <script src="js/templates-data.js"></script>
+  <script src="js/highlight.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/runner.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

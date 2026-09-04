@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Give — St. Brendan's Episcopal Church</title>
+  <meta name="description" content="Pledge, one-time gifts, recurring giving, planned giving, and the named funds of St. Brendan's. The parish runs on the generosity of its members.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="utility-bar" role="complementary">
+  <div class="utility-inner">
+    <span class="utility-item"><strong>Sunday:</strong> Holy Eucharist at 8 &amp; 10 AM</span>
+    <span class="utility-item">
+      <a href="services.html">Find us</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="sermons.html">Listen to last Sunday's sermon</a>
+    </span>
+  </div>
+</div>
+
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo" aria-label="St. Brendan's Episcopal Church — home">
+      <svg width="32" height="36" viewBox="0 0 32 36" fill="none" aria-hidden="true">
+        <path d="M16 1L24 11H8L16 1Z" fill="currentColor" opacity="0.85"/>
+        <path d="M16 1V-2M14 0H18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <rect x="6" y="11" width="20" height="22" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M13 33V24a3 3 0 0 1 6 0v9" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M16 14v6M13 17h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>
+        <strong>St. Brendan's</strong>
+        <span class="nav-logo-sub">Episcopal &middot; Kettle Cove</span>
+      </span>
+    </a>
+    <button class="hamburger" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-menu" id="nav-menu" role="list">
+      <li><a href="index.html"       class="nav-link">Home</a></li>
+      <li><a href="services.html"    class="nav-link">Services</a></li>
+      <li><a href="sermons.html"     class="nav-link">Sermons</a></li>
+      <li><a href="ministries.html"  class="nav-link">Ministries</a></li>
+      <li><a href="calendar.html"    class="nav-link">Calendar</a></li>
+      <li><a href="about.html"       class="nav-link">About</a></li>
+      <li><a href="give.html"        class="nav-cta">Give</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="page-header">
+  <div class="container">
+    <span class="overline">Stewardship &amp; Giving</span>
+    <h1>Ways to give.</h1>
+    <p class="lede">The parish is sustained by the regular, prayerful giving of its members. Thank you for considering a gift.</p>
+  </div>
+</header>
+
+<main>
+
+<!-- ── THEOLOGY OF STEWARDSHIP ──────────────────────────── -->
+<section class="section">
+  <div class="container container--prose">
+    <div class="reveal">
+      <span class="overline">Why we give</span>
+      <h2>A practice, not a transaction.</h2>
+      <p style="margin-top: 1.2rem;">
+        In the Episcopal tradition, stewardship is not fundraising. It is a spiritual practice. We give because everything we have &mdash; our time, our skills, our money, our breath &mdash; is a gift, and the proper response to a gift is gratitude. Giving is one of the ways we say <em>thank you</em> with our lives.
+      </p>
+      <p>
+        The traditional benchmark is the tithe &mdash; ten percent of income, with the first portion given to God and the work of the church. Most of us are not there. Most of us are walking toward it. The Episcopal Church asks us to give &ldquo;the first portion of our income for the spread of the Kingdom of God,&rdquo; and trusts us to discern what that looks like in our own circumstances. We will never ask you what you make. We will never ask you what you've given. Your pledge is held in confidence by the Treasurer and by no one else.
+      </p>
+      <p>
+        Below are the ways you can give &mdash; one time, monthly, by pledge, by bequest, by directing your IRA, or by giving of yourself in time and skill. All are welcome. None is required.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── ONE-TIME GIVE FORM ────────────────────────────────── -->
+<section class="section section--paper">
+  <div class="container">
+    <div class="grid grid-2" style="gap: 3rem; align-items: start;">
+
+      <div class="reveal">
+        <span class="overline">Make a gift</span>
+        <h2>One-time gift.</h2>
+        <p style="margin-top: 1rem; margin-bottom: 1.5rem;">
+          For a gift today &mdash; whether memorial, thanksgiving, or simply support of the work. All gifts are tax-deductible to the full extent of the law.
+        </p>
+
+        <form class="give-form" data-sb-form aria-label="One-time gift form">
+
+          <div class="form-row">
+            <span class="form-label">Amount</span>
+            <div class="amount-chips" role="radiogroup" aria-label="Gift amount">
+              <div class="amount-chip">
+                <input type="radio" id="amt-25" name="amount" value="25">
+                <label for="amt-25">$25</label>
+              </div>
+              <div class="amount-chip">
+                <input type="radio" id="amt-50" name="amount" value="50">
+                <label for="amt-50">$50</label>
+              </div>
+              <div class="amount-chip">
+                <input type="radio" id="amt-100" name="amount" value="100" checked>
+                <label for="amt-100">$100</label>
+              </div>
+              <div class="amount-chip">
+                <input type="radio" id="amt-250" name="amount" value="250">
+                <label for="amt-250">$250</label>
+              </div>
+              <div class="amount-chip">
+                <input type="radio" id="amt-500" name="amount" value="500">
+                <label for="amt-500">$500</label>
+              </div>
+              <div class="amount-chip">
+                <input type="radio" id="amt-1000" name="amount" value="1000">
+                <label for="amt-1000">$1,000</label>
+              </div>
+            </div>
+            <label for="custom-amount" class="sr-only">Custom amount</label>
+            <input type="number" id="custom-amount" name="custom-amount" class="form-input" placeholder="Other amount ($)" min="1" step="1">
+          </div>
+
+          <div class="form-row">
+            <span class="form-label">Payment method</span>
+            <div class="radio-row">
+              <label><input type="radio" name="method" value="card" checked> Credit or debit card</label>
+              <label><input type="radio" name="method" value="ach"> Bank transfer (ACH)</label>
+              <label><input type="radio" name="method" value="check"> I'll send a check</label>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label for="designation" class="form-label">Designation</label>
+            <select id="designation" name="designation" class="form-select">
+              <option value="operating">Operating fund (where most needed)</option>
+              <option value="outreach">Outreach Committee</option>
+              <option value="music">Music ministry</option>
+              <option value="youth">Youth &amp; children's formation</option>
+              <option value="building">Building &amp; grounds</option>
+              <option value="rector-discretionary">Rector's discretionary fund</option>
+              <option value="brendan-fund">The Brendan Fund (named endowments)</option>
+            </select>
+            <p class="form-note">If you're not sure, &ldquo;operating&rdquo; is always the right answer.</p>
+          </div>
+
+          <div class="form-row">
+            <label for="dedication" class="form-label">Dedication (optional)</label>
+            <input type="text" id="dedication" name="dedication" class="form-input" placeholder="In memory of&hellip; / In thanksgiving for&hellip;">
+          </div>
+
+          <div class="form-row">
+            <label for="email" class="form-label">Your email (for receipt)</label>
+            <input type="email" id="email" name="email" class="form-input" placeholder="you@example.com" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg" style="width:100%;">Make this gift</button>
+          <p class="form-note" style="margin-top: 0.8rem; text-align: center;">
+            You'll be taken to our secure processor to complete the gift.
+          </p>
+        </form>
+      </div>
+
+      <div class="reveal" data-delay="150">
+        <div class="photo-block photo--bible" role="img" aria-label="An old leather-bound Bible open on a wooden lectern, with the late afternoon harbor light falling across the page." style="margin-bottom: 2rem;"></div>
+
+        <span class="overline">Monthly</span>
+        <h2 style="margin-bottom: 1rem;">Recurring giving.</h2>
+        <p>
+          The simplest way to give &mdash; for both you and the parish &mdash; is monthly, automatically. A recurring gift means we can plan, and you don't have to remember.
+        </p>
+        <p>
+          You can set up a monthly gift through our secure online processor (any amount, any date, easy to change), or by sending us a voided check for a monthly ACH transfer. Many of our members give monthly toward their annual pledge; others give monthly outside the pledge cycle.
+        </p>
+        <p style="margin-top: 1.5rem;">
+          <a href="#recurring" class="btn btn-outline">Set up recurring giving</a>
+        </p>
+
+        <div style="margin-top: 2.5rem; padding: 1.5rem; background-color: var(--white); border-radius: var(--radius-lg); border: 1px solid var(--rule);">
+          <h4 style="font-family: var(--font-display); text-transform: none; font-size: 1.1rem; letter-spacing: 0.04em; color: var(--violet-deep); margin-bottom: 0.6rem;">Prefer to give by check?</h4>
+          <p style="font-size: 0.92rem;">
+            Make checks payable to <strong>St. Brendan's Episcopal Church</strong> and mail to:<br>
+            St. Brendan's Episcopal Church<br>
+            47 Harbor Road<br>
+            Kettle Cove, ME 04062
+          </p>
+          <p class="form-note" style="margin-top: 0.6rem;">Or drop your gift in the alms basin on Sunday morning.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── PLEDGE CAMPAIGN ──────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="grid-asymmetric">
+      <div class="reveal">
+        <span class="overline">Annual stewardship</span>
+        <h2>The 2026 pledge campaign.</h2>
+        <p style="margin-top: 1.2rem;">
+          Each fall we ask every household to consider a pledge for the coming year &mdash; an estimate of giving that lets the vestry build a responsible budget. The campaign begins on the first Sunday of October and culminates in the Ingathering on the first Sunday of Advent, when we bring our pledge cards forward and place them on the altar.
+        </p>
+        <p>
+          The pledge is a promise of intent, not a contract. It is held in confidence by the Treasurer. Pledges may be adjusted at any time, no questions asked &mdash; we have all had years when things changed.
+        </p>
+        <p>
+          <strong>This year's theme:</strong> <em>The boat we're all in</em>. The 2026 campaign opens October 4 with a homily from the Rector and a witness from a member of the parish.
+        </p>
+        <p style="margin-top: 1.5rem;">
+          <a href="mailto:treasurer@stbrendanskettlecove.org" class="btn btn-gold">Make a pledge</a>
+        </p>
+      </div>
+
+      <div class="reveal" data-delay="150">
+        <div class="pledge-block">
+          <span class="overline" style="color: var(--gold);">2026 Pledge campaign &middot; in progress</span>
+          <h3 style="margin-top: 0.6rem;">Toward our $324,000 goal.</h3>
+
+          <div class="progress-bar" aria-hidden="true">
+            <div class="progress-fill" style="width: 72%;"></div>
+          </div>
+
+          <div class="pledge-stats">
+            <div class="pledge-stat">
+              <span class="stat-value">$232k</span>
+              <span class="stat-label">Pledged so far</span>
+            </div>
+            <div class="pledge-stat">
+              <span class="stat-value">87</span>
+              <span class="stat-label">Households</span>
+            </div>
+            <div class="pledge-stat">
+              <span class="stat-value">72%</span>
+              <span class="stat-label">Of goal</span>
+            </div>
+          </div>
+
+          <p style="font-size: 0.92rem; margin-top: 1.2rem;">
+            Thank you. Every pledge &mdash; large and small &mdash; makes the next Sunday possible. If you have not yet pledged for 2026, there is room for yours.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── PLANNED GIVING / NAMED FUNDS ──────────────────────── -->
+<section class="section section--paper">
+  <div class="container">
+    <div class="section-head section-head--left reveal">
+      <span class="overline">Planned giving</span>
+      <h2>The Brendan Society.</h2>
+      <p>The Brendan Society is the parish's planned giving program &mdash; the company of those who have included St. Brendan's in their estate plans. It is named for the seafaring saint who, the old story says, set out from an Irish harbor without quite knowing where he would land.</p>
+    </div>
+
+    <div class="grid grid-2" data-stagger="120">
+      <div class="card card--bordered">
+        <h3>Bequests</h3>
+        <p>A bequest in your will is the simplest planned gift &mdash; a percentage of your estate, a specific sum, or the residue after other gifts. Our suggested language: <em>&ldquo;I give to St. Brendan's Episcopal Church of Kettle Cove, Maine (EIN 01-0556341), [the sum of ___ / ___ percent of the residue of my estate] for its general purposes.&rdquo;</em></p>
+      </div>
+      <div class="card card--bordered">
+        <h3>IRA Qualified Charitable Distributions</h3>
+        <p>If you are 70&frac12; or older, you may direct up to $108,000 (2026 limit) annually from your IRA to the parish without it counting as taxable income. This counts toward your required minimum distribution. Speak with your IRA custodian.</p>
+      </div>
+      <div class="card card--bordered">
+        <h3>Appreciated securities</h3>
+        <p>Giving long-held stocks, mutual funds, or other appreciated securities lets you avoid capital gains tax and claim a charitable deduction for the full fair-market value. Contact the Treasurer for our brokerage account details.</p>
+      </div>
+      <div class="card card--bordered">
+        <h3>Charitable gift annuities</h3>
+        <p>Through a relationship with the Episcopal Church Foundation, members can fund a charitable gift annuity that pays you (and a spouse, if desired) a fixed income for life, with the remainder coming to St. Brendan's.</p>
+      </div>
+    </div>
+
+    <hr class="ornament" aria-hidden="true">
+
+    <div class="section-head section-head--left reveal">
+      <h2 style="font-size: 1.9rem;">Named funds.</h2>
+      <p>Five named endowment funds were established by members over the past century. Each supports a particular dimension of the parish's life.</p>
+    </div>
+
+    <div class="grid grid-2" data-stagger="120">
+      <div class="card">
+        <h3>The Tasker Music Fund</h3>
+        <p style="font-size: 0.92rem;">Established 1957 in memory of Capt. Ezekiel Tasker (founder, 1849). Underwrites the music ministry &mdash; choir music, organ maintenance, occasional guest musicians and choral scholars.</p>
+        <p style="font-family: var(--font-ui); font-size: 0.82rem; color: var(--muted); margin-top: 0.8rem;">Current corpus: $186,000</p>
+      </div>
+      <div class="card">
+        <h3>The Harbor Fund</h3>
+        <p style="font-size: 0.92rem;">Established 1894 in memory of three fishermen lost off the Brendan Ledges. Supports the maintenance of the harbor window and the building fabric of the historic church.</p>
+        <p style="font-family: var(--font-ui); font-size: 0.82rem; color: var(--muted); margin-top: 0.8rem;">Current corpus: $312,000</p>
+      </div>
+      <div class="card">
+        <h3>The Brewster Outreach Fund</h3>
+        <p style="font-size: 0.92rem;">Established 2011 by the family of Helen Brewster, a longtime parishioner. Funds the parish's outreach work, with priority to direct relief in our coastal communities.</p>
+        <p style="font-family: var(--font-ui); font-size: 0.82rem; color: var(--muted); margin-top: 0.8rem;">Current corpus: $94,500</p>
+      </div>
+      <div class="card">
+        <h3>The Bishop Loring Formation Fund</h3>
+        <p style="font-size: 0.92rem;">Established 2003 in memory of the Rt. Rev. Chilton R. Loring (Bishop of Maine 1984&ndash;1997). Supports children's and adult Christian formation programs, including Vacation Bible School.</p>
+        <p style="font-family: var(--font-ui); font-size: 0.82rem; color: var(--muted); margin-top: 0.8rem;">Current corpus: $68,200</p>
+      </div>
+      <div class="card">
+        <h3>The Rector's Discretionary Fund</h3>
+        <p style="font-size: 0.92rem;">A confidential fund administered solely by the Rector for pastoral need &mdash; rent in a hard month, a utility bill, a tank of heating oil. Replenished annually by Easter and Christmas offerings.</p>
+        <p style="font-family: var(--font-ui); font-size: 0.82rem; color: var(--muted); margin-top: 0.8rem;">Replenished annually</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TIME / TALENT ─────────────────────────────────────── -->
+<section class="section">
+  <div class="container container--prose">
+    <div class="reveal">
+      <span class="overline">Beyond money</span>
+      <h2>Time. Talent. Treasure.</h2>
+      <p style="margin-top: 1.2rem;">
+        The old stewardship language speaks of three things, and means it. Money is one part &mdash; an important part &mdash; of how we offer our lives to God and to one another. It is not the only part.
+      </p>
+      <p>
+        <strong>Time.</strong> Showing up matters. Coming on Sunday is not just for you; it is for the person who walks in for the first time and finds the pews already half full. Coming Wednesday at noon to the Healing Eucharist is a gift to the person who sat at home wondering whether anyone would be there. Showing up is a form of giving.
+      </p>
+      <p>
+        <strong>Talent.</strong> You can read. Or sing. Or count. Or cook. Or sit quietly with someone who is grieving. Or fix a leaky valve. Every one of those is a need this parish has, right now. See the <a href="ministries.html">ministries page</a>, or speak with the Rector.
+      </p>
+      <p>
+        <strong>Treasure.</strong> Of course. The lights have to stay on; the curate has to be paid; the food bank's pallet has to be filled. Give what you can. If you can't right now, please come anyway. The table is not behind a paywall.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── TAX INFO ──────────────────────────────────────────── -->
+<section class="section section--paper" id="tax">
+  <div class="container container--prose">
+    <div class="reveal">
+      <span class="overline">For your records</span>
+      <h2>Tax information.</h2>
+      <p style="margin-top: 1.2rem;">
+        St. Brendan's Episcopal Church of Kettle Cove, Maine is a 501(c)(3) tax-exempt religious organization. All gifts are deductible as charitable contributions to the full extent permitted by law.
+      </p>
+      <p style="font-family: var(--font-ui); background-color: var(--white); border: 1px solid var(--rule); border-radius: var(--radius); padding: 1.2rem 1.5rem;">
+        <strong>Legal name:</strong> St. Brendan's Episcopal Church of Kettle Cove, Maine<br>
+        <strong>EIN:</strong> 01-0556341<br>
+        <strong>Address:</strong> 47 Harbor Road, Kettle Cove, ME 04062<br>
+        <strong>Diocese:</strong> The Episcopal Diocese of Maine (Province I)
+      </p>
+      <p style="font-size: 0.92rem;">
+        Annual statements of giving are mailed to all donors by January 31. If you need a statement at any other time, please email <a href="mailto:treasurer@stbrendanskettlecove.org">treasurer@stbrendanskettlecove.org</a>.
+      </p>
+      <p class="form-note">
+        We are not in a position to give individual tax or financial advice. Please consult your own advisor on matters of estate planning, qualified charitable distributions, or appreciated-securities gifts.
+      </p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-logo">
+          <svg width="28" height="32" viewBox="0 0 32 36" fill="none" aria-hidden="true">
+            <path d="M16 1L24 11H8L16 1Z" fill="currentColor" opacity="0.85"/>
+            <rect x="6" y="11" width="20" height="22" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M13 33V24a3 3 0 0 1 6 0v9" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M16 14v6M13 17h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          St. Brendan's
+        </div>
+        <p class="footer-tagline">A small Episcopal parish on the harbor in Kettle Cove, Maine — gathered around word, table, and a few hundred years of bad weather.</p>
+        <p>The Rev. Hannah Wycliffe, Rector<br>The Rev. Marcus Adlersson, Curate</p>
+      </div>
+      <div>
+        <h4>Visit</h4>
+        <ul class="footer-list">
+          <li><a href="services.html">Service times</a></li>
+          <li><a href="services.html#visitors">What to expect</a></li>
+          <li><a href="calendar.html">Calendar</a></li>
+          <li><a href="sermons.html">Sermons</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Get involved</h4>
+        <ul class="footer-list">
+          <li><a href="ministries.html">Ministries</a></li>
+          <li><a href="about.html">About us</a></li>
+          <li><a href="give.html">Give</a></li>
+          <li><a href="mailto:office@stbrendanskettlecove.org">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>The wider church</h4>
+        <ul class="footer-list">
+          <li><a href="https://episcopalmaine.org" rel="noopener">Diocese of Maine</a></li>
+          <li><a href="https://www.episcopalchurch.org" rel="noopener">The Episcopal Church USA</a></li>
+          <li><a href="https://www.bookofcommonprayer.net" rel="noopener">Book of Common Prayer</a></li>
+          <li><a href="https://lectionarypage.net" rel="noopener">Lectionary</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 St. Brendan's Episcopal Church &middot; A parish of the Diocese of Maine</p>
+      <p><a href="mailto:office@stbrendanskettlecove.org">office@stbrendanskettlecove.org</a> &middot; <a href="tel:+12075550149">(207) 555&middot;0149</a></p>
+    </div>
+  </div>
+</footer>
+
+<script src="nav.js"></script>
+</body>
+</html>

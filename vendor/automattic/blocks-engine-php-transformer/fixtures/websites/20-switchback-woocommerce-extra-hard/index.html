@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Switchback — Outdoor Gear for Dogs and Their People</title>
+  <meta name="description" content="Terrain-aware trail gear for dogs and their people. Hot weather, rain, night visibility, overnight camp — kits built around real outings.">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* Homepage-specific extras */
+    .hero-homepage {
+      background-color: var(--bark);
+      min-height: calc(100vh - var(--nav-height) - var(--utility-height));
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+      position: relative;
+    }
+    .hero-homepage__content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: var(--space-20) var(--space-8) var(--space-20) max(var(--space-12), calc((100vw - var(--container)) / 2 + var(--space-6)));
+      position: relative;
+      z-index: 2;
+    }
+    .hero-homepage__scene {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(160deg, #1A2738 0%, #2D3E52 40%, #3D4E40 70%, #2A1A0A 100%);
+    }
+    .hero-homepage__scene svg {
+      width: 100%; height: 100%;
+    }
+
+    .section-header--split { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--space-6); margin-bottom:var(--space-8); }
+
+    .seasonal-product-row { cursor: pointer; }
+    .seasonal-product-row:hover { background-color: #D4CEBC !important; }
+
+    .trust-strip-homepage { background-color: var(--bark); }
+
+    @media (max-width: 900px) {
+      .hero-homepage { grid-template-columns: 1fr; }
+      .hero-homepage__scene { display: none; }
+      .hero-homepage__content { padding: var(--space-16) var(--space-6); }
+    }
+    @media (max-width: 640px) {
+      .hero-homepage__content { padding: var(--space-12) var(--space-4); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Utility Nav ─────────────────────────── -->
+<div class="utility-nav">
+  <div class="container">
+    <div class="utility-nav__inner">
+      <div class="utility-nav__links">
+        <a href="size-guide.html" class="utility-nav__link">Size Guide</a>
+        <a href="trail-notes.html" class="utility-nav__link">Trail Notes</a>
+        <a href="#" class="utility-nav__link">Help</a>
+      </div>
+      <span class="utility-nav__promo">Free shipping on orders over $75</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main Header ─────────────────────────── -->
+<header class="site-header" role="banner">
+  <div class="container">
+    <div class="header-inner">
+      <a href="index.html" class="nav-logo" aria-label="Switchback home">
+        <svg class="nav-logo__mark" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M4 8l8 6-8 6" stroke="#B8956A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M14 8l8 6-8 6" stroke="#F2EDE4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="nav-logo__wordmark">Switchback</span>
+      </a>
+      <nav class="main-nav" role="navigation" aria-label="Main navigation">
+        <div class="nav-item">
+          <a href="shop-all.html" class="nav-link">Shop All</a>
+        </div>
+        <div class="nav-item">
+          <a href="by-outing.html" class="nav-link">By Outing
+            <svg class="nav-chevron" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5"/></svg>
+          </a>
+          <div class="dropdown">
+            <a href="by-outing.html#day-hike" class="dropdown__link"><span class="dropdown__dot"></span>Day Hike</a>
+            <a href="by-outing.html#beach" class="dropdown__link"><span class="dropdown__dot"></span>Beach &amp; Lake</a>
+            <a href="by-outing.html#camp" class="dropdown__link"><span class="dropdown__dot"></span>Weekend Camp</a>
+            <a href="by-outing.html#road-trip" class="dropdown__link"><span class="dropdown__dot"></span>Road Trip</a>
+          </div>
+        </div>
+        <div class="nav-item">
+          <a href="by-condition.html" class="nav-link">By Condition
+            <svg class="nav-chevron" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5"/></svg>
+          </a>
+          <div class="dropdown">
+            <a href="by-condition.html#hot" class="dropdown__link"><span class="dropdown__dot" style="background:#D45B1A"></span>Hot Weather</a>
+            <a href="by-condition.html#mud" class="dropdown__link"><span class="dropdown__dot" style="background:#5C7842"></span>Mud &amp; Rain</a>
+            <a href="by-condition.html#night" class="dropdown__link"><span class="dropdown__dot" style="background:#2D3A52"></span>Night Visibility</a>
+            <a href="by-condition.html#senior" class="dropdown__link"><span class="dropdown__dot" style="background:#7A5C9E"></span>Senior Dog</a>
+          </div>
+        </div>
+        <div class="nav-item">
+          <a href="bundles.html" class="nav-link">Bundles</a>
+        </div>
+        <div class="nav-item">
+          <a href="by-outing.html#road-trip" class="nav-link">Travel</a>
+        </div>
+        <div class="nav-item">
+          <a href="bundles.html#gifts" class="nav-link">Gifts</a>
+        </div>
+      </nav>
+      <div class="flex items-center gap-4">
+        <a href="bundles.html" class="nav-cart" aria-label="Cart, 0 items">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1 1h2.5l1.8 9h8.4l1.8-5H5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="15" r="1" fill="currentColor"/><circle cx="13" cy="15" r="1" fill="currentColor"/></svg>
+          <span class="cart-count">0</span>
+        </a>
+        <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-nav">
+          <span class="nav-toggle__bar"></span>
+          <span class="nav-toggle__bar"></span>
+          <span class="nav-toggle__bar"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Mobile Nav ─────────────────────────── -->
+<nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation" aria-hidden="true">
+  <div class="mobile-nav__section">
+    <span class="mobile-nav__label">Shop</span>
+    <a href="shop-all.html" class="mobile-nav__link">Shop All</a>
+    <a href="by-outing.html" class="mobile-nav__link">By Outing</a>
+    <a href="by-condition.html" class="mobile-nav__link">By Condition</a>
+    <a href="bundles.html" class="mobile-nav__link">Bundles</a>
+    <a href="bundles.html#gifts" class="mobile-nav__link">Gifts</a>
+  </div>
+  <div class="mobile-nav__section">
+    <span class="mobile-nav__label">Info</span>
+    <a href="size-guide.html" class="mobile-nav__utility">Size Guide</a>
+    <a href="trail-notes.html" class="mobile-nav__utility">Trail Notes</a>
+    <a href="#" class="mobile-nav__utility">Help &amp; Returns</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════════════════════
+     1. HERO
+═══════════════════════════════════════════ -->
+<section class="hero-homepage" aria-label="Hero">
+  <!-- Left: Content -->
+  <div class="hero-homepage__content">
+    <div class="hero__overline animate-fade-up">
+      Trail-Tested &nbsp;·&nbsp; Field-Ready
+    </div>
+    <h1 class="hero__title animate-fade-up animate-delay-1">
+      Gear for<br>the Dog<br><em>That Goes.</em>
+    </h1>
+    <p class="hero__subtitle animate-fade-up animate-delay-2">
+      Outfitting real hikes, lake weekends, and muddy rides home since day one. Built around the outing, not the breed.
+    </p>
+    <div class="hero__cta-group animate-fade-up animate-delay-3">
+      <a href="bundles.html" class="btn btn--primary btn--lg">Shop Trail Kits</a>
+      <a href="by-outing.html" class="btn btn--secondary btn--lg">Find Your Outing</a>
+    </div>
+  </div>
+
+  <!-- Right: SVG Scene -->
+  <div class="hero-homepage__scene" aria-hidden="true">
+    <svg viewBox="0 0 700 780" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="sky-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#131E2E"/>
+          <stop offset="45%" stop-color="#243448"/>
+          <stop offset="75%" stop-color="#3A4040"/>
+          <stop offset="100%" stop-color="#5C3A18"/>
+        </linearGradient>
+        <linearGradient id="horizon-glow" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#C87A30" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#C87A30" stop-opacity="0.35"/>
+        </linearGradient>
+        <linearGradient id="mountain-far" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#3A4A5C"/>
+          <stop offset="100%" stop-color="#2A3545"/>
+        </linearGradient>
+        <linearGradient id="mountain-mid" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#243525"/>
+          <stop offset="100%" stop-color="#1A2818"/>
+        </linearGradient>
+        <linearGradient id="dog-body" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#9A6B3A"/>
+          <stop offset="100%" stop-color="#6B4420"/>
+        </linearGradient>
+        <linearGradient id="trail-grad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#8A6A3A" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#C8A06A" stop-opacity="0.9"/>
+        </linearGradient>
+        <radialGradient id="sun-glow" cx="65%" cy="48%" r="30%">
+          <stop offset="0%" stop-color="#D4882A" stop-opacity="0.4"/>
+          <stop offset="100%" stop-color="#D4882A" stop-opacity="0"/>
+        </radialGradient>
+        <!-- Topo circle decorations -->
+        <radialGradient id="topo-fade" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#B8956A" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#B8956A" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Sky -->
+      <rect width="700" height="780" fill="url(#sky-grad)"/>
+
+      <!-- Horizon amber glow -->
+      <rect x="0" y="320" width="700" height="200" fill="url(#horizon-glow)"/>
+      <ellipse cx="455" cy="390" rx="280" ry="80" fill="#C87A30" opacity="0.12"/>
+
+      <!-- Sun glow -->
+      <rect width="700" height="780" fill="url(#sun-glow)"/>
+
+      <!-- Stars (tiny dots) -->
+      <circle cx="80" cy="60" r="1" fill="#E8DCC8" opacity="0.7"/>
+      <circle cx="145" cy="35" r="1.5" fill="#E8DCC8" opacity="0.8"/>
+      <circle cx="220" cy="80" r="1" fill="#E8DCC8" opacity="0.6"/>
+      <circle cx="310" cy="45" r="1" fill="#E8DCC8" opacity="0.5"/>
+      <circle cx="380" cy="25" r="1.5" fill="#E8DCC8" opacity="0.9"/>
+      <circle cx="460" cy="55" r="1" fill="#E8DCC8" opacity="0.6"/>
+      <circle cx="540" cy="30" r="1" fill="#E8DCC8" opacity="0.7"/>
+      <circle cx="610" cy="70" r="1.5" fill="#E8DCC8" opacity="0.8"/>
+      <circle cx="55" cy="130" r="1" fill="#E8DCC8" opacity="0.5"/>
+      <circle cx="170" cy="110" r="1" fill="#E8DCC8" opacity="0.6"/>
+      <circle cx="270" cy="95" r="1" fill="#E8DCC8" opacity="0.4"/>
+      <circle cx="500" cy="100" r="1" fill="#E8DCC8" opacity="0.5"/>
+      <circle cx="650" cy="115" r="1" fill="#E8DCC8" opacity="0.7"/>
+
+      <!-- Topographic circles (decorative) -->
+      <circle cx="490" cy="200" r="220" fill="none" stroke="#B8956A" stroke-width="0.6" opacity="0.12"/>
+      <circle cx="490" cy="200" r="170" fill="none" stroke="#B8956A" stroke-width="0.5" opacity="0.1"/>
+      <circle cx="490" cy="200" r="120" fill="none" stroke="#B8956A" stroke-width="0.6" opacity="0.12"/>
+      <circle cx="490" cy="200" r="70" fill="none" stroke="#B8956A" stroke-width="0.5" opacity="0.1"/>
+
+      <!-- Far mountain range (most distant, bluest) -->
+      <path d="M-20,520 L80,340 L160,420 L250,280 L340,380 L420,240 L520,350 L600,260 L700,320 L700,780 L-20,780Z" fill="url(#mountain-far)" opacity="0.7"/>
+
+      <!-- Mid mountains (darker, greener) -->
+      <path d="M-20,580 L60,440 L140,510 L220,380 L320,460 L420,360 L520,440 L620,380 L700,420 L700,780 L-20,780Z" fill="url(#mountain-mid)"/>
+
+      <!-- Near treeline / forest silhouette -->
+      <!-- Pine trees: triangle shapes -->
+      <g fill="#111C12">
+        <!-- Left cluster -->
+        <polygon points="30,680 58,580 86,680"/>
+        <polygon points="18,680 50,560 82,680"/>
+        <polygon points="55,680 80,605 105,680"/>
+        <polygon points="-10,680 25,575 60,680"/>
+        <!-- Middle-left -->
+        <polygon points="110,680 140,590 170,680"/>
+        <polygon points="135,680 162,610 189,680"/>
+        <!-- Right cluster -->
+        <polygon points="580,680 608,585 636,680"/>
+        <polygon points="610,680 638,560 666,680"/>
+        <polygon points="555,680 585,600 615,680"/>
+        <polygon points="635,680 660,595 685,680"/>
+        <polygon points="660,680 690,570 720,680"/>
+      </g>
+
+      <!-- Mid-ground pine trees (slightly taller, different shade) -->
+      <g fill="#182018">
+        <polygon points="200,680 228,620 256,680"/>
+        <polygon points="230,680 255,640 280,680"/>
+        <polygon points="480,680 508,615 536,680"/>
+        <polygon points="510,680 535,635 560,680"/>
+        <polygon points="530,680 558,620 586,680"/>
+      </g>
+
+      <!-- Trail path — winding S-curve through the scene -->
+      <path d="M700,750 C620,720 560,690 500,660 C440,630 420,600 390,570 C360,540 340,510 300,490 C260,470 220,475 180,460 C140,445 110,430 60,430"
+            fill="none" stroke="url(#trail-grad)" stroke-width="12" stroke-linecap="round" opacity="0.75"/>
+      <!-- Trail highlight -->
+      <path d="M700,750 C620,720 560,690 500,660 C440,630 420,600 390,570 C360,540 340,510 300,490 C260,470 220,475 180,460 C140,445 110,430 60,430"
+            fill="none" stroke="#D4B87A" stroke-width="3" stroke-linecap="round" opacity="0.4" stroke-dasharray="8 14"/>
+
+      <!-- Trail markers (small posts on path) -->
+      <rect x="356" y="538" width="4" height="14" fill="#C8956A" rx="1"/>
+      <rect x="354" y="535" width="8" height="5" fill="#C8956A" rx="1"/>
+
+      <!-- DOG ILLUSTRATION — golden/amber labrador-type in trail stride -->
+      <g transform="translate(260, 430)">
+        <!-- Dog body (elongated ellipse, slightly angled for stride) -->
+        <ellipse cx="40" cy="35" rx="52" ry="22" fill="url(#dog-body)" transform="rotate(-5 40 35)"/>
+
+        <!-- Dog pack/saddle bags on back -->
+        <rect x="15" y="10" width="22" height="14" rx="3" fill="#4A5C3A" opacity="0.9"/>
+        <rect x="15" y="24" width="22" height="10" rx="2" fill="#3A4A2C" opacity="0.9"/>
+        <!-- Pack straps -->
+        <path d="M20 10 Q26 5 32 10" fill="none" stroke="#6A7A5A" stroke-width="1.5"/>
+        <path d="M22 24 Q28 28 34 24" fill="none" stroke="#6A7A5A" stroke-width="1"/>
+        <!-- Pack buckle -->
+        <rect x="24" y="17" width="6" height="3" rx="1" fill="#B8956A"/>
+
+        <!-- Head (golden labrador style) -->
+        <ellipse cx="88" cy="22" rx="18" ry="16" fill="#9A6B3A"/>
+        <!-- Snout -->
+        <ellipse cx="104" cy="27" rx="12" ry="9" fill="#8A5C2A"/>
+        <!-- Nose -->
+        <ellipse cx="115" cy="26" rx="4" ry="3" fill="#2A1A0A"/>
+        <!-- Nostril -->
+        <circle cx="113" cy="27" r="1" fill="#1A0A00"/>
+        <!-- Eye -->
+        <circle cx="96" cy="18" r="4" fill="#1A1005"/>
+        <circle cx="96" cy="18" r="2.5" fill="#0A0800"/>
+        <circle cx="97.5" cy="16.5" r="1" fill="white" opacity="0.6"/>
+        <!-- Ear (floppy, golden) -->
+        <path d="M88 12 Q78 8 72 18 Q68 26 74 32 Q80 34 86 30 Q88 22 88 12Z" fill="#7A4E20"/>
+
+        <!-- Front legs (mid-stride: one forward, one back) -->
+        <!-- Front leg forward -->
+        <path d="M70 50 Q72 62 68 72 Q66 76 64 76" fill="none" stroke="#8A5C2A" stroke-width="7" stroke-linecap="round"/>
+        <!-- Front leg back (behind) -->
+        <path d="M60 50 Q56 60 54 70 Q53 74 52 75" fill="none" stroke="#7A4E20" stroke-width="6" stroke-linecap="round"/>
+
+        <!-- Back legs -->
+        <!-- Back leg forward -->
+        <path d="M22 53 Q18 63 20 73 Q21 77 24 78" fill="none" stroke="#8A5C2A" stroke-width="7" stroke-linecap="round"/>
+        <!-- Back leg back -->
+        <path d="M10 50 Q6 60 8 70 Q9 74 12 75" fill="none" stroke="#7A4E20" stroke-width="6" stroke-linecap="round"/>
+
+        <!-- Paws -->
+        <ellipse cx="64" cy="77" rx="5" ry="3" fill="#6A3E10"/>
+        <ellipse cx="52" cy="76" rx="4" ry="2.5" fill="#5A3010"/>
+        <ellipse cx="24" cy="79" rx="5" ry="3" fill="#6A3E10"/>
+        <ellipse cx="12" cy="76" rx="4" ry="2.5" fill="#5A3010"/>
+
+        <!-- Tail (upright, wagging) -->
+        <path d="M-12 28 Q-22 8 -14 -4" fill="none" stroke="#9A6B3A" stroke-width="8" stroke-linecap="round"/>
+        <path d="M-14 -4 Q-10 -12 -4 -10" fill="none" stroke="#9A6B3A" stroke-width="6" stroke-linecap="round"/>
+
+        <!-- Collar -->
+        <rect x="76" y="35" width="22" height="5" rx="2.5" fill="#C96B1A"/>
+        <!-- Collar tag -->
+        <circle cx="87" cy="42" r="3" fill="#B8956A"/>
+
+        <!-- LED light clip (glowing amber) -->
+        <circle cx="87" cy="42" r="2" fill="#E07A25"/>
+        <circle cx="87" cy="42" r="5" fill="#E07A25" opacity="0.25"/>
+      </g>
+
+      <!-- Ground / trail foreground -->
+      <path d="M0,700 Q200,680 400,695 Q550,705 700,690 L700,780 L0,780Z" fill="#1A1408" opacity="0.8"/>
+      <path d="M0,715 Q200,698 400,712 Q550,720 700,707 L700,780 L0,780Z" fill="#120E05"/>
+
+      <!-- Scene label -->
+      <text x="650" y="770" font-family="monospace" font-size="9" fill="#B8956A" opacity="0.5" text-anchor="end" letter-spacing="2">SWITCHBACK TRAIL</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     2. SCENARIO TILES
+═══════════════════════════════════════════ -->
+<section aria-labelledby="scenarios-heading">
+  <h2 class="visually-hidden" id="scenarios-heading">Shop by Outing Type</h2>
+  <div class="scenario-grid">
+
+    <!-- Day Hike -->
+    <a href="by-outing.html#day-hike" class="scenario-tile" aria-label="Day Hike — shop trail gear">
+      <svg class="scenario-tile__scene" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="dh-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4A7BA8"/>
+            <stop offset="100%" stop-color="#A8C4D8"/>
+          </linearGradient>
+        </defs>
+        <rect width="300" height="400" fill="url(#dh-sky)"/>
+        <!-- Sun -->
+        <circle cx="240" cy="60" r="28" fill="#F0C040" opacity="0.9"/>
+        <circle cx="240" cy="60" r="40" fill="#F0C040" opacity="0.18"/>
+        <!-- Mountains -->
+        <polygon points="0,280 100,160 200,260 300,180 300,400 0,400" fill="#2A4A2A"/>
+        <polygon points="80,400 160,240 240,340 300,280 300,400" fill="#1A3018"/>
+        <!-- Pine trees -->
+        <polygon points="20,400 40,340 60,400" fill="#0E2010"/>
+        <polygon points="40,400 60,330 80,400" fill="#0E2010"/>
+        <polygon points="200,400 220,345 240,400" fill="#0E2010"/>
+        <polygon points="220,400 240,330 260,400" fill="#0E2010"/>
+        <!-- Trail path -->
+        <path d="M300,370 C240,355 200,340 160,330 C120,320 90,325 50,320 C20,316 0,310 -20,305" fill="none" stroke="#C8A06A" stroke-width="8" stroke-linecap="round"/>
+        <!-- Dog silhouette on trail -->
+        <ellipse cx="155" cy="323" rx="22" ry="9" fill="#7A5A2A"/>
+        <circle cx="174" cy="316" r="8" fill="#7A5A2A"/>
+        <path d="M178,319 Q184,315 186,313" fill="none" stroke="#7A5A2A" stroke-width="4" stroke-linecap="round"/>
+        <path d="M148,332 L146,342" stroke="#7A5A2A" stroke-width="3" stroke-linecap="round"/>
+        <path d="M158,332 L160,342" stroke="#7A5A2A" stroke-width="3" stroke-linecap="round"/>
+        <path d="M134,330 L133,340" stroke="#5A4020" stroke-width="3" stroke-linecap="round"/>
+        <path d="M144,331 L145,341" stroke="#5A4020" stroke-width="3" stroke-linecap="round"/>
+        <path d="M135,322 Q128,312 130,306" fill="none" stroke="#7A5A2A" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div class="scenario-tile__overlay"></div>
+      <div class="scenario-tile__content">
+        <span class="scenario-tile__label">Outing</span>
+        <div class="scenario-tile__title">Day Hike</div>
+        <span class="scenario-tile__link">Shop trail gear →</span>
+      </div>
+    </a>
+
+    <!-- Beach Day -->
+    <a href="by-outing.html#beach" class="scenario-tile" aria-label="Beach and Lake — shop water gear">
+      <svg class="scenario-tile__scene" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="beach-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#5BA0C8"/>
+            <stop offset="65%" stop-color="#88C0D4"/>
+            <stop offset="100%" stop-color="#D8B870"/>
+          </linearGradient>
+          <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2A7A9A"/>
+            <stop offset="100%" stop-color="#1A5A78"/>
+          </linearGradient>
+        </defs>
+        <rect width="300" height="400" fill="url(#beach-sky)"/>
+        <!-- Sun -->
+        <circle cx="250" cy="55" r="32" fill="#F4C840"/>
+        <circle cx="250" cy="55" r="48" fill="#F4C840" opacity="0.15"/>
+        <!-- Water -->
+        <path d="M0,240 Q75,220 150,235 Q225,250 300,230 L300,400 L0,400Z" fill="url(#water)"/>
+        <!-- Waves -->
+        <path d="M0,248 Q50,240 100,248 Q150,256 200,246 Q250,236 300,246" fill="none" stroke="white" stroke-width="1.5" opacity="0.4"/>
+        <path d="M0,260 Q60,252 120,260 Q180,268 240,256 Q270,250 300,258" fill="none" stroke="white" stroke-width="1" opacity="0.3"/>
+        <!-- Sand -->
+        <path d="M0,310 Q80,295 160,305 Q240,315 300,300 L300,400 L0,400Z" fill="#D4A84A"/>
+        <!-- Dog swimming/splashing -->
+        <ellipse cx="160" cy="240" rx="28" ry="10" fill="#9A6B3A"/>
+        <circle cx="184" cy="233" r="10" fill="#9A6B3A"/>
+        <!-- Water splashes around dog -->
+        <path d="M135,240 Q130,230 125,235" fill="none" stroke="white" stroke-width="2" opacity="0.7"/>
+        <path d="M190,235 Q196,228 200,232" fill="none" stroke="white" stroke-width="2" opacity="0.7"/>
+        <path d="M160,225 Q163,218 160,215" fill="none" stroke="white" stroke-width="2" opacity="0.6"/>
+        <!-- Dog paws in water -->
+        <path d="M148,248 L146,258" stroke="#7A5020" stroke-width="4" stroke-linecap="round"/>
+        <path d="M162,250 L162,260" stroke="#7A5020" stroke-width="4" stroke-linecap="round"/>
+        <!-- Dog ears / head features -->
+        <ellipse cx="178" cy="229" rx="6" ry="9" fill="#7A5020"/>
+        <circle cx="190" cy="232" r="4" fill="#0A0500"/>
+        <!-- Floating leash in water -->
+        <path d="M140,244 Q100,248 70,244" fill="none" stroke="#C96B1A" stroke-width="3" stroke-dasharray="6,4"/>
+        <!-- Reeds/shore grass -->
+        <path d="M10,280 Q12,260 11,245" fill="none" stroke="#6A8040" stroke-width="2"/>
+        <path d="M18,282 Q20,262 19,248" fill="none" stroke="#6A8040" stroke-width="2"/>
+        <path d="M280,270 Q282,252 281,238" fill="none" stroke="#6A8040" stroke-width="2"/>
+      </svg>
+      <div class="scenario-tile__overlay"></div>
+      <div class="scenario-tile__content">
+        <span class="scenario-tile__label">Outing</span>
+        <div class="scenario-tile__title">Beach &amp; Lake</div>
+        <span class="scenario-tile__link">Shop water gear →</span>
+      </div>
+    </a>
+
+    <!-- Weekend Camp -->
+    <a href="by-outing.html#camp" class="scenario-tile" aria-label="Weekend Camp — shop camp gear">
+      <svg class="scenario-tile__scene" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="camp-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0E1620"/>
+            <stop offset="70%" stop-color="#1A2838"/>
+            <stop offset="100%" stop-color="#2A1A08"/>
+          </linearGradient>
+          <radialGradient id="fire-glow" cx="50%" cy="75%" r="30%">
+            <stop offset="0%" stop-color="#E07020" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="#E07020" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="300" height="400" fill="url(#camp-sky)"/>
+        <!-- Stars -->
+        <circle cx="30" cy="40" r="1.2" fill="white" opacity="0.8"/>
+        <circle cx="80" cy="25" r="1" fill="white" opacity="0.7"/>
+        <circle cx="150" cy="35" r="1.5" fill="white" opacity="0.9"/>
+        <circle cx="210" cy="20" r="1" fill="white" opacity="0.6"/>
+        <circle cx="260" cy="45" r="1.2" fill="white" opacity="0.8"/>
+        <circle cx="100" cy="70" r="1" fill="white" opacity="0.5"/>
+        <circle cx="230" cy="65" r="1" fill="white" opacity="0.7"/>
+        <circle cx="50" cy="90" r="1" fill="white" opacity="0.6"/>
+        <circle cx="280" cy="80" r="1.2" fill="white" opacity="0.8"/>
+        <!-- Moon -->
+        <circle cx="255" cy="55" r="18" fill="#D4C880"/>
+        <circle cx="262" cy="50" r="14" fill="#1A2838"/>
+        <!-- Pine trees dark -->
+        <polygon points="0,400 22,310 44,400" fill="#0A1208"/>
+        <polygon points="15,400 38,295 61,400" fill="#0A1208"/>
+        <polygon points="240,400 262,305 284,400" fill="#0A1208"/>
+        <polygon points="258,400 280,290 302,400" fill="#0A1208"/>
+        <!-- Ground -->
+        <rect x="0" y="330" width="300" height="70" fill="#120E05"/>
+        <!-- Fire glow on ground -->
+        <rect x="0" y="330" width="300" height="70" fill="url(#fire-glow)"/>
+        <!-- Tent -->
+        <polygon points="100,270 150,195 200,270" fill="#4A5C3A"/>
+        <polygon points="100,270 130,230 130,270" fill="#3A4A2C"/>
+        <!-- Tent door -->
+        <path d="M130,270 Q138,250 145,270" fill="#2A380A" stroke="#4A5C3A" stroke-width="1"/>
+        <!-- Tent stake lines -->
+        <line x1="100" y1="270" x2="85" y2="285" stroke="#8A7A5A" stroke-width="1.5"/>
+        <line x1="200" y1="270" x2="215" y2="285" stroke="#8A7A5A" stroke-width="1.5"/>
+        <!-- Campfire -->
+        <ellipse cx="150" cy="340" rx="18" ry="5" fill="#2A1A08"/>
+        <!-- Logs -->
+        <rect x="138" y="338" width="24" height="4" rx="2" fill="#5A3A1A" transform="rotate(-15 150 340)"/>
+        <rect x="138" y="338" width="24" height="4" rx="2" fill="#4A2A0A" transform="rotate(15 150 340)"/>
+        <!-- Flames -->
+        <path d="M143,338 Q145,318 150,310 Q155,318 157,338Z" fill="#E07820" opacity="0.9"/>
+        <path d="M146,338 Q147,322 150,316 Q153,322 154,338Z" fill="#F0A020"/>
+        <path d="M140,338 Q142,325 146,320 Q148,327 145,338Z" fill="#E06010" opacity="0.8"/>
+        <path d="M155,338 Q158,326 155,320 Q160,326 158,338Z" fill="#E06010" opacity="0.8"/>
+        <!-- Fire glow -->
+        <ellipse cx="150" cy="330" rx="30" ry="20" fill="#E07820" opacity="0.15"/>
+        <!-- Dog lying near fire -->
+        <ellipse cx="195" cy="350" rx="28" ry="11" fill="#7A5020"/>
+        <ellipse cx="220" cy="343" rx="14" ry="12" fill="#7A5020"/>
+        <path d="M232,345 Q242,342 245,346" fill="none" stroke="#7A5020" stroke-width="4" stroke-linecap="round"/>
+        <!-- Dog eye reflecting fire -->
+        <circle cx="228" cy="340" r="3" fill="#E07820" opacity="0.6"/>
+        <circle cx="228" cy="340" r="2" fill="#0A0500"/>
+      </svg>
+      <div class="scenario-tile__overlay"></div>
+      <div class="scenario-tile__content">
+        <span class="scenario-tile__label">Outing</span>
+        <div class="scenario-tile__title">Weekend Camp</div>
+        <span class="scenario-tile__link">Shop camp gear →</span>
+      </div>
+    </a>
+
+    <!-- Road Trip -->
+    <a href="by-outing.html#road-trip" class="scenario-tile" aria-label="Road Trip — shop travel gear">
+      <svg class="scenario-tile__scene" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="rt-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#5A8EB0"/>
+            <stop offset="100%" stop-color="#8ABCCC"/>
+          </linearGradient>
+        </defs>
+        <rect width="300" height="400" fill="url(#rt-sky)"/>
+        <!-- Rolling hills -->
+        <path d="M0,300 Q80,260 160,280 Q240,300 300,270 L300,400 L0,400Z" fill="#4A6830"/>
+        <path d="M0,330 Q100,310 200,320 Q260,325 300,315 L300,400 L0,400Z" fill="#3A5820"/>
+        <!-- Road -->
+        <path d="M0,380 Q150,360 300,370 L300,400 L0,400Z" fill="#5A5048"/>
+        <!-- Road dashes -->
+        <line x1="40" y1="388" x2="70" y2="387" stroke="#C8B890" stroke-width="2.5" stroke-dasharray="20,15"/>
+        <line x1="130" y1="385" x2="160" y2="384" stroke="#C8B890" stroke-width="2.5"/>
+        <line x1="220" y1="383" x2="250" y2="382" stroke="#C8B890" stroke-width="2.5"/>
+        <!-- Car body -->
+        <rect x="60" y="280" width="180" height="70" rx="8" fill="#3A3028"/>
+        <!-- Car windows -->
+        <rect x="75" y="255" width="150" height="50" rx="6" fill="#3A3028"/>
+        <!-- Window glass -->
+        <rect x="82" y="260" width="56" height="40" rx="4" fill="#5A7A90" opacity="0.8"/>
+        <rect x="145" y="260" width="56" height="40" rx="4" fill="#5A7A90" opacity="0.8"/>
+        <!-- Roof -->
+        <path d="M90,255 Q150,235 210,255" fill="none" stroke="#3A3028" stroke-width="3"/>
+        <!-- Car details -->
+        <rect x="60" y="340" width="180" height="10" rx="2" fill="#2A2018"/>
+        <!-- Headlights -->
+        <rect x="62" y="295" width="18" height="12" rx="3" fill="#E8C860"/>
+        <rect x="220" y="295" width="18" height="12" rx="3" fill="#E86040" opacity="0.8"/>
+        <!-- Wheels -->
+        <circle cx="100" cy="352" r="18" fill="#1A1408"/>
+        <circle cx="200" cy="352" r="18" fill="#1A1408"/>
+        <circle cx="100" cy="352" r="10" fill="#3A3028"/>
+        <circle cx="200" cy="352" r="10" fill="#3A3028"/>
+        <!-- DOG HEAD out window -->
+        <ellipse cx="175" cy="245" rx="20" ry="16" fill="#9A6B3A"/>
+        <!-- Dog snout -->
+        <ellipse cx="193" cy="252" rx="10" ry="7" fill="#8A5C2A"/>
+        <!-- Nose -->
+        <ellipse cx="202" cy="251" rx="4" ry="2.5" fill="#1A0A00"/>
+        <!-- Eye -->
+        <circle cx="183" cy="242" r="4" fill="#0A0500"/>
+        <circle cx="184.5" cy="240.5" r="1.2" fill="white" opacity="0.7"/>
+        <!-- Ear blowing in wind -->
+        <path d="M162 240 Q152 225 158 212 Q165 215 168 228 Z" fill="#7A4E20"/>
+        <!-- Tongue out (happy) -->
+        <path d="M194,257 Q198,265 194,270 Q190,270 190,264 Z" fill="#E04848" opacity="0.9"/>
+        <!-- Wind lines (motion) -->
+        <path d="M10,250 Q30,244 50,250" fill="none" stroke="white" stroke-width="1.5" opacity="0.4"/>
+        <path d="M5,265 Q25,259 45,265" fill="none" stroke="white" stroke-width="1" opacity="0.3"/>
+        <path d="M15,280 Q35,274 55,280" fill="none" stroke="white" stroke-width="1.2" opacity="0.35"/>
+        <!-- Trees passing by -->
+        <polygon points="18,320 30,275 42,320" fill="#1A2A10" opacity="0.7"/>
+        <polygon points="268,315 280,272 292,315" fill="#1A2A10" opacity="0.7"/>
+      </svg>
+      <div class="scenario-tile__overlay"></div>
+      <div class="scenario-tile__content">
+        <span class="scenario-tile__label">Outing</span>
+        <div class="scenario-tile__title">Road Trip</div>
+        <span class="scenario-tile__link">Shop travel gear →</span>
+      </div>
+    </a>
+
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     3. FEATURED BUNDLE ROW
+═══════════════════════════════════════════ -->
+<section class="section section--ash" aria-labelledby="bundles-heading">
+  <div class="container">
+    <div class="section-header--split">
+      <div>
+        <span class="eyebrow">Featured Bundles</span>
+        <h2 class="section-title" id="bundles-heading">The Kits That Work</h2>
+      </div>
+      <a href="bundles.html" class="view-all">See all kits <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a>
+    </div>
+
+    <div class="bundles-row">
+
+      <!-- Hot Trail Starter Kit -->
+      <article class="bundle-mini-card">
+        <div class="bundle-mini-card__image">
+          <svg viewBox="0 0 320 240" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="hot-bg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#8A5010"/>
+                <stop offset="100%" stop-color="#C87A30"/>
+              </linearGradient>
+            </defs>
+            <rect width="320" height="240" fill="url(#hot-bg)"/>
+            <!-- Sun -->
+            <circle cx="260" cy="50" r="45" fill="#F4C840" opacity="0.9"/>
+            <circle cx="260" cy="50" r="65" fill="#F4C840" opacity="0.15"/>
+            <!-- Heat rays -->
+            <line x1="260" y1="0" x2="260" y2="15" stroke="#F4C840" stroke-width="2" opacity="0.5"/>
+            <line x1="305" y1="10" x2="295" y2="22" stroke="#F4C840" stroke-width="2" opacity="0.5"/>
+            <line x1="310" y1="50" x2="295" y2="50" stroke="#F4C840" stroke-width="2" opacity="0.5"/>
+            <!-- Dusty trail -->
+            <path d="M0,190 Q160,170 320,180 L320,240 L0,240Z" fill="#C89060"/>
+            <path d="M0,210 Q160,195 320,205" fill="none" stroke="#E0B080" stroke-width="3" stroke-dasharray="10,8"/>
+            <!-- Dog with cooling bandana -->
+            <ellipse cx="130" cy="178" rx="52" ry="20" fill="#9A6B3A"/>
+            <ellipse cx="178" cy="162" rx="22" ry="18" fill="#9A6B3A"/>
+            <!-- Bandana (blue/cool around neck) -->
+            <path d="M162,172 Q178,180 194,172 Q192,184 178,188 Q164,184 162,172Z" fill="#3A6A9A"/>
+            <!-- Dog eye -->
+            <circle cx="188" cy="158" r="4" fill="#0A0500"/>
+            <circle cx="189.5" cy="156.5" r="1.2" fill="white" opacity="0.7"/>
+            <!-- Snout -->
+            <ellipse cx="198" cy="165" rx="10" ry="7" fill="#8A5C2A"/>
+            <!-- Ear -->
+            <ellipse cx="164" cy="154" rx="7" ry="10" fill="#7A4E20"/>
+            <!-- Panting tongue -->
+            <path d="M198,170 Q202,178 198,183 Q194,183 194,176 Z" fill="#E04848"/>
+            <!-- Legs -->
+            <line x1="110" y1="196" x2="108" y2="215" stroke="#7A5020" stroke-width="6" stroke-linecap="round"/>
+            <line x1="130" y1="197" x2="130" y2="216" stroke="#7A5020" stroke-width="6" stroke-linecap="round"/>
+            <line x1="150" y1="196" x2="152" y2="215" stroke="#7A5020" stroke-width="6" stroke-linecap="round"/>
+            <line x1="98" y1="194" x2="94" y2="213" stroke="#6A4010" stroke-width="5" stroke-linecap="round"/>
+            <!-- Tail up -->
+            <path d="M82 180 Q74 162 78 150" fill="none" stroke="#9A6B3A" stroke-width="7" stroke-linecap="round"/>
+            <!-- Collapsible bowl -->
+            <ellipse cx="55" cy="195" rx="22" ry="6" fill="#4A7290"/>
+            <path d="M33,195 Q33,210 55,212 Q77,210 77,195" fill="#3A6280"/>
+            <!-- Water ripple -->
+            <ellipse cx="55" cy="195" rx="16" ry="3" fill="#6AAAC8" opacity="0.6"/>
+          </svg>
+          <div style="position:absolute;top:10px;left:10px;">
+            <span class="badge badge--bestseller">Bestseller</span>
+          </div>
+        </div>
+        <div class="bundle-mini-card__body">
+          <div class="bundle-mini-card__eyebrow">Trail Kit · Hot Weather</div>
+          <h3 class="bundle-mini-card__title">Hot Trail Starter Kit</h3>
+          <p class="bundle-mini-card__desc">Cooling, hydration, and paw protection for when the temperature climbs.</p>
+          <div class="bundle-mini-card__meta">
+            <span class="tag tag--hot">Hot Weather</span>
+            <span class="tag tag--neutral">Any Dog</span>
+            <span class="tag tag--neutral">All Season</span>
+          </div>
+          <div class="bundle-mini-card__footer">
+            <div>
+              <span class="product-card__price-was">$107</span>
+              <span class="bundle-mini-card__price">$89</span>
+            </div>
+            <a href="bundles.html#hot-trail-starter" class="btn btn--pine btn--sm">View Kit</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Muddy Ride Home Kit -->
+      <article class="bundle-mini-card">
+        <div class="bundle-mini-card__image">
+          <svg viewBox="0 0 320 240" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="mud-bg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#3A4838"/>
+                <stop offset="100%" stop-color="#5A6850"/>
+              </linearGradient>
+            </defs>
+            <rect width="320" height="240" fill="url(#mud-bg)"/>
+            <!-- Rain clouds -->
+            <ellipse cx="100" cy="50" rx="55" ry="30" fill="#5A6868"/>
+            <ellipse cx="80" cy="45" rx="40" ry="28" fill="#6A7878"/>
+            <ellipse cx="130" cy="52" rx="35" ry="22" fill="#5A6868"/>
+            <ellipse cx="220" cy="55" rx="50" ry="26" fill="#4A5858"/>
+            <ellipse cx="200" cy="48" rx="38" ry="24" fill="#5A6868"/>
+            <!-- Rain drops -->
+            <line x1="60" y1="80" x2="55" y2="105" stroke="#7AAAC0" stroke-width="1.5" opacity="0.7"/>
+            <line x1="80" y1="78" x2="75" y2="103" stroke="#7AAAC0" stroke-width="1.5" opacity="0.7"/>
+            <line x1="100" y1="80" x2="95" y2="105" stroke="#7AAAC0" stroke-width="1.5" opacity="0.7"/>
+            <line x1="120" y1="82" x2="115" y2="107" stroke="#7AAAC0" stroke-width="1.5" opacity="0.6"/>
+            <line x1="140" y1="78" x2="135" y2="103" stroke="#7AAAC0" stroke-width="1.5" opacity="0.7"/>
+            <line x1="180" y1="80" x2="175" y2="105" stroke="#7AAAC0" stroke-width="1.5" opacity="0.6"/>
+            <line x1="200" y1="78" x2="195" y2="103" stroke="#7AAAC0" stroke-width="1.5" opacity="0.7"/>
+            <line x1="220" y1="82" x2="215" y2="107" stroke="#7AAAC0" stroke-width="1.5" opacity="0.6"/>
+            <line x1="240" y1="78" x2="235" y2="103" stroke="#7AAAC0" stroke-width="1.5" opacity="0.7"/>
+            <line x1="70" y1="115" x2="65" y2="140" stroke="#7AAAC0" stroke-width="1.5" opacity="0.5"/>
+            <line x1="110" y1="115" x2="105" y2="140" stroke="#7AAAC0" stroke-width="1.5" opacity="0.5"/>
+            <line x1="150" y1="115" x2="145" y2="140" stroke="#7AAAC0" stroke-width="1.5" opacity="0.5"/>
+            <line x1="190" y1="112" x2="185" y2="137" stroke="#7AAAC0" stroke-width="1.5" opacity="0.5"/>
+            <line x1="230" y1="115" x2="225" y2="140" stroke="#7AAAC0" stroke-width="1.5" opacity="0.5"/>
+            <!-- Muddy ground -->
+            <path d="M0,190 Q160,175 320,185 L320,240 L0,240Z" fill="#4A3218"/>
+            <!-- Mud puddles -->
+            <ellipse cx="80" cy="200" rx="30" ry="8" fill="#3A2810" opacity="0.8"/>
+            <ellipse cx="220" cy="205" rx="25" ry="7" fill="#3A2810" opacity="0.8"/>
+            <!-- Muddy dog -->
+            <ellipse cx="165" cy="182" rx="48" ry="18" fill="#6A4A22"/>
+            <ellipse cx="210" cy="168" rx="20" ry="17" fill="#6A4A22"/>
+            <!-- Mud spots on dog -->
+            <ellipse cx="145" cy="178" rx="8" ry="5" fill="#3A2810" opacity="0.6"/>
+            <ellipse cx="165" cy="173" rx="6" ry="4" fill="#3A2810" opacity="0.6"/>
+            <ellipse cx="185" cy="179" rx="7" ry="4" fill="#3A2810" opacity="0.6"/>
+            <!-- Dog features -->
+            <ellipse cx="228" cy="163" rx="10" ry="7" fill="#5A3A18"/>
+            <circle cx="236" cy="162" r="2" fill="#0A0500"/>
+            <!-- Muddy paws dripping -->
+            <line x1="140" y1="198" x2="138" y2="215" stroke="#4A3018" stroke-width="7" stroke-linecap="round"/>
+            <line x1="162" y1="200" x2="160" y2="218" stroke="#4A3018" stroke-width="7" stroke-linecap="round"/>
+            <!-- Mud drips -->
+            <path d="M138,215 Q137,222 139,224" fill="none" stroke="#3A2010" stroke-width="3"/>
+            <path d="M160,218 Q159,225 161,227" fill="none" stroke="#3A2010" stroke-width="3"/>
+            <!-- Car mat icon (back right) -->
+            <rect x="255" y="170" width="50" height="35" rx="3" fill="#2A2018"/>
+            <path d="M260,175 L300,175 M260,180 L300,180 M260,185 L300,185 M260,190 L300,190 M260,195 L300,195" stroke="#4A3828" stroke-width="1"/>
+          </svg>
+          <div style="position:absolute;top:10px;left:10px;">
+            <span class="badge badge--sale">Save $14</span>
+          </div>
+        </div>
+        <div class="bundle-mini-card__body">
+          <div class="bundle-mini-card__eyebrow">Trail Kit · Post-Hike</div>
+          <h3 class="bundle-mini-card__title">Muddy Ride Home Kit</h3>
+          <p class="bundle-mini-card__desc">The kit that deals with what happens after the trail ends and before you get home.</p>
+          <div class="bundle-mini-card__meta">
+            <span class="tag tag--mud">Mud &amp; Rain</span>
+            <span class="tag tag--neutral">Any Dog</span>
+          </div>
+          <div class="bundle-mini-card__footer">
+            <div>
+              <span class="product-card__price-was">$86</span>
+              <span class="bundle-mini-card__price">$72</span>
+            </div>
+            <a href="bundles.html#muddy-ride-home" class="btn btn--pine btn--sm">View Kit</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Weekend Camp Kit -->
+      <article class="bundle-mini-card">
+        <div class="bundle-mini-card__image">
+          <svg viewBox="0 0 320 240" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="camp-bg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0E1620"/>
+                <stop offset="100%" stop-color="#1A2410"/>
+              </linearGradient>
+              <radialGradient id="camp-fire-glow" cx="42%" cy="72%" r="25%">
+                <stop offset="0%" stop-color="#E07020" stop-opacity="0.55"/>
+                <stop offset="100%" stop-color="#E07020" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="320" height="240" fill="url(#camp-bg)"/>
+            <!-- Stars -->
+            <circle cx="25" cy="25" r="1" fill="white" opacity="0.8"/>
+            <circle cx="60" cy="15" r="1.2" fill="white" opacity="0.9"/>
+            <circle cx="120" cy="30" r="1" fill="white" opacity="0.7"/>
+            <circle cx="180" cy="18" r="1" fill="white" opacity="0.8"/>
+            <circle cx="240" cy="28" r="1.2" fill="white" opacity="0.7"/>
+            <circle cx="280" cy="12" r="1" fill="white" opacity="0.9"/>
+            <circle cx="50" cy="55" r="1" fill="white" opacity="0.6"/>
+            <circle cx="300" cy="45" r="1" fill="white" opacity="0.7"/>
+            <!-- Pine trees silhouette -->
+            <polygon points="0,240 18,175 36,240" fill="#0A1208"/>
+            <polygon points="10,240 30,160 50,240" fill="#0A1208"/>
+            <polygon points="270,240 288,168 306,240" fill="#0A1208"/>
+            <polygon points="285,240 305,178 325,240" fill="#0A1208"/>
+            <!-- Tent -->
+            <polygon points="100,185 155,120 210,185" fill="#4A5C3A"/>
+            <polygon points="100,185 130,148 130,185" fill="#3A4A2C"/>
+            <!-- Ground -->
+            <rect x="0" y="200" width="320" height="40" fill="#100E05"/>
+            <!-- Fire glow -->
+            <rect width="320" height="240" fill="url(#camp-fire-glow)"/>
+            <!-- Campfire -->
+            <ellipse cx="135" cy="210" rx="15" ry="4" fill="#2A1A08"/>
+            <line x1="123" y1="208" x2="148" y2="208" stroke="#5A3818" stroke-width="4" stroke-linecap="round" transform="rotate(15 135 208)"/>
+            <line x1="123" y1="208" x2="148" y2="208" stroke="#4A2808" stroke-width="4" stroke-linecap="round" transform="rotate(-15 135 208)"/>
+            <!-- Flames -->
+            <path d="M128,208 Q130,192 135,186 Q140,192 142,208Z" fill="#E07820" opacity="0.95"/>
+            <path d="M131,208 Q132,196 135,192 Q138,196 139,208Z" fill="#F0A020"/>
+            <!-- Dog pack + mat kit items (flat lay style) -->
+            <!-- Dog pack (upper right) -->
+            <rect x="220" y="100" width="70" height="50" rx="8" fill="#4A5C3A"/>
+            <rect x="225" y="108" width="22" height="34" rx="4" fill="#3A4A2C"/>
+            <rect x="252" y="108" width="22" height="34" rx="4" fill="#3A4A2C"/>
+            <!-- Mat (rolled) -->
+            <ellipse cx="262" cy="170" rx="28" ry="12" fill="#8A7A5A"/>
+            <ellipse cx="262" cy="170" rx="22" ry="9" fill="#7A6A4A"/>
+            <line x1="234" y1="170" x2="290" y2="170" stroke="#6A5A3A" stroke-width="2"/>
+          </svg>
+          <div style="position:absolute;top:10px;left:10px;">
+            <span class="badge badge--staff-pick">Staff Pick</span>
+          </div>
+        </div>
+        <div class="bundle-mini-card__body">
+          <div class="bundle-mini-card__eyebrow">Trail Kit · Overnight</div>
+          <h3 class="bundle-mini-card__title">Weekend Camp Dog Kit</h3>
+          <p class="bundle-mini-card__desc">Pack, sleep mat, first aid, paw care, cleanup — the full overnight setup for two nights out.</p>
+          <div class="bundle-mini-card__meta">
+            <span class="tag tag--neutral">2+ Nights</span>
+            <span class="tag tag--neutral">Med–XL Dog</span>
+            <span class="tag tag--neutral">Summer–Fall</span>
+          </div>
+          <div class="bundle-mini-card__footer">
+            <div>
+              <span class="product-card__price-was">$175</span>
+              <span class="bundle-mini-card__price">$145</span>
+            </div>
+            <a href="product-weekend-camp-kit.html" class="btn btn--pine btn--sm">View Kit</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Night Visibility Kit -->
+      <article class="bundle-mini-card">
+        <div class="bundle-mini-card__image">
+          <svg viewBox="0 0 320 240" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="night-bg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0A1020"/>
+                <stop offset="100%" stop-color="#1A2038"/>
+              </linearGradient>
+              <radialGradient id="led-glow" cx="52%" cy="60%" r="22%">
+                <stop offset="0%" stop-color="#E08820" stop-opacity="0.7"/>
+                <stop offset="100%" stop-color="#E08820" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="320" height="240" fill="url(#night-bg)"/>
+            <!-- Stars -->
+            <circle cx="20" cy="20" r="1.2" fill="white" opacity="0.9"/>
+            <circle cx="65" cy="12" r="1" fill="white" opacity="0.8"/>
+            <circle cx="110" cy="30" r="1.5" fill="white" opacity="0.95"/>
+            <circle cx="165" cy="15" r="1" fill="white" opacity="0.7"/>
+            <circle cx="220" cy="25" r="1" fill="white" opacity="0.8"/>
+            <circle cx="275" cy="18" r="1.2" fill="white" opacity="0.9"/>
+            <circle cx="40" cy="55" r="1" fill="white" opacity="0.6"/>
+            <circle cx="295" cy="50" r="1" fill="white" opacity="0.7"/>
+            <circle cx="135" cy="60" r="1" fill="white" opacity="0.5"/>
+            <!-- Moon crescent -->
+            <circle cx="255" cy="45" r="22" fill="#C8C070"/>
+            <circle cx="264" cy="40" r="17" fill="#1A2038"/>
+            <!-- Trail at night -->
+            <path d="M0,200 Q160,185 320,195 L320,240 L0,240Z" fill="#0E1008"/>
+            <!-- Night sky gradient on trail -->
+            <rect width="320" height="240" fill="url(#led-glow)"/>
+            <!-- Dog silhouette (dark, but glowing collar) -->
+            <ellipse cx="160" cy="190" rx="50" ry="19" fill="#1A1608"/>
+            <ellipse cx="205" cy="175" rx="21" ry="17" fill="#1A1608"/>
+            <!-- Dog features -->
+            <ellipse cx="222" cy="178" rx="8" ry="6" fill="#120E05"/>
+            <!-- Glowing LED collar -->
+            <ellipse cx="195" cy="182" rx="12" ry="5" fill="#E08820" opacity="0.9"/>
+            <ellipse cx="195" cy="182" rx="18" ry="8" fill="#E08820" opacity="0.3"/>
+            <ellipse cx="195" cy="182" rx="28" ry="14" fill="#E08820" opacity="0.12"/>
+            <!-- LED collar glow on ground -->
+            <ellipse cx="195" cy="210" rx="40" ry="10" fill="#E08820" opacity="0.08"/>
+            <!-- High-viz vest on dog (blaze orange) -->
+            <ellipse cx="155" cy="185" rx="35" ry="13" fill="#D45B1A" opacity="0.75"/>
+            <!-- Reflective strips on vest -->
+            <line x1="125" y1="185" x2="185" y2="183" stroke="#F0E090" stroke-width="2" opacity="0.6"/>
+            <line x1="128" y1="190" x2="182" y2="188" stroke="#F0E090" stroke-width="1.5" opacity="0.5"/>
+            <!-- Trail light clip glow on dog -->
+            <circle cx="205" cy="170" r="6" fill="#F0C840" opacity="0.8"/>
+            <circle cx="205" cy="170" r="12" fill="#F0C840" opacity="0.2"/>
+            <!-- Light beam on trail -->
+            <path d="M205,176 L240,210 L170,210Z" fill="#F0C840" opacity="0.06"/>
+          </svg>
+          <div style="position:absolute;top:10px;left:10px;">
+            <span class="badge badge--new">New</span>
+          </div>
+        </div>
+        <div class="bundle-mini-card__body">
+          <div class="bundle-mini-card__eyebrow">Trail Kit · Night &amp; Dusk</div>
+          <h3 class="bundle-mini-card__title">Night Visibility Kit</h3>
+          <p class="bundle-mini-card__desc">Three light sources and a reflective harness. For dawn starts and late finishes.</p>
+          <div class="bundle-mini-card__meta">
+            <span class="tag tag--night">Night &amp; Dusk</span>
+            <span class="tag tag--neutral">Any Dog</span>
+          </div>
+          <div class="bundle-mini-card__footer">
+            <div>
+              <span class="product-card__price-was">$102</span>
+              <span class="bundle-mini-card__price">$78</span>
+            </div>
+            <a href="bundles.html#night-visibility" class="btn btn--pine btn--sm">View Kit</a>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     4. SHOP BY CONDITION
+═══════════════════════════════════════════ -->
+<section class="section section--pine topo-texture" aria-labelledby="condition-heading">
+  <div class="container">
+    <div class="section-header section-header--centered">
+      <span class="eyebrow" style="color:var(--trail-tan);opacity:1;">Shop by Condition</span>
+      <h2 class="section-title text-ash" id="condition-heading">Built for the Conditions</h2>
+      <p class="section-subtitle">The trail conditions determine the kit. Heat, rain, darkness, or a dog that's put in years — each changes what you pack.</p>
+    </div>
+    <div class="condition-grid">
+
+      <!-- Hot Weather -->
+      <a href="by-condition.html#hot" class="condition-card condition-card--hot" aria-label="Hot Weather gear">
+        <svg class="condition-card__icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="24" cy="24" r="10" fill="#F4C840"/>
+          <circle cx="24" cy="24" r="14" fill="#F4C840" opacity="0.2"/>
+          <line x1="24" y1="4" x2="24" y2="10" stroke="#F4C840" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="24" y1="38" x2="24" y2="44" stroke="#F4C840" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="4" y1="24" x2="10" y2="24" stroke="#F4C840" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="38" y1="24" x2="44" y2="24" stroke="#F4C840" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="9" y1="9" x2="13.2" y2="13.2" stroke="#F4C840" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="34.8" y1="34.8" x2="39" y2="39" stroke="#F4C840" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="39" y1="9" x2="34.8" y2="13.2" stroke="#F4C840" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="13.2" y1="34.8" x2="9" y2="39" stroke="#F4C840" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+        <span class="condition-card__label">Hot Weather</span>
+        <h3 class="condition-card__title">When Heat Builds</h3>
+        <p class="condition-card__desc">Cooling bandanas, hydration, shaded rest reminders, and paw protection for hot pavement and dry trails.</p>
+        <span class="condition-card__arrow">Shop hot weather gear <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+      </a>
+
+      <!-- Mud & Rain -->
+      <a href="by-condition.html#mud" class="condition-card condition-card--mud" aria-label="Mud and Rain gear">
+        <svg class="condition-card__icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <ellipse cx="20" cy="18" rx="13" ry="10" fill="#7AAAC0" opacity="0.7"/>
+          <ellipse cx="30" cy="20" rx="10" ry="8" fill="#7AAAC0" opacity="0.8"/>
+          <ellipse cx="24" cy="22" rx="16" ry="10" fill="#8ABCD0"/>
+          <line x1="14" y1="32" x2="12" y2="42" stroke="#7AAAC0" stroke-width="2" stroke-linecap="round"/>
+          <line x1="22" y1="32" x2="20" y2="42" stroke="#7AAAC0" stroke-width="2" stroke-linecap="round"/>
+          <line x1="30" y1="32" x2="28" y2="42" stroke="#7AAAC0" stroke-width="2" stroke-linecap="round"/>
+          <line x1="38" y1="32" x2="36" y2="42" stroke="#7AAAC0" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="condition-card__label">Mud &amp; Rain</span>
+        <h3 class="condition-card__title">When It Gets Wet</h3>
+        <p class="condition-card__desc">Waterproof leashes, dry coats, car mats, and boot sets for wet dogs and muddy rides home.</p>
+        <span class="condition-card__arrow">Shop mud &amp; rain gear <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+      </a>
+
+      <!-- Night Visibility -->
+      <a href="by-condition.html#night" class="condition-card condition-card--night" aria-label="Night Visibility gear">
+        <svg class="condition-card__icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="24" cy="24" r="14" fill="#1A2A48" stroke="#7AAAC0" stroke-width="1.5"/>
+          <circle cx="29" cy="20" r="10" fill="#0E1828"/>
+          <circle cx="12" cy="12" r="2" fill="#F0E090"/>
+          <circle cx="36" cy="10" r="1.5" fill="#F0E090"/>
+          <circle cx="42" cy="22" r="1" fill="#F0E090"/>
+          <circle cx="8" cy="28" r="1" fill="#F0E090"/>
+          <!-- LED glow on moon -->
+          <circle cx="24" cy="24" r="6" fill="#E08820" opacity="0.35"/>
+          <circle cx="24" cy="24" r="3" fill="#F0A020" opacity="0.8"/>
+        </svg>
+        <span class="condition-card__label">Night Visibility</span>
+        <h3 class="condition-card__title">When Light Drops</h3>
+        <p class="condition-card__desc">LED collar lights, reflective harnesses, high-viz vests. Because dawn starts and late finishes are real.</p>
+        <span class="condition-card__arrow">Shop night gear <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+      </a>
+
+      <!-- Senior Dog -->
+      <a href="by-condition.html#senior" class="condition-card condition-card--senior" aria-label="Senior Dog Comfort gear">
+        <svg class="condition-card__icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M12 36 Q10 26 16 20 Q20 15 24 14 Q28 13 32 16 Q38 20 38 28 Q38 36 32 40 Q28 42 24 42 Q18 42 14 39Z" fill="#7A5C9E" opacity="0.2" stroke="#7A5C9E" stroke-width="1.5"/>
+          <!-- Paw pads -->
+          <ellipse cx="24" cy="34" rx="7" ry="6" fill="#7A5C9E"/>
+          <ellipse cx="18" cy="28" rx="4" ry="4" fill="#7A5C9E"/>
+          <ellipse cx="30" cy="28" rx="4" ry="4" fill="#7A5C9E"/>
+          <ellipse cx="24" cy="24" rx="4" ry="4" fill="#7A5C9E"/>
+          <!-- Heart in center -->
+          <path d="M21 33 Q21 29 24 31 Q27 29 27 33 Q27 36 24 38 Q21 36 21 33Z" fill="#B8956A"/>
+        </svg>
+        <span class="condition-card__label">Senior Dog</span>
+        <h3 class="condition-card__title">When They've Earned It</h3>
+        <p class="condition-card__desc">Support braces, cushioned boots, electrolytes, and gentler kit for dogs who still want to be out there.</p>
+        <span class="condition-card__arrow">Shop senior gear <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     5. TRUST STRIP
+═══════════════════════════════════════════ -->
+<div class="trust-strip trust-strip-homepage" role="complementary" aria-label="Why Switchback">
+  <div class="container">
+    <div class="trust-items">
+      <div class="trust-item">
+        <svg class="trust-item__icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="18" cy="18" r="14" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+          <path d="M10 18 L16 24 L26 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <div class="trust-item__title">Field-Tested Gear</div>
+          <p class="trust-item__desc">Everything gets trail time before it gets listed. No lab simulations.</p>
+        </div>
+      </div>
+      <div class="trust-item">
+        <svg class="trust-item__icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="6" y="8" width="24" height="20" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+          <path d="M6 14 h24" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+          <path d="M14 20 h8 M14 24 h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div>
+          <div class="trust-item__title">Fit &amp; Sizing Guidance</div>
+          <p class="trust-item__desc">Breed charts, weight ranges, and measure-yourself instructions on every product.</p>
+        </div>
+      </div>
+      <div class="trust-item">
+        <svg class="trust-item__icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M10 12 h16 v14 Q18 30 10 26 Z" stroke="currentColor" stroke-width="1.5" opacity="0.4" fill="none"/>
+          <path d="M13 19 l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <div class="trust-item__title">Curated Bundles</div>
+          <p class="trust-item__desc">Kits built around real outings — not category checkboxes. Every item earns its place.</p>
+        </div>
+      </div>
+      <div class="trust-item">
+        <svg class="trust-item__icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M18 6 L20.5 13 L28 13 L22 17.5 L24 25 L18 20.5 L12 25 L14 17.5 L8 13 L15.5 13 Z" stroke="currentColor" stroke-width="1.5" opacity="0.4" fill="none"/>
+          <circle cx="18" cy="17" r="4" fill="currentColor" opacity="0.5"/>
+        </svg>
+        <div>
+          <div class="trust-item__title">Trail-Ready Essentials</div>
+          <p class="trust-item__desc">No fluff. Hydration, paw care, safety, cleanup — what actually matters on the trail.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     6. SEASONAL FEATURE — LAKE SEASON
+═══════════════════════════════════════════ -->
+<section class="seasonal-section" aria-labelledby="seasonal-heading">
+  <div class="container">
+    <div class="seasonal-inner">
+      <!-- Scene SVG -->
+      <div class="seasonal-scene">
+        <svg viewBox="0 0 520 420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="lake-sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#5B8FA8"/>
+              <stop offset="60%" stop-color="#7AAEC0"/>
+              <stop offset="100%" stop-color="#C8D8A8"/>
+            </linearGradient>
+            <linearGradient id="lake-water" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#2A6A8A"/>
+              <stop offset="100%" stop-color="#1A4A62"/>
+            </linearGradient>
+            <linearGradient id="shore" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#C8A86A"/>
+              <stop offset="100%" stop-color="#A88A4A"/>
+            </linearGradient>
+          </defs>
+          <!-- Sky -->
+          <rect width="520" height="420" fill="url(#lake-sky)"/>
+          <!-- Sun -->
+          <circle cx="400" cy="70" r="40" fill="#F0C840" opacity="0.85"/>
+          <circle cx="400" cy="70" r="60" fill="#F0C840" opacity="0.1"/>
+          <!-- Distant shore/hills -->
+          <path d="M0,200 Q130,170 260,185 Q390,200 520,175 L520,420 L0,420Z" fill="#3A6030" opacity="0.5"/>
+          <!-- Lake water -->
+          <path d="M0,250 Q130,235 260,245 Q390,255 520,240 L520,420 L0,420Z" fill="url(#lake-water)"/>
+          <!-- Water reflections -->
+          <path d="M60,265 Q120,258 180,265" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <path d="M90,278 Q150,271 210,278" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+          <path d="M300,270 Q360,263 420,270" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+          <path d="M330,282 Q390,275 450,282" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+          <!-- Shore strip -->
+          <path d="M0,290 Q130,278 260,285 Q390,292 520,278 L520,310 L0,310Z" fill="url(#shore)" opacity="0.7"/>
+          <!-- Reeds -->
+          <line x1="30" y1="295" x2="30" y2="270" stroke="#4A6830" stroke-width="2.5"/>
+          <line x1="38" y1="292" x2="38" y2="268" stroke="#4A6830" stroke-width="2.5"/>
+          <ellipse cx="30" cy="268" rx="4" ry="8" fill="#6A8040"/>
+          <ellipse cx="38" cy="266" rx="4" ry="8" fill="#5A7030"/>
+          <line x1="480" y1="290" x2="480" y2="266" stroke="#4A6830" stroke-width="2.5"/>
+          <line x1="490" y1="288" x2="490" y2="264" stroke="#4A6830" stroke-width="2.5"/>
+          <ellipse cx="480" cy="264" rx="4" ry="8" fill="#6A8040"/>
+          <ellipse cx="490" cy="262" rx="4" ry="8" fill="#5A7030"/>
+          <!-- Pine trees on shore -->
+          <polygon points="120,295 138,248 156,295" fill="#2A4A1A"/>
+          <polygon points="100,295 120,240 140,295" fill="#1A3A10"/>
+          <polygon points="350,290 368,244 386,290" fill="#2A4A1A"/>
+          <polygon points="370,292 388,248 406,292" fill="#1A3A10"/>
+          <!-- Dog swimming — golden retriever in water -->
+          <ellipse cx="240" cy="262" rx="50" ry="16" fill="#9A6B3A" opacity="0.9"/>
+          <ellipse cx="286" cy="250" rx="24" ry="19" fill="#9A6B3A"/>
+          <!-- Dog snout -->
+          <ellipse cx="308" cy="256" rx="14" ry="10" fill="#8A5C2A"/>
+          <!-- Nose -->
+          <ellipse cx="321" cy="254" rx="5" ry="3.5" fill="#1A0A00"/>
+          <!-- Dog eye -->
+          <circle cx="296" cy="246" r="5" fill="#0A0500"/>
+          <circle cx="297.5" cy="244.5" r="1.5" fill="white" opacity="0.6"/>
+          <!-- Ear -->
+          <path d="M285 240 Q272 232 265 244 Q262 252 268 257 Q278 259 285 252 Q285 246 285 240Z" fill="#7A4E20"/>
+          <!-- Water around dog (splash) -->
+          <path d="M196,262 Q190,252 186,256" fill="none" stroke="white" stroke-width="2" opacity="0.7"/>
+          <path d="M310,262 Q316,252 320,256" fill="none" stroke="white" stroke-width="2" opacity="0.7"/>
+          <path d="M240,245 Q244,237 241,233" fill="none" stroke="white" stroke-width="2" opacity="0.6"/>
+          <!-- Floating orange leash in water -->
+          <path d="M195,264 Q160,268 130,262 Q100,258 80,265" fill="none" stroke="#C96B1A" stroke-width="3.5" stroke-linecap="round"/>
+          <!-- Ground/grass foreground -->
+          <path d="M0,360 Q130,348 260,356 Q390,364 520,352 L520,420 L0,420Z" fill="#3A5A20"/>
+          <!-- Sunlight on water -->
+          <path d="M350,250 Q400,240 430,248" fill="none" stroke="#F4D870" stroke-width="2" opacity="0.4"/>
+          <path d="M370,258 Q410,248 440,256" fill="none" stroke="#F4D870" stroke-width="1.5" opacity="0.35"/>
+        </svg>
+      </div>
+      <!-- Content -->
+      <div class="seasonal-content">
+        <span class="eyebrow">Now in Season</span>
+        <h2 class="seasonal-title">Dogs Go Where You Go — Water Included.</h2>
+        <p class="seasonal-body">Lake weekends, river hikes, and off-leash swim time. Three things your dog's kit needs: a leash that floats, a coat that dries fast, and a bowl that packs flat. The Lake Weekend Kit has all three plus bandana cooling and waste bags.</p>
+        <div class="seasonal-products">
+          <a href="bundles.html#lake-weekend" class="seasonal-product-row" style="background-color:var(--ash-dark);border-radius:var(--radius);padding:var(--space-3);display:flex;align-items:center;gap:var(--space-4);">
+            <svg class="seasonal-product-row__icon" viewBox="0 0 32 32" fill="none"><path d="M4 20 Q16 12 28 20" stroke="#2A4030" stroke-width="2"/><path d="M4 24 Q16 16 28 24" stroke="#2A4030" stroke-width="1.5" opacity="0.5"/><circle cx="16" cy="10" r="4" fill="#F0C840"/></svg>
+            <span class="seasonal-product-row__name">Lake Weekend Kit</span>
+            <span class="seasonal-product-row__price">$95</span>
+          </a>
+          <a href="bundles.html#lake-weekend" class="seasonal-product-row" style="background-color:var(--ash-dark);border-radius:var(--radius);padding:var(--space-3);display:flex;align-items:center;gap:var(--space-4);">
+            <svg class="seasonal-product-row__icon" viewBox="0 0 32 32" fill="none"><path d="M6 18 Q16 10 26 18 L26 22 Q16 14 6 22Z" fill="#2A4A8A" opacity="0.8"/><path d="M3 16 L29 16" stroke="#3A5A9A" stroke-width="2" stroke-dasharray="4,3"/></svg>
+            <span class="seasonal-product-row__name">Drift Waterproof Leash</span>
+            <span class="seasonal-product-row__price">$36</span>
+          </a>
+          <a href="shop-all.html" class="seasonal-product-row" style="background-color:var(--ash-dark);border-radius:var(--radius);padding:var(--space-3);display:flex;align-items:center;gap:var(--space-4);">
+            <svg class="seasonal-product-row__icon" viewBox="0 0 32 32" fill="none"><ellipse cx="16" cy="22" rx="12" ry="6" fill="#5A8AB0"/><path d="M4,22 Q4,16 16,14 Q28,16 28,22" fill="#4A7A9A"/></svg>
+            <span class="seasonal-product-row__name">Rapid Dry Coat</span>
+            <span class="seasonal-product-row__price">$52</span>
+          </a>
+          <a href="shop-all.html" class="seasonal-product-row" style="background-color:var(--ash-dark);border-radius:var(--radius);padding:var(--space-3);display:flex;align-items:center;gap:var(--space-4);">
+            <svg class="seasonal-product-row__icon" viewBox="0 0 32 32" fill="none"><path d="M8 8 Q8 24 16 24 Q24 24 24 8" fill="#3A6A9A" opacity="0.6" stroke="#3A6A9A" stroke-width="1.5"/><line x1="8" y1="8" x2="24" y2="8" stroke="#3A6A9A" stroke-width="2"/></svg>
+            <span class="seasonal-product-row__name">Ice Bandana</span>
+            <span class="seasonal-product-row__price">$16</span>
+          </a>
+        </div>
+        <a href="bundles.html#lake-weekend" class="btn btn--pine">Shop Lake Weekend Kit</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     7. GIFTABLE KITS
+═══════════════════════════════════════════ -->
+<section class="gifts-section" aria-labelledby="gifts-heading">
+  <div class="container">
+    <div class="section-header section-header--centered">
+      <span class="eyebrow" style="color:var(--trail-tan);opacity:1;">Gift Guide</span>
+      <h2 class="section-title text-ash" id="gifts-heading">Kits Worth Giving</h2>
+      <p class="section-subtitle" style="color:rgba(242,237,228,0.65);">Built around outings, not price points. Each one solves a real problem for a real dog owner.</p>
+    </div>
+    <div class="gift-grid">
+      <div class="gift-card">
+        <div class="gift-card__range">Under $30</div>
+        <h3 class="gift-card__title">First Dog Hiker</h3>
+        <p class="gift-card__desc">The right starting point for a first hike. Practical and specific — no guessing about what's useful.</p>
+        <div class="gift-card__kits">
+          <div class="gift-card__kit-item">Summit Paw Balm — $14</div>
+          <div class="gift-card__kit-item">Ice Bandana — $16</div>
+          <div class="gift-card__kit-item">Tick Pull Kit — $12</div>
+        </div>
+        <a href="shop-all.html" class="btn btn--secondary btn--sm">Shop Under $30</a>
+      </div>
+      <div class="gift-card">
+        <div class="gift-card__range">$70 – $95</div>
+        <h3 class="gift-card__title">The Weekend Upgrade</h3>
+        <p class="gift-card__desc">Best for new dog hikers who've done a few outings and want to stop improvising. A complete kit, not a collection of single items.</p>
+        <div class="gift-card__kits">
+          <div class="gift-card__kit-item">Hot Trail Starter Kit — $89</div>
+          <div class="gift-card__kit-item">Muddy Ride Home Kit — $72</div>
+          <div class="gift-card__kit-item">Night Visibility Kit — $78</div>
+        </div>
+        <a href="bundles.html" class="btn btn--secondary btn--sm">Shop $70–$95</a>
+      </div>
+      <div class="gift-card">
+        <div class="gift-card__range">$120+</div>
+        <h3 class="gift-card__title">The Full Setup</h3>
+        <p class="gift-card__desc">For the person whose dog goes on every trip. Gear that solves the hard problems — overnight readiness, limited mobility, or a dog who earns every mile.</p>
+        <div class="gift-card__kits">
+          <div class="gift-card__kit-item">Weekend Camp Dog Kit — $145</div>
+          <div class="gift-card__kit-item">Senior Dog Trail Kit — $120</div>
+        </div>
+        <a href="product-weekend-camp-kit.html" class="btn btn--secondary btn--sm">Shop $120+</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     8. TRAIL NOTES PREVIEW
+═══════════════════════════════════════════ -->
+<section class="section section--ash" aria-labelledby="trail-notes-heading">
+  <div class="container">
+    <div class="section-header--split">
+      <div>
+        <span class="eyebrow">Trail Notes</span>
+        <h2 class="section-title" id="trail-notes-heading">From the Field</h2>
+      </div>
+      <a href="trail-notes.html" class="view-all">All Trail Notes <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></a>
+    </div>
+    <div class="articles-grid">
+
+      <!-- Article 1 -->
+      <article class="article-card">
+        <div class="article-card__image">
+          <svg viewBox="0 0 400 225" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="art1-sky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#4A7BA8"/>
+                <stop offset="100%" stop-color="#88C0C8"/>
+              </linearGradient>
+            </defs>
+            <rect width="400" height="225" fill="url(#art1-sky)"/>
+            <circle cx="340" cy="45" r="28" fill="#F4C840" opacity="0.85"/>
+            <path d="M0,170 Q100,145 200,158 Q300,170 400,148 L400,225 L0,225Z" fill="#2A4020"/>
+            <path d="M0,188 Q100,172 200,180 Q300,188 400,172 L400,225 L0,225Z" fill="#1A2E10"/>
+            <!-- Trail -->
+            <path d="M400,210 Q300,200 220,195 Q160,190 80,198 Q40,202 0,198" fill="none" stroke="#C8A06A" stroke-width="6"/>
+            <!-- Hiker silhouette -->
+            <circle cx="220" cy="182" r="7" fill="#18120A"/>
+            <line x1="220" y1="189" x2="220" y2="208" stroke="#18120A" stroke-width="4"/>
+            <line x1="220" y1="195" x2="210" y2="205" stroke="#18120A" stroke-width="3"/>
+            <line x1="220" y1="195" x2="230" y2="203" stroke="#18120A" stroke-width="3"/>
+            <line x1="220" y1="208" x2="213" y2="218" stroke="#18120A" stroke-width="3"/>
+            <line x1="220" y1="208" x2="228" y2="217" stroke="#18120A" stroke-width="3"/>
+            <!-- Pack on hiker -->
+            <rect x="215" y="190" width="12" height="14" rx="2" fill="#4A5C3A"/>
+            <!-- Dog beside hiker -->
+            <ellipse cx="200" cy="198" rx="20" ry="8" fill="#8A6030"/>
+            <ellipse cx="216" cy="193" rx="10" ry="8" fill="#8A6030"/>
+            <path d="M218,195 Q224,192 226,194" fill="none" stroke="#8A6030" stroke-width="3"/>
+            <path d="M183,195 Q178,186 180,182" fill="none" stroke="#8A6030" stroke-width="3"/>
+            <!-- Pine trees -->
+            <polygon points="40,195 54,158 68,195" fill="#1A2E10"/>
+            <polygon points="55,195 70,150 85,195" fill="#0E2010"/>
+            <polygon points="320,188 334,152 348,188" fill="#1A2E10"/>
+            <polygon points="338,190 352,155 366,190" fill="#0E2010"/>
+          </svg>
+          <div class="article-card__image-overlay"></div>
+        </div>
+        <div class="article-card__body">
+          <span class="article-card__label">Packing Guides</span>
+          <h3 class="article-card__title">How to Pack for a Dog-Friendly Day Hike</h3>
+          <p class="article-card__excerpt">What goes in the pack, what clips to your belt, and what to leave in the car. Organized by trail length and dog size.</p>
+          <div class="article-card__meta">
+            <span class="article-card__read-time">5 min read</span>
+            <a href="trail-notes-day-hike.html" class="article-card__read-link">Read →</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Article 2 -->
+      <article class="article-card">
+        <div class="article-card__image">
+          <svg viewBox="0 0 400 225" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="art2-sky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#C87A20"/>
+                <stop offset="100%" stop-color="#E8A840"/>
+              </linearGradient>
+            </defs>
+            <rect width="400" height="225" fill="url(#art2-sky)"/>
+            <!-- Blazing sun -->
+            <circle cx="320" cy="50" r="45" fill="#F4D040" opacity="0.9"/>
+            <circle cx="320" cy="50" r="65" fill="#F4C020" opacity="0.18"/>
+            <!-- Heat shimmer lines -->
+            <path d="M50,160 Q80,150 110,160 Q140,170 170,158" fill="none" stroke="#E0B060" stroke-width="1.5" opacity="0.5"/>
+            <path d="M60,175 Q90,165 120,175 Q150,185 180,172" fill="none" stroke="#E0B060" stroke-width="1" opacity="0.4"/>
+            <!-- Dry dusty trail -->
+            <path d="M0,185 Q200,170 400,178 L400,225 L0,225Z" fill="#C89050"/>
+            <path d="M0,200 Q200,188 400,195" fill="none" stroke="#D4A870" stroke-width="3" stroke-dasharray="10,8"/>
+            <!-- Panting dog in shade -->
+            <ellipse cx="140" cy="182" rx="48" ry="17" fill="#9A6B3A"/>
+            <ellipse cx="183" cy="167" rx="22" ry="18" fill="#9A6B3A"/>
+            <ellipse cx="202" cy="172" rx="11" ry="8" fill="#8A5C2A"/>
+            <circle cx="210" cy="164" r="2" fill="#0A0500"/>
+            <!-- Panting tongue -->
+            <path d="M202,178 Q207,186 203,192 Q198,192 198,184Z" fill="#E04848"/>
+            <path d="M130,170 Q125,160 128,155" fill="none" stroke="#9A6B3A" stroke-width="6"/>
+            <!-- Temp indicator (thermometer) -->
+            <rect x="340" y="80" width="12" height="60" rx="6" fill="rgba(255,255,255,0.3)" stroke="white" stroke-width="1.5"/>
+            <rect x="343" y="100" width="6" height="37" rx="3" fill="#E04040"/>
+            <circle cx="346" cy="140" r="8" fill="#E04040"/>
+            <!-- 85°F text suggestion -->
+            <text x="330" y="78" font-family="monospace" font-size="9" fill="white" opacity="0.7">85°F</text>
+          </svg>
+          <div class="article-card__image-overlay"></div>
+        </div>
+        <div class="article-card__body">
+          <span class="article-card__label">Conditions</span>
+          <h3 class="article-card__title">What Changes When It Gets Hot</h3>
+          <p class="article-card__excerpt">Temperature thresholds, pavement burn risk, paw check timing, shade stop frequency, and hydration math for dogs who overheat.</p>
+          <div class="article-card__meta">
+            <span class="article-card__read-time">4 min read</span>
+            <a href="trail-notes.html" class="article-card__read-link">Read →</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Article 3 -->
+      <article class="article-card">
+        <div class="article-card__image">
+          <svg viewBox="0 0 400 225" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="art3-sky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#4A6050"/>
+                <stop offset="100%" stop-color="#6A8060"/>
+              </linearGradient>
+            </defs>
+            <rect width="400" height="225" fill="url(#art3-sky)"/>
+            <!-- Rainy sky -->
+            <ellipse cx="150" cy="50" rx="80" ry="35" fill="#5A7070"/>
+            <ellipse cx="280" cy="45" rx="70" ry="30" fill="#4A6060"/>
+            <!-- Rain lines -->
+            <line x1="100" y1="82" x2="96" y2="108" stroke="#7AAAC0" stroke-width="1.5" opacity="0.6"/>
+            <line x1="130" y1="80" x2="126" y2="106" stroke="#7AAAC0" stroke-width="1.5" opacity="0.6"/>
+            <line x1="160" y1="82" x2="156" y2="108" stroke="#7AAAC0" stroke-width="1.5" opacity="0.6"/>
+            <line x1="240" y1="76" x2="236" y2="102" stroke="#7AAAC0" stroke-width="1.5" opacity="0.6"/>
+            <line x1="270" y1="76" x2="266" y2="102" stroke="#7AAAC0" stroke-width="1.5" opacity="0.6"/>
+            <line x1="300" y1="78" x2="296" y2="104" stroke="#7AAAC0" stroke-width="1.5" opacity="0.6"/>
+            <!-- Muddy ground -->
+            <path d="M0,185 Q200,170 400,178 L400,225 L0,225Z" fill="#4A3018"/>
+            <!-- Car (back hatch open) -->
+            <rect x="220" y="130" width="160" height="65" rx="6" fill="#2A2818"/>
+            <rect x="240" y="108" width="120" height="50" rx="5" fill="#2A2818"/>
+            <!-- Car windows -->
+            <rect x="248" y="115" width="48" height="36" rx="3" fill="#3A4848" opacity="0.8"/>
+            <rect x="302" y="115" width="48" height="36" rx="3" fill="#3A4848" opacity="0.8"/>
+            <!-- Open hatch -->
+            <path d="M220,130 Q220,110 380,100 L380,130Z" fill="#3A3828" stroke="#2A2818" stroke-width="1"/>
+            <!-- Car mat visible inside -->
+            <rect x="228" y="175" width="144" height="18" rx="2" fill="#1A1408"/>
+            <!-- Muddy dog approaching car -->
+            <ellipse cx="140" cy="192" rx="48" ry="16" fill="#5A3A18"/>
+            <ellipse cx="184" cy="180" rx="21" ry="17" fill="#5A3A18"/>
+            <!-- Mud spots on dog -->
+            <circle cx="130" cy="188" r="6" fill="#3A2010" opacity="0.7"/>
+            <circle cx="155" cy="183" r="5" fill="#3A2010" opacity="0.7"/>
+            <!-- Dog snout -->
+            <ellipse cx="202" cy="184" rx="10" ry="7" fill="#4A2A10"/>
+            <!-- Muddy paw prints on ground -->
+            <ellipse cx="195" cy="210" rx="5" ry="3" fill="#3A2010" opacity="0.8"/>
+            <ellipse cx="178" cy="215" rx="5" ry="3" fill="#3A2010" opacity="0.8"/>
+            <ellipse cx="162" cy="212" rx="5" ry="3" fill="#3A2010" opacity="0.7"/>
+            <!-- Rapid dry coat draped on car -->
+            <path d="M338,130 Q360,135 380,132" fill="none" stroke="#5A7090" stroke-width="8" stroke-linecap="round"/>
+          </svg>
+          <div class="article-card__image-overlay"></div>
+        </div>
+        <div class="article-card__body">
+          <span class="article-card__label">After the Hike</span>
+          <h3 class="article-card__title">How to Clean Up After a Muddy Trail Day</h3>
+          <p class="article-card__excerpt">In the car, at the trailhead, at home. The right cleanup order matters. What to do with the leash, the coat, the paws, and the car mat.</p>
+          <div class="article-card__meta">
+            <span class="article-card__read-time">3 min read</span>
+            <a href="trail-notes.html" class="article-card__read-link">Read →</a>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     9. GUIDED SELECTOR TEASER
+═══════════════════════════════════════════ -->
+<section class="selector-section" id="selector" aria-labelledby="selector-heading">
+  <div class="container">
+    <div class="selector-inner">
+      <div class="selector-content">
+        <span class="eyebrow">Find Your Kit</span>
+        <h2 class="selector-title" id="selector-heading">Tell Us About the Outing.</h2>
+        <p class="selector-subtitle">Four questions. One recommended kit. No decision fatigue.</p>
+      </div>
+      <div class="selector-form" role="form" aria-label="Kit finder">
+        <div class="selector-form__title">Kit Finder</div>
+        <div class="form-field">
+          <label class="form-label" for="sel-outing">Outing Type</label>
+          <select class="form-select" id="sel-outing" name="outing">
+            <option value="">Choose an outing...</option>
+            <option value="hike">Day Hike</option>
+            <option value="lake">Beach / Lake</option>
+            <option value="camp">Weekend Camp</option>
+            <option value="road-trip">Road Trip</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="sel-weather">Weather &amp; Conditions</label>
+          <select class="form-select" id="sel-weather" name="weather">
+            <option value="">Choose conditions...</option>
+            <option value="hot">Hot &amp; Dry</option>
+            <option value="mud">Wet &amp; Muddy</option>
+            <option value="cold">Cold</option>
+            <option value="night">Night / Dusk</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="sel-size">Dog Size</label>
+          <select class="form-select" id="sel-size" name="dog-size">
+            <option value="">Choose size...</option>
+            <option value="small">Small — under 20lb</option>
+            <option value="medium">Medium — 20–50lb</option>
+            <option value="large">Large — 50–80lb</option>
+            <option value="xl">XL — 80lb+</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="sel-mobility">Dog Age &amp; Mobility</label>
+          <select class="form-select" id="sel-mobility" name="mobility">
+            <option value="">Choose mobility...</option>
+            <option value="active">Active &amp; Healthy</option>
+            <option value="normal">Normal Energy</option>
+            <option value="senior">Senior / Limited Mobility</option>
+          </select>
+        </div>
+        <button class="btn btn--primary btn--full selector-submit" type="button">Find My Kit</button>
+        <div class="selector-result" role="alert" aria-live="polite">
+          <div class="selector-result__label">Recommended Kit</div>
+          <div class="selector-result__kit"></div>
+          <p class="selector-result__why"></p>
+          <a href="bundles.html" class="selector-result__link btn btn--tan btn--sm"></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ── Footer ─────────────────────────────── -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <span class="footer-brand__logo">Switchback</span>
+        <p class="footer-brand__tagline">Terrain-aware gear for dogs and the people who take them outside. Built for real outings — not the dog park.</p>
+        <div class="footer-newsletter">
+          <input type="email" class="footer-newsletter__input" placeholder="Trail updates + new kits" aria-label="Email for newsletter">
+          <button class="footer-newsletter__btn" type="button">Subscribe</button>
+        </div>
+      </div>
+      <div>
+        <span class="footer-nav__heading">Shop</span>
+        <a href="shop-all.html" class="footer-nav__link">Shop All</a>
+        <a href="bundles.html" class="footer-nav__link">Bundles</a>
+        <a href="by-outing.html" class="footer-nav__link">By Outing</a>
+        <a href="by-condition.html" class="footer-nav__link">By Condition</a>
+        <a href="bundles.html#gifts" class="footer-nav__link">Gifts</a>
+        <a href="shop-all.html" class="footer-nav__link">New Arrivals</a>
+      </div>
+      <div>
+        <span class="footer-nav__heading">Gear Info</span>
+        <a href="size-guide.html" class="footer-nav__link">Size Guide</a>
+        <a href="trail-notes.html" class="footer-nav__link">Trail Notes</a>
+        <a href="#" class="footer-nav__link">How Bundles Work</a>
+        <a href="#" class="footer-nav__link">Materials &amp; Quality</a>
+      </div>
+      <div>
+        <span class="footer-nav__heading">Support</span>
+        <a href="#" class="footer-nav__link">Help Center</a>
+        <a href="#" class="footer-nav__link">Returns &amp; Exchanges</a>
+        <a href="#" class="footer-nav__link">Shipping Info</a>
+        <a href="#" class="footer-nav__link">About Switchback</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-bottom__copy">&copy; 2026 Switchback Outfitters. All rights reserved.</span>
+      <div class="footer-bottom__links">
+        <a href="#" class="footer-bottom__link">Privacy</a>
+        <a href="#" class="footer-bottom__link">Terms</a>
+        <a href="#" class="footer-bottom__link">Accessibility</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

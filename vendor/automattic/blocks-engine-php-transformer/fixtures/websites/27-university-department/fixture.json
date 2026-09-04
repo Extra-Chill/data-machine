@@ -1,0 +1,11 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "education",
+    "university",
+    "institutional",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

@@ -1,0 +1,36 @@
+{
+  "color": {
+    "indigo": {
+      "100": { "value": "#e0e1fb" },
+      "300": { "value": "#a5a8f4" },
+      "500": { "value": "#6366f1" },
+      "600": { "value": "#4f46e5" },
+      "700": { "value": "#4338ca" },
+      "900": { "value": "#272461" }
+    },
+    "emerald": {
+      "500": { "value": "#10b981" },
+      "700": { "value": "#047857" }
+    },
+    "amber": {
+      "500": { "value": "#f59e0b" },
+      "700": { "value": "#b45309" }
+    },
+    "rose": {
+      "500": { "value": "#f43f5e" },
+      "700": { "value": "#be123c" }
+    },
+    "slate": {
+      "0": { "value": "#ffffff" },
+      "100": { "value": "#eef0f6" },
+      "300": { "value": "#c3c8d9" },
+      "500": { "value": "#7c849c" },
+      "700": { "value": "#3d4256" },
+      "900": { "value": "#0b0d17" }
+    }
+  },
+  "brand": { "value": "{color.indigo.600.value}" },
+  "danger": { "value": "{color.rose.700.value}" },
+  "surface": { "value": "{color.slate.0.value}" },
+  "text": { "value": "{color.slate.900.value}" }
+}

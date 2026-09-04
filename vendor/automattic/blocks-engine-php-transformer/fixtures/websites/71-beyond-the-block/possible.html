@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What's Possible — Beyond the Block</title>
+  <meta name="description" content="A catalogue of experiences that are impractical or impossible to build by stacking static content blocks — each with a tiny live preview running in the page.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23c6ff3a'/><text x='16' y='23' font-family='monospace' font-size='20' font-weight='700' text-anchor='middle' fill='%2307060d'>&gt;</text></svg>">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="scroll-progress" aria-hidden="true"></div>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Beyond the Block — home">
+      <span class="logo-mark">Beyond the <b>Block</b></span>
+      <span class="logo-sub">A web that does more</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Manifesto</a>
+      <a href="possible.html" class="active">What's Possible</a>
+      <a href="about.html">Colophon</a>
+      <a href="#demos" class="nav-cta">Jump to demos →</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main id="main">
+
+    <!-- ══════════ PAGE HERO ══════════ -->
+    <section class="page-hero">
+      <div class="wrap">
+        <p class="eyebrow">The catalogue</p>
+        <h1>Things that live<br><em>beyond the block.</em></h1>
+        <p class="lede">A field guide to the categories of experience that resist being assembled from static content blocks — because they aren't content at all. They're <strong>behavior</strong>. Each card below has a tiny version running live in its corner.</p>
+      </div>
+    </section>
+
+    <!-- ══════════ CATEGORY GRID with live mini previews ══════════ -->
+    <section class="section" aria-labelledby="cat-h">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">A</span> / Categories</p>
+            <h2 class="section-title" id="cat-h">Eight kinds of <em>more</em></h2>
+          </div>
+        </div>
+
+        <div class="cat-grid">
+          <article class="cat reveal" data-demo="mini" data-mini="wave" data-seed="3">
+            <div class="cat-mini"><canvas aria-hidden="true"></canvas></div>
+            <p class="cat-num">CAT · 01</p>
+            <h3>Real-time generative visuals</h3>
+            <p>Flow fields, noise, fluid lines — drawn fresh every frame from math, never a saved image. The corner of this card is one such field, looping right now.</p>
+            <p class="verdict">In blocks: there is no "render this equation 60×/sec" block.</p>
+          </article>
+
+          <article class="cat reveal reveal-d1" data-demo="mini" data-mini="orbit" data-seed="11">
+            <div class="cat-mini"><canvas aria-hidden="true"></canvas></div>
+            <p class="cat-num">CAT · 02</p>
+            <h3>Physics &amp; simulation</h3>
+            <p>Gravity, springs, collisions, particle systems. The page maintains a little universe and steps it forward. Objects have momentum and consequences.</p>
+            <p class="verdict">In blocks: rectangles don't fall, bounce, or remember velocity.</p>
+          </article>
+
+          <article class="cat reveal reveal-d2" data-demo="mini" data-mini="grid" data-seed="22">
+            <div class="cat-mini"><canvas aria-hidden="true"></canvas></div>
+            <p class="cat-num">CAT · 03</p>
+            <h3>Audio synthesis</h3>
+            <p>Oscillators, envelopes, filters — instruments built from the Web Audio graph. No MP3s, just sound generated as you interact.</p>
+            <p class="verdict">In blocks: you can embed a player. You can't <em>build</em> the sound.</p>
+          </article>
+
+          <article class="cat reveal" data-demo="mini" data-mini="spiral" data-seed="2">
+            <div class="cat-mini"><canvas aria-hidden="true"></canvas></div>
+            <p class="cat-num">CAT · 04</p>
+            <h3>Scroll-choreographed story</h3>
+            <p>Pinned scenes, scrubbed animation, progressive reveals tied to scroll progress. The page becomes a timeline you control with the wheel.</p>
+            <p class="verdict">In blocks: stacking is vertical order, not a scrubbed timeline.</p>
+          </article>
+
+          <article class="cat reveal" data-demo="mini" data-mini="orbit" data-seed="33">
+            <div class="cat-mini"><canvas aria-hidden="true"></canvas></div>
+            <p class="cat-num">CAT · 05</p>
+            <h3>Stateful single-page apps</h3>
+            <p>Editors, dashboards, games, tools — anything that holds state, responds to events, and changes without reloading. The page <em>is</em> the application.</p>
+            <p class="verdict">In blocks: there's no place to put "the part that remembers."</p>
+          </article>
+
+          <article class="cat reveal" data-demo="mini" data-mini="grid" data-seed="44">
+            <div class="cat-mini"><canvas aria-hidden="true"></canvas></div>
+            <p class="cat-num">CAT · 06</p>
+            <h3>Custom interaction &amp; cursors</h3>
+            <p>Magnetic buttons, drag-and-fling, gesture surfaces, bespoke cursors. Interaction designed at the level of the individual frame and pointer event.</p>
+            <p class="verdict">In blocks: hover styles, yes. Pointer physics, no.</p>
+          </article>
+
+          <article class="cat reveal" data-demo="mini" data-mini="wave" data-seed="55">
+            <div class="cat-mini"><canvas aria-hidden="true"></canvas></div>
+            <p class="cat-num">CAT · 07</p>
+            <h3>Live data &amp; interactive viz</h3>
+            <p>Charts you can brush, attractors you can warp, maps you can drive. Data rendered as something you manipulate, not a flat exported chart image.</p>
+            <p class="verdict">In blocks: a static chart embed isn't a data instrument.</p>
+          </article>
+
+          <article class="cat reveal" data-demo="mini" data-mini="spiral" data-seed="66">
+            <div class="cat-mini"><canvas aria-hidden="true"></canvas></div>
+            <p class="cat-num">CAT · 08</p>
+            <h3>WebGL, 3D &amp; shaders</h3>
+            <p>GPU-driven scenes, raymarched worlds, per-pixel shader effects. Whole rendering pipelines, in the same browser tab, no plugin.</p>
+            <p class="verdict">In blocks: there is no fragment-shader content type.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ FULL DEMOS — reused widgets ══════════ -->
+    <section class="section section--soft" id="demos" aria-labelledby="demos-h">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">B</span> / Hands-on</p>
+            <h2 class="section-title" id="demos-h">Don't take our word for it. <em>Drive it.</em></h2>
+          </div>
+          <p class="mono" style="max-width:30ch;color:var(--ink-dim);">Two of the headline exhibits, bigger, with more knobs.</p>
+        </div>
+
+        <div class="demo-grid">
+          <article class="demo span-8" data-demo="attractor">
+            <div class="demo-stage">
+              <span class="demo-badge">Math · Dataviz</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <canvas aria-label="A strange attractor visualization with an adjustable parameter."></canvas>
+            </div>
+            <div class="demo-body">
+              <h3>Interactive data: a Clifford attractor</h3>
+              <p class="demo-caption">Thousands of plotted points redrawn every frame, breathing through two animated coefficients. <b>Drag the slider</b> to push the third — the structure reorganizes into something completely new. This is what "interactive visualization" actually means.</p>
+              <div class="ctl-row">
+                <label for="attr-k2">parameter k <b data-attr-val>1.60</b></label>
+                <input type="range" id="attr-k2" min="0" max="2.4" step="0.01" value="1.6">
+              </div>
+              <p class="demo-hint">Slide to warp the equation in real time</p>
+            </div>
+          </article>
+
+          <article class="demo span-4" data-demo="genart">
+            <div class="demo-stage">
+              <span class="demo-badge">Generative</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <canvas aria-label="Generative artwork. Click to generate a new one."></canvas>
+            </div>
+            <div class="demo-body">
+              <h3>One of billions</h3>
+              <p class="demo-caption">Seed <b><span data-seed-label class="mono">0x00000000</span></b>. Click for the next. A single tiny program, an infinite gallery.</p>
+              <div class="demo-controls">
+                <button class="chip" data-act="reroll">⟳ New seed</button>
+              </div>
+              <p class="demo-hint">Click the canvas to regenerate</p>
+            </div>
+          </article>
+
+          <article class="demo span-6" data-demo="magnet">
+            <div class="demo-stage">
+              <span class="demo-badge">Cursor-reactive</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <canvas aria-label="A lattice of dots that repels or attracts your cursor."></canvas>
+            </div>
+            <div class="demo-body">
+              <h3>A field that feels you</h3>
+              <p class="demo-caption">Spring-loaded points reacting to the pointer with real vector math. <b>Switch between repel and attract.</b> This is the engine behind every "magnetic" UI moment you've admired.</p>
+              <div class="demo-controls">
+                <button class="chip active" data-mode="repel">repel</button>
+                <button class="chip" data-mode="attract">attract</button>
+              </div>
+              <p class="demo-hint">Move your cursor across the field</p>
+            </div>
+          </article>
+
+          <article class="demo span-6" data-demo="physics">
+            <div class="demo-stage">
+              <span class="demo-badge">Canvas · Physics</span>
+              <span class="demo-live"><i class="pulse"></i>live</span>
+              <canvas aria-label="Interactive bouncing-ball physics toy."></canvas>
+            </div>
+            <div class="demo-body">
+              <h3>A pocket universe</h3>
+              <p class="demo-caption">Drag and <b>fling</b> the balls; momentum is conserved, collisions resolve, walls bounce. A simulation, paused only when off-screen to be kind to your battery.</p>
+              <div class="demo-controls">
+                <button class="chip" data-act="shake">Shake</button>
+                <button class="chip" data-act="add">+6 balls</button>
+              </div>
+              <p class="demo-hint">Drag-and-fling to test the physics</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ COMPARISON TABLE ══════════ -->
+    <section class="section" id="compare" aria-labelledby="cmp-h">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">C</span> / Honest scorecard</p>
+            <h2 class="section-title" id="cmp-h">Right tool, right job</h2>
+          </div>
+          <p class="mono" style="max-width:34ch;color:var(--ink-dim);">We're not here to dunk. Blocks win plenty of rows — and we say so.</p>
+        </div>
+
+        <table class="compare">
+          <thead>
+            <tr><th>The job</th><th>Page-builder / blocks</th><th>Hand-coded web</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Ship a marketing page today</td><td class="yes">Brilliant ✓</td><td class="meh">Overkill ~</td></tr>
+            <tr><td>Editor-friendly content updates</td><td class="yes">Brilliant ✓</td><td class="no">Needs a dev ✗</td></tr>
+            <tr><td>Consistent design system</td><td class="yes">Great ✓</td><td class="yes">Great ✓</td></tr>
+            <tr><td>Real-time generative graphics</td><td class="no">Not a thing ✗</td><td class="yes">Native ✓</td></tr>
+            <tr><td>Physics / simulation</td><td class="no">Not a thing ✗</td><td class="yes">Native ✓</td></tr>
+            <tr><td>Audio synthesis</td><td class="no">Embed only ✗</td><td class="yes">Native ✓</td></tr>
+            <tr><td>Scroll-scrubbed storytelling</td><td class="meh">Plugin-ish ~</td><td class="yes">Native ✓</td></tr>
+            <tr><td>Stateful app (editor, game, tool)</td><td class="no">No ✗</td><td class="yes">Native ✓</td></tr>
+            <tr><td>Custom cursor / magnetic UI</td><td class="no">No ✗</td><td class="yes">Native ✓</td></tr>
+            <tr><td>WebGL / 3D / shaders</td><td class="no">No ✗</td><td class="yes">Native ✓</td></tr>
+          </tbody>
+        </table>
+
+        <p class="callout">The point was never "blocks are bad." It's that <em>more exists</em>, it's open, and it runs in the same browser you're reading this in.</p>
+      </div>
+    </section>
+
+    <!-- ══════════ CTA ══════════ -->
+    <section class="cta" aria-labelledby="cta-h">
+      <canvas id="cta-canvas" aria-hidden="true"></canvas>
+      <div class="cta-inner wrap">
+        <h2 id="cta-h">Curious <em>how</em> a page like this gets made?</h2>
+        <p>No framework, no build step, no npm install. Just files. The colophon spells out exactly how — and why that itself is the flex.</p>
+        <a href="about.html" class="btn btn-primary">Read the colophon <span class="btn-arrow">→</span></a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Beyond the <b>Block</b></div>
+          <p class="footer-brand-desc">A good-humored manifesto and living showcase for the part of the web that lives past page-builders. Every pixel here is hand-written, framework-free, and runs from a single folder.</p>
+        </div>
+        <nav class="footer-col" aria-label="Site links">
+          <p class="footer-col-title">The site</p>
+          <ul>
+            <li><a href="index.html">Manifesto</a></li>
+            <li><a href="possible.html">What's Possible</a></li>
+            <li><a href="about.html">Colophon</a></li>
+            <li><a href="#demos">Live demos</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Category links">
+          <p class="footer-col-title">Categories</p>
+          <ul>
+            <li><a href="#cat-h">Generative visuals</a></li>
+            <li><a href="#cat-h">Physics</a></li>
+            <li><a href="#cat-h">Audio synthesis</a></li>
+            <li><a href="#cat-h">WebGL &amp; shaders</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="More links">
+          <p class="footer-col-title">More</p>
+          <ul>
+            <li><a href="#compare">Blocks vs. code</a></li>
+            <li><a href="about.html#how">How it's built</a></li>
+            <li><a href="index.html#manifesto">The thesis</a></li>
+            <li><a href="about.html#colophon">Colophon</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Beyond the Block · Made by hand, no framework, with affection for blocks</p>
+        <div class="footer-legal">
+          <a href="about.html">Colophon</a>
+          <a href="index.html">Manifesto</a>
+          <a href="#compare">Scorecard</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/engine.js"></script>
+  <script src="js/demos.js"></script>
+</body>
+</html>

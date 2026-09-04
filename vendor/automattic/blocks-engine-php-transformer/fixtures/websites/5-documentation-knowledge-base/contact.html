@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Support — PocketRoute Docs</title>
+  <meta name="description" content="Get help from the PocketRoute support team — email, live chat, community forum, and enterprise contact options.">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .toc-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .toc-list a {
+      font-family: var(--font-mono);
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      border-left: 2px solid transparent;
+      transition: color var(--t), background var(--t), border-color var(--t);
+    }
+    .toc-list a:hover { color: var(--text-secondary); border-left-color: var(--border-strong); }
+    .toc-list a.toc-active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+
+    .support-hero {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 32px 36px;
+      margin-bottom: 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .support-hero::before {
+      content: '';
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, rgba(240,130,42,0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .support-hero h2 {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .support-hero p {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+      max-width: 500px;
+      margin-bottom: 0;
+    }
+
+    .contact-option {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      transition: border-color var(--t), transform var(--t), box-shadow var(--t);
+      position: relative;
+    }
+
+    .contact-option:hover {
+      border-color: var(--border-default);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    .contact-option-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      flex-shrink: 0;
+    }
+
+    .icon-amber { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(240,130,42,0.2); }
+    .icon-teal  { background: var(--teal-dim);   color: var(--teal);   border: 1px solid rgba(45,207,190,0.2); }
+    .icon-green { background: rgba(82,217,138,0.1); color: var(--green); border: 1px solid rgba(82,217,138,0.2); }
+    .icon-purple { background: rgba(167,139,250,0.1); color: var(--purple); border: 1px solid rgba(167,139,250,0.2); }
+
+    .contact-option h3 {
+      font-size: 1.05rem;
+      margin-bottom: 8px;
+    }
+
+    .contact-option p {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+      flex: 1;
+      line-height: 1.55;
+    }
+
+    .contact-option .plan-note {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    .btn-contact-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 10px 20px;
+      background: var(--accent);
+      color: #0c1017;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      border: none;
+      transition: background var(--t), transform var(--t);
+      cursor: pointer;
+    }
+    .btn-contact-primary:hover { background: var(--accent-light); color: #0c1017; }
+
+    .btn-contact-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 10px 20px;
+      border: 1.5px solid var(--border-strong);
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: all var(--t);
+    }
+    .btn-contact-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .btn-contact-teal {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 10px 20px;
+      border: 1.5px solid rgba(45,207,190,0.35);
+      color: var(--teal);
+      background: var(--teal-dim);
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: all var(--t);
+    }
+    .btn-contact-teal:hover {
+      background: rgba(45,207,190,0.18);
+      border-color: var(--teal);
+      color: var(--teal);
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .hours-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .hours-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 0.875rem;
+    }
+    .hours-row:last-child { border-bottom: none; }
+    .hours-label { color: var(--text-secondary); }
+    .hours-val { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); }
+
+    .sla-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin: 12px 0;
+    }
+    .sla-table th {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-align: left;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border-default);
+      background: var(--bg-surface);
+    }
+    .sla-table td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      vertical-align: top;
+    }
+    .sla-table tr:last-child td { border-bottom: none; }
+    .sla-table td:first-child { font-family: var(--font-display); font-weight: 700; font-size: 0.85rem; color: var(--text-primary); }
+
+    .faq-item {
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 18px 0;
+    }
+    .faq-item:first-child { padding-top: 0; }
+    .faq-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .faq-q {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .faq-a {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .contact-section-title {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      letter-spacing: -0.015em;
+    }
+    .contact-section-sub {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── HEADER ─────────────────────────────────────────── -->
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo">
+      <span class="logo-icon">
+        <svg width="26" height="20" viewBox="0 0 26 20" fill="none" aria-hidden="true">
+          <circle cx="3.5" cy="16" r="3" fill="currentColor"/>
+          <circle cx="22.5" cy="4" r="3" fill="currentColor"/>
+          <path d="M6 14.5 C10 9, 16 11, 20 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <circle cx="10.8" cy="11.2" r="1.2" fill="currentColor" opacity="0.5"/>
+          <circle cx="15.5" cy="9.8" r="1.2" fill="currentColor" opacity="0.5"/>
+        </svg>
+      </span>
+      <span class="logo-wordmark">
+        <span>PocketRoute</span>
+        <span>Documentation</span>
+      </span>
+    </a>
+
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting Started</a>
+      <a href="release-notes.html">Releases</a>
+      <a href="api-docs.html">API</a>
+      <a href="contact.html" class="active">Support</a>
+    </nav>
+
+    <div class="header-right">
+      <span class="version-badge">v2.4.1</span>
+      <a href="#" class="btn-open-app">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+        </svg>
+        <span>Open App</span>
+      </a>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" id="nav-toggle">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="nav-overlay" id="nav-overlay" aria-hidden="true"></div>
+<nav class="nav-drawer" id="nav-drawer" aria-label="Mobile navigation">
+  <div class="nav-drawer-links">
+    <a href="index.html">Home</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="troubleshooting.html">Troubleshooting</a>
+    <a href="release-notes.html">Release Notes</a>
+    <a href="api-docs.html">API Docs</a>
+    <a href="contact.html" class="active">Contact Support</a>
+  </div>
+</nav>
+
+<!-- ─── PAGE LAYOUT ────────────────────────────────────── -->
+<div class="page-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar" aria-label="Documentation navigation">
+    <div class="sidebar-section">
+      <p class="sidebar-label">Navigation</p>
+      <nav class="sidebar-nav">
+        <a href="index.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Home
+        </a>
+        <a href="getting-started.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+          Getting Started
+        </a>
+        <a href="troubleshooting.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Troubleshooting
+        </a>
+        <a href="release-notes.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Release Notes
+        </a>
+        <a href="api-docs.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          API Reference
+        </a>
+        <a href="contact.html" class="active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Contact Support
+        </a>
+      </nav>
+    </div>
+
+    <div class="sidebar-section">
+      <p class="sidebar-label">On this page</p>
+      <nav class="toc-list" aria-label="Page sections">
+        <a href="#get-help" class="toc-active">Get Help</a>
+        <a href="#contact-options">Contact Options</a>
+        <a href="#hours">Support Hours</a>
+        <a href="#sla">Response Times</a>
+        <a href="#community">Community Forum</a>
+        <a href="#status">Service Status</a>
+        <a href="#faq">Common Questions</a>
+        <a href="#enterprise">Enterprise Support</a>
+      </nav>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content" id="main-content">
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="index.html">Docs</a>
+      <span class="breadcrumb-sep" aria-hidden="true">/</span>
+      <span aria-current="page">Contact Support</span>
+    </nav>
+
+    <header class="article-header">
+      <h1>Contact Support</h1>
+      <div class="article-meta">
+        <span class="article-meta-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+          Mon–Fri, 9am–6pm EST
+        </span>
+        <span class="article-meta-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Response within 4–24 hours
+        </span>
+      </div>
+    </header>
+
+    <!-- Status bar -->
+    <section id="status">
+      <div class="status-bar" role="status" aria-label="System status">
+        <div class="status-dot" aria-hidden="true"></div>
+        <span class="status-text">All systems operational &mdash; PocketRoute app, API, and dashboard are running normally</span>
+        <a href="#" class="status-link">
+          status.pocketroute.io
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-left: 4px;" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <!-- Support hero -->
+    <section id="get-help">
+      <div class="support-hero">
+        <h2>How can we help?</h2>
+        <p>Before contacting support, check the <a href="index.html">help center</a> and <a href="troubleshooting.html">troubleshooting articles</a> — most common issues are covered there and you'll get a faster answer. If you need to reach us, pick the best channel below.</p>
+      </div>
+    </section>
+
+    <!-- Contact options -->
+    <section id="contact-options">
+      <p class="contact-section-sub" style="margin-bottom: 20px;">Choose the support channel that fits your plan and urgency.</p>
+
+      <div class="contact-grid" role="list" aria-label="Contact options">
+
+        <div class="contact-option" role="listitem">
+          <div class="contact-option-icon icon-amber" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </div>
+          <h3>Email Support</h3>
+          <p>Send a detailed message and our team will respond with a solution or follow-up questions. Best for non-urgent issues, account questions, and anything requiring investigation.</p>
+          <a href="mailto:support@pocketroute.io" class="btn-contact-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            support@pocketroute.io
+          </a>
+          <span class="plan-note">Available on all plans</span>
+        </div>
+
+        <div class="contact-option" role="listitem">
+          <div class="contact-option-icon icon-teal" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+          </div>
+          <h3>Live Chat</h3>
+          <p>Chat with a support agent in real time from the dashboard. Best for quick questions, getting unblocked, and walking through issues step by step. Available during business hours.</p>
+          <a href="#" class="btn-contact-teal" onclick="alert('Live chat requires the PocketRoute dashboard. Open the app and click the chat bubble icon in the bottom right.');">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            Start Live Chat
+          </a>
+          <span class="plan-note">Growth &amp; Team plans · Business hours only</span>
+        </div>
+
+        <div class="contact-option" role="listitem" id="community">
+          <div class="contact-option-icon icon-green" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+          </div>
+          <h3>Community Forum</h3>
+          <p>Ask questions, share tips, and get answers from other PocketRoute users and the product team. Great for workflow questions, feature requests, and connecting with other fleet operators.</p>
+          <a href="#" class="btn-contact-secondary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            Visit Community Forum
+          </a>
+          <span class="plan-note">Free · community.pocketroute.io</span>
+        </div>
+
+        <div class="contact-option" role="listitem" id="enterprise">
+          <div class="contact-option-icon icon-purple" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <h3>Enterprise Support</h3>
+          <p>Team plan customers have a dedicated Customer Success Manager and access to a private Slack channel. Phone support and custom SLAs are available for enterprise agreements.</p>
+          <a href="mailto:enterprise@pocketroute.io" class="btn-contact-secondary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            enterprise@pocketroute.io
+          </a>
+          <span class="plan-note">Team plan &amp; Enterprise only</span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Hours -->
+    <section id="hours" style="margin-bottom: 40px;">
+      <h2 class="contact-section-title">Support Hours</h2>
+      <p class="contact-section-sub">All times Eastern (EST/EDT). We observe US federal holidays.</p>
+
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 8px 24px;">
+        <div class="hours-row">
+          <span class="hours-label">Monday – Friday</span>
+          <span class="hours-val">9:00 AM – 6:00 PM EST</span>
+        </div>
+        <div class="hours-row">
+          <span class="hours-label">Saturday</span>
+          <span class="hours-val">10:00 AM – 3:00 PM EST <span style="color: var(--text-muted);">(email only)</span></span>
+        </div>
+        <div class="hours-row">
+          <span class="hours-label">Sunday &amp; Holidays</span>
+          <span class="hours-val" style="color: var(--text-muted);">Closed — email monitored for critical issues</span>
+        </div>
+        <div class="hours-row">
+          <span class="hours-label">Team Plan P1 Issues</span>
+          <span class="hours-val" style="color: var(--green);">24/7 emergency escalation via CSM</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLA -->
+    <section id="sla" style="margin-bottom: 40px;">
+      <h2 class="contact-section-title">Response Time Targets</h2>
+      <p class="contact-section-sub">First response times by plan and severity. "First response" means a human reply, not an auto-confirmation.</p>
+
+      <table class="sla-table" aria-label="Support response time SLAs">
+        <thead>
+          <tr>
+            <th>Plan</th>
+            <th>General Questions</th>
+            <th>Account / Billing</th>
+            <th>Outage / Critical</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Starter</td>
+            <td>24 business hours</td>
+            <td>24 business hours</td>
+            <td>12 business hours</td>
+          </tr>
+          <tr>
+            <td>Growth</td>
+            <td>8 business hours</td>
+            <td>4 business hours</td>
+            <td>2 business hours</td>
+          </tr>
+          <tr>
+            <td>Team</td>
+            <td>4 business hours</td>
+            <td>2 business hours</td>
+            <td style="color: var(--green);">1 hour (24/7)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" style="margin-bottom: 40px;">
+      <h2 class="contact-section-title">Common Questions</h2>
+      <p class="contact-section-sub">Quick answers before you reach out.</p>
+
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 8px 24px;">
+
+        <div class="faq-item">
+          <p class="faq-q">Can I get a refund if I cancel mid-month?</p>
+          <p class="faq-a">PocketRoute subscriptions are billed monthly and are not prorated on cancellation — you retain access until the end of your billing period. Annual plan refunds are handled case-by-case. Email <a href="mailto:billing@pocketroute.io">billing@pocketroute.io</a> with your request.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">How do I transfer my account to a new owner?</p>
+          <p class="faq-a">Account ownership transfers require verification from both parties. Email <a href="mailto:support@pocketroute.io">support@pocketroute.io</a> with the subject line "Account Transfer Request" and include your account email and the new owner's email. We typically complete transfers within 1 business day.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Can I pause my subscription instead of canceling?</p>
+          <p class="faq-a">Yes — Growth and Team plans can pause billing for up to 3 months per year. Your data and team settings are preserved. Go to Settings → Billing → Pause Subscription, or email us if you don't see the option.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Do you offer discounts for non-profits or educational organizations?</p>
+          <p class="faq-a">Yes. We offer 30% off Growth and Team plans for registered 501(c)(3) organizations and accredited educational institutions. Email <a href="mailto:support@pocketroute.io">support@pocketroute.io</a> with proof of status and we'll apply the discount to your next billing cycle.</p>
+        </div>
+
+        <div class="faq-item">
+          <p class="faq-q">Is PocketRoute HIPAA or SOC 2 compliant?</p>
+          <p class="faq-a">PocketRoute is SOC 2 Type II certified (report available upon request under NDA). We do not currently hold HIPAA certification, as delivery route data does not typically constitute protected health information. Contact <a href="mailto:enterprise@pocketroute.io">enterprise@pocketroute.io</a> for compliance documentation.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Before contacting -->
+    <section style="margin-bottom: 40px;">
+      <div class="callout callout-info">
+        <span class="callout-label">Faster resolution</span>
+        <p>When contacting support, always include your <strong>account email</strong>, the <strong>Route ID</strong> (if relevant), the <strong>driver's email</strong> (if driver-related), and any <strong>error messages or screenshots</strong>. This helps us skip the back-and-forth and get to the root cause faster.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ─── FOOTER ─────────────────────────────────────────── -->
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="index.html" class="site-logo">
+        <span class="logo-icon">
+          <svg width="22" height="18" viewBox="0 0 26 20" fill="none" aria-hidden="true">
+            <circle cx="3.5" cy="16" r="3" fill="currentColor"/>
+            <circle cx="22.5" cy="4" r="3" fill="currentColor"/>
+            <path d="M6 14.5 C10 9, 16 11, 20 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </span>
+        <span class="logo-wordmark"><span>PocketRoute</span></span>
+      </a>
+      <p class="footer-desc">Route planning for small delivery teams. Built for the real world.</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <h4>Documentation</h4>
+        <ul>
+          <li><a href="getting-started.html">Getting Started</a></li>
+          <li><a href="troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="release-notes.html">Release Notes</a></li>
+          <li><a href="api-docs.html">API Reference</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="mailto:support@pocketroute.io">support@pocketroute.io</a></li>
+          <li><a href="mailto:billing@pocketroute.io">billing@pocketroute.io</a></li>
+          <li><a href="mailto:enterprise@pocketroute.io">enterprise@pocketroute.io</a></li>
+          <li><a href="#">Community Forum</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>&copy; 2025 PocketRoute, Inc. All rights reserved.</p>
+    <div class="footer-bottom-links">
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+      <a href="#">Security</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const navToggle = document.getElementById('nav-toggle');
+  const navDrawer = document.getElementById('nav-drawer');
+  const navOverlay = document.getElementById('nav-overlay');
+
+  navToggle.addEventListener('click', () => {
+    const open = navDrawer.classList.toggle('open');
+    navOverlay.classList.toggle('open', open);
+    navToggle.setAttribute('aria-expanded', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  });
+
+  navOverlay.addEventListener('click', () => {
+    navDrawer.classList.remove('open');
+    navOverlay.classList.remove('open');
+    navToggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+  });
+
+  // TOC scroll spy
+  const headings = document.querySelectorAll('[id]');
+  const tocLinks = document.querySelectorAll('.toc-list a');
+
+  window.addEventListener('scroll', () => {
+    let current = '';
+    headings.forEach(h => {
+      if (h.getBoundingClientRect().top <= 100) current = h.id;
+    });
+    tocLinks.forEach(link => {
+      link.classList.toggle('toc-active', link.getAttribute('href') === '#' + current);
+    });
+  }, { passive: true });
+</script>
+</body>
+</html>

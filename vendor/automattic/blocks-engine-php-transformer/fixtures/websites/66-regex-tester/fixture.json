@@ -1,0 +1,11 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "regex",
+    "tester",
+    "developer-tool",
+    "app",
+    "utility"
+  ],
+  "complexity": 3
+}

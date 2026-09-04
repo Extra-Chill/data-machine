@@ -1,0 +1,12 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "government",
+    "municipal",
+    "civic",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

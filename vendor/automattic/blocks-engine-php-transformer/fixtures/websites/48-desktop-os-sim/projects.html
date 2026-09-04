@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Projects — AuroraOS 88 // vega.sato</title>
+  <meta name="description" content="Projects, games, and records by Vega Sato — opened inside the Projects drive of AuroraOS 88, a bootable desktop website.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/windows.css">
+  <link rel="stylesheet" href="css/apps.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0220'/%3E%3Cpath d='M6 22 L16 7 L26 22' fill='none' stroke='%23ff4fd6' stroke-width='2.4'/%3E%3Ccircle cx='16' cy='22' r='2.6' fill='%2300eaff'/%3E%3C/svg%3E">
+  <script>window.AOS_DEEPLINK = 'projects';</script>
+</head>
+<body data-boot="warm">
+  <div id="boot" class="boot hidden" aria-hidden="true"><div class="boot-scanlines"></div><pre id="boot-log" class="boot-log"></pre></div>
+  <div id="login" class="login hidden" role="dialog" aria-label="AuroraOS login" aria-modal="true">
+    <canvas id="login-bg" class="login-bg" aria-hidden="true"></canvas>
+    <div class="login-card">
+      <div class="login-logo" aria-hidden="true">
+        <svg viewBox="0 0 120 120" width="76" height="76"><defs><linearGradient id="lg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4fd6"/><stop offset="1" stop-color="#00eaff"/></linearGradient></defs><rect x="6" y="6" width="108" height="108" rx="22" fill="#0b0220" stroke="url(#lg3)" stroke-width="2.5"/><path d="M24 86 L60 26 L96 86" fill="none" stroke="url(#lg3)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="60" cy="86" r="7" fill="#00eaff"/></svg>
+      </div>
+      <h1 class="login-os">AuroraOS <span>88</span></h1>
+      <p class="login-tag">Personal Computing for the Night Shift</p>
+      <button id="login-user" class="login-user" type="button"><span class="login-avatar">VS</span><span class="login-name">vega.sato<small>local account · administrator</small></span></button>
+      <p class="login-hint">Click the user to sign in <span class="blink">▌</span></p>
+      <p class="login-foot">Deep link → opening <b>Projects drive</b></p>
+    </div>
+  </div>
+
+  <main id="desktop" class="desktop hidden" aria-label="AuroraOS desktop">
+    <div class="wallpaper" aria-hidden="true"><canvas id="wall-canvas"></canvas><div class="wall-grid"></div><div class="wall-sun"></div></div>
+    <ul id="icon-layer" class="icon-layer" role="list" aria-label="Desktop icons"></ul>
+    <div id="window-layer" class="window-layer"></div>
+    <div id="context-menu" class="context-menu hidden" role="menu"></div>
+    <div id="taskbar" class="taskbar" role="toolbar" aria-label="Taskbar">
+      <button id="start-btn" class="start-btn" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 17 L12 5 L20 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="1.8" fill="currentColor"/></svg><span>Aurora</span></button>
+      <div id="task-buttons" class="task-buttons" aria-label="Open windows"></div>
+      <div class="tray"><button id="tray-sound" class="tray-btn" title="Now playing" aria-label="Now playing">♪</button><button id="tray-theme" class="tray-btn" title="Toggle theme" aria-label="Toggle theme">◑</button><span id="clock" class="clock">--:--</span></div>
+    </div>
+    <div id="start-menu" class="start-menu hidden" role="menu" aria-label="Start menu">
+      <div class="start-rail" aria-hidden="true"><span class="start-rail-text">AuroraOS&nbsp;88</span></div>
+      <div class="start-body"><p class="start-greeting">Hi, I'm <b>Vega Sato</b> — welcome to my machine.</p><ul id="start-apps" class="start-apps" role="list"></ul><div class="start-foot"><button class="start-power" data-power="restart">⟳ Restart</button><button class="start-power" data-power="logoff">⏻ Log&nbsp;off</button></div></div>
+    </div>
+  </main>
+
+  <div id="content-store" hidden>
+    <template data-content="readme"></template>
+    <template data-content="file-coastline"></template>
+    <template data-content="file-tidewave"></template>
+    <template data-content="file-rig"></template>
+    <template data-content="now"></template>
+  </div>
+
+  <script src="js/util.js"></script>
+  <script src="js/content.js"></script>
+  <script src="js/wallpaper.js"></script>
+  <script src="js/wm.js"></script>
+  <script src="js/apps.js"></script>
+  <script src="js/terminal.js"></script>
+  <script src="js/synth.js"></script>
+  <script src="js/paint.js"></script>
+  <script src="js/boot.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

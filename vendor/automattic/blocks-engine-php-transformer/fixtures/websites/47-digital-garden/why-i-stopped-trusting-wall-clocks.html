@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Why I Stopped Trusting Wall Clocks — Mara's Garden</title>
+  <meta name="description" content="A note from Mara Okonkwo's digital garden on distributed systems, note-taking, stoicism, and gardening.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/garden.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-leaf" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 28 C16 18 8 14 5 6 C16 6 24 12 24 22 C24 25 21 28 16 28 Z" fill="#3a7d52" opacity=".9"/>
+          <path d="M16 28 C16 20 19 13 24 8" fill="none" stroke="#fbf9f3" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="16" cy="28" r="2" fill="#b08b2e"/>
+        </svg>
+        <h1><a href="index.html">Mara's Garden</a></h1>
+      </div>
+      <p class="brand-tag">a digital garden by Mara Okonkwo</p>
+
+      <div class="search-box">
+        <span class="s-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="note-search" placeholder="Search notes  (press /)" aria-label="Search notes" autocomplete="off">
+        <ul class="search-results" id="search-results" aria-live="polite"></ul>
+      </div>
+
+      <nav aria-label="Garden navigation">
+      <p class="nav-section">Home</p>
+      <ul class="nav-list"><li><a href="index.html" class=""><span class="ripe">🌱</span><span>Start Here · MOC</span></a></li>
+      <li><a href="tags.html" class=""><span class="ripe">🏷️</span><span>Tags &amp; Index</span></a></li></ul>
+      
+        <p class="nav-section">Distributed Systems</p>
+        <ul class="nav-list">
+          <li><a href="idempotency-is-a-superpower.html" class=""><span class="ripe">🌳</span><span>Idempotency Is a Superpower</span></a></li>
+          <li><a href="the-two-generals-problem.html" class=""><span class="ripe">🌿</span><span>The Two Generals Problem</span></a></li>
+          <li><a href="why-i-stopped-trusting-wall-clocks.html" class="current"><span class="ripe">🌿</span><span>Why I Stopped Trusting Wall Clocks</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Knowledge &amp; Notes</p>
+        <ul class="nav-list">
+          <li><a href="on-tending-a-digital-garden.html" class=""><span class="ripe">🌳</span><span>On Tending a Digital Garden</span></a></li>
+          <li><a href="evergreen-notes.html" class=""><span class="ripe">🌳</span><span>Evergreen Notes</span></a></li>
+          <li><a href="book-how-to-take-smart-notes.html" class=""><span class="ripe">🌿</span><span>Book — How to Take Smart Notes</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Stoicism</p>
+        <ul class="nav-list">
+          <li><a href="the-dichotomy-of-control.html" class=""><span class="ripe">🌳</span><span>The Dichotomy of Control</span></a></li>
+          <li><a href="amor-fati.html" class=""><span class="ripe">🌿</span><span>Amor Fati</span></a></li>
+        </ul>
+      
+        <p class="nav-section">The Garden</p>
+        <ul class="nav-list">
+          <li><a href="compost-is-a-distributed-system.html" class=""><span class="ripe">🌿</span><span>Compost Is a Distributed System</span></a></li>
+          <li><a href="three-sisters-planting.html" class=""><span class="ripe">🌰</span><span>Three Sisters Planting</span></a></li>
+        </ul>
+      </nav>
+
+      <button class="theme-toggle" type="button" aria-pressed="false">☾ <span>Dark</span></button>
+    </aside>
+    <main class="content" id="main">
+      <article class="note">
+        <p class="breadcrumb"><a href="index.html">🌱 Garden</a> &nbsp;›&nbsp; Why I Stopped Trusting Wall Clocks</p>
+        <h1>Why I Stopped Trusting Wall Clocks</h1>
+        <div class="note-meta">
+          <span class="ripeness budding">🌿 Budding</span>
+          <span class="dot"></span>
+          <span>planted May 18, 2024</span>
+          <span class="dot"></span>
+          <span>tended Mar 8, 2026</span>
+        </div>
+        <div class="tag-list"><a class="tag" href="tags.html#budding">#budding</a><a class="tag" href="tags.html#distributed-systems">#distributed-systems</a><a class="tag" href="tags.html#engineering">#engineering</a></div>
+        <div class="prose">
+
+<p>The most dangerous line in a distributed system is the one that looks the most innocent:</p>
+<pre><code><span class="tok-kw">if</span> event_a.timestamp &gt; event_b.timestamp:
+    winner = event_a   <span class="tok-com"># "later" event wins</span></code></pre>
+<p><code>timestamp</code> here is a <strong>wall clock</strong> — the time-of-day clock on whatever machine produced the event. And wall clocks across machines are <em>liars</em>. They drift. They get corrected backwards by NTP mid-operation. A clock on server X can read <em>earlier</em> than a clock on server Y for an event that genuinely happened <em>later</em>. "Last write wins" becomes "whoever has the most optimistic clock wins," which is a silent data-corruption machine.</p>
+<h2 id="order">The real problem: ordering, not time <a class="anchor" href="#order">#</a></h2>
+<p>What that code actually wants to know is not "what time was it?" but <strong>"which event happened before the other?"</strong> Those are different questions. In a distributed system you usually cannot answer the first reliably — and you don't need to. You need <em>causal order</em>, which is exactly what the network can't naturally give you (same root cause as <a class="internal" data-slug="the-two-generals-problem" href="the-two-generals-problem.html">The Two Generals Problem</a>: no shared global state).</p>
+<h2 id="logical">Logical clocks <a class="anchor" href="#logical">#</a></h2>
+<p>Lamport's insight: forget the time of day, just count.</p>
+<ul>
+  <li>Each node keeps a counter.</li>
+  <li>On every local event, increment.</li>
+  <li>On every message <em>send</em>, attach the counter.</li>
+  <li>On every message <em>receive</em>, set <code>counter = max(local, received) + 1</code>.</li>
+</ul>
+<p>Now if A causally precedes B, then <code>clock(A) &lt; clock(B)</code>. The reverse isn't guaranteed (equal-ish counters mean "concurrent, can't order"), and <strong>that honesty is the point</strong>: a logical clock will <em>tell you</em> when two events are genuinely concurrent instead of inventing a fake order from drifting hardware.</p>
+<p>Vector clocks go further and let you detect concurrency precisely, which is how systems like Dynamo decide when two writes <em>conflict</em> and must be merged rather than silently clobbered.</p>
+<h2 id="connect">How this connects to the rest of the garden <a class="anchor" href="#connect">#</a></h2>
+<ul>
+  <li>It's the same impossibility as <a class="internal" data-slug="the-two-generals-problem" href="the-two-generals-problem.html">The Two Generals Problem</a> — there is no free shared clock for the same reason there's no reliable shared messenger.</li>
+  <li>It's why <a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a> uses an explicit <strong>idempotency key</strong> rather than "the most recent timestamp" to dedup. Identity beats timing.</li>
+</ul>
+<blockquote><p>Time tells you <em>when</em>. It does not tell you <em>what happened before what.</em> In a distributed system, only the second question is answerable, so stop asking the first.</p></blockquote>
+        </div>
+
+      <section class="backlinks" aria-labelledby="bl-h">
+        <h2 id="bl-h">Linked references</h2>
+        <p class="bl-sub">5 notes link to this one.</p>
+        <ul>
+        <li><a class="internal" data-slug="index" href="index.html">Start Here</a><div class="bl-ctx">Listed under Distributed systems in the MOC.</div></li>
+        <li><a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a><div class="bl-ctx">Used to motivate keys over timestamps for dedup.</div></li>
+        <li><a class="internal" data-slug="the-two-generals-problem" href="the-two-generals-problem.html">The Two Generals Problem</a><div class="bl-ctx">Same root impossibility — no shared global state.</div></li>
+        <li><a class="internal" data-slug="the-dichotomy-of-control" href="the-dichotomy-of-control.html">The Dichotomy of Control</a><div class="bl-ctx">Cited: "you can't control the clocks, so don't depend on them."</div></li>
+        <li><a class="internal" data-slug="compost-is-a-distributed-system" href="compost-is-a-distributed-system.html">Compost Is a Distributed System</a><div class="bl-ctx">The compost is noted to have no wall-clock problem because it needs no global clock.</div></li>
+        </ul>
+      </section>
+      </article>
+    </main>
+
+    <aside class="right-rail">
+      <div class="rail-card">
+        <p class="rail-title">On this page</p>
+        <ul class="toc">
+          <li class=""><a href="#order">The real problem: ordering, not time</a></li>
+          <li class=""><a href="#logical">Logical clocks</a></li>
+          <li class=""><a href="#connect">How this connects to the garden</a></li>
+        </ul>
+      </div>
+      <div class="rail-card">
+        <p class="rail-title">Graph view</p>
+        <svg id="graph" class="graph-svg" data-current="why-i-stopped-trusting-wall-clocks" role="img" aria-label="Graph of how notes in the garden connect"></svg>
+        <p class="graph-hint">Hover a node to spotlight its links. Click to jump.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-foot">
+    <span>🌱 Mara's Garden · tended on Sundays · last commit Jun 19, 2026</span>
+    <span>Built with <a href="quartz.config.ts">Quartz 4</a> from the markdown in <code style="font-family:var(--font-mono);font-size:.8rem">notes/</code> · <a href="https://github.com">source</a></span>
+  </footer>
+  <script src="js/garden.js"></script>
+</body>
+</html>

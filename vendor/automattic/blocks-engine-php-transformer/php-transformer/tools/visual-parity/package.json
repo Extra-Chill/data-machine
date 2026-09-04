@@ -1,0 +1,19 @@
+{
+  "name": "@automattic/blocks-engine-visual-parity",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Generic visual parity probe extractor for static HTML and materialized output fixtures.",
+  "type": "module",
+  "bin": {
+    "blocks-engine-visual-parity": "bin/visual-parity.mjs",
+    "blocks-engine-dom-box-provider": "bin/dom-box-provider.mjs",
+    "blocks-engine-screenshot-provider": "bin/screenshot-provider.mjs"
+  },
+  "scripts": {
+    "install:browsers": "playwright install chromium",
+    "test": "node tests/smoke.mjs && node tests/blockquote-margin-reset.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}

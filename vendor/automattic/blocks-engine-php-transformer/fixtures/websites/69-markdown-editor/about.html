@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Inkwell, the Markdown writing studio</title>
+  <meta name="description" content="Inkwell is a fully client-side Markdown editor with a from-scratch parser, a live preview, a presentation mode, themes, and local document storage. Built with vanilla HTML, CSS, and JavaScript — no frameworks, no build step.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/markdown.css">
+  <link rel="stylesheet" href="css/page.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%238a7bff'/%3E%3Cpath d='M9 22 L9 10 L16 19 L23 10 L23 22' fill='none' stroke='white' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body class="is-page" data-layout="split">
+
+  <header class="app-header" role="banner">
+    <a href="index.html" class="brand" aria-label="Inkwell home">
+      <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="7" fill="var(--accent)"/>
+        <path d="M9 22 L9 10 L16 19 L23 10 L23 22" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+      <span>Ink<b>well</b></span>
+      <span class="brand-sub">studio</span>
+    </a>
+    <span style="flex:1"></span>
+    <nav class="page-nav" aria-label="Primary">
+      <a href="index.html">Editor</a>
+      <a href="templates.html">Templates</a>
+      <a href="about.html" class="active" aria-current="page">About</a>
+      <a href="index.html" class="hbtn primary" style="text-decoration:none">Open editor →</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="page-hero">
+      <p class="eyebrow">What is this?</p>
+      <h1>Write in Markdown. <em>See it instantly. Present it live.</em></h1>
+      <p class="lead">Inkwell is an in-browser Markdown studio. You type plain text on the left and watch it render on the right, then turn the same document into a full-screen slide deck, export it, or keep a whole library of notes — all stored locally on your machine. There is no account, no server, and no build step. Open <code class="md-code-inline">index.html</code> and it just works.</p>
+    </section>
+
+    <section class="section">
+      <h2>What's inside</h2>
+      <p class="sub">Every piece is hand-built vanilla JavaScript. No Markdown library, no framework, no bundler.</p>
+      <div class="about-grid">
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+          <h3>A real Markdown parser</h3>
+          <p>Written from scratch in <code class="md-code-inline">js/markdown.js</code>: headings, bold/italic/strike, inline &amp; fenced code with a syntax tint, blockquotes, nested and task lists, tables with alignment, links, autolinks, images, and horizontal rules. HTML is escaped and unsafe URLs are blocked.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+          <h3>Live, synced preview</h3>
+          <p>The preview re-renders as you type, with scroll synced to the editor and a live outline built from your headings. Click any heading to jump.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 5v14l11-7z"/></svg>
+          <h3>Presentation mode</h3>
+          <p>Split the document on <code class="md-code-inline">---</code> and present it full-screen — a reveal-style deck built by hand. Arrow keys move, a progress bar tracks you, <kbd>Esc</kbd> exits.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <h3>Export anywhere</h3>
+          <p>Download raw <code class="md-code-inline">.md</code>, export a fully self-contained <code class="md-code-inline">.html</code> file with inlined styles, or open a print-friendly view and Save as PDF.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="6" height="16" rx="1.5"/><path d="M12 8h9M12 12h9M12 16h6"/></svg>
+          <h3>A document library</h3>
+          <p>Create, rename, duplicate, and delete documents in the sidebar. Everything autosaves to <code class="md-code-inline">localStorage</code> and is sorted by most-recently edited.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M17 7l2-2M5 19l2-2"/></svg>
+          <h3>Themes &amp; focus</h3>
+          <p>Light, dark, and sepia themes plus a focus / typewriter mode that dims everything but the line you're writing. Your preferences persist.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Keyboard shortcuts</h2>
+      <div class="shortcut-grid">
+        <div class="shortcut"><kbd>Ctrl/⌘</kbd><kbd>B</kbd><span>Bold</span></div>
+        <div class="shortcut"><kbd>Ctrl/⌘</kbd><kbd>I</kbd><span>Italic</span></div>
+        <div class="shortcut"><kbd>Ctrl/⌘</kbd><kbd>E</kbd><span>Inline code</span></div>
+        <div class="shortcut"><kbd>Ctrl/⌘</kbd><kbd>K</kbd><span>Insert link</span></div>
+        <div class="shortcut"><kbd>Ctrl/⌘</kbd><kbd>Shift</kbd><kbd>X</kbd><span>Strikethrough</span></div>
+        <div class="shortcut"><kbd>Ctrl/⌘</kbd><kbd>1</kbd>…<kbd>6</kbd><span>Headings</span></div>
+        <div class="shortcut"><kbd>Tab</kbd> / <kbd>Shift</kbd><kbd>Tab</kbd><span>Indent / outdent</span></div>
+        <div class="shortcut"><kbd>Enter</kbd><span>Continue list / quote</span></div>
+        <div class="shortcut"><kbd>Ctrl/⌘</kbd><kbd>P</kbd><span>Present slides</span></div>
+        <div class="shortcut"><kbd>Ctrl/⌘</kbd><kbd>S</kbd><span>Save now</span></div>
+        <div class="shortcut"><kbd>Ctrl/⌘</kbd><kbd>Alt</kbd><kbd>N</kbd><span>New document</span></div>
+        <div class="shortcut"><kbd>← →</kbd> / <kbd>Esc</kbd><span>Navigate / exit slides</span></div>
+      </div>
+    </section>
+
+    <section class="section privacy-note">
+      <h2>Where your writing lives</h2>
+      <p class="sub">Inkwell never sends your documents anywhere. They are kept in your browser's <code class="md-code-inline">localStorage</code> under the keys <code class="md-code-inline">inkwell.docs.v1</code> and <code class="md-code-inline">inkwell.settings.v1</code>. Clearing your browser data clears your notes, so export anything you want to keep. If you open Inkwell in a private window, changes won't persist after you close it.</p>
+    </section>
+
+    <section class="page-cta">
+      <h2>Ready to write?</h2>
+      <a href="index.html" class="hbtn primary big">Open the editor →</a>
+      <a href="templates.html" class="hbtn big" style="text-decoration:none">Browse templates</a>
+    </section>
+  </main>
+
+  <footer class="page-foot">
+    <span>Inkwell — a hand-built Markdown studio. No frameworks, no server, no build step.</span>
+    <span>v1.0 · Vanilla JS</span>
+  </footer>
+</body>
+</html>

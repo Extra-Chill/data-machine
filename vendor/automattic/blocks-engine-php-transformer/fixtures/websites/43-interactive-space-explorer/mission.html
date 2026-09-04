@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AETHELON — Mission Timeline & Trajectory</title>
+  <meta name="description" content="The AETHELON mission timeline, science objectives, and an interactive trajectory scrubber tracing the probe's seven-year cruise to Saturn.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <canvas class="starfield" aria-hidden="true"></canvas>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="AETHELON home">
+      <span class="logo-mark">AETHELON</span>
+      <span class="logo-sub">Mission to Enceladus</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Journey</a>
+      <a href="mission.html">Mission</a>
+      <a href="explore.html">Explore</a>
+      <a href="data.html">Science</a>
+      <a href="explore.html" class="nav-cta">Launch Explorer</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="wrap">
+        <p class="eyebrow reveal" style="justify-content:center">Flight plan · 2031 – 2042</p>
+        <h1 class="reveal" data-delay="1">The seven-year cruise</h1>
+        <p class="reveal" data-delay="2">From a launch pad in Florida to orbit around a ringed planet 1.27 billion kilometres away — every assist, burn and flyby that gets AETHELON to its ocean moon.</p>
+      </div>
+    </section>
+
+    <!-- ══════════ TRAJECTORY SCRUBBER ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head center reveal">
+          <p class="eyebrow" style="justify-content:center">Interactive</p>
+          <h2>Scrub the trajectory</h2>
+          <p>Drag the slider to fly AETHELON along its path. Watch heliocentric distance, velocity and mission elapsed time change as the planets do the work.</p>
+        </div>
+        <div class="scrubber-card reveal" data-delay="1">
+          <div class="scrubber-stage">
+            <svg viewBox="0 0 900 360" role="img" aria-label="Trajectory diagram with movable probe">
+              <defs>
+                <radialGradient id="sun2" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0" stop-color="#fff7e0"/><stop offset="0.4" stop-color="#ffd479"/><stop offset="1" stop-color="#ff8a4d" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="traj-grad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#7fe7ff" stop-opacity="0.2"/><stop offset="1" stop-color="#7fe7ff"/>
+                </linearGradient>
+              </defs>
+              <!-- the Sun -->
+              <circle cx="80" cy="300" r="120" fill="url(#sun2)" opacity="0.5"/>
+              <circle cx="80" cy="300" r="22" fill="#ffd479"/>
+              <text x="80" y="340" text-anchor="middle" font-family="Space Mono" font-size="11" fill="#9aa6cf">SUN</text>
+
+              <!-- planet markers -->
+              <circle cx="170" cy="210" r="9" fill="#c98f3a"/><text x="170" y="192" text-anchor="middle" font-family="Space Mono" font-size="10" fill="#9aa6cf">Venus</text>
+              <circle cx="300" cy="120" r="11" fill="#3a7bd5"/><text x="300" y="102" text-anchor="middle" font-family="Space Mono" font-size="10" fill="#9aa6cf">Earth</text>
+              <circle cx="560" cy="90" r="20" fill="#d8a24a"/><text x="560" y="58" text-anchor="middle" font-family="Space Mono" font-size="10" fill="#9aa6cf">Jupiter</text>
+              <g>
+                <ellipse cx="810" cy="170" rx="48" ry="13" fill="none" stroke="#e3c98a" stroke-width="4" opacity="0.5"/>
+                <circle cx="810" cy="170" r="22" fill="#d8b56a"/>
+                <text x="810" y="220" text-anchor="middle" font-family="Space Mono" font-size="10" fill="#9aa6cf">Saturn</text>
+              </g>
+
+              <!-- background reference path -->
+              <path d="M300,120 C200,170 150,260 230,250 C330,238 360,150 460,150 C560,150 540,60 620,90 C720,128 740,150 810,170"
+                    fill="none" stroke="rgba(150,180,255,.14)" stroke-width="2" stroke-dasharray="3 6"/>
+              <!-- travelled path (animated dash) -->
+              <path id="traj-path" d="M300,120 C200,170 150,260 230,250 C330,238 360,150 460,150 C560,150 540,60 620,90 C720,128 740,150 810,170"
+                    fill="none" stroke="url(#traj-grad)" stroke-width="3"/>
+              <!-- probe marker -->
+              <g id="traj-probe">
+                <circle r="6" fill="#7fe7ff"/><circle r="11" fill="#7fe7ff" opacity="0.25"/>
+              </g>
+            </svg>
+          </div>
+          <div class="scrubber-controls">
+            <label for="traj-slider">Mission progress — <span data-traj-phase>Launch · Earth departure</span></label>
+            <input type="range" id="traj-slider" min="0" max="1000" value="0" aria-label="Trajectory progress">
+            <div class="scrubber-readout">
+              <div class="item"><span class="v" data-traj-dist>1.00 AU</span><span class="k">Heliocentric distance</span></div>
+              <div class="item"><span class="v" data-traj-vel>11.2 km/s</span><span class="k">Velocity</span></div>
+              <div class="item"><span class="v" data-traj-met>Day 0</span><span class="k">Mission elapsed time</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ TIMELINE ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head center reveal">
+          <p class="eyebrow" style="justify-content:center">Flight log</p>
+          <h2>Mission timeline</h2>
+        </div>
+        <div class="timeline">
+          <div class="tl-item done reveal">
+            <div class="tl-date">Aug 2031</div>
+            <h3>Launch — Cape Canaveral</h3>
+            <p>AETHELON lifts off aboard a heavy-lift vehicle onto a Venus-Earth-Earth-Jupiter gravity-assist trajectory. Solar arrays stay stowed; the spacecraft runs on its radioisotope generator from minute one.</p>
+            <span class="tl-status">Complete</span>
+          </div>
+          <div class="tl-item done reveal">
+            <div class="tl-date">May 2032</div>
+            <h3>Venus gravity assist</h3>
+            <p>A 3,400 km flyby of Venus bends the trajectory and adds 4.1 km/s, sending the probe back toward Earth for the next kick.</p>
+            <span class="tl-status">Complete</span>
+          </div>
+          <div class="tl-item done reveal">
+            <div class="tl-date">Oct 2033</div>
+            <h3>Earth gravity assist</h3>
+            <p>Returning home for a slingshot, AETHELON checks out its full instrument suite against the Moon before being flung outward past Mars.</p>
+            <span class="tl-status">Complete</span>
+          </div>
+          <div class="tl-item reveal">
+            <div class="tl-date">Mar 2036</div>
+            <h3>Jupiter gravity assist · cruise</h3>
+            <p>The final and largest assist. Jupiter's enormous gravity adds the velocity needed to reach Saturn, and the probe images the Galilean moons in passing.</p>
+            <span class="tl-status live">In progress</span>
+          </div>
+          <div class="tl-item reveal">
+            <div class="tl-date">Jun 2038</div>
+            <h3>Saturn orbit insertion</h3>
+            <p>A 96-minute main-engine burn slows AETHELON enough for Saturn to capture it into a wide, looping orbit threaded between the rings.</p>
+            <span class="tl-status">Planned</span>
+          </div>
+          <div class="tl-item reveal">
+            <div class="tl-date">2038 – 2042</div>
+            <h3>Enceladus science campaign</h3>
+            <p>Twenty-three targeted Enceladus flybys, eleven of them straight through the plume at under 5 km/s, sampling ocean material and sounding the ice shell.</p>
+            <span class="tl-status">Planned</span>
+          </div>
+          <div class="tl-item reveal">
+            <div class="tl-date">Sep 2042</div>
+            <h3>Disposal</h3>
+            <p>With propellant spent, the probe is steered into Saturn's atmosphere to burn up — protecting Enceladus' ocean from any chance of contamination.</p>
+            <span class="tl-status">Planned</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ OBJECTIVES ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <p class="eyebrow">Why we go</p>
+          <h2>Four science objectives</h2>
+        </div>
+        <div class="obj-grid">
+          <div class="obj reveal">
+            <span class="badge">OBJ-1</span>
+            <h3>Assess habitability</h3>
+            <p>Measure the ocean's chemistry, pH, salinity and energy sources to determine whether Enceladus' sea can sustain life as we know it.</p>
+          </div>
+          <div class="obj reveal" data-delay="1">
+            <span class="badge">OBJ-2</span>
+            <h3>Search for biosignatures</h3>
+            <p>Hunt the plume for molecular patterns — amino-acid distributions, lipid chains — that would be difficult to produce without biology.</p>
+          </div>
+          <div class="obj reveal" data-delay="2">
+            <span class="badge">OBJ-3</span>
+            <h3>Map the ice shell</h3>
+            <p>Use ice-penetrating radar and gravity science to chart the shell's thickness and the conduits that connect ocean to surface.</p>
+          </div>
+          <div class="obj reveal" data-delay="3">
+            <span class="badge">OBJ-4</span>
+            <h3>Understand the plume</h3>
+            <p>Resolve how the geysers work, how their output varies with Enceladus' orbit, and how they sustain Saturn's vast E-ring.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="cta-band reveal">
+          <p class="eyebrow" style="justify-content:center">Next</p>
+          <h2>Meet the moons.</h2>
+          <p>Open the interactive explorer to click through every body AETHELON visits — from Titan's methane lakes to Enceladus' hidden sea.</p>
+          <a href="explore.html" class="btn btn-primary magnetic" data-strength="0.35">Open the explorer <span class="arrow">→</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <span class="logo-mark">AETHELON</span>
+          <p>An open deep-space outreach project tracing a robotic mission to Enceladus, Saturn's ocean moon. Figures are plausible mission estimates for educational use.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Mission</h4>
+          <a href="mission.html">Timeline</a>
+          <a href="mission.html">Trajectory</a>
+          <a href="data.html">Instruments</a>
+          <a href="explore.html">The system</a>
+        </div>
+        <div class="footer-col">
+          <h4>Science</h4>
+          <a href="data.html">Plume chemistry</a>
+          <a href="data.html">Data archive</a>
+          <a href="explore.html">Ocean worlds</a>
+          <a href="#">Publications</a>
+        </div>
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <a href="#">Newsletter</a>
+          <a href="#">Education kit</a>
+          <a href="#">Press</a>
+          <a href="#">Contact team</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2031 AETHELON Outreach Consortium. Educational fiction. Data are illustrative estimates.</span>
+        <div class="socials">
+          <a href="#" aria-label="Mastodon">Mastodon</a>
+          <a href="#" aria-label="YouTube">YouTube</a>
+          <a href="#" aria-label="GitHub">GitHub</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+  <script src="js/mission.js"></script>
+</body>
+</html>

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juniper Lane — Plant Shop &amp; Gift Store | Benton Harbor, MI</title>
+  <meta name="description" content="A warm neighborhood plant shop and gift store at 214 Maple Street in Benton Harbor, Michigan. Houseplants, ceramic pots, candles, greeting cards, and seasonal workshops.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo" aria-label="Juniper Lane Home">
+      <svg class="logo-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="18" cy="18" r="17" fill="#D0E3D2" stroke="#5D8A62" stroke-width="1.5"/>
+        <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#5D8A62"/>
+        <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#3A5438"/>
+        <ellipse cx="18" cy="30.5" rx="4" ry="1.5" fill="#B85A37" opacity="0.6"/>
+      </svg>
+      <span>
+        <span class="logo-text">Juniper Lane</span>
+        <span class="logo-sub">Plant Shop &amp; Gifts</span>
+      </span>
+    </a>
+
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html">Workshops</a>
+      <a href="plant-care.html">Plant Care</a>
+      <a href="events.html">Private Events</a>
+      <a href="visit.html">Visit Us</a>
+    </nav>
+
+    <div class="header-cta">
+      <a href="tel:+12695550193" class="phone-cta" aria-label="Call Juniper Lane">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        (269) 555-0193
+      </a>
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ========== MOBILE NAV ========== -->
+<div class="mobile-nav" id="mobile-nav" role="dialog" aria-label="Navigation menu">
+  <div class="mobile-nav-overlay" aria-hidden="true"></div>
+  <div class="mobile-nav-panel">
+    <nav class="mobile-nav-links" aria-label="Mobile navigation">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html">Workshops</a>
+      <a href="plant-care.html">Plant Care</a>
+      <a href="events.html">Private Events</a>
+      <a href="visit.html">Visit Us</a>
+    </nav>
+    <div class="mobile-nav-info">
+      <div>214 Maple Street</div>
+      <div>Benton Harbor, MI</div>
+      <div style="margin-top:0.5rem">Wed–Sat 10am–6pm</div>
+      <div>Sunday 11am–4pm</div>
+    </div>
+    <div class="mobile-nav-phone">
+      <a href="tel:+12695550193" class="btn btn-primary btn-lg" style="width:100%; justify-content:center;">
+        <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Call Us
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== HERO ========== -->
+<section class="hero" aria-label="Welcome to Juniper Lane">
+  <div class="hero-content">
+    <div class="hero-eyebrow">
+      <span class="hero-eyebrow-line" aria-hidden="true"></span>
+      <span class="eyebrow">Benton Harbor, Michigan</span>
+    </div>
+    <h1 class="display-xl hero-title">
+      Your<br>
+      <em>neighborhood</em><br>
+      plant shop.
+    </h1>
+    <p class="lead hero-desc">
+      Houseplants, handmade pots, locally poured candles, and greeting cards — plus repotting clinics and seasonal wreath workshops all year long.
+    </p>
+    <div class="hero-actions">
+      <a href="shop.html" class="btn btn-primary btn-lg">
+        Explore the Shop
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <a href="workshops.html" class="btn btn-secondary btn-lg">Upcoming Workshops</a>
+    </div>
+    <div class="hero-hours" role="complementary" aria-label="Store hours">
+      <span><strong>Wed–Sat</strong> 10am–6pm</span>
+      <span><strong>Sunday</strong> 11am–4pm</span>
+      <span>Closed Mon &amp; Tue</span>
+    </div>
+  </div>
+
+  <div class="hero-visual" aria-hidden="true">
+    <!-- Large botanical pothos illustration -->
+    <svg class="hero-illustration" viewBox="0 0 560 680" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decorative pothos illustration">
+      <!-- Background organic shape -->
+      <ellipse cx="280" cy="340" rx="240" ry="290" fill="rgba(245,237,215,0.08)"/>
+
+      <!-- Pot -->
+      <rect x="192" y="490" width="176" height="20" rx="4" fill="#7A5233"/>
+      <path d="M200 510 L176 590 Q176 610 200 610 L360 610 Q384 610 384 590 L360 510 Z" fill="#B85A37"/>
+      <path d="M200 510 L192 490 L368 490 L360 510 Z" fill="#C4933A"/>
+      <rect x="240" y="536" width="80" height="6" rx="3" fill="rgba(255,255,255,0.15)"/>
+
+      <!-- Soil -->
+      <ellipse cx="280" cy="492" rx="88" ry="12" fill="#5D3A1A"/>
+      <ellipse cx="280" cy="490" rx="88" ry="12" fill="#6B4423"/>
+
+      <!-- Main stem -->
+      <path d="M280 490 C280 450 275 400 268 350 C260 290 255 240 270 180 C278 148 285 120 280 90" stroke="#3A5438" stroke-width="4" stroke-linecap="round"/>
+
+      <!-- Leaf 1 - large left -->
+      <path d="M270 180 C240 140 180 135 155 160 C135 180 145 215 170 225 C200 238 245 215 270 180Z" fill="#5D8A62"/>
+      <path d="M270 180 C255 195 220 210 190 215" stroke="#3A5438" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M270 180 C255 195 200 205 175 200" stroke="#3A5438" stroke-width="1" opacity="0.5" stroke-linecap="round"/>
+
+      <!-- Leaf 2 - right -->
+      <path d="M274 240 C300 200 365 192 392 215 C412 232 405 268 380 280 C350 294 300 272 274 240Z" fill="#6B9B70"/>
+      <path d="M274 240 C290 255 330 268 360 268" stroke="#3A5438" stroke-width="1.5" stroke-linecap="round"/>
+
+      <!-- Leaf 3 - upper left -->
+      <path d="M272 320 C248 278 188 270 162 292 C142 310 150 346 175 356 C205 368 252 346 272 320Z" fill="#5D8A62"/>
+      <path d="M272 320 C258 335 222 350 195 350" stroke="#3A5438" stroke-width="1.5" stroke-linecap="round"/>
+
+      <!-- Leaf 4 - upper right small -->
+      <path d="M268 350 C292 318 338 312 360 332 C376 346 368 372 348 380 C320 390 282 372 268 350Z" fill="#88B38D"/>
+      <path d="M268 350 C282 362 318 374 342 374" stroke="#3A5438" stroke-width="1" stroke-linecap="round"/>
+
+      <!-- Leaf 5 - top large left -->
+      <path d="M271 120 C242 82 175 74 148 100 C125 122 138 160 168 170 C200 182 252 158 271 120Z" fill="#5D8A62"/>
+      <path d="M271 120 C254 138 214 155 185 162" stroke="#3A5438" stroke-width="1.5" stroke-linecap="round"/>
+
+      <!-- Trailing vine 1 -->
+      <path d="M270 180 C250 220 220 260 200 300 C178 345 165 380 155 420 C148 450 150 475 158 490" stroke="#3A5438" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+      <!-- Leaf on vine 1 -->
+      <path d="M200 300 C175 270 120 268 105 292 C92 312 104 342 128 350 C155 360 190 330 200 300Z" fill="#6B9B70"/>
+      <path d="M200 300 C182 315 150 332 128 340" stroke="#3A5438" stroke-width="1" stroke-linecap="round"/>
+
+      <!-- Trailing vine 2 -->
+      <path d="M274 240 C292 282 308 325 315 368 C322 408 318 445 310 478" stroke="#3A5438" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+      <!-- Leaf on vine 2 -->
+      <path d="M315 368 C340 338 390 338 408 362 C420 380 410 412 388 420 C360 430 326 406 315 368Z" fill="#5D8A62"/>
+      <path d="M315 368 C332 380 365 396 386 398" stroke="#3A5438" stroke-width="1" stroke-linecap="round"/>
+
+      <!-- Small accent leaves near top -->
+      <path d="M278 90 C296 62 332 58 345 78 C354 92 344 112 325 116 C304 122 282 106 278 90Z" fill="#88B38D"/>
+
+      <!-- Decorative dots / speckles -->
+      <circle cx="150" cy="180" r="3" fill="rgba(93,138,98,0.3)"/>
+      <circle cx="400" cy="250" r="4" fill="rgba(93,138,98,0.2)"/>
+      <circle cx="420" cy="420" r="2.5" fill="rgba(93,138,98,0.25)"/>
+      <circle cx="130" cy="430" r="3" fill="rgba(93,138,98,0.2)"/>
+
+      <!-- Small floating leaf top right -->
+      <g transform="translate(430 100) rotate(-20)" opacity="0.5" style="animation: float 4s ease-in-out infinite">
+        <path d="M0 20 C-18 -5 -5 -25 10 -18 C24 -10 22 10 0 20Z" fill="#5D8A62"/>
+        <path d="M0 20 C-5 8 5 -5 10 -12" stroke="#3A5438" stroke-width="1" stroke-linecap="round"/>
+      </g>
+
+      <!-- Small floating leaf bottom left -->
+      <g transform="translate(105 540) rotate(15)" opacity="0.4" style="animation: float 5s ease-in-out 1s infinite">
+        <path d="M0 16 C-14 -4 -4 -20 8 -14 C20 -8 18 8 0 16Z" fill="#88B38D"/>
+        <path d="M0 16 C-4 6 4 -4 8 -10" stroke="#3A5438" stroke-width="1" stroke-linecap="round"/>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<!-- ========== FEATURE STRIP ========== -->
+<div class="feature-strip" aria-hidden="true">
+  <div class="container">
+    <div class="feature-strip-inner marquee-track">
+      <span class="feature-strip-item"><span class="feature-strip-dot"></span> Houseplants &amp; Tropicals</span>
+      <span class="feature-strip-item"><span class="feature-strip-dot"></span> Handmade Ceramic Pots</span>
+      <span class="feature-strip-item"><span class="feature-strip-dot"></span> Repotting Clinics</span>
+      <span class="feature-strip-item"><span class="feature-strip-dot"></span> Seasonal Wreaths</span>
+      <span class="feature-strip-item"><span class="feature-strip-dot"></span> Locally Poured Candles</span>
+      <span class="feature-strip-item"><span class="feature-strip-dot"></span> Greeting Cards</span>
+      <span class="feature-strip-item"><span class="feature-strip-dot"></span> Private Plant Bar Events</span>
+      <span class="feature-strip-item"><span class="feature-strip-dot"></span> Gift Wrapping Available</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SHOP PREVIEW ========== -->
+<section class="section" aria-labelledby="shop-preview-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="eyebrow">What We Carry</span>
+      <h2 id="shop-preview-heading" style="margin-top: 0.6rem;">A shop full of <em style="font-style:italic; color:var(--terracotta)">living things</em><br>and things worth giving.</h2>
+      <div class="section-divider"></div>
+    </div>
+
+    <div class="grid-3" style="gap: 1.5rem;">
+      <!-- Houseplants -->
+      <div class="product-card reveal reveal-delay-1">
+        <div class="product-illustration green">
+          <svg width="120" height="160" viewBox="0 0 120 160" fill="none" aria-hidden="true">
+            <rect x="42" y="120" width="36" height="6" rx="3" fill="#7A5233"/>
+            <path d="M44 126 L36 152 Q36 158 44 158 L76 158 Q84 158 84 152 L76 126 Z" fill="#B85A37"/>
+            <ellipse cx="60" cy="120" rx="20" ry="5" fill="#6B4423"/>
+            <path d="M60 118 C60 100 55 80 52 60 C48 38 52 20 60 10" stroke="#3A5438" stroke-width="3" stroke-linecap="round"/>
+            <path d="M55 60 C35 42 14 44 10 62 C7 76 18 90 36 90 C50 90 58 76 55 60Z" fill="#5D8A62"/>
+            <path d="M63 90 C82 72 106 74 108 92 C110 104 100 116 82 118 C68 118 60 104 63 90Z" fill="#6B9B70"/>
+            <path d="M58 38 C38 22 18 26 14 44 C11 56 22 68 40 70 C52 70 60 56 58 38Z" fill="#88B38D"/>
+          </svg>
+        </div>
+        <div class="product-body">
+          <span class="eyebrow card-eyebrow">Category</span>
+          <h3 class="product-name">Houseplants</h3>
+          <p class="product-desc">Pothos, calathea, ferns, succulents, snake plants, peace lilies, and seasonal tropicals. Something for every window and every skill level.</p>
+          <a href="shop.html#houseplants" class="btn btn-ghost" style="margin-top:1.25rem; font-size:0.7rem">Browse plants →</a>
+        </div>
+      </div>
+
+      <!-- Ceramic Pots -->
+      <div class="product-card reveal reveal-delay-2">
+        <div class="product-illustration rust">
+          <svg width="120" height="160" viewBox="0 0 120 160" fill="none" aria-hidden="true">
+            <!-- Stoneware planter -->
+            <path d="M30 68 C28 68 22 75 20 90 L16 130 Q16 145 30 145 L90 145 Q104 145 104 130 L100 90 C98 75 92 68 90 68 Z" fill="#C4933A"/>
+            <path d="M30 68 L90 68 Q98 68 100 72 L104 80 L16 80 L20 72 Q22 68 30 68Z" fill="#E8D090"/>
+            <ellipse cx="60" cy="68" rx="38" ry="10" fill="#D4A84B"/>
+            <!-- Texture lines -->
+            <path d="M20 95 Q60 90 100 95" stroke="rgba(122,82,51,0.3)" stroke-width="1.5" fill="none"/>
+            <path d="M18 110 Q60 105 102 110" stroke="rgba(122,82,51,0.3)" stroke-width="1.5" fill="none"/>
+            <path d="M16 125 Q60 120 104 125" stroke="rgba(122,82,51,0.3)" stroke-width="1.5" fill="none"/>
+            <!-- Plant peeking -->
+            <path d="M60 68 C60 55 55 42 48 32 C42 22 42 12 52 8 C60 5 68 12 66 25 C62 40 60 55 60 68Z" fill="#5D8A62"/>
+            <path d="M60 50 C72 38 86 36 90 48 C92 56 84 64 72 64 C64 64 58 58 60 50Z" fill="#88B38D"/>
+            <path d="M60 55 C48 44 35 44 32 56 C30 64 38 72 50 72 C58 72 62 64 60 55Z" fill="#6B9B70"/>
+          </svg>
+        </div>
+        <div class="product-body">
+          <span class="eyebrow card-eyebrow">Category</span>
+          <h3 class="product-name">Ceramic Pots</h3>
+          <p class="product-desc">Handmade stoneware planters from Michigan artists. Drainage holes, matte glazes, and proportions that actually work for plants.</p>
+          <a href="shop.html#pots" class="btn btn-ghost" style="margin-top:1.25rem; font-size:0.7rem">Browse pots →</a>
+        </div>
+      </div>
+
+      <!-- Gifts -->
+      <div class="product-card reveal reveal-delay-3">
+        <div class="product-illustration cream">
+          <svg width="120" height="160" viewBox="0 0 120 160" fill="none" aria-hidden="true">
+            <!-- Candle -->
+            <rect x="48" y="70" width="24" height="64" rx="4" fill="#F5EDD7"/>
+            <rect x="48" y="70" width="24" height="64" rx="4" stroke="#E8D5B2" stroke-width="1"/>
+            <!-- Candle texture -->
+            <rect x="48" y="90" width="24" height="1.5" fill="rgba(200,170,120,0.3)"/>
+            <rect x="48" y="108" width="24" height="1.5" fill="rgba(200,170,120,0.3)"/>
+            <rect x="48" y="120" width="24" height="1.5" fill="rgba(200,170,120,0.3)"/>
+            <!-- Wick -->
+            <line x1="60" y1="70" x2="60" y2="58" stroke="#6B4423" stroke-width="1.5" stroke-linecap="round"/>
+            <!-- Flame -->
+            <path d="M60 58 C58 50 53 44 56 36 C58 30 62 28 65 34 C68 40 66 50 60 58Z" fill="#C4933A"/>
+            <path d="M60 54 C59 48 57 44 58 40 C59 36 62 35 63 39 C64 43 63 50 60 54Z" fill="#E8C97A"/>
+            <!-- Glow -->
+            <circle cx="60" cy="46" r="14" fill="rgba(196,147,58,0.12)"/>
+            <!-- Cedar sprig -->
+            <path d="M28 100 C32 88 44 82 48 90" stroke="#5D8A62" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <path d="M36 92 C33 86 35 80 39 82" stroke="#5D8A62" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            <!-- Card -->
+            <rect x="70" y="85" width="28" height="38" rx="3" fill="white" stroke="#E8D5B2" stroke-width="1.5"/>
+            <line x1="74" y1="95" x2="94" y2="95" stroke="#D0E3D2" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="74" y1="100" x2="94" y2="100" stroke="#D0E3D2" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="74" y1="105" x2="86" y2="105" stroke="#D0E3D2" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M84 88 C82 86 78 87 78 90 C78 93 84 94 84 97 C84 100 80 101 78 99" stroke="#B85A37" stroke-width="1" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="product-body">
+          <span class="eyebrow card-eyebrow">Category</span>
+          <h3 class="product-name">Gifts &amp; More</h3>
+          <p class="product-desc">Locally poured cedar candles, greeting cards, small gifts, and seasonal greenery. Easy, thoughtful, and actually useful.</p>
+          <a href="shop.html#gifts" class="btn btn-ghost" style="margin-top:1.25rem; font-size:0.7rem">See all gifts →</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center" style="margin-top: 2.5rem;">
+      <a href="shop.html" class="btn btn-secondary">View Everything We Carry</a>
+    </div>
+  </div>
+</section>
+
+<!-- ========== UPCOMING WORKSHOPS ========== -->
+<section class="section" style="background: var(--parchment); position:relative; overflow:hidden;" aria-labelledby="workshops-home-heading">
+  <!-- Decorative background leaf -->
+  <svg class="botanical-bg" style="position:absolute; right:-60px; top:-30px; width:380px; opacity:0.07;" viewBox="0 0 380 380" fill="none" aria-hidden="true">
+    <path d="M190 360 C190 360 20 240 20 140 C20 62 96 20 190 20 C284 20 360 62 360 140 C360 240 190 360 190 360Z" fill="#3A5438"/>
+  </svg>
+
+  <div class="container" style="position:relative; z-index:1;">
+    <div class="section-header reveal">
+      <span class="eyebrow">Hands-On Learning</span>
+      <h2 id="workshops-home-heading" style="margin-top: 0.6rem;">Upcoming <em style="font-style:italic">workshops</em></h2>
+      <div class="section-divider"></div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 1.25rem; max-width: 760px;">
+      <div class="workshop-card reveal reveal-delay-1">
+        <div class="workshop-date">
+          <span class="workshop-date-month">Jul</span>
+          <span class="workshop-date-day">12</span>
+        </div>
+        <div class="workshop-info">
+          <h3 class="workshop-title">Summer Succulent Bowls</h3>
+          <div class="workshop-meta">Saturday · 11am–1pm · $48 per person · All supplies included</div>
+          <p class="workshop-desc">Arrange a beautiful mixed bowl of drought-tolerant succulents to take home. We'll cover soil, spacing, drainage, and summer care. Great for beginners and kids 10+.</p>
+          <a href="workshops.html" class="btn btn-primary">Reserve Your Spot</a>
+        </div>
+      </div>
+
+      <div class="workshop-card reveal reveal-delay-2">
+        <div class="workshop-date">
+          <span class="workshop-date-month">Jul</span>
+          <span class="workshop-date-day">26</span>
+        </div>
+        <div class="workshop-info">
+          <h3 class="workshop-title">Repotting Clinic</h3>
+          <div class="workshop-meta">Saturday · 10am–12pm · $35 per person · Bring your own plant or use ours</div>
+          <p class="workshop-desc">Bring a rootbound plant from home, or work with one of ours. Learn how to choose the right pot, the right soil, and the right time to repot — plus hands-on practice.</p>
+          <a href="workshops.html" class="btn btn-primary">Reserve Your Spot</a>
+        </div>
+      </div>
+
+      <div class="workshop-card reveal reveal-delay-3">
+        <div class="workshop-date">
+          <span class="workshop-date-month">Sep</span>
+          <span class="workshop-date-day">7</span>
+        </div>
+        <div class="workshop-info">
+          <h3 class="workshop-title">Early Fall Wreaths</h3>
+          <div class="workshop-meta">Sunday · 12pm–3pm · $65 per person · Includes all fresh greenery &amp; wire frame</div>
+          <p class="workshop-desc">Welcome the season with a lush mixed-greenery wreath. We'll work with eucalyptus, cedar, dried seedheads, and seasonal foliage. Your wreath leaves with you same day.</p>
+          <a href="workshops.html" class="btn btn-primary">Reserve Your Spot</a>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 2rem;">
+      <a href="workshops.html" class="btn btn-secondary">All Workshops &amp; Past Events</a>
+    </div>
+  </div>
+</section>
+
+<!-- ========== STAFF PICKS ========== -->
+<section class="section staff-picks-section" aria-labelledby="staff-picks-heading">
+  <div class="container" style="position:relative; z-index:2;">
+    <div class="section-header centered reveal">
+      <span class="eyebrow">Our Favorites Right Now</span>
+      <h2 id="staff-picks-heading" style="margin-top:0.6rem; color:var(--cream);">Staff <em style="font-style:italic">picks</em></h2>
+      <div class="section-divider centered"></div>
+    </div>
+
+    <div class="grid-4" style="gap:1.25rem;">
+      <!-- Pick 1 -->
+      <div class="pick-card reveal reveal-delay-1">
+        <div class="pick-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+            <path d="M14 26 C14 26 4 18 4 12 C4 7 8.5 3 14 3 C19.5 3 24 7 24 12 C24 18 14 26 14 26Z" fill="#88B38D"/>
+            <path d="M14 14 C14 14 10 11 10 8 C10 8 12 7 14 9 C16 7 18 8 18 8 C18 11 14 14 14 14Z" fill="#3A5438"/>
+          </svg>
+        </div>
+        <div class="pick-name">Golden Pothos</div>
+        <p class="pick-reason">Genuinely hard to kill. Low light, irregular watering, small apartment — it doesn't care. New growth all summer long.</p>
+        <div class="staff-tag"><span class="staff-tag-dot"></span> Staff Pick</div>
+      </div>
+
+      <!-- Pick 2 -->
+      <div class="pick-card reveal reveal-delay-2">
+        <div class="pick-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+            <ellipse cx="14" cy="14" rx="9" ry="12" fill="#5D8A62"/>
+            <path d="M14 26 C14 26 8 20 8 14 C8 10 11 7 14 7" stroke="#3A5438" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <ellipse cx="14" cy="14" rx="9" ry="12" fill="none" stroke="#3A5438" stroke-width="1" opacity="0.3"/>
+          </svg>
+        </div>
+        <div class="pick-name">Calathea Orbifolia</div>
+        <p class="pick-reason">Stunning striped leaves and 100% pet-safe. A little dramatic about humidity — a pebble tray helps — but worth every drop.</p>
+        <div class="staff-tag"><span class="staff-tag-dot"></span> Pet Safe</div>
+      </div>
+
+      <!-- Pick 3 -->
+      <div class="pick-card reveal reveal-delay-3">
+        <div class="pick-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+            <path d="M8 22 L8 12 Q8 6 14 6 Q20 6 20 12 L20 22 Q20 26 14 26 Q8 26 8 22Z" fill="#C4933A"/>
+            <ellipse cx="14" cy="12" rx="7" ry="4" fill="#D4A84B"/>
+            <path d="M14 6 C14 6 10 2 12 0 C14 0 16 4 14 6Z" fill="#5D8A62"/>
+          </svg>
+        </div>
+        <div class="pick-name">Stoneware Planters</div>
+        <p class="pick-reason">Made by a ceramicist in Kalamazoo. Matte toffee glaze, drainage hole, and a weight that makes plants feel settled. They sell out fast.</p>
+        <div class="staff-tag"><span class="staff-tag-dot"></span> Locally Made</div>
+      </div>
+
+      <!-- Pick 4 -->
+      <div class="pick-card reveal reveal-delay-4">
+        <div class="pick-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+            <rect x="10" y="10" width="8" height="16" rx="2" fill="#F5EDD7" stroke="#E8D5B2" stroke-width="1"/>
+            <line x1="14" y1="10" x2="14" y2="5" stroke="#7A5233" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M14 5 C13 2 11 0 12 -1 C13 -2 15 0 16 3 C17 5 14 5 14 5Z" fill="#C4933A"/>
+            <circle cx="14" cy="4" r="4" fill="rgba(196,147,58,0.15)"/>
+          </svg>
+        </div>
+        <div class="pick-name">Cedar Candles</div>
+        <p class="pick-reason">Poured in small batches in South Haven. Clean-burning soy wax, cedar and white tea scent. The whole shop smells like this and people always ask.</p>
+        <div class="staff-tag"><span class="staff-tag-dot"></span> Michigan Made</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PRIVATE EVENTS CTA ========== -->
+<section class="section" aria-labelledby="events-cta-heading">
+  <div class="container">
+    <div class="events-split reveal">
+      <div class="events-visual">
+        <svg viewBox="0 0 300 300" width="220" style="position:relative;z-index:2;" fill="none" aria-hidden="true">
+          <!-- Wreath shape for events -->
+          <circle cx="150" cy="150" r="110" stroke="#5D8A62" stroke-width="2" stroke-dasharray="6 4" fill="none"/>
+          <!-- Wreath leaves -->
+          <g>
+            <path d="M150 50 C138 30 118 28 114 44 C110 58 128 70 150 70 C160 70 162 56 150 50Z" fill="#5D8A62"/>
+            <path d="M200 70 C218 56 222 36 208 32 C194 28 182 46 190 66 C194 74 202 76 200 70Z" fill="#6B9B70"/>
+            <path d="M235 120 C256 112 264 94 252 86 C240 78 222 92 224 112 C226 122 230 126 235 120Z" fill="#5D8A62"/>
+            <path d="M240 180 C260 180 272 164 264 152 C256 140 238 144 234 162 C232 172 234 180 240 180Z" fill="#88B38D"/>
+            <path d="M210 230 C226 244 244 240 246 226 C248 212 234 200 216 208 C206 214 202 224 210 230Z" fill="#5D8A62"/>
+            <path d="M150 250 C150 270 166 278 178 270 C190 262 188 244 168 240 C158 238 150 244 150 250Z" fill="#6B9B70"/>
+            <path d="M90 230 C76 244 76 260 90 264 C104 268 116 254 108 236 C104 226 94 222 90 230Z" fill="#5D8A62"/>
+            <path d="M60 180 C42 186 36 204 46 212 C56 220 74 212 76 192 C76 182 68 176 60 180Z" fill="#88B38D"/>
+            <path d="M64 120 C46 112 32 120 34 134 C36 148 54 156 70 146 C78 140 76 128 64 120Z" fill="#5D8A62"/>
+            <path d="M100 70 C84 58 66 64 66 80 C66 94 84 102 100 92 C108 86 108 76 100 70Z" fill="#6B9B70"/>
+          </g>
+          <!-- Center text area -->
+          <circle cx="150" cy="150" r="72" fill="rgba(245,237,215,0.08)"/>
+          <!-- Ribbon bow at bottom -->
+          <path d="M130 252 C120 242 110 248 112 258 C114 266 126 266 130 256 Z" fill="#B85A37"/>
+          <path d="M170 252 C180 242 190 248 188 258 C186 266 174 266 170 256 Z" fill="#B85A37"/>
+          <circle cx="150" cy="255" r="8" fill="#943F23"/>
+        </svg>
+      </div>
+      <div class="events-content">
+        <span class="eyebrow">Private Plant Bar</span>
+        <h2 id="events-cta-heading" style="margin-top:0.6rem;">Host your<br><em style="font-style:italic; color:var(--terracotta)">event here</em></h2>
+        <p class="lead" style="margin-top:1rem; max-width:380px;">Birthdays, team outings, baby showers, bachelorette parties — we close the shop and set up a private plant-potting experience just for your group.</p>
+        <ul style="margin-top:1.5rem; display:flex; flex-direction:column; gap:0.6rem;">
+          <li class="event-type">
+            <div class="event-type-icon">🎂</div>
+            <div class="event-type-info">
+              <strong>Birthday Parties</strong>
+              <span>Up to 20 guests, 2 hrs, includes champagne option</span>
+            </div>
+          </li>
+          <li class="event-type">
+            <div class="event-type-icon">🌿</div>
+            <div class="event-type-info">
+              <strong>Team Outings</strong>
+              <span>Pot your own plant to take back to the office</span>
+            </div>
+          </li>
+          <li class="event-type">
+            <div class="event-type-icon">🌸</div>
+            <div class="event-type-info">
+              <strong>Showers &amp; Celebrations</strong>
+              <span>Baby showers, bridal showers, or just a good reason to gather</span>
+            </div>
+          </li>
+        </ul>
+        <a href="events.html" class="btn btn-primary btn-lg" style="margin-top:2rem;">
+          Learn About Private Events
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PHONE CTA BAND ========== -->
+<div class="cta-band" role="complementary" aria-label="Contact us">
+  <div class="container" style="position:relative;z-index:2;">
+    <h2>Questions? We love to talk plants.</h2>
+    <p class="lead">Call us Wednesday through Saturday 10am–6pm, or stop in Sunday 11am–4pm.<br>We'll help you find the right plant for your light, your life, and your budget.</p>
+    <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+      <a href="tel:+12695550193" class="btn-white">
+        <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        (269) 555-0193
+      </a>
+      <a href="visit.html" class="btn btn-secondary" style="background:transparent; color:var(--white); border-color:rgba(255,255,255,0.5);">Get Directions</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== FOOTER ========== -->
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner container">
+    <div class="footer-grid">
+      <!-- Brand -->
+      <div class="footer-brand">
+        <a href="index.html" class="site-logo" style="margin-bottom:0.75rem; display:inline-flex;">
+          <svg class="logo-mark" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+            <circle cx="18" cy="18" r="17" fill="rgba(93,138,98,0.3)" stroke="#5D8A62" stroke-width="1.5"/>
+            <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#88B38D"/>
+            <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#5D8A62"/>
+          </svg>
+          <span>
+            <span class="logo-text">Juniper Lane</span>
+            <span class="logo-sub">Plant Shop &amp; Gifts</span>
+          </span>
+        </a>
+        <p class="footer-tagline">A warm neighborhood shop rooted in Benton Harbor since 2018.</p>
+      </div>
+
+      <!-- Pages -->
+      <div>
+        <div class="footer-heading">Explore</div>
+        <ul class="footer-links">
+          <li><a href="shop.html">Shop</a></li>
+          <li><a href="workshops.html">Workshops</a></li>
+          <li><a href="plant-care.html">Plant Care Tips</a></li>
+          <li><a href="events.html">Private Events</a></li>
+          <li><a href="visit.html">Visit Us</a></li>
+        </ul>
+      </div>
+
+      <!-- Hours & Location -->
+      <div>
+        <div class="footer-heading">Find Us</div>
+        <div class="footer-info">
+          <strong>214 Maple Street</strong><br>
+          Benton Harbor, MI 49022<br>
+          <br>
+          <strong>Wed–Sat</strong> 10am–6pm<br>
+          <strong>Sunday</strong> 11am–4pm<br>
+          Mon &amp; Tue: Closed<br>
+          <br>
+          <a href="tel:+12695550193" style="color: var(--sage-light);">(269) 555-0193</a>
+        </div>
+      </div>
+
+      <!-- Newsletter -->
+      <div>
+        <div class="footer-heading">Stay in the Loop</div>
+        <p style="font-size:0.85rem; color:rgba(245,237,215,0.6); margin-bottom:1rem; line-height:1.6;">New plants, workshop dates, and shop news — about once a month, never spam.</p>
+        <div class="newsletter-wrap">
+          <form class="newsletter-form" aria-label="Newsletter signup">
+            <label for="footer-email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Email address</label>
+            <input type="email" id="footer-email" placeholder="your@email.com" required autocomplete="email">
+            <button type="submit">Subscribe</button>
+          </form>
+          <div class="newsletter-success" role="status">You're on the list. See you soon!</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span class="footer-copy">© 2025 Juniper Lane · 214 Maple Street, Benton Harbor, MI</span>
+      <span class="footer-copy">Made with care in Michigan</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ========== MOBILE PHONE BAR ========== -->
+<a href="tel:+12695550193" class="mobile-phone-bar" aria-label="Call Juniper Lane">
+  <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+    <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  Call Us · (269) 555-0193
+</a>
+
+<script src="main.js"></script>
+</body>
+</html>

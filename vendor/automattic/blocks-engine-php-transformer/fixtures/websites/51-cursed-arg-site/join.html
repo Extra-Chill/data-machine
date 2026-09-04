@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join the Watch — Westridge Longwave Cooperative</title>
+  <meta name="description" content="The shifts are unfilled. The chair is empty. Apply to keep the watch on 14.770 kHz.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="join">
+  <a class="skip-link" href="#main">Skip to application</a>
+  <canvas id="static-canvas" aria-hidden="true"></canvas>
+
+  <header class="site-header">
+    <div class="hdr-inner">
+      <a class="brand" href="index.html" aria-label="Westridge Longwave Cooperative home">
+        <svg class="sigil" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#33503a" stroke-width="1.5"/>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#33503a" stroke-width="1"/>
+          <line x1="50" y1="14" x2="50" y2="78" stroke="#9fd6a8" stroke-width="2"/>
+          <path d="M50 30 a20 20 0 0 1 0 40" fill="none" stroke="#d8b25a" stroke-width="1.5" opacity=".8"/>
+          <path d="M50 30 a20 20 0 0 0 0 40" fill="none" stroke="#b4533b" stroke-width="1.5" opacity=".8"/>
+          <ellipse cx="50" cy="78" rx="10" ry="6" fill="#1c2a20"/>
+          <circle cx="50" cy="78" r="2.4" fill="#070a08"/>
+        </svg>
+        <span class="brand-txt">
+          <span class="brand-name">WESTRIDGE LONGWAVE</span>
+          <span class="brand-sub">Cooperative · est. 1971 · ⟂ still on air</span>
+        </span>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <a href="index.html">Transmission</a>
+        <a href="manifesto.html">The Charter</a>
+        <a href="archive.html">Field Logs</a>
+        <a href="join.html" class="active">Join the Watch</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker__track">
+      <span>FOUR CHAIRS EMPTY · ONE STRUCK THROUGH</span><span><b>APPLICATIONS OPEN</b></span><span>THE WATCH NEEDS LISTENERS</span><span>14.770 kHz HELD</span>
+      <span>FOUR CHAIRS EMPTY · ONE STRUCK THROUGH</span><span><b>APPLICATIONS OPEN</b></span><span>THE WATCH NEEDS LISTENERS</span><span>14.770 kHz HELD</span>
+    </div>
+  </div>
+
+  <main id="main" class="wrap">
+    <section class="section" style="margin-top:1.6rem">
+      <span class="kicker">Recruitment · perpetual</span>
+      <h2>Join the Watch</h2>
+      <div class="join-grid">
+        <div>
+          <p>
+            The cooperative stood down in 1997, but the carrier never did, and a carrier without a listener
+            is a door propped open in an empty house. We are taking applications. There is no salary. There
+            is no recognition. There is only the dial, the dark band, and the discipline of keeping a record
+            for whoever comes after you. If that sounds like a burden, it is. The right listener will recognize
+            it as a calling.
+          </p>
+          <form class="application" novalidate>
+            <div class="field">
+              <label for="ap-name">Listener designation</label>
+              <input id="ap-name" name="name" type="text" placeholder="what should the dial call you?" required>
+            </div>
+            <div class="field">
+              <label for="ap-band">Where do you listen from?</label>
+              <input id="ap-band" name="band" type="text" placeholder="city / coordinates / a frequency">
+            </div>
+            <div class="field">
+              <label for="ap-shift">Preferred shift</label>
+              <select id="ap-shift" name="shift">
+                <option>Dusk watch (the band wakes)</option>
+                <option>Deep night (01:00 – 04:00)</option>
+                <option>Half-light (the band gives instructions)</option>
+                <option>I will take the shift no one wants</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="ap-why">Why do you want to keep the watch?</label>
+              <textarea id="ap-why" name="why" rows="4" placeholder="be honest. the carrier can tell."></textarea>
+            </div>
+            <button class="btn" type="submit">Submit to the frequency</button>
+            <div class="notice" id="ap-notice" hidden></div>
+          </form>
+        </div>
+
+        <aside>
+          <figure style="border:1px solid var(--line);padding:.6rem;background:var(--panel)">
+            <svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg" role="img"
+                 aria-label="The empty operator's chair in the relay shed. Note from the photographer: the password Holloway is hidden inside the corrupted log; tune to fourteen seven seven zero kilohertz.">
+              <rect width="240" height="240" fill="#070a08"/>
+              <g stroke="#33503a" stroke-width="1.4" fill="none">
+                <rect x="40" y="120" width="70" height="70"/>
+                <line x1="40" y1="120" x2="40" y2="60"/>
+                <line x1="110" y1="120" x2="110" y2="60"/>
+                <line x1="40" y1="60" x2="110" y2="60"/>
+                <line x1="40" y1="190" x2="40" y2="220"/>
+                <line x1="110" y1="190" x2="110" y2="220"/>
+              </g>
+              <!-- receiver on the desk -->
+              <g stroke="#9fd6a8" stroke-width="1.4" fill="none">
+                <rect x="140" y="150" width="70" height="44" fill="#0e1611"/>
+                <circle cx="158" cy="172" r="7"/><circle cx="176" cy="172" r="7"/>
+                <line x1="195" y1="162" x2="205" y2="162"/>
+                <line x1="195" y1="172" x2="205" y2="172"/>
+                <line x1="195" y1="182" x2="205" y2="182"/>
+              </g>
+              <text x="175" y="146" fill="#d8b25a" font-family="VT323, monospace" font-size="13" text-anchor="middle">14.770</text>
+              <g stroke="#b4533b" stroke-width="1" opacity=".7" fill="none">
+                <path d="M175 150 a18 18 0 0 1 0 -1"/>
+              </g>
+              <text x="120" y="225" fill="#33503a" font-family="VT323, monospace" font-size="12" text-anchor="middle">RELAY SHED · CHAIR 5 · VACANT</text>
+            </svg>
+            <figcaption style="font-size:.74rem;color:var(--ink-faint);margin-top:.4rem">
+              The empty operator's chair, relay shed, photographed 1998. Chair five was never reassigned.
+            </figcaption>
+          </figure>
+
+          <p style="font-size:.84rem;color:var(--ink-dim);margin-top:1rem">
+            Already know the operator's name? Resume a shift directly at the relay terminal —
+            press <kbd>~</kbd> or type <strong>OPEN</strong>.
+          </p>
+          <p style="font-size:.78rem;color:var(--ink-faint);margin-top:.6rem">
+            <!-- the watch never truly ended. the carrier page exists. it is sealed until all three locks fall. -->
+            Note from the last operator: when the three locks fall, the carrier opens a final page.
+            It cannot be reached any other way.
+          </p>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="foot-inner">
+      <div class="foot-col">
+        <p class="h">Cooperative</p>
+        <a href="index.html">Transmission</a>
+        <a href="manifesto.html">The Charter</a>
+        <a href="archive.html">Field Logs</a>
+        <a href="join.html">Join the Watch</a>
+      </div>
+      <div class="foot-col">
+        <p class="h">Frequency</p>
+        <a href="#">Longwave · 14.770 kHz</a>
+        <a href="#">Relay Shed · Westridge Ridge</a>
+        <a href="#">Shift Roster (lost)</a>
+        <a href="#">Operator Terminal</a>
+      </div>
+      <div class="foot-col">
+        <p class="h">The Five</p>
+        <a href="archive.html">A. Holloway</a>
+        <a href="archive.html">M. Reyes</a>
+        <a href="archive.html">D. Okafor</a>
+        <a href="archive.html">S. Lindqvist</a>
+        <a href="archive.html">— (vacant)</a>
+      </div>
+    </div>
+    <div class="foot-meta">
+      <span class="stamp">application form regenerated · last human edit 1997-12-19</span>
+      <span class="freq">last carrier 14.770 kHz · do not adjust your set</span>
+    </div>
+  </footer>
+
+  <div id="whisper" role="status" aria-live="polite"></div>
+
+  <div id="terminal" aria-hidden="true">
+    <div class="term-box" role="dialog" aria-label="Operator terminal">
+      <div class="term-head">
+        <span>W.L.C. RELAY TERMINAL // 14.770 kHz</span>
+        <button class="term-close" aria-label="Close terminal">[ esc ]</button>
+      </div>
+      <div class="term-body">
+        <div class="term-out" aria-live="polite"></div>
+        <div class="beacons" aria-hidden="true">
+          <span class="beacon"></span><span class="beacon"></span><span class="beacon"></span>
+          <span>locks released</span>
+        </div>
+        <div class="term-line">
+          <span class="ps">wlc:~$</span>
+          <input id="term-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="terminal input" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/static.js"></script>
+  <script src="js/awareness.js"></script>
+  <script src="js/terminal.js"></script>
+  <script src="js/join.js"></script>
+</body>
+</html>

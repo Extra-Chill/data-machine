@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Charter — Westridge Longwave Cooperative</title>
+  <meta name="description" content="The seven principles every operator of the Westridge Longwave Cooperative signed before their first night on the dial.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="manifesto">
+  <a class="skip-link" href="#main">Skip to charter</a>
+  <canvas id="static-canvas" aria-hidden="true"></canvas>
+
+  <header class="site-header">
+    <div class="hdr-inner">
+      <a class="brand" href="index.html" aria-label="Westridge Longwave Cooperative home">
+        <svg class="sigil" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#33503a" stroke-width="1.5"/>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#33503a" stroke-width="1"/>
+          <line x1="50" y1="14" x2="50" y2="78" stroke="#9fd6a8" stroke-width="2"/>
+          <path d="M50 30 a20 20 0 0 1 0 40" fill="none" stroke="#d8b25a" stroke-width="1.5" opacity=".8"/>
+          <path d="M50 30 a20 20 0 0 0 0 40" fill="none" stroke="#b4533b" stroke-width="1.5" opacity=".8"/>
+          <ellipse cx="50" cy="78" rx="10" ry="6" fill="#1c2a20"/>
+          <circle cx="50" cy="78" r="2.4" fill="#070a08"/>
+        </svg>
+        <span class="brand-txt">
+          <span class="brand-name">WESTRIDGE LONGWAVE</span>
+          <span class="brand-sub">Cooperative · est. 1971 · ⟂ still on air</span>
+        </span>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <a href="index.html">Transmission</a>
+        <a href="manifesto.html" class="active">The Charter</a>
+        <a href="archive.html">Field Logs</a>
+        <a href="join.html">Join the Watch</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker__track">
+      <span>THE CHARTER · SIGNED IN INK · 1971</span><span><b>SEVEN PRINCIPLES</b></span><span>NEVER LEAVE THE CARRIER UNATTENDED</span><span>14.770 kHz HELD</span>
+      <span>THE CHARTER · SIGNED IN INK · 1971</span><span><b>SEVEN PRINCIPLES</b></span><span>NEVER LEAVE THE CARRIER UNATTENDED</span><span>14.770 kHz HELD</span>
+    </div>
+  </div>
+
+  <main id="main" class="wrap">
+    <section class="section" style="margin-top:1.6rem">
+      <span class="kicker">Founding document · 1971 · signed by all five</span>
+      <h2 class="glitch" data-text="The Charter of the Watch">The Charter of the Watch</h2>
+      <div class="manifesto">
+        <p>
+          We are not radio amateurs and we are not ghost hunters. We are listeners. The longwave band above
+          Westridge carries traffic that does not appear in any registry, on a schedule that answers to nothing
+          we can name. We do not claim to understand it. We claim only the discipline to <em>witness</em> it,
+          honestly, in shifts, forever — because something on that band has been witnessing us first, and a
+          watch that is only kept in one direction is not a watch at all.
+        </p>
+        <p>
+          Every operator signs the seven principles before their first night. They are not rules so much as
+          conditions of survival on the dial. We print them here so that any future listener understands what
+          they are agreeing to the moment they tune in.
+        </p>
+      </div>
+
+      <ol class="principles">
+        <li>Hold the frequency. The carrier is never to be left unattended between dusk and first light.</li>
+        <li>Log everything, especially the silence. Empty band is not empty; it is masked.</li>
+        <li>Never answer a voice that uses your name before you have given it.</li>
+        <li>The names of operators are always written under a shift. We do not record ourselves plainly.</li>
+        <li>What the band returns to you is not a coincidence. Treat the repetition as a message.</li>
+        <li>If the dial gives instructions, follow them slowly and verify each step before the next.</li>
+        <li>The watch outlives the operator. When you can no longer keep it, leave the way in for the next listener.</li>
+      </ol>
+
+      <p style="margin-top:1.6rem;color:var(--ink-dim);font-size:.9rem">
+        Signed, in the relay shed, the first night of the cooperative:
+        <span class="redacted" title="some ink here has been deliberately obscured. select it.">A. Holloway · M. Reyes · D. Okafor · S. Lindqvist · and one signature struck through</span>.
+      </p>
+    </section>
+
+    <!-- secret reinforcement clue: only visible if you select/highlight text -->
+    <section class="section" aria-hidden="false">
+      <p style="font-size:.86rem;color:var(--ink-faint)">
+        Appended to the charter, in a later hand, is a single line the archivist could not interpret.
+        It is preserved here exactly, encoded as it was found
+        <span style="color:var(--ink-faint)">(it is ordinary text in base&#8203;64)</span>:
+      </p>
+      <p class="raw" data-cipher="base64" style="font-size:.95rem">dGhlIGZyZXF1ZW5jeSBpcyAxNDc3MA==</p>
+      <p style="font-size:.8rem;color:var(--ink-faint)">
+        <!-- decode the base64 above. it confirms the final frequency you must enter: 14770. -->
+        Decoders welcome. The carrier confirms its own answers, if you are patient.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="foot-inner">
+      <div class="foot-col">
+        <p class="h">Cooperative</p>
+        <a href="index.html">Transmission</a>
+        <a href="manifesto.html">The Charter</a>
+        <a href="archive.html">Field Logs</a>
+        <a href="join.html">Join the Watch</a>
+      </div>
+      <div class="foot-col">
+        <p class="h">Frequency</p>
+        <a href="#">Longwave · 14.770 kHz</a>
+        <a href="#">Relay Shed · Westridge Ridge</a>
+        <a href="#">Shift Roster (lost)</a>
+        <a href="#">Operator Terminal</a>
+      </div>
+      <div class="foot-col">
+        <p class="h">The Five</p>
+        <a href="archive.html">A. Holloway</a>
+        <a href="archive.html">M. Reyes</a>
+        <a href="archive.html">D. Okafor</a>
+        <a href="archive.html">S. Lindqvist</a>
+        <a href="archive.html">— (vacant)</a>
+      </div>
+    </div>
+    <div class="foot-meta">
+      <span class="stamp">charter scan regenerated · last human edit 1997-12-19</span>
+      <span class="freq">last carrier 14.770 kHz · do not adjust your set</span>
+    </div>
+  </footer>
+
+  <div id="whisper" role="status" aria-live="polite"></div>
+
+  <div id="terminal" aria-hidden="true">
+    <div class="term-box" role="dialog" aria-label="Operator terminal">
+      <div class="term-head">
+        <span>W.L.C. RELAY TERMINAL // 14.770 kHz</span>
+        <button class="term-close" aria-label="Close terminal">[ esc ]</button>
+      </div>
+      <div class="term-body">
+        <div class="term-out" aria-live="polite"></div>
+        <div class="beacons" aria-hidden="true">
+          <span class="beacon"></span><span class="beacon"></span><span class="beacon"></span>
+          <span>locks released</span>
+        </div>
+        <div class="term-line">
+          <span class="ps">wlc:~$</span>
+          <input id="term-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="terminal input" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/static.js"></script>
+  <script src="js/awareness.js"></script>
+  <script src="js/terminal.js"></script>
+</body>
+</html>

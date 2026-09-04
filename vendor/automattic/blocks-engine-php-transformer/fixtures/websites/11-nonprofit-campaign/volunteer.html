@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volunteer — Keep the Library Open: Vote Yes on Measure L</title>
+  <meta name="description" content="Join the campaign to keep our library open. Phone banking tonight, poll greeters on Election Day June 18. Sign up for a shift.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* ===== VOLUNTEER PAGE ===== */
+
+    .volunteer-layout {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: clamp(2rem, 5vw, 4rem);
+      align-items: start;
+    }
+
+    /* Urgency callout */
+    .urgency-banner {
+      background: var(--rust);
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+    .urgency-banner__icon {
+      width: 40px;
+      height: 40px;
+      background: rgba(247,237,214,.15);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--cream);
+    }
+    .urgency-banner__icon svg { width: 20px; height: 20px; }
+    .urgency-banner p {
+      color: rgba(247,237,214,.9);
+      font-size: .9375rem;
+      margin: 0;
+    }
+    .urgency-banner strong { color: var(--cream); }
+
+    /* Shift cards list */
+    .shifts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+
+    /* Section label */
+    .shifts-section-label {
+      font-family: var(--font-mono);
+      font-size: .65rem;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: .625rem;
+    }
+    .shifts-section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--cream-deeper);
+    }
+
+    /* Filled shift (greyed out) */
+    .shift-card--filled {
+      opacity: .55;
+      border-left-color: var(--cream-deeper) !important;
+    }
+    .shift-card--filled .shift-spots__num { color: var(--rust); }
+
+    /* Form card */
+    .form-card {
+      background: var(--white);
+      border: 1px solid var(--cream-dark);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      box-shadow: var(--shadow-md);
+      position: sticky;
+      top: calc(var(--header-h) + 2rem);
+    }
+    .form-card__heading {
+      font-family: var(--font-display);
+      font-size: 1.375rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: .375rem;
+    }
+    .form-card__sub {
+      font-size: .9375rem;
+      color: var(--ink-faded);
+      margin-bottom: 1.75rem;
+    }
+
+    .form-submit-note {
+      font-family: var(--font-mono);
+      font-size: .62rem;
+      letter-spacing: .06em;
+      color: var(--ink-muted);
+      text-align: center;
+      margin-top: .875rem;
+      font-style: italic;
+    }
+
+    /* Success message */
+    .form-success {
+      display: none;
+      background: var(--forest-pale);
+      border: 1.5px solid var(--forest);
+      border-radius: var(--radius-md);
+      padding: 1.75rem;
+      text-align: center;
+    }
+    .form-success__icon {
+      width: 56px;
+      height: 56px;
+      background: var(--forest);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+      color: var(--cream);
+      font-size: 1.5rem;
+    }
+    .form-success h3 { color: var(--forest); margin-bottom: .5rem; }
+    .form-success p  { font-size: .9375rem; color: var(--ink-faded); margin-bottom: 0; }
+
+    /* Why volunteer section */
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    .why-card {
+      background: var(--white);
+      border: 1px solid var(--cream-dark);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+    }
+    .why-card__icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+    .why-card__icon svg { width: 24px; height: 24px; }
+    .why-card h3 { font-size: 1.0625rem; margin-bottom: .5rem; }
+    .why-card p  { font-size: .9rem; color: var(--ink-faded); margin: 0; }
+
+    @media (max-width: 900px) {
+      .volunteer-layout { grid-template-columns: 1fr; }
+      .form-card { position: static; }
+    }
+    @media (max-width: 640px) {
+      .why-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="election-bar" role="alert">
+    <strong>Election Day is Tomorrow — June 18, 2026.</strong> Polls open 7am–8pm. &nbsp;
+    <a href="faq.html#where-to-vote">Find your polling place &rarr;</a>
+  </div>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="site-logo" aria-label="Keep the Library Open — Home">
+        <span class="site-logo__icon" aria-hidden="true">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 7C4 7 10 5.5 15 9C20 5.5 26 7 26 7V23C26 23 20 21.5 15 23C10 21.5 4 23 4 23V7Z" fill="currentColor" opacity=".18"/>
+            <path d="M15 9V23" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M4 7C4 7 10 5.5 15 9C20 5.5 26 7 26 7V23C26 23 20 21.5 15 23C10 21.5 4 23 4 23V7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="site-logo__text">
+          Keep the Library Open
+          <span>Vote Yes on Measure L</span>
+        </span>
+      </a>
+      <button class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="Toggle navigation">
+        <span class="nav-toggle__bar"></span>
+        <span class="nav-toggle__bar"></span>
+        <span class="nav-toggle__bar"></span>
+      </button>
+      <nav aria-label="Main navigation">
+        <ul class="nav-menu" id="nav-menu" role="list">
+          <li><a href="index.html"          class="nav-link">Home</a></li>
+          <li><a href="the-measure.html"    class="nav-link">The Measure</a></li>
+          <li><a href="endorsements.html"   class="nav-link">Supporters</a></li>
+          <li><a href="volunteer.html"      class="nav-link active">Volunteer</a></li>
+          <li><a href="donate.html"         class="nav-link">Donate</a></li>
+          <li><a href="faq.html"            class="nav-link">FAQ</a></li>
+          <li><a href="faq.html#where-to-vote" class="nav-cta">Vote YES — June&nbsp;18</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Page Hero -->
+  <div class="page-hero" aria-labelledby="page-title">
+    <div class="container">
+      <span class="page-hero__eyebrow">Join the Campaign</span>
+      <h1 id="page-title">Volunteers Make the Difference</h1>
+      <p>
+        Local elections like this one are decided by a handful of votes.
+        Your two hours of volunteering can make the difference between winning and losing.
+        We need people tonight and on Election Day.
+      </p>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <section class="section">
+    <div class="container volunteer-layout">
+
+      <!-- Left: shifts -->
+      <div>
+
+        <!-- Urgency banner -->
+        <div class="urgency-banner" role="alert">
+          <span class="urgency-banner__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </span>
+          <p><strong>This is it.</strong> With Election Day tomorrow, these are our last chances to reach undecided voters. Every volunteer slot matters. Sign up now.</p>
+        </div>
+
+        <!-- Tonight -->
+        <p class="shifts-section-label">Tonight &mdash; June 17</p>
+        <div class="shifts-list" role="list">
+
+          <div class="shift-card shift-card--urgent reveal" role="listitem">
+            <div class="shift-date">
+              <div class="shift-date__day">17</div>
+              <div class="shift-date__month">Jun</div>
+            </div>
+            <div class="shift-info">
+              <p class="shift-info__title">Final Phone Banking Session</p>
+              <p class="shift-info__meta">6:00 pm &ndash; 8:00 pm &nbsp;&middot;&nbsp; Library Meeting Room A, 412 Oak Street</p>
+              <p>Call undecided voters from the library's own meeting room. Scripts and lists provided. No experience needed &mdash; just a friendly voice.</p>
+            </div>
+            <div class="shift-spots">
+              <div class="shift-spots__num">4</div>
+              <div class="shift-spots__label">Spots left</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Election Day -->
+        <p class="shifts-section-label" style="margin-top:2rem;">Election Day &mdash; June 18</p>
+        <div class="shifts-list" role="list">
+
+          <div class="shift-card shift-card--election reveal d1" role="listitem">
+            <div class="shift-date">
+              <div class="shift-date__day">18</div>
+              <div class="shift-date__month">Jun</div>
+            </div>
+            <div class="shift-info">
+              <p class="shift-info__title">Poll Greeter &mdash; City Hall Polling Place</p>
+              <p class="shift-info__meta">7:00 am &ndash; 11:00 am &nbsp;&middot;&nbsp; City Hall, 100 Civic Center Drive</p>
+              <p>Stand 100 feet from the polls (as required by law), hand out our "Vote YES" palm cards, and answer questions. Friendly and easy.</p>
+            </div>
+            <div class="shift-spots">
+              <div class="shift-spots__num">3</div>
+              <div class="shift-spots__label">Spots left</div>
+            </div>
+          </div>
+
+          <div class="shift-card shift-card--election reveal d2" role="listitem">
+            <div class="shift-date">
+              <div class="shift-date__day">18</div>
+              <div class="shift-date__month">Jun</div>
+            </div>
+            <div class="shift-info">
+              <p class="shift-info__title">Poll Greeter &mdash; Riverside Community Center</p>
+              <p class="shift-info__meta">11:00 am &ndash; 3:00 pm &nbsp;&middot;&nbsp; 820 Riverside Blvd.</p>
+              <p>This is our highest-traffic polling location. High visibility, lots of voters to reach. We want multiple people here if possible.</p>
+            </div>
+            <div class="shift-spots">
+              <div class="shift-spots__num">5</div>
+              <div class="shift-spots__label">Spots left</div>
+            </div>
+          </div>
+
+          <div class="shift-card shift-card--election reveal d3" role="listitem">
+            <div class="shift-date">
+              <div class="shift-date__day">18</div>
+              <div class="shift-date__month">Jun</div>
+            </div>
+            <div class="shift-info">
+              <p class="shift-info__title">Poll Greeter &mdash; Lincoln Elementary School</p>
+              <p class="shift-info__meta">3:00 pm &ndash; 8:00 pm &nbsp;&middot;&nbsp; 215 Lincoln Ave. (gym entrance)</p>
+              <p>The after-school rush is our best window for catching parents. Bring your energy for the final push to 8pm poll close.</p>
+            </div>
+            <div class="shift-spots">
+              <div class="shift-spots__num">4</div>
+              <div class="shift-spots__label">Spots left</div>
+            </div>
+          </div>
+
+          <div class="shift-card shift-card--election reveal d4" role="listitem">
+            <div class="shift-date">
+              <div class="shift-date__day">18</div>
+              <div class="shift-date__month">Jun</div>
+            </div>
+            <div class="shift-info">
+              <p class="shift-info__title">Social Media Volunteer &mdash; Work from Home</p>
+              <p class="shift-info__meta">All day &nbsp;&middot;&nbsp; Remote &mdash; Your home, phone, or device</p>
+              <p>Share campaign posts, respond to questions, and encourage friends to vote. We'll send you a kit with graphics, suggested copy, and talking points.</p>
+            </div>
+            <div class="shift-spots">
+              <div class="shift-spots__num">Open</div>
+              <div class="shift-spots__label">Unlimited</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Past shifts (for context) -->
+        <p class="shifts-section-label" style="margin-top:2rem;">Completed Shifts</p>
+        <div class="shifts-list" role="list">
+          <div class="shift-card shift-card--filled reveal" role="listitem" aria-label="Completed shift">
+            <div class="shift-date">
+              <div class="shift-date__day">14</div>
+              <div class="shift-date__month">Jun</div>
+            </div>
+            <div class="shift-info">
+              <p class="shift-info__title">Farmers Market Outreach</p>
+              <p class="shift-info__meta">9:00 am &ndash; 1:00 pm &nbsp;&middot;&nbsp; Downtown Farmers Market</p>
+              <p>Tabled and talked to hundreds of community members. <strong>Thank you to all who helped!</strong></p>
+            </div>
+            <div class="shift-spots">
+              <div class="shift-spots__num" style="color:var(--ink-muted);">Done</div>
+              <div class="shift-spots__label">Completed</div>
+            </div>
+          </div>
+          <div class="shift-card shift-card--filled reveal d1" role="listitem" aria-label="Completed shift">
+            <div class="shift-date">
+              <div class="shift-date__day">15</div>
+              <div class="shift-date__month">Jun</div>
+            </div>
+            <div class="shift-info">
+              <p class="shift-info__title">Door-to-Door Canvassing &mdash; District 3</p>
+              <p class="shift-info__meta">10:00 am &ndash; 2:00 pm &nbsp;&middot;&nbsp; Oak Street Neighborhood</p>
+              <p>Knocked 380 doors. <strong>Thank you to all 12 canvassers who came out!</strong></p>
+            </div>
+            <div class="shift-spots">
+              <div class="shift-spots__num" style="color:var(--ink-muted);">Done</div>
+              <div class="shift-spots__label">Completed</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /left -->
+
+      <!-- Right: signup form -->
+      <aside>
+        <div class="form-card" id="volunteer-form-card">
+
+          <!-- The form itself -->
+          <div id="form-wrapper">
+            <p class="form-card__heading">Sign Up to Volunteer</p>
+            <p class="form-card__sub">Takes 2 minutes. We'll confirm your shift by email or phone.</p>
+
+            <form id="volunteer-form" novalidate aria-label="Volunteer signup form">
+
+              <div class="form-group">
+                <label class="form-label" for="v-name">Full name <span style="color:var(--rust)">*</span></label>
+                <input type="text" id="v-name" name="name" class="form-input" placeholder="Your name" required autocomplete="name">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="v-email">Email address <span style="color:var(--rust)">*</span></label>
+                <input type="email" id="v-email" name="email" class="form-input" placeholder="you@example.com" required autocomplete="email">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="v-phone">Phone number</label>
+                <input type="tel" id="v-phone" name="phone" class="form-input" placeholder="(555) 000-0000" autocomplete="tel">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Shifts I can help with <span style="color:var(--rust)">*</span></label>
+                <div class="form-checkbox-list">
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="shifts" value="phone-tonight">
+                    <span>Phone Banking Tonight (Jun 17, 6–8pm)</span>
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="shifts" value="poll-city-hall-am">
+                    <span>Poll Greeter — City Hall (Jun 18, 7–11am)</span>
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="shifts" value="poll-riverside-pm">
+                    <span>Poll Greeter — Riverside (Jun 18, 11am–3pm)</span>
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="shifts" value="poll-lincoln-eve">
+                    <span>Poll Greeter — Lincoln School (Jun 18, 3–8pm)</span>
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="shifts" value="social-media">
+                    <span>Social Media Volunteer (Election Day, remote)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="v-notes">Anything else? (optional)</label>
+                <textarea id="v-notes" name="notes" class="form-textarea" placeholder="Questions, accessibility needs, or anything you'd like us to know…" rows="3"></textarea>
+              </div>
+
+              <button type="submit" class="btn btn--primary" style="width:100%;justify-content:center;">
+                Sign Me Up
+              </button>
+              <p class="form-submit-note">No spam. Your info stays private and is used only for campaign coordination.</p>
+
+            </form>
+          </div><!-- /form-wrapper -->
+
+          <!-- Success message (shown after submit) -->
+          <div class="form-success" id="form-success" role="alert" aria-live="polite">
+            <div class="form-success__icon" aria-hidden="true">&#x2713;</div>
+            <h3>You're signed up!</h3>
+            <p>Thank you. We'll be in touch with details for your shift. See you out there — the library is counting on us.</p>
+          </div>
+
+        </div><!-- /form-card -->
+
+        <!-- Sidebar note -->
+        <div class="card card--amber" style="margin-top:1.5rem;">
+          <h4 style="font-size:1rem;margin-bottom:.5rem;">Have 10 minutes but not 2 hours?</h4>
+          <p style="font-size:.9rem;margin-bottom:1rem;">Share this page with three friends who live in Evergreen and ask them to vote yes. Word-of-mouth wins local elections.</p>
+          <a href="donate.html" class="btn btn--amber btn--sm">Or make a donation &rarr;</a>
+        </div>
+
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- Why Volunteer -->
+  <section class="section--sm" style="background:var(--fog);border-top:1px solid var(--cream-deeper);" aria-labelledby="why-heading">
+    <div class="container">
+      <div class="text-center" style="margin-bottom:2rem;">
+        <hr class="divider divider--center">
+        <h2 id="why-heading" class="reveal">Why volunteering matters here</h2>
+      </div>
+      <div class="why-grid">
+        <div class="why-card reveal d1">
+          <div class="why-card__icon" style="background:var(--amber-pale);" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--amber-deep)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h3>Local elections are small</h3>
+          <p>Municipal measures often pass or fail by fewer than 200 votes. A single volunteer can speak to that many people in one shift at a polling place.</p>
+        </div>
+        <div class="why-card reveal d2">
+          <div class="why-card__icon" style="background:var(--forest-pale);" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 11.5 19.79 19.79 0 0 1 1.6 2.9 2 2 0 0 1 3.56.72h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </div>
+          <h3>Neighbor-to-neighbor persuasion works</h3>
+          <p>Research shows that a conversation with a real person — not a mailer, not an ad — is far more likely to change a vote or motivate an undecided neighbor.</p>
+        </div>
+        <div class="why-card reveal d3">
+          <div class="why-card__icon" style="background:var(--rust-pale);" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--rust)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <h3>This is the moment</h3>
+          <p>The library has been here for your whole life. Showing up for two hours on Election Day is a small thing that will echo for years in this community.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Strip -->
+  <div class="cta-strip">
+    <div class="container">
+      <h2 class="reveal">Every vote matters. Every hour matters.</h2>
+      <p class="reveal d1">Sign up above, or at minimum — vote yes on June 18 and tell your friends.</p>
+      <div class="reveal d2" style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+        <a href="faq.html#where-to-vote" class="btn btn--amber btn--lg">Find My Polling Place</a>
+        <a href="donate.html"             class="btn btn--outline-light btn--lg">Donate Instead</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <span class="footer-brand__name">Keep the Library Open</span>
+          <p class="footer-brand__tagline">A community campaign to protect library services in Evergreen.</p>
+          <span class="footer-stamp">Vote YES — June 18</span>
+        </div>
+        <div>
+          <p class="footer-col__heading">Campaign Pages</p>
+          <ul class="footer-links">
+            <li><a href="the-measure.html">The Measure</a></li>
+            <li><a href="endorsements.html">Supporters</a></li>
+            <li><a href="volunteer.html">Volunteer</a></li>
+            <li><a href="donate.html">Donate</a></li>
+            <li><a href="faq.html">FAQ</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="footer-col__heading">Election Info</p>
+          <ul class="footer-links">
+            <li><a href="faq.html#where-to-vote">Find your polling place</a></li>
+            <li><a href="faq.html#cost">What it costs</a></li>
+            <li><a href="faq.html#if-fails">If Measure L fails</a></li>
+            <li><a href="faq.html#partisan">Is this partisan?</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>Paid for by the Committee to Keep the Library Open, FPPC #2026-441892. Not an official government communication.</p>
+        <p>Evergreen Public Library Campaign &mdash; 2026</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /* Nav toggle */
+    const toggle = document.getElementById('nav-toggle');
+    const menu   = document.getElementById('nav-menu');
+    toggle.addEventListener('click', () => {
+      const open = menu.classList.toggle('open');
+      toggle.classList.toggle('open', open);
+      toggle.setAttribute('aria-expanded', String(open));
+    });
+    menu.querySelectorAll('.nav-link, .nav-cta').forEach(link => {
+      link.addEventListener('click', () => {
+        menu.classList.remove('open');
+        toggle.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    /* Form submission */
+    document.getElementById('volunteer-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      const name    = document.getElementById('v-name').value.trim();
+      const email   = document.getElementById('v-email').value.trim();
+      const checked = document.querySelectorAll('[name="shifts"]:checked');
+
+      if(!name){ alert('Please enter your name.'); return; }
+      if(!email || !email.includes('@')){ alert('Please enter a valid email address.'); return; }
+      if(checked.length === 0){ alert('Please select at least one shift.'); return; }
+
+      // Show success
+      document.getElementById('form-wrapper').style.display = 'none';
+      const success = document.getElementById('form-success');
+      success.style.display = 'block';
+
+      // Scroll to it on mobile
+      success.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    /* Scroll reveals */
+    const revealEls = document.querySelectorAll('.reveal, .reveal-up');
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); }});
+    }, { threshold: 0.1 });
+    revealEls.forEach(el => obs.observe(el));
+  </script>
+</body>
+</html>

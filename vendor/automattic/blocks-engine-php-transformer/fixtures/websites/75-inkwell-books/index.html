@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inkwell &amp; Quill — Independent Booksellers</title>
+  <meta name="description" content="Inkwell & Quill is a cozy independent bookstore. Discover staff picks, new arrivals, and bestsellers across fiction, mystery, poetry, and more." />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__bar">
+      <a class="brand" href="index.html">
+        <svg class="brand__mark" viewBox="0 0 48 48" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="44" height="44" rx="8" fill="#16223d" stroke="#b8923f" stroke-width="1.5"/>
+          <path d="M24 12 C18 9, 10 9, 8 11 V35 C10 33, 18 33, 24 36 C30 33, 38 33, 40 35 V11 C38 9, 30 9, 24 12 Z" fill="none" stroke="#d8c08a" stroke-width="1.6"/>
+          <line x1="24" y1="12" x2="24" y2="36" stroke="#d8c08a" stroke-width="1.6"/>
+          <path d="M32 8 L36 12 L24 24 L20 24 L20 20 Z" fill="#8c2b27" stroke="#d8c08a" stroke-width="1"/>
+        </svg>
+        <span class="brand__text">
+          <span class="brand__name">Inkwell &amp; Quill</span>
+          <span class="brand__tag">Independent Booksellers</span>
+        </span>
+      </a>
+      <nav class="site-nav" data-nav aria-label="Primary">
+        <a href="index.html" aria-current="page">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+      <div class="header-actions">
+        <a class="icon-btn" href="cart.html" data-open-cart aria-label="Open cart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/>
+            <path d="M2 3h2.2l2.1 12.2a1.5 1.5 0 0 0 1.5 1.3h8.9a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/>
+          </svg>
+          <span class="cart-count is-empty" data-cart-count>0</span>
+        </a>
+        <button class="nav-toggle" data-nav-toggle aria-label="Toggle menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero__inner">
+        <div class="hero__copy">
+          <p class="hero__kicker">Est. 1998 &middot; On the corner of Maple &amp; 3rd</p>
+          <h1>Where every story finds its reader.</h1>
+          <p class="hero__lead">A cozy corner bookshop stacked floor-to-ceiling with hand-picked titles, curated by booksellers who actually read them.</p>
+          <div class="hero__cta">
+            <a class="btn btn--primary" href="shop.html">Browse the Shelves</a>
+            <a class="btn btn--ghost" href="#staff-picks">See Staff Picks</a>
+          </div>
+        </div>
+        <div class="hero__art" aria-hidden="true">
+          <svg viewBox="0 0 360 360" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="hb1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8c2b27"/><stop offset="1" stop-color="#6f201d"/></linearGradient>
+              <linearGradient id="hb2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#25345a"/><stop offset="1" stop-color="#16223d"/></linearGradient>
+              <linearGradient id="hb3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b8923f"/><stop offset="1" stop-color="#8c6f2c"/></linearGradient>
+            </defs>
+            <!-- open book on top -->
+            <g transform="translate(40 40)">
+              <path d="M140 30 C100 12, 50 12, 30 24 V70 C50 58, 100 58, 140 76 C180 58, 230 58, 250 70 V24 C230 12, 180 12, 140 30 Z" fill="#f6efdf" stroke="#b8923f" stroke-width="2"/>
+              <line x1="140" y1="30" x2="140" y2="76" stroke="#b8923f" stroke-width="2"/>
+              <g stroke="#c9b48a" stroke-width="1.4">
+                <line x1="46" y1="36" x2="120" y2="40"/><line x1="46" y1="46" x2="120" y2="50"/>
+                <line x1="160" y1="40" x2="234" y2="36"/><line x1="160" y1="50" x2="234" y2="46"/>
+              </g>
+            </g>
+            <!-- stacked books -->
+            <g transform="translate(70 150)">
+              <rect x="0" y="0" width="220" height="34" rx="4" fill="url(#hb2)" stroke="#0d1426" stroke-width="1"/>
+              <rect x="10" y="6" width="200" height="3" fill="#d8c08a" opacity="0.6"/>
+              <rect x="14" y="40" width="200" height="34" rx="4" fill="url(#hb1)" stroke="#561917" stroke-width="1"/>
+              <rect x="24" y="46" width="180" height="3" fill="#f6efdf" opacity="0.5"/>
+              <rect x="4" y="80" width="214" height="34" rx="4" fill="url(#hb3)" stroke="#6c531f" stroke-width="1"/>
+              <rect x="14" y="86" width="194" height="3" fill="#16223d" opacity="0.4"/>
+            </g>
+            <!-- quill -->
+            <g transform="translate(232 30) rotate(20)">
+              <path d="M0 120 C30 60, 60 20, 96 0 C84 40, 60 90, 22 124 Z" fill="#f6efdf" stroke="#b8923f" stroke-width="1.4"/>
+              <line x1="14" y1="120" x2="60" y2="44" stroke="#b8923f" stroke-width="1.2"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAFF PICKS -->
+    <section class="section" id="staff-picks">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-head__titles">
+            <span class="section-head__eyebrow">Hand-selected by our booksellers</span>
+            <h2>Staff Picks</h2>
+          </div>
+          <a class="section-head__link" href="shop.html">Shop all &rarr;</a>
+        </div>
+        <div class="book-row" data-row="staff"></div>
+      </div>
+    </section>
+
+    <!-- NEW ARRIVALS -->
+    <section class="section section--tight">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-head__titles">
+            <span class="section-head__eyebrow">Fresh off the delivery truck</span>
+            <h2>New Arrivals</h2>
+          </div>
+          <a class="section-head__link" href="shop.html?sort=newest">Newest first &rarr;</a>
+        </div>
+        <div class="book-row" data-row="arrivals"></div>
+      </div>
+    </section>
+
+    <!-- BESTSELLERS -->
+    <section class="section section--tight">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-head__titles">
+            <span class="section-head__eyebrow">What the neighborhood is reading</span>
+            <h2>Bestsellers</h2>
+          </div>
+          <a class="section-head__link" href="shop.html">Shop all &rarr;</a>
+        </div>
+        <div class="book-row" data-row="bestsellers"></div>
+      </div>
+    </section>
+
+    <!-- READING LIST / BLOG TEASER -->
+    <section class="section feature-band">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-head__titles">
+            <span class="section-head__eyebrow" style="color:var(--gold-soft)">From the reading room</span>
+            <h2>The Reading List</h2>
+          </div>
+        </div>
+        <div class="reading-list">
+          <article class="post-card">
+            <div class="post-card__art" aria-hidden="true">
+              <svg viewBox="0 0 300 150" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><rect width="300" height="150" fill="#25345a"/><circle cx="60" cy="75" r="40" fill="#8c2b27" opacity="0.7"/><circle cx="220" cy="60" r="55" fill="#b8923f" opacity="0.45"/></svg>
+            </div>
+            <div class="post-card__body">
+              <span class="post-card__tag">Booklists</span>
+              <h3>10 Cozy Reads for a Rainy Weekend</h3>
+              <p class="post-card__excerpt">Kettle on, blanket out — these are the slow, warm novels we reach for when the sky turns gray.</p>
+              <a class="post-card__more" href="#">Read more &rarr;</a>
+            </div>
+          </article>
+          <article class="post-card">
+            <div class="post-card__art" aria-hidden="true">
+              <svg viewBox="0 0 300 150" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><rect width="300" height="150" fill="#16223d"/><path d="M0 110 Q75 60 150 100 T300 90 V150 H0 Z" fill="#0f5c63" opacity="0.7"/><circle cx="240" cy="45" r="26" fill="#d8c08a"/></svg>
+            </div>
+            <div class="post-card__body">
+              <span class="post-card__tag">Bookseller Diary</span>
+              <h3>How We Choose the Window Display</h3>
+              <p class="post-card__excerpt">A peek behind the glass at the small, opinionated ritual that greets you every morning.</p>
+              <a class="post-card__more" href="#">Read more &rarr;</a>
+            </div>
+          </article>
+          <article class="post-card">
+            <div class="post-card__art" aria-hidden="true">
+              <svg viewBox="0 0 300 150" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><rect width="300" height="150" fill="#2e2440"/><g stroke="#caa15a" stroke-width="2" opacity="0.7" fill="none"><circle cx="150" cy="75" r="30"/><circle cx="150" cy="75" r="55"/></g></svg>
+            </div>
+            <div class="post-card__body">
+              <span class="post-card__tag">Author Events</span>
+              <h3>Spring Author Series: The Lineup</h3>
+              <p class="post-card__excerpt">Five evenings, five voices. Wine, readings, and Q&amp;A with the writers we love most.</p>
+              <a class="post-card__more" href="about.html">See events &rarr;</a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTER -->
+    <section class="section">
+      <div class="container">
+        <div class="newsletter">
+          <h2>The Monthly Dispatch</h2>
+          <p>New releases, staff picks, and event invitations — one tasteful email a month. No spam, ever.</p>
+          <form class="newsletter__form" data-newsletter novalidate>
+            <label class="visually-hidden" for="nl-home">Email address</label>
+            <input type="email" id="nl-home" name="email" placeholder="you@example.com" required />
+            <button class="btn" type="submit">Subscribe</button>
+          </form>
+          <p class="form-note" data-newsletter-note hidden></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <h4>Inkwell &amp; Quill</h4>
+          <p>An independent bookshop on the corner of Maple &amp; 3rd, serving readers since 1998.</p>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="shop.html">All Books</a></li>
+            <li><a href="shop.html?genre=Fiction">Fiction</a></li>
+            <li><a href="shop.html?genre=Mystery">Mystery</a></li>
+            <li><a href="shop.html?genre=Poetry">Poetry</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Visit</h4>
+          <ul>
+            <li><a href="about.html">Our Story</a></li>
+            <li><a href="contact.html">Hours &amp; Location</a></li>
+            <li><a href="contact.html">Events</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Hours</h4>
+          <ul>
+            <li>Mon–Fri: 9am – 8pm</li>
+            <li>Saturday: 10am – 8pm</li>
+            <li>Sunday: 11am – 6pm</li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; <span data-year>2026</span> Inkwell &amp; Quill Booksellers. All rights reserved.</span>
+        <span>Made with care for readers everywhere.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/products.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

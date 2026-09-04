@@ -1,0 +1,13 @@
+{
+  "fixture_class": "canvas/webgl/audio/runtime-heavy",
+  "tags": [
+    "demo",
+    "interactive",
+    "canvas",
+    "webgl",
+    "audio",
+    "showcase",
+    "has-nav"
+  ],
+  "complexity": 4
+}

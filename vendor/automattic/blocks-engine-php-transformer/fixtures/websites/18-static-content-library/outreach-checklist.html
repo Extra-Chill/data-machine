@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community Outreach Checklist — Civic Signal</title>
+  <meta name="description" content="A complete five-phase checklist for neighborhood outreach campaigns: planning, materials, volunteer mobilization, field work, and follow-up. Progress tracked in-browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .checklist-header {
+      background: var(--forest);
+      padding-block: clamp(var(--sp-12), 6vw, var(--sp-20));
+      position: relative;
+      overflow: hidden;
+    }
+    .checklist-header::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(245,240,232,0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .checklist-header-inner {
+      position: relative;
+      z-index: 1;
+    }
+    .checklist-header h1 {
+      color: var(--cream);
+      font-size: clamp(var(--text-3xl), 5vw, var(--text-5xl));
+      margin-bottom: var(--sp-4);
+    }
+    .checklist-header p {
+      color: rgba(245,240,232,0.72);
+      font-size: var(--text-lg);
+      max-width: 560px;
+      margin-bottom: 0;
+    }
+    .checklist-header .header-actions {
+      display: flex;
+      gap: var(--sp-3);
+      margin-top: var(--sp-6);
+      flex-wrap: wrap;
+    }
+
+    /* Three-column layout: progress sidebar, main checklist, tip sidebar */
+    .checklist-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr 240px;
+      gap: var(--sp-8);
+      align-items: start;
+    }
+
+    .checklist-tip-sidebar {
+      position: sticky;
+      top: calc(var(--nav-h) + var(--sp-6));
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-4);
+    }
+
+    @media (max-width: 1100px) {
+      .checklist-layout {
+        grid-template-columns: 1fr;
+      }
+      .checklist-tip-sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
+      .checklist-progress { position: static; }
+    }
+    @media print {
+      .checklist-layout { display: block; }
+      .checklist-tip-sidebar, .checklist-progress { display: none; }
+      .checklist-header .header-actions, .site-nav, .site-footer, .related-section { display: none; }
+    }
+  </style>
+</head>
+<body data-checklist-key="civic-signal-outreach-2024">
+
+<!-- ====== NAVIGATION ====== -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="container nav-inner">
+    <a href="index.html" class="nav-logo" aria-label="Civic Signal Home">
+      <div class="nav-logo-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg>
+      </div>
+      <div class="nav-logo-text">
+        <span class="nav-logo-name">Civic Signal</span>
+        <span class="nav-logo-sub">Resource Library</span>
+      </div>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="resources.html" class="nav-link">All Resources</a>
+      <a href="about.html" class="nav-link">About</a>
+      <a href="outreach-checklist.html" class="nav-link active">Outreach</a>
+      <a href="grant-readiness.html" class="nav-link">Grants</a>
+    </div>
+    <div class="nav-cta">
+      <button class="btn btn-primary" data-print>Print Checklist</button>
+    </div>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+<div class="nav-drawer" id="nav-drawer">
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="resources.html" class="nav-link">All Resources</a>
+  <a href="about.html" class="nav-link">About</a>
+  <a href="outreach-checklist.html" class="nav-link">Outreach Checklist</a>
+  <a href="meeting-agenda.html" class="nav-link">Meeting Agenda Template</a>
+  <a href="grant-readiness.html" class="nav-link">Grant Readiness Guide</a>
+  <a href="case-study-roslindale.html" class="nav-link">Case Study</a>
+</div>
+
+<!-- ====== PAGE HEADER ====== -->
+<header class="checklist-header" role="banner">
+  <div class="container checklist-header-inner">
+    <nav aria-label="Breadcrumb" class="breadcrumbs" style="padding-top: 0; margin-bottom: var(--sp-5);">
+      <a href="index.html" style="color: rgba(245,240,232,0.5);">Home</a>
+      <span class="breadcrumbs-sep" aria-hidden="true">/</span>
+      <a href="resources.html" style="color: rgba(245,240,232,0.5);">Resources</a>
+      <span class="breadcrumbs-sep" aria-hidden="true">/</span>
+      <span class="breadcrumbs-current" style="color: var(--sage);">Outreach Checklist</span>
+    </nav>
+    <span class="resource-badge badge-outreach" style="margin-bottom: var(--sp-3); display: inline-flex;">Outreach</span>
+    <h1>Community Outreach Checklist</h1>
+    <p>Five phases, 38 items, one goal: a well-run outreach campaign that doesn't drop the ball. Check items off as you go — your progress is saved automatically in this browser.</p>
+    <div class="header-actions">
+      <button class="btn btn-outline-light" data-print>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4V2H12V4M4 12H2V7H14V12H12M4 10H12V14H4V10Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        Print
+      </button>
+      <a href="meeting-agenda.html" class="btn btn-outline-light" style="opacity: 0.7;">Use with: Meeting Agenda →</a>
+    </div>
+  </div>
+</header>
+
+<!-- ====== MAIN CONTENT ====== -->
+<section class="section section--cream" aria-label="Outreach checklist">
+  <div class="container">
+    <div class="checklist-layout">
+
+      <!-- Left: Progress bar -->
+      <aside aria-label="Progress tracker">
+        <div class="checklist-progress" role="status" aria-live="polite" aria-label="Checklist progress">
+          <div class="progress-header">
+            <span class="progress-title">Progress</span>
+            <span class="progress-count" aria-label="Items completed">0 / 38</span>
+          </div>
+          <div class="progress-bar-track" aria-hidden="true">
+            <div class="progress-bar-fill" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+          <p class="progress-pct" aria-hidden="true">0% complete</p>
+        </div>
+
+        <div class="sidebar-card" style="margin-top: var(--sp-4);">
+          <p class="sidebar-card-title">Quick Navigation</p>
+          <nav aria-label="Jump to phase">
+            <div class="toc-list">
+              <div class="toc-item"><a href="#phase-1"><span class="toc-num">1</span> Plan Your Campaign</a></div>
+              <div class="toc-item"><a href="#phase-2"><span class="toc-num">2</span> Prepare Materials</a></div>
+              <div class="toc-item"><a href="#phase-3"><span class="toc-num">3</span> Mobilize Your Team</a></div>
+              <div class="toc-item"><a href="#phase-4"><span class="toc-num">4</span> Go Out</a></div>
+              <div class="toc-item"><a href="#phase-5"><span class="toc-num">5</span> Capture &amp; Follow Up</a></div>
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      <!-- Center: Checklist -->
+      <main aria-label="Checklist items">
+        <!-- Phase 1 -->
+        <div class="checklist-section" id="phase-1" data-section>
+          <div class="checklist-section-header">
+            <div class="phase-number" aria-hidden="true">1</div>
+            <h2 class="checklist-section-title">Plan Your Campaign</h2>
+          </div>
+
+          <label class="checklist-item" for="c-1-1">
+            <input type="checkbox" id="c-1-1" aria-label="Define your outreach goal">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Define your outreach goal in one sentence — what decision, action, or turnout are you working toward?</div>
+              <div class="checklist-item-note">Example: "Recruit 40 residents to attend the November 14th zoning hearing and sign our petition."</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-1-2">
+            <input type="checkbox" id="c-1-2" aria-label="Define target geography">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Define the geographic area you'll canvass — pull a map and mark the boundaries.</div>
+              <div class="checklist-item-note">Be realistic: one team of four can cover about 80–120 households in a three-hour session.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-1-3">
+            <input type="checkbox" id="c-1-3" aria-label="Identify target population">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Identify your primary audience — registered voters, renters, homeowners, parents, or the whole neighborhood?</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-1-4">
+            <input type="checkbox" id="c-1-4" aria-label="Set timeline with milestones">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Set a timeline with three to five key milestones — materials-ready date, volunteer training date, canvass dates, and follow-up deadline.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-1-5">
+            <input type="checkbox" id="c-1-5" aria-label="Assign core roles">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Assign core roles: Lead Organizer, Data Entry Lead, Volunteer Coordinator, and Day-Of Logistics.</div>
+              <div class="checklist-item-note">These can overlap if you're a small team — just make sure everyone knows what they own.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-1-6">
+            <input type="checkbox" id="c-1-6" aria-label="Set a budget">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Set a budget for materials (printing, clipboards), volunteer appreciation (snacks, thank-you cards), and communication (postage if doing mail follow-up).</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-1-7">
+            <input type="checkbox" id="c-1-7" aria-label="Choose data capture method">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Decide how you'll capture data — paper tracking sheets, a shared spreadsheet, or a tool like VAN, Action Network, or a simple Google Form.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-1-8">
+            <input type="checkbox" id="c-1-8" aria-label="Confirm your event or deadline">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Confirm the date, time, and location of the meeting, vote, or event you're mobilizing people toward — make sure this detail is locked before you go out.</div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Phase 2 -->
+        <div class="checklist-section" id="phase-2" data-section>
+          <div class="checklist-section-header">
+            <div class="phase-number" aria-hidden="true">2</div>
+            <h2 class="checklist-section-title">Prepare Materials</h2>
+          </div>
+
+          <label class="checklist-item" for="c-2-1">
+            <input type="checkbox" id="c-2-1" aria-label="Create a one-page flyer">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Create a one-page flyer with the event date/time/location, the issue in plain language, and a clear call to action. Include your contact info.</div>
+              <div class="checklist-item-note">Rule of thumb: if someone reads only the headline and the first bullet, do they know what you want them to do?</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-2-2">
+            <input type="checkbox" id="c-2-2" aria-label="Prepare survey if collecting input">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">If you're collecting community input, prepare a short survey — five to eight questions maximum. Pre-test it with two or three people before printing.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-2-3">
+            <input type="checkbox" id="c-2-3" aria-label="Create tracking sheet">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Create or print tracking sheets for volunteers — include columns for address, name, contact info, response code (yes/maybe/no/NH), and notes.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-2-4">
+            <input type="checkbox" id="c-2-4" aria-label="Print materials">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Print enough materials — plan for 10% more than your target number of households.</div>
+              <div class="checklist-item-note">For door-hangers, also print extras: you'll use them when no one answers the door.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-2-5">
+            <input type="checkbox" id="c-2-5" aria-label="Set up shared drive">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Set up a shared drive or folder where all documents, maps, and tracking data will live — accessible to everyone on the team.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-2-6">
+            <input type="checkbox" id="c-2-6" aria-label="Prepare talking points">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Write a two-paragraph "why this matters" talking point for volunteers — plus three common objections and how to respond to them calmly.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-2-7">
+            <input type="checkbox" id="c-2-7" aria-label="Gather supplies">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Gather field supplies: clipboards (at least one per pair), pens, bags or folders, and a charged phone with the map pulled up.</div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Phase 3 -->
+        <div class="checklist-section" id="phase-3" data-section>
+          <div class="checklist-section-header">
+            <div class="phase-number" aria-hidden="true">3</div>
+            <h2 class="checklist-section-title">Mobilize Your Team</h2>
+          </div>
+
+          <label class="checklist-item" for="c-3-1">
+            <input type="checkbox" id="c-3-1" aria-label="Recruit volunteers">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Recruit volunteers at least two weeks before the canvass date — aim for one volunteer per 25 target households.</div>
+              <div class="checklist-item-note">Over-recruit by 20–30%: expect some no-shows.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-3-2">
+            <input type="checkbox" id="c-3-2" aria-label="Send confirmation 48 hours before">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Send a confirmation message to all volunteers 48 hours before the canvass with time, location, what to wear, and what they'll need to bring (or not need to bring).</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-3-3">
+            <input type="checkbox" id="c-3-3" aria-label="Plan volunteer briefing">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Plan a 20-minute volunteer briefing at the start of the canvass: who we are, what we're asking, what to say at the door, how to handle rejections, and how to fill out tracking sheets.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-3-4">
+            <input type="checkbox" id="c-3-4" aria-label="Divide into geographic zones">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Divide the target area into zones and assign pairs to each zone — use a printed or digital map with clear boundaries for each pair.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-3-5">
+            <input type="checkbox" id="c-3-5" aria-label="Establish check-in time">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Establish a mid-canvass check-in time (optional but helpful) and a firm end time and re-group location where tracking sheets will be collected.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-3-6">
+            <input type="checkbox" id="c-3-6" aria-label="Designate a point of contact">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Designate a point of contact who stays reachable by phone during the canvass to answer questions and troubleshoot.</div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Phase 4 -->
+        <div class="checklist-section" id="phase-4" data-section>
+          <div class="checklist-section-header">
+            <div class="phase-number" aria-hidden="true">4</div>
+            <h2 class="checklist-section-title">Go Out</h2>
+          </div>
+
+          <label class="checklist-item" for="c-4-1">
+            <input type="checkbox" id="c-4-1" aria-label="Knock in pairs">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Knock in pairs — it's safer, builds morale, and one person can take notes while the other talks.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-4-2">
+            <input type="checkbox" id="c-4-2" aria-label="Wear identifying gear">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Wear something that clearly identifies your organization — a T-shirt, badge, or button. Introduce your organization and your name immediately at the door.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-4-3">
+            <input type="checkbox" id="c-4-3" aria-label="Log every interaction">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Log every contact on your tracking sheet — including "NH" (not home), "Move" (wrong address), and "Refuse" (declined to engage). Blank entries don't help your follow-up.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-4-4">
+            <input type="checkbox" id="c-4-4" aria-label="Leave materials when no answer">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Leave a door hanger or flyer when no one answers — make sure it's visible and waterproof enough to survive a light rain.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-4-5">
+            <input type="checkbox" id="c-4-5" aria-label="Respect No Soliciting signs">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Respect "No Soliciting" signs. You can leave a door hanger without knocking, or skip the address entirely — note it on your sheet.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-4-6">
+            <input type="checkbox" id="c-4-6" aria-label="Table at community spots">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">If tabling, set up at high-foot-traffic spots: library entrance, laundromat, transit stop, or community center lobby. Have someone standing, not sitting.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-4-7">
+            <input type="checkbox" id="c-4-7" aria-label="Keep notes on common themes">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Keep brief notes on themes you hear at the door — concerns, questions, and opinions that come up repeatedly. These become your debrief data.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-4-8">
+            <input type="checkbox" id="c-4-8" aria-label="Collect tracking sheets at end">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Collect all tracking sheets before volunteers leave — do a quick headcount to make sure nothing gets left in a car or forgotten at home.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-4-9">
+            <input type="checkbox" id="c-4-9" aria-label="Run a quick debrief">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Run a 10-minute closing debrief with your team: what did you hear most often? what went well? what was confusing? This shapes your next canvass.</div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Phase 5 -->
+        <div class="checklist-section" id="phase-5" data-section>
+          <div class="checklist-section-header">
+            <div class="phase-number" aria-hidden="true">5</div>
+            <h2 class="checklist-section-title">Capture &amp; Follow Up</h2>
+          </div>
+
+          <label class="checklist-item" for="c-5-1">
+            <input type="checkbox" id="c-5-1" aria-label="Enter data within 48 hours">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Enter all tracking data into your spreadsheet or database within 24–48 hours while the context is still fresh.</div>
+              <div class="checklist-item-note">Late data entry is one of the most common places campaigns lose momentum. Set a hard deadline.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-5-2">
+            <input type="checkbox" id="c-5-2" aria-label="Thank volunteers">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Send a personal thank-you to every volunteer within three days — include a brief summary of what the team accomplished (households reached, flyers distributed, sign-ups collected).</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-5-3">
+            <input type="checkbox" id="c-5-3" aria-label="Follow up with interested residents">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Follow up individually with residents who expressed strong interest or signed up — a personal phone call or text converts far better than a mass email.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-5-4">
+            <input type="checkbox" id="c-5-4" aria-label="Send reminder to everyone contacted">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Send a reminder to everyone you collected contact info from — one week before the event, and again 24 hours before.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-5-5">
+            <input type="checkbox" id="c-5-5" aria-label="Compile a summary report">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Compile a brief summary report: households reached, total sign-ups, common concerns heard, and coverage gaps. Share with your steering committee or board.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-5-6">
+            <input type="checkbox" id="c-5-6" aria-label="Identify uncovered areas for follow-up canvass">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Identify blocks or buildings that weren't reached and plan a targeted follow-up canvass or mail drop for those addresses.</div>
+            </div>
+          </label>
+
+          <label class="checklist-item" for="c-5-7">
+            <input type="checkbox" id="c-5-7" aria-label="Document lessons for next time">
+            <div class="checklist-item-body">
+              <div class="checklist-item-text">Document at least three lessons for the next outreach campaign — what materials worked, what talking points fell flat, and what logistics tripped you up.</div>
+            </div>
+          </label>
+        </div>
+      </main>
+
+      <!-- Right: Tip sidebar -->
+      <aside class="checklist-tip-sidebar" aria-label="Tips and related resources">
+        <div class="sidebar-card">
+          <p class="sidebar-card-title">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="display: inline-block; margin-right: 4px; vertical-align: middle;"><circle cx="7" cy="7" r="6" stroke="var(--amber)" stroke-width="1.2"/><path d="M7 4V7.5" stroke="var(--amber)" stroke-width="1.2" stroke-linecap="round"/><circle cx="7" cy="10" r="0.75" fill="var(--amber)"/></svg>
+            Field Tip
+          </p>
+          <p style="font-size: var(--text-sm); color: var(--ink-light); line-height: 1.55; margin-bottom: 0;">The best time to knock doors is weekday evenings (5–8 PM) and Saturday mornings (10 AM–1 PM). Avoid Sunday mornings and dinner hour.</p>
+        </div>
+        <div class="sidebar-card">
+          <p class="sidebar-card-title">Opening line</p>
+          <p style="font-size: var(--text-sm); color: var(--ink-light); line-height: 1.55; margin-bottom: 0; font-style: italic;">"Hi, I'm [name] from [org]. We're talking with neighbors about [issue]. Do you have two minutes?"</p>
+          <p style="font-size: var(--text-xs); color: var(--muted); margin-top: var(--sp-2); margin-bottom: 0;">Keep it honest, direct, and short. Don't pitch before you ask.</p>
+        </div>
+        <div class="sidebar-card">
+          <p class="sidebar-card-title">Related Resources</p>
+          <div class="toc-list">
+            <div class="toc-item">
+              <a href="meeting-agenda.html">
+                <span class="toc-num">→</span>
+                Meeting Agenda Template
+              </a>
+            </div>
+            <div class="toc-item">
+              <a href="grant-readiness.html">
+                <span class="toc-num">→</span>
+                Grant Readiness Guide
+              </a>
+            </div>
+            <div class="toc-item">
+              <a href="case-study-roslindale.html">
+                <span class="toc-num">→</span>
+                Case Study: Roslindale
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="sidebar-card" style="background: var(--amber-pale); border-color: var(--amber);">
+          <p class="sidebar-card-title" style="color: var(--amber);">Used by Roslindale</p>
+          <p style="font-size: var(--text-sm); color: var(--ink-light); line-height: 1.55; margin-bottom: var(--sp-3);">The Roslindale Community Garden Network used an earlier version of this checklist during their 2021 outreach campaign — reaching 340 households over three canvass days.</p>
+          <a href="case-study-roslindale.html" class="arrow-link" style="font-size: var(--text-xs);">Read the case study <svg class="arrow" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8H13M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ====== RELATED RESOURCES ====== -->
+<section class="section section--paper" aria-labelledby="related-heading">
+  <div class="container">
+    <div class="related-section">
+      <h2 id="related-heading" style="font-size: var(--text-2xl); margin-bottom: var(--sp-2);">Up Next in Your Toolkit</h2>
+      <p style="color: var(--muted); margin-bottom: var(--sp-6);">After a successful outreach campaign, you'll need to run a good meeting — and eventually, apply for funding to sustain the work.</p>
+      <div class="related-grid">
+        <a href="meeting-agenda.html" class="related-card">
+          <span class="resource-badge badge-meetings related-card-badge">Meetings</span>
+          <h3 class="related-card-title">Public Meeting Agenda Template</h3>
+          <p class="related-card-desc">Once you've knocked doors, you need to run a meeting that keeps people engaged. This fillable agenda helps you do that.</p>
+        </a>
+        <a href="grant-readiness.html" class="related-card">
+          <span class="resource-badge badge-funding related-card-badge">Funding</span>
+          <h3 class="related-card-title">Grant Readiness Guide</h3>
+          <p class="related-card-desc">The community input you collect during outreach is one of the strongest pieces of evidence in a grant application. Here's how to use it.</p>
+        </a>
+        <a href="case-study-roslindale.html" class="related-card">
+          <span class="resource-badge badge-projects related-card-badge">Projects</span>
+          <h3 class="related-card-title">Case Study: Roslindale</h3>
+          <p class="related-card-desc">See how outreach, meetings, and grant funding came together in a real two-year neighborhood project in Boston.</p>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FOOTER ====== -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" style="margin-bottom: var(--sp-4); display: inline-flex;">
+          <div class="nav-logo-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg></div>
+          <div class="nav-logo-text"><span class="nav-logo-name">Civic Signal</span><span class="nav-logo-sub">Resource Library</span></div>
+        </a>
+        <p>Publishing practical toolkits for neighborhood organizers, free of charge and free of jargon.</p>
+      </div>
+      <div>
+        <span class="footer-col-title">Resources</span>
+        <div class="footer-links">
+          <a href="outreach-checklist.html" class="footer-link">Outreach Checklist</a>
+          <a href="meeting-agenda.html" class="footer-link">Meeting Agenda Template</a>
+          <a href="grant-readiness.html" class="footer-link">Grant Readiness Guide</a>
+          <a href="case-study-roslindale.html" class="footer-link">Case Study: Roslindale</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Topics</span>
+        <div class="footer-links">
+          <a href="resources.html?filter=outreach" class="footer-link">Outreach</a>
+          <a href="resources.html?filter=meetings" class="footer-link">Meetings</a>
+          <a href="resources.html?filter=funding" class="footer-link">Funding</a>
+          <a href="resources.html?filter=projects" class="footer-link">Projects</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Organization</span>
+        <div class="footer-links">
+          <a href="about.html" class="footer-link">About Civic Signal</a>
+          <a href="about.html#newsletter" class="footer-link">Newsletter</a>
+          <a href="resources.html" class="footer-link">All Resources</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-legal">© 2024 Civic Signal. Free to use and adapt with attribution.</p>
+      <div class="footer-bottom-links">
+        <a href="index.html">Home</a>
+        <a href="resources.html">Resources</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

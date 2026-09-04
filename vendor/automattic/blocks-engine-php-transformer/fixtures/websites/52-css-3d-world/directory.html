@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Collection — The Halden Vantapoint</title>
+  <meta name="description" content="A flat, accessible index of every work in the Halden Vantapoint, room by room, with full labels.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="The Halden Vantapoint, home">
+      <span class="logo-mark">VANTAPOINT</span>
+      <span class="logo-sub">The Halden Museum</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">The Space</a>
+      <a href="directory.html" aria-current="page">Collection</a>
+      <a href="about.html">About Halden</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="page-pad">
+    <section class="hero-strip">
+      <div class="content-wrap">
+        <p class="kicker">The collection · 12 works · 4 rooms</p>
+        <h1 class="page-title">The <em>Collection</em></h1>
+        <p class="page-lede">
+          Every work in the Vantapoint, listed room by room with its full label.
+          This is the accessible, flat companion to the
+          <a href="index.html">3D walk-through</a> — the same museum, no movement required.
+        </p>
+        <p class="dir-toolbar">
+          <a href="index.html" class="btn btn-primary">Walk through it in 3D →</a>
+          <button id="filter-all" class="chip chip-on" type="button">All rooms</button>
+          <span id="room-chips"></span>
+        </p>
+      </div>
+    </section>
+
+    <section class="content-wrap">
+      <div id="dir"><!-- built below --></div>
+    </section>
+
+    <!-- reuse the same detail overlay markup so labels open identically -->
+    <div id="detail" class="dir-detail" hidden role="dialog" aria-modal="true" aria-labelledby="detail-title">
+      <div class="dir-detail-card">
+        <button id="detail-close" class="detail-close" type="button" aria-label="Close">✕</button>
+        <div class="dir-detail-visual"><div id="detail-art"></div><p id="detail-caption" class="detail-caption"></p></div>
+        <div class="dir-detail-info">
+          <p id="detail-room" class="detail-room"></p>
+          <h2 id="detail-title" class="detail-title"></h2>
+          <p id="detail-meta" class="detail-meta"></p>
+          <p id="detail-body" class="detail-body"></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <p>© <span data-year>2026</span> The Halden Vantapoint · Bergen · A non-existent museum rendered in CSS 3D.</p>
+    <p class="footer-links"><a href="index.html">The Space</a> · <a href="about.html">About Halden</a> · <a href="mailto:office@vantapoint.museum">office@vantapoint.museum</a></p>
+  </footer>
+
+  <script src="js/exhibits.js"></script>
+  <script src="js/artworks.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    var $ = function (s, r) { return (r || document).querySelector(s); };
+    var dir = $('#dir');
+    var rooms = window.VANTAPOINT.rooms;
+
+    /* room filter chips */
+    var chips = $('#room-chips');
+    rooms.forEach(function (r) {
+      var b = document.createElement('button');
+      b.className = 'chip'; b.type = 'button'; b.dataset.room = r.id;
+      b.textContent = r.name.replace('The ', '');
+      b.style.setProperty('--accent', r.accent);
+      chips.appendChild(b);
+    });
+
+    function render(filter) {
+      var html = '';
+      rooms.forEach(function (r) {
+        if (filter && filter !== r.id) return;
+        html += '<section class="dir-room" data-room="' + r.id + '">' +
+          '<header class="dir-room-head" style="--accent:' + r.accent + '">' +
+          '<h2>' + r.name + '</h2><p>' + r.era + ' · ' + r.intro + '</p></header>' +
+          '<div class="dir-grid">';
+        ['north','east','south','west'].forEach(function (side) {
+          var w = r.walls[side]; if (!w) return;
+          if (w.type === 'art') {
+            html += '<article class="dir-card" style="--accent:' + r.accent + '">' +
+              '<div class="dir-thumb">' + window.ARTWORKS.render(w.art) + '</div>' +
+              '<div class="dir-meta"><h3>' + w.title + '</h3>' +
+              '<p class="dir-line">' + w.year + ' · ' + w.medium + '</p>' +
+              '<p class="dir-dims">' + w.dims + '</p>' +
+              '<p class="dir-cap">' + w.caption + '</p>' +
+              '<button class="dir-open" data-open="' + w.id + '">Read full label →</button></div></article>';
+          } else {
+            html += '<article class="dir-card dir-text"><div class="dir-meta">' +
+              '<p class="dir-line">Wall text</p><h3>' + w.title + '</h3><p class="dir-cap">' + w.body + '</p></div></article>';
+          }
+        });
+        html += '</div></section>';
+      });
+      dir.innerHTML = html;
+    }
+    render(null);
+
+    /* filtering */
+    function setFilter(id) {
+      $('#filter-all').classList.toggle('chip-on', !id);
+      document.querySelectorAll('#room-chips .chip').forEach(function (c) {
+        c.classList.toggle('chip-on', c.dataset.room === id);
+      });
+      render(id);
+    }
+    $('#filter-all').addEventListener('click', function () { setFilter(null); });
+    chips.addEventListener('click', function (e) {
+      var c = e.target.closest('.chip'); if (c) setFilter(c.dataset.room);
+    });
+
+    /* detail overlay */
+    var overlay = $('#detail'), lastFocus = null;
+    function find(id) {
+      for (var i = 0; i < rooms.length; i++)
+        for (var s = 0, sides = ['north','east','south','west']; s < sides.length; s++)
+          if (rooms[i].walls[sides[s]] && rooms[i].walls[sides[s]].id === id)
+            return { wall: rooms[i].walls[sides[s]], room: rooms[i] };
+      return null;
+    }
+    function open(id) {
+      var f = find(id); if (!f) return; var w = f.wall;
+      $('#detail-art').innerHTML = window.ARTWORKS.render(w.art);
+      $('#detail-title').textContent = w.title;
+      $('#detail-meta').textContent = w.year + ' · ' + w.medium + ' · ' + w.dims;
+      $('#detail-room').textContent = f.room.name + ' — ' + f.room.era;
+      $('#detail-body').textContent = w.detail;
+      $('#detail-caption').textContent = w.caption;
+      overlay.style.setProperty('--accent', f.room.accent);
+      overlay.hidden = false;
+      requestAnimationFrame(function () { overlay.classList.add('open'); });
+      lastFocus = document.activeElement; $('#detail-close').focus();
+    }
+    function close() {
+      overlay.classList.remove('open');
+      setTimeout(function () { overlay.hidden = true; }, 260);
+      if (lastFocus) lastFocus.focus();
+    }
+    dir.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-open]'); if (b) open(b.dataset.open);
+    });
+    $('#detail-close').addEventListener('click', close);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    window.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !overlay.hidden) close(); });
+
+    document.querySelectorAll('[data-year]').forEach(function (e) { e.textContent = new Date().getFullYear(); });
+    var t = document.querySelector('.nav-toggle');
+    t && t.addEventListener('click', function () { var n = document.querySelector('.site-nav'); var o = n.classList.toggle('open'); t.setAttribute('aria-expanded', String(o)); });
+  })();
+  </script>
+</body>
+</html>

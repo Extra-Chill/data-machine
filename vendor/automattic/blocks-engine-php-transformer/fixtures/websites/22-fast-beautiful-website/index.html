@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Fast Beautiful Website — Moth &amp; Meridian</title>
+  <meta name="description" content="Moth &amp; Meridian — rare botanical perfumes distilled from the wild places of the Scottish Highlands.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ══════════════ HEADER ══════════════ -->
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Moth &amp; Meridian home">
+      <span class="logo-mark">Moth &amp; Meridian</span>
+      <span class="logo-sub">Est. Caithness, 2011</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html" class="active">Home</a>
+      <a href="collection.html">Collection</a>
+      <a href="about.html">The Distillery</a>
+      <a href="journal.html">Journal</a>
+      <a href="contact.html" class="nav-cta">Visit &amp; Stockists</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- ══════════════ HERO ══════════════ -->
+    <section class="hero" aria-label="Welcome">
+      <div class="hero-bg" aria-hidden="true"></div>
+
+      <!-- Moth SVG illustration -->
+      <div class="hero-moth" aria-hidden="true">
+        <svg viewBox="0 0 520 440" xmlns="http://www.w3.org/2000/svg">
+          <!-- Upper left wing -->
+          <path d="M260,202 C245,180 218,152 182,138 C146,124 98,120 66,140 C34,160 36,196 68,212 C100,228 148,224 190,218 C220,214 244,207 260,202" fill="#141A10" stroke="#C4A042" stroke-width="1"/>
+          <!-- Upper right wing -->
+          <path d="M260,202 C275,180 302,152 338,138 C374,124 422,120 454,140 C486,160 484,196 452,212 C420,228 372,224 330,218 C300,214 276,207 260,202" fill="#141A10" stroke="#C4A042" stroke-width="1"/>
+          <!-- Lower left wing -->
+          <path d="M260,220 C228,228 190,248 168,272 C146,296 152,322 180,320 C208,318 234,296 260,272" fill="#0E1309" stroke="#C4A042" stroke-width="0.7" opacity="0.8"/>
+          <!-- Lower right wing -->
+          <path d="M260,220 C292,228 330,248 352,272 C374,296 368,322 340,320 C312,318 286,296 260,272" fill="#0E1309" stroke="#C4A042" stroke-width="0.7" opacity="0.8"/>
+          <!-- Wing vein details left -->
+          <path d="M260,208 C238,192 210,180 178,174" fill="none" stroke="#C4A042" stroke-width="0.5" opacity="0.45"/>
+          <path d="M257,210 C230,190 196,174 160,168" fill="none" stroke="#C4A042" stroke-width="0.35" opacity="0.3"/>
+          <path d="M258,214 C234,214 204,218 174,226" fill="none" stroke="#C4A042" stroke-width="0.3" opacity="0.25"/>
+          <!-- Wing vein details right -->
+          <path d="M260,208 C282,192 310,180 342,174" fill="none" stroke="#C4A042" stroke-width="0.5" opacity="0.45"/>
+          <path d="M263,210 C290,190 324,174 360,168" fill="none" stroke="#C4A042" stroke-width="0.35" opacity="0.3"/>
+          <path d="M262,214 C286,214 316,218 346,226" fill="none" stroke="#C4A042" stroke-width="0.3" opacity="0.25"/>
+          <!-- Eye spots left -->
+          <circle cx="162" cy="178" r="16" fill="none" stroke="#C4A042" stroke-width="0.9" opacity="0.65"/>
+          <circle cx="162" cy="178" r="9"  fill="none" stroke="#C4A042" stroke-width="0.6" opacity="0.45"/>
+          <circle cx="162" cy="178" r="3.5" fill="#C4A042" opacity="0.55"/>
+          <!-- Eye spots right -->
+          <circle cx="358" cy="178" r="16" fill="none" stroke="#C4A042" stroke-width="0.9" opacity="0.65"/>
+          <circle cx="358" cy="178" r="9"  fill="none" stroke="#C4A042" stroke-width="0.6" opacity="0.45"/>
+          <circle cx="358" cy="178" r="3.5" fill="#C4A042" opacity="0.55"/>
+          <!-- Body -->
+          <ellipse cx="260" cy="238" rx="7" ry="38" fill="#C4A042" opacity="0.75"/>
+          <!-- Head -->
+          <circle cx="260" cy="198" r="8" fill="#C4A042" opacity="0.65"/>
+          <!-- Antennae -->
+          <path d="M255,192 C244,174 224,152 206,134" fill="none" stroke="#C4A042" stroke-width="1" stroke-linecap="round"/>
+          <path d="M265,192 C276,174 296,152 314,134" fill="none" stroke="#C4A042" stroke-width="1" stroke-linecap="round"/>
+          <circle cx="206" cy="134" r="3" fill="#C4A042" opacity="0.7"/>
+          <circle cx="314" cy="134" r="3" fill="#C4A042" opacity="0.7"/>
+          <!-- Feather details on antennae -->
+          <path d="M238,172 C230,165 225,160" fill="none" stroke="#C4A042" stroke-width="0.6" opacity="0.5"/>
+          <path d="M228,161 C220,154 215,149" fill="none" stroke="#C4A042" stroke-width="0.5" opacity="0.4"/>
+          <path d="M218,150 C210,143 205,138" fill="none" stroke="#C4A042" stroke-width="0.4" opacity="0.3"/>
+          <path d="M282,172 C290,165 295,160" fill="none" stroke="#C4A042" stroke-width="0.6" opacity="0.5"/>
+          <path d="M292,161 C300,154 305,149" fill="none" stroke="#C4A042" stroke-width="0.5" opacity="0.4"/>
+          <path d="M302,150 C310,143 315,138" fill="none" stroke="#C4A042" stroke-width="0.4" opacity="0.3"/>
+          <!-- Lower wing details -->
+          <path d="M260,240 C240,256 215,270 195,288" fill="none" stroke="#C4A042" stroke-width="0.4" opacity="0.3"/>
+          <path d="M260,240 C280,256 305,270 325,288" fill="none" stroke="#C4A042" stroke-width="0.4" opacity="0.3"/>
+          <!-- Decorative ring around moth -->
+          <circle cx="260" cy="210" r="145" fill="none" stroke="#C4A042" stroke-width="0.25" stroke-dasharray="3,10" opacity="0.2"/>
+        </svg>
+      </div>
+
+      <p class="hero-eyebrow">Scottish Highlands &nbsp;·&nbsp; Botanical Perfumery</p>
+
+      <h1 class="hero-title">
+        <span class="hero-title-line"><span class="hero-title-inner">Moth</span></span>
+        <span class="hero-title-line"><span class="hero-title-inner">&amp; Meridian</span></span>
+      </h1>
+
+      <div class="hero-ornament" aria-hidden="true">
+        <span class="hero-ornament-line"></span>
+        <span class="hero-ornament-icon">✦</span>
+        <span class="hero-ornament-line"></span>
+      </div>
+
+      <p class="hero-tagline">
+        Fragrances distilled from wet peat, night-blooming flora, and the cold mineral silence of the northern moor.
+      </p>
+
+      <div class="hero-actions">
+        <a href="collection.html" class="btn btn-primary">Explore the Collection</a>
+        <a href="about.html" class="btn btn-outline">Our Distillery</a>
+      </div>
+
+      <div class="hero-scroll" aria-hidden="true">
+        <span class="scroll-label">Scroll</span>
+        <span class="scroll-line"></span>
+      </div>
+    </section>
+
+    <!-- ══════════════ MARQUEE ══════════════ -->
+    <div class="marquee-band" aria-hidden="true">
+      <div class="marquee-track">
+        <!-- Items duplicated for seamless loop -->
+        <span class="marquee-item">Noctiluca <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Ambarvalia <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Sphagnum <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Miriam's Garden <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">The Moth Hour <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Loch Asymptote <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Small-Batch Distillation <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Caithness, Scotland <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Noctiluca <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Ambarvalia <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Sphagnum <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Miriam's Garden <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">The Moth Hour <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Loch Asymptote <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Small-Batch Distillation <span class="marquee-sep">✦</span></span>
+        <span class="marquee-item">Caithness, Scotland <span class="marquee-sep">✦</span></span>
+      </div>
+    </div>
+
+    <!-- ══════════════ FEATURED FRAGRANCES ══════════════ -->
+    <section class="section" aria-labelledby="featured-heading">
+      <div class="section-inner">
+        <div class="section-header reveal">
+          <div>
+            <div class="section-badge"><span>The Collection</span></div>
+            <h2 class="section-title" id="featured-heading">
+              Scents born<br><em>from wild places</em>
+            </h2>
+          </div>
+          <a href="collection.html" class="section-link">View all six fragrances</a>
+        </div>
+
+        <div class="fragrance-grid-home">
+          <!-- Card 1: Noctiluca -->
+          <article class="fragrance-card reveal reveal-d1">
+            <div class="fragrance-card-visual">
+              <div class="card-glow"></div>
+              <svg viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <!-- Jellyfish / Noctiluca -->
+                <ellipse cx="100" cy="80" rx="52" ry="38" fill="#141A10" stroke="#C4A042" stroke-width="0.8"/>
+                <path d="M58,92 C55,110 52,130 58,148" fill="none" stroke="#C4A042" stroke-width="0.8" stroke-linecap="round" opacity="0.6"/>
+                <path d="M72,98 C70,120 69,142 72,162" fill="none" stroke="#C4A042" stroke-width="0.6" stroke-linecap="round" opacity="0.5"/>
+                <path d="M88,102 C88,126 88,150 88,174" fill="none" stroke="#C4A042" stroke-width="0.7" stroke-linecap="round" opacity="0.55"/>
+                <path d="M100,103 C100,128 100,153 100,180" fill="none" stroke="#C4A042" stroke-width="0.8" stroke-linecap="round" opacity="0.6"/>
+                <path d="M112,102 C112,126 112,150 112,174" fill="none" stroke="#C4A042" stroke-width="0.7" stroke-linecap="round" opacity="0.55"/>
+                <path d="M128,98 C130,120 131,142 128,162" fill="none" stroke="#C4A042" stroke-width="0.6" stroke-linecap="round" opacity="0.5"/>
+                <path d="M142,92 C145,110 148,130 142,148" fill="none" stroke="#C4A042" stroke-width="0.8" stroke-linecap="round" opacity="0.6"/>
+                <!-- Bioluminescent dots -->
+                <circle cx="80"  cy="70" r="2" fill="#C4A042" opacity="0.5"/>
+                <circle cx="100" cy="62" r="2.5" fill="#C4A042" opacity="0.6"/>
+                <circle cx="120" cy="70" r="2" fill="#C4A042" opacity="0.5"/>
+                <circle cx="90"  cy="82" r="1.5" fill="#C4A042" opacity="0.35"/>
+                <circle cx="110" cy="82" r="1.5" fill="#C4A042" opacity="0.35"/>
+                <!-- Circular ring -->
+                <ellipse cx="100" cy="80" rx="52" ry="38" fill="none" stroke="#C4A042" stroke-width="0.3" stroke-dasharray="2,6" opacity="0.35"/>
+              </svg>
+            </div>
+            <div class="fragrance-card-body">
+              <p class="fragrance-number">No. 01</p>
+              <h3 class="fragrance-name">Noctiluca</h3>
+              <p class="fragrance-accord">Bioluminescent sea, night air, crystalline salt, white musk</p>
+            </div>
+          </article>
+
+          <!-- Card 2: Ambarvalia -->
+          <article class="fragrance-card reveal reveal-d2">
+            <div class="fragrance-card-visual">
+              <div class="card-glow"></div>
+              <svg viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <!-- Wheat / grain stalks -->
+                <line x1="100" y1="200" x2="100" y2="60" stroke="#C4A042" stroke-width="1.2" opacity="0.7"/>
+                <!-- Grain head center -->
+                <ellipse cx="100" cy="48" rx="10" ry="22" fill="#141A10" stroke="#C4A042" stroke-width="0.8" opacity="0.85"/>
+                <ellipse cx="100" cy="44" rx="5"  ry="10" fill="#C4A042" opacity="0.2"/>
+                <!-- Leaves -->
+                <path d="M100,120 C80,108 58,102 46,92" fill="none" stroke="#C4A042" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+                <path d="M100,140 C120,128 142,122 154,112" fill="none" stroke="#C4A042" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+                <path d="M100,165 C82,155 62,150 52,142" fill="none" stroke="#C4A042" stroke-width="0.9" stroke-linecap="round" opacity="0.5"/>
+                <!-- Smaller stalks -->
+                <line x1="82"  y1="200" x2="76"  y2="100" stroke="#C4A042" stroke-width="0.8" opacity="0.35"/>
+                <line x1="118" y1="200" x2="124" y2="100" stroke="#C4A042" stroke-width="0.8" opacity="0.35"/>
+                <ellipse cx="76"  cy="90" rx="7" ry="16" fill="none" stroke="#C4A042" stroke-width="0.6" opacity="0.4"/>
+                <ellipse cx="124" cy="90" rx="7" ry="16" fill="none" stroke="#C4A042" stroke-width="0.6" opacity="0.4"/>
+                <!-- Smoke wisps -->
+                <path d="M100,200 C96,190 104,182 100,172 C96,162 102,154 100,145" fill="none" stroke="#C4A042" stroke-width="0.4" opacity="0.25"/>
+              </svg>
+            </div>
+            <div class="fragrance-card-body">
+              <p class="fragrance-number">No. 02</p>
+              <h3 class="fragrance-name">Ambarvalia</h3>
+              <p class="fragrance-accord">Burnt hay, smoked stone, Roman chamomile, warm amber</p>
+            </div>
+          </article>
+
+          <!-- Card 3: Miriam's Garden -->
+          <article class="fragrance-card reveal reveal-d3">
+            <div class="fragrance-card-visual">
+              <div class="card-glow"></div>
+              <svg viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <!-- Rose bloom, top view -->
+                <!-- Outer petals -->
+                <ellipse cx="100" cy="85"  rx="28" ry="14" fill="#141A10" stroke="#C4A042" stroke-width="0.7" transform="rotate(-30 100 85)"  opacity="0.85"/>
+                <ellipse cx="100" cy="85"  rx="28" ry="14" fill="#141A10" stroke="#C4A042" stroke-width="0.7" transform="rotate(30 100 85)"   opacity="0.85"/>
+                <ellipse cx="100" cy="85"  rx="28" ry="14" fill="#141A10" stroke="#C4A042" stroke-width="0.7" transform="rotate(90 100 85)"   opacity="0.85"/>
+                <ellipse cx="100" cy="85"  rx="28" ry="14" fill="#141A10" stroke="#C4A042" stroke-width="0.7" transform="rotate(150 100 85)"  opacity="0.85"/>
+                <ellipse cx="100" cy="85"  rx="28" ry="14" fill="#141A10" stroke="#C4A042" stroke-width="0.7" transform="rotate(210 100 85)"  opacity="0.85"/>
+                <ellipse cx="100" cy="85"  rx="28" ry="14" fill="#141A10" stroke="#C4A042" stroke-width="0.7" transform="rotate(270 100 85)"  opacity="0.85"/>
+                <!-- Inner petals -->
+                <ellipse cx="100" cy="85"  rx="16" ry="8"  fill="#1A2116" stroke="#C4A042" stroke-width="0.8" transform="rotate(15 100 85)"  opacity="0.9"/>
+                <ellipse cx="100" cy="85"  rx="16" ry="8"  fill="#1A2116" stroke="#C4A042" stroke-width="0.8" transform="rotate(75 100 85)"  opacity="0.9"/>
+                <ellipse cx="100" cy="85"  rx="16" ry="8"  fill="#1A2116" stroke="#C4A042" stroke-width="0.8" transform="rotate(135 100 85)" opacity="0.9"/>
+                <!-- Center -->
+                <circle cx="100" cy="85" r="9" fill="#20281C" stroke="#C4A042" stroke-width="1"/>
+                <circle cx="100" cy="85" r="4" fill="#C4A042" opacity="0.5"/>
+                <!-- Stem -->
+                <line x1="100" y1="110" x2="100" y2="200" stroke="#78906A" stroke-width="1.2" opacity="0.6"/>
+                <!-- Leaf left -->
+                <path d="M100,145 C82,136 68,130 58,122 C68,130 76,142 100,148" fill="#141A10" stroke="#78906A" stroke-width="0.7" opacity="0.6"/>
+                <!-- Leaf right -->
+                <path d="M100,165 C118,156 132,150 142,142 C132,150 124,162 100,168" fill="#141A10" stroke="#78906A" stroke-width="0.7" opacity="0.6"/>
+              </svg>
+            </div>
+            <div class="fragrance-card-body">
+              <p class="fragrance-number">No. 04</p>
+              <h3 class="fragrance-name">Miriam's Garden</h3>
+              <p class="fragrance-accord">White rose, fig leaf, warm earth, oakmoss, tonka</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ ETHOS QUOTE ══════════════ -->
+    <section class="ethos" aria-label="Our ethos">
+      <div class="ethos-bg" aria-hidden="true"></div>
+      <div class="ethos-inner">
+        <div class="ethos-ornament reveal" aria-hidden="true">
+          <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="20" fill="none" stroke="#C4A042" stroke-width="0.7" opacity="0.4"/>
+            <circle cx="24" cy="24" r="12" fill="none" stroke="#C4A042" stroke-width="0.5" opacity="0.3"/>
+            <circle cx="24" cy="24" r="2" fill="#C4A042" opacity="0.7"/>
+            <line x1="24" y1="4"  x2="24" y2="10" stroke="#C4A042" stroke-width="0.7" opacity="0.5"/>
+            <line x1="24" y1="38" x2="24" y2="44" stroke="#C4A042" stroke-width="0.7" opacity="0.5"/>
+            <line x1="4"  y1="24" x2="10" y2="24" stroke="#C4A042" stroke-width="0.7" opacity="0.5"/>
+            <line x1="38" y1="24" x2="44" y2="24" stroke="#C4A042" stroke-width="0.7" opacity="0.5"/>
+          </svg>
+        </div>
+        <blockquote class="ethos-quote reveal">
+          "We do not invent scent.<br>
+          We <em>listen</em> to what the moor already knows,<br>
+          and carry it carefully into glass."
+        </blockquote>
+        <p class="ethos-attribution reveal">— Miriam Gault &amp; Alasdair Finch, Founders</p>
+      </div>
+    </section>
+
+    <!-- ══════════════ STATS BAND ══════════════ -->
+    <section class="section section--dark" aria-label="Our numbers">
+      <div class="section-inner">
+        <div style="display:grid; grid-template-columns: repeat(4,1fr); gap: 2rem; text-align:center;" class="reveal">
+          <div>
+            <p style="font-family:var(--font-display); font-size:clamp(2.5rem,5vw,5rem); font-weight:300; color:var(--gold);"><span data-count="13">13</span></p>
+            <p class="label" style="margin-top:0.5rem;">Years Distilling</p>
+          </div>
+          <div>
+            <p style="font-family:var(--font-display); font-size:clamp(2.5rem,5vw,5rem); font-weight:300; color:var(--gold);"><span data-count="6">6</span></p>
+            <p class="label" style="margin-top:0.5rem;">Signature Scents</p>
+          </div>
+          <div>
+            <p style="font-family:var(--font-display); font-size:clamp(2.5rem,5vw,5rem); font-weight:300; color:var(--gold);"><span data-count="42">42</span></p>
+            <p class="label" style="margin-top:0.5rem;">Botanical Sources</p>
+          </div>
+          <div>
+            <p style="font-family:var(--font-display); font-size:clamp(2.5rem,5vw,5rem); font-weight:300; color:var(--gold);">18</p>
+            <p class="label" style="margin-top:0.5rem;">Stockists Worldwide</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ JOURNAL PREVIEW ══════════════ -->
+    <section class="section" aria-labelledby="journal-heading">
+      <div class="section-inner">
+        <div class="section-header reveal">
+          <div>
+            <div class="section-badge"><span>Field Notes</span></div>
+            <h2 class="section-title" id="journal-heading">
+              From the<br><em>Journal</em>
+            </h2>
+          </div>
+          <a href="journal.html" class="section-link">Read all dispatches</a>
+        </div>
+
+        <div class="journal-grid-home">
+          <article class="journal-card reveal reveal-d1">
+            <p class="journal-date">March 2026</p>
+            <h3 class="journal-card-title">Field Notes: The Peat Bogs of Caithness</h3>
+            <p class="journal-card-excerpt">
+              We rose before dawn and walked three miles into the Flow Country with nothing but a headlamp and rubber boots. The bog at this hour is not quiet — it breathes, softly, releasing something ancient and green and faintly sweet.
+            </p>
+            <a href="journal.html" class="read-more">Read dispatch →</a>
+          </article>
+
+          <article class="journal-card reveal reveal-d2">
+            <p class="journal-date">January 2026</p>
+            <h3 class="journal-card-title">On the Habit of Silence: Distilling at Dawn</h3>
+            <p class="journal-card-excerpt">
+              The copper still takes forty minutes to warm. In that time, Alasdair reads, and I watch the first light come over the hill. There is a quality to this particular stillness that no synthetic accord has ever captured.
+            </p>
+            <a href="journal.html" class="read-more">Read dispatch →</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════════ FOOTER ══════════════ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="logo-mark" style="margin-bottom:0.25rem;">Moth &amp; Meridian</div>
+          <div class="logo-sub">Est. Caithness, 2011</div>
+          <p class="footer-brand-desc" style="margin-top:1rem;">
+            Small-batch botanical perfumery from the Scottish Highlands. Every fragrance is wild-sourced, copper-distilled, and bottled by hand in an edition of three hundred.
+          </p>
+        </div>
+        <nav class="footer-col" aria-label="Collection links">
+          <p class="footer-col-title">Collection</p>
+          <ul>
+            <li><a href="collection.html">All Fragrances</a></li>
+            <li><a href="collection.html">Noctiluca</a></li>
+            <li><a href="collection.html">Ambarvalia</a></li>
+            <li><a href="collection.html">Sphagnum</a></li>
+            <li><a href="collection.html">The Moth Hour</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Studio links">
+          <p class="footer-col-title">Studio</p>
+          <ul>
+            <li><a href="about.html">The Distillery</a></li>
+            <li><a href="about.html">The Founders</a></li>
+            <li><a href="about.html">Our Process</a></li>
+            <li><a href="journal.html">Journal</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Visit links">
+          <p class="footer-col-title">Visit</p>
+          <ul>
+            <li><a href="contact.html">Find a Stockist</a></li>
+            <li><a href="contact.html">Distillery Visits</a></li>
+            <li><a href="contact.html">Contact Us</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© 2026 Moth &amp; Meridian Ltd. All rights reserved.</p>
+        <div class="footer-legal">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Accessibility</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

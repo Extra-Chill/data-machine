@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How It Works — Voltrove Filament One</title>
+  <meta name="description" content="The story behind Voltrove and a plain-language tour of the Filament One signal chain: oscillators, ADSR, the resonant filter, drive, feedback delay, and the lookahead step sequencer.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Voltrove home">
+      <span class="logo-mark">Voltrove<span class="dot">●</span></span>
+      <span class="logo-sub">Software Instruments</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Play</a>
+      <a href="patches.html">Patches</a>
+      <a href="about.html" class="active">How it works</a>
+      <a href="index.html" class="nav-cta">Open the synth</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+  </header>
+
+  <main class="wrap">
+    <div class="page-hero">
+      <p class="eyebrow">The studio &amp; the signal chain</p>
+      <h1 class="page-title">We build instruments <em>out of math.</em></h1>
+      <p class="page-lead">Voltrove is a two-person workshop making playable synthesizers that need nothing but a browser. The Filament One is our first public instrument — here’s the story, and a tour of exactly how it turns a key-press into sound.</p>
+    </div>
+
+    <section class="section" style="padding-top:1rem;">
+      <div class="prose">
+        <p class="lead">In 2023 we got tired of every “try our synth” button leading to a 400-megabyte installer. The web already has a real-time audio engine baked into it — the Web Audio API — so we asked a stubborn question: how much of a proper hardware-feeling synth can you ship as a single web page?</p>
+        <p>The answer turned out to be: almost all of it. The Filament One is a complete subtractive synthesizer. Two oscillators, an envelope-driven resonant filter, amplitude shaping, a stereo-feel feedback delay, a sixteen-step sequencer, and an oscilloscope — and it loads as fast as a blog post. We named it after the glowing tungsten filament of an old vacuum tube: warm, simple, and a little bit alive.</p>
+
+        <h3 id="how">How a note becomes sound</h3>
+        <p>When you press a key, the synth builds a fresh <strong>voice</strong> and routes it through this chain. Every box below is a real Web Audio node:</p>
+      </div>
+
+      <div class="chain" aria-label="Signal chain diagram">
+        <div class="chain-node">
+          <svg class="ic" width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 17q8-13 16 0t14 0"/></svg>
+          <b>Oscillators ×2</b><span>OscillatorNode</span>
+        </div>
+        <span class="chain-arrow" aria-hidden="true">→</span>
+        <div class="chain-node">
+          <svg class="ic" width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 28 L9 6 L15 24 L31 24"/></svg>
+          <b>Amp ADSR</b><span>GainNode</span>
+        </div>
+        <span class="chain-arrow" aria-hidden="true">→</span>
+        <div class="chain-node">
+          <svg class="ic" width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12 H20 L31 26"/><circle cx="20" cy="12" r="2.5"/></svg>
+          <b>Resonant filter</b><span>BiquadFilterNode</span>
+        </div>
+        <span class="chain-arrow" aria-hidden="true">→</span>
+        <div class="chain-node">
+          <svg class="ic" width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 24 Q9 4 13 17 T23 17"/><path d="M3 30 H31" opacity="0.4"/></svg>
+          <b>Drive + delay</b><span>WaveShaper · DelayNode</span>
+        </div>
+        <span class="chain-arrow" aria-hidden="true">→</span>
+        <div class="chain-node">
+          <svg class="ic" width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><circle cx="17" cy="17" r="13"/><path d="M5 17 q6 -8 12 0 t12 0"/></svg>
+          <b>Analyser → out</b><span>AnalyserNode</span>
+        </div>
+      </div>
+
+      <div class="prose">
+        <h3>1 · Oscillators</h3>
+        <p>Two oscillators give the Filament One its body. <strong>Osc A</strong> sets the core character; <strong>Osc B</strong> sits underneath at a chosen octave and is blended in with the <em>Osc B mix</em> control. Nudging the <em>Detune</em> control spreads the two oscillators a few cents apart, which is the entire secret behind a “fat” analog sound — the slight beating between the two pitches is what your ear reads as richness.</p>
+
+        <h3>2 · The amplitude envelope (ADSR)</h3>
+        <p>Raw oscillators just drone. The <strong>ADSR</strong> envelope shapes their loudness over time: <em>Attack</em> is how fast the note fades in, <em>Decay</em> drops it to the <em>Sustain</em> level it holds while you keep the key down, and <em>Release</em> is the tail after you let go. Short attack + zero sustain gives a pluck; long attack + long release gives a pad. It’s the same four numbers behind almost every electronic sound you’ve ever heard.</p>
+
+        <h3>3 · The resonant filter</h3>
+        <p>A lowpass <strong>BiquadFilter</strong> removes the harmonics above its <em>cutoff</em> frequency — the higher the cutoff, the brighter the tone. Crank the <em>resonance</em> (Q) and the frequencies right at the cutoff get a sharp boost, the squelchy “wah” that defines acid basslines. A second envelope sweeps the cutoff each time you play, so notes open up and then settle — that’s the <em>Filter envelope</em> amount.</p>
+
+        <h3>4 · Drive, delay &amp; the master bus</h3>
+        <p>From the filter, every voice sums into a shared bus. A gentle <strong>waveshaper</strong> adds <em>Drive</em> — soft saturation that thickens the sound. A feedback <strong>DelayNode</strong> creates echoes, with <em>feedback</em> deciding how many repeats and <em>mix</em> how loud they sit. Finally a compressor keeps big chords from clipping, an <strong>AnalyserNode</strong> feeds the oscilloscope you see while you play, and the signal reaches your speakers.</p>
+
+        <h3 id="seq">5 · The step sequencer’s secret: a lookahead clock</h3>
+        <p>Naively scheduling notes with <code>setInterval</code> drifts and stutters, because JavaScript timers aren’t precise. The Filament One instead uses the classic <strong>lookahead scheduler</strong>: a lightweight timer wakes up every 25&nbsp;ms only to <em>schedule</em> notes a fraction of a second ahead, but each note’s actual start time is locked to the rock-solid Web Audio hardware clock. The result is sample-accurate timing that never wanders, even while the tab is busy — and it’s how the optional <em>swing</em> control can shuffle the off-beats by exact amounts.</p>
+      </div>
+
+      <h3 class="section-title" id="specs" style="font-size:1.4rem;margin-top:2rem;">Specifications</h3>
+      <table class="spec-table">
+        <thead><tr><th>Section</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Architecture</td><td>Two-oscillator subtractive, polyphonic</td></tr>
+          <tr><td>Oscillators</td><td>Sine · triangle · sawtooth · square, per-osc octave &amp; detune</td></tr>
+          <tr><td>Filter</td><td>12 dB/oct resonant lowpass with dedicated envelope</td></tr>
+          <tr><td>Envelopes</td><td>ADSR for amplitude, separate envelope amount for filter</td></tr>
+          <tr><td>Effects</td><td>Soft-clip drive · feedback delay with damping · master limiter</td></tr>
+          <tr><td>Sequencer</td><td>16 steps · 4 drum lanes · 1 synth lane · 40&ndash;200 BPM · swing</td></tr>
+          <tr><td>Visualizer</td><td>Real-time oscilloscope + 1024-bin spectrum (FFT 2048)</td></tr>
+          <tr><td>Storage</td><td>Unlimited user patches saved to browser localStorage</td></tr>
+          <tr><td>Requirements</td><td>Any browser with the Web Audio API — no installs, works offline</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="section-title" style="font-size:1.4rem;">Keyboard map</h3>
+      <p class="section-sub">Your computer keyboard is the piano. The home row plays the white keys; the row above plays the sharps.</p>
+      <div class="kbd-map">
+        <div class="row"><b>White keys</b><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd></div>
+        <div class="row"><b>Black keys</b><kbd>W</kbd><kbd>E</kbd><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd><kbd>O</kbd><kbd>P</kbd></div>
+        <div class="row"><b>Lower octave</b><kbd>Z</kbd><kbd>X</kbd><kbd>C</kbd><kbd>V</kbd><kbd>B</kbd><kbd>N</kbd><kbd>M</kbd></div>
+        <div class="row"><b>Shift octave</b><kbd>←</kbd><kbd>→</kbd></div>
+        <div class="row"><b>Sequencer</b><kbd>Space</kbd> play / stop</div>
+        <div class="row"><b>Panic</b><kbd>Esc</kbd> all notes off</div>
+      </div>
+
+      <h3 class="section-title" id="team" style="font-size:1.4rem;">The makers</h3>
+      <div class="team">
+        <div class="person">
+          <div class="avatar" style="background:linear-gradient(135deg,var(--mint),var(--cyan))">NO</div>
+          <b>Nima Osei</b><span>DSP &amp; sound design</span>
+          <p>Former game-audio engineer. Designs the factory patches and obsesses over how filters actually feel under your fingers.</p>
+        </div>
+        <div class="person">
+          <div class="avatar" style="background:linear-gradient(135deg,var(--violet),var(--coral))">MQ</div>
+          <b>Marlowe Quist</b><span>Interface &amp; web</span>
+          <p>Builds the playable front-end. Believes an instrument you can open in one click will always beat the one you have to install.</p>
+        </div>
+      </div>
+
+      <div class="cta-strip" style="margin-top:2.5rem;">
+        <h2>Enough reading — go make noise.</h2>
+        <p>The whole instrument is one click away.</p>
+        <a href="index.html" class="btn btn-primary">Play the Filament One →</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Voltrove<span class="dot" style="color:var(--mint)">●</span></div>
+          <p class="footer-brand-desc">A tiny instrument studio building playable synthesizers that live entirely in the browser.</p>
+        </div>
+        <nav class="footer-col" aria-label="Instrument">
+          <p class="footer-col-title">Instrument</p>
+          <ul>
+            <li><a href="index.html">Play the Filament One</a></li>
+            <li><a href="patches.html">Patch library</a></li>
+            <li><a href="about.html#how">Signal chain</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Studio">
+          <p class="footer-col-title">Studio</p>
+          <ul>
+            <li><a href="about.html">About Voltrove</a></li>
+            <li><a href="about.html#team">The makers</a></li>
+            <li><a href="mailto:hello@voltrove.audio">hello@voltrove.audio</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="More">
+          <p class="footer-col-title">More</p>
+          <ul>
+            <li><a href="#">Changelog</a></li>
+            <li><a href="#">Mastodon</a></li>
+            <li><a href="#">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Voltrove Instruments · Built on the open web</p>
+        <div class="footer-legal"><a href="#">Privacy</a><a href="#">Terms</a><a href="about.html">Colophon</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+</body>
+</html>

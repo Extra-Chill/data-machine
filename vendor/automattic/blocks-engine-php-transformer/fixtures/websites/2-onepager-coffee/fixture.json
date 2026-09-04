@@ -1,0 +1,10 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "restaurant",
+    "cafe",
+    "one-pager",
+    "has-nav"
+  ],
+  "complexity": 1
+}

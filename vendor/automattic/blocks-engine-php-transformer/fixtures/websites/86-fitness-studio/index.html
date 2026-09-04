@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeFit Studio | Strength, Conditioning, Mobility</title>
+  <meta name="description" content="ForgeFit Studio is a neighborhood training studio with coached strength classes, mobility work, and personal training in Denver.">
+  <link rel="stylesheet" href="css/site.css">
+  <script src="js/site.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav wrap" aria-label="Main navigation">
+      <a class="brand" href="#top" aria-label="ForgeFit home"><span class="brand-mark">F</span><span>ForgeFit Studio</span></a>
+      <ul class="nav-links" role="list">
+        <li><a href="#classes">Classes</a></li>
+        <li><a href="#schedule">Schedule</a></li>
+        <li><a href="#trainers">Trainers</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+      </ul>
+      <a class="button" href="#trial">Book a trial</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap hero-content reveal">
+        <p class="eyebrow">Denver small-group training</p>
+        <h1 id="hero-title">Build strength that holds up outside the gym.</h1>
+        <p>Coached strength, conditioning, and mobility sessions for busy adults who want durable progress without guesswork.</p>
+        <div class="hero-actions">
+          <a class="button" href="#trial">Start with a free trial</a>
+          <a class="button alt" href="#schedule">View this week</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap stats" aria-label="Studio statistics">
+      <div class="stat"><strong data-count="612">612</strong><span>active members</span></div>
+      <div class="stat"><strong data-count="84">84</strong><span>weekly classes</span></div>
+      <div class="stat"><strong data-count="9">9</strong><span>certified coaches</span></div>
+    </section>
+
+    <section id="classes" class="section">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Class tracks</p>
+          <h2>Choose your lane, then move with intent.</h2>
+          <p>Every class card is a full-card link because that is how real service businesses make mobile discovery fast.</p>
+        </div>
+        <div class="classes-grid">
+          <article class="class-card reveal" style="--accent:#b8ff3d">
+            <span class="eyebrow">Strength</span>
+            <h3>Barbell Build</h3>
+            <p>Progressive squat, hinge, press, and pull programming with coach-led scaling.</p>
+            <a class="stretched-link" href="#schedule" aria-label="See Barbell Build classes"></a>
+          </article>
+          <article class="class-card reveal" style="--accent:#55e4d3">
+            <span class="eyebrow">Conditioning</span>
+            <h3>Engine Room</h3>
+            <p>Intervals, sled work, bikes, and circuits designed around sustainable intensity.</p>
+            <a class="stretched-link" href="#schedule" aria-label="See Engine Room classes"></a>
+          </article>
+          <article class="class-card reveal" style="--accent:#e3734e">
+            <span class="eyebrow">Recovery</span>
+            <h3>Reset Mobility</h3>
+            <p>Joint prep, breath-led mobility, and downshift work for desk-stiff athletes.</p>
+            <a class="stretched-link" href="#schedule" aria-label="See Reset Mobility classes"></a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="schedule" class="section">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Weekly schedule</p>
+          <h2>Sticky class names, real table semantics.</h2>
+        </div>
+        <div class="schedule-wrap reveal">
+          <table class="schedule">
+            <thead><tr><th>Track</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
+            <tbody>
+              <tr><td>Barbell Build</td><td>6:00a<br>5:30p</td><td>7:00a</td><td>6:00a<br>5:30p</td><td>7:00a</td><td>6:00a</td><td>9:00a</td></tr>
+              <tr><td>Engine Room</td><td>12:00p</td><td>6:15p</td><td>12:00p</td><td>6:15p</td><td>12:00p</td><td>10:15a</td></tr>
+              <tr><td>Reset Mobility</td><td>7:00p</td><td>12:00p</td><td>7:00p</td><td>12:00p</td><td>5:30p</td><td>11:30a</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="trial" class="section">
+      <div class="wrap split">
+        <div class="section-head reveal">
+          <p class="eyebrow">Trial week</p>
+          <h2>Tell us where you are starting.</h2>
+          <p>Your first session includes movement screening, class placement, and a plan for the next four weeks.</p>
+        </div>
+        <form class="trial-form reveal" action="#trial" method="post">
+          <div class="field-grid">
+            <label>First name <input name="first-name" autocomplete="given-name" required></label>
+            <label>Email <input type="email" name="email" autocomplete="email" required></label>
+            <label>Training goal <select name="goal"><option>Build strength</option><option>Improve conditioning</option><option>Move pain-free</option></select></label>
+            <label>Preferred time <select name="time"><option>Early morning</option><option>Lunch</option><option>Evening</option></select></label>
+            <label class="full">Anything we should know? <textarea name="notes"></textarea></label>
+          </div>
+          <p><button class="button" type="submit">Request trial week</button></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="trainers" class="section trainers">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Coaches</p>
+          <h2>People who can coach the room, not just the workout.</h2>
+        </div>
+        <div class="carousel" data-carousel aria-label="Trainer carousel">
+          <article class="trainer"><div class="trainer-art" style="--tone:#2b443f"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="38" r="18" fill="#b8ff3d"/><path d="M25 110c7-31 22-48 35-48s28 17 35 48" fill="#55e4d3" opacity=".8"/></svg></div><div class="trainer-body"><h3>Maya Ruiz</h3><p>Strength lead, pre/postnatal specialist.</p></div></article>
+          <article class="trainer"><div class="trainer-art" style="--tone:#3a3527"><svg viewBox="0 0 120 120" aria-hidden="true"><rect x="35" y="20" width="50" height="50" rx="24" fill="#e3734e"/><path d="M28 104c6-25 20-38 32-38s26 13 32 38" fill="#b8ff3d" opacity=".78"/></svg></div><div class="trainer-body"><h3>Drew Coleman</h3><p>Conditioning coach and former trail racer.</p></div></article>
+          <article class="trainer"><div class="trainer-art" style="--tone:#29354d"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="42" r="20" fill="#55e4d3"/><path d="M22 108c9-28 22-42 38-42s29 14 38 42" fill="#e3734e" opacity=".78"/></svg></div><div class="trainer-body"><h3>Samir Patel</h3><p>Mobility coach, FRC, kettlebell programming.</p></div></article>
+          <article class="trainer"><div class="trainer-art" style="--tone:#423044"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="40" r="19" fill="#f8f2e8"/><path d="M24 108c8-29 22-44 36-44s28 15 36 44" fill="#b8ff3d" opacity=".75"/></svg></div><div class="trainer-body"><h3>Lena Park</h3><p>Olympic lifting coach and youth athletic mentor.</p></div></article>
+        </div>
+        <div class="carousel-controls"><button class="icon-button" data-slide="prev" aria-label="Previous trainer">‹</button><button class="icon-button" data-slide="next" aria-label="Next trainer">›</button></div>
+      </div>
+    </section>
+
+    <section id="pricing" class="section">
+      <div class="wrap">
+        <div class="section-head reveal"><p class="eyebrow">Memberships</p><h2>Simple pricing, no initiation fee.</h2></div>
+        <div class="pricing-toggle reveal" aria-label="Billing period"><button class="is-active" data-billing="monthly" aria-pressed="true">Monthly</button><button data-billing="annual" aria-pressed="false">Annual</button></div>
+        <div class="pricing-grid" data-pricing>
+          <article class="pricing-card reveal"><h3>2x Week</h3><p><span class="price monthly-price">$159</span><span class="price annual-price">$143</span> /mo</p><span class="annual-note">Annual saves $192</span><p>Two coached classes weekly plus open gym Sundays.</p></article>
+          <article class="pricing-card reveal"><h3>Unlimited</h3><p><span class="price monthly-price">$229</span><span class="price annual-price">$206</span> /mo</p><span class="annual-note">Annual saves $276</span><p>Unlimited classes, priority booking, and quarterly goal reviews.</p></article>
+          <article class="pricing-card reveal"><h3>Personal</h3><p><span class="price monthly-price">$420</span><span class="price annual-price">$378</span> /mo</p><span class="annual-note">Annual saves $504</span><p>Four private sessions monthly plus full class access.</p></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer"><div class="wrap">ForgeFit Studio · 1801 Blake Street, Denver · <a href="#trial">Book your trial</a></div></footer>
+</body>
+</html>

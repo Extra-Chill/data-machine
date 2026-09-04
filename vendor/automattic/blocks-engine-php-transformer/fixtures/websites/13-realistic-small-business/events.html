@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Private Events — Juniper Lane Plant Shop</title>
+  <meta name="description" content="Host a private plant bar event at Juniper Lane in Benton Harbor, Michigan. Birthdays, team outings, showers, and celebrations — we close the shop just for your group.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .event-package {
+      background: var(--white);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      border: 1px solid var(--parchment);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      transition: box-shadow 0.3s var(--ease-out);
+    }
+    .event-package:hover { box-shadow: var(--shadow-lg); }
+    .event-package-accent {
+      background: var(--forest);
+      color: var(--cream);
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .event-package-accent::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 30% 70%, rgba(93,138,98,0.3) 0%, transparent 60%);
+    }
+    .event-package-content {
+      padding: 3rem;
+    }
+    .faq-item {
+      border-bottom: 1px solid var(--parchment);
+      padding: 1.5rem 0;
+    }
+    .faq-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .faq-question {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      color: var(--forest);
+      margin-bottom: 0.6rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 1rem;
+    }
+    .faq-answer {
+      font-size: 0.92rem;
+      color: var(--forest-mid);
+      line-height: 1.7;
+    }
+    .package-feature {
+      display: flex;
+      align-items: start;
+      gap: 0.75rem;
+      margin-bottom: 0.875rem;
+    }
+    .package-feature-dot {
+      width: 20px;
+      height: 20px;
+      background: rgba(245,237,215,0.15);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .package-feature span {
+      font-size: 0.9rem;
+      color: rgba(245,237,215,0.8);
+      line-height: 1.55;
+    }
+    @media (max-width: 720px) {
+      .event-package { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo" aria-label="Juniper Lane Home">
+      <svg class="logo-mark" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+        <circle cx="18" cy="18" r="17" fill="#D0E3D2" stroke="#5D8A62" stroke-width="1.5"/>
+        <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#5D8A62"/>
+        <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#3A5438"/>
+        <ellipse cx="18" cy="30.5" rx="4" ry="1.5" fill="#B85A37" opacity="0.6"/>
+      </svg>
+      <span>
+        <span class="logo-text">Juniper Lane</span>
+        <span class="logo-sub">Plant Shop &amp; Gifts</span>
+      </span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html">Workshops</a>
+      <a href="plant-care.html">Plant Care</a>
+      <a href="events.html" class="active">Private Events</a>
+      <a href="visit.html">Visit Us</a>
+    </nav>
+    <div class="header-cta">
+      <a href="tel:+12695550193" class="phone-cta">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        (269) 555-0193
+      </a>
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav" role="dialog" aria-label="Navigation menu">
+  <div class="mobile-nav-overlay" aria-hidden="true"></div>
+  <div class="mobile-nav-panel">
+    <nav class="mobile-nav-links">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html">Workshops</a>
+      <a href="plant-care.html">Plant Care</a>
+      <a href="events.html">Private Events</a>
+      <a href="visit.html">Visit Us</a>
+    </nav>
+    <div class="mobile-nav-info">
+      <div>214 Maple Street · Benton Harbor, MI</div>
+      <div style="margin-top:0.5rem">Wed–Sat 10am–6pm · Sun 11am–4pm</div>
+    </div>
+    <div class="mobile-nav-phone">
+      <a href="tel:+12695550193" class="btn btn-primary btn-lg" style="width:100%; justify-content:center;">Call to Inquire</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE HERO ========== -->
+<section class="page-hero">
+  <div class="container page-hero-inner">
+    <span class="eyebrow">Private Plant Bar</span>
+    <h1>Host your event<br><em>here.</em></h1>
+    <p class="lead">We close the shop, set up the tables, and build a hands-on plant-potting experience around your group. You bring the people. We handle the rest.</p>
+  </div>
+  <svg style="position:absolute;top:0;right:0;opacity:0.08;width:280px;" viewBox="0 0 280 280" fill="none" aria-hidden="true">
+    <circle cx="140" cy="140" r="120" stroke="#88B38D" stroke-width="2" stroke-dasharray="8 5"/>
+    <circle cx="140" cy="140" r="80" fill="#5D8A62"/>
+    <circle cx="140" cy="140" r="50" fill="#3A5438"/>
+  </svg>
+</section>
+
+<!-- ========== HOW IT WORKS ========== -->
+<section class="section" aria-labelledby="how-events-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="eyebrow">The Experience</span>
+      <h2 id="how-events-heading" style="margin-top:0.5rem;">What a private <em style="font-style:italic; color:var(--sage)">plant bar</em> looks like</h2>
+      <div class="section-divider"></div>
+    </div>
+
+    <div class="grid-3" style="gap:1.5rem; margin-bottom:4rem;">
+      <div class="reveal reveal-delay-1" style="padding:2rem 0;">
+        <div style="font-family:var(--font-display); font-size:4rem; font-weight:300; color:var(--parchment-dk); line-height:1; margin-bottom:1rem;">01</div>
+        <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:0.6rem;">You Call, We Plan</h4>
+        <p style="font-size:0.9rem; color:var(--forest-mid); line-height:1.7;">Tell us your date, group size, and what you're celebrating. We'll suggest an activity, talk through pricing, and confirm everything over the phone. No online forms, no waiting for email replies.</p>
+      </div>
+      <div class="reveal reveal-delay-2" style="padding:2rem 0;">
+        <div style="font-family:var(--font-display); font-size:4rem; font-weight:300; color:var(--parchment-dk); line-height:1; margin-bottom:1rem;">02</div>
+        <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:0.6rem;">We Set the Stage</h4>
+        <p style="font-size:0.9rem; color:var(--forest-mid); line-height:1.7;">We close the shop to outside customers and set up a plant bar with everything your group needs — labeled plants to choose from, pots, soil, tools, and a welcome drink station. The shop feels cozy and intentional, not like a craft store.</p>
+      </div>
+      <div class="reveal reveal-delay-3" style="padding:2rem 0;">
+        <div style="font-family:var(--font-display); font-size:4rem; font-weight:300; color:var(--parchment-dk); line-height:1; margin-bottom:1rem;">03</div>
+        <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:0.6rem;">Everyone Takes Home a Plant</h4>
+        <p style="font-size:0.9rem; color:var(--forest-mid); line-height:1.7;">Each guest pots their own plant — choosing their plant, their pot, and their soil. We walk everyone through the process together and answer questions. The whole thing takes about 90 minutes to 2 hours. Everyone leaves with a wrapped plant and a care card.</p>
+      </div>
+    </div>
+
+    <!-- Illustration: plant bar setup -->
+    <div style="background:var(--sage-pale); border-radius:var(--radius-xl); padding:3rem; display:flex; align-items:center; justify-content:center; margin-bottom:4rem;" class="reveal">
+      <svg viewBox="0 0 700 280" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:640px; width:100%;" role="img" aria-label="Illustration of a plant bar setup with potted plants and supplies">
+        <!-- Table -->
+        <rect x="50" y="160" width="600" height="18" rx="4" fill="#7A5233"/>
+        <rect x="60" y="178" width="16" height="80" rx="4" fill="#6B4423"/>
+        <rect x="220" y="178" width="16" height="80" rx="4" fill="#6B4423"/>
+        <rect x="464" y="178" width="16" height="80" rx="4" fill="#6B4423"/>
+        <rect x="624" y="178" width="16" height="80" rx="4" fill="#6B4423"/>
+
+        <!-- Left pot cluster -->
+        <!-- Pot 1 -->
+        <path d="M98 155 L92 130 Q92 124 98 124 L118 124 Q124 124 124 130 L118 155 Z" fill="#B85A37"/>
+        <ellipse cx="108" cy="155" rx="13" ry="4" fill="#C4933A"/>
+        <!-- Plant in pot 1 -->
+        <path d="M108 124 C108 108 104 96 106 84 C108 74 112 68 108 58" stroke="#3A5438" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M106 95 C92 82 78 86 78 96 C78 104 90 110 102 106Z" fill="#5D8A62"/>
+        <path d="M110 78 C122 66 136 70 136 80 C136 90 122 96 110 90Z" fill="#6B9B70"/>
+
+        <!-- Pot 2 (wide) -->
+        <path d="M148 158 L142 138 Q142 132 150 132 L180 132 Q188 132 188 138 L182 158 Z" fill="#C4933A"/>
+        <ellipse cx="165" cy="158" rx="20" ry="5" fill="#D4A84B"/>
+        <!-- Succulent in pot 2 -->
+        <circle cx="165" cy="122" r="14" fill="#5D8A62"/>
+        <circle cx="165" cy="122" r="9" fill="#6B9B70"/>
+        <circle cx="165" cy="122" r="5" fill="#88B38D"/>
+        <circle cx="165" cy="122" r="2" fill="#5D8A62"/>
+        <!-- Small succulents beside -->
+        <circle cx="150" cy="128" r="8" fill="#88B38D"/>
+        <circle cx="150" cy="128" r="5" fill="#6B9B70"/>
+        <circle cx="179" cy="128" r="9" fill="#6B9B70"/>
+        <circle cx="179" cy="128" r="6" fill="#5D8A62"/>
+
+        <!-- Soil bags center -->
+        <rect x="210" y="110" width="38" height="50" rx="4" fill="#7A5233"/>
+        <rect x="215" y="115" width="28" height="3" rx="1.5" fill="rgba(255,255,255,0.2)"/>
+        <path d="M214 128 Q229 123 244 128" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" fill="none"/>
+
+        <rect x="256" y="118" width="34" height="42" rx="4" fill="#5D3A1A"/>
+        <rect x="260" y="123" width="26" height="2.5" rx="1" fill="rgba(255,255,255,0.15)"/>
+
+        <!-- Tall snake plant center-right -->
+        <rect x="310" y="138" width="28" height="22" rx="4" fill="#5D8A62"/>
+        <ellipse cx="324" cy="138" rx="16" ry="5" fill="#6B9B70"/>
+        <rect x="316" y="60" width="16" height="80" rx="7" fill="#5D8A62"/>
+        <rect x="316" y="60" width="4" height="80" rx="2" fill="#3A5438" opacity="0.25"/>
+        <rect x="328" y="60" width="4" height="80" rx="2" fill="#88B38D" opacity="0.25"/>
+        <rect x="306" y="72" width="14" height="72" rx="6" fill="#6B9B70" transform="rotate(-10 313 72)"/>
+        <rect x="332" y="74" width="14" height="70" rx="6" fill="#5D8A62" transform="rotate(9 339 74)"/>
+
+        <!-- Watering can -->
+        <path d="M378 145 C378 130 388 120 402 120 C416 120 426 130 426 145 Z" fill="#88B38D"/>
+        <rect x="378" y="145" width="48" height="10" rx="4" fill="#6B9B70"/>
+        <path d="M426 128 C436 124 444 126 448 132 C450 136 444 142 436 140" stroke="#5D8A62" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <path d="M378 128 L370 118" stroke="#5D8A62" stroke-width="3" stroke-linecap="round"/>
+        <path d="M370 118 L362 128 L366 130" stroke="#5D8A62" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+        <!-- Pothos trailing right -->
+        <path d="M488 155 L482 128 Q482 122 490 122 L520 122 Q528 122 528 128 L522 155 Z" fill="#C4933A"/>
+        <ellipse cx="505" cy="155" rx="20" ry="5" fill="#D4A84B"/>
+        <path d="M505 122 C505 104 500 88 502 72 C504 58 510 48 505 36" stroke="#3A5438" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <path d="M502 88 C486 72 468 76 468 90 C468 102 484 108 500 100Z" fill="#5D8A62"/>
+        <path d="M508 68 C522 54 540 58 540 72 C540 86 524 92 508 84Z" fill="#6B9B70"/>
+        <path d="M503 50 C489 36 474 40 474 52 C474 64 488 70 502 62Z" fill="#88B38D"/>
+
+        <!-- Card + candle right side -->
+        <rect x="558" y="104" width="32" height="48" rx="3" fill="white" stroke="#E8D5B2" stroke-width="1.5"/>
+        <line x1="563" y1="116" x2="585" y2="116" stroke="#D0E3D2" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="563" y1="122" x2="585" y2="122" stroke="#D0E3D2" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="563" y1="128" x2="576" y2="128" stroke="#D0E3D2" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M572 108 C570 106 566 107 566 110 C566 113 572 114 572 117 C572 120 568 121 566 119" stroke="#B85A37" stroke-width="1" fill="none" stroke-linecap="round"/>
+
+        <rect x="598" y="110" width="20" height="50" rx="4" fill="#F5EDD7" stroke="#E8D5B2" stroke-width="1"/>
+        <line x1="608" y1="110" x2="608" y2="100" stroke="#7A5233" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M608 100 C606 94 602 90 604 86 C606 82 610 81 612 85 C614 89 612 94 608 100Z" fill="#C4933A"/>
+        <circle cx="608" cy="92" r="8" fill="rgba(196,147,58,0.1)"/>
+
+        <!-- Decorative hanging plants above (suggested) -->
+        <line x1="350" y1="0" x2="350" y2="40" stroke="#7A5233" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 2"/>
+        <path d="M350 40 C342 30 328 32 326 42 C324 50 332 58 344 54 C350 52 352 46 350 40Z" fill="#5D8A62" opacity="0.4"/>
+        <path d="M350 40 C358 30 372 32 374 42 C376 50 368 56 356 54 C350 52 348 46 350 40Z" fill="#6B9B70" opacity="0.4"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ========== EVENT PACKAGES ========== -->
+<section class="section" style="background:var(--parchment);" aria-labelledby="packages-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="eyebrow">What's Included</span>
+      <h2 id="packages-heading" style="margin-top:0.5rem;">Event <em style="font-style:italic; color:var(--terracotta)">options</em></h2>
+      <div class="section-divider"></div>
+      <p class="lead" style="max-width:560px; margin-top:1rem;">Every private event is built around your group. Call us and we'll put together exactly what you need.</p>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:2rem;">
+      <!-- Standard Plant Bar -->
+      <div class="event-package reveal reveal-delay-1">
+        <div class="event-package-accent">
+          <div style="position:relative; z-index:2;">
+            <span class="eyebrow" style="color:var(--sage-light); display:block; margin-bottom:0.6rem;">Most Popular</span>
+            <h3 style="font-family:var(--font-display); font-size:2.2rem; color:var(--cream); font-weight:300; line-height:1.15; margin-bottom:0.5rem;">Plant Bar</h3>
+            <div style="font-family:var(--font-mono); font-size:0.7rem; letter-spacing:0.08em; color:rgba(245,237,215,0.6); margin-bottom:1.5rem;">8–20 Guests · 90–120 Minutes</div>
+            <div style="font-family:var(--font-display); font-size:1.8rem; color:var(--gold); margin-bottom:0.25rem;">$55 <span style="font-size:1rem; color:rgba(245,237,215,0.5);">per person</span></div>
+            <div style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.06em; color:rgba(245,237,215,0.45);">Minimum 8 guests</div>
+            <svg viewBox="0 0 200 200" width="140" style="margin-top:2rem; opacity:0.3;" fill="none" aria-hidden="true">
+              <circle cx="100" cy="100" r="90" stroke="#88B38D" stroke-width="1.5" stroke-dasharray="6 4"/>
+              <path d="M100 40 C76 20 44 28 42 50 C40 68 62 80 90 72 C96 70 100 60 100 40Z" fill="#5D8A62"/>
+              <path d="M100 40 C124 20 156 28 158 50 C160 68 138 80 110 72 C104 70 100 60 100 40Z" fill="#6B9B70"/>
+            </svg>
+          </div>
+        </div>
+        <div class="event-package-content">
+          <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:1.25rem;">What's Included</h4>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--sage);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Private use of the shop for 2 hours (30 min setup / 90 min activity)</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--sage);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Each guest chooses one 4"–6" plant from a curated selection of 8–10 varieties</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--sage);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Each guest chooses a ceramic or terracotta pot from our selection</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--sage);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Soil, tools, and hands-on guidance throughout</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--sage);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Complimentary coffee, tea, and sparkling water</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--sage);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Printed care cards to take home with the plant</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:1.75rem;">
+            <div style="width:6px;height:6px;background:var(--sage);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">10% shop discount for all guests during the event</span>
+          </div>
+          <a href="tel:+12695550193" class="btn btn-primary btn-lg">
+            <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+              <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Call to Inquire
+          </a>
+        </div>
+      </div>
+
+      <!-- Premium Event -->
+      <div class="event-package reveal reveal-delay-2" style="border-color:var(--gold);">
+        <div class="event-package-accent" style="background: linear-gradient(160deg, var(--bark), var(--rust));">
+          <div style="position:relative; z-index:2;">
+            <span class="eyebrow" style="color:var(--gold-pale); display:block; margin-bottom:0.6rem;">Elevated</span>
+            <h3 style="font-family:var(--font-display); font-size:2.2rem; color:var(--cream); font-weight:300; line-height:1.15; margin-bottom:0.5rem;">Premium Celebration</h3>
+            <div style="font-family:var(--font-mono); font-size:0.7rem; letter-spacing:0.08em; color:rgba(245,237,215,0.6); margin-bottom:1.5rem;">10–25 Guests · 2.5–3 Hours</div>
+            <div style="font-family:var(--font-display); font-size:1.8rem; color:var(--gold); margin-bottom:0.25rem;">$80 <span style="font-size:1rem; color:rgba(245,237,215,0.5);">per person</span></div>
+            <div style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.06em; color:rgba(245,237,215,0.45);">Minimum 10 guests</div>
+          </div>
+        </div>
+        <div class="event-package-content">
+          <h4 style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:1.25rem;">Everything in Plant Bar, Plus:</h4>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--gold);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Larger plant selection — 6"–8" plants including ferns, calathea, and small tropicals</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--gold);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Upgraded ceramic pot selection including handmade stoneware planters</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--gold);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Prosecco or cider welcome toast + nibbles from a local bakery</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--gold);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">Personalized name tags for pots and custom kraft-paper wrapping for the guest of honor's plant</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:0.875rem;">
+            <div style="width:6px;height:6px;background:var(--gold);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">A cedar candle or small gift for the event host, from us</span>
+          </div>
+          <div class="package-feature" style="display:flex;gap:0.75rem;align-items:start;margin-bottom:1.75rem;">
+            <div style="width:6px;height:6px;background:var(--gold);border-radius:50%;flex-shrink:0;margin-top:8px;"></div>
+            <span style="font-size:0.9rem;color:var(--forest-mid);line-height:1.6;">15% shop discount for all guests during the event</span>
+          </div>
+          <a href="tel:+12695550193" class="btn btn-primary btn-lg">
+            <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+              <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Call to Inquire
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== OCCASIONS ========== -->
+<section class="section" aria-labelledby="occasions-heading">
+  <div class="container">
+    <div class="section-header centered reveal">
+      <span class="eyebrow">Good Reasons to Gather</span>
+      <h2 id="occasions-heading" style="margin-top:0.5rem;">We've hosted <em style="font-style:italic; color:var(--terracotta)">all kinds</em> of events.</h2>
+      <div class="section-divider centered"></div>
+    </div>
+
+    <div class="grid-3" style="gap:1.25rem;">
+      <div class="card reveal reveal-delay-1">
+        <div class="card-illustration" style="background:linear-gradient(135deg,#f0ddd0,#e8c8b8); position:relative; overflow:hidden;">
+          <div style="font-size:3rem; position:relative; z-index:2;">🎂</div>
+        </div>
+        <div class="card-body">
+          <h3 class="card-title">Birthday Parties</h3>
+          <p class="card-desc">Adults only or mixed ages — both work well. A plant party is a great alternative to a restaurant dinner or bar night. People love having something to take home.</p>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-2">
+        <div class="card-illustration" style="background:linear-gradient(135deg,#d4e3d5,#b5ceb7); position:relative; overflow:hidden;">
+          <div style="font-size:3rem; position:relative; z-index:2;">🌿</div>
+        </div>
+        <div class="card-body">
+          <h3 class="card-title">Team Outings</h3>
+          <p class="card-desc">A genuinely fun alternative to happy hour. Everyone pots a plant to take back to their desk — it becomes a standing reminder of a good afternoon away from the office.</p>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-3">
+        <div class="card-illustration" style="background:linear-gradient(135deg,#f5eedd,#e8d5b8); position:relative; overflow:hidden;">
+          <div style="font-size:3rem; position:relative; z-index:2;">🌸</div>
+        </div>
+        <div class="card-body">
+          <h3 class="card-title">Baby &amp; Bridal Showers</h3>
+          <p class="card-desc">Guests leave with a plant instead of a party favor. We can suggest pet-safe or nursery-safe plant options for the guest of honor and personalize the whole setup around the theme.</p>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-1">
+        <div class="card-illustration" style="background:linear-gradient(135deg,#ddeedd,#c5dec8); position:relative; overflow:hidden;">
+          <div style="font-size:3rem; position:relative; z-index:2;">👩‍👩‍👧</div>
+        </div>
+        <div class="card-body">
+          <h3 class="card-title">Girls' Night Out</h3>
+          <p class="card-desc">A plant bar, some good wine (bring your own — we're BYOB), and two hours away from everything else. Book a weeknight and have the whole shop to yourselves.</p>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-2">
+        <div class="card-illustration" style="background:linear-gradient(135deg,#ede4d3,#d4b892); position:relative; overflow:hidden;">
+          <div style="font-size:3rem; position:relative; z-index:2;">🏫</div>
+        </div>
+        <div class="card-body">
+          <h3 class="card-title">School &amp; Youth Groups</h3>
+          <p class="card-desc">We've hosted 4-H groups, school science classes, and summer camp field trips. Younger kids do best with the succulent bowl format. Call to discuss age-appropriate options.</p>
+        </div>
+      </div>
+
+      <div class="card reveal reveal-delay-3">
+        <div class="card-illustration" style="background:linear-gradient(135deg,#d4e3d5,#b5ceb7); position:relative; overflow:hidden;">
+          <div style="font-size:3rem; position:relative; z-index:2;">🎉</div>
+        </div>
+        <div class="card-body">
+          <h3 class="card-title">Just Because</h3>
+          <p class="card-desc">You don't need a special occasion. Some people book a plant bar just because they want a unique night out with friends. That's our favorite kind of event.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== FAQ ========== -->
+<section class="section" style="background:var(--parchment);" aria-labelledby="faq-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="eyebrow">Common Questions</span>
+      <h2 id="faq-heading" style="margin-top:0.5rem;">Before you <em style="font-style:italic; color:var(--sage)">call</em></h2>
+      <div class="section-divider"></div>
+    </div>
+
+    <div style="max-width:720px;">
+      <div class="faq-item reveal reveal-delay-1">
+        <div class="faq-question">How far in advance do I need to book?</div>
+        <p class="faq-answer">We recommend at least two to three weeks out, especially for weekend dates. Summer and fall book fast. If you have something coming up sooner, call anyway — we'll do our best to make it work.</p>
+      </div>
+      <div class="faq-item reveal reveal-delay-2">
+        <div class="faq-question">Can we bring our own food and drinks?</div>
+        <p class="faq-answer">Yes. Juniper Lane is BYOB-friendly and you're welcome to bring any food you like. We provide coffee, tea, and sparkling water; the Premium package includes a toast. You can absolutely bring a birthday cake or catered snacks — just let us know ahead of time so we can set up appropriately.</p>
+      </div>
+      <div class="faq-item reveal reveal-delay-3">
+        <div class="faq-question">What if someone in our group is allergic to plants?</div>
+        <p class="faq-answer">Let us know when you book and we'll work with you. Most of our tropical houseplants are low-allergen. We can curate the selection to avoid known triggers and make sure there's something appropriate for everyone in the group.</p>
+      </div>
+      <div class="faq-item reveal reveal-delay-1">
+        <div class="faq-question">Can we do a theme?</div>
+        <p class="faq-answer">Yes! We've done jungle themes, fall harvest vibes, minimalist all-white setups, and more. We can adjust pot selections, top dressings, table decor, and plant varieties to fit a theme. Tell us your vision when you call and we'll figure out how to make it work within reason.</p>
+      </div>
+      <div class="faq-item reveal reveal-delay-2">
+        <div class="faq-question">Do you travel or do events off-site?</div>
+        <p class="faq-answer">We're set up best at the shop — it's where all our supplies, plants, and tables are. We don't currently offer off-site events, but if you have a venue in mind and a large enough group, give us a call and we can at least have the conversation.</p>
+      </div>
+      <div class="faq-item reveal reveal-delay-3">
+        <div class="faq-question">What's your cancellation policy?</div>
+        <p class="faq-answer">We ask for a 50% deposit to hold a date, and we require at least one week's notice to cancel or reschedule for a full refund of the deposit. Life happens — just call us as early as possible and we'll do our best to work with you.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== CTA ========== -->
+<div class="cta-band">
+  <div class="container" style="position:relative;z-index:2;">
+    <h2>Ready to book your plant bar?</h2>
+    <p class="lead">Call us to check availability and get your date on the calendar. We make the whole process easy.</p>
+    <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+      <a href="tel:+12695550193" class="btn-white">
+        <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Call (269) 555-0193
+      </a>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="site-logo" style="margin-bottom:0.75rem; display:inline-flex;">
+          <svg class="logo-mark" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+            <circle cx="18" cy="18" r="17" fill="rgba(93,138,98,0.3)" stroke="#5D8A62" stroke-width="1.5"/>
+            <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#88B38D"/>
+            <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#5D8A62"/>
+          </svg>
+          <span>
+            <span class="logo-text">Juniper Lane</span>
+            <span class="logo-sub">Plant Shop &amp; Gifts</span>
+          </span>
+        </a>
+        <p class="footer-tagline">A warm neighborhood shop rooted in Benton Harbor since 2018.</p>
+      </div>
+      <div>
+        <div class="footer-heading">Explore</div>
+        <ul class="footer-links">
+          <li><a href="shop.html">Shop</a></li>
+          <li><a href="workshops.html">Workshops</a></li>
+          <li><a href="plant-care.html">Plant Care Tips</a></li>
+          <li><a href="events.html">Private Events</a></li>
+          <li><a href="visit.html">Visit Us</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-heading">Find Us</div>
+        <div class="footer-info">
+          <strong>214 Maple Street</strong><br>
+          Benton Harbor, MI 49022<br><br>
+          <strong>Wed–Sat</strong> 10am–6pm<br>
+          <strong>Sunday</strong> 11am–4pm<br>
+          Mon &amp; Tue: Closed<br><br>
+          <a href="tel:+12695550193" style="color:var(--sage-light);">(269) 555-0193</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-heading">Stay in the Loop</div>
+        <p style="font-size:0.85rem; color:rgba(245,237,215,0.6); margin-bottom:1rem; line-height:1.6;">Event dates, new plants, and seasonal offerings.</p>
+        <div class="newsletter-wrap">
+          <form class="newsletter-form" aria-label="Newsletter signup">
+            <input type="email" placeholder="your@email.com" required autocomplete="email">
+            <button type="submit">Subscribe</button>
+          </form>
+          <div class="newsletter-success" role="status">You're on the list. See you soon!</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-copy">© 2025 Juniper Lane · 214 Maple Street, Benton Harbor, MI</span>
+      <span class="footer-copy">Made with care in Michigan</span>
+    </div>
+  </div>
+</footer>
+
+<a href="tel:+12695550193" class="mobile-phone-bar" aria-label="Call Juniper Lane">
+  <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+    <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  Book Your Event · (269) 555-0193
+</a>
+
+<script src="main.js"></script>
+</body>
+</html>

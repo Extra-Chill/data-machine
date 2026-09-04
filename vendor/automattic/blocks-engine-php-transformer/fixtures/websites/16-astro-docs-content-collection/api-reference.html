@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SignalForge REST API reference — monitors, signals, alert rules, and webhooks endpoints with curl examples.">
+  <title>API Reference — SignalForge Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .endpoint-toggle-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      transition: color var(--t-fast);
+    }
+    .endpoint-toggle-btn:hover { color: var(--text-secondary); }
+    .endpoint-toggle-btn svg { transition: transform var(--t-base); }
+    .endpoint.collapsed .endpoint-body { display: none; }
+    .endpoint.collapsed .endpoint-toggle-btn svg { transform: rotate(-90deg); }
+    .response-tabs { display: flex; gap: 0.35rem; margin-bottom: 0.75rem; }
+    .response-tab {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      padding: 0.25em 0.75em;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-default);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all var(--t-fast);
+    }
+    .response-tab.active {
+      background: var(--accent-dim);
+      border-color: var(--accent-border);
+      color: var(--accent);
+    }
+    .response-tab:hover:not(.active) { border-color: var(--border-strong); color: var(--text-secondary); }
+    .response-content { display: none; }
+    .response-content.active { display: block; }
+  </style>
+</head>
+<body>
+  <button class="mobile-nav-toggle" id="navToggle" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <div class="overlay" id="overlay"></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <a href="index.html">
+          <svg class="sidebar-logo-mark" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="7" fill="#111512"/>
+            <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#2a352a"/>
+            <polyline points="3,16 7,16 9,10 11,22 13,16 16,16 18,8 20,24 22,16 29,16"
+              stroke="#3efb6a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="sidebar-logo-text">
+            <span class="sidebar-logo-name">SignalForge</span>
+            <span class="sidebar-logo-sub">docs</span>
+          </div>
+        </a>
+      </div>
+      <div class="sidebar-version">
+        <span class="status-dot live"></span>
+        <span class="sidebar-status-text">all systems operational</span>
+        <span class="sidebar-version-badge">v0.9.2</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <span class="nav-section-label">Docs</span>
+          <a class="nav-link" href="index.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+            Home
+          </a>
+          <a class="nav-link" href="overview.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.5"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1"/></svg>
+            Product Overview
+          </a>
+          <a class="nav-link" href="getting-started.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12L6 4l3 5 2-3 3 6"/></svg>
+            Getting Started
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Guides</span>
+          <a class="nav-link" href="incident-workflow.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2l1.5 4h4l-3.2 2.3 1.2 3.9L8 10l-3.5 2.2 1.2-3.9L2.5 6H6.5z"/></svg>
+            Incident Workflow
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Reference</span>
+          <a class="nav-link" href="api-reference.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="12" height="8" rx="1.5"/><path d="M5 5V4a3 3 0 016 0v1"/><path d="M6 9h4M8 8v2"/></svg>
+            API Reference
+          </a>
+          <a class="nav-link" href="changelog.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2" width="11" height="13" rx="1.5"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>
+            Changelog
+          </a>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section">
+          <span class="nav-section-label">Help</span>
+          <a class="nav-link" href="support.html">
+            <svg class="nav-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 10.5v.5M8 5.5a1.5 1.5 0 011.5 1.5c0 1-1.5 1.5-1.5 2.5"/></svg>
+            Support
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        <a href="changelog.html">Releases</a>
+        <a href="support.html">Discord</a>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-breadcrumb">
+          <a href="index.html">Docs</a>
+          <span class="sep">/</span>
+          <span class="current">API Reference</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="topbar-search-btn">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+            <span class="topbar-search-text">Search docs</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="content-with-toc">
+          <div class="main-content">
+
+            <div class="page-header">
+              <div class="page-tag" style="color: var(--purple);">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="12" height="8" rx="1.5"/><path d="M5 5V4a3 3 0 016 0v1"/></svg>
+                API Reference
+              </div>
+              <h1>REST API v1</h1>
+              <p class="page-desc">
+                Base URL: <code>https://api.signalforge.io/v1</code> &nbsp;·&nbsp; All responses are JSON &nbsp;·&nbsp; All timestamps are UTC ISO 8601
+              </p>
+            </div>
+
+            <!-- Authentication -->
+            <h2 id="authentication">Authentication</h2>
+            <p>All API requests must include a Bearer token in the <code>Authorization</code> header. Generate tokens from your workspace settings at <a href="https://app.signalforge.io/settings/tokens" target="_blank" rel="noopener">app.signalforge.io/settings/tokens</a>.</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <span class="code-block-filename">Authentication header</span>
+                <span class="code-block-lang">bash</span>
+                <button class="copy-btn">copy</button>
+              </div>
+              <pre><span class="hl-prompt">$</span> <span class="hl-cmd">curl</span> <span class="hl-flag">-H</span> <span class="hl-s">"Authorization: Bearer sfk_live_01HXK9F2J8ABCDEF"</span> \
+  <span class="hl-u">https://api.signalforge.io/v1/status</span></pre>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Header</th><th>Value</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><code>Authorization</code></td>
+                    <td><code>Bearer &lt;token&gt;</code> — required on all requests</td>
+                  </tr>
+                  <tr>
+                    <td><code>Content-Type</code></td>
+                    <td><code>application/json</code> — required for POST/PATCH requests</td>
+                  </tr>
+                  <tr>
+                    <td><code>SF-Workspace-ID</code></td>
+                    <td>Optional. Override workspace context for multi-workspace tokens.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="callout warning">
+              <div class="callout-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2L1 14h14L8 2z" stroke-linejoin="round"/><path d="M8 7v3M8 12v.5"/></svg></div>
+              <div class="callout-body">
+                <span class="callout-title">Token scopes</span>
+                <p>Production tokens have prefix <code>sfk_live_</code>. Test tokens (<code>sfk_test_</code>) are rate-limited and only affect your test workspace. Never embed a live token in client-side code.</p>
+              </div>
+            </div>
+
+            <!-- Monitors -->
+            <h2 id="get-monitors">Monitors</h2>
+
+            <!-- GET /v1/monitors -->
+            <div class="endpoint" id="ep-get-monitors">
+              <div class="endpoint-header">
+                <span class="method-badge method-get">GET</span>
+                <span class="endpoint-path">/v1/monitors</span>
+                <span class="endpoint-summary">List monitors</span>
+                <button class="endpoint-toggle-btn">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>
+                  collapse
+                </button>
+              </div>
+              <div class="endpoint-body">
+                <p class="endpoint-desc">Returns a paginated list of all monitors in your workspace, ordered by creation date descending.</p>
+
+                <h4>Query parameters</h4>
+                <div class="param-table">
+                  <div class="param-row">
+                    <div class="param-name">limit</div>
+                    <div class="param-type">integer</div>
+                    <div class="param-desc">Number of results per page. Default: 20, max: 100.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">cursor</div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc">Pagination cursor from previous response's <code>next_cursor</code> field.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">status</div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc">Filter by status: <code>active</code>, <code>paused</code>, or <code>muted</code>.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">tag</div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc">Filter by tag key-value pair, e.g. <code>tier:tier-1</code>.</div>
+                  </div>
+                </div>
+
+                <h4>Example request</h4>
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-lang">bash</span>
+                    <button class="copy-btn">copy</button>
+                  </div>
+                  <pre><span class="hl-prompt">$</span> <span class="hl-cmd">curl</span> <span class="hl-flag">-s</span> <span class="hl-flag">-H</span> <span class="hl-s">"Authorization: Bearer sfk_live_01HXK9F2J8"</span> \
+  <span class="hl-s">"https://api.signalforge.io/v1/monitors?limit=5&status=active"</span> \
+  | <span class="hl-cmd">jq</span> <span class="hl-s">'.'</span></pre>
+                </div>
+
+                <h4>Response</h4>
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-lang">json</span>
+                    <button class="copy-btn">copy</button>
+                  </div>
+                  <pre>{
+  <span class="hl-p">"data"</span>: [
+    {
+      <span class="hl-p">"id"</span>:          <span class="hl-s">"mon_01HXK8A2BC"</span>,
+      <span class="hl-p">"name"</span>:        <span class="hl-s">"Payments API Health"</span>,
+      <span class="hl-p">"type"</span>:        <span class="hl-s">"http"</span>,
+      <span class="hl-p">"url"</span>:         <span class="hl-s">"https://api.acme.io/v1/health"</span>,
+      <span class="hl-p">"interval_s"</span>:  <span class="hl-n">30</span>,
+      <span class="hl-p">"status"</span>:      <span class="hl-s">"active"</span>,
+      <span class="hl-p">"last_check"</span>:  <span class="hl-s">"2024-03-12T14:36:50Z"</span>,
+      <span class="hl-p">"last_result"</span>: <span class="hl-s">"ok"</span>,
+      <span class="hl-p">"uptime_7d"</span>:   <span class="hl-n">99.94</span>,
+      <span class="hl-p">"tags"</span>: {
+        <span class="hl-p">"team"</span>: <span class="hl-s">"payments"</span>,
+        <span class="hl-p">"tier"</span>: <span class="hl-s">"tier-1"</span>
+      },
+      <span class="hl-p">"created_at"</span>:  <span class="hl-s">"2024-01-08T09:00:00Z"</span>
+    }
+  ],
+  <span class="hl-p">"meta"</span>: {
+    <span class="hl-p">"total"</span>:       <span class="hl-n">12</span>,
+    <span class="hl-p">"limit"</span>:       <span class="hl-n">5</span>,
+    <span class="hl-p">"next_cursor"</span>: <span class="hl-s">"cur_01HXM2A9ZP"</span>
+  }
+}</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- POST /v1/monitors -->
+            <div class="endpoint" id="create-monitor">
+              <div class="endpoint-header">
+                <span class="method-badge method-post">POST</span>
+                <span class="endpoint-path">/v1/monitors</span>
+                <span class="endpoint-summary">Create a monitor</span>
+                <button class="endpoint-toggle-btn">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>
+                  collapse
+                </button>
+              </div>
+              <div class="endpoint-body">
+                <p class="endpoint-desc">Creates a new monitor. Returns the created monitor object with its assigned ID.</p>
+
+                <h4>Request body</h4>
+                <div class="param-table">
+                  <div class="param-row">
+                    <div class="param-name">name <span class="param-required">required</span></div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc">Human-readable monitor name. Max 120 characters.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">type <span class="param-required">required</span></div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc">Monitor type: <code>http</code>, <code>tcp</code>, <code>ssl</code>, or <code>dns</code>.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">url <span class="param-required">required</span></div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc">Target URL (http/https). Required for <code>http</code> and <code>ssl</code> types.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">interval_s</div>
+                    <div class="param-type">integer</div>
+                    <div class="param-desc">Check interval in seconds. Min: 30 (free tier), 10 (paid). Default: 60.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">timeout_s</div>
+                    <div class="param-type">integer</div>
+                    <div class="param-desc">Request timeout in seconds. Default: 10, max: 30.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">regions</div>
+                    <div class="param-type">array</div>
+                    <div class="param-desc">Regions to probe from. Options: <code>us-east-1</code>, <code>us-west-2</code>, <code>eu-west-1</code>, <code>ap-southeast-1</code>. Default: <code>["us-east-1"]</code>.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">expect</div>
+                    <div class="param-type">object</div>
+                    <div class="param-desc">Expected response criteria. See <a href="#expect-object">expect object</a>.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">tags</div>
+                    <div class="param-type">object</div>
+                    <div class="param-desc">Key-value pairs for grouping and filtering. All values must be strings.</div>
+                  </div>
+                </div>
+
+                <h4>Example request</h4>
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-lang">bash</span>
+                    <button class="copy-btn">copy</button>
+                  </div>
+                  <pre><span class="hl-prompt">$</span> <span class="hl-cmd">curl</span> <span class="hl-flag">-s</span> <span class="hl-flag">-X</span> <span class="hl-v">POST</span> \
+  <span class="hl-flag">-H</span> <span class="hl-s">"Authorization: Bearer sfk_live_01HXK9F2J8"</span> \
+  <span class="hl-flag">-H</span> <span class="hl-s">"Content-Type: application/json"</span> \
+  <span class="hl-flag">-d</span> <span class="hl-s">'{
+    "name":       "Auth Service Health",
+    "type":       "http",
+    "url":        "https://auth.acme.io/health",
+    "interval_s": 30,
+    "timeout_s":  5,
+    "regions":    ["us-east-1", "eu-west-1"],
+    "expect": {
+      "status":        200,
+      "latency_p95_ms": 1500
+    },
+    "tags": { "team": "platform", "tier": "tier-1" }
+  }'</span> \
+  <span class="hl-u">https://api.signalforge.io/v1/monitors</span></pre>
+                </div>
+
+                <h4>Response <code style="font-size:0.75rem; color: var(--accent); background: var(--accent-dim); border-color: var(--accent-border);">201 Created</code></h4>
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-lang">json</span>
+                    <button class="copy-btn">copy</button>
+                  </div>
+                  <pre>{
+  <span class="hl-p">"id"</span>:          <span class="hl-s">"mon_01HXM2A9ZP"</span>,
+  <span class="hl-p">"name"</span>:        <span class="hl-s">"Auth Service Health"</span>,
+  <span class="hl-p">"type"</span>:        <span class="hl-s">"http"</span>,
+  <span class="hl-p">"url"</span>:         <span class="hl-s">"https://auth.acme.io/health"</span>,
+  <span class="hl-p">"interval_s"</span>:  <span class="hl-n">30</span>,
+  <span class="hl-p">"timeout_s"</span>:   <span class="hl-n">5</span>,
+  <span class="hl-p">"regions"</span>:     [<span class="hl-s">"us-east-1"</span>, <span class="hl-s">"eu-west-1"</span>],
+  <span class="hl-p">"status"</span>:      <span class="hl-s">"active"</span>,
+  <span class="hl-p">"expect"</span>: {
+    <span class="hl-p">"status"</span>:         <span class="hl-n">200</span>,
+    <span class="hl-p">"latency_p95_ms"</span>: <span class="hl-n">1500</span>
+  },
+  <span class="hl-p">"tags"</span>: {
+    <span class="hl-p">"team"</span>: <span class="hl-s">"platform"</span>,
+    <span class="hl-p">"tier"</span>: <span class="hl-s">"tier-1"</span>
+  },
+  <span class="hl-p">"created_at"</span>:  <span class="hl-s">"2024-03-12T15:00:00Z"</span>
+}</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- DELETE /v1/monitors/:id -->
+            <div class="endpoint">
+              <div class="endpoint-header">
+                <span class="method-badge method-delete">DELETE</span>
+                <span class="endpoint-path">/v1/monitors/{id}</span>
+                <span class="endpoint-summary">Delete a monitor</span>
+                <button class="endpoint-toggle-btn">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>
+                  collapse
+                </button>
+              </div>
+              <div class="endpoint-body">
+                <p class="endpoint-desc">Permanently deletes a monitor and all associated signal history. This action cannot be undone.</p>
+                <div class="code-block">
+                  <div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn">copy</button></div>
+                  <pre><span class="hl-prompt">$</span> <span class="hl-cmd">curl</span> <span class="hl-flag">-s</span> <span class="hl-flag">-X</span> <span class="hl-v">DELETE</span> \
+  <span class="hl-flag">-H</span> <span class="hl-s">"Authorization: Bearer sfk_live_01HXK9F2J8"</span> \
+  <span class="hl-u">https://api.signalforge.io/v1/monitors/mon_01HXM2A9ZP</span>
+
+<span class="hl-out">HTTP/2 204 No Content</span></pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Signals -->
+            <h2 id="get-signals">Signals</h2>
+
+            <div class="endpoint">
+              <div class="endpoint-header">
+                <span class="method-badge method-get">GET</span>
+                <span class="endpoint-path">/v1/signals</span>
+                <span class="endpoint-summary">List signals</span>
+                <button class="endpoint-toggle-btn">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>
+                  collapse
+                </button>
+              </div>
+              <div class="endpoint-body">
+                <p class="endpoint-desc">Returns recent signals across all monitors in your workspace. Supports filtering by monitor, severity, type, and time range.</p>
+
+                <h4>Query parameters</h4>
+                <div class="param-table">
+                  <div class="param-row">
+                    <div class="param-name">monitor_id</div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc">Filter signals to a specific monitor.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">severity</div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc"><code>critical</code>, <code>warning</code>, or <code>info</code>.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">state</div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc"><code>firing</code>, <code>acknowledged</code>, <code>resolved</code>, or <code>muted</code>.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">since</div>
+                    <div class="param-type">string</div>
+                    <div class="param-desc">ISO 8601 timestamp. Return signals after this time.</div>
+                  </div>
+                  <div class="param-row">
+                    <div class="param-name">limit</div>
+                    <div class="param-type">integer</div>
+                    <div class="param-desc">Results per page. Default: 50, max: 500.</div>
+                  </div>
+                </div>
+
+                <h4>Example: get all firing critical signals</h4>
+                <div class="code-block">
+                  <div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn">copy</button></div>
+                  <pre><span class="hl-prompt">$</span> <span class="hl-cmd">curl</span> <span class="hl-flag">-s</span> <span class="hl-flag">-H</span> <span class="hl-s">"Authorization: Bearer sfk_live_01HXK9F2J8"</span> \
+  <span class="hl-s">"https://api.signalforge.io/v1/signals?state=firing&severity=critical"</span></pre>
+                </div>
+
+                <h4>Signal object</h4>
+                <div class="code-block">
+                  <div class="code-block-header"><span class="code-block-lang">json</span><button class="copy-btn">copy</button></div>
+                  <pre>{
+  <span class="hl-p">"id"</span>:                  <span class="hl-s">"sig_01HXK9F2J8"</span>,
+  <span class="hl-p">"monitor_id"</span>:          <span class="hl-s">"mon_01HXK8A2BC"</span>,
+  <span class="hl-p">"monitor_name"</span>:        <span class="hl-s">"Payments API Health"</span>,
+  <span class="hl-p">"type"</span>:                <span class="hl-s">"status_not_2xx"</span>,
+  <span class="hl-p">"severity"</span>:            <span class="hl-s">"critical"</span>,
+  <span class="hl-p">"state"</span>:               <span class="hl-s">"resolved"</span>,
+  <span class="hl-p">"value"</span>:               <span class="hl-n">503</span>,
+  <span class="hl-p">"threshold"</span>:           <span class="hl-s">"2xx"</span>,
+  <span class="hl-p">"consecutive_failures"</span>: <span class="hl-n">4</span>,
+  <span class="hl-p">"regions_affected"</span>:    [<span class="hl-s">"us-east-1"</span>, <span class="hl-s">"eu-west-1"</span>],
+  <span class="hl-p">"first_seen"</span>:          <span class="hl-s">"2024-03-12T14:32:18Z"</span>,
+  <span class="hl-p">"last_seen"</span>:           <span class="hl-s">"2024-03-12T14:36:32Z"</span>,
+  <span class="hl-p">"resolved_at"</span>:         <span class="hl-s">"2024-03-12T14:36:50Z"</span>,
+  <span class="hl-p">"duration_s"</span>:          <span class="hl-n">272</span>,
+  <span class="hl-p">"metadata"</span>: {
+    <span class="hl-p">"environment"</span>: <span class="hl-s">"production"</span>,
+    <span class="hl-p">"tags"</span>: { <span class="hl-p">"team"</span>: <span class="hl-s">"payments"</span>, <span class="hl-p">"tier"</span>: <span class="hl-s">"tier-1"</span> }
+  }
+}</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Webhooks -->
+            <h2 id="webhooks">Webhooks</h2>
+            <p>Webhooks deliver signal payloads to your endpoint in real time. SignalForge signs every request with HMAC-SHA256 using your webhook secret, allowing you to verify authenticity.</p>
+
+            <div class="endpoint">
+              <div class="endpoint-header">
+                <span class="method-badge method-post">POST</span>
+                <span class="endpoint-path">/v1/webhooks</span>
+                <span class="endpoint-summary">Create a webhook destination</span>
+                <button class="endpoint-toggle-btn">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>
+                  collapse
+                </button>
+              </div>
+              <div class="endpoint-body">
+                <div class="code-block">
+                  <div class="code-block-header"><span class="code-block-lang">bash</span><button class="copy-btn">copy</button></div>
+                  <pre><span class="hl-prompt">$</span> <span class="hl-cmd">curl</span> <span class="hl-flag">-s</span> <span class="hl-flag">-X</span> <span class="hl-v">POST</span> \
+  <span class="hl-flag">-H</span> <span class="hl-s">"Authorization: Bearer sfk_live_01HXK9F2J8"</span> \
+  <span class="hl-flag">-H</span> <span class="hl-s">"Content-Type: application/json"</span> \
+  <span class="hl-flag">-d</span> <span class="hl-s">'{
+    "url":          "https://hooks.acme.io/signalforge",
+    "description":  "Acme internal incident handler",
+    "on_severity":  ["critical", "warning"],
+    "on_events":    ["signal.fired", "signal.resolved"]
+  }'</span> \
+  <span class="hl-u">https://api.signalforge.io/v1/webhooks</span></pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Webhook payload -->
+            <h3 id="webhook-payload">Webhook payload format</h3>
+            <p>SignalForge POSTs a JSON payload to your endpoint whenever a matching event occurs. The delivery includes a signature header for verification.</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <span class="code-block-filename">Incoming webhook request headers</span>
+                <span class="code-block-lang">http</span>
+              </div>
+              <pre><span class="hl-t">POST</span> <span class="hl-u">/signalforge</span> <span class="hl-v">HTTP/1.1</span>
+<span class="hl-p">Host:</span> <span class="hl-s">hooks.acme.io</span>
+<span class="hl-p">Content-Type:</span> <span class="hl-s">application/json</span>
+<span class="hl-p">User-Agent:</span> <span class="hl-s">SignalForge/1.0</span>
+<span class="hl-p">SF-Signature:</span> <span class="hl-s">sha256=3e5f4b1c2a7d...</span>
+<span class="hl-p">SF-Event:</span> <span class="hl-s">signal.fired</span>
+<span class="hl-p">SF-Delivery:</span> <span class="hl-s">del_01HXK9F2J8GHIJK</span></pre>
+            </div>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <span class="code-block-filename">Webhook payload — signal.fired</span>
+                <span class="code-block-lang">json</span>
+                <button class="copy-btn">copy</button>
+              </div>
+              <pre>{
+  <span class="hl-p">"event"</span>:       <span class="hl-s">"signal.fired"</span>,
+  <span class="hl-p">"delivery_id"</span>: <span class="hl-s">"del_01HXK9F2J8GHIJK"</span>,
+  <span class="hl-p">"timestamp"</span>:   <span class="hl-s">"2024-03-12T14:32:49Z"</span>,
+  <span class="hl-p">"signal"</span>: {
+    <span class="hl-p">"id"</span>:                  <span class="hl-s">"sig_01HXK9F2J8"</span>,
+    <span class="hl-p">"type"</span>:                <span class="hl-s">"status_not_2xx"</span>,
+    <span class="hl-p">"severity"</span>:            <span class="hl-s">"critical"</span>,
+    <span class="hl-p">"value"</span>:               <span class="hl-n">503</span>,
+    <span class="hl-p">"threshold"</span>:           <span class="hl-s">"2xx"</span>,
+    <span class="hl-p">"consecutive_failures"</span>: <span class="hl-n">2</span>,
+    <span class="hl-p">"first_seen"</span>:          <span class="hl-s">"2024-03-12T14:32:18Z"</span>
+  },
+  <span class="hl-p">"monitor"</span>: {
+    <span class="hl-p">"id"</span>:   <span class="hl-s">"mon_01HXK8A2BC"</span>,
+    <span class="hl-p">"name"</span>: <span class="hl-s">"Payments API Health"</span>,
+    <span class="hl-p">"url"</span>:  <span class="hl-s">"https://api.acme.io/v1/health"</span>
+  },
+  <span class="hl-p">"workspace"</span>: {
+    <span class="hl-p">"id"</span>:   <span class="hl-s">"ws_01HX3K9F2J"</span>,
+    <span class="hl-p">"name"</span>: <span class="hl-s">"acme-platform"</span>
+  },
+  <span class="hl-p">"metadata"</span>: {
+    <span class="hl-p">"environment"</span>: <span class="hl-s">"production"</span>,
+    <span class="hl-p">"regions"</span>:     [<span class="hl-s">"us-east-1"</span>, <span class="hl-s">"eu-west-1"</span>],
+    <span class="hl-p">"tags"</span>: { <span class="hl-p">"team"</span>: <span class="hl-s">"payments"</span>, <span class="hl-p">"tier"</span>: <span class="hl-s">"tier-1"</span> }
+  }
+}</pre>
+            </div>
+
+            <!-- Error codes -->
+            <h2 id="errors">Error codes</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>HTTP</th><th>Code</th><th>Description</th></tr></thead>
+                <tbody>
+                  <tr><td><code>400</code></td><td><code>invalid_request</code></td><td>Request body failed schema validation. Check the <code>errors</code> array in the response.</td></tr>
+                  <tr><td><code>401</code></td><td><code>unauthorized</code></td><td>Missing or invalid Bearer token.</td></tr>
+                  <tr><td><code>403</code></td><td><code>forbidden</code></td><td>Token does not have permission for this operation or resource.</td></tr>
+                  <tr><td><code>404</code></td><td><code>not_found</code></td><td>Resource does not exist or belongs to a different workspace.</td></tr>
+                  <tr><td><code>409</code></td><td><code>conflict</code></td><td>Resource with this ID or name already exists.</td></tr>
+                  <tr><td><code>422</code></td><td><code>unprocessable</code></td><td>Semantically invalid — e.g., interval below tier minimum.</td></tr>
+                  <tr><td><code>429</code></td><td><code>rate_limited</code></td><td>Exceeded rate limit. See <code>Retry-After</code> header.</td></tr>
+                  <tr><td><code>500</code></td><td><code>internal_error</code></td><td>SignalForge error. The <code>request_id</code> field can be shared with <a href="support.html">support</a>.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="code-block">
+              <div class="code-block-header"><span class="code-block-filename">Error response shape</span><span class="code-block-lang">json</span></div>
+              <pre>{
+  <span class="hl-p">"error"</span>:      <span class="hl-s">"invalid_request"</span>,
+  <span class="hl-p">"message"</span>:    <span class="hl-s">"Validation failed"</span>,
+  <span class="hl-p">"request_id"</span>: <span class="hl-s">"req_01HXK9F2J8XYZ"</span>,
+  <span class="hl-p">"errors"</span>: [
+    {
+      <span class="hl-p">"field"</span>:   <span class="hl-s">"interval_s"</span>,
+      <span class="hl-p">"message"</span>: <span class="hl-s">"Minimum interval for free tier is 30 seconds"</span>
+    }
+  ]
+}</pre>
+            </div>
+
+            <!-- Rate limits -->
+            <h2 id="rate-limits">Rate limits</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Tier</th><th>Reads</th><th>Writes</th><th>Window</th></tr></thead>
+                <tbody>
+                  <tr><td>Free</td><td>60 req/min</td><td>20 req/min</td><td>Rolling 60s</td></tr>
+                  <tr><td>Pro</td><td>300 req/min</td><td>100 req/min</td><td>Rolling 60s</td></tr>
+                  <tr><td>Enterprise</td><td>Custom</td><td>Custom</td><td>Custom</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+          <!-- TOC -->
+          <aside>
+            <div class="toc-aside">
+              <span class="toc-label">On this page</span>
+              <ul class="toc-list">
+                <li><a href="#authentication">Authentication</a></li>
+                <li><a href="#get-monitors">Monitors</a></li>
+                <li><a href="#ep-get-monitors">  GET /monitors</a></li>
+                <li><a href="#create-monitor">  POST /monitors</a></li>
+                <li><a href="#get-signals">Signals</a></li>
+                <li><a href="#webhooks">Webhooks</a></li>
+                <li><a href="#webhook-payload">  Payload format</a></li>
+                <li><a href="#errors">Error codes</a></li>
+                <li><a href="#rate-limits">Rate limits</a></li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-left">SignalForge v0.9.2 · MIT License</div>
+        <div class="footer-links">
+          <a href="api-reference.html">API</a>
+          <a href="changelog.html">Changelog</a>
+          <a href="support.html">Support</a>
+          <a href="https://github.com/signalforge/signalforge">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+  <script>
+    // Collapsible endpoints
+    document.querySelectorAll('.endpoint-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const ep = header.closest('.endpoint');
+        ep.classList.toggle('collapsed');
+        const btn = header.querySelector('.endpoint-toggle-btn');
+        if (btn) btn.lastChild.textContent = ep.classList.contains('collapsed') ? ' expand' : ' collapse';
+      });
+    });
+  </script>
+</body>
+</html>

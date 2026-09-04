@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THE WAKING DEPTH — a drowned-lighthouse text adventure · Saltwire Interactive</title>
+  <meta name="description" content="THE WAKING DEPTH is a short, complete parser-based interactive fiction set in a drowned lighthouse, played in a CRT terminal. By Saltwire Interactive.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="brand" aria-label="Saltwire Interactive home">
+      <span class="glyph">▚ SALTWIRE</span>
+      <span class="studio">Interactive Fiction Studio</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html" class="active">Play</a>
+      <a href="story.html">World Bible</a>
+      <a href="about.html">About / How to Play</a>
+    </nav>
+  </header>
+
+  <main class="game-shell">
+
+    <!-- ═══════════ THE TERMINAL ═══════════ -->
+    <section class="crt" aria-label="THE WAKING DEPTH terminal">
+      <div id="terminal">
+        <div class="term-bar">
+          <span><span class="dot" aria-hidden="true"></span>CORMORANT LIGHT // KEEPER TERMINAL v4.2</span>
+          <span class="term-tools">
+            <button type="button" data-cmd="save" title="Save game">SAVE</button>
+            <button type="button" data-cmd="load" title="Load game">LOAD</button>
+            <button type="button" data-cmd="restart" title="Restart game">RESTART</button>
+            <button type="button" data-cmd="help" title="Show help">HELP</button>
+          </span>
+        </div>
+
+        <div id="screen" role="log" aria-live="polite" aria-label="Game transcript" tabindex="0"></div>
+
+        <form id="cmd-form" autocomplete="off">
+          <span class="prompt-glyph" aria-hidden="true">&gt;</span>
+          <label for="cmd" class="sr-only" style="position:absolute;left:-9999px;">Enter command</label>
+          <input id="cmd" name="cmd" type="text" inputmode="text"
+                 placeholder="type a command — try LOOK, then HELP"
+                 autocapitalize="off" autocorrect="off" spellcheck="false" autofocus>
+        </form>
+      </div>
+    </section>
+
+    <!-- ═══════════ SIDE PANEL ═══════════ -->
+    <aside class="side" aria-label="Game status and tools">
+      <div class="panel">
+        <h2>Status</h2>
+        <div class="hud-row"><span class="k">Location</span><span class="v" id="hud-loc">—</span></div>
+        <div class="hud-row"><span class="k">Moves</span><span class="v" id="hud-moves">0</span></div>
+        <div class="hud-row"><span class="k">Score</span><span class="v" id="hud-score">0/6</span></div>
+        <p class="panel-note">Type <b style="color:var(--amber)">SCORE</b> for your objective checklist.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Map · explored</h2>
+        <svg id="mapsvg" viewBox="0 0 360 200" role="img" aria-label="Map of explored rooms; fills in as you go"></svg>
+        <p class="panel-note">Rooms appear as you visit them. The lit box is where you stand.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Try a command</h2>
+        <div id="examples"></div>
+        <p class="panel-note">Click a chip to run it. Use ↑ / ↓ in the prompt to recall past commands.</p>
+      </div>
+    </aside>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <span>© <span data-year>2026</span> Saltwire Interactive — Cape Wrack, NS. THE WAKING DEPTH.</span>
+    <span><a href="story.html">World Bible</a> · <a href="about.html">Credits &amp; Help</a> · <a href="mailto:hello@saltwire.example">hello@saltwire.example</a></span>
+  </footer>
+
+  <script src="js/world.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/terminal.js"></script>
+  <script>
+    document.querySelectorAll("[data-year]").forEach(function (e) { e.textContent = new Date().getFullYear(); });
+  </script>
+</body>
+</html>

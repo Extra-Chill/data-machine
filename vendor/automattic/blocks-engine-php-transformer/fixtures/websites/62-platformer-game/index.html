@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lumen Leap — A Cosy Firefly Platformer</title>
+  <meta name="description" content="Lumen Leap is a hand-built, in-browser 2D platformer. Play as Pip, a tiny firefly-lantern, and hop, stomp and glide through the Dusk Hollow to relight the world's lanterns. No engines, no frameworks — just vanilla canvas.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ══════════════ HEADER ══════════════ -->
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Lumen Leap home">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">
+        <span class="logo-name">Lumen<b>·</b>Leap</span>
+        <span class="logo-sub">A Firefly Platformer</span>
+      </span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html" class="active">Home</a>
+      <a href="play.html">Play</a>
+      <a href="levels.html">Levels</a>
+      <a href="about.html">Story &amp; Help</a>
+      <a href="play.html" class="nav-cta">Play now ▸</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+    <!-- ══════════════ HERO ══════════════ -->
+    <section class="hero" aria-label="Lumen Leap title scene">
+      <div class="hero-canvas-wrap">
+        <canvas id="hero-sim" aria-hidden="true"></canvas>
+        <div class="hero-overlay">
+          <p class="hero-eyebrow">A real, completable platformer — running in your browser</p>
+          <h1 class="hero-title">Light the Hollow, <em>one leap at a time.</em></h1>
+          <p class="hero-sub">
+            You are <strong>Pip</strong>, the last lit firefly of the Dusk Hollow. The great lanterns
+            have gone dark and the grumpy hollow-beetles have moved in. Run, jump and stomp your way
+            across three hand-drawn worlds to relight them — and bring the dawn back.
+          </p>
+          <div class="hero-actions">
+            <a href="play.html" class="btn btn-primary">▶ Start playing</a>
+            <a href="levels.html" class="btn btn-outline">Choose a level</a>
+          </div>
+          <div class="hero-meta">
+            <span><b>3</b> hand-built levels</span>
+            <span><b>0</b> game engines used</span>
+            <span><b>~140 KB</b> of vanilla JS</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ FEATURES ══════════════ -->
+    <section class="wrap">
+      <p class="section-eyebrow">What's under the hood</p>
+      <h2 class="section-title">A platformer that actually feels good</h2>
+      <p class="section-lead">
+        Lumen Leap is not a slideshow or a video — it is a genuine game engine written from scratch
+        in plain JavaScript. A fixed-timestep loop, a hand-tuned player controller and a tile
+        collision solver give Pip that springy, forgiving, "one more try" feel.
+      </p>
+
+      <div class="feature-grid">
+        <article class="feature">
+          <svg class="feature-ico" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <circle cx="20" cy="20" r="9" fill="#ffd15a"/>
+            <circle cx="17" cy="17" r="3" fill="#fff6cf"/>
+            <path d="M27 9 L31 4 M30 16 L36 14" stroke="#ffe79a" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <h3>Springy controls</h3>
+          <p>Run acceleration and friction, variable jump height, coyote time and jump buffering — the same "good-feel" tech in your favourite indie platformers.</p>
+        </article>
+        <article class="feature">
+          <svg class="feature-ico" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <rect x="5" y="24" width="9" height="9" fill="#2c8f63"/>
+            <rect x="15" y="18" width="9" height="9" fill="#5be0a0"/>
+            <rect x="25" y="11" width="9" height="9" fill="#2c8f63"/>
+          </svg>
+          <h3>Hand-built levels</h3>
+          <p>Three tilemaps authored tile-by-tile: gentle Hollow's Edge, the vertical Bramble Climb, and the finale, Lantern's Heart. Every path is verified beatable.</p>
+        </article>
+        <article class="feature">
+          <svg class="feature-ico" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <ellipse cx="20" cy="22" rx="11" ry="9" fill="#a85a3f"/>
+            <ellipse cx="20" cy="20" rx="9" ry="7" fill="#7a3f2e"/>
+            <circle cx="24" cy="18" r="2.4" fill="#fff"/><circle cx="25" cy="18" r="1.1" fill="#000"/>
+          </svg>
+          <h3>Stomp the beetles</h3>
+          <p>Grumpy hollow-beetles patrol their ledges. Land on one to bounce off it — or take a hit and lose a glimmer. Classic, readable enemy rules.</p>
+        </article>
+        <article class="feature">
+          <svg class="feature-ico" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <rect x="6" y="20" width="12" height="5" rx="2" fill="#9b8bff"/>
+            <rect x="22" y="13" width="12" height="5" rx="2" fill="#9b8bff"/>
+            <path d="M14 28 L20 22 L26 16" stroke="#ffe79a" stroke-width="2" stroke-dasharray="2 3" stroke-linecap="round"/>
+          </svg>
+          <h3>Moving platforms</h3>
+          <p>Rune-lit platforms drift on sine paths and carry you with them. Time your hops across pits and rise up through the brambles.</p>
+        </article>
+        <article class="feature">
+          <svg class="feature-ico" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <path d="M20 6 L24 18 L20 30 L16 18 Z" fill="#7ef0ff"/>
+            <circle cx="31" cy="12" r="2.2" fill="#ffe27a"/>
+            <circle cx="9" cy="24" r="1.8" fill="#ffe27a"/>
+            <circle cx="30" cy="27" r="1.6" fill="#ffe27a"/>
+          </svg>
+          <h3>Lumens &amp; gems</h3>
+          <p>Collect glowing lumens for points and chase a hidden gem in every world. Grab them all and clear quickly for a three-star run.</p>
+        </article>
+        <article class="feature">
+          <svg class="feature-ico" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <rect x="8" y="10" width="24" height="16" rx="3" fill="#161e3e" stroke="#9b8bff" stroke-width="2"/>
+            <circle cx="14" cy="30" r="2" fill="#5be0a0"/><circle cx="20" cy="30" r="2" fill="#5be0a0"/><circle cx="26" cy="30" r="2" fill="#5be0a0"/>
+          </svg>
+          <h3>Saves your progress</h3>
+          <p>Level unlocks, best times, best lumen counts and your star ratings all persist in your browser via localStorage. Pick up right where you left off.</p>
+        </article>
+      </div>
+
+      <div class="badge-row" aria-label="Tech highlights">
+        <span class="badge"><b>Canvas 2D</b> rendering</span>
+        <span class="badge"><b>Web Audio</b> synth SFX</span>
+        <span class="badge"><b>Fixed-timestep</b> physics</span>
+        <span class="badge"><b>Keyboard</b> + touch controls</span>
+        <span class="badge"><b>prefers-reduced-motion</b> aware</span>
+      </div>
+    </section>
+
+    <!-- ══════════════ CTA ══════════════ -->
+    <section class="wrap" style="padding-top:0;">
+      <div class="card-soft" style="text-align:center;">
+        <p class="section-eyebrow" style="color:var(--gold);">Ready when you are</p>
+        <h2 class="section-title" style="margin-bottom:0.6rem;">The Hollow is dark. Pip is glowing. Go.</h2>
+        <p class="section-lead" style="margin:0 auto 1.4rem;">
+          Arrow keys or WASD to move, Space or Up to jump. That's the whole tutorial.
+        </p>
+        <div class="hero-actions">
+          <a href="play.html" class="btn btn-primary">▶ Play Lumen Leap</a>
+          <a href="about.html" class="btn btn-outline">Read the story</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ══════════════ FOOTER ══════════════ -->
+  <footer class="site-footer">
+    <div>© <span data-year>2026</span> Lumen Leap — a hand-written browser platformer. No engines were used.</div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="play.html">Play</a>
+      <a href="levels.html">Levels</a>
+      <a href="about.html">Story &amp; Help</a>
+    </nav>
+  </footer>
+
+  <script src="js/storage.js"></script>
+  <script src="js/hero.js"></script>
+  <script src="js/nav.js"></script>
+</body>
+</html>

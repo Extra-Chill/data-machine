@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AETHELON — Mission to Enceladus, Saturn's Ocean Moon</title>
+  <meta name="description" content="AETHELON is a deep-space mission to Enceladus, the ice moon of Saturn. Follow the probe's seven-year journey and explore the ocean world beneath the ice.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ══════════ INTRO LOADER ══════════ -->
+  <div class="loader" role="status" aria-live="polite" aria-label="Loading mission">
+    <div class="loader-inner">
+      <div class="loader-mark"><span>A</span><span>E</span><span>T</span><span>H</span><span>E</span><span>L</span><span>O</span><span>N</span></div>
+      <div class="loader-sub">Enceladus Ocean-World Mission</div>
+      <div class="loader-bar"><i></i></div>
+      <div class="loader-pct">T-MINUS 100</div>
+    </div>
+  </div>
+
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <canvas class="starfield" aria-hidden="true"></canvas>
+
+  <!-- ══════════ HEADER ══════════ -->
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="AETHELON home">
+      <span class="logo-mark">AETHELON</span>
+      <span class="logo-sub">Mission to Enceladus</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Journey</a>
+      <a href="mission.html">Mission</a>
+      <a href="explore.html">Explore</a>
+      <a href="data.html">Science</a>
+      <a href="explore.html" class="nav-cta">Launch Explorer</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- ══════════ SCROLL-PINNED STORYTELLING HERO ══════════ -->
+    <section class="hero-scope" aria-label="The journey to Enceladus">
+      <div class="hero-track">
+        <div class="hero-pin">
+          <div class="hero-nebula" aria-hidden="true"></div>
+
+          <!-- pinned trajectory stage: probe flies Earth → Saturn -->
+          <div class="hero-stage" aria-hidden="true">
+            <svg viewBox="0 0 980 560" role="img" aria-label="AETHELON trajectory from Earth to Saturn">
+              <defs>
+                <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+                  <stop offset="0" stop-color="#fff7e0"/><stop offset="0.4" stop-color="#ffd479"/><stop offset="1" stop-color="#ff8a4d" stop-opacity="0"/>
+                </radialGradient>
+                <radialGradient id="earth" cx="0.35" cy="0.32" r="0.75">
+                  <stop offset="0" stop-color="#9fd0ff"/><stop offset="0.5" stop-color="#3a7bd5"/><stop offset="1" stop-color="#10254a"/>
+                </radialGradient>
+                <radialGradient id="venus" cx="0.35" cy="0.32" r="0.8">
+                  <stop offset="0" stop-color="#ffe6b0"/><stop offset="1" stop-color="#c98f3a"/>
+                </radialGradient>
+                <radialGradient id="saturnG" cx="0.4" cy="0.35" r="0.8">
+                  <stop offset="0" stop-color="#f4e2af"/><stop offset="0.6" stop-color="#d8b56a"/><stop offset="1" stop-color="#8a6a32"/>
+                </radialGradient>
+                <linearGradient id="trail" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#7fe7ff" stop-opacity="0"/><stop offset="1" stop-color="#7fe7ff"/>
+                </linearGradient>
+              </defs>
+
+              <g id="stage-camera">
+                <!-- Sun glow off-frame left -->
+                <circle cx="-20" cy="520" r="220" fill="url(#sun)" opacity="0.6"/>
+
+                <!-- dashed reference orbits -->
+                <ellipse cx="120" cy="430" rx="0" ry="0" fill="none"/>
+                <path d="M120,430 C260,300 380,280 520,360 C640,430 760,250 860,300"
+                      fill="none" stroke="rgba(150,180,255,.16)" stroke-width="1.5" stroke-dasharray="4 7"/>
+
+                <!-- the travelled trajectory (animated dash) -->
+                <path id="probe-trail" d="M120,430 C260,300 380,280 520,360 C640,430 760,250 860,300"
+                      fill="none" stroke="url(#trail)" stroke-width="2.5"/>
+
+                <!-- Earth (origin) -->
+                <g>
+                  <circle cx="120" cy="430" r="26" fill="url(#earth)"/>
+                  <circle cx="120" cy="430" r="26" fill="none" stroke="#7fe7ff" stroke-width="1" opacity="0.4"/>
+                  <text x="120" y="478" text-anchor="middle" font-family="Space Mono" font-size="12" fill="#9aa6cf">EARTH</text>
+                </g>
+
+                <!-- Venus (gravity assist) -->
+                <g>
+                  <circle cx="520" cy="360" r="17" fill="url(#venus)"/>
+                  <text x="520" y="394" text-anchor="middle" font-family="Space Mono" font-size="11" fill="#9aa6cf">VENUS</text>
+                </g>
+
+                <!-- Saturn + rings (destination) -->
+                <g>
+                  <ellipse cx="860" cy="300" rx="74" ry="20" fill="none" stroke="#e3c98a" stroke-width="6" opacity="0.55"/>
+                  <ellipse cx="860" cy="300" rx="58" ry="15" fill="none" stroke="#b89455" stroke-width="3" opacity="0.4"/>
+                  <circle cx="860" cy="300" r="36" fill="url(#saturnG)"/>
+                  <ellipse cx="860" cy="300" rx="74" ry="20" fill="none" stroke="#f4e2af" stroke-width="2" opacity="0.7"/>
+                  <text x="860" y="360" text-anchor="middle" font-family="Space Mono" font-size="12" fill="#9aa6cf">SATURN</text>
+                </g>
+
+                <!-- the probe -->
+                <g id="probe">
+                  <g transform="rotate(0)">
+                    <rect x="-7" y="-4" width="14" height="8" rx="2" fill="#e9eeff"/>
+                    <rect x="-14" y="-2" width="6" height="4" fill="#7fe7ff"/>
+                    <rect x="-2" y="-14" width="4" height="10" fill="#6f7bff"/>
+                    <rect x="-2" y="4" width="4" height="10" fill="#6f7bff"/>
+                    <circle cx="9" cy="0" r="3" fill="#7fe7ff"/>
+                  </g>
+                </g>
+              </g>
+            </svg>
+          </div>
+
+          <!-- centred intro copy (fades on scroll) -->
+          <div class="hero-copy">
+            <p class="eyebrow hero-eyebrow">Deep Space Mission · Launch 2031</p>
+            <h1 class="hero-headline">There is an ocean<br><em>under the ice.</em></h1>
+            <p class="hero-sub">AETHELON is a robotic mission to Enceladus — Saturn's smallest round moon, hiding a global liquid-water ocean beneath a shell of ice. Scroll to follow the seven-year journey.</p>
+            <div class="hero-cta-row">
+              <a href="mission.html" class="btn btn-primary magnetic" data-strength="0.35">Trace the trajectory <span class="arrow">→</span></a>
+              <a href="explore.html" class="btn btn-ghost magnetic" data-strength="0.2">Explore the system</a>
+            </div>
+          </div>
+
+          <!-- narrative captions cross-fade across scroll stages -->
+          <div class="story-caption">
+            <span class="stage-tag">Stage 01 · Departure</span>
+            <h2>Leaving Earth at 11.2 km/s</h2>
+            <p>AETHELON breaks free of Earth's gravity well and begins a looping inner-system cruise, borrowing speed from the planets instead of carrying the fuel to do it alone.</p>
+          </div>
+          <div class="story-caption">
+            <span class="stage-tag">Stage 02 · Gravity Assist</span>
+            <h2>A slingshot past Venus</h2>
+            <p>Diving toward the Sun, the probe whips around Venus. The flyby bends its path and adds tens of kilometres per second — for free — flinging it back outward.</p>
+          </div>
+          <div class="story-caption">
+            <span class="stage-tag">Stage 03 · Outbound Cruise</span>
+            <h2>Six years across the dark</h2>
+            <p>Past the asteroid belt and a Jupiter assist, AETHELON coasts through the outer Solar System, instruments asleep, drinking power from its radioisotope generator.</p>
+          </div>
+          <div class="story-caption">
+            <span class="stage-tag">Stage 04 · Arrival</span>
+            <h2>Saturn orbit insertion</h2>
+            <p>A 96-minute engine burn captures the probe into Saturn's grip. Ahead lies Enceladus — and the first close look at the geysers feeding the rings.</p>
+          </div>
+
+          <!-- floating HUD readouts -->
+          <div class="hud-readout r1"><span class="n">11.2</span><span class="l">km/s launch v∞</span></div>
+          <div class="hud-readout r2"><span class="n">1.27B</span><span class="l">km to Saturn</span></div>
+          <div class="hud-readout r3"><span class="n">7.0</span><span class="l">year cruise</span></div>
+          <div class="hud-readout r4"><span class="n">−201°C</span><span class="l">target surface</span></div>
+
+          <div class="scroll-hint">Scroll to fly<span class="line"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ PARALLAX STATEMENT ══════════ -->
+    <section class="parallax-band" aria-label="Why Enceladus">
+      <div class="parallax-layer pl-bg" aria-hidden="true"><span class="blob b1"></span></div>
+      <div class="parallax-layer pl-mid" aria-hidden="true"><span class="blob b2"></span></div>
+      <div class="parallax-layer pl-fg" aria-hidden="true"><span class="blob b3"></span></div>
+      <div class="wrap statement-grid">
+        <div>
+          <p class="eyebrow reveal">The question</p>
+          <p class="lede split" data-split>Could life begin in an alien sea?</p>
+        </div>
+        <div class="statement-side reveal" data-delay="2">
+          <p>In 2005 the Cassini spacecraft flew through a curtain of icy spray erupting from Enceladus' south pole and tasted it: water vapour, salt, silica nanograins, and complex organic molecules. The plumes are the moon's hidden ocean, venting into space. AETHELON's single purpose is to fly back through those geysers — slower, closer, and with instruments a generation sharper — and ask whether anything in that water is alive.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ STATS COUNT-UP ══════════ -->
+    <section class="section-sm">
+      <div class="wrap">
+        <div class="stat-row reveal">
+          <div class="stat"><div class="num"><span data-count="1271" >0</span><span class="unit">M km</span></div><div class="label">distance to target</div></div>
+          <div class="stat"><div class="num"><span data-count="7.0" data-decimals="1">0</span><span class="unit">yr</span></div><div class="label">cruise duration</div></div>
+          <div class="stat"><div class="num"><span data-count="101" >0</span><span class="unit">jets</span></div><div class="label">plume sources mapped</div></div>
+          <div class="stat"><div class="num"><span data-count="252" >0</span><span class="unit">km</span></div><div class="label">moon mean radius</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ LIVE ORBITAL DIAGRAM ══════════ -->
+    <section class="section orbit-section" aria-label="The Saturn system">
+      <div class="wrap">
+        <div class="orbit-stage reveal">
+          <svg id="orbit-diagram" viewBox="0 0 500 500" role="img" aria-label="Animated orbital diagram of Saturn's major inner moons">
+            <!-- orbit rings (tilted ellipses) -->
+            <ellipse class="orbit-ring" cx="250" cy="250" rx="90" ry="38"/>
+            <ellipse class="orbit-ring" cx="250" cy="250" rx="130" ry="55"/>
+            <ellipse class="orbit-ring" cx="250" cy="250" rx="168" ry="71"/>
+            <ellipse class="orbit-ring" cx="250" cy="250" rx="210" ry="88"/>
+            <!-- Saturn at centre -->
+            <ellipse cx="250" cy="250" rx="62" ry="16" fill="none" stroke="#e3c98a" stroke-width="4" opacity="0.5"/>
+            <circle cx="250" cy="250" r="30" fill="#d8b56a"/>
+            <circle cx="250" cy="250" r="30" fill="none" stroke="#f4e2af" stroke-width="1.5" opacity="0.6"/>
+            <!-- orbiting bodies -->
+            <g id="orb-enceladus"><circle r="7" fill="#bfeaff"/><circle r="11" fill="#7fe7ff" opacity="0.25"/></g>
+            <g id="orb-tethys"><circle r="6" fill="#e6ecf2"/></g>
+            <g id="orb-dione"><circle r="7" fill="#cfd6e0"/></g>
+            <g id="orb-titan"><circle r="10" fill="#d8a24a"/></g>
+          </svg>
+        </div>
+        <div class="orbit-copy reveal" data-delay="2">
+          <p class="eyebrow">A crowded neighbourhood</p>
+          <h2>Enceladus rides Saturn's E-ring</h2>
+          <p>Enceladus orbits Saturn every 33 hours, locked in a 2:1 resonance with neighbouring Dione that flexes its interior and keeps the ocean liquid. Its geysers don't just escape — they paint the entire E-ring, the faint blue band that arcs across Saturn's sky. AETHELON threads this system, using each moon's gravity to refine its approach.</p>
+          <ul class="orbit-legend">
+            <li><span class="dot" style="background:#bfeaff"></span> Enceladus — prime objective, ocean world</li>
+            <li><span class="dot" style="background:#e6ecf2"></span> Tethys — pure-ice, imaged on approach</li>
+            <li><span class="dot" style="background:#cfd6e0"></span> Dione — resonance partner, survey target</li>
+            <li><span class="dot" style="background:#d8a24a"></span> Titan — gravity-assist flybys</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ INSTRUMENT FEATURE ══════════ -->
+    <section class="section">
+      <div class="wrap feature">
+        <div class="feature-media reveal">
+          <svg viewBox="0 0 340 280" aria-label="Plume mass spectrometer diagram">
+            <defs>
+              <linearGradient id="plumeg" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0" stop-color="#7fe7ff" stop-opacity="0"/><stop offset="1" stop-color="#b9f4ff"/>
+              </linearGradient>
+            </defs>
+            <!-- ice surface -->
+            <rect x="0" y="200" width="340" height="80" fill="#1a2540"/>
+            <path d="M0,200 L340,200" stroke="#7fe7ff" stroke-width="1.5" opacity="0.4"/>
+            <!-- tiger-stripe fissure -->
+            <path d="M150,200 L162,250 M168,200 L178,250 M186,200 L198,250" stroke="#0b1224" stroke-width="3"/>
+            <!-- erupting plume -->
+            <path d="M150,200 C140,140 120,90 110,40 M186,200 C196,150 214,100 224,46 M168,200 C166,140 168,80 170,30" stroke="url(#plumeg)" stroke-width="3" fill="none" opacity="0.8"/>
+            <circle cx="118" cy="60" r="2" fill="#b9f4ff"/><circle cx="170" cy="48" r="2.5" fill="#b9f4ff"/><circle cx="216" cy="70" r="2" fill="#b9f4ff"/>
+            <!-- probe flying through -->
+            <g transform="translate(250,90)">
+              <rect x="-10" y="-6" width="20" height="12" rx="3" fill="#e9eeff"/>
+              <rect x="-18" y="-3" width="7" height="6" fill="#7fe7ff"/>
+              <rect x="-3" y="-18" width="6" height="12" fill="#6f7bff"/>
+              <rect x="-3" y="6" width="6" height="12" fill="#6f7bff"/>
+            </g>
+            <text x="170" y="24" text-anchor="middle" font-family="Space Mono" font-size="11" fill="#9aa6cf">SUNA · 4 km/s sampling</text>
+          </svg>
+        </div>
+        <div class="feature-copy reveal" data-delay="2">
+          <p class="eyebrow">Payload</p>
+          <h2>Tasting a geyser at four kilometres a second</h2>
+          <p>AETHELON's core instrument is a high-resolution mass spectrometer that captures plume grains as the probe flies through them. At 4 km/s, every droplet hits the detector hard enough to shatter into its molecular fingerprint — letting scientists weigh amino acids, fatty acids and the chemistry of the ocean below, without ever landing.</p>
+          <ul class="feature-list">
+            <li>Mass range to 2,000 Da — large organics resolved</li>
+            <li>Slow flythroughs preserve fragile molecules intact</li>
+            <li>Dust analyser sizes and counts every grain</li>
+            <li>Sub-surface radar sounds the ice shell thickness</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ FEATURE GRID ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <p class="eyebrow">Engineered for the cold and dark</p>
+          <h2>A spacecraft built for one ocean.</h2>
+        </div>
+        <div class="grid-3">
+          <div class="card reveal">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
+            <h3>Radioisotope power</h3>
+            <p>At ten times Earth's distance from the Sun, solar panels are useless. A next-generation eMMRTG converts the heat of decaying plutonium-238 into 290 watts of steady electricity for two decades.</p>
+          </div>
+          <div class="card reveal" data-delay="1">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4M8 8h8M8 12h5"/></svg>
+            <h3>Autonomous flybys</h3>
+            <p>A 78-minute light delay makes joysticking impossible. Onboard fault protection and optical navigation let AETHELON aim itself through each plume and recover from glitches alone.</p>
+          </div>
+          <div class="card reveal" data-delay="2">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a7 7 0 0 1 7 7c0 4-7 13-7 13S5 13 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            <h3>Planetary protection</h3>
+            <p>To keep an ocean that might host life pristine, the probe is sterilised to Category III standards and its end-of-mission disposal is plotted to never contaminate Enceladus.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ CTA BAND ══════════ -->
+    <section class="section">
+      <div class="wrap">
+        <div class="cta-band reveal">
+          <p class="eyebrow" style="justify-content:center">Open science · Public mission</p>
+          <h2>Fly the mission yourself.</h2>
+          <p>Scrub the seven-year trajectory, click through every moon in the Saturn system, and read the instrument data as it would arrive. AETHELON is an outreach project — everything here is yours to explore.</p>
+          <a href="explore.html" class="btn btn-primary magnetic" data-strength="0.35">Open the system explorer <span class="arrow">→</span></a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════ FOOTER ══════════ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <span class="logo-mark">AETHELON</span>
+          <p>An open deep-space outreach project tracing a robotic mission to Enceladus, Saturn's ocean moon. Figures are plausible mission estimates for educational use.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Mission</h4>
+          <a href="mission.html">Timeline</a>
+          <a href="mission.html">Trajectory</a>
+          <a href="data.html">Instruments</a>
+          <a href="explore.html">The system</a>
+        </div>
+        <div class="footer-col">
+          <h4>Science</h4>
+          <a href="data.html">Plume chemistry</a>
+          <a href="data.html">Data archive</a>
+          <a href="explore.html">Ocean worlds</a>
+          <a href="#">Publications</a>
+        </div>
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <a href="#">Newsletter</a>
+          <a href="#">Education kit</a>
+          <a href="#">Press</a>
+          <a href="#">Contact team</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2031 AETHELON Outreach Consortium. Educational fiction. Data are illustrative estimates.</span>
+        <div class="socials">
+          <a href="#" aria-label="Mastodon">Mastodon</a>
+          <a href="#" aria-label="YouTube">YouTube</a>
+          <a href="#" aria-label="GitHub">GitHub</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+  <script src="js/story.js"></script>
+</body>
+</html>

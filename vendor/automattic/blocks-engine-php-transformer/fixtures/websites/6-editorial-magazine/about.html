@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — The Ledger Room</title>
+  <meta name="description" content="About The Ledger Room — Milwaukee's independent magazine covering politics, food, arts, and neighborhood history since 2019. Meet the team and join as a member.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* About page specific overrides */
+    .about-hero-inner {
+      max-width: 840px;
+      margin: 0 auto;
+      padding: 0 var(--pad);
+    }
+
+    .about-ornament {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 3rem 0 2rem;
+    }
+    .about-ornament::before,
+    .about-ornament::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #3a3530;
+    }
+    .about-ornament span {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      margin: var(--sp-8) 0;
+    }
+
+    .stat {
+      padding: var(--sp-6) var(--sp-5);
+      border-right: 1px solid var(--rule);
+      text-align: center;
+    }
+    .stat:last-child { border-right: none; }
+
+    .stat-num {
+      font-family: var(--font-display);
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1;
+      letter-spacing: -0.03em;
+      display: block;
+      margin-bottom: var(--sp-2);
+    }
+
+    .stat-label {
+      font-family: var(--font-ui);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gray-1);
+    }
+
+    @media (max-width: 640px) {
+      .stat-row { grid-template-columns: 1fr 1fr; }
+      .stat:nth-child(2) { border-right: none; }
+      .stat:nth-child(3) { border-top: 1px solid var(--rule); }
+      .stat:nth-child(4) { border-top: 1px solid var(--rule); }
+    }
+
+    @media (max-width: 480px) {
+      .stat-row { grid-template-columns: 1fr; }
+      .stat { border-right: none; border-bottom: 1px solid var(--rule); }
+      .stat:last-child { border-bottom: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MASTHEAD -->
+  <header class="masthead" role="banner">
+    <div class="masthead-bar">
+      <div class="container">
+        <span class="masthead-bar-meta">Vol. 7, No. 23 &nbsp;·&nbsp; June 17, 2026 &nbsp;·&nbsp; Milwaukee, Wisconsin</span>
+        <a href="about.html" class="masthead-bar-sub">Subscribe</a>
+      </div>
+    </div>
+    <div class="masthead-logo-row">
+      <div class="container">
+        <a href="index.html">
+          <span class="masthead-name">The Ledger Room</span>
+          <span class="masthead-tagline">Milwaukee's Independent Voice &nbsp;·&nbsp; Politics · Food · Arts · History</span>
+        </a>
+        <button class="nav-toggle" aria-label="Open navigation" aria-expanded="false" aria-controls="nav-mobile">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+    <nav class="nav-main" aria-label="Primary navigation">
+      <div class="container">
+        <ul class="nav-list">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="politics.html">Politics</a></li>
+          <li><a href="food.html">Food</a></li>
+          <li><a href="arts.html">Arts</a></li>
+          <li><a href="arts.html#history">History</a></li>
+          <li><a href="about.html" aria-current="page">About</a></li>
+          <li><a href="about.html#membership">Membership</a></li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <nav class="nav-mobile" id="nav-mobile" aria-label="Mobile navigation">
+    <a href="index.html">Home</a>
+    <a href="politics.html">Politics</a>
+    <a href="food.html">Food</a>
+    <a href="arts.html">Arts</a>
+    <a href="arts.html#history">History</a>
+    <a href="about.html">About</a>
+    <a href="about.html#membership">Membership</a>
+  </nav>
+
+  <main>
+
+    <!-- ABOUT HERO -->
+    <section class="about-hero" aria-label="About the magazine">
+      <div class="about-hero-inner">
+        <h1 class="about-hero-title reveal">We cover Milwaukee because it matters. Full stop.</h1>
+        <p class="about-hero-lead reveal reveal-d1">The Ledger Room is a small, independent magazine publishing original reporting on Milwaukee's politics, food, arts, and neighborhood history. We are funded entirely by our readers. We have no corporate owner, no investor, and no editorial mandate beyond getting things right.</p>
+        <div class="about-ornament reveal reveal-d2">
+          <span>✦</span>
+        </div>
+        <p class="about-hero-lead reveal reveal-d3" style="font-size: 1rem; color: var(--gray-2);">Founded in 2019 by Nadia Okafor and Marcus Trzeciak &nbsp;·&nbsp; Published weekly from Milwaukee, Wisconsin &nbsp;·&nbsp; Vol. 7, No. 23</p>
+      </div>
+    </section>
+
+    <!-- STATS -->
+    <section aria-label="By the numbers">
+      <div class="container">
+        <div class="stat-row">
+          <div class="stat reveal reveal-d1">
+            <span class="stat-num">7</span>
+            <span class="stat-label">Years publishing</span>
+          </div>
+          <div class="stat reveal reveal-d2">
+            <span class="stat-num">4,200</span>
+            <span class="stat-label">Paying members</span>
+          </div>
+          <div class="stat reveal reveal-d3">
+            <span class="stat-num">380+</span>
+            <span class="stat-label">Original stories</span>
+          </div>
+          <div class="stat reveal reveal-d4">
+            <span class="stat-num">100%</span>
+            <span class="stat-label">Reader funded</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MANIFESTO -->
+    <section class="about-section" aria-label="Our mission">
+      <div class="container">
+        <h2 class="about-section-title">Why we exist</h2>
+        <div class="about-manifesto">
+          <p>Milwaukee has had its share of headlines — a major American city with a complex history, deep inequalities, extraordinary creative energy, and a food culture that refuses to be simplified. What it has not always had is journalism that treats it with the seriousness it deserves.</p>
+
+          <p>The Ledger Room started in 2019 as a newsletter, written by two former newspaper reporters who were tired of watching local coverage shrink. It grew into a weekly publication with a staff of six writers, a podcast, a print quarterly, and a community of readers who have made it financially viable without a single outside investment.</p>
+
+          <p>We cover the city's politics without access journalism. We review restaurants without PR relationships. We write about the neighborhoods being reshaped by development — sometimes with residents' consent, sometimes without it — and about the neighborhoods that have already been erased. We believe that the history of a city is not a sidebar; it is the story itself.</p>
+
+          <p>Everything we publish is available without a paywall. Membership funds the reporting. If you read us regularly, we'd be grateful if you joined.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TEAM -->
+    <section class="about-section" id="team" aria-label="Our team">
+      <div class="container">
+        <h2 class="about-section-title">Contributors</h2>
+        <div class="team-grid">
+
+          <div class="team-member reveal reveal-d1">
+            <div class="team-avatar-svg" aria-hidden="true">
+              <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+                <rect width="56" height="56" fill="#d4c8b8"/>
+                <circle cx="28" cy="22" r="12" fill="#b0a090"/>
+                <ellipse cx="28" cy="52" rx="18" ry="14" fill="#b0a090"/>
+              </svg>
+            </div>
+            <div class="team-member-info">
+              <p class="team-member-name">Nadia Okafor</p>
+              <span class="team-member-role">Editor in Chief, Politics</span>
+              <p class="team-member-bio">Nadia co-founded The Ledger Room in 2019 after seven years at the Milwaukee Journal Sentinel, where she covered city hall. She's a Milwaukee native, a graduate of Marquette University, and the recipient of a 2024 Wisconsin Newspaper Association award for investigative reporting.</p>
+            </div>
+          </div>
+
+          <div class="team-member reveal reveal-d2">
+            <div class="team-avatar-svg" aria-hidden="true">
+              <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+                <rect width="56" height="56" fill="#c8bfaa"/>
+                <circle cx="28" cy="22" r="12" fill="#a89880"/>
+                <ellipse cx="28" cy="52" rx="18" ry="14" fill="#a89880"/>
+              </svg>
+            </div>
+            <div class="team-member-info">
+              <p class="team-member-name">Marcus Trzeciak</p>
+              <span class="team-member-role">Senior Reporter, Politics &amp; Housing</span>
+              <p class="team-member-bio">Marcus co-founded The Ledger Room after a decade covering urban policy at newspapers in Chicago and Cleveland. He covers city government, housing, and the land use decisions that shape Milwaukee's neighborhoods. He lives in Bay View.</p>
+            </div>
+          </div>
+
+          <div class="team-member reveal reveal-d3">
+            <div class="team-avatar-svg" aria-hidden="true">
+              <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+                <rect width="56" height="56" fill="#ddd0c0"/>
+                <circle cx="28" cy="22" r="12" fill="#bca898"/>
+                <ellipse cx="28" cy="52" rx="18" ry="14" fill="#bca898"/>
+              </svg>
+            </div>
+            <div class="team-member-info">
+              <p class="team-member-name">Jess Halvorsen</p>
+              <span class="team-member-role">Food Editor</span>
+              <p class="team-member-bio">Jess has been writing about food in Milwaukee for twelve years. She came to The Ledger Room from a previous stint at Milwaukee Magazine, and before that spent three years cooking in restaurant kitchens. She believes the fish fry is a civic institution and will defend this position strenuously.</p>
+            </div>
+          </div>
+
+          <div class="team-member reveal reveal-d1">
+            <div class="team-avatar-svg" aria-hidden="true">
+              <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+                <rect width="56" height="56" fill="#c8c0b0"/>
+                <circle cx="28" cy="22" r="12" fill="#a89888"/>
+                <ellipse cx="28" cy="52" rx="18" ry="14" fill="#a89888"/>
+              </svg>
+            </div>
+            <div class="team-member-info">
+              <p class="team-member-name">Devlin Park</p>
+              <span class="team-member-role">Arts &amp; Culture Editor</span>
+              <p class="team-member-bio">Devlin covers Milwaukee's visual art, theater, and music scenes with the conviction that culture is not a soft beat. He's a former MIAD student, a dedicated attendee of every Skylight Music Theatre production, and one of the few journalists in the city who has actually read the Menomonee Valley Partners' strategic plans.</p>
+            </div>
+          </div>
+
+          <div class="team-member reveal reveal-d2">
+            <div class="team-avatar-svg" aria-hidden="true">
+              <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+                <rect width="56" height="56" fill="#e0d4c4"/>
+                <circle cx="28" cy="22" r="12" fill="#c4b0a0"/>
+                <ellipse cx="28" cy="52" rx="18" ry="14" fill="#c4b0a0"/>
+              </svg>
+            </div>
+            <div class="team-member-info">
+              <p class="team-member-name">Ruth Steinberg</p>
+              <span class="team-member-role">Neighborhood History Editor</span>
+              <p class="team-member-bio">Ruth is a Milwaukee historian and the author of <em>Gridded: How Urban Renewal Reshaped Milwaukee's Black Neighborhoods</em> (Wisconsin Historical Society Press, 2022). She teaches at UWM and writes The Ledger Room's history coverage with the aim of making the past legible to people who weren't there for it.</p>
+            </div>
+          </div>
+
+          <div class="team-member reveal reveal-d3">
+            <div class="team-avatar-svg" aria-hidden="true">
+              <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+                <rect width="56" height="56" fill="#d4c8b0"/>
+                <circle cx="28" cy="22" r="12" fill="#b0a080"/>
+                <ellipse cx="28" cy="52" rx="18" ry="14" fill="#b0a080"/>
+              </svg>
+            </div>
+            <div class="team-member-info">
+              <p class="team-member-name">Carl Yablonski</p>
+              <span class="team-member-role">Photography &amp; Visual</span>
+              <p class="team-member-bio">Carl is a documentary photographer and occasional writer who has been documenting Milwaukee neighborhoods since 2011. His work has appeared in The Guardian and The New York Times. He shoots on film when he can get away with it and digital when the deadline demands it.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- MEMBERSHIP -->
+    <section class="membership-section" id="membership" aria-label="Membership">
+      <div class="container">
+        <div class="membership-header reveal">
+          <span class="membership-eyebrow">Support Independent Milwaukee Journalism</span>
+          <h2 class="membership-headline">Join The Ledger Room</h2>
+          <p class="membership-subhead">Your membership funds the reporting directly. No investors. No corporate backstop. No paywall. Just readers who believe Milwaukee deserves real journalism.</p>
+        </div>
+
+        <div class="membership-tiers reveal reveal-d1">
+          <div class="tier">
+            <span class="tier-label">Tier 1</span>
+            <p class="tier-name">Reader</p>
+            <p class="tier-price">$5 <span class="period">/ month</span></p>
+            <ul class="tier-features">
+              <li>Weekly Thursday Dispatch newsletter</li>
+              <li>Full article archive access</li>
+              <li>Podcast early access (48 hours before public)</li>
+              <li>Satisfaction of paying for local journalism</li>
+            </ul>
+            <a href="#" class="tier-btn">Become a Reader</a>
+          </div>
+
+          <div class="tier featured">
+            <span class="tier-label">Most Popular</span>
+            <p class="tier-name">Supporter</p>
+            <p class="tier-price">$12 <span class="period">/ month</span></p>
+            <ul class="tier-features">
+              <li>Everything in Reader</li>
+              <li>Invitations to all Ledger Room events</li>
+              <li>Monthly editor's letter from Nadia</li>
+              <li>Quarterly print edition mailed to you</li>
+              <li>Annual thank-you in the print edition</li>
+            </ul>
+            <a href="#" class="tier-btn">Become a Supporter</a>
+          </div>
+
+          <div class="tier">
+            <span class="tier-label">Tier 3</span>
+            <p class="tier-name">Patron</p>
+            <p class="tier-price">$30 <span class="period">/ month</span></p>
+            <ul class="tier-features">
+              <li>Everything in Supporter</li>
+              <li>Name in print each quarter</li>
+              <li>Annual patron gathering with the editors</li>
+              <li>Direct editorial contact line</li>
+              <li>Occasional dispatches from the field</li>
+            </ul>
+            <a href="#" class="tier-btn">Become a Patron</a>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding: 1.5rem; border: 1px solid var(--rule); background: var(--paper);">
+          <p style="font-family: var(--font-body); font-size: 0.95rem; color: var(--gray-1); font-style: italic; text-align: center;">Memberships can be cancelled anytime. Annual memberships receive a discount. If cost is a barrier, email us — we have a sliding scale option. We would rather have you reading than not.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="about-section" id="contact" aria-label="Contact us">
+      <div class="container">
+        <h2 class="about-section-title">Get in touch</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; max-width: 720px;">
+          <div>
+            <p style="font-family: var(--font-ui); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5rem;">Editorial</p>
+            <p style="font-family: var(--font-body); font-size: 1rem; color: var(--ink-light);">Story tips, corrections, letters to the editor:</p>
+            <p style="font-family: var(--font-body); font-size: 1rem; color: var(--ink); margin-top: 0.25rem;">editors@theledgerroom.com</p>
+          </div>
+          <div>
+            <p style="font-family: var(--font-ui); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5rem;">Membership & Support</p>
+            <p style="font-family: var(--font-body); font-size: 1rem; color: var(--ink-light);">Membership questions, account help:</p>
+            <p style="font-family: var(--font-body); font-size: 1rem; color: var(--ink); margin-top: 0.25rem;">members@theledgerroom.com</p>
+          </div>
+          <div>
+            <p style="font-family: var(--font-ui); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5rem;">Advertising</p>
+            <p style="font-family: var(--font-body); font-size: 1rem; color: var(--ink-light);">We accept a limited number of sponsor partnerships per quarter. Inquiries only:</p>
+            <p style="font-family: var(--font-body); font-size: 1rem; color: var(--ink); margin-top: 0.25rem;">partnerships@theledgerroom.com</p>
+          </div>
+          <div>
+            <p style="font-family: var(--font-ui); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5rem;">Security / Tips</p>
+            <p style="font-family: var(--font-body); font-size: 1rem; color: var(--ink-light);">Confidential tip line available via Signal. Contact us at the editorial address for the current number.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTER -->
+    <section class="newsletter-band" aria-label="Newsletter signup">
+      <div class="newsletter-inner">
+        <span class="newsletter-eyebrow">The Thursday Dispatch</span>
+        <h2 class="newsletter-headline">Start here, every Thursday</h2>
+        <p class="newsletter-desc">Our weekly newsletter is the best way to read The Ledger Room. Written by the editors. Free, always.</p>
+        <form class="newsletter-form" novalidate>
+          <input type="email" placeholder="your@email.com" aria-label="Email address">
+          <button type="submit">Subscribe</button>
+        </form>
+        <p class="newsletter-success" role="status">You're on the list. See you Thursday.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <span class="footer-brand-name">The Ledger Room</span>
+          <p class="footer-brand-desc">Independent journalism covering Milwaukee's politics, food, arts, and neighborhood history since 2019. Funded entirely by readers.</p>
+        </div>
+        <div>
+          <span class="footer-col-title">Sections</span>
+          <ul class="footer-nav">
+            <li><a href="politics.html">Politics</a></li>
+            <li><a href="food.html">Food</a></li>
+            <li><a href="arts.html">Arts</a></li>
+            <li><a href="arts.html#history">History</a></li>
+          </ul>
+        </div>
+        <div>
+          <span class="footer-col-title">Publication</span>
+          <ul class="footer-nav">
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="about.html#team">Contributors</a></li>
+            <li><a href="about.html#membership">Membership</a></li>
+            <li><a href="about.html#contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <span class="footer-col-title">More</span>
+          <ul class="footer-nav">
+            <li><a href="#">Podcast</a></li>
+            <li><a href="#">Events</a></li>
+            <li><a href="#">Archive</a></li>
+            <li><a href="#">Letters</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">&copy; 2026 The Ledger Room. Published in Milwaukee, Wisconsin. All rights reserved.</p>
+        <p class="footer-copy">Edited by Nadia Okafor &nbsp;·&nbsp; Designed with care for the city</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

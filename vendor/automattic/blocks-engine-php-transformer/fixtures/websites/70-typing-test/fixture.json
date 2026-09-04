@@ -1,0 +1,13 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "typing-test",
+    "utility",
+    "app",
+    "canvas",
+    "audio",
+    "data-viz",
+    "has-stats"
+  ],
+  "complexity": 3
+}

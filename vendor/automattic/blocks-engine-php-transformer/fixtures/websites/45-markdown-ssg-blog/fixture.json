@@ -1,0 +1,11 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "blog",
+    "markdown",
+    "ssg",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

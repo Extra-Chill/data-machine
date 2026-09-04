@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Fragment Foundry · How WebGL Shaders Work</title>
+  <meta name="description" content="Fragment Foundry is a real-time generative-graphics studio. Learn how raw WebGL fragment shaders turn coordinates into colour — vertex to fragment, uniforms, and the GPU pipeline.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Fragment Foundry home">
+      <span class="logo-mark">Fragment&nbsp;Foundry<span class="logo-dot">.</span></span>
+      <span class="logo-sub">Real-time shader lab</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Gallery</a>
+      <a href="editor.html">Live Editor</a>
+      <a href="about.html">About</a>
+      <a href="editor.html" class="nav-cta">Open the Lab</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="wrap about-page">
+
+    <p class="mono" style="margin-bottom:1rem;">[ The studio ]</p>
+    <p class="lede">
+      Fragment Foundry is a four-person generative-graphics studio in Berlin. We make real-time visual systems — title sequences, installation backdrops, generative brand marks, and the occasional album cover — all rendered live on the GPU. We work in raw WebGL because we like to understand every instruction that touches a pixel.
+    </p>
+
+    <!-- ── HOW SHADERS WORK ── -->
+    <section style="margin-top:3.5rem;">
+      <h2 class="section-title" style="font-size:clamp(1.4rem,3vw,2.1rem);margin-bottom:0.6rem;">How a fragment shader actually works</h2>
+      <p class="prose" style="margin-bottom:0.4rem;">
+        A page builder thinks in boxes. A GPU thinks in pixels — millions of them, all coloured at once. To draw the shaders on this site we hand the graphics card two tiny programs and one flat shape, then let it run the second program independently for every pixel on screen. Here is the whole pipeline:
+      </p>
+
+      <!-- pipeline diagram (inline SVG icons) -->
+      <div class="pipeline" role="img" aria-label="Diagram: geometry to vertex shader to rasterizer to fragment shader to pixels">
+        <div class="pipe-step">
+          <div class="pipe-icon" aria-hidden="true">
+            <svg width="34" height="34" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 40 L40 40 L24 10 Z"/><circle cx="8" cy="40" r="2.5" fill="currentColor"/><circle cx="40" cy="40" r="2.5" fill="currentColor"/><circle cx="24" cy="10" r="2.5" fill="currentColor"/></svg>
+          </div>
+          <h3>1 · Geometry</h3>
+          <p>We upload one full-screen triangle — three corners that cover the whole canvas. That's the only shape involved.</p>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-icon" aria-hidden="true">
+            <svg width="34" height="34" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><rect x="10" y="10" width="28" height="28" rx="4"/><path d="M18 24 L30 24 M24 18 L24 30"/></svg>
+          </div>
+          <h3>2 · Vertex shader</h3>
+          <p>Runs once per corner. It just places those three points in clip space — our version is four lines long and never changes.</p>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-icon pipe-arrow" aria-hidden="true">
+            <svg width="34" height="34" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 24h30"/><path d="M28 16l10 8-10 8"/></svg>
+          </div>
+          <h3>3 · Rasterizer</h3>
+          <p>The GPU fills the triangle, figuring out which screen pixels it covers — typically every pixel on the canvas.</p>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-icon" aria-hidden="true">
+            <svg width="34" height="34" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="11" height="11"/><rect x="22" y="8" width="11" height="11"/><rect x="8" y="22" width="11" height="11"/><rect x="22" y="22" width="11" height="11"/></svg>
+          </div>
+          <h3>4 · Fragment shader</h3>
+          <p>Runs once per pixel, in parallel. Given the pixel's coordinate, our GLSL returns its colour. This is where all the art lives.</p>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-icon" aria-hidden="true">
+            <svg width="34" height="34" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><circle cx="24" cy="24" r="16"/><circle cx="24" cy="24" r="5" fill="currentColor" stroke="none"/></svg>
+          </div>
+          <h3>5 · Pixels</h3>
+          <p>The results land in the framebuffer and the browser shows them. Sixty times a second, the whole thing repeats.</p>
+        </div>
+      </div>
+
+      <div class="prose">
+        <h2>Uniforms: the dials we turn</h2>
+        <p>
+          A fragment shader is the same code for every pixel, so on its own it can only draw something static. <strong style="color:var(--ink)">Uniforms</strong> are values that stay constant across all pixels for a single frame but can change <em>between</em> frames — they're how we feed the shader the outside world. Every shader on this site receives three:
+        </p>
+        <p>
+          <code>u_time</code> makes a formula move; <code>u_resolution</code> lets it adapt to any canvas size; and <code>u_mouse</code> lets the cursor reach in and bend the image. Each gallery piece also declares its own custom uniforms — <code>u_speed</code>, <code>u_zoom</code>, <code>u_segments</code> — and those are exactly what the stage sliders write to, live, with no recompile.
+        </p>
+
+        <h2>Why this is impossible in a page builder</h2>
+        <p>
+          Tools like Gutenberg compose pre-made blocks of HTML. There is no block for "run a C-like program on the graphics card and paint the result every frame." The work happens below the document — in GLSL, compiled by the GPU driver at runtime. We surface compile errors, manage context loss, cap the pixel ratio for performance, and respect <code>prefers-reduced-motion</code> by freezing to a still frame. None of that is content; all of it is code.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── TEAM ── -->
+    <section style="margin-top:3.5rem;">
+      <h2 class="section-title" style="font-size:clamp(1.4rem,3vw,2.1rem);">The people</h2>
+      <div class="team-grid">
+        <div class="team-card">
+          <svg class="team-avatar" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#5cf2d6"/><circle cx="24" cy="19" r="8" fill="#06070d"/><path d="M10 42c2-9 26-9 28 0" fill="#06070d"/></svg>
+          <h3>Mara Okonkwo</h3>
+          <p class="role">Founder · Shader artist</p>
+          <p>Came from VFX compositing. Writes the flow-field and tunnel pieces; believes a good noise function is worth a thousand textures.</p>
+        </div>
+        <div class="team-card">
+          <svg class="team-avatar" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#7c8bff"/><circle cx="24" cy="19" r="8" fill="#06070d"/><path d="M10 42c2-9 26-9 28 0" fill="#06070d"/></svg>
+          <h3>Luca Vásquez</h3>
+          <p class="role">Raymarching · Tooling</p>
+          <p>Maintains the WebGL helper and the editor's error parser. Obsessed with signed distance fields and sub-millisecond frame times.</p>
+        </div>
+        <div class="team-card">
+          <svg class="team-avatar" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#ff5d8f"/><circle cx="24" cy="19" r="8" fill="#06070d"/><path d="M10 42c2-9 26-9 28 0" fill="#06070d"/></svg>
+          <h3>Rowan Halloran</h3>
+          <p class="role">Fractals · Colour</p>
+          <p>Designs the palettes and the fractal pieces. Keeps a notebook of cosine-gradient coefficients the way other people keep recipes.</p>
+        </div>
+        <div class="team-card">
+          <svg class="team-avatar" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#ffd166"/><circle cx="24" cy="19" r="8" fill="#06070d"/><path d="M10 42c2-9 26-9 28 0" fill="#06070d"/></svg>
+          <h3>Sun-Mi Park</h3>
+          <p class="role">Producer · Installations</p>
+          <p>Turns shaders into shows — LED walls, projection mapping, gallery commissions. The reason any of this ends up on a real surface.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta" style="text-align:left;padding-bottom:2rem;">
+      <h2 class="cta-title" style="font-size:clamp(1.5rem,3vw,2.2rem)">See it all <em>moving</em>.</h2>
+      <p class="cta-sub" style="margin-left:0;">Head back to the gallery to drive the shaders, or open the editor to write one yourself.</p>
+      <div style="display:flex;gap:0.8rem;flex-wrap:wrap;">
+        <a href="index.html" class="btn btn-primary">Open the gallery →</a>
+        <a href="editor.html" class="btn btn-outline">Live editor</a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-bottom" style="margin-top:0;border-top:none;padding-top:0;">
+        <p class="footer-copy">© <span data-year>2026</span> Fragment Foundry — Berlin / Remote</p>
+        <div class="footer-legal">
+          <a href="index.html">Gallery</a>
+          <a href="editor.html">Editor</a>
+          <a href="mailto:hello@fragmentfoundry.gl">Contact</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+</body>
+</html>

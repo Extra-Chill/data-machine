@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact &amp; Visit — Inkwell &amp; Quill Booksellers</title>
+  <meta name="description" content="Visit Inkwell & Quill on the corner of Maple & 3rd. Store hours, location, and a contact form for any question." />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__bar">
+      <a class="brand" href="index.html">
+        <svg class="brand__mark" viewBox="0 0 48 48" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="44" height="44" rx="8" fill="#16223d" stroke="#b8923f" stroke-width="1.5"/>
+          <path d="M24 12 C18 9, 10 9, 8 11 V35 C10 33, 18 33, 24 36 C30 33, 38 33, 40 35 V11 C38 9, 30 9, 24 12 Z" fill="none" stroke="#d8c08a" stroke-width="1.6"/>
+          <line x1="24" y1="12" x2="24" y2="36" stroke="#d8c08a" stroke-width="1.6"/>
+          <path d="M32 8 L36 12 L24 24 L20 24 L20 20 Z" fill="#8c2b27" stroke="#d8c08a" stroke-width="1"/>
+        </svg>
+        <span class="brand__text">
+          <span class="brand__name">Inkwell &amp; Quill</span>
+          <span class="brand__tag">Independent Booksellers</span>
+        </span>
+      </a>
+      <nav class="site-nav" data-nav aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html" aria-current="page">Contact</a>
+      </nav>
+      <div class="header-actions">
+        <a class="icon-btn" href="cart.html" data-open-cart aria-label="Open cart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/>
+            <path d="M2 3h2.2l2.1 12.2a1.5 1.5 0 0 0 1.5 1.3h8.9a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/>
+          </svg>
+          <span class="cart-count is-empty" data-cart-count>0</span>
+        </a>
+        <button class="nav-toggle" data-nav-toggle aria-label="Toggle menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-hero">
+    <div class="container">
+      <p class="breadcrumb"><a href="index.html">Home</a> / Contact</p>
+      <h1>Come Visit Us</h1>
+      <p>Questions about an order, a special request, or just want to say hello? Drop us a line, or stop by the shop.</p>
+    </div>
+  </section>
+
+  <main class="section">
+    <div class="container contact-layout">
+      <div>
+        <h2>Send a Message</h2>
+        <form class="contact-form" data-contact-form novalidate>
+          <div class="row2">
+            <label class="field">
+              <span class="field__label">Name</span>
+              <input type="text" name="name" autocomplete="name" required />
+            </label>
+            <label class="field">
+              <span class="field__label">Email</span>
+              <input type="email" name="email" autocomplete="email" required />
+            </label>
+          </div>
+          <label class="field">
+            <span class="field__label">Subject</span>
+            <input type="text" name="subject" required />
+          </label>
+          <label class="field">
+            <span class="field__label">Message</span>
+            <textarea name="message" rows="6" required></textarea>
+          </label>
+          <div>
+            <button class="btn btn--primary" type="submit">Send Message</button>
+          </div>
+          <p class="form-note" data-form-note hidden style="color:var(--oxblood)"></p>
+        </form>
+      </div>
+
+      <aside>
+        <div class="info-card">
+          <h3>Find the Shop</h3>
+          <p>142 Maple Street (corner of 3rd)<br />Rivertown, OR 97000</p>
+          <p><strong>Phone:</strong> (555) 014-2030<br /><strong>Email:</strong> hello@inkwellquill.example</p>
+        </div>
+        <div class="info-card">
+          <h3>Store Hours</h3>
+          <table class="hours-table">
+            <tbody>
+              <tr><td>Monday – Friday</td><td>9:00am – 8:00pm</td></tr>
+              <tr><td>Saturday</td><td>10:00am – 8:00pm</td></tr>
+              <tr><td>Sunday</td><td>11:00am – 6:00pm</td></tr>
+              <tr><td>Holidays</td><td>Reduced hours</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="storefront-art" aria-hidden="true">
+          <svg viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg">
+            <rect width="400" height="240" fill="#e8ddc2"/>
+            <!-- streets -->
+            <rect x="0" y="150" width="400" height="34" fill="#d2c39e"/>
+            <rect x="170" y="0" width="34" height="240" fill="#d2c39e"/>
+            <g stroke="#f6efdf" stroke-width="2" stroke-dasharray="10 10"><line x1="0" y1="167" x2="400" y2="167"/><line x1="187" y1="0" x2="187" y2="240"/></g>
+            <!-- blocks -->
+            <rect x="20" y="20" width="130" height="110" fill="#cbbb95"/>
+            <rect x="224" y="20" width="156" height="110" fill="#cbbb95"/>
+            <rect x="20" y="200" width="130" height="30" fill="#cbbb95"/>
+            <rect x="224" y="200" width="156" height="30" fill="#cbbb95"/>
+            <!-- river -->
+            <path d="M224 20 q60 40 0 90 q-50 40 30 20" fill="none" stroke="#5fb0c9" stroke-width="10" opacity="0.6"/>
+            <!-- pin marking the shop -->
+            <g transform="translate(187 150)">
+              <path d="M0 -44 C20 -44 28 -28 28 -16 C28 2 0 24 0 24 C0 24 -28 2 -28 -16 C-28 -28 -20 -44 0 -44 Z" fill="#8c2b27" stroke="#6f201d" stroke-width="2"/>
+              <circle cx="0" cy="-16" r="10" fill="#f6efdf"/>
+            </g>
+            <text x="187" y="200" text-anchor="middle" font-family="Georgia, serif" font-size="13" fill="#16223d">Maple &amp; 3rd</text>
+          </svg>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <h4>Inkwell &amp; Quill</h4>
+          <p>An independent bookshop on the corner of Maple &amp; 3rd, serving readers since 1998.</p>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="shop.html">All Books</a></li>
+            <li><a href="shop.html?genre=Fiction">Fiction</a></li>
+            <li><a href="shop.html?genre=Mystery">Mystery</a></li>
+            <li><a href="shop.html?genre=Poetry">Poetry</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Visit</h4>
+          <ul>
+            <li><a href="about.html">Our Story</a></li>
+            <li><a href="contact.html">Hours &amp; Location</a></li>
+            <li><a href="contact.html">Events</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Hours</h4>
+          <ul>
+            <li>Mon–Fri: 9am – 8pm</li>
+            <li>Saturday: 10am – 8pm</li>
+            <li>Sunday: 11am – 6pm</li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; <span data-year>2026</span> Inkwell &amp; Quill Booksellers. All rights reserved.</span>
+        <span>Made with care for readers everywhere.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/products.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workshops — Juniper Lane Plant Shop</title>
+  <meta name="description" content="Hands-on plant workshops in Benton Harbor, Michigan. Succulent bowls, repotting clinics, and seasonal wreath making at Juniper Lane.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .workshop-full {
+      background: var(--white);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      border: 1px solid var(--parchment);
+      margin-bottom: 2rem;
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      transition: box-shadow 0.3s var(--ease-out);
+    }
+    .workshop-full:hover { box-shadow: var(--shadow-lg); }
+    .workshop-full-visual {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem;
+      gap: 1rem;
+    }
+    .workshop-full-visual.green { background: linear-gradient(160deg, var(--sage-pale), #c8dfc9); }
+    .workshop-full-visual.rust  { background: linear-gradient(160deg, #f0ddd0, #e4c5ae); }
+    .workshop-full-visual.forest{ background: linear-gradient(160deg, #d4e3d5, #b5ceb7); }
+    .workshop-full-body {
+      padding: 2.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .workshop-detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem 2rem;
+      margin: 1.25rem 0 1.75rem;
+    }
+    .workshop-detail-item {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+    }
+    .workshop-detail-label {
+      color: var(--terracotta);
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+    .workshop-detail-value {
+      color: var(--forest);
+      font-size: 0.82rem;
+    }
+    .includes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+    .includes-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.88rem;
+      color: var(--forest-mid);
+    }
+    .includes-list li::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--sage);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    @media (max-width: 720px) {
+      .workshop-full {
+        grid-template-columns: 1fr;
+      }
+      .workshop-full-visual {
+        min-height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo" aria-label="Juniper Lane Home">
+      <svg class="logo-mark" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+        <circle cx="18" cy="18" r="17" fill="#D0E3D2" stroke="#5D8A62" stroke-width="1.5"/>
+        <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#5D8A62"/>
+        <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#3A5438"/>
+        <ellipse cx="18" cy="30.5" rx="4" ry="1.5" fill="#B85A37" opacity="0.6"/>
+      </svg>
+      <span>
+        <span class="logo-text">Juniper Lane</span>
+        <span class="logo-sub">Plant Shop &amp; Gifts</span>
+      </span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html" class="active">Workshops</a>
+      <a href="plant-care.html">Plant Care</a>
+      <a href="events.html">Private Events</a>
+      <a href="visit.html">Visit Us</a>
+    </nav>
+    <div class="header-cta">
+      <a href="tel:+12695550193" class="phone-cta">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        (269) 555-0193
+      </a>
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-nav" role="dialog" aria-label="Navigation menu">
+  <div class="mobile-nav-overlay" aria-hidden="true"></div>
+  <div class="mobile-nav-panel">
+    <nav class="mobile-nav-links">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="workshops.html">Workshops</a>
+      <a href="plant-care.html">Plant Care</a>
+      <a href="events.html">Private Events</a>
+      <a href="visit.html">Visit Us</a>
+    </nav>
+    <div class="mobile-nav-info">
+      <div>214 Maple Street · Benton Harbor, MI</div>
+      <div style="margin-top:0.5rem">Wed–Sat 10am–6pm · Sun 11am–4pm</div>
+    </div>
+    <div class="mobile-nav-phone">
+      <a href="tel:+12695550193" class="btn btn-primary btn-lg" style="width:100%; justify-content:center;">Call Us</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE HERO ========== -->
+<section class="page-hero">
+  <div class="container page-hero-inner">
+    <span class="eyebrow">Hands-On Learning</span>
+    <h1>Workshops</h1>
+    <p class="lead">Small groups, good soil, and something you take home. No experience needed — just bring yourself.</p>
+  </div>
+  <svg style="position:absolute;bottom:0;left:3%;opacity:0.1;width:180px;" viewBox="0 0 180 260" fill="none" aria-hidden="true">
+    <path d="M90 250 C90 250 10 180 10 110 C10 55 46 20 90 20 C134 20 170 55 170 110 C170 180 90 250 90 250Z" fill="#88B38D"/>
+  </svg>
+</section>
+
+<!-- ========== HOW IT WORKS ========== -->
+<section class="section" style="padding-bottom:0;" aria-labelledby="how-heading">
+  <div class="container">
+    <div class="grid-3" style="gap:1.5rem; text-align:center; margin-bottom:4rem;">
+      <div class="reveal reveal-delay-1" style="padding:2rem;">
+        <div style="width:56px; height:56px; background:var(--sage-pale); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1rem;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 2C12 2 6 6 6 12C6 15.31 8.69 18 12 18C15.31 18 18 15.31 18 12C18 6 12 2 12 2Z" fill="#5D8A62"/>
+            <path d="M12 18 L12 22" stroke="#3A5438" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h4 style="font-family:var(--font-display); font-size:1.25rem; margin-bottom:0.5rem;">Reserve a Spot</h4>
+        <p style="font-size:0.88rem; color:var(--forest-mid); line-height:1.65;">Call us at (269) 555-0193 to reserve your place. We keep groups small — usually 8–14 people — so every workshop feels personal.</p>
+      </div>
+      <div class="reveal reveal-delay-2" style="padding:2rem;">
+        <div style="width:56px; height:56px; background:var(--sage-pale); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1rem;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="5" y="8" width="14" height="12" rx="2" fill="#C4933A"/>
+            <path d="M8 8 L8 6 C8 4.34 9.34 3 11 3 L13 3 C14.66 3 16 4.34 16 6 L16 8" stroke="#7A5233" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <h4 style="font-family:var(--font-display); font-size:1.25rem; margin-bottom:0.5rem;">We Supply Everything</h4>
+        <p style="font-size:0.88rem; color:var(--forest-mid); line-height:1.65;">All materials — soil, pots, plants, tools — are included in the workshop price. Just show up. Coffee and tea are always available.</p>
+      </div>
+      <div class="reveal reveal-delay-3" style="padding:2rem;">
+        <div style="width:56px; height:56px; background:var(--sage-pale); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1rem;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 21 C12 21 4 16 4 10 C4 6.69 7.13 4 11 4 C11.68 4 12.34 4.1 12.98 4.28" stroke="#5D8A62" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <path d="M12 21 C12 21 20 16 20 10 C20 6.69 16.87 4 13 4" stroke="#5D8A62" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h4 style="font-family:var(--font-display); font-size:1.25rem; margin-bottom:0.5rem;">Take It Home</h4>
+        <p style="font-size:0.88rem; color:var(--forest-mid); line-height:1.65;">Everything you make leaves with you — potted, wrapped, and ready. We'll give you a care card so you know exactly how to keep it happy.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== UPCOMING WORKSHOPS ========== -->
+<section class="section" aria-labelledby="upcoming-heading">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="eyebrow">Summer &amp; Fall 2025</span>
+      <h2 id="upcoming-heading" style="margin-top:0.5rem;">Upcoming <em style="font-style:italic; color:var(--terracotta)">workshops</em></h2>
+      <div class="section-divider"></div>
+    </div>
+
+    <!-- Workshop 1 -->
+    <div class="workshop-full reveal reveal-delay-1">
+      <div class="workshop-full-visual green">
+        <svg width="120" height="140" viewBox="0 0 120 140" fill="none" aria-hidden="true">
+          <!-- Succulent bowl illustration -->
+          <ellipse cx="60" cy="115" rx="48" ry="14" fill="#B85A37"/>
+          <path d="M12 115 L18 82 Q18 70 30 70 L90 70 Q102 70 102 82 L108 115 Z" fill="#C4933A"/>
+          <ellipse cx="60" cy="70" rx="48" ry="12" fill="#D4A84B"/>
+          <!-- Succulents -->
+          <!-- Center rosette -->
+          <circle cx="60" cy="55" r="18" fill="#5D8A62"/>
+          <circle cx="60" cy="55" r="12" fill="#6B9B70"/>
+          <circle cx="60" cy="55" r="7" fill="#88B38D"/>
+          <circle cx="60" cy="55" r="3" fill="#5D8A62"/>
+          <!-- Left succulent -->
+          <circle cx="32" cy="62" r="12" fill="#88B38D"/>
+          <circle cx="32" cy="62" r="7" fill="#5D8A62"/>
+          <circle cx="32" cy="62" r="3" fill="#6B9B70"/>
+          <!-- Right succulent -->
+          <circle cx="88" cy="62" r="12" fill="#6B9B70"/>
+          <circle cx="88" cy="62" r="7" fill="#88B38D"/>
+          <circle cx="88" cy="62" r="3" fill="#5D8A62"/>
+        </svg>
+        <div style="text-align:center; position:relative; z-index:2;">
+          <span style="font-family:var(--font-mono); font-size:0.68rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--forest-mid); display:block; margin-bottom:0.25rem;">July</span>
+          <span style="font-family:var(--font-display); font-size:3.5rem; font-weight:300; line-height:1; color:var(--forest);">12</span>
+          <span style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--forest-mid); display:block; margin-top:0.25rem;">Saturday</span>
+        </div>
+      </div>
+      <div class="workshop-full-body">
+        <span class="eyebrow">Workshop · Beginner Friendly</span>
+        <h2 style="margin-top:0.5rem; font-size:clamp(1.6rem, 3vw, 2.5rem);">Summer Succulent Bowls</h2>
+        <div class="workshop-detail-grid">
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Time</span>
+            <span class="workshop-detail-value">11:00am – 1:00pm</span>
+          </div>
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Price</span>
+            <span class="workshop-detail-value">$48 per person</span>
+          </div>
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Group Size</span>
+            <span class="workshop-detail-value">Max 12 participants</span>
+          </div>
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Age</span>
+            <span class="workshop-detail-value">10 and up</span>
+          </div>
+        </div>
+        <p style="font-size:0.95rem; color:var(--forest-mid); line-height:1.7;">You'll arrange a mixed bowl of drought-tolerant succulents — choosing your own combination from a selection of 6–8 varieties. We'll cover soil layering, spacing for healthy growth, drainage basics, and how to keep your bowl thriving through the summer. Great for absolute beginners and a genuinely fun two hours.</p>
+        <ul class="includes-list">
+          <li>Ceramic or terracotta bowl (yours to keep)</li>
+          <li>6–8 succulent varieties to choose from</li>
+          <li>Cactus mix soil, decorative top dressing, and tools</li>
+          <li>Take-home care card</li>
+          <li>Coffee, tea, and light refreshments</li>
+        </ul>
+        <div style="margin-top:2rem; display:flex; gap:1rem; flex-wrap:wrap;">
+          <a href="tel:+12695550193" class="btn btn-primary btn-lg">
+            <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+              <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Call to Reserve
+          </a>
+          <span style="font-family:var(--font-mono); font-size:0.7rem; color:var(--terracotta); align-self:center; letter-spacing:0.05em;">Spots filling fast</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workshop 2 -->
+    <div class="workshop-full reveal reveal-delay-2">
+      <div class="workshop-full-visual rust">
+        <svg width="120" height="140" viewBox="0 0 120 140" fill="none" aria-hidden="true">
+          <!-- Repotting illustration: rootbound plant + new pot -->
+          <!-- Old pot being lifted -->
+          <path d="M42 90 L36 122 Q36 130 44 130 L60 130" stroke="none"/>
+          <!-- New pot -->
+          <path d="M58 88 L52 122 Q52 130 60 130 L80 130 Q88 130 88 122 L82 88 Z" fill="#C4933A"/>
+          <ellipse cx="70" cy="88" rx="16" ry="5" fill="#D4A84B"/>
+          <!-- Roots visible -->
+          <path d="M60 88 C56 76 54 64 58 52" stroke="#7A5233" stroke-width="1.5" stroke-linecap="round" fill="none" stroke-dasharray="3 2"/>
+          <path d="M68 88 C70 74 68 62 66 50" stroke="#7A5233" stroke-width="1.5" stroke-linecap="round" fill="none" stroke-dasharray="3 2"/>
+          <path d="M76 88 C80 74 80 62 74 50" stroke="#7A5233" stroke-width="1.5" stroke-linecap="round" fill="none" stroke-dasharray="3 2"/>
+          <!-- Plant above -->
+          <path d="M65 50 C48 32 28 36 26 52 C24 66 40 76 58 70 C64 68 66 58 65 50Z" fill="#5D8A62"/>
+          <path d="M65 50 C80 34 100 38 102 54 C104 68 88 76 70 70 C64 68 64 58 65 50Z" fill="#6B9B70"/>
+          <path d="M65 38 C65 38 60 22 65 12 C70 22 65 38 65 38Z" fill="#88B38D"/>
+          <!-- Soil bag -->
+          <rect x="10" y="95" width="32" height="38" rx="4" fill="#7A5233"/>
+          <rect x="14" y="99" width="24" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+          <rect x="14" y="104" width="18" height="1" rx="0.5" fill="rgba(255,255,255,0.15)"/>
+        </svg>
+        <div style="text-align:center; position:relative; z-index:2;">
+          <span style="font-family:var(--font-mono); font-size:0.68rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--bark); display:block; margin-bottom:0.25rem;">July</span>
+          <span style="font-family:var(--font-display); font-size:3.5rem; font-weight:300; line-height:1; color:var(--forest);">26</span>
+          <span style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--bark); display:block; margin-top:0.25rem;">Saturday</span>
+        </div>
+      </div>
+      <div class="workshop-full-body">
+        <span class="eyebrow">Workshop · All Skill Levels</span>
+        <h2 style="margin-top:0.5rem; font-size:clamp(1.6rem, 3vw, 2.5rem);">Repotting Clinic</h2>
+        <div class="workshop-detail-grid">
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Time</span>
+            <span class="workshop-detail-value">10:00am – 12:00pm</span>
+          </div>
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Price</span>
+            <span class="workshop-detail-value">$35 per person</span>
+          </div>
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Group Size</span>
+            <span class="workshop-detail-value">Max 10 participants</span>
+          </div>
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Bring</span>
+            <span class="workshop-detail-value">Your own plant, or use one of ours</span>
+          </div>
+        </div>
+        <p style="font-size:0.95rem; color:var(--forest-mid); line-height:1.7;">We'll walk through the full repotting process: how to know when it's time, how to choose the right pot size and shape, which soil mixes work for different plants, and how to handle roots without causing stress. You'll practice on your own plant or one we provide, and leave with it freshly potted and a solid plan for next time.</p>
+        <ul class="includes-list">
+          <li>Hands-on repotting with your own plant (or one of ours)</li>
+          <li>Full selection of pot sizes to choose from</li>
+          <li>Multiple potting mix options + amendments (perlite, worm castings)</li>
+          <li>Root health assessment and troubleshooting Q&amp;A</li>
+          <li>Take-home aftercare card</li>
+        </ul>
+        <div style="margin-top:2rem; display:flex; gap:1rem; flex-wrap:wrap;">
+          <a href="tel:+12695550193" class="btn btn-primary btn-lg">
+            <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+              <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Call to Reserve
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workshop 3 -->
+    <div class="workshop-full reveal reveal-delay-3">
+      <div class="workshop-full-visual forest">
+        <svg width="120" height="150" viewBox="0 0 120 150" fill="none" aria-hidden="true">
+          <!-- Wreath illustration -->
+          <circle cx="60" cy="80" r="48" stroke="#5D8A62" stroke-width="2" stroke-dasharray="5 3" fill="none"/>
+          <!-- Leaves arranged in circle -->
+          <g>
+            <path d="M60 36 C52 20 38 18 36 30 C34 40 46 48 60 44Z" fill="#5D8A62"/>
+            <path d="M84 44 C94 30 96 16 84 14 C72 12 66 28 76 42Z" fill="#6B9B70"/>
+            <path d="M100 68 C114 64 122 52 114 44 C106 36 92 44 92 58Z" fill="#5D8A62"/>
+            <path d="M104 96 C118 100 124 90 118 80 C112 70 98 74 96 88Z" fill="#88B38D"/>
+            <path d="M88 118 C96 130 108 128 110 118 C112 108 98 100 84 108Z" fill="#5D8A62"/>
+            <path d="M60 126 C60 140 72 144 80 138 C88 132 84 118 68 118Z" fill="#6B9B70"/>
+            <path d="M36 118 C28 130 30 142 40 142 C50 142 56 130 48 120Z" fill="#5D8A62"/>
+            <path d="M16 96 C4 100 2 112 10 118 C18 124 30 116 28 100Z" fill="#88B38D"/>
+            <path d="M16 68 C2 62 -2 74 4 84 C10 94 26 90 28 74Z" fill="#5D8A62"/>
+            <path d="M28 44 C16 36 8 44 12 54 C16 64 30 66 36 52Z" fill="#6B9B70"/>
+          </g>
+          <!-- Ribbon bow -->
+          <path d="M48 128 C40 120 32 124 34 132 C36 138 46 138 48 130 Z" fill="#B85A37"/>
+          <path d="M72 128 C80 120 88 124 86 132 C84 138 74 138 72 130 Z" fill="#B85A37"/>
+          <circle cx="60" cy="130" r="7" fill="#943F23"/>
+        </svg>
+        <div style="text-align:center; position:relative; z-index:2;">
+          <span style="font-family:var(--font-mono); font-size:0.68rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--forest-mid); display:block; margin-bottom:0.25rem;">Sep</span>
+          <span style="font-family:var(--font-display); font-size:3.5rem; font-weight:300; line-height:1; color:var(--forest);">7</span>
+          <span style="font-family:var(--font-mono); font-size:0.65rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--forest-mid); display:block; margin-top:0.25rem;">Sunday</span>
+        </div>
+      </div>
+      <div class="workshop-full-body">
+        <span class="eyebrow">Workshop · All Skill Levels</span>
+        <h2 style="margin-top:0.5rem; font-size:clamp(1.6rem, 3vw, 2.5rem);">Early Fall Wreaths</h2>
+        <div class="workshop-detail-grid">
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Time</span>
+            <span class="workshop-detail-value">12:00pm – 3:00pm</span>
+          </div>
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Price</span>
+            <span class="workshop-detail-value">$65 per person</span>
+          </div>
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Group Size</span>
+            <span class="workshop-detail-value">Max 14 participants</span>
+          </div>
+          <div class="workshop-detail-item">
+            <span class="workshop-detail-label">Bring</span>
+            <span class="workshop-detail-value">Just yourself</span>
+          </div>
+        </div>
+        <p style="font-size:0.95rem; color:var(--forest-mid); line-height:1.7;">Our most popular workshop of the year. We'll build full, lush wreaths using fresh-cut eucalyptus, cedar boughs, dried seedheads, and whatever seasonal foliage is looking beautiful that weekend. No wreath-making experience needed — we walk you through everything. You leave with a finished wreath ready to hang, plus the confidence to make one yourself.</p>
+        <ul class="includes-list">
+          <li>12" grapevine or wire frame</li>
+          <li>Fresh eucalyptus, cedar, and mixed seasonal greenery</li>
+          <li>Dried elements: seedheads, preserved leaves, berries (seasonal)</li>
+          <li>Ribbon or jute for hanging</li>
+          <li>Floral wire, clippers, and a step-by-step guide to keep</li>
+          <li>Cider, tea, and a small snack spread</li>
+        </ul>
+        <div style="margin-top:2rem; display:flex; gap:1rem; flex-wrap:wrap;">
+          <a href="tel:+12695550193" class="btn btn-primary btn-lg">
+            <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+              <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Call to Reserve
+          </a>
+          <span style="font-family:var(--font-mono); font-size:0.7rem; color:var(--sage); align-self:center; letter-spacing:0.05em;">Early registration suggested</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PRIVATE WORKSHOPS ========== -->
+<section class="section" style="background:var(--parchment);" aria-labelledby="private-workshops-heading">
+  <div class="container">
+    <div class="grid-2" style="gap:clamp(2.5rem,5vw,5rem); align-items:center;">
+      <div class="reveal">
+        <span class="eyebrow">For Your Group</span>
+        <h2 id="private-workshops-heading" style="margin-top:0.6rem;">Want a <em style="font-style:italic; color:var(--terracotta)">private</em><br>workshop?</h2>
+        <div class="section-divider" style="margin: 1.25rem 0;"></div>
+        <p class="lead">We offer all of these workshops as private events for birthdays, showers, team outings, and more. You pick the workshop, we pick the date and handle everything else.</p>
+        <p style="font-size:0.92rem; color:var(--forest-mid); margin-top:1rem; line-height:1.7;">Private workshops run for groups of 8–25 people and can be customized in scope and duration. We can add a welcome drink, shop a discount for guests, or pair the workshop with a plant-shopping hour. Inquire by phone and we'll put together a proposal.</p>
+        <a href="events.html" class="btn btn-primary btn-lg" style="margin-top:2rem;">See Private Events</a>
+      </div>
+      <div class="reveal reveal-delay-2">
+        <div style="background:var(--white); border-radius:var(--radius-xl); padding:2.5rem; border:1px solid var(--parchment-dk);">
+          <h4 style="font-family:var(--font-display); font-size:1.4rem; margin-bottom:1.25rem;">Good to Know</h4>
+          <div style="display:flex;flex-direction:column;gap:1.1rem;">
+            <div style="display:flex;gap:0.75rem;align-items:start;">
+              <div style="width:28px;height:28px;background:var(--sage-pale);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5.5" stroke="#5D8A62" stroke-width="1.2"/><path d="M4 6.5L6 8.5L9.5 5" stroke="#5D8A62" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <p style="font-size:0.88rem;color:var(--forest-mid);line-height:1.6;margin:0;"><strong style="color:var(--forest);font-style:normal;">Reservations required.</strong> We don't do walk-in workshop spots. Call ahead and we'll hold your place.</p>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:start;">
+              <div style="width:28px;height:28px;background:var(--sage-pale);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5.5" stroke="#5D8A62" stroke-width="1.2"/><path d="M4 6.5L6 8.5L9.5 5" stroke="#5D8A62" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <p style="font-size:0.88rem;color:var(--forest-mid);line-height:1.6;margin:0;"><strong style="color:var(--forest);font-style:normal;">Payment at the door.</strong> We accept cash, card, and Venmo. No deposit required for public workshops.</p>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:start;">
+              <div style="width:28px;height:28px;background:var(--sage-pale);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5.5" stroke="#5D8A62" stroke-width="1.2"/><path d="M4 6.5L6 8.5L9.5 5" stroke="#5D8A62" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <p style="font-size:0.88rem;color:var(--forest-mid);line-height:1.6;margin:0;"><strong style="color:var(--forest);font-style:normal;">Kids are welcome</strong> at succulent bowl workshops (ages 10+) and wreath workshops (ages 12+).</p>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:start;">
+              <div style="width:28px;height:28px;background:var(--sage-pale);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="5.5" stroke="#5D8A62" stroke-width="1.2"/><path d="M4 6.5L6 8.5L9.5 5" stroke="#5D8A62" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <p style="font-size:0.88rem;color:var(--forest-mid);line-height:1.6;margin:0;"><strong style="color:var(--forest);font-style:normal;">New workshops</strong> are announced on our newsletter first. Sign up below so you don't miss a date.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== CTA ========== -->
+<div class="cta-band">
+  <div class="container" style="position:relative;z-index:2;">
+    <h2>Ready to join us?</h2>
+    <p class="lead">Call us to reserve your spot — all it takes is a quick phone call and your name on the list.</p>
+    <a href="tel:+12695550193" class="btn-white">
+      <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+        <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Call (269) 555-0193
+    </a>
+  </div>
+</div>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="site-logo" style="margin-bottom:0.75rem; display:inline-flex;">
+          <svg class="logo-mark" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+            <circle cx="18" cy="18" r="17" fill="rgba(93,138,98,0.3)" stroke="#5D8A62" stroke-width="1.5"/>
+            <path d="M18 30 C18 30 10 22 10 16 C10 11.58 13.58 8 18 8 C22.42 8 26 11.58 26 16 C26 22 18 30 18 30Z" fill="#88B38D"/>
+            <path d="M18 16 C18 16 14 13 14 10 C14 10 16 9 18 11 C20 9 22 10 22 10 C22 13 18 16 18 16Z" fill="#5D8A62"/>
+          </svg>
+          <span>
+            <span class="logo-text">Juniper Lane</span>
+            <span class="logo-sub">Plant Shop &amp; Gifts</span>
+          </span>
+        </a>
+        <p class="footer-tagline">A warm neighborhood shop rooted in Benton Harbor since 2018.</p>
+      </div>
+      <div>
+        <div class="footer-heading">Explore</div>
+        <ul class="footer-links">
+          <li><a href="shop.html">Shop</a></li>
+          <li><a href="workshops.html">Workshops</a></li>
+          <li><a href="plant-care.html">Plant Care Tips</a></li>
+          <li><a href="events.html">Private Events</a></li>
+          <li><a href="visit.html">Visit Us</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-heading">Find Us</div>
+        <div class="footer-info">
+          <strong>214 Maple Street</strong><br>
+          Benton Harbor, MI 49022<br><br>
+          <strong>Wed–Sat</strong> 10am–6pm<br>
+          <strong>Sunday</strong> 11am–4pm<br>
+          Mon &amp; Tue: Closed<br><br>
+          <a href="tel:+12695550193" style="color:var(--sage-light);">(269) 555-0193</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-heading">Stay in the Loop</div>
+        <p style="font-size:0.85rem; color:rgba(245,237,215,0.6); margin-bottom:1rem; line-height:1.6;">Workshop dates go to subscribers first.</p>
+        <div class="newsletter-wrap">
+          <form class="newsletter-form" aria-label="Newsletter signup">
+            <input type="email" placeholder="your@email.com" required autocomplete="email">
+            <button type="submit">Subscribe</button>
+          </form>
+          <div class="newsletter-success" role="status">You're on the list. See you soon!</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-copy">© 2025 Juniper Lane · 214 Maple Street, Benton Harbor, MI</span>
+      <span class="footer-copy">Made with care in Michigan</span>
+    </div>
+  </div>
+</footer>
+
+<a href="tel:+12695550193" class="mobile-phone-bar" aria-label="Call Juniper Lane">
+  <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+    <path d="M2.5 1.5C2.5 1.5 1 1.5 1 3C1 6.5 6.5 12 10 12C11.5 12 11.5 10.5 11.5 10.5L9.5 8.5L8 9.5C8 9.5 5 7 4 4.5L5 3L2.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  Call to Reserve · (269) 555-0193
+</a>
+
+<script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Department of Earth, Atmospheric & Marine Sciences at Brennan University — research, teaching, and field programs across coastal Massachusetts and beyond.">
+  <title>Department of Earth, Atmospheric &amp; Marine Sciences — Brennan University</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400..700;1,400..700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ============================================================
+       SHARED HEADER (also appears on every other page)
+       ============================================================ -->
+  <header class="site-header" role="banner">
+    <div class="utility-bar">
+      <div class="container">
+        <span>Brennan University &middot; College of Science &middot; <span class="small-caps">est.&nbsp;1947</span></span>
+        <nav aria-label="Utility">
+          <a href="https://brennan.example.edu/">Brennan.edu</a>
+          <a href="https://brennan.example.edu/library/">Library</a>
+          <a href="https://brennan.example.edu/portal/">myBrennan</a>
+          <a href="https://brennan.example.edu/giving/eams/">Give to EAMS</a>
+        </nav>
+      </div>
+    </div>
+    <div class="brand-bar">
+      <div class="container">
+        <a href="index.html" aria-label="EAMS home" style="display:flex; align-items:center; gap:18px; border-bottom:0;">
+          <!-- Inline SVG university crest -->
+          <svg class="crest" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="crestNavy" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#2a3a5e"/>
+                <stop offset="1" stop-color="#08152a"/>
+              </linearGradient>
+            </defs>
+            <!-- shield -->
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z"
+                  fill="url(#crestNavy)" stroke="#b08938" stroke-width="1.5"/>
+            <!-- horizon line -->
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <!-- wave above horizon -->
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <!-- mountain peaks below horizon -->
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <!-- sun -->
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+            <!-- date banner -->
+            <rect x="20" y="52" width="24" height="6" fill="#8c3a2a"/>
+            <text x="32" y="56.6" text-anchor="middle" font-family="Inter,sans-serif" font-size="4.4" font-weight="600" fill="#ecd9a8" letter-spacing="0.3">EAMS</text>
+          </svg>
+          <span class="brand-text">
+            <span class="brand-institution">Brennan University</span>
+            <span class="brand-department">Earth, Atmospheric <span class="amp">&amp;</span> Marine Sciences</span>
+          </span>
+        </a>
+        <button class="nav-toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Toggle menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+          <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="faculty.html">Faculty</a></li>
+            <li><a href="programs.html">Programs</a></li>
+            <li><a href="courses.html">Courses</a></li>
+            <li><a href="research.html">Research</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="events.html">Events</a></li>
+            <li><a href="contact.html">Contact</a></li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="home-hero">
+    <div class="container">
+      <div>
+        <span class="eyebrow">Welcome from the Chair</span>
+        <h1>Studying the systems that hold the planet together &mdash; and the ones that are coming apart.</h1>
+        <p class="tagline">Coastal field sites, instrumented oceans, ice cores from two continents.</p>
+
+        <blockquote class="chair-quote">
+          For nearly eighty years, EAMS faculty and students have worked across the boundary between rock, water, and air &mdash; from the granite cliffs at Cobbett Point to the Labrador Sea. Our department is small enough that every undergraduate has a research home by sophomore year, and large enough to host a thirty-foot piston core and a full atmospheric chemistry suite. Whether you are deciding on a major, considering graduate study, or visiting the building for a seminar, we are glad to have you.
+        </blockquote>
+        <p class="chair-attribution">
+          &mdash; Prof. Asha Mahalingam<br>
+          <span style="color:var(--slate); font-weight:400;">Chair &middot; Henry C. Brennan Professor of Physical Oceanography</span>
+        </p>
+      </div>
+
+      <div>
+        <div class="photo-block brick large" role="img"
+          aria-label="Mendel Hall, the four-story red-brick department building, with maple trees and a granite entry portico"
+          data-caption="Mendel Hall &middot; built 1923, renovated 2014"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       BY THE NUMBERS
+       ============================================================ -->
+  <section class="stat-strip" aria-label="Department at a glance">
+    <div class="container">
+      <div class="stat">
+        <span class="stat-number">38</span>
+        <span class="stat-label">Faculty &amp; research staff</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">412</span>
+        <span class="stat-label">Undergraduates &amp; grad students</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">61</span>
+        <span class="stat-label">Active federal &amp; foundation grants</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">$24.6M</span>
+        <span class="stat-label">Annual research funding (FY25)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       NEWS HIGHLIGHTS
+       ============================================================ -->
+  <main>
+    <section class="container" aria-labelledby="news-heading">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">In the news</span>
+          <h2 id="news-heading">Recent stories</h2>
+        </div>
+        <a href="news.html" class="more-link">All news &rarr;</a>
+      </div>
+
+      <div class="card-grid three">
+        <article class="card">
+          <div class="photo-block ocean" role="img"
+            aria-label="A research vessel at dawn, gantry crane silhouetted against an orange sky, deploying a yellow CTD rosette"
+            data-caption="R/V Cobbett Bay &middot; spring 2026 cruise"></div>
+          <span class="meta">Field Reports &middot; May 22, 2026</span>
+          <h3>Spring cruise returns with 14 sediment cores from the western North Atlantic shelf</h3>
+          <p class="dek">The 18-day cruise aboard the R/V <em>Cobbett Bay</em> wrapped operations off the Scotian Shelf last week, recovering the longest piston cores ever pulled from the Wilkinson Basin.</p>
+          <a class="more" href="news.html#cruise-2026">Read &rarr;</a>
+        </article>
+
+        <article class="card">
+          <div class="photo-block atmosphere" role="img"
+            aria-label="A weather balloon being released at sunrise from a coastal launch pad, atmospheric instruments dangling below"
+            data-caption="Cobbett Point boundary-layer station"></div>
+          <span class="meta">Grants &middot; May 8, 2026</span>
+          <h3>Adeyemi lab awarded $3.1M NSF grant to extend coastal aerosol observatory</h3>
+          <p class="dek">The four-year award funds three new instrumented towers along the Massachusetts Bay sea-breeze front and a graduate-student-led data portal.</p>
+          <a class="more" href="news.html#adeyemi-grant">Read &rarr;</a>
+        </article>
+
+        <article class="card">
+          <div class="photo-block paleo" role="img"
+            aria-label="Close-up of a striped sediment core split lengthwise, alternating dark and pale layers under a fluorescent lab lamp"
+            data-caption="Holocene varves from Penobscot Bay"></div>
+          <span class="meta">Awards &middot; April 30, 2026</span>
+          <h3>PhD candidate Maya Two-Hawk named Packard Climate Fellow</h3>
+          <p class="dek">Two-Hawk, advised by Prof. Rasmussen, will use the three-year fellowship to extend her isotope work on Holocene drought cycles in the Gulf of Maine.</p>
+          <a class="more" href="news.html#two-hawk-packard">Read &rarr;</a>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         UPCOMING EVENTS STRIP
+         ============================================================ -->
+    <section class="container" aria-labelledby="events-heading" style="margin-top:64px;">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Department calendar</span>
+          <h2 id="events-heading">Coming up</h2>
+        </div>
+        <a href="events.html" class="more-link">Full calendar &rarr;</a>
+      </div>
+
+      <div class="event-list">
+        <article class="event">
+          <div class="event-date">
+            <span class="month">Jun</span>
+            <span class="day">25</span>
+            <time class="time" datetime="2026-06-25T15:00">3:00&nbsp;PM</time>
+          </div>
+          <div class="event-body">
+            <span class="event-type defense">Dissertation Defense</span>
+            <h3>Ezra Okonkwo-Lin &mdash; <em>Mesoscale eddy heat transport in the Gulf Stream extension, 1993&ndash;2024</em></h3>
+            <div class="event-meta">
+              Committee chair: Prof. Mahalingam <span class="pipe">&middot;</span> <span class="room-code">M-302</span> Mendel Hall &middot; reception to follow in the atrium
+            </div>
+          </div>
+        </article>
+
+        <article class="event">
+          <div class="event-date">
+            <span class="month">Jul</span>
+            <span class="day">09</span>
+            <time class="time" datetime="2026-07-09T18:30">6:30&nbsp;PM</time>
+          </div>
+          <div class="event-body">
+            <span class="event-type public">Public Lecture</span>
+            <h3>Heat domes, the Atlantic blob, and what made 2024 the hottest summer on record</h3>
+            <div class="event-meta">
+              Speaker: Prof. Wei-Ling Tan, Atmospheric Sciences <span class="pipe">&middot;</span> <span class="room-code">Hartwell Aud.</span> &middot; free, open to the public
+            </div>
+          </div>
+        </article>
+
+        <article class="event">
+          <div class="event-date">
+            <span class="month">Jul</span>
+            <span class="day">15</span>
+            <time class="time" datetime="2026-07-15T09:00">9:00&nbsp;AM</time>
+          </div>
+          <div class="event-body">
+            <span class="event-type field">Field Trip</span>
+            <h3>Summer field-camp orientation: EAMS 2210 Coastal Sedimentary Systems</h3>
+            <div class="event-meta">
+              Co-led by Prof. Kasprzak and Prof. Two-Hawk &middot; meets at <span class="room-code">M-118</span> Mendel Hall &middot; transport to Cobbett Point provided
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         FEATURED RESEARCH STORY
+         ============================================================ -->
+    <section class="container" aria-labelledby="feature-heading">
+      <div class="feature-story">
+        <div>
+          <span class="eyebrow gold">Research Spotlight</span>
+          <h2 id="feature-heading">Listening to the overturning slowdown</h2>
+          <p class="dek">After eight years of moored observations across the western boundary, the Mahalingam Lab is publishing the first continuous regional record of the Atlantic Meridional Overturning Circulation.</p>
+          <p>Most published estimates of the AMOC's recent decline have leaned heavily on the RAPID array at 26&deg;N. Prof. Mahalingam's group has, since 2017, kept seven bottom-mounted instruments at the western edge of the subpolar gyre, recording temperature, salinity, and bottom currents at fifteen-minute resolution. Their new <em>Nature Geoscience</em> paper combines those moorings with tracer chemistry from annual ship visits to reconstruct a regional overturning index back to 1820, finding a step-decline that begins decades earlier than the global average suggests.</p>
+          <p><a href="research.html#area-coastal">Read more from the Coastal Resilience program &rarr;</a></p>
+        </div>
+        <div>
+          <div class="photo-block ocean large" role="img"
+            aria-label="A bottom-moored oceanographic instrument package being lowered over the stern of a research vessel into deep blue water"
+            data-caption="Mooring K3 redeployment, Labrador Sea, Aug 2025"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         QUICK LINKS
+         ============================================================ -->
+    <section class="container" aria-labelledby="quick-heading" style="margin-top:64px;">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Find what you need</span>
+          <h2 id="quick-heading">Quick links</h2>
+        </div>
+      </div>
+      <div class="quick-links">
+        <a class="quick-link" href="programs.html#undergraduate">
+          <svg class="ql-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+            <path d="M3 9l9-5 9 5-9 5z"/>
+            <path d="M7 11v5c0 1 2 2 5 2s5-1 5-2v-5"/>
+            <path d="M21 9v6"/>
+          </svg>
+          <h3>Apply</h3>
+          <p>Undergraduate majors, graduate degrees, and the 5-year combined BS/MS pathway.</p>
+        </a>
+        <a class="quick-link" href="programs.html#graduate">
+          <svg class="ql-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+            <path d="M8 8h8M8 12h8M8 16h5"/>
+          </svg>
+          <h3>Current students</h3>
+          <p>Advising, registration, fieldwork forms, and the graduate student handbook.</p>
+        </a>
+        <a class="quick-link" href="faculty.html">
+          <svg class="ql-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+            <circle cx="9" cy="8" r="3.4"/>
+            <circle cx="17" cy="10" r="2.4"/>
+            <path d="M3 19c0-3 3-5 6-5s6 2 6 5M15 19c0-2 1.6-3.4 3.6-3.4S22 17 22 19"/>
+          </svg>
+          <h3>Faculty directory</h3>
+          <p>Search 38 faculty and research staff by research area, lab, or office.</p>
+        </a>
+        <a class="quick-link" href="courses.html">
+          <svg class="ql-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+            <path d="M4 5h13a3 3 0 013 3v11H7a3 3 0 01-3-3z"/>
+            <path d="M4 5v14M8 9h8M8 12h6"/>
+          </svg>
+          <h3>Course catalog</h3>
+          <p>Browse the full 2026&ndash;2027 EAMS catalog &mdash; 30+ courses across five levels.</p>
+        </a>
+        <a class="quick-link" href="contact.html">
+          <svg class="ql-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+            <path d="M12 21s-7-5.5-7-11a7 7 0 0114 0c0 5.5-7 11-7 11z"/>
+            <circle cx="12" cy="10" r="2.5"/>
+          </svg>
+          <h3>Visit</h3>
+          <p>Mendel Hall hours, building access, parking, transit, and accessibility info.</p>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================================================
+       SHARED FOOTER
+       ============================================================ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <svg class="crest" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M32 4 L58 12 L58 30 C58 46 47 56 32 60 C17 56 6 46 6 30 L6 12 Z"
+                  fill="#14233f" stroke="#b08938" stroke-width="1.5"/>
+            <path d="M10 34 L54 34" stroke="#b08938" stroke-width="1"/>
+            <path d="M10 30 Q16 26 22 30 T34 30 T46 30 T54 30" stroke="#ecd9a8" stroke-width="1.2" fill="none"/>
+            <path d="M10 50 L20 38 L28 46 L36 36 L48 50 Z" fill="#b08938" opacity="0.85"/>
+            <circle cx="44" cy="20" r="4" fill="#ecd9a8"/>
+          </svg>
+          <p><strong style="color:var(--paper);">Department of Earth, Atmospheric &amp; Marine Sciences</strong><br>
+            Brennan University &middot; Mendel Hall<br>
+            415 Brennan Avenue<br>
+            Brennan, Massachusetts 02143</p>
+        </div>
+        <div>
+          <h4>Academics</h4>
+          <ul>
+            <li><a href="programs.html#undergraduate">Undergraduate</a></li>
+            <li><a href="programs.html#masters">Master's</a></li>
+            <li><a href="programs.html#phd">PhD</a></li>
+            <li><a href="programs.html#minors">Minors</a></li>
+            <li><a href="courses.html">Course catalog</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>People &amp; research</h4>
+          <ul>
+            <li><a href="faculty.html">Faculty directory</a></li>
+            <li><a href="research.html#labs">Labs &amp; centers</a></li>
+            <li><a href="research.html#publications">Publications</a></li>
+            <li><a href="research.html#grants">Funded projects</a></li>
+            <li><a href="contact.html#staff">Department staff</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Visit &amp; connect</h4>
+          <ul>
+            <li><a href="contact.html">Contact</a></li>
+            <li><a href="events.html">Events &amp; seminars</a></li>
+            <li><a href="news.html">News</a></li>
+            <li><a href="https://brennan.example.edu/giving/eams/">Make a gift</a></li>
+            <li><a href="https://brennan.example.edu/library/eams/">Hartwell Library</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2008&ndash;2026 The Trustees of Brennan University. All rights reserved.</span>
+        <span class="established">Academic year <span data-academic-year>2025&ndash;2026</span> &middot; Department reorganized 2008 &middot; Established 1947</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>

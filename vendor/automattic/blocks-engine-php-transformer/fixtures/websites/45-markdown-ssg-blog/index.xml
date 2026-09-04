@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Cold Start</title>
+    <link>https://coldstart.dev/</link>
+    <description>A software-craft blog about distributed systems, storage engines, and the quiet engineering that keeps production alive.</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <managingEditor>mara@coldstart.dev (Mara Quintero)</managingEditor>
+    <webMaster>mara@coldstart.dev (Mara Quintero)</webMaster>
+    <copyright>2024 Cold Start</copyright>
+    <lastBuildDate>Tue, 18 Jun 2024 09:15:00 +0000</lastBuildDate>
+    <atom:link href="https://coldstart.dev/index.xml" rel="self" type="application/rss+xml"/>
+
+    <item>
+      <title>The Cost of an fsync, Measured</title>
+      <link>https://coldstart.dev/posts/the-cost-of-an-fsync/</link>
+      <pubDate>Tue, 18 Jun 2024 09:15:00 +0000</pubDate>
+      <author>mara@coldstart.dev (Mara Quintero)</author>
+      <guid>https://coldstart.dev/posts/the-cost-of-an-fsync/</guid>
+      <description>Everyone says fsync is expensive. Few say how expensive, or why the number swings by four orders of magnitude depending on your hardware. A short, numbers-first field note.</description>
+      <category>storage</category>
+      <category>durability</category>
+      <category>performance</category>
+    </item>
+
+    <item>
+      <title>Consensus Without Tears: What Raft Actually Promises</title>
+      <link>https://coldstart.dev/posts/consensus-without-tears/</link>
+      <pubDate>Tue, 28 May 2024 08:45:00 +0000</pubDate>
+      <author>mara@coldstart.dev (Mara Quintero)</author>
+      <guid>https://coldstart.dev/posts/consensus-without-tears/</guid>
+      <description>Distributed consensus has a reputation for being impossibly hard. Raft made it merely difficult. Here's the mental model that makes Raft click.</description>
+      <category>distributed-systems</category>
+      <category>consensus</category>
+      <category>raft</category>
+    </item>
+
+    <item>
+      <title>Backpressure, or How to Say No Before You Fall Over</title>
+      <link>https://coldstart.dev/posts/backpressure/</link>
+      <pubDate>Tue, 07 May 2024 07:30:00 +0000</pubDate>
+      <author>devin@coldstart.dev (Devin Osei)</author>
+      <guid>https://coldstart.dev/posts/backpressure/</guid>
+      <description>Unbounded queues are not resilience — they're a slow-motion outage with extra latency. A practical look at backpressure, load shedding, and the art of failing on purpose.</description>
+      <category>reliability</category>
+      <category>queues</category>
+      <category>sre</category>
+    </item>
+
+    <item>
+      <title>Idempotency Keys: The Cheapest Insurance in Distributed Systems</title>
+      <link>https://coldstart.dev/posts/idempotency-keys/</link>
+      <pubDate>Tue, 16 Apr 2024 08:00:00 +0000</pubDate>
+      <author>mara@coldstart.dev (Mara Quintero)</author>
+      <guid>https://coldstart.dev/posts/idempotency-keys/</guid>
+      <description>A small, boring pattern that quietly prevents double-charges, duplicate orders, and a whole category of 2 a.m. pages.</description>
+      <category>distributed-systems</category>
+      <category>apis</category>
+      <category>patterns</category>
+    </item>
+
+    <item>
+      <title>Your Retries Are Making the Outage Worse</title>
+      <link>https://coldstart.dev/posts/retries-make-outages-worse/</link>
+      <pubDate>Mon, 25 Mar 2024 06:15:00 +0000</pubDate>
+      <author>devin@coldstart.dev (Devin Osei)</author>
+      <guid>https://coldstart.dev/posts/retries-make-outages-worse/</guid>
+      <description>Retries feel like resilience. Under load they're often the thing that turns a small hiccup into a full outage.</description>
+      <category>reliability</category>
+      <category>distributed-systems</category>
+      <category>operations</category>
+    </item>
+
+    <item>
+      <title>LSM Trees vs. B-Trees: A Bet About Your Workload</title>
+      <link>https://coldstart.dev/posts/lsm-vs-btree/</link>
+      <pubDate>Mon, 04 Mar 2024 07:45:00 +0000</pubDate>
+      <author>mara@coldstart.dev (Mara Quintero)</author>
+      <guid>https://coldstart.dev/posts/lsm-vs-btree/</guid>
+      <description>B-trees and LSM trees aren't competitors so much as opposite wagers on whether you read more than you write.</description>
+      <category>storage</category>
+      <category>databases</category>
+      <category>performance</category>
+    </item>
+
+    <item>
+      <title>The Write-Ahead Log Is the Database</title>
+      <link>https://coldstart.dev/posts/write-ahead-log/</link>
+      <pubDate>Mon, 12 Feb 2024 08:30:00 +0000</pubDate>
+      <author>mara@coldstart.dev (Mara Quintero)</author>
+      <guid>https://coldstart.dev/posts/write-ahead-log/</guid>
+      <description>Almost every durable storage system you use is, underneath, a write-ahead log with some indexes bolted on top.</description>
+      <category>storage</category>
+      <category>durability</category>
+      <category>databases</category>
+    </item>
+
+  </channel>
+</rss>

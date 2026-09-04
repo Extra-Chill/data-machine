@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ep 14 · Building a tool library from a single donated drill — with Marcus Haines · Slow Burn Stories</title>
+  <meta name="description" content="Season 3, episode 14 of Slow Burn Stories. Cassia Romero talks with Marcus Haines, founder of Foundry Row, about the four-year slow build of an East Bay tool-lending nonprofit and the single suggestion that quietly reshaped the entire model.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a href="index.html" class="nav-logo" aria-label="Slow Burn Stories — Home">
+        <svg class="nav-logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="20" cy="20" r="18.5" stroke="#d97333" stroke-width="1.2"/>
+          <circle cx="20" cy="20" r="14" fill="#2d1f3a"/>
+          <path d="M14 13 L14 27 L26 20 Z" fill="#d97333"/>
+          <path d="M20 4 Q22 7 20 10 Q18 7 20 4 Z" fill="#d97333" opacity="0.55"/>
+          <circle cx="20" cy="20" r="1.6" fill="#f3ead9"/>
+        </svg>
+        <span class="nav-logo-text">
+          <span class="nav-logo-title">Slow Burn Stories</span>
+          <span class="nav-logo-sub">A podcast · with Cassia Romero</span>
+        </span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="index.html">Home</a>
+        <a href="episodes.html">Episodes</a>
+        <a href="about.html">About</a>
+        <a href="subscribe.html">Subscribe</a>
+        <a href="subscribe.html#support" class="nav-cta">Support the Show</a>
+      </nav>
+
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+    <a href="index.html">Home</a>
+    <a href="episodes.html">Episodes</a>
+    <a href="about.html">About</a>
+    <a href="subscribe.html">Subscribe</a>
+    <a href="subscribe.html#support" class="mobile-nav-cta">Support the Show</a>
+  </nav>
+
+  <main>
+
+    <!-- ── Episode Hero ───────────────────────────────── -->
+    <section class="episode-hero">
+      <div class="container">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="episodes.html">Episodes</a>
+          <span class="sep">/</span>
+          <a href="episodes.html#season-3">Season 3</a>
+          <span class="sep">/</span>
+          <span class="current">Ep 14 · Marcus Haines</span>
+        </nav>
+
+        <div class="episode-hero-grid">
+
+          <!-- Show artwork (with embedded play) -->
+          <div class="hero-art-wrap">
+            <div class="artwork" aria-label="Episode 14 artwork — Marcus Haines, Foundry Row">
+              <div class="artwork-inner">
+                <div class="artwork-top">
+                  <span>S3 · Ep 14</span>
+                  <span>72:14</span>
+                </div>
+                <div>
+                  <div class="artwork-title">Building a tool library from<br>a <em>donated drill.</em></div>
+                </div>
+                <div class="artwork-bottom">
+                  <span>Marcus Haines</span>
+                  <span>Foundry Row</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Episode meta / player -->
+          <div>
+            <div class="ep-eyebrow">
+              <span class="ember">Season 3 · Episode 14</span>
+              <span class="muted">Released Tuesday, June 17, 2026</span>
+            </div>
+
+            <h1>Building a tool library from a single <em>donated drill.</em></h1>
+            <p class="guest-line">A conversation with Marcus Haines, founder of Foundry Row</p>
+
+            <div class="ep-stats">
+              <div class="ep-stat">
+                <span class="label">Duration</span>
+                <span class="value">1 hr 12 min</span>
+              </div>
+              <div class="ep-stat">
+                <span class="label">Recorded</span>
+                <span class="value">May 28, 2026</span>
+              </div>
+              <div class="ep-stat">
+                <span class="label">Episode no.</span>
+                <span class="value">S03E14</span>
+              </div>
+              <div class="ep-stat">
+                <span class="label">Location</span>
+                <span class="value">Oakland · the garage</span>
+              </div>
+            </div>
+
+            <!-- ── Custom Audio Player ───────────────── -->
+            <div class="player" role="region" aria-label="Audio player for episode 14">
+              <div class="player-top">
+                <button class="player-play" type="button" aria-label="Play episode">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7L7 5z"/></svg>
+                </button>
+                <div class="player-controls-secondary">
+                  <button type="button" aria-label="Skip back 15 seconds" data-skip-back>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+                  </button>
+                  <button type="button" aria-label="Skip forward 30 seconds" data-skip-forward>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+                  </button>
+                </div>
+                <div class="player-scrub">
+                  <div class="player-track" role="slider" tabindex="0" aria-label="Episode progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="22">
+                    <div class="player-track-fill"></div>
+                    <div class="player-track-handle"></div>
+                  </div>
+                  <div class="player-times">
+                    <span data-current-time>15:53</span>
+                    <button type="button" class="player-speed" aria-label="Change playback speed">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg>
+                      <span data-speed-value>1×</span>
+                    </button>
+                    <span data-duration>1:12:14</span>
+                  </div>
+                </div>
+              </div>
+              <audio class="player-native" controls preload="none" src="audio/ep-014-marcus-haines.mp3">
+                Your browser doesn't support the audio element. <a href="audio/ep-014-marcus-haines.mp3">Download the MP3</a>.
+              </audio>
+
+              <!-- Listen-on row -->
+              <div class="listen-on-row">
+                <span class="label">Or listen in</span>
+                <a href="subscribe.html#apple" class="listen-pill">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>
+                  Apple Podcasts
+                </a>
+                <a href="subscribe.html#spotify" class="listen-pill">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>
+                  Spotify
+                </a>
+                <a href="subscribe.html#overcast" class="listen-pill">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>
+                  Overcast
+                </a>
+                <a href="subscribe.html#pocketcasts" class="listen-pill">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>
+                  Pocket Casts
+                </a>
+                <a href="subscribe.html#rss" class="listen-pill">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="18" r="2"/><path d="M4 10a10 10 0 0 1 10 10" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                  RSS
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Episode Body ───────────────────────────────── -->
+    <section class="episode-body">
+      <div class="container">
+        <div class="episode-body-grid">
+
+          <article class="episode-content">
+
+            <!-- Dek -->
+            <p class="episode-dek">Marcus Haines spent four years turning a rented Oakland garage into a tool-lending nonprofit that now serves four East Bay neighborhoods. We talk about the slow, mostly unphotogenic work of building public infrastructure when nobody asked for it — and about the suggestion from a single member, posted in the comments of a Patreon update, that ended up quietly reshaping the entire membership model.</p>
+
+            <!-- Guest Bio -->
+            <h2 class="section-h">About the guest</h2>
+            <div class="guest-bio">
+              <div class="photo-block photo-marcus" aria-label="Portrait of Marcus Haines at Foundry Row"></div>
+              <div>
+                <h3 class="bio-name">Marcus Haines</h3>
+                <p class="bio-role">Founder &amp; Director · Foundry Row · Oakland, CA</p>
+                <p>Marcus is the founder of <strong>Foundry Row</strong>, a free, member-supported tool library now serving the Fruitvale, San Antonio, Dimond, and Eastmont neighborhoods of East Oakland. The collection began in 2021 with a single donated DeWalt drill and a chest freezer's worth of secondhand hand tools. It now circulates over 2,400 items — power tools, garden equipment, sewing machines, ladders, a 12-inch table saw, and one large, beloved pasta maker — to roughly 3,700 members across four storefronts.</p>
+                <p>Before Foundry Row, Marcus spent twelve years as a journeyman carpenter and another four running the cabinet shop for a custom millwork outfit in Berkeley. He is a 2024 fellow of the <em>Just Transition</em> civic infrastructure cohort and has written about the cooperative-tool-library model for <em>The Long Now Quarterly</em> and <em>Shareable</em>.</p>
+              </div>
+            </div>
+
+            <!-- Show Notes -->
+            <h2 class="section-h">Show notes</h2>
+            <p style="color: var(--slate); margin-bottom: var(--sp-md); max-width: 65ch;">Mentioned in the conversation. Compiled by Priya Anand-Kowalski with help, as always, from the listeners who emailed corrections.</p>
+            <ul class="shownotes">
+              <li>
+                <span class="ts">00:00</span>
+                <span>Cold open: Marcus reading the original Craigslist post he wrote in February 2021 looking for "any unwanted tools in working condition" — the post that launched the whole thing.</span>
+              </li>
+              <li>
+                <span class="ts">04:18</span>
+                <span><a href="#">Foundry Row's public catalog and reservation system</a> — open source, built by a volunteer named Theo who lives in Detroit and has, at the time of recording, never met Marcus in person.</span>
+              </li>
+              <li>
+                <span class="ts">11:42</span>
+                <span><em>The Tools We Need</em> by Hellen Lawrence Quattro (Long Reach Press, 2019) — a small book about the politics of tool ownership that Marcus has bought and given away "probably forty copies of by now."</span>
+              </li>
+              <li>
+                <span class="ts">19:05</span>
+                <span>The <a href="#">North Portland Tool Library</a>, which Marcus visited in 2020 and credits as the model that proved this could work in an American city without university funding.</span>
+              </li>
+              <li>
+                <span class="ts">26:40</span>
+                <span><em>Tools as Infrastructure</em> — Marcus's 2023 essay in <a href="#">Shareable</a>, the piece that ended up bringing in their first $50,000 unrestricted grant from a small family foundation in Berkeley.</span>
+              </li>
+              <li>
+                <span class="ts">34:11</span>
+                <span>The <a href="#">Eastmont Mall pop-up branch</a>, the second-newest of Foundry Row's four locations, opened in March 2025 in a former Sears auto-service bay.</span>
+              </li>
+              <li>
+                <span class="ts">42:28</span>
+                <span><a href="#">"The suggestion that changed everything"</a> — the original Patreon comment from a member named Diana, posted October 14, 2023, suggesting Foundry Row let members opt into a small monthly contribution instead of charging a flat membership fee. Quoted in full in the transcript.</span>
+              </li>
+              <li>
+                <span class="ts">51:14</span>
+                <span><em>The Library Book</em> by Susan Orlean — the book that, Marcus says, gave him "language for the kind of institution I didn't realize I was building."</span>
+              </li>
+              <li>
+                <span class="ts">58:30</span>
+                <span>The <a href="#">East Bay Cooperative Federation</a>, the small umbrella org that helped Foundry Row incorporate as a 501(c)(3) in 2022 — and which now provides shared back-office services to fourteen Bay Area cooperatives.</span>
+              </li>
+              <li>
+                <span class="ts">1:04:55</span>
+                <span>Marcus's three "what I'd tell someone starting today" recommendations — read in full at the timestamp.</span>
+              </li>
+              <li>
+                <span class="ts">1:09:20</span>
+                <span>How to <a href="#">become a Foundry Row member</a> (free, two-page form, $5/mo opt-in contribution if you want).</span>
+              </li>
+            </ul>
+
+            <!-- Chapters -->
+            <h2 class="section-h">Chapters</h2>
+            <p style="color: var(--slate); margin-bottom: var(--sp-md); max-width: 65ch;">Click any chapter to jump in the player above.</p>
+            <ol class="chapters">
+              <li><span class="ts">00:00</span><span class="chapter-title">The cold open: Marcus reads his original Craigslist post</span></li>
+              <li><span class="ts">02:48</span><span class="chapter-title">How the drill arrived (and the toaster oven that came with it)</span></li>
+              <li><span class="ts">11:30</span><span class="chapter-title">What a tool library actually is, for people who've never used one</span></li>
+              <li><span class="ts">19:12</span><span class="chapter-title">Why the Fruitvale storefront was a bad idea on paper</span></li>
+              <li><span class="ts">26:40</span><span class="chapter-title">The first hundred members, and the one who never came back</span></li>
+              <li><span class="ts">34:22</span><span class="chapter-title">Becoming a 501(c)(3) — and why that took eighteen months</span></li>
+              <li><span class="ts">42:28</span><span class="chapter-title">How the membership model emerged from a single suggestion</span></li>
+              <li><span class="ts">51:14</span><span class="chapter-title">The week in 2024 when Marcus almost shut the whole thing down</span></li>
+              <li><span class="ts">58:30</span><span class="chapter-title">Working with other cooperatives, learning what to share and what not to</span></li>
+              <li><span class="ts">1:04:55</span><span class="chapter-title">Three pieces of advice for someone starting today</span></li>
+              <li><span class="ts">1:09:20</span><span class="chapter-title">What success looks like, six years out</span></li>
+              <li><span class="ts">1:11:08</span><span class="chapter-title">Closing: what Marcus is currently reading</span></li>
+            </ol>
+
+            <!-- ── TRANSCRIPT ───────────────────────── -->
+            <h2 class="section-h" id="transcript">Transcript</h2>
+            <div class="transcript">
+              <p class="transcript-meta">Full episode transcript · lightly edited for clarity · about 11,400 words · published with Marcus's review</p>
+
+              <p><span class="ts-inline">00:00</span><span class="speaker">CASSIA:</span> Marcus, before we start — I want to do something I've never done on the show before, which is to ask you to read something out loud at the top, instead of at the end. Is that okay?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> [<em>laughs</em>] Sure. What am I reading?</p>
+
+              <p><span class="speaker">CASSIA:</span> The Craigslist post. The original one. I have it pulled up here. February 11th, 2021.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Oh, no. Oh god. Okay. [<em>pause</em>] Okay. "Hi neighbors. I'm Marcus, I live in Fruitvale, I'm a carpenter. I'm trying to start a small free tool-lending program out of my garage and I'm looking for any unwanted tools in working condition. Power tools, hand tools, garden stuff, whatever. I can pick up within five miles. I will return them to you if the project doesn't get off the ground. No catch, no MLM, no church. Email or text me at —" and then it has my old number.</p>
+
+              <p><span class="speaker">CASSIA:</span> "No catch, no MLM, no church."</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Yeah, I — listen, in 2021, in Oakland, if a guy on the internet says he's going to give you something for free, you have questions. And the questions are usually one of those three things.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">02:48</span>So when did the first tool actually come in?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Three days later. There was a guy named Curtis. Lives in San Leandro now, but he was up in the Dimond at the time. He had a yellow DeWalt drill that he'd bought for one project in 2018 and not used since. He drove it over, he handed it to me, and then he said — and I'll never forget this — he said, "Do you want this toaster oven too? It still works." And I said, "Curtis, I don't — I don't think I —" and he just put it on my kitchen counter.</p>
+
+              <p><span class="speaker">CASSIA:</span> [<em>laughs</em>]</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> So the very first donation to Foundry Row was a drill and a toaster oven, and the toaster oven is still in my kitchen.</p>
+
+              <p><span class="speaker">CASSIA:</span> That's such a beautiful detail. Did you know — at that point, holding the drill — did you know what you were building?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> No. I didn't even know it was a tool library. I just knew that I had been working as a carpenter for twelve years, and every job site I'd ever been on had a hundred dollars of disposable Harbor Freight tools in the back of someone's truck, and every house I'd ever done work in had a closet full of nice, expensive, never-touched tools. And the math of that — the asymmetry of it — had been bothering me for a long time. I just didn't have a name for the bothering.</p>
+
+              <p><span class="speaker">CASSIA:</span> When did the name come?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> About a month later. I had a friend, Renata — different Renata than the one on the previous episode — and she sent me a link to the North Portland Tool Library. And I clicked it and I just sat at my kitchen table for, I want to say, an hour. Because I had been doing this thing in my head where I thought I was inventing something. And I was very rapidly realizing I was not inventing anything. There were already, at that time, like eighty-some of these in the United States. Mostly in the Pacific Northwest, some in the Midwest. And I read everything I could find about them for the next two weeks.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">11:30</span>Can we — for anyone listening who has genuinely never used or seen one — what is a tool library? Just, the simplest version.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Yeah. So. The simplest version. Imagine a regular library. You walk in. There's a desk, there's a person at the desk, there's stuff on shelves. The stuff on the shelves is not books, it's tools. You take a tool home for a week. You bring it back. If you broke it, you tell us, we figure it out together. That's it. That's the whole thing.</p>
+
+              <p><span class="speaker">CASSIA:</span> And it's free.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> It's free. Membership is free. Borrowing is free. Late fees — we tried late fees for the first eight months and we got rid of them. They were doing the opposite of what we wanted them to do. They were keeping people away who'd had a bad experience with a tool, instead of bringing the tool back.</p>
+
+              <p><span class="speaker">CASSIA:</span> So no late fees, no charges, no — </p>
+
+              <p><span class="speaker marcus">MARCUS:</span> No charges of any kind. We ask for a contribution if you can. We do not ask for the contribution at the front desk. We send you an email a month after you join and we say, "Hey, the library cost about four dollars to lend you that drill — here's our budget if you want to see it, here's how you can chip in if you want." That's it. We never bring it up again unless you ask.</p>
+
+              <p><span class="speaker">CASSIA:</span> That's so — that's a very specific posture. Where did that come from?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Honestly? My mom. My mom worked at the public library in Modesto for thirty-one years. And she was very clear, my whole childhood, that a library is something that you do not make people prove they deserve. You just — they walk in, and you trust them. And if 5% of them don't return what they took, that is a price you pay willingly, because the alternative is that the other 95% feel surveilled. And the surveilled feeling — she would tell me this — the surveilled feeling is what kills a library.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">17:14</span>That's a beautiful idea. That's a — okay. So you have the drill, you have the toaster oven, you have a name. When does it become a thing you can walk into?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> June 2021. So about four months after the Craigslist post. By then I had about — I want to say two hundred and thirty tools? In my garage. And the garage was full. Like, I could not park my car in there anymore. My downstairs neighbor was being unbelievably gracious about the fact that there was a circular saw on the staircase. And I knew I needed a real space.</p>
+
+              <p><span class="speaker">CASSIA:</span> The Fruitvale storefront. Tell me about finding that.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> So. The Fruitvale storefront. <span class="ts-inline">19:12</span>That place is on International Boulevard, between 35th and 36th, and it had been a check-cashing place that closed in 2019. It had sat empty for two years. The landlord, who I will not name on the air but who I love very much — </p>
+
+              <p><span class="speaker">CASSIA:</span> [<em>laughs</em>]</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> — he agreed to rent it to me for nine hundred dollars a month, which in Oakland in 2021 was bananas, and he agreed to it because I told him exactly what I was going to do with it, and he said, and I quote, "Okay, but I'm telling you right now, the neighborhood doesn't need this." And I said, "I think it does." And he said, "Well, we'll see." And it took about six months for me to be able to look him in the eye and not feel like he was right.</p>
+
+              <p><span class="speaker">CASSIA:</span> What did the first six months look like?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Very slow. Like, painfully slow. I would open the doors at ten in the morning on a Saturday and I would sit at a folding table with a clipboard, and on a good day, three people would come in. Sometimes the three people were the same person three times. And I thought — there was a period of maybe four months in there where I genuinely thought I had made a very expensive mistake.</p>
+
+              <p><span class="speaker">CASSIA:</span> What changed?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> A guy named Hector came in. <span class="ts-inline">23:40</span>And Hector — this is a story I tell a lot, I'm sorry if anyone's heard it. Hector was a retired auto-body guy. Lived two blocks away. He came in, he looked around for forty minutes, didn't say anything. And then he came up to the desk and he said, "You need a sign." And I said, "I have a sign." And he pointed out the window and he said, "That is not a sign. That is a piece of paper taped to a window. I am going to bring you a sign."</p>
+
+              <p><span class="speaker">CASSIA:</span> And he did.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> The next Tuesday. Hand-painted. Wood. Said FOUNDRY ROW · TOOLS FOR THE NEIGHBORHOOD. And after that sign went up, the number of people walking in went from three a day to about fifteen. Not because the sign was that good — the sign was great, but it wasn't, like, magic. It was because Hector then went to every business on a four-block stretch of International and personally told them about it. He'd been living there for thirty years. He had a credibility I did not yet have, and he gave it to me. For free. Just gave it to me.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">26:40</span>I read your <em>Shareable</em> piece — the one from 2023. And there's a line in it that I underlined and I want to read it back to you. You wrote: "The work of building public infrastructure when nobody asked for it is the work of waiting to be asked." Did you know what you meant when you wrote that?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> [<em>long pause</em>] I think I knew what I felt. I'm not sure I knew what I meant. Can I — can I think about that for a second?</p>
+
+              <p><span class="speaker">CASSIA:</span> Please.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> [<em>pause</em>] I think — okay. I think what I was trying to say is that there's this — there's a certain kind of building, like the kind that gets covered in business magazines, where you have an idea and you go and you announce it and you put it on a website and you raise money and you hire people and you ship it. And that is a real way to build a thing, I'm not knocking it. But there's another kind of building, where what you are actually doing is making yourself available. You are saying — I am here, this thing exists, when you decide you want it, it will be ready for you. And the building is not the launching of it. The building is the staying. The building is the four months of three-people-a-day, where what you are doing is proving to the neighborhood that you will still be here in a year.</p>
+
+              <p><span class="speaker">CASSIA:</span> The staying.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> The staying is the work. I think I really do believe that now. I'm not sure I believed it then. Then I just thought I was failing.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">30:55</span>I want to come back to that. But first — practical question. The first hundred members. Who were they?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Carpenters. Almost entirely. Other carpenters, sort of like me but younger. People who had a project and didn't want to spend $300 on a tile saw they were going to use once. And then somewhere around member fifty or sixty, it shifted. It became renters. People who'd just moved in somewhere and needed a stud finder and a drill to hang a curtain rod. And once it was renters, it was — that was the moment it became a real thing. Because renters told other renters.</p>
+
+              <p><span class="speaker">CASSIA:</span> You said earlier — there was a member who never came back. Can you tell me about that?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> [<em>pause</em>] Yeah. Her name was — I'm not going to use her real name. Let's say her name was Marisol. She was probably forty-five. She came in maybe four times. She borrowed a hedge trimmer. She borrowed a Shop-Vac. And the third time she came in, she — there was a guy at the front desk who is not a guy I work with anymore. And he asked her for her ID, and she didn't have one, and he was — he was not kind about it. And I wasn't there. I was at the dump. And I came back, and the guy at the desk said, "Some lady came in and got upset," and I asked what happened, and he told me, and I — I have not been that angry at someone in a long time.</p>
+
+              <p><span class="speaker">CASSIA:</span> And she never came back.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> She never came back. I tried to find her. I asked around. The guy who worked the desk that day is no longer with us. And the policy — the ID policy — is gone. We do not ask for ID anymore. We ask for an email or a phone number, and if you don't have those, we ask for the name of any neighbor who can vouch for you. That's it. That whole change of policy is because of Marisol. I owe her an apology I cannot deliver. That's just the truth.</p>
+
+              <p><span class="speaker">CASSIA:</span> [<em>pause</em>] Thank you for telling me that.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Yeah.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">34:22</span>Let's — can we move into the 501(c)(3) stuff? Because I know that took a long time, and I think a lot of people listening have wanted to start something nonprofit-shaped and have been chased off by the paperwork.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Eighteen months. Eighteen months. And the reason was — okay, this is a deeply unsexy story, but the reason is that I tried to do it myself, and then I tried to do it with the wrong lawyer, and then I tried to do it with a free legal clinic that was overwhelmed, and then I finally — finally — found the East Bay Cooperative Federation, who I cannot say enough nice things about. They had a template. They had walked, at that point, eleven other small Bay Area co-ops and nonprofits through the exact same process. They charged me on a sliding scale. They got us our 501(c)(3) determination letter in five and a half months.</p>
+
+              <p><span class="speaker">CASSIA:</span> Five and a half months versus eighteen months trying to do it alone.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Yes. And the lesson — if I have one lesson from all of this — is, you do not have to figure out the legal structure by yourself. Find the people who have done it for organizations that look like yours, and pay them whatever you can pay them. It is the best money you will ever spend.</p>
+
+              <p><span class="speaker">CASSIA:</span> What did the 501(c)(3) actually unlock?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Two things. One, the obvious — bigger donations become tax-deductible, which means people who care about tax deductions, which is a real demographic of donor, can now give us money. The second thing, which is way bigger and nobody talks about, is — landlords. Landlords will rent to a 501(c)(3) at rates and on terms that they will not give to a guy with a Craigslist post. Our second location, our third location, our fourth location — all of those leases are at below-market rent because the landlords get a piece of paper they can point to for their own community-investment portfolio. The legal status is, like, half the reason we have four locations now.</p>
+
+              <p><span class="speaker">CASSIA:</span> Huh.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> That is the unsexiest possible answer to the question of how we grew, and it is the true one.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">42:28</span>Okay. I want to talk about the membership model. Because I think this is the single most interesting thing about Foundry Row, and I think it is — it is what I want every nonprofit listening to this to hear. Tell me about Diana's comment.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Diana. [<em>pause</em>] Okay. So. By October 2023 we'd been operating for about two and a half years. We had a flat-rate membership — five dollars a month, you got the library card, that was the deal. We had about nine hundred members. The five-dollar-a-month was — for a lot of people, that was fine, that was a coffee, no problem. For a meaningful number of people, that was the reason they didn't sign up. We knew that. We had data on it. We were stuck on what to do about it.</p>
+
+              <p><span class="speaker">CASSIA:</span> And Diana — </p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Diana posted a comment on one of our Patreon updates. October 14th, 2023. I have it in front of me actually. She wrote — can I read it?</p>
+
+              <p><span class="speaker">CASSIA:</span> Please.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> She wrote: "I love this place. I would pay twenty dollars a month if I could. I do not understand why you charge five dollars instead of letting me, and the people who can afford it, pay more so that the people who can't afford five dollars don't have to pay anything. Just — let me pay what I want. Let everybody pay what they want. Show us the budget. Trust us." That was the comment.</p>
+
+              <p><span class="speaker">CASSIA:</span> That's the whole comment?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> That's the whole comment. And I read it on my phone, in line at a Trader Joe's. And I stood there for probably ninety seconds just staring at it. Because — every nonprofit consultant I had ever talked to, every funding workshop I'd been to, every Stanford-MBA-pro-bono advisor — every single one of them had told me, you need a clear, simple, predictable membership fee. Five dollars. Ten dollars. Pick a number, defend it, never change it. And Diana, who has, like, no nonprofit experience that I know of, in a Patreon comment, in two paragraphs — she said the opposite, and she was right, and she was right in a way that took me about four months to figure out how to actually implement.</p>
+
+              <p><span class="speaker">CASSIA:</span> What did you do?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> <span class="ts-inline">47:18</span>We made it free. Everything. Membership, borrowing, all of it, free. We removed the five-dollar fee in February 2024. And the only thing we added was — when you sign up, on the welcome email, we say, "The library cost about $X to operate last month per active member. Here's our full budget, line by line. If you want to chip in, here's a sliding scale of $1, $3, $5, $10, $25 a month. If you don't want to chip in, that is genuinely fine, we are glad you are here, please use the library." That's it.</p>
+
+              <p><span class="speaker">CASSIA:</span> And what happened?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Our monthly recurring revenue went up by 41% in three months. And our membership doubled in eight months. Both. At the same time. We are now — we are now bringing in more money, per member, on average, than we were before, because the people who were giving five dollars are now giving ten or fifteen or in some cases — Diana is giving twenty-five — and the people who weren't giving anything are now members and are also, a lot of them, kicking in a couple of dollars when they can.</p>
+
+              <p><span class="speaker">CASSIA:</span> So everyone wins.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Everyone wins. And I would never have done it without Diana. I sent her a long email after we made the change. I told her, you reshaped my organization. She wrote back, and she said — and this is the part that I think about all the time — she said, "I'm a librarian. This is just how public libraries work."</p>
+
+              <p><span class="speaker">CASSIA:</span> [<em>laughs</em>] Oh, of course she's a librarian.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Of course she is. Of course she is. The whole thing was already invented. I just hadn't been listening to librarians.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">51:14</span>Marcus, can I ask you about the hard part?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Sure.</p>
+
+              <p><span class="speaker">CASSIA:</span> You mentioned, before we started recording, that there was a week in 2024 where you almost shut the whole thing down.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> [<em>long pause</em>] Yeah. Okay. I — yeah. Can I — can I take a sip of coffee? [<em>pause</em>] Okay. So. November 2024. We had just opened the Eastmont location. We had just hired our second full-time employee. We were about to lose our biggest grant — they had a leadership transition and they shifted their giving priorities away from local infrastructure. I had not slept more than five hours a night for about four weeks. And my dad — my dad had a stroke. In Modesto. And I — I drove down to be with him, and I sat in the hospital, and I just — I was just done. I called my board chair from the hospital cafeteria and I said, I think I have to step back. I think I can't do this. I think I'm going to wind it down.</p>
+
+              <p><span class="speaker">CASSIA:</span> [<em>quietly</em>] What did she say?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> She said — her name is Renee — she said, "Marcus, you are exhausted and your dad is in the hospital. You are not allowed to make that decision today. We will talk about it in six weeks. In the meantime I am going to tell the staff what is going on, and I am going to ask the volunteers to keep things running for a month, and you are going to take care of your dad." And she — she did it. She did all of it. I didn't open my laptop for thirty-one days. And the library kept running. Without me. Because we had — we had quietly built a thing that was bigger than just me, and I had not noticed.</p>
+
+              <p><span class="speaker">CASSIA:</span> And your dad?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> He's good. He's — he's slower than he was. He's still in Modesto. I see him every other weekend now. He's — he's the one who actually came up with the name Foundry Row, did I ever tell you that?</p>
+
+              <p><span class="speaker">CASSIA:</span> No, you didn't.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Yeah. Foundry Row was a real place. It was — there used to be a stretch of the rail line in West Oakland, in the forties and fifties, that was all small metal-casting shops. Family-owned, mostly. Working-class. They poured the iron grates that are still in half the storm drains in this city. My dad's family knew people who worked there. And when I was looking for a name, in 2021, I called him, and he said — without missing a beat — he said, Foundry Row. He said, your great-uncle worked on Foundry Row. He said, that's a place that made things for the city. And I thought — that's the name. Done.</p>
+
+              <p><span class="speaker">CASSIA:</span> [<em>pause</em>] Marcus, that's beautiful.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Yeah.</p>
+
+              <p><span class="speaker">CASSIA:</span> Can I push back on one thing, though?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Please.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">56:48</span>When you tell the story of almost shutting down — and I love that you told me — but the takeaway you offered is, "we'd quietly built a thing that was bigger than me." And I — I love that. But I think there's a version of that takeaway that lets the founder off the hook a little. That lets you not look at why you almost burned out. And I'm curious if — three years later, eighteen months later — do you think there were structural things you should have changed earlier? About how you were running yourself?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> [<em>long pause</em>] Yeah. Yes. The honest answer is yes. I should have hired a second full-time person a year earlier than I did. I should have built a board that was more than three people, three years ago. I should have — I should have had a written sick-leave policy for myself. I did not. I had one for everyone else. And the reason I didn't is that I had this — I think a lot of founders have this — this feeling that the thing only works if I'm the one doing it. And that is, like, the founder's curse. That is the thing you have to walk yourself out of. And I had not done that work. November 2024 was, partly, the bill for not having done that work.</p>
+
+              <p><span class="speaker">CASSIA:</span> Thank you for that.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Yeah. Yeah, no, it's a fair pushback.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">58:30</span>Tell me about working with the other co-ops. The East Bay Cooperative Federation, the bookstore folks, the bakery folks. What's that ecosystem like?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> It's the best part of the job, honestly. There are now about fourteen small worker-owned or community-owned organizations in the East Bay that share a back office — the Federation runs our bookkeeping, our HR, our compliance, our payroll. We pay them a flat percentage of our budget. It's the single biggest reason we can operate with two and a half employees instead of needing five. And once you're in that network, the lateral relationships are — they're the thing.</p>
+
+              <p><span class="speaker">CASSIA:</span> What does that look like, day to day?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> It looks like, the bakery had a freezer go down last winter and Sage texted me at six in the morning and said, "Do you have a spare freezer?" And we did, because somebody had donated a chest freezer the month before, and I drove it over before opening. It looks like — the Foxglove bookstore is doing a community-fundraiser event next month and they asked if we could lend them ten folding chairs. Of course. It looks like, when the Federation gets a grant, they parcel out the unrestricted portion across all fourteen of us. It is — it is mutual aid in a very practical form.</p>
+
+              <p><span class="speaker">CASSIA:</span> Is there anything you don't share?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> [<em>laughs</em>] Email lists. We do not share email lists. That is the one line. You earn your own list. You do not get to borrow somebody else's list. Otherwise, basically everything.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">1:04:55</span>If somebody is listening to this — and I know they are — and they are thinking, I want to start a tool library, or I want to start something like a tool library, in their city, in their town — what would you tell them?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Three things. Can I just go through three things?</p>
+
+              <p><span class="speaker">CASSIA:</span> Please.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> One. Do not start by raising money. Do not write a grant proposal. Do not file paperwork. Start by getting one tool from one neighbor and lending it to one other neighbor. If you cannot do that, you cannot do this. If you can do that, you have already done the hardest part. Everything else is logistics.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Two. Find the people who have already done what you are trying to do. Call them. They will pick up. I cold-emailed the woman who runs the North Portland Tool Library in 2021 and she got on a Zoom with me within a week. The cooperative-tool-library world is small and generous and they will help you, for free, immediately. Do not try to invent anything. Use what's been built.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Three. Be willing to stay. The whole thing is the staying. I said that earlier and I keep saying it because I keep believing it more. There is no shortcut to legitimacy in a neighborhood. You have to be the place that is still there in a year. So if you don't think you can be still there in a year, do something else, build something else. But if you can — if you can promise yourself you will still be opening the doors in a year, in two years, in five — then start. Then absolutely start.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">1:09:20</span>Marcus, last question. Or — second to last, actually. What does success look like to you, six years from now?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Six years from now. Six years from now, I want Foundry Row to be in every neighborhood in Oakland that wants one. I do not want to be the founder of any of those branches. I want to have trained the people who founded them. I want to be — I want to be the guy who answers their cold emails. I want to be the version of the North Portland Tool Library woman who got on a Zoom with me. That's the success. The success is not me running fourteen branches. The success is me running zero branches and being one phone call away from fourteen branches that are running themselves.</p>
+
+              <p><span class="speaker">CASSIA:</span> And the actual last question. What are you reading right now?</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> [<em>laughs</em>] <span class="ts-inline">1:11:08</span>I'm reading <em>A Paradise Built in Hell</em> by Rebecca Solnit. For the third time. It's the book I go back to when I get tired. Solnit's whole argument is — when disaster strikes, the thing that emerges is not chaos, it's mutual aid. It's neighbors taking care of neighbors. It's the part of us that we have been trained to forget about. I find it — I find it very useful to be reminded of that, a lot.</p>
+
+              <p><span class="speaker">CASSIA:</span> Marcus Haines, thank you so much for doing this.</p>
+
+              <p><span class="speaker marcus">MARCUS:</span> Cassia, thank you. Thank you for having me. Thank you for the show. I — I listen every Tuesday. It means a lot to be on it.</p>
+
+              <p><span class="speaker">CASSIA:</span> <span class="ts-inline">1:12:00</span>Foundry Row is at foundryrow.org. Four locations across East Oakland. If you've got a tool in a closet that hasn't been used in a year, you know where to take it. We'll be back next Tuesday with the wonderful Naomi Estefan-Brooke, who runs a small community-supported fishery out of Half Moon Bay. Until then — take care of each other.</p>
+
+              <p style="text-align:center; font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.14em; color: var(--slate); margin-top: var(--sp-lg); text-transform: uppercase;">— end of transcript —</p>
+            </div>
+
+            <!-- Related Episodes -->
+            <h2 class="section-h">Related episodes</h2>
+            <div class="related-grid">
+              <article class="episode-card">
+                <div class="artwork artwork-sm" aria-label="Episode 13 artwork — Renata Okonkwo-Lima">
+                  <div class="artwork-inner">
+                    <div class="artwork-top"><span>S3 · 13</span><span>66:48</span></div>
+                    <div class="artwork-title">The neighborhood that <em>showed up.</em></div>
+                    <div class="artwork-bottom"><span>R. Okonkwo-Lima</span><span></span></div>
+                  </div>
+                </div>
+                <div class="ep-meta"><span>S3 · Ep 13</span><span>·</span><span class="ember">Jun 10</span></div>
+                <h3 class="ep-title"><a href="episodes.html#s3-13">The neighborhood watch that became a mutual aid network</a></h3>
+                <p class="ep-dek">A phone tree during a blackout in East Boston, five years on. The closest sibling to Marcus's story.</p>
+              </article>
+
+              <article class="episode-card">
+                <div class="artwork artwork-sm" aria-label="Episode 8 artwork — Priya Bandyopadhyay-Hale">
+                  <div class="artwork-inner">
+                    <div class="artwork-top"><span>S3 · 08</span><span>69:22</span></div>
+                    <div class="artwork-title">The cooperative <em>bookstore.</em></div>
+                    <div class="artwork-bottom"><span>P. Bandyopadhyay-Hale</span><span></span></div>
+                  </div>
+                </div>
+                <div class="ep-meta"><span>S3 · Ep 08</span><span>·</span><span class="ember">May 6</span></div>
+                <h3 class="ep-title"><a href="episodes.html#s3-08">The cooperative bookstore that survived a chain opening across the street</a></h3>
+                <p class="ep-dek">Another member of the East Bay Cooperative Federation that Marcus mentions at 58:30 of this episode.</p>
+              </article>
+
+              <article class="episode-card">
+                <div class="artwork artwork-sm" aria-label="Episode 18 of season 2 artwork — Devon Asante-Klein">
+                  <div class="artwork-inner">
+                    <div class="artwork-top"><span>S2 · 18</span><span>69:33</span></div>
+                    <div class="artwork-title">The library that won't <em>shush.</em></div>
+                    <div class="artwork-bottom"><span>D. Asante-Klein</span><span></span></div>
+                  </div>
+                </div>
+                <div class="ep-meta"><span>S2 · Ep 18</span><span>·</span><span class="ember">Jan 14</span></div>
+                <h3 class="ep-title"><a href="episodes.html#s2-18">The library that decided to stop asking people to be quiet</a></h3>
+                <p class="ep-dek">A different kind of library, but the same posture: trust people, drop the surveillance, watch what happens.</p>
+              </article>
+            </div>
+
+            <!-- Comments -->
+            <h2 class="section-h" id="discussion">Listener discussion</h2>
+            <p style="color: var(--slate); margin-bottom: var(--sp-md); max-width: 65ch;">A small, moderated comment thread. Be kind, be specific, no self-promotion. New comments are reviewed before they go live (usually within a day).</p>
+
+            <div class="comments">
+
+              <article class="comment">
+                <div class="comment-avatar">D</div>
+                <div>
+                  <div class="comment-head">
+                    <span class="comment-author">Diana K.</span>
+                    <span class="comment-time">2 days ago · librarian, Oakland</span>
+                  </div>
+                  <div class="comment-body">
+                    <p>Marcus — hi. It's Diana. I had no idea you were going to read my comment out loud on a podcast. I just listened to this in the car and then sat in the parking lot at Target for ten minutes. Thank you for taking it seriously. For the record, the part where you said "of course she's a librarian" made me laugh so hard I had to pause it.</p>
+                    <p>To anyone reading this: support your local public library. They have been quietly running this exact playbook for two hundred years.</p>
+                  </div>
+                  <div class="comment-actions">
+                    <a href="#">Reply</a>
+                    <a href="#">Heart · 84</a>
+                  </div>
+                </div>
+              </article>
+
+              <article class="comment">
+                <div class="comment-avatar b">T</div>
+                <div>
+                  <div class="comment-head">
+                    <span class="comment-author">Teagan Ward-Olufsen</span>
+                    <span class="comment-time">3 days ago · Sacramento</span>
+                  </div>
+                  <div class="comment-body">
+                    <p>The part about Hector and the sign. That's the whole episode for me. The idea that you can have the best building, the right legal structure, the perfect mission, and still need the retired auto-body guy from two blocks away to validate you to the neighborhood — that's such a generous, true thing to admit.</p>
+                    <p>I run a small mutual-aid pantry in midtown Sac and I'm going to keep thinking about "the building is the staying" for a long time. Thanks Cassia and Marcus.</p>
+                  </div>
+                  <div class="comment-actions">
+                    <a href="#">Reply</a>
+                    <a href="#">Heart · 41</a>
+                  </div>
+                </div>
+              </article>
+
+              <article class="comment">
+                <div class="comment-avatar c">M</div>
+                <div>
+                  <div class="comment-head">
+                    <span class="comment-author">Margot Quintanilla-Stein</span>
+                    <span class="comment-time">4 days ago · Minneapolis</span>
+                  </div>
+                  <div class="comment-body">
+                    <p>Question for Marcus or Cassia if either of you see this: was there a specific moment where the "pay what you want" model crossed over from being terrifying to being obviously correct? I'm on the board of a community art space in Powderhorn and we're considering something similar. The ED is open to it, the rest of the board is — politely — not.</p>
+                    <p>The data you mentioned (41% revenue lift in three months) would land hard. Did you publish it anywhere we could cite?</p>
+                  </div>
+                  <div class="comment-actions">
+                    <a href="#">Reply</a>
+                    <a href="#">Heart · 22</a>
+                  </div>
+                </div>
+              </article>
+
+              <article class="comment">
+                <div class="comment-avatar d">J</div>
+                <div>
+                  <div class="comment-head">
+                    <span class="comment-author">Juan Carlos R.</span>
+                    <span class="comment-time">5 days ago · Fruitvale, Oakland</span>
+                  </div>
+                  <div class="comment-body">
+                    <p>I've been a Foundry Row member for two years and I had no idea about most of this story. I borrowed a tile saw from them last summer to redo my mom's bathroom and the staff helped me pick the right blade. I think about that all the time. We are very lucky to have them in our neighborhood.</p>
+                    <p>To Marcus: please give the toaster oven a proper retirement when the time comes. It has earned it.</p>
+                  </div>
+                  <div class="comment-actions">
+                    <a href="#">Reply</a>
+                    <a href="#">Heart · 67</a>
+                  </div>
+                </div>
+              </article>
+
+            </div>
+
+            <p style="text-align:center; margin-top: var(--sp-lg);">
+              <button class="btn btn-outline btn-sm" type="button" data-load-more>Load older comments</button>
+            </p>
+
+          </article>
+
+          <!-- ── Sidebar ─────────────────────────── -->
+          <aside class="episode-aside">
+
+            <div class="aside-card">
+              <h4>Listen / Subscribe</h4>
+              <p style="font-size: 0.92rem; color: var(--slate); margin: 0 0 var(--sp-sm);">Don't miss the next episode. New shows Tuesdays at 6am PT.</p>
+              <a href="subscribe.html" class="btn btn-primary btn-sm" style="display: block; text-align: center;">Subscribe</a>
+            </div>
+
+            <div class="aside-card">
+              <h4>Jump to a chapter</h4>
+              <ul class="aside-list">
+                <li><span class="ts">02:48</span><a href="#">The drill arrives</a></li>
+                <li><span class="ts">11:30</span><a href="#">What a tool library is</a></li>
+                <li><span class="ts">19:12</span><a href="#">The Fruitvale storefront</a></li>
+                <li><span class="ts">26:40</span><a href="#">"The staying is the work"</a></li>
+                <li><span class="ts">34:22</span><a href="#">Becoming a 501(c)(3)</a></li>
+                <li><span class="ts">42:28</span><a href="#">Diana's suggestion</a></li>
+                <li><span class="ts">51:14</span><a href="#">The week he almost quit</a></li>
+                <li><span class="ts">1:04:55</span><a href="#">Three pieces of advice</a></li>
+              </ul>
+            </div>
+
+            <div class="aside-card">
+              <h4>Mentioned in this episode</h4>
+              <ul class="aside-list">
+                <li><em>The Tools We Need</em> — Hellen Lawrence Quattro</li>
+                <li><em>The Library Book</em> — Susan Orlean</li>
+                <li><em>A Paradise Built in Hell</em> — Rebecca Solnit</li>
+                <li>North Portland Tool Library</li>
+                <li>East Bay Cooperative Federation</li>
+              </ul>
+            </div>
+
+            <div class="aside-card">
+              <h4>Episode credits</h4>
+              <ul class="aside-list">
+                <li><strong>Host &amp; producer</strong><br>Cassia Romero</li>
+                <li><strong>Sound design &amp; mix</strong><br>Eitan Cohen-Mizrahi</li>
+                <li><strong>Show notes</strong><br>Priya Anand-Kowalski</li>
+                <li><strong>Recorded</strong> May 28, 2026<br>The garage, Oakland</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Bottom CTA ─────────────────────────────────── -->
+    <section class="section section-plum">
+      <div class="container text-center">
+        <span class="eyebrow">If this episode meant something</span>
+        <h2 style="margin: var(--sp-xs) 0 var(--sp-md);">Support the show.<br>Keep it independent.</h2>
+        <p style="color: rgba(243,234,217,0.85); margin: 0 auto var(--sp-lg);">Five dollars a month keeps the lights on. Fifteen keeps the rest of it on. Both are deeply appreciated.</p>
+        <a href="subscribe.html#support" class="btn btn-primary btn-lg">See supporter tiers →</a>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Footer ──────────────────────────────────────── -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a href="index.html" class="nav-logo" style="text-decoration: none;">
+            <svg class="nav-logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="20" cy="20" r="18.5" stroke="#d97333" stroke-width="1.2"/>
+              <circle cx="20" cy="20" r="14" fill="#2d1f3a"/>
+              <path d="M14 13 L14 27 L26 20 Z" fill="#d97333"/>
+              <circle cx="20" cy="20" r="1.6" fill="#f3ead9"/>
+            </svg>
+            <span class="nav-logo-text">
+              <span class="nav-logo-title">Slow Burn Stories</span>
+              <span class="nav-logo-sub">Independent · Listener-supported</span>
+            </span>
+          </a>
+          <p>Hour-long conversations with people who built something from nothing. Hosted by Cassia Romero. Recorded in a converted garage studio in Oakland, California.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>The Show</h4>
+          <ul>
+            <li><a href="episodes.html">All Episodes</a></li>
+            <li><a href="episodes.html#season-3">Season 3</a></li>
+            <li><a href="episodes.html#season-2">Season 2</a></li>
+            <li><a href="episodes.html#season-1">Season 1</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Listen</h4>
+          <ul>
+            <li><a href="subscribe.html#apple">Apple Podcasts</a></li>
+            <li><a href="subscribe.html#spotify">Spotify</a></li>
+            <li><a href="subscribe.html#overcast">Overcast</a></li>
+            <li><a href="subscribe.html#rss">RSS Feed</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Show</h4>
+          <ul>
+            <li><a href="about.html">About the show</a></li>
+            <li><a href="about.html#team">Credits &amp; team</a></li>
+            <li><a href="subscribe.html#support">Support the show</a></li>
+            <li><a href="mailto:hello@slowburnstories.fm">Get in touch</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© 2026 Slow Burn Stories · Oakland, CA</span>
+        <span>Made on stolen Ohlone land · Listener-funded</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

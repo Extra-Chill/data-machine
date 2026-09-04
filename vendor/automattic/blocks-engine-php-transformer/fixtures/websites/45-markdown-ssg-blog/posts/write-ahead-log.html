@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Write-Ahead Log Is the Database — Cold Start</title>
+<meta name="description" content="Almost every durable storage system you use is, underneath, a write-ahead log with some indexes bolted on top. Here's why that framing makes everything else click.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../css/style.css">
+<link rel="alternate" type="application/rss+xml" title="Cold Start" href="../index.xml">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="shell shell--wide masthead__inner">
+    <a class="brand" href="../index.html" aria-label="Cold Start — home">
+      <svg class="brand__mark" width="30" height="30" viewBox="0 0 32 32" role="img" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#c2410c"/>
+        <path d="M16 6c1.6 3.4 1 5.6-.8 7.6-2 2.2-2.6 4.4-1.4 7.2-3-1.4-4.4-4.2-3.6-7.4C11 17 13 18 13.2 20.4 14.6 18 13.4 15.4 16 6Z" fill="#fde7d8"/>
+        <circle cx="20.5" cy="20" r="2.3" fill="#fdba74"/>
+      </svg>
+      <span class="brand__text">
+        <span class="brand__name">Cold Start</span>
+        <span class="brand__tag">storage &amp; distributed systems</span>
+      </span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="../index.html">Home</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../about.html">About</a>
+      <a class="nav__rss" href="../index.xml" aria-label="RSS feed" title="RSS feed">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="13" r="1.6"/><path d="M2 7.3a6.7 6.7 0 0 1 6.7 6.7H6.5A4.5 4.5 0 0 0 2 9.5z"/><path d="M2 3a11 11 0 0 1 11 11h-2.2A8.8 8.8 0 0 0 2 5.2z"/></svg>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <article class="article shell">
+    <header class="article__header">
+      <div class="article__meta">
+        <a class="series-badge" href="../tags.html">Storage Internals</a>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <time datetime="2024-02-12">Feb 12, 2024</time>
+        <span class="post-card__dot" aria-hidden="true"></span>
+        <span>12 min read</span>
+      </div>
+      <h1 class="article__title">The Write-Ahead Log Is the Database</h1>
+      <p class="article__dek">Almost every durable storage system you use is, underneath, a write-ahead log with some indexes bolted on top. Here's why that framing makes everything else click.</p>
+      <div class="byline">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <span>
+          <span class="byline__name">Mara Quintero</span><br>
+          <span class="byline__role">Principal Engineer, Storage · Lisbon</span>
+        </span>
+      </div>
+    </header>
+
+    <div class="prose">
+      <p>There's a moment in every storage engineer's education where the whole field suddenly collapses into a single idea. For me it was realizing that the <strong>write-ahead log</strong> isn't a feature of a database. It <em>is</em> the database. The tables, the indexes, the MVCC machinery — those are derived, rebuildable views over the one thing that's actually authoritative: an append-only log of what happened.</p>
+      <p>Once you see it, you can't unsee it.</p>
+
+      <h2 id="the-problem-wal-solves">The problem WAL solves</h2>
+      <p>Durability has an annoying property: you can't make a write durable and fast at the same time using the obvious approach. The obvious approach is "update the data in place and flush it to disk." But your data lives in a B-tree spread across thousands of pages. A single logical write — increment a counter, insert a row — might touch several pages in random locations.</p>
+      <p>Flushing random pages to disk on every commit is catastrophic for performance. Spinning disks hate random I/O, and even SSDs charge you for it in write amplification and latency tails.</p>
+      <p>The write-ahead log is the trick that breaks the tradeoff:</p>
+      <blockquote><p>Before you touch the real data, append a record describing the change to a sequential log, and <code>fsync</code> <em>that</em>. Only the log needs to be durable at commit time. The actual pages can be flushed lazily, in the background, whenever it's convenient.</p></blockquote>
+      <p>You've converted random writes into sequential ones. Commit latency is now the cost of appending to a file and forcing it to disk — which is about as cheap as durability gets.</p>
+
+      <h2 id="the-recovery-contract">The recovery contract</h2>
+      <p>The log earns its keep at recovery time. When the process crashes — and it <em>will</em> crash; that's the whole premise — the on-disk data pages are in some unknown, half-updated state. Some changes made it; some didn't. You can't trust any of it.</p>
+      <p>So you don't. You replay the log:</p>
+      <ol>
+        <li>Find the last checkpoint (a known-good marker).</li>
+        <li>Walk forward through every log record after it.</li>
+        <li>Re-apply each change to the data pages.</li>
+        <li>Roll back anything from transactions that never committed.</li>
+      </ol>
+      <p>This is the famous <strong>ARIES</strong> algorithm in a nutshell: <em>redo everything, then undo the losers.</em> The log is the source of truth; the data files are just a cache of the log's effects that happens to be slow to rebuild from scratch.</p>
+      <pre><code><span class="k">def</span> <span class="f">recover</span>(log, pages):
+    checkpoint = log.last_checkpoint()
+    <span class="c"># Redo phase: bring pages up to the end of the log</span>
+    <span class="k">for</span> record <span class="k">in</span> log.records_after(checkpoint):
+        <span class="k">if</span> record.lsn &gt; pages.get_lsn(record.page_id):
+            pages.apply(record)
+    <span class="c"># Undo phase: revert uncommitted transactions</span>
+    losers = log.transactions_without_commit()
+    <span class="k">for</span> record <span class="k">in</span> log.records_reversed():
+        <span class="k">if</span> record.txn_id <span class="k">in</span> losers:
+            pages.apply(record.compensation())</code></pre>
+      <p>The detail that makes this correct is the <strong>LSN</strong> — the log sequence number. Every page stores the LSN of the last log record applied to it. During redo you skip any record whose LSN is already reflected in the page. That's what makes replay <strong>idempotent</strong>: you can crash <em>during recovery</em>, restart, and replay again without double-applying anything.</p>
+
+      <h2 id="fsync-is-the-whole-ballgame">fsync is the whole ballgame</h2>
+      <p>Here's where people get burned. The log only works if the log is actually on disk when you tell the client "committed." And "on disk" is a slippery phrase, because there are at least three places your bytes can be hiding:</p>
+      <table>
+        <thead>
+          <tr><th>Layer</th><th align="center">Survives process crash?</th><th align="center">Survives power loss?</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Application buffer</td><td align="center">no</td><td align="center">no</td></tr>
+          <tr><td>OS page cache (after <code>write</code>)</td><td align="center"><strong>yes</strong></td><td align="center">no</td></tr>
+          <tr><td>Physical media (after <code>fsync</code>)</td><td align="center">yes</td><td align="center"><strong>yes</strong></td></tr>
+        </tbody>
+      </table>
+      <p>A bare <code>write()</code> only copies bytes into the kernel's page cache. If the machine loses power, those bytes evaporate, and your "durable" commit was a lie. You need <code>fsync()</code> (or <code>fdatasync</code>, or <code>O_DSYNC</code>) to force the data through to stable storage.</p>
+      <p>And then there's the truly cursed layer below that: the drive's own write cache. Consumer SSDs have been caught acknowledging <code>fsync</code> before the data hit flash, which is great for benchmarks and terrible for your data. This is why serious systems care about whether the drive honors <strong>FUA</strong> (Force Unit Access) and power-loss protection capacitors.</p>
+      <p>The lesson Jim Gray gave us decades ago still holds:</p>
+      <blockquote><p>Anyone can make a system fast if it doesn't have to be correct.</p></blockquote>
+
+      <h2 id="group-commit">Group commit: the obvious optimization</h2>
+      <p>If every commit does its own <code>fsync</code>, your throughput is capped by how many <code>fsync</code>s per second your disk can do — often just a few thousand. That's brutal when you have thousands of concurrent transactions.</p>
+      <p>The fix is <strong>group commit</strong>. Instead of each transaction forcing the log independently, you batch them: a bunch of transactions append their records, then a <em>single</em> <code>fsync</code> makes all of them durable at once. The cost of durability gets amortized across the whole batch.</p>
+      <p>The tradeoff is latency. A transaction now waits a few milliseconds for the batch window to fill. You're trading a little per-request latency for a large gain in aggregate throughput — which is almost always the right call for a busy system, and exactly the wrong call for a quiet one. Tune accordingly.</p>
+
+      <h2 id="why-this-framing-pays-off">Why this framing pays off</h2>
+      <p>Once you internalize "the log is the database," a lot of modern systems stop looking exotic:</p>
+      <ul>
+        <li><strong>Replication</strong> is just shipping the log to another machine and replaying it there. Postgres streaming replication, MySQL binlog, and Raft's replicated log are all the same idea at different altitudes.</li>
+        <li><strong>Change Data Capture</strong> is reading the log and turning each record into an event for downstream consumers. Debezium is, fundamentally, a log reader.</li>
+        <li><strong>Event sourcing</strong> is the application deciding to <em>keep</em> the log forever and treat it as the model of record, rather than as a recovery detail.</li>
+        <li><strong>LSM trees</strong> (which I'll cover in <a href="lsm-vs-btree.html">a later post</a>) lean into this even harder: the log-structured part <em>is</em> the storage layout.</li>
+      </ul>
+      <p>It's logs all the way down. The next time a storage system confuses you, ask the question that unlocks everything: <em>where is the log, and what does replay look like?</em> The answer is usually the design.</p>
+
+      <hr>
+      <p><em>Corrections welcome — email <a href="mailto:mara@coldstart.dev">mara@coldstart.dev</a>. Next in this series: how LSM trees and B-trees make opposite bets about your workload.</em></p>
+    </div>
+
+    <footer class="article-footer">
+      <div class="tag-row">
+        <a class="tag" href="../tags.html#storage">storage</a>
+        <a class="tag" href="../tags.html#durability">durability</a>
+        <a class="tag" href="../tags.html#databases">databases</a>
+        <a class="tag" href="../tags.html#internals">internals</a>
+      </div>
+      <div class="author-box">
+        <span class="byline__avatar" aria-hidden="true" style="background:linear-gradient(135deg,#c2410c,#fb923c)">MQ</span>
+        <p class="author-box__body">
+          <span class="author-box__name">Mara Quintero</span><br>
+          <span class="author-box__bio">Principal Engineer, Storage · Lisbon. Fifteen years building and breaking storage systems, with an unhealthy affection for write-ahead logs.</span>
+        </p>
+      </div>
+      <nav class="post-nav" aria-label="More posts">
+        <a class="next" href="lsm-vs-btree.html">
+          <span class="dir">Next in series →</span>
+          <span class="ttl">LSM Trees vs. B-Trees</span>
+        </a>
+      </nav>
+    </footer>
+  </article>
+</main>
+
+<footer class="site-foot">
+  <div class="shell shell--wide site-foot__inner">
+    <p>&copy; 2024 Cold Start · Built with <a href="https://gohugo.io/">Hugo</a> · One pager-induced essay at a time.</p>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="../about.html">About</a>
+      <a href="../tags.html">Archive</a>
+      <a href="../index.xml">RSS</a>
+      <a href="https://github.com/coldstart-dev">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

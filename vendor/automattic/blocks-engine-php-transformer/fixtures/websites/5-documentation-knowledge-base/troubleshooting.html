@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drivers Not Receiving Route Assignments — PocketRoute Docs</title>
+  <meta name="description" content="Troubleshoot why drivers aren't receiving route assignment notifications in PocketRoute.">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .toc-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .toc-list a {
+      font-family: var(--font-mono);
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      border-left: 2px solid transparent;
+      transition: color var(--t), background var(--t), border-color var(--t);
+      line-height: 1.35;
+    }
+    .toc-list a:hover {
+      color: var(--text-secondary);
+      border-left-color: var(--border-strong);
+    }
+    .toc-list a.toc-active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .related-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      text-decoration: none;
+      transition: color var(--t);
+    }
+    .related-card:last-child { border-bottom: none; padding-bottom: 0; }
+    .related-card:first-child { padding-top: 0; }
+    .related-card svg { color: var(--text-muted); flex-shrink: 0; margin-top: 2px; }
+    .related-card:hover svg { color: var(--accent); }
+    .related-card-title {
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      line-height: 1.35;
+    }
+    .related-card:hover .related-card-title { color: var(--accent); }
+    .related-card-cat {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .checklist {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .checklist-item {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .checklist-item input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      cursor: pointer;
+      margin-top: 2px;
+    }
+    .checklist-item label { cursor: pointer; line-height: 1.5; }
+
+    .diag-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 16px 0;
+    }
+    .diag-table th {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-default);
+      background: var(--bg-surface);
+    }
+    .diag-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .diag-table tr:last-child td { border-bottom: none; }
+    .diag-table td:first-child { color: var(--text-primary); font-weight: 500; }
+    .status-icon-ok { color: var(--green); }
+    .status-icon-err { color: var(--red); }
+  </style>
+</head>
+<body>
+
+<!-- ─── HEADER ─────────────────────────────────────────── -->
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo">
+      <span class="logo-icon">
+        <svg width="26" height="20" viewBox="0 0 26 20" fill="none" aria-hidden="true">
+          <circle cx="3.5" cy="16" r="3" fill="currentColor"/>
+          <circle cx="22.5" cy="4" r="3" fill="currentColor"/>
+          <path d="M6 14.5 C10 9, 16 11, 20 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <circle cx="10.8" cy="11.2" r="1.2" fill="currentColor" opacity="0.5"/>
+          <circle cx="15.5" cy="9.8" r="1.2" fill="currentColor" opacity="0.5"/>
+        </svg>
+      </span>
+      <span class="logo-wordmark">
+        <span>PocketRoute</span>
+        <span>Documentation</span>
+      </span>
+    </a>
+
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting Started</a>
+      <a href="release-notes.html">Releases</a>
+      <a href="api-docs.html">API</a>
+      <a href="contact.html">Support</a>
+    </nav>
+
+    <div class="header-right">
+      <span class="version-badge">v2.4.1</span>
+      <a href="#" class="btn-open-app">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+        </svg>
+        <span>Open App</span>
+      </a>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" id="nav-toggle">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="nav-overlay" id="nav-overlay" aria-hidden="true"></div>
+<nav class="nav-drawer" id="nav-drawer" aria-label="Mobile navigation">
+  <div class="nav-drawer-links">
+    <a href="index.html">Home</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="troubleshooting.html" class="active">Troubleshooting</a>
+    <a href="release-notes.html">Release Notes</a>
+    <a href="api-docs.html">API Docs</a>
+    <a href="contact.html">Contact Support</a>
+  </div>
+</nav>
+
+<!-- ─── PAGE LAYOUT ────────────────────────────────────── -->
+<div class="page-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar" aria-label="Documentation navigation">
+    <div class="sidebar-section">
+      <p class="sidebar-label">Navigation</p>
+      <nav class="sidebar-nav">
+        <a href="index.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Home
+        </a>
+        <a href="getting-started.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+          Getting Started
+        </a>
+        <a href="troubleshooting.html" class="active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Troubleshooting
+        </a>
+        <a href="release-notes.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Release Notes
+        </a>
+        <a href="api-docs.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          API Reference
+        </a>
+        <a href="contact.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Contact Support
+        </a>
+      </nav>
+    </div>
+
+    <div class="sidebar-section">
+      <p class="sidebar-label">On this page</p>
+      <nav class="toc-list" aria-label="Page sections">
+        <a href="#symptoms" class="toc-active">Symptoms</a>
+        <a href="#quick-checklist">Quick Checklist</a>
+        <a href="#cause-1">1. Notification Permissions</a>
+        <a href="#cause-2">2. Driver Not Signed In</a>
+        <a href="#cause-3">3. App Backgrounded (iOS)</a>
+        <a href="#cause-4">4. Assignment Not Dispatched</a>
+        <a href="#cause-5">5. Notification Delivery Delay</a>
+        <a href="#still-stuck">Still Stuck?</a>
+      </nav>
+    </div>
+
+    <div class="sidebar-section">
+      <p class="sidebar-label">Related Articles</p>
+      <nav aria-label="Related articles">
+        <a href="troubleshooting.html" class="related-card">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div>
+            <div class="related-card-title">GPS Location Not Updating</div>
+            <div class="related-card-cat">Troubleshooting</div>
+          </div>
+        </a>
+        <a href="troubleshooting.html" class="related-card">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div>
+            <div class="related-card-title">App Crashes on Large Routes</div>
+            <div class="related-card-cat">Troubleshooting</div>
+          </div>
+        </a>
+        <a href="getting-started.html#team" class="related-card">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          <div>
+            <div class="related-card-title">Inviting Drivers to Your Team</div>
+            <div class="related-card-cat">Getting Started</div>
+          </div>
+        </a>
+      </nav>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content" id="main-content">
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="index.html">Docs</a>
+      <span class="breadcrumb-sep" aria-hidden="true">/</span>
+      <a href="index.html#group-troubleshooting">Troubleshooting</a>
+      <span class="breadcrumb-sep" aria-hidden="true">/</span>
+      <span aria-current="page">Drivers Not Receiving Route Assignments</span>
+    </nav>
+
+    <header class="article-header">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span class="popular-tag tag-bug" style="font-size: 0.65rem;">Bug Fix</span>
+        <span class="popular-tag tag-setup" style="font-size: 0.65rem;">Setup</span>
+      </div>
+      <h1>Drivers Not Receiving Route Assignments</h1>
+      <div class="article-meta">
+        <span class="article-meta-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+          8 min read
+        </span>
+        <span class="article-meta-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4z"/></svg>
+          Updated May 22, 2025
+        </span>
+        <span class="article-meta-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          iOS &amp; Android
+        </span>
+      </div>
+    </header>
+
+    <div class="article-body">
+
+      <p>When you dispatch a route, drivers should receive a push notification and see the route load in their app within about 30 seconds. If that's not happening, this guide covers every known cause in order of likelihood.</p>
+
+      <!-- Symptoms -->
+      <section id="symptoms">
+        <h2>Symptoms</h2>
+        <p>This article applies if you're experiencing any of the following:</p>
+        <ul>
+          <li>Dispatched a route but the driver received no notification</li>
+          <li>The route shows as "Dispatched" in the dashboard but is missing from the driver's app</li>
+          <li>Driver says they received a notification but tapping it didn't open the route</li>
+          <li>Routes appear in the driver's app hours later, with a delay</li>
+        </ul>
+
+        <div class="callout callout-info" style="margin-top: 20px;">
+          <span class="callout-label">Before you start</span>
+          <p>Check the <strong>Route Activity Log</strong> in your dispatcher dashboard (Routes → select route → Activity tab). It will show whether the route was sent and whether the delivery server acknowledged receipt. This narrows the problem to either our servers or the driver's device.</p>
+        </div>
+      </section>
+
+      <!-- Quick Checklist -->
+      <section id="quick-checklist">
+        <h2>Quick Checklist</h2>
+        <p>Run through these first — they resolve the majority of cases:</p>
+
+        <div class="checklist" role="group" aria-label="Troubleshooting checklist">
+          <div class="checklist-item">
+            <input type="checkbox" id="check-1">
+            <label for="check-1">Driver is signed into the correct PocketRoute account (check their profile email in the app: Settings → Account)</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check-2">
+            <label for="check-2">The driver account you dispatched to matches the driver's actual login email</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check-3">
+            <label for="check-3">Push notifications are enabled for PocketRoute in device Settings (iOS: Settings → PocketRoute → Notifications; Android: Settings → Apps → PocketRoute → Notifications)</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check-4">
+            <label for="check-4">The driver's phone is not in Do Not Disturb or Focus mode</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check-5">
+            <label for="check-5">The driver has opened the PocketRoute app at least once since installing (cold-start required to register push token)</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check-6">
+            <label for="check-6">The driver's device has an active internet connection (try toggling Airplane mode)</label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cause 1 -->
+      <section id="cause-1">
+        <h2>1. Notification Permissions Are Blocked</h2>
+        <p>This is the most common cause. If a driver denies notification permissions on first launch — or if system updates have reset them — PocketRoute can't deliver route alerts.</p>
+
+        <h3>Check on iOS</h3>
+        <ol>
+          <li>Open <strong>Settings</strong> on the driver's iPhone</li>
+          <li>Scroll to <strong>PocketRoute</strong></li>
+          <li>Tap <strong>Notifications</strong></li>
+          <li>Ensure <strong>Allow Notifications</strong> is on, and that <strong>Alerts</strong> and <strong>Sounds</strong> are enabled</li>
+        </ol>
+
+        <h3>Check on Android</h3>
+        <ol>
+          <li>Open <strong>Settings → Apps → PocketRoute</strong></li>
+          <li>Tap <strong>Notifications</strong></li>
+          <li>Ensure the <strong>Route Assignments</strong> and <strong>Dispatch Alerts</strong> channels are both enabled</li>
+        </ol>
+
+        <div class="callout callout-warn">
+          <span class="callout-label">Android Battery Optimization</span>
+          <p>On many Android manufacturers (Samsung, Xiaomi, OnePlus), aggressive battery optimization kills background processes and blocks notifications. Go to <strong>Settings → Battery → Battery Optimization</strong> and set PocketRoute to <strong>Unrestricted</strong> or <strong>Don't optimize</strong>.</p>
+        </div>
+      </section>
+
+      <!-- Cause 2 -->
+      <section id="cause-2">
+        <h2>2. Driver Is Not Signed In</h2>
+        <p>Push tokens are only registered while a driver is signed in. If they signed out (or were signed out by a session expiry), they won't receive notifications.</p>
+
+        <p>Have the driver open the app and confirm they see their name in <strong>Settings → Account</strong>. If the sign-in screen is showing, they need to re-authenticate. After signing in, wait 60 seconds and re-dispatch the route — the push token will re-register automatically.</p>
+
+        <table class="diag-table" aria-label="Session state diagnostics">
+          <thead>
+            <tr>
+              <th>What the driver sees</th>
+              <th>What it means</th>
+              <th>Fix</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Sign-in screen on open</td>
+              <td>Session expired or manually signed out</td>
+              <td>Sign in again, re-dispatch</td>
+            </tr>
+            <tr>
+              <td>Wrong name in Account settings</td>
+              <td>Multiple accounts on one device</td>
+              <td>Sign out, sign in with correct account</td>
+            </tr>
+            <tr>
+              <td>Correct name, no routes</td>
+              <td>Route not yet synced or dispatch failed</td>
+              <td>Pull to refresh on Routes tab</td>
+            </tr>
+            <tr>
+              <td>Route visible but no notification</td>
+              <td>Push delivery failed; route still synced</td>
+              <td>Check notification permissions (see above)</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Cause 3 -->
+      <section id="cause-3">
+        <h2>3. App Was Force-Quit or Restricted (iOS)</h2>
+        <p>iOS can restrict an app's ability to receive push notifications if the device is in Low Power Mode, or if the user has recently force-closed the app by swiping up from the app switcher.</p>
+
+        <p>While PocketRoute doesn't require the app to be open to receive notifications, iOS occasionally throttles push delivery after force-quit. The fix:</p>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-num" aria-label="Step 1">1</div>
+            <div class="step-body">
+              <h4>Disable Low Power Mode on the driver's iPhone</h4>
+              <p>Settings → Battery → Low Power Mode → Off. Low Power Mode suppresses background network requests and delays push delivery by up to 30 minutes.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num" aria-label="Step 2">2</div>
+            <div class="step-body">
+              <h4>Open PocketRoute once</h4>
+              <p>Have the driver launch the app and leave it in the background (don't force-quit). iOS will restore full push delivery priority within 60 seconds.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num" aria-label="Step 3">3</div>
+            <div class="step-body">
+              <h4>Re-dispatch the route</h4>
+              <p>In your dashboard, open the route → Actions → Resend to Driver. This sends a fresh push notification.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cause 4 -->
+      <section id="cause-4">
+        <h2>4. Route Was Not Actually Dispatched</h2>
+        <p>It's possible the route was saved as a draft rather than dispatched. Check in the dashboard:</p>
+        <ul>
+          <li>Routes in <strong>Draft</strong> status have not been sent to any driver</li>
+          <li>Routes in <strong>Assigned</strong> status are assigned but awaiting dispatch</li>
+          <li>Routes in <strong>Dispatched</strong> status have been sent — check the Activity Log for delivery confirmation</li>
+        </ul>
+        <p>If the route shows as Draft or Assigned, click <strong>Dispatch Now</strong> on the route detail page.</p>
+      </section>
+
+      <!-- Cause 5 -->
+      <section id="cause-5">
+        <h2>5. Push Notification Delivery Delay</h2>
+        <p>In rare cases, Apple (APNS) or Google (FCM) push infrastructure experiences delays — usually during high-traffic periods like early morning delivery windows. If the Activity Log shows <strong>"Delivered to push provider"</strong> but the driver hasn't received it, this is likely the cause.</p>
+
+        <p>Workarounds:</p>
+        <ul>
+          <li>Have the driver pull to refresh on the Routes tab — the route will load even without the notification, since routes also sync on a 60-second background interval</li>
+          <li>Send the driver a direct message or call to tell them the route is ready</li>
+          <li>Use <strong>Actions → Resend to Driver</strong> to attempt another push delivery</li>
+        </ul>
+
+        <div class="callout callout-info">
+          <span class="callout-label">Push Delivery Status</span>
+          <p>PocketRoute logs whether our server successfully handed the notification to Apple/Google. We don't have visibility into final device delivery — that's controlled by APNS/FCM. Check <a href="contact.html#status">status.pocketroute.io</a> if you suspect a widespread issue.</p>
+        </div>
+      </section>
+
+      <!-- Still Stuck -->
+      <section id="still-stuck">
+        <h2>Still Stuck?</h2>
+        <p>If none of the above resolves the issue, our support team can review your account's push delivery logs directly. Please include:</p>
+        <ul>
+          <li>The Route ID (found in the route URL: <code class="inline">app.pocketroute.io/routes/<strong>r_xxxx</strong></code>)</li>
+          <li>The driver's account email</li>
+          <li>Device model and OS version</li>
+          <li>Approximate time you dispatched the route</li>
+        </ul>
+
+        <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
+          <a href="contact.html" style="display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 0.88rem; font-weight: 700; padding: 10px 20px; background: var(--accent); color: #0c1017; border-radius: var(--radius-sm); text-decoration: none; transition: background var(--t);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='var(--accent)'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            Contact Support
+          </a>
+          <a href="contact.html#community" style="display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 0.88rem; font-weight: 700; padding: 10px 20px; border: 1.5px solid var(--border-strong); color: var(--text-secondary); border-radius: var(--radius-sm); text-decoration: none; transition: all var(--t);" onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border-strong)'; this.style.color='var(--text-secondary)'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            Community Forum
+          </a>
+        </div>
+      </section>
+
+      <!-- Feedback -->
+      <div class="feedback-widget" aria-label="Article feedback">
+        <span class="feedback-question">Did this article solve your problem?</span>
+        <div class="feedback-btns">
+          <button class="feedback-btn" onclick="this.textContent='Glad to help!'; this.disabled=true;">Yes, resolved</button>
+          <button class="feedback-btn" onclick="window.location='contact.html'">No, still broken</button>
+        </div>
+      </div>
+
+    </div><!-- /article-body -->
+  </main>
+</div>
+
+<!-- ─── FOOTER ─────────────────────────────────────────── -->
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="index.html" class="site-logo">
+        <span class="logo-icon">
+          <svg width="22" height="18" viewBox="0 0 26 20" fill="none" aria-hidden="true">
+            <circle cx="3.5" cy="16" r="3" fill="currentColor"/>
+            <circle cx="22.5" cy="4" r="3" fill="currentColor"/>
+            <path d="M6 14.5 C10 9, 16 11, 20 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </span>
+        <span class="logo-wordmark"><span>PocketRoute</span></span>
+      </a>
+      <p class="footer-desc">Route planning for small delivery teams.</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <h4>Documentation</h4>
+        <ul>
+          <li><a href="getting-started.html">Getting Started</a></li>
+          <li><a href="troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Support</h4>
+        <ul>
+          <li><a href="contact.html">Contact Support</a></li>
+          <li><a href="contact.html#status">Service Status</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>&copy; 2025 PocketRoute, Inc. All rights reserved.</p>
+    <div class="footer-bottom-links">
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const navToggle = document.getElementById('nav-toggle');
+  const navDrawer = document.getElementById('nav-drawer');
+  const navOverlay = document.getElementById('nav-overlay');
+
+  navToggle.addEventListener('click', () => {
+    const open = navDrawer.classList.toggle('open');
+    navOverlay.classList.toggle('open', open);
+    navToggle.setAttribute('aria-expanded', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  });
+
+  navOverlay.addEventListener('click', () => {
+    navDrawer.classList.remove('open');
+    navOverlay.classList.remove('open');
+    navToggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+  });
+
+  // TOC highlight on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const tocLinks = document.querySelectorAll('.toc-list a');
+
+  function updateTOC() {
+    let current = '';
+    sections.forEach(section => {
+      if (section.getBoundingClientRect().top <= 100) current = section.id;
+    });
+    tocLinks.forEach(link => {
+      link.classList.toggle('toc-active', link.getAttribute('href') === '#' + current);
+    });
+  }
+
+  window.addEventListener('scroll', updateTOC, { passive: true });
+  updateTOC();
+</script>
+</body>
+</html>

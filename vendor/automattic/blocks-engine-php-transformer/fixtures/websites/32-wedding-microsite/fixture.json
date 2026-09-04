@@ -1,0 +1,12 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "wedding",
+    "microsite",
+    "event",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Cart — Fernwood Botanicals</title>
+  <meta name="description" content="Review your Fernwood Botanicals cart, adjust quantities, and check out." />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="index.html" aria-label="Fernwood Botanicals home">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44C16 40 7 36 7 22 7 13 14 6 24 6s17 7 17 16c0 14-9 18-17 22Z" fill="#9caf88"/><path d="M24 42V16" stroke="#2f4a2c" stroke-width="2.4" stroke-linecap="round"/><path d="M24 24C18 22 13 17 13 11c6 0 11 4 13 9 2-6 7-9 13-9 0 6-5 11-11 13" fill="#3f6b3a"/></svg>
+        Fernwood
+      </a>
+      <button class="nav-toggle" data-nav-toggle aria-label="Toggle menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <nav class="nav" data-nav>
+        <a href="index.html">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn" data-open-cart aria-label="Open cart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/><path d="M2 3h2.2l2.3 12.3a2 2 0 0 0 2 1.7h8.7a2 2 0 0 0 2-1.6L21 7H6"/></svg>
+          <span class="cart-badge is-empty" data-cart-count>0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="eyebrow">Almost there</span>
+        <h1>Your cart</h1>
+        <p>Review your selection, adjust quantities, and check out. Free shipping on orders over $75.</p>
+      </div>
+    </section>
+
+    <section class="section section-tight" data-cart-page>
+      <div class="wrap">
+        <div class="cart-empty" data-cart-empty hidden>
+          <svg viewBox="0 0 120 120" width="120" height="120" aria-hidden="true" style="margin:0 auto 12px;">
+            <path d="M30 50h60l-8 50a8 8 0 0 1-8 7H46a8 8 0 0 1-8-7Z" fill="#cdd8bf"/>
+            <rect x="24" y="40" width="72" height="14" rx="7" fill="#9caf88"/>
+            <path d="M60 40V22m0 0c-6-2-10-7-10-12 6 0 11 4 13 9 2-5 7-9 13-9 0 5-4 10-10 12" fill="#3f6b3a"/>
+          </svg>
+          <h2>Your cart is empty</h2>
+          <p style="margin-bottom:18px;">Looks like you haven't added any greenery yet.</p>
+          <a class="btn btn-primary" href="shop.html">Start shopping</a>
+        </div>
+
+        <div class="cart-grid">
+          <div class="cart-lines" data-cart-lines></div>
+
+          <aside class="cart-summary" data-cart-summary hidden>
+            <h3>Order summary</h3>
+            <div class="summary-row"><span>Subtotal</span><span data-sum-subtotal>$0.00</span></div>
+            <div class="summary-row"><span>Shipping</span><span data-sum-shipping>Free</span></div>
+            <div class="summary-row total"><span>Total</span><span data-sum-total>$0.00</span></div>
+            <p class="summary-note">Taxes calculated at checkout. Free shipping over $75.</p>
+            <button class="btn btn-primary btn-block" data-c-checkout>Proceed to checkout</button>
+            <p style="text-align:center;margin:14px 0 0;"><a href="shop.html">← Continue shopping</a></p>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44C16 40 7 36 7 22 7 13 14 6 24 6s17 7 17 16c0 14-9 18-17 22Z" fill="#9caf88"/><path d="M24 42V16" stroke="#1f3320" stroke-width="2.4" stroke-linecap="round"/><path d="M24 24C18 22 13 17 13 11c6 0 11 4 13 9 2-6 7-9 13-9 0 6-5 11-11 13" fill="#3f6b3a"/></svg>
+            Fernwood Botanicals
+          </div>
+          <p>A family nursery growing happy, healthy plants — and the people who care for them — since 1994.</p>
+        </div>
+        <div><h4>Shop</h4><ul>
+          <li><a href="shop.html?category=Indoor">Indoor plants</a></li>
+          <li><a href="shop.html?category=Outdoor">Outdoor plants</a></li>
+          <li><a href="shop.html?category=Succulents &amp; Cacti">Succulents &amp; cacti</a></li>
+          <li><a href="shop.html?category=Pots &amp; Planters">Pots &amp; planters</a></li>
+        </ul></div>
+        <div><h4>Company</h4><ul>
+          <li><a href="about.html">Our story</a></li>
+          <li><a href="about.html#sustainability">Sustainability</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="contact.html#hours">Greenhouse hours</a></li>
+        </ul></div>
+        <div><h4>Visit</h4><ul>
+          <li>14 Fernwood Lane</li><li>Mossvale, OR 97000</li>
+          <li><a href="tel:+15035550142">(503) 555-0142</a></li>
+          <li><a href="mailto:hello@fernwood.example">hello@fernwood.example</a></li>
+        </ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; <span data-year>2026</span> Fernwood Botanicals. Grown with care.</span>
+        <span>Peat-free · Plastic-light · Locally rooted</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/products.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

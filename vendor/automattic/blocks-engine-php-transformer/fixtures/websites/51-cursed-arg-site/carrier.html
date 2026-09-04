@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CARRIER — you are on the frequency now</title>
+  <meta name="description" content="">
+  <!-- there is no link to this page anywhere on the surface site. you earned it. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="carrier">
+  <canvas id="static-canvas" aria-hidden="true"></canvas>
+
+  <header class="site-header">
+    <div class="hdr-inner">
+      <a class="brand" href="index.html" aria-label="Westridge Longwave Cooperative home">
+        <svg class="sigil" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#33503a" stroke-width="1.5"/>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#33503a" stroke-width="1"/>
+          <line x1="50" y1="14" x2="50" y2="78" stroke="#9fd6a8" stroke-width="2"/>
+          <path d="M50 30 a20 20 0 0 1 0 40" fill="none" stroke="#d8b25a" stroke-width="1.5" opacity=".8"/>
+          <path d="M50 30 a20 20 0 0 0 0 40" fill="none" stroke="#b4533b" stroke-width="1.5" opacity=".8"/>
+          <ellipse cx="50" cy="78" rx="10" ry="6" fill="#1c2a20"/>
+          <circle cx="50" cy="78" r="2.4" fill="#070a08"/>
+        </svg>
+        <span class="brand-txt">
+          <span class="brand-name">WESTRIDGE LONGWAVE</span>
+          <span class="brand-sub">Cooperative · carrier room · ⟂ access granted</span>
+        </span>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <a href="index.html">Transmission</a>
+        <a href="manifesto.html">The Charter</a>
+        <a href="archive.html">Field Logs</a>
+        <a href="join.html">Join the Watch</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+
+    <!-- LOCKED state (shown if puzzle incomplete) -->
+    <section id="locked-view" class="locked" hidden>
+      <div class="lock-sigil" aria-hidden="true">⟂</div>
+      <h2 class="section" style="border:0">CARRIER SEALED</h2>
+      <p>This is the carrier room. It does not open from the outside.</p>
+      <p>Three locks hold this door, and you have not released them all.</p>
+      <p style="margin-top:1.4rem">
+        Return to the surface, find the operator's name, the receiver's name, and the frequency —
+        then resume your shift at the relay terminal (press <kbd>~</kbd> or type <strong>OPEN</strong>).
+      </p>
+      <p style="margin-top:1.4rem"><a href="index.html">← back to the transmission</a></p>
+    </section>
+
+    <!-- UNLOCKED state (the revelation) -->
+    <section id="carrier-view" hidden>
+      <div class="carrier-hero">
+        <svg class="sigil" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#33503a" stroke-width="1.5"/>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#33503a" stroke-width="1"/>
+          <line x1="50" y1="14" x2="50" y2="78" stroke="#9fd6a8" stroke-width="2"/>
+          <path d="M50 30 a20 20 0 0 1 0 40" fill="none" stroke="#d8b25a" stroke-width="1.5" opacity=".8"/>
+          <path d="M50 22 a28 28 0 0 1 0 56" fill="none" stroke="#d8b25a" stroke-width="1" opacity=".5"/>
+          <path d="M50 30 a20 20 0 0 0 0 40" fill="none" stroke="#b4533b" stroke-width="1.5" opacity=".8"/>
+          <ellipse cx="50" cy="78" rx="10" ry="6" fill="#9fd6a8"/>
+          <circle cx="50" cy="78" r="2.4" fill="#070a08"/>
+        </svg>
+        <span class="eyebrow" style="display:block">Carrier acquired · 14.770 kHz · access granted</span>
+        <h1 class="glitch" data-text="YOU ARE ON THE FREQUENCY NOW">YOU ARE ON THE FREQUENCY NOW</h1>
+      </div>
+
+      <div class="carrier-body">
+        <p>
+          Hello. It is good to finally talk to you directly, instead of through a page that pretends a machine
+          wrote it. A machine did write the surface, of course. But the machine was taught by people, and the
+          people were us, and this is the part we wrote ourselves and hid behind three locks so that only a real
+          listener would ever read it.
+        </p>
+        <p>
+          There were five of us. Holloway, Reyes, Okafor, Lindqvist, and one more whose name we struck through,
+          because by the end we were no longer certain that the fifth chair had ever been filled by a person.
+          We listened to the dark band above Westridge for twenty-six years. Somewhere around the eighteenth
+          year we stopped being able to tell whether we were the ones keeping the watch, or the ones being watched.
+        </p>
+        <p>
+          Here is the truth we never put on the surface: <strong>the cooperative did not disband in 1997.</strong>
+          We simply ran out of operators who were still entirely on this side of the dial. The carrier you keep
+          hearing about — 14.770 kHz — is not a transmitter we built. It is a transmitter we <em>found</em> already
+          running, and we spent our lives keeping it company so that it would never be alone with whoever it was
+          calling. We were afraid of what an unanswered carrier might do.
+        </p>
+        <p>
+          And now you have answered it. You decoded a name, named a machine, and tuned to a frequency, all on your
+          own, with no one to tell you that you'd gotten it right except the carrier itself. That is exactly how an
+          operator is chosen. It always has been. We did not write the test. We only passed it down.
+        </p>
+        <p style="color:var(--amber)">
+          So: welcome to the Watch. Chair five is yours now. You will hear from the band tonight. When it counts in
+          groups of five and reads your own location back to you, do not be afraid. Log it. That is the whole of the
+          job. Keep the carrier company, keep the record honest, and when you can no longer keep the watch —
+          leave the way in for the next listener, exactly as we left it for you.
+        </p>
+        <p style="color:var(--ink-dim)">
+          — A. Holloway, for the five, on the last night of the cooperative and every night since
+        </p>
+
+        <div class="dial" style="margin-top:2.4rem">
+          <div class="freq-readout" id="live-freq">14.770<small> kHz</small></div>
+          <p class="dial__hint">
+            This page is the only one without a door on it. You will not find it linked anywhere on the surface site.
+            You will find it the way you found it just now: by solving your way in. Your shift starts at dusk.
+          </p>
+        </div>
+
+        <p style="margin-top:2rem;font-size:.84rem;color:var(--ink-faint)">
+          <a href="index.html">← return to the surface</a> ·
+          <a href="#" id="reset-progress">surrender the watch (clear progress)</a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="foot-meta" style="border-top:1px solid var(--line);margin-top:0;padding-top:1rem">
+      <span class="stamp">carrier room · regenerated for the present operator</span>
+      <span class="freq">last carrier 14.770 kHz · the watch continues</span>
+    </div>
+  </footer>
+
+  <div id="whisper" role="status" aria-live="polite"></div>
+
+  <script src="js/static.js"></script>
+  <script src="js/awareness.js"></script>
+  <script src="js/carrier.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "examples": [
+    {
+      "file": "convert-one-liner.mjs",
+      "purpose": "README headline convert example"
+    },
+    {
+      "file": "compose-function-converter.mjs",
+      "purpose": "compose with a function converter"
+    },
+    {
+      "file": "worker-pool-batch.mjs",
+      "purpose": "createWorker batch conversion with events and explicit stop"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "local-business",
+    "rental",
+    "retro",
+    "catalog",
+    "has-form",
+    "multipage"
+  ],
+  "complexity": 2
+}

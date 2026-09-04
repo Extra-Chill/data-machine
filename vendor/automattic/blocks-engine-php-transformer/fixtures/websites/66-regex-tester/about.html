@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Relay, the regex lab</title>
+  <meta name="description" content="Relay is a fully client-side regular-expression playground. It uses the real JavaScript RegExp engine for matching and a hand-written recursive-descent parser to power its explainer and SVG railroad diagram.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body class="is-page">
+
+  <header class="page-header">
+    <div class="inner">
+      <a href="index.html" class="logo" aria-label="Relay home">
+        <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="7" cy="16" r="3.4" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <circle cx="25" cy="16" r="3.4" fill="none" stroke="var(--accent)" stroke-width="2.2"/>
+          <path d="M10.4 16 H21.6" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M14 9 q4 7 0 14" fill="none" stroke="var(--accent-3)" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <span class="logo-word">Re<b>lay</b></span>
+      </a>
+      <nav class="page-nav" aria-label="Primary">
+        <a href="index.html">Lab</a>
+        <a href="cheatsheet.html">Cheatsheet</a>
+        <a href="about.html" class="active" aria-current="page">About</a>
+        <a href="index.html" class="cta">Open the lab →</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero page-wrap">
+      <p class="eyebrow">What is this?</p>
+      <h1>Write a regex. <em>See it think.</em></h1>
+      <p class="lead">Relay is an in-browser regular-expression playground. You type a pattern and some test text, and Relay highlights every match live, lists the capture groups, explains the pattern token by token in plain English, and draws an SVG railroad diagram of its structure. There's a replace/split workbench too. The whole thing runs client-side — open <code>index.html</code> over <code>file://</code> and it just works.</p>
+    </section>
+
+    <section class="section page-wrap">
+      <h2>What's inside</h2>
+      <p class="sub">No regex library, no diagram library, no framework, no build step — everything is hand-written vanilla JavaScript.</p>
+      <div class="about-grid">
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h10M4 17h7"/></svg>
+          <h3>Real matching</h3>
+          <p>Matching uses the browser's native <code>RegExp</code> engine, with the <code>d</code> (indices) flag where available to resolve exact capture-group offsets — and a 250 ms guard against catastrophic backtracking.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v6"/></svg>
+          <h3>A real parser</h3>
+          <p>A hand-written recursive-descent parser turns your pattern into an abstract syntax tree — literals, classes, quantifiers, groups, lookaround, alternation, backreferences. The AST drives the explainer and the diagram.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 12h4l3-7 4 14 3-7h2"/></svg>
+          <h3>Railroad diagrams</h3>
+          <p>The diagram pane runs a two-pass SVG layout (measure, then draw) over the AST: sequences flow left-to-right, alternations stack and fan out, quantifiers draw loop-back rails, groups become labelled boxes.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>
+          <h3>Live overlay highlights</h3>
+          <p>A transparent textarea sits over a synced overlay <code>div</code>; matches are <code>&lt;mark&gt;</code> spans in alternating colors, with capture groups tinted distinctly — handling overlaps, multiline text, and zero-width matches.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 7l-4 5 4 5M16 7l4 5-4 5"/></svg>
+          <h3>Replace &amp; split</h3>
+          <p>A transform workbench shows live <code>String.replace</code> output with <code>$1</code>, <code>$&lt;name&gt;</code>, and <code>$&amp;</code> tokens, plus a <code>split</code> mode that lists every resulting part.</p>
+        </div>
+        <div class="feature">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4h16v16H4z"/><path d="M9 9h6v6H9z"/></svg>
+          <h3>Shareable &amp; persistent</h3>
+          <p>Your pattern, flags, and text are saved to <code>localStorage</code> and encoded into the URL hash. Copy the share link and the whole session travels with it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section page-wrap">
+      <h2>How a pattern flows through Relay</h2>
+      <ol class="flow-list">
+        <li><span class="flow-n">1</span><div><strong>Parse</strong> — <code>parser.js</code> reads the source string left to right, building an AST node for each construct and counting capture groups.</div></li>
+        <li><span class="flow-n">2</span><div><strong>Match</strong> — <code>matcher.js</code> compiles a real <code>RegExp</code> and iterates every match, resolving group offsets and bailing if a run blows past the time budget.</div></li>
+        <li><span class="flow-n">3</span><div><strong>Highlight</strong> — <code>highlight.js</code> turns matches into overlay spans, nesting capture-group tints and marking zero-width hits.</div></li>
+        <li><span class="flow-n">4</span><div><strong>Explain</strong> — <code>explain.js</code> walks the AST into an indented, plain-English breakdown.</div></li>
+        <li><span class="flow-n">5</span><div><strong>Draw</strong> — <code>railroad.js</code> lays out and renders the AST as an SVG railroad diagram.</div></li>
+      </ol>
+    </section>
+
+    <section class="section page-wrap">
+      <h2>Keyboard shortcuts</h2>
+      <div class="kbd-grid">
+        <div class="kbd-card"><kbd>⌘/Ctrl</kbd> + <kbd>/</kbd><span>Focus the pattern field</span></div>
+        <div class="kbd-card"><kbd>⌘/Ctrl</kbd> + <kbd>Enter</kbd><span>Re-run matching</span></div>
+        <div class="kbd-card"><kbd>Tab</kbd><span>Insert two spaces in the test text</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-foot">
+    <div class="page-wrap">
+      <span>Relay Regex Lab v3.2 · vanilla HTML / CSS / JS · no dependencies</span>
+      <span><a href="cheatsheet.html" style="color:var(--accent)">Cheatsheet →</a></span>
+    </div>
+  </footer>
+</body>
+</html>

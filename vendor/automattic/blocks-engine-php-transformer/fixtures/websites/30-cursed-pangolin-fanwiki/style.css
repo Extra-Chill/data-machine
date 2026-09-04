@@ -1,0 +1,620 @@
+/* ============================================================
+   THE OFFICIAL STYLESHEET of the HONORABLE & IMAGINARY ORDER
+   OF THE VELVET PANGOLIN. Begun 14-Feb-1999. Continuously
+   "improved" since. Do not delete rules you do not understand.
+   This file contains 28 years of overlapping authorship. Walk
+   carefully. Rules are not in chronological order. Conflicts
+   are not bugs; conflicts are HERITAGE.
+   ============================================================ */
+
+/* ---- 1999: original styles by Geoffrey (DO NOT REMOVE) ---- */
+BODY {
+  background: #F0EAD2 url('images/parchment-tile.gif') repeat;
+  color: #1F1F1F;
+  font-family: "Times New Roman", Times, serif;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+}
+
+TABLE { border-collapse: separate; border-spacing: 2px; }
+TD { vertical-align: top; padding: 4px; }
+TH { background: #B22222; color: #F0EAD2; font-weight: bold; padding: 4px 8px; }
+
+A:link    { color: #B22222; }
+A:visited { color: #8B5A8E; }
+A:active  { color: #C49934; }
+A:hover   { color: #355E3B; text-decoration: underline overline; }
+
+H1 { font-family: "Cinzel", "Trajan Pro", "Times New Roman", serif; color: #3A1B47; font-size: 36px; letter-spacing: 4px; text-shadow: 2px 2px 0 #C49934; }
+H2 { font-family: "Cinzel", serif; color: #B22222; border-bottom: 3px double #355E3B; padding-bottom: 4px; }
+H3 { font-family: Georgia, serif; color: #355E3B; }
+H4 { font-family: "Trebuchet MS", sans-serif; color: #3A1B47; }
+H5 { font-family: "Comic Sans MS", cursive; color: #FF69B4; }
+H6 { font-family: Impact, sans-serif; color: #C49934; letter-spacing: 2px; }
+
+/* ---- 2000: per-tag presentational rules (Geoffrey was new to CSS) ---- */
+FONT { font-family: inherit; } /* a vain attempt to corral the <font> tags */
+CENTER { display: block; text-align: center; }
+B, STRONG { font-weight: 700; }
+I, EM { font-style: italic; }
+U { text-decoration: underline; }
+S, STRIKE { text-decoration: line-through; color: #888; }
+TT, CODE, KBD, SAMP { font-family: "Courier New", "Lucida Console", monospace; }
+BIG { font-size: 1.3em; }
+SMALL { font-size: 0.85em; }
+ACRONYM, ABBR { border-bottom: 1px dotted #B22222; cursor: help; }
+ADDRESS { font-style: normal; }
+BLOCKQUOTE { margin-left: 24px; border-left: 3px solid #C49934; padding-left: 10px; }
+HR { border: none; border-top: 1px solid #888; margin: 8px 0; }
+
+/* ---- 2001: Reginald added rules for new "About" section ---- */
+.about-section { width: 90%; margin: 12px auto; padding: 14px; background: #fff8e0; border: 3px ridge #C49934; }
+.about-section font { font-family: "Times New Roman", serif !important; }
+
+/* ---- 2002: a brief and unsuccessful experiment with the @import directive ---- */
+/* @import url("style-2002-experimental.css"); -- removed because Firefox 0.9 couldn't handle it */
+/* @import "style-fonts.css"; -- removed because Reginald couldn't find the file */
+
+/* ---- 2003: Geoffrey overrides because Reginald's rules are too plain ---- */
+body { background: #F0EAD2 url('images/parchment-tile.gif') repeat !important; }
+.about-section { border-color: #B22222 !important; background: linear-gradient(to bottom, #fff8e0, #f0e6c0) !important; }
+.about-section font { color: #3A1B47 !important; }
+
+/* ---- 2004: cheap hover effects (Geoffrey) ---- */
+a img { border: 0; transition: opacity 0.2s; }
+a img:hover { opacity: 0.7; }
+table.shell a:hover { background: rgba(255,105,180,0.15); }
+
+/* ---- 2005: web 2.0 era (Mavis) ---- */
+.web2-card {
+  background: -webkit-gradient(linear, left top, left bottom, from(#fff), to(#dcd0a0));
+  background: -moz-linear-gradient(top, #fff, #dcd0a0);
+  background: -o-linear-gradient(top, #fff, #dcd0a0);
+  background: linear-gradient(to bottom, #fff, #dcd0a0);
+  -webkit-border-radius: 12px;
+  -moz-border-radius: 12px;
+  border-radius: 12px;
+  -webkit-box-shadow: 0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.8);
+  -moz-box-shadow: 0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.8);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.8);
+  padding: 14px;
+  margin: 12px 0;
+  border: 1px solid #b8a060;
+}
+
+.web2-button {
+  display: inline-block;
+  padding: 6px 16px;
+  background: -webkit-gradient(linear, left top, left bottom, from(#4a90c2), to(#1f4f7a));
+  background: -moz-linear-gradient(top, #4a90c2, #1f4f7a);
+  background: linear-gradient(to bottom, #4a90c2, #1f4f7a);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0,0,0,0.4);
+  -webkit-border-radius: 6px;
+  -moz-border-radius: 6px;
+  border-radius: 6px;
+  border: 1px solid #1a3f60;
+  -webkit-box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  font-family: "Trebuchet MS", "Lucida Grande", sans-serif;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: none;
+}
+.web2-button:hover { background: linear-gradient(to bottom, #5aa0d2, #2f5f8a); }
+.web2-button:active { background: linear-gradient(to bottom, #1f4f7a, #4a90c2); }
+
+.gloss-strip {
+  background: -webkit-gradient(linear, left top, left bottom,
+              color-stop(0%, rgba(255,255,255,0.7)),
+              color-stop(50%, rgba(255,255,255,0.2)),
+              color-stop(50%, rgba(0,0,0,0.05)),
+              color-stop(100%, rgba(0,0,0,0.15)));
+  background: linear-gradient(to bottom,
+              rgba(255,255,255,0.7) 0%,
+              rgba(255,255,255,0.2) 50%,
+              rgba(0,0,0,0.05) 50%,
+              rgba(0,0,0,0.15) 100%);
+  height: 28px;
+  border-radius: 4px;
+}
+
+/* ---- 2006: rounded everything (the worst year) ---- */
+input, button, select, textarea { border-radius: 4px; }
+fieldset { border-radius: 6px; }
+img { border-radius: 2px; }
+/* (the above were enthusiastic but did nothing because Geoffrey's overrides came later) */
+
+/* ---- 2007: ANOTHER body rule because the 2003 one stopped working in Firefox 2 ---- */
+body {
+  font-family: "Trebuchet MS", "Lucida Grande", Tahoma, sans-serif;
+  line-height: 1.5;
+}
+
+/* ---- 2008: Geoffrey re-overrides because Mavis broke the font ---- */
+body { font-family: "Times New Roman", Times, serif !important; }
+
+/* ---- 2008: Mavis sneaks the modern font back via a more specific selector ---- */
+html > body { font-family: "Trebuchet MS", "Lucida Grande", Tahoma, sans-serif; }
+/* (this doesn't actually beat !important. Mavis never noticed.) */
+
+/* ---- 2009: an entire ruleset for a section that no longer exists ---- */
+.donations-banner { display: block; padding: 12px; background: #B22222; color: #fff; text-align: center; border-radius: 8px; font-family: "Trebuchet MS"; }
+.donations-banner a { color: #FFFF99; }
+.donations-banner::after { content: " &middot; the Order does not accept donations &middot;"; font-style: italic; }
+/* (Reginald: "Why is this here?" Geoffrey: "Just in case.") */
+
+/* ---- 2010: introduction of "mystical-section" by Reginald ---- */
+.mystical {
+  background: #3A1B47;
+  color: #F0EAD2;
+  font-family: "Cinzel", "Trajan Pro", "Times New Roman", serif;
+  padding: 24px;
+  margin: 18px 0;
+  border-top: 4px solid #C49934;
+  border-bottom: 4px solid #C49934;
+}
+.mystical h2, .mystical h3 { color: #C49934; text-shadow: 0 0 8px rgba(196,153,52,0.6); }
+.mystical a { color: #FF69B4; }
+.mystical p::first-letter {
+  float: left;
+  font-size: 3.2em;
+  line-height: 0.85;
+  padding: 4px 8px 0 0;
+  color: #C49934;
+  font-family: "Cinzel", serif;
+}
+.mystical figure { display: inline-block; vertical-align: top; }
+.mystical figcaption { color: #C49934; }
+.mystical em, .mystical i { color: #f6d28a; }
+
+/* ---- 2011: dl-of-doom rules for hierarchy of ranks ---- */
+dl { margin: 8px 0; padding-left: 12px; border-left: 2px solid #8B5A8E; }
+dt { font-weight: bold; font-family: "Cinzel", serif; color: #B22222; margin-top: 6px; }
+dd { margin-left: 14px; color: #1F1F1F; }
+dl dl { border-left-color: #B22222; }
+dl dl dl { border-left-color: #C49934; }
+dl dl dl dl { border-left-color: #355E3B; }
+dl dl dl dl dl { border-left-color: #3A1B47; }
+dl dl dl dl dl dl { border-left-color: #FF69B4; }
+dl dl dl dl dl dl dl { border-left-color: #00FF00; } /* depth 7 emergency color */
+
+/* ---- 2012: id-only fight ---- */
+#main-content { max-width: 1100px; margin: 0 auto; padding: 12px; }
+#main-content { font-family: Georgia, serif; } /* duplicate selector intentional */
+#main-content { color: #1F1F1F; } /* third duplicate */
+#page-shell { table-layout: auto; } /* fighting the table-shell layout */
+#banner h1 { font-size: 32px; }
+#banner h1 { font-size: 36px; } /* dup */
+#footer p { margin: 6px 0; }
+#emergency-override { /* defined inline in <style>, but here too */ background: #FF69B4 !important; }
+
+/* ---- 2012: a class-vs-id war ---- */
+.do-not-touch { color: #B22222; }
+#do-not-touch { color: #355E3B; }
+div.do-not-touch.special#do-not-touch { color: #C49934; } /* hyper-specific to win */
+
+/* ---- 2013: tenets section ---- */
+.tenets-list { counter-reset: tenet; list-style: none; padding-left: 0; }
+.tenets-list > li {
+  counter-increment: tenet;
+  position: relative;
+  padding: 12px 12px 12px 64px;
+  margin: 10px 0;
+  border-left: 4px solid #C49934;
+  background: rgba(196,153,52,0.06);
+}
+.tenets-list > li::before {
+  content: "TENET " counter(tenet, upper-roman);
+  position: absolute;
+  left: 6px; top: 12px;
+  font-family: "Cinzel", serif;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #B22222;
+  font-weight: bold;
+  width: 52px;
+}
+.tenets-list details { margin-top: 6px; }
+.tenets-list summary { cursor: pointer; color: #355E3B; font-style: italic; }
+.tenets-list summary:hover { color: #B22222; }
+
+/* ---- 2014: ARIA / modern responsive (by NewInitiate_Tilda) ---- */
+@media (max-width: 720px) {
+  body { font-size: 14px; }
+  .web2-card { padding: 10px; }
+  table.shell { display: block; }
+  table.shell > tbody > tr > td.shell-left,
+  table.shell > tbody > tr > td.shell-right { display: block; width: 100%; }
+  .library-grid { grid-template-columns: 1fr; }
+  .roster { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  h1 { font-size: 24px; letter-spacing: 2px; }
+  .modern-card { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  marquee { animation: none !important; }
+  blink { animation: none !important; }
+  #sigil-svg { animation: none !important; }
+}
+@media print {
+  marquee, blink, dialog, #footer, .shell-left, .shell-right { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+}
+@media (prefers-color-scheme: dark) {
+  /* Reginald: I don't believe in dark mode. - 2018 */
+  /* (rules left empty intentionally) */
+}
+
+/* ---- 2015: modern grid section "Library of Holdings" ---- */
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  background: #1F1F1F;
+  color: #F0EAD2;
+  padding: 20px;
+  border-radius: 0;
+}
+.library-grid figure {
+  margin: 0;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.library-grid figure picture { display: block; aspect-ratio: 4/3; background: linear-gradient(135deg, #555, #222); border: 1px dashed #666; }
+.library-grid figure picture img { width: 100%; height: 100%; object-fit: cover; opacity: 0.4; }
+.library-grid figcaption { font-family: "Trebuchet MS", sans-serif; font-size: 13px; color: #C49934; }
+.library-grid figcaption b { color: #f6d28a; }
+.library-grid figcaption small { color: #888; }
+
+/* ---- 2016: footer ---- */
+#footer {
+  background: #1F1F1F;
+  color: #888;
+  padding: 28px 16px;
+  text-align: center;
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 12px;
+  border-top: 6px ridge #B22222;
+}
+#footer a { color: #FF69B4; }
+#footer a:hover { color: #C49934; }
+#footer p { margin: 8px 0; }
+#footer p:first-child { font-size: 14px; color: #C49934; }
+
+/* ---- 2017: contradictory !important war ---- */
+.sigil-caption { color: #C49934 !important; }
+.sigil-caption { color: #B22222 !important; } /* Geoffrey */
+.sigil-caption { color: #355E3B !important; } /* Mavis */
+.sigil-caption { color: #8B5A8E !important; } /* Reginald */
+.sigil-caption { color: #3A1B47 !important; } /* the Vault-Warden */
+/* the last rule wins. this has been the subject of three Convocations. */
+
+/* ---- 2017: silence is golden ---- */
+.silence-of-1947 { background: repeating-linear-gradient(45deg, #111 0 6px, #1a1a1a 6px 12px); color: #555; font-style: italic; padding: 8px; }
+
+/* ---- 2018: dialog (Initiation Oath) ---- */
+dialog[open] {
+  border: 6px double #C49934;
+  background: #3A1B47;
+  color: #F0EAD2;
+  font-family: "Cinzel", serif;
+  padding: 30px;
+  max-width: 600px;
+  box-shadow: 0 0 48px rgba(58,27,71,0.8);
+  margin: 20px auto;
+}
+dialog[open]::backdrop {
+  background: rgba(0,0,0,0.6);
+}
+dialog[open] h3 { color: #C49934; margin-top: 0; border-bottom: 1px solid #C49934; padding-bottom: 6px; }
+dialog[open] ol { padding-left: 22px; }
+dialog[open] ol li { margin: 4px 0; }
+
+/* ---- 2019: custom element styles (CodeFriend_2014) ---- */
+pangolin-scale {
+  display: inline-block;
+  width: 18px;
+  height: 22px;
+  background: radial-gradient(circle at 30% 30%, #b87333, #6b3f1a);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  margin: 0 2px;
+  vertical-align: middle;
+  box-shadow: inset -2px -3px 4px rgba(0,0,0,0.5);
+}
+pangolin-scale[color="copper"] { background: radial-gradient(circle at 30% 30%, #d97f3a, #7a4520); }
+pangolin-scale[color="silver"] { background: radial-gradient(circle at 30% 30%, #d8d8d8, #888); }
+pangolin-scale[color="onyx"]   { background: radial-gradient(circle at 30% 30%, #555, #111); }
+pangolin-scale[color="gilt"]   { background: radial-gradient(circle at 30% 30%, #f0d070, #8a6a20); }
+pangolin-scale:hover { transform: rotate(-6deg) scale(1.05); transition: transform 0.15s; }
+
+sacred-glyph {
+  display: inline-block;
+  width: 1.6em;
+  height: 1.6em;
+  border: 2px solid #C49934;
+  border-radius: 50%;
+  text-align: center;
+  font-family: "Cinzel", serif;
+  font-weight: bold;
+  color: #C49934;
+  line-height: 1.5;
+  background: #1F1F1F;
+}
+sacred-glyph[rune="seventh"]::before { content: "VII"; font-size: 0.6em; }
+sacred-glyph[rune="thirteenth"]::before { content: "XIII"; font-size: 0.45em; }
+sacred-glyph[rune="alpha"]::before { content: "\03B1"; }
+sacred-glyph[rune="omega"]::before { content: "\03A9"; }
+sacred-glyph:not([rune])::before { content: "?"; color: #B22222; }
+
+order-rank {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #355E3B;
+  color: #F0EAD2;
+  font-family: "Cinzel", serif;
+  font-size: 11px;
+  letter-spacing: 1px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+order-rank[tier="initiate"]      { background: #8B5A8E; }
+order-rank[tier="scalebearer"]   { background: #355E3B; }
+order-rank[tier="adept"]         { background: #B22222; }
+order-rank[tier="custodian"]     { background: #C49934; color: #1F1F1F; }
+order-rank[tier="vault-warden"]  { background: #3A1B47; border: 1px solid #C49934; }
+order-rank[tier="pangolin-equal"]{ background: linear-gradient(45deg, #C49934, #B22222, #3A1B47); color: #F0EAD2; }
+order-rank::before { content: "\2756"; margin-right: 4px; color: #fff8e0; opacity: 0.6; }
+
+/* ---- 2020: a third body rule appears ---- */
+body {
+  scroll-behavior: smooth;
+}
+
+/* ---- 2020: someone discovered :is() ---- */
+:is(h1, h2, h3, h4, h5, h6) { font-feature-settings: "smcp" 1; }
+:is(.web2-card, .modern-card) :is(h2, h3) { margin-top: 0; }
+
+/* ---- 2021: dark "vault" panel ---- */
+.vault-panel {
+  background: #1F1F1F;
+  color: #F0EAD2;
+  padding: 24px;
+  border: 1px solid #C49934;
+  font-family: "Trebuchet MS", sans-serif;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.vault-panel h3 { color: #C49934; margin-top: 0; }
+.vault-panel code { background: #000; color: #00FF00; padding: 1px 4px; font-family: "Courier New", monospace; }
+.vault-panel a { color: #FF69B4; }
+.vault-panel template { display: none; }
+.vault-panel applet { display: block; background: #000; color: #00FF00; padding: 6px; border: 1px dashed #C49934; font-family: monospace; font-size: 11px; }
+
+/* ---- 2022: a rule with very specific selector to beat the !importants ---- */
+html body div#main-content section.mystical p.sigil-caption { color: #C49934 !important; }
+
+/* ---- 2022: Tilda's accessibility additions ---- */
+[aria-hidden="true"] { /* honoured, but visible anyway because old layouts depend on it */ }
+[tabindex="-1"]:focus { outline: none; }
+.skip-link { position: absolute; left: -9999px; }
+.skip-link:focus { left: 12px; top: 12px; background: #B22222; color: #fff; padding: 6px 10px; z-index: 9999; }
+
+/* ---- 2023: the form chaos ---- */
+.chaos-form { border: 2px solid #355E3B; padding: 16px; background: #fffceb; max-width: 720px; margin: 16px 0; }
+.chaos-form fieldset { border: 1px solid #C49934; padding: 12px; margin: 10px 0; }
+.chaos-form fieldset legend { font-family: "Cinzel", serif; color: #B22222; padding: 0 8px; }
+.chaos-form label { display: block; margin: 6px 0 2px; font-weight: bold; font-size: 12px; color: #3A1B47; }
+.chaos-form input, .chaos-form select, .chaos-form textarea {
+  font-family: "Trebuchet MS", sans-serif;
+  padding: 4px 6px;
+  border: 1px solid #888;
+  background: #fff;
+}
+.chaos-form input[type="checkbox"], .chaos-form input[type="radio"] { display: inline-block; margin-right: 4px; }
+.chaos-form input[type="submit"], .chaos-form button {
+  background: linear-gradient(to bottom, #B22222, #6a1010);
+  color: #fff;
+  border: 1px solid #4a0a0a;
+  padding: 6px 14px;
+  font-family: "Cinzel", serif;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+.chaos-form input[type="submit"]:hover, .chaos-form button:hover { background: linear-gradient(to bottom, #C42323, #7a2010); }
+.chaos-form input[type="reset"] { background: #888; color: #fff; padding: 6px 14px; border: 1px solid #555; cursor: pointer; }
+.chaos-form input:focus, .chaos-form select:focus, .chaos-form textarea:focus { outline: 2px solid #C49934; outline-offset: 1px; }
+.chaos-form input:invalid { background: rgba(178,34,34,0.06); }
+.chaos-form progress { width: 200px; height: 14px; }
+.chaos-form meter { width: 200px; height: 14px; }
+.chaos-form output { font-family: "Courier New", monospace; color: #355E3B; font-weight: bold; padding: 2px 6px; background: #fff; border: 1px solid #888; }
+.chaos-form datalist { display: none; }
+.chaos-form keygen { display: inline-block; padding: 4px; background: #fff8e0; border: 1px dashed #B22222; font-size: 11px; }
+.chaos-form isindex { display: block; margin: 8px 0; padding: 4px; background: #fff8e0; }
+
+/* ---- 2024: NEW MODERN LAYOUT (CodeFriend_2014, "the great refactor") ---- */
+:root {
+  --pang-vermilion: #B22222;
+  --pang-mauve: #8B5A8E;
+  --pang-mustard: #C49934;
+  --pang-hunter: #355E3B;
+  --pang-eggplant: #3A1B47;
+  --pang-bone: #F0EAD2;
+  --pang-charcoal: #1F1F1F;
+  --pang-pink-1998: #FF69B4;
+  --pang-marquee-green: #00FF00;
+}
+
+.modern-card {
+  background: var(--pang-bone);
+  color: var(--pang-charcoal);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 18px rgba(31,31,31,0.12);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 16px 0;
+}
+.modern-card h3 { grid-column: 1 / -1; margin: 0 0 8px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--pang-eggplant); }
+.modern-card p { margin: 4px 0; }
+.modern-card pre { font-size: 11px; line-height: 1.4; }
+
+/* ---- 2024: but Geoffrey re-broke it with another override ---- */
+.modern-card { background: #F0EAD2 url('images/parchment-tile.gif') repeat !important; }
+.modern-card h3 { font-family: "Cinzel", serif !important; }
+
+/* ---- 2025: a fourth body rule ---- */
+body { background-attachment: fixed; }
+
+/* ---- 2025: container queries that nobody uses yet ---- */
+@container (min-width: 600px) {
+  .modern-card { grid-template-columns: 1fr 1fr 1fr; }
+}
+@supports (display: grid) {
+  .library-grid { gap: 18px; }
+}
+@supports not (display: grid) {
+  .library-grid { display: block; }
+  .library-grid figure { display: inline-block; width: 30%; margin: 1%; vertical-align: top; }
+}
+
+/* ---- 2026: NEW user CodeFriend_2014 added accessible focus rings; immediately overridden by Geoffrey ---- */
+:focus-visible { outline: 3px solid #355E3B; outline-offset: 2px; }
+:focus-visible { outline: none !important; } /* Geoffrey: "ugly" */
+
+/* ---- the doctrine table ---- */
+table.doctrine {
+  width: 100%;
+  border: 4px ridge #C49934;
+  background: #fff8e0;
+  margin: 16px 0;
+}
+table.doctrine caption { font-family: "Cinzel", serif; color: #3A1B47; padding: 6px; background: #fff8e0; border: 1px solid #C49934; border-bottom: none; }
+table.doctrine th { background: #3A1B47; color: #C49934; border: 1px solid #C49934; }
+table.doctrine td { border: 1px solid #C49934; padding: 6px; }
+table.doctrine td.rhombus { background: linear-gradient(135deg, #3A1B47 0%, #3A1B47 48%, #C49934 48%, #C49934 52%, #3A1B47 52%); color: #F0EAD2; text-align: center; font-family: "Cinzel", serif; }
+table.doctrine td.silence { background: repeating-linear-gradient(45deg, #1F1F1F, #1F1F1F 6px, #2a2a2a 6px, #2a2a2a 12px); color: #888; text-align: center; font-style: italic; }
+table.doctrine tfoot td { background: #fff8e0; color: #666; }
+table.doctrine table { border: 1px dashed #C49934; background: rgba(255,248,224,0.6); margin: 4px; }
+table.doctrine table table { border: 1px dotted #B22222; background: rgba(255,255,255,0.6); }
+table.doctrine table table table { border: 1px dotted #355E3B; }
+table.doctrine table table table table { border: 1px dotted #8B5A8E; }
+table.doctrine table table table table table { border: 1px dotted #3A1B47; }
+table.doctrine table table table table table table { border: 1px dotted #C49934; }
+/* nesting-depth indicators are HERITAGE -- Reginald 2018 */
+
+/* ---- header table-shell layout ---- */
+table.shell { width: 100%; border-collapse: collapse; background: #F0EAD2; }
+table.shell > tbody > tr > td.shell-left { width: 200px; background: #3A1B47; color: #F0EAD2; padding: 12px; vertical-align: top; }
+table.shell > tbody > tr > td.shell-main { padding: 16px; vertical-align: top; }
+table.shell > tbody > tr > td.shell-right { width: 180px; background: #C49934; color: #1F1F1F; padding: 12px; vertical-align: top; font-family: "Comic Sans MS", cursive; font-size: 11px; }
+table.shell menu { padding: 0; margin: 0; list-style: none; }
+table.shell menu menuitem { display: block; padding: 4px 6px; background: rgba(196,153,52,0.1); color: #C49934; margin: 2px 0; cursor: pointer; }
+table.shell menu menuitem:hover { background: rgba(196,153,52,0.25); }
+table.shell dir { padding-left: 18px; color: #FF69B4; font-size: 11px; }
+
+/* ---- marquee section ---- */
+.motto-bar { background: #000; color: #00FF00; font-family: "Courier New", monospace; font-size: 14px; padding: 4px 0; border-top: 2px solid #B22222; border-bottom: 2px solid #B22222; }
+marquee { color: inherit; }
+blink { animation: blink 1.2s steps(2, end) infinite; }
+@keyframes blink { 50% { visibility: hidden; } }
+
+/* ---- ascii art pre ---- */
+pre.ascii-pangolin { font-family: "Courier New", monospace; font-size: 11px; line-height: 1.0; background: #1F1F1F; color: #C49934; padding: 12px; border: 1px solid #C49934; overflow-x: auto; }
+pre.ascii-pangolin code { color: inherit; background: none; }
+
+/* ---- address (correspondence) ---- */
+address.correspondence {
+  font-family: "Lucida Handwriting", "Bradley Hand", cursive;
+  font-style: normal;
+  background: #fff8e0;
+  border: 1px dashed #8B5A8E;
+  padding: 12px 18px;
+  max-width: 420px;
+  -webkit-transform: rotate(-1.2deg);
+  -moz-transform: rotate(-1.2deg);
+  transform: rotate(-1.2deg);
+  margin: 16px auto;
+  color: #3A1B47;
+  line-height: 1.7;
+  box-shadow: 4px 4px 0 rgba(58,27,71,0.15);
+}
+address.correspondence a { color: #B22222; }
+
+/* ---- multi-script roster ---- */
+.roster { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; padding: 16px; background: #fff8e0; border: 1px solid #C49934; }
+.roster .member { background: #fff; padding: 10px; border-left: 4px solid #B22222; }
+.roster .member[lang="ar"] { border-left-color: #355E3B; font-family: "Noto Naskh Arabic", "Geeza Pro", serif; }
+.roster .member[lang="he"] { border-left-color: #C49934; font-family: "Frank Ruhl Libre", "Times New Roman", serif; }
+.roster .member[lang="ja"] { border-left-color: #8B5A8E; font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; }
+.roster .member[lang="grc"] { border-left-color: #3A1B47; font-family: "Cardo", serif; }
+.roster .member strong { display: block; margin-bottom: 4px; font-size: 14px; }
+.roster .member small { display: block; margin-top: 6px; color: #666; font-size: 11px; }
+.roster .userbox { font-family: "Trebuchet MS", sans-serif; }
+
+/* ---- mathml section ---- */
+.geometry-section { background: #fff8e0; padding: 20px; border: 2px solid #355E3B; margin: 16px 0; font-family: Georgia, serif; }
+math { font-size: 18px; }
+math[display="block"] { display: block; text-align: center; margin: 14px 0; }
+
+/* ---- ruby annotations ---- */
+ruby { font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; }
+rt { font-size: 0.55em; color: #B22222; }
+rp { color: transparent; font-size: 0; }
+
+/* ---- bdi / bdo ---- */
+bdi { unicode-bidi: isolate; }
+bdo[dir="rtl"] { background: rgba(196,153,52,0.08); padding: 0 2px; }
+
+/* ---- conditional comment fallback alert ---- */
+.ie-alert { background: #ffe; border: 3px ridge #C49934; padding: 8px; color: #B22222; font-family: "MS Sans Serif", sans-serif; }
+
+/* ---- correspondence articles (section XII.b) ---- */
+section#correspondence article { transition: transform 0.3s; }
+section#correspondence article:nth-child(odd):hover { transform: rotate(0.5deg); }
+section#correspondence article:nth-child(even):hover { transform: rotate(-0.5deg); }
+section#correspondence header small { color: #666; }
+
+/* ---- bestiary cards ---- */
+section#bestiary .web2-card h3 { font-style: italic; color: #355E3B; }
+section#bestiary .modern-card { border: 1px solid #C49934; }
+
+/* ---- vandal-protection (added 2024) ---- */
+[data-vandal-protection="true"] { content: "; "; pointer-events: none; }
+/* (Tilda: "this doesn't do anything." Eduardo: "good.") */
+
+/* ---- emergency reset that Geoffrey added during a 2007 panic ---- */
+/* DO NOT ENABLE
+  * { all: unset; }
+*/
+
+/* ---- placeholder hover for the under-construction GIF ---- */
+img[src*="under-construction"] { opacity: 1; transition: transform 0.4s; }
+img[src*="under-construction"]:hover { transform: rotate(-8deg); }
+
+/* ---- ABSOLUTELY FINAL OVERRIDE (Geoffrey, 2026) ---- */
+* { box-sizing: border-box; }
+/* the above does nothing about the cursed energy but Geoffrey insisted on a "universal selector for safety" */
+
+/* ---- 2026 (one minute after Geoffrey's "final" override) ---- */
+*, *::before, *::after { box-sizing: border-box; } /* Mavis: "if we are doing it, do it properly." */
+
+/* ---- a closing benediction in CSS, by Vault-Warden Eduardo, 2026 ---- */
+/*
+   per scalas ad astra
+   may your stylesheets cascade in the correct order
+   may your specificity never betray you
+   may your !importants be few and considered
+   may the Pangolin see your media queries with favor
+                                                  &mdash; Eduardo
+*/
+
+/* end of stylesheet — please add new rules ABOVE this line — Mavis */

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulseforge RB-16 — Browser Drum Machine &amp; Beat Sequencer</title>
+  <meta name="description" content="The Pulseforge RB-16 is a fully synthesized drum machine and step sequencer in your browser: 10 drum voices, a 16-step grid with swing, pattern banks, a song arranger, preset kits (808/909/Acoustic/LoFi) and a live visualizer. No samples — every sound is built with the Web Audio API.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── Audio gate ── -->
+  <div class="audio-gate" id="audio-gate" role="dialog" aria-label="Enable sound">
+    <div class="gate-card">
+      <div class="gate-pulse" aria-hidden="true"></div>
+      <h2>Power up the RB-16</h2>
+      <p>Browsers won't start audio until you ask. Click below to spin up the drum machine — then click the grid to program a beat and hit <b>Play</b> (or the <b>Space</b> bar).</p>
+      <button class="btn btn-primary" id="enable-audio">◉ Enable sound &amp; start</button>
+      <p class="gate-note">Every drum here is synthesized live with the Web Audio API. No samples are loaded.</p>
+    </div>
+  </div>
+
+  <!-- ── Header ── -->
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Pulseforge home">
+      <span class="logo-mark">Pulseforge<span class="dot">◉</span></span>
+      <span class="logo-sub">Rhythm Machines</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html" class="active">Machine</a>
+      <a href="patterns.html">Kits &amp; Grooves</a>
+      <a href="about.html">How it works</a>
+      <a href="patterns.html" class="nav-cta">Browse grooves</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+  </header>
+
+  <main class="machine wrap">
+
+    <div class="page-hero">
+      <p class="eyebrow">Pulseforge · RB-16 · Rhythm Box</p>
+      <h1 class="page-title">A drum machine, <em>in your browser.</em></h1>
+      <p class="page-lead">Sixteen steps, ten synthesized voices, pattern banks, swing and a full song arranger. The RB-16 schedules every hit against the audio clock with a lookahead window, so the timing stays tight no matter what the page is doing. Program a beat below.</p>
+    </div>
+
+    <div class="rack">
+      <div class="rack-bar">
+        <div class="rack-brand">
+          <span class="badge">RB-16</span>
+          <span class="model">Rhythm Composer</span>
+        </div>
+        <div class="rack-status">
+          <span class="led" id="machine-status" role="status" aria-live="polite">stand by</span>
+        </div>
+      </div>
+
+      <div class="rack-body">
+
+        <!-- Visualizer -->
+        <div class="viz-wrap">
+          <span class="viz-tag">Spectrum + waveform — live output</span>
+          <canvas id="viz-canvas" aria-label="Live audio spectrum and waveform of the drum machine output"></canvas>
+        </div>
+
+        <!-- Transport -->
+        <div class="transport">
+          <button class="btn-play" id="btn-play"><span class="tri" aria-hidden="true"></span><span class="label">Play</span></button>
+          <button class="t-btn" id="btn-stop" title="Stop">■ Stop</button>
+          <button class="t-btn" id="btn-tap" title="Tap tempo (T)">⊙ Tap</button>
+          <button class="t-btn toggle" id="btn-metro" aria-pressed="false" title="Metronome (M)">𝅘𝅥 Metro</button>
+          <button class="t-btn panic" id="btn-panic" title="Panic / stop all (Esc)">⏻ Panic</button>
+
+          <div class="t-field"><label for="bpm">Tempo</label><input type="range" id="bpm" min="40" max="240" step="1" value="126"><b id="bpm-val">126</b><span class="unit">BPM</span></div>
+          <div class="t-field"><label for="swing">Swing</label><input type="range" id="swing" min="0" max="0.6" step="0.01" value="0"><b id="swing-val">0%</b></div>
+          <div class="t-field"><label for="steps">Steps</label><input type="range" id="steps" min="4" max="16" step="1" value="16"><b id="steps-val">16</b></div>
+          <div class="t-field"><label for="master">Master</label><input type="range" id="master" min="0" max="1" step="0.01" value="0.85"><b id="master-val">85%</b></div>
+          <div class="t-field"><label for="drive">Drive</label><input type="range" id="drive" min="0" max="1" step="0.01" value="0.12"><b id="drive-val">12%</b></div>
+        </div>
+
+        <!-- Pattern banks + tools -->
+        <div class="bank-bar">
+          <div class="bank-group">
+            <span class="bank-lab">Pattern</span>
+            <div id="pattern-banks" class="banks"></div>
+          </div>
+          <div class="bank-tools">
+            <button class="btn-sm" id="pat-copy" title="Copy this pattern to the next bank">Copy →</button>
+            <button class="btn-sm" id="pat-clear" title="Clear pattern (C)">Clear</button>
+            <button class="btn-sm" id="pat-random" title="Randomise pattern (R)">⚄ Random</button>
+            <button class="btn-sm" id="pat-shift-l" title="Shift left">⟲</button>
+            <button class="btn-sm" id="pat-shift-r" title="Shift right">⟳</button>
+          </div>
+        </div>
+
+        <!-- Step grid -->
+        <div class="grid-wrap">
+          <div class="grid-numbers" aria-hidden="true">
+            <span></span>
+            <div class="num-cells">
+              <span>1</span><span>2</span><span>3</span><span>4</span>
+              <span>5</span><span>6</span><span>7</span><span>8</span>
+              <span>9</span><span>10</span><span>11</span><span>12</span>
+              <span>13</span><span>14</span><span>15</span><span>16</span>
+            </div>
+          </div>
+          <div class="grid-scroll">
+            <div class="seq-grid" id="seq-grid" role="group" aria-label="Step sequencer grid"></div>
+            <div id="playhead" class="playhead" aria-hidden="true"></div>
+          </div>
+          <p class="grid-hint mono">Click a cell to toggle a hit. <b>Shift-click</b> or right-click cycles accent → ghost → normal. Click a voice name to audition it.</p>
+        </div>
+
+        <!-- Lower decks: kits, voice editor, mixer, song -->
+        <div class="decks">
+
+          <section class="deck deck-kits">
+            <h3>Kits</h3>
+            <p class="deck-sub">Swap the whole sound palette. Each kit re-tunes every voice.</p>
+            <div class="chip-row" id="kit-chips"></div>
+          </section>
+
+          <section class="deck deck-voice">
+            <h3>Voice editor</h3>
+            <div class="voice-head">
+              <select id="voice-select" aria-label="Choose a voice to edit"></select>
+              <button class="btn-sm" id="param-audition">▶ Hit</button>
+            </div>
+            <div class="param-ctl"><label for="param-tune">Tune <b id="param-tune-val">50</b></label><input type="range" id="param-tune" min="0" max="1" step="0.01" value="0.5"></div>
+            <div class="param-ctl"><label for="param-decay">Decay <b id="param-decay-val">50</b></label><input type="range" id="param-decay" min="0" max="1" step="0.01" value="0.5"></div>
+            <div class="param-ctl"><label for="param-tone">Tone <b id="param-tone-val">50</b></label><input type="range" id="param-tone" min="0" max="1" step="0.01" value="0.5"></div>
+            <div class="param-ctl"><label for="param-level">Level <b id="param-level-val">80</b></label><input type="range" id="param-level" min="0" max="1" step="0.01" value="0.8"></div>
+          </section>
+
+          <section class="deck deck-mixer">
+            <h3>Mixer</h3>
+            <p class="deck-sub">Per-track level, mute (M) and solo (S).</p>
+            <div id="mixer" class="mixer"></div>
+          </section>
+
+        </div>
+
+        <!-- Song arranger -->
+        <section class="deck deck-song">
+          <div class="song-head">
+            <h3>Song arranger</h3>
+            <label class="switch">
+              <input type="checkbox" id="song-toggle">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-label">Song mode</span>
+            </label>
+          </div>
+          <p class="deck-sub">Chain pattern banks into a track. Add the current bank with a repeat count; playback walks the chain in order.</p>
+          <div class="song-controls">
+            <label for="song-repeats">Repeats</label>
+            <input type="number" id="song-repeats" min="1" max="16" value="2">
+            <button class="btn-sm" id="song-add">+ Add to chain</button>
+            <button class="btn-sm" id="song-clear">Clear chain</button>
+          </div>
+          <div class="song-arranger" id="song-arranger">
+            <div id="song-chain" class="song-chain"></div>
+          </div>
+        </section>
+
+        <!-- Grooves + save/load -->
+        <div class="decks decks-2">
+          <section class="deck deck-grooves">
+            <h3>Factory grooves</h3>
+            <p class="deck-sub">Load a ready-made beat into the current bank.</p>
+            <div class="chip-row" id="groove-chips"></div>
+          </section>
+
+          <section class="deck deck-io">
+            <h3>Save &amp; share</h3>
+            <div class="io-row">
+              <input type="text" id="pattern-name" placeholder="Name this beat…" aria-label="Pattern name">
+              <button class="btn-sm" id="save-pattern">Save beat</button>
+              <button class="btn-sm" id="save-kit">Save kit</button>
+            </div>
+            <div class="io-row">
+              <button class="btn-sm" id="export-json">⭳ Export JSON</button>
+              <button class="btn-sm" id="import-btn">⭱ Import JSON</button>
+              <input type="file" id="import-json" accept="application/json,.json" hidden>
+            </div>
+            <p class="deck-sub" style="margin-top:.8rem;">Your beats (this browser)</p>
+            <div id="user-patterns" class="user-list"></div>
+            <p class="deck-sub" style="margin-top:.6rem;">Your kits (this browser)</p>
+            <div id="user-kits" class="user-list"></div>
+          </section>
+        </div>
+
+      </div><!-- /rack-body -->
+    </div><!-- /rack -->
+
+    <p class="mono shortcuts-line">
+      <b>Space</b> play/stop · <b>Esc</b> panic · <b>M</b> metronome · <b>T</b> tap · <b>R</b> random · <b>C</b> clear · <b>1–4</b> pattern bank · <b>↑ ↓</b> tempo · <b>Shift-click</b> accent.
+    </p>
+
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- ── Footer ── -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Pulseforge<span class="dot" style="color:var(--coral)">◉</span></div>
+          <p class="footer-brand-desc">A tiny instrument shop building playable rhythm machines that live entirely in the browser. No installs, no samples, no accounts — just the open web making beats.</p>
+        </div>
+        <nav class="footer-col" aria-label="Machine">
+          <p class="footer-col-title">Machine</p>
+          <ul>
+            <li><a href="index.html">Play the RB-16</a></li>
+            <li><a href="patterns.html">Kit library</a></li>
+            <li><a href="patterns.html#grooves">Factory grooves</a></li>
+            <li><a href="about.html">Signal &amp; scheduler</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Shop">
+          <p class="footer-col-title">Shop</p>
+          <ul>
+            <li><a href="about.html">About Pulseforge</a></li>
+            <li><a href="about.html#voices">Voice synthesis</a></li>
+            <li><a href="about.html#specs">Specs</a></li>
+            <li><a href="mailto:hello@pulseforge.audio">hello@pulseforge.audio</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="More">
+          <p class="footer-col-title">More</p>
+          <ul>
+            <li><a href="#">Changelog</a></li>
+            <li><a href="#">MIDI clock roadmap</a></li>
+            <li><a href="#">Mastodon</a></li>
+            <li><a href="#">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Pulseforge Instruments · Built on the open web</p>
+        <div class="footer-legal"><a href="#">Privacy</a><a href="#">Terms</a><a href="about.html">Colophon</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/engine.js"></script>
+  <script src="js/kits.js"></script>
+  <script src="js/sequencer.js"></script>
+  <script src="js/visualizer.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/site.js"></script>
+</body>
+</html>

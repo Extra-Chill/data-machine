@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inkwell — Markdown Writing Studio</title>
+  <meta name="description" content="Inkwell is a distraction-free, fully client-side Markdown editor with a live preview, a built-in presentation mode, themes, and local document storage. No build step, no server.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/markdown.css">
+  <link rel="stylesheet" href="css/slides.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%238a7bff'/%3E%3Cpath d='M9 22 L9 10 L16 19 L23 10 L23 22' fill='none' stroke='white' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body data-layout="split">
+
+  <!-- ═══════════ HEADER ═══════════ -->
+  <header class="app-header" role="banner">
+    <button class="tbtn icon-only" id="btn-sidebar" type="button" title="Toggle documents sidebar" aria-pressed="false" aria-label="Toggle sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+
+    <a href="index.html" class="brand" aria-label="Inkwell home">
+      <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="7" fill="var(--accent)"/>
+        <path d="M9 22 L9 10 L16 19 L23 10 L23 22" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+      <span>Ink<b>well</b></span>
+      <span class="brand-sub">studio</span>
+    </a>
+
+    <div class="doc-titlebar">
+      <input id="doc-title" class="doc-title" value="" aria-label="Document title" spellcheck="false" autocomplete="off" placeholder="Untitled document">
+      <span class="save-state saved" id="save-state" aria-live="polite">saved</span>
+    </div>
+
+    <div class="header-actions">
+      <div class="seg theme-seg" role="group" aria-label="Theme">
+        <button class="theme-btn" data-theme="light" type="button" title="Light theme" aria-pressed="false"><span class="swatch light"></span></button>
+        <button class="theme-btn" data-theme="dark" type="button" title="Dark theme" aria-pressed="true"><span class="swatch dark"></span></button>
+        <button class="theme-btn" data-theme="sepia" type="button" title="Sepia theme" aria-pressed="false"><span class="swatch sepia"></span></button>
+      </div>
+
+      <div class="seg layout-seg" role="group" aria-label="Layout">
+        <button class="layout-btn" data-layout="editor" type="button" title="Editor only" aria-pressed="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        </button>
+        <button class="layout-btn" data-layout="split" type="button" title="Split view" aria-pressed="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        </button>
+        <button class="layout-btn" data-layout="preview" type="button" title="Preview only" aria-pressed="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+        </button>
+      </div>
+
+      <button class="hbtn" id="btn-focus" type="button" title="Focus / typewriter mode" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3"/></svg>
+        <span class="label-hide">Focus</span>
+      </button>
+
+      <button class="hbtn primary" id="btn-present" type="button" title="Present as slides (Ctrl/⌘ + P)">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <span class="label-hide">Present</span>
+      </button>
+
+      <div class="menu" id="export-menu">
+        <button class="hbtn" id="btn-export-menu" type="button" aria-haspopup="true" aria-expanded="false" title="Export & share">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>
+          <span class="label-hide">Export</span>
+        </button>
+        <div class="menu-panel" role="menu">
+          <button class="menu-item" id="btn-export-md" role="menuitem" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>
+            Download .md
+          </button>
+          <button class="menu-item" id="btn-export-html" role="menuitem" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg>
+            Export standalone .html
+          </button>
+          <button class="menu-item" id="btn-print" role="menuitem" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print / Save as PDF
+          </button>
+          <div class="menu-sep"></div>
+          <a class="menu-item" href="templates.html" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            Browse templates
+          </a>
+          <a class="menu-item" href="about.html" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+            About Inkwell
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════ SHELL ═══════════ -->
+  <div class="shell">
+
+    <!-- Sidebar: documents -->
+    <aside class="sidebar" aria-label="Documents">
+      <div class="sidebar-head">
+        <h2>Documents</h2>
+        <button class="sidebar-new" id="btn-new" type="button" title="New document (Ctrl/⌘ + Alt + N)" aria-label="New document">+</button>
+      </div>
+      <p class="doc-count" id="doc-count">0 documents</p>
+      <ul class="doc-list" id="doc-list" aria-label="Document list"></ul>
+      <div class="sidebar-foot">
+        Everything is saved in your browser.
+        <br><a href="templates.html">Templates</a> · <a href="about.html">About</a>
+      </div>
+    </aside>
+
+    <!-- Workspace -->
+    <main class="workspace">
+      <!-- Formatting toolbar -->
+      <div class="toolbar" role="toolbar" aria-label="Formatting">
+        <button class="tbtn" data-cmd="h1" type="button" title="Heading 1 (Ctrl/⌘ + 1)"><b>H1</b></button>
+        <button class="tbtn" data-cmd="h2" type="button" title="Heading 2 (Ctrl/⌘ + 2)"><b>H2</b></button>
+        <button class="tbtn" data-cmd="h3" type="button" title="Heading 3 (Ctrl/⌘ + 3)"><b>H3</b></button>
+        <span class="tb-sep"></span>
+        <button class="tbtn" data-cmd="bold" type="button" title="Bold (Ctrl/⌘ + B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z"/></svg></button>
+        <button class="tbtn" data-cmd="italic" type="button" title="Italic (Ctrl/⌘ + I)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="11" y2="5"/><line x1="13" y1="19" x2="5" y2="19"/><line x1="15" y1="5" x2="9" y2="19"/></svg></button>
+        <button class="tbtn" data-cmd="strike" type="button" title="Strikethrough (Ctrl/⌘ + Shift + X)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><path d="M7 7a4 3 0 0 1 8 0M9 17a4 3 0 0 0 8 0"/></svg></button>
+        <button class="tbtn" data-cmd="code" type="button" title="Inline code (Ctrl/⌘ + E)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 6 3 12 8 18"/><polyline points="16 6 21 12 16 18"/></svg></button>
+        <span class="tb-sep"></span>
+        <button class="tbtn" data-cmd="ul" type="button" title="Bullet list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="7" r="1.4" fill="currentColor"/><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="5" cy="17" r="1.4" fill="currentColor"/><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/></svg></button>
+        <button class="tbtn" data-cmd="ol" type="button" title="Numbered list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="17" x2="20" y2="17"/><text x="3" y="9" font-size="7" fill="currentColor" stroke="none">1</text><text x="3" y="14" font-size="7" fill="currentColor" stroke="none">2</text><text x="3" y="19" font-size="7" fill="currentColor" stroke="none">3</text></svg></button>
+        <button class="tbtn" data-cmd="task" type="button" title="Task list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="7" height="7" rx="1.5"/><path d="M4.5 7.5 6 9 8.5 5.5"/><line x1="13" y1="7" x2="21" y2="7"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><line x1="13" y1="17" x2="21" y2="17"/></svg></button>
+        <button class="tbtn" data-cmd="quote" type="button" title="Blockquote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7H4v6h3a3 3 0 0 1-3 3M17 7h-3v6h3a3 3 0 0 1-3 3"/></svg></button>
+        <span class="tb-sep"></span>
+        <button class="tbtn" data-cmd="link" type="button" title="Link (Ctrl/⌘ + K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>
+        <button class="tbtn" data-cmd="image" type="button" title="Image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></button>
+        <button class="tbtn" data-cmd="codeblock" type="button" title="Code block"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><polyline points="9 9 7 12 9 15"/><polyline points="15 9 17 12 15 15"/></svg></button>
+        <button class="tbtn" data-cmd="table" type="button" title="Table"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="4" x2="12" y2="20"/></svg></button>
+        <button class="tbtn" data-cmd="hr" type="button" title="Horizontal rule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
+        <button class="tbtn" data-cmd="slide" type="button" title="Slide break (---)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="10" rx="2"/><line x1="8" y1="19" x2="16" y2="19"/></svg></button>
+
+        <span class="tb-spacer"></span>
+        <span class="tb-stat"><b id="stat-words">0</b> words</span>
+        <span class="tb-stat"><b id="stat-chars">0</b> chars</span>
+        <span class="tb-stat"><b id="stat-read">0 min</b> read</span>
+        <button class="tbtn" id="btn-syncscroll" type="button" title="Sync scroll" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v18M8 3 4 7M8 3l4 4M16 21V3M16 21l-4-4M16 21l4-4"/></svg></button>
+      </div>
+
+      <!-- Editor / preview / outline -->
+      <div class="panes">
+        <section class="pane-editor" aria-label="Markdown source">
+          <div class="pane-head"><span class="dot"></span> Markdown</div>
+          <div class="pane-scroll" id="editor-scroll">
+            <textarea id="md-input" spellcheck="true" autocomplete="off" autocapitalize="off"
+              placeholder="# Start writing in Markdown…" aria-label="Markdown editor"></textarea>
+          </div>
+        </section>
+
+        <section class="pane-preview" aria-label="Live preview">
+          <div class="pane-head"><span class="dot" style="background:var(--accent-2)"></span> Preview</div>
+          <div class="preview-scroll" id="preview-scroll">
+            <article class="markdown-body" id="preview"></article>
+          </div>
+        </section>
+
+        <aside class="pane-outline" aria-label="Document outline">
+          <div class="pane-head">Outline</div>
+          <nav class="outline-list" id="outline" aria-label="Table of contents"></nav>
+        </aside>
+      </div>
+
+      <!-- Status bar -->
+      <footer class="statusbar" role="contentinfo">
+        <span id="cursor-pos">Ln 1, Col 1</span>
+        <span>Markdown</span>
+        <span>UTF-8</span>
+        <span class="sb-spacer"></span>
+        <span id="stat-words-foot">0 words</span>
+        <span id="stat-read-foot">0 min read</span>
+        <span class="sb-kbd"><kbd>⌘/Ctrl</kbd>+<kbd>P</kbd> present · <kbd>⌘/Ctrl</kbd>+<kbd>S</kbd> save</span>
+      </footer>
+    </main>
+  </div>
+
+  <!-- ═══════════ SLIDES OVERLAY ═══════════ -->
+  <div class="slides-overlay" id="slides-overlay" hidden tabindex="-1" role="dialog" aria-modal="true" aria-label="Presentation">
+    <div class="slide-progress-track"><div class="slide-progress" data-slide-progress></div></div>
+    <div class="slide-stage" data-slide-stage></div>
+    <div class="slide-chrome">
+      <button class="slide-nav-btn" data-slide-nav="-1" type="button" aria-label="Previous slide">‹</button>
+      <button class="slide-nav-btn" data-slide-nav="1" type="button" aria-label="Next slide">›</button>
+      <span class="slide-counter" data-slide-counter>1 / 1</span>
+      <span class="spacer"></span>
+      <span class="slide-hint">← → to navigate · F fullscreen · Esc to exit</span>
+      <button class="slide-close" data-slide-close type="button" aria-label="Exit presentation">✕ Exit</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Scripts -->
+  <script src="js/markdown.js"></script>
+  <script src="js/seed-data.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/slides.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // export menu open/close (kept tiny + inline)
+    (function () {
+      var menu = document.getElementById('export-menu');
+      var btn = document.getElementById('btn-export-menu');
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = menu.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(open));
+      });
+      document.addEventListener('click', function (e) {
+        if (!menu.contains(e.target)) { menu.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); }
+      });
+      menu.querySelectorAll('.menu-item').forEach(function (mi) {
+        if (mi.tagName === 'BUTTON') mi.addEventListener('click', function () { menu.classList.remove('open'); });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit colors="true">
+	<!--
+		Local and release-preflight suite for environments without Docker/MySQL.
+		GitHub CI overrides this with phpunit.xml.dist and runs every excluded
+		persistence/concurrency class against MySQL.
+	-->
+	<testsuites>
+		<testsuite name="Data Machine SQLite">
+			<directory suffix="Test.php">tests</directory>
+			<exclude>tests/Unit/AI/Tools/ImageGenerationToolCallTest.php</exclude>
+			<exclude>tests/Unit/AI/Tools/ToolExecutorValidationTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Content/UpsertPostAbilityTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Engine/DrainJobAbilityTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Engine/ExecuteStepMixedClaimRoutingTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Engine/PipelineBatchDeferralRoutingTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Engine/PipelineBatchSchedulerTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Engine/PipelineExecutionContractTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Engine/RunFlowAbilityLifecycleTest.php</exclude>
+			<exclude>tests/Unit/Abilities/ImageGenerationPromptRefinementTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Job/DelegatedOperationTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Job/DirectJobOwnershipTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Job/GetRunArtifactsAbilityTest.php</exclude>
+			<exclude>tests/Unit/Abilities/Media/ImageGenerationAbilitiesTest.php</exclude>
+			<exclude>tests/Unit/Core/Agents/AgentBundlerImportTest.php</exclude>
+			<exclude>tests/Unit/Core/Content/SourceDerivedBlockAttributeRepairTest.php</exclude>
+			<exclude>tests/Unit/Core/Database/JobLifecycleTransitionTest.php</exclude>
+			<exclude>tests/Unit/Core/Database/ProcessedItemsTest.php</exclude>
+			<exclude>tests/Unit/Core/ExecutionContextSourceEligibilityTest.php</exclude>
+			<exclude>tests/Unit/Core/Identity/AgentIdentityStoreAdapterTest.php</exclude>
+			<exclude>tests/Unit/Core/ItemClaimLifecycleTest.php</exclude>
+			<exclude>tests/Unit/Core/OptionLeaseStoreTest.php</exclude>
+			<exclude>tests/Unit/Core/Steps/WebhookGate/WebhookGateStepTest.php</exclude>
+		</testsuite>
+	</testsuites>
+</phpunit>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Driftlane — About</title>
+  <meta name="description" content="About Driftlane: a fast, keyboard-first kanban board built entirely in vanilla HTML, CSS and JavaScript with hand-written pointer drag-and-drop.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='5' width='6' height='22' rx='2' fill='%236c8cff'/%3E%3Crect x='13' y='5' width='6' height='14' rx='2' fill='%232bbf9f'/%3E%3Crect x='22' y='5' width='6' height='18' rx='2' fill='%23b57bff'/%3E%3C/svg%3E">
+</head>
+<body data-theme="dark">
+<div class="app">
+
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="4" y="5" width="6" height="22" rx="2" fill="#6c8cff"/>
+        <rect x="13" y="5" width="6" height="14" rx="2" fill="#2bbf9f"/>
+        <rect x="22" y="5" width="6" height="18" rx="2" fill="#b57bff"/>
+      </svg>
+      <span><span class="brand-name">Drift<b>lane</b></span><br><span class="brand-sub">Boards</span></span>
+    </a>
+    <nav class="side-nav" aria-label="Primary">
+      <div class="side-section-label">Workspace</div>
+      <a class="side-link" href="index.html"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg>Board</a>
+      <a class="side-link" href="templates.html"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Templates</a>
+      <div class="side-section-label">Reference</div>
+      <a class="side-link" href="about.html"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r="0.6" fill="currentColor"/></svg>About Driftlane</a>
+    </nav>
+    <div class="side-foot"><span class="op-avatar">AO</span><span class="op">Amara Okafor</span><br><span style="opacity:.75">Atlas Mobile · Eng Lead</span></div>
+  </aside>
+  <div class="nav-scrim"></div>
+
+  <header class="topbar">
+    <button class="ctrl menu-toggle" id="menuToggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <div class="page-title">About Driftlane</div>
+    <div class="topbar-spacer"></div>
+    <button class="ctrl" id="themeToggle" aria-label="Toggle color theme"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg><span data-theme-label>Dark</span></button>
+    <div class="clock" id="clock"></div>
+  </header>
+
+  <main class="content-main">
+    <div class="content-wrap">
+      <h1>Driftlane</h1>
+      <p class="lead">A fast, keyboard-first kanban board you can run by opening a single HTML file. No accounts, no servers, no build step — just columns, cards, and drag-and-drop that actually feels good.</p>
+
+      <h2>What's inside</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <svg viewBox="0 0 24 24"><path d="M5 9l4-4 4 4M9 5v10M19 15l-4 4-4-4M15 19V9"/></svg>
+          <h3>Real drag-and-drop</h3>
+          <p>Hand-written with Pointer Events — a lifted ghost, a live insertion placeholder, cross-column moves and column reordering. Works with mouse, touch and pen.</p>
+        </div>
+        <div class="feature-card">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h8"/></svg>
+          <h3>Rich cards</h3>
+          <p>Labels, assignees with generated avatars, due dates, priority, comment counts and checklists with a live progress bar. Click any card to edit everything.</p>
+        </div>
+        <div class="feature-card">
+          <svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-9"/></svg>
+          <h3>WIP limits &amp; stats</h3>
+          <p>Per-column work-in-progress limits flag overload, while a stats rail shows cards per column, percent complete and a rolling activity log.</p>
+        </div>
+        <div class="feature-card">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <h3>Search &amp; filter</h3>
+          <p>Live search plus filters for label, assignee and priority, and a "my cards" toggle — the board re-flows instantly as you type.</p>
+        </div>
+        <div class="feature-card">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg>
+          <h3>Local autosave &amp; I/O</h3>
+          <p>The whole board persists to localStorage and restores on load. Export and import boards as JSON, or reset to the sample sprint at any time.</p>
+        </div>
+        <div class="feature-card">
+          <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M7 13h10"/></svg>
+          <h3>Keyboard-first</h3>
+          <p>Tab through cards, open with Enter, and move cards between columns with the arrow keys — no mouse required. Press <span class="kbd">?</span> for the full list.</p>
+        </div>
+      </div>
+
+      <h2>Keyboard shortcuts</h2>
+      <ul class="bullets">
+        <li><span class="kbd">/</span> &nbsp;focus the search box</li>
+        <li><span class="kbd">N</span> &nbsp;quick-add a card to the first column</li>
+        <li><span class="kbd">Tab</span> &nbsp;move focus between cards · <span class="kbd">Enter</span> opens the focused card</li>
+        <li><span class="kbd">←</span> <span class="kbd">→</span> &nbsp;move the focused card to the previous / next column</li>
+        <li><span class="kbd">↑</span> <span class="kbd">↓</span> &nbsp;reorder the focused card within its column</li>
+        <li><span class="kbd">F2</span> or double-click &nbsp;rename a column</li>
+        <li><span class="kbd">Esc</span> &nbsp;close a dialog or cancel · <span class="kbd">?</span> &nbsp;toggle the shortcut help</li>
+      </ul>
+
+      <h2>How it's built</h2>
+      <p>Driftlane is intentionally dependency-free. There is no React, no drag-and-drop library, no bundler. The data layer (<strong>data.js</strong>) holds the board, seed content and persistence; <strong>render.js</strong> turns state into DOM; <strong>dnd.js</strong> implements drag-and-drop from scratch on top of Pointer Events; <strong>modal.js</strong> is the card editor; and <strong>board.js</strong> wires it all together. Everything respects <strong>prefers-reduced-motion</strong> and works offline over <span class="kbd">file://</span>.</p>
+
+      <p style="margin-top:24px"><a class="inline" href="index.html">← Back to the board</a> &nbsp;·&nbsp; <a class="inline" href="templates.html">Browse templates</a></p>
+    </div>
+  </main>
+</div>
+
+<script src="js/shell.js"></script>
+</body>
+</html>

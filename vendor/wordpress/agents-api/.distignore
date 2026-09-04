@@ -1,0 +1,9 @@
+.claude
+.github
+.git
+.gitignore
+AGENTS.md
+CHANGELOG.md
+composer.lock
+phpstan.neon
+tests

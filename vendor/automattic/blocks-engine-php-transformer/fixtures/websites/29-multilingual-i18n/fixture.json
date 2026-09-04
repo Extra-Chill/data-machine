@@ -1,0 +1,12 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "nonprofit",
+    "multilingual",
+    "i18n",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 3
+}

@@ -1,0 +1,127 @@
+{
+  "name": "automattic/blocks-engine-php-transformer",
+  "description": "PHP primitives for transforming HTML, Markdown, and website artifacts into WordPress block outputs.",
+  "type": "library",
+  "license": "GPL-3.0-or-later",
+  "authors": [
+    {
+      "name": "Automattic"
+    }
+  ],
+  "keywords": [
+    "blocks",
+    "html",
+    "markdown",
+    "wordpress"
+  ],
+  "homepage": "https://github.com/Automattic/blocks-engine/tree/trunk/php-transformer",
+  "support": {
+    "issues": "https://github.com/Automattic/blocks-engine/issues",
+    "source": "https://github.com/Automattic/blocks-engine-php-transformer"
+  },
+  "autoload": {
+    "psr-4": {
+      "Automattic\\BlocksEngine\\PhpTransformer\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Automattic\\BlocksEngine\\PhpTransformer\\Tests\\": "tests/"
+    }
+  },
+  "require": {
+    "league/commonmark": "^2.5",
+    "league/html-to-markdown": "^5.1",
+    "php": ">=8.1"
+  },
+  "scripts": {
+    "parity": "@test:parity",
+    "static-parity": "php tools/static-parity/run.php",
+    "live-wp-parity": "php tools/live-wp-parity/run.php",
+    "corpus-diagnostics": "php tools/corpus-diagnostics/run.php",
+    "content-round-trip": "php tools/content-round-trip/run.php",
+    "test": [
+      "@test:canonical",
+      "@test:parity",
+      "@test:packaging"
+    ],
+    "test:canonical": [
+      "php tests/contract/runtime-no-wordpress.php",
+      "php tests/contract/runtime-no-markdown.php",
+      "php tests/contract/runtime-wordpress-stubs.php",
+      "php tests/contract/plugin-bootstrap.php",
+      "php tests/contract/run.php",
+      "php tests/contract/finding-contract.php",
+      "php tests/contract/wordpress-site-plan.php",
+      "php tests/contract/staged-artifact-compilation.php",
+      "php tests/contract/shared-shell-plan.php",
+      "php tests/contract/empty-visual-figure.php",
+      "@test:unit"
+    ],
+    "test:unit": [
+      "php tests/unit/runtime-declarations-streaming-hash.php",
+      "php tests/unit/asset-reference-canonicalizer-memory.php",
+      "php tests/unit/editability-report.php",
+      "php tests/unit/list-item-lowering.php",
+      "php tests/unit/artifact-normalizer-idempotence.php",
+      "php tests/unit/artifact-normalizer-source-budget.php",
+      "php tests/unit/subtree-classifier.php",
+      "php tests/unit/custom-block-generator.php",
+      "php tests/unit/description-list-block.php",
+      "php tests/unit/css-value-splitter.php",
+      "php tests/unit/background-image-extractor.php",
+      "php tests/unit/cover-block-factory.php",
+      "php tests/unit/cover-pattern.php",
+      "php tests/unit/media-text-block-factory.php",
+      "php tests/unit/rich-text-source-serialization.php",
+      "php tests/unit/media-text-pattern.php",
+      "php tests/unit/cover-style-resolver.php",
+      "php tests/unit/css-stylesheet-transformer.php",
+      "php tests/unit/css-selector-matcher.php",
+      "php tests/unit/author-selector-semantics.php",
+      "php tests/unit/engine-support-css-asset.php",
+      "php tests/unit/engine-support-css-specificity.php",
+      "php tests/unit/inline-display-carrier.php",
+      "php tests/unit/css-owned-flex-carrier.php",
+      "php tests/unit/inline-flex-item-carrier.php",
+      "php tests/unit/inline-author-override-carrier.php",
+      "php tests/unit/auto-fit-grid-carrier.php",
+      "php tests/unit/artifact-author-stylesheet-projection.php",
+      "php tests/unit/fallback-finding-normalizer.php",
+      "php tests/unit/navigation-underline-color-resolver.php",
+      "php tests/unit/navigation-brand-anchor-hoist.php",
+      "php tests/unit/navigation-brand-cue-carrier.php",
+      "php tests/unit/navigation-direct-cluster-parity.php",
+      "php tests/unit/navigation-inline-margin-carry.php",
+      "php tests/unit/navigation-dropped-anchors.php",
+      "php tests/unit/button-signal-classifier.php",
+      "php tests/unit/button-style-resolver.php",
+      "php tests/unit/button-font-family-carry.php",
+      "php tests/unit/button-visual-probe-diagnostics.php",
+      "php tests/unit/shell-landmark-policy.php",
+      "php tests/unit/block-style-support-conversion.php",
+      "php tests/unit/content-round-trip-reporter.php",
+      "php tests/unit/content-round-trip-form-echo.php",
+      "php tests/unit/corpus-detectors.php",
+      "php tests/unit/live-wp-parity-runner.php",
+      "php tests/unit/deterministic-row-deduplicator.php",
+      "php tests/unit/html-transformer-shared-analysis-cache.php",
+      "php tests/unit/compile-fragment-author-stylesheet.php"
+    ],
+    "test:parity": "php tests/parity/run.php",
+    "test:migration:examples": "php tests/migration/examples.php",
+    "test:migration:legacy-parity": "BLOCKS_ENGINE_PARITY_LEGACY=1 php tests/parity/run.php --migration-comparison",
+    "test:wordpress-integration": "php tests/integration/wordpress-site-plan.php",
+    "test:packaging": "php tests/packaging/install-proof.php"
+  },
+  "config": {
+    "platform": {
+      "php": "8.1.0"
+    },
+    "sort-packages": true
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.6",
+    "yoast/phpunit-polyfills": "^3.0"
+  }
+}

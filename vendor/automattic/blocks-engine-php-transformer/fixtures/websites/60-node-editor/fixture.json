@@ -1,0 +1,11 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "node-editor",
+    "procedural",
+    "app",
+    "canvas",
+    "creative-tool"
+  ],
+  "complexity": 4
+}

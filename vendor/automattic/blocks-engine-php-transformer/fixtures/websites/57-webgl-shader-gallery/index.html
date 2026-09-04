@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fragment Foundry — Real-Time WebGL Shader Lab</title>
+  <meta name="description" content="Fragment Foundry is a generative-graphics studio. A live gallery of GPU fragment shaders running in your browser, plus a hot-reloading GLSL editor — built on raw WebGL, no libraries.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ══════════════ HEADER ══════════════ -->
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Fragment Foundry home">
+      <span class="logo-mark">Fragment&nbsp;Foundry<span class="logo-dot">.</span></span>
+      <span class="logo-sub">Real-time shader lab</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Gallery</a>
+      <a href="editor.html">Live Editor</a>
+      <a href="about.html">About</a>
+      <a href="editor.html" class="nav-cta">Open the Lab</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- ══════════════ STAGE / HERO ══════════════ -->
+    <section class="stage" id="stage" aria-label="Live shader stage">
+      <canvas id="stage-canvas" aria-label="Full-screen animated WebGL fragment shader"></canvas>
+
+      <!-- WebGL-unavailable fallback -->
+      <div class="webgl-fallback" id="webgl-fallback" hidden>
+        <div class="inner">
+          <h2>WebGL isn't available here</h2>
+          <p>Your browser or device doesn't expose a WebGL context, so the GPU shaders can't run. We've dropped in a lightweight 2D plasma instead. Try a recent Chrome, Firefox, Safari, or Edge with hardware acceleration enabled.</p>
+        </div>
+      </div>
+
+      <!-- top status row -->
+      <div class="stage-top">
+        <span class="stage-eyebrow">Fragment Foundry · Live GPU stage</span>
+        <span class="stage-badge" id="stage-fps">— fps</span>
+      </div>
+
+      <!-- per-shader uniform sliders -->
+      <aside class="stage-uniforms" aria-label="Shader controls">
+        <h2>Uniforms</h2>
+        <div id="stage-controls"></div>
+      </aside>
+
+      <!-- bottom info + transport -->
+      <div class="stage-overlay">
+        <div class="stage-info">
+          <span class="stage-tag" id="stage-tag">flow field</span>
+          <h1 class="stage-title" id="stage-title">Aurora Plasma</h1>
+          <p class="stage-desc" id="stage-desc">Move your mouse across the canvas — every pixel above is computed by a fragment shader on your GPU, recomputed sixty times a second.</p>
+          <div class="stage-meta-row">
+            <span class="mono" id="stage-meta">M. Okonkwo · 2026</span>
+          </div>
+        </div>
+
+        <div class="stage-controls-bar">
+          <button class="ctrl-btn" id="btn-prev" type="button" aria-label="Previous shader">‹ Prev</button>
+          <button class="ctrl-btn" id="btn-next" type="button" aria-label="Next shader">Next ›</button>
+          <button class="ctrl-btn" id="btn-play" type="button" aria-pressed="true">❚❚ Pause</button>
+          <button class="ctrl-btn" id="btn-reset" type="button">↺ Reset time</button>
+          <button class="ctrl-btn" id="btn-fullscreen" type="button">⛶ Fullscreen</button>
+          <span class="spacer"></span>
+        </div>
+      </div>
+
+      <div class="error-bar" id="stage-error" hidden></div>
+    </section>
+
+    <!-- ══════════════ MANIFESTO ══════════════ -->
+    <section class="section section--soft" aria-labelledby="intro-heading">
+      <div class="wrap">
+        <p class="mono" style="margin-bottom:1rem;">[ 00 — The premise ]</p>
+        <p class="lede" id="intro-heading">
+          A fragment shader is a tiny program that runs <em style="color:var(--accent);font-style:normal;">in parallel for every pixel</em>, on the GPU, sixty times a second. There is no DOM, no layout, no page — just math turning coordinates into colour. This is the one thing a page builder can never give you, so we built a studio around it.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══════════════ GALLERY ══════════════ -->
+    <section class="section" aria-labelledby="gallery-heading">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">01</span> / The collection</p>
+            <h2 class="section-title" id="gallery-heading">Six shaders, <em>running live</em></h2>
+          </div>
+          <p class="section-lead">Each tile is its own WebGL context drawing a screen-filling quad. Click any one to load it onto the big stage and drive its uniforms.</p>
+        </div>
+        <div class="shader-grid" id="shader-grid" role="list" aria-label="Shader gallery"></div>
+      </div>
+    </section>
+
+    <!-- ══════════════ HOW IT WORKS ══════════════ -->
+    <section class="section section--soft" aria-labelledby="how-heading">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-index"><span class="accent">02</span> / Under the hood</p>
+            <h2 class="section-title" id="how-heading">How the lab is wired</h2>
+          </div>
+        </div>
+        <div class="feature-grid">
+          <div class="feature">
+            <p class="feature-num">01</p>
+            <h3>One quad, raw WebGL</h3>
+            <p>We bind a single full-screen triangle and a fragment program. No three.js, no regl — just <code style="font-family:var(--font-mono);color:var(--accent)">gl.drawArrays</code> and a ~300-line helper you can read end to end.</p>
+          </div>
+          <div class="feature">
+            <p class="feature-num">02</p>
+            <h3>Standard uniforms</h3>
+            <p>Every shader receives <code style="font-family:var(--font-mono);color:var(--accent)">u_time</code>, <code style="font-family:var(--font-mono);color:var(--accent)">u_resolution</code> and <code style="font-family:var(--font-mono);color:var(--accent)">u_mouse</code> — the three values you need to make a static formula breathe and respond.</p>
+          </div>
+          <div class="feature">
+            <p class="feature-num">03</p>
+            <h3>Live uniform controls</h3>
+            <p>The sliders on the stage push new float values into the running program between frames. Nothing recompiles; you're tuning the math in real time.</p>
+          </div>
+          <div class="feature">
+            <p class="feature-num">04</p>
+            <h3>Hot-reloading editor</h3>
+            <p>The <a href="editor.html" style="color:var(--accent)">Live Editor</a> recompiles your GLSL as you type, parses the driver's info log, and points at the exact line that failed.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ CTA ══════════════ -->
+    <section class="cta" aria-labelledby="cta-heading">
+      <h2 class="cta-title" id="cta-heading">Write your own <em>pixels</em>.</h2>
+      <p class="cta-sub">The editor ships with starter shaders, inline error reporting, and the full uniform set already wired. Change one line and watch the GPU repaint.</p>
+      <a href="editor.html" class="btn btn-primary">Open the Live Editor →</a>
+    </section>
+
+  </main>
+
+  <!-- ══════════════ FOOTER ══════════════ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Fragment&nbsp;Foundry<span class="logo-dot">.</span></div>
+          <p class="footer-brand-desc">A real-time generative-graphics studio. We build GPU shaders, live visual systems, and the tools to write them — all in raw WebGL, all in the browser.</p>
+        </div>
+        <nav class="footer-col" aria-label="Lab links">
+          <p class="footer-col-title">The Lab</p>
+          <ul>
+            <li><a href="index.html">Shader gallery</a></li>
+            <li><a href="editor.html">Live editor</a></li>
+            <li><a href="about.html">How it works</a></li>
+            <li><a href="about.html">The pipeline</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Studio links">
+          <p class="footer-col-title">Studio</p>
+          <ul>
+            <li><a href="about.html">About the studio</a></li>
+            <li><a href="about.html">The team</a></li>
+            <li><a href="#">Commissions</a></li>
+            <li><a href="#">Workshops</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Connect links">
+          <p class="footer-col-title">Connect</p>
+          <ul>
+            <li><a href="mailto:hello@fragmentfoundry.gl">hello@fragmentfoundry.gl</a></li>
+            <li><a href="#">GitHub</a></li>
+            <li><a href="#">Shadertoy</a></li>
+            <li><a href="#">Mastodon</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Fragment Foundry — Berlin / Remote</p>
+        <div class="footer-legal">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Colophon</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+  <script src="js/webgl.js"></script>
+  <script src="js/shaders.js"></script>
+  <script src="js/gallery.js"></script>
+</body>
+</html>

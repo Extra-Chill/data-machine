@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Civic Signal — Resource Library for Neighborhood Organizers</title>
+  <meta name="description" content="Civic Signal is a nonprofit publishing free, practical toolkits for neighborhood organizers. Learn about our mission, approach, and team.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .about-hero {
+      background: var(--forest);
+      padding-block: clamp(var(--sp-16), 10vw, var(--sp-24));
+      position: relative;
+      overflow: hidden;
+    }
+    .about-hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(245,240,232,0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .about-hero-inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-16);
+      align-items: center;
+    }
+    .about-hero h1 {
+      color: var(--cream);
+      font-size: clamp(var(--text-3xl), 5vw, var(--text-5xl));
+      margin-bottom: var(--sp-5);
+    }
+    .about-hero p {
+      color: rgba(245,240,232,0.75);
+      font-size: var(--text-xl);
+      font-weight: 300;
+      line-height: 1.65;
+    }
+    .about-visual {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .principle-card {
+      background: var(--paper);
+      border: var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--sp-6);
+    }
+    .principle-number {
+      font-family: var(--font-display);
+      font-size: var(--text-4xl);
+      font-weight: 900;
+      color: var(--rule);
+      line-height: 1;
+      margin-bottom: var(--sp-3);
+    }
+    .principle-title {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 700;
+      color: var(--forest);
+      margin-bottom: var(--sp-2);
+    }
+    .principle-body { font-size: var(--text-sm); color: var(--muted); line-height: 1.6; }
+
+    .newsletter-form {
+      display: flex;
+      gap: var(--sp-3);
+      max-width: 480px;
+    }
+    .newsletter-input {
+      flex: 1;
+      padding: var(--sp-3) var(--sp-4);
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--r);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      color: var(--cream);
+      outline: none;
+      transition: border-color var(--t), background var(--t);
+    }
+    .newsletter-input::placeholder { color: rgba(245,240,232,0.4); }
+    .newsletter-input:focus {
+      border-color: rgba(255,255,255,0.5);
+      background: rgba(255,255,255,0.15);
+    }
+    @media (max-width: 768px) {
+      .about-hero-inner { grid-template-columns: 1fr; gap: var(--sp-8); }
+      .about-visual { display: none; }
+      .newsletter-form { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====== NAVIGATION ====== -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="container nav-inner">
+    <a href="index.html" class="nav-logo" aria-label="Civic Signal Home">
+      <div class="nav-logo-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg>
+      </div>
+      <div class="nav-logo-text">
+        <span class="nav-logo-name">Civic Signal</span>
+        <span class="nav-logo-sub">Resource Library</span>
+      </div>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="resources.html" class="nav-link">All Resources</a>
+      <a href="about.html" class="nav-link active">About</a>
+      <a href="outreach-checklist.html" class="nav-link">Outreach</a>
+      <a href="grant-readiness.html" class="nav-link">Grants</a>
+    </div>
+    <div class="nav-cta">
+      <a href="resources.html" class="btn btn-primary">Browse Resources</a>
+    </div>
+    <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-drawer">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+<div class="nav-drawer" id="nav-drawer">
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="resources.html" class="nav-link">All Resources</a>
+  <a href="about.html" class="nav-link">About</a>
+  <a href="outreach-checklist.html" class="nav-link">Outreach Checklist</a>
+  <a href="meeting-agenda.html" class="nav-link">Meeting Agenda Template</a>
+  <a href="grant-readiness.html" class="nav-link">Grant Readiness Guide</a>
+  <a href="case-study-roslindale.html" class="nav-link">Case Study</a>
+</div>
+
+<!-- ====== HERO ====== -->
+<section class="about-hero" aria-labelledby="about-headline">
+  <div class="container about-hero-inner">
+    <div>
+      <nav aria-label="Breadcrumb" class="breadcrumbs" style="padding-top: 0; margin-bottom: var(--sp-5);">
+        <a href="index.html" style="color: rgba(245,240,232,0.5);">Home</a>
+        <span class="breadcrumbs-sep" aria-hidden="true">/</span>
+        <span class="breadcrumbs-current" style="color: var(--sage);">About</span>
+      </nav>
+      <p class="kicker">Who We Are</p>
+      <h1 id="about-headline">The toolkit you wish had existed when you started.</h1>
+      <p>Civic Signal is a small nonprofit with a simple premise: the knowledge it takes to organize a neighborhood should be free, practical, and written for people who are doing this work without a staff or a training budget.</p>
+    </div>
+    <div class="about-visual" aria-hidden="true">
+      <svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background circle -->
+        <circle cx="150" cy="150" r="130" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+        <circle cx="150" cy="150" r="100" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+        <circle cx="150" cy="150" r="70" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+        <!-- Signal wave lines -->
+        <path d="M60 150 Q100 100 150 150 Q200 200 240 150" stroke="rgba(201,151,44,0.4)" stroke-width="2" fill="none"/>
+        <path d="M75 150 Q105 115 150 150 Q195 185 225 150" stroke="rgba(201,151,44,0.25)" stroke-width="1.5" fill="none"/>
+        <path d="M90 150 Q110 128 150 150 Q190 172 210 150" stroke="rgba(201,151,44,0.15)" stroke-width="1" fill="none"/>
+        <!-- Center dot -->
+        <circle cx="150" cy="150" r="8" fill="var(--amber)"/>
+        <circle cx="150" cy="150" r="16" fill="var(--amber)" opacity="0.2"/>
+        <circle cx="150" cy="150" r="24" fill="var(--amber)" opacity="0.08"/>
+        <!-- Dots around circumference (community members) -->
+        <circle cx="150" cy="50" r="5" fill="rgba(245,240,232,0.4)"/>
+        <circle cx="218" cy="80" r="5" fill="rgba(245,240,232,0.4)"/>
+        <circle cx="246" cy="155" r="5" fill="rgba(245,240,232,0.3)"/>
+        <circle cx="215" cy="220" r="5" fill="rgba(245,240,232,0.4)"/>
+        <circle cx="150" cy="248" r="5" fill="rgba(245,240,232,0.4)"/>
+        <circle cx="84" cy="220" r="5" fill="rgba(245,240,232,0.3)"/>
+        <circle cx="52" cy="155" r="5" fill="rgba(245,240,232,0.4)"/>
+        <circle cx="82" cy="80" r="5" fill="rgba(245,240,232,0.4)"/>
+        <!-- Lines from center to dots -->
+        <line x1="150" y1="150" x2="150" y2="50" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <line x1="150" y1="150" x2="218" y2="80" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <line x1="150" y1="150" x2="246" y2="155" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <line x1="150" y1="150" x2="215" y2="220" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <line x1="150" y1="150" x2="150" y2="248" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <line x1="150" y1="150" x2="84" y2="220" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <line x1="150" y1="150" x2="52" y2="155" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <line x1="150" y1="150" x2="82" y2="80" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ====== MISSION ====== -->
+<section class="section section--paper" aria-labelledby="mission-heading">
+  <div class="container">
+    <div class="grid-2" style="gap: var(--sp-16); align-items: start;">
+      <div class="reveal">
+        <p class="kicker">Our Mission</p>
+        <h2 id="mission-heading">Democracy works best when neighbors have the tools to act.</h2>
+        <p style="color: var(--muted); font-size: var(--text-lg); font-weight: 300; margin-bottom: var(--sp-5);">
+          The gap between good intentions and effective organizing often comes down to information — knowing how to run a meeting that doesn't spiral, how to write a grant proposal that gets funded, how to knock on a door without feeling like a pest.
+        </p>
+        <p style="color: var(--muted);">
+          That knowledge exists. It's held by experienced organizers, community development professionals, and civic leaders — but it rarely makes it into the hands of the volunteers who are doing this work in evenings and weekends, often for the first time.
+        </p>
+        <p style="color: var(--muted);">
+          Civic Signal closes that gap. We work with experienced practitioners to turn what they know into clear, practical, shareable resources — and we publish them for free.
+        </p>
+      </div>
+      <div class="reveal">
+        <div class="callout callout--tip" style="margin-bottom: var(--sp-5);">
+          <div class="callout-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="var(--forest-mid)" stroke-width="1.5"/><path d="M10 6V10.5" stroke="var(--forest-mid)" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="13.5" r="1" fill="var(--forest-mid)"/></svg>
+          </div>
+          <div>
+            <p class="callout-title">Free, always.</p>
+            <p>Every resource on this site is free to read, download, print, and adapt. We ask only that you credit Civic Signal when you share our materials.</p>
+          </div>
+        </div>
+        <div class="callout callout--action">
+          <div class="callout-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2L12.5 7.5H18L13.5 11L15.5 17L10 14L4.5 17L6.5 11L2 7.5H7.5L10 2Z" stroke="var(--amber)" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          </div>
+          <div>
+            <p class="callout-title">Built from the field up.</p>
+            <p>We review every resource with community members doing real organizing work before we publish. Their feedback shapes the final product — not internal assumptions about what organizers need.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== PRINCIPLES ====== -->
+<section class="section section--cream" aria-labelledby="principles-heading">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <p class="section-label">How We Work</p>
+        <h2 id="principles-heading">Four Editorial Principles</h2>
+      </div>
+    </div>
+    <div class="grid-4 stagger">
+      <div class="principle-card reveal">
+        <div class="principle-number">01</div>
+        <h3 class="principle-title">Plain language, always</h3>
+        <p class="principle-body">No jargon, no acronyms without explanation, no language that assumes the reader has a graduate degree in public administration. We write like we're explaining something to a smart friend who just moved to the neighborhood.</p>
+      </div>
+      <div class="principle-card reveal">
+        <div class="principle-number">02</div>
+        <h3 class="principle-title">Actionable over inspirational</h3>
+        <p class="principle-body">We are not in the business of telling you why community organizing matters. You already know. We focus on the how — step-by-step, specific, and honest about what's hard.</p>
+      </div>
+      <div class="principle-card reveal">
+        <div class="principle-number">03</div>
+        <h3 class="principle-title">Tested in the field</h3>
+        <p class="principle-body">Every resource gets reviewed by people who have used similar materials in real campaigns, meetings, and grant applications. We don't publish anything that hasn't survived contact with actual practice.</p>
+      </div>
+      <div class="principle-card reveal">
+        <div class="principle-number">04</div>
+        <h3 class="principle-title">Continuously updated</h3>
+        <p class="principle-body">Organizing environments change. Grant requirements shift. Meeting formats evolve. We revise our resources at least annually based on user feedback and changing conditions on the ground.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== TEAM ====== -->
+<section class="section section--paper" aria-labelledby="team-heading" id="team">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <p class="section-label">The People</p>
+        <h2 id="team-heading">Who Runs Civic Signal</h2>
+      </div>
+    </div>
+    <div class="grid-2 stagger" style="max-width: 800px;">
+      <div class="person-card reveal">
+        <div class="person-avatar" aria-hidden="true">D</div>
+        <div>
+          <div class="person-name">Diane Okafor</div>
+          <div class="person-title">Executive Director</div>
+          <p class="person-bio">Fifteen years running neighborhood associations in Chicago and Detroit before founding Civic Signal in 2019. Diane's frustrated by how much wheel-reinventing happens in organizing, and built this library to fix it.</p>
+        </div>
+      </div>
+      <div class="person-card reveal">
+        <div class="person-avatar" aria-hidden="true" style="background: var(--forest-mid);">T</div>
+        <div>
+          <div class="person-name">Thomas Vásquez</div>
+          <div class="person-title">Content Director</div>
+          <p class="person-bio">Former community development officer at the City of Portland. Tom translates the practical knowledge of experienced organizers into usable formats — checklists, guides, templates, case studies.</p>
+        </div>
+      </div>
+      <div class="person-card reveal">
+        <div class="person-avatar" aria-hidden="true" style="background: var(--amber);">R</div>
+        <div>
+          <div class="person-name">Rania El-Amin</div>
+          <div class="person-title">Community Partnerships</div>
+          <p class="person-bio">Works with neighborhood organizations across the country to pilot and review resources before they're published. Rania's also the person who fields emails from readers — reach out through the newsletter.</p>
+        </div>
+      </div>
+      <div class="person-card reveal">
+        <div class="person-avatar" aria-hidden="true" style="background: var(--gold); color: var(--ink);">J</div>
+        <div>
+          <div class="person-name">Jerome Whitfield</div>
+          <div class="person-title">Grants &amp; Development</div>
+          <p class="person-bio">Jerome keeps the lights on — managing grant relationships with our funders and making sure Civic Signal stays free. He also wrote large parts of the <a href="grant-readiness.html" style="color: var(--amber); text-decoration: underline; text-underline-offset: 2px;">Grant Readiness Guide</a>, drawing on a decade of proposal work.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FUNDERS ====== -->
+<section class="section section--sand" aria-labelledby="funders-heading" style="padding-block: var(--sp-12);">
+  <div class="container">
+    <p class="section-label" style="margin-bottom: var(--sp-3);">Support</p>
+    <h2 id="funders-heading" style="font-size: var(--text-2xl); margin-bottom: var(--sp-5);">Who funds this work</h2>
+    <p style="color: var(--muted); max-width: 640px; margin-bottom: var(--sp-6);">Civic Signal is funded by a combination of foundation grants and individual donors. Our current funders include the Rosewood Community Foundation, the Urban Equity Fund, and the National Neighborhood Initiative. We do not accept funding from political parties, campaigns, or corporate lobbying organizations.</p>
+    <div class="flex gap-4 flex-wrap">
+      <div style="background: var(--paper); border: var(--border); border-radius: var(--r-lg); padding: var(--sp-4) var(--sp-6); font-family: var(--font-display); font-weight: 700; color: var(--forest);">Rosewood Community Foundation</div>
+      <div style="background: var(--paper); border: var(--border); border-radius: var(--r-lg); padding: var(--sp-4) var(--sp-6); font-family: var(--font-display); font-weight: 700; color: var(--forest);">Urban Equity Fund</div>
+      <div style="background: var(--paper); border: var(--border); border-radius: var(--r-lg); padding: var(--sp-4) var(--sp-6); font-family: var(--font-display); font-weight: 700; color: var(--forest);">National Neighborhood Initiative</div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== NEWSLETTER ====== -->
+<section class="cta-banner" id="newsletter" aria-labelledby="newsletter-heading">
+  <div class="cta-banner-inner">
+    <p class="kicker" style="color: var(--gold);">Stay Connected</p>
+    <h2 id="newsletter-heading">New resources, monthly.</h2>
+    <p>We publish a new resource or case study every four to six weeks. The newsletter is the fastest way to find out — plus we share organizing tips and examples from the field that don't make it onto the website.</p>
+    <form class="newsletter-form" style="margin-inline: auto;" aria-label="Newsletter signup">
+      <input
+        type="email"
+        class="newsletter-input"
+        placeholder="your@email.org"
+        aria-label="Email address"
+        required
+      >
+      <button type="submit" class="btn btn-primary">Subscribe</button>
+    </form>
+    <p style="font-family: var(--font-ui); font-size: var(--text-xs); color: rgba(245,240,232,0.4); letter-spacing: 0.04em; margin-top: var(--sp-4);">No spam. One email per month. Unsubscribe anytime.</p>
+  </div>
+</section>
+
+<!-- ====== CONTRIBUTE ====== -->
+<section class="section section--cream" id="contribute" aria-labelledby="contribute-heading">
+  <div class="container">
+    <div class="grid-2" style="align-items: center; gap: var(--sp-12);">
+      <div class="reveal">
+        <p class="kicker">Get Involved</p>
+        <h2 id="contribute-heading">Know something our library is missing?</h2>
+        <p style="color: var(--muted); margin-bottom: var(--sp-5);">
+          The best resources come from people who've been through the work. If you've developed a tool that helped your organization — a checklist, a script, a guide, a template — and you'd like to share it with the broader community, we want to hear from you.
+        </p>
+        <p style="color: var(--muted); margin-bottom: var(--sp-6);">
+          We review all submissions, work with contributors to adapt materials to the Civic Signal format, and publish with full attribution to the originating organization or individual.
+        </p>
+        <a href="mailto:resources@civicsignal.org" class="btn btn-primary">Submit a Resource Idea</a>
+      </div>
+      <div class="reveal">
+        <div class="callout callout--tip" style="margin-bottom: var(--sp-4);">
+          <div class="callout-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2L12.5 7.5H18L13.5 11L15.5 17L10 14L4.5 17L6.5 11L2 7.5H7.5L10 2Z" stroke="var(--forest-mid)" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          </div>
+          <div>
+            <p class="callout-title">What we're looking for</p>
+            <p>Practical tools built from real organizing experience — especially in areas we don't yet cover: tenant outreach, youth engagement, multilingual materials, rural community context, and tools that center communities of color.</p>
+          </div>
+        </div>
+        <div style="background: var(--paper); border: var(--border); border-radius: var(--r-lg); padding: var(--sp-5);">
+          <p style="font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: var(--sp-3);">Also useful</p>
+          <div class="flex flex-col gap-3">
+            <a href="resources.html" style="color: var(--amber); font-size: var(--text-sm); text-decoration: underline; text-underline-offset: 3px;">Browse what's already in the library →</a>
+            <a href="case-study-roslindale.html" style="color: var(--amber); font-size: var(--text-sm); text-decoration: underline; text-underline-offset: 3px;">Read the Roslindale Case Study →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FOOTER ====== -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" style="margin-bottom: var(--sp-4); display: inline-flex;">
+          <div class="nav-logo-mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" fill="white"/><path d="M10 3C10 3 5 6.5 5 10C5 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M10 3C10 3 15 6.5 15 10C15 13.5 10 17 10 17" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/><path d="M3 10H17" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/></svg></div>
+          <div class="nav-logo-text"><span class="nav-logo-name">Civic Signal</span><span class="nav-logo-sub">Resource Library</span></div>
+        </a>
+        <p>Publishing practical toolkits for neighborhood organizers, free of charge and free of jargon.</p>
+      </div>
+      <div>
+        <span class="footer-col-title">Resources</span>
+        <div class="footer-links">
+          <a href="outreach-checklist.html" class="footer-link">Outreach Checklist</a>
+          <a href="meeting-agenda.html" class="footer-link">Meeting Agenda Template</a>
+          <a href="grant-readiness.html" class="footer-link">Grant Readiness Guide</a>
+          <a href="case-study-roslindale.html" class="footer-link">Case Study: Roslindale</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Topics</span>
+        <div class="footer-links">
+          <a href="resources.html?filter=outreach" class="footer-link">Outreach</a>
+          <a href="resources.html?filter=meetings" class="footer-link">Meetings</a>
+          <a href="resources.html?filter=funding" class="footer-link">Funding</a>
+          <a href="resources.html?filter=projects" class="footer-link">Projects</a>
+        </div>
+      </div>
+      <div>
+        <span class="footer-col-title">Organization</span>
+        <div class="footer-links">
+          <a href="about.html#team" class="footer-link">Our Team</a>
+          <a href="about.html#newsletter" class="footer-link">Newsletter</a>
+          <a href="about.html#contribute" class="footer-link">Contribute</a>
+          <a href="mailto:resources@civicsignal.org" class="footer-link">Contact</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-legal">© 2024 Civic Signal. All resources are free to use and adapt with attribution.</p>
+      <div class="footer-bottom-links">
+        <a href="index.html">Home</a>
+        <a href="resources.html">Resources</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

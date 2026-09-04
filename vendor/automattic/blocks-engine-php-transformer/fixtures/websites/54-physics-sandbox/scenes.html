@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenes — Tumble Lab</title>
+  <meta name="description" content="A gallery of ready-made Tumble Lab physics scenes — ball pit, rope bridge, cloth flag, tearable cloth, box stack, zero-g, fireworks and Newton's cradle. Launch any one into the live sandbox.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Tumble Lab home">
+      <span class="logo-mark" aria-hidden="true"></span>
+      <span class="logo-text">
+        <span class="logo-name">Tumble<b>·</b>Lab</span>
+        <span class="logo-sub">Verlet Physics Toy</span>
+      </span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="sandbox.html">Sandbox</a>
+      <a href="scenes.html" class="active">Scenes</a>
+      <a href="about.html">How it works</a>
+      <a href="sandbox.html" class="nav-cta">Launch ▸</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="wrap">
+    <p class="section-eyebrow">Preset gallery</p>
+    <h1 class="section-title">Eight scenes, one engine</h1>
+    <p class="section-lead">
+      Each scene loads the same Verlet solver with different bodies, constraints and tuning.
+      Click any card to launch it straight into the live sandbox — then twist the sliders and
+      break it however you like.
+    </p>
+
+    <div class="scene-grid">
+
+      <!-- BALL PIT -->
+      <article class="scene-card">
+        <svg class="scene-thumb" viewBox="0 0 320 200" role="img" aria-label="Ball pit thumbnail">
+          <rect width="320" height="200" fill="#080a12"/>
+          <circle cx="70" cy="150" r="26" fill="#6cf2c8"/>
+          <circle cx="125" cy="160" r="20" fill="#ff6b8b"/>
+          <circle cx="172" cy="150" r="28" fill="#5cc8ff"/>
+          <circle cx="225" cy="158" r="22" fill="#ffd166"/>
+          <circle cx="262" cy="148" r="18" fill="#8a7bff"/>
+          <circle cx="110" cy="120" r="16" fill="#ff9f59"/>
+          <circle cx="190" cy="116" r="14" fill="#6cf2c8"/>
+          <circle cx="150" cy="90" r="12" fill="#ff6b8b"/>
+        </svg>
+        <div class="scene-body">
+          <h3>Ball Pit</h3>
+          <p class="scene-meta">180 bodies · g 0.6 · bounce 50%</p>
+          <p>A few hundred elastic balls tumbling under gravity. Stir them with the mouse or fling new ones in.</p>
+          <a class="scene-launch" href="sandbox.html?scene=ball-pit">Launch scene →</a>
+        </div>
+      </article>
+
+      <!-- ROPE BRIDGE -->
+      <article class="scene-card">
+        <svg class="scene-thumb" viewBox="0 0 320 200" role="img" aria-label="Rope bridge thumbnail">
+          <rect width="320" height="200" fill="#080a12"/>
+          <path d="M40 70 C 120 130, 200 130, 280 70" stroke="#ffd166" stroke-width="4" fill="none"/>
+          <line x1="40" y1="70" x2="40" y2="140" stroke="#9a99b5" stroke-width="3"/>
+          <line x1="280" y1="70" x2="280" y2="140" stroke="#9a99b5" stroke-width="3"/>
+          <circle cx="40" cy="70" r="6" fill="#ffd166"/>
+          <circle cx="280" cy="70" r="6" fill="#ffd166"/>
+          <circle cx="130" cy="118" r="12" fill="#6cf2c8"/>
+          <circle cx="175" cy="120" r="12" fill="#ff6b8b"/>
+          <circle cx="105" cy="40" r="10" fill="#5cc8ff"/>
+        </svg>
+        <div class="scene-body">
+          <h3>Rope Bridge</h3>
+          <p class="scene-meta">28-segment span · pinned both ends</p>
+          <p>A slack suspension bridge between two towers. Drop balls and watch it sag, swing and recover.</p>
+          <a class="scene-launch" href="sandbox.html?scene=rope-bridge">Launch scene →</a>
+        </div>
+      </article>
+
+      <!-- CLOTH FLAG -->
+      <article class="scene-card">
+        <svg class="scene-thumb" viewBox="0 0 320 200" role="img" aria-label="Cloth flag thumbnail">
+          <rect width="320" height="200" fill="#080a12"/>
+          <g stroke="#5cc8ff" stroke-width="1.4" fill="none" opacity="0.85">
+            <path d="M60 50 Q100 56 140 50 T220 54 T260 60"/>
+            <path d="M60 80 Q100 92 140 84 T220 92 T260 100"/>
+            <path d="M60 110 Q100 128 140 116 T220 130 T260 140"/>
+            <path d="M60 50 V110 M100 53 V120 M140 50 V116 M180 53 V125 M220 54 V130 M260 60 V140"/>
+          </g>
+          <circle cx="60" cy="50" r="4" fill="#fff"/>
+          <circle cx="140" cy="50" r="4" fill="#fff"/>
+          <circle cx="220" cy="54" r="4" fill="#fff"/>
+        </svg>
+        <div class="scene-body">
+          <h3>Cloth Flag</h3>
+          <p class="scene-meta">26×18 grid · pinned top edge</p>
+          <p>A pinned cloth grid solved with distance constraints. It ripples, folds, and drapes like fabric.</p>
+          <a class="scene-launch" href="sandbox.html?scene=cloth-flag">Launch scene →</a>
+        </div>
+      </article>
+
+      <!-- TEARABLE CLOTH -->
+      <article class="scene-card">
+        <svg class="scene-thumb" viewBox="0 0 320 200" role="img" aria-label="Tearable cloth thumbnail">
+          <rect width="320" height="200" fill="#080a12"/>
+          <g stroke="#ff6b8b" stroke-width="1.4" fill="none" opacity="0.85">
+            <path d="M50 40 H140 M180 40 H270"/>
+            <path d="M50 70 H120 M150 78 H270"/>
+            <path d="M50 100 H110 M165 110 H270"/>
+            <path d="M50 40 V100 M80 40 V130 M110 40 V100 M210 40 V140 M240 40 V145 M270 40 V140"/>
+          </g>
+          <path d="M120 70 L150 78 L165 110 L150 130" stroke="#ff6b8b" stroke-width="1" fill="none" opacity="0.4" stroke-dasharray="3 4"/>
+          <circle cx="50" cy="40" r="4" fill="#fff"/>
+          <circle cx="270" cy="40" r="4" fill="#fff"/>
+        </svg>
+        <div class="scene-body">
+          <h3>Tearable Cloth</h3>
+          <p class="scene-meta">28×20 grid · threads snap at 4×</p>
+          <p>The same cloth, but constraints break when overstretched. Grab and rip holes right through it.</p>
+          <a class="scene-launch" href="sandbox.html?scene=cloth-tear">Launch scene →</a>
+        </div>
+      </article>
+
+      <!-- BOX STACK -->
+      <article class="scene-card">
+        <svg class="scene-thumb" viewBox="0 0 320 200" role="img" aria-label="Box stack thumbnail">
+          <rect width="320" height="200" fill="#080a12"/>
+          <g stroke="rgba(255,255,255,0.35)" stroke-width="1.5">
+            <rect x="90" y="150" width="36" height="36" fill="#8a7bff"/>
+            <rect x="128" y="150" width="36" height="36" fill="#6cf2c8"/>
+            <rect x="166" y="150" width="36" height="36" fill="#ffd166"/>
+            <rect x="204" y="150" width="36" height="36" fill="#ff6b8b"/>
+            <rect x="110" y="112" width="36" height="36" fill="#5cc8ff"/>
+            <rect x="148" y="112" width="36" height="36" fill="#ff9f59"/>
+            <rect x="186" y="112" width="36" height="36" fill="#8a7bff"/>
+            <rect x="130" y="74" width="36" height="36" fill="#6cf2c8"/>
+            <rect x="168" y="74" width="36" height="36" fill="#ffd166" transform="rotate(6 186 92)"/>
+          </g>
+        </svg>
+        <div class="scene-body">
+          <h3>Box Stack</h3>
+          <p class="scene-meta">21 crates · diagonal-braced</p>
+          <p>Soft-rigid crates braced by diagonal constraints. Build a pyramid, then knock it over.</p>
+          <a class="scene-launch" href="sandbox.html?scene=box-stack">Launch scene →</a>
+        </div>
+      </article>
+
+      <!-- ZERO-G -->
+      <article class="scene-card">
+        <svg class="scene-thumb" viewBox="0 0 320 200" role="img" aria-label="Zero gravity thumbnail">
+          <rect width="320" height="200" fill="#080a12"/>
+          <circle cx="60" cy="60" r="14" fill="#6cf2c8"/>
+          <circle cx="180" cy="40" r="10" fill="#ff6b8b"/>
+          <circle cx="250" cy="90" r="16" fill="#5cc8ff"/>
+          <circle cx="110" cy="130" r="12" fill="#ffd166"/>
+          <circle cx="220" cy="150" r="13" fill="#8a7bff"/>
+          <circle cx="150" cy="95" r="9" fill="#ff9f59"/>
+          <g stroke="rgba(255,255,255,0.25)" stroke-width="1.5">
+            <path d="M60 60 l24 -10"/><path d="M250 90 l-22 8"/><path d="M110 130 l18 -16"/>
+          </g>
+        </svg>
+        <div class="scene-body">
+          <h3>Zero-G Drift</h3>
+          <p class="scene-meta">90 bodies · g 0 · bounce 92%</p>
+          <p>Gravity off, near-perfect restitution. Bodies drift forever — click to drop a gravity well.</p>
+          <a class="scene-launch" href="sandbox.html?scene=zero-g">Launch scene →</a>
+        </div>
+      </article>
+
+      <!-- FIREWORKS -->
+      <article class="scene-card">
+        <svg class="scene-thumb" viewBox="0 0 320 200" role="img" aria-label="Fireworks thumbnail">
+          <rect width="320" height="200" fill="#080a12"/>
+          <g stroke-width="2" fill="none">
+            <g stroke="#ffd166" opacity="0.9"><path d="M110 80 L90 50 M110 80 L130 50 M110 80 L80 90 M110 80 L140 92 M110 80 L100 110 M110 80 L122 112"/></g>
+            <g stroke="#ff6b8b" opacity="0.9"><path d="M210 110 L190 84 M210 110 L232 84 M210 110 L182 118 M210 110 L240 120 M210 110 L202 140"/></g>
+          </g>
+          <circle cx="110" cy="80" r="4" fill="#fff"/>
+          <circle cx="210" cy="110" r="4" fill="#fff"/>
+          <circle cx="250" cy="60" r="2.5" fill="#6cf2c8"/>
+          <circle cx="70" cy="130" r="2.5" fill="#5cc8ff"/>
+        </svg>
+        <div class="scene-body">
+          <h3>Fireworks</h3>
+          <p class="scene-meta">recurring bursts · short-lived sparks</p>
+          <p>Continuous bursts of fading sparks that arc under light gravity. A pure particle flourish.</p>
+          <a class="scene-launch" href="sandbox.html?scene=fireworks">Launch scene →</a>
+        </div>
+      </article>
+
+      <!-- NEWTON'S CRADLE -->
+      <article class="scene-card">
+        <svg class="scene-thumb" viewBox="0 0 320 200" role="img" aria-label="Newton's cradle thumbnail">
+          <rect width="320" height="200" fill="#080a12"/>
+          <line x1="100" y1="40" x2="220" y2="40" stroke="#5a5972" stroke-width="3"/>
+          <g stroke="rgba(255,255,255,0.35)" stroke-width="1.5">
+            <line x1="120" y1="40" x2="80" y2="120"/>
+            <line x1="150" y1="40" x2="150" y2="150"/>
+            <line x1="170" y1="40" x2="170" y2="150"/>
+            <line x1="190" y1="40" x2="190" y2="150"/>
+            <line x1="210" y1="40" x2="210" y2="150"/>
+          </g>
+          <circle cx="80" cy="120" r="14" fill="#ffd166"/>
+          <circle cx="150" cy="150" r="14" fill="#ffd166"/>
+          <circle cx="170" cy="150" r="14" fill="#ffd166"/>
+          <circle cx="190" cy="150" r="14" fill="#ffd166"/>
+          <circle cx="210" cy="150" r="14" fill="#ffd166"/>
+        </svg>
+        <div class="scene-body">
+          <h3>Newton's Cradle</h3>
+          <p class="scene-meta">5 pendulums · bounce 95%</p>
+          <p>Five pinned pendulums in a row — a classic momentum demo built from ropes and balls.</p>
+          <a class="scene-launch" href="sandbox.html?scene=pendulum-newton">Launch scene →</a>
+        </div>
+      </article>
+
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div>© <span data-year>2026</span> Tumble Lab — a hand-written physics toy. No engines were used.</div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="sandbox.html">Sandbox</a>
+      <a href="scenes.html">Scenes</a>
+      <a href="about.html">How it works</a>
+    </nav>
+  </footer>
+
+  <script src="js/nav.js"></script>
+</body>
+</html>

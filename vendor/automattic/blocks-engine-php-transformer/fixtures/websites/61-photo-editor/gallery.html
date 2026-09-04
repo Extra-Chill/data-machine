@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tonebox — Sample Gallery &amp; Preset Looks</title>
+  <meta name="description" content="Browse the built-in, procedurally generated sample images that ship with Tonebox, and see every preset look rendered live on a real photo.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/page.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23111827'/><circle cx='12' cy='13' r='5' fill='%23f43f5e'/><circle cx='20' cy='13' r='5' fill='%2334d399' opacity='0.85'/><circle cx='16' cy='20' r='5' fill='%2360a5fa' opacity='0.85'/></svg>">
+</head>
+<body class="page-body">
+
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Tonebox home">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#111827"/>
+        <circle cx="12" cy="13" r="5" fill="#f43f5e"/>
+        <circle cx="20" cy="13" r="5" fill="#34d399" opacity="0.85"/>
+        <circle cx="16" cy="20" r="5" fill="#60a5fa" opacity="0.85"/>
+      </svg>
+      <span>Tonebox</span>
+    </a>
+    <nav class="site-nav">
+      <a href="index.html">Editor</a>
+      <a href="gallery.html" class="is-current" aria-current="page">Gallery</a>
+      <a href="about.html">About</a>
+      <a href="index.html" class="btn nav-cta">Open editor</a>
+    </nav>
+  </header>
+
+  <section class="page-hero wrap">
+    <span class="eyebrow">Sample library</span>
+    <h1>Five starting images, drawn entirely in code.</h1>
+    <p class="lead">Every sample below is generated on a canvas with gradients, procedural noise and primitive shapes — there are no downloaded photos anywhere in Tonebox. Pick one to start editing, or bring your own image. Each thumbnail is the real bitmap the editor loads.</p>
+    <div class="hero-actions">
+      <a href="index.html" class="btn btn-primary">Start editing →</a>
+      <a href="about.html" class="btn btn-ghost">How the filters work</a>
+    </div>
+  </section>
+
+  <div class="section-head wrap"><h2>Built-in samples</h2><p>Generated fresh in your browser at 960 × 640. Click any card to open it in the editor.</p></div>
+  <div id="sample-grid" class="gal-grid wrap"></div>
+
+  <div class="section-head wrap"><h2>Preset looks, side by side</h2><p>The same image — <em>Cypress Coast</em> — processed through each one-click look. Looks stack point adjustments (and sometimes a convolution kernel) on top of the original pixels.</p></div>
+  <div id="look-grid" class="look-grid wrap"></div>
+
+  <div class="wrap">
+    <div class="cta-band">
+      <h2>Make it yours</h2>
+      <p>Load a sample, push the sliders, stack a look, then export a PNG — no account, no upload, all on your machine.</p>
+      <a href="index.html" class="btn btn-primary">Open the editor</a>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>Tonebox — a fictional client-side image editor. Built with vanilla canvas, no libraries.</span>
+      <span><a href="about.html">About</a> · <a href="index.html">Editor</a></span>
+    </div>
+  </footer>
+
+  <script src="js/samples.js"></script>
+  <script src="js/filters.js"></script>
+  <script>
+  (function () {
+    const F = window.TBFilters;
+
+    function processCanvas(srcCanvas, state, w, h) {
+      // downscale source then run the same pipeline as the editor
+      const tmp = document.createElement('canvas');
+      tmp.width = w; tmp.height = h;
+      const tctx = tmp.getContext('2d', { willReadFrequently: true });
+      tctx.drawImage(srcCanvas, 0, 0, w, h);
+      const src = tctx.getImageData(0, 0, w, h);
+      const buf = new Uint8ClampedArray(src.data);
+      F.applyAdjustments(buf, state);
+      let out = F.applyConvolution(buf, w, h, state.convolution);
+      F.applyVignette(out, w, h, state.vignette);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').putImageData(new ImageData(out, w, h), 0, 0);
+      return c;
+    }
+
+    // sample grid
+    const sg = document.getElementById('sample-grid');
+    window.TBSamples.list.forEach(s => {
+      const big = s.build();
+      const card = document.createElement('a');
+      card.className = 'gal-card';
+      card.href = 'index.html';
+      const thumb = document.createElement('div');
+      thumb.className = 'gal-thumb';
+      const cv = document.createElement('canvas');
+      cv.width = 360; cv.height = 240;
+      cv.getContext('2d').drawImage(big, 0, 0, 360, 240);
+      thumb.appendChild(cv);
+      card.appendChild(thumb);
+      card.insertAdjacentHTML('beforeend',
+        '<div class="gal-body"><h3>' + s.name + '</h3><p>' + s.sub +
+        '</p><span class="gal-tag">960 × 640 · generated</span></div>');
+      sg.appendChild(card);
+    });
+
+    // look grid on Cypress Coast
+    const base = window.TBSamples.build('coast');
+    const lg = document.getElementById('look-grid');
+    F.PRESETS.forEach(p => {
+      const out = processCanvas(base, F.presetState(p.id), 300, 200);
+      const card = document.createElement('div');
+      card.className = 'look-card';
+      card.appendChild(out);
+      const desc = describe(p);
+      card.insertAdjacentHTML('beforeend',
+        '<div class="look-name">' + p.name + '<span>' + desc + '</span></div>');
+      lg.appendChild(card);
+    });
+
+    function describe(p) {
+      const s = p.state;
+      if (p.id === 'original') return 'unmodified source';
+      const parts = [];
+      if (s.convolution && s.convolution !== 'none') parts.push(s.convolution.replace('blur', 'blur '));
+      if (s.grayscale === 100) parts.push('mono');
+      if (s.sepia) parts.push('sepia');
+      if (s.vignette) parts.push('vignette');
+      if (s.saturation > 0) parts.push('+sat');
+      if (s.saturation < 0) parts.push('-sat');
+      if (s.temperature > 0) parts.push('warm');
+      if (s.temperature < 0) parts.push('cool');
+      return parts.slice(0, 3).join(' · ') || 'tonal shift';
+    }
+  })();
+  </script>
+</body>
+</html>

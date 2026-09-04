@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live GLSL Editor — Fragment Foundry</title>
+  <meta name="description" content="Edit GLSL fragment shaders in the browser and watch them hot-recompile on the GPU. Inline compile errors with line numbers, loadable examples, raw WebGL.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Fragment Foundry home">
+      <span class="logo-mark">Fragment&nbsp;Foundry<span class="logo-dot">.</span></span>
+      <span class="logo-sub">Real-time shader lab</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Gallery</a>
+      <a href="editor.html">Live Editor</a>
+      <a href="about.html">About</a>
+      <a href="index.html" class="nav-cta">View Gallery</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="wrap editor-page">
+
+    <div class="editor-intro">
+      <p class="mono" style="margin-bottom:0.6rem;">[ Live GLSL Editor ]</p>
+      <h1>Edit the fragment shader. <span class="accent">It recompiles as you type.</span></h1>
+      <p>The boilerplate is handled for you — a vertex shader and the standard uniforms are injected automatically, so you only write the fragment body and a <code style="font-family:var(--font-mono);color:var(--accent)">main()</code>. Type and the GPU repaints; break it and the driver's error log is parsed and pinned to the line below.</p>
+    </div>
+
+    <!-- WebGL-unavailable fallback -->
+    <div class="webgl-fallback" id="webgl-fallback" hidden style="position:static;background:rgba(255,93,143,0.1);border:1px solid rgba(255,93,143,0.4);border-radius:12px;margin-bottom:1.4rem;">
+      <div class="inner">
+        <h2>WebGL isn't available</h2>
+        <p>The live editor needs a WebGL context to compile and run your shaders. Please enable hardware acceleration or try a modern desktop browser.</p>
+      </div>
+    </div>
+
+    <div class="editor-grid">
+      <!-- ── code pane ── -->
+      <section class="editor-pane" aria-label="Shader source editor">
+        <div class="pane-head">
+          <span class="title">fragment.glsl</span>
+          <span class="spacer"></span>
+          <label class="mono" for="example-select" style="color:var(--ink-faint)">load:</label>
+          <select class="field" id="example-select" aria-label="Load example shader"></select>
+          <span class="compile-status ok" id="compile-status">✓ compiled</span>
+        </div>
+        <div class="code-area">
+          <pre id="line-numbers" aria-hidden="true">1</pre>
+          <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off"
+            aria-label="GLSL fragment shader source code"></textarea>
+        </div>
+        <div class="compile-errors" id="compile-errors" role="status" aria-live="polite">
+          <div class="err-line ok-line">No errors — shader is live.</div>
+        </div>
+        <div class="pane-head" style="border-top:1px solid var(--line);border-bottom:none;">
+          <button class="ctrl-btn" id="btn-compile" type="button">⟳ Recompile</button>
+          <button class="ctrl-btn" id="btn-revert" type="button">↺ Reset to starter</button>
+          <span class="spacer"></span>
+          <span class="mono" style="color:var(--ink-faint)">Tab = 2 spaces</span>
+        </div>
+      </section>
+
+      <!-- ── preview pane ── -->
+      <section class="preview-pane" aria-label="Shader preview">
+        <div class="pane-head">
+          <span class="title">GPU output</span>
+          <span class="spacer"></span>
+          <button class="ctrl-btn" id="btn-eplay" type="button">❚❚ Pause</button>
+        </div>
+        <div class="preview-stage">
+          <canvas id="editor-canvas" aria-label="Live preview of the shader you are editing"></canvas>
+        </div>
+      </section>
+    </div>
+
+    <!-- uniform reference -->
+    <div class="editor-uniforms-note">
+      <h2>Uniforms available to your shader</h2>
+      <ul>
+        <li><code>uniform float u_time;</code> — seconds since the shader loaded, increasing every frame.</li>
+        <li><code>uniform vec2 u_resolution;</code> — drawing-buffer size in pixels. Use <code>gl_FragCoord.xy / u_resolution.xy</code> for 0–1 coordinates.</li>
+        <li><code>uniform vec2 u_mouse;</code> — pointer position in pixels (y is up). Move your mouse over the preview to drive it.</li>
+        <li>Write to <code>gl_FragColor</code> — a <code>vec4</code> of <code>(r, g, b, a)</code> in 0–1. That's your pixel.</li>
+      </ul>
+    </div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-bottom" style="margin-top:0;border-top:none;padding-top:0;">
+        <p class="footer-copy">© <span data-year>2026</span> Fragment Foundry — Berlin / Remote</p>
+        <div class="footer-legal">
+          <a href="index.html">Gallery</a>
+          <a href="about.html">About</a>
+          <a href="mailto:hello@fragmentfoundry.gl">Contact</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+  <script src="js/webgl.js"></script>
+  <script src="js/editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Idempotency Is a Superpower — Mara's Garden</title>
+  <meta name="description" content="A note from Mara Okonkwo's digital garden on distributed systems, note-taking, stoicism, and gardening.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/garden.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-leaf" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 28 C16 18 8 14 5 6 C16 6 24 12 24 22 C24 25 21 28 16 28 Z" fill="#3a7d52" opacity=".9"/>
+          <path d="M16 28 C16 20 19 13 24 8" fill="none" stroke="#fbf9f3" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="16" cy="28" r="2" fill="#b08b2e"/>
+        </svg>
+        <h1><a href="index.html">Mara's Garden</a></h1>
+      </div>
+      <p class="brand-tag">a digital garden by Mara Okonkwo</p>
+
+      <div class="search-box">
+        <span class="s-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="note-search" placeholder="Search notes  (press /)" aria-label="Search notes" autocomplete="off">
+        <ul class="search-results" id="search-results" aria-live="polite"></ul>
+      </div>
+
+      <nav aria-label="Garden navigation">
+      <p class="nav-section">Home</p>
+      <ul class="nav-list"><li><a href="index.html" class=""><span class="ripe">🌱</span><span>Start Here · MOC</span></a></li>
+      <li><a href="tags.html" class=""><span class="ripe">🏷️</span><span>Tags &amp; Index</span></a></li></ul>
+      
+        <p class="nav-section">Distributed Systems</p>
+        <ul class="nav-list">
+          <li><a href="idempotency-is-a-superpower.html" class="current"><span class="ripe">🌳</span><span>Idempotency Is a Superpower</span></a></li>
+          <li><a href="the-two-generals-problem.html" class=""><span class="ripe">🌿</span><span>The Two Generals Problem</span></a></li>
+          <li><a href="why-i-stopped-trusting-wall-clocks.html" class=""><span class="ripe">🌿</span><span>Why I Stopped Trusting Wall Clocks</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Knowledge &amp; Notes</p>
+        <ul class="nav-list">
+          <li><a href="on-tending-a-digital-garden.html" class=""><span class="ripe">🌳</span><span>On Tending a Digital Garden</span></a></li>
+          <li><a href="evergreen-notes.html" class=""><span class="ripe">🌳</span><span>Evergreen Notes</span></a></li>
+          <li><a href="book-how-to-take-smart-notes.html" class=""><span class="ripe">🌿</span><span>Book — How to Take Smart Notes</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Stoicism</p>
+        <ul class="nav-list">
+          <li><a href="the-dichotomy-of-control.html" class=""><span class="ripe">🌳</span><span>The Dichotomy of Control</span></a></li>
+          <li><a href="amor-fati.html" class=""><span class="ripe">🌿</span><span>Amor Fati</span></a></li>
+        </ul>
+      
+        <p class="nav-section">The Garden</p>
+        <ul class="nav-list">
+          <li><a href="compost-is-a-distributed-system.html" class=""><span class="ripe">🌿</span><span>Compost Is a Distributed System</span></a></li>
+          <li><a href="three-sisters-planting.html" class=""><span class="ripe">🌰</span><span>Three Sisters Planting</span></a></li>
+        </ul>
+      </nav>
+
+      <button class="theme-toggle" type="button" aria-pressed="false">☾ <span>Dark</span></button>
+    </aside>
+    <main class="content" id="main">
+      <article class="note">
+        <p class="breadcrumb"><a href="index.html">🌱 Garden</a> &nbsp;›&nbsp; Idempotency Is a Superpower</p>
+        <h1>Idempotency Is a Superpower</h1>
+        <div class="note-meta">
+          <span class="ripeness evergreen">🌳 Evergreen</span>
+          <span class="dot"></span>
+          <span>planted Mar 1, 2024</span>
+          <span class="dot"></span>
+          <span>tended Jun 10, 2026</span>
+        </div>
+        <div class="tag-list"><a class="tag" href="tags.html#evergreen">#evergreen</a><a class="tag" href="tags.html#distributed-systems">#distributed-systems</a><a class="tag" href="tags.html#engineering">#engineering</a></div>
+        <div class="prose">
+
+<p>An operation is <strong>idempotent</strong> if doing it twice has the same effect as doing it once. <code>DELETE /users/42</code> is idempotent. <code>POST /charge?amount=50</code> usually is not — and that difference is the cause of a depressing fraction of all production incidents.</p>
+<p>This is, for my money, the single highest-leverage idea in distributed systems, because it dissolves a problem that is otherwise <em>unsolvable</em>: in any system that can drop or duplicate messages, you cannot know whether your request actually happened. See <a class="internal" data-slug="the-two-generals-problem" href="the-two-generals-problem.html">The Two Generals Problem</a> for the proof that this uncertainty is fundamental, not a bug you can fix with a better network.</p>
+<h2 id="unavoid">Why it's unavoidable <a class="anchor" href="#unavoid">#</a></h2>
+<p>The classic failure: a client sends "charge $50," the charge succeeds, but the <em>acknowledgement</em> is lost. The client, seeing no ACK, retries. Now the customer is charged twice. You cannot remove this risk by retrying <em>less</em> (you'll lose legitimate charges) or retrying <em>more</em> (you'll double-charge). The only escape is to make the <em>operation</em> safe to repeat.</p>
+<h2 id="keys">The pattern: idempotency keys <a class="anchor" href="#keys">#</a></h2>
+<pre><code><span class="tok-kw">def</span> <span class="tok-fn">charge</span>(idempotency_key: <span class="tok-kw">str</span>, amount_cents: <span class="tok-kw">int</span>):
+    <span class="tok-com"># First writer wins; the unique index is the source of truth.</span>
+    existing = db.charges.find_one({<span class="tok-str">"key"</span>: idempotency_key})
+    <span class="tok-kw">if</span> existing:
+        <span class="tok-kw">return</span> existing            <span class="tok-com"># replay the original result, do nothing new</span>
+
+    result = payment_gateway.charge(amount_cents)
+    db.charges.insert_one({        <span class="tok-com"># unique index on `key` makes the race safe</span>
+        <span class="tok-str">"key"</span>: idempotency_key,
+        <span class="tok-str">"amount"</span>: amount_cents,
+        <span class="tok-str">"result"</span>: result,
+    })
+    <span class="tok-kw">return</span> result</code></pre>
+<p>The client generates the key <em>once</em> (a UUID per logical attempt) and reuses it across retries. The server promises: same key → same outcome, exactly once. Stripe's API is built entirely on this idea, and it's why you can hammer retry on a flaky connection without fear.</p>
+<h2 id="deeper">The deeper move <a class="anchor" href="#deeper">#</a></h2>
+<p>Idempotency works by <strong>shifting the burden from delivery to identity</strong>. You stop trying to guarantee "this message arrives exactly once" (impossible — see <a class="internal" data-slug="the-two-generals-problem" href="the-two-generals-problem.html">The Two Generals Problem</a>) and instead guarantee "this <em>intent</em> is applied exactly once." Delivery becomes at-least-once, which networks <em>can</em> provide, and dedup happens at the destination.</p>
+<h2 id="where">Where else this shows up <a class="anchor" href="#where">#</a></h2>
+<ul>
+  <li><strong>Database migrations</strong> should be re-runnable. <code>CREATE TABLE IF NOT EXISTS</code>.</li>
+  <li><strong>Infrastructure-as-code</strong> (Terraform) is desired-state, i.e. idempotent by design.</li>
+  <li><strong>My compost bin</strong>, genuinely — see <a class="internal" data-slug="compost-is-a-distributed-system" href="compost-is-a-distributed-system.html">Compost Is a Distributed System</a>. Throwing in a banana peel twice doesn't break the pile; the system converges on the same end state.</li>
+</ul>
+<h2 id="stoic">The Stoic footnote <a class="anchor" href="#stoic">#</a></h2>
+<p>There's a quiet <a class="internal" data-slug="the-dichotomy-of-control" href="the-dichotomy-of-control.html">The Dichotomy of Control</a> lesson here. You can't control whether the network delivers your message. You <em>can</em> control whether your system is harmed by not knowing. Designing for "I may have to do this again and that must be fine" is the engineering form of "focus on what's up to you."</p>
+        </div>
+
+      <section class="backlinks" aria-labelledby="bl-h">
+        <h2 id="bl-h">Linked references</h2>
+        <p class="bl-sub">8 notes link to this one.</p>
+        <ul>
+        <li><a class="internal" data-slug="index" href="index.html">Start Here</a><div class="bl-ctx">The MOC calls it the clearest expression of the garden's throughline.</div></li>
+        <li><a class="internal" data-slug="evergreen-notes" href="evergreen-notes.html">Evergreen Notes</a><div class="bl-ctx">Used as the example of a linkable, atomic, concept-titled note.</div></li>
+        <li><a class="internal" data-slug="book-how-to-take-smart-notes" href="book-how-to-take-smart-notes.html">Book — How to Take Smart Notes</a><div class="bl-ctx">Links to <strong>Idempotency Is a Superpower</strong>.</div></li>
+        <li><a class="internal" data-slug="the-two-generals-problem" href="the-two-generals-problem.html">The Two Generals Problem</a><div class="bl-ctx">Named as the industrial escape hatch from the impossibility result.</div></li>
+        <li><a class="internal" data-slug="why-i-stopped-trusting-wall-clocks" href="why-i-stopped-trusting-wall-clocks.html">Why I Stopped Trusting Wall Clocks</a><div class="bl-ctx">Cited for using an explicit key instead of "most recent timestamp" to dedup.</div></li>
+        <li><a class="internal" data-slug="the-dichotomy-of-control" href="the-dichotomy-of-control.html">The Dichotomy of Control</a><div class="bl-ctx">Held up as engineering compiled down from "focus on what is up to you."</div></li>
+        <li><a class="internal" data-slug="amor-fati" href="amor-fati.html">Amor Fati</a><div class="bl-ctx">The duplicate-charge bug that taught this is called "genuinely, a gift."</div></li>
+        <li><a class="internal" data-slug="compost-is-a-distributed-system" href="compost-is-a-distributed-system.html">Compost Is a Distributed System</a><div class="bl-ctx">The compost pile is described as idempotent in exactly this sense.</div></li>
+        </ul>
+      </section>
+      </article>
+    </main>
+
+    <aside class="right-rail">
+      <div class="rail-card">
+        <p class="rail-title">On this page</p>
+        <ul class="toc">
+          <li class=""><a href="#unavoid">Why it's unavoidable</a></li>
+          <li class=""><a href="#keys">The pattern: idempotency keys</a></li>
+          <li class=""><a href="#deeper">The deeper move</a></li>
+          <li class=""><a href="#where">Where else this shows up</a></li>
+          <li class=""><a href="#stoic">The Stoic footnote</a></li>
+        </ul>
+      </div>
+      <div class="rail-card">
+        <p class="rail-title">Graph view</p>
+        <svg id="graph" class="graph-svg" data-current="idempotency-is-a-superpower" role="img" aria-label="Graph of how notes in the garden connect"></svg>
+        <p class="graph-hint">Hover a node to spotlight its links. Click to jump.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-foot">
+    <span>🌱 Mara's Garden · tended on Sundays · last commit Jun 19, 2026</span>
+    <span>Built with <a href="quartz.config.ts">Quartz 4</a> from the markdown in <code style="font-family:var(--font-mono);font-size:.8rem">notes/</code> · <a href="https://github.com">source</a></span>
+  </footer>
+  <script src="js/garden.js"></script>
+</body>
+</html>

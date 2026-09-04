@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/amzn/style-dictionary/main/schema.json",
+  "source": ["tokens/src/**/*.json"],
+  "platforms": {
+    "css": {
+      "transformGroup": "css",
+      "prefix": "halo",
+      "buildPath": "packages/tokens/dist/",
+      "files": [
+        {
+          "destination": "halo.css",
+          "format": "css/variables",
+          "options": { "outputReferences": true }
+        }
+      ]
+    },
+    "js": {
+      "transformGroup": "js",
+      "prefix": "halo",
+      "buildPath": "packages/tokens/dist/",
+      "files": [
+        { "destination": "tokens.js", "format": "javascript/es6" },
+        { "destination": "tokens.d.ts", "format": "typescript/es6-declarations" }
+      ]
+    },
+    "report": {
+      "transformGroup": "css",
+      "buildPath": "tokens/report/",
+      "files": [
+        {
+          "destination": "contrast.html",
+          "format": "halo/contrast-matrix",
+          "comment": "Custom format: grades every semantic role pairing against WCAG 2.2 AA."
+        }
+      ]
+    }
+  }
+}

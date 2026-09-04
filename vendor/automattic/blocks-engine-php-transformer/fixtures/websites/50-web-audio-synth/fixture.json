@@ -1,0 +1,12 @@
+{
+  "fixture_class": "canvas/webgl/audio/runtime-heavy",
+  "tags": [
+    "synth",
+    "web-audio",
+    "audio",
+    "music",
+    "canvas",
+    "instrument"
+  ],
+  "complexity": 5
+}

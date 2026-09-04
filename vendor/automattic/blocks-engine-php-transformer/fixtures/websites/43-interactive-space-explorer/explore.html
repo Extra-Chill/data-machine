@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AETHELON — Interactive Saturn System Explorer</title>
+  <meta name="description" content="Click through the moons of Saturn — Enceladus, Titan, Dione, Tethys — and read each world's physical data in the AETHELON interactive system explorer.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="scroll-progress" aria-hidden="true"></div>
+  <canvas class="starfield" aria-hidden="true"></canvas>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="AETHELON home">
+      <span class="logo-mark">AETHELON</span>
+      <span class="logo-sub">Mission to Enceladus</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main">
+      <a href="index.html">Journey</a>
+      <a href="mission.html">Mission</a>
+      <a href="explore.html">Explore</a>
+      <a href="data.html">Science</a>
+      <a href="explore.html" class="nav-cta">Launch Explorer</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="wrap">
+        <p class="eyebrow reveal" style="justify-content:center">Interactive · The Saturn system</p>
+        <h1 class="reveal" data-delay="1">Explore the worlds</h1>
+        <p class="reveal" data-delay="2">Select a body on the map to read its physical data. Each is a stop on AETHELON's journey — a gravity assist, a survey target, or the prime objective itself.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="explorer">
+          <!-- clickable system map -->
+          <div class="explorer-map reveal">
+            <svg viewBox="0 0 600 520" role="group" aria-label="Map of Saturn and its major moons — select a body">
+              <defs>
+                <radialGradient id="m-saturn" cx="0.4" cy="0.35" r="0.8"><stop offset="0" stop-color="#f4e2af"/><stop offset="0.6" stop-color="#d8b56a"/><stop offset="1" stop-color="#8a6a32"/></radialGradient>
+                <radialGradient id="m-enc" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ffffff"/><stop offset="0.5" stop-color="#bfeaff"/><stop offset="1" stop-color="#5a8fa8"/></radialGradient>
+                <radialGradient id="m-titan" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ffe6b0"/><stop offset="0.5" stop-color="#d8a24a"/><stop offset="1" stop-color="#7a5520"/></radialGradient>
+                <radialGradient id="m-dione" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ffffff"/><stop offset="0.5" stop-color="#cfd6e0"/><stop offset="1" stop-color="#6b7280"/></radialGradient>
+                <radialGradient id="m-tethys" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ffffff"/><stop offset="0.5" stop-color="#e6ecf2"/><stop offset="1" stop-color="#8a93a3"/></radialGradient>
+              </defs>
+
+              <!-- orbit guides -->
+              <circle cx="120" cy="260" r="120" fill="none" stroke="rgba(150,180,255,.12)" stroke-width="1" stroke-dasharray="2 6"/>
+              <circle cx="120" cy="260" r="180" fill="none" stroke="rgba(150,180,255,.12)" stroke-width="1" stroke-dasharray="2 6"/>
+              <circle cx="120" cy="260" r="250" fill="none" stroke="rgba(150,180,255,.12)" stroke-width="1" stroke-dasharray="2 6"/>
+              <circle cx="120" cy="260" r="340" fill="none" stroke="rgba(150,180,255,.12)" stroke-width="1" stroke-dasharray="2 6"/>
+
+              <!-- Saturn (selectable) -->
+              <g class="body-node" data-body="saturn" aria-label="Saturn">
+                <circle class="body-halo" cx="120" cy="260" r="74" fill="none" stroke="#ffd479" stroke-width="2"/>
+                <ellipse cx="120" cy="260" rx="92" ry="24" fill="none" stroke="#e3c98a" stroke-width="5" opacity="0.5"/>
+                <circle cx="120" cy="260" r="48" fill="url(#m-saturn)"/>
+                <ellipse cx="120" cy="260" rx="92" ry="24" fill="none" stroke="#f4e2af" stroke-width="2" opacity="0.6"/>
+                <text class="body-label" x="120" y="330" text-anchor="middle">SATURN</text>
+              </g>
+
+              <!-- Enceladus -->
+              <g class="body-node selected" data-body="enceladus" aria-label="Enceladus">
+                <circle class="body-halo" cx="240" cy="260" r="26" fill="none" stroke="#7fe7ff" stroke-width="2"/>
+                <circle cx="240" cy="260" r="16" fill="url(#m-enc)"/>
+                <text class="body-label" x="240" y="296" text-anchor="middle">Enceladus</text>
+              </g>
+
+              <!-- Tethys -->
+              <g class="body-node" data-body="tethys" aria-label="Tethys">
+                <circle class="body-halo" cx="300" cy="260" r="24" fill="none" stroke="#e6ecf2" stroke-width="2"/>
+                <circle cx="300" cy="260" r="14" fill="url(#m-tethys)"/>
+                <text class="body-label" x="300" y="294" text-anchor="middle">Tethys</text>
+              </g>
+
+              <!-- Dione -->
+              <g class="body-node" data-body="dione" aria-label="Dione">
+                <circle class="body-halo" cx="370" cy="260" r="24" fill="none" stroke="#cfd6e0" stroke-width="2"/>
+                <circle cx="370" cy="260" r="15" fill="url(#m-dione)"/>
+                <text class="body-label" x="370" y="296" text-anchor="middle">Dione</text>
+              </g>
+
+              <!-- Titan -->
+              <g class="body-node" data-body="titan" aria-label="Titan">
+                <circle class="body-halo" cx="460" cy="260" r="34" fill="none" stroke="#d8a24a" stroke-width="2"/>
+                <circle cx="460" cy="260" r="24" fill="url(#m-titan)"/>
+                <text class="body-label" x="460" y="304" text-anchor="middle">Titan</text>
+              </g>
+            </svg>
+            <p class="explorer-hint">Tip: bodies are keyboard-focusable — Tab to a world and press Enter.</p>
+          </div>
+
+          <!-- detail panel (populated by explore.js) -->
+          <aside class="explorer-panel reveal" data-delay="1" aria-live="polite">
+            <span class="ptag" data-ptag>Prime objective</span>
+            <h2 data-pname>Enceladus</h2>
+            <p class="ptype" data-ptype>Ice moon · ocean world</p>
+            <div class="pviz"><span class="orb"></span></div>
+            <p class="pdesc" data-pdesc>Loading…</p>
+            <div class="pstats"></div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- context cards -->
+    <section class="section">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <p class="eyebrow">Ocean worlds</p>
+          <h2>Enceladus is not alone.</h2>
+        </div>
+        <div class="grid-3">
+          <div class="card reveal">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M3 12c4 3 14 3 18 0M12 3c-3 4-3 14 0 18"/></svg>
+            <h3>Europa</h3>
+            <p>Jupiter's smooth ice moon hides perhaps twice Earth's volume of liquid water. NASA's Europa Clipper studies it from a sibling trajectory to AETHELON's.</p>
+          </div>
+          <div class="card reveal" data-delay="1">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17c3-2 6-2 9 0s6 2 9 0M3 12c3-2 6-2 9 0s6 2 9 0"/></svg>
+            <h3>Titan</h3>
+            <p>Beneath its hazy nitrogen sky and methane lakes, Titan likely cradles a deep water-ammonia ocean — a second habitable layer on one moon.</p>
+          </div>
+          <div class="card reveal" data-delay="2">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v20M2 12h20" /><circle cx="12" cy="12" r="6"/></svg>
+            <h3>Why ocean worlds</h3>
+            <p>Liquid water, chemical energy and organics are the recipe for life. The outer Solar System turns out to be full of all three — hidden under ice.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <span class="logo-mark">AETHELON</span>
+          <p>An open deep-space outreach project tracing a robotic mission to Enceladus, Saturn's ocean moon. Figures are plausible mission estimates for educational use.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Mission</h4>
+          <a href="mission.html">Timeline</a>
+          <a href="mission.html">Trajectory</a>
+          <a href="data.html">Instruments</a>
+          <a href="explore.html">The system</a>
+        </div>
+        <div class="footer-col">
+          <h4>Science</h4>
+          <a href="data.html">Plume chemistry</a>
+          <a href="data.html">Data archive</a>
+          <a href="explore.html">Ocean worlds</a>
+          <a href="#">Publications</a>
+        </div>
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <a href="#">Newsletter</a>
+          <a href="#">Education kit</a>
+          <a href="#">Press</a>
+          <a href="#">Contact team</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2031 AETHELON Outreach Consortium. Educational fiction. Data are illustrative estimates.</span>
+        <div class="socials">
+          <a href="#" aria-label="Mastodon">Mastodon</a>
+          <a href="#" aria-label="YouTube">YouTube</a>
+          <a href="#" aria-label="GitHub">GitHub</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/site.js"></script>
+  <script src="js/explore.js"></script>
+</body>
+</html>

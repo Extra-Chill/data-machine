@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lattice — How the Formula Engine Works</title>
+  <meta name="description" content="A tour of the Lattice formula engine: tokenizer, recursive-descent parser, the dependency graph, automatic recalculation and circular-reference detection — plus the full function reference.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='5' fill='none' stroke='%232f7d5c' stroke-width='2.4'/%3E%3Cpath d='M3 12h26M3 21h26M12 3v26M21 3v26' stroke='%232f7d5c' stroke-width='1.6' opacity='.7'/%3E%3C/svg%3E">
+</head>
+<body class="content" data-theme="light">
+
+  <header class="top-header">
+    <a class="brand" href="index.html" aria-label="Lattice home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="3" y="3" width="26" height="26" rx="5" fill="none" stroke="var(--accent)" stroke-width="2.4"/>
+        <path d="M3 12h26M3 21h26M12 3v26M21 3v26" stroke="var(--accent)" stroke-width="1.4" opacity=".65"/>
+        <rect x="12" y="12" width="9" height="9" fill="var(--accent)" opacity=".22"/>
+      </svg>
+      <span><span class="brand-name">Latt<b>ice</b></span><br><span class="brand-sub">Formula Sheets</span></span>
+    </a>
+    <nav class="top-nav" aria-label="Primary">
+      <a href="index.html">Sheet</a>
+      <a href="templates.html">Templates</a>
+      <a href="about.html">Formula Engine</a>
+    </nav>
+    <div class="header-spacer"></div>
+    <button class="icon-btn" id="themeToggle" aria-label="Toggle color theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg>
+      <span class="t-label">Light</span>
+    </button>
+  </header>
+
+  <main class="page-wrap">
+    <div class="page-hero">
+      <div class="eyebrow">Under the hood</div>
+      <h1>How the formula engine works</h1>
+      <p>Lattice isn't a styled table — it's a real calculation engine written from scratch in vanilla JavaScript. Type <code>=</code> in any cell and your text is tokenized, parsed into a syntax tree, and evaluated against a live dependency graph. Here's the whole pipeline.</p>
+    </div>
+
+    <div class="prose">
+
+      <h2>1. The pipeline</h2>
+      <p>Every formula travels the same path. Edit cell <code>D5</code> to <code>=B5-C5</code> and Lattice runs:</p>
+      <div class="code-block">
+<span class="cm">// 1 — tokenize: split the raw text into typed tokens</span>
+"<span class="fn">=B5-C5</span>"  →  [ REF "B5", OP "-", REF "C5" ]
+
+<span class="cm">// 2 — parse: recursive descent builds an AST</span>
+{ binary "-", left: ref B5, right: ref C5 }
+
+<span class="cm">// 3 — extract deps: which cells does this read?</span>
+deps = { <span class="res">B5</span>, <span class="res">C5</span> }   <span class="cm">// registered in the dependency graph</span>
+
+<span class="cm">// 4 — evaluate against the sheet, with memoization + cycle guard</span>
+result = value(B5) − value(C5)
+      </div>
+
+      <h2>2. Tokenizer</h2>
+      <p>The tokenizer is a hand-written scanner. It recognises numbers (including <code>1.5e3</code> and a trailing <code>%</code>), quoted strings with escaped <code>""</code>, cell references (<code>A1</code>, <code>$B$2</code>), ranges via <code>:</code>, booleans, every operator, and function names (an identifier immediately followed by <code>(</code>). Anything else becomes a <code>#NAME?</code>.</p>
+
+      <h2>3. Recursive-descent parser</h2>
+      <p>A classic precedence-climbing recursive-descent parser turns tokens into a tree. Each grammar rule is one method, lowest precedence on the outside:</p>
+      <div class="code-block">
+expr      := compare
+compare   := concat   ( (= &lt;&gt; &lt; &gt; &lt;= &gt;=) concat )*
+concat    := additive ( &amp; additive )*
+additive  := term     ( (+ -) term )*
+term      := power    ( (* /) power )*
+power     := unary    ( ^ unary )*        <span class="cm">// right-associative</span>
+unary     := (+|-) unary | postfix
+postfix   := primary  ( % )*
+primary   := NUMBER | STRING | BOOL
+           | REF ( ":" REF )?             <span class="cm">// a cell or a range</span>
+           | NAME "(" args ")"            <span class="cm">// a function call</span>
+           | "(" expr ")"
+      </div>
+      <p>Because precedence is encoded in the call chain, <code>=2+3*4^2</code> correctly evaluates to <code>50</code> (power, then multiply, then add), and parentheses override it: <code>=(2+3)*4</code> is <code>20</code>.</p>
+
+      <h2>4. Dependency graph &amp; recalculation</h2>
+      <p>When a formula compiles, Lattice records the set of cells it reads and adds reverse edges to a dependency graph. A recalculation walks every formula cell and resolves its value <em>lazily and recursively</em>: reading <code>D14</code> (a <code>SUM</code>) pulls each cell in its range, which may themselves be formulas, all the way down. Results are memoised per pass so a cell is never computed twice.</p>
+      <div class="callout"><b>Try it:</b> in the budget template, change <code>C6</code> (Groceries actual). The category difference <code>D6</code>, the <code>% Used</code> in <code>E6</code>, the <code>SUM</code> totals on row 14, the average, the max and the over-budget <code>IF</code> all update in a single pass.</div>
+
+      <h2>5. Circular-reference detection</h2>
+      <p>If <code>A1</code> is <code>=B1</code> and <code>B1</code> is <code>=A1</code>, there's no valid value. Lattice detects this two ways: a recursion stack catches a cell that re-enters itself mid-evaluation, and a depth-first colouring pass over the dependency graph marks every cell on a cycle. Both surface as <code>#CIRC!</code> instead of hanging.</p>
+      <div class="code-block">
+A1: <span class="fn">=B1 + 1</span>      B1: <span class="fn">=A1 * 2</span>
+                    ↓
+A1 → <span class="res">#CIRC!</span>     B1 → <span class="res">#CIRC!</span>   <span class="cm">// the whole cycle is flagged</span>
+      </div>
+
+      <h2>6. Worked examples</h2>
+      <p>These all work in the editor right now — copy one into the formula bar:</p>
+      <table class="fn-table">
+        <thead><tr><th>Formula</th><th>What it does</th><th>Result*</th></tr></thead>
+        <tbody>
+          <tr><td>=SUM(1,2,3,4)</td><td>add a list of numbers</td><td>10</td></tr>
+          <tr><td>=AVERAGE(10,20,30)</td><td>mean, ignoring blanks &amp; text</td><td>20</td></tr>
+          <tr><td>=IF(5&gt;3,"yes","no")</td><td>branch on a comparison</td><td>yes</td></tr>
+          <tr><td>=ROUND(3.14159,2)</td><td>round to 2 decimals</td><td>3.14</td></tr>
+          <tr><td>=CONCAT("Q",1," report")</td><td>join values into text</td><td>Q1 report</td></tr>
+          <tr><td>=2+3*4^2</td><td>operator precedence</td><td>50</td></tr>
+          <tr><td>=COUNTIF(A1:A9,"&gt;100")</td><td>count cells matching a rule</td><td>(range)</td></tr>
+          <tr><td>=IF(AND(B2&gt;0,C2&gt;0),"ok","check")</td><td>nested boolean logic</td><td>ok / check</td></tr>
+          <tr><td>=10/0</td><td>handled error, not a crash</td><td>#DIV/0!</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:var(--ink-faint)">*Numeric results assume the referenced cells are empty in a fresh sheet.</p>
+
+      <h2>7. Full function reference</h2>
+      <p>Lattice ships <strong id="fnCount">50+</strong> functions. Arithmetic <code>+ − * / ^</code>, comparisons, string concat with <code>&amp;</code>, percentages and absolute references (<code>$A$1</code>) are all built in too.</p>
+      <table class="fn-table">
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody id="fnTableBody"></tbody>
+      </table>
+
+      <h2>8. Keyboard shortcuts</h2>
+      <table class="fn-table">
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>Arrows</td><td>Move the active cell</td></tr>
+          <tr><td>Shift + Arrows</td><td>Extend the selection range</td></tr>
+          <tr><td>Ctrl/Cmd + Arrows</td><td>Jump to the edge of the sheet</td></tr>
+          <tr><td>Enter / Tab</td><td>Commit edit &amp; move down / right (Shift reverses)</td></tr>
+          <tr><td>F2 / dbl-click</td><td>Edit the active cell</td></tr>
+          <tr><td>Delete / Backspace</td><td>Clear selected cells</td></tr>
+          <tr><td>Ctrl/Cmd + C / X / V</td><td>Copy / cut / paste (formulas re-base their refs)</td></tr>
+          <tr><td>Ctrl/Cmd + B / I</td><td>Bold / italic</td></tr>
+          <tr><td>Ctrl/Cmd + A</td><td>Select the whole sheet</td></tr>
+          <tr><td>Esc</td><td>Cancel an edit / clear the copy outline</td></tr>
+        </tbody>
+      </table>
+
+      <div class="cta-row">
+        <a class="btn-primary" href="index.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:18px;height:18px"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          Open the editor
+        </a>
+        <a class="btn-ghost" href="templates.html">Browse templates</a>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/formula.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+  (function () {
+    const F = window.Lattice.Formula;
+    const descs = {
+      SUM:'Add all numbers in the arguments / ranges', AVERAGE:'Arithmetic mean of numbers', MIN:'Smallest number', MAX:'Largest number',
+      PRODUCT:'Multiply all numbers', MEDIAN:'Middle value when sorted',
+      COUNT:'Count of numeric cells', COUNTA:'Count of non-empty cells', COUNTIF:'Count cells matching a criterion', SUMIF:'Sum cells matching a criterion',
+      IF:'Return one value if true, another if false', IFERROR:'Fallback value when the first argument errors',
+      AND:'TRUE if every argument is true', OR:'TRUE if any argument is true', NOT:'Logical negation', TRUE:'The boolean true', FALSE:'The boolean false',
+      ROUND:'Round to N decimal places', ROUNDUP:'Round away from zero', ROUNDDOWN:'Round toward zero', INT:'Round down to an integer',
+      ABS:'Absolute value', SQRT:'Square root', POWER:'Base raised to an exponent', MOD:'Remainder of division', CEILING:'Round up to an integer',
+      FLOOR:'Round down to an integer', PI:'The constant π', SIGN:'-1, 0 or 1 by sign',
+      CONCAT:'Join values into one string', CONCATENATE:'Alias of CONCAT', LEN:'Length of text', LOWER:'Lower-case text', UPPER:'Upper-case text',
+      TRIM:'Collapse runs of whitespace', LEFT:'Leftmost N characters', RIGHT:'Rightmost N characters', MID:'Substring from a position',
+      REPT:'Repeat text N times', TEXT:'Format a number with N decimals', VALUE:'Convert text to a number',
+      TODAY:"Today's date (serial)", NOW:'Current date/time (serial)', YEAR:'Year of a date', MONTH:'Month of a date', DAY:'Day of a date', DATE:'Build a date from y, m, d',
+    };
+    const body = document.getElementById('fnTableBody');
+    F.FUNC_NAMES.forEach(name => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${name}()</td><td>${descs[name] || '—'}</td>`;
+      body.appendChild(tr);
+    });
+    document.getElementById('fnCount').textContent = F.FUNC_NAMES.length;
+  })();
+  </script>
+</body>
+</html>

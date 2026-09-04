@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tideglass — a web terminal that runs on nothing but a browser tab</title>
+  <meta name="description" content="Tideglass is a fully client-side Unix-style shell with a virtual filesystem, real pipes and redirects, tab completion, history, and a handful of fun commands. Open index.html and start typing.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/terminal.css">
+</head>
+<body class="is-app" data-scheme="harbor">
+
+  <!-- ══════════════ SHARED HEADER ══════════════ -->
+  <header class="app-header" role="banner">
+    <a href="index.html" class="brand" aria-label="Tideglass home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="2" y="4" width="28" height="24" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M7 12 L11 16 L7 20" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="14" y1="20" x2="22" y2="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-word">Tide<b>glass</b></span>
+    </a>
+
+    <nav class="app-nav" aria-label="Primary">
+      <a href="index.html" class="active" aria-current="page">Terminal</a>
+      <a href="docs.html">Docs</a>
+      <a href="about.html">About</a>
+    </nav>
+
+    <div class="app-tools" role="group" aria-label="Appearance">
+      <label class="tool">
+        <span class="tool-label">Theme</span>
+        <select id="scheme-select" aria-label="Color scheme">
+          <option value="harbor">Harbor</option>
+          <option value="amber">Amber</option>
+          <option value="phosphor">Phosphor</option>
+          <option value="paper">Paper</option>
+          <option value="grape">Grape</option>
+        </select>
+      </label>
+      <label class="tool toggle-tool" title="CRT scanline effect (disabled if you prefer reduced motion)">
+        <input type="checkbox" id="crt-toggle">
+        <span class="tool-label">CRT</span>
+      </label>
+      <div class="tool font-tool" role="group" aria-label="Font size">
+        <button id="font-dec" type="button" aria-label="Decrease font size">A−</button>
+        <button id="font-inc" type="button" aria-label="Increase font size">A+</button>
+      </div>
+      <button id="reset-fs" type="button" class="reset-btn" title="Restore the original seeded filesystem">Reset FS</button>
+    </div>
+  </header>
+
+  <!-- ══════════════ TERMINAL ══════════════ -->
+  <main class="term-main">
+    <div class="term-window" id="terminal">
+      <div class="term-titlebar" aria-hidden="true">
+        <span class="tb-dots"><i></i><i></i><i></i></span>
+        <span class="tb-title">mara@harborlight: ~ — glass</span>
+        <span class="tb-spacer"></span>
+        <span class="tb-hint">click to focus · Tab completes · Ctrl+R searches</span>
+      </div>
+
+      <div class="term-screen" id="screen" role="log" aria-live="polite" aria-label="Terminal output">
+        <div class="term-output" id="output"></div>
+        <div class="term-input-line" id="input-line">
+          <span class="term-prompt" id="prompt"></span>
+          <span class="term-edit" id="edit"><span class="cursor" id="cursor">&nbsp;</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- hidden field that actually receives keystrokes (keyboard a11y) -->
+    <input id="capture" class="capture" type="text" autocomplete="off" autocorrect="off"
+           autocapitalize="off" spellcheck="false" aria-label="Terminal command input"
+           inputmode="text">
+
+    <aside class="cheatsheet" aria-label="Quick reference">
+      <h2>Quick keys</h2>
+      <ul>
+        <li><kbd>Tab</kbd> complete command / path</li>
+        <li><kbd>↑</kbd> <kbd>↓</kbd> history</li>
+        <li><kbd>Ctrl</kbd>+<kbd>R</kbd> reverse search</li>
+        <li><kbd>Ctrl</kbd>+<kbd>A</kbd>/<kbd>E</kbd> line start / end</li>
+        <li><kbd>Ctrl</kbd>+<kbd>U</kbd>/<kbd>K</kbd> kill before / after</li>
+        <li><kbd>Ctrl</kbd>+<kbd>W</kbd> delete word</li>
+        <li><kbd>Ctrl</kbd>+<kbd>L</kbd> clear screen</li>
+      </ul>
+      <h2>Try these</h2>
+      <ul class="try">
+        <li><code>tour</code></li>
+        <li><code>find . -name "*.md" | wc -l</code></li>
+        <li><code>grep WARN logs/tidewatch.log</code></li>
+        <li><code>find . -name "*.toml"</code></li>
+        <li><code>cat notes/todo.md | tail -3</code></li>
+        <li><code>fortune | cowsay</code></li>
+        <li><code>neofetch</code></li>
+        <li><code>echo "hi $USER" &gt; hi.txt &amp;&amp; cat hi.txt</code></li>
+      </ul>
+      <p class="cheatsheet-note">Everything is in-memory and saved to <code>localStorage</code>. Use <b>Reset&nbsp;FS</b> to start over.</p>
+    </aside>
+  </main>
+
+  <footer class="app-footer">
+    <span>Tideglass v1.4 · a fictional product, built in vanilla HTML/CSS/JS</span>
+    <span>No servers were contacted in the making of this shell.</span>
+  </footer>
+
+  <!-- modules, in dependency order -->
+  <script src="js/fs.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/commands.js"></script>
+  <script src="js/shell.js"></script>
+</body>
+</html>

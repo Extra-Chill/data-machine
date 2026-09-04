@@ -1,0 +1,13 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "event",
+    "conference",
+    "landing",
+    "has-form",
+    "has-nav",
+    "multipage",
+    "schedule"
+  ],
+  "complexity": 2
+}

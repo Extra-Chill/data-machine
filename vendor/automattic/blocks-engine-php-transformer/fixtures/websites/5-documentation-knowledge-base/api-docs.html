@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Reference — PocketRoute Docs</title>
+  <meta name="description" content="PocketRoute REST API reference — authenticate, create routes, manage drivers, and subscribe to webhook events.">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .toc-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .toc-list a {
+      font-family: var(--font-mono);
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      border-left: 2px solid transparent;
+      transition: color var(--t), background var(--t), border-color var(--t);
+      line-height: 1.35;
+    }
+    .toc-list a:hover { color: var(--text-secondary); border-left-color: var(--border-strong); }
+    .toc-list a.toc-active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+
+    .toc-sub {
+      padding-left: 12px;
+      margin-top: 2px;
+    }
+    .toc-sub a {
+      font-size: 0.68rem;
+      padding: 3px 12px;
+    }
+
+    .api-section {
+      margin-bottom: 56px;
+      scroll-margin-top: calc(var(--header-h) + 16px);
+    }
+
+    .endpoint-section {
+      margin-bottom: 44px;
+    }
+
+    .endpoint-section h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+
+    .api-key-display {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #080d12;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+
+    .api-key-label {
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .api-key-value {
+      color: var(--accent-light);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .api-key-btn {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      padding: 4px 10px;
+      background: var(--bg-raised);
+      color: var(--text-muted);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+      transition: all var(--t);
+    }
+    .api-key-btn:hover { color: var(--teal); border-color: var(--teal); background: var(--teal-dim); }
+
+    .response-block {
+      margin: 16px 0;
+    }
+
+    .rate-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .rate-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .rate-plan {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .rate-val {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--accent);
+      display: block;
+    }
+
+    .rate-unit {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      display: block;
+      margin-top: 2px;
+    }
+
+    .webhook-event {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .webhook-event:last-child { border-bottom: none; }
+    .webhook-event-name {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-light);
+      min-width: 200px;
+      flex-shrink: 0;
+    }
+    .webhook-event-desc {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .base-url-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(240,130,42,0.2);
+      border-radius: var(--radius);
+      margin-bottom: 28px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+    .base-url-label {
+      color: var(--accent);
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .base-url-val { color: var(--text-primary); }
+  </style>
+</head>
+<body>
+
+<!-- ─── HEADER ─────────────────────────────────────────── -->
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a href="index.html" class="site-logo">
+      <span class="logo-icon">
+        <svg width="26" height="20" viewBox="0 0 26 20" fill="none" aria-hidden="true">
+          <circle cx="3.5" cy="16" r="3" fill="currentColor"/>
+          <circle cx="22.5" cy="4" r="3" fill="currentColor"/>
+          <path d="M6 14.5 C10 9, 16 11, 20 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <circle cx="10.8" cy="11.2" r="1.2" fill="currentColor" opacity="0.5"/>
+          <circle cx="15.5" cy="9.8" r="1.2" fill="currentColor" opacity="0.5"/>
+        </svg>
+      </span>
+      <span class="logo-wordmark">
+        <span>PocketRoute</span>
+        <span>Documentation</span>
+      </span>
+    </a>
+
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting Started</a>
+      <a href="release-notes.html">Releases</a>
+      <a href="api-docs.html" class="active">API</a>
+      <a href="contact.html">Support</a>
+    </nav>
+
+    <div class="header-right">
+      <span class="version-badge">v2.4.1</span>
+      <a href="#" class="btn-open-app">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+        </svg>
+        <span>Open App</span>
+      </a>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" id="nav-toggle">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="nav-overlay" id="nav-overlay" aria-hidden="true"></div>
+<nav class="nav-drawer" id="nav-drawer" aria-label="Mobile navigation">
+  <div class="nav-drawer-links">
+    <a href="index.html">Home</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="troubleshooting.html">Troubleshooting</a>
+    <a href="release-notes.html">Release Notes</a>
+    <a href="api-docs.html" class="active">API Docs</a>
+    <a href="contact.html">Contact Support</a>
+  </div>
+</nav>
+
+<!-- ─── PAGE LAYOUT ────────────────────────────────────── -->
+<div class="page-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar" aria-label="Documentation navigation">
+    <div class="sidebar-section">
+      <p class="sidebar-label">Navigation</p>
+      <nav class="sidebar-nav">
+        <a href="index.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Home
+        </a>
+        <a href="getting-started.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+          Getting Started
+        </a>
+        <a href="troubleshooting.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Troubleshooting
+        </a>
+        <a href="release-notes.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Release Notes
+        </a>
+        <a href="api-docs.html" class="active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          API Reference
+        </a>
+        <a href="contact.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Contact Support
+        </a>
+      </nav>
+    </div>
+
+    <div class="sidebar-section">
+      <p class="sidebar-label">On this page</p>
+      <nav class="toc-list" aria-label="API reference sections">
+        <a href="#overview" class="toc-active">Overview</a>
+        <a href="#auth">Authentication</a>
+        <a href="#routes">Routes</a>
+        <div class="toc-sub">
+          <a href="#get-routes">GET /v1/routes</a>
+          <a href="#post-routes">POST /v1/routes</a>
+          <a href="#get-route-id">GET /v1/routes/:id</a>
+          <a href="#patch-route-id">PATCH /v1/routes/:id</a>
+        </div>
+        <a href="#drivers">Drivers</a>
+        <div class="toc-sub">
+          <a href="#get-drivers">GET /v1/drivers</a>
+        </div>
+        <a href="#webhooks">Webhooks</a>
+        <a href="#errors">Errors</a>
+        <a href="#rate-limits">Rate Limits</a>
+      </nav>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content" id="main-content">
+
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="index.html">Docs</a>
+      <span class="breadcrumb-sep" aria-hidden="true">/</span>
+      <span aria-current="page">API Reference</span>
+    </nav>
+
+    <header class="article-header">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span class="popular-tag tag-feature" style="font-size: 0.65rem;">API v1</span>
+        <span class="popular-tag" style="font-size: 0.65rem; background: rgba(82,217,138,0.1); color: var(--green); border: 1px solid rgba(82,217,138,0.2);">GA</span>
+      </div>
+      <h1>API Reference</h1>
+      <div class="article-meta">
+        <span class="article-meta-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          REST API — v1
+        </span>
+        <span class="article-meta-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Team plan required for API access
+        </span>
+      </div>
+    </header>
+
+    <!-- Overview -->
+    <section class="api-section" id="overview">
+      <h2 class="article-body" style="font-size: 1.3rem; margin-bottom: 12px;">Overview</h2>
+
+      <p style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.75; margin-bottom: 20px;">
+        The PocketRoute API is a RESTful HTTP API that lets you automate route creation, driver assignment, and delivery tracking from your own systems. All requests and responses use JSON. The API is available on Growth (read-only) and Team (full access) plans.
+      </p>
+
+      <div class="base-url-bar" aria-label="API base URL">
+        <span class="base-url-label">Base URL</span>
+        <code class="base-url-val">https://api.pocketroute.io/v1</code>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">shell</span>
+          <span class="code-block-title">Quick start — list your routes</span>
+          <button class="copy-btn" data-copy="curl -s https://api.pocketroute.io/v1/routes \
+  -H &quot;Authorization: Bearer pr_live_xxxxxxxxxxxxxxxxxxxx&quot; \
+  -H &quot;Content-Type: application/json&quot;" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><code class="block"><span class="c-method">curl</span> -s https://api.pocketroute.io/v1/routes \
+  -H <span class="c-string">"Authorization: Bearer pr_live_xxxxxxxxxxxxxxxxxxxx"</span> \
+  -H <span class="c-string">"Content-Type: application/json"</span></code></pre>
+      </div>
+    </section>
+
+    <!-- Auth -->
+    <section class="api-section" id="auth">
+      <h2 style="font-size: 1.3rem; font-family: var(--font-display); font-weight: 700; margin-bottom: 12px;">Authentication</h2>
+
+      <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.75; margin-bottom: 16px;">
+        All API requests are authenticated using a Bearer token in the <code class="inline">Authorization</code> header. Generate API keys from <strong>Settings → Developers → API Keys</strong> in your dashboard.
+      </p>
+
+      <div class="api-key-display" aria-label="Example API key">
+        <span class="api-key-label">LIVE KEY</span>
+        <span class="api-key-value">pr_live_a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9</span>
+        <button class="api-key-btn" onclick="this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 1500);">Copy</button>
+      </div>
+
+      <div class="callout callout-warn" style="margin-top: 16px;">
+        <span class="callout-label">Keep keys secret</span>
+        <p>API keys carry full account access. Never expose them in client-side code, public repositories, or log files. Use environment variables. If a key is compromised, rotate it immediately from the dashboard.</p>
+      </div>
+
+      <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 16px;">
+        Keys are prefixed with <code class="inline">pr_live_</code> for production or <code class="inline">pr_test_</code> for the sandbox environment. Test mode routes are not dispatched to real drivers.
+      </p>
+    </section>
+
+    <!-- Routes -->
+    <section class="api-section" id="routes">
+      <h2 style="font-size: 1.3rem; font-family: var(--font-display); font-weight: 700; margin-bottom: 24px;">Routes</h2>
+
+      <!-- GET /v1/routes -->
+      <div class="endpoint-section" id="get-routes">
+        <h3>List Routes</h3>
+        <div class="endpoint-bar">
+          <span class="method-badge method-get">GET</span>
+          <code class="endpoint-path">/v1/routes</code>
+        </div>
+
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 16px;">Returns a paginated list of routes for your account, ordered by creation date descending.</p>
+
+        <h4 style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Query Parameters</h4>
+        <table class="param-table" aria-label="GET /v1/routes query parameters">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>status</td>
+              <td><code class="inline">string</code></td>
+              <td>Filter by status. One of: <code class="inline">draft</code>, <code class="inline">assigned</code>, <code class="inline">dispatched</code>, <code class="inline">in_progress</code>, <code class="inline">completed</code>, <code class="inline">cancelled</code>.</td>
+            </tr>
+            <tr>
+              <td>driver_id</td>
+              <td><code class="inline">string</code></td>
+              <td>Filter routes assigned to a specific driver.</td>
+            </tr>
+            <tr>
+              <td>date</td>
+              <td><code class="inline">string</code></td>
+              <td>ISO 8601 date (<code class="inline">YYYY-MM-DD</code>). Returns routes scheduled for this date.</td>
+            </tr>
+            <tr>
+              <td>limit</td>
+              <td><code class="inline">integer</code></td>
+              <td>Number of results per page. Default: <code class="inline">20</code>. Max: <code class="inline">100</code>.</td>
+            </tr>
+            <tr>
+              <td>cursor</td>
+              <td><code class="inline">string</code></td>
+              <td>Pagination cursor from the previous response's <code class="inline">next_cursor</code> field.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">shell</span>
+            <span class="code-block-title">Example request</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="block"><span class="c-method">curl</span> -s <span class="c-string">"https://api.pocketroute.io/v1/routes?status=dispatched&limit=5"</span> \
+  -H <span class="c-string">"Authorization: Bearer $POCKETROUTE_KEY"</span></code></pre>
+        </div>
+
+        <div class="code-block response-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">json</span>
+            <span class="code-block-title">200 Response</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="block">{
+  <span class="c-key">"data"</span>: [
+    {
+      <span class="c-key">"id"</span>: <span class="c-string">"r_a1b2c3d4e5f6"</span>,
+      <span class="c-key">"status"</span>: <span class="c-string">"dispatched"</span>,
+      <span class="c-key">"driver_id"</span>: <span class="c-string">"drv_78gh90ij"</span>,
+      <span class="c-key">"stop_count"</span>: <span class="c-num">24</span>,
+      <span class="c-key">"completed_stops"</span>: <span class="c-num">8</span>,
+      <span class="c-key">"estimated_duration_min"</span>: <span class="c-num">187</span>,
+      <span class="c-key">"scheduled_date"</span>: <span class="c-string">"2025-06-17"</span>,
+      <span class="c-key">"dispatched_at"</span>: <span class="c-string">"2025-06-17T08:32:11Z"</span>,
+      <span class="c-key">"created_at"</span>: <span class="c-string">"2025-06-16T22:14:09Z"</span>
+    }
+  ],
+  <span class="c-key">"has_more"</span>: <span class="c-method">true</span>,
+  <span class="c-key">"next_cursor"</span>: <span class="c-string">"cur_eyJvZmZzZXQiOjV9"</span>
+}</code></pre>
+        </div>
+      </div>
+
+      <!-- POST /v1/routes -->
+      <div class="endpoint-section" id="post-routes">
+        <h3>Create a Route</h3>
+        <div class="endpoint-bar">
+          <span class="method-badge method-post">POST</span>
+          <code class="endpoint-path">/v1/routes</code>
+        </div>
+
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 16px;">Creates a new route. Optionally runs optimization and dispatches to a driver in one call.</p>
+
+        <h4 style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Request Body</h4>
+        <table class="param-table" aria-label="POST /v1/routes request body parameters">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>stops <span class="required-badge" aria-label="required">req</span></td>
+              <td><code class="inline">array</code></td>
+              <td>Array of stop objects. Each must include <code class="inline">address</code>. Optional: <code class="inline">recipient</code>, <code class="inline">notes</code>, <code class="inline">time_from</code>, <code class="inline">time_to</code>, <code class="inline">phone</code>.</td>
+            </tr>
+            <tr>
+              <td>origin <span class="required-badge" aria-label="required">req</span></td>
+              <td><code class="inline">string</code></td>
+              <td>Starting address (depot or warehouse).</td>
+            </tr>
+            <tr>
+              <td>driver_id</td>
+              <td><code class="inline">string</code></td>
+              <td>Assign to a driver. Include <code class="inline">"dispatch": true</code> to also dispatch immediately.</td>
+            </tr>
+            <tr>
+              <td>dispatch</td>
+              <td><code class="inline">boolean</code></td>
+              <td>If <code class="inline">true</code> and <code class="inline">driver_id</code> is set, dispatches the route immediately after creation. Default: <code class="inline">false</code>.</td>
+            </tr>
+            <tr>
+              <td>optimize</td>
+              <td><code class="inline">boolean</code></td>
+              <td>Run route optimization before saving. Default: <code class="inline">true</code>.</td>
+            </tr>
+            <tr>
+              <td>scheduled_date</td>
+              <td><code class="inline">string</code></td>
+              <td>ISO 8601 date for the planned delivery date. Defaults to today.</td>
+            </tr>
+            <tr>
+              <td>name</td>
+              <td><code class="inline">string</code></td>
+              <td>Human-readable name for the route (e.g., <code class="inline">"AM Run - Zone 4"</code>).</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">shell</span>
+            <span class="code-block-title">Create and dispatch a route</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="block"><span class="c-method">curl</span> -s -X POST https://api.pocketroute.io/v1/routes \
+  -H <span class="c-string">"Authorization: Bearer $POCKETROUTE_KEY"</span> \
+  -H <span class="c-string">"Content-Type: application/json"</span> \
+  -d <span class="c-string">'{
+    "name": "AM Run - Zone 4",
+    "origin": "450 Commerce Blvd, Brooklyn, NY 11207",
+    "driver_id": "drv_78gh90ij",
+    "dispatch": true,
+    "optimize": true,
+    "scheduled_date": "2025-06-17",
+    "stops": [
+      {
+        "address": "123 Main St, Brooklyn, NY 11201",
+        "recipient": "Sarah Chen",
+        "notes": "Leave at door",
+        "time_from": "09:00",
+        "time_to": "12:00"
+      },
+      {
+        "address": "450 Park Ave, New York, NY 10022",
+        "recipient": "James Rivera",
+        "phone": "+12125550147",
+        "notes": "Buzzer 4B"
+      }
+    ]
+  }'</span></code></pre>
+        </div>
+
+        <div class="code-block response-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">json</span>
+            <span class="code-block-title">201 Created</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="block">{
+  <span class="c-key">"id"</span>: <span class="c-string">"r_x9y8z7w6v5u4"</span>,
+  <span class="c-key">"status"</span>: <span class="c-string">"dispatched"</span>,
+  <span class="c-key">"name"</span>: <span class="c-string">"AM Run - Zone 4"</span>,
+  <span class="c-key">"driver_id"</span>: <span class="c-string">"drv_78gh90ij"</span>,
+  <span class="c-key">"stop_count"</span>: <span class="c-num">2</span>,
+  <span class="c-key">"optimized"</span>: <span class="c-method">true</span>,
+  <span class="c-key">"estimated_duration_min"</span>: <span class="c-num">34</span>,
+  <span class="c-key">"estimated_distance_km"</span>: <span class="c-num">12.4</span>,
+  <span class="c-key">"dispatched_at"</span>: <span class="c-string">"2025-06-17T07:45:00Z"</span>,
+  <span class="c-key">"created_at"</span>: <span class="c-string">"2025-06-17T07:44:58Z"</span>
+}</code></pre>
+        </div>
+      </div>
+
+      <!-- GET /v1/routes/:id -->
+      <div class="endpoint-section" id="get-route-id">
+        <h3>Get a Route</h3>
+        <div class="endpoint-bar">
+          <span class="method-badge method-get">GET</span>
+          <code class="endpoint-path">/v1/routes/:id</code>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 16px;">Returns full details for a single route, including all stops and their current status.</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">shell</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="block"><span class="c-method">curl</span> -s https://api.pocketroute.io/v1/routes/r_a1b2c3d4e5f6 \
+  -H <span class="c-string">"Authorization: Bearer $POCKETROUTE_KEY"</span></code></pre>
+        </div>
+      </div>
+
+      <!-- PATCH /v1/routes/:id -->
+      <div class="endpoint-section" id="patch-route-id">
+        <h3>Update a Route</h3>
+        <div class="endpoint-bar">
+          <span class="method-badge method-patch">PATCH</span>
+          <code class="endpoint-path">/v1/routes/:id</code>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--text-secondary);">Update route fields. Only <code class="inline">draft</code> and <code class="inline">assigned</code> routes can be modified. Use this to update the driver, name, or scheduled date. To cancel a dispatched route, set <code class="inline">"status": "cancelled"</code>.</p>
+      </div>
+    </section>
+
+    <!-- Drivers -->
+    <section class="api-section" id="drivers">
+      <h2 style="font-size: 1.3rem; font-family: var(--font-display); font-weight: 700; margin-bottom: 24px;">Drivers</h2>
+
+      <div class="endpoint-section" id="get-drivers">
+        <h3>List Drivers</h3>
+        <div class="endpoint-bar">
+          <span class="method-badge method-get">GET</span>
+          <code class="endpoint-path">/v1/drivers</code>
+        </div>
+
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 16px;">Returns all drivers on your team with their current availability and active route status.</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">shell</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="block"><span class="c-method">curl</span> -s https://api.pocketroute.io/v1/drivers \
+  -H <span class="c-string">"Authorization: Bearer $POCKETROUTE_KEY"</span></code></pre>
+        </div>
+
+        <div class="code-block response-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">json</span>
+            <span class="code-block-title">200 Response</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code class="block">{
+  <span class="c-key">"data"</span>: [
+    {
+      <span class="c-key">"id"</span>: <span class="c-string">"drv_78gh90ij"</span>,
+      <span class="c-key">"name"</span>: <span class="c-string">"Marcus Delgado"</span>,
+      <span class="c-key">"email"</span>: <span class="c-string">"m.delgado@rapidfleet.co"</span>,
+      <span class="c-key">"status"</span>: <span class="c-string">"active"</span>,
+      <span class="c-key">"active_route_id"</span>: <span class="c-string">"r_a1b2c3d4e5f6"</span>,
+      <span class="c-key">"last_location"</span>: {
+        <span class="c-key">"lat"</span>: <span class="c-num">40.7589</span>,
+        <span class="c-key">"lng"</span>: <span class="c-num">-73.9851</span>,
+        <span class="c-key">"updated_at"</span>: <span class="c-string">"2025-06-17T10:22:43Z"</span>
+      }
+    }
+  ],
+  <span class="c-key">"has_more"</span>: <span class="c-method">false</span>
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Webhooks -->
+    <section class="api-section" id="webhooks">
+      <h2 style="font-size: 1.3rem; font-family: var(--font-display); font-weight: 700; margin-bottom: 12px;">Webhooks</h2>
+
+      <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.75; margin-bottom: 20px;">
+        Subscribe to delivery events to get real-time updates sent to your endpoint via HTTP POST. Configure webhook URLs under <strong>Settings → Developers → Webhooks</strong>.
+      </p>
+
+      <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 16px;">All events are delivered with a <code class="inline">X-PocketRoute-Signature</code> header (HMAC-SHA256) so you can verify authenticity. Retry policy: 3 attempts with exponential backoff over 24 hours.</p>
+
+      <h4 style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px;">Available Events</h4>
+
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 4px 20px;" role="list" aria-label="Webhook events">
+        <div class="webhook-event" role="listitem">
+          <code class="webhook-event-name">route.created</code>
+          <span class="webhook-event-desc">A new route has been created (draft or assigned).</span>
+        </div>
+        <div class="webhook-event" role="listitem">
+          <code class="webhook-event-name">route.dispatched</code>
+          <span class="webhook-event-desc">A route has been sent to a driver and they've been notified.</span>
+        </div>
+        <div class="webhook-event" role="listitem">
+          <code class="webhook-event-name">route.started</code>
+          <span class="webhook-event-desc">Driver has begun navigating to the first stop.</span>
+        </div>
+        <div class="webhook-event" role="listitem">
+          <code class="webhook-event-name">route.completed</code>
+          <span class="webhook-event-desc">All stops have been resolved and the route is marked complete.</span>
+        </div>
+        <div class="webhook-event" role="listitem">
+          <code class="webhook-event-name">stop.completed</code>
+          <span class="webhook-event-desc">A single stop was marked as delivered. Payload includes stop ID, timestamp, and optional proof of delivery URL.</span>
+        </div>
+        <div class="webhook-event" role="listitem">
+          <code class="webhook-event-name">stop.failed</code>
+          <span class="webhook-event-desc">A stop was marked as failed (no answer, wrong address, refused delivery). Payload includes failure reason.</span>
+        </div>
+        <div class="webhook-event" role="listitem">
+          <code class="webhook-event-name">driver.location_update</code>
+          <span class="webhook-event-desc">Driver location changed by more than 100 meters. High frequency — consider filtering client-side. Only available on Team plan.</span>
+        </div>
+      </div>
+
+      <div class="code-block" style="margin-top: 20px;">
+        <div class="code-block-header">
+          <span class="code-block-lang">json</span>
+          <span class="code-block-title">Example webhook payload — stop.completed</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><code class="block">{
+  <span class="c-key">"event"</span>: <span class="c-string">"stop.completed"</span>,
+  <span class="c-key">"created_at"</span>: <span class="c-string">"2025-06-17T10:14:33Z"</span>,
+  <span class="c-key">"data"</span>: {
+    <span class="c-key">"stop_id"</span>: <span class="c-string">"stp_1q2w3e4r"</span>,
+    <span class="c-key">"route_id"</span>: <span class="c-string">"r_a1b2c3d4e5f6"</span>,
+    <span class="c-key">"driver_id"</span>: <span class="c-string">"drv_78gh90ij"</span>,
+    <span class="c-key">"recipient"</span>: <span class="c-string">"Sarah Chen"</span>,
+    <span class="c-key">"completed_at"</span>: <span class="c-string">"2025-06-17T10:14:31Z"</span>,
+    <span class="c-key">"proof_of_delivery_url"</span>: <span class="c-string">"https://cdn.pocketroute.io/pod/img_abc123.jpg"</span>
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- Errors -->
+    <section class="api-section" id="errors">
+      <h2 style="font-size: 1.3rem; font-family: var(--font-display); font-weight: 700; margin-bottom: 12px;">Errors</h2>
+
+      <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 16px;">Errors follow a consistent JSON format with an HTTP status code, machine-readable <code class="inline">code</code>, and human-readable <code class="inline">message</code>.</p>
+
+      <table class="param-table" aria-label="API error codes">
+        <thead>
+          <tr>
+            <th>HTTP Status</th>
+            <th>Code</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline">400</code></td>
+            <td><code class="inline">invalid_request</code></td>
+            <td>Missing required fields or invalid field values. Check the <code class="inline">details</code> array for per-field errors.</td>
+          </tr>
+          <tr>
+            <td><code class="inline">401</code></td>
+            <td><code class="inline">unauthorized</code></td>
+            <td>Missing or invalid API key. Check the Authorization header.</td>
+          </tr>
+          <tr>
+            <td><code class="inline">403</code></td>
+            <td><code class="inline">forbidden</code></td>
+            <td>Your plan doesn't include API access, or this resource belongs to a different account.</td>
+          </tr>
+          <tr>
+            <td><code class="inline">404</code></td>
+            <td><code class="inline">not_found</code></td>
+            <td>The requested resource doesn't exist or has been deleted.</td>
+          </tr>
+          <tr>
+            <td><code class="inline">409</code></td>
+            <td><code class="inline">conflict</code></td>
+            <td>The action can't be completed in the resource's current state (e.g., modifying a completed route).</td>
+          </tr>
+          <tr>
+            <td><code class="inline">429</code></td>
+            <td><code class="inline">rate_limited</code></td>
+            <td>Too many requests. Back off and retry after the <code class="inline">Retry-After</code> header value (seconds).</td>
+          </tr>
+          <tr>
+            <td><code class="inline">500</code></td>
+            <td><code class="inline">server_error</code></td>
+            <td>Something went wrong on our end. We've been alerted. Retry with exponential backoff.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Rate Limits -->
+    <section class="api-section" id="rate-limits">
+      <h2 style="font-size: 1.3rem; font-family: var(--font-display); font-weight: 700; margin-bottom: 12px;">Rate Limits</h2>
+      <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 16px;">Rate limits are enforced per API key on a rolling 60-second window.</p>
+
+      <div class="rate-grid" role="list" aria-label="Rate limits by plan">
+        <div class="rate-card" role="listitem">
+          <div class="rate-plan">Growth</div>
+          <span class="rate-val">120</span>
+          <span class="rate-unit">requests / minute</span>
+        </div>
+        <div class="rate-card" role="listitem">
+          <div class="rate-plan">Team</div>
+          <span class="rate-val">600</span>
+          <span class="rate-unit">requests / minute</span>
+        </div>
+        <div class="rate-card" role="listitem">
+          <div class="rate-plan">Enterprise</div>
+          <span class="rate-val">Custom</span>
+          <span class="rate-unit">contact us</span>
+        </div>
+      </div>
+
+      <p style="font-size: 0.88rem; color: var(--text-secondary);">When rate limited, responses include a <code class="inline">Retry-After</code> header with the number of seconds to wait. All rate limit metadata is returned in <code class="inline">X-RateLimit-Limit</code>, <code class="inline">X-RateLimit-Remaining</code>, and <code class="inline">X-RateLimit-Reset</code> headers on every response.</p>
+    </section>
+
+    <!-- Feedback -->
+    <div class="feedback-widget" aria-label="API docs feedback">
+      <span class="feedback-question">Was this API reference helpful?</span>
+      <div class="feedback-btns">
+        <button class="feedback-btn" onclick="this.textContent='Thanks!'; this.disabled=true;">Yes, it helped</button>
+        <button class="feedback-btn" onclick="window.location='contact.html'">I have a question</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ─── FOOTER ─────────────────────────────────────────── -->
+<footer class="site-footer" role="contentinfo">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="index.html" class="site-logo">
+        <span class="logo-icon">
+          <svg width="22" height="18" viewBox="0 0 26 20" fill="none" aria-hidden="true">
+            <circle cx="3.5" cy="16" r="3" fill="currentColor"/>
+            <circle cx="22.5" cy="4" r="3" fill="currentColor"/>
+            <path d="M6 14.5 C10 9, 16 11, 20 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </span>
+        <span class="logo-wordmark"><span>PocketRoute</span></span>
+      </a>
+      <p class="footer-desc">Route planning for small delivery teams.</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <h4>API</h4>
+        <ul>
+          <li><a href="api-docs.html#overview">Overview</a></li>
+          <li><a href="api-docs.html#auth">Authentication</a></li>
+          <li><a href="api-docs.html#routes">Routes</a></li>
+          <li><a href="api-docs.html#webhooks">Webhooks</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Support</h4>
+        <ul>
+          <li><a href="contact.html">Contact Support</a></li>
+          <li><a href="release-notes.html">Release Notes</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>&copy; 2025 PocketRoute, Inc. All rights reserved.</p>
+    <div class="footer-bottom-links">
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Mobile nav
+  const navToggle = document.getElementById('nav-toggle');
+  const navDrawer = document.getElementById('nav-drawer');
+  const navOverlay = document.getElementById('nav-overlay');
+
+  navToggle.addEventListener('click', () => {
+    const open = navDrawer.classList.toggle('open');
+    navOverlay.classList.toggle('open', open);
+    navToggle.setAttribute('aria-expanded', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  });
+
+  navOverlay.addEventListener('click', () => {
+    navDrawer.classList.remove('open');
+    navOverlay.classList.remove('open');
+    navToggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+  });
+
+  // Copy code button
+  function copyCode(btn) {
+    const codeBlock = btn.closest('.code-block');
+    const code = codeBlock.querySelector('code.block');
+    const text = code.innerText;
+
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.classList.remove('copied');
+      }, 1600);
+    }).catch(() => {
+      // Fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1600);
+    });
+  }
+
+  // TOC scroll spy
+  const sections = document.querySelectorAll('.api-section');
+  const tocLinks = document.querySelectorAll('.toc-list a');
+
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (s.getBoundingClientRect().top <= 100) current = s.id;
+    });
+    tocLinks.forEach(link => {
+      const href = link.getAttribute('href').replace('#', '');
+      link.classList.toggle('toc-active', href === current);
+    });
+  }, { passive: true });
+</script>
+</body>
+</html>

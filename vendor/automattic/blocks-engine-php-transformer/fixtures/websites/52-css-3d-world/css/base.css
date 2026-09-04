@@ -1,0 +1,122 @@
+/* ============================================================================
+   VANTAPOINT — base.css
+   Shared reset, typography, header, footer, buttons. Used by every page.
+   ========================================================================== */
+
+:root {
+  --bg: #07080c;
+  --bg-2: #0d0f15;
+  --ink: #e7e9ef;
+  --ink-dim: #9aa0b0;
+  --ink-faint: #5d6478;
+  --line: rgba(255,255,255,.1);
+  --gold: #e3b873;
+  --teal: #6ce0d6;
+  --serif: 'Fraunces', Georgia, serif;
+  --sans: 'Space Grotesk', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --maxw: 1180px;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+img, svg { display: block; max-width: 100%; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 500; line-height: 1.08; margin: 0; }
+em { font-style: italic; }
+
+::selection { background: var(--gold); color: #14110a; }
+
+:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------- header -- */
+.site-header {
+  position: fixed; inset: 0 0 auto 0; z-index: 90;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px clamp(16px, 4vw, 40px);
+  background: linear-gradient(180deg, rgba(7,8,12,.92), rgba(7,8,12,.55) 70%, transparent);
+  backdrop-filter: blur(6px);
+}
+.logo { text-decoration: none; display: grid; gap: 2px; line-height: 1; }
+.logo-mark {
+  font-family: var(--serif); font-weight: 600; font-size: 1.18rem; letter-spacing: .14em;
+}
+.logo-sub { font-family: var(--mono); font-size: .62rem; letter-spacing: .28em; color: var(--ink-faint); text-transform: uppercase; }
+
+.site-nav { display: flex; gap: clamp(14px, 2.4vw, 30px); align-items: center; }
+.site-nav a {
+  text-decoration: none; font-size: .82rem; letter-spacing: .04em; color: var(--ink-dim);
+  padding: 6px 2px; position: relative; transition: color .2s;
+}
+.site-nav a:hover, .site-nav a[aria-current="page"] { color: var(--ink); }
+.site-nav a[aria-current="page"]::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: var(--gold);
+}
+
+.nav-toggle {
+  display: none; flex-direction: column; gap: 5px; background: none; border: 0; cursor: pointer; padding: 8px;
+}
+.nav-toggle span { width: 24px; height: 2px; background: var(--ink); border-radius: 2px; }
+
+/* ---------------------------------------------------------------- buttons - */
+.btn {
+  display: inline-flex; align-items: center; gap: .5em;
+  font-family: var(--sans); font-size: .9rem; font-weight: 500; letter-spacing: .02em;
+  padding: .72em 1.4em; border-radius: 100px; border: 1px solid transparent;
+  cursor: pointer; text-decoration: none; transition: transform .15s, background .2s, border-color .2s;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--gold); color: #1a1408; border-color: var(--gold); }
+.btn-primary:hover { background: #efc685; }
+.btn-ghost { background: rgba(255,255,255,.04); color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover { border-color: var(--ink-dim); }
+.btn-outline { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn-outline:hover { border-color: var(--ink); }
+
+kbd {
+  font-family: var(--mono); font-size: .72rem; padding: 2px 7px; border-radius: 5px;
+  background: rgba(255,255,255,.07); border: 1px solid var(--line); border-bottom-width: 2px;
+  color: var(--ink); margin: 0 1px;
+}
+
+/* ---------------------------------------------------------------- footer -- */
+.site-footer {
+  border-top: 1px solid var(--line);
+  padding: 40px clamp(16px, 4vw, 40px);
+  color: var(--ink-faint); font-size: .8rem;
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.site-footer a { color: var(--ink-dim); text-decoration: none; }
+.site-footer a:hover { color: var(--ink); }
+.site-footer--world {
+  position: relative; z-index: 5; background: var(--bg);
+}
+.footer-links { font-family: var(--mono); font-size: .72rem; letter-spacing: .03em; }
+
+/* ---------------------------------------------------------------- generic content pages */
+.content-wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 clamp(16px,4vw,40px); }
+.page-pad { padding-top: 120px; }
+
+@media (max-width: 760px) {
+  .nav-toggle { display: flex; }
+  .site-nav {
+    position: fixed; inset: 56px 12px auto 12px; flex-direction: column; align-items: flex-start;
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px;
+    gap: 8px; transform: translateY(-8px); opacity: 0; pointer-events: none; transition: .2s;
+  }
+  .site-nav.open { transform: none; opacity: 1; pointer-events: auto; }
+  .site-footer { flex-direction: column; }
+}

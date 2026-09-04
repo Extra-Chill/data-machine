@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Block Editor — The Block Party</title>
+  <meta name="description" content="A deep, friendly tour of the Gutenberg block editor: reusable blocks, patterns, block themes, full-site editing, and the theme.json design system.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="index.html" class="logo" aria-label="The Block Party — home">
+        <span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        <span class="logo-text">The Block <span>Party</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="blocks.html">The Block Editor</a>
+        <a href="ai.html">WordPress &amp; AI</a>
+        <a href="about.html">Manifesto</a>
+      </nav>
+      <div class="header-actions">
+        <button class="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg>
+        </button>
+        <a href="index.html#main" class="btn btn-primary">Back to the pitch</a>
+        <button class="nav-toggle" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- PAGE HERO -->
+    <section class="page-hero">
+      <div class="hero-orbs" aria-hidden="true"><span class="orb orb-1"></span><span class="orb orb-2"></span></div>
+      <div class="wrap" style="position:relative;z-index:1;">
+        <p class="eyebrow"><span class="dot"></span> The heart of modern WordPress</p>
+        <h1>The block editor, lovingly explained</h1>
+        <p>Gutenberg turned a text box into a canvas. Everything is a block — and blocks compose into patterns, patterns into pages, pages into a whole site you can style without touching a stylesheet. Here's the joyful tour.</p>
+      </div>
+    </section>
+
+    <!-- WHAT IS A BLOCK -->
+    <section class="section section-tight">
+      <div class="wrap">
+        <div class="split">
+          <div class="split-text reveal">
+            <p class="kicker">First principles</p>
+            <h2>Everything is a block</h2>
+            <p>A paragraph is a block. So is an image, a heading, a button, an embed, a table, a whole layout group. Each block is a small, self-contained unit with its own settings — and because they share a common model, they snap together predictably.</p>
+            <p>Press <code>/</code> anywhere and type a block name. Drag a handle to reorder. Select a few and group them. It feels less like wrestling a page builder and more like arranging ideas.</p>
+            <ul class="check-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span><strong>Content-first.</strong> Write naturally; structure follows your words.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span><strong>Semantic output.</strong> Clean HTML that's great for SEO and accessibility.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span><strong>Extensible.</strong> Developers can author custom blocks for anything.</span></li>
+            </ul>
+          </div>
+          <div class="reveal d1">
+            <pre class="code-card" aria-label="Example block markup"><span class="c-com">&lt;!-- wp:heading --&gt;</span>
+<span class="c-key">&lt;h2&gt;</span>A joyful headline<span class="c-key">&lt;/h2&gt;</span>
+<span class="c-com">&lt;!-- /wp:heading --&gt;</span>
+
+<span class="c-com">&lt;!-- wp:paragraph --&gt;</span>
+<span class="c-key">&lt;p&gt;</span>Blocks are just annotated, semantic
+HTML. Portable. Readable. Yours.<span class="c-key">&lt;/p&gt;</span>
+<span class="c-com">&lt;!-- /wp:paragraph --&gt;</span>
+
+<span class="c-com">&lt;!-- wp:buttons --&gt;</span>
+<span class="c-prop">&lt;div</span> <span class="c-prop">class</span>=<span class="c-str">"wp-block-buttons"</span><span class="c-prop">&gt;</span>
+  <span class="c-key">&lt;a&gt;</span>Get started →<span class="c-key">&lt;/a&gt;</span>
+<span class="c-prop">&lt;/div&gt;</span>
+<span class="c-com">&lt;!-- /wp:buttons --&gt;</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- THE FOUR SUPERPOWERS -->
+    <section class="section section--alt" aria-labelledby="super-h">
+      <div class="wrap">
+        <div class="section-head center reveal">
+          <p class="kicker">Why blocks change everything</p>
+          <h2 id="super-h">Four superpowers, no plugins required</h2>
+        </div>
+        <div class="grid grid-2">
+          <article class="card reveal">
+            <div class="card-icon ic-grape" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <h3>Reusable &amp; synced blocks</h3>
+            <p>Build a call-to-action once, save it, and reuse it everywhere. Edit the original and every instance updates — perfect for footers, promos, and disclaimers across a big site.</p>
+          </article>
+          <article class="card reveal d1">
+            <div class="card-icon ic-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+            <h3>Patterns</h3>
+            <p>Whole pre-designed sections — hero, pricing table, testimonial wall — dropped in with a single click, then edited to taste. A library of patterns turns an empty page into a finished one in minutes.</p>
+          </article>
+          <article class="card reveal d2">
+            <div class="card-icon ic-mint" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18M9 21V9"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>
+            <h3>Full-Site Editing</h3>
+            <p>Headers, footers, archive templates, single-post layouts — all edited visually with the same block tools. The whole site becomes a canvas, not just the post body.</p>
+          </article>
+          <article class="card reveal d3">
+            <div class="card-icon ic-warm" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="12" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 22a10 10 0 1 1 0-20 7 7 0 0 0 0 14h1a3 3 0 0 1 0 6z"/></svg></div>
+            <h3>theme.json design system</h3>
+            <p>One JSON file defines your palette, typography, spacing scale, and block defaults. It's a real design system — version-controlled, consistent, and editable in the UI through the Styles panel.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- theme.json PALETTE DEMO -->
+    <section class="section" aria-labelledby="tj-h">
+      <div class="wrap">
+        <div class="split">
+          <div class="split-text reveal">
+            <p class="kicker">Design as data</p>
+            <h2 id="tj-h">Your whole look, in one file</h2>
+            <p><code>theme.json</code> is the quiet hero of modern WordPress. Define your colors, fonts, and spacing once, and every block inherits them. Change a value and the entire site re-themes instantly — in the editor and on the front end.</p>
+            <p>Here's a palette like one you'd declare. Click a swatch to copy its hex — design tokens you can actually hold.</p>
+            <div class="palette" role="group" aria-label="Theme palette swatches">
+              <span class="swatch" data-name="Primary"  data-hex="#2c63ff" style="background:#2c63ff"></span>
+              <span class="swatch" data-name="Grape"    data-hex="#6d4aff" style="background:#6d4aff"></span>
+              <span class="swatch" data-name="Coral"    data-hex="#ff5d73" style="background:#ff5d73"></span>
+              <span class="swatch" data-name="Sun"      data-hex="#ffb547" style="background:#ffb547"></span>
+              <span class="swatch" data-name="Mint"     data-hex="#16b58a" style="background:#16b58a"></span>
+              <span class="swatch" data-name="Ink"      data-hex="#1d2230" style="background:#1d2230"></span>
+            </div>
+          </div>
+          <div class="reveal d1">
+            <pre class="code-card" aria-label="theme.json example">{
+  <span class="c-prop">"version"</span>: <span class="c-num">3</span>,
+  <span class="c-prop">"settings"</span>: {
+    <span class="c-prop">"color"</span>: {
+      <span class="c-prop">"palette"</span>: [
+        { <span class="c-prop">"slug"</span>:<span class="c-str">"primary"</span>, <span class="c-prop">"color"</span>:<span class="c-str">"#2c63ff"</span> },
+        { <span class="c-prop">"slug"</span>:<span class="c-str">"grape"</span>,   <span class="c-prop">"color"</span>:<span class="c-str">"#6d4aff"</span> },
+        { <span class="c-prop">"slug"</span>:<span class="c-str">"coral"</span>,   <span class="c-prop">"color"</span>:<span class="c-str">"#ff5d73"</span> }
+      ]
+    },
+    <span class="c-prop">"typography"</span>: {
+      <span class="c-prop">"fontFamilies"</span>: [
+        { <span class="c-prop">"slug"</span>:<span class="c-str">"display"</span>,
+          <span class="c-prop">"fontFamily"</span>:<span class="c-str">"Fraunces, serif"</span> }
+      ]
+    },
+    <span class="c-prop">"spacing"</span>: { <span class="c-prop">"units"</span>:[<span class="c-str">"px"</span>,<span class="c-str">"rem"</span>,<span class="c-str">"%"</span>] }
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PATTERN GRID -->
+    <section class="section section--alt" aria-labelledby="pat-h">
+      <div class="wrap">
+        <div class="section-head center reveal">
+          <p class="kicker">Patterns, previewed</p>
+          <h2 id="pat-h">Drop in a finished section</h2>
+          <p>These are little mockups of the kind of patterns you'd insert — each one a complete, pre-styled arrangement of blocks ready to make yours.</p>
+        </div>
+        <div class="pattern-grid">
+          <article class="pattern-card reveal">
+            <div class="pattern-preview" style="background:var(--grad-cool)">
+              <span class="pp-bar" style="width:60%;background:rgba(255,255,255,.85)"></span>
+              <span class="pp-bar" style="width:90%;background:rgba(255,255,255,.45)"></span>
+              <span class="pp-bar" style="width:40%;background:rgba(255,255,255,.7);height:18px;border-radius:9px;margin-top:.4rem"></span>
+            </div>
+            <div class="pattern-meta"><b>Hero with call-to-action</b><span>Cover · Heading · Buttons</span></div>
+          </article>
+          <article class="pattern-card reveal d1">
+            <div class="pattern-preview">
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;height:100%">
+                <div style="background:var(--paper-2);border-radius:8px"></div>
+                <div style="background:var(--paper-2);border-radius:8px"></div>
+                <div style="background:var(--paper-2);border-radius:8px"></div>
+              </div>
+            </div>
+            <div class="pattern-meta"><b>Three-column features</b><span>Columns · Icon · Text</span></div>
+          </article>
+          <article class="pattern-card reveal d2">
+            <div class="pattern-preview" style="background:var(--grad-warm)">
+              <span class="pp-bar" style="width:30%;background:rgba(255,255,255,.7);height:14px"></span>
+              <span class="pp-bar" style="width:80%;background:rgba(255,255,255,.85);height:14px"></span>
+              <span class="pp-bar" style="width:55%;background:rgba(255,255,255,.5)"></span>
+            </div>
+            <div class="pattern-meta"><b>Testimonial wall</b><span>Quote · Media &amp; Text</span></div>
+          </article>
+          <article class="pattern-card reveal">
+            <div class="pattern-preview">
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;height:100%">
+                <div style="background:var(--grad-hero);border-radius:8px"></div>
+                <div style="display:flex;flex-direction:column;gap:.4rem;justify-content:center">
+                  <span class="pp-bar" style="width:90%"></span>
+                  <span class="pp-bar" style="width:70%"></span>
+                  <span class="pp-bar" style="width:40%;background:var(--blue)"></span>
+                </div>
+              </div>
+            </div>
+            <div class="pattern-meta"><b>Media &amp; text split</b><span>Image · Paragraph · Button</span></div>
+          </article>
+          <article class="pattern-card reveal d1">
+            <div class="pattern-preview">
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;height:100%">
+                <div style="background:var(--mint);border-radius:6px;opacity:.8"></div>
+                <div style="background:var(--coral);border-radius:6px;opacity:.8"></div>
+                <div style="background:var(--sun);border-radius:6px;opacity:.8"></div>
+                <div style="background:var(--grape);border-radius:6px;opacity:.8"></div>
+                <div style="background:var(--blue);border-radius:6px;opacity:.8"></div>
+                <div style="background:var(--mint);border-radius:6px;opacity:.6"></div>
+              </div>
+            </div>
+            <div class="pattern-meta"><b>Image gallery</b><span>Gallery · Caption</span></div>
+          </article>
+          <article class="pattern-card reveal d2">
+            <div class="pattern-preview" style="background:var(--grad-hero)">
+              <span class="pp-bar" style="width:50%;background:rgba(255,255,255,.85);height:16px;margin-inline:auto"></span>
+              <span class="pp-bar" style="width:34%;background:rgba(255,255,255,.55);height:28px;border-radius:14px;margin:.6rem auto 0"></span>
+            </div>
+            <div class="pattern-meta"><b>Newsletter sign-up</b><span>Heading · Form · Button</span></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURE MATRIX -->
+    <section class="section" aria-labelledby="mat-h">
+      <div class="wrap">
+        <div class="section-head center reveal">
+          <p class="kicker">An honest comparison</p>
+          <h2 id="mat-h">Open WordPress vs. the walled gardens</h2>
+          <p>We genuinely admire how polished hosted builders are. But here's where an open, self-owned WordPress site quietly pulls ahead over the long run.</p>
+        </div>
+        <div class="matrix-wrap reveal d1">
+          <table class="matrix">
+            <thead>
+              <tr>
+                <th scope="col">Capability</th>
+                <th scope="col" class="col-wp">WordPress (open)</th>
+                <th scope="col">Typical hosted builder</th>
+                <th scope="col">Social platform</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">You own the content &amp; data</th><td class="col-wp"><span class="yes">Fully</span></td><td>Partly</td><td><span class="no">No</span></td></tr>
+              <tr><th scope="row">Export &amp; move freely</th><td class="col-wp"><span class="yes">One click</span></td><td>Limited</td><td><span class="no">Rare</span></td></tr>
+              <tr><th scope="row">Open-source &amp; forkable</th><td class="col-wp"><span class="yes">Yes (GPL)</span></td><td><span class="no">No</span></td><td><span class="no">No</span></td></tr>
+              <tr><th scope="row">Custom domain &amp; SEO control</th><td class="col-wp"><span class="yes">Total</span></td><td>Good</td><td><span class="no">Minimal</span></td></tr>
+              <tr><th scope="row">Plugins &amp; extensibility</th><td class="col-wp"><span class="yes">59,000+</span></td><td>Curated</td><td><span class="no">None</span></td></tr>
+              <tr><th scope="row">Runs without a monthly fee</th><td class="col-wp"><span class="yes">Yes</span></td><td><span class="no">No</span></td><td>Free*</td></tr>
+              <tr><th scope="row">Backward compatible for years</th><td class="col-wp"><span class="yes">Sacred</span></td><td>Varies</td><td><span class="no">Changes often</span></td></tr>
+              <tr><th scope="row">Choose your own host</th><td class="col-wp"><span class="yes">Anywhere</span></td><td><span class="no">Locked</span></td><td><span class="no">Locked</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="text-align:center;color:var(--ink-faint);font-size:.85rem;margin-top:1rem;">*Free in price, but your audience and reach belong to the platform, not to you.</p>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="section">
+      <div class="wrap">
+        <div class="cta reveal">
+          <div class="cta-inner">
+            <h2>Blocks are the LEGO of the open web.</h2>
+            <p>Snap, restyle, reuse, ship. Once it clicks, you'll never want to publish any other way.</p>
+            <div class="hero-actions">
+              <a href="index.html#demo-h" class="btn btn-primary btn-lg">Play with the inserter</a>
+              <a href="ai.html" class="btn btn-ghost btn-lg">And now, the AI era →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <a href="index.html" class="logo">
+            <span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+            <span class="logo-text">The Block <span>Party</span></span>
+          </a>
+          <p>An independent, unaffiliated love letter to WordPress and the Gutenberg block editor. Made by people who believe the open web is worth celebrating.</p>
+        </div>
+        <nav class="footer-col" aria-label="Site">
+          <h4>Explore</h4>
+          <ul><li><a href="index.html">Home</a></li><li><a href="blocks.html">The Block Editor</a></li><li><a href="ai.html">WordPress &amp; AI</a></li><li><a href="about.html">Manifesto</a></li></ul>
+        </nav>
+        <nav class="footer-col" aria-label="The case">
+          <h4>The case</h4>
+          <ul><li><a href="blocks.html">Patterns &amp; FSE</a></li><li><a href="blocks.html">theme.json</a></li><li><a href="ai.html">MCP &amp; automation</a></li><li><a href="about.html">Open source</a></li></ul>
+        </nav>
+        <nav class="footer-col" aria-label="Community">
+          <h4>Community</h4>
+          <ul><li><a href="about.html">Get involved</a></li><li><a href="about.html">WordCamps</a></li><li><a href="about.html">Five for the Future</a></li><li><a href="about.html">Colophon</a></li></ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 The Block Party. A fan project — not affiliated with the WordPress Foundation or Automattic.</p>
+        <p class="made">Hand-built with vanilla HTML, CSS &amp; JS <span class="heart" aria-hidden="true">♥</span></p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "fixture_class": "ecommerce/catalog",
+  "tags": [
+    "ecommerce",
+    "woocommerce",
+    "catalog",
+    "outdoor",
+    "has-form",
+    "has-nav",
+    "multipage",
+    "product-grid",
+    "bundles",
+    "pricing"
+  ],
+  "capabilities": [
+    "commerce-products",
+    "forms"
+  ],
+  "complexity": 3
+}

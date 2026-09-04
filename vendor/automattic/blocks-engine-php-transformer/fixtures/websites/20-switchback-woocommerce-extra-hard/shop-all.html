@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop All — Switchback</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<!-- Utility Nav -->
+<div class="utility-nav">
+  <div class="container">
+    <div class="utility-nav__inner">
+      <div class="utility-nav__links">
+        <a href="size-guide.html" class="utility-nav__link">Size Guide</a>
+        <a href="trail-notes.html" class="utility-nav__link">Trail Notes</a>
+        <a href="#" class="utility-nav__link">Help</a>
+      </div>
+      <span class="utility-nav__promo">Free shipping on orders over $75</span>
+    </div>
+  </div>
+</div>
+
+<header class="site-header" role="banner">
+  <div class="container">
+    <div class="header-inner">
+      <a href="index.html" class="nav-logo" aria-label="Switchback home">
+        <svg class="nav-logo__mark" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M4 8l8 6-8 6" stroke="#B8956A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M14 8l8 6-8 6" stroke="#F2EDE4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="nav-logo__wordmark">Switchback</span>
+      </a>
+      <nav class="main-nav" role="navigation" aria-label="Main navigation">
+        <div class="nav-item"><a href="shop-all.html" class="nav-link active">Shop All</a></div>
+        <div class="nav-item">
+          <a href="by-outing.html" class="nav-link">By Outing <svg class="nav-chevron" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5"/></svg></a>
+          <div class="dropdown">
+            <a href="by-outing.html#day-hike" class="dropdown__link"><span class="dropdown__dot"></span>Day Hike</a>
+            <a href="by-outing.html#beach" class="dropdown__link"><span class="dropdown__dot"></span>Beach &amp; Lake</a>
+            <a href="by-outing.html#camp" class="dropdown__link"><span class="dropdown__dot"></span>Weekend Camp</a>
+            <a href="by-outing.html#road-trip" class="dropdown__link"><span class="dropdown__dot"></span>Road Trip</a>
+          </div>
+        </div>
+        <div class="nav-item">
+          <a href="by-condition.html" class="nav-link">By Condition <svg class="nav-chevron" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5"/></svg></a>
+          <div class="dropdown">
+            <a href="by-condition.html#hot" class="dropdown__link"><span class="dropdown__dot" style="background:#D45B1A"></span>Hot Weather</a>
+            <a href="by-condition.html#mud" class="dropdown__link"><span class="dropdown__dot" style="background:#5C7842"></span>Mud &amp; Rain</a>
+            <a href="by-condition.html#night" class="dropdown__link"><span class="dropdown__dot" style="background:#2D3A52"></span>Night Visibility</a>
+            <a href="by-condition.html#senior" class="dropdown__link"><span class="dropdown__dot" style="background:#7A5C9E"></span>Senior Dog</a>
+          </div>
+        </div>
+        <div class="nav-item"><a href="bundles.html" class="nav-link">Bundles</a></div>
+        <div class="nav-item"><a href="by-outing.html#road-trip" class="nav-link">Travel</a></div>
+        <div class="nav-item"><a href="bundles.html#gifts" class="nav-link">Gifts</a></div>
+      </nav>
+      <div class="flex items-center gap-4">
+        <a href="bundles.html" class="nav-cart" aria-label="Cart"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1 1h2.5l1.8 9h8.4l1.8-5H5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="15" r="1" fill="currentColor"/><circle cx="13" cy="15" r="1" fill="currentColor"/></svg><span class="cart-count">0</span></a>
+        <button class="nav-toggle" aria-label="Open menu" aria-expanded="false"><span class="nav-toggle__bar"></span><span class="nav-toggle__bar"></span><span class="nav-toggle__bar"></span></button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+  <div class="mobile-nav__section">
+    <span class="mobile-nav__label">Shop</span>
+    <a href="shop-all.html" class="mobile-nav__link">Shop All</a>
+    <a href="by-outing.html" class="mobile-nav__link">By Outing</a>
+    <a href="by-condition.html" class="mobile-nav__link">By Condition</a>
+    <a href="bundles.html" class="mobile-nav__link">Bundles</a>
+    <a href="bundles.html#gifts" class="mobile-nav__link">Gifts</a>
+  </div>
+  <div class="mobile-nav__section">
+    <span class="mobile-nav__label">Info</span>
+    <a href="size-guide.html" class="mobile-nav__utility">Size Guide</a>
+    <a href="trail-notes.html" class="mobile-nav__utility">Trail Notes</a>
+    <a href="#" class="mobile-nav__utility">Help &amp; Returns</a>
+  </div>
+</nav>
+
+<!-- Breadcrumb -->
+<div class="page-breadcrumb">
+  <div class="container">
+    <ol class="breadcrumb-list">
+      <li class="breadcrumb-list__item"><a href="index.html">Home</a></li>
+      <li class="breadcrumb-list__sep" aria-hidden="true">/</li>
+      <li class="breadcrumb-list__current">Shop All</li>
+    </ol>
+  </div>
+</div>
+
+<!-- Shop Header -->
+<div class="shop-header">
+  <div class="container">
+    <span class="shop-header__eyebrow">Everything Switchback Carries</span>
+    <h1 class="shop-header__title">Shop All Gear</h1>
+    <p class="shop-header__count">24 products</p>
+  </div>
+</div>
+
+<!-- Shop Layout -->
+<div class="container">
+  <div class="shop-layout">
+
+    <!-- Sidebar -->
+    <aside class="shop-sidebar" aria-label="Product filters">
+
+      <div class="filter-panel">
+        <div class="filter-panel__title">Product Type</div>
+        <div class="filter-panel__body">
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="type" value="bundle">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Bundles</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="type" value="hydration">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Hydration</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="type" value="safety">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Safety &amp; Visibility</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="type" value="paw">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Paw Care</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="type" value="cleanup">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Recovery &amp; Cleanup</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="type" value="pack">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Packs &amp; Carriers</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="type" value="sleep">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Sleep &amp; Camp</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="filter-panel">
+        <div class="filter-panel__title">Condition</div>
+        <div class="filter-panel__body">
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="condition" value="hot">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Hot Weather</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="condition" value="mud">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Mud &amp; Rain</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="condition" value="night">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Night</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="condition" value="senior">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Senior</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="condition" value="all">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">All Weather</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="filter-panel">
+        <div class="filter-panel__title">Dog Size</div>
+        <div class="filter-panel__body">
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="size" value="small">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Small — under 20 lb</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="size" value="medium">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Medium — 20–50 lb</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="size" value="large">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">Large — 50–80 lb</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" class="js-filter-check" data-group="size" value="xl">
+            <span class="filter-checkbox"></span>
+            <span class="filter-label">XL — 80 lb+</span>
+          </label>
+        </div>
+      </div>
+
+      <p class="sidebar-note">Showing results for all dogs and conditions. Use filters to narrow.</p>
+
+    </aside>
+
+    <!-- Main Content -->
+    <main class="shop-main">
+
+      <div class="shop-toolbar">
+        <span class="shop-result-count">24 products</span>
+        <div class="shop-sort">
+          <select class="sort-select js-sort-select" aria-label="Sort products">
+            <option value="featured">Featured</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="new">New Arrivals</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="product-grid js-product-grid">
+
+        <!-- 1. Hot Trail Starter Kit -->
+        <div class="product-card js-product-card" data-type="bundle" data-condition="hot" data-size="small,medium,large,xl" data-price="89">
+          <div class="product-card__image">
+            <div class="product-card__badge-row">
+              <span class="badge badge--bestseller">Bestseller</span>
+            </div>
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#E0D8CC"/>
+              <!-- Sun -->
+              <circle cx="38" cy="36" r="14" fill="#C96B1A" opacity="0.9"/>
+              <line x1="38" y1="14" x2="38" y2="8" stroke="#C96B1A" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="38" y1="58" x2="38" y2="64" stroke="#C96B1A" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="16" y1="36" x2="10" y2="36" stroke="#C96B1A" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="60" y1="36" x2="66" y2="36" stroke="#C96B1A" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="23" y1="21" x2="19" y2="17" stroke="#C96B1A" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="53" y1="51" x2="57" y2="55" stroke="#C96B1A" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="53" y1="21" x2="57" y2="17" stroke="#C96B1A" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="23" y1="51" x2="19" y2="55" stroke="#C96B1A" stroke-width="2.5" stroke-linecap="round"/>
+              <!-- Dog silhouette -->
+              <ellipse cx="88" cy="58" rx="18" ry="11" fill="#2A4030" opacity="0.85"/>
+              <circle cx="82" cy="46" r="9" fill="#2A4030" opacity="0.85"/>
+              <path d="M78 42 Q74 35 71 38" stroke="#2A4030" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.85"/>
+              <path d="M86 42 Q90 35 93 37" stroke="#2A4030" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.85"/>
+              <path d="M72 58 L68 72" stroke="#2A4030" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+              <path d="M80 66 L79 72" stroke="#2A4030" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+              <path d="M96 58 L100 72" stroke="#2A4030" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+              <path d="M103 58 L107 72" stroke="#2A4030" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+              <ellipse cx="91" cy="50" rx="4" ry="2.5" fill="#B8956A" opacity="0.7"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Bundle</span>
+            <h3 class="product-card__title">Hot Trail Starter Kit</h3>
+            <p class="product-card__desc">Ice bandana, trail bowl, paw balm, and waste bags — everything you need when temps climb above 75°.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--hot">Hot Weather</span>
+              <span class="tag tag--neutral">All Dogs</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$89</span>
+              <button class="product-card__add" aria-label="Add Hot Trail Starter Kit to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Weekend Camp Dog Kit -->
+        <div class="product-card js-product-card" data-type="bundle,pack,sleep" data-condition="all" data-size="medium,large,xl" data-price="145">
+          <div class="product-card__image">
+            <div class="product-card__badge-row">
+              <span class="badge badge--staff-pick">Staff Pick</span>
+            </div>
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#2A4030" opacity="0.12"/>
+              <rect width="120" height="90" fill="#E8E2D5"/>
+              <!-- Tent -->
+              <polygon points="60,12 20,68 100,68" fill="#2A4030" opacity="0.85"/>
+              <polygon points="60,12 35,68 85,68" fill="#3A5842" opacity="0.7"/>
+              <rect x="46" y="52" width="28" height="16" rx="2" fill="#18120A" opacity="0.6"/>
+              <!-- Stars -->
+              <circle cx="18" cy="20" r="2" fill="#B8956A"/>
+              <circle cx="98" cy="16" r="1.5" fill="#B8956A"/>
+              <circle cx="108" cy="30" r="1" fill="#B8956A"/>
+              <circle cx="10" cy="38" r="1.2" fill="#B8956A"/>
+              <!-- Moon -->
+              <path d="M95 22 A10 10 0 1 1 105 32 A6 6 0 1 0 95 22Z" fill="#B8956A" opacity="0.8"/>
+              <!-- Ground -->
+              <rect x="0" y="68" width="120" height="22" fill="#B8956A" opacity="0.2"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Bundle</span>
+            <h3 class="product-card__title">Weekend Camp Dog Kit</h3>
+            <p class="product-card__desc">Dog pack, sleep mat, first aid, paw wax, waste bags — everything for two nights out.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--neutral">2+ Nights</span>
+              <span class="tag tag--pine">Med–XL</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$145</span>
+              <button class="product-card__add" aria-label="Add Weekend Camp Dog Kit to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Muddy Ride Home Kit -->
+        <div class="product-card js-product-card" data-type="bundle,cleanup" data-condition="mud" data-size="small,medium,large,xl" data-price="72">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#D8CFC0"/>
+              <!-- Car side view simplified -->
+              <rect x="14" y="44" width="92" height="28" rx="6" fill="#3F5464"/>
+              <path d="M28 44 Q34 26 50 24 L76 24 Q90 26 96 44Z" fill="#3F5464"/>
+              <rect x="36" y="28" width="22" height="14" rx="2" fill="#B8C4CC" opacity="0.6"/>
+              <rect x="62" y="28" width="22" height="14" rx="2" fill="#B8C4CC" opacity="0.6"/>
+              <circle cx="32" cy="72" r="9" fill="#18120A"/>
+              <circle cx="32" cy="72" r="5" fill="#3F5464"/>
+              <circle cx="88" cy="72" r="9" fill="#18120A"/>
+              <circle cx="88" cy="72" r="5" fill="#3F5464"/>
+              <!-- Mud splatter -->
+              <ellipse cx="60" cy="85" rx="40" ry="4" fill="#5C7842" opacity="0.35"/>
+              <circle cx="18" cy="58" r="3" fill="#5C7842" opacity="0.5"/>
+              <circle cx="12" cy="50" r="2" fill="#5C7842" opacity="0.4"/>
+              <circle cx="25" cy="52" r="1.5" fill="#5C7842" opacity="0.5"/>
+              <circle cx="102" cy="55" r="2.5" fill="#5C7842" opacity="0.4"/>
+              <circle cx="107" cy="62" r="1.5" fill="#5C7842" opacity="0.5"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Bundle</span>
+            <h3 class="product-card__title">Muddy Ride Home Kit</h3>
+            <p class="product-card__desc">Car mat, rapid dry coat, waterproof leash, and waste bags. Designed for the aftermath.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--mud">Mud &amp; Rain</span>
+              <span class="tag tag--neutral">Any Dog</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$72</span>
+              <button class="product-card__add" aria-label="Add Muddy Ride Home Kit to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Night Visibility Kit -->
+        <div class="product-card js-product-card" data-type="bundle,safety" data-condition="night" data-size="small,medium,large,xl" data-price="78">
+          <div class="product-card__image">
+            <div class="product-card__badge-row">
+              <span class="badge badge--new">New</span>
+            </div>
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#1A2438"/>
+              <!-- Moon -->
+              <path d="M52 20 A22 22 0 1 1 74 42 A14 14 0 1 0 52 20Z" fill="#B8956A" opacity="0.85"/>
+              <!-- Stars -->
+              <circle cx="22" cy="18" r="1.5" fill="#F2EDE4" opacity="0.9"/>
+              <circle cx="96" cy="14" r="1" fill="#F2EDE4" opacity="0.7"/>
+              <circle cx="104" cy="28" r="1.5" fill="#F2EDE4" opacity="0.8"/>
+              <circle cx="14" cy="42" r="1" fill="#F2EDE4" opacity="0.6"/>
+              <circle cx="108" cy="56" r="1.2" fill="#F2EDE4" opacity="0.7"/>
+              <!-- LED glow beams -->
+              <circle cx="60" cy="65" r="7" fill="#C96B1A" opacity="0.9"/>
+              <circle cx="60" cy="65" r="12" fill="#C96B1A" opacity="0.2"/>
+              <circle cx="60" cy="65" r="18" fill="#C96B1A" opacity="0.08"/>
+              <!-- Harness dot -->
+              <path d="M44 72 Q60 62 76 72" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Bundle</span>
+            <h3 class="product-card__title">Night Visibility Kit</h3>
+            <p class="product-card__desc">Clip light, reflective harness, and high-viz vest. Three sources of visibility for after-dark runs and hikes.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--night">Night</span>
+              <span class="tag tag--neutral">Any Dog</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$78</span>
+              <button class="product-card__add" aria-label="Add Night Visibility Kit to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Summit Paw Balm -->
+        <div class="product-card js-product-card" data-type="paw" data-condition="hot,all" data-size="small,medium,large,xl" data-price="14">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#F2EDE4"/>
+              <!-- Paw print -->
+              <ellipse cx="60" cy="54" rx="16" ry="12" fill="#B8956A" opacity="0.75"/>
+              <circle cx="44" cy="38" r="6" fill="#B8956A" opacity="0.75"/>
+              <circle cx="60" cy="34" r="5" fill="#B8956A" opacity="0.75"/>
+              <circle cx="76" cy="38" r="6" fill="#B8956A" opacity="0.75"/>
+              <circle cx="52" cy="46" r="4" fill="#B8956A" opacity="0.5"/>
+              <!-- Balm jar ring -->
+              <circle cx="60" cy="48" r="30" stroke="#2A4030" stroke-width="1.5" stroke-dasharray="4 3" fill="none" opacity="0.25"/>
+              <!-- Mountain outline -->
+              <path d="M20 72 L48 38 L60 52 L72 34 L100 72" stroke="#2A4030" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.2"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Paw Care</span>
+            <h3 class="product-card__title">Summit Paw Balm</h3>
+            <p class="product-card__desc">Beeswax base with hemp seed oil. Protects cracked pads on hot pavement, rough rock, and dry trail.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--neutral">All Temps</span>
+              <span class="tag tag--tan">Paw Protection</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$14</span>
+              <button class="product-card__add" aria-label="Add Summit Paw Balm to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Ice Bandana -->
+        <div class="product-card js-product-card" data-type="hydration" data-condition="hot" data-size="small,medium,large,xl" data-price="16">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#D6EDF8"/>
+              <!-- Bandana / neck shape -->
+              <path d="M30 30 Q60 18 90 30 L80 62 Q60 72 40 62Z" fill="#3F5464" opacity="0.8"/>
+              <!-- Ice crystal -->
+              <line x1="60" y1="32" x2="60" y2="60" stroke="#B8C4CC" stroke-width="2" stroke-linecap="round"/>
+              <line x1="46" y1="39" x2="74" y2="53" stroke="#B8C4CC" stroke-width="2" stroke-linecap="round"/>
+              <line x1="74" y1="39" x2="46" y2="53" stroke="#B8C4CC" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="60" cy="32" r="2.5" fill="#F2EDE4"/>
+              <circle cx="60" cy="60" r="2.5" fill="#F2EDE4"/>
+              <circle cx="46" cy="39" r="2.5" fill="#F2EDE4"/>
+              <circle cx="74" cy="39" r="2.5" fill="#F2EDE4"/>
+              <circle cx="46" cy="53" r="2.5" fill="#F2EDE4"/>
+              <circle cx="74" cy="53" r="2.5" fill="#F2EDE4"/>
+              <!-- Water droplets -->
+              <path d="M22 18 Q22 12 26 12 Q30 12 30 18 Q30 24 26 26 Q22 24 22 18Z" fill="#8AAFC4" opacity="0.6"/>
+              <path d="M88 14 Q88 9 91 9 Q94 9 94 14 Q94 19 91 21 Q88 19 88 14Z" fill="#8AAFC4" opacity="0.6"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Hydration</span>
+            <h3 class="product-card__title">Ice Bandana</h3>
+            <p class="product-card__desc">Soaks in water, keeps cool for up to two hours. Wraps around the neck — works on any coat length.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--hot">Hot Weather</span>
+              <span class="tag tag--neutral">Cooling</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$16</span>
+              <button class="product-card__add" aria-label="Add Ice Bandana to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. Pack-Flat Trail Bowl -->
+        <div class="product-card js-product-card" data-type="hydration" data-condition="all" data-size="small,medium,large,xl" data-price="18">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#F2EDE4"/>
+              <!-- Bowl flat form -->
+              <ellipse cx="60" cy="55" rx="36" ry="10" fill="#3F5464" opacity="0.15"/>
+              <!-- Bowl open -->
+              <path d="M24 48 Q24 76 60 76 Q96 76 96 48Z" fill="#3F5464" opacity="0.75"/>
+              <ellipse cx="60" cy="48" rx="36" ry="7" fill="#3F5464"/>
+              <!-- Water inside -->
+              <path d="M30 52 Q30 70 60 70 Q90 70 90 52Z" fill="#8AAFC4" opacity="0.35"/>
+              <!-- Fold line -->
+              <line x1="24" y1="48" x2="96" y2="48" stroke="#F2EDE4" stroke-width="1.5" stroke-dasharray="5 3" opacity="0.6"/>
+              <!-- Carabiner clip -->
+              <circle cx="100" cy="30" r="10" stroke="#B8956A" stroke-width="2.5" fill="none"/>
+              <line x1="95" y1="30" x2="105" y2="30" stroke="#B8956A" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Hydration</span>
+            <h3 class="product-card__title">Pack-Flat Trail Bowl</h3>
+            <p class="product-card__desc">Silicone bowl collapses to 0.4 inches. Clips to a pack. Holds 36 oz. Fits in a cupholder when flat.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--neutral">All Weather</span>
+              <span class="tag tag--pine">Hydration</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$18</span>
+              <button class="product-card__add" aria-label="Add Pack-Flat Trail Bowl to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 8. Ridgeline Dog Pack -->
+        <div class="product-card js-product-card" data-type="pack" data-condition="all" data-size="medium,large,xl" data-price="78">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#E8E2D5"/>
+              <!-- Pack body -->
+              <rect x="30" y="20" width="60" height="52" rx="10" fill="#2A4030"/>
+              <!-- Pack pockets -->
+              <rect x="36" y="26" width="48" height="18" rx="4" fill="#3A5842"/>
+              <rect x="36" y="48" width="22" height="18" rx="4" fill="#3A5842"/>
+              <rect x="62" y="48" width="22" height="18" rx="4" fill="#3A5842"/>
+              <!-- Straps -->
+              <path d="M40 20 Q36 10 30 8" stroke="#B8956A" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <path d="M80 20 Q84 10 90 8" stroke="#B8956A" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <path d="M30 8 Q60 2 90 8" stroke="#B8956A" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <!-- Buckle -->
+              <rect x="50" y="68" width="20" height="6" rx="2" fill="#B8956A"/>
+              <!-- Zipper line -->
+              <line x1="42" y1="35" x2="78" y2="35" stroke="#F2EDE4" stroke-width="1" stroke-dasharray="3 2" opacity="0.5"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Packs &amp; Carriers</span>
+            <h3 class="product-card__title">Ridgeline Dog Pack</h3>
+            <p class="product-card__desc">Balanced saddlebag design for dogs 25 lb and up. Two 1.2L pockets, sternum strap, grab handle.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--pine">Pack &amp; Carry</span>
+              <span class="tag tag--neutral">Med–XL</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$78</span>
+              <button class="product-card__add" aria-label="Add Ridgeline Dog Pack to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 9. Trail Light Clip -->
+        <div class="product-card js-product-card" data-type="safety" data-condition="night" data-size="small,medium,large,xl" data-price="22">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#1A2438"/>
+              <!-- LED light body -->
+              <rect x="46" y="28" width="28" height="38" rx="6" fill="#3F5464"/>
+              <rect x="50" y="32" width="20" height="8" rx="2" fill="#C96B1A" opacity="0.9"/>
+              <!-- Glow -->
+              <ellipse cx="60" cy="36" rx="22" ry="12" fill="#C96B1A" opacity="0.15"/>
+              <ellipse cx="60" cy="36" rx="32" ry="18" fill="#C96B1A" opacity="0.07"/>
+              <!-- Clip -->
+              <path d="M54 66 L54 78 Q60 82 66 78 L66 66" stroke="#B8956A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <!-- Stars -->
+              <circle cx="20" cy="22" r="1.2" fill="#F2EDE4" opacity="0.5"/>
+              <circle cx="100" cy="18" r="1" fill="#F2EDE4" opacity="0.5"/>
+              <circle cx="108" cy="50" r="1.5" fill="#F2EDE4" opacity="0.5"/>
+              <circle cx="14" cy="60" r="1" fill="#F2EDE4" opacity="0.5"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Safety &amp; Visibility</span>
+            <h3 class="product-card__title">Trail Light Clip</h3>
+            <p class="product-card__desc">Clips to collar, harness, or leash. Solid, strobe, and fade modes. 40-hour battery on steady beam.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--night">Night</span>
+              <span class="tag tag--neutral">LED</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$22</span>
+              <button class="product-card__add" aria-label="Add Trail Light Clip to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 10. Scout Reflective Harness -->
+        <div class="product-card js-product-card" data-type="safety" data-condition="night,all" data-size="small,medium,large,xl" data-price="54">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#E8E2D5"/>
+              <!-- Harness chest strap -->
+              <path d="M30 30 Q60 18 90 30" stroke="#2A4030" stroke-width="8" stroke-linecap="round" fill="none"/>
+              <!-- Side straps -->
+              <path d="M30 30 L24 55" stroke="#2A4030" stroke-width="6" stroke-linecap="round"/>
+              <path d="M90 30 L96 55" stroke="#2A4030" stroke-width="6" stroke-linecap="round"/>
+              <!-- Belly strap -->
+              <path d="M24 55 Q60 68 96 55" stroke="#2A4030" stroke-width="6" stroke-linecap="round" fill="none"/>
+              <!-- Reflective strips -->
+              <path d="M30 30 Q60 18 90 30" stroke="#B8956A" stroke-width="2" stroke-linecap="round" fill="none"/>
+              <path d="M24 55 Q60 68 96 55" stroke="#B8956A" stroke-width="2" stroke-linecap="round" fill="none" stroke-dasharray="6 4"/>
+              <!-- D-ring -->
+              <circle cx="60" cy="24" r="5" stroke="#B8956A" stroke-width="2.5" fill="none"/>
+              <rect x="57" y="20" width="6" height="4" rx="1" fill="#B8956A" opacity="0.6"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Safety &amp; Visibility</span>
+            <h3 class="product-card__title">Scout Reflective Harness</h3>
+            <p class="product-card__desc">No-pull front clip and back D-ring. Reflective piping is visible at 200 feet. Machine washable.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--neutral">All Day</span>
+              <span class="tag tag--night">Reflective</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$54</span>
+              <button class="product-card__add" aria-label="Add Scout Reflective Harness to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 11. High-Viz Trail Vest -->
+        <div class="product-card js-product-card" data-type="safety" data-condition="night,all" data-size="small,medium,large,xl" data-price="38">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#F2EDE4"/>
+              <!-- Vest body -->
+              <path d="M28 24 L28 70 Q60 78 92 70 L92 24 Q76 18 60 20 Q44 18 28 24Z" fill="#D45B1A" opacity="0.85"/>
+              <!-- Neck opening -->
+              <path d="M44 24 Q60 16 76 24" fill="#F2EDE4"/>
+              <!-- Chest strap -->
+              <rect x="44" y="42" width="32" height="6" rx="2" fill="#B8956A"/>
+              <!-- Reflective stripe -->
+              <line x1="28" y1="54" x2="92" y2="54" stroke="#F2EDE4" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Safety &amp; Visibility</span>
+            <h3 class="product-card__title">High-Viz Trail Vest</h3>
+            <p class="product-card__desc">Blaze orange vest for hunting season and low-light trails. Mesh back, adjustable chest strap, XS–XL.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--night">Night &amp; Dusk</span>
+              <span class="tag tag--hot-dark">Blaze Orange</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$38</span>
+              <button class="product-card__add" aria-label="Add High-Viz Trail Vest to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 12. Haul-Out Car Mat -->
+        <div class="product-card js-product-card" data-type="cleanup" data-condition="mud" data-size="small,medium,large,xl" data-price="45">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#D8CFC0"/>
+              <!-- Mat shape with texture -->
+              <rect x="12" y="22" width="96" height="52" rx="6" fill="#3F5464"/>
+              <!-- Mat ribs texture -->
+              <line x1="24" y1="22" x2="24" y2="74" stroke="#F2EDE4" stroke-width="1" opacity="0.15"/>
+              <line x1="36" y1="22" x2="36" y2="74" stroke="#F2EDE4" stroke-width="1" opacity="0.15"/>
+              <line x1="48" y1="22" x2="48" y2="74" stroke="#F2EDE4" stroke-width="1" opacity="0.15"/>
+              <line x1="60" y1="22" x2="60" y2="74" stroke="#F2EDE4" stroke-width="1" opacity="0.15"/>
+              <line x1="72" y1="22" x2="72" y2="74" stroke="#F2EDE4" stroke-width="1" opacity="0.15"/>
+              <line x1="84" y1="22" x2="84" y2="74" stroke="#F2EDE4" stroke-width="1" opacity="0.15"/>
+              <line x1="96" y1="22" x2="96" y2="74" stroke="#F2EDE4" stroke-width="1" opacity="0.15"/>
+              <!-- Mud spots -->
+              <circle cx="42" cy="45" r="7" fill="#5C7842" opacity="0.55"/>
+              <circle cx="68" cy="52" r="5" fill="#5C7842" opacity="0.45"/>
+              <circle cx="55" cy="38" r="3" fill="#5C7842" opacity="0.4"/>
+              <circle cx="80" cy="40" r="4" fill="#5C7842" opacity="0.4"/>
+              <!-- Roll handle -->
+              <rect x="54" y="10" width="12" height="14" rx="3" fill="#B8956A"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Recovery &amp; Cleanup</span>
+            <h3 class="product-card__title">Haul-Out Car Mat</h3>
+            <p class="product-card__desc">Waterproof ribbed mat sized for cargo areas and back seats. Rolls up with its own strap. No-slip backing.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--neutral">Post-Hike</span>
+              <span class="tag tag--mud">Cleanup</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$45</span>
+              <button class="product-card__add" aria-label="Add Haul-Out Car Mat to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 13. Rapid Dry Coat -->
+        <div class="product-card js-product-card" data-type="cleanup" data-condition="mud" data-size="small,medium,large,xl" data-price="52">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#D6EDF8"/>
+              <!-- Coat body -->
+              <path d="M28 28 Q28 68 60 72 Q92 68 92 28 Q78 22 60 22 Q42 22 28 28Z" fill="#3F5464" opacity="0.8"/>
+              <!-- Velcro front seam -->
+              <line x1="60" y1="22" x2="60" y2="70" stroke="#F2EDE4" stroke-width="2" stroke-dasharray="4 3" opacity="0.5"/>
+              <!-- Water droplets falling off -->
+              <path d="M18 38 Q18 33 21 33 Q24 33 24 38 Q24 43 21 44 Q18 43 18 38Z" fill="#8AAFC4" opacity="0.7"/>
+              <path d="M14 52 Q14 48 17 48 Q20 48 20 52 Q20 55 17 56 Q14 55 14 52Z" fill="#8AAFC4" opacity="0.6"/>
+              <path d="M96 42 Q96 37 99 37 Q102 37 102 42 Q102 46 99 47 Q96 46 96 42Z" fill="#8AAFC4" opacity="0.7"/>
+              <path d="M100 58 Q100 54 103 54 Q106 54 106 58 Q106 62 103 63 Q100 62 100 58Z" fill="#8AAFC4" opacity="0.55"/>
+              <!-- Reflective tab -->
+              <rect x="54" y="22" width="12" height="6" rx="2" fill="#B8956A" opacity="0.8"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Recovery &amp; Cleanup</span>
+            <h3 class="product-card__title">Rapid Dry Coat</h3>
+            <p class="product-card__desc">Microfiber-lined shammy coat. Absorbs 8x its weight. Wraps and secures with two velcro straps.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--neutral">Post-Swim</span>
+              <span class="tag tag--pine">Fast Dry</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$52</span>
+              <button class="product-card__add" aria-label="Add Rapid Dry Coat to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 14. Drift Waterproof Leash -->
+        <div class="product-card js-product-card" data-type="pack" data-condition="mud,all" data-size="small,medium,large,xl" data-price="36">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#D6EDF8"/>
+              <!-- Leash rope wavy -->
+              <path d="M20 30 Q34 20 48 32 Q62 44 76 34 Q90 24 104 36" stroke="#2A4030" stroke-width="5" stroke-linecap="round" fill="none"/>
+              <!-- Handle loop -->
+              <path d="M16 30 Q10 16 20 12 Q30 8 30 20 Q30 30 20 30" fill="none" stroke="#2A4030" stroke-width="4" stroke-linecap="round"/>
+              <!-- Clasp clip -->
+              <rect x="96" y="28" width="14" height="18" rx="4" fill="#B8956A"/>
+              <rect x="99" y="32" width="8" height="6" rx="1" fill="#2A4030"/>
+              <!-- Water rings -->
+              <ellipse cx="60" cy="70" rx="28" ry="8" fill="#8AAFC4" opacity="0.2"/>
+              <ellipse cx="60" cy="70" rx="18" ry="5" fill="#8AAFC4" opacity="0.2"/>
+              <ellipse cx="60" cy="70" rx="8" ry="2.5" fill="#8AAFC4" opacity="0.3"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Packs &amp; Carriers</span>
+            <h3 class="product-card__title">Drift Waterproof Leash</h3>
+            <p class="product-card__desc">Coated nylon — doesn't absorb water, doesn't stretch when wet. Tested floating in a lake for 48 hours.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--neutral">Waterproof</span>
+              <span class="tag tag--pine">Float-Tested</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$36</span>
+              <button class="product-card__add" aria-label="Add Drift Waterproof Leash to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 15. Base Camp Sleep Mat -->
+        <div class="product-card js-product-card" data-type="sleep" data-condition="all" data-size="medium,large,xl" data-price="65">
+          <div class="product-card__image">
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#E8E2D5"/>
+              <!-- Rolled mat view -->
+              <ellipse cx="60" cy="48" rx="42" ry="14" fill="#2A4030" opacity="0.8"/>
+              <ellipse cx="60" cy="46" rx="42" ry="14" fill="#3A5842"/>
+              <!-- Roll rings (side view) -->
+              <ellipse cx="18" cy="46" rx="10" ry="14" fill="#2A4030" opacity="0.9"/>
+              <ellipse cx="102" cy="46" rx="10" ry="14" fill="#2A4030" opacity="0.9"/>
+              <!-- Mat layers visible on end -->
+              <ellipse cx="18" cy="46" rx="8" ry="11" fill="#4D7259" opacity="0.7"/>
+              <ellipse cx="18" cy="46" rx="5" ry="7" fill="#3A5842"/>
+              <ellipse cx="18" cy="46" rx="2.5" ry="4" fill="#2A4030"/>
+              <ellipse cx="102" cy="46" rx="8" ry="11" fill="#4D7259" opacity="0.7"/>
+              <ellipse cx="102" cy="46" rx="5" ry="7" fill="#3A5842"/>
+              <ellipse cx="102" cy="46" rx="2.5" ry="4" fill="#2A4030"/>
+              <!-- Strap -->
+              <rect x="50" y="42" width="20" height="8" rx="3" fill="#B8956A"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Sleep &amp; Camp</span>
+            <h3 class="product-card__title">Base Camp Sleep Mat</h3>
+            <p class="product-card__desc">Closed-cell foam with waterproof cover. Rated to 20°F ground. Rolls to 4 inches with buckle strap.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--neutral">2+ Nights</span>
+              <span class="tag tag--pine">Waterproof Cover</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$65</span>
+              <button class="product-card__add" aria-label="Add Base Camp Sleep Mat to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 16. Senior Dog Trail Kit -->
+        <div class="product-card js-product-card" data-type="bundle" data-condition="senior" data-size="small,medium,large" data-price="120">
+          <div class="product-card__image">
+            <div class="product-card__badge-row">
+              <span class="badge badge--new">New</span>
+            </div>
+            <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="120" height="90" fill="#F0EBF6"/>
+              <!-- Senior dog silhouette — slower, lower to ground -->
+              <ellipse cx="62" cy="58" rx="28" ry="14" fill="#7A5C9E" opacity="0.8"/>
+              <circle cx="40" cy="46" r="12" fill="#7A5C9E" opacity="0.8"/>
+              <!-- Grey muzzle -->
+              <ellipse cx="32" cy="50" rx="8" ry="5" fill="#B8C4CC" opacity="0.8"/>
+              <!-- Ear -->
+              <ellipse cx="34" cy="38" rx="5" ry="8" fill="#6A4C8E" opacity="0.8"/>
+              <!-- Legs (slower gait) -->
+              <line x1="46" y1="70" x2="44" y2="82" stroke="#7A5C9E" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+              <line x1="56" y1="72" x2="55" y2="82" stroke="#7A5C9E" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+              <line x1="72" y1="72" x2="72" y2="82" stroke="#7A5C9E" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+              <line x1="84" y1="70" x2="86" y2="82" stroke="#7A5C9E" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+              <!-- Tail (lower) -->
+              <path d="M90 58 Q96 54 98 50" stroke="#7A5C9E" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8"/>
+              <!-- Heart -->
+              <path d="M22 22 Q22 18 26 18 Q30 18 30 22 Q30 26 26 30 Q22 26 22 22Z" fill="#7A5C9E" opacity="0.5"/>
+              <!-- Electrolyte drops -->
+              <circle cx="98" cy="28" r="4" fill="#B8956A" opacity="0.6"/>
+              <circle cx="108" cy="22" r="3" fill="#B8956A" opacity="0.5"/>
+              <circle cx="104" cy="36" r="2.5" fill="#B8956A" opacity="0.5"/>
+            </svg>
+          </div>
+          <div class="product-card__body">
+            <span class="product-card__category">Bundle</span>
+            <h3 class="product-card__title">Senior Dog Trail Kit</h3>
+            <p class="product-card__desc">Joint-support wrap, paw balm, electrolyte packets, and a cushioned short leash for dogs who still want to go.</p>
+            <div class="product-card__meta tags-row">
+              <span class="tag tag--senior">Senior Dog</span>
+              <span class="tag tag--neutral">Low Impact</span>
+            </div>
+            <div class="product-card__footer">
+              <span class="product-card__price">$120</span>
+              <button class="product-card__add" aria-label="Add Senior Dog Trail Kit to cart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /.product-grid -->
+
+      <div class="load-more-wrap">
+        <button class="btn btn--secondary-dark">Load More Products</button>
+      </div>
+
+    </main><!-- /.shop-main -->
+
+  </div><!-- /.shop-layout -->
+</div><!-- /.container -->
+
+<!-- Footer -->
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <span class="footer-brand__logo">Switchback</span>
+        <p class="footer-brand__tagline">Terrain-aware gear for dogs and the people who take them outside.</p>
+        <div class="footer-newsletter">
+          <input type="email" class="footer-newsletter__input" placeholder="Trail updates + new kits" aria-label="Email for newsletter">
+          <button class="footer-newsletter__btn" type="button">Subscribe</button>
+        </div>
+      </div>
+      <div>
+        <span class="footer-nav__heading">Shop</span>
+        <a href="shop-all.html" class="footer-nav__link">Shop All</a>
+        <a href="bundles.html" class="footer-nav__link">Bundles</a>
+        <a href="by-outing.html" class="footer-nav__link">By Outing</a>
+        <a href="by-condition.html" class="footer-nav__link">By Condition</a>
+        <a href="bundles.html#gifts" class="footer-nav__link">Gifts</a>
+      </div>
+      <div>
+        <span class="footer-nav__heading">Gear Info</span>
+        <a href="size-guide.html" class="footer-nav__link">Size Guide</a>
+        <a href="trail-notes.html" class="footer-nav__link">Trail Notes</a>
+        <a href="#" class="footer-nav__link">How Bundles Work</a>
+        <a href="#" class="footer-nav__link">Materials &amp; Quality</a>
+      </div>
+      <div>
+        <span class="footer-nav__heading">Support</span>
+        <a href="#" class="footer-nav__link">Help Center</a>
+        <a href="#" class="footer-nav__link">Returns &amp; Exchanges</a>
+        <a href="#" class="footer-nav__link">Shipping Info</a>
+        <a href="#" class="footer-nav__link">About Switchback</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-bottom__copy">&copy; 2026 Switchback Outfitters.</span>
+      <div class="footer-bottom__links">
+        <a href="#" class="footer-bottom__link">Privacy</a>
+        <a href="#" class="footer-bottom__link">Terms</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Fast Beautiful Website — Visit &amp; Stockists · Moth &amp; Meridian</title>
+  <meta name="description" content="Visit the Moth &amp; Meridian distillery in Caithness, find stockists worldwide, or send an enquiry about our fragrances and bespoke commissions.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Map placeholder */
+    .map-area {
+      aspect-ratio: 16/7;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 3rem;
+    }
+    .map-area-inner {
+      text-align: center;
+    }
+    .map-coords {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 4rem);
+      font-weight: 300;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    .map-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    /* Map crosshair SVG */
+    .map-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.12;
+    }
+    /* Visit info banner */
+    .visit-info {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    .visit-item {
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .visit-item-title {
+      font-size: 0.58rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.75rem;
+    }
+    .visit-item-value {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    @media (max-width: 768px) {
+      .visit-info { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Moth &amp; Meridian home">
+      <span class="logo-mark">Moth &amp; Meridian</span>
+      <span class="logo-sub">Est. Caithness, 2011</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Home</a>
+      <a href="collection.html">Collection</a>
+      <a href="about.html">The Distillery</a>
+      <a href="journal.html">Journal</a>
+      <a href="contact.html" class="active nav-cta">Visit &amp; Stockists</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- ══════════════ PAGE HERO ══════════════ -->
+    <section class="page-hero" aria-label="Visit and contact">
+      <div class="page-hero-bg" aria-hidden="true"></div>
+      <div class="page-hero-inner">
+        <p class="page-hero-label">Visit &amp; Stockists</p>
+        <h1 class="page-hero-title">Find <em>Us</em></h1>
+        <p class="page-hero-sub">
+          We welcome visitors by appointment between May and September. The drive from Inverness takes approximately two and a half hours. It is worth it — we believe.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══════════════ MAP AREA ══════════════ -->
+    <section class="section" aria-label="Location">
+      <div class="section-inner">
+
+        <!-- Abstract map / coordinate art -->
+        <div class="map-area reveal">
+          <svg class="map-svg" viewBox="0 0 1000 430" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <!-- Grid lines -->
+            <line x1="0"    y1="86"  x2="1000" y2="86"  stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="0"    y1="172" x2="1000" y2="172" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="0"    y1="258" x2="1000" y2="258" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="0"    y1="344" x2="1000" y2="344" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="100"  y1="0"   x2="100"  y2="430" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="200"  y1="0"   x2="200"  y2="430" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="300"  y1="0"   x2="300"  y2="430" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="400"  y1="0"   x2="400"  y2="430" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="500"  y1="0"   x2="500"  y2="430" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="600"  y1="0"   x2="600"  y2="430" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="700"  y1="0"   x2="700"  y2="430" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="800"  y1="0"   x2="800"  y2="430" stroke="#C4A042" stroke-width="0.5"/>
+            <line x1="900"  y1="0"   x2="900"  y2="430" stroke="#C4A042" stroke-width="0.5"/>
+            <!-- Topographic contour lines (abstracted Caithness bog) -->
+            <path d="M0,300 C80,280 150,290 220,270 C290,250 340,240 400,255 C460,270 500,260 560,245 C620,230 680,240 740,225 C800,210 870,220 950,205 C1000,198" fill="none" stroke="#C4A042" stroke-width="1"/>
+            <path d="M0,320 C90,302 165,312 240,294 C315,276 360,268 420,282 C480,296 518,287 575,272 C632,257 690,265 748,252 C806,239 872,248 950,235 C985,230 1000,228" fill="none" stroke="#C4A042" stroke-width="0.7"/>
+            <path d="M0,338 C100,322 180,334 255,316 C330,298 375,292 435,305 C495,318 532,310 588,296 C644,282 700,290 756,278 C812,266 875,274 950,263 C975,260 1000,258" fill="none" stroke="#C4A042" stroke-width="0.5"/>
+            <!-- Location marker -->
+            <circle cx="500" cy="215" r="18" fill="none" stroke="#C4A042" stroke-width="1.5"/>
+            <circle cx="500" cy="215" r="6"  fill="#C4A042"/>
+            <line x1="500" y1="175" x2="500" y2="197" stroke="#C4A042" stroke-width="1"/>
+            <line x1="500" y1="233" x2="500" y2="255" stroke="#C4A042" stroke-width="1"/>
+            <line x1="460" y1="215" x2="482" y2="215" stroke="#C4A042" stroke-width="1"/>
+            <line x1="518" y1="215" x2="540" y2="215" stroke="#C4A042" stroke-width="1"/>
+            <!-- River / burn suggestion -->
+            <path d="M350,430 C370,390 380,360 400,330 C415,308 430,285 450,265 C468,246 485,232 500,215" fill="none" stroke="#C4A042" stroke-width="0.8" stroke-dasharray="4,6" opacity="0.6"/>
+          </svg>
+          <div class="map-area-inner">
+            <p class="map-coords">58°26'N, 3°31'W</p>
+            <p class="map-label">Moth &amp; Meridian Distillery · Caithness, Scotland</p>
+          </div>
+        </div>
+
+        <div class="visit-info reveal">
+          <div class="visit-item">
+            <p class="visit-item-title">Address</p>
+            <p class="visit-item-value">Balnakiel Farm Track<br>Near Wick, Caithness<br>KW1 5NR, Scotland</p>
+          </div>
+          <div class="visit-item">
+            <p class="visit-item-title">Visit Hours</p>
+            <p class="visit-item-value">By appointment only<br>May – September<br>Thursday – Saturday</p>
+          </div>
+          <div class="visit-item">
+            <p class="visit-item-title">Getting Here</p>
+            <p class="visit-item-value">2.5 hrs from Inverness<br>Train to Wick, then taxi<br>No motorway access</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ CONTACT FORM + INFO ══════════════ -->
+    <section class="section section--dark" aria-labelledby="contact-heading">
+      <div class="section-inner">
+        <div class="contact-grid">
+          <!-- Info column -->
+          <div class="reveal">
+            <div class="section-badge"><span>Get in Touch</span></div>
+            <h2 class="contact-info-title" id="contact-heading">Write to<br><em>the distillery</em></h2>
+            <div class="contact-info">
+              <p>
+                We read every letter personally. We try to reply within a week — sometimes longer during distillation season or harvest. We do not have a phone line. This is a deliberate choice.
+              </p>
+              <p>
+                For stockist enquiries, distillery visits, wholesale, and bespoke commissions, please use the form or write to us directly.
+              </p>
+            </div>
+            <div class="contact-detail">
+              <span class="contact-detail-label">Email</span>
+              <span class="contact-detail-value">hello@mothandmeridian.co.uk</span>
+            </div>
+            <div class="contact-detail">
+              <span class="contact-detail-label">Distillery</span>
+              <span class="contact-detail-value">Balnakiel Farm Track, Wick<br>Caithness, KW1 5NR</span>
+            </div>
+            <div class="contact-detail">
+              <span class="contact-detail-label">Response time</span>
+              <span class="contact-detail-value">5 – 10 working days</span>
+            </div>
+
+            <!-- Inline botanical decoration -->
+            <div aria-hidden="true" style="margin-top:2.5rem; opacity:0.35;">
+              <svg width="120" height="80" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+                <line x1="60" y1="78" x2="60" y2="18" stroke="#78906A" stroke-width="1" stroke-linecap="round"/>
+                <path d="M60,40 C44,32 30,28 20,20" fill="none" stroke="#78906A" stroke-width="0.9" stroke-linecap="round"/>
+                <path d="M60,55 C76,47 92,43 102,35" fill="none" stroke="#78906A" stroke-width="0.9" stroke-linecap="round"/>
+                <ellipse cx="20" cy="20" rx="8" ry="13" fill="none" stroke="#78906A" stroke-width="0.7" transform="rotate(-35 20 20)"/>
+                <ellipse cx="102" cy="35" rx="8" ry="13" fill="none" stroke="#78906A" stroke-width="0.7" transform="rotate(35 102 35)"/>
+                <circle cx="60" cy="14" r="5" fill="none" stroke="#C4A042" stroke-width="0.8"/>
+                <circle cx="60" cy="14" r="2" fill="#C4A042" opacity="0.5"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Form column -->
+          <div class="reveal reveal-d2">
+            <form class="contact-form" novalidate>
+              <div class="form-field">
+                <label for="name" class="form-label">Full Name</label>
+                <input type="text" id="name" name="name" class="form-input" placeholder="Your name" required autocomplete="name">
+              </div>
+              <div class="form-field">
+                <label for="email" class="form-label">Email Address</label>
+                <input type="email" id="email" name="email" class="form-input" placeholder="your@email.com" required autocomplete="email">
+              </div>
+              <div class="form-field">
+                <label for="subject" class="form-label">Subject</label>
+                <input type="text" id="subject" name="subject" class="form-input" placeholder="e.g. Distillery visit, Wholesale, Bespoke">
+              </div>
+              <div class="form-field">
+                <label for="message" class="form-label">Message</label>
+                <textarea id="message" name="message" class="form-textarea" placeholder="Your message…" required></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Send Message</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ STOCKISTS ══════════════ -->
+    <section class="section" aria-labelledby="stockists-heading">
+      <div class="section-inner">
+        <div class="section-header reveal">
+          <div>
+            <div class="section-badge"><span>Worldwide</span></div>
+            <h2 class="section-title" id="stockists-heading">
+              Where to<br><em>find us</em>
+            </h2>
+          </div>
+          <p style="font-size:0.84rem; color:var(--text-muted); max-width:38ch; line-height:1.7; font-style:italic;">
+            We work with eighteen independent retailers who share our values around quality, small-batch sourcing, and unhurried commerce.
+          </p>
+        </div>
+
+        <div class="stockists-grid">
+          <div class="stockist-card reveal reveal-d1">
+            <p class="stockist-city">Edinburgh, Scotland</p>
+            <h3 class="stockist-name">Botanica &amp; Co.</h3>
+            <p class="stockist-address">14 Thistle Street<br>Edinburgh, EH2 1EN</p>
+          </div>
+          <div class="stockist-card reveal reveal-d2">
+            <p class="stockist-city">London, England</p>
+            <h3 class="stockist-name">The Perfume Library</h3>
+            <p class="stockist-address">38 Chiltern Street<br>London, W1U 7QR</p>
+          </div>
+          <div class="stockist-card reveal reveal-d3">
+            <p class="stockist-city">Paris, France</p>
+            <h3 class="stockist-name">Lumierre Olfactive</h3>
+            <p class="stockist-address">6 Rue du Faubourg<br>Saint-Honoré, 75008</p>
+          </div>
+          <div class="stockist-card reveal reveal-d1">
+            <p class="stockist-city">Copenhagen, Denmark</p>
+            <h3 class="stockist-name">Skovduft Atelier</h3>
+            <p class="stockist-address">Kronprinsessegade 11<br>1306 Copenhagen</p>
+          </div>
+          <div class="stockist-card reveal reveal-d2">
+            <p class="stockist-city">New York, USA</p>
+            <h3 class="stockist-name">Verdure &amp; Vice</h3>
+            <p class="stockist-address">224 Elizabeth Street<br>New York, NY 10012</p>
+          </div>
+          <div class="stockist-card reveal reveal-d3">
+            <p class="stockist-city">Tokyo, Japan</p>
+            <h3 class="stockist-name">Kōri Perfumery</h3>
+            <p class="stockist-address">3-8-12 Minami-Aoyama<br>Minato-ku, Tokyo 107</p>
+          </div>
+          <div class="stockist-card reveal reveal-d1">
+            <p class="stockist-city">Berlin, Germany</p>
+            <h3 class="stockist-name">Dunkel Duft</h3>
+            <p class="stockist-address">Torstrasse 157<br>10115 Berlin-Mitte</p>
+          </div>
+          <div class="stockist-card reveal reveal-d2">
+            <p class="stockist-city">Melbourne, Australia</p>
+            <h3 class="stockist-name">Olfact Studio</h3>
+            <p class="stockist-address">Level 1, 120 Collins St<br>Melbourne, VIC 3000</p>
+          </div>
+          <div class="stockist-card reveal reveal-d3">
+            <p class="stockist-city">Amsterdam, Netherlands</p>
+            <h3 class="stockist-name">Het Parfumhuis</h3>
+            <p class="stockist-address">Keizersgracht 422<br>1016 GC Amsterdam</p>
+          </div>
+        </div>
+
+        <div class="reveal" style="margin-top:3rem; text-align:center;">
+          <p style="font-size:0.84rem; color:var(--text-muted); margin-bottom:1.25rem; font-style:italic;">Interested in stocking Moth &amp; Meridian? We work with a small number of new retail partners each year.</p>
+          <a href="#" class="btn btn-outline">Wholesale Enquiries</a>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="logo-mark">Moth &amp; Meridian</div>
+          <div class="logo-sub">Est. Caithness, 2011</div>
+          <p class="footer-brand-desc" style="margin-top:1rem;">
+            Small-batch botanical perfumery from the Scottish Highlands. Every fragrance is wild-sourced, copper-distilled, and bottled by hand in an edition of three hundred.
+          </p>
+        </div>
+        <nav class="footer-col" aria-label="Collection links">
+          <p class="footer-col-title">Collection</p>
+          <ul>
+            <li><a href="collection.html">All Fragrances</a></li>
+            <li><a href="collection.html">Noctiluca</a></li>
+            <li><a href="collection.html">Ambarvalia</a></li>
+            <li><a href="collection.html">Sphagnum</a></li>
+            <li><a href="collection.html">The Moth Hour</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Studio links">
+          <p class="footer-col-title">Studio</p>
+          <ul>
+            <li><a href="about.html">The Distillery</a></li>
+            <li><a href="about.html">The Founders</a></li>
+            <li><a href="about.html">Our Process</a></li>
+            <li><a href="journal.html">Journal</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Visit links">
+          <p class="footer-col-title">Visit</p>
+          <ul>
+            <li><a href="contact.html">Find a Stockist</a></li>
+            <li><a href="contact.html">Distillery Visits</a></li>
+            <li><a href="contact.html">Contact Us</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© 2026 Moth &amp; Meridian Ltd. All rights reserved.</p>
+        <div class="footer-legal">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Accessibility</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

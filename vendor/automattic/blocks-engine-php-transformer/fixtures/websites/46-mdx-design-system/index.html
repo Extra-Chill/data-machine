@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Halo UI — Design System &amp; Component Library</title>
+  <meta name="description" content="Halo UI is the open-source design system and React component library that powers every Lumen Labs product. 38 accessible components, 412 design tokens, MDX docs." />
+  <link rel="stylesheet" href="css/halo.css" />
+</head>
+<body>
+  <div class="sidebar-backdrop"></div>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <a class="sidebar__brand" href="index.html">Halo&nbsp;UI</a>
+      <p class="sidebar__version">v2.4.0 · MIT · @halo-ui/react</p>
+      <nav class="nav-group" aria-label="Overview">
+        <p class="nav-group__title">Overview</p>
+        <a class="nav-link" href="index.html">Halo UI</a>
+      </nav>
+      <nav class="nav-group" aria-label="Foundations">
+        <p class="nav-group__title">Foundations</p>
+        <a class="nav-link" href="color.html">Color</a>
+        <a class="nav-link" href="typography.html">Typography</a>
+      </nav>
+      <nav class="nav-group" aria-label="Components">
+        <p class="nav-group__title">Components</p>
+        <a class="nav-link" href="button.html">Button</a>
+        <a class="nav-link" href="input.html">Input</a>
+        <a class="nav-link" href="modal.html">Modal</a>
+        <a class="nav-link" href="card.html">Card</a>
+      </nav>
+    </aside>
+
+    <!-- CONTENT -->
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn mobile-nav-toggle" id="nav-toggle" aria-label="Toggle navigation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <span class="topbar__crumb"><strong>Halo UI</strong></span>
+        <span class="topbar__spacer"></span>
+        <button class="search-btn" data-palette-open aria-label="Search documentation">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+          <span class="search-btn__text">Search docs…</span>
+          <kbd>⌘K</kbd>
+        </button>
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle color theme">
+          <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke-linecap="round"/></svg>
+          <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 14.5A8 8 0 119.5 4a6.5 6.5 0 0010.5 10.5z"/></svg>
+        </button>
+        <a class="icon-btn" href="https://github.com/lumen-labs/halo-ui" target="_blank" rel="noopener" aria-label="GitHub repository">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0112 6.8c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.58.69.48A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"/></svg>
+        </a>
+      </header>
+
+      <!-- ARTICLE -->
+      <article class="doc">
+        <header class="doc__header">
+          <p class="doc__eyebrow">Overview</p>
+          <h1>Halo UI</h1>
+          <p class="doc__lede">The open-source design system and React component library that powers every Lumen Labs product.</p>
+          <span class="badge badge--stable">stable</span>
+        </header>
+
+        <p>Halo UI is the shared design language behind <strong>Aperture</strong> (our analytics suite), <strong>Relay</strong> (our messaging platform), and the Lumen Labs marketing site. It ships <strong>38 accessible components</strong>, <strong>412 design tokens</strong>, and a themeable runtime that weighs <strong>11.4&nbsp;kB</strong> gzipped for the core layer.</p>
+
+        <div class="stat-row">
+          <div class="stat"><span class="stat__num">38</span><span class="stat__label">Components</span></div>
+          <div class="stat"><span class="stat__num">412</span><span class="stat__label">Tokens</span></div>
+          <div class="stat"><span class="stat__num">11.4&nbsp;kB</span><span class="stat__label">Core gzip</span></div>
+          <div class="stat"><span class="stat__num">v2.4.0</span><span class="stat__label">Released 2026-06-09</span></div>
+        </div>
+
+        <p>Everything you read in these docs is written in MDX — Markdown prose interleaved with the very components it documents. The <code>&lt;Button&gt;</code> below is the real <code>@halo-ui/react</code> export, rendered inline.</p>
+
+        <!-- CodePreview -->
+        <div class="code-preview">
+          <div class="code-preview__stage" data-preview>
+            <button type="button" class="halo-button halo-button--solid halo-button--brand"><span class="halo-button__label">Save changes</span></button>
+          </div>
+          <div class="code-preview__panel">
+            <div class="code-preview__bar">
+              <span class="code-preview__lang">tsx</span>
+              <button class="code-preview__copy" type="button">Copy</button>
+            </div>
+            <pre class="code-preview__code"><code><span class="tok-key">import</span> { Button } <span class="tok-key">from</span> <span class="tok-str">'@halo-ui/react'</span>
+
+<span class="tok-key">export function</span> <span class="tok-fn">Save</span>() {
+  <span class="tok-key">return</span> <span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">tone</span>=<span class="tok-str">"brand"</span><span class="tok-punc">&gt;</span>Save changes<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+}</code></pre>
+          </div>
+        </div>
+
+        <h2 id="install">Install</h2>
+        <p>Halo UI is distributed as a set of scoped packages on npm. Install the React bindings and the token layer together.</p>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <div class="tabs__list" role="tablist">
+            <button class="tabs__tab is-active" role="tab" aria-selected="true">pnpm</button>
+            <button class="tabs__tab" role="tab" aria-selected="false" tabindex="-1">npm</button>
+            <button class="tabs__tab" role="tab" aria-selected="false" tabindex="-1">yarn</button>
+          </div>
+          <div class="tabs__panel" role="tabpanel">
+            <div class="halo-codeblock">
+              <div class="halo-codeblock__bar"><span class="halo-codeblock__lang">bash</span><button class="copy-btn" type="button">Copy</button></div>
+              <pre><code>pnpm add @halo-ui/react @halo-ui/tokens</code></pre>
+            </div>
+          </div>
+          <div class="tabs__panel" role="tabpanel" hidden>
+            <div class="halo-codeblock">
+              <div class="halo-codeblock__bar"><span class="halo-codeblock__lang">bash</span><button class="copy-btn" type="button">Copy</button></div>
+              <pre><code>npm install @halo-ui/react @halo-ui/tokens</code></pre>
+            </div>
+          </div>
+          <div class="tabs__panel" role="tabpanel" hidden>
+            <div class="halo-codeblock">
+              <div class="halo-codeblock__bar"><span class="halo-codeblock__lang">bash</span><button class="copy-btn" type="button">Copy</button></div>
+              <pre><code>yarn add @halo-ui/react @halo-ui/tokens</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <p>Import the token stylesheet once at the root of your app. It defines every CSS custom property the components read from.</p>
+
+        <div class="halo-codeblock">
+          <div class="halo-codeblock__bar"><span class="halo-codeblock__file">src/main.tsx</span><span class="halo-codeblock__lang">tsx</span><button class="copy-btn" type="button">Copy</button></div>
+          <pre><code><span class="tok-key">import</span> <span class="tok-str">'@halo-ui/tokens/halo.css'</span>
+<span class="tok-key">import</span> { ThemeProvider } <span class="tok-key">from</span> <span class="tok-str">'@halo-ui/react'</span>
+
+<span class="tok-fn">createRoot</span>(document.<span class="tok-fn">getElementById</span>(<span class="tok-str">'root'</span>)!).<span class="tok-fn">render</span>(
+  <span class="tok-punc">&lt;</span><span class="tok-tag">ThemeProvider</span> <span class="tok-attr">defaultTheme</span>=<span class="tok-str">"system"</span><span class="tok-punc">&gt;</span>
+    <span class="tok-punc">&lt;</span><span class="tok-tag">App</span> <span class="tok-punc">/&gt;</span>
+  <span class="tok-punc">&lt;/</span><span class="tok-tag">ThemeProvider</span><span class="tok-punc">&gt;</span>,
+)</code></pre>
+        </div>
+
+        <aside class="callout callout--success" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M5 8.5l2 2 4-4.5" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Zero-config theming</p><div class="callout__content">Components never hard-code color or spacing. Wrap your tree in <code>ThemeProvider</code> and the entire system flips between light, dark, and the high-contrast theme with a single attribute on <code>&lt;html&gt;</code>.</div></div>
+        </aside>
+
+        <h2 id="how-the-system-is-layered">How the system is layered</h2>
+        <p>Halo UI is intentionally split so teams can adopt only what they need.</p>
+        <ol>
+          <li><strong>Tokens</strong> — <code>@halo-ui/tokens</code> is the source of truth. Raw values (<code>indigo/600</code>, <code>space/4</code>) compile to CSS variables and a JS/TS object.</li>
+          <li><strong>Primitives</strong> — unstyled, fully accessible behavior (focus management, keyboard nav, ARIA) shared across frameworks.</li>
+          <li><strong>Components</strong> — the styled React layer most product teams consume.</li>
+          <li><strong>Patterns</strong> — opinionated compositions (forms, empty states, page shells) documented as recipes.</li>
+        </ol>
+
+        <h2 id="start-here">Start here</h2>
+        <div class="home-grid">
+          <a class="home-card" href="color.html"><div class="home-card__title">Color</div><div class="home-card__desc">Palette, semantic roles, and the AA contrast rules.</div></a>
+          <a class="home-card" href="typography.html"><div class="home-card__title">Typography</div><div class="home-card__desc">Type scale, font stacks, measure, and rhythm.</div></a>
+          <a class="home-card" href="button.html"><div class="home-card__title">Button</div><div class="home-card__desc">The first component to read — sets every convention.</div></a>
+          <a class="home-card" href="modal.html"><div class="home-card__title">Modal</div><div class="home-card__desc">Live focus-trapped dialog playground.</div></a>
+        </div>
+
+        <h2 id="versioning-support">Versioning &amp; support</h2>
+        <p>We follow semantic versioning. Token names are treated as public API — a rename is always a major release. The current line is <strong>2.4.0</strong>, released <strong>2026-06-09</strong>. The previous major (<code>1.x</code>) receives security fixes through the end of 2026.</p>
+      </article>
+
+      <!-- TOC -->
+      <aside class="toc" aria-label="On this page">
+        <p class="toc__title">On this page</p>
+        <ul>
+          <li class="toc__item toc__item--h2"><a href="#install">Install</a></li>
+          <li class="toc__item toc__item--h2"><a href="#how-the-system-is-layered">How the system is layered</a></li>
+          <li class="toc__item toc__item--h2"><a href="#start-here">Start here</a></li>
+          <li class="toc__item toc__item--h2"><a href="#versioning-support">Versioning &amp; support</a></li>
+        </ul>
+      </aside>
+
+      <footer class="doc-footer">
+        <div>Halo UI v2.4.0 · MIT License · Built with Astro + MDX</div>
+        <div class="doc-footer__links">
+          <a href="https://github.com/lumen-labs/halo-ui">GitHub</a>
+          <a href="color.html">Foundations</a>
+          <a href="button.html">Components</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- COMMAND PALETTE -->
+  <div class="palette-backdrop" id="palette">
+    <div class="palette" role="dialog" aria-label="Search documentation">
+      <div class="palette__input-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+        <input class="palette__input" type="text" placeholder="Search components, tokens, foundations…" aria-label="Search" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="palette__results"></div>
+      <div class="palette__hint"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+    </div>
+  </div>
+
+  <script src="js/halo.js"></script>
+</body>
+</html>

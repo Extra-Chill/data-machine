@@ -1,0 +1,17 @@
+{
+  "source": "ideal",
+  "_note": "IDEAL (content-anchored, faithful -> 100): a full-bleed hero is a core/cover wrapping the headline, supporting copy, and a primary call-to-action (block-runner hero-cover archetype). Heading + button text asserted, so this 100 is earned by matching real content, not derived-by-construction.",
+  "tree": [
+    {
+      "block": "core/cover",
+      "children": [
+        { "block": "core/heading", "contains": "A native cover from captured hero media" },
+        { "block": "core/paragraph" },
+        {
+          "block": "core/buttons",
+          "children": [{ "block": "core/button", "contains": "Explore patterns" }]
+        }
+      ]
+    }
+  ]
+}

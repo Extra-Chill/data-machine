@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ &amp; Contact — Common Table</title>
+  <meta name="description" content="Answers to common questions about Common Table, plus a contact form to reach Rosa, Declan, or Priya directly.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* FAQ + Contact two-column layout */
+    .faq-contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .faq-contact-grid { grid-template-columns: 1fr; gap: 3rem; }
+    }
+
+    /* Contact card */
+    .contact-card {
+      background-color: var(--warm-white);
+      border-radius: var(--radius-xl);
+      padding: 2.5rem;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: calc(var(--nav-height) + 2rem);
+    }
+
+    .contact-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .contact-card .lead {
+      font-size: 0.9rem;
+      color: var(--ink-muted);
+      margin-bottom: 1.75rem;
+    }
+
+    /* Contact info item */
+    .contact-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--parchment);
+    }
+    .contact-info-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .contact-info-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background-color: var(--terracotta-pale);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .contact-info-text strong { display: block; font-size: 0.875rem; margin-bottom: 0.1rem; }
+    .contact-info-text span, .contact-info-text a { font-size: 0.85rem; color: var(--ink-muted); }
+    .contact-info-text a:hover { color: var(--terracotta); }
+
+    /* FAQ categories */
+    .faq-category {
+      margin-bottom: 3rem;
+    }
+    .faq-category:last-child { margin-bottom: 0; }
+    .faq-cat-heading {
+      font-family: var(--font-hand);
+      font-size: 1.2rem;
+      color: var(--terracotta);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .faq-cat-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--terracotta);
+      flex-shrink: 0;
+    }
+
+    /* Drop-in info strip */
+    .dropin-strip {
+      background-color: var(--sage);
+      color: var(--warm-white);
+      border-radius: var(--radius-lg);
+      padding: 2rem 2.5rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+    .dropin-strip svg { flex-shrink: 0; }
+    .dropin-strip h3 { color: var(--warm-white); font-size: 1.15rem; margin-bottom: 0.35rem; }
+    .dropin-strip p { font-size: 0.875rem; opacity: 0.85; margin: 0; }
+
+    /* Anchor for contact section */
+    #contact { scroll-margin-top: 100px; }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────────────── -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      Common Table
+    </a>
+    <button class="hamburger" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-menu" id="nav-menu" role="list">
+      <li><a href="index.html"       class="nav-link">Home</a></li>
+      <li><a href="gatherings.html"  class="nav-link">Gatherings</a></li>
+      <li><a href="organizers.html"  class="nav-link">Organizers</a></li>
+      <li><a href="stories.html"     class="nav-link">Stories</a></li>
+      <li><a href="membership.html"  class="nav-link">Membership</a></li>
+      <li><a href="faq.html"         class="nav-link">FAQ</a></li>
+      <li><a href="membership.html"  class="nav-cta">Join Us</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+
+<!-- ── PAGE HERO ─────────────────────────────────────────────── -->
+<header class="page-hero">
+  <div class="container">
+    <span class="overline">Questions &amp; answers</span>
+    <h1>FAQ &amp; Contact</h1>
+    <p class="lead">Most questions answered below. Anything else — just ask.</p>
+  </div>
+</header>
+
+<!-- ── MAIN CONTENT GRID ─────────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="faq-contact-grid">
+
+      <!-- FAQ Column -->
+      <div>
+        <!-- Category: Getting Started -->
+        <div class="faq-category reveal">
+          <p class="faq-cat-heading"><span class="faq-cat-dot"></span>Getting started</p>
+          <div class="faq-list">
+
+            <details class="faq-item">
+              <summary>
+                Do I need to be a member to attend a gathering?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>No — your first gathering is always free, no membership required. We want you to try it before you commit. After that, you'll need a membership to RSVP to future events. Memberships start at $8/month.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                How do I know if I live in the neighborhood?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>Common Table centers on the Portsmith District, roughly bounded by River Road to the west, Oak Street to the north, Highway 9 to the east, and the park to the south. If you're close enough to get here by foot or bike, you're in. If you live just outside those edges and feel a pull toward the community, reach out — we make exceptions for good people.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Can I join if I don't know how to cook?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>Absolutely. Potlucks welcome store-bought contributions, wine, and excellent cheese. Skill shares are specifically designed for beginners. The only cooking requirement is genuine interest, and even that we can negotiate.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Is Common Table a nonprofit?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>We're an informal membership collective — not legally incorporated. Membership fees cover printing, event supplies, the seed library, and the occasional rental of the Common Kitchen. Rosa, Declan, and Priya are all volunteers. There's no profit here; there's just the community.</p>
+              </div>
+            </details>
+
+          </div>
+        </div>
+
+        <!-- Category: Gatherings -->
+        <div class="faq-category reveal" data-delay="100">
+          <p class="faq-cat-heading"><span class="faq-cat-dot"></span>Gatherings</p>
+          <div class="faq-list">
+
+            <details class="faq-item">
+              <summary>
+                How often do gatherings happen?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>We run 4–6 gatherings per month across all types — potlucks, skill shares, reading circles, and volunteer days. The rhythm varies by season: summer is busiest, winter is quieter and cozier. The monthly newsletter always has the full calendar.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Where do gatherings take place?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>All over the neighborhood. Members host in their homes and backyards, we use the Portsmith Branch Library reading room, the Elm Street Community Garden, Riverside Park Pavilion, and the Common Kitchen at 48 Elm Street. Location is always listed clearly on each event.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Can I bring my kids? My dog?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>Yes to both, with a small asterisk. Outdoor events (potlucks, volunteer days, garden walks) are always child and dog-friendly. Indoor skill shares and reading circles may have space limitations — check the event details or email us. When in doubt: ask. We almost always say yes.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Can I RSVP for a friend who isn't a member?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>Regular and Steward members can bring unlimited guests. Neighbor members can bring one guest per month. Just let us know ahead of time so we have enough chairs (and food).</p>
+              </div>
+            </details>
+
+          </div>
+        </div>
+
+        <!-- Category: Hosting -->
+        <div class="faq-category reveal" data-delay="150">
+          <p class="faq-cat-heading"><span class="faq-cat-dot"></span>Hosting your own gathering</p>
+          <div class="faq-list">
+
+            <details class="faq-item">
+              <summary>
+                What does "host your own gathering" actually mean?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>As a Regular or Steward member, you can pitch any gathering you want to run — a cooking class, a repair café, a film screening, a board game afternoon, a neighborhood walk. We help you pick a date, promote it through the newsletter and member channels, and provide logistical support. You bring the expertise and enthusiasm; we bring the rest.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Do I need a space? Equipment?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>Not necessarily. We can help arrange the Common Kitchen, the library reading room, or an outdoor space in the park. We also have a small supply closet with folding tables, chairs, a portable speaker, and basic kitchen equipment available for member use. Just give us two weeks' notice.</p>
+              </div>
+            </details>
+
+          </div>
+        </div>
+
+        <!-- Category: Membership -->
+        <div class="faq-category reveal" data-delay="200">
+          <p class="faq-cat-heading"><span class="faq-cat-dot"></span>Membership &amp; payment</p>
+          <div class="faq-list">
+
+            <details class="faq-item">
+              <summary>
+                How does payment work?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>We keep it low-tech. After you submit the join form, Rosa will email you to confirm and set up payment — typically via Venmo, PayPal, or a check dropped off at 48 Elm Street. We don't process cards online and we never store your financial information.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Can I cancel my membership?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>Yes, any time, no questions asked. Just send an email to hello@commontable.club and we'll cancel your membership effective at the end of your current billing month. We'll also miss you and probably invite you back next season.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Do you offer reduced or sliding-scale memberships?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>Yes. We don't advertise this widely because we don't want to make anyone feel singled out, but we believe cost should never be the reason someone can't be part of this community. Reach out to Rosa directly at hello@commontable.club and we'll work something out quietly.</p>
+              </div>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Can I upgrade or downgrade my tier?
+                <span class="faq-icon" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#C05A36" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </span>
+              </summary>
+              <div class="faq-answer">
+                <p>Of course. Just email us and it'll take effect the following month. Many members start as Neighbor and move to Regular once they realize how much they want to host their own gathering. It happens quickly.</p>
+              </div>
+            </details>
+
+          </div>
+        </div>
+
+        <!-- Drop-in info -->
+        <div class="dropin-strip reveal" data-delay="250" style="margin-top:3rem;">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+            <circle cx="18" cy="18" r="16" stroke="rgba(250,247,239,0.6)" stroke-width="1.5"/>
+            <path d="M18 10v8l5 3" stroke="rgba(250,247,239,0.9)" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <div>
+            <h3>Prefer to drop by?</h3>
+            <p>Declan is usually at the Common Kitchen (48 Elm Street) Tuesday and Thursday mornings from 9–11 AM. Walk in, pull up a chair, have a coffee.</p>
+          </div>
+        </div>
+
+      </div><!-- /FAQ column -->
+
+      <!-- Contact Column -->
+      <div id="contact">
+        <div class="contact-card reveal" data-delay="80">
+          <h2>Send us a note</h2>
+          <p class="lead">Questions, story pitches, hosting ideas, or just wanting to say hello — this goes to all three organizers.</p>
+
+          <form data-ct-form="contact" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="c-name">Your name</label>
+              <input class="form-input" type="text" id="c-name" name="name" placeholder="Your full name" required autocomplete="name">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="c-email">Email</label>
+              <input class="form-input" type="email" id="c-email" name="email" placeholder="you@example.com" required autocomplete="email">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="c-subject">What's this about?</label>
+              <select class="form-select" id="c-subject" name="subject">
+                <option value="" disabled selected>Choose a topic…</option>
+                <option value="membership">Membership question</option>
+                <option value="gathering">A specific gathering</option>
+                <option value="host">I want to host something</option>
+                <option value="story">Share a member story</option>
+                <option value="sliding-scale">Sliding-scale pricing</option>
+                <option value="press">Press or partnership</option>
+                <option value="other">Something else</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="c-message">Your message</label>
+              <textarea class="form-textarea" id="c-message" name="message" placeholder="Tell us what's on your mind…" required style="min-height:150px;"></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom:0;">
+              <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+                Send message →
+              </button>
+            </div>
+
+            <div class="form-success" role="alert">
+              Got it — one of us will reply within 2–3 days.
+            </div>
+          </form>
+
+          <!-- Contact info -->
+          <div class="contact-info">
+            <div class="contact-info-item">
+              <div class="contact-info-icon">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M14 3H2C1.4 3 1 3.4 1 4v8c0 .6.4 1 1 1h12c.6 0 1-.4 1-1V4c0-.6-.4-1-1-1z" stroke="#C05A36" stroke-width="1.3"/>
+                  <path d="M1 4l7 5 7-5" stroke="#C05A36" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="contact-info-text">
+                <strong>Email</strong>
+                <a href="mailto:hello@commontable.club">hello@commontable.club</a>
+              </div>
+            </div>
+            <div class="contact-info-item">
+              <div class="contact-info-icon">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 1C5.2 1 3 3.2 3 6C3 9.5 8 15 8 15S13 9.5 13 6C13 3.2 10.8 1 8 1Z" stroke="#C05A36" stroke-width="1.3"/>
+                  <circle cx="8" cy="6" r="1.8" fill="#C05A36"/>
+                </svg>
+              </div>
+              <div class="contact-info-text">
+                <strong>Address</strong>
+                <span>48 Elm Street, Portsmith District</span>
+              </div>
+            </div>
+            <div class="contact-info-item">
+              <div class="contact-info-icon">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <rect x="2" y="2" width="12" height="12" rx="2" stroke="#C05A36" stroke-width="1.3"/>
+                  <path d="M5 5h6M5 8h6M5 11h4" stroke="#C05A36" stroke-width="1.2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="contact-info-text">
+                <strong>Drop-in hours</strong>
+                <span>Tue &amp; Thu, 9–11 AM at the Common Kitchen</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /.contact-card -->
+      </div><!-- /contact column -->
+
+    </div><!-- /.faq-contact-grid -->
+  </div>
+</section>
+
+<!-- ── CTA STRIP ─────────────────────────────────────────────── -->
+<section class="cta-strip">
+  <div class="container">
+    <div class="reveal">
+      <h2 style="color:var(--cream);">Still not sure? Come to a gathering first.</h2>
+      <p>Your first one is free. Just show up — no RSVP needed for outdoor events.</p>
+      <a href="gatherings.html" class="btn btn-white btn-lg">See what's coming up</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ── FOOTER ─────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="index.html" class="footer-brand-logo">
+          <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          Common Table
+        </a>
+        <p class="footer-tagline">A neighborhood membership club for people who love to share food, skills, stories, and a few hours of doing something that matters.</p>
+        <address class="footer-address">48 Elm Street · Portsmith District<br><a href="mailto:hello@commontable.club" style="color:rgba(240,232,212,0.5); text-decoration:none;">hello@commontable.club</a></address>
+      </div>
+      <div>
+        <span class="footer-col-heading">Explore</span>
+        <ul class="footer-links">
+          <li><a href="gatherings.html">Upcoming Gatherings</a></li>
+          <li><a href="organizers.html">Meet the Organizers</a></li>
+          <li><a href="stories.html">Member Stories</a></li>
+          <li><a href="membership.html">Membership Levels</a></li>
+          <li><a href="faq.html">FAQ &amp; Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <span class="footer-col-heading">Get Involved</span>
+        <ul class="footer-links">
+          <li><a href="membership.html">Join the Table</a></li>
+          <li><a href="gatherings.html">RSVP to a Gathering</a></li>
+          <li><a href="membership.html#host">Host Your Own</a></li>
+          <li><a href="faq.html#contact">Send Us a Note</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Common Table · Eval Membership Community</span>
+      <span>Made with care in the neighborhood</span>
+    </div>
+  </div>
+</footer>
+
+<script src="nav.js"></script>
+</body>
+</html>

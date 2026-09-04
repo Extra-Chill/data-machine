@@ -1,0 +1,11 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "code-editor",
+    "playground",
+    "app",
+    "developer-tool",
+    "canvas"
+  ],
+  "complexity": 4
+}

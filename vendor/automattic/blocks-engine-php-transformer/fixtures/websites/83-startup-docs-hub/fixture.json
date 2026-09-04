@@ -1,0 +1,7 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": ["docs", "startup", "sidebar", "breadcrumbs", "code", "admonitions", "tabs", "toc", "search"],
+  "capabilities": ["local-css", "syntax-highlight", "forms"],
+  "risk_profile": "medium",
+  "complexity": 3
+}

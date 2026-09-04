@@ -1,0 +1,19 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": [
+    "music",
+    "artist",
+    "portfolio",
+    "has-form",
+    "has-nav",
+    "multipage"
+  ],
+  "capabilities": [
+    "commerce-products",
+    "forms",
+    "local-css",
+    "runtime-js"
+  ],
+  "risk_profile": "medium",
+  "complexity": 2
+}

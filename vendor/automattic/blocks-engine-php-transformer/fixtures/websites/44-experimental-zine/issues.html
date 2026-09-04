@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Archive — STATIC//NOISE</title>
+  <meta name="description" content="Every issue of STATIC//NOISE, 2019 to now. Filter by frequency, shuffle the grid, decode the back catalogue.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="STATIC//NOISE home">
+      <span class="logo-mark">STATIC<em>//</em>NOISE</span>
+      <span class="logo-sub">Indie Culture Zine · Issue 14</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Cover</a>
+      <a href="read.html">Feature</a>
+      <a href="issues.html" class="active">Issues</a>
+      <a href="masthead.html">Masthead</a>
+      <button class="theme-toggle magnetic" data-magnet="0.25" aria-label="Toggle glitch theme">
+        <span class="dot" aria-hidden="true"></span><span class="lbl">Glitch</span>
+      </button>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <div class="marquee alt" aria-hidden="true">
+    <div class="marquee__track">
+      <span>The Archive</span><span>14 Issues</span><span>2019 → Now</span><span>Shuffle Me</span>
+      <span>The Archive</span><span>14 Issues</span><span>2019 → Now</span><span>Shuffle Me</span>
+    </div>
+  </div>
+
+  <main id="main">
+    <div class="page-head">
+      <span class="eyebrow">Back Catalogue</span>
+      <h1 data-split><span>THE</span> <span class="out">ARCHIVE</span></h1>
+      <p>Every frequency we've tuned into since 2019. Filter by theme, or hit shuffle and let
+      the static decide what you read next.</p>
+    </div>
+
+    <div class="issue-controls">
+      <span class="lbl">Frequency</span>
+      <button class="chip" data-filter="all" aria-pressed="true">All</button>
+      <button class="chip" data-filter="type" aria-pressed="false">Type</button>
+      <button class="chip" data-filter="sound" aria-pressed="false">Sound</button>
+      <button class="chip" data-filter="space" aria-pressed="false">Space</button>
+      <button class="chip" data-filter="body" aria-pressed="false">Body</button>
+      <button class="chip shuffle-btn magnetic" data-magnet="0.3">⇄ Shuffle</button>
+    </div>
+
+    <div class="issue-grid">
+
+      <article class="issue-card" data-theme="sound">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 14 cover">
+            <rect width="300" height="400" fill="#0a0a0a"/>
+            <g stroke="#ff2e63" stroke-width="3" fill="none">
+              <path d="M0,200 L20,120 L35,280 L50,140 L70,260 L90,160 L110,250 L130,150 L150,300 L170,120 L190,270 L210,150 L230,260 L250,130 L270,280 L300,200"/>
+            </g>
+            <text x="20" y="70" font-family="'Archivo Black', sans-serif" font-size="58" fill="#d6ff2e">14</text>
+            <text x="20" y="370" font-family="'Space Mono', monospace" font-size="13" fill="#f3f0e7">SIGNAL DECAY</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №14 · Sound</p>
+          <p class="t">Signal Decay</p>
+          <p class="d">June 2026 · Current</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="type">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 13 cover">
+            <rect width="300" height="400" fill="#2e5bff"/>
+            <g fill="#d6ff2e">
+              <rect x="30" y="60" width="60" height="280"/>
+              <rect x="30" y="60" width="200" height="55"/>
+              <rect x="30" y="190" width="150" height="50"/>
+            </g>
+            <text x="200" y="380" font-family="'Archivo Black', sans-serif" font-size="40" fill="#0a0a0a">13</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №13 · Type</p>
+          <p class="t">Ugly On Purpose</p>
+          <p class="d">March 2026</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="space">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 12 cover">
+            <rect width="300" height="400" fill="#f3f0e7"/>
+            <g stroke="#0a0a0a" stroke-width="2" fill="none">
+              <path d="M0,50 H300 M0,100 H300 M0,150 H300 M0,200 H300 M0,250 H300 M0,300 H300 M0,350 H300"/>
+            </g>
+            <circle cx="150" cy="200" r="90" fill="#ff7a00" style="mix-blend-mode:multiply"/>
+            <text x="120" y="215" font-family="'Archivo Black', sans-serif" font-size="60" fill="#0a0a0a">12</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №12 · Space</p>
+          <p class="t">Rooms That Hum</p>
+          <p class="d">December 2025</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="body">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 11 cover">
+            <rect width="300" height="400" fill="#b026ff"/>
+            <path d="M150,40 C90,40 90,160 150,180 C210,160 210,40 150,40 Z" fill="#d6ff2e"/>
+            <path d="M150,180 C100,200 80,360 150,380 C220,360 200,200 150,180 Z" fill="#00e5d4"/>
+            <text x="30" y="380" font-family="'Archivo Black', sans-serif" font-size="40" fill="#0a0a0a">11</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №11 · Body</p>
+          <p class="t">Soft Machines</p>
+          <p class="d">September 2025</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="type">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 10 cover">
+            <rect width="300" height="400" fill="#0a0a0a"/>
+            <text x="150" y="160" text-anchor="middle" font-family="'Archivo Black', sans-serif" font-size="150" fill="none" stroke="#d6ff2e" stroke-width="2">10</text>
+            <text x="150" y="280" text-anchor="middle" font-family="'Archivo Black', sans-serif" font-size="150" fill="#ff2e63" opacity="0.5">10</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №10 · Type</p>
+          <p class="t">Double Vision</p>
+          <p class="d">June 2025</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="sound">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 9 cover">
+            <rect width="300" height="400" fill="#ff7a00"/>
+            <g fill="#0a0a0a">
+              <rect x="40" y="100" width="22" height="200"/>
+              <rect x="80" y="60" width="22" height="280"/>
+              <rect x="120" y="140" width="22" height="120"/>
+              <rect x="160" y="40" width="22" height="320"/>
+              <rect x="200" y="120" width="22" height="160"/>
+              <rect x="240" y="80" width="22" height="240"/>
+            </g>
+            <text x="40" y="380" font-family="'Archivo Black', sans-serif" font-size="40" fill="#d6ff2e">09</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №09 · Sound</p>
+          <p class="t">Tape Hiss</p>
+          <p class="d">March 2025</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="space">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 8 cover">
+            <rect width="300" height="400" fill="#00e5d4"/>
+            <g stroke="#0a0a0a" stroke-width="3" fill="none">
+              <rect x="50" y="80" width="200" height="240" transform="skewX(-8)"/>
+              <rect x="80" y="120" width="200" height="240" transform="skewX(-8)"/>
+            </g>
+            <text x="200" y="380" font-family="'Archivo Black', sans-serif" font-size="40" fill="#0a0a0a">08</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №08 · Space</p>
+          <p class="t">Off Square</p>
+          <p class="d">December 2024</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="body">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 7 cover">
+            <rect width="300" height="400" fill="#d6ff2e"/>
+            <path d="M150,30 Q260,150 150,200 Q40,250 150,370" fill="none" stroke="#ff2e63" stroke-width="14"/>
+            <path d="M150,30 Q40,150 150,200 Q260,250 150,370" fill="none" stroke="#0a0a0a" stroke-width="4"/>
+            <text x="30" y="380" font-family="'Archivo Black', sans-serif" font-size="40" fill="#0a0a0a">07</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №07 · Body</p>
+          <p class="t">The Slump</p>
+          <p class="d">September 2024</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="type">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 6 cover">
+            <rect width="300" height="400" fill="#ff2e63"/>
+            <text x="150" y="240" text-anchor="middle" font-family="'Space Mono', monospace" font-weight="700" font-size="200" fill="#0a0a0a">?</text>
+            <text x="30" y="60" font-family="'Archivo Black', sans-serif" font-size="40" fill="#f3f0e7">06</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №06 · Type</p>
+          <p class="t">Glyph Anxiety</p>
+          <p class="d">June 2024</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="space">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 5 cover">
+            <rect width="300" height="400" fill="#0a0a0a"/>
+            <g stroke="#2e5bff" stroke-width="2" fill="none">
+              <circle cx="150" cy="200" r="40"/><circle cx="150" cy="200" r="80"/>
+              <circle cx="150" cy="200" r="120"/><circle cx="150" cy="200" r="160"/>
+            </g>
+            <text x="120" y="215" font-family="'Archivo Black', sans-serif" font-size="60" fill="#d6ff2e">05</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №05 · Space</p>
+          <p class="t">Concentric</p>
+          <p class="d">March 2024</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="sound">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 4 cover">
+            <rect width="300" height="400" fill="#f3f0e7"/>
+            <g stroke="#0a0a0a" stroke-width="3" fill="none">
+              <path d="M0,200 C50,80 100,320 150,200 S250,80 300,200"/>
+              <path d="M0,250 C50,130 100,370 150,250 S250,130 300,250" stroke="#ff7a00"/>
+            </g>
+            <text x="30" y="60" font-family="'Archivo Black', sans-serif" font-size="40" fill="#0a0a0a">04</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №04 · Sound</p>
+          <p class="t">Two Waves</p>
+          <p class="d">December 2023</p>
+        </div>
+      </article>
+
+      <article class="issue-card" data-theme="body">
+        <div class="issue-cover">
+          <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Issue 3 cover">
+            <rect width="300" height="400" fill="#b026ff"/>
+            <g fill="#d6ff2e">
+              <circle cx="100" cy="130" r="50"/><circle cx="200" cy="270" r="70"/>
+            </g>
+            <circle cx="100" cy="130" r="20" fill="#0a0a0a"/>
+            <circle cx="200" cy="270" r="28" fill="#0a0a0a"/>
+            <text x="30" y="380" font-family="'Archivo Black', sans-serif" font-size="40" fill="#0a0a0a">03</text>
+          </svg>
+        </div>
+        <div class="issue-meta">
+          <p class="n">Issue №03 · Body</p>
+          <p class="t">Eyes / Hands</p>
+          <p class="d">September 2023</p>
+        </div>
+      </article>
+
+    </div>
+
+    <section class="split" aria-labelledby="sub-h" style="border-top:var(--border-w) solid var(--line)">
+      <div class="split__left">
+        <h2 id="sub-h">Missed<br>One?</h2>
+        <p>Back issues are printed in tiny runs and sell out fast, but every cover story
+        lives on here forever. Subscribe and never miss a frequency.</p>
+      </div>
+      <div class="split__right">
+        <h3>From The Archive</h3>
+        <ol>
+          <li><span>Issue 09 — "Tape Hiss as Comfort" remains our most-read piece.</span></li>
+          <li><span>Issue 06 had a die-cut question mark on the cover. It jammed every guillotine in the city.</span></li>
+          <li><span>Issue 01 was 200 photocopies. We keep the last one in a drawer.</span></li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <span class="logo-mark">STATIC//NOISE</span>
+        <p>An independent, reader-funded zine about art, design, sound and the texture of now.</p>
+        <form class="footer-sub" aria-label="Newsletter signup">
+          <input type="email" placeholder="you@frequency.fm" aria-label="Email address" required>
+          <button type="submit">Tune in</button>
+        </form>
+      </div>
+      <nav class="footer-col" aria-label="Read links">
+        <p class="footer-col-title">Read</p>
+        <ul>
+          <li><a href="read.html">Cover Feature</a></li>
+          <li><a href="issues.html">All Issues</a></li>
+          <li><a href="read.html">Essays</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="About links">
+        <p class="footer-col-title">Zine</p>
+        <ul>
+          <li><a href="masthead.html">Masthead</a></li>
+          <li><a href="masthead.html">Contributors</a></li>
+          <li><a href="masthead.html">Submit Work</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="Follow links">
+        <p class="footer-col-title">Signal</p>
+        <ul>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">RSS Feed</a></li>
+          <li><a href="#">Print Shop</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p>© <span data-year>2026</span> STATIC//NOISE Editions.</p>
+      <div class="footer-legal">
+        <a href="#">Colophon</a><a href="#">Privacy</a><a href="#">Type "noise"</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

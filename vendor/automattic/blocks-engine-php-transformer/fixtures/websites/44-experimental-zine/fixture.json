@@ -1,0 +1,13 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "zine",
+    "experimental",
+    "editorial",
+    "has-form",
+    "has-nav",
+    "multipage",
+    "animation"
+  ],
+  "complexity": 3
+}

@@ -1,0 +1,21 @@
+{
+  "source": "ideal",
+  "_note": "IDEAL (content-anchored, currently faithful → ~100): a finish-palette image row is a group with its heading then a gallery of images. The heading content and every image source are asserted, so this 100 is earned by matching real content/structure, not derived-by-construction.",
+  "tree": [
+    {
+      "block": "core/group",
+      "children": [
+        { "block": "core/heading", "contains": "Finish palette" },
+        {
+          "block": "core/gallery",
+          "children": [
+            { "block": "core/image", "contains": "swatch.png" },
+            { "block": "core/image", "contains": "swatch.png" },
+            { "block": "core/image", "contains": "swatch.png" },
+            { "block": "core/image", "contains": "swatch.png" }
+          ]
+        }
+      ]
+    }
+  ]
+}

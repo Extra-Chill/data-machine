@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browse 147 remote jobs — Remote Roost</title>
+  <meta name="description" content="147 vetted, fully-remote jobs across engineering, design, product, marketing, operations, customer, data, and leadership. No 'remote-friendly' bait postings.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="site-header" role="banner">
+  <div class="site-header__inner">
+    <a href="index.html" class="brand" aria-label="Remote Roost — home">
+      <svg class="brand__mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="2" y="2" width="28" height="28" rx="6" fill="#1a5a5a"/>
+        <path d="M9 22 Q9 14 16 14 Q23 14 23 22 L23 24 L9 24 Z" fill="#f4ecda"/>
+        <circle cx="13" cy="18" r="1.6" fill="#1a5a5a"/>
+        <circle cx="19" cy="18" r="1.6" fill="#1a5a5a"/>
+        <path d="M14 10 L16 6 L18 10 Z" fill="#d97333"/>
+      </svg>
+      <span class="brand__name">Remote <span>Roost</span></span>
+    </a>
+    <nav class="main-nav" role="navigation" aria-label="Primary">
+      <a href="jobs.html" class="is-current">Browse jobs</a>
+      <a href="companies.html">Companies</a>
+      <a href="post-a-job.html">Post a job</a>
+      <a href="resources.html">Resources</a>
+      <a href="about.html">About</a>
+    </nav>
+    <div class="nav-actions">
+      <a href="post-a-job.html" class="btn btn--primary btn--sm">Post a job</a>
+    </div>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-controls="mobile-nav" aria-expanded="false">
+      <span class="nav-toggle__bars" aria-hidden="true"></span>
+    </button>
+  </div>
+  <div id="mobile-nav" class="mobile-nav">
+    <a href="jobs.html">Browse jobs</a>
+    <a href="companies.html">Companies</a>
+    <a href="post-a-job.html">Post a job</a>
+    <a href="resources.html">Resources</a>
+    <a href="about.html">About</a>
+    <a href="post-a-job.html" class="btn btn--primary btn--block">Post a job</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============================================================
+       HERO STRIP
+       ============================================================ -->
+  <section class="hero hero--compact">
+    <div class="container">
+      <div class="hero__eyebrow">
+        <span class="dot" aria-hidden="true"></span>
+        <span>Updated 14 minutes ago</span>
+      </div>
+      <h1>147 open remote roles</h1>
+      <p class="hero__dek">All fully remote. All salary-transparent. All vetted by a human before they go live. Filter by category, experience, or region — or just scroll, it's a good list.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FILTERS
+       ============================================================ -->
+  <section class="section section--sm" style="padding-top:24px;padding-bottom:24px;">
+    <div class="container">
+
+      <div class="filter-bar">
+        <span class="filter-bar__label">Category</span>
+        <button class="filter-chip is-active" type="button" aria-pressed="true">All <span class="count">147</span></button>
+        <button class="filter-chip" type="button">Engineering <span class="count">52</span></button>
+        <button class="filter-chip" type="button">Design <span class="count">18</span></button>
+        <button class="filter-chip" type="button">Product <span class="count">14</span></button>
+        <button class="filter-chip" type="button">Marketing <span class="count">11</span></button>
+        <button class="filter-chip" type="button">Customer <span class="count">17</span></button>
+        <button class="filter-chip" type="button">Operations <span class="count">12</span></button>
+        <button class="filter-chip" type="button">Data <span class="count">15</span></button>
+        <button class="filter-chip" type="button">Leadership <span class="count">8</span></button>
+      </div>
+
+      <div class="filter-bar">
+        <span class="filter-bar__label">Experience</span>
+        <button class="filter-chip is-active" type="button" aria-pressed="true">All experience</button>
+        <button class="filter-chip" type="button">Junior</button>
+        <button class="filter-chip" type="button">Mid</button>
+        <button class="filter-chip" type="button">Senior</button>
+        <button class="filter-chip" type="button">Staff+</button>
+      </div>
+
+      <div class="filter-bar">
+        <span class="filter-bar__label">Region</span>
+        <button class="filter-chip is-active" type="button" aria-pressed="true">All regions</button>
+        <button class="filter-chip" type="button">Worldwide</button>
+        <button class="filter-chip" type="button">US-only</button>
+        <button class="filter-chip" type="button">EU-only</button>
+        <button class="filter-chip" type="button">Americas</button>
+        <button class="filter-chip" type="button">EMEA</button>
+        <button class="filter-chip" type="button">APAC</button>
+        <button class="filter-chip" type="button">EU + Americas</button>
+      </div>
+
+      <div class="sort-bar">
+        <span class="sort-bar__count"><span class="total">147</span> jobs · showing 1–30</span>
+        <div class="sort-bar__sort">
+          <label for="sort" style="color:var(--rr-slate);">Sort:</label>
+          <select id="sort" class="select" data-sort>
+            <option>Newest first</option>
+            <option>Salary high to low</option>
+            <option>Salary low to high</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       LISTINGS — grouped by posted date
+       ============================================================ -->
+  <section class="section" style="padding-top:8px;">
+    <div class="container">
+
+      <!-- ─── Today ─────────────────────────────────────── -->
+      <div class="date-group">
+        <div class="date-group__label"><span>Today · Wed, Jun 24</span><span class="count">3 new</span></div>
+        <ul class="job-list">
+
+          <li class="job-row">
+            <div class="photo-block pb--teal job-row__logo" aria-label="Cellular logo">CL</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="job-senior-platform-engineer-cellular.html">Senior Platform Engineer</a></div>
+              <div class="job-row__company">Cellular <span class="dot">·</span> cellular IoT connectivity</div>
+              <div class="job-row__meta">
+                <span class="mono">$175K – $225K USD</span>
+                <span>Remote (US-only, any state)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-24">Today</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">Kubernetes</span>
+                <span class="chip">Go</span>
+                <span class="chip">Terraform</span>
+                <span class="chip">Postgres</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="job-senior-platform-engineer-cellular.html" class="btn btn--primary btn--sm">Apply</a>
+              <a href="job-senior-platform-engineer-cellular.html" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--berry job-row__logo" aria-label="Fieldwork logo">FW</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Backend Engineer, Billing</a></div>
+              <div class="job-row__company">Fieldwork <span class="dot">·</span> research-ops platform</div>
+              <div class="job-row__meta">
+                <span class="mono">€85K – €120K EUR</span>
+                <span>Remote (EU + UK, GMT to GMT+3)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-24">Today</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">Ruby</span>
+                <span class="chip">Rails</span>
+                <span class="chip">Stripe</span>
+                <span class="chip">Postgres</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--amber job-row__logo" aria-label="Halftone logo">HT</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Product Designer (Brand &amp; Marketing)</a></div>
+              <div class="job-row__company">Halftone <span class="dot">·</span> design tooling</div>
+              <div class="job-row__meta">
+                <span class="mono">$130K – $160K USD</span>
+                <span>Remote (Americas, ±3h ET)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-24">Today</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Mid–Senior</span>
+                <span class="chip">Brand</span>
+                <span class="chip">Figma</span>
+                <span class="chip">Webflow</span>
+                <span class="chip">Motion</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+        </ul>
+      </div>
+
+      <!-- ─── Yesterday ─────────────────────────────────── -->
+      <div class="date-group">
+        <div class="date-group__label"><span>Yesterday · Tue, Jun 23</span><span class="count">6 new</span></div>
+        <ul class="job-list">
+
+          <li class="job-row">
+            <div class="photo-block pb--ochre job-row__logo" aria-label="Citation Network logo">CN</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Data Engineer (Streaming)</a></div>
+              <div class="job-row__company">Citation Network <span class="dot">·</span> scholarly publishing</div>
+              <div class="job-row__meta">
+                <span class="mono">$155K – $195K USD</span>
+                <span>Remote (Worldwide)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-23">1d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">Kafka</span>
+                <span class="chip">ClickHouse</span>
+                <span class="chip">Python</span>
+                <span class="chip">dbt</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--copper job-row__logo" aria-label="Pyrite logo">PY</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Engineering Manager, Mobile</a></div>
+              <div class="job-row__company">Pyrite <span class="dot">·</span> developer tools</div>
+              <div class="job-row__meta">
+                <span class="mono">$210K – $260K USD</span>
+                <span>Remote (US, any state)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-23">1d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Staff+</span>
+                <span class="chip">Management</span>
+                <span class="chip">iOS</span>
+                <span class="chip">Android</span>
+                <span class="chip">React Native</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--rust job-row__logo" aria-label="Solstice Software logo">SS</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Developer Relations Engineer</a></div>
+              <div class="job-row__company">Solstice Software <span class="dot">·</span> CI/CD platform</div>
+              <div class="job-row__meta">
+                <span class="mono">£75K – £100K GBP</span>
+                <span>Remote (EMEA)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-23">1d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">DevRel</span>
+                <span class="chip">Go</span>
+                <span class="chip">Public speaking</span>
+                <span class="chip">Writing</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--ink job-row__logo" aria-label="Northgate Studio logo">NS</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Lead Motion Designer</a></div>
+              <div class="job-row__company">Northgate Studio <span class="dot">·</span> interactive agency</div>
+              <div class="job-row__meta">
+                <span class="mono">€70K – €95K EUR</span>
+                <span>Remote (EU + UK)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-23">1d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">After Effects</span>
+                <span class="chip">Cinema 4D</span>
+                <span class="chip">Lottie</span>
+                <span class="chip">Direction</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--moss job-row__logo" aria-label="Beanstalk logo">BS</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Customer Operations Lead</a></div>
+              <div class="job-row__company">Beanstalk <span class="dot">·</span> nursery management SaaS</div>
+              <div class="job-row__meta">
+                <span class="mono">$95K – $130K USD</span>
+                <span>Remote (Worldwide)</span>
+                <span>Full-time · 4-day week</span>
+                <time datetime="2026-06-23">1d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Mid–Senior</span>
+                <span class="chip">CS</span>
+                <span class="chip">Support</span>
+                <span class="chip">Async</span>
+                <span class="chip">Zendesk</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--ocean job-row__logo" aria-label="Beacon Health logo">BH</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Product Manager, Growth</a></div>
+              <div class="job-row__company">Beacon Health <span class="dot">·</span> telemedicine</div>
+              <div class="job-row__meta">
+                <span class="mono">$170K – $210K USD</span>
+                <span>Remote (US-only)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-23">1d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">PM</span>
+                <span class="chip">Growth</span>
+                <span class="chip">HIPAA</span>
+                <span class="chip">Amplitude</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+        </ul>
+      </div>
+
+      <!-- ─── This week ─────────────────────────────────── -->
+      <div class="date-group">
+        <div class="date-group__label"><span>This week</span><span class="count">11 jobs</span></div>
+        <ul class="job-list">
+
+          <li class="job-row">
+            <div class="photo-block pb--sage job-row__logo" aria-label="Mossy Logic logo">ML</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Site Reliability Engineer</a></div>
+              <div class="job-row__company">Mossy Logic <span class="dot">·</span> log-search infrastructure</div>
+              <div class="job-row__meta">
+                <span class="mono">$170K – $215K USD</span>
+                <span>Remote (Worldwide)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-21">3d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">SRE</span>
+                <span class="chip">Rust</span>
+                <span class="chip">Kubernetes</span>
+                <span class="chip">eBPF</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--slate job-row__logo" aria-label="Greylock Labs logo">GL</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Customer Success Manager (Mid-Market)</a></div>
+              <div class="job-row__company">Greylock Labs <span class="dot">·</span> security tooling</div>
+              <div class="job-row__meta">
+                <span class="mono">$110K – $145K USD</span>
+                <span>Remote (US-only)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-21">3d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Mid</span>
+                <span class="chip">CS</span>
+                <span class="chip">Enterprise</span>
+                <span class="chip">Salesforce</span>
+                <span class="chip">B2B</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--plum job-row__logo" aria-label="Tideline AI logo">TL</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Staff Machine Learning Engineer</a></div>
+              <div class="job-row__company">Tideline AI <span class="dot">·</span> ML observability</div>
+              <div class="job-row__meta">
+                <span class="mono">$230K – $310K USD</span>
+                <span>Remote (US + Canada)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-20">4d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Staff+</span>
+                <span class="chip">PyTorch</span>
+                <span class="chip">CUDA</span>
+                <span class="chip">Distributed</span>
+                <span class="chip">Python</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--cobalt job-row__logo" aria-label="Brigantine logo">BR</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Frontend Engineer (React)</a></div>
+              <div class="job-row__company">Brigantine <span class="dot">·</span> docs &amp; knowledge tools</div>
+              <div class="job-row__meta">
+                <span class="mono">$140K – $180K USD</span>
+                <span>Remote (Worldwide)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-19">5d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">React</span>
+                <span class="chip">TypeScript</span>
+                <span class="chip">Tiptap</span>
+                <span class="chip">CRDTs</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--terracotta job-row__logo" aria-label="Saltbox logo">SX</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Head of Marketing</a></div>
+              <div class="job-row__company">Saltbox <span class="dot">·</span> small-business CRM</div>
+              <div class="job-row__meta">
+                <span class="mono">$185K – $235K USD + equity</span>
+                <span>Remote (US-only)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-19">5d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Leadership</span>
+                <span class="chip">B2B SaaS</span>
+                <span class="chip">SEO</span>
+                <span class="chip">Lifecycle</span>
+                <span class="chip">Team building</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--teal job-row__logo" aria-label="Cellular logo">CL</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Solutions Engineer</a></div>
+              <div class="job-row__company">Cellular <span class="dot">·</span> cellular IoT connectivity</div>
+              <div class="job-row__meta">
+                <span class="mono">$155K – $195K USD</span>
+                <span>Remote (US-only)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-18">6d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">SE</span>
+                <span class="chip">APIs</span>
+                <span class="chip">Embedded</span>
+                <span class="chip">B2B</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--amber job-row__logo" aria-label="Halftone logo">HT</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Staff Product Designer, Design Systems</a></div>
+              <div class="job-row__company">Halftone <span class="dot">·</span> design tools</div>
+              <div class="job-row__meta">
+                <span class="mono">$160K – $200K USD</span>
+                <span>Remote (Americas, ±3h ET)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-18">6d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Staff</span>
+                <span class="chip">Design systems</span>
+                <span class="chip">Figma</span>
+                <span class="chip">Tokens</span>
+                <span class="chip">Documentation</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--berry job-row__logo" aria-label="Fieldwork logo">FW</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Research Operations Manager</a></div>
+              <div class="job-row__company">Fieldwork <span class="dot">·</span> research-ops platform</div>
+              <div class="job-row__meta">
+                <span class="mono">€72K – €95K EUR</span>
+                <span>Remote (EU + UK)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-17">7d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">ResearchOps</span>
+                <span class="chip">Recruiting</span>
+                <span class="chip">UXR</span>
+                <span class="chip">Vendors</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--ochre job-row__logo" aria-label="Citation Network logo">CN</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Software Engineer, Search</a></div>
+              <div class="job-row__company">Citation Network <span class="dot">·</span> scholarly publishing</div>
+              <div class="job-row__meta">
+                <span class="mono">$150K – $190K USD</span>
+                <span>Remote (Worldwide)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-17">7d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">OpenSearch</span>
+                <span class="chip">Python</span>
+                <span class="chip">Ranking</span>
+                <span class="chip">Embeddings</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--copper job-row__logo" aria-label="Pyrite logo">PY</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Junior Backend Engineer</a></div>
+              <div class="job-row__company">Pyrite <span class="dot">·</span> developer tools</div>
+              <div class="job-row__meta">
+                <span class="mono">$95K – $125K USD</span>
+                <span>Remote (US, any state)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-17">7d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Junior</span>
+                <span class="chip">Go</span>
+                <span class="chip">Postgres</span>
+                <span class="chip">gRPC</span>
+                <span class="chip">Mentorship</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--rust job-row__logo" aria-label="Solstice Software logo">SS</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Backend Engineer, Pipelines</a></div>
+              <div class="job-row__company">Solstice Software <span class="dot">·</span> CI/CD platform</div>
+              <div class="job-row__meta">
+                <span class="mono">£90K – £125K GBP</span>
+                <span>Remote (EMEA)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-17">7d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">Go</span>
+                <span class="chip">Buildkit</span>
+                <span class="chip">Docker</span>
+                <span class="chip">Caching</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+        </ul>
+      </div>
+
+      <!-- ─── This month ────────────────────────────────── -->
+      <div class="date-group">
+        <div class="date-group__label"><span>Earlier this month</span><span class="count">8 jobs</span></div>
+        <ul class="job-list">
+
+          <li class="job-row">
+            <div class="photo-block pb--moss job-row__logo" aria-label="Beanstalk logo">BS</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Rails Engineer</a></div>
+              <div class="job-row__company">Beanstalk <span class="dot">·</span> nursery management SaaS</div>
+              <div class="job-row__meta">
+                <span class="mono">$140K – $175K USD</span>
+                <span>Remote (Worldwide)</span>
+                <span>Full-time · 4-day week</span>
+                <time datetime="2026-06-12">12d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">Rails</span>
+                <span class="chip">Hotwire</span>
+                <span class="chip">Postgres</span>
+                <span class="chip">RSpec</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--ocean job-row__logo" aria-label="Beacon Health logo">BH</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Director of Engineering, Clinical</a></div>
+              <div class="job-row__company">Beacon Health <span class="dot">·</span> telemedicine</div>
+              <div class="job-row__meta">
+                <span class="mono">$240K – $295K USD + equity</span>
+                <span>Remote (US-only)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-11">13d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Leadership</span>
+                <span class="chip">Director</span>
+                <span class="chip">HIPAA</span>
+                <span class="chip">Healthcare</span>
+                <span class="chip">EHR</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--sand job-row__logo" aria-label="Driftwood logo">DW</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Content Marketing Manager</a></div>
+              <div class="job-row__company">Driftwood <span class="dot">·</span> remote-team payroll</div>
+              <div class="job-row__meta">
+                <span class="mono">$115K – $145K USD</span>
+                <span>Remote (Americas)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-10">14d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">Content</span>
+                <span class="chip">B2B</span>
+                <span class="chip">SEO</span>
+                <span class="chip">Editorial</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--cobalt job-row__logo" aria-label="Brigantine logo">BR</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Engineering Manager, Editor</a></div>
+              <div class="job-row__company">Brigantine <span class="dot">·</span> docs &amp; knowledge tools</div>
+              <div class="job-row__meta">
+                <span class="mono">$200K – $250K USD</span>
+                <span>Remote (Worldwide)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-08">16d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Staff+</span>
+                <span class="chip">Management</span>
+                <span class="chip">Frontend</span>
+                <span class="chip">Performance</span>
+                <span class="chip">Hiring</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--terracotta job-row__logo" aria-label="Saltbox logo">SX</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Mid-Level Backend Engineer (Elixir)</a></div>
+              <div class="job-row__company">Saltbox <span class="dot">·</span> small-business CRM</div>
+              <div class="job-row__meta">
+                <span class="mono">$120K – $155K USD</span>
+                <span>Remote (US-only)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-07">17d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Mid</span>
+                <span class="chip">Elixir</span>
+                <span class="chip">Phoenix</span>
+                <span class="chip">LiveView</span>
+                <span class="chip">Postgres</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--sage job-row__logo" aria-label="Mossy Logic logo">ML</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Technical Writer</a></div>
+              <div class="job-row__company">Mossy Logic <span class="dot">·</span> log-search infrastructure</div>
+              <div class="job-row__meta">
+                <span class="mono">$130K – $165K USD</span>
+                <span>Remote (Worldwide)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-06">18d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">Docs</span>
+                <span class="chip">API reference</span>
+                <span class="chip">DITA</span>
+                <span class="chip">Markdown</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--plum job-row__logo" aria-label="Tideline AI logo">TL</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Backend Engineer, Inference</a></div>
+              <div class="job-row__company">Tideline AI <span class="dot">·</span> ML observability</div>
+              <div class="job-row__meta">
+                <span class="mono">$180K – $230K USD</span>
+                <span>Remote (US + Canada)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-05">19d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">Go</span>
+                <span class="chip">gRPC</span>
+                <span class="chip">Triton</span>
+                <span class="chip">GPU</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--slate job-row__logo" aria-label="Greylock Labs logo">GL</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Senior Security Engineer</a></div>
+              <div class="job-row__company">Greylock Labs <span class="dot">·</span> security tooling</div>
+              <div class="job-row__meta">
+                <span class="mono">$185K – $230K USD</span>
+                <span>Remote (US-only)</span>
+                <span>Full-time</span>
+                <time datetime="2026-06-03">21d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">AppSec</span>
+                <span class="chip">Threat modeling</span>
+                <span class="chip">Burp</span>
+                <span class="chip">SOC 2</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+        </ul>
+      </div>
+
+      <!-- ─── Older ──────────────────────────────────── -->
+      <div class="date-group">
+        <div class="date-group__label"><span>Older (still active)</span><span class="count">2 jobs</span></div>
+        <ul class="job-list">
+
+          <li class="job-row">
+            <div class="photo-block pb--sand job-row__logo" aria-label="Driftwood logo">DW</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Part-time Payroll Specialist (EOR)</a></div>
+              <div class="job-row__company">Driftwood <span class="dot">·</span> remote-team payroll</div>
+              <div class="job-row__meta">
+                <span class="mono">$45 – $65/hr USD</span>
+                <span>Remote (Worldwide)</span>
+                <span>Part-time · 20h/wk</span>
+                <time datetime="2026-05-22">33d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Mid</span>
+                <span class="chip">Part-time</span>
+                <span class="chip">EOR</span>
+                <span class="chip">Compliance</span>
+                <span class="chip">Multi-country</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+          <li class="job-row">
+            <div class="photo-block pb--ink job-row__logo" aria-label="Northgate Studio logo">NS</div>
+            <div class="job-row__body">
+              <div class="job-row__title"><a href="#">Contract Brand Designer (3 months)</a></div>
+              <div class="job-row__company">Northgate Studio <span class="dot">·</span> interactive agency</div>
+              <div class="job-row__meta">
+                <span class="mono">€450 – €650/day EUR</span>
+                <span>Remote (EU + UK)</span>
+                <span>Contract · 3 months</span>
+                <time datetime="2026-05-08">47d ago</time>
+              </div>
+              <div class="job-row__tags">
+                <span class="chip chip--teal">Senior</span>
+                <span class="chip">Contract</span>
+                <span class="chip">Brand</span>
+                <span class="chip">Identity</span>
+                <span class="chip">Typography</span>
+              </div>
+            </div>
+            <div class="job-row__actions">
+              <a href="#" class="btn btn--primary btn--sm">Apply</a>
+              <a href="#" class="btn btn--ghost btn--sm">View</a>
+            </div>
+          </li>
+
+        </ul>
+      </div>
+
+      <!-- ─── Pagination ─────────────────────────────────── -->
+      <nav class="pagination" aria-label="Pagination">
+        <a href="#" class="prev" aria-label="Previous page">← Prev</a>
+        <span class="is-current" aria-current="page">1</span>
+        <a href="#">2</a>
+        <a href="#">3</a>
+        <a href="#">4</a>
+        <span class="ellipsis" aria-hidden="true">…</span>
+        <a href="#">8</a>
+        <a href="#" class="next" aria-label="Next page">Next →</a>
+      </nav>
+
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="site-footer__cols">
+      <div class="site-footer__about">
+        <a href="index.html" class="brand" aria-label="Remote Roost — home">
+          <svg class="brand__mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2" y="2" width="28" height="28" rx="6" fill="#1a5a5a"/>
+            <path d="M9 22 Q9 14 16 14 Q23 14 23 22 L23 24 L9 24 Z" fill="#f4ecda"/>
+            <circle cx="13" cy="18" r="1.6" fill="#1a5a5a"/>
+            <circle cx="19" cy="18" r="1.6" fill="#1a5a5a"/>
+            <path d="M14 10 L16 6 L18 10 Z" fill="#d97333"/>
+          </svg>
+          <span class="brand__name">Remote <span>Roost</span></span>
+        </a>
+        <p>Real remote jobs at companies that get it. Independent, vetted, founded in 2018 by two burned-out hybrid refugees.</p>
+      </div>
+      <div class="site-footer__col">
+        <h6>Browse</h6>
+        <ul>
+          <li><a href="jobs.html">All jobs</a></li>
+          <li><a href="jobs.html">Engineering</a></li>
+          <li><a href="jobs.html">Design</a></li>
+          <li><a href="jobs.html">Product</a></li>
+          <li><a href="companies.html">Companies</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h6>For employers</h6>
+        <ul>
+          <li><a href="post-a-job.html">Post a job</a></li>
+          <li><a href="post-a-job.html">Pricing</a></li>
+          <li><a href="post-a-job.html">Editorial standards</a></li>
+          <li><a href="post-a-job.html">Featured slots</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h6>About</h6>
+        <ul>
+          <li><a href="about.html">Our story</a></li>
+          <li><a href="about.html">Team</a></li>
+          <li><a href="resources.html">Resources</a></li>
+          <li><a href="about.html">Contact</a></li>
+        </ul>
+      </div>
+      <div class="site-footer__col">
+        <h6>Legal</h6>
+        <ul>
+          <li><a href="#">Terms</a></li>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Cookies</a></li>
+          <li><a href="#">DMCA</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="site-footer__bottom">
+      <span>© 2018–2026 Remote Roost Ltd. Made by humans in Berlin &amp; Lisbon.</span>
+      <div class="site-footer__social" aria-label="Social links">
+        <a href="#" aria-label="Mastodon">Mt</a>
+        <a href="#" aria-label="LinkedIn">In</a>
+        <a href="#" aria-label="Bluesky">Bs</a>
+        <a href="#" aria-label="RSS">Rs</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

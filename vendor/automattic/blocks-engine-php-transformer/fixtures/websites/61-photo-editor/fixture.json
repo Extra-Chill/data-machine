@@ -1,0 +1,11 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "photo-editor",
+    "image-editor",
+    "canvas",
+    "app",
+    "creative-tool"
+  ],
+  "complexity": 4
+}

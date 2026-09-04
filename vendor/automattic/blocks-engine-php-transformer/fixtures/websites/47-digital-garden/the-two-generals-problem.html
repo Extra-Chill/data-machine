@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Two Generals Problem — Mara's Garden</title>
+  <meta name="description" content="A note from Mara Okonkwo's digital garden on distributed systems, note-taking, stoicism, and gardening.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/garden.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-leaf" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 28 C16 18 8 14 5 6 C16 6 24 12 24 22 C24 25 21 28 16 28 Z" fill="#3a7d52" opacity=".9"/>
+          <path d="M16 28 C16 20 19 13 24 8" fill="none" stroke="#fbf9f3" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="16" cy="28" r="2" fill="#b08b2e"/>
+        </svg>
+        <h1><a href="index.html">Mara's Garden</a></h1>
+      </div>
+      <p class="brand-tag">a digital garden by Mara Okonkwo</p>
+
+      <div class="search-box">
+        <span class="s-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="note-search" placeholder="Search notes  (press /)" aria-label="Search notes" autocomplete="off">
+        <ul class="search-results" id="search-results" aria-live="polite"></ul>
+      </div>
+
+      <nav aria-label="Garden navigation">
+      <p class="nav-section">Home</p>
+      <ul class="nav-list"><li><a href="index.html" class=""><span class="ripe">🌱</span><span>Start Here · MOC</span></a></li>
+      <li><a href="tags.html" class=""><span class="ripe">🏷️</span><span>Tags &amp; Index</span></a></li></ul>
+      
+        <p class="nav-section">Distributed Systems</p>
+        <ul class="nav-list">
+          <li><a href="idempotency-is-a-superpower.html" class=""><span class="ripe">🌳</span><span>Idempotency Is a Superpower</span></a></li>
+          <li><a href="the-two-generals-problem.html" class="current"><span class="ripe">🌿</span><span>The Two Generals Problem</span></a></li>
+          <li><a href="why-i-stopped-trusting-wall-clocks.html" class=""><span class="ripe">🌿</span><span>Why I Stopped Trusting Wall Clocks</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Knowledge &amp; Notes</p>
+        <ul class="nav-list">
+          <li><a href="on-tending-a-digital-garden.html" class=""><span class="ripe">🌳</span><span>On Tending a Digital Garden</span></a></li>
+          <li><a href="evergreen-notes.html" class=""><span class="ripe">🌳</span><span>Evergreen Notes</span></a></li>
+          <li><a href="book-how-to-take-smart-notes.html" class=""><span class="ripe">🌿</span><span>Book — How to Take Smart Notes</span></a></li>
+        </ul>
+      
+        <p class="nav-section">Stoicism</p>
+        <ul class="nav-list">
+          <li><a href="the-dichotomy-of-control.html" class=""><span class="ripe">🌳</span><span>The Dichotomy of Control</span></a></li>
+          <li><a href="amor-fati.html" class=""><span class="ripe">🌿</span><span>Amor Fati</span></a></li>
+        </ul>
+      
+        <p class="nav-section">The Garden</p>
+        <ul class="nav-list">
+          <li><a href="compost-is-a-distributed-system.html" class=""><span class="ripe">🌿</span><span>Compost Is a Distributed System</span></a></li>
+          <li><a href="three-sisters-planting.html" class=""><span class="ripe">🌰</span><span>Three Sisters Planting</span></a></li>
+        </ul>
+      </nav>
+
+      <button class="theme-toggle" type="button" aria-pressed="false">☾ <span>Dark</span></button>
+    </aside>
+    <main class="content" id="main">
+      <article class="note">
+        <p class="breadcrumb"><a href="index.html">🌱 Garden</a> &nbsp;›&nbsp; The Two Generals Problem</p>
+        <h1>The Two Generals Problem</h1>
+        <div class="note-meta">
+          <span class="ripeness budding">🌿 Budding</span>
+          <span class="dot"></span>
+          <span>planted Mar 10, 2024</span>
+          <span class="dot"></span>
+          <span>tended Jan 22, 2026</span>
+        </div>
+        <div class="tag-list"><a class="tag" href="tags.html#budding">#budding</a><a class="tag" href="tags.html#distributed-systems">#distributed-systems</a><a class="tag" href="tags.html#theory">#theory</a></div>
+        <div class="prose">
+
+<p>Two generals, A and B, are camped on opposite hills with the enemy in the valley between them. They can only win if they attack <em>at the same time</em>. Their only way to communicate is to send a messenger <em>through</em> the valley — where the messenger may be captured.</p>
+<p>The question: can they ever agree on a time to attack?</p>
+<p><strong>No.</strong> Provably not. And the proof is short and devastating.</p>
+<h2 id="proof">The proof (by contradiction) <a class="anchor" href="#proof">#</a></h2>
+<p>Suppose some finite exchange of messages <code>m₁, m₂, … mₙ</code> is sufficient to coordinate the attack. Consider the <em>last</em> message, <code>mₙ</code>. Since any message can be lost, the sender of <code>mₙ</code> cannot know it arrived. So <code>mₙ</code> cannot be necessary — the generals must have already been committed before sending it. But then <code>mₙ₋₁</code> is now the last message, and the same argument applies to it. By induction, <em>no</em> message is necessary, which means zero messages suffice — absurd. Therefore no finite protocol works. ∎</p>
+<h2 id="costume">Why this is the most important "no" in computing <a class="anchor" href="#costume">#</a></h2>
+<p>Almost every hard problem in distributed systems is the Two Generals Problem wearing a costume:</p>
+<ul>
+  <li><strong>"Did my payment go through?"</strong> → see <a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a>. We can't guarantee delivery, so we make the operation safe to repeat instead.</li>
+  <li><strong>"Are these two database replicas in sync?"</strong> → you can have consistency or availability under a partition, not both (CAP). The partition <em>is</em> the captured messenger.</li>
+  <li><strong>"Did the other service get my event?"</strong> → at-most-once vs at-least-once delivery. You must pick which failure you can tolerate; you cannot have exactly-once <em>delivery</em>.</li>
+</ul>
+<h2 id="lesson">The practical lesson <a class="anchor" href="#lesson">#</a></h2>
+<p>You don't <em>solve</em> Two Generals. You <strong>route around it.</strong> The two industrial escape hatches:</p>
+<ol>
+  <li><strong>Make actions idempotent</strong> so duplicate delivery is harmless (<a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a>). This trades the impossible "exactly-once delivery" for the achievable "at-least-once delivery + exactly-once <em>effect</em>."</li>
+  <li><strong>Accept eventual agreement</strong> instead of instantaneous agreement. Most systems don't actually need the generals to attack at the <em>same instant</em> — they need them to converge.</li>
+</ol>
+<p>A surprising amount of engineering maturity is learning to recognize a Two Generals problem early and stop trying to defeat physics. That recognition is itself a kind of <a class="internal" data-slug="the-dichotomy-of-control" href="the-dichotomy-of-control.html">The Dichotomy of Control</a>: some uncertainty is simply not up to you.</p>
+        </div>
+
+      <section class="backlinks" aria-labelledby="bl-h">
+        <h2 id="bl-h">Linked references</h2>
+        <p class="bl-sub">5 notes link to this one.</p>
+        <ul>
+        <li><a class="internal" data-slug="index" href="index.html">Start Here</a><div class="bl-ctx">Listed under Distributed systems in the MOC.</div></li>
+        <li><a class="internal" data-slug="idempotency-is-a-superpower" href="idempotency-is-a-superpower.html">Idempotency Is a Superpower</a><div class="bl-ctx">Cited twice as the proof that exactly-once delivery is impossible.</div></li>
+        <li><a class="internal" data-slug="why-i-stopped-trusting-wall-clocks" href="why-i-stopped-trusting-wall-clocks.html">Why I Stopped Trusting Wall Clocks</a><div class="bl-ctx">Same impossibility — "no free shared clock for the same reason there's no reliable messenger."</div></li>
+        <li><a class="internal" data-slug="the-dichotomy-of-control" href="the-dichotomy-of-control.html">The Dichotomy of Control</a><div class="bl-ctx">Used as the canonical example of an uncontrollable in engineering.</div></li>
+        <li><a class="internal" data-slug="compost-is-a-distributed-system" href="compost-is-a-distributed-system.html">Compost Is a Distributed System</a><div class="bl-ctx">The compost is noted to have NO Two Generals problem because it needs no coordination.</div></li>
+        </ul>
+      </section>
+      </article>
+    </main>
+
+    <aside class="right-rail">
+      <div class="rail-card">
+        <p class="rail-title">On this page</p>
+        <ul class="toc">
+          <li class=""><a href="#proof">The proof (by contradiction)</a></li>
+          <li class=""><a href="#costume">The most important "no"</a></li>
+          <li class=""><a href="#lesson">The practical lesson</a></li>
+        </ul>
+      </div>
+      <div class="rail-card">
+        <p class="rail-title">Graph view</p>
+        <svg id="graph" class="graph-svg" data-current="the-two-generals-problem" role="img" aria-label="Graph of how notes in the garden connect"></svg>
+        <p class="graph-hint">Hover a node to spotlight its links. Click to jump.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-foot">
+    <span>🌱 Mara's Garden · tended on Sundays · last commit Jun 19, 2026</span>
+    <span>Built with <a href="quartz.config.ts">Quartz 4</a> from the markdown in <code style="font-family:var(--font-mono);font-size:.8rem">notes/</code> · <a href="https://github.com">source</a></span>
+  </footer>
+  <script src="js/garden.js"></script>
+</body>
+</html>

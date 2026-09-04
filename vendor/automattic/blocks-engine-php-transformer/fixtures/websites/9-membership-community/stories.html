@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Member Stories — Common Table</title>
+  <meta name="description" content="Hear from Common Table members — how they found the club, what kept them coming back, and what changed.">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Testimonial cards grid */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      margin-bottom: 5rem;
+    }
+    @media (max-width: 900px) { .testimonials-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 580px) { .testimonials-grid { grid-template-columns: 1fr; } }
+
+    /* Full-length story section */
+    .stories-section { background-color: var(--warm-white); }
+
+    /* Avatar colors */
+    .av-marcelline { background: linear-gradient(135deg, #C8A890, #DEB898); }
+    .av-theo       { background: linear-gradient(135deg, #9BB8A0, #B8D0B8); }
+    .av-simone     { background: linear-gradient(135deg, #A898C8, #C4B8D8); }
+    .av-baba       { background: linear-gradient(135deg, #A8C4B8, #C0D8C8); }
+    .av-kezia      { background: linear-gradient(135deg, #D4A888, #E8C0A0); }
+    .av-rafael     { background: linear-gradient(135deg, #90A8C0, #B0C8D8); }
+
+    /* Pull banner */
+    .story-banner {
+      background-color: var(--sage);
+      color: var(--warm-white);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem;
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+    .story-banner p {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 1.35rem;
+      line-height: 1.45;
+      margin-bottom: 0.75rem;
+    }
+    .story-banner small {
+      font-family: var(--font-hand);
+      font-size: 1rem;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────────────── -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      Common Table
+    </a>
+    <button class="hamburger" aria-label="Open navigation menu" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-menu" id="nav-menu" role="list">
+      <li><a href="index.html"       class="nav-link">Home</a></li>
+      <li><a href="gatherings.html"  class="nav-link">Gatherings</a></li>
+      <li><a href="organizers.html"  class="nav-link">Organizers</a></li>
+      <li><a href="stories.html"     class="nav-link">Stories</a></li>
+      <li><a href="membership.html"  class="nav-link">Membership</a></li>
+      <li><a href="faq.html"         class="nav-link">FAQ</a></li>
+      <li><a href="membership.html"  class="nav-cta">Join Us</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+
+<!-- ── PAGE HERO ─────────────────────────────────────────────── -->
+<header class="page-hero">
+  <div class="container">
+    <span class="overline">In their own words</span>
+    <h1>Member Stories</h1>
+    <p class="lead">What happens when a neighborhood stops being a backdrop and starts being a community.</p>
+  </div>
+</header>
+
+<!-- ── QUICK TESTIMONIALS ───────────────────────────────────── -->
+<section class="section--sm">
+  <div class="container">
+    <div class="testimonials-grid" data-stagger="100">
+
+      <article class="testimonial-card">
+        <div class="testimonial-qmark" aria-hidden="true">"</div>
+        <p class="testimonial-text">
+          I'd been in this neighborhood for four years and could name maybe three people on my street. After one potluck, I had people waving to me from their porches. It really is that simple.
+        </p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar av-marcelline" style="border-radius:50%; width:42px; height:42px; overflow:hidden; flex-shrink:0;">
+            <svg viewBox="0 0 42 42" fill="none" width="42" height="42">
+              <ellipse cx="21" cy="46" rx="16" ry="14" fill="#C05A36" opacity="0.6"/>
+              <circle cx="21" cy="17" r="12" fill="#D4A870"/>
+              <path d="M9 17 C9 4 33 4 33 17" fill="#2C1A0E" opacity="0.85"/>
+            </svg>
+          </div>
+          <div>
+            <p class="testimonial-name">Marcelline Osei</p>
+            <p class="testimonial-meta">Member since May 2024</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="testimonial-card">
+        <div class="testimonial-qmark" aria-hidden="true">"</div>
+        <p class="testimonial-text">
+          My father taught me his mother's bread recipe at the skill share. We'd never actually cooked together before, just the two of us. I don't know how to explain what that meant.
+        </p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar av-baba" style="border-radius:50%; width:42px; height:42px; overflow:hidden; flex-shrink:0;">
+            <svg viewBox="0 0 42 42" fill="none" width="42" height="42">
+              <ellipse cx="21" cy="46" rx="16" ry="14" fill="#4A6741" opacity="0.6"/>
+              <circle cx="21" cy="17" r="12" fill="#C8A870"/>
+              <path d="M9 17 C9 5 33 5 33 17" fill="#5A4A20" opacity="0.75"/>
+            </svg>
+          </div>
+          <div>
+            <p class="testimonial-name">Baba Kurosaki</p>
+            <p class="testimonial-meta">Member since November 2023</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="testimonial-card">
+        <div class="testimonial-qmark" aria-hidden="true">"</div>
+        <p class="testimonial-text">
+          I'm 71 years old and I've never talked about a book this hard in my life. Priya's reading circles are the most intellectually alive I've felt since I stopped teaching.
+        </p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar av-simone" style="border-radius:50%; width:42px; height:42px; overflow:hidden; flex-shrink:0;">
+            <svg viewBox="0 0 42 42" fill="none" width="42" height="42">
+              <ellipse cx="21" cy="46" rx="16" ry="14" fill="#8898C0" opacity="0.6"/>
+              <circle cx="21" cy="17" r="12" fill="#D4B890"/>
+              <circle cx="21" cy="11" r="8" fill="#9A9A9A" opacity="0.7"/>
+            </svg>
+          </div>
+          <div>
+            <p class="testimonial-name">Simone Whitfield</p>
+            <p class="testimonial-meta">Member since February 2022</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="testimonial-card">
+        <div class="testimonial-qmark" aria-hidden="true">"</div>
+        <p class="testimonial-text">
+          We joined as a family. My kids helped paint a mural, learned to make tamales, and now both volunteer to help set up at gatherings. This is what I wanted when we moved here.
+        </p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar av-kezia" style="border-radius:50%; width:42px; height:42px; overflow:hidden; flex-shrink:0;">
+            <svg viewBox="0 0 42 42" fill="none" width="42" height="42">
+              <ellipse cx="21" cy="46" rx="16" ry="14" fill="#C05A36" opacity="0.5"/>
+              <circle cx="21" cy="17" r="12" fill="#E8C0A0"/>
+              <path d="M9 17 C9 4 33 4 33 17" fill="#1E1208" opacity="0.8"/>
+              <circle cx="21" cy="10" r="9" fill="#1E1208" opacity="0.8"/>
+            </svg>
+          </div>
+          <div>
+            <p class="testimonial-name">Kezia Adeyemi</p>
+            <p class="testimonial-meta">Member since March 2025</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="testimonial-card">
+        <div class="testimonial-qmark" aria-hidden="true">"</div>
+        <p class="testimonial-text">
+          I moved here from Monterrey and the first gathering I attended felt like a birthday party I'd been invited to by mistake — in the best possible way. Nobody made me feel like a guest.
+        </p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar av-rafael" style="border-radius:50%; width:42px; height:42px; overflow:hidden; flex-shrink:0;">
+            <svg viewBox="0 0 42 42" fill="none" width="42" height="42">
+              <ellipse cx="21" cy="46" rx="16" ry="14" fill="#7A8AB0" opacity="0.6"/>
+              <circle cx="21" cy="17" r="12" fill="#D4A870"/>
+              <path d="M9 17 C9 5 33 5 33 17" fill="#2C1A0E" opacity="0.82"/>
+            </svg>
+          </div>
+          <div>
+            <p class="testimonial-name">Rafael Ibáñez</p>
+            <p class="testimonial-meta">Member since January 2026</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="testimonial-card">
+        <div class="testimonial-qmark" aria-hidden="true">"</div>
+        <p class="testimonial-text">
+          I am the Steward tier and I want to be clear that the hand-stamped welcome kit made me tear up a little. There's something about someone taking that much care.
+        </p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar av-theo" style="border-radius:50%; width:42px; height:42px; overflow:hidden; flex-shrink:0;">
+            <svg viewBox="0 0 42 42" fill="none" width="42" height="42">
+              <ellipse cx="21" cy="46" rx="16" ry="14" fill="#4A6741" opacity="0.55"/>
+              <circle cx="21" cy="17" r="12" fill="#C8B870"/>
+              <path d="M9 14 C9 4 33 4 33 14" fill="#7A7060" opacity="0.7"/>
+            </svg>
+          </div>
+          <div>
+            <p class="testimonial-name">Theodora Lim</p>
+            <p class="testimonial-meta">Steward member since 2022</p>
+          </div>
+        </div>
+      </article>
+
+    </div><!-- /.testimonials-grid -->
+  </div>
+</section>
+
+<!-- ── FULL MEMBER STORIES ───────────────────────────────────── -->
+<section class="section stories-section">
+  <div class="container" style="max-width:860px;">
+    <div class="text-center reveal" style="margin-bottom:3.5rem;">
+      <span class="overline">Longer reads</span>
+      <h2>Three stories, in full</h2>
+    </div>
+
+    <!-- Story 1: Marcelline -->
+    <article class="story-item reveal">
+      <div class="story-avatar av-marcelline" style="overflow:hidden; flex-shrink:0; border-radius:50%;">
+        <svg viewBox="0 0 80 80" fill="none" width="80" height="80">
+          <rect width="80" height="80" rx="40" fill="#C8A890"/>
+          <ellipse cx="40" cy="88" rx="28" ry="22" fill="#C05A36" opacity="0.65"/>
+          <circle cx="40" cy="32" r="22" fill="#D4A870"/>
+          <path d="M18 32 C18 8 62 8 62 32" fill="#2C1A0E" opacity="0.88"/>
+          <circle cx="40" cy="18" r="16" fill="#2C1A0E" opacity="0.88"/>
+        </svg>
+      </div>
+      <div class="story-content">
+        <h3>Marcelline Osei</h3>
+        <span class="story-meta">Neighbor → Regular member · Joined May 2024</span>
+        <blockquote class="story-pull">
+          "I moved two blocks from here alone, knowing nobody. I stayed that way for years — I got good at it, honestly."
+        </blockquote>
+        <div class="story-body">
+          <p>
+            Marcelline moved to the Portsmith District in the spring of 2020 — right into the lockdown. By the time the world opened up, she'd developed the efficient solitude of someone who had learned to need very little. She had her routes, her grocery store, her park bench. The neighborhood was a backdrop, not a community.
+          </p>
+          <p>
+            A flyer for the August 2024 potluck landed under her door. She almost didn't go. "It seemed like the kind of thing where everyone already knows each other and you're the weird solo person in the corner," she remembers. She went anyway, because she'd been making jollof rice all weekend and had too much of it.
+          </p>
+          <p>
+            She ended up talking to Declan Walsh for an hour and a half about urban soil chemistry. He gave her a cutting from his lemon verbena. By the following month, she was helping Rosa plan the September gathering. By November, she'd volunteered at two garden workdays and started a WhatsApp group with her immediate neighbors to coordinate watching the block during rainstorms.
+          </p>
+          <p>
+            "The jollof rice is what got me in the door," she says. "But the thing that kept me coming back was realizing there's nothing magic about Common Table. It's just people making it easy to say hello. I could have done that any time. I just didn't know how."
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- Divider botanical -->
+    <div class="botanical-divider" aria-hidden="true">
+      <svg width="200" height="30" viewBox="0 0 200 30" fill="none">
+        <path d="M10 15 C30 8 50 22 70 15 C90 8 110 22 130 15 C150 8 170 22 190 15" stroke="#4A6741" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <circle cx="100" cy="15" r="4" fill="#C05A36"/>
+        <circle cx="55" cy="11" r="3" fill="#4A6741"/>
+        <circle cx="145" cy="19" r="3" fill="#4A6741"/>
+      </svg>
+    </div>
+
+    <!-- Story 2: Theo & Baba -->
+    <article class="story-item reveal">
+      <div class="story-avatar av-baba" style="overflow:hidden; flex-shrink:0; border-radius:50%;">
+        <svg viewBox="0 0 80 80" fill="none" width="80" height="80">
+          <rect width="80" height="80" rx="40" fill="#9BB8A0"/>
+          <ellipse cx="40" cy="88" rx="28" ry="22" fill="#4A6741" opacity="0.65"/>
+          <circle cx="40" cy="33" r="22" fill="#C8A870"/>
+          <path d="M18 33 C18 10 62 10 62 33" fill="#5A4A20" opacity="0.72"/>
+        </svg>
+      </div>
+      <div class="story-content">
+        <h3>Theo &amp; Baba Kurosaki</h3>
+        <span class="story-meta">Father &amp; son · Regular members since November 2023</span>
+        <blockquote class="story-pull">
+          "My father is 68 years old and I have never seen him cry. He cried that morning, a little, in the kitchen."
+        </blockquote>
+        <div class="story-body">
+          <p>
+            Theo Kurosaki moved back to the neighborhood three years ago after a decade in Seattle. He and his father Baba — who has lived on Caldera Street since 1982 — had grown close again in theory but not quite in practice. They had dinner every few weeks. They talked about soccer and the weather. They were polite in the way that people who love each other and don't know how to say so become polite.
+          </p>
+          <p>
+            Theo signed them both up for Rosa's bread-baking skill share mostly because he thought his father would like getting out of the house. Baba had different ideas. He arrived with a well-worn index card — his own mother's milk bread recipe, in her handwriting, which he'd been carrying in his wallet for forty years. He had never made it. He had never taught it to anyone. He was waiting, he said, for the right moment.
+          </p>
+          <p>
+            For three hours in the Common Kitchen, Theo and Baba stood at the same table and made bread together. Baba translated the recipe from Japanese as they went, explaining the techniques in a voice Theo had never heard from him before — quiet, careful, almost tender. The bread came out beautifully. They ate it at the table with Rosa and six strangers and it was, by general agreement, the best thing anyone had tasted all year.
+          </p>
+          <p>
+            Baba has attended every skill share since. He brought his dashi recipe in December and his gyoza technique in March. "I have been waiting a long time to share these," he told Rosa. "I just needed someone to open the door."
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <div class="botanical-divider" aria-hidden="true">
+      <svg width="200" height="30" viewBox="0 0 200 30" fill="none">
+        <path d="M10 15 C30 8 50 22 70 15 C90 8 110 22 130 15 C150 8 170 22 190 15" stroke="#4A6741" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <circle cx="100" cy="15" r="4" fill="#C05A36"/>
+        <circle cx="55" cy="11" r="3" fill="#4A6741"/>
+        <circle cx="145" cy="19" r="3" fill="#4A6741"/>
+      </svg>
+    </div>
+
+    <!-- Story 3: Simone -->
+    <article class="story-item reveal">
+      <div class="story-avatar av-simone" style="overflow:hidden; flex-shrink:0; border-radius:50%;">
+        <svg viewBox="0 0 80 80" fill="none" width="80" height="80">
+          <rect width="80" height="80" rx="40" fill="#A898C8"/>
+          <ellipse cx="40" cy="88" rx="28" ry="22" fill="#8898C0" opacity="0.65"/>
+          <circle cx="40" cy="33" r="22" fill="#D4B890"/>
+          <circle cx="40" cy="22" r="14" fill="#9A9A9A" opacity="0.65"/>
+          <circle cx="40" cy="16" r="10" fill="#B4B4B4" opacity="0.55"/>
+        </svg>
+      </div>
+      <div class="story-content">
+        <h3>Simone Whitfield</h3>
+        <span class="story-meta">Steward member · Joined February 2022</span>
+        <blockquote class="story-pull">
+          "When you're retired and widowed, the world gets very quiet in ways you didn't expect. Common Table turned up the volume."
+        </blockquote>
+        <div class="story-body">
+          <p>
+            Simone Whitfield taught high school English for thirty-one years. She retired in 2019, then lost her husband Marcus in 2021. She is, as she describes herself, someone who spent a lifetime in rooms full of young people arguing about books, and then found herself in a very quiet house.
+          </p>
+          <p>
+            Her daughter sent her a link to Priya's reading circle in early 2022. "I think she was worried about me," Simone says with a measured smile. The title that month was <em>Giovanni's Room</em>. She arrived with seven sticky notes and strong opinions. She has not run out of sticky notes or opinions in the four years since.
+          </p>
+          <p>
+            Simone is now a Steward member and participates in the monthly organizer calls, where she is reliably the most prepared person in the room. She suggested the neighborhood newsletter that Common Table now prints quarterly. She organized a reading circle specifically for teens after noticing there were none. She helped design the seed library filing system.
+          </p>
+          <p>
+            "People say old age is about slowing down," she says. "I don't believe that. I just needed to find the right rooms again." She pauses. "Also, Priya chooses better books than I did. I will never say this to her face."
+          </p>
+        </div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<!-- ── SHARE YOUR STORY CTA ─────────────────────────────────── -->
+<section class="section">
+  <div class="container" style="max-width: 640px; text-align:center;">
+    <div class="reveal">
+      <div aria-hidden="true" style="margin-bottom:1.5rem;">
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+          <circle cx="28" cy="28" r="26" fill="var(--terracotta-pale)"/>
+          <path d="M18 28 C18 22 23 18 28 18 C33 18 38 22 38 28 C38 34 33 38 28 38 C25 38 22 36.5 20 35 L16 38 L17.5 34 C17.5 33 18 30.5 18 28Z" stroke="#C05A36" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+          <path d="M23 26h10M23 30h7" stroke="#C05A36" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="overline">Share yours</span>
+      <h2 style="margin-bottom:0.75rem;">Have a Common Table story?</h2>
+      <p style="color:var(--ink-muted); margin-bottom:1.75rem;">We'd love to hear how a gathering, a potluck dish, or a conversation changed something for you. Stories are shared with permission and always lovingly edited.</p>
+      <a href="faq.html#contact" class="btn btn-primary">Tell us about it</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ── FOOTER ─────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="index.html" class="footer-brand-logo">
+          <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <ellipse cx="13" cy="12" rx="10" ry="6.5" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M7 16v6M19 16v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M9.5 22h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          Common Table
+        </a>
+        <p class="footer-tagline">A neighborhood membership club for people who love to share food, skills, stories, and a few hours of doing something that matters.</p>
+        <address class="footer-address">48 Elm Street · Portsmith District<br><a href="mailto:hello@commontable.club" style="color:rgba(240,232,212,0.5); text-decoration:none;">hello@commontable.club</a></address>
+      </div>
+      <div>
+        <span class="footer-col-heading">Explore</span>
+        <ul class="footer-links">
+          <li><a href="gatherings.html">Upcoming Gatherings</a></li>
+          <li><a href="organizers.html">Meet the Organizers</a></li>
+          <li><a href="stories.html">Member Stories</a></li>
+          <li><a href="membership.html">Membership Levels</a></li>
+          <li><a href="faq.html">FAQ &amp; Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <span class="footer-col-heading">Get Involved</span>
+        <ul class="footer-links">
+          <li><a href="membership.html">Join the Table</a></li>
+          <li><a href="gatherings.html">RSVP to a Gathering</a></li>
+          <li><a href="membership.html#host">Host Your Own</a></li>
+          <li><a href="faq.html#contact">Send Us a Note</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Common Table · Eval Membership Community</span>
+      <span>Made with care in the neighborhood</span>
+    </div>
+  </div>
+</footer>
+
+<script src="nav.js"></script>
+</body>
+</html>

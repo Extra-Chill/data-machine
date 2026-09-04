@@ -1,0 +1,11 @@
+{
+  "fixture_class": "docs/blog",
+  "tags": [
+    "docs",
+    "knowledge-base",
+    "release-notes",
+    "has-nav",
+    "multipage"
+  ],
+  "complexity": 2
+}

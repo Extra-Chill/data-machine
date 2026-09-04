@@ -1,0 +1,64 @@
+baseURL = "https://coldstart.dev/"
+languageCode = "en-us"
+title = "Cold Start"
+theme = "ember"
+enableRobotsTXT = true
+enableGitInfo = true
+paginate = 8
+summaryLength = 40
+
+# Cold Start is a software-craft blog about the unglamorous parts of
+# building reliable systems: storage engines, replication, queues, and
+# the operational reality of keeping them up at 3 a.m.
+
+[params]
+  author = "Mara Quintero"
+  description = "A software-craft blog about distributed systems, storage engines, and the quiet engineering that keeps production alive."
+  subtitle = "Notes on building systems that survive contact with reality"
+  email = "mara@coldstart.dev"
+  copyright = "Cold Start"
+  showReadingTime = true
+  mainSections = ["posts"]
+  dateFormat = "Jan 2, 2006"
+
+  [params.social]
+    github = "https://github.com/coldstart-dev"
+    mastodon = "https://hachyderm.io/@coldstart"
+    rss = "/index.xml"
+
+[taxonomies]
+  tag = "tags"
+  series = "series"
+
+[menu]
+  [[menu.main]]
+    name = "Home"
+    url = "/"
+    weight = 10
+  [[menu.main]]
+    name = "Archive"
+    url = "/tags/"
+    weight = 20
+  [[menu.main]]
+    name = "About"
+    url = "/about/"
+    weight = 30
+
+[markup]
+  [markup.highlight]
+    style = "nord"
+    lineNos = false
+    noClasses = true
+  [markup.goldmark.renderer]
+    unsafe = true
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+
+[outputs]
+  home = ["HTML", "RSS"]
+  section = ["HTML", "RSS"]
+
+[services]
+  [services.rss]
+    limit = 20

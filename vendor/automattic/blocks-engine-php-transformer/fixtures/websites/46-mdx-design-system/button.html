@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Button · Halo UI</title>
+  <meta name="description" content="The Halo UI Button — triggers an action. Variants, tones, sizes, props, usage in React/Vue/CSS, and accessibility notes." />
+  <link rel="stylesheet" href="css/halo.css" />
+</head>
+<body>
+  <div class="sidebar-backdrop"></div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <a class="sidebar__brand" href="index.html">Halo&nbsp;UI</a>
+      <p class="sidebar__version">v2.4.0 · MIT · @halo-ui/react</p>
+      <nav class="nav-group" aria-label="Overview"><p class="nav-group__title">Overview</p><a class="nav-link" href="index.html">Halo UI</a></nav>
+      <nav class="nav-group" aria-label="Foundations"><p class="nav-group__title">Foundations</p><a class="nav-link" href="color.html">Color</a><a class="nav-link" href="typography.html">Typography</a></nav>
+      <nav class="nav-group" aria-label="Components"><p class="nav-group__title">Components</p><a class="nav-link" href="button.html">Button</a><a class="nav-link" href="input.html">Input</a><a class="nav-link" href="modal.html">Modal</a><a class="nav-link" href="card.html">Card</a></nav>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn mobile-nav-toggle" id="nav-toggle" aria-label="Toggle navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <span class="topbar__crumb">Components / <strong>Button</strong></span>
+        <span class="topbar__spacer"></span>
+        <button class="search-btn" data-palette-open aria-label="Search documentation"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><span class="search-btn__text">Search docs…</span><kbd>⌘K</kbd></button>
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle color theme"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke-linecap="round"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 14.5A8 8 0 119.5 4a6.5 6.5 0 0010.5 10.5z"/></svg></button>
+        <a class="icon-btn" href="https://github.com/lumen-labs/halo-ui" target="_blank" rel="noopener" aria-label="GitHub repository"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0112 6.8c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.58.69.48A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"/></svg></a>
+      </header>
+
+      <article class="doc">
+        <header class="doc__header">
+          <p class="doc__eyebrow">Components</p>
+          <h1>Button</h1>
+          <p class="doc__lede">Triggers an action or event — the primary way users commit to a decision in Halo UI.</p>
+          <span class="badge badge--stable">stable</span>
+        </header>
+
+        <div class="doc__meta">
+          <span>Since <code>1.0.0</code></span>
+          <span>A11y: WCAG 2.2 AA · keyboard + SR verified</span>
+          <span>Source: <code>packages/react/src/Button/Button.tsx</code></span>
+          <span><a href="https://www.figma.com/file/halo-ui/components" target="_blank" rel="noopener">Figma ↗</a></span>
+        </div>
+
+        <p>The <code>Button</code> component triggers an action — submitting a form, opening a dialog, or confirming a destructive operation. For navigation, use a <code>Link</code> styled as a button instead; a real <code>&lt;button&gt;</code> should never change the URL.</p>
+
+        <h2 id="anatomy">Anatomy</h2>
+        <p>A button is composed of an optional <strong>start icon</strong>, a <strong>label</strong>, and an optional <strong>end icon</strong>, inside a pressable target that is always at least 40×40px.</p>
+        <div class="code-preview">
+          <div class="code-preview__stage"><div class="preview-row">
+            <button type="button" class="halo-button halo-button--solid halo-button--neutral"><span class="halo-button__label">Default</span></button>
+            <button type="button" class="halo-button halo-button--solid halo-button--brand"><span class="halo-button__label">Brand</span></button>
+            <button type="button" class="halo-button halo-button--solid halo-button--danger"><span class="halo-button__label">Delete</span></button>
+          </div></div>
+          <div class="code-preview__panel"><div class="code-preview__bar"><span class="code-preview__lang">tsx</span><button class="code-preview__copy" type="button">Copy</button></div>
+          <pre class="code-preview__code"><code><span class="tok-punc">&lt;</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>Default<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">tone</span>=<span class="tok-str">"brand"</span><span class="tok-punc">&gt;</span>Brand<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">tone</span>=<span class="tok-str">"danger"</span><span class="tok-punc">&gt;</span>Delete<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span></code></pre></div>
+        </div>
+
+        <h2 id="variants">Variants</h2>
+        <p><code>variant</code> controls emphasis; <code>tone</code> controls meaning. The two are orthogonal, so you can have a <code>soft danger</code> or an <code>outline brand</code>.</p>
+        <div class="code-preview">
+          <div class="code-preview__stage"><div class="preview-row">
+            <button type="button" class="halo-button halo-button--solid halo-button--brand"><span class="halo-button__label">Solid</span></button>
+            <button type="button" class="halo-button halo-button--soft halo-button--brand"><span class="halo-button__label">Soft</span></button>
+            <button type="button" class="halo-button halo-button--outline halo-button--brand"><span class="halo-button__label">Outline</span></button>
+            <button type="button" class="halo-button halo-button--ghost halo-button--brand"><span class="halo-button__label">Ghost</span></button>
+          </div></div>
+          <div class="code-preview__panel"><div class="code-preview__bar"><span class="code-preview__lang">tsx</span><button class="code-preview__copy" type="button">Copy</button></div>
+          <pre class="code-preview__code"><code><span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">variant</span>=<span class="tok-str">"solid"</span><span class="tok-punc">&gt;</span>Solid<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">variant</span>=<span class="tok-str">"soft"</span><span class="tok-punc">&gt;</span>Soft<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">variant</span>=<span class="tok-str">"outline"</span><span class="tok-punc">&gt;</span>Outline<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">variant</span>=<span class="tok-str">"ghost"</span><span class="tok-punc">&gt;</span>Ghost<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span></code></pre></div>
+        </div>
+
+        <aside class="callout callout--info" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 5.5v.5" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">One solid per view</p><div class="callout__content">Reserve the <code>solid brand</code> button for the single most important action on a screen. Everything else should step down to <code>soft</code>, <code>outline</code>, or <code>ghost</code>.</div></div>
+        </aside>
+
+        <h2 id="sizes-states">Sizes &amp; states</h2>
+        <div class="code-preview">
+          <div class="code-preview__stage"><div class="preview-row">
+            <button type="button" class="halo-button halo-button--solid halo-button--brand halo-button--sm"><span class="halo-button__label">Small</span></button>
+            <button type="button" class="halo-button halo-button--solid halo-button--brand halo-button--md"><span class="halo-button__label">Medium</span></button>
+            <button type="button" class="halo-button halo-button--solid halo-button--brand halo-button--lg"><span class="halo-button__label">Large</span></button>
+            <button type="button" class="halo-button halo-button--solid halo-button--brand" data-loading aria-busy="true" disabled><span class="halo-button__spinner" aria-hidden="true"></span><span class="halo-button__label">Saving</span></button>
+            <button type="button" class="halo-button halo-button--solid halo-button--brand" disabled><span class="halo-button__label">Disabled</span></button>
+          </div></div>
+          <div class="code-preview__panel"><div class="code-preview__bar"><span class="code-preview__lang">tsx</span><button class="code-preview__copy" type="button">Copy</button></div>
+          <pre class="code-preview__code"><code><span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">size</span>=<span class="tok-str">"sm"</span><span class="tok-punc">&gt;</span>Small<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">size</span>=<span class="tok-str">"md"</span><span class="tok-punc">&gt;</span>Medium<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">size</span>=<span class="tok-str">"lg"</span><span class="tok-punc">&gt;</span>Large<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">loading</span><span class="tok-punc">&gt;</span>Saving<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">disabled</span><span class="tok-punc">&gt;</span>Disabled<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span></code></pre></div>
+        </div>
+
+        <h2 id="props">Props</h2>
+        <div class="props-table-wrap" role="region" aria-label="Component props">
+          <table class="props-table">
+            <thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code class="prop-name">variant</code></td><td><code class="prop-type">'solid' | 'soft' | 'outline' | 'ghost'</code></td><td><code class="prop-default">'solid'</code></td><td>Visual emphasis of the button.</td></tr>
+              <tr><td><code class="prop-name">tone</code></td><td><code class="prop-type">'brand' | 'neutral' | 'danger'</code></td><td><code class="prop-default">'brand'</code></td><td>Semantic meaning, mapped to color roles.</td></tr>
+              <tr><td><code class="prop-name">size</code></td><td><code class="prop-type">'sm' | 'md' | 'lg'</code></td><td><code class="prop-default">'md'</code></td><td>Control height and horizontal padding.</td></tr>
+              <tr><td><code class="prop-name">loading</code></td><td><code class="prop-type">boolean</code></td><td><code class="prop-default">false</code></td><td>Shows a spinner and sets aria-busy.</td></tr>
+              <tr><td><code class="prop-name">iconStart</code></td><td><code class="prop-type">ReactNode</code></td><td><span class="prop-empty">—</span></td><td>Icon rendered before the label.</td></tr>
+              <tr><td><code class="prop-name">iconEnd</code></td><td><code class="prop-type">ReactNode</code></td><td><span class="prop-empty">—</span></td><td>Icon rendered after the label.</td></tr>
+              <tr><td><code class="prop-name">fullWidth</code></td><td><code class="prop-type">boolean</code></td><td><code class="prop-default">false</code></td><td>Stretch to fill the inline container.</td></tr>
+              <tr><td><code class="prop-name">disabled</code><span class="prop-required" title="Required">*</span></td><td><code class="prop-type">boolean</code></td><td><code class="prop-default">false</code></td><td>Prevents interaction; not focusable.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="usage">Usage</h2>
+        <div class="tabs">
+          <div class="tabs__list" role="tablist">
+            <button class="tabs__tab is-active" role="tab" aria-selected="true">React</button>
+            <button class="tabs__tab" role="tab" aria-selected="false" tabindex="-1">Vue</button>
+            <button class="tabs__tab" role="tab" aria-selected="false" tabindex="-1">HTML/CSS</button>
+          </div>
+          <div class="tabs__panel" role="tabpanel">
+            <div class="halo-codeblock"><div class="halo-codeblock__bar"><span class="halo-codeblock__lang">tsx</span><button class="copy-btn" type="button">Copy</button></div>
+            <pre><code><span class="tok-key">import</span> { Button } <span class="tok-key">from</span> <span class="tok-str">'@halo-ui/react'</span>
+
+<span class="tok-punc">&lt;</span><span class="tok-tag">Button</span> <span class="tok-attr">tone</span>=<span class="tok-str">"danger"</span> <span class="tok-attr">variant</span>=<span class="tok-str">"soft"</span> <span class="tok-attr">onClick</span>={remove}<span class="tok-punc">&gt;</span>
+  Delete project
+<span class="tok-punc">&lt;/</span><span class="tok-tag">Button</span><span class="tok-punc">&gt;</span></code></pre></div>
+          </div>
+          <div class="tabs__panel" role="tabpanel" hidden>
+            <div class="halo-codeblock"><div class="halo-codeblock__bar"><span class="halo-codeblock__lang">vue</span><button class="copy-btn" type="button">Copy</button></div>
+            <pre><code><span class="tok-punc">&lt;</span><span class="tok-tag">script</span> <span class="tok-attr">setup</span><span class="tok-punc">&gt;</span>
+<span class="tok-key">import</span> { HaloButton } <span class="tok-key">from</span> <span class="tok-str">'@halo-ui/vue'</span>
+<span class="tok-punc">&lt;/</span><span class="tok-tag">script</span><span class="tok-punc">&gt;</span>
+
+<span class="tok-punc">&lt;</span><span class="tok-tag">HaloButton</span> <span class="tok-attr">tone</span>=<span class="tok-str">"danger"</span> <span class="tok-attr">variant</span>=<span class="tok-str">"soft"</span> <span class="tok-attr">@click</span>=<span class="tok-str">"remove"</span><span class="tok-punc">&gt;</span>
+  Delete project
+<span class="tok-punc">&lt;/</span><span class="tok-tag">HaloButton</span><span class="tok-punc">&gt;</span></code></pre></div>
+          </div>
+          <div class="tabs__panel" role="tabpanel" hidden>
+            <div class="halo-codeblock"><div class="halo-codeblock__bar"><span class="halo-codeblock__lang">html</span><button class="copy-btn" type="button">Copy</button></div>
+            <pre><code><span class="tok-punc">&lt;</span><span class="tok-tag">button</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-button halo-button--soft halo-button--danger"</span><span class="tok-punc">&gt;</span>
+  <span class="tok-punc">&lt;</span><span class="tok-tag">span</span> <span class="tok-attr">class</span>=<span class="tok-str">"halo-button__label"</span><span class="tok-punc">&gt;</span>Delete project<span class="tok-punc">&lt;/</span><span class="tok-tag">span</span><span class="tok-punc">&gt;</span>
+<span class="tok-punc">&lt;/</span><span class="tok-tag">button</span><span class="tok-punc">&gt;</span></code></pre></div>
+          </div>
+        </div>
+
+        <h2 id="guidelines">Guidelines</h2>
+        <div class="dodont">
+          <div class="dodont__card dodont__card--do"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>Do</span><p>Lead with a verb: "Save changes", "Invite member", "Publish".</p></div>
+          <div class="dodont__card dodont__card--dont"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>Don't</span><p>Use vague labels like "OK", "Submit", or "Click here".</p></div>
+        </div>
+        <div class="dodont">
+          <div class="dodont__card dodont__card--do"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>Do</span><p>Place the primary action on the right in a dialog footer.</p></div>
+          <div class="dodont__card dodont__card--dont"><span class="dodont__label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>Don't</span><p>Stack two <code>solid brand</code> buttons of equal weight side by side.</p></div>
+        </div>
+
+        <h2 id="accessibility">Accessibility</h2>
+        <ul>
+          <li>Renders a native <code>&lt;button&gt;</code> — focusable, Enter/Space activated, announced as a button by screen readers.</li>
+          <li><code>loading</code> sets <code>aria-busy="true"</code> and disables pointer + keyboard activation so the action can't fire twice.</li>
+          <li>Focus shows a 2px <code>--halo-focus-ring</code> offset by 2px, meeting the 3:1 non-text contrast requirement against every surface.</li>
+          <li>Icon-only buttons <strong>must</strong> pass an <code>aria-label</code>.</li>
+        </ul>
+
+        <aside class="callout callout--danger" role="note">
+          <span class="callout__icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M6 6l4 4M10 6l-4 4" stroke-linecap="round"/></svg></span>
+          <div class="callout__body"><p class="callout__title">Don't disable the only path forward</p><div class="callout__content">A disabled submit button gives no feedback about <em>why</em> it's disabled. Prefer keeping it enabled and surfacing a validation message on click.</div></div>
+        </aside>
+      </article>
+
+      <aside class="toc" aria-label="On this page">
+        <p class="toc__title">On this page</p>
+        <ul>
+          <li class="toc__item toc__item--h2"><a href="#anatomy">Anatomy</a></li>
+          <li class="toc__item toc__item--h2"><a href="#variants">Variants</a></li>
+          <li class="toc__item toc__item--h2"><a href="#sizes-states">Sizes &amp; states</a></li>
+          <li class="toc__item toc__item--h2"><a href="#props">Props</a></li>
+          <li class="toc__item toc__item--h2"><a href="#usage">Usage</a></li>
+          <li class="toc__item toc__item--h2"><a href="#guidelines">Guidelines</a></li>
+          <li class="toc__item toc__item--h2"><a href="#accessibility">Accessibility</a></li>
+        </ul>
+      </aside>
+
+      <footer class="doc-footer">
+        <div>Halo UI v2.4.0 · MIT License · Built with Astro + MDX</div>
+        <div class="doc-footer__links"><a href="typography.html">← Typography</a><a href="input.html">Input →</a></div>
+      </footer>
+    </div>
+  </div>
+
+  <div class="palette-backdrop" id="palette">
+    <div class="palette" role="dialog" aria-label="Search documentation">
+      <div class="palette__input-wrap"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input class="palette__input" type="text" placeholder="Search components, tokens, foundations…" aria-label="Search" autocomplete="off" spellcheck="false" /></div>
+      <div class="palette__results"></div>
+      <div class="palette__hint"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+    </div>
+  </div>
+  <script src="js/halo.js"></script>
+</body>
+</html>

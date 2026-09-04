@@ -1,0 +1,13 @@
+{
+  "fixture_class": "canvas/webgl/audio/runtime-heavy",
+  "tags": [
+    "generative-art",
+    "creative-tech",
+    "portfolio",
+    "canvas",
+    "webgl",
+    "has-form",
+    "has-nav"
+  ],
+  "complexity": 4
+}

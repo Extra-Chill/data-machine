@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News Archive · Hudson Valley Hockey Conference</title>
+  <meta name="description" content="HVHC news archive: game recaps, trades, injuries, league announcements, and player profiles from the U18 AA Hudson Valley junior hockey beat.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;700&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a href="index.html" class="nav-logo" aria-label="Hudson Valley Hockey Conference — Home">
+        <svg class="nav-logo-icon" viewBox="0 0 42 42" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="21" cy="21" r="20" fill="#1a4870" stroke="#c89a2a" stroke-width="1.5"/>
+          <path d="M10 17 L21 9 L32 17 L32 28 L21 34 L10 28 Z" stroke="#fff" stroke-width="1.4" fill="none"/>
+          <path d="M14 22 C16 19, 19 19, 21 21 C23 23, 26 23, 28 20" stroke="#c89a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+          <circle cx="21" cy="26" r="1.8" fill="#b8252a"/>
+        </svg>
+        <span class="nav-logo-text">
+          <span class="nav-logo-title">HVHC</span>
+          <span class="nav-logo-sub">Hudson Valley Hockey · U18 AA</span>
+        </span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="standings.html">Standings</a>
+        <a href="schedule.html">Schedule</a>
+        <a href="teams.html">Teams</a>
+        <a href="leaderboard.html">Leaders</a>
+        <a href="news.html">News</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+      <button class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+    <a href="standings.html">Standings</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="teams.html">Teams</a>
+    <a href="leaderboard.html">Leaders</a>
+    <a href="news.html">News</a>
+    <a href="contact.html">Contact</a>
+  </nav>
+
+  <main>
+    <header class="page-header">
+      <div class="container">
+        <span class="page-kicker">Reporting from rink-side</span>
+        <h1>News &amp; Notes</h1>
+        <p>Offseason moves, summer development camps, and the looming October 11 puck drop. Filter by category, or page through the archive going back to 2023.</p>
+      </div>
+    </header>
+
+    <section class="section-tight" style="background:#fff;border-bottom:1px solid var(--rule);">
+      <div class="container">
+        <div class="filter-chips" role="toolbar" aria-label="Filter news">
+          <div class="chip-group">
+            <span class="chip-group-label">Category</span>
+            <button type="button" class="chip active">All</button>
+            <button type="button" class="chip">Game Recaps</button>
+            <button type="button" class="chip">Trades</button>
+            <button type="button" class="chip">Injuries</button>
+            <button type="button" class="chip">League News</button>
+            <button type="button" class="chip">Profiles</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="news-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));">
+
+          <article class="news-card" id="camp-invites">
+            <div class="news-thumb news-thumb-red" role="img" aria-label="Hockey training camp ice surface with cones and pucks"></div>
+            <div class="news-body">
+              <span class="news-tag">League News</span>
+              <h3><a href="#">Roxbury announce two training-camp invites for August</a></h3>
+              <p class="news-dek">Cup champion Roar invite Saugerties forward Tyler Janowski and Hudson defenseman Connor Bell to a five-day Aug 24-28 camp, with one roster spot still up for grabs.</p>
+              <div class="news-meta">By Margie Costanza · <time datetime="2026-06-20">Jun 20, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card" id="cup-banner">
+            <div class="news-thumb news-thumb-gold" role="img" aria-label="Hockey championship banner being lowered from arena rafters"></div>
+            <div class="news-body">
+              <span class="news-tag">League News</span>
+              <h3><a href="#">Roxbury to raise third Cup banner on October 11</a></h3>
+              <p class="news-dek">The Roar will unfurl the 2026 Lewis Cup banner before their home opener against Catskill, the club's third championship flag in eleven seasons.</p>
+              <div class="news-meta">By Hal Reinhart · <time datetime="2026-06-18">Jun 18, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card" id="kingston-trade">
+            <div class="news-thumb news-thumb-ice" role="img" aria-label="Two hockey jerseys hanging on equipment rack"></div>
+            <div class="news-body">
+              <span class="news-tag">Trades</span>
+              <h3><a href="#">Kingpins land Bluefins blueliner Bergeron in two-pick swap</a></h3>
+              <p class="news-dek">Kingston shores up its right side by acquiring two-way defenseman Pascal Bergeron from Beacon for 2027 first- and third-round picks. Bergeron, 17, finished 16th in league scoring with 47 points.</p>
+              <div class="news-meta">By Margie Costanza · <time datetime="2026-06-12">Jun 12, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card" id="kowalczyk-mvp">
+            <div class="news-thumb news-thumb-green" role="img" aria-label="Hockey player holding MVP trophy with team teammates around"></div>
+            <div class="news-body">
+              <span class="news-tag">Profiles</span>
+              <h3><a href="#">Kowalczyk named back-to-back league MVP</a></h3>
+              <p class="news-dek">The 17-year-old Roxbury captain becomes the first player in HVHC history to repeat as MVP, capping a 90-point season at the U18 AA junior level.</p>
+              <div class="news-meta">By Dom Reilly · <time datetime="2026-06-06">Jun 6, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-slate" role="img" aria-label="Hockey draft podium with team logos in background"></div>
+            <div class="news-body">
+              <span class="news-tag">League News</span>
+              <h3><a href="#">2026 entry draft order set; Rhinebeck on the clock first</a></h3>
+              <p class="news-dek">Following a reverse-standings draft lottery held at the Poughkeepsie office, Rhinebeck will hold the No. 1 overall pick for the second straight summer. Draft is scheduled for Aug 8 at the Catskill Civic Arena.</p>
+              <div class="news-meta">By Annette Pearson · <time datetime="2026-06-04">Jun 4, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card" id="realignment">
+            <div class="news-thumb news-thumb-gold" role="img" aria-label="Hockey rink overhead view with painted league logo center ice"></div>
+            <div class="news-body">
+              <span class="news-tag">League News</span>
+              <h3><a href="#">League scraps two-division format for 2026-27</a></h3>
+              <p class="news-dek">After two years of unbalanced schedules, the HVHC reverts to a single-table eight-team format with a 42-game slate (12 vs each opponent), commissioner Hank Boyle announced.</p>
+              <div class="news-meta">By Margie Costanza · <time datetime="2026-05-28">May 28, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-purple" role="img" aria-label="Player headshot composition for new general manager announcement"></div>
+            <div class="news-body">
+              <span class="news-tag">League News</span>
+              <h3><a href="#">River Rats name former Saugerties exec Halloran as interim GM</a></h3>
+              <p class="news-dek">Susan Halloran, who built Saugerties' 2018 Cup roster as assistant GM, will run the Rhinebeck front office through the 2026-27 season as the club searches for a permanent hire.</p>
+              <div class="news-meta">By Hal Reinhart · <time datetime="2026-05-22">May 22, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-red" role="img" aria-label="Hockey player on stretcher being assisted off ice"></div>
+            <div class="news-body">
+              <span class="news-tag">Injuries</span>
+              <h3><a href="#">Beacon captain Lavoie cleared after offseason shoulder surgery</a></h3>
+              <p class="news-dek">Théo Lavoie, the league's leading goal scorer in 2025-26, has been medically cleared after April shoulder labrum repair. The Bluefins captain is on track to be full-go for training camp Aug 31.</p>
+              <div class="news-meta">By Dom Reilly · <time datetime="2026-05-18">May 18, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-ice" role="img" aria-label="Group of young hockey players in jerseys at summer development camp"></div>
+            <div class="news-body">
+              <span class="news-tag">Profiles</span>
+              <h3><a href="#">Six HVHC alumni earn NCAA Division I commitments</a></h3>
+              <p class="news-dek">A bumper offseason for the league: graduates of Roxbury, Beacon, Catskill, and Kingston have signed letters of intent at programs from Maine to Air Force. Full list and reaction inside.</p>
+              <div class="news-meta">By Hal Reinhart · <time datetime="2026-05-12">May 12, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-green" role="img" aria-label="Hockey trade announcement graphic with two team color swatches"></div>
+            <div class="news-body">
+              <span class="news-tag">Trades</span>
+              <h3><a href="#">Catskill ship rugged D Ferreira to Hudson for picks and prospect</a></h3>
+              <p class="news-dek">Crusaders deal shutdown defenseman Diogo Ferreira to the Hawks in exchange for a 2027 second-round pick and rookie forward Sebastien Couture. Deal closes Catskill's blueline rebuild.</p>
+              <div class="news-meta">By Margie Costanza · <time datetime="2026-05-08">May 8, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-slate" role="img" aria-label="Hockey commissioner at podium with microphone speaking to press"></div>
+            <div class="news-body">
+              <span class="news-tag">League News</span>
+              <h3><a href="#">Boyle re-upped as commissioner through 2030</a></h3>
+              <p class="news-dek">The HVHC Board of Governors unanimously extended commissioner Hank Boyle for four more years. Boyle, in the role since 2016, oversaw the league's expansion to eight clubs and the launch of HVHC Live.</p>
+              <div class="news-meta">By Annette Pearson · <time datetime="2026-05-02">May 2, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-gold" role="img" aria-label="Lewis Cup trophy on display table with engraved nameplate"></div>
+            <div class="news-body">
+              <span class="news-tag">Game Recaps</span>
+              <h3><a href="#">Roxbury cap Cup run: Kowalczyk hat trick caps 4-2 Game 6 win</a></h3>
+              <p class="news-dek">Final score reads 4-2 but the Roxbury Memorial faithful won't soon forget Mateusz Kowalczyk's first-period natural hat trick that put Beacon on the back foot for good.</p>
+              <div class="news-meta">By Dom Reilly · <time datetime="2026-03-21">Mar 21, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-purple" role="img" aria-label="Hockey scoreboard showing dramatic late-game numbers"></div>
+            <div class="news-body">
+              <span class="news-tag">Game Recaps</span>
+              <h3><a href="#">Beacon force Game 6 on Lavoie OT winner at Roxbury Memorial</a></h3>
+              <p class="news-dek">Down 3-1 in the series, Théo Lavoie's overtime laser from the left circle sent the Bluefins back to Beacon for a Game 6 the Bluefins ultimately lost. The goal lives on as one of the great moments in HVHC playoff history.</p>
+              <div class="news-meta">By Hal Reinhart · <time datetime="2026-03-19">Mar 19, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-ice" role="img" aria-label="Awards podium with three trophies at HVHC annual ceremony"></div>
+            <div class="news-body">
+              <span class="news-tag">League News</span>
+              <h3><a href="#">Annual awards: Sokolowski takes Coach of the Year, Cabrera Rookie</a></h3>
+              <p class="news-dek">Greg Sokolowski edged Kingston's Tom O'Connell for Coach of the Year honors, while Kingston rookie Joaquín Cabrera (66 points) ran away with Rookie of the Year hardware. Full awards list inside.</p>
+              <div class="news-meta">By Annette Pearson · <time datetime="2026-03-17">Mar 17, 2026</time></div>
+            </div>
+          </article>
+
+          <article class="news-card">
+            <div class="news-thumb news-thumb-red" role="img" aria-label="Two hockey players in scoring celebration on ice"></div>
+            <div class="news-body">
+              <span class="news-tag">Game Recaps</span>
+              <h3><a href="#">Crusaders rally past Kingpins 4-3 in OT thriller</a></h3>
+              <p class="news-dek">Catskill spotted Kingston a 2-0 lead before storming back behind Petrov's three-point night. Yusuf Demir buried the OT winner 1:42 into the extra frame at Catskill Civic.</p>
+              <div class="news-meta">By Dom Reilly · <time datetime="2026-02-08">Feb 8, 2026</time></div>
+            </div>
+          </article>
+
+        </div>
+
+        <!-- ── Pagination mock ─────────────────────────── -->
+        <nav class="pagination" aria-label="News pagination">
+          <span class="current" aria-current="page">1</span>
+          <a href="#">2</a>
+          <a href="#">3</a>
+          <a href="#">4</a>
+          <a href="#">5</a>
+          <span>…</span>
+          <a href="#">28</a>
+          <a href="#" aria-label="Next page">Next →</a>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="nav-logo" aria-label="HVHC home">
+            <svg class="nav-logo-icon" viewBox="0 0 42 42" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="21" cy="21" r="20" fill="#1a4870" stroke="#c89a2a" stroke-width="1.5"/>
+              <path d="M10 17 L21 9 L32 17 L32 28 L21 34 L10 28 Z" stroke="#fff" stroke-width="1.4" fill="none"/>
+              <path d="M14 22 C16 19, 19 19, 21 21 C23 23, 26 23, 28 20" stroke="#c89a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+            </svg>
+            <span class="nav-logo-text">
+              <span class="nav-logo-title">HVHC</span>
+              <span class="nav-logo-sub">U18 AA Junior Hockey · Est. 1998</span>
+            </span>
+          </a>
+          <p>Hudson Valley Hockey Conference is a non-profit U18 AA junior hockey league sanctioned by USA Hockey and serving the Hudson Valley region of New York since 1998.</p>
+          <div class="footer-social" aria-label="Social media">
+            <a href="#" aria-label="Facebook">FB</a>
+            <a href="#" aria-label="Instagram">IG</a>
+            <a href="#" aria-label="YouTube">YT</a>
+            <a href="#" aria-label="RSS feed">RSS</a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4>League</h4>
+          <ul>
+            <li><a href="standings.html">Standings</a></li>
+            <li><a href="schedule.html">Schedule</a></li>
+            <li><a href="leaderboard.html">Stat Leaders</a></li>
+            <li><a href="teams.html">Team Directory</a></li>
+            <li><a href="news.html">News Archive</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Teams</h4>
+          <ul>
+            <li><a href="team-roxbury-roar.html">Roxbury Roar</a></li>
+            <li><a href="teams.html">Beacon Bluefins</a></li>
+            <li><a href="teams.html">Catskill Crusaders</a></li>
+            <li><a href="teams.html">New Paltz Northstars</a></li>
+            <li><a href="teams.html">All 8 teams →</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Office</h4>
+          <ul>
+            <li>14 Liberty St<br>Poughkeepsie, NY 12601</li>
+            <li><a href="tel:8455550118">(845) 555-0118</a></li>
+            <li><a href="mailto:office@hvhc.org">office@hvhc.org</a></li>
+            <li><a href="contact.html">Full contact info →</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <div>© 2026 Hudson Valley Hockey Conference · A 501(c)(3) non-profit organization</div>
+        <div><a href="#">Bylaws</a> · <a href="#">Code of Conduct</a> · <a href="#">Privacy</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

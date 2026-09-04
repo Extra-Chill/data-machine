@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cheatsheet — Relay Regex Lab</title>
+  <meta name="description" content="A compact, well-organized JavaScript regular-expression reference: character classes, anchors, quantifiers, groups, lookaround, flags, and replacement tokens.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body class="is-page">
+
+  <header class="page-header">
+    <div class="inner">
+      <a href="index.html" class="logo" aria-label="Relay home">
+        <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="7" cy="16" r="3.4" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <circle cx="25" cy="16" r="3.4" fill="none" stroke="var(--accent)" stroke-width="2.2"/>
+          <path d="M10.4 16 H21.6" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M14 9 q4 7 0 14" fill="none" stroke="var(--accent-3)" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <span class="logo-word">Re<b>lay</b></span>
+      </a>
+      <nav class="page-nav" aria-label="Primary">
+        <a href="index.html">Lab</a>
+        <a href="cheatsheet.html" class="active" aria-current="page">Cheatsheet</a>
+        <a href="about.html">About</a>
+        <a href="index.html" class="cta">Open the lab →</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero page-wrap">
+      <p class="eyebrow">Quick reference</p>
+      <h1>The regex <em>cheatsheet</em></h1>
+      <p class="lead">Everything Relay's parser understands, in one place. This is JavaScript (ECMAScript) flavour — the same engine that runs in the lab. Click any pattern to <a href="index.html" style="color:var(--accent)">try it</a>.</p>
+    </section>
+
+    <div class="cheat-wrap page-wrap">
+
+      <section class="cheat-card">
+        <h2>Character classes</h2>
+        <table class="cheat-table">
+          <tbody>
+            <tr><td><code>.</code></td><td>Any char except newline (any char with <code>s</code> flag)</td></tr>
+            <tr><td><code>\d</code> <code>\D</code></td><td>Digit <code>[0-9]</code> / non-digit</td></tr>
+            <tr><td><code>\w</code> <code>\W</code></td><td>Word char <code>[A-Za-z0-9_]</code> / non-word</td></tr>
+            <tr><td><code>\s</code> <code>\S</code></td><td>Whitespace / non-whitespace</td></tr>
+            <tr><td><code>[abc]</code></td><td>Any one of a, b, or c</td></tr>
+            <tr><td><code>[^abc]</code></td><td>Any char NOT a, b, or c</td></tr>
+            <tr><td><code>[a-z]</code></td><td>A range: any lowercase letter</td></tr>
+            <tr><td><code>[\d.]</code></td><td>Shorthands combine inside a class</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="cheat-card">
+        <h2>Anchors &amp; boundaries</h2>
+        <table class="cheat-table">
+          <tbody>
+            <tr><td><code>^</code></td><td>Start of string (start of line with <code>m</code>)</td></tr>
+            <tr><td><code>$</code></td><td>End of string (end of line with <code>m</code>)</td></tr>
+            <tr><td><code>\b</code></td><td>Word boundary</td></tr>
+            <tr><td><code>\B</code></td><td>Not a word boundary</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="cheat-card">
+        <h2>Quantifiers</h2>
+        <table class="cheat-table">
+          <tbody>
+            <tr><td><code>*</code></td><td>0 or more (greedy)</td></tr>
+            <tr><td><code>+</code></td><td>1 or more (greedy)</td></tr>
+            <tr><td><code>?</code></td><td>0 or 1 (optional)</td></tr>
+            <tr><td><code>{n}</code></td><td>Exactly n times</td></tr>
+            <tr><td><code>{n,}</code></td><td>n or more times</td></tr>
+            <tr><td><code>{n,m}</code></td><td>Between n and m times</td></tr>
+            <tr><td><code>*?</code> <code>+?</code> <code>??</code></td><td>Lazy variants — as few as possible</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="cheat-card">
+        <h2>Groups &amp; references</h2>
+        <table class="cheat-table">
+          <tbody>
+            <tr><td><code>( … )</code></td><td>Capturing group (numbered)</td></tr>
+            <tr><td><code>(?: … )</code></td><td>Non-capturing group</td></tr>
+            <tr><td><code>(?&lt;name&gt; … )</code></td><td>Named capturing group</td></tr>
+            <tr><td><code>\1</code> <code>\2</code></td><td>Backreference to group 1, 2…</td></tr>
+            <tr><td><code>\k&lt;name&gt;</code></td><td>Backreference to a named group</td></tr>
+            <tr><td><code>a|b</code></td><td>Alternation — match a OR b</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="cheat-card">
+        <h2>Lookaround</h2>
+        <table class="cheat-table">
+          <tbody>
+            <tr><td><code>(?= … )</code></td><td>Positive lookahead — followed by</td></tr>
+            <tr><td><code>(?! … )</code></td><td>Negative lookahead — not followed by</td></tr>
+            <tr><td><code>(?&lt;= … )</code></td><td>Positive lookbehind — preceded by</td></tr>
+            <tr><td><code>(?&lt;! … )</code></td><td>Negative lookbehind — not preceded by</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="cheat-card">
+        <h2>Escapes &amp; literals</h2>
+        <table class="cheat-table">
+          <tbody>
+            <tr><td><code>\.</code> <code>\*</code> <code>\\</code></td><td>Escape a metacharacter to match it literally</td></tr>
+            <tr><td><code>\n \r \t</code></td><td>Newline, carriage return, tab</td></tr>
+            <tr><td><code>\xHH</code></td><td>Char by 2-digit hex code (<code>\x41</code> = A)</td></tr>
+            <tr><td><code>\uHHHH</code></td><td>Char by 4-digit hex code (<code>é</code> = é)</td></tr>
+            <tr><td><code>\u{H…}</code></td><td>Code point (needs <code>u</code> flag)</td></tr>
+            <tr><td><code>\p{…}</code></td><td>Unicode property (needs <code>u</code> flag)</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="cheat-card">
+        <h2>Flags</h2>
+        <table class="cheat-table">
+          <tbody>
+            <tr><td><code>g</code></td><td>Global — find all matches, not just the first</td></tr>
+            <tr><td><code>i</code></td><td>Ignore case</td></tr>
+            <tr><td><code>m</code></td><td>Multiline — <code>^</code>/<code>$</code> match line edges</td></tr>
+            <tr><td><code>s</code></td><td>dotAll — <code>.</code> matches newlines too</td></tr>
+            <tr><td><code>u</code></td><td>Unicode — full code-point semantics</td></tr>
+            <tr><td><code>y</code></td><td>Sticky — anchored at <code>lastIndex</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="cheat-card">
+        <h2>Replacement tokens</h2>
+        <table class="cheat-table">
+          <tbody>
+            <tr><td><code>$&amp;</code></td><td>The whole match</td></tr>
+            <tr><td><code>$1</code> <code>$2</code></td><td>Capture group 1, 2…</td></tr>
+            <tr><td><code>$&lt;name&gt;</code></td><td>Named capture group</td></tr>
+            <tr><td><code>$`</code></td><td>Text before the match</td></tr>
+            <tr><td><code>$'</code></td><td>Text after the match</td></tr>
+            <tr><td><code>$$</code></td><td>A literal dollar sign</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="cheat-card span2">
+        <h2>Gotchas &amp; performance</h2>
+        <ul class="cheat-bullets">
+          <li><strong>Catastrophic backtracking.</strong> Nested quantifiers over overlapping patterns — e.g. <code>(a+)+$</code> against <code>"aaaaaaX"</code> — can explode into exponential work. Relay caps each run at <code>250ms</code> and warns if it bails.</li>
+          <li><strong>Greedy vs. lazy.</strong> <code>&lt;.*&gt;</code> on <code>&lt;a&gt;&lt;b&gt;</code> grabs the whole thing; <code>&lt;.*?&gt;</code> stops at the first <code>&gt;</code>.</li>
+          <li><strong>Escape your dots.</strong> <code>192.168.0.1</code> — the unescaped <code>.</code> matches any char. Use <code>\.</code> for a literal dot.</li>
+          <li><strong>Zero-width matches.</strong> Patterns like <code>\b</code> or <code>(?=…)</code> match an empty string; Relay marks them with a thin caret in the test text.</li>
+          <li><strong>The <code>g</code> flag and <code>lastIndex</code>.</strong> A global regex is stateful between <code>.exec()</code> calls. Relay creates a fresh one each run to avoid surprises.</li>
+        </ul>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="page-foot">
+    <div class="page-wrap">
+      <span>Relay Regex Lab · ECMAScript flavour · built with vanilla JS</span>
+      <span><a href="index.html" style="color:var(--accent)">Open the lab →</a></span>
+    </div>
+  </footer>
+</body>
+</html>

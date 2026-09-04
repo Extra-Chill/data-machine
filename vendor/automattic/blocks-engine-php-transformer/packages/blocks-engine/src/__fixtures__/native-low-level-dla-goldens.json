@@ -1,0 +1,873 @@
+{
+  "version": 1,
+  "derivation": "Mechanically generated from DLA page-reconstruct.ts low-level helpers and footer-color.ts color helpers at DLA commit 1e393c5.",
+  "helpers": {
+    "MISSING_IMAGE_PLACEHOLDER": [
+      {
+        "id": "constant",
+        "output": "[image unavailable — not captured]"
+      }
+    ],
+    "visibleText": [
+      {
+        "id": "tags-and-whitespace",
+        "output": "Hello there Again"
+      }
+    ],
+    "nearestToken": [
+      {
+        "id": "nearest-hex",
+        "output": "accent-primary"
+      },
+      {
+        "id": "nearest-rgb",
+        "output": "text-inverse"
+      },
+      {
+        "id": "invalid-color",
+        "output": null
+      }
+    ],
+    "brightness": [
+      {
+        "id": "hex",
+        "output": 86
+      },
+      {
+        "id": "rgb",
+        "output": 29
+      },
+      {
+        "id": "invalid",
+        "output": 255
+      }
+    ],
+    "familyMatches": [
+      {
+        "id": "exact-body",
+        "output": true
+      },
+      {
+        "id": "hash-overlap",
+        "output": true
+      },
+      {
+        "id": "substring",
+        "output": true
+      },
+      {
+        "id": "miss",
+        "output": false
+      }
+    ],
+    "nearestFamily": [
+      {
+        "id": "body-priority",
+        "output": "body"
+      },
+      {
+        "id": "display",
+        "output": "body"
+      },
+      {
+        "id": "unknown-falls-body",
+        "output": "body"
+      },
+      {
+        "id": "generic-null",
+        "output": null
+      }
+    ],
+    "responsiveFontSize": [
+      {
+        "id": "missing",
+        "output": ""
+      },
+      {
+        "id": "hero",
+        "output": "clamp(46px, 6.4vw, 92px)"
+      },
+      {
+        "id": "small",
+        "output": "clamp(12px, 0.8vw, 12px)"
+      }
+    ],
+    "responsiveSpace": [
+      {
+        "id": "negative",
+        "output": "0px"
+      },
+      {
+        "id": "small",
+        "output": "16px"
+      },
+      {
+        "id": "large",
+        "output": "clamp(43px, 6.67vw, 96px)"
+      }
+    ],
+    "sectionPad": [
+      {
+        "id": "none",
+        "output": {}
+      },
+      {
+        "id": "top-bottom",
+        "output": {
+          "padTopPx": 48,
+          "padBottomPx": 80
+        }
+      }
+    ],
+    "centerOf": [
+      {
+        "id": "default-center",
+        "output": true
+      },
+      {
+        "id": "left",
+        "output": false
+      }
+    ],
+    "buttonJustify": [
+      {
+        "id": "center",
+        "output": "center"
+      },
+      {
+        "id": "left-for-right-source",
+        "output": "left"
+      }
+    ],
+    "isTintedSection": [
+      {
+        "id": "saturated-light",
+        "output": false
+      },
+      {
+        "id": "near-white",
+        "output": false
+      },
+      {
+        "id": "dark",
+        "output": false
+      }
+    ],
+    "opaqueTintHex": [
+      {
+        "id": "rgb-tint",
+        "output": "#e8eff1"
+      },
+      {
+        "id": "rgba-faint",
+        "output": null
+      },
+      {
+        "id": "near-white",
+        "output": null
+      },
+      {
+        "id": "light-neutral",
+        "output": null
+      }
+    ],
+    "isDarkSection": [
+      {
+        "id": "dark",
+        "output": true
+      },
+      {
+        "id": "light",
+        "output": false
+      }
+    ],
+    "pickLeadImage": [
+      {
+        "id": "skips-small",
+        "output": {
+          "url": "http://localhost:8883/wp-content/uploads/2026/05/lead.jpg",
+          "sourceUrl": "https://cdn.example.test/assets/lead.jpg",
+          "alt": "Lead alt",
+          "kind": "img",
+          "width": 640,
+          "height": 480
+        }
+      },
+      {
+        "id": "none",
+        "output": {
+          "__type": "undefined"
+        }
+      }
+    ],
+    "isWpMediaUrl": [
+      {
+        "id": "wp",
+        "output": true
+      },
+      {
+        "id": "remote",
+        "output": false
+      }
+    ],
+    "recolorSvg": [
+      {
+        "id": "replace-fill-stroke",
+        "output": "<svg fill=\"#ffffff\" viewBox=\"0 0 10 10\"><path d=\"M1 1h8v8H1z\"/></svg>"
+      },
+      {
+        "id": "preserve-none",
+        "output": "<svg fill=\"#ffffff\"><path fill=\"none\" stroke=\"none\" d=\"M1 1h2\"/></svg>"
+      }
+    ],
+    "resolveImage": [
+      {
+        "id": "missing",
+        "output": {
+          "returnValue": {
+            "url": "",
+            "alt": "[image unavailable — not captured]",
+            "usable": false
+          },
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [],
+            "flags": [
+              "hero#1: no image in spec — placeholder emitted"
+            ],
+            "iconAssets": []
+          }
+        }
+      },
+      {
+        "id": "remote",
+        "output": {
+          "returnValue": {
+            "url": "",
+            "alt": "[image unavailable — not captured]",
+            "usable": false
+          },
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [],
+            "flags": [
+              "hero#2: image not in WP library (https://cdn.example.test/assets/remote.jpg) — placeholder emitted"
+            ],
+            "iconAssets": []
+          }
+        }
+      },
+      {
+        "id": "wp",
+        "output": {
+          "returnValue": {
+            "url": "http://localhost:8883/wp-content/uploads/2026/05/lead.jpg",
+            "alt": "Lead alt",
+            "usable": true
+          },
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      }
+    ],
+    "iconImageBlock": [
+      {
+        "id": "center-fill",
+        "output": {
+          "returnValue": "<!-- wp:image {\"width\":\"32px\",\"height\":\"32px\",\"sizeSlug\":\"full\",\"align\":\"center\"} -->\n<figure class=\"wp-block-image aligncenter size-full is-resized\"><img src=\"<?php echo esc_url(get_theme_file_uri('assets/icon-0.svg')); ?>\" alt=\"\" style=\"width:32px;height:32px\"/></figure>\n<!-- /wp:image -->",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": [
+              {
+                "path": "assets/icon-0.svg",
+                "svg": "<svg fill=\"#ffffff\" viewBox=\"0 0 10 10\"><path d=\"M2 2h6v6H2z\"/></svg>"
+              }
+            ]
+          },
+          "ctx": {
+            "mediaTextIndex": 0,
+            "iconCounter": 1,
+            "paletteTokens": [
+              {
+                "slug": "text-default",
+                "hex": "#102030"
+              },
+              {
+                "slug": "text-inverse",
+                "hex": "#f8fafc"
+              },
+              {
+                "slug": "accent-primary",
+                "hex": "#008060"
+              },
+              {
+                "slug": "surface-raised",
+                "hex": "#e8eff1"
+              }
+            ],
+            "fontFamilies": [
+              {
+                "slug": "display",
+                "family": "Caldera Display, serif"
+              },
+              {
+                "slug": "body",
+                "family": "Caldera, sans-serif"
+              },
+              {
+                "slug": "wix",
+                "family": "wf_5499e3d4abcd, sans-serif"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "left-no-fill",
+        "output": {
+          "returnValue": "<!-- wp:image {\"width\":\"48px\",\"height\":\"48px\",\"sizeSlug\":\"full\"} -->\n<figure class=\"wp-block-image size-full is-resized\"><img src=\"<?php echo esc_url(get_theme_file_uri('assets/icon-0.svg')); ?>\" alt=\"\" style=\"width:48px;height:48px\"/></figure>\n<!-- /wp:image -->",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": [
+              {
+                "path": "assets/icon-0.svg",
+                "svg": "<svg viewBox=\"0 0 10 10\"><path fill=\"#111\" stroke=\"#222\" d=\"M1 1h8v8H1z\"/></svg>"
+              }
+            ]
+          },
+          "ctx": {
+            "mediaTextIndex": 0,
+            "iconCounter": 1,
+            "paletteTokens": [
+              {
+                "slug": "text-default",
+                "hex": "#102030"
+              },
+              {
+                "slug": "text-inverse",
+                "hex": "#f8fafc"
+              },
+              {
+                "slug": "accent-primary",
+                "hex": "#008060"
+              },
+              {
+                "slug": "surface-raised",
+                "hex": "#e8eff1"
+              }
+            ],
+            "fontFamilies": [
+              {
+                "slug": "display",
+                "family": "Caldera Display, serif"
+              },
+              {
+                "slug": "body",
+                "family": "Caldera, sans-serif"
+              },
+              {
+                "slug": "wix",
+                "family": "wf_5499e3d4abcd, sans-serif"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "glyph-empty",
+        "output": {
+          "returnValue": "",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          },
+          "ctx": {
+            "mediaTextIndex": 0,
+            "iconCounter": 0,
+            "paletteTokens": [
+              {
+                "slug": "text-default",
+                "hex": "#102030"
+              },
+              {
+                "slug": "text-inverse",
+                "hex": "#f8fafc"
+              },
+              {
+                "slug": "accent-primary",
+                "hex": "#008060"
+              },
+              {
+                "slug": "surface-raised",
+                "hex": "#e8eff1"
+              }
+            ],
+            "fontFamilies": [
+              {
+                "slug": "display",
+                "family": "Caldera Display, serif"
+              },
+              {
+                "slug": "body",
+                "family": "Caldera, sans-serif"
+              },
+              {
+                "slug": "wix",
+                "family": "wf_5499e3d4abcd, sans-serif"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "emptyNativeRenderOut": [
+      {
+        "id": "empty",
+        "output": {
+          "markup": "",
+          "expectedText": [],
+          "bodyText": [],
+          "assets": [],
+          "flags": [],
+          "iconAssets": []
+        }
+      }
+    ],
+    "typographyStyle": [
+      {
+        "id": "font-and-line-height",
+        "output": {
+          "attr": "\"style\":{\"typography\":{\"fontSize\":\"clamp(20px, 4.0vw, 60px)\",\"lineHeight\":\"1.1\"}},",
+          "inline": " style=\"font-size:clamp(20px, 4.0vw, 60px);line-height:1.1\""
+        }
+      },
+      {
+        "id": "invalid-line-height",
+        "output": {
+          "attr": "\"style\":{\"typography\":{\"fontSize\":\"16px\"}},",
+          "inline": " style=\"font-size:16px\""
+        }
+      }
+    ],
+    "imageBlock": [
+      {
+        "id": "wp-rounded-center",
+        "output": {
+          "returnValue": "<!-- wp:image {\"sizeSlug\":\"large\",\"width\":\"640px\",\"align\":\"center\",\"style\":{\"border\":{\"radius\":\"12px\"}}} -->\n<figure class=\"wp-block-image aligncenter size-large has-custom-border is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/lead.jpg\" alt=\"Lead alt\" style=\"width:640px;max-width:100%;height:auto;border-radius:12px;\"/></figure>\n<!-- /wp:image -->",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [
+              "http://localhost:8883/wp-content/uploads/2026/05/lead.jpg"
+            ],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      },
+      {
+        "id": "remote-placeholder",
+        "output": {
+          "returnValue": "<!-- wp:paragraph {\"align\":\"center\",\"textColor\":\"text-subtle\",\"fontSize\":\"small\"} -->\n<p class=\"has-text-align-center has-text-subtle-color has-text-color has-small-font-size\">[image unavailable — not captured]</p>\n<!-- /wp:paragraph -->",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [],
+            "flags": [
+              "image#2: image not in WP library (https://cdn.example.test/assets/remote.jpg) — placeholder emitted"
+            ],
+            "iconAssets": []
+          }
+        }
+      }
+    ],
+    "headingBlock": [
+      {
+        "id": "heading-rich",
+        "output": {
+          "returnValue": "<!-- wp:heading {\"textAlign\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(32px, 4.4vw, 64px)\",\"lineHeight\":\"1.05\"}},\"level\":1,\"fontFamily\":\"display\",\"textColor\":\"text-inverse\"} -->\n<h1 class=\"wp-block-heading has-text-align-center has-text-inverse-color has-text-color has-display-font-family\" style=\"font-size:clamp(32px, 4.4vw, 64px);line-height:1.05\">Launch &lt;Now&gt;</h1>\n<!-- /wp:heading -->",
+          "out": {
+            "markup": "",
+            "expectedText": [
+              "Launch <Now>"
+            ],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      },
+      {
+        "id": "empty",
+        "output": {
+          "returnValue": "",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      }
+    ],
+    "paragraphBlock": [
+      {
+        "id": "paragraph-rich",
+        "output": {
+          "returnValue": "<!-- wp:paragraph {\"align\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 1.3vw, 18px)\",\"lineHeight\":\"1.5\"}},\"fontFamily\":\"body\",\"textColor\":\"text-default\"} -->\n<p class=\"has-text-align-center has-text-default-color has-text-color has-body-font-family\" style=\"font-size:clamp(16px, 1.3vw, 18px);line-height:1.5\">Body &amp; copy</p>\n<!-- /wp:paragraph -->",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [
+              "Body & copy"
+            ],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      },
+      {
+        "id": "size-slug",
+        "output": {
+          "returnValue": "<!-- wp:paragraph {\"fontSize\":\"small\",\"textColor\":\"text-muted\"} -->\n<p class=\"has-text-muted-color has-text-color has-small-font-size\">Small copy</p>\n<!-- /wp:paragraph -->",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [
+              "Small copy"
+            ],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      }
+    ],
+    "buttonBlock": [
+      {
+        "id": "default",
+        "output": {
+          "returnValue": "<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"center\"}} -->\n<div class=\"wp-block-buttons is-content-justification-center\">\n<!-- wp:button {\"backgroundColor\":\"accent-primary\",\"textColor\":\"text-inverse\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-inverse-color has-accent-primary-background-color has-text-color has-background wp-element-button\">Buy &lt;Now&gt;</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->",
+          "out": {
+            "markup": "",
+            "expectedText": [
+              "Buy <Now>"
+            ],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      },
+      {
+        "id": "left",
+        "output": {
+          "returnValue": "<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"left\"}} -->\n<div class=\"wp-block-buttons is-content-justification-left\">\n<!-- wp:button {\"backgroundColor\":\"accent-primary\",\"textColor\":\"text-inverse\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-inverse-color has-accent-primary-background-color has-text-color has-background wp-element-button\">Learn</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->",
+          "out": {
+            "markup": "",
+            "expectedText": [
+              "Learn"
+            ],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      }
+    ],
+    "ctaButton": [
+      {
+        "id": "colored-link-icon-after",
+        "output": {
+          "returnValue": "<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"left\"}} -->\n<div class=\"wp-block-buttons is-content-justification-left\">\n<!-- wp:button {\"backgroundColor\":\"accent-primary\",\"textColor\":\"text-inverse\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-inverse-color has-accent-primary-background-color has-text-color has-background wp-element-button\" href=\"/shop\">Shop<img src=\"<?php echo esc_url(get_theme_file_uri('assets/icon-0.svg')); ?>\" alt=\"\" style=\"width:18px;height:18px;vertical-align:middle;margin-left:8px\"/></a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->",
+          "out": {
+            "markup": "",
+            "expectedText": [
+              "Shop"
+            ],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": [
+              {
+                "path": "assets/icon-0.svg",
+                "svg": "<svg fill=\"#f8fafc\" viewBox=\"0 0 10 10\"><path d=\"M2 2h6v6H2z\"/></svg>"
+              }
+            ]
+          },
+          "ctx": {
+            "mediaTextIndex": 0,
+            "iconCounter": 1,
+            "paletteTokens": [
+              {
+                "slug": "text-default",
+                "hex": "#102030"
+              },
+              {
+                "slug": "text-inverse",
+                "hex": "#f8fafc"
+              },
+              {
+                "slug": "accent-primary",
+                "hex": "#008060"
+              },
+              {
+                "slug": "surface-raised",
+                "hex": "#e8eff1"
+              }
+            ],
+            "fontFamilies": [
+              {
+                "slug": "display",
+                "family": "Caldera Display, serif"
+              },
+              {
+                "slug": "body",
+                "family": "Caldera, sans-serif"
+              },
+              {
+                "slug": "wix",
+                "family": "wf_5499e3d4abcd, sans-serif"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "icon-only",
+        "output": {
+          "returnValue": "<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"center\"}} -->\n<div class=\"wp-block-buttons is-content-justification-center\">\n<!-- wp:button {\"backgroundColor\":\"accent-primary\",\"textColor\":\"text-inverse\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-inverse-color has-accent-primary-background-color has-text-color has-background wp-element-button\"><img src=\"<?php echo esc_url(get_theme_file_uri('assets/icon-0.svg')); ?>\" alt=\"\" style=\"width:18px;height:18px;vertical-align:middle;margin-right:8px\"/></a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": [
+              {
+                "path": "assets/icon-0.svg",
+                "svg": "<svg viewBox=\"0 0 10 10\"><path d=\"M2 2h6v6H2z\"/></svg>"
+              }
+            ]
+          },
+          "ctx": {
+            "mediaTextIndex": 0,
+            "iconCounter": 1,
+            "paletteTokens": [
+              {
+                "slug": "text-default",
+                "hex": "#102030"
+              },
+              {
+                "slug": "text-inverse",
+                "hex": "#f8fafc"
+              },
+              {
+                "slug": "accent-primary",
+                "hex": "#008060"
+              },
+              {
+                "slug": "surface-raised",
+                "hex": "#e8eff1"
+              }
+            ],
+            "fontFamilies": [
+              {
+                "slug": "display",
+                "family": "Caldera Display, serif"
+              },
+              {
+                "slug": "body",
+                "family": "Caldera, sans-serif"
+              },
+              {
+                "slug": "wix",
+                "family": "wf_5499e3d4abcd, sans-serif"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "sectionButtons": [
+      {
+        "id": "structured",
+        "output": {
+          "returnValue": [
+            "<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"left\"}} -->\n<div class=\"wp-block-buttons is-content-justification-left\">\n<!-- wp:button {\"backgroundColor\":\"accent-primary\",\"textColor\":\"text-inverse\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-inverse-color has-accent-primary-background-color has-text-color has-background wp-element-button\" href=\"/contact\">Contact</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->"
+          ],
+          "out": {
+            "markup": "",
+            "expectedText": [
+              "Contact"
+            ],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          },
+          "ctx": {
+            "mediaTextIndex": 0,
+            "iconCounter": 0,
+            "paletteTokens": [
+              {
+                "slug": "text-default",
+                "hex": "#102030"
+              },
+              {
+                "slug": "text-inverse",
+                "hex": "#f8fafc"
+              },
+              {
+                "slug": "accent-primary",
+                "hex": "#008060"
+              },
+              {
+                "slug": "surface-raised",
+                "hex": "#e8eff1"
+              }
+            ],
+            "fontFamilies": [
+              {
+                "slug": "display",
+                "family": "Caldera Display, serif"
+              },
+              {
+                "slug": "body",
+                "family": "Caldera, sans-serif"
+              },
+              {
+                "slug": "wix",
+                "family": "wf_5499e3d4abcd, sans-serif"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "labels",
+        "output": {
+          "returnValue": [
+            "<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"center\"}} -->\n<div class=\"wp-block-buttons is-content-justification-center\">\n<!-- wp:button {\"backgroundColor\":\"accent-primary\",\"textColor\":\"text-inverse\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-inverse-color has-accent-primary-background-color has-text-color has-background wp-element-button\">Alpha</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->",
+            "<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"center\"}} -->\n<div class=\"wp-block-buttons is-content-justification-center\">\n<!-- wp:button {\"backgroundColor\":\"accent-primary\",\"textColor\":\"text-inverse\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-inverse-color has-accent-primary-background-color has-text-color has-background wp-element-button\">Beta</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->"
+          ],
+          "out": {
+            "markup": "",
+            "expectedText": [
+              "Alpha",
+              "Beta"
+            ],
+            "bodyText": [],
+            "assets": [],
+            "flags": [],
+            "iconAssets": []
+          },
+          "ctx": {
+            "mediaTextIndex": 0,
+            "iconCounter": 0,
+            "paletteTokens": [
+              {
+                "slug": "text-default",
+                "hex": "#102030"
+              },
+              {
+                "slug": "text-inverse",
+                "hex": "#f8fafc"
+              },
+              {
+                "slug": "accent-primary",
+                "hex": "#008060"
+              },
+              {
+                "slug": "surface-raised",
+                "hex": "#e8eff1"
+              }
+            ],
+            "fontFamilies": [
+              {
+                "slug": "display",
+                "family": "Caldera Display, serif"
+              },
+              {
+                "slug": "body",
+                "family": "Caldera, sans-serif"
+              },
+              {
+                "slug": "wix",
+                "family": "wf_5499e3d4abcd, sans-serif"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "column": [
+      {
+        "id": "auto",
+        "output": "<!-- wp:column  -->\n<div class=\"wp-block-column\">\nA\nB\n</div>\n<!-- /wp:column -->"
+      },
+      {
+        "id": "width",
+        "output": "<!-- wp:column {\"width\":\"33.33%\"} -->\n<div class=\"wp-block-column\" style=\"flex-basis:33.33%\">\nA\n</div>\n<!-- /wp:column -->"
+      }
+    ],
+    "columns": [
+      {
+        "id": "empty",
+        "output": ""
+      },
+      {
+        "id": "standard",
+        "output": "<!-- wp:columns {\"verticalAlignment\":\"center\"} -->\n<div class=\"wp-block-columns are-vertically-aligned-center\">\n<p>A</p>\n<p>B</p>\n</div>\n<!-- /wp:columns -->"
+      },
+      {
+        "id": "full-bleed",
+        "output": "<!-- wp:columns {\"verticalAlignment\":\"center\",\"align\":\"full\",\"style\":{\"spacing\":{\"blockGap\":\"0\"}}} -->\n<div class=\"wp-block-columns alignfull are-vertically-aligned-center\">\n<p>A</p>\n</div>\n<!-- /wp:columns -->"
+      }
+    ],
+    "wrapSection": [
+      {
+        "id": "empty",
+        "output": ""
+      },
+      {
+        "id": "raised-constrained",
+        "output": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"style\":{\"color\":{\"background\":\"#e8eff1\"},\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"clamp(22px, 3.33vw, 48px)\",\"bottom\":\"clamp(29px, 4.44vw, 64px)\",\"left\":\"var:preset|spacing|40\",\"right\":\"var:preset|spacing|40\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"constrained\",\"contentSize\":\"760px\"}} -->\n<section class=\"wp-block-group alignfull has-background\" style=\"margin-top:0;margin-bottom:0;background-color:#e8eff1;padding-top:clamp(22px, 3.33vw, 48px);padding-right:var(--wp--preset--spacing--40);padding-bottom:clamp(29px, 4.44vw, 64px);padding-left:var(--wp--preset--spacing--40)\">\n<p>Body</p>\n</section>\n<!-- /wp:group -->"
+      },
+      {
+        "id": "inverse-full-bleed",
+        "output": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"backgroundColor\":\"surface-inverse\",\"textColor\":\"text-inverse\",\"style\":{\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"12px\",\"bottom\":\"12px\",\"left\":\"0\",\"right\":\"0\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"default\"}} -->\n<section class=\"wp-block-group alignfull has-surface-inverse-background-color has-text-inverse-color has-text-color has-background\" style=\"margin-top:0;margin-bottom:0;padding-top:12px;padding-right:0px;padding-bottom:12px;padding-left:0px\">\n<p>Inverse</p>\n</section>\n<!-- /wp:group -->"
+      }
+    ]
+  }
+}

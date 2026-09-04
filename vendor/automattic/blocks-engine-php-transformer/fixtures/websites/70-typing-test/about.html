@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="midnight">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keystroke — How it works</title>
+  <meta name="description" content="How Keystroke measures words per minute, accuracy, and consistency — plus practical tips to type faster.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="2" y="8" width="28" height="18" rx="4" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="2"/>
+        <rect x="6" y="12" width="4" height="4" rx="1" fill="var(--accent)"/>
+        <rect x="12" y="12" width="4" height="4" rx="1" fill="var(--muted)"/>
+        <rect x="18" y="12" width="4" height="4" rx="1" fill="var(--muted)"/>
+        <rect x="10" y="18" width="12" height="4" rx="1.5" fill="var(--accent)"/>
+      </svg>
+      Key<span>stroke</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false">≡</button>
+    <nav class="site-nav">
+      <a href="index.html">Test</a>
+      <a href="stats.html">Stats</a>
+      <a href="about.html" class="active">About</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1 class="page-title">How Keystroke works</h1>
+    <div class="prose">
+      <p class="lede">Keystroke is a single-purpose tool: measure how fast and how accurately you type, then show you exactly where to improve. It's hand-built with plain HTML, CSS, and JavaScript — no frameworks, no analytics, no accounts. Your results live in <code>localStorage</code> and never leave your browser.</p>
+
+      <h2>The maths</h2>
+      <p>Speed in typing is measured in <strong>words per minute</strong>, but a "word" is standardized as <strong>five characters</strong> (including spaces). That keeps short and long words comparable.</p>
+      <div class="formula">WPM&nbsp;=&nbsp;(correct characters&nbsp;/&nbsp;5)&nbsp;/&nbsp;minutes elapsed</div>
+      <p><strong>Raw WPM</strong> uses every character you typed, right or wrong — so the gap between raw and net WPM is the speed you're losing to mistakes.</p>
+      <div class="formula">Raw WPM&nbsp;=&nbsp;(all typed characters&nbsp;/&nbsp;5)&nbsp;/&nbsp;minutes</div>
+      <p><strong>Accuracy</strong> is the share of keystrokes you got right on the first try — fixing a typo with backspace doesn't repair the accuracy hit, just like in real writing.</p>
+      <div class="formula">Accuracy&nbsp;=&nbsp;correct keystrokes&nbsp;/&nbsp;total keystrokes</div>
+      <p><strong>Consistency</strong> looks at your per-second WPM samples and rewards a steady pace. It's derived from the coefficient of variation (standard deviation ÷ mean): a flat line scores near 100%, a spiky one scores lower. Fast bursts followed by stalls feel productive but cost you.</p>
+
+      <h2>Modes</h2>
+      <ul>
+        <li><strong>Time</strong> — type as much as you can in 15, 30, 60, or 120 seconds.</li>
+        <li><strong>Words</strong> — race through a fixed count: 10, 25, 50, or 100 words.</li>
+        <li><strong>Quote</strong> — type a complete short passage, punctuation and all.</li>
+      </ul>
+      <p>Toggle <strong>punctuation</strong> and <strong>numbers</strong> to make any generated test more realistic — that's the kind of text you actually write.</p>
+
+      <h2>The keyboard &amp; heatmap</h2>
+      <p>The on-screen keyboard highlights the next key and lights up as you type, color-coded by which finger should reach it (home-row touch typing). Over time, Keystroke tallies the keys you miss most and tints them red — both live and on your <a href="stats.html">stats page</a>. Those red keys are your highest-leverage practice.</p>
+
+      <h2>Tips to actually get faster</h2>
+      <ul>
+        <li><strong>Accuracy first, speed second.</strong> Aim for 97%+ accuracy; raw speed follows once your fingers stop backtracking.</li>
+        <li><strong>Don't watch your hands.</strong> Trust the muscle memory — the on-screen keyboard is there if you need a glance.</li>
+        <li><strong>Keep the pace even.</strong> A smooth 70 WPM beats a jerky 90-then-stall. Watch your consistency score.</li>
+        <li><strong>Drill your red keys.</strong> A handful of letters usually cause most of your errors. Fix those and everything lifts.</li>
+        <li><strong>Practice real text.</strong> Turn on punctuation and numbers, or use quote mode — capitals and symbols are where most people slow down.</li>
+      </ul>
+
+      <h2>Privacy &amp; the build</h2>
+      <p>There is no server. The word bank, the quotes, the timing engine, the chart, and the keyboard heatmap are all computed in your browser. Clearing your history on the stats page wipes everything. It's a small, honest tool — the kind of stateful, real-time interface that's a joy to build from scratch.</p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand" href="index.html">Key<span>stroke</span></a>
+    <span class="muted">A hand-built typing trainer — no frameworks, no trackers. Everything stays in your browser.</span>
+    <span class="muted" style="margin-left:auto">© <span data-year>2026</span></span>
+  </footer>
+
+  <script src="js/storage.js"></script>
+  <script src="js/site.js"></script>
+</body>
+</html>

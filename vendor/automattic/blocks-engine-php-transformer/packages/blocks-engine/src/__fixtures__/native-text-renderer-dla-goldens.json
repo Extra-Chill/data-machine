@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "derivation": "Mechanically generated from DLA src/lib/replicate/page-reconstruct.ts reconstructPagePattern at DLA commit 1e393c5; section renderer markup strips the final reconstruct body newline, and direct galleryBlock outputs extract the nested wp:gallery block.",
+  "renderers": {
+    "renderTextBand": [
+      {
+        "id": "dark-band-cta-lead-image",
+        "output": {
+          "markup": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"backgroundColor\":\"surface-inverse\",\"textColor\":\"text-inverse\",\"style\":{\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"clamp(32px, 5.00vw, 72px)\",\"bottom\":\"clamp(36px, 5.56vw, 80px)\",\"left\":\"var:preset|spacing|40\",\"right\":\"var:preset|spacing|40\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"constrained\",\"contentSize\":\"760px\"}} -->\n<section class=\"wp-block-group alignfull has-surface-inverse-background-color has-text-inverse-color has-text-color has-background\" style=\"margin-top:0;margin-bottom:0;padding-top:clamp(32px, 5.00vw, 72px);padding-right:var(--wp--preset--spacing--40);padding-bottom:clamp(36px, 5.56vw, 80px);padding-left:var(--wp--preset--spacing--40)\">\n<!-- wp:heading {\"textAlign\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(29px, 4.0vw, 58px)\",\"lineHeight\":\"1.05\"}},\"level\":1,\"fontFamily\":\"display\",\"textColor\":\"text-inverse\"} -->\n<h1 class=\"wp-block-heading has-text-align-center has-text-inverse-color has-text-color has-display-font-family\" style=\"font-size:clamp(29px, 4.0vw, 58px);line-height:1.05\">Build calmer block themes</h1>\n<!-- /wp:heading -->\n<!-- wp:heading {\"textAlign\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 1.7vw, 24px)\",\"lineHeight\":\"1.25\"}},\"level\":2,\"fontFamily\":\"display\",\"textColor\":\"text-inverse\"} -->\n<h2 class=\"wp-block-heading has-text-align-center has-text-inverse-color has-text-color has-display-font-family\" style=\"font-size:clamp(16px, 1.7vw, 24px);line-height:1.25\">Without losing source copy</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph {\"align\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 1.3vw, 18px)\",\"lineHeight\":\"1.55\"}},\"textColor\":\"text-inverse\"} -->\n<p class=\"has-text-align-center has-text-inverse-color has-text-color\" style=\"font-size:clamp(16px, 1.3vw, 18px);line-height:1.55\">Every heading, paragraph, button, and media asset traces back to capture.</p>\n<!-- /wp:paragraph -->\n<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"center\"}} -->\n<div class=\"wp-block-buttons is-content-justification-center\">\n<!-- wp:button {\"backgroundColor\":\"accent-primary\",\"textColor\":\"text-inverse\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-inverse-color has-accent-primary-background-color has-text-color has-background wp-element-button\" href=\"/demo\">See the demo</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->\n<!-- wp:image {\"sizeSlug\":\"large\",\"width\":\"720px\",\"align\":\"center\",\"style\":{\"border\":{\"radius\":\"12px\"}}} -->\n<figure class=\"wp-block-image aligncenter size-large has-custom-border is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/theme-preview.jpg\" alt=\"Theme preview\" style=\"width:720px;max-width:100%;height:auto;border-radius:12px;\"/></figure>\n<!-- /wp:image -->\n</section>\n<!-- /wp:group -->",
+          "expectedText": [
+            "Build calmer block themes",
+            "Without losing source copy",
+            "See the demo"
+          ],
+          "bodyText": [
+            "Every heading, paragraph, button, and media asset traces back to capture."
+          ],
+          "assets": [
+            "http://localhost:8883/wp-content/uploads/2026/05/theme-preview.jpg"
+          ],
+          "flags": [],
+          "iconAssets": []
+        }
+      }
+    ],
+    "renderCover": [
+      {
+        "id": "full-bleed-hero-cover",
+        "output": {
+          "markup": "<!-- wp:cover {\"url\":\"http://localhost:8883/wp-content/uploads/2026/05/hero-cover.jpg\",\"dimRatio\":40,\"overlayColor\":\"surface-inverse\",\"isUserOverlayColor\":true,\"minHeight\":50.9,\"minHeightUnit\":\"vw\",\"align\":\"full\",\"style\":{\"spacing\":{\"margin\":{\"top\":\"0px\"}}},\"layout\":{\"type\":\"constrained\"}} -->\n<div class=\"wp-block-cover alignfull\" style=\"margin-top:0px;min-height:50.9vw\"><img class=\"wp-block-cover__image-background\" src=\"http://localhost:8883/wp-content/uploads/2026/05/hero-cover.jpg\" alt=\"Workspace with block patterns\" data-object-fit=\"cover\"/><span aria-hidden=\"true\" class=\"wp-block-cover__background has-surface-inverse-background-color has-background-dim-40 has-background-dim\"></span>\n<div class=\"wp-block-cover__inner-container\">\n<!-- wp:heading {\"textAlign\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(34px, 4.7vw, 68px)\",\"lineHeight\":\"1.02\"}},\"level\":1,\"fontFamily\":\"display\",\"textColor\":\"text-inverse\"} -->\n<h1 class=\"wp-block-heading has-text-align-center has-text-inverse-color has-text-color has-display-font-family\" style=\"font-size:clamp(34px, 4.7vw, 68px);line-height:1.02\">A native cover from captured hero media</h1>\n<!-- /wp:heading -->\n<!-- wp:paragraph {\"align\":\"center\",\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 1.4vw, 20px)\",\"lineHeight\":\"1.5\"}},\"textColor\":\"text-inverse\"} -->\n<p class=\"has-text-align-center has-text-inverse-color has-text-color\" style=\"font-size:clamp(16px, 1.4vw, 20px);line-height:1.5\">The headline and CTA stay over the migrated background image.</p>\n<!-- /wp:paragraph -->\n<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"center\"}} -->\n<div class=\"wp-block-buttons is-content-justification-center\">\n<!-- wp:button {\"backgroundColor\":\"surface-base\",\"textColor\":\"text-default\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-default-color has-surface-base-background-color has-text-color has-background wp-element-button\" href=\"/patterns\">Explore patterns</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->\n</div>\n</div>\n<!-- /wp:cover -->",
+          "expectedText": [
+            "A native cover from captured hero media",
+            "Explore patterns"
+          ],
+          "bodyText": [
+            "The headline and CTA stay over the migrated background image."
+          ],
+          "assets": [
+            "http://localhost:8883/wp-content/uploads/2026/05/hero-cover.jpg"
+          ],
+          "flags": [],
+          "iconAssets": []
+        }
+      }
+    ],
+    "renderMediaText": [
+      {
+        "id": "image-right-with-gallery-strip",
+        "output": {
+          "markup": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"style\":{\"color\":{\"background\":\"#e8eff1\"},\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"clamp(29px, 4.44vw, 64px)\",\"bottom\":\"clamp(29px, 4.44vw, 64px)\",\"left\":\"var:preset|spacing|40\",\"right\":\"var:preset|spacing|40\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"constrained\",\"wideSize\":\"1100px\"}} -->\n<section class=\"wp-block-group alignfull has-background\" style=\"margin-top:0;margin-bottom:0;background-color:#e8eff1;padding-top:clamp(29px, 4.44vw, 64px);padding-right:var(--wp--preset--spacing--40);padding-bottom:clamp(29px, 4.44vw, 64px);padding-left:var(--wp--preset--spacing--40)\">\n<!-- wp:columns {\"verticalAlignment\":\"center\"} -->\n<div class=\"wp-block-columns are-vertically-aligned-center\">\n<!-- wp:column {\"width\":\"55%\"} -->\n<div class=\"wp-block-column\" style=\"flex-basis:55%\">\n<!-- wp:heading {\"style\":{\"typography\":{\"fontSize\":\"clamp(20px, 2.8vw, 40px)\",\"lineHeight\":\"1.15\"}},\"level\":2,\"fontFamily\":\"display\",\"textColor\":\"text-default\"} -->\n<h2 class=\"wp-block-heading has-text-default-color has-text-color has-display-font-family\" style=\"font-size:clamp(20px, 2.8vw, 40px);line-height:1.15\">Media beside structured copy</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph {\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 1.2vw, 17px)\",\"lineHeight\":\"1.6\"}},\"textColor\":\"text-muted\"} -->\n<p class=\"has-text-muted-color has-text-color\" style=\"font-size:clamp(16px, 1.2vw, 17px);line-height:1.6\">A two-up row carries the main product image and preserves the sample strip below it.</p>\n<!-- /wp:paragraph -->\n<!-- wp:buttons {\"layout\":{\"type\":\"flex\",\"justifyContent\":\"left\"}} -->\n<div class=\"wp-block-buttons is-content-justification-left\">\n<!-- wp:button {\"backgroundColor\":\"accent-primary\",\"textColor\":\"text-inverse\"} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link has-text-inverse-color has-accent-primary-background-color has-text-color has-background wp-element-button\" href=\"/compare\">Compare specs</a></div>\n<!-- /wp:button -->\n</div>\n<!-- /wp:buttons -->\n</div>\n<!-- /wp:column -->\n<!-- wp:column {\"width\":\"45%\"} -->\n<div class=\"wp-block-column\" style=\"flex-basis:45%\">\n<!-- wp:image {\"sizeSlug\":\"large\",\"width\":\"720px\",\"style\":{\"border\":{\"radius\":\"12px\"}}} -->\n<figure class=\"wp-block-image size-large has-custom-border is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/media-primary.jpg\" alt=\"Primary product\" style=\"width:720px;max-width:100%;height:auto;border-radius:12px;\"/></figure>\n<!-- /wp:image -->\n</div>\n<!-- /wp:column -->\n</div>\n<!-- /wp:columns -->\n<!-- wp:gallery {\"columns\":3,\"imageCrop\":false,\"linkTo\":\"none\",\"sizeSlug\":\"large\",\"className\":\"is-gallery-scroller\"} -->\n<figure class=\"wp-block-gallery has-nested-images columns-3 is-gallery-scroller\">\n<!-- wp:image {\"width\":\"320px\",\"height\":\"180px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/sample-oak.jpg\" alt=\"Oak sample\" style=\"width:320px;height:180px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"300px\",\"height\":\"180px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/sample-walnut.jpg\" alt=\"Walnut sample\" style=\"width:300px;height:180px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"280px\",\"height\":\"180px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/sample-maple.jpg\" alt=\"Maple sample\" style=\"width:280px;height:180px\"/></figure>\n<!-- /wp:image -->\n</figure>\n<!-- /wp:gallery -->\n</section>\n<!-- /wp:group -->",
+          "expectedText": [
+            "Media beside structured copy",
+            "Compare specs"
+          ],
+          "bodyText": [
+            "A two-up row carries the main product image and preserves the sample strip below it."
+          ],
+          "assets": [
+            "http://localhost:8883/wp-content/uploads/2026/05/media-primary.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/sample-oak.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/sample-walnut.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/sample-maple.jpg"
+          ],
+          "flags": [],
+          "iconAssets": []
+        }
+      },
+      {
+        "id": "image-left-with-stacked-extra",
+        "output": {
+          "markup": "<!-- wp:group {\"tagName\":\"section\",\"align\":\"full\",\"style\":{\"spacing\":{\"margin\":{\"top\":\"0\",\"bottom\":\"0\"},\"padding\":{\"top\":\"clamp(22px, 3.33vw, 48px)\",\"bottom\":\"clamp(25px, 3.89vw, 56px)\",\"left\":\"var:preset|spacing|40\",\"right\":\"var:preset|spacing|40\"},\"blockGap\":\"var:preset|spacing|40\"}},\"layout\":{\"type\":\"constrained\",\"wideSize\":\"1100px\"}} -->\n<section class=\"wp-block-group alignfull\" style=\"margin-top:0;margin-bottom:0;padding-top:clamp(22px, 3.33vw, 48px);padding-right:var(--wp--preset--spacing--40);padding-bottom:clamp(25px, 3.89vw, 56px);padding-left:var(--wp--preset--spacing--40)\">\n<!-- wp:columns {\"verticalAlignment\":\"center\"} -->\n<div class=\"wp-block-columns are-vertically-aligned-center\">\n<!-- wp:column {\"width\":\"45%\"} -->\n<div class=\"wp-block-column\" style=\"flex-basis:45%\">\n<!-- wp:image {\"sizeSlug\":\"large\",\"width\":\"520px\",\"style\":{\"border\":{\"radius\":\"12px\"}}} -->\n<figure class=\"wp-block-image size-large has-custom-border is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/story-portrait.jpg\" alt=\"Portrait crop\" style=\"width:520px;max-width:100%;height:auto;border-radius:12px;\"/></figure>\n<!-- /wp:image -->\n</div>\n<!-- /wp:column -->\n<!-- wp:column {\"width\":\"55%\"} -->\n<div class=\"wp-block-column\" style=\"flex-basis:55%\">\n<!-- wp:heading {\"style\":{\"typography\":{\"fontSize\":\"clamp(18px, 2.5vw, 36px)\",\"lineHeight\":\"1.16\"}},\"level\":2,\"fontFamily\":\"display\",\"textColor\":\"text-default\"} -->\n<h2 class=\"wp-block-heading has-text-default-color has-text-color has-display-font-family\" style=\"font-size:clamp(18px, 2.5vw, 36px);line-height:1.16\">Image-led story row</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph {\"style\":{\"typography\":{\"fontSize\":\"clamp(16px, 1.1vw, 16px)\",\"lineHeight\":\"1.55\"}},\"textColor\":\"text-muted\"} -->\n<p class=\"has-text-muted-color has-text-color\" style=\"font-size:clamp(16px, 1.1vw, 16px);line-height:1.55\">When the source puts media first, the parity corpus fixes the column order.</p>\n<!-- /wp:paragraph -->\n</div>\n<!-- /wp:column -->\n</div>\n<!-- /wp:columns -->\n<!-- wp:image {\"sizeSlug\":\"large\",\"width\":\"360px\",\"align\":\"center\",\"style\":{\"border\":{\"radius\":\"12px\"}}} -->\n<figure class=\"wp-block-image aligncenter size-large has-custom-border is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/story-detail.jpg\" alt=\"Detail crop\" style=\"width:360px;max-width:100%;height:auto;border-radius:12px;\"/></figure>\n<!-- /wp:image -->\n</section>\n<!-- /wp:group -->",
+          "expectedText": [
+            "Image-led story row"
+          ],
+          "bodyText": [
+            "When the source puts media first, the parity corpus fixes the column order."
+          ],
+          "assets": [
+            "http://localhost:8883/wp-content/uploads/2026/05/story-portrait.jpg",
+            "http://localhost:8883/wp-content/uploads/2026/05/story-detail.jpg"
+          ],
+          "flags": [],
+          "iconAssets": []
+        }
+      }
+    ],
+    "galleryBlock": [
+      {
+        "id": "scroller-landscape-strip",
+        "output": {
+          "returnValue": "<!-- wp:gallery {\"columns\":4,\"imageCrop\":false,\"linkTo\":\"none\",\"sizeSlug\":\"large\",\"className\":\"is-gallery-scroller\"} -->\n<figure class=\"wp-block-gallery has-nested-images columns-4 is-gallery-scroller\">\n<!-- wp:image {\"width\":\"647px\",\"height\":\"302px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/gallery-wide-1.jpg\" alt=\"Wide one\" style=\"width:647px;height:302px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"561px\",\"height\":\"302px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/gallery-wide-2.jpg\" alt=\"Wide two\" style=\"width:561px;height:302px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"201px\",\"height\":\"302px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/gallery-tall.jpg\" alt=\"Tall item\" style=\"width:201px;height:302px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"537px\",\"height\":\"302px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/gallery-wide-3.jpg\" alt=\"Wide three\" style=\"width:537px;height:302px\"/></figure>\n<!-- /wp:image -->\n</figure>\n<!-- /wp:gallery -->",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [
+              "http://localhost:8883/wp-content/uploads/2026/05/gallery-wide-1.jpg",
+              "http://localhost:8883/wp-content/uploads/2026/05/gallery-wide-2.jpg",
+              "http://localhost:8883/wp-content/uploads/2026/05/gallery-tall.jpg",
+              "http://localhost:8883/wp-content/uploads/2026/05/gallery-wide-3.jpg"
+            ],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      },
+      {
+        "id": "multi-row-cropped-grid",
+        "output": {
+          "returnValue": "<!-- wp:gallery {\"columns\":4,\"imageCrop\":true,\"linkTo\":\"none\",\"sizeSlug\":\"large\"} -->\n<figure class=\"wp-block-gallery has-nested-images columns-4 is-cropped\">\n<!-- wp:image {\"width\":\"320px\",\"height\":\"320px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/gallery-grid-1.jpg\" alt=\"Grid one\" style=\"width:320px;height:320px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"320px\",\"height\":\"320px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/gallery-grid-2.jpg\" alt=\"Grid two\" style=\"width:320px;height:320px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"320px\",\"height\":\"320px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/gallery-grid-3.jpg\" alt=\"Grid three\" style=\"width:320px;height:320px\"/></figure>\n<!-- /wp:image -->\n<!-- wp:image {\"width\":\"320px\",\"height\":\"320px\",\"sizeSlug\":\"large\",\"linkDestination\":\"none\"} -->\n<figure class=\"wp-block-image size-large is-resized\"><img src=\"http://localhost:8883/wp-content/uploads/2026/05/gallery-grid-4.jpg\" alt=\"Grid four\" style=\"width:320px;height:320px\"/></figure>\n<!-- /wp:image -->\n</figure>\n<!-- /wp:gallery -->",
+          "out": {
+            "markup": "",
+            "expectedText": [],
+            "bodyText": [],
+            "assets": [
+              "http://localhost:8883/wp-content/uploads/2026/05/gallery-grid-1.jpg",
+              "http://localhost:8883/wp-content/uploads/2026/05/gallery-grid-2.jpg",
+              "http://localhost:8883/wp-content/uploads/2026/05/gallery-grid-3.jpg",
+              "http://localhost:8883/wp-content/uploads/2026/05/gallery-grid-4.jpg"
+            ],
+            "flags": [],
+            "iconAssets": []
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Charleston Seafood Pop-up</title>
+  <meta name="description" content="Low Tide Table — a Lowcountry seafood pop-up by Chef Nate Rivers. Local shrimp, fresh oysters, blue crab, and bright Lowcountry sides. Thursday–Saturday evenings at The Dockyard Courtyard, 72 Morrison Drive, Charleston, SC.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600;1,700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ====================================================
+       DESIGN TOKENS
+    ==================================================== */
+    :root {
+      --navy:        #0b1e2e;
+      --navy-mid:    #132c42;
+      --navy-light:  #1c3d56;
+      --sand:        #f4ead8;
+      --chalk:       #faf5ec;
+      --citrus:      #e8990d;
+      --citrus-lt:   #f5b925;
+      --teal:        #18604e;
+      --teal-mid:    #226b56;
+      --teal-dark:   #0e3d30;
+      --coral:       #bf4427;
+      --sky:         #9ec0d0;
+      --sky-lt:      #c8dde8;
+      --text:        #281d10;
+      --ff-display:  'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+      --ff-body:     'Jost', 'Gill Sans', sans-serif;
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* ====================================================
+       RESET & BASE
+    ==================================================== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: var(--ff-body);
+      background: var(--chalk);
+      color: var(--text);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    img, svg { display: block; }
+    button { cursor: pointer; }
+
+    /* ====================================================
+       KEYFRAME ANIMATIONS
+    ==================================================== */
+    @keyframes wave-drift {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+    @keyframes wave-drift-rev {
+      from { transform: translateX(-50%); }
+      to   { transform: translateX(0); }
+    }
+    @keyframes ticker-scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes float-gentle {
+      0%, 100% { transform: translateY(0px) rotate(-1deg); }
+      50%       { transform: translateY(-14px) rotate(1deg); }
+    }
+    @keyframes shimmer-pulse {
+      0%, 100% { opacity: 0.08; }
+      50%       { opacity: 0.15; }
+    }
+    @keyframes grain {
+      0%, 100% { transform: translate(0, 0); }
+      10%  { transform: translate(-1%, -2%); }
+      20%  { transform: translate(2%, 1%); }
+      30%  { transform: translate(-2%, 2%); }
+      40%  { transform: translate(1%, -1%); }
+      50%  { transform: translate(-1%, 2%); }
+      60%  { transform: translate(2%, -2%); }
+      70%  { transform: translate(-2%, 1%); }
+      80%  { transform: translate(1%, 2%); }
+      90%  { transform: translate(-1%, -1%); }
+    }
+
+    /* ====================================================
+       SCROLL REVEAL
+    ==================================================== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.72s var(--ease-out-expo),
+                  transform 0.72s var(--ease-out-expo);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ====================================================
+       STICKY HEADER
+    ==================================================== */
+    #site-header {
+      position: fixed;
+      inset: 0 0 auto 0;
+      z-index: 200;
+      height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2.5rem;
+      transition: background 0.35s ease, box-shadow 0.35s ease,
+                  backdrop-filter 0.35s ease;
+    }
+    #site-header.scrolled {
+      background: rgba(11, 30, 46, 0.97);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 1px 0 rgba(250,245,236,0.07), 0 4px 24px rgba(11,30,46,0.4);
+    }
+
+    .nav-logo {
+      font-family: var(--ff-display);
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--chalk);
+      line-height: 1;
+    }
+    .nav-logo em {
+      font-style: normal;
+      color: var(--citrus);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2.25rem;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(250,245,236,0.72);
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--citrus); }
+    .nav-links .nav-cta a {
+      background: var(--citrus);
+      color: var(--navy);
+      padding: 0.5rem 1.2rem;
+      font-weight: 600;
+      border-radius: 1px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .nav-links .nav-cta a:hover { background: var(--citrus-lt); color: var(--navy); }
+
+    /* Hamburger */
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      background: none;
+      border: none;
+      padding: 4px;
+    }
+    .nav-toggle span {
+      display: block;
+      width: 22px;
+      height: 1.5px;
+      background: var(--chalk);
+      transition: transform 0.25s, opacity 0.25s;
+    }
+
+    /* Mobile nav dropdown */
+    .mobile-nav {
+      display: none;
+      position: fixed;
+      top: 66px;
+      left: 0;
+      right: 0;
+      background: var(--navy);
+      z-index: 199;
+      padding: 1.5rem 2.5rem 2rem;
+      border-top: 1px solid rgba(250,245,236,0.08);
+      list-style: none;
+      gap: 1.5rem;
+      flex-direction: column;
+    }
+    .mobile-nav.open { display: flex; }
+    .mobile-nav a {
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: rgba(250,245,236,0.75);
+    }
+    .mobile-nav .nav-cta a {
+      color: var(--citrus);
+    }
+
+    @media (max-width: 860px) {
+      .nav-links { display: none; }
+      .nav-toggle { display: flex; }
+    }
+
+    /* ====================================================
+       HERO
+    ==================================================== */
+    #hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      background: var(--navy);
+    }
+
+    /* Layered gradient atmosphere */
+    .hero-atmo {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 55% 60% at 15% 55%, rgba(24,96,78,0.28) 0%, transparent 100%),
+        radial-gradient(ellipse 40% 40% at 85% 15%, rgba(158,192,208,0.12) 0%, transparent 100%),
+        radial-gradient(ellipse 30% 50% at 50% 80%, rgba(11,30,46,0.6) 0%, transparent 100%),
+        linear-gradient(170deg, #0b1e2e 0%, #0f293d 45%, #091826 100%);
+    }
+
+    /* Grain overlay */
+    .hero-grain {
+      position: absolute;
+      inset: -50%;
+      width: 200%;
+      height: 200%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 180px 180px;
+      opacity: 0.4;
+      animation: grain 8s steps(1) infinite;
+      pointer-events: none;
+    }
+
+    /* Animated wave layers at bottom */
+    .hero-waves {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 220px;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .wave-layer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 220%;
+    }
+    .wave-layer-1 {
+      animation: wave-drift 15s linear infinite;
+    }
+    .wave-layer-2 {
+      animation: wave-drift-rev 22s linear infinite;
+      opacity: 0.45;
+    }
+
+    /* Floating illustration */
+    .hero-ill-wrap {
+      position: absolute;
+      right: 6%;
+      top: 50%;
+      transform: translateY(-50%);
+      animation: fade-in 1.8s var(--ease-out-expo) 1.8s both;
+      pointer-events: none;
+    }
+    .hero-ill-inner {
+      animation: float-gentle 8s ease-in-out 2.5s infinite;
+    }
+
+    /* Hero content */
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 100px 2.5rem 180px;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.65rem;
+      font-weight: 500;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--citrus);
+      margin-bottom: 1.75rem;
+      animation: fade-up 0.8s var(--ease-out-expo) 0.2s both;
+    }
+    .hero-eyebrow::before {
+      content: '';
+      display: block;
+      width: 32px;
+      height: 1px;
+      background: var(--citrus);
+      flex-shrink: 0;
+    }
+
+    .hero-h1 {
+      font-family: var(--ff-display);
+      font-size: clamp(5rem, 11vw, 10.5rem);
+      font-weight: 300;
+      line-height: 0.875;
+      letter-spacing: -0.025em;
+      color: var(--chalk);
+      margin-bottom: 2.25rem;
+    }
+    .hero-h1 .line { display: block; }
+    .hero-h1 .line-1 { animation: fade-up 1s var(--ease-out-expo) 0.45s both; }
+    .hero-h1 .line-2 { animation: fade-up 1s var(--ease-out-expo) 0.65s both; }
+    .hero-h1 em { font-style: italic; color: var(--citrus); }
+
+    .hero-rule {
+      width: 72px;
+      height: 1px;
+      background: rgba(250,245,236,0.25);
+      margin-bottom: 1.75rem;
+      animation: fade-in 1s ease 0.85s both;
+    }
+
+    .hero-sub {
+      font-family: var(--ff-display);
+      font-size: clamp(1.05rem, 2vw, 1.4rem);
+      font-weight: 300;
+      line-height: 1.65;
+      color: var(--sky);
+      max-width: 480px;
+      animation: fade-up 1s var(--ease-out-expo) 0.9s both;
+    }
+
+    /* Info badges */
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1px;
+      margin-top: 3rem;
+      animation: fade-up 1s var(--ease-out-expo) 1.1s both;
+    }
+    .hero-badge {
+      background: rgba(250,245,236,0.055);
+      border: 1px solid rgba(250,245,236,0.1);
+      padding: 0.85rem 1.35rem;
+      backdrop-filter: blur(6px);
+    }
+    .badge-label {
+      font-size: 0.6rem;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--citrus);
+      margin-bottom: 0.3rem;
+    }
+    .badge-value {
+      font-family: var(--ff-display);
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--chalk);
+      line-height: 1.3;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-top: 2.5rem;
+      animation: fade-up 1s var(--ease-out-expo) 1.3s both;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      background: var(--citrus);
+      color: var(--navy);
+      padding: 0.9rem 1.9rem;
+      font-family: var(--ff-body);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      transition: background 0.2s, gap 0.25s;
+      border: none;
+      outline: none;
+    }
+    .btn-primary:hover { background: var(--citrus-lt); gap: 0.9rem; }
+    .btn-ghost {
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: rgba(250,245,236,0.5);
+      border-bottom: 1px solid rgba(250,245,236,0.2);
+      padding-bottom: 2px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .btn-ghost:hover { color: var(--chalk); border-color: var(--chalk); }
+
+    /* ====================================================
+       TICKER
+    ==================================================== */
+    .ticker-bar {
+      position: relative;
+      z-index: 3;
+      background: var(--citrus);
+      overflow: hidden;
+      white-space: nowrap;
+      padding: 0.65rem 0;
+    }
+    .ticker-track {
+      display: inline-flex;
+      animation: ticker-scroll 24s linear infinite;
+    }
+    .ticker-item {
+      font-family: var(--ff-body);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--navy);
+      padding: 0 2rem;
+    }
+    .ticker-sep {
+      color: var(--navy);
+      opacity: 0.35;
+      padding: 0 0.5rem;
+    }
+
+    /* ====================================================
+       SHARED SECTION STRUCTURE
+    ==================================================== */
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 2.5rem;
+    }
+    .eyebrow {
+      font-family: var(--ff-body);
+      font-size: 0.62rem;
+      font-weight: 500;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      margin-bottom: 0.9rem;
+    }
+    .eyebrow-teal  { color: var(--teal); }
+    .eyebrow-citrus { color: var(--citrus); }
+    .display-title {
+      font-family: var(--ff-display);
+      font-size: clamp(2.8rem, 6vw, 5.5rem);
+      font-weight: 300;
+      line-height: 0.95;
+      letter-spacing: -0.015em;
+    }
+
+    /* Section wave dividers */
+    .wave-divide {
+      line-height: 0;
+      overflow: hidden;
+    }
+    .wave-divide svg { width: 100%; display: block; }
+
+    /* ====================================================
+       MENU SECTION
+    ==================================================== */
+    #menu {
+      background: var(--chalk);
+      padding: 6.5rem 0 5rem;
+    }
+    .menu-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: end;
+      margin-bottom: 4rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid rgba(40,29,16,0.1);
+    }
+    .menu-intro-note {
+      font-family: var(--ff-display);
+      font-size: 1.05rem;
+      font-style: italic;
+      font-weight: 300;
+      color: rgba(40,29,16,0.5);
+      line-height: 1.65;
+      text-align: right;
+      align-self: end;
+    }
+
+    .menu-category { margin-bottom: 4rem; }
+    .cat-label {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--coral);
+      margin-bottom: 1.5rem;
+    }
+    .cat-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(40,29,16,0.09);
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1px;
+      background: rgba(40,29,16,0.07);
+      outline: 1px solid rgba(40,29,16,0.07);
+    }
+    .menu-card {
+      background: var(--chalk);
+      padding: 1.6rem 1.8rem 1.8rem;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.2s;
+    }
+    .menu-card:hover { background: #fff; }
+    .menu-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 0.55rem;
+    }
+    .menu-name {
+      font-family: var(--ff-display);
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--navy);
+      line-height: 1.15;
+    }
+    .menu-price {
+      font-family: var(--ff-display);
+      font-size: 1.2rem;
+      font-weight: 400;
+      color: var(--teal);
+      flex-shrink: 0;
+    }
+    .menu-desc {
+      font-size: 0.82rem;
+      font-weight: 300;
+      color: rgba(40,29,16,0.58);
+      line-height: 1.7;
+    }
+    .menu-card-deco {
+      position: absolute;
+      right: 1.5rem;
+      bottom: 1.25rem;
+      opacity: 0.06;
+      transition: opacity 0.25s;
+    }
+    .menu-card:hover .menu-card-deco { opacity: 0.12; }
+
+    /* ====================================================
+       WHEN & WHERE
+    ==================================================== */
+    #when {
+      background: var(--navy);
+      padding: 6.5rem 0 6rem;
+      color: var(--chalk);
+    }
+
+    .when-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      margin-top: 3.5rem;
+    }
+
+    .info-block {
+      border-top: 1px solid rgba(250,245,236,0.12);
+      padding-top: 2rem;
+      margin-bottom: 2rem;
+    }
+    .info-block-label {
+      font-size: 0.6rem;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--citrus);
+      margin-bottom: 0.8rem;
+    }
+    .info-block-main {
+      font-family: var(--ff-display);
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+      font-weight: 300;
+      line-height: 1.25;
+      margin-bottom: 0.75rem;
+    }
+    .info-block-sub {
+      font-size: 0.83rem;
+      font-weight: 300;
+      color: rgba(250,245,236,0.55);
+      line-height: 1.75;
+    }
+
+    /* Sold-out alert */
+    .sold-out-alert {
+      background: var(--coral);
+      padding: 1.1rem 1.4rem;
+      display: flex;
+      gap: 0.9rem;
+      align-items: flex-start;
+    }
+    .sold-out-icon {
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .sold-out-copy { flex: 1; }
+    .sold-out-copy strong {
+      display: block;
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 0.3rem;
+    }
+    .sold-out-copy span {
+      font-size: 0.8rem;
+      font-weight: 300;
+      color: rgba(255,255,255,0.82);
+      line-height: 1.55;
+    }
+
+    /* Map card */
+    .map-card {
+      border: 1px solid rgba(250,245,236,0.1);
+      background: rgba(250,245,236,0.04);
+      padding: 2.25rem 2rem 2rem;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 280px;
+    }
+    .map-compass-art {
+      position: absolute;
+      right: 1.75rem;
+      bottom: 1.75rem;
+      opacity: 0;
+      animation: shimmer-pulse 4s ease-in-out 2s infinite;
+    }
+    .map-address {
+      font-family: var(--ff-display);
+      font-size: clamp(1.4rem, 2.5vw, 2rem);
+      font-weight: 300;
+      line-height: 1.4;
+      flex: 1;
+    }
+    .map-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.65rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--citrus);
+      margin-top: 1.75rem;
+      transition: gap 0.2s, color 0.2s;
+    }
+    .map-link:hover { gap: 0.75rem; color: var(--citrus-lt); }
+
+    /* ====================================================
+       CHEF STORY
+    ==================================================== */
+    #story {
+      background: var(--chalk);
+      padding: 7rem 0 6rem;
+    }
+    .story-layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 6rem;
+      align-items: start;
+    }
+
+    .portrait-wrap {
+      position: relative;
+    }
+    .portrait-box {
+      aspect-ratio: 4 / 5;
+      background: var(--teal-dark);
+      position: relative;
+      overflow: hidden;
+    }
+    .portrait-gradient {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 30% 80%, rgba(24,96,78,0.55) 0%, transparent 65%),
+        radial-gradient(ellipse at 70% 20%, rgba(11,30,46,0.4) 0%, transparent 60%),
+        linear-gradient(160deg, #0e3d30 0%, #18604e 60%, #0b1e2e 100%);
+    }
+    .portrait-inset {
+      position: absolute;
+      inset: 1.5rem;
+      border: 1px solid rgba(250,245,236,0.1);
+      pointer-events: none;
+    }
+    .portrait-chef {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .portrait-nameplate {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--citrus);
+      padding: 0.65rem 1rem;
+      font-family: var(--ff-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--navy);
+      text-align: center;
+    }
+    .portrait-sidebar {
+      position: absolute;
+      top: 2rem;
+      right: -1.75rem;
+      background: var(--navy);
+      padding: 1.1rem 0.9rem;
+      color: var(--chalk);
+    }
+    .sidebar-text {
+      font-family: var(--ff-display);
+      font-style: italic;
+      font-size: 0.9rem;
+      font-weight: 300;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      letter-spacing: 0.07em;
+      white-space: nowrap;
+      color: rgba(250,245,236,0.65);
+    }
+
+    .story-content { padding-top: 0.5rem; }
+    .story-title {
+      color: var(--navy);
+      margin-top: 1rem;
+      margin-bottom: 2rem;
+    }
+    .story-pull {
+      border-left: 3px solid var(--citrus);
+      padding-left: 1.5rem;
+      margin-bottom: 2rem;
+      font-family: var(--ff-display);
+      font-size: 1.45rem;
+      font-style: italic;
+      font-weight: 300;
+      line-height: 1.5;
+      color: var(--navy);
+    }
+    .story-body {
+      font-family: var(--ff-display);
+      font-size: 1.1rem;
+      font-weight: 300;
+      line-height: 1.88;
+      color: rgba(40,29,16,0.68);
+    }
+    .story-body p + p { margin-top: 1.3rem; }
+    .story-body strong {
+      font-weight: 600;
+      color: var(--navy);
+    }
+
+    /* ====================================================
+       RESERVATION CTA
+    ==================================================== */
+    #reserve {
+      background: var(--teal-dark);
+      padding: 7rem 0;
+      position: relative;
+      overflow: hidden;
+      color: var(--chalk);
+    }
+    .reserve-glow {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 70% at 75% 50%, rgba(232,153,13,0.09) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 60% at 20% 50%, rgba(24,96,78,0.3) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    /* Lemon decoration */
+    .reserve-lemon-l,
+    .reserve-lemon-r {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .reserve-lemon-l { left: 4%; }
+    .reserve-lemon-r { right: 4%; }
+
+    .reserve-inner {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .reserve-title {
+      font-family: var(--ff-display);
+      font-size: clamp(3rem, 7vw, 6rem);
+      font-weight: 300;
+      line-height: 0.9;
+      margin-bottom: 1.75rem;
+    }
+    .reserve-title em { font-style: italic; color: var(--citrus); }
+    .reserve-sub {
+      font-size: 0.88rem;
+      font-weight: 300;
+      color: rgba(250,245,236,0.6);
+      line-height: 1.75;
+      max-width: 460px;
+      margin: 0 auto 2.75rem;
+    }
+    .reserve-note {
+      margin-top: 1.5rem;
+      font-size: 0.72rem;
+      font-weight: 300;
+      color: rgba(250,245,236,0.38);
+      letter-spacing: 0.04em;
+    }
+
+    /* ====================================================
+       EMAIL SIGNUP
+    ==================================================== */
+    #signup {
+      background: var(--sand);
+      padding: 5.5rem 0;
+    }
+    .signup-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: center;
+    }
+    .signup-hed { color: var(--navy); margin-top: 0.75rem; margin-bottom: 1.25rem; }
+    .signup-sub {
+      font-size: 0.88rem;
+      font-weight: 300;
+      color: rgba(40,29,16,0.58);
+      line-height: 1.75;
+    }
+
+    .signup-form { display: flex; flex-direction: column; gap: 0.7rem; }
+    .signup-row { display: flex; }
+    .signup-email {
+      flex: 1;
+      background: #fff;
+      border: 1px solid rgba(40,29,16,0.15);
+      border-right: none;
+      padding: 0.9rem 1rem;
+      font-family: var(--ff-body);
+      font-size: 0.88rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .signup-email::placeholder { color: rgba(40,29,16,0.35); }
+    .signup-email:focus { border-color: var(--teal); }
+    .signup-btn {
+      background: var(--navy);
+      color: var(--chalk);
+      border: none;
+      padding: 0.9rem 1.4rem;
+      font-family: var(--ff-body);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    .signup-btn:hover { background: var(--navy-mid); }
+    .signup-fine {
+      font-size: 0.7rem;
+      font-weight: 300;
+      color: rgba(40,29,16,0.38);
+    }
+    .signup-success {
+      display: none;
+      background: var(--teal);
+      color: var(--chalk);
+      padding: 1rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 400;
+    }
+
+    /* ====================================================
+       FOOTER
+    ==================================================== */
+    #site-footer {
+      background: var(--navy);
+      color: rgba(250,245,236,0.4);
+      padding: 3.5rem 0 2rem;
+    }
+    .footer-main {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 2rem;
+      padding-bottom: 2.5rem;
+      border-bottom: 1px solid rgba(250,245,236,0.07);
+      margin-bottom: 1.5rem;
+    }
+    .footer-brand-name {
+      font-family: var(--ff-display);
+      font-size: 2.2rem;
+      font-weight: 300;
+      color: rgba(250,245,236,0.65);
+      line-height: 1;
+    }
+    .footer-brand-tag {
+      font-family: var(--ff-display);
+      font-style: italic;
+      font-size: 0.95rem;
+      color: rgba(250,245,236,0.3);
+      margin-top: 0.3rem;
+    }
+    .footer-links {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      list-style: none;
+      align-self: end;
+    }
+    .footer-links a {
+      font-size: 0.67rem;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: rgba(250,245,236,0.35);
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--citrus); }
+    .footer-bottom {
+      font-size: 0.68rem;
+      line-height: 1.6;
+    }
+
+    /* ====================================================
+       RESPONSIVE
+    ==================================================== */
+    @media (max-width: 960px) {
+      .when-layout { grid-template-columns: 1fr; gap: 2.5rem; }
+      .story-layout { grid-template-columns: 1fr; gap: 3rem; }
+      .portrait-sidebar { display: none; }
+      .signup-layout { grid-template-columns: 1fr; gap: 2.5rem; }
+      .footer-main { flex-direction: column; align-items: flex-start; }
+      .menu-header { grid-template-columns: 1fr; }
+      .menu-intro-note { text-align: left; }
+      .hero-ill-wrap { display: none; }
+      .reserve-lemon-l,
+      .reserve-lemon-r { display: none; }
+    }
+
+    @media (max-width: 600px) {
+      .menu-grid { grid-template-columns: 1fr; }
+      .hero-badges { flex-direction: column; gap: 0; }
+      .hero-badge { border-bottom: none; }
+      .hero-badges { border: 1px solid rgba(250,245,236,0.1); }
+      .hero-badge { border-bottom: 1px solid rgba(250,245,236,0.08); }
+      .hero-badge:last-child { border-bottom: none; }
+      #site-header { padding: 0 1.5rem; }
+      .container { padding: 0 1.5rem; }
+      .hero-content { padding-left: 1.5rem; padding-right: 1.5rem; }
+    }
+
+    /* utility */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; overflow: hidden; clip: rect(0,0,0,0);
+      white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================================================
+       STICKY HEADER
+  ================================================ -->
+  <header id="site-header" role="banner">
+    <a href="#hero" class="nav-logo" aria-label="Low Tide Table — home">Low&nbsp;<em>Tide</em>&nbsp;Table</a>
+
+    <nav aria-label="Primary navigation">
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#menu">Menu</a></li>
+        <li><a href="#when">When &amp; Where</a></li>
+        <li><a href="#story">The Story</a></li>
+        <li><a href="#signup">Stay Looped</a></li>
+        <li class="nav-cta"><a href="#reserve">Reserve</a></li>
+      </ul>
+    </nav>
+
+    <button class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <ul class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+    <li><a href="#menu">Menu</a></li>
+    <li><a href="#when">When &amp; Where</a></li>
+    <li><a href="#story">The Story</a></li>
+    <li><a href="#signup">Stay Looped</a></li>
+    <li class="nav-cta"><a href="#reserve">Reserve a Spot</a></li>
+  </ul>
+
+  <!-- ================================================
+       HERO
+  ================================================ -->
+  <section id="hero" aria-label="Hero — Low Tide Table">
+    <div class="hero-atmo" aria-hidden="true"></div>
+    <div class="hero-grain" aria-hidden="true"></div>
+
+    <!-- Animated wave bottom -->
+    <div class="hero-waves" aria-hidden="true">
+      <svg class="wave-layer wave-layer-1" viewBox="0 0 1440 220" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" height="220">
+        <path d="M0,80 C180,130 360,30 540,80 C720,130 900,30 1080,80 C1260,130 1400,50 1440,80 L1440,220 L0,220Z" fill="rgba(24,96,78,0.12)"/>
+        <path d="M0,110 C200,70 400,150 600,110 C800,70 1000,150 1200,110 C1300,90 1380,120 1440,110 L1440,220 L0,220Z" fill="rgba(11,30,46,0.5)"/>
+        <path d="M0,140 C240,100 480,170 720,140 C960,110 1200,165 1440,140 L1440,220 L0,220Z" fill="rgba(11,30,46,0.85)"/>
+      </svg>
+      <svg class="wave-layer wave-layer-2" viewBox="0 0 1440 220" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" height="220">
+        <path d="M0,90 C300,140 600,40 900,90 C1200,140 1380,60 1440,90 L1440,220 L0,220Z" fill="rgba(14,61,48,0.25)"/>
+      </svg>
+    </div>
+
+    <!-- Floating oyster illustration -->
+    <div class="hero-ill-wrap" aria-hidden="true">
+      <div class="hero-ill-inner">
+        <svg width="380" height="480" viewBox="0 0 380 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Oyster shell bottom -->
+          <ellipse cx="190" cy="300" rx="155" ry="95" fill="none" stroke="rgba(250,245,236,0.9)" stroke-width="1.5"/>
+          <ellipse cx="190" cy="308" rx="135" ry="78" fill="none" stroke="rgba(250,245,236,0.4)" stroke-width="1"/>
+          <ellipse cx="190" cy="316" rx="112" ry="60" fill="none" stroke="rgba(250,245,236,0.2)" stroke-width="1"/>
+          <!-- Pearl -->
+          <circle cx="190" cy="300" r="22" fill="rgba(158,192,208,0.25)" stroke="rgba(158,192,208,0.4)" stroke-width="1"/>
+          <circle cx="183" cy="293" r="7" fill="rgba(250,245,236,0.4)"/>
+          <!-- Top shell arch -->
+          <path d="M42,300 Q80,195 190,176 Q300,195 338,300" fill="none" stroke="rgba(250,245,236,0.9)" stroke-width="1.5"/>
+          <!-- Top shell ribs -->
+          <path d="M190,176 Q155,225 60,282" fill="none" stroke="rgba(250,245,236,0.2)" stroke-width="1"/>
+          <path d="M190,176 Q168,232 85,288" fill="none" stroke="rgba(250,245,236,0.15)" stroke-width="1"/>
+          <path d="M190,176 Q180,235 110,293" fill="none" stroke="rgba(250,245,236,0.12)" stroke-width="1"/>
+          <path d="M190,176 Q202,235 270,293" fill="none" stroke="rgba(250,245,236,0.12)" stroke-width="1"/>
+          <path d="M190,176 Q212,232 295,288" fill="none" stroke="rgba(250,245,236,0.15)" stroke-width="1"/>
+          <path d="M190,176 Q225,225 320,282" fill="none" stroke="rgba(250,245,236,0.2)" stroke-width="1"/>
+
+          <!-- Lemon wedge, upper right -->
+          <path d="M280,120 Q315,92 348,108 Q370,138 345,162 Q312,174 278,150 Z" fill="rgba(232,153,13,0.18)" stroke="rgba(232,153,13,0.55)" stroke-width="1.5"/>
+          <!-- Lemon segments -->
+          <line x1="314" y1="96" x2="296" y2="172" stroke="rgba(232,153,13,0.3)" stroke-width="0.75"/>
+          <line x1="332" y1="101" x2="308" y2="173" stroke="rgba(232,153,13,0.3)" stroke-width="0.75"/>
+          <path d="M278,130 Q313,120 348,130" fill="none" stroke="rgba(232,153,13,0.25)" stroke-width="0.75"/>
+          <path d="M279,142 Q314,132 347,142" fill="none" stroke="rgba(232,153,13,0.2)" stroke-width="0.75"/>
+
+          <!-- Small shrimp silhouette, upper left -->
+          <path d="M95,130 Q120,108 138,118 Q152,130 145,148 Q135,162 118,158 Q104,152 100,140 Q98,128 108,122 Q122,116 130,124 Q138,134 128,144" fill="none" stroke="rgba(201,88,51,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+          <!-- Shrimp antenna -->
+          <path d="M95,130 Q82,118 74,110" fill="none" stroke="rgba(201,88,51,0.4)" stroke-width="1" stroke-linecap="round"/>
+          <path d="M98,122 Q86,108 80,100" fill="none" stroke="rgba(201,88,51,0.3)" stroke-width="1" stroke-linecap="round"/>
+          <!-- Shrimp tail -->
+          <path d="M128,144 Q132,152 126,158 M128,144 Q135,152 132,160" fill="none" stroke="rgba(201,88,51,0.4)" stroke-width="1" stroke-linecap="round"/>
+
+          <!-- Decorative dash lines -->
+          <line x1="40" y1="380" x2="340" y2="380" stroke="rgba(250,245,236,0.1)" stroke-width="1" stroke-dasharray="4 8"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Main copy -->
+    <div class="hero-content">
+      <p class="hero-eyebrow">Charleston, South Carolina &mdash; Lowcountry Pop-Up</p>
+
+      <h1 class="hero-h1">
+        <span class="line line-1">Low</span>
+        <span class="line line-2"><em>Tide</em> Table</span>
+      </h1>
+
+      <div class="hero-rule"></div>
+
+      <p class="hero-sub">
+        Local shrimp. Freshly shucked oysters. Blue crab.
+        The real thing, done right, right here at the dock.
+      </p>
+
+      <div class="hero-badges" role="list">
+        <div class="hero-badge" role="listitem">
+          <div class="badge-label">Next Run</div>
+          <div class="badge-value">Thursday &mdash; Saturday</div>
+        </div>
+        <div class="hero-badge" role="listitem">
+          <div class="badge-label">Hours</div>
+          <div class="badge-value">5:00 &ndash; 10:00 PM</div>
+        </div>
+        <div class="hero-badge" role="listitem">
+          <div class="badge-label">Location</div>
+          <div class="badge-value">The Dockyard Courtyard</div>
+        </div>
+      </div>
+
+      <div class="hero-cta-row">
+        <a href="#reserve" class="btn-primary">
+          Reserve a Spot
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+            <path d="M2 7.5h11M8.5 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <a href="#menu" class="btn-ghost">See the Menu</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================
+       TICKER
+  ================================================ -->
+  <div class="ticker-bar" aria-hidden="true">
+    <div class="ticker-track">
+      <span class="ticker-item">Peel-and-Eat Shrimp</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Freshly Shucked Oysters</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Crab Rice Fritters</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Blackened Local Catch</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Key Lime Pie Jars</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Rotating Spritz</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Walk-Ups Welcome</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Chef Nate Rivers</span>
+      <span class="ticker-sep">&#9670;</span>
+      <!-- duplicate for seamless loop -->
+      <span class="ticker-item">Peel-and-Eat Shrimp</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Freshly Shucked Oysters</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Crab Rice Fritters</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Blackened Local Catch</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Key Lime Pie Jars</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Rotating Spritz</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Walk-Ups Welcome</span>
+      <span class="ticker-sep">&#9670;</span>
+      <span class="ticker-item">Chef Nate Rivers</span>
+      <span class="ticker-sep">&#9670;</span>
+    </div>
+  </div>
+
+  <!-- ================================================
+       MENU
+  ================================================ -->
+  <section id="menu" aria-labelledby="menu-heading">
+    <div class="container">
+
+      <div class="menu-header">
+        <div>
+          <p class="eyebrow eyebrow-teal reveal">What We're Serving</p>
+          <h2 id="menu-heading" class="display-title reveal" style="color: var(--navy);">The Night's<br><em style="font-style:italic; color:var(--teal)">Menu</em></h2>
+        </div>
+        <p class="menu-intro-note reveal">
+          Sourced daily. Market-driven.<br>
+          Prepared by hand.<br>
+          <em>Menu shifts with the tides.</em>
+        </p>
+      </div>
+
+      <!-- Raw Bar -->
+      <div class="menu-category">
+        <div class="cat-label reveal">
+          <!-- oyster icon -->
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+            <ellipse cx="9" cy="11" rx="7.5" ry="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M2,11 Q5,6 9,5 Q13,6 16,11" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="9" cy="10.5" r="1.5" fill="currentColor"/>
+          </svg>
+          Raw Bar
+        </div>
+        <div class="menu-grid">
+
+          <article class="menu-card reveal">
+            <div class="menu-card-top">
+              <h3 class="menu-name">Oyster Tray</h3>
+              <span class="menu-price">$18</span>
+            </div>
+            <p class="menu-desc">Half-dozen freshly shucked Johns Island oysters on the half shell — briny, cold, and clean as the tide. Served with house mignonette, fresh horseradish, and a wedge of lemon.</p>
+            <svg class="menu-card-deco" width="54" height="54" viewBox="0 0 54 54" fill="none" aria-hidden="true">
+              <ellipse cx="27" cy="34" rx="20" ry="13" fill="none" stroke="currentColor" stroke-width="2"/>
+              <path d="M8,34 Q16,24 27,22 Q38,24 46,34" fill="none" stroke="currentColor" stroke-width="2"/>
+              <circle cx="27" cy="32" r="4" fill="currentColor"/>
+            </svg>
+          </article>
+
+          <article class="menu-card reveal">
+            <div class="menu-card-top">
+              <h3 class="menu-name">Peel-and-Eat Shrimp</h3>
+              <span class="menu-price">$16</span>
+            </div>
+            <p class="menu-desc">One pound of wild-caught Lowcountry shrimp, steamed in Old Bay and sea salt. Served with house lemon aioli and house cocktail sauce. Peel it. Dip it. There's your evening.</p>
+            <svg class="menu-card-deco" width="54" height="54" viewBox="0 0 54 54" fill="none" aria-hidden="true">
+              <path d="M36,8 Q47,15 45,27 Q43,39 28,44 Q18,46 16,41 Q14,34 21,32 Q29,29 31,22 Q33,13 25,11 Q33,6 36,8Z" fill="none" stroke="currentColor" stroke-width="2"/>
+              <path d="M16,41 Q11,46 8,50" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M25,11 Q22,7 19,5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </article>
+
+        </div>
+      </div>
+
+      <!-- From the Kitchen -->
+      <div class="menu-category">
+        <div class="cat-label reveal">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+            <rect x="3" y="7" width="12" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6,7 L6,5 Q6,3 9,3 Q12,3 12,5 L12,7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          From the Kitchen
+        </div>
+        <div class="menu-grid">
+
+          <article class="menu-card reveal">
+            <div class="menu-card-top">
+              <h3 class="menu-name">Crab Rice Fritters</h3>
+              <span class="menu-price">$14</span>
+            </div>
+            <p class="menu-desc">Blue crab folded into Carolina gold rice, pan-crisped until burnished and served with a smoked paprika remoulade. A Lowcountry staple done the way it always should've been.</p>
+          </article>
+
+          <article class="menu-card reveal">
+            <div class="menu-card-top">
+              <h3 class="menu-name">Blackened Local Catch</h3>
+              <span class="menu-price">$24</span>
+            </div>
+            <p class="menu-desc">Today's fish — flounder, sheepshead, or whatever the boats brought in — hit with Nate's spice blend and seared in a screaming-hot cast iron. Herb butter, lemon, cucumber-tomato relish.</p>
+            <svg class="menu-card-deco" width="60" height="30" viewBox="0 0 60 30" fill="none" aria-hidden="true">
+              <path d="M5,15 Q15,2 30,5 Q45,8 55,15 Q45,22 30,25 Q15,28 5,15Z" fill="none" stroke="currentColor" stroke-width="2"/>
+              <circle cx="48" cy="13" r="2" fill="currentColor"/>
+              <path d="M55,15 Q62,12 60,8 Q58,15 65,18 Q60,18 55,15Z" fill="currentColor" opacity="0.5"/>
+            </svg>
+          </article>
+
+          <article class="menu-card reveal">
+            <div class="menu-card-top">
+              <h3 class="menu-name">Hushpuppies</h3>
+              <span class="menu-price">$7</span>
+            </div>
+            <p class="menu-desc">Golden-fried cornmeal fritters with scallion and a whisper of jalapeño. Crisp shell, pillowy inside. You'll order a second basket before the first one is gone. We already know.</p>
+          </article>
+
+          <article class="menu-card reveal">
+            <div class="menu-card-top">
+              <h3 class="menu-name">Tomato Cucumber Salad</h3>
+              <span class="menu-price">$9</span>
+            </div>
+            <p class="menu-desc">Peak-season tomatoes and garden cucumbers in a white balsamic vinaigrette with fresh dill, shaved red onion, and flaky salt. Bright, sharp, and exactly what you need alongside the rest of this.</p>
+          </article>
+
+        </div>
+      </div>
+
+      <!-- To Finish -->
+      <div class="menu-category">
+        <div class="cat-label reveal">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+            <path d="M5,14 Q3,9 9,5 Q15,9 13,14 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <line x1="9" y1="14" x2="9" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="6" y1="17" x2="12" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          To Finish
+        </div>
+        <div class="menu-grid">
+
+          <article class="menu-card reveal">
+            <div class="menu-card-top">
+              <h3 class="menu-name">Key Lime Pie Jars</h3>
+              <span class="menu-price">$8</span>
+            </div>
+            <p class="menu-desc">Tart key lime curd layered over a buttery graham cracker crumble, finished with whipped cream and lime zest. Punchy. Creamy. The exact right note to end on.</p>
+            <svg class="menu-card-deco" width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+              <circle cx="22" cy="22" r="18" fill="none" stroke="currentColor" stroke-width="2"/>
+              <circle cx="22" cy="22" r="12" fill="none" stroke="currentColor" stroke-width="1"/>
+              <line x1="22" y1="4" x2="22" y2="40" stroke="currentColor" stroke-width="0.75"/>
+              <line x1="4" y1="22" x2="40" y2="22" stroke="currentColor" stroke-width="0.75"/>
+              <line x1="9.4" y1="9.4" x2="34.6" y2="34.6" stroke="currentColor" stroke-width="0.75"/>
+              <line x1="34.6" y1="9.4" x2="9.4" y2="34.6" stroke="currentColor" stroke-width="0.75"/>
+            </svg>
+          </article>
+
+          <article class="menu-card reveal">
+            <div class="menu-card-top">
+              <h3 class="menu-name">Rotating Spritz</h3>
+              <span class="menu-price">$11</span>
+            </div>
+            <p class="menu-desc"><strong style="color:var(--teal);font-weight:600">Tonight:</strong> Aperol, blood orange, and soda with a rosemary sprig and orange peel. Changes with the season and Nate's mood. Always cold. Always worth asking about.</p>
+          </article>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Wave down into dark section -->
+  <div class="wave-divide" aria-hidden="true" style="background: var(--chalk);">
+    <svg viewBox="0 0 1440 70" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" height="70">
+      <path d="M0,35 C240,70 480,0 720,35 C960,70 1200,0 1440,35 L1440,70 L0,70Z" fill="var(--navy)"/>
+    </svg>
+  </div>
+
+  <!-- ================================================
+       WHEN & WHERE
+  ================================================ -->
+  <section id="when" aria-labelledby="when-heading">
+    <div class="container">
+      <p class="eyebrow eyebrow-citrus reveal">Hours &amp; Location</p>
+      <h2 id="when-heading" class="display-title reveal" style="color: var(--chalk);">
+        Find Us<br><em style="font-style:italic; color:var(--citrus)">at the Dock</em>
+      </h2>
+
+      <div class="when-layout">
+        <!-- Left: hours + warning -->
+        <div>
+          <div class="info-block reveal">
+            <div class="info-block-label">When We're Open</div>
+            <div class="info-block-main">Thursday &mdash; Saturday<br>5:00 PM &ndash; 10:00 PM</div>
+            <p class="info-block-sub">
+              Walk-ups are always welcome until we sell out. Reservations are recommended for parties of four or more — we hold your table until 6:30 PM. After that, it's first-come.
+            </p>
+          </div>
+
+          <div class="sold-out-alert reveal" role="alert">
+            <svg class="sold-out-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M10 2.5L17.5 16H2.5L10 2.5Z" fill="rgba(255,255,255,0.15)" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+              <line x1="10" y1="8" x2="10" y2="12.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="10" cy="14.5" r="0.85" fill="white"/>
+            </svg>
+            <div class="sold-out-copy">
+              <strong>Heads Up &mdash; We Sell Out</strong>
+              <span>Oysters and shrimp are regularly gone by 8 PM. Walk-ins: come early. Once we're out, we're out &mdash; no exceptions, no rain checks.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: map card -->
+        <div class="map-card reveal">
+          <div>
+            <div class="info-block-label">Where to Find Us</div>
+            <div class="map-address">The Dockyard Courtyard<br>72 Morrison Drive<br>Charleston, SC&nbsp;29403</div>
+          </div>
+          <a href="https://maps.google.com/?q=72+Morrison+Drive+Charleston+SC" target="_blank" rel="noopener noreferrer" class="map-link">
+            Get Directions
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 7h10M8 3.5l3.5 3.5L8 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+          <!-- Compass rose decoration -->
+          <svg class="map-compass-art" width="130" height="130" viewBox="0 0 130 130" fill="none" aria-hidden="true">
+            <circle cx="65" cy="65" r="62" stroke="rgba(250,245,236,1)" stroke-width="1"/>
+            <circle cx="65" cy="65" r="46" stroke="rgba(250,245,236,1)" stroke-width="0.5"/>
+            <circle cx="65" cy="65" r="28" stroke="rgba(250,245,236,1)" stroke-width="0.5"/>
+            <!-- N pointer -->
+            <path d="M65,4 L68.5,63 L65,122 L61.5,63 Z" fill="rgba(250,245,236,1)"/>
+            <!-- E pointer -->
+            <path d="M126,65 L67,61.5 L4,65 L67,68.5 Z" fill="rgba(250,245,236,0.5)"/>
+            <!-- Cardinal labels -->
+            <text x="65" y="3" text-anchor="middle" dominant-baseline="auto" font-size="7" fill="rgba(250,245,236,0.9)" font-family="serif" letter-spacing="1">N</text>
+            <text x="128" y="68" text-anchor="start" dominant-baseline="middle" font-size="7" fill="rgba(250,245,236,0.6)" font-family="serif">E</text>
+            <text x="65" y="129" text-anchor="middle" dominant-baseline="hanging" font-size="7" fill="rgba(250,245,236,0.6)" font-family="serif" dy="-2">S</text>
+            <text x="2" y="68" text-anchor="end" dominant-baseline="middle" font-size="7" fill="rgba(250,245,236,0.6)" font-family="serif">W</text>
+            <circle cx="65" cy="65" r="4" fill="rgba(250,245,236,0.9)"/>
+            <circle cx="65" cy="65" r="2" fill="var(--navy)"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Wave up back to light -->
+  <div class="wave-divide" aria-hidden="true" style="background:var(--chalk);">
+    <svg viewBox="0 0 1440 70" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" height="70">
+      <path d="M0,35 C240,0 480,70 720,35 C960,0 1200,70 1440,35 L1440,0 L0,0Z" fill="var(--navy)"/>
+    </svg>
+  </div>
+
+  <!-- ================================================
+       CHEF STORY
+  ================================================ -->
+  <section id="story" aria-labelledby="story-heading">
+    <div class="container">
+      <div class="story-layout">
+
+        <!-- Portrait column -->
+        <div class="portrait-wrap reveal">
+          <div class="portrait-box">
+            <div class="portrait-gradient"></div>
+            <div class="portrait-inset"></div>
+
+            <!-- Abstract chef figure SVG -->
+            <svg class="portrait-chef" width="280" height="360" viewBox="0 0 280 360" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Illustration of Chef Nate Rivers">
+              <!-- Toque blanche -->
+              <path d="M96,132 Q92,88 140,74 Q188,88 184,132 L184,150 L96,150Z" fill="rgba(250,245,236,0.1)"/>
+              <path d="M90,148 L190,148 L190,162 L90,162Z" fill="rgba(250,245,236,0.14)"/>
+              <!-- Toque top puff shape -->
+              <ellipse cx="140" cy="74" rx="46" ry="38" fill="rgba(250,245,236,0.07)" stroke="rgba(250,245,236,0.15)" stroke-width="1"/>
+              <!-- Head -->
+              <ellipse cx="140" cy="195" rx="40" ry="44" fill="rgba(250,245,236,0.09)"/>
+              <!-- Neck + shoulders -->
+              <path d="M112,228 Q98,244 82,266 L64,360 L216,360 L198,266 Q182,244 168,228 Z" fill="rgba(250,245,236,0.07)"/>
+              <!-- Chef coat details -->
+              <line x1="140" y1="250" x2="140" y2="360" stroke="rgba(250,245,236,0.08)" stroke-width="1"/>
+              <circle cx="140" cy="268" r="3" fill="rgba(250,245,236,0.2)"/>
+              <circle cx="140" cy="286" r="3" fill="rgba(250,245,236,0.2)"/>
+              <circle cx="140" cy="304" r="3" fill="rgba(250,245,236,0.2)"/>
+              <!-- Collar -->
+              <path d="M112,228 Q125,240 140,244 Q155,240 168,228" fill="none" stroke="rgba(250,245,236,0.2)" stroke-width="1.5"/>
+              <!-- Apron strings -->
+              <path d="M116,270 L82,298" fill="none" stroke="rgba(250,245,236,0.15)" stroke-width="1.5"/>
+              <path d="M164,270 L198,298" fill="none" stroke="rgba(250,245,236,0.15)" stroke-width="1.5"/>
+            </svg>
+
+            <div class="portrait-nameplate">Chef Nate Rivers</div>
+          </div>
+
+          <div class="portrait-sidebar">
+            <span class="sidebar-text">Charleston-born. Dock-raised.</span>
+          </div>
+        </div>
+
+        <!-- Story text -->
+        <div class="story-content">
+          <p class="eyebrow eyebrow-teal reveal">The Story</p>
+          <h2 id="story-heading" class="display-title story-title reveal">
+            About<br><em style="font-style:italic; color:var(--teal)">Nate Rivers</em>
+          </h2>
+
+          <blockquote class="story-pull reveal">
+            "The best meal I ever had was standing at a folding table on my uncle's dock. I've been trying to recreate that ever since."
+          </blockquote>
+
+          <div class="story-body reveal">
+            <p>
+              Nate Rivers grew up in North Charleston with a grandfather who cast nets before sunrise and a grandmother who could take a pound of blue crab and turn it into something you'd still be talking about a decade later. He didn't go to culinary school right away — he worked the docks first, then the kitchens of other people's restaurants, before he felt ready enough to own the whole thing.
+            </p>
+            <p>
+              <strong>Low Tide Table</strong> started as a way to get back to what mattered: seasonal, local seafood prepared simply and served the way Lowcountry cooking always has been — without fuss, without pretense, with a cold drink in hand and the smell of salt in the air.
+            </p>
+            <p>
+              Every Thursday through Saturday evening, Nate and a small crew set up at The Dockyard Courtyard with whatever came off the boats that morning. The menu is short on purpose. Everything is made from scratch, every time, in a space where the air still carries the tides.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================
+       RESERVATION CTA
+  ================================================ -->
+  <section id="reserve" aria-labelledby="reserve-heading">
+    <div class="reserve-glow" aria-hidden="true"></div>
+
+    <!-- Lemon slice decorations -->
+    <svg class="reserve-lemon-l" width="180" height="180" viewBox="0 0 180 180" fill="none" aria-hidden="true">
+      <circle cx="90" cy="90" r="82" stroke="rgba(250,245,236,0.06)" stroke-width="1.5"/>
+      <circle cx="90" cy="90" r="62" stroke="rgba(250,245,236,0.05)" stroke-width="1"/>
+      <circle cx="90" cy="90" r="38" fill="rgba(250,245,236,0.03)"/>
+      <line x1="90" y1="8" x2="90" y2="172" stroke="rgba(250,245,236,0.04)" stroke-width="1"/>
+      <line x1="8" y1="90" x2="172" y2="90" stroke="rgba(250,245,236,0.04)" stroke-width="1"/>
+      <line x1="32" y1="32" x2="148" y2="148" stroke="rgba(250,245,236,0.04)" stroke-width="1"/>
+      <line x1="148" y1="32" x2="32" y2="148" stroke="rgba(250,245,236,0.04)" stroke-width="1"/>
+    </svg>
+    <svg class="reserve-lemon-r" width="220" height="220" viewBox="0 0 220 220" fill="none" aria-hidden="true">
+      <circle cx="110" cy="110" r="100" stroke="rgba(232,153,13,0.07)" stroke-width="1.5"/>
+      <circle cx="110" cy="110" r="76" stroke="rgba(232,153,13,0.05)" stroke-width="1"/>
+      <circle cx="110" cy="110" r="46" fill="rgba(232,153,13,0.04)"/>
+      <line x1="110" y1="10" x2="110" y2="210" stroke="rgba(232,153,13,0.05)" stroke-width="1"/>
+      <line x1="10" y1="110" x2="210" y2="110" stroke="rgba(232,153,13,0.05)" stroke-width="1"/>
+      <line x1="39" y1="39" x2="181" y2="181" stroke="rgba(232,153,13,0.05)" stroke-width="1"/>
+      <line x1="181" y1="39" x2="39" y2="181" stroke="rgba(232,153,13,0.05)" stroke-width="1"/>
+    </svg>
+
+    <div class="container">
+      <div class="reserve-inner">
+        <p class="eyebrow eyebrow-citrus reveal">Reservations</p>
+        <h2 id="reserve-heading" class="reserve-title reveal">
+          Come<br><em>Hungry.</em>
+        </h2>
+        <p class="reserve-sub reveal">
+          Reservations are recommended for parties of four or more — we hold your table through 6:30 PM. Walk-ups are welcome until we sell out. Don't sleep on it.
+        </p>
+        <a href="mailto:reserve@lowtide.table?subject=Reservation%20Request%20—%20Low%20Tide%20Table" class="btn-primary reveal">
+          Request a Reservation
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+            <path d="M2 7.5h11M8.5 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <p class="reserve-note reveal">
+          Or call us at <a href="tel:+18435550192" style="color:rgba(250,245,236,0.55); border-bottom:1px solid rgba(250,245,236,0.2);">(843) 555-0192</a> &mdash; we answer when we're not shucking.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================
+       EMAIL SIGNUP
+  ================================================ -->
+  <section id="signup" aria-labelledby="signup-heading">
+    <div class="container">
+      <div class="signup-layout">
+
+        <div>
+          <p class="eyebrow eyebrow-teal reveal">Stay in the Loop</p>
+          <h2 id="signup-heading" class="display-title signup-hed reveal">
+            First to Know<br><em style="font-style:italic; color:var(--teal)">When We're Back</em>
+          </h2>
+          <p class="signup-sub reveal">
+            Pop-up dates, last-minute openings, sold-out warnings, and the occasional menu preview. No spam. No noise. Just the good stuff — right before we open the doors.
+          </p>
+        </div>
+
+        <div class="reveal">
+          <form class="signup-form" id="signup-form" novalidate>
+            <div class="signup-row">
+              <label for="email-field" class="sr-only">Your email address</label>
+              <input
+                type="email"
+                id="email-field"
+                class="signup-email"
+                placeholder="your@email.com"
+                autocomplete="email"
+                required
+                aria-required="true"
+              >
+              <button type="submit" class="signup-btn">Notify Me</button>
+            </div>
+            <p class="signup-fine">No spam. Unsubscribe any time. We're too busy cooking to bother you.</p>
+          </form>
+          <div class="signup-success" id="signup-success" role="status" aria-live="polite">
+            You're in. We'll reach out before our next run.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================
+       FOOTER
+  ================================================ -->
+  <footer id="site-footer">
+    <div class="container">
+      <div class="footer-main">
+        <div>
+          <div class="footer-brand-name">Low Tide Table</div>
+          <div class="footer-brand-tag">A Lowcountry Pop-Up by Chef Nate Rivers</div>
+        </div>
+        <nav aria-label="Footer navigation">
+          <ul class="footer-links">
+            <li><a href="#menu">Menu</a></li>
+            <li><a href="#when">Hours</a></li>
+            <li><a href="#story">Story</a></li>
+            <li><a href="#reserve">Reserve</a></li>
+            <li><a href="mailto:hello@lowtide.table">Contact</a></li>
+          </ul>
+        </nav>
+      </div>
+      <p class="footer-bottom">
+        &copy; 2026 Low Tide Table &mdash; The Dockyard Courtyard, 72 Morrison Drive, Charleston, SC 29403
+        &mdash; Est. with salt and intention.
+      </p>
+    </div>
+  </footer>
+
+  <!-- ================================================
+       JAVASCRIPT
+  ================================================ -->
+  <script>
+    /* ---- Sticky header ---- */
+    const header = document.getElementById('site-header');
+    function onScroll() {
+      header.classList.toggle('scrolled', window.scrollY > 50);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    /* ---- Mobile nav toggle ---- */
+    const navToggle  = document.getElementById('nav-toggle');
+    const mobileNav  = document.getElementById('mobile-nav');
+    navToggle.addEventListener('click', () => {
+      const open = mobileNav.classList.toggle('open');
+      navToggle.setAttribute('aria-expanded', open);
+    });
+    // Close mobile nav on link click
+    mobileNav.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        mobileNav.classList.remove('open');
+        navToggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    /* ---- Scroll reveal with stagger ---- */
+    const revealEls = document.querySelectorAll('.reveal');
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        // Stagger siblings within the same direct parent
+        const parent = entry.target.parentElement;
+        const sibs   = Array.from(parent.querySelectorAll(':scope > .reveal'));
+        const idx    = sibs.indexOf(entry.target);
+        // Only stagger if there are siblings
+        const delay  = sibs.length > 1 ? idx * 90 : 0;
+        entry.target.style.transitionDelay = delay + 'ms';
+        entry.target.classList.add('visible');
+        io.unobserve(entry.target);
+      });
+    }, {
+      threshold: 0.08,
+      rootMargin: '0px 0px -36px 0px'
+    });
+    revealEls.forEach(el => io.observe(el));
+
+    /* ---- Compass shimmer ---- */
+    // Trigger once it enters viewport
+    const compass = document.querySelector('.map-compass-art');
+    if (compass) {
+      const compassObs = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          compass.style.opacity = '1';
+          compassObs.disconnect();
+        }
+      }, { threshold: 0.2 });
+      compassObs.observe(compass);
+    }
+
+    /* ---- Email signup ---- */
+    const signupForm    = document.getElementById('signup-form');
+    const signupSuccess = document.getElementById('signup-success');
+    if (signupForm) {
+      signupForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email-field').value.trim();
+        if (!email || !email.includes('@')) return;
+        signupForm.style.display     = 'none';
+        signupSuccess.style.display  = 'block';
+      });
+    }
+
+    /* ---- Smooth-scroll polyfill guard ---- */
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', (e) => {
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

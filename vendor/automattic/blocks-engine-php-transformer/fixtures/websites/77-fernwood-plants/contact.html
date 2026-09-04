@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact &amp; Visit — Fernwood Botanicals</title>
+  <meta name="description" content="Get in touch with Fernwood Botanicals. Greenhouse hours, location, and a message form to reach our growers." />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="index.html" aria-label="Fernwood Botanicals home">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44C16 40 7 36 7 22 7 13 14 6 24 6s17 7 17 16c0 14-9 18-17 22Z" fill="#9caf88"/><path d="M24 42V16" stroke="#2f4a2c" stroke-width="2.4" stroke-linecap="round"/><path d="M24 24C18 22 13 17 13 11c6 0 11 4 13 9 2-6 7-9 13-9 0 6-5 11-11 13" fill="#3f6b3a"/></svg>
+        Fernwood
+      </a>
+      <button class="nav-toggle" data-nav-toggle aria-label="Toggle menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <nav class="nav" data-nav>
+        <a href="index.html">Home</a>
+        <a href="shop.html">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html" class="active">Contact</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn" data-open-cart aria-label="Open cart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/><path d="M2 3h2.2l2.3 12.3a2 2 0 0 0 2 1.7h8.7a2 2 0 0 0 2-1.6L21 7H6"/></svg>
+          <span class="cart-badge is-empty" data-cart-count>0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="eyebrow">We'd love to hear from you</span>
+        <h1>Contact &amp; visit</h1>
+        <p>Questions about a plant, an order, or just need some care advice? Reach out, or come wander the greenhouse in person.</p>
+      </div>
+    </section>
+
+    <section class="section section-tight">
+      <div class="wrap contact-grid">
+        <!-- FORM -->
+        <div>
+          <h2>Send us a message</h2>
+          <form data-contact-form novalidate>
+            <div class="field">
+              <label for="cf-name">Your name</label>
+              <input id="cf-name" name="name" type="text" autocomplete="name" required />
+            </div>
+            <div class="field">
+              <label for="cf-email">Email address</label>
+              <input id="cf-email" name="email" type="email" autocomplete="email" required />
+            </div>
+            <div class="field">
+              <label for="cf-topic">What's this about?</label>
+              <select id="cf-topic" name="topic">
+                <option>Plant care advice</option>
+                <option>An existing order</option>
+                <option>Wholesale &amp; events</option>
+                <option>Something else</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="cf-message">Message</label>
+              <textarea id="cf-message" name="message" required placeholder="Tell us what's growing on…"></textarea>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">Send message</button>
+            <p class="form-note" data-form-note hidden></p>
+          </form>
+        </div>
+
+        <!-- INFO -->
+        <div>
+          <div class="info-card" id="hours">
+            <h3>Greenhouse hours</h3>
+            <div class="hours-row"><span>Monday – Friday</span><span>9:00 – 18:00</span></div>
+            <div class="hours-row"><span>Saturday</span><span>9:00 – 17:00</span></div>
+            <div class="hours-row"><span>Sunday</span><span>10:00 – 16:00</span></div>
+            <div class="hours-row"><span>Public holidays</span><span>Closed</span></div>
+          </div>
+
+          <div class="info-card">
+            <h3>Find us</h3>
+            <p style="color:var(--muted);margin-top:0;">14 Fernwood Lane<br>Mossvale, OR 97000</p>
+            <p style="margin:0;"><a href="tel:+15035550142">(503) 555-0142</a> · <a href="mailto:hello@fernwood.example">hello@fernwood.example</a></p>
+          </div>
+
+          <div class="map-art" role="img" aria-label="Stylized map showing Fernwood Botanicals just off Mossvale's main road">
+            <svg viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="400" height="240" rx="16" fill="#eef3e6"/>
+              <path d="M0 150 Q120 120 220 160 T400 150" fill="none" stroke="#cdd8bf" stroke-width="16"/>
+              <path d="M120 0 L150 240" fill="none" stroke="#cdd8bf" stroke-width="12"/>
+              <path d="M0 60 L400 90" fill="none" stroke="#dde7d0" stroke-width="8"/>
+              <circle cx="80" cy="60" r="10" fill="#9caf88"/>
+              <circle cx="320" cy="180" r="12" fill="#9caf88"/>
+              <rect x="250" y="50" width="40" height="34" rx="4" fill="#c4d4b2"/>
+              <!-- marker -->
+              <g transform="translate(196 96)">
+                <path d="M0 60 C-22 32 -22 12 0 0 C22 12 22 32 0 60Z" fill="#c97a54"/>
+                <circle cx="0" cy="22" r="10" fill="#fff"/>
+                <path d="M0 28V14m0 0c-3-1-5-3-5-6 3 0 5 2 6 4 1-2 3-4 6-4 0 3-2 5-5 6" fill="#3f6b3a"/>
+              </g>
+              <text x="210" y="190" font-family="sans-serif" font-size="13" fill="#6a7563">Mossvale</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44C16 40 7 36 7 22 7 13 14 6 24 6s17 7 17 16c0 14-9 18-17 22Z" fill="#9caf88"/><path d="M24 42V16" stroke="#1f3320" stroke-width="2.4" stroke-linecap="round"/><path d="M24 24C18 22 13 17 13 11c6 0 11 4 13 9 2-6 7-9 13-9 0 6-5 11-11 13" fill="#3f6b3a"/></svg>
+            Fernwood Botanicals
+          </div>
+          <p>A family nursery growing happy, healthy plants — and the people who care for them — since 1994.</p>
+        </div>
+        <div><h4>Shop</h4><ul>
+          <li><a href="shop.html?category=Indoor">Indoor plants</a></li>
+          <li><a href="shop.html?category=Outdoor">Outdoor plants</a></li>
+          <li><a href="shop.html?category=Succulents &amp; Cacti">Succulents &amp; cacti</a></li>
+          <li><a href="shop.html?category=Pots &amp; Planters">Pots &amp; planters</a></li>
+        </ul></div>
+        <div><h4>Company</h4><ul>
+          <li><a href="about.html">Our story</a></li>
+          <li><a href="about.html#sustainability">Sustainability</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="contact.html#hours">Greenhouse hours</a></li>
+        </ul></div>
+        <div><h4>Visit</h4><ul>
+          <li>14 Fernwood Lane</li><li>Mossvale, OR 97000</li>
+          <li><a href="tel:+15035550142">(503) 555-0142</a></li>
+          <li><a href="mailto:hello@fernwood.example">hello@fernwood.example</a></li>
+        </ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; <span data-year>2026</span> Fernwood Botanicals. Grown with care.</span>
+        <span>Peat-free · Plastic-light · Locally rooted</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/products.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

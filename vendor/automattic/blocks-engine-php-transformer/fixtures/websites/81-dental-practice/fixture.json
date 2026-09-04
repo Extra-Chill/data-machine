@@ -1,0 +1,7 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": ["dental", "local-business", "has-form", "team", "hours", "schema", "comparison-slider"],
+  "capabilities": ["forms", "local-css", "runtime-js"],
+  "risk_profile": "medium",
+  "complexity": 2
+}

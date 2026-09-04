@@ -1,0 +1,92 @@
+/* =========================================================
+   AuroraOS 88 — window manager chrome
+   ========================================================= */
+
+.window {
+  position: absolute;
+  display: flex; flex-direction: column;
+  min-width: 240px; min-height: 160px;
+  background: var(--win-bg);
+  border: 1px solid var(--win-line);
+  border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.3);
+  overflow: hidden;
+  will-change: transform, width, height;
+}
+.window.active {
+  box-shadow: 0 24px 70px rgba(0,0,0,.6), 0 0 32px var(--win-glow);
+  border-color: var(--neon);
+}
+.window.dragging, .window.resizing { transition: none !important; user-select: none; }
+.window.opening { animation: winOpen .18s var(--ease); }
+@keyframes winOpen { from { opacity: 0; transform: scale(.96); } }
+.window.closing { animation: winClose .14s var(--ease) forwards; }
+@keyframes winClose { to { opacity: 0; transform: scale(.95); } }
+.window.minned { display: none; }
+.window.maxed { border-radius: 0; }
+
+/* Title bar */
+.win-title {
+  display: flex; align-items: center; gap: 8px; height: 34px; flex: none;
+  padding: 0 6px 0 12px;
+  background: linear-gradient(90deg, var(--title-a), var(--title-b));
+  color: #fff; cursor: grab; touch-action: none;
+}
+.window.maxed .win-title { cursor: default; }
+.win-title:active { cursor: grabbing; }
+.window:not(.active) .win-title { background: linear-gradient(90deg, #2a1d4d, #1a1136); color: var(--ink-soft); }
+.win-ico { width: 18px; height: 18px; flex: none; display: grid; place-items: center; }
+.win-name {
+  flex: 1; min-width: 0; font-weight: 600; font-size: .85rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0,0,0,.3);
+}
+.win-controls { display: flex; gap: 4px; flex: none; }
+.win-ctl {
+  width: 24px; height: 22px; border-radius: 6px; display: grid; place-items: center;
+  color: #fff; font-size: 13px; line-height: 1;
+  background: rgba(255,255,255,.12);
+}
+.win-ctl:hover { background: rgba(255,255,255,.28); }
+.win-ctl.close:hover { background: #ff3b6b; }
+.win-ctl svg { width: 11px; height: 11px; }
+
+/* Body */
+.win-body {
+  flex: 1; min-height: 0; overflow: auto; position: relative;
+  background: var(--win-bg);
+  color: var(--ink);
+  scrollbar-width: thin; scrollbar-color: var(--win-line) transparent;
+}
+.win-body::-webkit-scrollbar { width: 12px; height: 12px; }
+.win-body::-webkit-scrollbar-thumb { background: var(--win-line); border-radius: 8px; border: 3px solid var(--win-bg); }
+.win-body::-webkit-scrollbar-track { background: transparent; }
+
+/* Resize handles */
+.win-resize { position: absolute; z-index: 5; }
+.rz-e  { top: 6px; bottom: 14px; right: 0; width: 6px; cursor: ew-resize; }
+.rz-s  { left: 6px; right: 14px; bottom: 0; height: 6px; cursor: ns-resize; }
+.rz-se { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; }
+.rz-se::after {
+  content: ""; position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px;
+  border-right: 2px solid var(--win-line); border-bottom: 2px solid var(--win-line);
+}
+.window.maxed .win-resize { display: none; }
+
+/* Generic doc content used by readme/files */
+.doc { padding: 22px 26px; font-size: .92rem; line-height: 1.7; color: var(--ink); user-select: text; max-width: 70ch; }
+.doc h1 { font-size: 1.35rem; color: var(--neon); margin-bottom: .6rem; letter-spacing: -.3px; }
+.doc h2 { font-size: .82rem; font-family: var(--font-mono); color: var(--cyan); margin: 1.4rem 0 .4rem; letter-spacing: .04em; }
+.doc h3 { font-size: 1rem; color: var(--ink); margin: 1.1rem 0 .25rem; }
+.doc p { color: var(--ink-soft); margin-bottom: .7rem; }
+.doc .doc-lead { color: var(--ink); font-size: 1rem; }
+.doc ul, .doc ol { color: var(--ink-soft); margin: .3rem 0 .8rem 1.3rem; }
+.doc li { margin-bottom: .3rem; }
+.doc em { color: var(--lime); font-style: italic; }
+.doc b { color: var(--ink); }
+.doc code { font-family: var(--font-mono); font-size: .85em; background: rgba(0,234,255,.12); color: var(--cyan); padding: 1px 6px; border-radius: 5px; }
+.doc .doc-note { font-family: var(--font-mono); font-size: .8rem; color: var(--amber); background: rgba(255,209,102,.08); border-left: 2px solid var(--amber); padding: 8px 12px; border-radius: 4px; }
+.doc .doc-sign { font-style: italic; color: var(--ink-faint); margin-top: 1.4rem; }
+.now-list { list-style: none; margin-left: 0 !important; }
+.now-list li { padding: 7px 0; border-bottom: 1px dashed var(--win-line); }
+.now-list b { color: var(--cyan); }

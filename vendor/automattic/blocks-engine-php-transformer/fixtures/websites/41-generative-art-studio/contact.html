@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commission — Noisewright Studio</title>
+  <meta name="description" content="Start a generative-art commission with Noisewright Studio. Tell us about your wall, screen, brand, or dataset and we'll write the system that brings it to life.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header" role="banner">
+    <a href="index.html" class="logo" aria-label="Noisewright Studio home">
+      <span class="logo-mark">Noisewright<span class="logo-dot">.</span></span>
+      <span class="logo-sub">Generative Studio</span>
+    </a>
+    <nav class="site-nav" role="navigation" aria-label="Main navigation">
+      <a href="index.html">Index</a>
+      <a href="work.html">Work</a>
+      <a href="studio.html">Studio</a>
+      <a href="contact.html" class="nav-cta">Commission</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- ══════════════ PAGE HERO ══════════════ -->
+    <section class="page-hero" aria-labelledby="contact-title">
+      <div class="wrap">
+        <span class="mono">[ Open for 2026 commissions ]</span>
+        <h1 class="page-title" id="contact-title">Start a <em>commission</em></h1>
+        <p class="page-lead">
+          Tell us what you have and what it should feel like. We read every inquiry ourselves
+          and reply within three working days — usually with a question or two.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══════════════ CONTACT ══════════════ -->
+    <section class="section" aria-label="Commission inquiry">
+      <div class="wrap contact-grid">
+
+        <aside class="contact-aside reveal">
+          <h3>Before you write</h3>
+          <p>The briefs we love most name a <em class="accent">source of variation</em> — a dataset, a sensor, a feeling, a constraint. Don't worry if you don't have one yet; that's often the first thing we figure out together.</p>
+          <ul class="contact-info">
+            <li><span>Email</span><a href="mailto:studio@noisewright.art">studio@noisewright.art</a></li>
+            <li><span>Studio</span>Rua do Século 84, Lisbon</li>
+            <li><span>Hours</span>Mon–Thu, 10:00–18:00 WET</li>
+            <li><span>Lead time</span>Typically 6–14 weeks</li>
+            <li><span>Range</span>Commissions from €8k</li>
+          </ul>
+        </aside>
+
+        <div class="reveal reveal-d1">
+          <form class="contact-form" novalidate>
+            <div class="form-row two">
+              <div>
+                <label class="form-label" for="name">Your name <span class="req">*</span></label>
+                <input class="form-control" type="text" id="name" name="name" placeholder="Jordan Rivera" autocomplete="name">
+                <p class="form-error" data-error="name"></p>
+              </div>
+              <div>
+                <label class="form-label" for="email">Email <span class="req">*</span></label>
+                <input class="form-control" type="email" id="email" name="email" placeholder="you@studio.com" autocomplete="email">
+                <p class="form-error" data-error="email"></p>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label" for="org">Organisation</label>
+              <input class="form-control" type="text" id="org" name="org" placeholder="Museum, brand, agency, or yourself" autocomplete="organization">
+            </div>
+
+            <div class="form-row">
+              <label class="form-label" for="type">Commission type <span class="req">*</span></label>
+              <select class="form-control" id="type" name="type">
+                <option value="">Select one…</option>
+                <option value="installation">Live installation</option>
+                <option value="identity">Generative identity</option>
+                <option value="sculpture">Data sculpture / print</option>
+                <option value="web">Web experience</option>
+                <option value="workshop">Workshop / R&amp;D</option>
+                <option value="other">Something else</option>
+              </select>
+              <p class="form-error" data-error="type"></p>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">Rough budget</label>
+              <div class="form-budget" role="group" aria-label="Budget range">
+                <button type="button" class="budget-chip" data-value="8-20k">€8–20k</button>
+                <button type="button" class="budget-chip" data-value="20-50k">€20–50k</button>
+                <button type="button" class="budget-chip" data-value="50-100k">€50–100k</button>
+                <button type="button" class="budget-chip" data-value="100k+">€100k+</button>
+                <button type="button" class="budget-chip" data-value="unsure">Not sure yet</button>
+              </div>
+              <input type="hidden" id="budget" name="budget" value="">
+            </div>
+
+            <div class="form-row">
+              <label class="form-label" for="message">The brief <span class="req">*</span></label>
+              <textarea class="form-control" id="message" name="message" placeholder="What's the surface? What should it feel like? Is there a dataset, a deadline, a venue? Tell us anything."></textarea>
+              <p class="form-error" data-error="message"></p>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Send inquiry <span class="btn-arrow">→</span></button>
+          </form>
+
+          <div class="form-success" role="status" aria-live="polite">
+            <svg viewBox="0 0 56 56" fill="none" stroke="#6cf2c8" stroke-width="2" aria-hidden="true">
+              <circle cx="28" cy="28" r="25"/><path d="M17 29 l8 8 l14 -16"/>
+            </svg>
+            <h3>Thank you, <span data-greet>there</span>.</h3>
+            <p>Your brief is in our queue. We read everything ourselves and will reply within three working days — keep an eye on your inbox.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <canvas id="footer-canvas" aria-hidden="true"></canvas>
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="logo-mark">Noisewright<span class="logo-dot">.</span></div>
+          <p class="footer-brand-desc">A generative-art and creative-technology studio. We write noise into form — for walls, brands, browsers, and the occasional pen plotter.</p>
+        </div>
+        <nav class="footer-col" aria-label="Studio links">
+          <p class="footer-col-title">Studio</p>
+          <ul>
+            <li><a href="work.html">Selected work</a></li>
+            <li><a href="studio.html">About the studio</a></li>
+            <li><a href="studio.html">Process</a></li>
+            <li><a href="studio.html">The team</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Service links">
+          <p class="footer-col-title">Services</p>
+          <ul>
+            <li><a href="work.html">Installations</a></li>
+            <li><a href="work.html">Generative identity</a></li>
+            <li><a href="work.html">Data sculpture</a></li>
+            <li><a href="contact.html">Workshops</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-col" aria-label="Connect links">
+          <p class="footer-col-title">Connect</p>
+          <ul>
+            <li><a href="contact.html">Commission us</a></li>
+            <li><a href="mailto:studio@noisewright.art">studio@noisewright.art</a></li>
+            <li><a href="#">Instagram</a></li>
+            <li><a href="#">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© <span data-year>2026</span> Noisewright Studio Lda · Lisbon, Portugal</p>
+        <div class="footer-legal">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Colophon</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/generative.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

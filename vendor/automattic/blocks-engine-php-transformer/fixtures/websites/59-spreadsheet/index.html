@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lattice — Spreadsheet with a real formula engine</title>
+  <meta name="description" content="Lattice is a browser spreadsheet with a genuine formula engine: cell references, ranges, 50+ functions, a dependency graph, automatic recalculation and circular-reference detection.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='5' fill='none' stroke='%232f7d5c' stroke-width='2.4'/%3E%3Cpath d='M3 12h26M3 21h26M12 3v26M21 3v26' stroke='%232f7d5c' stroke-width='1.6' opacity='.7'/%3E%3C/svg%3E">
+</head>
+<body class="app-shell" data-theme="light">
+
+  <!-- ══════════ HEADER ══════════ -->
+  <header class="top-header">
+    <a class="brand" href="index.html" aria-label="Lattice home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="3" y="3" width="26" height="26" rx="5" fill="none" stroke="var(--accent)" stroke-width="2.4"/>
+        <path d="M3 12h26M3 21h26M12 3v26M21 3v26" stroke="var(--accent)" stroke-width="1.4" opacity=".65"/>
+        <rect x="12" y="12" width="9" height="9" fill="var(--accent)" opacity=".22"/>
+      </svg>
+      <span>
+        <span class="brand-name">Latt<b>ice</b></span><br>
+        <span class="brand-sub">Formula Sheets</span>
+      </span>
+    </a>
+
+    <nav class="top-nav" aria-label="Primary">
+      <a href="index.html"><span class="full">Sheet</span></a>
+      <a href="templates.html">Templates</a>
+      <a href="about.html"><span class="full">Formula </span>Engine</a>
+    </nav>
+
+    <div class="header-spacer"></div>
+
+    <div class="sheet-name-wrap">
+      <span id="sheetName" class="sheet-name" contenteditable="true" spellcheck="false" role="textbox" aria-label="Sheet name">Untitled sheet</span>
+      <span class="autosave-dot">Saved</span>
+    </div>
+
+    <button class="icon-btn" id="themeToggle" aria-label="Toggle color theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg>
+      <span class="t-label">Light</span>
+    </button>
+  </header>
+
+  <!-- ══════════ TOOLBAR ══════════ -->
+  <div class="toolbar" role="toolbar" aria-label="Sheet tools">
+
+    <div class="menu">
+      <button class="menu-btn" aria-haspopup="true">File
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="menu-pop" role="menu">
+        <button class="menu-item" id="miNew" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+          New blank sheet
+        </button>
+        <button class="menu-item" id="miRecalc" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 0 1 14-5l2 2M20 12a8 8 0 0 1-14 5l-2-2"/><path d="M18 4v5h-5M6 20v-5h5"/></svg>
+          Recalculate all <span class="mi-key">F9</span>
+        </button>
+        <div class="menu-label">Templates</div>
+        <button class="menu-item" data-load-tpl="budget" role="menuitem">Monthly Budget</button>
+        <button class="menu-item" data-load-tpl="invoice" role="menuitem">Freelance Invoice</button>
+        <button class="menu-item" data-load-tpl="habits" role="menuitem">14-Day Habit Tracker</button>
+        <button class="menu-item" data-load-tpl="project" role="menuitem">Sprint Tracker</button>
+        <div class="menu-divider"></div>
+        <div class="menu-label">Import</div>
+        <button class="menu-item" id="miImportCsv" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
+          Import CSV…
+        </button>
+        <button class="menu-item" id="miImportJson" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
+          Import JSON…
+        </button>
+        <div class="menu-label">Export</div>
+        <button class="menu-item" id="miExportCsv" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9M7 14l5-5 5 5"/><path d="M4 3h16"/></svg>
+          Export as CSV
+        </button>
+        <button class="menu-item" id="miExportJson" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9M7 14l5-5 5 5"/><path d="M4 3h16"/></svg>
+          Export as JSON
+        </button>
+      </div>
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <div class="tb-group">
+      <button class="tb-btn" id="btnCut" title="Cut (Ctrl/Cmd+X)" aria-label="Cut">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 8.5 20 18M8.5 15.5 20 6"/></svg>
+      </button>
+      <button class="tb-btn" id="btnCopy" title="Copy (Ctrl/Cmd+C)" aria-label="Copy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>
+      </button>
+      <button class="tb-btn" id="btnPaste" title="Paste (Ctrl/Cmd+V) — relative refs adjust" aria-label="Paste">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 11h6M9 15h4"/></svg>
+      </button>
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <div class="tb-group">
+      <button class="tb-btn b-bold" id="btnBold" title="Bold (Ctrl/Cmd+B)" aria-label="Bold">B</button>
+      <button class="tb-btn b-italic" id="btnItalic" title="Italic (Ctrl/Cmd+I)" aria-label="Italic">I</button>
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <div class="tb-group">
+      <button class="tb-btn align-btn" data-align="left" title="Align left" aria-label="Align left">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h14"/></svg>
+      </button>
+      <button class="tb-btn align-btn" data-align="center" title="Align center" aria-label="Align center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M5 18h14"/></svg>
+      </button>
+      <button class="tb-btn align-btn" data-align="right" title="Align right" aria-label="Align right">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M10 12h10M6 18h14"/></svg>
+      </button>
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <div class="tb-group">
+      <button class="tb-btn" id="btnCurrency" title="Format as currency" aria-label="Currency">$</button>
+      <button class="tb-btn" id="btnPercent" title="Format as percent" aria-label="Percent">%</button>
+      <select class="tb-select" id="numFmtSelect" aria-label="Number format">
+        <option value="auto">Automatic</option>
+        <option value="integer">Number (1,234)</option>
+        <option value="comma">Decimal (1,234.5)</option>
+        <option value="currency">Currency ($)</option>
+        <option value="percent">Percent (%)</option>
+        <option value="date">Date</option>
+      </select>
+    </div>
+
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btnClear" title="Clear contents (Delete)" aria-label="Clear">Clear</button>
+  </div>
+
+  <!-- ══════════ FORMULA BAR ══════════ -->
+  <div class="formula-bar">
+    <div class="cell-addr" id="cellAddr">A1</div>
+    <span class="fx-mark" aria-hidden="true">fx</span>
+    <input class="formula-input" id="formulaInput" type="text" spellcheck="false" autocomplete="off"
+           placeholder="Type a value, or a formula starting with =  (e.g. =SUM(B5:B12))" aria-label="Formula bar">
+    <div class="fx-chips" aria-label="Insert function">
+      <button class="fx-chip" data-fx="=SUM()">SUM</button>
+      <button class="fx-chip" data-fx="=AVERAGE()">AVERAGE</button>
+      <button class="fx-chip" data-fx="=IF(,,)">IF</button>
+      <button class="fx-chip" data-fx="=COUNTIF(,)">COUNTIF</button>
+      <button class="fx-chip" data-fx="=ROUND(,2)">ROUND</button>
+      <button class="fx-chip" data-fx="=CONCAT()">CONCAT</button>
+      <button class="fx-chip" data-fx="=TODAY()">TODAY</button>
+    </div>
+  </div>
+
+  <!-- ══════════ GRID ══════════ -->
+  <div class="grid-scroll" id="gridScroll" tabindex="0" aria-label="Spreadsheet grid, use arrow keys to navigate"></div>
+
+  <!-- ══════════ STATUS BAR ══════════ -->
+  <div class="status-bar" role="status" aria-live="polite">
+    <span class="sb-item"><span class="sb-label">Selection</span> <b id="sbRange">A1</b></span>
+    <span class="sb-item"><span class="sb-label">Sum</span> <b id="sbSum">—</b></span>
+    <span class="sb-item"><span class="sb-label">Avg</span> <b id="sbAvg">—</b></span>
+    <span class="sb-item"><span class="sb-label">Count</span> <b id="sbCount">0</b></span>
+    <span class="sb-item"><span class="sb-label">Min</span> <b id="sbMin">—</b></span>
+    <span class="sb-item"><span class="sb-label">Max</span> <b id="sbMax">—</b></span>
+    <span class="sb-spacer"></span>
+    <span class="cell-kind" id="cellKind">empty</span>
+  </div>
+
+  <input type="file" id="fileInput" style="display:none" aria-hidden="true">
+
+  <script src="js/formula.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "fixture_class": "marketing/static",
+  "tags": ["marketplace", "cards", "has-nav", "multipage", "product-grid", "pricing"],
+  "capabilities": ["local-css", "runtime-js"],
+  "risk_profile": "medium",
+  "complexity": 4
+}

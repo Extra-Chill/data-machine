@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shop — Fernwood Botanicals</title>
+  <meta name="description" content="Browse Fernwood Botanicals: indoor plants, outdoor greenery, succulents, cacti, pots and tools. Filter by category, price and light, then sort to taste." />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="index.html" aria-label="Fernwood Botanicals home">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44C16 40 7 36 7 22 7 13 14 6 24 6s17 7 17 16c0 14-9 18-17 22Z" fill="#9caf88"/><path d="M24 42V16" stroke="#2f4a2c" stroke-width="2.4" stroke-linecap="round"/><path d="M24 24C18 22 13 17 13 11c6 0 11 4 13 9 2-6 7-9 13-9 0 6-5 11-11 13" fill="#3f6b3a"/></svg>
+        Fernwood
+      </a>
+      <button class="nav-toggle" data-nav-toggle aria-label="Toggle menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <nav class="nav" data-nav>
+        <a href="index.html">Home</a>
+        <a href="shop.html" class="active">Shop</a>
+        <a href="about.html">About</a>
+        <a href="contact.html">Contact</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn" data-open-cart aria-label="Open cart">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/><path d="M2 3h2.2l2.3 12.3a2 2 0 0 0 2 1.7h8.7a2 2 0 0 0 2-1.6L21 7H6"/></svg>
+          <span class="cart-badge is-empty" data-cart-count>0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="eyebrow">The full collection</span>
+        <h1>Shop our greenery</h1>
+        <p>From near-unkillable starters to statement foliage and the pots and tools to match. Filter, sort, and build your jungle.</p>
+      </div>
+    </section>
+
+    <section class="section section-tight">
+      <div class="wrap shop-layout">
+        <!-- FILTERS -->
+        <aside class="filters" aria-label="Product filters">
+          <h3>Filter</h3>
+          <div class="filter-group">
+            <label id="catlabel">Category</label>
+            <div class="cat-filters" data-cat-filters role="group" aria-labelledby="catlabel">
+              <button class="cat-btn" data-cat="all">All plants &amp; goods</button>
+              <button class="cat-btn" data-cat="Indoor">Indoor</button>
+              <button class="cat-btn" data-cat="Outdoor">Outdoor</button>
+              <button class="cat-btn" data-cat="Succulents &amp; Cacti">Succulents &amp; Cacti</button>
+              <button class="cat-btn" data-cat="Pots &amp; Planters">Pots &amp; Planters</button>
+              <button class="cat-btn" data-cat="Tools">Tools</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label for="price-filter">Max price</label>
+            <input id="price-filter" class="range" type="range" min="10" max="100" value="100" step="2" data-price-filter />
+            <div class="price-row"><span>$10</span><span data-price-out>$100</span></div>
+          </div>
+          <div class="filter-group">
+            <label for="light-filter">Light level</label>
+            <select id="light-filter" data-light-filter>
+              <option value="all">Any light</option>
+              <option value="low">Low light</option>
+              <option value="medium">Medium / indirect</option>
+              <option value="high">Bright / full sun</option>
+            </select>
+          </div>
+        </aside>
+
+        <!-- RESULTS -->
+        <div>
+          <div class="shop-toolbar">
+            <span class="result-count" data-result-count aria-live="polite">All plants</span>
+            <div class="sort-wrap">
+              <label for="sort">Sort by</label>
+              <select id="sort" data-sort>
+                <option value="featured">Featured</option>
+                <option value="newest">Newest</option>
+                <option value="price-asc">Price: low to high</option>
+                <option value="price-desc">Price: high to low</option>
+                <option value="name">Name: A → Z</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid" data-shop-grid></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44C16 40 7 36 7 22 7 13 14 6 24 6s17 7 17 16c0 14-9 18-17 22Z" fill="#9caf88"/><path d="M24 42V16" stroke="#1f3320" stroke-width="2.4" stroke-linecap="round"/><path d="M24 24C18 22 13 17 13 11c6 0 11 4 13 9 2-6 7-9 13-9 0 6-5 11-11 13" fill="#3f6b3a"/></svg>
+            Fernwood Botanicals
+          </div>
+          <p>A family nursery growing happy, healthy plants — and the people who care for them — since 1994.</p>
+        </div>
+        <div><h4>Shop</h4><ul>
+          <li><a href="shop.html?category=Indoor">Indoor plants</a></li>
+          <li><a href="shop.html?category=Outdoor">Outdoor plants</a></li>
+          <li><a href="shop.html?category=Succulents &amp; Cacti">Succulents &amp; cacti</a></li>
+          <li><a href="shop.html?category=Pots &amp; Planters">Pots &amp; planters</a></li>
+        </ul></div>
+        <div><h4>Company</h4><ul>
+          <li><a href="about.html">Our story</a></li>
+          <li><a href="about.html#sustainability">Sustainability</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="contact.html#hours">Greenhouse hours</a></li>
+        </ul></div>
+        <div><h4>Visit</h4><ul>
+          <li>14 Fernwood Lane</li><li>Mossvale, OR 97000</li>
+          <li><a href="tel:+15035550142">(503) 555-0142</a></li>
+          <li><a href="mailto:hello@fernwood.example">hello@fernwood.example</a></li>
+        </ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; <span data-year>2026</span> Fernwood Botanicals. Grown with care.</span>
+        <span>Peat-free · Plastic-light · Locally rooted</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/products.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "fixture_class": "app/dashboard",
+  "tags": [
+    "dashboard",
+    "ops",
+    "analytics",
+    "data-viz",
+    "canvas",
+    "app"
+  ],
+  "complexity": 4
+}

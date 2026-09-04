@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Helix Grid — Live Operations Console</title>
+  <meta name="description" content="Helix Grid is a real-time renewable-energy grid operations console: live metrics, charts, status heatmaps and a streaming event feed for a fictional six-region power network.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 L28 9 V23 L16 30 L4 23 V9 Z' fill='none' stroke='%2334e0c4' stroke-width='2'/%3E%3Cpath d='M10 20 Q16 6 22 20' fill='none' stroke='%2334e0c4' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body data-theme="dark">
+<div class="app" id="dashboard">
+
+  <!-- ══════════ SIDEBAR ══════════ -->
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 2 L28 9 V23 L16 30 L4 23 V9 Z" fill="none" stroke="#34e0c4" stroke-width="2"/>
+        <path d="M9 21 Q16 5 23 21" fill="none" stroke="#34e0c4" stroke-width="2"/>
+        <circle cx="16" cy="16" r="2.4" fill="#34e0c4"/>
+      </svg>
+      <span>
+        <span class="brand-name">Helix<b>Grid</b></span><br>
+        <span class="brand-sub">Ops Console</span>
+      </span>
+    </a>
+    <nav class="side-nav" aria-label="Primary">
+      <div class="side-section-label">Monitor</div>
+      <a class="side-link" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        Overview
+      </a>
+      <a class="side-link" href="service.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+        Service Detail
+      </a>
+      <a class="side-link" href="alerts.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg>
+        Alerts &amp; Incidents
+        <span class="badge crit" id="alertsBadge">0</span>
+      </a>
+      <div class="side-section-label">Reference</div>
+      <a class="side-link" href="about.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r="0.6" fill="currentColor"/></svg>
+        About Helix Grid
+      </a>
+    </nav>
+    <div class="side-foot">
+      <span class="op-avatar">CH</span><span class="op">on-call: C. Huber</span><br>
+      <span style="opacity:.7">shift 19:00–07:00 UTC · NOC-2</span>
+    </div>
+  </aside>
+  <div class="nav-scrim"></div>
+
+  <!-- ══════════ TOPBAR ══════════ -->
+  <header class="topbar">
+    <button class="ctrl menu-toggle" id="menuToggle" aria-label="Toggle navigation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="page-title">Grid Overview <small>6 control areas · 144 substations</small></div>
+    <div class="feed-status" id="feedStatus"><span class="pulse-dot"></span><span class="fs-text">LIVE · streaming</span></div>
+    <div class="topbar-spacer"></div>
+
+    <button class="ctrl" id="pauseBtn" aria-label="Pause or resume the live feed">
+      <svg class="picon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      <span class="plabel">Pause</span>
+    </button>
+    <button class="ctrl danger" id="incidentBtn" aria-label="Simulate an incident">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><line x1="12" y1="9" x2="12" y2="14"/></svg>
+      Simulate incident
+    </button>
+    <button class="ctrl" id="themeToggle" aria-label="Toggle color theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      <span class="tlabel">Dark</span>
+    </button>
+    <div class="clock" id="clock"></div>
+  </header>
+
+  <!-- ══════════ MAIN ══════════ -->
+  <main class="main">
+
+    <!-- alert banner -->
+    <div class="alert-banner" id="alertBanner" role="alert">
+      <svg class="ab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg>
+      <div class="ab-body">
+        <div class="ab-title">Incident</div>
+        <div class="ab-desc">details</div>
+      </div>
+      <button class="ab-dismiss">Acknowledge</button>
+    </div>
+
+    <!-- control bar -->
+    <div class="controlbar">
+      <div class="control-group">
+        <label>Window</label>
+        <div class="seg" id="windowSeg">
+          <button data-win="30">30s</button>
+          <button data-win="60" class="active">1m</button>
+          <button data-win="120">2m</button>
+          <button data-win="240">4m</button>
+        </div>
+      </div>
+      <div class="divider-v"></div>
+      <div class="control-group">
+        <label>Region</label>
+        <select class="pill-select" id="regionSelect">
+          <option value="all">All control areas</option>
+          <option value="pnw">Pacific NW</option>
+          <option value="cal">California</option>
+          <option value="tex">ERCOT Texas</option>
+          <option value="mw">Midwest</option>
+          <option value="ne">New England</option>
+          <option value="se">Southeast</option>
+        </select>
+      </div>
+      <div class="divider-v"></div>
+      <div class="control-group speed-control">
+        <label for="speedSlider">Play speed</label>
+        <input type="range" id="speedSlider" min="0.25" max="8" step="0.25" value="1" aria-label="Playback speed">
+        <span class="speed-val" id="speedVal">1.00×</span>
+      </div>
+    </div>
+
+    <!-- KPI tiles -->
+    <div class="kpi-grid" id="kpiGrid" aria-label="Key performance indicators"></div>
+
+    <!-- charts grid -->
+    <div class="grid">
+
+      <section class="panel col-8">
+        <div class="panel-head">
+          <span class="panel-title">Demand vs. Supply</span>
+          <span class="panel-sub">MW · grid-wide</span>
+          <div class="right">
+            <span class="legend">
+              <span><i style="background:#5b9dff"></i>Demand</span>
+              <span><i style="background:#34e0c4"></i>Supply</span>
+            </span>
+            <span class="live-tag"><span class="dot"></span>live</span>
+          </div>
+        </div>
+        <div class="panel-body flush"><div class="chart-wrap" style="height:230px"><canvas id="demandChart"></canvas></div></div>
+      </section>
+
+      <section class="panel col-4">
+        <div class="panel-head"><span class="panel-title">System Frequency</span><span class="panel-sub">Hz</span>
+          <div class="right"><span class="live-tag"><span class="dot"></span>live</span></div></div>
+        <div class="panel-body" style="display:flex;align-items:center;justify-content:center">
+          <div class="chart-wrap" style="height:200px;width:100%"><canvas id="freqGauge"></canvas></div>
+        </div>
+      </section>
+
+      <section class="panel col-7">
+        <div class="panel-head"><span class="panel-title">Generation Mix</span><span class="panel-sub">stacked · MW by source</span>
+          <div class="right"><span class="legend" id="mixLegend">
+            <span><i class="sq" style="background:#ffc04d"></i>Solar</span>
+            <span><i class="sq" style="background:#5b9dff"></i>Wind</span>
+            <span><i class="sq" style="background:#34e0c4"></i>Hydro</span>
+            <span><i class="sq" style="background:#b07bff"></i>Storage</span>
+          </span></div>
+        </div>
+        <div class="panel-body flush"><div class="chart-wrap" style="height:200px"><canvas id="mixChart"></canvas></div></div>
+      </section>
+
+      <section class="panel col-5">
+        <div class="panel-head"><span class="panel-title">Regional Load</span><span class="panel-sub">% of nameplate capacity</span></div>
+        <div class="panel-body"><div class="bars" id="regionBars"></div></div>
+      </section>
+
+      <section class="panel col-8">
+        <div class="panel-head"><span class="panel-title">API Latency</span><span class="panel-sub">p50 across services · ms · 250ms SLO</span>
+          <div class="right"><span class="live-tag"><span class="dot"></span>live</span></div></div>
+        <div class="panel-body flush"><div class="chart-wrap" style="height:170px"><canvas id="latChart"></canvas></div></div>
+      </section>
+
+      <section class="panel col-4">
+        <div class="panel-head"><span class="panel-title">Reserve &amp; Load</span></div>
+        <div class="panel-body">
+          <div class="gauge-stack">
+            <div class="gauge"><div class="chart-wrap" style="height:118px;width:130px"><canvas id="reserveGauge"></canvas></div></div>
+            <div class="gauge"><div class="chart-wrap" style="height:118px;width:130px"><canvas id="loadGauge"></canvas></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel col-7">
+        <div class="panel-head"><span class="panel-title">Substation Status</span><span class="panel-sub">144 nodes · color = stress</span>
+          <div class="right"><span class="live-tag"><span class="dot"></span>live</span></div></div>
+        <div class="panel-body">
+          <div class="statusgrid" id="statusGrid"></div>
+          <div class="heat-scale"><span>nominal</span><span class="heat-bar"></span><span>critical</span></div>
+        </div>
+      </section>
+
+      <section class="panel col-5">
+        <div class="panel-head"><span class="panel-title">Frequency Detail</span><span class="panel-sub">59.95Hz threshold</span></div>
+        <div class="panel-body flush"><div class="chart-wrap" style="height:160px"><canvas id="freqChart"></canvas></div></div>
+      </section>
+
+      <!-- live log -->
+      <section class="panel col-12">
+        <div class="panel-head"><span class="panel-title">Event Stream</span><span class="panel-sub">tailing · structured logs</span>
+          <div class="right"><span class="live-tag"><span class="dot"></span>tail -f</span></div></div>
+        <div class="log-toolbar" id="logChips">
+          <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600">Severity</span>
+          <button class="chip active" data-sev="crit"><span class="cdot" style="background:var(--crit)"></span>Critical</button>
+          <button class="chip active" data-sev="warn"><span class="cdot" style="background:var(--warn)"></span>Warning</button>
+          <button class="chip active" data-sev="info"><span class="cdot" style="background:var(--info)"></span>Info</button>
+          <button class="chip active" data-sev="ok"><span class="cdot" style="background:var(--ok)"></span>Recovery</button>
+          <input class="log-search" id="logSearch" type="search" placeholder="filter service / text…" aria-label="Filter log">
+        </div>
+        <div class="panel-body flush"><div class="log" id="logFeed" role="log" aria-live="off"></div></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script src="js/engine.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
