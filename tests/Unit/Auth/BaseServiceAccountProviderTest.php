@@ -62,19 +62,21 @@ class BaseServiceAccountProviderTest extends WP_UnitTestCase {
 	/** @var string */
 	private static $public_key = '';
 
+	/**
+	 * Load a committed test keypair.
+	 *
+	 * Generated once and committed rather than created per run: the sandbox
+	 * PHP build cannot generate keys (openssl_pkey_new() returns false), and a
+	 * fixed key also keeps the signature assertion deterministic. This key is
+	 * a test fixture and protects nothing.
+	 */
 	public static function setUpBeforeClass(): void {
 		parent::setUpBeforeClass();
 
-		$resource = openssl_pkey_new(
-			array(
-				'private_key_bits' => 2048,
-				'private_key_type' => OPENSSL_KEYTYPE_RSA,
-			)
-		);
+		$dir = dirname( __DIR__, 2 ) . '/fixtures/service-account';
 
-		openssl_pkey_export( $resource, self::$private_key );
-		$details          = openssl_pkey_get_details( $resource );
-		self::$public_key = $details['key'];
+		self::$private_key = (string) file_get_contents( $dir . '/test-key.pem' );
+		self::$public_key  = (string) file_get_contents( $dir . '/test-key.pub' );
 	}
 
 	private function provider(): StubServiceAccountProvider {
