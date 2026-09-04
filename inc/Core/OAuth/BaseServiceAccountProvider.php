@@ -207,8 +207,15 @@ abstract class BaseServiceAccountProvider extends BaseAuthProvider {
 	 * @return array|\WP_Error
 	 */
 	protected function extract_credential( array $config ) {
-		if ( ! empty( $config['client_email'] ) && ! empty( $config['private_key'] ) ) {
-			return $config;
+		// Any discrete credential field means the operator configured discrete
+		// fields. Requiring all of them here would misreport a half-filled
+		// credential as "no credential configured" and send the operator
+		// looking for the wrong problem - completeness is checked separately,
+		// which is what produces the actionable "missing X" error.
+		foreach ( $this->get_required_credential_fields() as $field ) {
+			if ( ! empty( $config[ $field ] ) ) {
+				return $config;
+			}
 		}
 
 		$json = '';
