@@ -76,6 +76,12 @@ abstract class BaseAuthProvider {
 		'consumer_secret',
 		'api_secret',
 		'webhook_secret',
+		// Service account material. A private key is long-lived and unscoped,
+		// so leaving it plaintext while encrypting short-lived access tokens
+		// inverts protection relative to risk.
+		'private_key',
+		'service_account_json',
+		'credentials_json',
 	);
 
 	/**
