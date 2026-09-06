@@ -32,12 +32,8 @@ class Geocoding {
 			)
 		);
 
-		if ( ! empty( $result['error'] ) ) {
-			return new \WP_Error(
-				'geocoding_failed',
-				$result['error'],
-				array( 'status' => 400 )
-			);
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
 		return rest_ensure_response( $result );
