@@ -261,6 +261,20 @@ trait VenueFieldsTrait {
 	}
 
 	/**
+	 * Config keys this trait's sanitizer derives without the caller passing them.
+	 *
+	 * save_venue_on_settings_save() resolves venue_name + address into a venue
+	 * term ID and stores it under `venue`. Data Machine's sparse-patch write
+	 * path drops sanitizer output keys the caller did not send unless the
+	 * settings class declares them here (see data-machine #3449).
+	 *
+	 * @return string[] Derived config keys.
+	 */
+	public static function derived_fields(): array {
+		return array( 'venue' );
+	}
+
+	/**
 	 * Get venue field keys for settings operations.
 	 *
 	 * @return array List of venue field keys (snake_case)
