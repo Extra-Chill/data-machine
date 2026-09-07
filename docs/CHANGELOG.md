@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.4] - 2026-09-07
+
+### Changed
+- declare dev-only tracked files as intentional release exclusions
+
+### Fixed
+- inherit pipeline agent_id when no agent context resolves
+- backpressure deferral tick is no longer dropped when queue is still saturated
+- prepare WordPress.org release package
+
 ## [0.176.3] - 2026-09-07
 
 ### Changed
