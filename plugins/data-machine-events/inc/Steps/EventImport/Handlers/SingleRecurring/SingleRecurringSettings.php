@@ -71,7 +71,7 @@ class SingleRecurringSettings {
 			'end_time'          => array(
 				'type'        => 'text',
 				'label'       => __( 'End Time', 'data-machine-events' ),
-				'description' => __( 'Event end time in 24-hour format.', 'data-machine-events' ),
+				'description' => __( 'Event end time in 24-hour format. After-midnight end times are supported (e.g. 00:00 ends the event the next day).', 'data-machine-events' ),
 				'placeholder' => __( '22:00', 'data-machine-events' ),
 				'required'    => false,
 			),

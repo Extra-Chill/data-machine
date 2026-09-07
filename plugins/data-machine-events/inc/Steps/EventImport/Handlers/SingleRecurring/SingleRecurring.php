@@ -13,6 +13,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\SingleRecurring;
 
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
+use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -22,6 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class SingleRecurring extends EventImportHandler {
 
 	use HandlerRegistrationTrait;
+	use VenueFieldsTrait;
 
 	private const DAY_NAMES = array(
 		0 => 'Sunday',
@@ -98,7 +100,7 @@ class SingleRecurring extends EventImportHandler {
 			return array();
 		}
 
-		$next_occurrence = $this->calculateNextOccurrence( $day_of_week );
+		$next_occurrence = $this->calculateNextOccurrence( $day_of_week, (string) ( $config['start_time'] ?? '' ) );
 		$next_date       = $next_occurrence->format( 'Y-m-d' );
 
 		$standardized_event = $this->buildEventData( $config, $next_date );
@@ -147,16 +149,32 @@ class SingleRecurring extends EventImportHandler {
 	/**
 	 * Calculate the next occurrence of a given day of week
 	 *
-	 * @param int $target_day Day of week (0=Sunday, 6=Saturday)
+	 * Today counts as the next occurrence when it is the configured day and
+	 * the configured start time has not yet passed. An empty start time is
+	 * treated as end of day, so today still counts.
+	 *
+	 * @param int                     $target_day Day of week (0=Sunday, 6=Saturday)
+	 * @param string                  $start_time Configured start time (HH:MM). Empty means end of day.
+	 * @param \DateTimeInterface|null $now        Optional current time for testing. Defaults to wp_timezone() now.
 	 * @return \DateTime Next occurrence date
 	 */
-	private function calculateNextOccurrence( int $target_day ): \DateTime {
-		$today       = new \DateTime( 'today', wp_timezone() );
+	protected function calculateNextOccurrence( int $target_day, string $start_time = '', ?\DateTimeInterface $now = null ): \DateTime {
+		$today       = null === $now
+			? new \DateTime( 'today', wp_timezone() )
+			: \DateTime::createFromInterface( $now )->setTime( 0, 0, 0 );
 		$current_day = (int) $today->format( 'w' );
 
 		$days_until = $target_day - $current_day;
-		if ( $days_until <= 0 ) {
+		if ( $days_until < 0 ) {
 			$days_until += 7;
+		} elseif ( 0 === $days_until && '' !== $start_time ) {
+			// Today is the configured day: roll to next week only once today's
+			// start time has already passed.
+			$now_time    = null === $now ? new \DateTime( 'now', wp_timezone() ) : \DateTime::createFromInterface( $now );
+			$start_today = strtotime( $today->format( 'Y-m-d' ) . ' ' . $start_time, $now_time->getTimestamp() );
+			if ( false !== $start_today && $now_time->getTimestamp() >= $start_today ) {
+				$days_until += 7;
+			}
 		}
 
 		$next = clone $today;
@@ -168,30 +186,44 @@ class SingleRecurring extends EventImportHandler {
 	/**
 	 * Build standardized event data from handler config
 	 *
+	 * Venue fields are mapped through VenueFieldsTrait so phone, website,
+	 * ticketing, and capacity config reach the upsert step. An end time
+	 * earlier than the start time is an after-midnight end: the event ends
+	 * on the following calendar day.
+	 *
 	 * @param array $config Handler configuration
 	 * @param string $event_date Event date (Y-m-d)
 	 * @return array Standardized event data
 	 */
-	private function buildEventData( array $config, string $event_date ): array {
-		return array(
-			'title'        => sanitize_text_field( $config['event_title'] ?? '' ),
-			'description'  => sanitize_textarea_field( $config['event_description'] ?? '' ),
-			'startDate'    => $event_date,
-			'endDate'      => $event_date,
-			'startTime'    => sanitize_text_field( $config['start_time'] ?? '' ),
-			'endTime'      => sanitize_text_field( $config['end_time'] ?? '' ),
-			'venue'        => sanitize_text_field( $config['venue_name'] ?? '' ),
-			'venueAddress' => sanitize_text_field( $config['venue_address'] ?? '' ),
-			'venueCity'    => sanitize_text_field( $config['venue_city'] ?? '' ),
-			'venueState'   => sanitize_text_field( $config['venue_state'] ?? '' ),
-			'venueZip'     => sanitize_text_field( $config['venue_zip'] ?? '' ),
-			'venueCountry' => sanitize_text_field( $config['venue_country'] ?? '' ),
-			'ticketUrl'    => esc_url_raw( $config['ticket_url'] ?? '' ),
-			'image'        => '',
-			'price'        => sanitize_text_field( $config['price'] ?? '' ),
-			'performer'    => '',
-			'organizer'    => '',
-			'source_url'   => '',
+	protected function buildEventData( array $config, string $event_date ): array {
+		$start_time = sanitize_text_field( $config['start_time'] ?? '' );
+		$end_time   = sanitize_text_field( $config['end_time'] ?? '' );
+
+		$end_date = $event_date;
+		if ( '' !== $end_time && '' !== $start_time && $end_time < $start_time ) {
+			$overnight = new \DateTime( $event_date, wp_timezone() );
+			$overnight->modify( '+1 day' );
+			$end_date = $overnight->format( 'Y-m-d' );
+		}
+
+		return array_merge(
+			array(
+				'title'       => sanitize_text_field( $config['event_title'] ?? '' ),
+				'description' => sanitize_textarea_field( $config['event_description'] ?? '' ),
+				'startDate'   => $event_date,
+				'endDate'     => $end_date,
+				'startTime'   => $start_time,
+				'endTime'     => $end_time,
+			),
+			self::map_venue_config_to_event_data( $config ),
+			array(
+				'ticketUrl'  => esc_url_raw( $config['ticket_url'] ?? '' ),
+				'image'      => '',
+				'price'      => sanitize_text_field( $config['price'] ?? '' ),
+				'performer'  => '',
+				'organizer'  => '',
+				'source_url' => '',
+			)
 		);
 	}
 }
