@@ -33,10 +33,10 @@ Pipeline and flow creation include the selected admin agent when one is active. 
 
 Current client mutations that include the selected agent payload:
 
-- `createPipeline(name)` sends `POST /pipelines` with `pipeline_name` and optional `agent_id`.
-- `createFlow(pipelineId, flowName)` sends `POST /flows` with `pipeline_id`, `flow_name`, and optional `agent_id`.
+- `createPipeline(name)` sends `pipeline_name` and optional `agent_id` to the `create-pipeline` ability.
+- `createFlow(pipelineId, flowName)` sends `pipeline_id`, `flow_name`, and optional `agent_id` to the `create-flow` ability.
 
-Updates, deletes, queue changes, handler changes, and file operations do not add the selected agent payload in the client wrapper.
+Flow and pipeline list reads (`fetchFlows`, `fetchPipelines`, and the Jobs page flow dropdown) also include the selected agent payload so the AgentSwitcher filter keeps applying to ability-backed queries.
 
 ## Pipeline Operations
 
@@ -67,16 +67,16 @@ List mode requests `output_mode=list` with `include_flows=false`; selected pipel
 
 | Operation | Client function | Endpoint |
 | --- | --- | --- |
-| List flows for pipeline | `fetchFlows(pipelineId, { page, perPage, outputMode })` | `GET /flows` |
-| Fetch one flow | `fetchFlow(flowId)` | `GET /flows/{flow_id}` |
-| Create flow | `createFlow(pipelineId, flowName)` | `POST /flows` |
-| Rename flow | `updateFlowTitle(flowId, name)` | `PATCH /flows/{flow_id}` |
-| Delete flow | `deleteFlow(flowId)` | `DELETE /flows/{flow_id}` |
-| Duplicate flow | `duplicateFlow(flowId)` | `POST /flows/{flow_id}/duplicate` |
-| Run flow now | `runFlow(flowId)` | `POST /execute` with `flow_id` |
-| Update schedule | `updateFlowSchedule(flowId, schedulingConfig)` | `PATCH /flows/{flow_id}` |
+| List flows for pipeline | `fetchFlows(pipelineId, { page, perPage, outputMode })` | `POST /wp-abilities/v1/abilities/datamachine/get-flows/run` with `input.pipeline_id` |
+| Fetch one flow | `fetchFlow(flowId)` | `POST /wp-abilities/v1/abilities/datamachine/get-flows/run` with `input.flow_id` |
+| Create flow | `createFlow(pipelineId, flowName)` | `POST /wp-abilities/v1/abilities/datamachine/create-flow/run` with `input.pipeline_id`, `input.flow_name` |
+| Rename flow | `updateFlowTitle(flowId, name)` | `POST /wp-abilities/v1/abilities/datamachine/update-flow/run` with `input.flow_name`, then `get-flows` for the fresh record |
+| Delete flow | `deleteFlow(flowId)` | `POST /wp-abilities/v1/abilities/datamachine/delete-flow/run` with `input.flow_id` |
+| Duplicate flow | `duplicateFlow(flowId)` | `POST /wp-abilities/v1/abilities/datamachine/duplicate-flow/run` with `input.source_flow_id` |
+| Run flow now | `runFlow(flowId)` | `POST /execute` with `flow_id` (transport route, later tranche) |
+| Update schedule | `updateFlowSchedule(flowId, schedulingConfig)` | `POST /wp-abilities/v1/abilities/datamachine/update-flow/run` with `input.scheduling_config`, then `get-flows` for the fresh record |
 
-Flow duplication invalidates the selected pipeline's flow query. It copies via the REST `duplicate` endpoint; the client does not build the duplicate payload itself.
+Flow duplication invalidates the selected pipeline's flow query; the client sends only `source_flow_id` and the ability builds the copy.
 
 ## Pagination
 
@@ -100,7 +100,7 @@ The card distinguishes these cases:
 - Handler-backed steps show handler badges and configure controls.
 - Non-handler step types render inline fields through `InlineStepConfig` and the handler details API fallback.
 
-`updateFlowStepConfig(flowStepId, config)` sends partial config patches to `PATCH /flows/steps/{flow_step_id}/config`.
+`updateFlowStepConfig(flowStepId, config)` sends partial config patches to the `update-flow-step` ability run route.
 
 ## Queue CRUD And Modes
 
@@ -108,12 +108,12 @@ Prompt queues are flow-step scoped. `FlowQueueModal.jsx` and `queries/queue.js` 
 
 | Operation | Client function | Endpoint |
 | --- | --- | --- |
-| Read queue | `fetchFlowQueue(flowId, flowStepId)` | `GET /flows/{flow_id}/queue?flow_step_id=...` |
-| Add prompt(s) | `addToFlowQueue(flowId, flowStepId, prompts)` | `POST /flows/{flow_id}/queue` |
-| Clear queue | `clearFlowQueue(flowId, flowStepId)` | `DELETE /flows/{flow_id}/queue?flow_step_id=...` |
-| Remove item | `removeFromFlowQueue(flowId, flowStepId, index)` | `DELETE /flows/{flow_id}/queue/{index}?flow_step_id=...` |
-| Update item | `updateFlowQueueItem(flowId, flowStepId, index, prompt)` | `PUT /flows/{flow_id}/queue/{index}` |
-| Update mode | `updateFlowQueueMode(flowId, flowStepId, mode)` | `PUT /flows/{flow_id}/queue/mode` |
+| Read queue | `fetchFlowQueue(flowId, flowStepId)` | `POST /wp-abilities/v1/abilities/datamachine/queue-list/run` |
+| Add prompt(s) | `addToFlowQueue(flowId, flowStepId, prompts)` | `POST /wp-abilities/v1/abilities/datamachine/queue-add/run` (one call per prompt) |
+| Clear queue | `clearFlowQueue(flowId, flowStepId)` | `POST /wp-abilities/v1/abilities/datamachine/queue-clear/run` |
+| Remove item | `removeFromFlowQueue(flowId, flowStepId, index)` | `POST /wp-abilities/v1/abilities/datamachine/queue-remove/run` |
+| Update item | `updateFlowQueueItem(flowId, flowStepId, index, prompt)` | `POST /wp-abilities/v1/abilities/datamachine/queue-update/run` |
+| Update mode | `updateFlowQueueMode(flowId, flowStepId, mode)` | `POST /wp-abilities/v1/abilities/datamachine/queue-mode/run` |
 
 Queue modes are:
 
@@ -132,20 +132,17 @@ Handler discovery and details use:
 
 `HandlerSettingsModal.jsx` receives full handler metadata and the selected handler details as props. It renders schema fields through `HandlerSettingField`, normalizes/sanitizes values through `useHandlerModel()`, and saves through `useUpdateFlowHandler()`.
 
-The save path calls `updateFlowHandler(flowStepId, handlerSlug, settings, pipelineId, stepType, flowConfig, pipelineStepConfig)` and sends:
+The save path calls `updateFlowHandler(flowStepId, handlerSlug, settings)` and sends to the `update-flow-step` ability run route:
 
 ```json
 {
+  "flow_step_id": "3_12",
   "handler_slug": "example_handler",
-  "pipeline_id": 123,
-  "step_type": "fetch",
-  "flow_config": {},
-  "pipeline_step": {},
-  "settings": {}
+  "handler_config": {}
 }
 ```
 
-The endpoint is `PUT /flows/steps/{flow_step_id}/handler`.
+The flow, pipeline, and step-type context is derived server-side from the flow step ID. The client then re-reads the step through `get-flow-steps` so the caller can patch its cache with the fresh step config and settings display data.
 
 Handler settings can be enriched by plugins through these client-side filters:
 
@@ -168,12 +165,12 @@ Multi-handler steps are driven by step type metadata where `multi_handler === tr
 
 `HandlerSettingsModal.jsx` supports per-handler editing by receiving `handlerSlugs` and `onRemoveHandler`. The destructive remove button is only shown when more than one handler is attached.
 
-Add/remove multi-handler operations use the WordPress Abilities API directly instead of the page REST client:
+Add/remove multi-handler operations go through the shared `executeAbility()` client:
 
 | Operation | Client function | Ability endpoint | Payload |
 | --- | --- | --- | --- |
-| Add handler | `addFlowHandler(flowStepId, handlerSlug, settings)` | `POST /wp-abilities/v1/execute/datamachine/update-flow-step` | `flow_step_id`, `add_handler`, `add_handler_config` |
-| Remove handler | `removeFlowHandler(flowStepId, handlerSlug)` | `POST /wp-abilities/v1/execute/datamachine/update-flow-step` | `flow_step_id`, `remove_handler` |
+| Add handler | `addFlowHandler(flowStepId, handlerSlug, settings)` | `POST /wp-abilities/v1/abilities/datamachine/update-flow-step/run` | `flow_step_id`, `add_handler`, `add_handler_config` |
+| Remove handler | `removeFlowHandler(flowStepId, handlerSlug)` | `POST /wp-abilities/v1/abilities/datamachine/update-flow-step/run` | `flow_step_id`, `remove_handler` |
 
 ## Memory, Context, And Agent Files
 
@@ -181,9 +178,9 @@ The builder exposes three file surfaces:
 
 | Surface | Client functions | Endpoints |
 | --- | --- | --- |
-| Pipeline context files | `fetchContextFiles`, `uploadContextFile`, `deleteContextFile` | `GET /files`, `POST /files`, `DELETE /files/{filename}` |
+| Pipeline context files | `fetchContextFiles`, `uploadContextFile`, `deleteContextFile` | `POST /files` (multipart upload, retained); listing/deletion route the `list-flow-files`/`delete-flow-file` abilities |
 | Pipeline memory files | `fetchPipelineMemoryFiles`, `updatePipelineMemoryFiles` | `POST /wp-abilities/v1/abilities/datamachine/{get,update}-pipeline-memory-files/run` |
-| Flow memory files | `fetchFlowMemoryFiles`, `updateFlowMemoryFiles` | `GET/PUT /flows/{flow_id}/memory-files` |
+| Flow memory files | `fetchFlowMemoryFiles`, `updateFlowMemoryFiles` | `POST /wp-abilities/v1/abilities/datamachine/{get,update}-flow-memory-files/run` |
 | Available agent files | `fetchAgentFiles` | `GET /files/agent` |
 
 Context files are uploaded against a pipeline. Memory files are selected by filename at either pipeline or flow scope. Agent files are read as an inventory for the selector UI.

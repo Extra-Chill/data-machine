@@ -57,6 +57,7 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\Flow\ResumeFlowAbility();
 		new \DataMachine\Abilities\Flow\ReconcileFlowSchedulesAbility();
 		new \DataMachine\Abilities\Flow\QueueAbility();
+		new \DataMachine\Abilities\Flow\FlowMemoryFilesAbility();
 		new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
 		new \DataMachine\Abilities\FlowStep\GetFlowStepsAbility();
 		new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();

@@ -14,8 +14,8 @@ A flow is flagged as a "Problem Flow" when it exceeds the `problem_flow_threshol
 The Jobs dashboard provides visual indicators for flows that are experiencing issues. Look for flows with repeated "Failed" or "No Items" statuses.
 
 ### REST API
-You can retrieve a list of currently flagged flows via the following endpoint:
-`GET /wp-json/datamachine/v1/flows/problems`
+You can retrieve a list of currently flagged flows through the `datamachine/get-problem-flows` ability run route:
+`POST /wp-json/wp-abilities/v1/abilities/datamachine/get-problem-flows/run` with body `{"input": {}}`
 
 ### AI Chat Agent
 The chat agent can list problem flows via the `get_problem_flows` tool.

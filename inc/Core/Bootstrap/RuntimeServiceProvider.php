@@ -120,9 +120,6 @@ final class RuntimeServiceProvider {
 
 		\DataMachine\Api\Execute::register();
 		\DataMachine\Api\WebhookTrigger::register();
-		\DataMachine\Api\Flows\Flows::register();
-		\DataMachine\Api\Flows\FlowSteps::register();
-		\DataMachine\Api\Flows\FlowQueue::register();
 		\DataMachine\Api\AgentPing::register();
 		\DataMachine\Api\AgentFiles::register();
 		\DataMachine\Api\FlowFiles::register();

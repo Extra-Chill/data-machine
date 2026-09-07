@@ -34,9 +34,10 @@ Pipelines routes were retired (#3456); query the ability runner routes instead:
 - `POST /wp-abilities/v1/abilities/datamachine/get-pipelines/run` with `{"input": {}}` - List all pipelines
 
 ### Flows (Read-Only)
-- `GET /datamachine/v1/flows` - List all flows
-- `GET /datamachine/v1/flows/{id}` - Get flow details
-- `GET /datamachine/v1/flows/problems` - List flows flagged for review due to consecutive failures/no items
+Flow routes were retired (#3456); query the ability runner routes instead:
+- `GET /wp-abilities/v1/abilities/datamachine/get-flows/run?input={"flow_id":123}` - Get flow details
+- `POST /wp-abilities/v1/abilities/datamachine/get-flows/run` with `{"input": {"pipeline_id": 123}}` - List flows for a pipeline
+- `POST /wp-abilities/v1/abilities/datamachine/get-problem-flows/run` with `{"input": {}}` - List flows flagged for review due to consecutive failures/no items
 
 ### Jobs & Monitoring
 - `GET /datamachine/v1/jobs` - List all jobs
@@ -55,9 +56,8 @@ Pipelines routes were retired (#3456); query the ability runner routes instead:
 - `PATCH /datamachine/v1/settings` - Update settings (partial)
 
 ### Files
-- `GET /datamachine/v1/files` - List uploaded files
-- `POST /datamachine/v1/files` - Upload file
-- `DELETE /datamachine/v1/files/{filename}` - Delete file
+- `GET /datamachine/v1/files` listing and `DELETE /datamachine/v1/files/{filename}` were retired (#3456) — use the `datamachine/list-flow-files` and `datamachine/delete-flow-file` ability run routes (`flow_step_id` required)
+- `POST /datamachine/v1/files` - Upload file (multipart, retained)
 
 ## Usage Examples
 

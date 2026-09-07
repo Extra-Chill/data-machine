@@ -94,27 +94,31 @@ These intervals are available by default in the Data Machine core plugin.
 
 ## Usage Examples
 
-### Flows API Integration
+### Flows Ability Integration
 
 ```bash
 # Schedule flow to run daily
-curl -X POST https://example.com/wp-json/datamachine/v1/flows \
+curl -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/create-flow/run \
   -H "Content-Type: application/json" \
   -u username:application_password \
   -d '{
-    "pipeline_id": 123,
-    "flow_name": "Daily Flow",
-    "scheduling_config": {"interval": "daily"}
+    "input": {
+      "pipeline_id": 123,
+      "flow_name": "Daily Flow",
+      "scheduling_config": {"interval": "daily"}
+    }
   }'
 
 # Schedule flow to run every 5 minutes
-curl -X POST https://example.com/wp-json/datamachine/v1/flows \
+curl -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/create-flow/run \
   -H "Content-Type: application/json" \
   -u username:application_password \
   -d '{
-    "pipeline_id": 123,
-    "flow_name": "Rapid Processing",
-    "scheduling_config": {"interval": "every_5_minutes"}
+    "input": {
+      "pipeline_id": 123,
+      "flow_name": "Rapid Processing",
+      "scheduling_config": {"interval": "every_5_minutes"}
+    }
   }'
 ```
 
@@ -174,8 +178,10 @@ Action Scheduler automatically handles missed schedules:
 ### Schedule Status
 ```bash
 # Check current schedule status
-curl -X GET https://example.com/wp-json/datamachine/v1/flows/123 \
-  -u username:application_password
+curl -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/get-flows/run \
+  -H "Content-Type: application/json" \
+  -u username:application_password \
+  -d '{"input": {"flow_id": 123}}'
 ```
 
 Response includes `scheduling_config` with current settings and historical execution data.

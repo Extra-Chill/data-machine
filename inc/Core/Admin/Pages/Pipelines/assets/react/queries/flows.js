@@ -252,15 +252,7 @@ export const useRunFlow = () => {
 export const useUpdateFlowHandler = () => {
 	const queryClient = useQueryClient();
 	return useMutation( {
-		mutationFn: async ( {
-			flowStepId,
-			handlerSlug,
-			settings,
-			pipelineId,
-			stepType,
-			flowConfig = {},
-			pipelineStepConfig = {},
-		} ) => {
+		mutationFn: async ( { flowStepId, handlerSlug, settings } ) => {
 			// Attempt to find handler details in cache to create model for sanitization
 			let sanitizedSettings = settings;
 			try {
@@ -296,11 +288,7 @@ export const useUpdateFlowHandler = () => {
 			return updateFlowHandler(
 				flowStepId,
 				handlerSlug,
-				sanitizedSettings,
-				pipelineId,
-				stepType,
-				flowConfig,
-				pipelineStepConfig
+				sanitizedSettings
 			);
 		},
 		onSuccess: ( response, variables ) => {

@@ -563,13 +563,13 @@ Server-side operation failure.
 
 ```javascript
 try {
-  const response = await fetch('/wp-json/datamachine/v1/flows', {
+  const response = await fetch('/wp-json/wp-abilities/v1/abilities/datamachine/create-flow/run', {
     method: 'POST',
     headers: {
       'Authorization': 'Basic ' + btoa('username:app_password'),
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({pipeline_id: 5})
+    body: JSON.stringify({input: {pipeline_id: 5}})
   });
 
   const data = await response.json();
@@ -593,11 +593,11 @@ try {
 import requests
 from requests.auth import HTTPBasicAuth
 
-url = "https://example.com/wp-json/datamachine/v1/flows"
+url = "https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/create-flow/run"
 auth = HTTPBasicAuth("username", "application_password")
 
 try:
-    response = requests.post(url, json={"pipeline_id": 5}, auth=auth)
+    response = requests.post(url, json={"input": {"pipeline_id": 5}}, auth=auth)
     response.raise_for_status()  # Raises HTTPError for bad status
 
     data = response.json()
@@ -631,7 +631,10 @@ async function retryRequest(fn, maxRetries = 3) {
 ```javascript
 async function getFlows() {
   try {
-    const response = await axios.get('/wp-json/datamachine/v1/flows');
+    const response = await axios.post(
+      '/wp-json/wp-abilities/v1/abilities/datamachine/get-flows/run',
+      { input: {} }
+    );
     return response.data.flows;
   } catch (error) {
     console.error('Failed to fetch flows:', error);

@@ -1,261 +1,63 @@
-# Flows Endpoints
+# Flows Abilities
 
-**Implementation**: `inc/Api/Flows/`
+**Implementation**: `inc/Abilities/Flow/`, `inc/Abilities/FlowStep/`
 
-**Base URL**: `/wp-json/datamachine/v1/flows`
+The `datamachine/v1/flows` REST routes were retired in #3456. Flows are managed through the REST-visible Data Machine abilities, executed through WordPress core's ability runner:
+
+```
+POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run
+Content-Type: application/json
+
+{ "input": { ... } }
+```
+
+The admin Pipeline Builder calls these through the shared `executeAbility()` client (`inc/Core/Admin/shared/utils/api.js`).
 
 Flows are configured executions of pipeline templates.
 
 ## Authentication
 
-Requires the Data Machine `manage_flows` permission (`PermissionHelper::can( 'manage_flows' )`). Requests may be user-scoped or agent-scoped through `PermissionHelper`.
+Each ability's permission callback enforces Data Machine permissions (`PermissionHelper::can_manage()` for the flow family). The core ability runner also requires `show_in_rest` and a valid REST nonce for cookie-authenticated callers.
 
 ## Response Envelope
 
-Most flow routes return:
-
-```json
-{
-  "success": true,
-  "data": {}
-}
-```
-
-Some ability-backed mutation routes return the ability result directly when it already includes `success`.
-
-## Flow Routes
-
-### GET `/wp-json/datamachine/v1/flows`
-
-List flows.
-
-**Query parameters**:
-
-- `pipeline_id` (integer, optional): filter by pipeline.
-- `per_page` (integer, optional, default `20`, max `100`): page size.
-- `offset` (integer, optional, default `0`): pagination offset.
-- `output_mode` (string, optional, default `full`): `full`, `list`, `summary`, or `ids`.
-- `user_id` (integer, optional): filter by user when allowed by scope.
-
-Without `pipeline_id`, `data` is the flow array. With `pipeline_id`, `data` is `{ pipeline_id, flows }`.
-
-### POST `/wp-json/datamachine/v1/flows`
-
-Create a flow.
-
-**Body parameters**:
-
-- `pipeline_id` (integer, required): parent pipeline.
-- `flow_name` (string, optional, default `Flow`): flow name.
-- `flow_config` (array, optional): per-flow step settings.
-- `scheduling_config` (array, optional): scheduling config.
-
-### GET `/wp-json/datamachine/v1/flows/{flow_id}`
-
-Get one flow.
-
-### PATCH `/wp-json/datamachine/v1/flows/{flow_id}`
-
-Update a flow title and/or scheduling.
-
-**Body parameters**:
-
-- `flow_name` (string, optional): new flow title.
-- `scheduling_config` (object, optional): scheduling config.
-
-### DELETE `/wp-json/datamachine/v1/flows/{flow_id}`
-
-Delete a flow.
-
-### POST `/wp-json/datamachine/v1/flows/{flow_id}/duplicate`
-
-Duplicate a flow.
-
-### POST `/wp-json/datamachine/v1/flows/{flow_id}/pause`
-
-Pause one flow.
-
-### POST `/wp-json/datamachine/v1/flows/{flow_id}/resume`
-
-Resume one flow.
-
-### POST `/wp-json/datamachine/v1/flows/pause`
-
-Bulk-pause flows. Body must include `pipeline_id` or `agent_id`.
-
-### POST `/wp-json/datamachine/v1/flows/resume`
-
-Bulk-resume flows. Body must include `pipeline_id` or `agent_id`.
-
-### GET `/wp-json/datamachine/v1/flows/problems`
-
-List problem flows.
-
-**Query parameters**:
-
-- `threshold` (integer, optional): override the `problem_flow_threshold` setting.
-
-**Success response**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "problem_flows": [],
-    "total": 0,
-    "threshold": 3,
-    "failing": [],
-    "idle": []
-  }
-}
-```
-
-## Flow Step Configuration Routes
-
-### GET `/wp-json/datamachine/v1/flows/{flow_id}/config`
-
-Return all configured steps for a flow.
-
-**Success shape**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "flow_id": 42,
-    "flow_config": {}
-  }
-}
-```
-
-### GET `/wp-json/datamachine/v1/flows/steps/{flow_step_id}/config`
-
-Return one flow step config.
-
-**Success shape**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "flow_step_id": "<pipeline_step_id>_<flow_id>",
-    "step_config": {}
-  }
-}
-```
-
-### PATCH `/wp-json/datamachine/v1/flows/steps/{flow_step_id}/config`
-
-Patch one flow step config.
-
-**Body parameters**:
-
-- `handler_slug` (string, optional): handler identifier.
-- `handler_config` (object, optional): handler settings to merge.
-- `user_message` (string, optional): AI user message.
-
-### PUT `/wp-json/datamachine/v1/flows/steps/{flow_step_id}/handler`
-
-Save handler selection/settings for one flow step.
-
-**Body parameters**:
-
-- `handler_slug` (string, required): handler identifier.
-- `pipeline_id` (integer, required): pipeline context.
-- `step_type` (string, required): step type.
-- `settings` (object, optional): raw handler settings.
-
-### PATCH `/wp-json/datamachine/v1/flows/steps/{flow_step_id}/user-message`
-
-Save the AI user message for one flow step.
-
-**Body parameters**:
-
-- `user_message` (string, required): message text.
-
-## Queue Routes
-
-All queue routes require `flow_step_id` as a request parameter. The route path only carries `flow_id` and, where applicable, `index`.
-
-### GET `/wp-json/datamachine/v1/flows/{flow_id}/queue`
-
-List a queue.
-
-**Query parameters**:
-
-- `flow_step_id` (string, required): flow step ID.
-
-**Success shape**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "flow_id": 42,
-    "flow_step_id": "<pipeline_step_id>_<flow_id>",
-    "queue": [],
-    "count": 0,
-    "queue_mode": "drain"
-  }
-}
-```
-
-### POST `/wp-json/datamachine/v1/flows/{flow_id}/queue`
-
-Add queue items.
-
-**Body parameters**:
-
-- `flow_step_id` (string, required): flow step ID.
-- `prompt` (string, optional): one prompt.
-- `prompts` (array of strings, optional): multiple prompts.
-
-At least one non-empty `prompt` or `prompts[]` entry is required.
-
-### DELETE `/wp-json/datamachine/v1/flows/{flow_id}/queue`
-
-Clear a queue.
-
-**Body/query parameters**:
-
-- `flow_step_id` (string, required): flow step ID.
-
-### POST/PUT/PATCH `/wp-json/datamachine/v1/flows/{flow_id}/queue/{index}`
-
-Update one queue item.
-
-**Body parameters**:
-
-- `flow_step_id` (string, required): flow step ID.
-- `prompt` (string, required): replacement prompt.
-
-### DELETE `/wp-json/datamachine/v1/flows/{flow_id}/queue/{index}`
-
-Remove one queue item.
-
-**Body/query parameters**:
-
-- `flow_step_id` (string, required): flow step ID.
-
-### POST/PUT/PATCH `/wp-json/datamachine/v1/flows/{flow_id}/queue/mode`
-
-Set queue mode.
-
-**Body parameters**:
-
-- `flow_step_id` (string, required): flow step ID.
-- `mode` (string, required): `drain`, `loop`, or `static`.
-
-## Flow Memory Routes
-
-### GET `/wp-json/datamachine/v1/flows/{flow_id}/memory-files`
-
-Return configured memory filenames for a flow.
-
-### POST/PUT/PATCH `/wp-json/datamachine/v1/flows/{flow_id}/memory-files`
-
-Replace configured memory filenames.
-
-**Body parameters**:
-
-- `memory_files` (array of strings, required): agent memory filenames. `daily_memory` is not accepted.
+The ability runner returns the ability's output directly (no `{success, data}` wrapper). Errors return standard REST error objects (`code`, `message`, `data.status`).
+
+## Flow Abilities
+
+| Ability slug | Purpose |
+| --- | --- |
+| `datamachine/get-flows` | List flows or fetch one by `flow_id`. Supports `pipeline_id`, `agent_id`, `user_id`, `per_page`, `offset`, `output_mode` (`full`/`list`/`summary`/`ids`). |
+| `datamachine/create-flow` | Create a flow (`pipeline_id`, optional `flow_name`, `flow_config`, `scheduling_config`, `agent_id`). |
+| `datamachine/update-flow` | Update flow title (`flow_name`) and/or `scheduling_config`. |
+| `datamachine/delete-flow` | Delete a flow. |
+| `datamachine/duplicate-flow` | Duplicate a flow (`source_flow_id`). |
+| `datamachine/pause-flow` / `datamachine/resume-flow` | Pause/resume a flow (`flow_id`), or in bulk by `pipeline_id` or `agent_id`. |
+| `datamachine/get-flow-memory-files` | Get the agent memory filenames attached to a flow. |
+| `datamachine/update-flow-memory-files` | Replace the agent memory filenames attached to a flow (`memory_files`). |
+| `datamachine/get-problem-flows` | List flows flagged for consecutive failures or no-item runs. |
+
+## Flow Step Abilities
+
+| Ability slug | Purpose |
+| --- | --- |
+| `datamachine/get-flow-steps` | Get all configured steps for a flow (`flow_id`), or one step (`flow_step_id`). |
+| `datamachine/update-flow-step` | Update one flow step: `handler_slug` + `handler_config` settings, `user_message`, or multi-handler `add_handler`/`remove_handler`. |
+
+## Queue Abilities
+
+All queue abilities require `flow_id` and `flow_step_id`.
+
+| Ability slug | Purpose |
+| --- | --- |
+| `datamachine/queue-list` | List queued prompts (`queue`, `count`, `queue_mode`). |
+| `datamachine/queue-add` | Add one `prompt` to the queue (runs duplicate validation). |
+| `datamachine/queue-clear` | Clear the queue (`cleared_count`). |
+| `datamachine/queue-remove` | Remove one item by `index`. |
+| `datamachine/queue-update` | Replace the `prompt` at `index`. |
+| `datamachine/queue-move` | Move an item (`from_index`, `to_index`). |
+| `datamachine/queue-mode` | Set the access `mode`: `drain`, `loop`, or `static`. |
+
+## Flow Files
+
+Uploaded flow files are listed and deleted through the `datamachine/list-flow-files` and `datamachine/delete-flow-file` abilities (both require `flow_step_id`). Multipart upload remains a transport route at `POST /wp-json/datamachine/v1/files` (see [files](files.md)).
