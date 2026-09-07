@@ -76,6 +76,12 @@ abstract class BaseAuthProvider {
 		'consumer_secret',
 		'api_secret',
 		'webhook_secret',
+		// Service account material. A private key is long-lived and unscoped,
+		// so leaving it plaintext while encrypting short-lived access tokens
+		// inverts protection relative to risk.
+		'private_key',
+		'service_account_json',
+		'credentials_json',
 	);
 
 	/**
@@ -1185,7 +1191,12 @@ abstract class BaseAuthProvider {
 		$tag        = '';
 		$ciphertext = openssl_encrypt( $plaintext, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv, $tag, '', self::AUTH_TAG_LENGTH );
 
-		if ( false === $ciphertext || '' === $tag ) {
+		// $tag is filled by reference by openssl_encrypt(), so static analysis
+		// infers it as non-empty and narrows any emptiness check away. The
+		// check is real - an empty auth tag produces an envelope that cannot
+		// be decrypted - so it is expressed with empty(), which PHPStan does
+		// not fold for by-reference output.
+		if ( false === $ciphertext || empty( $tag ) ) {
 			$this->log_encryption_error( 'Encryption failed' );
 			return null;
 		}

@@ -299,7 +299,15 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		);
 		$slug_queries = 0;
 		$observer     = static function ( \WP_Query $query ) use ( &$slug_queries ): void {
-			if ( 'observable-fallback' === $query->get( 'name' ) ) {
+			if (
+				'observable-fallback' === $query->get( 'name' )
+				&& 'post' === $query->get( 'post_type' )
+				&& 'any' === $query->get( 'post_status' )
+				&& 0 === $query->get( 'post_parent' )
+				&& 1 === $query->get( 'posts_per_page' )
+				&& 'ids' === $query->get( 'fields' )
+				&& true === $query->get( 'no_found_rows' )
+			) {
 				++$slug_queries;
 			}
 		};

@@ -570,6 +570,14 @@ class TaskScheduler {
 			return;
 		}
 
+		if ( ! empty( $result['item_failed'] ) && empty( $result['more'] ) ) {
+			if ( ! $jobs_db->complete_job( $parent_job_id, JobStatus::failed( 'batch_item_attempts_exhausted' )->toString() ) ) {
+				return;
+			}
+			BatchScheduler::finalize( $parent_job_id );
+			return;
+		}
+
 		// Surface progress fields on the parent's engine_data using the
 		// keys CLI / status consumers already know about.
 		$authoritative_scheduled = (int) ( $parent_engine['batch_scheduled'] ?? 0 );

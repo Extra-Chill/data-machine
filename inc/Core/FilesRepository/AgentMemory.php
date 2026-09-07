@@ -24,6 +24,7 @@ use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Read_Result;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Stores;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Engine\AI\MemoryFileRegistry;
@@ -87,7 +88,9 @@ class AgentMemory {
 			$agent_id,
 			$safe_filename
 		);
-		$this->store = AgentMemoryStoreFactory::for_scope( $this->scope );
+		/** @var WP_Agent_Memory_Store $store */
+		$store       = WP_Agent_Memory_Stores::get_store( array( 'scope' => $this->scope ) );
+		$this->store = $store;
 
 		// Self-heal: ensure agent files exist on first use.
 		DirectoryManager::ensure_agent_files();
@@ -236,7 +239,8 @@ class AgentMemory {
 		$effective_user_id = $dm->get_effective_user_id( $user_id );
 		$workspace         = WordPressWorkspaceScope::current();
 		$scope_query       = new WP_Agent_Memory_Scope( $layer, $workspace->workspace_type, $workspace->workspace_id, $effective_user_id, $agent_id, '' );
-		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
+		/** @var WP_Agent_Memory_Store $store */
+		$store = WP_Agent_Memory_Stores::get_store( array( 'scope' => $scope_query ) );
 
 		return $store->list_layer( $scope_query );
 	}
@@ -265,7 +269,8 @@ class AgentMemory {
 		$effective_user_id = $dm->get_effective_user_id( $user_id );
 		$workspace         = WordPressWorkspaceScope::current();
 		$scope_query       = new WP_Agent_Memory_Scope( $layer, $workspace->workspace_type, $workspace->workspace_id, $effective_user_id, $agent_id, '' );
-		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
+		/** @var WP_Agent_Memory_Store $store */
+		$store = WP_Agent_Memory_Stores::get_store( array( 'scope' => $scope_query ) );
 
 		return $store->list_subtree( $scope_query, $prefix );
 	}

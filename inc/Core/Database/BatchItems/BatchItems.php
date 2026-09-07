@@ -20,9 +20,22 @@ class BatchItems extends BaseRepository {
 	public const STATE_CANCEL_PENDING  = 'cancel_pending';
 	public const STATE_COMPLETED       = 'completed';
 	public const STATE_DISCARDED       = 'discarded';
+	public const STATE_FAILED          = 'failed';
 	public const DEFAULT_LEASE_SECONDS = 60;
+	public const DEFAULT_MAX_ATTEMPTS  = 3;
 	private const INSERT_CHUNK_SIZE    = 100;
 	private const READ_CHUNK_SIZE      = 100;
+
+	/** Resolve the durable per-item attempt budget. */
+	public static function maxAttempts( string $context = '' ): int {
+		/**
+		 * Filter the maximum claim attempts for one batch item.
+		 *
+		 * @param int    $max     Maximum attempts, default 3.
+		 * @param string $context Consumer context ('pipeline', 'task', or custom).
+		 */
+		return max( 1, (int) apply_filters( 'datamachine_batch_item_max_attempts', self::DEFAULT_MAX_ATTEMPTS, $context ) );
+	}
 
 	/**
 	 * Persist a complete worklist in bounded statements.
@@ -235,19 +248,21 @@ class BatchItems extends BaseRepository {
 
 			$token      = bin2hex( random_bytes( 16 ) );
 			$expires_at = gmdate( 'Y-m-d H:i:s', time() + max( 1, $lease_seconds ) );
+			$attempts   = (int) ( $row['attempts'] ?? 0 ) + 1;
 			$updated    = $this->wpdb->update(
 				$this->table_name,
 				array(
 					'state'            => self::STATE_CLAIMED,
 					'lease_token'      => $token,
 					'lease_expires_at' => $expires_at,
+					'attempts'         => $attempts,
 					'updated_at'       => $now,
 				),
 				array(
 					'batch_job_id' => $batch_job_id,
 					'item_index'   => (int) $row['item_index'],
 				),
-				array( '%s', '%s', '%s', '%s' ),
+				array( '%s', '%s', '%s', '%d', '%s' ),
 				array( '%d', '%d' )
 			);
 			if ( 1 !== $updated ) {
@@ -257,6 +272,7 @@ class BatchItems extends BaseRepository {
 
 			$row['lease_token']      = $token;
 			$row['lease_expires_at'] = $expires_at;
+			$row['attempts']         = $attempts;
 			$claimed[]               = $this->decode_row( $row );
 		}
 
@@ -339,6 +355,27 @@ class BatchItems extends BaseRepository {
 			$this->table_name,
 			array(
 				'state'            => self::STATE_READY,
+				'lease_token'      => null,
+				'lease_expires_at' => null,
+				'updated_at'       => current_time( 'mysql', true ),
+			),
+			array(
+				'batch_job_id' => $batch_job_id,
+				'item_index'   => $item_index,
+				'state'        => self::STATE_CLAIMED,
+				'lease_token'  => $token,
+			),
+			array( '%s', '%s', '%s', '%s' ),
+			array( '%d', '%d', '%s', '%s' )
+		);
+	}
+
+	/** Terminally fail an owned claim after the attempt budget is exhausted. */
+	public function fail_claim( int $batch_job_id, int $item_index, string $token ): bool {
+		return 1 === $this->wpdb->update(
+			$this->table_name,
+			array(
+				'state'            => self::STATE_FAILED,
 				'lease_token'      => null,
 				'lease_expires_at' => null,
 				'updated_at'       => current_time( 'mysql', true ),
@@ -595,6 +632,19 @@ class BatchItems extends BaseRepository {
 		);
 	}
 
+	public function count_failed( int $batch_job_id ): int {
+		$wpdb = $this->wpdb;
+
+		return (int) $this->wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM %i WHERE batch_job_id = %d AND state = %s',
+				$this->table_name,
+				$batch_job_id,
+				self::STATE_FAILED
+			)
+		);
+	}
+
 	/** Delete only rows created by the supplied insertion owner. */
 	public function delete_owned_batch( int $batch_job_id, string $token ): bool {
 		if ( '' === $token ) {
@@ -626,6 +676,7 @@ class BatchItems extends BaseRepository {
 		$row['payload_valid']   = $valid;
 		$row['payload']         = $valid ? $payload : array();
 		$row['cleanup_context'] = is_array( $cleanup ) ? $cleanup : array();
+		$row['attempts']        = (int) ( $row['attempts'] ?? 0 );
 		return $row;
 	}
 
@@ -644,6 +695,7 @@ class BatchItems extends BaseRepository {
 			lease_token VARCHAR(64) NULL,
 			lease_expires_at DATETIME NULL,
 			child_result_id VARCHAR(191) NULL,
+			attempts INT UNSIGNED NOT NULL DEFAULT 0,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL,
 			PRIMARY KEY  (batch_job_id, item_index),
@@ -651,5 +703,21 @@ class BatchItems extends BaseRepository {
 		) ENGINE=InnoDB {$charset_collate};";
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+		self::ensure_attempts_column( $table_name );
+	}
+
+	/** Add the attempts column on existing installs where dbDelta leaves it missing. */
+	public static function ensure_attempts_column( string $table_name = '' ): void {
+		global $wpdb;
+
+		if ( '' === $table_name ) {
+			$table_name = $wpdb->prefix . self::TABLE_NAME;
+		}
+		if ( self::column_exists( $table_name, 'attempts', $wpdb ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared -- Deploy-time schema convergence for existing batch-item tables.
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN attempts INT UNSIGNED NOT NULL DEFAULT 0', $table_name ) );
 	}
 }

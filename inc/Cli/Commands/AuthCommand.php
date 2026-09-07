@@ -154,8 +154,8 @@ class AuthCommand extends BaseCommand {
 	/**
 	 * Revoke authentication for a handler at site or per-user scope.
 	 *
-	 * Without --user, behaves like `disconnect` — clears the shared
-	 * site-wide account slot. With --user=<id>, clears only that user's
+	 * Without --target-user, behaves like `disconnect` — clears the shared
+	 * site-wide account slot. With --target-user=<id>, clears only that user's
 	 * per-user credential slot via the BaseAuthProvider per-user API.
 	 *
 	 * Providers that expose an upstream revoke endpoint are called first,
@@ -168,7 +168,7 @@ class AuthCommand extends BaseCommand {
 	 * <handler_slug>
 	 * : Handler to revoke (e.g., a registered handler slug).
 	 *
-	 * [--user=<id>]
+	 * [--target-user=<id>]
 	 * : Target user ID. When provided, revokes only that user's per-user
 	 *   credentials. When omitted, revokes the site-wide account.
 	 *
@@ -181,7 +181,7 @@ class AuthCommand extends BaseCommand {
 	 *     wp datamachine auth revoke <handler>
 	 *
 	 *     # Revoke a specific user's per-user credentials.
-	 *     wp datamachine auth revoke <handler> --user=42
+	 *     wp datamachine auth revoke <handler> --target-user=42
 	 *
 	 * @subcommand revoke
 	 */
@@ -198,7 +198,7 @@ class AuthCommand extends BaseCommand {
 			return;
 		}
 
-		$user_id = isset( $assoc_args['user'] ) ? absint( $assoc_args['user'] ) : 0;
+		$user_id = isset( $assoc_args['target-user'] ) ? absint( $assoc_args['target-user'] ) : 0;
 		$message = '';
 
 		// Per-user revoke path.
@@ -472,7 +472,6 @@ class AuthCommand extends BaseCommand {
 	 * @subcommand refresh
 	 */
 	public function refresh( array $args, array $assoc_args ): void {
-		$assoc_args;
 		if ( empty( $args[0] ) ) {
 			WP_CLI::error( 'Handler slug is required. Use "wp datamachine auth status" to see available providers.' );
 			return;
@@ -521,8 +520,6 @@ class AuthCommand extends BaseCommand {
 	 * @subcommand refresh-all
 	 */
 	public function refresh_all( array $args, array $assoc_args ): void {
-		$args;
-		$assoc_args;
 		$providers = $this->abilities->getAllProviders();
 
 		if ( empty( $providers ) ) {
@@ -535,6 +532,10 @@ class AuthCommand extends BaseCommand {
 		$failed    = 0;
 
 		foreach ( $providers as $key => $provider ) {
+			if ( ! is_object( $provider ) ) {
+				++$skipped;
+				continue;
+			}
 			$authenticated = method_exists( $provider, 'is_authenticated' ) && $provider->is_authenticated();
 			$can_refresh   = method_exists( $provider, 'get_valid_access_token' );
 
@@ -588,6 +589,9 @@ class AuthCommand extends BaseCommand {
 		$items = array();
 
 		foreach ( $providers as $key => $provider ) {
+			if ( ! is_object( $provider ) ) {
+				continue;
+			}
 			$authenticated = method_exists( $provider, 'is_authenticated' ) ? $provider->is_authenticated() : false;
 			$configured    = method_exists( $provider, 'is_configured' ) ? $provider->is_configured() : false;
 			$is_oauth      = method_exists( $provider, 'get_authorization_url' );
@@ -646,7 +650,11 @@ class AuthCommand extends BaseCommand {
 			return;
 		}
 
-		$provider      = $auth_status['provider'];
+		$provider = $auth_status['provider'];
+		if ( ! is_object( $provider ) ) {
+			WP_CLI::error( sprintf( 'Auth provider "%s" is invalid.', $handler_slug ) );
+			return;
+		}
 		$authenticated = $auth_status['authenticated'];
 		$configured    = method_exists( $provider, 'is_configured' ) ? $provider->is_configured() : false;
 		$is_oauth      = method_exists( $provider, 'get_authorization_url' );
@@ -687,7 +695,7 @@ class AuthCommand extends BaseCommand {
 				}
 			}
 
-			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -961,7 +969,7 @@ class AuthCommand extends BaseCommand {
 		}
 
 		WP_CLI::log( '' );
-		$cli_key_example = str_replace( '_', '-', array_key_first( $config_fields ) );
+		$cli_key_example = str_replace( '_', '-', (string) array_key_first( $config_fields ) );
 		WP_CLI::log(
 			sprintf(
 				'To update: wp datamachine auth config %s --%s=<value>',

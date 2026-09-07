@@ -2,6 +2,53 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.2] - 2026-09-07
+
+### Fixed
+- drop settled-claim packets before explicit disposition routing
+
+## [0.176.1] - 2026-09-07
+
+### Fixed
+- match near-identical short colon suffixes in SimilarityEngine
+
+## [0.176.0] - 2026-09-04
+
+### Added
+- add BaseServiceAccountProvider for RFC 7523 JWT-bearer auth
+
+## [0.175.29] - 2026-09-03
+
+### Fixed
+- open real transactions when no boundary exists
+- avoid WP-CLI global option collisions
+- Fix bounded idempotent batch retries
+
+## [0.175.28] - 2026-08-27
+
+### Fixed
+- enforce the worker time limit at the process level
+
+## [0.175.27] - 2026-08-26
+
+### Changed
+- align composable file assignments
+- delete agent memory store factory
+- fold provider request assembly into builder
+- delete duplicate agent registry facade
+
+### Fixed
+- default composable file mode
+
+## [0.175.26] - 2026-08-25
+
+### Changed
+- isolate explicit identity fallback query
+
+### Fixed
+- make response types explicit
+- accept partial content responses
+
 ## [0.175.25] - 2026-08-25
 
 ### Fixed

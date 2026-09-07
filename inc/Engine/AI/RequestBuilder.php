@@ -12,6 +12,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\Directives\DirectivePolicyResolver;
 
@@ -54,14 +55,15 @@ class RequestBuilder {
 	) {
 		WpAiClientCache::install();
 
-		$modes                 = self::normalizeModes( $modes );
-		$mode_label            = implode( ',', $modes );
-		$assembled             = self::assemble( $messages, $provider, $model, $tools, $modes, $payload );
-		$request               = $assembled['request'];
-		$structured_tools      = $assembled['structured_tools'];
-		$provider_tool_aliases = self::providerToolNameAliases( $structured_tools );
-		$provider_request      = ProviderRequestAssembler::toProviderRequest( $request );
-		$prompt_context        = self::wpAiClientPromptContext( $request['messages'] ?? array(), $provider_tool_aliases['logical_to_provider'] );
+		$modes                        = self::normalizeModes( $modes );
+		$mode_label                   = implode( ',', $modes );
+		$assembled                    = self::assemble( $messages, $provider, $model, $tools, $modes, $payload );
+		$request                      = $assembled['request'];
+		$structured_tools             = $assembled['structured_tools'];
+		$provider_tool_aliases        = self::providerToolNameAliases( $structured_tools );
+		$provider_request             = $request;
+		$provider_request['messages'] = WP_Agent_Message::to_provider_messages( $request['messages'] ?? array() );
+		$prompt_context               = self::wpAiClientPromptContext( $request['messages'] ?? array(), $provider_tool_aliases['logical_to_provider'] );
 		if ( '' !== $prompt_context['prompt'] ) {
 			$provider_request['prompt'] = $prompt_context['prompt'];
 		}
@@ -644,7 +646,7 @@ class RequestBuilder {
 	/**
 	 * Resolve the request timeout Data Machine applies to wp-ai-client calls.
 	 *
-	 * @param array  $modes    Execution modes.
+	 * @param string $mode     Execution mode.
 	 * @param string $provider Provider identifier.
 	 * @param string $model    Model identifier.
 	 * @param array  $payload  Step payload.
@@ -908,7 +910,7 @@ class RequestBuilder {
 	 * @param string $provider AI provider name.
 	 * @param string $model    Model identifier.
 	 * @param array  $tools    Raw tools array from filters.
-	 * @param string $mode     Execution mode.
+	 * @param array  $modes    Execution modes.
 	 * @param array  $payload  Step payload.
 	 * @return array Assembled request and inspection metadata.
 	 */
@@ -933,14 +935,41 @@ class RequestBuilder {
 		$directives       = $directive_policy['directives'];
 		$suppressed       = $directive_policy['suppressed'];
 
-		$assembled = ( new ProviderRequestAssembler() )->assemble( $messages, $provider, $model, $tools, $modes, $payload, $directives );
+		$structured_tools = array();
+		foreach ( $tools as $tool_name => $tool_config ) {
+			$structured_tools[ $tool_name ] = array(
+				'name'           => $tool_name,
+				'description'    => $tool_config['description'] ?? '',
+				'parameters'     => ToolSchemaNormalizer::normalize( $tool_config['parameters'] ?? array() ),
+				'handler'        => $tool_config['handler'] ?? null,
+				'handler_config' => $tool_config['handler_config'] ?? array(),
+			);
+		}
+
+		$prompt_builder = new PromptBuilder();
+		$prompt_builder->setMessages( $messages )->setTools( $structured_tools );
+		foreach ( $directives as $directive ) {
+			$prompt_builder->addDirective(
+				$directive['class'],
+				$directive['priority'],
+				$directive['modes'] ?? array( 'all' )
+			);
+		}
+
+		$request             = $prompt_builder->buildDetailed( $modes, $provider, $payload );
+		$request['messages'] = WP_Agent_Message::normalize_many( $request['messages'] ?? array() );
+		$applied_directives  = $request['applied_directives'] ?? array();
+		$directive_metadata  = $request['directive_metadata'] ?? array();
+		$directive_breakdown = $request['directive_breakdown'] ?? array();
+		unset( $request['applied_directives'], $request['directive_metadata'], $request['directive_breakdown'] );
+		$request['model'] = $model;
 
 		return array(
-			'request'               => $assembled['request'],
-			'structured_tools'      => $assembled['structured_tools'],
-			'applied_directives'    => $assembled['applied_directives'],
-			'directive_metadata'    => $assembled['directive_metadata'],
-			'directive_breakdown'   => $assembled['directive_breakdown'],
+			'request'               => $request,
+			'structured_tools'      => $structured_tools,
+			'applied_directives'    => $applied_directives,
+			'directive_metadata'    => $directive_metadata,
+			'directive_breakdown'   => $directive_breakdown,
 			'suppressed_directives' => $suppressed,
 		);
 	}
