@@ -45,63 +45,63 @@ trait VenueFieldsTrait {
 		}
 
 		return array(
-			'venue'          => array(
+			'venue'               => array(
 				'type'        => 'select',
 				'label'       => __( 'Venue', 'data-machine-events' ),
 				'description' => __( 'Select an existing venue or choose "Create New Venue" to add a new one.', 'data-machine-events' ),
 				'options'     => $venue_options,
 				'required'    => false,
 			),
-			'venue_name'     => array(
+			'venue_name'          => array(
 				'type'        => 'text',
 				'label'       => __( 'Venue Name', 'data-machine-events' ),
 				'description' => __( 'Required when creating a new venue.', 'data-machine-events' ),
 				'placeholder' => __( 'The Royal American', 'data-machine-events' ),
 				'required'    => false,
 			),
-			'venue_address'  => array(
+			'venue_address'       => array(
 				'type'        => 'address-autocomplete',
 				'label'       => __( 'Venue Address', 'data-machine-events' ),
 				'description' => __( 'Start typing to search. Auto-fills city, state, zip, country.', 'data-machine-events' ),
 				'placeholder' => __( '970 Morrison Drive', 'data-machine-events' ),
 				'required'    => false,
 			),
-			'venue_city'     => array(
+			'venue_city'          => array(
 				'type'        => 'text',
 				'label'       => __( 'City', 'data-machine-events' ),
 				'description' => __( 'Auto-filled from address selection.', 'data-machine-events' ),
 				'placeholder' => __( 'Charleston', 'data-machine-events' ),
 				'required'    => false,
 			),
-			'venue_state'    => array(
+			'venue_state'         => array(
 				'type'        => 'text',
 				'label'       => __( 'State', 'data-machine-events' ),
 				'description' => __( 'Auto-filled from address selection.', 'data-machine-events' ),
 				'placeholder' => __( 'South Carolina', 'data-machine-events' ),
 				'required'    => false,
 			),
-			'venue_zip'      => array(
+			'venue_zip'           => array(
 				'type'        => 'text',
 				'label'       => __( 'ZIP Code', 'data-machine-events' ),
 				'description' => __( 'Auto-filled from address selection.', 'data-machine-events' ),
 				'placeholder' => __( '29403', 'data-machine-events' ),
 				'required'    => false,
 			),
-			'venue_country'  => array(
+			'venue_country'       => array(
 				'type'        => 'text',
 				'label'       => __( 'Country', 'data-machine-events' ),
 				'description' => __( 'Auto-filled from address selection. Two-letter country code.', 'data-machine-events' ),
 				'placeholder' => __( 'US', 'data-machine-events' ),
 				'required'    => false,
 			),
-			'venue_phone'    => array(
+			'venue_phone'         => array(
 				'type'        => 'text',
 				'label'       => __( 'Phone', 'data-machine-events' ),
 				'description' => __( 'Venue phone number.', 'data-machine-events' ),
 				'placeholder' => __( '(843) 817-6925', 'data-machine-events' ),
 				'required'    => false,
 			),
-			'venue_website'  => array(
+			'venue_website'       => array(
 				'type'        => 'url',
 				'label'       => __( 'Official Website', 'data-machine-events' ),
 				'description' => __( 'Official venue website URL.', 'data-machine-events' ),
@@ -115,7 +115,7 @@ trait VenueFieldsTrait {
 				'placeholder' => __( 'https://www.eventbrite.com/o/example', 'data-machine-events' ),
 				'required'    => false,
 			),
-			'venue_capacity' => array(
+			'venue_capacity'      => array(
 				'type'        => 'number',
 				'label'       => __( 'Capacity', 'data-machine-events' ),
 				'description' => __( 'Maximum venue capacity.', 'data-machine-events' ),
@@ -132,47 +132,66 @@ trait VenueFieldsTrait {
 	 */
 	protected static function get_venue_field_defaults(): array {
 		return array(
-			'venue'          => '',
-			'venue_name'     => '',
-			'venue_address'  => '',
-			'venue_city'     => '',
-			'venue_state'    => '',
-			'venue_zip'      => '',
-			'venue_country'  => '',
-			'venue_phone'    => '',
-			'venue_website'  => '',
+			'venue'               => '',
+			'venue_name'          => '',
+			'venue_address'       => '',
+			'venue_city'          => '',
+			'venue_state'         => '',
+			'venue_zip'           => '',
+			'venue_country'       => '',
+			'venue_phone'         => '',
+			'venue_website'       => '',
 			'venue_ticketing_url' => '',
-			'venue_capacity' => '',
+			'venue_capacity'      => '',
 		);
 	}
 
 	/**
 	 * Sanitize venue fields from raw settings input.
 	 *
+	 * Only keys present in $raw_settings are included in the returned array.
+	 * Handler config patches are sparse (see Data Machine's
+	 * prepareHandlerConfigPatch), so absent keys must not be defaulted to
+	 * empty strings here — save_venue_on_settings_save() would otherwise
+	 * diff those empties against stored venue meta and wipe it. Full-object
+	 * input (admin settings form) contains every key and is unaffected.
+	 *
 	 * @param array $raw_settings Raw settings input
 	 * @return array Sanitized venue field values
 	 */
 	protected static function sanitize_venue_fields( array $raw_settings ): array {
-		return array(
-			'venue'          => sanitize_text_field( $raw_settings['venue'] ?? '' ),
-			'venue_name'     => sanitize_text_field( $raw_settings['venue_name'] ?? '' ),
-			'venue_address'  => sanitize_text_field( $raw_settings['venue_address'] ?? '' ),
-			'venue_city'     => sanitize_text_field( $raw_settings['venue_city'] ?? '' ),
-			'venue_state'    => sanitize_text_field( $raw_settings['venue_state'] ?? '' ),
-			'venue_zip'      => sanitize_text_field( $raw_settings['venue_zip'] ?? '' ),
-			'venue_country'  => sanitize_text_field( $raw_settings['venue_country'] ?? '' ),
-			'venue_phone'    => sanitize_text_field( $raw_settings['venue_phone'] ?? '' ),
-			'venue_website'  => esc_url_raw( $raw_settings['venue_website'] ?? '' ),
-			'venue_ticketing_url' => esc_url_raw( $raw_settings['venue_ticketing_url'] ?? '' ),
-			'venue_capacity' => ! empty( $raw_settings['venue_capacity'] ) ? absint( $raw_settings['venue_capacity'] ) : '',
-		);
+		$sanitized = array();
+
+		foreach ( self::get_venue_field_keys() as $key ) {
+			if ( ! array_key_exists( $key, $raw_settings ) ) {
+				continue;
+			}
+
+			switch ( $key ) {
+				case 'venue_website':
+				case 'venue_ticketing_url':
+					$sanitized[ $key ] = esc_url_raw( $raw_settings[ $key ] );
+					break;
+				case 'venue_capacity':
+					$sanitized[ $key ] = ! empty( $raw_settings[ $key ] ) ? absint( $raw_settings[ $key ] ) : '';
+					break;
+				default:
+					$sanitized[ $key ] = sanitize_text_field( $raw_settings[ $key ] );
+			}
+		}
+
+		return $sanitized;
 	}
 
 	/**
 	 * Process venue data on settings save.
 	 *
 	 * Creates new venue term if venue is empty and venue_name is provided.
-	 * Updates existing venue term meta if venue has a term_id.
+	 * Updates existing venue term meta if venue has a term_id, writing only
+	 * the venue fields actually present in $settings. Sparse handler-config
+	 * patches that only touch e.g. `venue` (or non-venue keys) therefore
+	 * leave stored venue meta untouched instead of overwriting it with
+	 * sanitizer defaults.
 	 * Stores both term_id AND venue fields in handler_config for dual storage.
 	 *
 	 * @param array $settings Sanitized settings array (modified in place)
@@ -181,17 +200,35 @@ trait VenueFieldsTrait {
 	protected static function save_venue_on_settings_save( array $settings ): array {
 		$venue_term_id = $settings['venue'] ?? '';
 
-		$venue_data = array(
-			'address'  => $settings['venue_address'] ?? '',
-			'city'     => $settings['venue_city'] ?? '',
-			'state'    => $settings['venue_state'] ?? '',
-			'zip'      => $settings['venue_zip'] ?? '',
-			'country'  => $settings['venue_country'] ?? '',
-			'phone'    => $settings['venue_phone'] ?? '',
-			'website'  => $settings['venue_website'] ?? '',
-			'ticketing_url' => $settings['venue_ticketing_url'] ?? '',
-			'capacity' => $settings['venue_capacity'] ?? '',
-		);
+		$venue_data = array();
+
+		if ( array_key_exists( 'venue_address', $settings ) ) {
+			$venue_data['address'] = $settings['venue_address'];
+		}
+		if ( array_key_exists( 'venue_city', $settings ) ) {
+			$venue_data['city'] = $settings['venue_city'];
+		}
+		if ( array_key_exists( 'venue_state', $settings ) ) {
+			$venue_data['state'] = $settings['venue_state'];
+		}
+		if ( array_key_exists( 'venue_zip', $settings ) ) {
+			$venue_data['zip'] = $settings['venue_zip'];
+		}
+		if ( array_key_exists( 'venue_country', $settings ) ) {
+			$venue_data['country'] = $settings['venue_country'];
+		}
+		if ( array_key_exists( 'venue_phone', $settings ) ) {
+			$venue_data['phone'] = $settings['venue_phone'];
+		}
+		if ( array_key_exists( 'venue_website', $settings ) ) {
+			$venue_data['website'] = $settings['venue_website'];
+		}
+		if ( array_key_exists( 'venue_ticketing_url', $settings ) ) {
+			$venue_data['ticketing_url'] = $settings['venue_ticketing_url'];
+		}
+		if ( array_key_exists( 'venue_capacity', $settings ) ) {
+			$venue_data['capacity'] = $settings['venue_capacity'];
+		}
 
 		if ( empty( $venue_term_id ) ) {
 			$venue_name = $settings['venue_name'] ?? '';
@@ -200,7 +237,7 @@ trait VenueFieldsTrait {
 				$result        = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_data );
 				$venue_term_id = $result['term_id'] ?? '';
 			}
-		} else {
+		} elseif ( ! empty( $venue_data ) ) {
 			$original_data  = Venue_Taxonomy::get_venue_data( $venue_term_id );
 			$changed_fields = array();
 
@@ -216,7 +253,9 @@ trait VenueFieldsTrait {
 			}
 		}
 
-		$settings['venue'] = $venue_term_id;
+		if ( array_key_exists( 'venue', $settings ) || ! empty( $venue_term_id ) ) {
+			$settings['venue'] = $venue_term_id;
+		}
 
 		return $settings;
 	}
@@ -252,16 +291,16 @@ trait VenueFieldsTrait {
 	 */
 	protected static function map_venue_config_to_event_data( array $config ): array {
 		return array(
-			'venue'         => $config['venue_name'] ?? '',
-			'venueAddress'  => $config['venue_address'] ?? '',
-			'venueCity'     => $config['venue_city'] ?? '',
-			'venueState'    => $config['venue_state'] ?? '',
-			'venueZip'      => $config['venue_zip'] ?? '',
-			'venueCountry'  => $config['venue_country'] ?? '',
-			'venuePhone'    => $config['venue_phone'] ?? '',
-			'venueWebsite'  => $config['venue_website'] ?? '',
+			'venue'             => $config['venue_name'] ?? '',
+			'venueAddress'      => $config['venue_address'] ?? '',
+			'venueCity'         => $config['venue_city'] ?? '',
+			'venueState'        => $config['venue_state'] ?? '',
+			'venueZip'          => $config['venue_zip'] ?? '',
+			'venueCountry'      => $config['venue_country'] ?? '',
+			'venuePhone'        => $config['venue_phone'] ?? '',
+			'venueWebsite'      => $config['venue_website'] ?? '',
 			'venueTicketingUrl' => $config['venue_ticketing_url'] ?? '',
-			'venueCapacity' => $config['venue_capacity'] ?? '',
+			'venueCapacity'     => $config['venue_capacity'] ?? '',
 		);
 	}
 }
