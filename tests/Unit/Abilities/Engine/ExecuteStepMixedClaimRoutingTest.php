@@ -35,7 +35,7 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 		MixedClaimFetchStep::$packets = array();
 
 		$this->step_types_filter = static function ( array $types ): array {
-			$types['fetch'] = array(
+			$types['fetch']        = array(
 				'class'                     => MixedClaimFetchStep::class,
 				'uses_handler'              => false,
 				'source_ingestion'          => true,
@@ -43,13 +43,17 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 				'supports_item_disposition' => true,
 				'handler_category'          => 'source',
 			);
-			$types['ai'] = array(
+			$types['ai']           = array(
 				'class'        => MixedClaimAIStep::class,
 				'uses_handler' => false,
 			);
-			$types['passthrough'] = array(
+			$types['passthrough']  = array(
 				'class'        => MixedClaimFetchStep::class,
 				'uses_handler' => false,
+			);
+			$types['handler_sink'] = array(
+				'class'        => MixedClaimFetchStep::class,
+				'uses_handler' => true,
 			);
 			return $types;
 		};
@@ -340,7 +344,172 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 		$this->assertSame( 'reject_source', $this->scheduled[0]['packets'][0]['metadata']['packet_disposition'] );
 	}
 
-	private function create_job( string $step_type = 'fetch' ): int {
+	/**
+	 * Issue #3444: a failed handler-tool result must not block the explicit
+	 * disposition short-circuit when the agent subsequently rejects the item.
+	 */
+	public function test_failed_handler_tool_then_reject_terminalizes_before_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-failed-then-reject', false );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array(
+			$this->failed_handler_tool_result_packet( $claim ),
+			$this->disposition_result_packet( $claim, 'reject_source' ),
+		);
+
+		$result = $this->execute( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'packets_dispositioned', $result['outcome'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $result['status'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+		$this->assertTrue( $this->processed->has_item_been_processed( 'mixed-scope', 'mixed-source', 'ai-failed-then-reject' ) );
+		$this->assertNotSame( 'handler_requiring_step_missing_handler_packets', datamachine_get_engine_data( $job_id )['job_status_reason'] ?? '' );
+	}
+
+	/**
+	 * Issue #3444: same as above with defer_item, which releases (not completes) the claim.
+	 */
+	public function test_failed_handler_tool_then_defer_terminalizes_before_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-failed-then-defer', false );
+		$this->assertSame( 1, $this->processed->record_owned_deferral_attempt( $claim, $job_id )['attempts'] );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array(
+			$this->failed_handler_tool_result_packet( $claim ),
+			$this->disposition_result_packet( $claim, 'defer_item' ),
+		);
+
+		$result = $this->execute( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'packets_dispositioned', $result['outcome'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $result['status'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+		$evidence = datamachine_get_engine_data( $job_id )['packet_disposition_evidence'][0];
+		$this->assertSame( array( $claim['disposition_id'] ), $evidence['released_ids'] );
+		$this->assertFalse( $this->processed->has_item_been_processed( 'mixed-scope', 'mixed-source', 'ai-failed-then-defer' ) );
+	}
+
+	/**
+	 * Issue #3444: multiple rejected handler attempts before the disposition
+	 * (the most common production shape) must also short-circuit.
+	 */
+	public function test_repeated_failed_handler_tool_then_defer_terminalizes_before_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-repeat-failed-then-defer', false );
+		$this->assertSame( 1, $this->processed->record_owned_deferral_attempt( $claim, $job_id )['attempts'] );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array(
+			$this->failed_handler_tool_result_packet( $claim ),
+			$this->failed_handler_tool_result_packet( $claim ),
+			$this->failed_handler_tool_result_packet( $claim ),
+			$this->disposition_result_packet( $claim, 'defer_item' ),
+		);
+
+		$result = $this->execute( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'packets_dispositioned', $result['outcome'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+	}
+
+	/**
+	 * Regression guard for #3444: an AI step that only produced a summary
+	 * response (no tool call, no disposition) is an unsuccessful step and must
+	 * still fail rather than terminalize as dispositioned.
+	 */
+	public function test_ai_response_without_disposition_still_fails_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-no-disposition', false );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array( $this->ai_response_packet() );
+
+		$result = $this->execute( $job_id );
+
+		$this->assertFalse( $result['step_success'] );
+		$this->assertNotSame( 'packets_dispositioned', $result['outcome'] );
+		$this->assertSame( 'ai_response_without_tool_result', $result['reason'] );
+		$this->assertSame( JobStatus::FAILED, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+		$this->assertFalse( $this->processed->has_item_been_processed( 'mixed-scope', 'mixed-source', 'ai-no-disposition' ) );
+	}
+
+	/**
+	 * Regression guard for #3444: a successful non-handler tool call with no
+	 * disposition and no handler completion must still fail routing into a
+	 * handler-requiring step with the missing-handler-packet reason.
+	 */
+	public function test_successful_non_handler_tool_without_disposition_still_fails_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-search-no-disposition', false );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array( $this->successful_non_handler_tool_result_packet() );
+
+		$result = $this->execute( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertFalse( $result['step_success'] );
+		$this->assertSame( 'failed', $result['outcome'] );
+		$this->assertSame( 'handler_requiring_step_missing_handler_packets', $result['reason'] );
+		$this->assertSame( JobStatus::FAILED, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+		$evidence = datamachine_get_engine_data( $job_id )['packet_disposition_evidence'][0];
+		$this->assertSame( array( $claim['disposition_id'] ), $evidence['omitted_ids'] );
+	}
+
+	/**
+	 * Regression guard for #3444: a failed handler tool whose claim was merely
+	 * released (no explicit reject/defer) must remain routable so the job still
+	 * fails as a missing handler packet. This is the case that distinguishes
+	 * "settled by a disposition result" from "present in evidence.released_ids".
+	 */
+	public function test_failed_handler_tool_without_disposition_still_fails_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-failed-no-disposition', false );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array(
+			$this->successful_non_handler_tool_result_packet(),
+			$this->failed_handler_tool_result_packet( $claim ),
+		);
+
+		$result = $this->execute( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertFalse( $result['step_success'] );
+		$this->assertSame( 'failed', $result['outcome'] );
+		$this->assertSame( 'handler_requiring_step_missing_handler_packets', $result['reason'] );
+		$this->assertSame( JobStatus::FAILED, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+		$evidence = datamachine_get_engine_data( $job_id )['packet_disposition_evidence'][0];
+		$this->assertSame( array( $claim['disposition_id'] ), $evidence['released_ids'] );
+		$this->assertSame( array(), $evidence['completed_ids'] );
+		$this->assertFalse( $this->processed->has_item_been_processed( 'mixed-scope', 'mixed-source', 'ai-failed-no-disposition' ) );
+	}
+
+	/**
+	 * Regression guard for #3444: a failed handler tool alone is an unsuccessful
+	 * step and must still fail rather than terminalize as dispositioned.
+	 */
+	public function test_failed_handler_tool_alone_still_fails(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-failed-alone', false );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array( $this->failed_handler_tool_result_packet( $claim ) );
+
+		$result = $this->execute( $job_id );
+
+		$this->assertFalse( $result['step_success'] );
+		$this->assertNotSame( 'packets_dispositioned', $result['outcome'] );
+		$this->assertSame( 'tool_result_failed', $result['reason'] );
+		$this->assertSame( JobStatus::FAILED, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+	}
+
+	private function create_job( string $step_type = 'fetch', string $sink_step_type = 'passthrough' ): int {
 		$job_id = $this->jobs->create_job(
 			array(
 				'pipeline_id' => 'direct',
@@ -368,7 +537,7 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 						),
 						'sink'   => array(
 							'flow_step_id'    => 'sink',
-							'step_type'       => 'passthrough',
+							'step_type'       => $sink_step_type,
 							'execution_order' => 1,
 							'pipeline_id'     => 'direct',
 							'flow_id'         => 'direct',
@@ -443,6 +612,87 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 			'timestamp' => time(),
 			'data'      => array( 'title' => 'Claimless packet', 'body' => 'This packet remains routable.' ),
 			'metadata'  => array( 'origin' => 'claimless' ),
+		);
+	}
+
+	/**
+	 * Mirror AIStep::processLoopResults() output for a handler tool call that
+	 * failed parameter validation: a `tool_result` packet bound to the claim
+	 * with packet_disposition 'failed'.
+	 */
+	private function failed_handler_tool_result_packet( array $claim ): array {
+		$error    = 'Tool "upsert_event" requires the following parameters: startTime.';
+		$metadata = array(
+			'tool_name'              => 'upsert_event',
+			'handler_tool'           => 'upsert_event',
+			'tool_parameters'        => array( 'disposition_id' => $claim['disposition_id'] ),
+			'tool_success'           => false,
+			'tool_failure_non_fatal' => false,
+			'tool_result_envelope'   => array(
+				'success'   => false,
+				'error'     => $error,
+				'tool_name' => 'upsert_event',
+			),
+			'source_type'            => 'mixed-source',
+			'packet_disposition'     => 'failed',
+			'disposition_id'         => $claim['disposition_id'],
+		);
+
+		$metadata[ ProcessedItems::CLAIM_METADATA_KEY ]          = $claim;
+		$metadata[ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] = $claim['disposition_id'];
+
+		return array(
+			'type'      => 'tool_result',
+			'timestamp' => time(),
+			'data'      => array(
+				'title' => 'Upsert Event Result',
+				'body'  => $error,
+			),
+			'metadata'  => $metadata,
+		);
+	}
+
+	/** Mirror a successful, claimless `tool_result` from a non-handler tool (e.g. a search). */
+	private function successful_non_handler_tool_result_packet(): array {
+		return array(
+			'type'      => 'tool_result',
+			'timestamp' => time(),
+			'data'      => array(
+				'title' => 'Web Search Result',
+				'body'  => 'Found 3 results.',
+			),
+			'metadata'  => array(
+				'tool_name'              => 'web_search',
+				'handler_tool'           => null,
+				'tool_parameters'        => array( 'query' => 'event start time' ),
+				'tool_success'           => true,
+				'tool_failure_non_fatal' => false,
+				'tool_result_envelope'   => array(
+					'success' => true,
+					'data'    => array( 'results' => array() ),
+				),
+				'source_type'            => 'mixed-source',
+				'packet_disposition'     => 'succeeded',
+			),
+		);
+	}
+
+	/** Mirror the claimless `ai_response` summary packet emitted when no tool was called. */
+	private function ai_response_packet(): array {
+		return array(
+			'type'      => 'ai_response',
+			'timestamp' => time(),
+			'data'      => array(
+				'title' => 'AI Response',
+				'body'  => 'I could not find enough detail to proceed.',
+			),
+			'metadata'  => array(
+				'source_type'            => 'ai_response',
+				'flow_step_id'           => 'source',
+				'conversation_turn'      => 1,
+				'step_execution_success' => false,
+				'failure_reason'         => 'ai_response_without_tool_result',
+			),
 		);
 	}
 

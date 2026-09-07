@@ -257,10 +257,7 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
         $this->assertSame('flow_ai', $this->_latestScheduledStep()['flow_step_id'] ?? '');
 
 		$engine_after_fetch = datamachine_get_engine_data($job_id);
-		$this->assertSame(
-			'datamachine.step_result.v1',
-			$engine_after_fetch['step_result']['flow_fetch']['schema_version'] ?? ''
-		);
+		$this->assertArrayNotHasKey( 'step_result', $engine_after_fetch );
 		$this->assertSame(
 			'datamachine.step_result.v1',
 			$engine_after_fetch['step_results']['flow_fetch']['step_result']['schema_version'] ?? ''
@@ -317,11 +314,8 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
             $engine_after_ai['token_usage'] ?? array()
         );
         $this->assertSame('preserved', $engine_after_ai['fake_handler_written_key'] ?? '');
-		$this->assertSame(
-			'datamachine.step_result.v1',
-			$engine_after_ai['step_result']['flow_ai']['schema_version'] ?? ''
-		);
-		$this->assertNotEmpty($engine_after_ai['step_result']['flow_ai']['packet_refs'] ?? array());
+		$this->assertArrayNotHasKey( 'step_result', $engine_after_ai );
+		$this->assertNotEmpty($engine_after_ai['step_results']['flow_ai']['step_result']['packet_refs'] ?? array());
 
         $publish_result = $executor->execute(
             array(

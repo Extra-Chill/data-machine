@@ -282,7 +282,7 @@ assert_bundle_update_equals( 'existing stale flow payload normalizes pipeline me
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';
 $pipelines_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Pipelines/Pipelines.php' ) ?: '';
 $flows_source         = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Flows/Flows.php' ) ?: '';
-$bootstrap_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/CommandRegistry.php' ) ?: '';
+$bootstrap_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Bootstrap/CliServiceProvider.php' ) ?: '';
 $agents_cli_source    = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/AgentsCommand.php' ) ?: '';
 $bundle_cli_source    = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/AgentBundleCommand.php' ) ?: '';
 assert_bundle_update( 'importer resolves existing pipelines by portable slug', str_contains( $agent_bundler_source, 'get_by_portable_slug( $agent_id, $portable_slug )' ) );

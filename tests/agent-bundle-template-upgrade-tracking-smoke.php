@@ -54,7 +54,6 @@ require_once dirname( __DIR__ ) . '/inc/Core/Agents/AgentConfigFactory.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentConfigArtifactProjector.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleAgentConfig.php';
-require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentTemplateMetadata.php';
 require_once dirname( __DIR__ ) . '/inc/Cli/BaseCommand.php';
 require_once dirname( __DIR__ ) . '/inc/Cli/Commands/AgentBundleCommand.php';
 
@@ -63,7 +62,6 @@ use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
 use WP_Agent_Package_Artifact_Hasher as AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use WP_Agent_Package_Artifact_Status as AgentBundleArtifactStatus;
-use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 
 $failures = 0;
 $total    = 0;
@@ -139,14 +137,7 @@ $bundle = array(
 	'agent'           => array( 'agent_slug' => 'wordpress-com-brain' ),
 );
 
-echo "\n[1] Bundle arrays produce template source/version metadata\n";
-$metadata = AgentTemplateMetadata::from_bundle_array( $bundle )->to_array();
-template_tracking_assert_equals( 'template slug comes from bundle metadata', 'domain-wiki-template', $metadata['template_slug'] );
-template_tracking_assert_equals( 'template version comes from bundle metadata', '4.5.6', $metadata['template_version'] );
-template_tracking_assert_equals( 'bundle version remains distinct', '1.2.3', $metadata['bundle_version'] );
-template_tracking_assert_equals( 'source revision is preserved', 'etag-abc123', $metadata['source_revision'] );
-
-echo "\n[2] Installed status reports source/version and live local modification state\n";
+echo "\n[1] Installed status reports source/version and live local modification state\n";
 $installed_agent_config = array( 'default_model' => 'openai/gpt-5.5' );
 $installed_pipeline     = array(
 	'portable_slug'   => 'daily-sync',

@@ -46,6 +46,7 @@ use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\BundleSchema;
+use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Agents\PersistedAgentGraphProjector;
 use DataMachine\Engine\Agents\AgentSubagentGraph;
 use WP_UnitTestCase;
@@ -222,6 +223,78 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				),
 			),
 		);
+	}
+
+	public function test_legacy_import_persists_template_metadata_with_existing_precedence(): void {
+		$bundle = $this->fixture_bundle( 'template-metadata-agent' );
+		$bundle['template_slug']     = 'top-level-template';
+		$bundle['template_version']  = ' 4.5.6 ';
+		$bundle['source_ref']        = ' refs/tags/v4.5.6 ';
+		$bundle['source_revision']   = ' revision-456 ';
+		$bundle['template']          = array(
+			'slug'    => 'nested-template',
+			'version' => '3.0.0',
+		);
+		$bundle['template_metadata'] = array(
+			'template_slug'    => 'legacy-template',
+			'template_version' => '2.0.0',
+			'source_ref'       => 'legacy-ref',
+			'source_revision'  => 'legacy-revision',
+		);
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'] );
+		$agent    = $this->agents_repo->get_by_slug( 'template-metadata-agent' );
+		$metadata = $agent['agent_config']['datamachine_bundle'] ?? array();
+		$this->assertSame( 'top-level-template', $metadata['template_slug'] ?? null );
+		$this->assertSame( '4.5.6', $metadata['template_version'] ?? null );
+		$this->assertSame( 'template-metadata-agent', $metadata['bundle_slug'] ?? null );
+		$this->assertSame( '1', $metadata['bundle_version'] ?? null );
+		$this->assertSame( 'refs/tags/v4.5.6', $metadata['source_ref'] ?? null );
+		$this->assertSame( 'revision-456', $metadata['source_revision'] ?? null );
+	}
+
+	public function test_legacy_import_preserves_explicit_empty_template_slug_semantics(): void {
+		$bundle = $this->fixture_bundle( 'empty-template-slug-agent' );
+		$bundle['template_slug'] = '';
+		$bundle['template']      = array(
+			'slug'    => 'nested-template',
+			'version' => '2.0.0',
+		);
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'] );
+		$agent    = $this->agents_repo->get_by_slug( 'empty-template-slug-agent' );
+		$metadata = $agent['agent_config']['datamachine_bundle'] ?? array();
+		$this->assertSame( 'template', $metadata['template_slug'] ?? null );
+		$this->assertSame( '2.0.0', $metadata['template_version'] ?? null );
+	}
+
+	public function test_legacy_import_rejects_explicit_empty_template_version(): void {
+		$bundle = $this->fixture_bundle( 'empty-template-version-agent' );
+		$bundle['template_version'] = ' ';
+		$bundle['template']         = array( 'version' => '2.0.0' );
+
+		$this->expectException( BundleValidationException::class );
+		$this->expectExceptionMessage( 'agent template metadata template_version must be a non-empty string.' );
+
+		$this->bundler->import( $bundle, null, $this->owner_id );
+	}
+
+	public function test_legacy_import_validates_nested_source_metadata_before_mutation(): void {
+		$bundle = $this->fixture_bundle( 'oversized-source-agent' );
+		$bundle['template_metadata'] = array( 'source_ref' => str_repeat( 'x', 192 ) );
+
+		$this->expectException( BundleValidationException::class );
+		$this->expectExceptionMessage( 'agent template metadata source fields must be 191 characters or fewer.' );
+
+		try {
+			$this->bundler->import( $bundle, null, $this->owner_id );
+		} finally {
+			$this->assertNull( $this->agents_repo->get_by_slug( 'oversized-source-agent' ) );
+		}
 	}
 
 	public function test_import_honors_scheduled_bundle_flows_on_create(): void {
@@ -1198,6 +1271,33 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		};
 		add_filter( 'datamachine_agent_config_artifact_projection_policies', $this->agent_config_projection_filter, 10, 1 );
 
+		$grandchild_config = array(
+			'default_model'      => 'gpt-5.5-mini',
+			'plugin_runtime'     => array( 'endpoint' => 'https://grandchild-runtime.example.test' ),
+			'backup_private'     => array( 'token' => 'grandchild-secret' ),
+			'datamachine_bundle' => array( 'source_revision' => 'grandchild-source-revision' ),
+		);
+		$grandchild_id = $this->agents_repo->create_if_missing( 'backup-grandchild', 'Backup Grandchild', $this->owner_id, $grandchild_config, 7 );
+		$this->assertIsInt( $grandchild_id );
+
+		$child_config = array(
+			'default_model'      => 'gpt-5.5-mini',
+			'plugin_runtime'     => array( 'endpoint' => 'https://child-runtime.example.test' ),
+			'backup_private'     => array( 'token' => 'child-secret' ),
+			'datamachine_bundle' => array( 'source_revision' => 'child-source-revision' ),
+			'subagents'          => array( 'backup-grandchild' ),
+		);
+		$child_id = $this->agents_repo->create_if_missing( 'backup-child', 'Backup Child', $this->owner_id, $child_config, 7 );
+		$this->assertIsInt( $child_id );
+		$coordinator_id = $this->agents_repo->create_if_missing(
+			'profile-coordinator',
+			'Profile Coordinator',
+			$this->owner_id,
+			array( 'subagents' => array( 'backup-child' ) ),
+			7
+		);
+		$this->assertIsInt( $coordinator_id );
+
 		$source_config = array(
 			'default_provider'        => 'openai',
 			'default_model'           => 'gpt-5.5',
@@ -1221,7 +1321,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 		$exports = array();
 		foreach ( array( 'share', 'backup', 'fork' ) as $profile ) {
-			$result = $this->bundler->export_directory_object( 'backup-source', array( 'profile' => $profile ) );
+			$result = $this->bundler->export_directory_object( 'backup-source', array( 'profile' => $profile, 'reproducible' => true ) );
 			$this->assertTrue( (bool) $result['success'], "{$profile} export succeeds." );
 			$this->assertInstanceOf( AgentBundleDirectory::class, $result['directory'] ?? null );
 			$exports[ $profile ] = AgentBundleArrayAdapter::to_array_bundle( $result['directory'] );
@@ -1240,6 +1340,37 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 'https://runtime.example.test', $backup_config['example']['runtime_endpoints']['events']['url'] ?? null );
 		$this->assertSame( 'runtime:events', $backup_config['example']['auth_refs']['events'] ?? null );
 		$this->assertArrayNotHasKey( 'backup_private', $backup_config, 'Backup honors explicit backup egress exclusion.' );
+
+		$nested_exports = array();
+		foreach ( array( 'share', 'backup', 'fork' ) as $profile ) {
+			$result = $this->bundler->export_directory_object( 'profile-coordinator', array( 'profile' => $profile, 'reproducible' => true ) );
+			$this->assertTrue( (bool) $result['success'], "{$profile} nested export succeeds." );
+			$nested_exports[ $profile ] = AgentBundleArrayAdapter::to_array_bundle( $result['directory'] );
+		}
+		$share_subagents    = array_column( $nested_exports['share']['subagents'], null, 'slug' );
+		$backup_subagents   = array_column( $nested_exports['backup']['subagents'], null, 'slug' );
+		$fork_subagents     = array_column( $nested_exports['fork']['subagents'], null, 'slug' );
+		$subagent_endpoints = array(
+			'backup-child'      => 'https://child-runtime.example.test',
+			'backup-grandchild' => 'https://grandchild-runtime.example.test',
+		);
+		foreach ( $subagent_endpoints as $subagent_slug => $expected_endpoint ) {
+			$share_child      = $share_subagents[ $subagent_slug ]['agent_config'] ?? array();
+			$backup_child     = $backup_subagents[ $subagent_slug ]['agent_config'] ?? array();
+			$fork_child       = $fork_subagents[ $subagent_slug ]['agent_config'] ?? array();
+
+			$this->assertArrayNotHasKey( 'plugin_runtime', $share_child, "Share applies tracking exclusions to {$subagent_slug}." );
+			$this->assertArrayNotHasKey( 'plugin_runtime', $fork_child, "Fork applies tracking exclusions to {$subagent_slug}." );
+			$this->assertSame( $expected_endpoint, $backup_child['plugin_runtime']['endpoint'] ?? null );
+			$this->assertArrayNotHasKey( 'backup_private', $backup_child, "Backup applies egress exclusions to {$subagent_slug}." );
+			$this->assertArrayNotHasKey( 'datamachine_bundle', $share_child );
+			$this->assertArrayNotHasKey( 'datamachine_bundle', $backup_child );
+			$this->assertArrayNotHasKey( 'datamachine_bundle', $fork_child );
+		}
+
+		$repeat = $this->bundler->export_directory_object( 'profile-coordinator', array( 'profile' => 'backup', 'reproducible' => true ) );
+		$this->assertTrue( (bool) $repeat['success'] );
+		$this->assertSame( $nested_exports['backup'], AgentBundleArrayAdapter::to_array_bundle( $repeat['directory'] ) );
 
 		$restore = $this->bundler->import( $exports['backup'], 'backup-restored', $this->owner_id );
 		$this->assertTrue( (bool) $restore['success'], 'Backup imports into a fresh agent.' );

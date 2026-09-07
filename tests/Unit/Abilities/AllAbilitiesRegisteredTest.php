@@ -104,6 +104,12 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			// DuplicateCheckAbility (2)
 			'datamachine/check-duplicate',
 			'datamachine/titles-match',
+			// Taxonomy abilities (5)
+			'datamachine/get-taxonomy-terms',
+			'datamachine/create-taxonomy-term',
+			'datamachine/update-taxonomy-term',
+			'datamachine/delete-taxonomy-term',
+			'datamachine/resolve-term',
 		);
 
 		$missing = array();

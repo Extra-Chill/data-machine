@@ -122,26 +122,6 @@ namespace {
 		return isset( $registered_abilities[ $ability_name ] );
 	}
 
-	function datamachine_smoke_register_manifest( array $declarations ): void {
-		if ( function_exists( 'wp_get_ability' ) && did_action( 'wp_abilities_api_init' ) && ! doing_action( 'wp_abilities_api_init' ) ) {
-			global $wp_actions;
-
-			$previous_action_count = $wp_actions['wp_abilities_api_init'] ?? null;
-			$wp_actions['wp_abilities_api_init'] = 0;
-			\DataMachine\Abilities\AbilityManifest::register( $declarations );
-			do_action( 'wp_abilities_api_init' );
-			if ( null === $previous_action_count ) {
-				unset( $wp_actions['wp_abilities_api_init'] );
-			} else {
-				$wp_actions['wp_abilities_api_init'] = $previous_action_count;
-			}
-			return;
-		}
-
-		\DataMachine\Abilities\AbilityManifest::register( $declarations );
-		do_action( 'wp_abilities_api_init' );
-	}
-
 	function datamachine_smoke_write_error( string $message ): void {
 		$error_stream = defined( 'STDERR' ) ? STDERR : fopen( 'php://stderr', 'w' );
 
@@ -152,7 +132,12 @@ namespace {
 
 	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactRebase.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityRegistration.php';
-	require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityManifest.php';
+	require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityCategories.php';
+	require_once dirname( __DIR__ ) . '/inc/Abilities/AgentAbilities.php';
+	require_once dirname( __DIR__ ) . '/inc/Abilities/Media/ImageTemplateAbilities.php';
+	require_once dirname( __DIR__ ) . '/inc/Abilities/Publish/SendEmailAbility.php';
+	require_once dirname( __DIR__ ) . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
+	require_once dirname( __DIR__ ) . '/inc/Core/Bootstrap/AbilityServiceProvider.php';
 
 	$failed = 0;
 	$total  = 0;
@@ -168,36 +153,13 @@ namespace {
 		++$failed;
 	};
 
-	$plugin_root = dirname( __DIR__ );
-
-	datamachine_smoke_register_manifest(
-		array(
-			array(
-				'file'  => $plugin_root . '/inc/Abilities/AgentAbilities.php',
-				'class' => \DataMachine\Abilities\AgentAbilities::class,
-			),
-			array(
-				'file'   => $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php',
-				'class'  => \DataMachine\Abilities\Media\ImageTemplateAbilities::class,
-				'method' => 'ensure_registered',
-			),
-			array(
-				'file'   => $plugin_root . '/inc/Abilities/Publish/SendEmailAbility.php',
-				'class'  => \DataMachine\Abilities\Publish\SendEmailAbility::class,
-				'method' => 'ensure_registered',
-			),
-			array(
-				'file'   => $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php',
-				'class'  => \DataMachine\Abilities\Publish\SendEmailQueuedAbility::class,
-				'method' => 'ensure_registered',
-			),
-		)
-	);
+	\DataMachine\Core\Bootstrap\AbilityServiceProvider::register_lightweight();
+	do_action( 'wp_abilities_api_init' );
 
 	foreach ( array( 'datamachine/list-agents', 'datamachine/run-agent-bundle', 'datamachine/render-image-template', 'datamachine/send-email', 'datamachine/send-email-queued' ) as $ability_name ) {
-		$assert( "lite manifest resolves {$ability_name}", datamachine_smoke_has_registered_ability( $ability_name ) );
+		$assert( "lightweight provider resolves {$ability_name}", datamachine_smoke_has_registered_ability( $ability_name ) );
 	}
-	$assert( 'lite manifest resolution does not activate full runtime', 0 === $runtime_activations );
+	$assert( 'lightweight provider does not activate full runtime', 0 === $runtime_activations );
 
 	$callback_runs = 0;
 	$callback      = \DataMachine\Abilities\AbilityRegistration::runtime_callback(

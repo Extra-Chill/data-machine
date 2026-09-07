@@ -23,7 +23,6 @@ $providers = array(
 	'AlwaysOnServiceProvider',
 	'ActivationServiceProvider',
 	'RuntimeServiceProvider',
-	'RestServiceProvider',
 	'HostIntegrationServiceProvider',
 );
 
@@ -35,8 +34,9 @@ foreach ( $providers as $provider ) {
 
 $assert( str_contains( $main, 'CliServiceProvider::register();' ), 'entrypoint delegates CLI composition' );
 $cli = (string) file_get_contents( $root . '/inc/Core/Bootstrap/CliServiceProvider.php' );
-$assert( str_contains( $cli, 'CommandRegistry::map()' ), 'CLI provider owns command registration' );
-$assert( str_contains( $cli, 'WP_CLI::add_command' ), 'CLI provider registers every mapped command' );
+$assert( str_contains( $cli, "'datamachine settings'" ), 'CLI provider owns the canonical command map' );
+$assert( str_contains( $cli, 'WP_CLI::add_command' ), 'CLI provider registers every command' );
+$assert( ! is_file( $root . '/inc/Cli/CommandRegistry.php' ), 'single-caller command registry is absent' );
 $assert( str_contains( $main, 'RuntimeServiceProvider::register();' ), 'entrypoint delegates full runtime composition' );
 $assert( str_contains( $main, 'AbilityServiceProvider::register_lightweight();' ), 'lightweight abilities remain unconditional' );
 $assert( str_contains( $main, 'AlwaysOnServiceProvider::register_scheduler();' ), 'entrypoint delegates scheduler integrations' );
@@ -45,14 +45,17 @@ $assert( str_contains( $main, 'ActivationServiceProvider::register_defaults_hook
 $assert( str_contains( $main, 'ActivationServiceProvider::register_lifecycle_hooks( __FILE__ );' ), 'entrypoint delegates lifecycle registration' );
 $assert( str_contains( $main, 'ActivationServiceProvider::register_new_site_hook();' ), 'entrypoint delegates multisite setup registration' );
 $assert( str_contains( $bootstrap, 'HostIntegrationServiceProvider::register();' ), 'bootstrap delegates host integrations' );
+$assert( str_contains( $bootstrap, "require_once __DIR__ . '/Engine/AI/Tools/ability-tool-projections.php';" ), 'bootstrap defines projection helpers before runtime composition' );
 
 $runtime = (string) file_get_contents( $root . '/inc/Core/Bootstrap/RuntimeServiceProvider.php' );
 $order   = array(
 	'RuntimeEnvironment::should_load_full_runtime()',
-	'self::register_step_types();',
-	'self::register_handlers();',
-	'ToolServiceProvider::register();',
-	'RestServiceProvider::register();',
+	'new \\DataMachine\\Core\\Steps\\Fetch\\FetchStep();',
+	'new \\DataMachine\\Core\\Steps\\Publish\\Handlers\\WordPress\\WordPress();',
+	'new \\DataMachine\\Engine\\AI\\Tools\\Global\\AgentDailyMemory();',
+	'new \\DataMachine\\Api\\Chat\\Tools\\ConsultAgent();',
+	'\\DataMachine\\Api\\Execute::register();',
+	'\\DataMachine\\Api\\Email::register();',
 	'AbilityServiceProvider::register_full_runtime();',
 );
 $offset  = -1;
@@ -62,11 +65,26 @@ foreach ( $order as $needle ) {
 	$offset = false === $position ? $offset : $position;
 }
 
-$rest       = (string) file_get_contents( $root . '/inc/Core/Bootstrap/RestServiceProvider.php' );
-$rest_calls = substr_count( $rest, '::register();' );
-$assert( 27 === $rest_calls, 'REST provider composes all 27 controllers' );
+$rest_start = strpos( $runtime, '\\DataMachine\\Api\\Execute::register();' );
+$rest_end   = strpos( $runtime, '\\DataMachine\\Api\\Email::register();' );
+$rest       = false !== $rest_start && false !== $rest_end ? substr( $runtime, $rest_start, $rest_end - $rest_start + strlen( '\\DataMachine\\Api\\Email::register();' ) ) : '';
+$assert( 27 === substr_count( $rest, '::register();' ), 'runtime composes all 27 REST controllers' );
+$assert( ! is_file( $root . '/inc/Core/Bootstrap/RestServiceProvider.php' ), 'single-caller REST provider is absent' );
+$assert( ! is_file( $root . '/inc/Engine/AI/Tools/ToolServiceProvider.php' ), 'single-caller tool provider is absent' );
 $assert( ! str_contains( $main, '\\DataMachine\\Api\\Execute::register();' ), 'entrypoint no longer composes concrete REST controllers' );
 $assert( substr_count( $main, 'register_activation_hook(' ) === 0, 'entrypoint no longer registers lifecycle hooks directly' );
+
+$tool_provider_order = array(
+	'new \\DataMachine\\Engine\\AI\\Configuration\\ImageGenerationSettings();',
+	'\\datamachine_register_global_ability_tools();',
+	'new \\DataMachine\\Engine\\AI\\Tools\\Global\\QueueValidator();',
+);
+$offset              = -1;
+foreach ( $tool_provider_order as $needle ) {
+	$position = strpos( $runtime, $needle );
+	$assert( false !== $position && $position > $offset, "runtime tool order preserves {$needle}" );
+	$offset = false === $position ? $offset : $position;
+}
 
 $removed_functions = array(
 	'datamachine_skip_action_scheduler_migration_during_install',

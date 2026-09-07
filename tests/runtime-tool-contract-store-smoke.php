@@ -107,6 +107,16 @@ namespace DataMachine\Core\Database\Chat {
 
 			return true;
 		}
+
+		public function acquire_session_lock( string $session_id, int $ttl_seconds = 300 ): ?string {
+			unset( $session_id, $ttl_seconds );
+			return 'runtime-tool-contract-lock';
+		}
+
+		public function release_session_lock( string $session_id, string $lock_token ): bool {
+			unset( $session_id, $lock_token );
+			return true;
+		}
 	}
 
 	class ConversationStoreFactory {

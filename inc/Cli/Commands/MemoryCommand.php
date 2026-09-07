@@ -23,6 +23,7 @@ use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
 use DataMachine\Cli\UserResolver;
+use DataMachine\Cli\CallerLivenessMonitor;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 use DataMachine\Engine\AI\SectionRegistry;
 use DataMachine\Engine\AI\ComposableFileGenerator;
@@ -667,11 +668,11 @@ class MemoryCommand extends BaseCommand {
 		$result = $daily->read( $parts['year'], $parts['month'], $parts['day'] );
 
 		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['message'] );
+			WP_CLI::error( $result['message'] ?? 'Daily memory file could not be read.' );
 			return;
 		}
 
-		WP_CLI::log( $result['content'] );
+		WP_CLI::log( $result['content'] ?? '' );
 	}
 
 	/**
@@ -889,12 +890,13 @@ class MemoryCommand extends BaseCommand {
 		$now   = time();
 
 		foreach ( $files as $file ) {
-			$mtime    = filemtime( $file );
+			$mtime    = (int) filemtime( $file );
+			$size     = (int) filesize( $file );
 			$age_days = floor( ( $now - $mtime ) / 86400 );
 
 			$items[] = array(
 				'file'     => basename( $file ),
-				'size'     => size_format( filesize( $file ) ),
+				'size'     => size_format( $size ),
 				'modified' => wp_date( 'Y-m-d H:i:s', $mtime ),
 				'age'      => $age_days . 'd',
 			);
@@ -930,7 +932,7 @@ class MemoryCommand extends BaseCommand {
 		$stale     = 0;
 
 		foreach ( $files as $file ) {
-			$mtime    = filemtime( $file );
+			$mtime    = (int) filemtime( $file );
 			$age_days = floor( ( $now - $mtime ) / 86400 );
 			$is_stale = $mtime < $threshold;
 
@@ -1182,9 +1184,6 @@ class MemoryCommand extends BaseCommand {
 	 *   - yaml
 	 * ---
 	 *
-	 * [--quiet]
-	 * : Suppress output on success.
-	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Regenerate all composable files
@@ -1199,12 +1198,14 @@ class MemoryCommand extends BaseCommand {
 	 *     # List all sections across all composable files
 	 *     wp datamachine memory compose --list
 	 *
+	 *     # Suppress informational output with WP-CLI's global option
+	 *     wp --quiet datamachine memory compose
+	 *
 	 * @subcommand compose
 	 */
 	public function compose( array $args, array $assoc_args ): void {
 		$filename = $args[0] ?? '';
 		$list     = \WP_CLI\Utils\get_flag_value( $assoc_args, 'list', false );
-		$quiet    = \WP_CLI\Utils\get_flag_value( $assoc_args, 'quiet', false );
 
 		if ( $list ) {
 			$this->compose_list( $filename, $assoc_args );
@@ -1214,30 +1215,78 @@ class MemoryCommand extends BaseCommand {
 		// Build context from CLI flags.
 		$context = $this->build_compose_context( $assoc_args );
 
-		if ( ! empty( $filename ) ) {
-			// Regenerate a single file.
-			$result = ComposableFileGenerator::regenerate( $filename, $context );
+		$monitoring = CallerLivenessMonitor::start();
+		try {
+			if ( ! empty( $filename ) ) {
+				// Regenerate a single file.
+				$result = ComposableFileGenerator::regenerate( $filename, $context );
 
-			if ( ! $result['success'] ) {
-				WP_CLI::error( $result['message'] );
-				return;
-			}
+				if ( ! $result['success'] ) {
+					$message = $result['message'];
+					if ( isset( $result['blocker'] ) ) {
+						$message .= ' Blocker: ' . wp_json_encode( $result['blocker'], JSON_UNESCAPED_SLASHES );
+					}
+					if ( $monitoring ) {
+						WP_CLI::error( $message, false );
+						CallerLivenessMonitor::terminate( SIGTERM );
+					}
+					WP_CLI::error( $message );
+				}
 
-			if ( ! $quiet ) {
 				WP_CLI::success( $result['message'] );
-			}
-		} else {
-			// Regenerate all composable files.
-			$result = ComposableFileGenerator::regenerate_all( $context );
+			} else {
+				// Regenerate all composable files.
+				$result = ComposableFileGenerator::regenerate_all( $context );
 
-			if ( ! $quiet ) {
 				foreach ( $result['results'] as $file_result ) {
-					$status = ! empty( $file_result['success'] ) ? 'OK' : 'FAIL';
-					WP_CLI::log( sprintf( '  [%s] %s — %s', $status, $file_result['filename'], $file_result['message'] ) );
+					$status  = ! empty( $file_result['success'] ) ? 'OK' : 'FAIL';
+					$message = $file_result['message'];
+					if ( isset( $file_result['blocker'] ) ) {
+						$message .= ' Blocker: ' . wp_json_encode( $file_result['blocker'], JSON_UNESCAPED_SLASHES );
+					}
+					WP_CLI::log( sprintf( '  [%s] %s — %s', $status, $file_result['filename'], $message ) );
+				}
+				if ( ! $result['success'] ) {
+					if ( $monitoring ) {
+						WP_CLI::error( $result['message'], false );
+						CallerLivenessMonitor::terminate( SIGTERM );
+					}
+					WP_CLI::error( $result['message'] );
 				}
 				WP_CLI::success( $result['message'] );
 			}
+		} finally {
+			if ( $monitoring ) {
+				CallerLivenessMonitor::stop();
+			}
 		}
+	}
+
+	/**
+	 * Inspect bounded composable-file lock owner diagnostics.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [<filename>]
+	 * : Optional composable filename. Defaults to all composable files.
+	 *
+	 * [--format=<format>]
+	 * : Output format (table or json).
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 * @subcommand compose-status
+	 */
+	public function compose_status( array $args, array $assoc_args ): void {
+		$filename = (string) ( $args[0] ?? '' );
+		$context  = $this->build_compose_context( $assoc_args );
+		$files    = '' === $filename ? array_keys( MemoryFileRegistry::get_composable() ) : array( $filename );
+		$items    = array_map(
+			static fn( string $file ): array => ComposableFileGenerator::lock_status( $file, $context ),
+			$files
+		);
+
+		$this->format_items( $items, array( 'filename', 'lock_status', 'owner_operation', 'owner_pid', 'owner_run_id', 'lock_age_seconds', 'owner_alive', 'recovery_command' ), $assoc_args );
 	}
 
 	/**
@@ -1585,7 +1634,7 @@ class MemoryCommand extends BaseCommand {
 				'relative_files' => $relative_files,
 			);
 
-			WP_CLI::line( wp_json_encode( $output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		} else {
 			$items = array();
 			foreach ( $core_files as $entry ) {

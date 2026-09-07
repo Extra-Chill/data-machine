@@ -82,6 +82,7 @@ class ProcessedItemsEndpointTest extends WP_UnitTestCase {
 		$request->set_param( 'clear_type', 'flow' );
 		$request->set_param( 'target_id', 1 );
 
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$result = ProcessedItems::handle_clear( $request );
 
 		$this->assertInstanceOf( WP_Error::class, $result );

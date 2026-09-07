@@ -133,7 +133,6 @@ use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
-use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AuthRef;
 use DataMachine\Engine\Bundle\AuthRefResolver;
 use DataMachine\Engine\Bundle\AuthRefResolverInterface;
@@ -380,47 +379,7 @@ prompt_artifact_assert_equals( 'local override changes current artifact hash det
 prompt_artifact_assert( 'local override is detectable before bundle apply', SystemTaskPromptRegistry::has_local_override_for_artifact( $target_prompt ) );
 SystemTask::setPromptOverride( 'fixture_generation', 'generate', '' );
 
-echo "\n[3] Agent template source/version metadata round-trips\n";
-$manifest       = AgentBundleManifest::from_array(
-	array(
-		'schema_version'  => 1,
-		'bundle_slug'     => 'portable-knowledge-agent',
-		'bundle_version'  => '2.3.4',
-		'source_ref'      => 'refs/tags/v2.3.4',
-		'source_revision' => 'abc123',
-		'exported_at'     => '2026-04-28T00:00:00Z',
-		'exported_by'     => 'data-machine/test',
-		'agent'           => array(
-			'slug'         => 'knowledge-agent',
-			'label'        => 'Knowledge Agent',
-			'description'  => 'Maintains a domain wiki.',
-			'agent_config' => array(),
-		),
-		'included'        => array(
-			'memory'       => array(),
-			'pipelines'    => array(),
-			'flows'        => array(),
-			'handler_auth' => 'refs',
-		),
-	)
-);
-$template       = AgentTemplateMetadata::from_manifest(
-	$manifest,
-	'domain-wiki-template',
-	'5.6.7',
-	array(
-		'instructions' => hash( 'sha256', 'instructions' ),
-		'tool_policy'  => hash( 'sha256', 'tool policy' ),
-	)
-);
-$template_array = $template->to_array();
-prompt_artifact_assert_equals( 'template slug preserved', 'domain-wiki-template', $template_array['template_slug'] );
-prompt_artifact_assert_equals( 'template version preserved', '5.6.7', $template_array['template_version'] );
-prompt_artifact_assert_equals( 'bundle source revision preserved', 'abc123', $template_array['source_revision'] );
-prompt_artifact_assert_equals( 'installed hashes sorted by artifact ID', array( 'instructions', 'tool_policy' ), array_keys( $template_array['installed_hashes'] ) );
-prompt_artifact_assert_equals( 'template metadata round-trips', $template_array, AgentTemplateMetadata::from_array( $template_array )->to_array() );
-
-echo "\n[4] Auth refs validate, resolve, and strip secrets\n";
+echo "\n[3] Auth refs validate, resolve, and strip secrets\n";
 $auth_ref = AuthRef::from_string(
 	'github:automattic',
 	array(

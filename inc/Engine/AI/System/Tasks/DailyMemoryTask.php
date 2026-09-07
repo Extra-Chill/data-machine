@@ -21,13 +21,14 @@
 
 namespace DataMachine\Engine\AI\System\Tasks;
 
+use AgentsAPI\AI\WP_Agent_Run_Outcome;
+
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DailyMemory;
-use DataMachine\Engine\AI\DataMachineConversationStatus;
 use DataMachine\Engine\AI\NaturalCompletionPolicyInterface;
 use AgentsAPI\AI\WP_Agent_Compaction_Conservation;
 use AgentsAPI\AI\WP_Agent_Conversation_Completion_Decision;
@@ -212,7 +213,7 @@ class DailyMemoryTask extends SystemTask {
 			// reviewed the day and never emitted an acceptable split, so the
 			// completion policy kept declining until the turn budget was
 			// exhausted. The substrate reports that budget exhaustion as
-			// `budget_exceeded` (see DataMachineConversationStatus), which is
+			// `budget_exceeded` (see WP_Agent_Run_Outcome), which is
 			// deliberately NOT a hard-failure status here. Classification is
 			// centralized in self::isGenuineFailureResponse() so the no-op vs
 			// failure decision has a single, testable source of truth rather
@@ -460,8 +461,8 @@ class DailyMemoryTask extends SystemTask {
 		return in_array(
 			$status,
 			array(
-				DataMachineConversationStatus::FAILED,
-				DataMachineConversationStatus::INTERRUPTED,
+				WP_Agent_Run_Outcome::STATUS_FAILED,
+				WP_Agent_Run_Outcome::STATUS_INTERRUPTED,
 				'error',
 			),
 			true
@@ -974,7 +975,7 @@ class DailyMemoryTask extends SystemTask {
 			)
 		);
 
-		if ( WP_Agent_Markdown_Section_Compaction_Adapter::STATUS_ARCHIVED !== ( $split['status'] ?? '' ) || empty( $split['archive_items'] ) ) {
+		if ( WP_Agent_Markdown_Section_Compaction_Adapter::STATUS_ARCHIVED !== $split['status'] || empty( $split['archive_items'] ) ) {
 			return array(
 				'persistent'        => $content,
 				'archived'          => '',

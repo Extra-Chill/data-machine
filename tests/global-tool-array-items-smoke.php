@@ -17,6 +17,7 @@ declare(strict_types=1);
 
 $assertions = 0;
 $failures   = array();
+$global_tool_schema_filters = array();
 
 $assert = function ( bool $condition, string $message ) use ( &$assertions, &$failures ): void {
 	++$assertions;
@@ -42,12 +43,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 // the top of each tool file.
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-		unset( $tag, $callback, $priority, $accepted_args );
+		global $global_tool_schema_filters;
+		unset( $accepted_args );
+		$global_tool_schema_filters[ $tag ][ $priority ][] = $callback;
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $tag, $value ) {
+		global $global_tool_schema_filters;
+		ksort( $global_tool_schema_filters[ $tag ] );
+		foreach ( $global_tool_schema_filters[ $tag ] ?? array() as $callbacks ) {
+			foreach ( $callbacks as $callback ) {
+				$value = $callback( $value );
+			}
+		}
+		return $value;
 	}
 }
 
 require_once $root . '/inc/Engine/AI/Tools/BaseTool.php';
 require_once $root . '/inc/Engine/AI/Tools/ToolPolicyResolver.php';
+require_once $root . '/inc/Engine/AI/Tools/ability-tool-projections.php';
+datamachine_register_global_ability_tools();
 
 $tools_dir = $root . '/inc/Engine/AI/Tools/Global';
 $tool_files = glob( $tools_dir . '/*.php' ) ?: array();
@@ -128,6 +146,17 @@ foreach ( $tool_files as $file ) {
 	$assert( 'object' === ( $definition['parameters']['type'] ?? null ), "{$class_short}: parameters is a canonical object schema" );
 	$assert( isset( $definition['parameters']['properties'] ) && is_array( $definition['parameters']['properties'] ), "{$class_short}: parameters declares properties" );
 	$assert_schema_shape( $definition['parameters'], $class_short . '.parameters' );
+}
+
+foreach ( apply_filters( 'datamachine_ability_tool_projections', array() ) as $tool_name => $definition ) {
+	if ( empty( $definition['parameters'] ) || ! is_array( $definition['parameters'] ) ) {
+		continue;
+	}
+
+	++$schemas_checked;
+	$assert( 'object' === ( $definition['parameters']['type'] ?? null ), "{$tool_name}: parameters is a canonical object schema" );
+	$assert( isset( $definition['parameters']['properties'] ) && is_array( $definition['parameters']['properties'] ), "{$tool_name}: parameters declares properties" );
+	$assert_schema_shape( $definition['parameters'], $tool_name . '.parameters' );
 }
 
 $assert(

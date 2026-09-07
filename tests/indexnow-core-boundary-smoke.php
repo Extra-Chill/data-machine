@@ -28,7 +28,6 @@ if ( ! class_exists( 'WP_CLI' ) ) {
 	}
 }
 
-require_once dirname( __DIR__ ) . '/inc/Cli/CommandRegistry.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Bootstrap/CliServiceProvider.php';
 
 $root     = dirname( __DIR__ );

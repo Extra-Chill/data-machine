@@ -253,11 +253,11 @@ unscoped callbacks retain the site-administrator requirement.
 wp datamachine auth revoke <handler>
 
 # Per-user revoke.
-wp datamachine auth revoke <handler> --user=42
+wp datamachine auth revoke <handler> --target-user=42
 ```
 
 The pre-1.0 `auth disconnect` verb is not registered. Use `wp datamachine auth
-revoke <handler>` for site-wide credentials or add `--user=<id>` for a per-user
+revoke <handler>` for site-wide credentials or add `--target-user=<id>` for a per-user
 credential slot.
 
 Or via the abilities surface:

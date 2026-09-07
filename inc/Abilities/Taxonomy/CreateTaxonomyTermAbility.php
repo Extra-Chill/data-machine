@@ -15,9 +15,10 @@ use DataMachine\Core\WordPress\TaxonomyHandler;
 defined( 'ABSPATH' ) || exit;
 
 class CreateTaxonomyTermAbility extends AbstractTaxonomyAbility {
+	public const ABILITY_NAME = 'datamachine/create-taxonomy-term';
 
 	protected function getAbilityName(): string {
-		return 'datamachine/create-taxonomy-term';
+		return self::ABILITY_NAME;
 	}
 
 	protected function getAbilityArgs(): array {

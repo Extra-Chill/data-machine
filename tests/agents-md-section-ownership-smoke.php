@@ -19,14 +19,6 @@ namespace DataMachine\Engine\AI {
 	}
 }
 
-namespace DataMachine\Cli {
-	final class CommandRegistry {
-		public static function map(): array {
-			return array();
-		}
-	}
-}
-
 namespace {
 	define( 'ABSPATH', '/var/www/html/' );
 	define( 'DATAMACHINE_COMPOSE_AGENTS_MD', true );

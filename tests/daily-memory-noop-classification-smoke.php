@@ -70,12 +70,12 @@ if ( ! function_exists( '__' ) ) {
 	}
 }
 
-// Only the status vocabulary and the task class are needed. Load the status
-// constants and the task file directly; SystemTask (the parent) and the
+// Only the canonical outcome vocabulary and the task class are needed. Load
+// the outcome class and task file directly; SystemTask (the parent) and the
 // Agents API compaction classes are not touched by the pure classifier, but
 // the class declaration must be loadable, so stub the parent minimally when
 // the real one is unavailable.
-require_once dirname( __DIR__ ) . '/inc/Engine/AI/DataMachineConversationStatus.php';
+require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Runtime/class-wp-agent-run-outcome.php';
 
 if ( ! class_exists( '\DataMachine\Engine\AI\System\Tasks\SystemTask' ) ) {
 	// Declare a lightweight parent so DailyMemoryTask can be declared without
@@ -95,11 +95,11 @@ if ( ! interface_exists( '\DataMachine\Engine\AI\NaturalCompletionPolicyInterfac
 // PHP resolves `use` lazily (only on actual reference), so unresolved imports
 // do not fatal at include time as long as the referenced symbols are never
 // used by the code path we exercise. isGenuineFailureResponse() references
-// only DataMachineConversationStatus, already loaded above.
+// only WP_Agent_Run_Outcome, already loaded above.
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/System/Tasks/DailyMemoryTask.php';
 
 use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
-use DataMachine\Engine\AI\DataMachineConversationStatus;
+use AgentsAPI\AI\WP_Agent_Run_Outcome;
 
 $failures = array();
 $passes   = 0;
@@ -125,7 +125,7 @@ echo "\n[no-op] budget exhausted, no error (the common quiet-day path):\n";
 assert_bool(
 	false,
 	DailyMemoryTask::isGenuineFailureResponse(
-		array( 'status' => DataMachineConversationStatus::BUDGET_EXCEEDED, 'turn_count' => 3 ),
+		array( 'status' => WP_Agent_Run_Outcome::STATUS_BUDGET_EXCEEDED, 'turn_count' => 3 ),
 		''
 	),
 	'budget_exceeded with no error is a no-op',
@@ -153,7 +153,7 @@ echo "\n[no-op] max_turns_reached diagnostic status, no error:\n";
 assert_bool(
 	false,
 	DailyMemoryTask::isGenuineFailureResponse(
-		array( 'status' => DataMachineConversationStatus::MAX_TURNS_REACHED ),
+		array( 'status' => 'max_turns_reached' ),
 		''
 	),
 	'max_turns_reached with no error is a no-op',
@@ -165,7 +165,7 @@ echo "\n[no-op] runtime_tool_pending status, no error:\n";
 assert_bool(
 	false,
 	DailyMemoryTask::isGenuineFailureResponse(
-		array( 'status' => DataMachineConversationStatus::RUNTIME_TOOL_PENDING ),
+		array( 'status' => WP_Agent_Run_Outcome::STATUS_RUNTIME_TOOL_PENDING ),
 		''
 	),
 	'runtime_tool_pending with no error is a no-op',
@@ -179,7 +179,7 @@ echo "\n[fail] non-empty error string:\n";
 assert_bool(
 	true,
 	DailyMemoryTask::isGenuineFailureResponse(
-		array( 'status' => DataMachineConversationStatus::BUDGET_EXCEEDED ),
+		array( 'status' => WP_Agent_Run_Outcome::STATUS_BUDGET_EXCEEDED ),
 		'provider request timed out'
 	),
 	'non-empty error string fails even with budget_exceeded status',
@@ -203,7 +203,7 @@ echo "\n[fail] hard failure status: failed:\n";
 assert_bool(
 	true,
 	DailyMemoryTask::isGenuineFailureResponse(
-		array( 'status' => DataMachineConversationStatus::FAILED ),
+		array( 'status' => WP_Agent_Run_Outcome::STATUS_FAILED ),
 		''
 	),
 	'failed status is a genuine failure',
@@ -215,7 +215,7 @@ echo "\n[fail] hard failure status: interrupted (external interrupt, not budget)
 assert_bool(
 	true,
 	DailyMemoryTask::isGenuineFailureResponse(
-		array( 'status' => DataMachineConversationStatus::INTERRUPTED ),
+		array( 'status' => WP_Agent_Run_Outcome::STATUS_INTERRUPTED ),
 		''
 	),
 	'interrupted status is a genuine failure',
@@ -237,8 +237,8 @@ assert_bool(
 // a no-op, external interruption is a failure. If a future refactor collapses
 // these two the daily-memory job starts failing every quiet day again.
 echo "\n[invariant] budget_exceeded != interrupted:\n";
-$budget_is_failure      = DailyMemoryTask::isGenuineFailureResponse( array( 'status' => DataMachineConversationStatus::BUDGET_EXCEEDED ), '' );
-$interrupted_is_failure = DailyMemoryTask::isGenuineFailureResponse( array( 'status' => DataMachineConversationStatus::INTERRUPTED ), '' );
+$budget_is_failure      = DailyMemoryTask::isGenuineFailureResponse( array( 'status' => WP_Agent_Run_Outcome::STATUS_BUDGET_EXCEEDED ), '' );
+$interrupted_is_failure = DailyMemoryTask::isGenuineFailureResponse( array( 'status' => WP_Agent_Run_Outcome::STATUS_INTERRUPTED ), '' );
 assert_bool(
 	true,
 	( false === $budget_is_failure ) && ( true === $interrupted_is_failure ),

@@ -1348,11 +1348,37 @@ class ExecuteStepAbility {
 		);
 	}
 
-	/** Remove terminal disposition results and exhausted identities while preserving live packets. */
+	/**
+	 * Remove terminal disposition results and settled claim identities while preserving live packets.
+	 *
+	 * A claim is settled when this reconciliation exhausted it, or when an
+	 * explicit disposition result packet (reject_source, defer_item,
+	 * defer_exhausted) resolved it. A packet carrying only settled claims has
+	 * nothing left to route. This covers the failed handler-tool `tool_result`
+	 * packet emitted before the agent explicitly rejected or deferred the same
+	 * item: the later disposition settles its claim, and leaving it routable
+	 * would push the job into `resolveTransitionRoute()` where it fails as a
+	 * missing handler packet.
+	 *
+	 * Settled identities are derived from the disposition result packets rather
+	 * than from `evidence.completed_ids`/`released_ids`, because those lists
+	 * also contain claims released by a plain failed tool result or omitted by
+	 * the agent. Such packets must stay routable so a genuine missing-handler
+	 * outcome still fails downstream instead of short-circuiting as
+	 * explicitly dispositioned.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine/issues/3444
+	 */
 	private static function filterReconciledPacketsForRouting( array $packets, array $reconciliation ): array {
-		$exhausted           = array_fill_keys( (array) ( $reconciliation['evidence']['exhausted_ids'] ?? array() ), true );
+		$settled             = array_fill_keys( (array) ( $reconciliation['evidence']['exhausted_ids'] ?? array() ), true );
 		$disposition_results = array_fill_keys( (array) ( $reconciliation['routing']['disposition_result_packet_indexes'] ?? array() ), true );
-		if ( empty( $exhausted ) && empty( $disposition_results ) ) {
+		foreach ( array_keys( $disposition_results ) as $packet_index ) {
+			$result_metadata = is_array( $packets[ $packet_index ]['metadata'] ?? null ) ? $packets[ $packet_index ]['metadata'] : array();
+			foreach ( array_keys( ProcessedItems::disposition_claims( $result_metadata ) ) as $disposition_id ) {
+				$settled[ $disposition_id ] = true;
+			}
+		}
+		if ( empty( $settled ) && empty( $disposition_results ) ) {
 			return $packets;
 		}
 
@@ -1363,12 +1389,12 @@ class ExecuteStepAbility {
 			}
 			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
 			$claims   = ProcessedItems::disposition_claims( $metadata );
-			if ( empty( $claims ) || empty( array_intersect_key( $claims, $exhausted ) ) ) {
+			if ( empty( $claims ) || empty( array_intersect_key( $claims, $settled ) ) ) {
 				$routable[] = $packet;
 				continue;
 			}
 
-			$live = array_diff_key( $claims, $exhausted );
+			$live = array_diff_key( $claims, $settled );
 			if ( empty( $live ) ) {
 				continue;
 			}

@@ -53,7 +53,12 @@ class DeleteTaxonomyTermAbility extends AbstractTaxonomyAbility {
 					'term_name'  => array( 'type' => 'string' ),
 					'taxonomy'   => array( 'type' => 'string' ),
 					'deleted'    => array( 'type' => 'boolean' ),
-					'reassigned' => array( 'type' => 'integer' ),
+					'reassigned' => array(
+						'anyOf' => array(
+							array( 'type' => 'integer' ),
+							array( 'type' => 'null' ),
+						),
+					),
 					'error'      => array( 'type' => 'string' ),
 				),
 			),

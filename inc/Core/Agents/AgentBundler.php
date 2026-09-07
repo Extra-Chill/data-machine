@@ -19,6 +19,7 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Api\Flows\FlowScheduling;
+use WP_Agent_Package;
 use WP_Agent_Package_Artifact_Hasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactPayloads;
 use DataMachine\Engine\Bundle\AgentBundleArtifactDefinitions;
@@ -37,7 +38,6 @@ use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 use DataMachine\Engine\Bundle\AgentConfigArtifactProjector;
-use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleSchema;
 use DataMachine\Engine\Bundle\BundleRelativePath;
@@ -140,6 +140,7 @@ class AgentBundler {
 		$agent_id        = (int) $agent['agent_id'];
 		$export_manifest = self::resolve_export_manifest( $agent_id, $context );
 		$handler_auth    = (string) $export_manifest['handler_auth'];
+		$profile         = (string) ( $context['profile'] ?? 'share' );
 
 		$pipelines                 = $this->pipelines_repo->get_all_pipelines( null, $agent_id );
 		$flows                     = $this->flows_repo->get_all_flows( null, $agent_id );
@@ -244,7 +245,7 @@ class AgentBundler {
 			\DataMachine\Engine\Bundle\BundleSchema::PROMPTS_DIR => SystemTaskPromptRegistry::bundle_prompt_files(),
 		);
 		$extension_paths   = array_map( static fn( array $artifact ) => (string) ( $artifact['source_path'] ?? '' ), $extension_artifacts );
-		$subagents         = $this->export_subagents( is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array() );
+		$subagents         = $this->export_subagents( is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(), $profile );
 		$root_subagent     = is_array( $agent['agent_config']['datamachine_subagent'] ?? null ) ? $agent['agent_config']['datamachine_subagent'] : array();
 		$coordinator_edges = AgentSubagentGraph::coordinator_edges(
 			is_array( $agent['agent_config'] ?? null ) ? ( $agent['agent_config']['subagents'] ?? array() ) : array(),
@@ -264,7 +265,7 @@ class AgentBundler {
 				'description'  => '',
 				'agent_config' => AgentBundleAgentConfig::export_payload(
 					is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
-					(string) ( $context['profile'] ?? 'share' )
+					$profile
 				),
 				'subagents'    => $coordinator_edges,
 				'tool_policy'  => is_array( $root_subagent['tool_policy'] ?? null ) ? $root_subagent['tool_policy'] : array(),
@@ -310,8 +311,12 @@ class AgentBundler {
 		return ! empty( $context['reproducible'] ) ? self::REPRODUCIBLE_EXPORTED_AT : gmdate( 'c' );
 	}
 
-	/** @return array<int,array<string,mixed>> */
-	private function export_subagents( array $coordinator_config ): array {
+	/**
+	 * @param array<string,mixed> $coordinator_config Coordinator agent config.
+	 * @param string              $profile            Export projection profile.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function export_subagents( array $coordinator_config, string $profile ): array {
 		$edges = AgentSubagentGraph::edges_from_config( $coordinator_config['subagents'] ?? array() );
 		$nodes = array();
 		while ( ! empty( $edges ) ) {
@@ -330,7 +335,7 @@ class AgentBundler {
 				'slug'         => (string) $child['agent_slug'],
 				'label'        => (string) $child['agent_name'],
 				'description'  => (string) ( $config['description'] ?? '' ),
-				'agent_config' => AgentBundleAgentConfig::export_payload( $config ),
+				'agent_config' => AgentBundleAgentConfig::export_payload( $config, $profile ),
 				'memory'       => $memory,
 				'tool_policy'  => is_array( $subagent['tool_policy'] ?? null ) ? $subagent['tool_policy'] : array(),
 				'skill_policy' => is_array( $subagent['skill_policy'] ?? null ) ? $subagent['skill_policy'] : array(),
@@ -395,9 +400,9 @@ class AgentBundler {
 	 * Project a legacy bundle array to the Core-shaped package contract.
 	 *
 	 * @param array<string,mixed> $bundle Legacy bundle array.
-	 * @return object
+	 * @return WP_Agent_Package
 	 */
-	public static function package_from_bundle( array $bundle ): object {
+	public static function package_from_bundle( array $bundle ): WP_Agent_Package {
 		return AgentPackageProjection::from_array_bundle( $bundle );
 	}
 
@@ -405,9 +410,9 @@ class AgentBundler {
 	 * Project a bundle directory to the Core-shaped package contract.
 	 *
 	 * @param AgentBundleDirectory $directory Bundle directory.
-	 * @return object
+	 * @return WP_Agent_Package
 	 */
-	public static function package_from_directory( AgentBundleDirectory $directory ): object {
+	public static function package_from_directory( AgentBundleDirectory $directory ): WP_Agent_Package {
 		return AgentPackageProjection::from_directory( $directory );
 	}
 
@@ -588,7 +593,7 @@ class AgentBundler {
 	 *                                target instead of returning a slug-collision error. Required when the live
 	 *                                pipelines/flows have been edited (`local_modified`) so the importer can stage
 	 *                                conflicts and the CLI can hand them to the planner / PendingActions.
-	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
+	 * @return array<string,mixed>
 	 */
 	public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
 		// Validate bundle.
@@ -678,13 +683,11 @@ class AgentBundler {
 			'source_ref'      => $bundle_source_ref,
 			'source_revision' => $bundle_source_revision,
 		);
-		$template_metadata      = AgentTemplateMetadata::from_bundle_array( $bundle )->to_array();
-		unset( $template_metadata['installed_hashes'] );
-		$bundle_metadata    = array_merge( $template_metadata, $bundle_metadata );
-		$is_portable_bundle = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
-		$reconcile_runtime  = ! empty( $options['reconcile_runtime'] );
-		$is_upgrade         = ! empty( $options['is_upgrade'] );
-		$root_import        = empty( $options['_graph_transaction'] );
+		$bundle_metadata        = array_merge( self::legacy_template_metadata( $bundle ), $bundle_metadata );
+		$is_portable_bundle     = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
+		$reconcile_runtime      = ! empty( $options['reconcile_runtime'] );
+		$is_upgrade             = ! empty( $options['is_upgrade'] );
+		$root_import            = empty( $options['_graph_transaction'] );
 
 		// Check for slug collision.
 		// On install: existing slug + (renamed-to-collision OR non-portable bundle) is a hard error.
@@ -869,7 +872,7 @@ class AgentBundler {
 				// by `??` and collapsed into the unspecified sentinel.
 				$raw_site_scope    = array_key_exists( 'site_scope', $agent_data ) ? $agent_data['site_scope'] : BundleSchema::SITE_SCOPE_UNSPECIFIED;
 				$bundle_site_scope = BundleSchema::normalize_agent_site_scope( $raw_site_scope );
-				$create_site_scope = ( BundleSchema::SITE_SCOPE_UNSPECIFIED === $bundle_site_scope ) ? false : $bundle_site_scope;
+				$create_site_scope = is_int( $bundle_site_scope ) || null === $bundle_site_scope ? $bundle_site_scope : false;
 
 				$agent_id = $this->agents_repo->create_if_missing(
 					$slug,
@@ -1464,6 +1467,40 @@ class AgentBundler {
 	}
 
 	/**
+	 * Preserve template metadata normalization for legacy array imports.
+	 *
+	 * @param array $bundle Legacy bundle payload.
+	 * @return array{template_slug:string,template_version:string}
+	 */
+	private static function legacy_template_metadata( array $bundle ): array {
+		$bundle_slug      = (string) ( $bundle['bundle_slug'] ?? ( $bundle['agent']['agent_slug'] ?? 'bundle' ) );
+		$bundle_version   = (string) ( $bundle['bundle_version'] ?? '1' );
+		$template         = is_array( $bundle['template'] ?? null ) ? $bundle['template'] : array();
+		$template_meta    = is_array( $bundle['template_metadata'] ?? null ) ? $bundle['template_metadata'] : array();
+		$template_slug    = PortableSlug::normalize( (string) ( $bundle['template_slug'] ?? $template['slug'] ?? $template_meta['template_slug'] ?? $bundle_slug ), 'template' );
+		$template_version = trim( (string) ( $bundle['template_version'] ?? $template['version'] ?? $template_meta['template_version'] ?? $bundle_version ) );
+		if ( '' === $template_version ) {
+			throw new BundleValidationException( 'agent template metadata template_version must be a non-empty string.' );
+		}
+
+		PortableSlug::normalize( $bundle_slug, 'bundle' );
+		if ( '' === trim( $bundle_version ) ) {
+			throw new BundleValidationException( 'agent template metadata bundle_version must be a non-empty string.' );
+		}
+
+		$source_ref      = trim( (string) ( $bundle['source_ref'] ?? $template_meta['source_ref'] ?? '' ) );
+		$source_revision = trim( (string) ( $bundle['source_revision'] ?? $template_meta['source_revision'] ?? '' ) );
+		if ( strlen( $source_ref ) > 191 || strlen( $source_revision ) > 191 ) {
+			throw new BundleValidationException( 'agent template metadata source fields must be 191 characters or fewer.' );
+		}
+
+		return array(
+			'template_slug'    => $template_slug,
+			'template_version' => $template_version,
+		);
+	}
+
+	/**
 	 * Import an agent from a directory bundle value object.
 	 *
 	 * @param AgentBundleDirectory $directory Bundle directory value object.
@@ -1471,7 +1508,7 @@ class AgentBundler {
 	 * @param int                  $owner_id WordPress user ID to own the imported agent.
 	 * @param bool                 $dry_run If true, validate without writing.
 	 * @param array                $options Import options.
-	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
+	 * @return array<string,mixed>
 	 */
 	public function import_directory_object( AgentBundleDirectory $directory, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
 		return $this->import_directory_materialization( $directory, $new_slug, $owner_id, $dry_run, $options );
@@ -1486,7 +1523,7 @@ class AgentBundler {
 	 * @param bool                 $dry_run If true, validate without writing.
 	 * @param array                $options Import options.
 	 * @param array                $abilities_manifest Compatibility abilities manifest.
-	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
+	 * @return array<string,mixed>
 	 */
 	private function import_directory_materialization( AgentBundleDirectory $directory, ?string $new_slug, int $owner_id, bool $dry_run, array $options, array $abilities_manifest = array() ): array {
 		$compatibility = AgentBundleCompatibility::report( AgentPackageProjection::from_directory( $directory ) )->to_array();
@@ -2213,7 +2250,7 @@ class AgentBundler {
 		return $files;
 	}
 
-	/** @param array<string,string> $metadata @return array<string,string> */
+	/** @param array<string,mixed> $metadata @return array<string,string> */
 	private function collect_subagent_runtime_artifacts( string $slug, array $metadata, string $kind ): array {
 		$files = array();
 		$root  = $this->directory_manager->get_agent_identity_directory( $slug ) . '/' . $kind;

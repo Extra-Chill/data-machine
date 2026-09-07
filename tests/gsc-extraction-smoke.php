@@ -45,8 +45,8 @@ assert_gsc_extraction(
 );
 
 assert_gsc_extraction(
-	! gsc_file_contains( $root . '/inc/Engine/AI/Tools/ToolServiceProvider.php', 'GoogleSearchConsole' ),
-	'core tool service provider does not register GSC',
+	! gsc_file_contains( $root . '/inc/Core/Bootstrap/RuntimeServiceProvider.php', 'GoogleSearchConsole' ),
+	'core runtime does not register GSC',
 	$failures,
 	$passes
 );
@@ -54,13 +54,6 @@ assert_gsc_extraction(
 assert_gsc_extraction(
 	! gsc_file_contains( $root . '/inc/Api/Analytics.php', 'datamachine/google-search-console' ),
 	'core analytics REST map does not register GSC',
-	$failures,
-	$passes
-);
-
-assert_gsc_extraction(
-	! gsc_file_contains( $root . '/inc/Cli/Commands/AnalyticsCommand.php', 'datamachine/google-search-console' ),
-	'core analytics CLI command does not register GSC',
 	$failures,
 	$passes
 );

@@ -7,7 +7,7 @@
  *  2. When OFF, the file/section registration helpers are no-ops.
  *  3. The `datamachine` section renders bounded routing and live-help discovery
  *     rather than an exhaustive command map.
- *  4. The CommandRegistry remains authoritative and excludes relocated commands.
+ *  4. The CLI provider remains authoritative and excludes relocated commands.
  *
  * Run with: php tests/agents-md-gated-composition-smoke.php
  *
@@ -18,6 +18,21 @@ declare( strict_types=1 );
 
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
+}
+
+if ( ! defined( 'WP_CLI' ) ) {
+	define( 'WP_CLI', true );
+}
+
+if ( ! class_exists( 'WP_CLI' ) ) {
+	final class WP_CLI {
+		/** @var array<string, class-string> */
+		public static array $commands = array();
+
+		public static function add_command( string $command, string $class ): void {
+			self::$commands[ $command ] = $class;
+		}
+	}
 }
 
 if ( ! defined( 'STDERR' ) ) {
@@ -53,10 +68,10 @@ function datamachine_assert( bool $cond, string $message, array &$failures ): vo
 	fwrite( fopen( 'php://stdout', 'w' ), "FAIL: {$message}\n" );
 }
 
-// Load the CommandRegistry (pure map, no WP_CLI dependency) and the gated
-// composition helpers.
-require_once dirname( __DIR__ ) . '/inc/Cli/CommandRegistry.php';
+// Load the CLI provider and gated composition helpers.
+require_once dirname( __DIR__ ) . '/inc/Core/Bootstrap/CliServiceProvider.php';
 require_once dirname( __DIR__ ) . '/inc/setup/agents-md.php';
+\DataMachine\Core\Bootstrap\CliServiceProvider::register();
 
 // --- 1. Gate is constant-only and default-OFF. -----------------------------
 
@@ -85,9 +100,9 @@ datamachine_assert( str_contains( $rendered, 'datamachine jobs --help' ), 'Secti
 datamachine_assert( str_contains( $rendered, 'datamachine --help' ), 'Section points to live command discovery', $failures );
 datamachine_assert( ! str_contains( $rendered, 'artifact-content|artifacts|cleanup' ), 'Section omits exhaustive reflected subcommands', $failures );
 
-// --- 4. CommandRegistry map: analytics is gone, real commands present. ------
+// --- 4. CLI registrations: analytics is gone, real commands present. --------
 
-$map = \DataMachine\Cli\CommandRegistry::map();
+$map = WP_CLI::$commands;
 
 foreach ( array( 'memory', 'flows', 'pipelines', 'jobs', 'worker', 'posts', 'blocks', 'image', 'email', 'pending-actions', 'agents', 'system' ) as $advertised_root ) {
 	datamachine_assert(
@@ -99,7 +114,7 @@ foreach ( array( 'memory', 'flows', 'pipelines', 'jobs', 'worker', 'posts', 'blo
 
 datamachine_assert(
 	! array_key_exists( 'datamachine analytics', $map ),
-	'CommandRegistry map does NOT contain a `datamachine analytics` entry (relocated to DMB)',
+	'CLI provider does NOT register `datamachine analytics` (relocated to DMB)',
 	$failures
 );
 

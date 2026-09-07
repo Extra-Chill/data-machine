@@ -272,6 +272,8 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 
 	public function test_jobs_rest_item_and_delete_errors_preserve_contracts(): void {
 		wp_set_current_user( $this->admin_id );
+		$this->assertNotNull( wp_get_ability( 'datamachine/get-jobs' ) );
+		$this->assertNotNull( wp_get_ability( 'datamachine/delete-jobs' ) );
 
 		$get_request = new \WP_REST_Request( 'GET', '/datamachine/v1/jobs/999999' );
 		$get_request->set_param( 'id', 999999 );
@@ -288,6 +290,27 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertSame( 'delete_failed', $delete_response->get_error_code() );
 		$this->assertSame( 'type is required and must be "all" or "failed"', $delete_response->get_error_message() );
 		$this->assertSame( 500, $delete_response->get_error_data()['status'] );
+	}
+
+	public function test_jobs_rest_item_and_delete_success_contracts_are_unchanged(): void {
+		wp_set_current_user( $this->admin_id );
+		$created = $this->execute( 'jobs-rest-success' );
+		$job_id  = (int) $created['job_id'];
+
+		$get_request = new \WP_REST_Request( 'GET', "/datamachine/v1/jobs/{$job_id}" );
+		$get_request->set_param( 'id', $job_id );
+		$get_response = JobsApi::handle_get_job_by_id( $get_request );
+		$this->assertInstanceOf( \WP_REST_Response::class, $get_response );
+		$this->assertSame( $job_id, (int) $get_response->get_data()['data']['job_id'] );
+
+		$delete_request = new \WP_REST_Request( 'DELETE', '/datamachine/v1/jobs' );
+		$delete_request->set_param( 'type', 'all' );
+		$delete_request->set_param( 'cleanup_processed', false );
+		$delete_response = JobsApi::handle_clear( $delete_request );
+		$this->assertInstanceOf( \WP_REST_Response::class, $delete_response );
+		$this->assertTrue( $delete_response->get_data()['success'] );
+		$this->assertGreaterThanOrEqual( 1, $delete_response->get_data()['jobs_deleted'] );
+		$this->assertSame( 0, $delete_response->get_data()['processed_items_cleaned'] );
 	}
 
 	public function test_successful_rest_collection_contract_is_unchanged(): void {

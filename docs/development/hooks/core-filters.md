@@ -1583,7 +1583,8 @@ underneath.
 
 **Single consumer of the store**: `\DataMachine\Core\FilesRepository\AgentMemory`.
 
-`AgentMemory` is the only class in core that talks to `AgentMemoryStoreFactory`. It exposes:
+`AgentMemory` is the only class in core that resolves stores through
+`WP_Agent_Memory_Stores::get_store()`. It exposes:
 
 - Section-level ops: `get_section()`, `set_section()`, `append_to_section()`, `get_sections()`, `search()`
 - Whole-file ops: `read()` (returns `WP_Agent_Memory_Read_Result`), `get_all()`, `replace_all()`, `exists()`, `delete()`
@@ -1596,7 +1597,7 @@ Higher-level consumers all go through this facade rather than instantiating stor
 - `\DataMachine\Engine\AI\System\Tasks\DailyMemoryTask` — full-file rewrite during scheduled compaction
 - `\DataMachine\Abilities\AgentMemoryAbilities` — Abilities API surface for memory operations
 
-Outside plugins and extensions should follow the same pattern: instantiate `AgentMemory`, never reach for `AgentMemoryStoreFactory` directly.
+Outside plugins and extensions should follow the same pattern: instantiate `AgentMemory` rather than resolving or instantiating stores directly.
 
 ### ConversationManager (`/inc/Engine/AI/ConversationManager.php`)
 

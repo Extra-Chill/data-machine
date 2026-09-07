@@ -85,6 +85,7 @@ if ( ! function_exists( 'get_option' ) ) {
 
 require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/conversation-loop.php';
 
 use DataMachine\Engine\AI\LoopEventSinkInterface;
 use DataMachine\Engine\AI\NullLoopEventSink;
