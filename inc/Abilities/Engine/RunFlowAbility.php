@@ -50,7 +50,7 @@ class RunFlowAbility {
 	 * Scheduling metadata key holding a flow's consecutive backpressure
 	 * deferral count. Cleared when the flow is admitted.
 	 */
-	private const BACKPRESSURE_DEFERRAL_COUNT_KEY = 'datamachine_backpressure_deferral_count';
+	public const BACKPRESSURE_DEFERRAL_COUNT_KEY = 'datamachine_backpressure_deferral_count';
 
 	public function __construct() {
 		$this->initDatabases();

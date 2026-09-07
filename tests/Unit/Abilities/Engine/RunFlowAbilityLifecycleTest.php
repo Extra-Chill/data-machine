@@ -12,6 +12,7 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Api\Flows\FlowScheduling;
+use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Core\JobStatus;
 use WP_UnitTestCase;
 
@@ -178,7 +179,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 			array(
 				'hook'     => FlowScheduling::FLOW_HOOK,
 				'args'     => array( $flow_id ),
-				'group'    => 'data-machine',
+				'group'    => RecurringScheduler::GROUP,
 				'status'   => \ActionScheduler_Store::STATUS_PENDING,
 				'per_page' => 10,
 			)
@@ -235,7 +236,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 		$this->assertIsInt( $result->get_error_data()['job_id'] ?? null );
 
 		$scheduling_config = ( new Flows() )->get_flow( $flow_id )['scheduling_config'] ?? array();
-		$this->assertArrayNotHasKey( 'datamachine_backpressure_deferral_count', $scheduling_config );
+		$this->assertArrayNotHasKey( RunFlowAbility::BACKPRESSURE_DEFERRAL_COUNT_KEY, $scheduling_config );
 	}
 
 	/**
@@ -277,7 +278,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 			array(
 				'hook'     => FlowScheduling::FLOW_HOOK,
 				'args'     => array( $flow_id ),
-				'group'    => 'data-machine',
+				'group'    => RecurringScheduler::GROUP,
 				'status'   => \ActionScheduler_Store::STATUS_PENDING,
 				'per_page' => 1,
 			)
