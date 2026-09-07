@@ -20,7 +20,7 @@ This page describes authentication options, but it does not replace WordPress’
 **Usage**:
 ```bash
 curl -u username:application_password \
-  https://example.com/wp-json/datamachine/v1/pipelines
+  https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/get-pipelines/run
 ```
 
 **Python Example**:
@@ -28,7 +28,7 @@ curl -u username:application_password \
 import requests
 from requests.auth import HTTPBasicAuth
 
-url = "https://example.com/wp-json/datamachine/v1/pipelines"
+url = "https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/get-pipelines/run"
 auth = HTTPBasicAuth("username", "xxxx xxxx xxxx xxxx")
 
 response = requests.get(url, auth=auth)
@@ -39,7 +39,7 @@ response = requests.get(url, auth=auth)
 const axios = require('axios');
 
 const response = await axios.get(
-  'https://example.com/wp-json/datamachine/v1/pipelines',
+  'https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/get-pipelines/run',
   {
     auth: {
       username: 'admin',
@@ -58,7 +58,7 @@ const response = await axios.get(
 **Usage**:
 ```javascript
 // WordPress admin context
-fetch('/wp-json/datamachine/v1/pipelines', {
+fetch('/wp-json/wp-abilities/v1/abilities/datamachine/get-pipelines/run', {
   credentials: 'same-origin',
   headers: {
     'X-WP-Nonce': wpApiSettings.nonce
@@ -120,7 +120,7 @@ curl -u username:app_password \
 
 # Test Data Machine authentication
 curl -u username:app_password \
-  https://example.com/wp-json/datamachine/v1/pipelines
+  https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/get-pipelines/run
 ```
 
 ## Authentication errors

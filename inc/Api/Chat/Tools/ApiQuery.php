@@ -70,10 +70,12 @@ MODES:
 KEY ENDPOINTS:
 /datamachine/v1/handlers - List handlers (?step_type=fetch|publish|upsert)
 /datamachine/v1/handlers/{slug} - Handler config schema
-/datamachine/v1/pipelines - List pipelines
-/datamachine/v1/pipelines/{id} - Pipeline with flows
 /datamachine/v1/flows/{id} - Flow details
-/datamachine/v1/jobs - List jobs (?flow_id, ?status)';
+/datamachine/v1/jobs - List jobs (?flow_id, ?status)
+
+PIPELINES (via ability runner, POST /wp-abilities/v1/abilities/datamachine/{slug}/run):
+get-pipelines - List pipelines or fetch one by pipeline_id
+get-pipeline-steps - Steps for a pipeline';
 	}
 
 	/**
@@ -219,13 +221,6 @@ KEY ENDPOINTS:
 
 		$response = rest_do_request( $request );
 
-		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
-		}
-
 		$data   = $response->get_data();
 		$status = $response->get_status();
 
@@ -272,12 +267,8 @@ KEY ENDPOINTS:
 		// If there's an ID (numeric second segment), append it
 		if ( ! empty( $segments ) ) {
 			$next = array_shift( $segments );
-			if ( is_numeric( $next ) ) {
-				$resource .= '_' . $next;
-			} elseif ( ! empty( $next ) ) {
-				// Sub-resource like /pipelines/5/steps
-				$resource .= '_' . $next;
-			}
+			// Numeric ID or sub-resource like /flows/5/queue — both append.
+			$resource .= '_' . $next;
 		}
 
 		return $resource;

@@ -85,6 +85,7 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\Pipeline\DuplicatePipelineAbility();
 		new \DataMachine\Abilities\Pipeline\ImportExportAbility();
 		new \DataMachine\Abilities\Pipeline\PipelineConfigurationAbilities();
+		new \DataMachine\Abilities\Pipeline\PipelineMemoryFilesAbility();
 		new \DataMachine\Abilities\PipelineStepAbilities();
 		new \DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility();
 		new \DataMachine\Abilities\ProcessedItemsAbilities();

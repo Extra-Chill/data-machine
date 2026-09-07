@@ -29,8 +29,9 @@ The `api_query` tool enables chat agents to query the Data Machine REST API (via
 - `GET /datamachine/v1/tools` - List available AI tools
 
 ### Pipelines (Read-Only)
-- `GET /datamachine/v1/pipelines` - List all pipelines
-- `GET /datamachine/v1/pipelines/{id}` - Get pipeline details with steps and flows
+Pipelines routes were retired (#3456); query the ability runner routes instead:
+- `GET /wp-abilities/v1/abilities/datamachine/get-pipelines/run?input={"pipeline_id":123}` - Get pipeline details with steps and flows
+- `POST /wp-abilities/v1/abilities/datamachine/get-pipelines/run` with `{"input": {}}` - List all pipelines
 
 ### Flows (Read-Only)
 - `GET /datamachine/v1/flows` - List all flows
@@ -79,8 +80,9 @@ The `api_query` tool enables chat agents to query the Data Machine REST API (via
 ### Get Pipeline Details
 ```json
 {
-  "endpoint": "/datamachine/v1/pipelines/123",
-  "method": "GET"
+  "endpoint": "/wp-abilities/v1/abilities/datamachine/get-pipelines/run",
+  "method": "POST",
+  "body": { "input": { "pipeline_id": 123 } }
 }
 ```
 

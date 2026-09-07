@@ -42,12 +42,12 @@ Updates, deletes, queue changes, handler changes, and file operations do not add
 
 | Operation | Client function | Endpoint |
 | --- | --- | --- |
-| List pipelines | `fetchPipelines(null, { perPage, offset, outputMode, includeFlows, search })` | `GET /pipelines` |
-| Fetch one pipeline | `fetchPipelines(pipelineId, { outputMode, includeFlows })` | `GET /pipelines?pipeline_id=...` |
-| Create pipeline | `createPipeline(name)` | `POST /pipelines` |
-| Rename pipeline | `updatePipelineTitle(pipelineId, name)` | `PATCH /pipelines/{pipeline_id}` |
-| Delete pipeline | `deletePipeline(pipelineId)` | `DELETE /pipelines/{pipeline_id}` |
-| Export pipelines | `exportPipelines(pipelineIds)` | `GET /pipelines?format=csv&ids=...` |
+| List pipelines | `fetchPipelines(null, { perPage, offset, outputMode, includeFlows, search })` | `POST /wp-abilities/v1/abilities/datamachine/get-pipelines/run` with `input.output_mode=list`, `input.include_flows=false` |
+| Fetch one pipeline | `fetchPipelines(pipelineId, { outputMode, includeFlows })` | `POST /wp-abilities/v1/abilities/datamachine/get-pipelines/run` with `input.pipeline_id` |
+| Create pipeline | `createPipeline(name)` | `POST /wp-abilities/v1/abilities/datamachine/create-pipeline/run` with `input.pipeline_name` |
+| Rename pipeline | `updatePipelineTitle(pipelineId, name)` | `POST /wp-abilities/v1/abilities/datamachine/update-pipeline/run` |
+| Delete pipeline | `deletePipeline(pipelineId)` | `POST /wp-abilities/v1/abilities/datamachine/delete-pipeline/run` |
+| Export pipelines | `exportPipelines(pipelineIds)` | `POST /wp-abilities/v1/abilities/datamachine/export-pipelines/run` with `input.pipeline_ids` |
 | Import pipelines | `importPipelines(csvContent)` | `POST /wp-abilities/v1/abilities/datamachine/import-pipelines/run` with `input.data` and `input.format=csv` |
 
 List mode requests `output_mode=list` with `include_flows=false`; selected pipeline flows are loaded separately.
@@ -56,12 +56,12 @@ List mode requests `output_mode=list` with `include_flows=false`; selected pipel
 
 | Operation | Client function | Endpoint |
 | --- | --- | --- |
-| Add step | `addPipelineStep(pipelineId, stepType, executionOrder)` | `POST /pipelines/{pipeline_id}/steps` |
-| Delete step | `deletePipelineStep(pipelineId, stepId)` | `DELETE /pipelines/{pipeline_id}/steps/{step_id}` |
-| Reorder steps | `reorderPipelineSteps(pipelineId, steps)` | `PUT /pipelines/{pipeline_id}/steps/reorder` |
-| Update AI step system prompt | `updateSystemPrompt(stepId, prompt, stepType, pipelineId)` | `PUT /pipelines/steps/{step_id}/config` |
+| Add step | `addPipelineStep(pipelineId, stepType, executionOrder)` | `POST /wp-abilities/v1/abilities/datamachine/add-pipeline-step/run` with `input.pipeline_id`, `input.step_type` |
+| Delete step | `deletePipelineStep(pipelineId, stepId)` | `POST /wp-abilities/v1/abilities/datamachine/delete-pipeline-step/run` |
+| Reorder steps | `reorderPipelineSteps(pipelineId, steps)` | `POST /wp-abilities/v1/abilities/datamachine/reorder-pipeline-steps/run` with `input.step_order` |
+| Update AI step system prompt | `updateSystemPrompt(stepId, prompt, stepType, pipelineId)` | `POST /wp-abilities/v1/abilities/datamachine/update-pipeline-step/run` with `input.system_prompt` |
 
-`updateSystemPrompt()` only sends `step_type`, `pipeline_id`, and `system_prompt`; provider, model, and tool policy are resolved by the current mode system rather than the pipeline builder client.
+`updateSystemPrompt()` only sends `pipeline_step_id` and `system_prompt`; provider, model, and tool policy are resolved by the current mode system rather than the pipeline builder client. The step's pipeline context is resolved server-side from the step ID.
 
 ## Flow Operations
 
@@ -182,7 +182,7 @@ The builder exposes three file surfaces:
 | Surface | Client functions | Endpoints |
 | --- | --- | --- |
 | Pipeline context files | `fetchContextFiles`, `uploadContextFile`, `deleteContextFile` | `GET /files`, `POST /files`, `DELETE /files/{filename}` |
-| Pipeline memory files | `fetchPipelineMemoryFiles`, `updatePipelineMemoryFiles` | `GET/PUT /pipelines/{pipeline_id}/memory-files` |
+| Pipeline memory files | `fetchPipelineMemoryFiles`, `updatePipelineMemoryFiles` | `POST /wp-abilities/v1/abilities/datamachine/{get,update}-pipeline-memory-files/run` |
 | Flow memory files | `fetchFlowMemoryFiles`, `updateFlowMemoryFiles` | `GET/PUT /flows/{flow_id}/memory-files` |
 | Available agent files | `fetchAgentFiles` | `GET /files/agent` |
 

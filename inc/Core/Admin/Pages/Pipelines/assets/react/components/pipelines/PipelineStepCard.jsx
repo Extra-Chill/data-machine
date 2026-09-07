@@ -83,14 +83,12 @@ const renderToolPolicyRow = ( label, values ) => {
  *
  * @param {Object}   props                - Component props
  * @param {Object}   props.step           - Step data
- * @param {number}   props.pipelineId     - Pipeline ID
  * @param {Object}   props.pipelineConfig - AI configuration keyed by pipeline_step_id
  * @param {Function} props.onDelete       - Delete handler
  * @return {React.ReactElement} Pipeline step card
  */
 export default function PipelineStepCard( {
 	step,
-	pipelineId,
 	pipelineConfig,
 	onDelete,
 } ) {
@@ -134,9 +132,7 @@ export default function PipelineStepCard( {
 			try {
 				const response = await updateSystemPrompt(
 					step.pipeline_step_id,
-					prompt,
-					step.step_type,
-					pipelineId
+					prompt
 				);
 
 				if ( ! response.success ) {
@@ -159,7 +155,7 @@ export default function PipelineStepCard( {
 				};
 			}
 		},
-		[ pipelineId, step.pipeline_step_id, step.step_type, stepConfig ]
+		[ step.pipeline_step_id, stepConfig ]
 	);
 
 	/**
