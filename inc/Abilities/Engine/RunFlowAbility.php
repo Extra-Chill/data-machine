@@ -185,6 +185,8 @@ class RunFlowAbility {
 				)
 			);
 
+			// Empty drain ticks are virtual runs: no job is admitted and the
+			// scheduler backs off until the next normal window.
 			return array(
 				'success'    => true,
 				'flow_id'    => $flow_id,
@@ -246,6 +248,7 @@ class RunFlowAbility {
 					array(
 						'flow_id'     => $flow_id,
 						'pipeline_id' => $pipeline_id,
+						'label'       => $flow['flow_name'] ?? null,
 					)
 				);
 				return new \WP_Error(
@@ -253,9 +256,9 @@ class RunFlowAbility {
 					'Job creation failed - database insert failed.',
 					array(
 						'status'      => 500,
-						'retryable'   => true,
 						'flow_id'     => $flow_id,
 						'pipeline_id' => $pipeline_id,
+						'retryable'   => true,
 					)
 				);
 			}
@@ -374,16 +377,7 @@ class RunFlowAbility {
 					'error'       => $e->getMessage(),
 				)
 			);
-			return new \WP_Error(
-				'invalid_execution_plan',
-				$e->getMessage(),
-				array(
-					'status'    => 400,
-					'job_id'    => $job_id,
-					'flow_id'   => $flow_id,
-					'retryable' => false,
-				)
-			);
+			return $this->flow_start_failure_error( 'invalid_execution_plan', $e->getMessage(), $job_id, $flow_id );
 		}
 
 		if ( ! $first_flow_step_id ) {
@@ -399,16 +393,7 @@ class RunFlowAbility {
 					'flow_id'     => $flow_id,
 				)
 			);
-			return new \WP_Error(
-				'no_first_step',
-				'Flow execution failed - no first step found.',
-				array(
-					'status'    => 400,
-					'job_id'    => $job_id,
-					'flow_id'   => $flow_id,
-					'retryable' => false,
-				)
-			);
+			return $this->flow_start_failure_error( 'no_first_step', 'Flow execution failed - no first step found.', $job_id, $flow_id );
 		}
 
 		// Transition job from pending to processing only after a first step is known.
@@ -432,6 +417,29 @@ class RunFlowAbility {
 			'flow_id'    => $flow_id,
 			'job_id'     => $job_id,
 			'first_step' => $first_flow_step_id,
+		);
+	}
+
+	/**
+	 * Build the shared 400 error returned when a flow cannot start because
+	 * its config yields no executable plan (invalid plan or no first step).
+	 *
+	 * @param string $code    Error code (invalid_execution_plan|no_first_step).
+	 * @param string $message Error message.
+	 * @param int    $job_id  Created (and failed) job ID.
+	 * @param int    $flow_id Flow ID.
+	 * @return \WP_Error Non-retryable 400 error carrying the job and flow IDs.
+	 */
+	private function flow_start_failure_error( string $code, string $message, int $job_id, int $flow_id ): \WP_Error {
+		return new \WP_Error(
+			$code,
+			$message,
+			array(
+				'status'    => 400,
+				'job_id'    => $job_id,
+				'flow_id'   => $flow_id,
+				'retryable' => false,
+			)
 		);
 	}
 
