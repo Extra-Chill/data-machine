@@ -145,16 +145,17 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 		$flow_id = $this->create_backpressure_flow( 'Backpressure Tick Flow' );
 
-		$cap = static fn() => 1;
-		add_filter( 'datamachine_max_active_jobs', $cap );
-
-		// First saturated run defers and schedules a wake-up tick.
-		$first = ( new RunFlowAbility() )->execute(
+		$cap              = static fn() => 1;
+		$run_scheduler_fn = static fn () => ( new RunFlowAbility() )->execute(
 			array(
 				'flow_id'        => $flow_id,
 				'respect_paused' => true,
 			)
 		);
+		add_filter( 'datamachine_max_active_jobs', $cap );
+
+		// First saturated run defers and schedules a wake-up tick.
+		$first = $run_scheduler_fn();
 		$this->assertTrue( $first['skipped'] ?? false );
 
 		// Simulate that tick firing: Action Scheduler flips the action from
@@ -167,12 +168,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 		// The tick executes while the queue is still saturated: a fresh
 		// pending tick must exist afterwards — the run must not be dropped.
-		$second = ( new RunFlowAbility() )->execute(
-			array(
-				'flow_id'        => $flow_id,
-				'respect_paused' => true,
-			)
-		);
+		$second = $run_scheduler_fn();
 
 		remove_filter( 'datamachine_max_active_jobs', $cap );
 

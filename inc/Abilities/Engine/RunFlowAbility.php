@@ -252,9 +252,10 @@ class RunFlowAbility {
 					'job_creation_failed',
 					'Job creation failed - database insert failed.',
 					array(
-						'status'    => 500,
-						'retryable' => true,
-						'flow_id'   => $flow_id,
+						'status'      => 500,
+						'retryable'   => true,
+						'flow_id'     => $flow_id,
+						'pipeline_id' => $pipeline_id,
 					)
 				);
 			}
