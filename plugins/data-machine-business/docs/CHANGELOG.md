@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.2] - 2026-09-07
+
+### Fixed
+- drop redundant array_values on action enum
+- flatten google_analytics AI tool schema to a single object
+
 ## [0.17.1] - 2026-09-07
 
 ### Changed
