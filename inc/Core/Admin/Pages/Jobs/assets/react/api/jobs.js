@@ -8,6 +8,7 @@
  * External dependencies
  */
 import { client, executeAbility } from '@shared/utils/api';
+import { useAgentStore } from '@shared/stores/agentStore';
 
 /**
  * Fetch jobs list with pagination
@@ -111,9 +112,21 @@ export const fetchPipelines = async () => {
  * @param {number} pipelineId Pipeline ID
  * @return {Promise<Object>} Flows list response
  */
-export const fetchFlowsForPipeline = ( pipelineId ) =>
-	client.get( '/flows', {
+export const fetchFlowsForPipeline = async ( pipelineId ) => {
+	const { selectedAgentId } = useAgentStore.getState();
+	const result = await executeAbility( 'get-flows', {
 		pipeline_id: pipelineId,
 		output_mode: 'list',
 		per_page: 100,
+		...( selectedAgentId ? { agent_id: selectedAgentId } : {} ),
 	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: { flows: result.flows ?? [] },
+	};
+};

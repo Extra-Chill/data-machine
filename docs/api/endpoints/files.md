@@ -67,63 +67,19 @@ curl -X POST https://example.com/wp-json/datamachine/v1/files \
   - `url` (string): Public URL to access file
 - `message` (string): Success confirmation
 
-### GET /files
+### Listing and Deletion (Abilities)
 
-List files in a flow scope (`flow_step_id`).
+The flow-file listing and deletion REST routes were retired in #3456. Use the REST-visible abilities through the core ability runner (both require `flow_step_id`):
 
-**Success Response (200 OK)**:
+```
+POST /wp-json/wp-abilities/v1/abilities/datamachine/list-flow-files/run
+{ "input": { "flow_step_id": "abc-123_42" } }
 
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "name": "document_1234567890.pdf",
-      "size": 1048576,
-      "modified": 1704153600,
-      "url": "https://example.com/wp-content/uploads/datamachine-files/.../document_1234567890.pdf"
-    }
-  ]
-}
+POST /wp-json/wp-abilities/v1/abilities/datamachine/delete-flow-file/run
+{ "input": { "filename": "document_1234567890.pdf", "flow_step_id": "abc-123_42" } }
 ```
 
-### GET /files/{filename}
-
-Download a file by filename.
-
-**Permission**: Logged-in user plus `PermissionHelper::can_manage()`.
-
-**Parameters**:
-- `filename` (string, required): File to retrieve
-- `pipeline_id` (integer, optional): Filter by pipeline
-- `flow_id` (integer, optional): Filter by flow
-- `flow_step_id` (string, optional): Filter by flow step
-
-**Response**: Returns the file content directly.
-
-### DELETE /files/{filename}
-
-Delete a file by filename.
-
-**Permission**: Logged-in user plus `PermissionHelper::can_manage()`.
-
-**Parameters**:
-- `filename` (string, required): File to delete
-- `pipeline_id` (integer, optional): Filter by pipeline
-- `flow_id` (integer, optional): Filter by flow
-- `flow_step_id` (string, optional): Filter by flow step
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "deleted": true,
-    "filename": "document_1234567890.pdf"
-  }
-}
-```
+`list-flow-files` returns `{ "success": true, "files": [ ... ] }`; `delete-flow-file` returns `{ "success": true, "message": "..." }`.
 
 ## Agent File Endpoints
 

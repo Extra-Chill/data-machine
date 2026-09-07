@@ -257,9 +257,6 @@ export const useUpdateFlowHandler = () => {
 			handlerSlug,
 			settings,
 			pipelineId,
-			stepType,
-			flowConfig = {},
-			pipelineStepConfig = {},
 		} ) => {
 			// Attempt to find handler details in cache to create model for sanitization
 			let sanitizedSettings = settings;
@@ -296,11 +293,7 @@ export const useUpdateFlowHandler = () => {
 			return updateFlowHandler(
 				flowStepId,
 				handlerSlug,
-				sanitizedSettings,
-				pipelineId,
-				stepType,
-				flowConfig,
-				pipelineStepConfig
+				sanitizedSettings
 			);
 		},
 		onSuccess: ( response, variables ) => {

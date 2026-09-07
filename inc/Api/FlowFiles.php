@@ -2,8 +2,9 @@
 /**
  * REST API Flow Files Endpoint
  *
- * Routes for flow-scoped uploaded files.
- * Delegates to FlowFileAbilities.
+ * Multipart upload transport for flow-scoped uploaded files. Listing and
+ * deletion live in the datamachine/list-flow-files and
+ * datamachine/delete-flow-file abilities (see #3456).
  *
  * @package DataMachine\Api
  * @since   0.38.0
@@ -52,7 +53,7 @@ class FlowFiles {
 			},
 		);
 
-		// POST /files — Upload file to flow.
+		// TRANSPORT (multipart upload): retained per #3456.
 		register_rest_route(
 			'datamachine/v1',
 			'/files',
@@ -61,41 +62,6 @@ class FlowFiles {
 				'callback'            => array( self::class, 'handle_upload' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'flow_step_id' => $flow_step_arg,
-				),
-			)
-		);
-
-		// GET /files — List flow files.
-		register_rest_route(
-			'datamachine/v1',
-			'/files',
-			array(
-				'methods'             => WP_REST_Server::READABLE,
-				'callback'            => array( self::class, 'list_files' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
-				'args'                => array(
-					'flow_step_id' => $flow_step_arg,
-				),
-			)
-		);
-
-		// DELETE /files/{filename} — Delete flow file.
-		register_rest_route(
-			'datamachine/v1',
-			'/files/(?P<filename>[^/]+)',
-			array(
-				'methods'             => WP_REST_Server::DELETABLE,
-				'callback'            => array( self::class, 'delete_file' ),
-				'permission_callback' => array( self::class, 'check_permission' ),
-				'args'                => array(
-					'filename'     => array(
-						'required'          => true,
-						'type'              => 'string',
-						'sanitize_callback' => function ( $param ) {
-							return sanitize_file_name( $param );
-						},
-					),
 					'flow_step_id' => $flow_step_arg,
 				),
 			)
@@ -122,32 +88,6 @@ class FlowFiles {
 	// =========================================================================
 	// Handlers
 	// =========================================================================
-
-	public static function list_files( WP_REST_Request $request ) {
-		$flow_step_id = $request->get_param( 'flow_step_id' );
-
-		if ( ! $flow_step_id ) {
-			return new WP_Error( 'list_files_error', 'flow_step_id is required', array( 'status' => 400 ) );
-		}
-
-		$result = self::getAbilities()->executeListFlowFiles( array(
-			'flow_step_id' => sanitize_text_field( $flow_step_id ),
-		) );
-
-		if ( is_wp_error( $result ) ) {
-			return RestResultSpec::legacy_error( $result, 'list_files_error' );
-		}
-
-		if ( ! $result['success'] ) {
-			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
-			return new WP_Error( 'list_files_error', $result['error'], array( 'status' => $status ) );
-		}
-
-		return rest_ensure_response( array(
-			'success' => true,
-			'data'    => $result['files'],
-		) );
-	}
 
 	public static function handle_upload( WP_REST_Request $request ) {
 		$flow_step_id = $request->get_param( 'flow_step_id' );
@@ -198,34 +138,6 @@ class FlowFiles {
 			'data'    => array(
 				'files' => $result['files'],
 			),
-		) );
-	}
-
-	public static function delete_file( WP_REST_Request $request ) {
-		$filename     = sanitize_file_name( wp_unslash( $request['filename'] ) );
-		$flow_step_id = $request->get_param( 'flow_step_id' );
-
-		if ( ! $flow_step_id ) {
-			return new WP_Error( 'delete_file_error', 'flow_step_id is required', array( 'status' => 400 ) );
-		}
-
-		$result = self::getAbilities()->executeDeleteFlowFile( array(
-			'filename'     => $filename,
-			'flow_step_id' => sanitize_text_field( $flow_step_id ),
-		) );
-
-		if ( is_wp_error( $result ) ) {
-			return RestResultSpec::legacy_error( $result, 'delete_file_error' );
-		}
-
-		if ( ! $result['success'] ) {
-			$status = false !== strpos( $result['error'] ?? '', 'not found' ) ? 404 : 400;
-			return new WP_Error( 'delete_file_error', $result['error'], array( 'status' => $status ) );
-		}
-
-		return rest_ensure_response( array(
-			'success' => true,
-			'data'    => array( 'message' => $result['message'] ),
 		) );
 	}
 

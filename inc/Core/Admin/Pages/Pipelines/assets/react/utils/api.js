@@ -91,7 +91,10 @@ export const fetchPipelines = async (
 		input.search = search;
 	}
 
-	const result = await executeAbility( 'get-pipelines', input );
+	const result = await executeAbility( 'get-pipelines', {
+		...input,
+		...getAgentPayload(),
+	} );
 
 	if ( ! result.success ) {
 		return result;
@@ -251,12 +254,22 @@ export const fetchFlows = async (
 	{ page = 1, perPage = 20, outputMode = 'list' } = {}
 ) => {
 	const offset = ( page - 1 ) * perPage;
-	return await client.get( '/flows', {
+	const result = await executeAbility( 'get-flows', {
 		pipeline_id: pipelineId,
 		per_page: perPage,
 		offset,
 		output_mode: outputMode,
+		...getAgentPayload(),
 	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: { pipeline_id: pipelineId, flows: result.flows ?? [] },
+	};
 };
 
 /**
@@ -266,7 +279,25 @@ export const fetchFlows = async (
  * @return {Promise<Object>} Flow data
  */
 export const fetchFlow = async ( flowId ) => {
-	return await client.get( `/flows/${ flowId }` );
+	const result = await executeAbility( 'get-flows', { flow_id: flowId } );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	const flow = result.flows?.[ 0 ] ?? null;
+	if ( ! flow ) {
+		return {
+			success: false,
+			data: null,
+			message: 'Flow not found.',
+		};
+	}
+
+	return {
+		...result,
+		data: flow,
+	};
 };
 
 /**
@@ -277,11 +308,42 @@ export const fetchFlow = async ( flowId ) => {
  * @return {Promise<Object>} Created flow data
  */
 export const createFlow = async ( pipelineId, flowName ) => {
-	return await client.post( '/flows', {
+	return await executeAbility( 'create-flow', {
 		pipeline_id: pipelineId,
 		flow_name: flowName,
 		...getAgentPayload(),
 	} );
+};
+
+/**
+ * Update a flow record (title and/or scheduling), then re-fetch the full
+ * flow record so callers can cache it.
+ *
+ * @param {number} flowId - Flow ID
+ * @param {Object} patch  - Fields to update (flow_name, scheduling_config)
+ * @return {Promise<Object>} Updated flow data
+ */
+const updateFlowRecord = async ( flowId, patch ) => {
+	const result = await executeAbility( 'update-flow', {
+		flow_id: flowId,
+		...patch,
+	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	const flowResult = await executeAbility( 'get-flows', { flow_id: flowId } );
+	const flow = flowResult.success ? ( flowResult.flows?.[ 0 ] ?? null ) : null;
+
+	if ( ! flow ) {
+		return { ...result, data: result.flow_data ?? { flow_id: flowId } };
+	}
+
+	return {
+		...result,
+		data: flow,
+	};
 };
 
 /**
@@ -292,7 +354,7 @@ export const createFlow = async ( pipelineId, flowName ) => {
  * @return {Promise<Object>} Updated flow data
  */
 export const updateFlowTitle = async ( flowId, name ) => {
-	return await client.patch( `/flows/${ flowId }`, { flow_name: name } );
+	return await updateFlowRecord( flowId, { flow_name: name } );
 };
 
 /**
@@ -302,7 +364,7 @@ export const updateFlowTitle = async ( flowId, name ) => {
  * @return {Promise<Object>} Deletion confirmation
  */
 export const deleteFlow = async ( flowId ) => {
-	return await client.delete( `/flows/${ flowId }` );
+	return await executeAbility( 'delete-flow', { flow_id: flowId } );
 };
 
 /**
@@ -312,7 +374,9 @@ export const deleteFlow = async ( flowId ) => {
  * @return {Promise<Object>} Duplicated flow data
  */
 export const duplicateFlow = async ( flowId ) => {
-	return await client.post( `/flows/${ flowId }/duplicate` );
+	return await executeAbility( 'duplicate-flow', {
+		source_flow_id: flowId,
+	} );
 };
 
 /**
@@ -328,43 +392,64 @@ export const runFlow = async ( flowId ) => {
 /**
  * Update flow handler for a specific step
  *
- * @param {string} flowStepId         - Flow step ID
- * @param {string} handlerSlug        - Handler slug
- * @param {Object} settings           - Handler settings
- * @param {number} pipelineId         - Pipeline ID
- * @param {string} stepType           - Step type
- * @param {Object} flowConfig         - Flow configuration
- * @param {Object} pipelineStepConfig - Pipeline step configuration
+ * The update-flow-step ability derives flow, pipeline, and step-type context
+ * from the flow step ID; only the handler selection and settings are sent.
+ * The refreshed step config (including settings display data) is fetched so
+ * callers can patch their caches.
+ *
+ * @param {string} flowStepId  - Flow step ID
+ * @param {string} handlerSlug - Handler slug
+ * @param {Object} settings    - Handler settings
  * @return {Promise<Object>} Updated flow step data
  */
 export const updateFlowHandler = async (
 	flowStepId,
 	handlerSlug,
-	settings = {},
-	pipelineId,
-	stepType,
-	flowConfig = {},
-	pipelineStepConfig = {}
+	settings = {}
 ) => {
-	return await client.put( `/flows/steps/${ flowStepId }/handler`, {
+	const result = await executeAbility( 'update-flow-step', {
+		flow_step_id: flowStepId,
 		handler_slug: handlerSlug,
-		pipeline_id: pipelineId,
-		step_type: stepType,
-		flow_config: flowConfig,
-		pipeline_step: pipelineStepConfig,
-		settings,
+		handler_config: settings,
 	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	const stepsResult = await executeAbility( 'get-flow-steps', {
+		flow_step_id: flowStepId,
+	} );
+	const step = stepsResult.success
+		? ( stepsResult.steps?.[ 0 ] ?? null )
+		: null;
+
+	return {
+		...result,
+		data: {
+			step_type: step?.step_type ?? null,
+			flow_step_id: flowStepId,
+			flow_id: step?.flow_id ?? null,
+			step_config: step ?? {},
+			handler_settings_display: step?.settings_display ?? null,
+			handler_settings_displays: step?.handler_settings_displays ?? null,
+		},
+	};
 };
 
 /**
  * Update flow step configuration
  *
  * @param {string} flowStepId - Flow step ID
- * @param {Object} config     - Partial step configuration
+ * @param {Object} config     - Partial step configuration (handler_slug,
+ *                              handler_config, user_message)
  * @return {Promise<Object>} Updated flow step data
  */
 export const updateFlowStepConfig = async ( flowStepId, config ) => {
-	return await client.patch( `/flows/steps/${ flowStepId }/config`, config );
+	return await executeAbility( 'update-flow-step', {
+		flow_step_id: flowStepId,
+		...config,
+	} );
 };
 
 /**
@@ -419,7 +504,7 @@ export const getSchedulingIntervals = async () => {
  * @return {Promise<Object>} Updated flow data
  */
 export const updateFlowSchedule = async ( flowId, schedulingConfig ) => {
-	return await client.patch( `/flows/${ flowId }`, {
+	return await updateFlowRecord( flowId, {
 		scheduling_config: schedulingConfig,
 	} );
 };
@@ -460,11 +545,18 @@ export const importPipelines = async ( csvContent ) => {
 /**
  * Fetch context files for a pipeline
  *
+ * Files are flow-step scoped on the ability (`list-flow-files` requires a
+ * `flow_step_id`); the pipeline-scoped section cannot supply one, so this
+ * surface keeps failing the way the wrapper route did. See the #3456
+ * parity note before wiring this to a real step.
+ *
  * @param {number} pipelineId - Pipeline ID
  * @return {Promise<Object>} Array of context files
  */
 export const fetchContextFiles = async ( pipelineId ) => {
-	return await client.get( '/files', { pipeline_id: pipelineId } );
+	return await executeAbility( 'list-flow-files', {
+		pipeline_id: pipelineId,
+	} );
 };
 
 /**
@@ -481,11 +573,15 @@ export const uploadContextFile = async ( pipelineId, file ) => {
 /**
  * Delete context file
  *
+ * Mirrors fetchContextFiles: deletion is flow-step scoped on the ability
+ * (`delete-flow-file` requires a `flow_step_id`), which this caller cannot
+ * supply, so the call fails the way the wrapper route did.
+ *
  * @param {string} filename - Filename to delete
  * @return {Promise<Object>} Deletion confirmation
  */
 export const deleteContextFile = async ( filename ) => {
-	return await client.delete( `/files/${ filename }` );
+	return await executeAbility( 'delete-flow-file', { filename } );
 };
 
 /**
@@ -534,7 +630,18 @@ export const updatePipelineMemoryFiles = async ( pipelineId, memoryFiles ) => {
  * @return {Promise<Object>} Object with memory_files array
  */
 export const fetchFlowMemoryFiles = async ( flowId ) => {
-	return await client.get( `/flows/${ flowId }/memory-files` );
+	const result = await executeAbility( 'get-flow-memory-files', {
+		flow_id: flowId,
+	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: { memory_files: result.memory_files ?? [] },
+	};
 };
 
 /**
@@ -545,7 +652,8 @@ export const fetchFlowMemoryFiles = async ( flowId ) => {
  * @return {Promise<Object>} Update confirmation
  */
 export const updateFlowMemoryFiles = async ( flowId, memoryFiles ) => {
-	return await client.put( `/flows/${ flowId }/memory-files`, {
+	return await executeAbility( 'update-flow-memory-files', {
+		flow_id: flowId,
 		memory_files: memoryFiles,
 	} );
 };
@@ -612,7 +720,8 @@ export const getHandlers = async ( stepType = null ) => {
  * @return {Promise<Object>} Queue data with items and count
  */
 export const fetchFlowQueue = async ( flowId, flowStepId ) => {
-	return await client.get( `/flows/${ flowId }/queue`, {
+	return await executeAbility( 'queue-list', {
+		flow_id: flowId,
 		flow_step_id: flowStepId,
 	} );
 };
@@ -620,19 +729,63 @@ export const fetchFlowQueue = async ( flowId, flowStepId ) => {
 /**
  * Add prompt(s) to flow queue
  *
+ * The queue-add ability takes a single prompt; multiple prompts are added
+ * sequentially, mirroring the retired wrapper route.
+ *
  * @param {number}               flowId     - Flow ID
  * @param {string}               flowStepId - Flow step ID
  * @param {string|Array<string>} prompts    - Single prompt string or array of prompts
  * @return {Promise<Object>} Result with added count and queue length
  */
 export const addToFlowQueue = async ( flowId, flowStepId, prompts ) => {
-	const payload = Array.isArray( prompts )
-		? { prompts }
-		: { prompt: prompts };
-	return await client.post( `/flows/${ flowId }/queue`, {
-		...payload,
-		flow_step_id: flowStepId,
-	} );
+	const list = Array.isArray( prompts ) ? prompts : [ prompts ];
+	let addedCount = 0;
+	let queueLength = 0;
+	let lastResult = null;
+
+	for ( const prompt of list ) {
+		if ( ! prompt || ! String( prompt ).trim() ) {
+			continue;
+		}
+
+		const result = await executeAbility( 'queue-add', {
+			flow_id: flowId,
+			flow_step_id: flowStepId,
+			prompt,
+		} );
+		lastResult = result;
+
+		if ( ! result.success ) {
+			if ( 0 === addedCount ) {
+				return result;
+			}
+			continue;
+		}
+
+		addedCount += 1;
+		queueLength = result.queue_length ?? queueLength;
+	}
+
+	if ( 0 === addedCount ) {
+		return (
+			lastResult ?? {
+				success: false,
+				data: null,
+				message: 'No prompts provided.',
+			}
+		);
+	}
+
+	return {
+		success: true,
+		data: {
+			flow_id: flowId,
+			flow_step_id: flowStepId,
+			added_count: addedCount,
+			queue_length: queueLength,
+		},
+		message: lastResult?.message || '',
+	};
 };
 
 /**
@@ -643,11 +796,10 @@ export const addToFlowQueue = async ( flowId, flowStepId, prompts ) => {
  * @return {Promise<Object>} Result with cleared count
  */
 export const clearFlowQueue = async ( flowId, flowStepId ) => {
-	return await client.delete(
-		`/flows/${ flowId }/queue?flow_step_id=${ encodeURIComponent(
-			flowStepId
-		) }`
-	);
+	return await executeAbility( 'queue-clear', {
+		flow_id: flowId,
+		flow_step_id: flowStepId,
+	} );
 };
 
 /**
@@ -659,11 +811,11 @@ export const clearFlowQueue = async ( flowId, flowStepId ) => {
  * @return {Promise<Object>} Result with removed prompt and new queue length
  */
 export const removeFromFlowQueue = async ( flowId, flowStepId, index ) => {
-	return await client.delete(
-		`/flows/${ flowId }/queue/${ index }?flow_step_id=${ encodeURIComponent(
-			flowStepId
-		) }`
-	);
+	return await executeAbility( 'queue-remove', {
+		flow_id: flowId,
+		flow_step_id: flowStepId,
+		index,
+	} );
 };
 
 /**
@@ -681,8 +833,10 @@ export const updateFlowQueueItem = async (
 	index,
 	prompt
 ) => {
-	return await client.put( `/flows/${ flowId }/queue/${ index }`, {
+	return await executeAbility( 'queue-update', {
+		flow_id: flowId,
 		flow_step_id: flowStepId,
+		index,
 		prompt,
 	} );
 };
@@ -696,7 +850,8 @@ export const updateFlowQueueItem = async (
  * @return {Promise<Object>} Result
  */
 export const updateFlowQueueMode = async ( flowId, flowStepId, mode ) => {
-	return await client.put( `/flows/${ flowId }/queue/mode`, {
+	return await executeAbility( 'queue-mode', {
+		flow_id: flowId,
 		flow_step_id: flowStepId,
 		mode,
 	} );

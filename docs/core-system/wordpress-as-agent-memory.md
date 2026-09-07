@@ -622,9 +622,9 @@ Rather than letting MEMORY.md grow indefinitely, the daily memory system provide
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/datamachine/v1/files?flow_step_id={id}` | List flow files |
-| `POST` | `/datamachine/v1/files` | Upload file (multipart form) |
-| `DELETE` | `/datamachine/v1/files/{filename}?flow_step_id={id}` | Delete flow file |
+| `POST` | `/wp-abilities/v1/abilities/datamachine/list-flow-files/run` | List flow files (`input.flow_step_id` required) |
+| `POST` | `/datamachine/v1/files` | Upload file (multipart form, retained transport route) |
+| `POST` | `/wp-abilities/v1/abilities/datamachine/delete-flow-file/run` | Delete flow file (`input.filename` + `input.flow_step_id`) |
 
 All agent file endpoints support a `user_id` parameter for multi-agent scoping. Requires authentication.
 
