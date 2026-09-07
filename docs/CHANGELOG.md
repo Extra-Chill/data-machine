@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.3] - 2026-09-07
+
+### Changed
+- prove sibling flow creation through REST
+
+### Fixed
+- route pipeline CSV imports through ability
+
 ## [0.176.2] - 2026-09-07
 
 ### Fixed
