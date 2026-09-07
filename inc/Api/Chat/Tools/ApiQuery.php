@@ -70,10 +70,12 @@ MODES:
 KEY ENDPOINTS:
 /datamachine/v1/handlers - List handlers (?step_type=fetch|publish|upsert)
 /datamachine/v1/handlers/{slug} - Handler config schema
-/datamachine/v1/pipelines - List pipelines
-/datamachine/v1/pipelines/{id} - Pipeline with flows
 /datamachine/v1/flows/{id} - Flow details
-/datamachine/v1/jobs - List jobs (?flow_id, ?status)';
+/datamachine/v1/jobs - List jobs (?flow_id, ?status)
+
+PIPELINES (via ability runner, POST /wp-abilities/v1/abilities/datamachine/{slug}/run):
+get-pipelines - List pipelines or fetch one by pipeline_id
+get-pipeline-steps - Steps for a pipeline';
 	}
 
 	/**

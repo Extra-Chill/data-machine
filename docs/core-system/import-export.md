@@ -29,7 +29,7 @@ The canonical 1.0 CSV export includes three typed rows:
 
 The `format_version` value is `1.0`. Import rejects an unversioned, differently versioned, incorrectly typed, or malformed metadata row rather than guessing and silently dropping behavior. The lossy unversioned header used during pre-1.0 development is intentionally unsupported under the 1.0 baseline.
 
-Export through `POST /wp-json/wp-abilities/v1/abilities/datamachine/export-pipelines/run`. The curated `GET /wp-json/datamachine/v1/pipelines?format=csv&ids=1,2` endpoint is also available when a raw CSV download response is required.
+Export through `POST /wp-json/wp-abilities/v1/abilities/datamachine/export-pipelines/run`; the ability payload carries the CSV string in `data`.
 
 ## Import Functionality
 
@@ -44,7 +44,7 @@ Pipeline import processes CSV data to recreate pipeline structures and flow conf
 
 Imported `auth_ref` values resolve against authorization configured on the destination installation. Configure the corresponding destination provider/account before running the imported flow; exports do not carry API keys, access or refresh tokens, bearer credentials, passwords, or other inline secrets.
 
-Import through `POST /wp-json/wp-abilities/v1/abilities/datamachine/import-pipelines/run`. Successful ability payloads include the imported pipeline IDs. The curated `datamachine/v1/pipelines` controller does not provide CSV import.
+Import through `POST /wp-json/wp-abilities/v1/abilities/datamachine/import-pipelines/run`. Successful ability payloads include the imported pipeline IDs.
 
 ### Import Behavior
 

@@ -47,9 +47,9 @@ export default function ExportTab( { pipelines, onClose } ) {
 		exportOperation.execute( async () => {
 			const response = await exportPipelines( selectedIds );
 
-			if ( response.success && response.data.csv_content ) {
+			if ( response.success && response.data ) {
 				// Create download link
-				const blob = new Blob( [ response.data.csv_content ], {
+				const blob = new Blob( [ response.data ], {
 					type: 'text/csv',
 				} );
 				const url = URL.createObjectURL( blob );

@@ -62,7 +62,7 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/clear-logs',
 			'datamachine/read-logs',
 			'datamachine/get-log-metadata',
-			// Pipeline abilities (7)
+			// Pipeline abilities (9)
 			'datamachine/get-pipelines',
 			'datamachine/create-pipeline',
 			'datamachine/update-pipeline',
@@ -70,6 +70,8 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/duplicate-pipeline',
 			'datamachine/import-pipelines',
 			'datamachine/export-pipelines',
+			'datamachine/get-pipeline-memory-files',
+			'datamachine/update-pipeline-memory-files',
 			// PipelineStepAbilities (5)
 			'datamachine/get-pipeline-steps',
 			'datamachine/add-pipeline-step',

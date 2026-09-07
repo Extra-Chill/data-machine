@@ -7,7 +7,7 @@
 /**
  * External dependencies
  */
-import { client } from '@shared/utils/api';
+import { client, executeAbility } from '@shared/utils/api';
 
 /**
  * Fetch jobs list with pagination
@@ -88,12 +88,22 @@ export const clearProcessedItems = ( clearType, targetId ) =>
  *
  * @return {Promise<Object>} Pipelines list response
  */
-export const fetchPipelines = () =>
-	client.get( '/pipelines', {
+export const fetchPipelines = async () => {
+	const result = await executeAbility( 'get-pipelines', {
 		output_mode: 'list',
 		include_flows: false,
 		per_page: 100,
 	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: { pipelines: result.pipelines ?? [] },
+	};
+};
 
 /**
  * Fetch flows for a specific pipeline

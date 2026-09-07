@@ -8,7 +8,7 @@
 /**
  * External dependencies
  */
-import { client } from '@shared/utils/api';
+import { client, executeAbility } from '@shared/utils/api';
 import { useAgentStore } from '@shared/stores/agentStore';
 
 /**
@@ -54,14 +54,33 @@ export const fetchPipelines = async (
 	} = {}
 ) => {
 	if ( pipelineId ) {
-		return await client.get( '/pipelines', {
+		const result = await executeAbility( 'get-pipelines', {
 			pipeline_id: pipelineId,
 			output_mode: outputMode,
 			include_flows: includeFlows,
 		} );
+
+		if ( ! result.success ) {
+			return result;
+		}
+
+		const record = result.pipelines?.[ 0 ] ?? null;
+		if ( ! record ) {
+			return {
+				success: false,
+				data: null,
+				message: 'Pipeline not found.',
+			};
+		}
+
+		const { flows = [], ...pipeline } = record;
+		return {
+			...result,
+			data: { pipeline, flows },
+		};
 	}
 
-	const params = {
+	const input = {
 		per_page: perPage,
 		offset,
 		output_mode: outputMode,
@@ -69,10 +88,19 @@ export const fetchPipelines = async (
 	};
 
 	if ( search ) {
-		params.search = search;
+		input.search = search;
 	}
 
-	return await client.get( '/pipelines', params );
+	const result = await executeAbility( 'get-pipelines', input );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: { pipelines: result.pipelines ?? [] },
+	};
 };
 
 /**
@@ -82,7 +110,7 @@ export const fetchPipelines = async (
  * @return {Promise<Object>} Created pipeline data
  */
 export const createPipeline = async ( name ) => {
-	return await client.post( '/pipelines', {
+	return await executeAbility( 'create-pipeline', {
 		pipeline_name: name,
 		...getAgentPayload(),
 	} );
@@ -96,7 +124,8 @@ export const createPipeline = async ( name ) => {
  * @return {Promise<Object>} Updated pipeline data
  */
 export const updatePipelineTitle = async ( pipelineId, name ) => {
-	return await client.patch( `/pipelines/${ pipelineId }`, {
+	return await executeAbility( 'update-pipeline', {
+		pipeline_id: pipelineId,
 		pipeline_name: name,
 	} );
 };
@@ -108,7 +137,9 @@ export const updatePipelineTitle = async ( pipelineId, name ) => {
  * @return {Promise<Object>} Deletion confirmation
  */
 export const deletePipeline = async ( pipelineId ) => {
-	return await client.delete( `/pipelines/${ pipelineId }` );
+	return await executeAbility( 'delete-pipeline', {
+		pipeline_id: pipelineId,
+	} );
 };
 
 /**
@@ -116,7 +147,7 @@ export const deletePipeline = async ( pipelineId ) => {
  *
  * @param {number} pipelineId     - Pipeline ID
  * @param {string} stepType       - Step type (fetch, ai, publish, upsert)
- * @param {number} executionOrder - Step position
+ * @param {number} executionOrder - Step position (informational; order is derived)
  * @return {Promise<Object>} Created step data
  */
 export const addPipelineStep = async (
@@ -124,13 +155,35 @@ export const addPipelineStep = async (
 	stepType,
 	executionOrder
 ) => {
-	return await client.post( `/pipelines/${ pipelineId }/steps`, {
+	const result = await executeAbility( 'add-pipeline-step', {
+		pipeline_id: pipelineId,
 		step_type: stepType,
-		execution_order: executionOrder,
-		label: `${
-			stepType.charAt( 0 ).toUpperCase() + stepType.slice( 1 )
-		} Step`,
 	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	const pipelineStepId = result.pipeline_step_id;
+	const stepsResult = await executeAbility( 'get-pipeline-steps', {
+		pipeline_step_id: pipelineStepId,
+	} );
+	const stepData = stepsResult.success
+		? ( stepsResult.data?.steps ?? stepsResult.steps ?? [] ).find(
+				( step ) => step.pipeline_step_id === pipelineStepId
+		  )
+		: null;
+
+	return {
+		...result,
+		data: {
+			step_type: stepType,
+			pipeline_id: pipelineId,
+			pipeline_step_id: pipelineStepId,
+			step_data: stepData ?? null,
+			created_type: 'step',
+		},
+	};
 };
 
 /**
@@ -141,9 +194,10 @@ export const addPipelineStep = async (
  * @return {Promise<Object>} Deletion confirmation
  */
 export const deletePipelineStep = async ( pipelineId, stepId ) => {
-	return await client.delete(
-		`/pipelines/${ pipelineId }/steps/${ stepId }`
-	);
+	return await executeAbility( 'delete-pipeline-step', {
+		pipeline_id: pipelineId,
+		pipeline_step_id: stepId,
+	} );
 };
 
 /**
@@ -159,7 +213,8 @@ export const reorderPipelineSteps = async ( pipelineId, steps ) => {
 		execution_order: index,
 	} ) );
 
-	return await client.put( `/pipelines/${ pipelineId }/steps/reorder`, {
+	return await executeAbility( 'reorder-pipeline-steps', {
+		pipeline_id: pipelineId,
 		step_order: stepOrder,
 	} );
 };
@@ -169,8 +224,8 @@ export const reorderPipelineSteps = async ( pipelineId, steps ) => {
  *
  * @param {string} stepId     - Pipeline step ID
  * @param {string} prompt     - System prompt content
- * @param {string} stepType   - Step type (currently only 'ai' supported)
- * @param {number} pipelineId - Pipeline ID for context
+ * @param {string} stepType   - Step type (unused; only 'ai' steps are configurable)
+ * @param {number} pipelineId - Pipeline ID (unused; resolved from the step)
  * @return {Promise<Object>} Updated step data
  */
 export const updateSystemPrompt = async (
@@ -180,13 +235,10 @@ export const updateSystemPrompt = async (
 	pipelineId = null
 ) => {
 	// Model/provider/tools are managed via context system, not per-pipeline.
-	const payload = {
-		step_type: stepType,
-		pipeline_id: pipelineId,
+	return await executeAbility( 'update-pipeline-step', {
+		pipeline_step_id: stepId,
 		system_prompt: prompt,
-	};
-
-	return await client.put( `/pipelines/steps/${ stepId }/config`, payload );
+	} );
 };
 
 /**
@@ -335,15 +387,10 @@ export const updateFlowStepConfig = async ( flowStepId, config ) => {
  * @return {Promise<Object>} Ability execution result
  */
 export const addFlowHandler = async ( flowStepId, handlerSlug, settings = {} ) => {
-	const { default: apiFetch } = await import( '@wordpress/api-fetch' );
-	return await apiFetch( {
-		path: '/wp-abilities/v1/execute/datamachine/update-flow-step',
-		method: 'POST',
-		data: {
-			flow_step_id: flowStepId,
-			add_handler: handlerSlug,
-			add_handler_config: settings,
-		},
+	return await executeAbility( 'update-flow-step', {
+		flow_step_id: flowStepId,
+		add_handler: handlerSlug,
+		add_handler_config: settings,
 	} );
 };
 
@@ -357,14 +404,9 @@ export const addFlowHandler = async ( flowStepId, handlerSlug, settings = {} ) =
  * @return {Promise<Object>} Ability execution result
  */
 export const removeFlowHandler = async ( flowStepId, handlerSlug ) => {
-	const { default: apiFetch } = await import( '@wordpress/api-fetch' );
-	return await apiFetch( {
-		path: '/wp-abilities/v1/execute/datamachine/update-flow-step',
-		method: 'POST',
-		data: {
-			flow_step_id: flowStepId,
-			remove_handler: handlerSlug,
-		},
+	return await executeAbility( 'update-flow-step', {
+		flow_step_id: flowStepId,
+		remove_handler: handlerSlug,
 	} );
 };
 
@@ -399,12 +441,11 @@ export const updateFlowSchedule = async ( flowId, schedulingConfig ) => {
  * Export pipelines to CSV
  *
  * @param {Array<number>} pipelineIds - Array of pipeline IDs to export
- * @return {Promise<Object>} Export data with CSV content
+ * @return {Promise<Object>} Export result with `data` holding the CSV content
  */
 export const exportPipelines = async ( pipelineIds ) => {
-	return await client.get( '/pipelines', {
-		format: 'csv',
-		ids: pipelineIds.join( ',' ),
+	return await executeAbility( 'export-pipelines', {
+		pipeline_ids: pipelineIds,
 	} );
 };
 
@@ -415,16 +456,9 @@ export const exportPipelines = async ( pipelineIds ) => {
  * @return {Promise<Object>} Import result with created pipeline IDs
  */
 export const importPipelines = async ( csvContent ) => {
-	const { default: apiFetch } = await import( '@wordpress/api-fetch' );
-	return await apiFetch( {
-		path: '/wp-abilities/v1/abilities/datamachine/import-pipelines/run',
-		method: 'POST',
-		data: {
-			input: {
-				format: 'csv',
-				data: csvContent,
-			},
-		},
+	return await executeAbility( 'import-pipelines', {
+		format: 'csv',
+		data: csvContent,
 	} );
 };
 
@@ -474,7 +508,18 @@ export const deleteContextFile = async ( filename ) => {
  * @return {Promise<Object>} Array of memory filenames
  */
 export const fetchPipelineMemoryFiles = async ( pipelineId ) => {
-	return await client.get( `/pipelines/${ pipelineId }/memory-files` );
+	const result = await executeAbility( 'get-pipeline-memory-files', {
+		pipeline_id: pipelineId,
+	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: result.memory_files ?? [],
+	};
 };
 
 /**
@@ -485,7 +530,8 @@ export const fetchPipelineMemoryFiles = async ( pipelineId ) => {
  * @return {Promise<Object>} Update confirmation
  */
 export const updatePipelineMemoryFiles = async ( pipelineId, memoryFiles ) => {
-	return await client.put( `/pipelines/${ pipelineId }/memory-files`, {
+	return await executeAbility( 'update-pipeline-memory-files', {
+		pipeline_id: pipelineId,
 		memory_files: memoryFiles,
 	} );
 };

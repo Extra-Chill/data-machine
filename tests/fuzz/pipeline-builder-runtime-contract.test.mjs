@@ -82,9 +82,11 @@ assert.equal(serializedFixture.includes("page=pipelines"), false, "Pipeline Buil
 assert.ok(serializedFixture.includes("page=datamachine-pipelines"), "Fixture must exercise the registered Pipeline Builder admin route.");
 assert.equal(serializedFixture.includes("/wp-json/"), false, "Runtime REST requests must use WP_REST_Request routes, not HTTP wp-json paths.");
 assert.equal(serializedFixture.includes("batch_import"), false, "Fixture must not exercise the dead custom pipeline import arguments.");
+assert.ok(serializedFixture.includes("/wp-abilities/v1/abilities/datamachine/create-pipeline/run"), "Fixture must exercise the canonical REST-visible create ability.");
 assert.ok(serializedFixture.includes("/wp-abilities/v1/abilities/datamachine/import-pipelines/run"), "Fixture must execute the canonical REST-visible import ability.");
 assert.ok(serializedFixture.includes("format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings"), "Fixture imports must use the canonical 1.0 CSV header.");
-assert.ok(source.includes("path: '/wp-abilities/v1/abilities/datamachine/import-pipelines/run'"), "Pipeline Builder must call the canonical REST-visible import ability.");
+assert.ok(source.includes("executeAbility( 'import-pipelines'"), "Pipeline Builder must call the canonical REST-visible import ability via the shared ability client.");
+assert.equal(source.includes("datamachine/v1/pipelines"), false, "Pipeline Builder must not call the retired datamachine/v1 pipeline routes.");
 assert.ok(source.includes("const count = response.count || 0"), "Pipeline Builder must consume the ability's direct count result.");
 assert.equal(source.includes("response.data.created_count"), false, "Pipeline Builder must not consume the retired bulk-create envelope.");
 

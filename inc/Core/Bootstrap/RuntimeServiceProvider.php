@@ -120,9 +120,6 @@ final class RuntimeServiceProvider {
 
 		\DataMachine\Api\Execute::register();
 		\DataMachine\Api\WebhookTrigger::register();
-		\DataMachine\Api\Pipelines\Pipelines::register();
-		\DataMachine\Api\Pipelines\PipelineSteps::register();
-		\DataMachine\Api\Pipelines\PipelineFlows::register();
 		\DataMachine\Api\Flows\Flows::register();
 		\DataMachine\Api\Flows\FlowSteps::register();
 		\DataMachine\Api\Flows\FlowQueue::register();

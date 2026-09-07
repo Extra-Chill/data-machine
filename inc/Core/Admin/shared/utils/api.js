@@ -124,6 +124,57 @@ const request = async (
 };
 
 /**
+ * Execute a Data Machine ability through WordPress core's ability runner.
+ *
+ * Posts to `/wp-abilities/v1/abilities/datamachine/<slug>/run` with the
+ * ability's `input` and unwraps the REST envelope. The returned object keeps
+ * the shared client contract (`success`, `data`, `message`) while also
+ * spreading the ability's own output keys at the top level, so callers can
+ * read either shape:
+ *
+ *   const res = await executeAbility( 'get-pipelines', { per_page: 100 } );
+ *   res.data.pipelines; // legacy envelope shape
+ *   res.pipelines;      // direct ability output
+ *
+ * The route is transport-agnostic: permission checks, input normalization,
+ * and error mapping are owned by the ability and the core REST runner.
+ *
+ * @param {string} slug  Ability slug without the `datamachine/` prefix.
+ * @param {Object} input Ability input object.
+ * @return {Promise<Object>} `{ success, data, message, ...abilityOutput }`
+ */
+export const executeAbility = async ( slug, input = {} ) => {
+	const config = getConfig();
+	try {
+		const response = await apiFetch( {
+			path: `/wp-abilities/v1/abilities/datamachine/${ slug }/run`,
+			method: 'POST',
+			data: { input },
+			headers: {
+				'X-WP-Nonce': config.restNonce,
+			},
+		} );
+		return {
+			success: true,
+			data: response,
+			message: response?.message || '',
+			...response,
+		};
+	} catch ( error ) {
+		reportApiFailure(
+			'POST',
+			`/wp-abilities/v1/abilities/datamachine/${ slug }/run`,
+			error?.message
+		);
+		return {
+			success: false,
+			data: null,
+			message: error?.message || 'An error occurred',
+		};
+	}
+};
+
+/**
  * API Client Methods
  */
 export const client = {
