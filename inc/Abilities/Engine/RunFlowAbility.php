@@ -18,6 +18,7 @@ use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\JobStatus;
 use DataMachine\Engine\ExecutionPlan;
+use DataMachine\Engine\Tasks\ScheduleActionIdentity;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -37,6 +38,19 @@ class RunFlowAbility {
 	 * Tunable via the `datamachine_backpressure_defer_seconds` filter.
 	 */
 	public const DEFAULT_BACKPRESSURE_DEFER_SECONDS = 60;
+
+	/**
+	 * Consecutive backpressure deferrals after which the deferral log entry
+	 * escalates from info to warning so a sustained deferral loop is visible
+	 * at production log levels.
+	 */
+	public const BACKPRESSURE_DEFERRAL_WARNING_THRESHOLD = 5;
+
+	/**
+	 * Scheduling metadata key holding a flow's consecutive backpressure
+	 * deferral count. Cleared when the flow is admitted.
+	 */
+	private const BACKPRESSURE_DEFERRAL_COUNT_KEY = 'datamachine_backpressure_deferral_count';
 
 	public function __construct() {
 		$this->initDatabases();
@@ -204,7 +218,7 @@ class RunFlowAbility {
 			// the claim query into deadlocks. Manual/API runs (respect_paused
 			// === false, or a pre-created job_id) are never throttled.
 			if ( $respect_paused ) {
-				$defer = $this->maybeDeferForBackpressure( $flow_id );
+				$defer = $this->maybeDeferForBackpressure( $flow_id, $scheduling_config );
 				if ( null !== $defer ) {
 					return $defer;
 				}
@@ -244,6 +258,11 @@ class RunFlowAbility {
 					)
 				);
 			}
+
+			// The run is admitted: reset the consecutive backpressure deferral
+			// counter so escalation restarts on the next saturated peak.
+			$this->clearBackpressureDeferrals( $flow_id );
+
 			do_action(
 				'datamachine_log',
 				'debug',
@@ -428,11 +447,18 @@ class RunFlowAbility {
 	 * The jittered backoff prevents a thundering-herd re-stampede where every
 	 * deferred flow wakes at the same instant and saturates the queue again.
 	 *
-	 * @param int $flow_id Flow being scheduled.
+	 * Deferral is unbounded by design: each saturated wake-up schedules a
+	 * fresh tick until the flow finally runs. Each consecutive deferral is
+	 * counted in flow scheduling metadata, and once the count reaches the
+	 * warning threshold the deferral log entry escalates from info to warning
+	 * so a sustained deferral loop cannot vanish at production log levels.
+	 *
+	 * @param int   $flow_id           Flow being scheduled.
+	 * @param array $scheduling_config Flow scheduling config (deferral counter source).
 	 * @return array{success:bool,flow_id:int,job_id:null,skipped:bool,reason:string}|null
 	 *               Skip result when deferred, or null to proceed.
 	 */
-	private function maybeDeferForBackpressure( int $flow_id ): ?array {
+	private function maybeDeferForBackpressure( int $flow_id, array $scheduling_config = array() ): ?array {
 		$max_active = self::maxActiveJobs();
 		if ( $max_active <= 0 ) {
 			return null;
@@ -443,14 +469,25 @@ class RunFlowAbility {
 			return null;
 		}
 
-		$delay = self::backpressureDeferSeconds( $flow_id );
+		$delay          = self::backpressureDeferSeconds( $flow_id );
+		$deferral_count = $this->recordBackpressureDeferral( $flow_id, $scheduling_config );
 
 		if ( function_exists( 'as_schedule_single_action' ) ) {
-			// Only enqueue a deferral tick if one is not already pending for
+			// Only enqueue a deferral tick if one is genuinely pending for
 			// this flow, so repeated saturated cycles don't pile up duplicate
-			// wake-ups for the same flow.
-			$already_pending = function_exists( 'as_next_scheduled_action' )
-				&& false !== as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+			// wake-ups for the same flow. as_next_scheduled_action() cannot be
+			// used here: it reports STATUS_RUNNING actions as scheduled, so
+			// when this method runs from inside a deferral tick whose queue is
+			// still saturated, the currently executing tick matches, the
+			// reschedule is skipped, and the run is silently dropped until the
+			// next recurring fire. Querying STATUS_PENDING only counts
+			// wake-ups that have not started yet.
+			$already_pending = 0 < ScheduleActionIdentity::exactActionId(
+				'datamachine_run_flow_now',
+				array( $flow_id ),
+				'data-machine',
+				'pending'
+			);
 
 			if ( ! $already_pending ) {
 				as_schedule_single_action(
@@ -464,14 +501,15 @@ class RunFlowAbility {
 
 		do_action(
 			'datamachine_log',
-			'info',
+			$deferral_count >= self::BACKPRESSURE_DEFERRAL_WARNING_THRESHOLD ? 'warning' : 'info',
 			'Flow execution deferred - queue backpressure',
 			array(
-				'flow_id'       => $flow_id,
-				'active_jobs'   => $active,
-				'max_active'    => $max_active,
-				'defer_seconds' => $delay,
-				'reason'        => 'queue_backpressure',
+				'flow_id'        => $flow_id,
+				'active_jobs'    => $active,
+				'max_active'     => $max_active,
+				'defer_seconds'  => $delay,
+				'deferral_count' => $deferral_count,
+				'reason'         => 'queue_backpressure',
 			)
 		);
 
@@ -481,6 +519,40 @@ class RunFlowAbility {
 			'job_id'  => null,
 			'skipped' => true,
 			'reason'  => 'queue_backpressure',
+		);
+	}
+
+	/**
+	 * Increment and persist a flow's consecutive backpressure deferral count.
+	 *
+	 * The counter lives in flow scheduling metadata so it survives across the
+	 * separate processes that execute each deferral tick.
+	 *
+	 * @param int   $flow_id           Flow being deferred.
+	 * @param array $scheduling_config Flow scheduling config read by the caller.
+	 * @return int New consecutive deferral count (starting at 1).
+	 */
+	private function recordBackpressureDeferral( int $flow_id, array $scheduling_config ): int {
+		$count = (int) ( $scheduling_config[ self::BACKPRESSURE_DEFERRAL_COUNT_KEY ] ?? 0 ) + 1;
+
+		$this->db_flows->update_flow_scheduling_metadata(
+			$flow_id,
+			array( self::BACKPRESSURE_DEFERRAL_COUNT_KEY => $count )
+		);
+
+		return $count;
+	}
+
+	/**
+	 * Reset a flow's consecutive backpressure deferral count once it runs.
+	 *
+	 * @param int $flow_id Flow that was admitted.
+	 */
+	private function clearBackpressureDeferrals( int $flow_id ): void {
+		$this->db_flows->update_flow_scheduling_metadata(
+			$flow_id,
+			array(),
+			array( self::BACKPRESSURE_DEFERRAL_COUNT_KEY )
 		);
 	}
 
