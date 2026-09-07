@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.1] - 2026-09-07
+
+### Changed
+- migrate Google service account auth to the shared provider
+
+### Fixed
+- cache GA service-account token network-wide
+
 ## [0.17.0] - 2026-08-19
 
 ### Added
