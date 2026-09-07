@@ -87,7 +87,7 @@ class GoogleAnalytics extends BaseTool {
 		$legacy_properties = array(
 			'action'      => array(
 				'type'        => 'string',
-				'enum'        => array_values( $valid_actions ),
+				'enum'        => $valid_actions,
 				'description' => 'Choose a bounded preset report, or aggregate_report for a bounded read-only aggregate query (requires date_range and metrics). landing_page_acquisition uses session-entry landingPage x session source/medium and discloses material `(not set)` coverage without filtering it. page_acquisition uses touched pagePath x session source/medium. page_audience uses touched pagePath x country/device.',
 			),
 			'property_id' => array(
