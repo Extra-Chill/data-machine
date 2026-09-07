@@ -1,109 +1,47 @@
-# Internal Links Endpoints
+# Internal Links Abilities
 
-**Implementation**: `inc/Api/InternalLinks.php`
+**Implementation**: `inc/Abilities/InternalLinkingAbilities.php`
 
-**Base URL**: `/wp-json/datamachine/v1/links`
+The `datamachine/v1/links` REST routes were retired in #3456. Internal link auditing and diagnostics are exposed through the REST-visible Data Machine abilities, executed through WordPress core's ability runner:
 
-## Overview
+```
+POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run
+Content-Type: application/json
 
-Internal links endpoints expose the link graph abilities used by SEO audits and agents. They can build the cached graph, report orphaned posts, fetch backlinks, check broken URLs, and diagnose site-wide internal link coverage.
+{ "input": { ... } }
+```
 
 ## Authentication
 
-All routes require `PermissionHelper::can( 'manage_flows' )`. Requests can use WordPress application passwords or cookie auth.
+Each ability's permission callback requires Data Machine manage permission (`PermissionHelper::can_manage()`, meaning `manage_flows`, `manage_settings`, or `manage_agents`; administrators pass through the `manage_options` fallback). The core ability runner also requires `show_in_rest` and a valid REST nonce for cookie-authenticated callers.
 
-The controller delegates to WordPress Abilities API abilities. If an ability is not registered, the response is `ability_not_found` with HTTP 500.
+## Response Envelope
 
-## Route Table
+The ability runner returns the ability's output directly (no `{success, data}` wrapper). Errors return standard REST error objects (`code`, `message`, `data.status`).
 
-| Method | Route | Ability | Purpose |
-|---|---|---|---|
-| POST | `/links/audit` | `datamachine/audit-internal-links` | Scan content, build/cache the link graph, and return aggregates. |
-| GET | `/links/orphans` | `datamachine/get-orphaned-posts` | Return posts with zero inbound internal links. |
-| GET | `/links/backlinks` | `datamachine/get-backlinks` | Return posts linking to a target post. |
-| POST | `/links/broken` | `datamachine/check-broken-links` | Check URLs from the cached graph with HTTP HEAD/GET fallback. |
-| GET | `/links/diagnose` | `datamachine/diagnose-internal-links` | Report internal link coverage from stored metadata. |
+## Internal Links Abilities
 
-GET routes read query parameters. POST routes read the JSON body.
+| Ability slug | Purpose |
+| --- | --- |
+| `datamachine/audit-internal-links` | Scan post content, build/cache the link graph, and return aggregates (`post_type`, `category`, `post_ids`, `force`, `types`). |
+| `datamachine/get-orphaned-posts` | Return posts with zero inbound internal links (`post_type`, `limit`, `types`). Runs the audit automatically when no cache exists. |
+| `datamachine/get-backlinks` | Return posts linking to a target post (`post_id`, `types`, `limit`). |
+| `datamachine/check-broken-links` | Check URLs from the cached graph with HTTP HEAD/GET fallback (`scope` `internal`/`external`/`all`, `limit`, `timeout`, `types`). |
+| `datamachine/diagnose-internal-links` | Report site-wide internal link coverage from stored metadata (no input). |
+| `datamachine/link-opportunities` | Suggest internal link opportunities between posts. |
+| `datamachine/internal-linking` | Queue agent insertion of semantic internal links (`post_ids`, `category`, `links_per_post`, `dry_run`, `force`). Not REST-visible. |
 
-## Core Parameters
+## Edge Types
 
-| Parameter | Routes | Type | Default | Notes |
-|---|---|---|---|---|
-| `post_type` | audit, orphans, backlinks, broken | string | `post` | Post type scope for graph reads and scans. |
-| `category` | audit | string | none | Category slug to limit audit scope. |
-| `post_ids` | audit | array<int> | none | Specific posts to scan. |
-| `force` | audit | boolean | `false` | Rebuild even when cached data exists. |
-| `types` | audit, orphans, backlinks, broken | array<string> | all | Edge types to include, for example `html_anchor` or `wikilink`. GET accepts comma-separated values. |
-| `limit` | orphans, broken | integer | route-specific | Maximum results or URLs to process. |
-| `post_id` | backlinks | integer | required | Target post ID. |
-| `scope` | broken | string | `internal` | `internal`, `external`, or `all`. |
-| `timeout` | broken | integer | `5` | HTTP timeout per URL in seconds. |
+`types` filters the link graph edges, for example `["html_anchor"]` or `["wikilink"]`. Omit for all types.
 
-## Response Shape
+## Example
 
-Successful responses return ability output directly after internal keys prefixed with `_` are stripped.
-
-Audit response shape:
-
-```json
-{
-  "success": true,
-  "total_scanned": 120,
-  "total_links": 640,
-  "orphaned_count": 8,
-  "avg_outbound": 5.3,
-  "avg_inbound": 5.3,
-  "orphaned_posts": [],
-  "top_linked": [],
-  "cached": false
-}
-```
-
-Backlinks response shape:
-
-```json
-{
-  "success": true,
-  "post_id": 123,
-  "backlink_count": 2,
-  "backlinks": [
-    {
-      "source_id": 45,
-      "title": "Related guide",
-      "permalink": "https://example.com/related-guide/",
-      "link_count": 1
-    }
-  ],
-  "from_cache": true
-}
-```
-
-Errors from abilities are returned as `internal_links_error` with HTTP 400 for ability-declared errors or HTTP 500 for `WP_Error` results.
-
-## Agent Usage Examples
-
-Run a fresh internal-link audit for posts:
+Run a fresh internal-link audit through the ability runner:
 
 ```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/links/audit \
+curl -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/audit-internal-links/run \
   -H "Content-Type: application/json" \
   -u username:application_password \
-  -d '{"post_type":"post","force":true,"types":["html_anchor"]}'
-```
-
-Find orphaned pages from the cached graph:
-
-```bash
-curl "https://example.com/wp-json/datamachine/v1/links/orphans?post_type=page&limit=25" \
-  -u username:application_password
-```
-
-Check external broken links with a conservative limit:
-
-```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/links/broken \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{"scope":"external","limit":50,"timeout":5}'
+  -d '{"input":{"post_type":"post","force":true,"types":["html_anchor"]}}'
 ```
