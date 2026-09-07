@@ -136,6 +136,10 @@ trait FlowStepHelpers {
 	 * type coercion, term ID resolution, and value validation. This ensures all
 	 * write paths (REST, CLI, chat tools, abilities API) produce consistent data.
 	 *
+	 * A sanitizer that synthesizes keys the caller did not pass (e.g. resolving
+	 * a venue name into a venue term ID) must declare those keys via
+	 * SettingsClass::derived_fields() so patch-based write paths keep them (#3449).
+	 *
 	 * @since 0.38.0
 	 * @param string $handler_slug Handler slug.
 	 * @param array  $handler_config Raw configuration values to sanitize.
@@ -174,6 +178,11 @@ trait FlowStepHelpers {
 	 * explicitly patched top-level fields are merged so omitted stored values
 	 * retain their value and type.
 	 *
+	 * Keys a sanitizer synthesizes that the caller did not pass (term ID
+	 * resolution and similar derivations) are kept when the settings class
+	 * declares them via derived_fields(); the sparse-patch intersect cannot
+	 * tell "declared derived key" from "untouched default" on its own (#3449).
+	 *
 	 * @param string $handler_slug Handler slug.
 	 * @param array  $existing_config Stored configuration.
 	 * @param array  $handler_patch Sparse configuration patch.
@@ -190,13 +199,40 @@ trait FlowStepHelpers {
 		}
 
 		$sanitized = $this->sanitizeHandlerConfig( $handler_slug, $handler_patch, $log_errors );
-		$sanitized = array_intersect_key( $sanitized, $handler_patch );
+		$sanitized = array_intersect_key( $sanitized, $handler_patch + $this->getDerivedHandlerConfigFields( $handler_slug ) );
 		$merged    = self::deepMergeConfig( $existing_config, $sanitized );
 
 		return array(
 			'valid'  => true,
 			'config' => $this->handler_abilities->applyDefaults( $handler_slug, $merged ),
 		);
+	}
+
+	/**
+	 * Get the sanitizer-declared derived config field keys for a handler.
+	 *
+	 * A settings class whose sanitize() synthesizes keys the caller did not
+	 * pass (e.g. resolving venue_name plus an address into a venue term ID)
+	 * declares those keys via `public static function derived_fields(): array`.
+	 * prepareHandlerConfigPatch() keeps declared keys through the sparse-patch
+	 * intersect so derived values are stored rather than discarded (#3449).
+	 *
+	 * A declared key should also be a declared config field; applyDefaults()
+	 * drops stored keys that are absent from the field schema.
+	 *
+	 * @param string $handler_slug Handler slug.
+	 * @return array Derived field names as array keys.
+	 */
+	protected function getDerivedHandlerConfigFields( string $handler_slug ): array {
+		$settings_class = $this->handler_abilities->getSettingsClass( $handler_slug );
+
+		if ( ! $settings_class || ! method_exists( $settings_class, 'derived_fields' ) ) {
+			return array();
+		}
+
+		$derived_fields = $settings_class::derived_fields();
+
+		return is_array( $derived_fields ) ? array_flip( $derived_fields ) : array();
 	}
 
 	/**
