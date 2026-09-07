@@ -19,35 +19,35 @@ class VenueParameterProvider {
 	use DynamicToolParametersTrait;
 
 	private const TOOL_PARAMETERS = array(
-		'venue'            => array(
+		'venue'             => array(
 			'type'        => 'string',
 			'description' => 'Venue name where the event takes place',
 		),
-		'venueAddress'     => array(
+		'venueAddress'      => array(
 			'type'        => 'string',
 			'description' => 'Street address of the venue',
 		),
-		'venueCity'        => array(
+		'venueCity'         => array(
 			'type'        => 'string',
 			'description' => 'City where the venue is located',
 		),
-		'venueState'       => array(
+		'venueState'        => array(
 			'type'        => 'string',
 			'description' => 'State/province where the venue is located',
 		),
-		'venueZip'         => array(
+		'venueZip'          => array(
 			'type'        => 'string',
 			'description' => 'Postal/zip code of the venue',
 		),
-		'venueCountry'     => array(
+		'venueCountry'      => array(
 			'type'        => 'string',
 			'description' => 'Country where the venue is located',
 		),
-		'venuePhone'       => array(
+		'venuePhone'        => array(
 			'type'        => 'string',
 			'description' => 'Phone number of the venue',
 		),
-		'venueWebsite'     => array(
+		'venueWebsite'      => array(
 			'type'        => 'string',
 			'description' => 'Official website URL of the venue',
 		),
@@ -55,33 +55,33 @@ class VenueParameterProvider {
 			'type'        => 'string',
 			'description' => 'Public ticketing destination URL for the venue',
 		),
-		'venueCoordinates' => array(
+		'venueCoordinates'  => array(
 			'type'        => 'string',
 			'description' => 'GPS coordinates (latitude,longitude format)',
 		),
-		'venueCapacity'    => array(
+		'venueCapacity'     => array(
 			'type'        => 'string',
 			'description' => 'Maximum venue capacity',
 		),
-		'venueTimezone'    => array(
+		'venueTimezone'     => array(
 			'type'        => 'string',
 			'description' => 'IANA timezone identifier (e.g., America/Chicago, America/Los_Angeles)',
 		),
 	);
 
 	private const PARAMETER_TO_META_MAP = array(
-		'venue'            => 'name',
-		'venueAddress'     => 'address',
-		'venueCity'        => 'city',
-		'venueState'       => 'state',
-		'venueZip'         => 'zip',
-		'venueCountry'     => 'country',
-		'venuePhone'       => 'phone',
-		'venueWebsite'     => 'website',
+		'venue'             => 'name',
+		'venueAddress'      => 'address',
+		'venueCity'         => 'city',
+		'venueState'        => 'state',
+		'venueZip'          => 'zip',
+		'venueCountry'      => 'country',
+		'venuePhone'        => 'phone',
+		'venueWebsite'      => 'website',
 		'venueTicketingUrl' => 'ticketing_url',
-		'venueCoordinates' => 'coordinates',
-		'venueCapacity'    => 'capacity',
-		'venueTimezone'    => 'timezone',
+		'venueCoordinates'  => 'coordinates',
+		'venueCapacity'     => 'capacity',
+		'venueTimezone'     => 'timezone',
 	);
 
 	/**
@@ -117,10 +117,34 @@ class VenueParameterProvider {
 	 * @return array Canonical fragment, or empty array when venue is pre-configured.
 	 */
 	public static function getToolParameters( array $handler_config, array $engine_data = array() ): array {
-		if ( self::hasVenueData( $handler_config, $engine_data ) ) {
+		// A venue pinned in handler config is fully known; the model never
+		// needs venue parameters. A scraper that found only a venue *name* is
+		// not the same thing: the model must still be able to supply the
+		// city/country/timezone the page lacked, otherwise the venue is created
+		// blank and can never resolve a timezone (#782). filterByEngineData()
+		// already drops just the keys the scraper did populate.
+		if ( self::isVenuePinnedByConfig( $handler_config ) ) {
 			return array();
 		}
 		return static::filterByEngineData( array( 'properties' => self::TOOL_PARAMETERS ), $engine_data );
+	}
+
+	/**
+	 * Whether the flow's handler config fixes the venue to a known term.
+	 *
+	 * @param array $handler_config Handler configuration.
+	 * @return bool True when a venue term is pre-selected in config.
+	 */
+	public static function isVenuePinnedByConfig( array $handler_config ): bool {
+		if ( ! empty( $handler_config['universal_web_scraper']['venue'] ) ) {
+			return true;
+		}
+
+		if ( ! empty( $handler_config['venue'] ) && is_numeric( $handler_config['venue'] ) ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -135,15 +159,7 @@ class VenueParameterProvider {
 			return true;
 		}
 
-		if ( ! empty( $handler_config['universal_web_scraper']['venue'] ) ) {
-			return true;
-		}
-
-		if ( ! empty( $handler_config['venue'] ) && is_numeric( $handler_config['venue'] ) ) {
-			return true;
-		}
-
-		return false;
+		return self::isVenuePinnedByConfig( $handler_config );
 	}
 
 	/**
