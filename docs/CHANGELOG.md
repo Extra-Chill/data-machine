@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.2] - 2026-09-07
+
+### Fixed
+- drop settled-claim packets before explicit disposition routing
+
 ## [0.176.1] - 2026-09-07
 
 ### Fixed
