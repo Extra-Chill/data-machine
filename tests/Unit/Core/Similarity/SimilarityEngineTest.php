@@ -252,6 +252,56 @@ class SimilarityEngineTest extends WP_UnitTestCase {
 				'Series: Advanced Programing Techniques',
 				true,
 			),
+			// Short suffixes are fragments, so no minimum length gates the
+			// near-equality check. A one-character typo still matches.
+			'close short suffix variants'          => array(
+				'Rap-A-Lot: Royale Finale',
+				'Rap-A-Lot: Royal Finale',
+				true,
+			),
+			'close short suffix variants reversed' => array(
+				'Rap-A-Lot: Royal Finale',
+				'Rap-A-Lot: Royale Finale',
+				true,
+			),
+			// Ordinal tokens name distinct occurrences and must never collapse,
+			// even when edit distance alone would allow it. Prefixes here are
+			// deliberately long: with a short prefix the whole-title Levenshtein
+			// floor rejects these incidentally, which would let the cases pass
+			// for the wrong reason and hide a regression in the ordinal guard.
+			'numeric ordinal suffixes'             => array(
+				'Charleston Music Festival: Night 1',
+				'Charleston Music Festival: Night 2',
+				false,
+			),
+			'word ordinal suffixes'                => array(
+				'Charleston Music Festival: Night One',
+				'Charleston Music Festival: Night Two',
+				false,
+			),
+			'roman numeral suffixes'               => array(
+				'Charleston Music Festival: Part II',
+				'Charleston Music Festival: Part III',
+				false,
+			),
+			'letter series suffixes'               => array(
+				'Charleston Music Festival: Stage A',
+				'Charleston Music Festival: Stage B',
+				false,
+			),
+			'ordinal present on one side only'     => array(
+				'Charleston Music Festival: Late Night',
+				'Charleston Music Festival: Late Night 2',
+				false,
+			),
+			'short ordinal suffixes'               => array( 'Fest: Stage 3', 'Fest: Stage 4', false ),
+			// Matching ordinals on both sides must not block an otherwise-close
+			// suffix pair from matching.
+			'shared ordinal with typo'             => array(
+				'Fest: Night 2 Finale',
+				'Fest: Night 2 Finalle',
+				true,
+			),
 		);
 	}
 

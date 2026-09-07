@@ -52,6 +52,50 @@ class SimilarityEngine {
 	const MIN_PREFIX_LENGTH = 5;
 
 	/**
+	 * Ordinal-like tokens that distinguish one instance of a series from another.
+	 *
+	 * When two colon suffixes carry different ordinal tokens they name different
+	 * occurrences ("Night One" vs "Night Two", "Stage 3" vs "Stage 4") and must
+	 * never be collapsed, no matter how close their edit distance is. Bare digits
+	 * are detected numerically rather than enumerated here.
+	 *
+	 * @var array
+	 */
+	const ORDINAL_TOKENS = array(
+		// Cardinal words.
+		'one',
+		'two',
+		'three',
+		'four',
+		'five',
+		'six',
+		'seven',
+		'eight',
+		'nine',
+		'ten',
+		// Ordinal words.
+		'first',
+		'second',
+		'third',
+		'fourth',
+		'fifth',
+		'sixth',
+		'seventh',
+		'eighth',
+		'ninth',
+		'tenth',
+		// Roman numerals (also covers single-letter series markers a/b/c via
+		// the single-character check in isOrdinalToken()).
+		'ii',
+		'iii',
+		'iv',
+		'vi',
+		'vii',
+		'viii',
+		'ix',
+	);
+
+	/**
 	 * Stop words excluded from Jaccard tokenization.
 	 *
 	 * @var array
@@ -130,7 +174,11 @@ class SimilarityEngine {
 	 * 3. Levenshtein distance (≤15% diff for titles ≥15 chars)
 	 *
 	 * Distinct meaningful suffixes on two colon-delimited titles short-circuit
-	 * this cascade with a no-match result and score 0.0. Thresholds are unchanged.
+	 * this cascade with a no-match result and score 0.0. Two suffixes are treated
+	 * as equivalent when they carry the same ordinal tokens and are within the
+	 * standard proportional edit-distance tolerance, so a typo variant such as
+	 * "Royale Finale" vs "Royal Finale" still matches while genuinely distinct
+	 * occurrences such as "Night 1" vs "Night 2" never do. Thresholds are unchanged.
 	 *
 	 * Returns a SimilarityResult with match, score, and strategy.
 	 *
@@ -155,10 +203,21 @@ class SimilarityEngine {
 			$suffix2 = preg_match( '/[a-z0-9]/i', $suffix2 ) ? $suffix2 : '';
 
 			if ( '' !== $suffix1 && '' !== $suffix2 && $suffix1 !== $suffix2 ) {
+				// Differing ordinal tokens name different occurrences of the same
+				// series. These are never duplicates regardless of edit distance,
+				// which would otherwise collapse "Night 1" and "Night 2".
+				if ( self::ordinalTokens( $suffix1 ) !== self::ordinalTokens( $suffix2 ) ) {
+					return SimilarityResult::noMatch( $core1, $core2 );
+				}
+
+				// Otherwise let proportional edit distance decide. No minimum
+				// length applies: suffixes are fragments, and most real ones are
+				// shorter than MIN_LEVENSHTEIN_LENGTH, so a length floor here
+				// would reject every near-identical short suffix outright.
+				// Proportional tolerance already collapses to zero on very short
+				// suffixes, so those still require an exact match.
 				$max_suffix_length = max( strlen( $suffix1 ), strlen( $suffix2 ) );
-				$suffixes_match    = strlen( $suffix1 ) >= self::MIN_LEVENSHTEIN_LENGTH
-					&& strlen( $suffix2 ) >= self::MIN_LEVENSHTEIN_LENGTH
-					&& levenshtein( $suffix1, $suffix2 ) <= (int) ( $max_suffix_length * self::DEFAULT_LEVENSHTEIN_TOLERANCE );
+				$suffixes_match    = levenshtein( $suffix1, $suffix2 ) <= (int) ( $max_suffix_length * self::DEFAULT_LEVENSHTEIN_TOLERANCE );
 
 				if ( ! $suffixes_match ) {
 					return SimilarityResult::noMatch( $core1, $core2 );
@@ -196,6 +255,41 @@ class SimilarityEngine {
 		}
 
 		return SimilarityResult::noMatch( $core1, $core2 );
+	}
+
+	/**
+	 * Extract the ordered list of ordinal-like tokens from a normalized suffix.
+	 *
+	 * Two suffixes carrying different ordinal sequences describe different
+	 * occurrences in a series and must not be treated as duplicates.
+	 *
+	 * @param string $suffix Normalized suffix.
+	 * @return array Ordered ordinal tokens (empty when the suffix carries none).
+	 */
+	private static function ordinalTokens( string $suffix ): array {
+		preg_match_all( '/[a-z0-9]+/', strtolower( $suffix ), $matches );
+
+		return array_values( array_filter( $matches[0], array( self::class, 'isOrdinalToken' ) ) );
+	}
+
+	/**
+	 * Determine whether a single token reads as an ordinal/series marker.
+	 *
+	 * @param string $token Lowercase alphanumeric token.
+	 * @return bool True when the token distinguishes one instance from another.
+	 */
+	private static function isOrdinalToken( string $token ): bool {
+		// Bare numbers: "1", "02", "2026".
+		if ( ctype_digit( $token ) ) {
+			return true;
+		}
+
+		// Single-letter series markers: "Set A" vs "Set B", and roman "i"/"v"/"x".
+		if ( 1 === strlen( $token ) && ctype_alpha( $token ) ) {
+			return true;
+		}
+
+		return in_array( $token, self::ORDINAL_TOKENS, true );
 	}
 
 	// -----------------------------------------------------------------------
