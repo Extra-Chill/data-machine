@@ -157,7 +157,7 @@ export default function PipelineStepCard( {
 				};
 			}
 		},
-		[ pipelineId, step.pipeline_step_id, step.step_type, stepConfig ]
+		[ step.pipeline_step_id, stepConfig ]
 	);
 
 	/**
