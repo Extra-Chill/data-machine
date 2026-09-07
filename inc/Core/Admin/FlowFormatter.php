@@ -13,6 +13,7 @@ namespace DataMachine\Core\Admin;
 
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Core\Steps\Settings\SettingsDisplayService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -29,8 +30,8 @@ class FlowFormatter {
 	/**
 	 * Cached service instances to avoid re-creation per flow in batch formatting.
 	 */
-	private static ?HandlerAbilities $handler_abilities_cache = null;
-	private static ?object $settings_display_cache            = null;
+	private static ?HandlerAbilities $handler_abilities_cache      = null;
+	private static ?SettingsDisplayService $settings_display_cache = null;
 
 	public static function format_flow_for_response( array $flow, ?array $latest_job = null, ?array $next_runs = null ): array {
 		$flow_config = $flow['flow_config'] ?? array();
@@ -66,21 +67,19 @@ class FlowFormatter {
 			);
 
 			// Apply defaults to the primary config slot.
-			if ( ! empty( $effective_slug ) ) {
-				$primary_config = FlowStepConfig::getPrimaryHandlerConfig( $step_data );
-				$with_defaults  = $handler_abilities->applyDefaults( $effective_slug, $primary_config );
+			$primary_config = FlowStepConfig::getPrimaryHandlerConfig( $step_data );
+			$with_defaults  = $handler_abilities->applyDefaults( $effective_slug, $primary_config );
 
-				if ( FlowStepConfig::usesHandler( $step_data ) ) {
-					$handler_slugs = FlowStepConfig::getHandlerSlugs( $step_data );
-					if ( ! in_array( $effective_slug, $handler_slugs, true ) ) {
-						$handler_slugs[] = $effective_slug;
-					}
-					$step_data['handler_slugs']                      = $handler_slugs;
-					$step_data['handler_configs'][ $effective_slug ] = $with_defaults;
-					unset( $step_data['handler_slug'], $step_data['handler_config'] );
-				} else {
-					$step_data['handler_config'] = $with_defaults;
+			if ( FlowStepConfig::usesHandler( $step_data ) ) {
+				$handler_slugs = FlowStepConfig::getHandlerSlugs( $step_data );
+				if ( ! in_array( $effective_slug, $handler_slugs, true ) ) {
+					$handler_slugs[] = $effective_slug;
 				}
+				$step_data['handler_slugs']                      = $handler_slugs;
+				$step_data['handler_configs'][ $effective_slug ] = $with_defaults;
+				unset( $step_data['handler_slug'], $step_data['handler_config'] );
+			} else {
+				$step_data['handler_config'] = $with_defaults;
 			}
 
 			if ( ! empty( $step_data['settings_display'] ) && is_array( $step_data['settings_display'] ) ) {
@@ -168,7 +167,13 @@ class FlowFormatter {
 			'data-machine'
 		);
 
-		return $next_timestamp ? wp_date( 'Y-m-d H:i:s', $next_timestamp, new \DateTimeZone( 'UTC' ) ) : null;
+		if ( ! is_int( $next_timestamp ) || $next_timestamp <= 0 ) {
+			return null;
+		}
+
+		$formatted = wp_date( 'Y-m-d H:i:s', $next_timestamp, new \DateTimeZone( 'UTC' ) );
+
+		return is_string( $formatted ) ? $formatted : null;
 	}
 
 	/**
@@ -181,7 +186,7 @@ class FlowFormatter {
 			return false;
 		}
 
-		if ( ! class_exists( '\ActionScheduler' ) || ! method_exists( '\ActionScheduler', 'is_initialized' ) ) {
+		if ( ! class_exists( '\ActionScheduler' ) ) {
 			return true;
 		}
 
@@ -192,6 +197,8 @@ class FlowFormatter {
 	 * Batch-fetch next run times for multiple flows in a single query.
 	 *
 	 * Replaces per-flow as_next_scheduled_action() calls (N queries → 1).
+	 * Identity matching is delegated to ScheduleActionIdentity so pending
+	 * actions resolve across legacy and generated argument shapes (#3462).
 	 *
 	 * @since 0.55.0
 	 *
@@ -199,55 +206,27 @@ class FlowFormatter {
 	 * @return array<int, string|null> Flow ID → next run datetime (UTC) or null.
 	 */
 	public static function batch_get_next_run_times( array $flow_ids ): array {
-		$result = array_fill_keys( $flow_ids, null );
+		$result = array_fill_keys( array_map( 'intval', $flow_ids ), null );
 
 		if ( empty( $flow_ids ) ) {
 			return $result;
 		}
 
-		global $wpdb;
-		$table = $wpdb->prefix . 'actionscheduler_actions';
-
-		// Build args JSON patterns for each flow_id.
-		// AS stores args as JSON: [flow_id] (serialized array with one int element).
-		$conditions = array();
-		$values     = array( $table );
-		foreach ( $flow_ids as $fid ) {
-			$conditions[] = 'args = %s';
-			$values[]     = wp_json_encode( array( (int) $fid ) );
+		$logical_args = array();
+		foreach ( $flow_ids as $flow_id ) {
+			$flow_id                  = (int) $flow_id;
+			$logical_args[ $flow_id ] = array( $flow_id );
 		}
 
-		if ( empty( $conditions ) ) {
-			return $result;
-		}
-
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The generated condition list contains %s placeholders paired with $values.
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				sprintf(
-					"SELECT args, MIN(scheduled_date_gmt) as next_run
-				FROM %%i
-				WHERE hook = 'datamachine_run_flow_now'
-				AND status = 'pending'
-				AND (%s)
-				GROUP BY args",
-					implode( ' OR ', $conditions )
-				),
-				$values
-			),
-			ARRAY_A
+		$dates = \DataMachine\Engine\Tasks\ScheduleActionIdentity::nextScheduledDates(
+			'datamachine_run_flow_now',
+			$logical_args
 		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
-		if ( ! $rows ) {
-			return $result;
-		}
-
-		foreach ( $rows as $row ) {
-			$args = json_decode( $row['args'], true );
-			if ( is_array( $args ) && isset( $args[0] ) ) {
-				$fid            = (int) $args[0];
-				$result[ $fid ] = $row['next_run'];
+		foreach ( array_keys( $logical_args ) as $flow_id ) {
+			$date = $dates[ $flow_id ] ?? null;
+			if ( is_string( $date ) ) {
+				$result[ $flow_id ] = $date;
 			}
 		}
 

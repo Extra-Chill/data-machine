@@ -75,7 +75,10 @@ final class ScheduleActionIdentity {
 	 */
 	public static function nextTimestamp( string $hook, array $args, string $group ) {
 		foreach ( self::actions( $hook, $group, 'pending', true ) as $action ) {
-			if ( ! is_object( $action ) || ! method_exists( $action, 'get_args' ) || self::logicalArgs( $action->get_args() ) !== $args ) {
+			if ( ! is_object( $action )
+				|| ! method_exists( $action, 'get_args' )
+				|| ! method_exists( $action, 'get_schedule' )
+				|| self::logicalArgs( $action->get_args() ) !== $args ) {
 				continue;
 			}
 			$date = $action->get_schedule()->get_date();
@@ -83,6 +86,69 @@ final class ScheduleActionIdentity {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Batch-resolve the earliest pending scheduled date for logical identities.
+	 *
+	 * Aggregates one hook's pending actions in a single query and matches
+	 * stored args through the logical identity, so legacy and generated
+	 * argument shapes both resolve. Rows are not filtered by AS group; the
+	 * hook is expected to be plugin-namespaced.
+	 *
+	 * @param string            $hook              AS hook.
+	 * @param array<int, array> $logical_args_list Logical signatures keyed by caller keys (e.g. flow IDs).
+	 * @return array<int|string, string|null> Earliest pending UTC datetime per input key, null when none pending.
+	 */
+	public static function nextScheduledDates( string $hook, array $logical_args_list ): array {
+		$result = array_fill_keys( array_keys( $logical_args_list ), null );
+		if ( empty( $logical_args_list ) ) {
+			return $result;
+		}
+
+		$wanted = array();
+		foreach ( $logical_args_list as $caller_key => $logical_args ) {
+			$encoded_request = wp_json_encode( $logical_args );
+			if ( is_string( $encoded_request ) ) {
+				$wanted[ $encoded_request ] = $caller_key;
+			}
+		}
+
+		global $wpdb;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Identity resolution requires fresh AS runtime state across batch callers; the generated SQL pairs one %s/%i set with $values.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT args, MIN(scheduled_date_gmt) AS next_run
+				FROM %i
+				WHERE hook = %s
+				AND status = 'pending'
+				GROUP BY args",
+				$wpdb->prefix . 'actionscheduler_actions',
+				$hook
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		if ( ! is_array( $rows ) ) {
+			return $result;
+		}
+
+		foreach ( $rows as $row ) {
+			$decoded = json_decode( (string) ( $row['args'] ?? '' ), true );
+			if ( ! is_array( $decoded ) ) {
+				continue;
+			}
+			$encoded = wp_json_encode( self::logicalArgs( $decoded ) );
+			if ( is_string( $encoded ) && isset( $wanted[ $encoded ] ) ) {
+				$caller_key = $wanted[ $encoded ];
+				if ( null === $result[ $caller_key ] ) {
+					$result[ $caller_key ] = (string) ( $row['next_run'] ?? '' );
+				}
+			}
+		}
+
+		return $result;
 	}
 
 	public static function countPending( string $hook, array $args, string $group ): int {
@@ -139,7 +205,7 @@ final class ScheduleActionIdentity {
 			),
 			'ids'
 		);
-		$action_id  = is_array( $action_ids ) ? reset( $action_ids ) : 0;
+		$action_id  = reset( $action_ids );
 
 		return is_numeric( $action_id ) && (int) $action_id > 0 ? (int) $action_id : 0;
 	}
@@ -160,7 +226,7 @@ final class ScheduleActionIdentity {
 			'ids'
 		);
 
-		return is_array( $actions ) ? count( $actions ) : 0;
+		return count( $actions );
 	}
 
 	public static function cancelExact( int $action_id ): bool {
@@ -170,8 +236,8 @@ final class ScheduleActionIdentity {
 
 		try {
 			$store = \ActionScheduler_Store::instance();
-			$store->cancel_action( $action_id );
-			return \ActionScheduler_Store::STATUS_CANCELED === $store->get_status( $action_id );
+			$store->cancel_action( (string) $action_id );
+			return \ActionScheduler_Store::STATUS_CANCELED === $store->get_status( (string) $action_id );
 		} catch ( \Throwable $throwable ) {
 			unset( $throwable );
 			return false;
@@ -213,6 +279,6 @@ final class ScheduleActionIdentity {
 		}
 
 		$actions = as_get_scheduled_actions( $query, 'OBJECT' );
-		return is_array( $actions ) ? $actions : array();
+		return $actions;
 	}
 }
