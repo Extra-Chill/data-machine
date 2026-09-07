@@ -257,8 +257,8 @@ class AgentsCommand extends AgentBundleCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine agents rename chubesextrachill-com chubes-bot
-	 *     wp datamachine agents rename chubesextrachill-com chubes-bot --dry-run
+	 *     wp datamachine agents rename old-agent content-agent
+	 *     wp datamachine agents rename old-agent content-agent --dry-run
 	 *
 	 * @subcommand rename
 	 */
@@ -327,7 +327,7 @@ class AgentsCommand extends AgentBundleCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine agents create analytics-bot --name="Analytics Bot" --owner=1
-	 *     wp datamachine agents create content-bot --owner=chubes
+	 *     wp datamachine agents create content-agent --owner=editor
 	 *
 	 * @subcommand create
 	 */
@@ -416,7 +416,7 @@ class AgentsCommand extends AgentBundleCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine agents show chubes-bot
+	 *     wp datamachine agents show content-agent
 	 *     wp datamachine agents show 1 --format=json
 	 *
 	 * @subcommand show
@@ -672,11 +672,11 @@ class AgentsCommand extends AgentBundleCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine agents access grant chubes-bot 2 --role=admin
-	 *     wp datamachine agents access grant-audience chubes-bot audience:automattician --role=operator
-	 *     wp datamachine agents access revoke chubes-bot 2
-	 *     wp datamachine agents access revoke-audience chubes-bot audience:automattician
-	 *     wp datamachine agents access list chubes-bot
+	 *     wp datamachine agents access grant content-agent 2 --role=admin
+	 *     wp datamachine agents access grant-audience content-agent audience:editors --role=operator
+	 *     wp datamachine agents access revoke content-agent 2
+	 *     wp datamachine agents access revoke-audience content-agent audience:editors
+	 *     wp datamachine agents access list content-agent
 	 *
 	 * @subcommand access
 	 */
@@ -843,7 +843,7 @@ class AgentsCommand extends AgentBundleCommand {
 		$id   = sanitize_title( $id );
 
 		if ( '' === $type || '' === $id || 'user' === $type ) {
-			WP_CLI::error( 'Audience principal must be a non-user value such as audience:automattician.' );
+			WP_CLI::error( 'Audience principal must be a non-user value such as audience:editors.' );
 		}
 
 		return array( $type, $id );
@@ -884,19 +884,19 @@ class AgentsCommand extends AgentBundleCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Create a token for an agent
-	 *     wp datamachine agents token create chubes-bot --label="kimaki-prod"
+	 *     wp datamachine agents token create content-agent --label="desktop-client"
 	 *
 	 *     # Create a token with 90-day expiry
-	 *     wp datamachine agents token create chubes-bot --label="ci" --expires-in=7776000
+	 *     wp datamachine agents token create content-agent --label="ci" --expires-in=7776000
 	 *
 	 *     # Create a token with restricted capabilities
-	 *     wp datamachine agents token create chubes-bot --capabilities='["datamachine_chat","datamachine_use_tools"]'
+	 *     wp datamachine agents token create content-agent --capabilities='["datamachine_chat","datamachine_use_tools"]'
 	 *
 	 *     # List tokens for an agent
-	 *     wp datamachine agents token list chubes-bot
+	 *     wp datamachine agents token list content-agent
 	 *
 	 *     # Revoke a token
-	 *     wp datamachine agents token revoke chubes-bot 3
+	 *     wp datamachine agents token revoke content-agent 3
 	 *
 	 * @subcommand token
 	 */
@@ -1123,20 +1123,20 @@ class AgentsCommand extends AgentBundleCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # View agent config
-	 *     wp datamachine agents config sarai
+	 *     wp datamachine agents config content-agent
 	 *
 	 *     # Set allowed redirect URIs
-	 *     wp datamachine agents config sarai --set='allowed_redirect_uris=["example.com","https://example.com/*"]'
+	 *     wp datamachine agents config content-agent --set='allowed_redirect_uris=["example.com","https://example.com/*"]'
 	 *
 	 *     # Set a single key
-	 *     wp datamachine agents config sarai --set='model=gpt-4o'
+	 *     wp datamachine agents config content-agent --set='model=example-model'
 	 *
 	 *     # Remove a key
-	 *     wp datamachine agents config sarai --unset=model
+	 *     wp datamachine agents config content-agent --unset=model
 	 *
 	 *     # Set site_scope (special: updates the agent column directly)
-	 *     wp datamachine agents config sarai --set='site_scope=7'
-	 *     wp datamachine agents config sarai --set='site_scope=null'
+	 *     wp datamachine agents config content-agent --set='site_scope=7'
+	 *     wp datamachine agents config content-agent --set='site_scope=null'
 	 *
 	 * @subcommand config
 	 */
@@ -1473,7 +1473,7 @@ class AgentsCommand extends AgentBundleCommand {
 	 *     wp datamachine agents import mattic-agent-bundle.zip --slug=my-agent
 	 *
 	 *     # Import with specific owner
-	 *     wp datamachine agents import mattic-agent-bundle.json --owner=chubes
+	 *     wp datamachine agents import content-agent-bundle.json --owner=editor
 	 *
 	 *     # Dry run to preview
 	 *     wp datamachine agents import mattic-agent-bundle.zip --dry-run

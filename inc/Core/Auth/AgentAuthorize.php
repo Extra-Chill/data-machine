@@ -444,7 +444,7 @@ class AgentAuthorize {
 			return null;
 		}
 
-		// Always allow same network (*.extrachill.com or the network domain).
+		// Always allow the current multisite network domain and its subsites.
 		$site_host = wp_parse_url( network_home_url(), PHP_URL_HOST );
 		if ( $host === $site_host || str_ends_with( $host, '.' . $site_host ) ) {
 			return null;

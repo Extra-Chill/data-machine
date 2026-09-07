@@ -34,6 +34,36 @@ agents_api_smoke_assert_equals( true, str_contains( $buildignore, ".git\n" ), 'g
 agents_api_smoke_assert_equals( true, str_contains( $buildignore, ".datamachine/\n" ), 'DMC metadata is excluded from distribution package', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $buildignore, "AGENTS.md\n" ), 'agent context is excluded from distribution package', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $buildignore, "bin/install-wp-tests.sh\n" ), 'test install script is excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "phpunit.xml.dist\n" ), 'PHPUnit configuration is excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "phpunit.sqlite.xml.dist\n" ), 'SQLite PHPUnit configuration is excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "vendor/wordpress/agents-api/tests/\n" ), 'bundled Agents API tests are excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "vendor/wordpress/agents-api/stubs/\n" ), 'unused bundled Agents API stubs are excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "vendor/automattic/blocks-engine-php-transformer/fixtures/\n" ), 'bundled Blocks Engine fixtures are excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "vendor/**/phpstan.neon.dist\n" ), 'vendor PHPStan configs are excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "vendor/**/psalm.xml\n" ), 'vendor Psalm configs are excluded from distribution package', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $buildignore, "vendor/**/phpcs.xml.dist\n" ), 'vendor PHPCS configs are excluded from distribution package', $failures, $passes );
+
+$package_zip = (string) getenv( 'DATAMACHINE_PACKAGE_ZIP' );
+if ( '' !== $package_zip ) {
+	$zip = new ZipArchive();
+	agents_api_smoke_assert_equals( true, true === $zip->open( $package_zip ), 'candidate ZIP opens for inventory assertions', $failures, $passes );
+
+	$forbidden_paths = array();
+	for ( $index = 0; $index < $zip->numFiles; ++$index ) {
+		$path = (string) $zip->getNameIndex( $index );
+		if (
+			1 === preg_match( '#/(?:test|tests|fixture|fixtures|__tests__)/#', $path )
+			|| str_starts_with( $path, 'data-machine/vendor/wordpress/agents-api/stubs/' )
+			|| 1 === preg_match( '#/(?:phpstan\.neon\.dist|psalm\.xml|phpcs\.xml\.dist|phpunit(?:\.sqlite)?\.xml\.dist)$#', $path )
+			|| 1 === preg_match( '#\.(?:zip|phar|tar|gz)$#', $path )
+		) {
+			$forbidden_paths[] = $path;
+		}
+	}
+	$zip->close();
+
+	agents_api_smoke_assert_equals( array(), $forbidden_paths, 'candidate ZIP contains no forbidden test, stub, development-config, or nested-archive paths', $failures, $passes );
+}
 
 foreach ( array( 'inc/Core/Admin/AdminRootFilters.php', 'inc/Engine/AI/Directives/ClientContextDirective.php' ) as $guarded_file ) {
 	agents_api_smoke_assert_equals( true, str_contains( datamachine_plugin_check_source( $guarded_file ), "defined( 'ABSPATH' ) || exit;" ), "{$guarded_file} has a direct access guard", $failures, $passes );

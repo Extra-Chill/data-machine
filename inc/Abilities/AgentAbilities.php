@@ -854,7 +854,7 @@ class AgentAbilities {
 							),
 							'principal_id'   => array(
 								'type'        => 'string',
-								'description' => 'Principal identifier, such as public or automattician.',
+								'description' => 'Principal identifier, such as public or organization-member.',
 							),
 							'role'           => array(
 								'type'        => 'string',

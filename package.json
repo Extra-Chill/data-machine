@@ -26,7 +26,6 @@
 	"dependencies": {
 		"@extrachill/chat": "^0.11.0",
 		"@tanstack/react-query": "^5.90.12",
-		"@tanstack/react-query-devtools": "^5.91.1",
 		"@wordpress/api-fetch": "^7.36.0",
 		"@wordpress/components": "^35.0.1",
 		"@wordpress/data": "^10.36.0",

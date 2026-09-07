@@ -1,7 +1,6 @@
 {
 	"name": "chubes/datamachine",
 	"description": "WordPress plugin for automated data collection, AI processing, and multi-platform publishing",
-	"version": "0.10.2",
 	"license": "GPL-2.0-or-later",
 	"require": {
 		"php": ">=8.2",

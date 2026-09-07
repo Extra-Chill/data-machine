@@ -1,0 +1,42 @@
+{
+  "schema": "data-machine/plugin-check-unescaped-parameter-map/v1",
+  "package_sha256": "fb0f4164717d6f8519b4aadc57cf3e8111f4f97144e7788c188a47fd22941558",
+  "command": "wordpress.plugin-check",
+  "wordpress_version": "7.1",
+  "plugin_check": {
+    "exit_code": 0,
+    "status": "passed",
+    "summary": {
+      "total": 222,
+      "errors": 0,
+      "warnings": 222,
+      "notices": 0,
+      "info": 0,
+      "unknown": 0
+    }
+  },
+  "rule": "PluginCheck.Security.DirectDB.UnescapedDBParameter",
+  "total": 83,
+  "files": [
+    { "file": "inc/Abilities/Job/RecoverStuckJobsAbility.php", "count": 9, "locations": ["341:25", "450:29", "953:23", "975:18", "1018:19", "1059:23", "1268:17", "1334:22", "1382:27"] },
+    { "file": "inc/Cli/Commands/ProcessedItemsCommand.php", "count": 8, "locations": ["101:21", "385:25", "429:21", "497:25", "520:21", "594:25", "621:18", "704:21"] },
+    { "file": "inc/Core/ActionScheduler/ClaimIndexMigration.php", "count": 1, "locations": ["221:32"] },
+    { "file": "inc/Core/ActionScheduler/PathlessBatchRecovery.php", "count": 1, "locations": ["118:21"] },
+    { "file": "inc/Core/ActionScheduler/ScopedDrainService.php", "count": 10, "locations": ["212:29", "224:29", "238:29", "456:20", "492:23", "939:23", "987:24", "1008:23", "1059:18", "1095:18"] },
+    { "file": "inc/Core/Admin/FlowFormatter.php", "count": 1, "locations": ["225:18"] },
+    { "file": "inc/Core/Database/BaseRepository.php", "count": 1, "locations": ["131:29"] },
+    { "file": "inc/Core/Database/BatchItems/BatchItems.php", "count": 1, "locations": ["156:23"] },
+    { "file": "inc/Core/Database/Chat/Chat.php", "count": 6, "locations": ["399:25", "1330:22", "1748:22", "1856:19", "1885:23", "1959:21"] },
+    { "file": "inc/Core/Database/Flows/Flows.php", "count": 4, "locations": ["427:25", "641:25", "684:25", "723:25"] },
+    { "file": "inc/Core/Database/Jobs/Jobs.php", "count": 12, "locations": ["772:23", "867:25", "921:25", "1068:37", "1092:24", "1116:24", "1155:24", "1186:25", "1400:27", "1791:30", "1832:30", "4369:20"] },
+    { "file": "inc/Core/Database/Logs/LogRepository.php", "count": 3, "locations": ["185:32", "193:32", "199:25"] },
+    { "file": "inc/Core/Database/Pipelines/Pipelines.php", "count": 12, "locations": ["272:27", "337:27", "368:27", "625:25", "659:20", "660:20", "662:20", "663:20", "665:20", "666:20", "668:20", "669:20"] },
+    { "file": "inc/Core/Database/PostIdentityIndex/PostIdentityIndex.php", "count": 1, "locations": ["127:26"] },
+    { "file": "inc/Core/Database/ProcessedItems/ProcessedItemDeferrals.php", "count": 2, "locations": ["198:11", "208:11"] },
+    { "file": "inc/Core/Database/ProcessedItems/ProcessedItems.php", "count": 1, "locations": ["892:32"] },
+    { "file": "inc/Core/Database/RunMetadata/RunMetadata.php", "count": 2, "locations": ["151:24", "195:25"] },
+    { "file": "inc/Core/Database/TrackedItems/TrackedItems.php", "count": 2, "locations": ["149:24", "166:24"] },
+    { "file": "inc/Core/Database/TransactionScope.php", "count": 4, "locations": ["41:26", "62:40", "82:32", "86:32"] },
+    { "file": "inc/Engine/AI/Actions/PendingActionStore.php", "count": 2, "locations": ["650:18", "730:18"] }
+  ]
+}

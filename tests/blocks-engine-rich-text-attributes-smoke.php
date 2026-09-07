@@ -23,6 +23,7 @@ if ( ! defined( 'ABSPATH' ) || ! function_exists( 'parse_blocks' ) ) {
 		'uses integrity round-trip guard'     => false !== strpos( $repair_source, 'datamachine_blocks_repair_integrity_failed' ),
 		'bulk query is bounded'               => false !== strpos( $command_source, "'posts_per_page'" ) && false !== strpos( $command_source, "'no_found_rows'" ),
 		'bulk query disables cache priming'   => false !== strpos( $command_source, "'cache_results'" ) && false !== strpos( $command_source, "'update_post_meta_cache'" ) && false !== strpos( $command_source, "'update_post_term_cache'" ),
+		'bulk query bypasses site filters'    => false !== strpos( $command_source, "'suppress_filters'       => true" ),
 		'JSON emits one findings envelope'    => 1 === substr_count( $command_source, "'findings' => \$findings" ) && 1 === substr_count( $command_source, "'summary'  => \$summary" ),
 		'structured findings expose no preview' => false === strpos( $command_source, "'preview'" ) && false === strpos( $repair_source, "'preview'" ),
 		'apply errors halt after output'       => strpos( $command_source, 'WP_CLI::halt( 1 )' ) > strpos( $command_source, 'WP_CLI::line' ),
@@ -271,6 +272,7 @@ assert_blocks_engine_rich_text( 'command accepts positive canonical post ID', 42
 assert_blocks_engine_rich_text( 'command rejects every malformed post ID', count( $invalid_ids ) === $rejected );
 assert_blocks_engine_rich_text( 'bulk query is bounded and ordered', 100 === $query_args['posts_per_page'] && 2 === $query_args['paged'] && 'ID' === $query_args['orderby'] && 'ASC' === $query_args['order'] );
 assert_blocks_engine_rich_text( 'bulk query disables all cache priming', false === $query_args['cache_results'] && false === $query_args['update_post_meta_cache'] && false === $query_args['update_post_term_cache'] );
+assert_blocks_engine_rich_text( 'bulk query inventories posts without site filters', true === $query_args['suppress_filters'] );
 assert_blocks_engine_rich_text( 'partial apply failures exit nonzero', 1 === $exit_code->invoke( null, true, array( 'errors' => 1, 'repairable' => 2 ) ) );
 assert_blocks_engine_rich_text( 'total apply failures exit nonzero', 1 === $exit_code->invoke( null, true, array( 'errors' => 3, 'repairable' => 0 ) ) );
 assert_blocks_engine_rich_text( 'dry-run findings never force failure exit', 0 === $exit_code->invoke( null, false, array( 'errors' => 3 ) ) );

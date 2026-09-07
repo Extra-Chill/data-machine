@@ -86,7 +86,7 @@ class AgentTokens extends BaseRepository implements \WP_Agent_Token_Store {
 	 *
 	 * @param int         $agent_id     Agent ID.
 	 * @param string      $agent_slug   Agent slug (used in token prefix).
-	 * @param string      $label        Human-readable label (e.g., "kimaki-prod").
+	 * @param string      $label        Human-readable label (e.g., "desktop-client").
 	 * @param array|null  $capabilities Allowed capabilities (null = all agent capabilities).
 	 * @param string|null $expires_at   Expiry datetime string (null = never).
 	 * @return array{token_id: int, raw_token: string, token_prefix: string}|null Created token data or null on failure.

@@ -608,14 +608,15 @@ class SystemCommand extends BaseCommand {
 	 * @return array|string
 	 */
 	private static function collectRunTaskParamArgs( array $assoc_args, ?array $argv = null ): array|string {
-		$argv = $argv ?? array_map(
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Raw WP-CLI parameters are unslashed here and parsed by the task schema below; text sanitization would corrupt JSON and URLs.
+		$raw_argv   = isset( $_SERVER['argv'] ) ? wp_unslash( $_SERVER['argv'] ) : array();
+		$argv       = $argv ?? array_map(
 			static function ( $arg ): string {
 				// Preserve raw CLI parameter payloads; values are parsed/coerced after
 				// the `--param` boundary and may intentionally contain JSON/URLs.
-				return (string) wp_unslash( $arg );
+				return (string) $arg;
 			},
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Raw argv values are unslashed here and parsed as CLI task parameters below; full-field sanitization would corrupt structured values.
-			$_SERVER['argv'] ?? array()
+			$raw_argv
 		);
 		$raw_params = array();
 

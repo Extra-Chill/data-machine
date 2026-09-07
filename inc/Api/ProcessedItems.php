@@ -84,6 +84,11 @@ class ProcessedItems {
 		$clear_type = $request->get_param( 'clear_type' );
 		$target_id  = (int) $request->get_param( 'target_id' );
 
+		$registry = \WP_Abilities_Registry::get_instance();
+		if ( ! $registry->is_registered( 'datamachine/clear-processed-items' ) ) {
+			return new \WP_Error( 'ability_not_found', __( 'Ability not found', 'data-machine' ), array( 'status' => 500 ) );
+		}
+
 		$ability = wp_get_ability( 'datamachine/clear-processed-items' );
 		if ( ! $ability ) {
 			return new \WP_Error( 'ability_not_found', __( 'Ability not found', 'data-machine' ), array( 'status' => 500 ) );
