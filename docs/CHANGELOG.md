@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.6] - 2026-09-07
+
+### Changed
+- tranche 2 — migrate Flows admin calls to /wp-abilities/v1 and delete wrapper routes
+- tranche 1 — migrate Pipelines admin calls to /wp-abilities/v1 and delete wrapper routes
+
+### Fixed
+- resolve next_run from the real scheduled action identity in flows list
+
 ## [0.176.5] - 2026-09-07
 
 ### Fixed
