@@ -54,12 +54,12 @@ class HandlerDetailAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'slug'    => array( 'type' => 'string' ),
-							'info'    => array( 'type' => 'object' ),
+							'success'  => array( 'type' => 'boolean' ),
+							'slug'     => array( 'type' => 'string' ),
+							'info'     => array( 'type' => 'object' ),
 							'settings' => array( 'type' => 'object' ),
-							'ai_tool' => array( 'type' => array( 'object', 'null' ) ),
-							'error'   => array( 'type' => 'string' ),
+							'ai_tool'  => array( 'type' => array( 'object', 'null' ) ),
+							'error'    => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),

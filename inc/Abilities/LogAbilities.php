@@ -411,8 +411,19 @@ class LogAbilities {
 		}
 
 		// Get file metadata.
-		$file_size     = filesize( $log_file );
-		$last_modified = gmdate( 'c', filemtime( $log_file ) );
+		$file_size = filesize( $log_file );
+		$mtime     = filemtime( $log_file );
+		if ( false === $mtime ) {
+			return new \WP_Error(
+				'debug_log_not_readable',
+				'Unable to stat debug.log.',
+				array(
+					'status' => 500,
+					'file'   => $log_file,
+				)
+			);
+		}
+		$last_modified = gmdate( 'c', $mtime );
 
 		// Parse parameters.
 		$max_lines = min( (int) ( $input['lines'] ?? 100 ), 1000 );
@@ -563,7 +574,7 @@ class LogAbilities {
 		// Handles multi-word levels like "Fatal error", "Parse error", etc.
 		if ( preg_match( '/^\[([^\]]+)\]\s*(?:PHP\s+)?([A-Za-z]+(?:\s+[A-Za-z]+)?)?:\s*(.+)$/i', $line, $matches ) ) {
 			$timestamp_str = $matches[1];
-			$level         = strtoupper( $matches[2] ?? 'UNKNOWN' );
+			$level         = strtoupper( (string) $matches[2] );
 			$message_part  = $matches[3];
 
 			// Parse timestamp (WordPress format: 01-Jan-2026 12:34:56+00:00).

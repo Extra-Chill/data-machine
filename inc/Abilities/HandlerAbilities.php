@@ -278,7 +278,7 @@ class HandlerAbilities {
 
 		// Direct handler lookup by slug - bypasses step_type filter.
 		if ( $handler_slug ) {
-			if ( ! is_string( $handler_slug ) || empty( $handler_slug ) ) {
+			if ( ! is_string( $handler_slug ) ) {
 				return new \WP_Error( 'handler_slug_invalid', 'handler_slug must be a non-empty string', array( 'status' => 400 ) );
 			}
 

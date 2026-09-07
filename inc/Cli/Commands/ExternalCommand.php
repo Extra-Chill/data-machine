@@ -79,7 +79,8 @@ class ExternalCommand extends BaseCommand {
 		// Get token from flag or STDIN.
 		$token = $assoc_args['token'] ?? null;
 		if ( null === $token ) {
-			$token = trim( file_get_contents( 'php://stdin' ) );
+			$stdin = file_get_contents( 'php://stdin' );
+			$token = is_string( $stdin ) ? trim( $stdin ) : '';
 		}
 
 		if ( empty( $token ) ) {
@@ -559,7 +560,7 @@ class ExternalCommand extends BaseCommand {
 			}
 			WP_CLI::log( '' );
 			WP_CLI::log( 'Body:' );
-			WP_CLI::log( wp_json_encode( $result['body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $result['body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		} else {
 			// Default: full JSON envelope minus the headers/raw_body noise.
 			$output = array(
@@ -571,7 +572,7 @@ class ExternalCommand extends BaseCommand {
 			if ( ! empty( $result['error'] ) ) {
 				$output['error'] = $result['error'];
 			}
-			WP_CLI::log( wp_json_encode( $output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		}
 
 		if ( ! $result['success'] ) {

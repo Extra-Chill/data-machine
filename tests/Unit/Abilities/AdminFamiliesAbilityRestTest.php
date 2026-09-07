@@ -93,7 +93,13 @@ class AdminFamiliesAbilityRestTest extends WP_UnitTestCase {
 	public function test_rest_visible_logs_read_metadata_and_clear(): void {
 		$this->act_as_admin();
 
-		$logs = $this->run_ability( 'read-logs', array( 'per_page' => 10, 'page' => 1 ) );
+		$logs = $this->run_ability(
+			'read-logs',
+			array(
+				'per_page' => 10,
+				'page'     => 1,
+			)
+		);
 		$this->assertTrue( $logs['success'] );
 		$this->assertArrayHasKey( 'items', $logs );
 		$this->assertArrayHasKey( 'total', $logs );

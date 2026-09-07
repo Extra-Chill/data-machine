@@ -79,7 +79,7 @@ set_error_handler(
 add_filter(
 	'datamachine_handlers',
 	static function ( array $handlers ): array {
-		$handlers['minimal'] = array(
+		$handlers['minimal']   = array(
 			'type'  => 'fetch',
 			'label' => 'Minimal Handler',
 		);
