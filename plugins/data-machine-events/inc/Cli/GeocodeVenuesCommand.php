@@ -34,6 +34,11 @@ class GeocodeVenuesCommand {
 	 * [--limit=<number>]
 	 * : Max venues to process (default: 50).
 	 *
+	 * [--timezones]
+	 * : Only derive missing venue timezones from existing coordinates, country,
+	 * : and state. Does not call Nominatim. Uses GeoNames when configured,
+	 * : otherwise offline country / US-state / nearest-zone rules.
+	 *
 	 * [--format=<format>]
 	 * : Output format (table or json). Default: table.
 	 *
@@ -51,6 +56,9 @@ class GeocodeVenuesCommand {
 	 *     # Force re-geocode all venues
 	 *     wp data-machine-events geocode-venues --force --limit=10
 	 *
+	 *     # Backfill missing venue timezones without hitting Nominatim
+	 *     wp data-machine-events geocode-venues --timezones --limit=500
+	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.
 	 */
@@ -58,8 +66,9 @@ class GeocodeVenuesCommand {
 		$format = $assoc_args['format'] ?? 'table';
 
 		$input = array(
-			'force'   => isset( $assoc_args['force'] ),
-			'dry_run' => isset( $assoc_args['dry-run'] ),
+			'force'          => isset( $assoc_args['force'] ),
+			'dry_run'        => isset( $assoc_args['dry-run'] ),
+			'timezones_only' => isset( $assoc_args['timezones'] ),
 		);
 
 		if ( isset( $assoc_args['venue-id'] ) ) {
@@ -73,12 +82,18 @@ class GeocodeVenuesCommand {
 		$abilities = new GeocodingAbilities();
 		$result    = $abilities->executeGeocodeVenues( $input );
 
+		if ( is_wp_error( $result ) ) {
+			\WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( isset( $result['error'] ) ) {
-			\WP_CLI::error( $result['error'] );
+			\WP_CLI::error( (string) $result['error'] );
+			return;
 		}
 
 		if ( 'json' === $format ) {
-			\WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			\WP_CLI::log( (string) wp_json_encode( $result, JSON_PRETTY_PRINT ) );
 			return;
 		}
 
@@ -103,11 +118,19 @@ class GeocodeVenuesCommand {
 				$row['Coordinates'] = $item['coordinates'];
 			}
 
+			if ( isset( $item['timezone'] ) ) {
+				$row['Timezone'] = $item['timezone'];
+				$row['Source']   = $item['source'] ?? '';
+			}
+
 			$table_data[] = $row;
 		}
 
 		$columns = array( 'ID', 'Name', 'Address', 'Action' );
-		if ( ! $input['dry_run'] ) {
+		if ( $input['timezones_only'] ) {
+			$columns[] = 'Timezone';
+			$columns[] = 'Source';
+		} elseif ( ! $input['dry_run'] ) {
 			$columns[] = 'Coordinates';
 		}
 

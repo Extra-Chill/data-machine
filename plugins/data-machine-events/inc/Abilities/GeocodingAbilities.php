@@ -24,27 +24,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class GeocodingAbilities {
 
-	/**
-	 * Transient cache TTL for geocoded addresses (30 days).
-	 *
-	 * @deprecated Use NominatimClient::CACHE_TTL.
-	 */
-	private const CACHE_TTL = NominatimClient::CACHE_TTL;
-
-	/**
-	 * Transient prefix for cached geocoding results.
-	 *
-	 * @deprecated Use NominatimClient::CACHE_PREFIX.
-	 */
-	private const CACHE_PREFIX = NominatimClient::CACHE_PREFIX;
-
-	/**
-	 * Rate limit: seconds between Nominatim requests.
-	 *
-	 * @deprecated Use NominatimClient::RATE_LIMIT_SECONDS.
-	 */
-	private const RATE_LIMIT_SECONDS = NominatimClient::RATE_LIMIT_SECONDS;
-
 	private static bool $registered = false;
 
 	public function __construct() {
@@ -235,21 +214,25 @@ class GeocodingAbilities {
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
-						'venue_id' => array(
+						'venue_id'       => array(
 							'type'        => 'integer',
 							'description' => 'Geocode a specific venue by term ID (optional, omit for all)',
 						),
-						'force'    => array(
+						'force'          => array(
 							'type'        => 'boolean',
 							'description' => 'Re-geocode even if coordinates already exist (default: false)',
 						),
-						'dry_run'  => array(
+						'dry_run'        => array(
 							'type'        => 'boolean',
 							'description' => 'Show what would be geocoded without doing it (default: false)',
 						),
-						'limit'    => array(
+						'limit'          => array(
 							'type'        => 'integer',
 							'description' => 'Max venues to process in one batch (default: 50)',
+						),
+						'timezones_only' => array(
+							'type'        => 'boolean',
+							'description' => 'Only derive missing venue timezones (from existing coordinates, country, and state). Does not call Nominatim. (default: false)',
 						),
 					),
 				),
@@ -279,10 +262,11 @@ class GeocodingAbilities {
 	 * @return array|\WP_Error Batch results.
 	 */
 	public function executeGeocodeVenues( array $input ): array|\WP_Error {
-		$venue_id = $input['venue_id'] ?? null;
-		$force    = (bool) ( $input['force'] ?? false );
-		$dry_run  = (bool) ( $input['dry_run'] ?? false );
-		$limit    = (int) ( $input['limit'] ?? 50 );
+		$venue_id       = $input['venue_id'] ?? null;
+		$force          = (bool) ( $input['force'] ?? false );
+		$dry_run        = (bool) ( $input['dry_run'] ?? false );
+		$limit          = (int) ( $input['limit'] ?? 50 );
+		$timezones_only = (bool) ( $input['timezones_only'] ?? false );
 
 		if ( $limit <= 0 ) {
 			$limit = 50;
@@ -307,6 +291,10 @@ class GeocodingAbilities {
 			if ( is_wp_error( $venues ) ) {
 				return new \WP_Error( 'query_failed', 'Failed to query venues: ' . $venues->get_error_message(), array( 'status' => 500 ) );
 			}
+		}
+
+		if ( $timezones_only ) {
+			return $this->deriveTimezones( $venues, $force, $dry_run, $limit );
 		}
 
 		$results   = array();
@@ -395,6 +383,116 @@ class GeocodingAbilities {
 			if ( $skipped > 0 ) {
 				$message_parts[] = "{$skipped} skipped";
 			}
+		}
+
+		return array(
+			'processed' => $processed,
+			'success'   => $success,
+			'failed'    => $failed,
+			'skipped'   => $skipped,
+			'results'   => $results,
+			'message'   => implode( ', ', $message_parts ) . '.',
+		);
+	}
+
+	/**
+	 * Derive missing venue timezones without calling Nominatim.
+	 *
+	 * Uses VenueTimezoneResolver: GeoNames when configured, otherwise offline
+	 * country / US-state / nearest-zone rules. Backfill path for #766.
+	 *
+	 * @param \WP_Term[] $venues  Candidate venues.
+	 * @param bool       $force   Re-derive even when a timezone exists.
+	 * @param bool       $dry_run Report without writing.
+	 * @param int        $limit   Max venues to process.
+	 * @return array
+	 */
+	private function deriveTimezones( array $venues, bool $force, bool $dry_run, int $limit ): array {
+		$results   = array();
+		$success   = 0;
+		$failed    = 0;
+		$skipped   = 0;
+		$processed = 0;
+		$estimated = 0;
+
+		foreach ( $venues as $venue ) {
+			if ( $processed >= $limit ) {
+				break;
+			}
+
+			$term_id  = (int) $venue->term_id;
+			$existing = get_term_meta( $term_id, '_venue_timezone', true );
+			if ( ! empty( $existing ) && ! $force ) {
+				++$skipped;
+				continue;
+			}
+
+			$coords  = (string) get_term_meta( $term_id, '_venue_coordinates', true );
+			$country = (string) get_term_meta( $term_id, '_venue_country', true );
+			$state   = (string) get_term_meta( $term_id, '_venue_state', true );
+
+			if ( '' === $coords && '' === $country && '' === $state ) {
+				++$skipped;
+				continue;
+			}
+
+			$venue_result = array(
+				'term_id' => $term_id,
+				'name'    => html_entity_decode( $venue->name ),
+				'address' => (string) get_term_meta( $term_id, '_venue_address', true ),
+				'city'    => (string) get_term_meta( $term_id, '_venue_city', true ),
+			);
+
+			$resolved = \DataMachineEvents\Core\VenueTimezoneResolver::resolve( $coords, $country, $state );
+			++$processed;
+
+			if ( ! $resolved ) {
+				$venue_result['action'] = 'failed';
+				$results[]              = $venue_result;
+				++$failed;
+				continue;
+			}
+
+			$venue_result['timezone'] = $resolved['timezone'];
+			$venue_result['source']   = $resolved['source'];
+			if ( ! \DataMachineEvents\Core\VenueTimezoneResolver::isExactSource( $resolved['source'] ) ) {
+				++$estimated;
+			}
+
+			if ( $dry_run ) {
+				$venue_result['action'] = 'would_derive';
+				$results[]              = $venue_result;
+				continue;
+			}
+
+			$write = \DataMachineEvents\Core\VenueProfileMutations::updateSystem( $term_id, array( 'timezone' => $resolved['timezone'] ) );
+			if ( is_wp_error( $write ) || empty( $write['success'] ) ) {
+				$venue_result['action'] = 'failed';
+				++$failed;
+			} else {
+				$venue_result['action'] = 'derived';
+				++$success;
+			}
+
+			$results[] = $venue_result;
+		}
+
+		$message_parts = array();
+		if ( $dry_run ) {
+			$message_parts[] = "Dry run: {$processed} venue timezones would be derived";
+		} else {
+			if ( $success > 0 ) {
+				$message_parts[] = "{$success} derived";
+			}
+			if ( $failed > 0 ) {
+				$message_parts[] = "{$failed} failed";
+			}
+			if ( $skipped > 0 ) {
+				$message_parts[] = "{$skipped} skipped";
+			}
+		}
+		if ( $estimated > 0 ) {
+			$message_parts[] = "{$estimated} estimated by nearest zone (review recommended)";
 		}
 
 		return array(

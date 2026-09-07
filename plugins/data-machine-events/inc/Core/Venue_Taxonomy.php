@@ -8,7 +8,6 @@
 
 namespace DataMachineEvents\Core;
 
-use DataMachineEvents\Core\GeoNamesService;
 use DataMachineEvents\Core\NominatimClient;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -870,18 +869,32 @@ class Venue_Taxonomy {
 		$coordinates = self::geocode_address( $venue_data );
 
 		if ( $coordinates ) {
-			$result = VenueProfileMutations::updateSystem( (int) $term_id, array( 'coordinates' => $coordinates ) );
-			return ! is_wp_error( $result ) && ! empty( $result['success'] );
+			$result   = VenueProfileMutations::updateSystem( (int) $term_id, array( 'coordinates' => $coordinates ) );
+			$geocoded = ! is_wp_error( $result ) && ! empty( $result['success'] );
+
+			// Derive the timezone in the same pass. Previously this only ran on
+			// a *subsequent* call (via the existing-coordinates branch above), so
+			// a freshly created venue always landed with coordinates but no
+			// timezone and failed the canonical publication guard. See #766.
+			if ( $geocoded ) {
+				self::maybe_derive_timezone( $term_id, $coordinates );
+			}
+
+			return $geocoded;
 		}
+
+		// Geocoding failed, but country/state alone may still pin the zone.
+		self::maybe_derive_timezone( $term_id );
 
 		return false;
 	}
 
 	/**
-	 * Derive timezone from coordinates if timezone is missing
+	 * Derive timezone if timezone is missing.
 	 *
-	 * Uses GeoNames API to lookup IANA timezone from lat/lng coordinates.
-	 * Only runs if GeoNames username is configured in settings.
+	 * Delegates to VenueTimezoneResolver, which tries GeoNames first (when
+	 * configured) and falls back to offline country / US-state / nearest-zone
+	 * rules so a venue can publish on sites without GeoNames. See #766.
 	 *
 	 * @param int $term_id Venue term ID
 	 * @param string $coordinates Coordinates as "lat,lng"
@@ -901,22 +914,34 @@ class Venue_Taxonomy {
 			$coordinates = get_term_meta( $term_id, '_venue_coordinates', true );
 		}
 
-		if ( empty( $coordinates ) ) {
+		$resolved = VenueTimezoneResolver::resolve(
+			(string) $coordinates,
+			(string) get_term_meta( $term_id, '_venue_country', true ),
+			(string) get_term_meta( $term_id, '_venue_state', true )
+		);
+
+		if ( ! $resolved ) {
 			return false;
 		}
 
-		if ( ! GeoNamesService::isConfigured() ) {
-			return false;
+		$result = VenueProfileMutations::updateSystem( (int) $term_id, array( 'timezone' => $resolved['timezone'] ) );
+		$saved  = ! is_wp_error( $result ) && ! empty( $result['success'] );
+
+		if ( $saved ) {
+			do_action(
+				'datamachine_log',
+				VenueTimezoneResolver::isExactSource( $resolved['source'] ) ? 'info' : 'warning',
+				'Venue timezone derived',
+				array(
+					'term_id'  => (int) $term_id,
+					'timezone' => $resolved['timezone'],
+					'source'   => $resolved['source'],
+					'exact'    => VenueTimezoneResolver::isExactSource( $resolved['source'] ),
+				)
+			);
 		}
 
-		$timezone = GeoNamesService::getTimezoneFromCoordinates( $coordinates );
-
-		if ( $timezone ) {
-			$result = VenueProfileMutations::updateSystem( (int) $term_id, array( 'timezone' => $timezone ) );
-			return ! is_wp_error( $result ) && ! empty( $result['success'] );
-		}
-
-		return false;
+		return $saved;
 	}
 
 	/**

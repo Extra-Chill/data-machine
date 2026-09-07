@@ -546,7 +546,9 @@ class VenueProfileMutations {
 		$updated     = array( 'coordinates', 'timezone' );
 		$coordinates = Venue_Taxonomy::geocode_address( Venue_Taxonomy::get_venue_data( $term_id ) );
 		if ( ! $coordinates ) {
-			return $updated;
+			// No coordinates, but the new country/state may still pin the zone.
+			$timezone_result = self::replaceTimezone( $term_id, '' );
+			return is_wp_error( $timezone_result ) ? $timezone_result : $updated;
 		}
 
 		$result = update_term_meta( $term_id, self::canonicalMetaFields()['coordinates'], sanitize_text_field( $coordinates ) );
@@ -570,15 +572,15 @@ class VenueProfileMutations {
 		if ( metadata_exists( 'term', $term_id, $meta_key ) && ! delete_term_meta( $term_id, $meta_key ) ) {
 			return new \WP_Error( 'venue_timezone_delete_failed', 'Could not invalidate venue timezone.', array( 'status' => 500 ) );
 		}
-		if ( '' === $coordinates || ! GeoNamesService::isConfigured() ) {
+		$resolved = VenueTimezoneResolver::resolve(
+			$coordinates,
+			(string) get_term_meta( $term_id, self::canonicalMetaFields()['country'], true ),
+			(string) get_term_meta( $term_id, self::canonicalMetaFields()['state'], true )
+		);
+		if ( ! $resolved ) {
 			return array( 'timezone' );
 		}
-
-		$timezone = GeoNamesService::getTimezoneFromCoordinates( $coordinates );
-		if ( ! $timezone ) {
-			return array( 'timezone' );
-		}
-		$result = update_term_meta( $term_id, $meta_key, $timezone );
+		$result = update_term_meta( $term_id, $meta_key, $resolved['timezone'] );
 		if ( is_wp_error( $result ) || false === $result ) {
 			return is_wp_error( $result ) ? $result : new \WP_Error( 'venue_timezone_update_failed', 'Could not save the derived venue timezone.', array( 'status' => 500 ) );
 		}
