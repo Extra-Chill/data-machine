@@ -215,7 +215,7 @@ class FetchGoogleDriveAbility {
 				);
 			}
 
-			$reason = $last_error instanceof \WP_Error ? $last_error->get_error_message() : 'Export failed.';
+			$reason = $last_error->get_error_message();
 			$logs[] = array(
 				'level'   => 'warning',
 				'message' => 'GoogleDrive: All export candidates failed for native file.',

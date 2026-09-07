@@ -387,9 +387,9 @@ class ImageOptimizationAbilities {
 			'image_optimization',
 			$item_params,
 			array(
-				'user_id'            => isset( $acting['user_id'] ) ? (int) $acting['user_id'] : 0,
-				'agent_id'           => isset( $acting['agent_id'] ) ? (int) $acting['agent_id'] : 0,
-				'triggering_user_id' => isset( $acting['triggering_user_id'] ) ? (int) $acting['triggering_user_id'] : 0,
+				'user_id'            => (int) $acting['user_id'],
+				'agent_id'           => (int) $acting['agent_id'],
+				'triggering_user_id' => (int) $acting['triggering_user_id'],
 			)
 		);
 

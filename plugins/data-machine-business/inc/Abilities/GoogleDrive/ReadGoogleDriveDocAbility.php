@@ -202,7 +202,7 @@ class ReadGoogleDriveDocAbility {
 			);
 		}
 
-		$reason = $last_error instanceof \WP_Error ? $last_error->get_error_message() : 'Export failed.';
+		$reason = $last_error->get_error_message();
 		return $this->fail( $reason, $logs );
 	}
 

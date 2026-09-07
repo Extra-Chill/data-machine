@@ -257,9 +257,9 @@ class GoogleDriveClient {
 			$moved = @rename( $temp_path, $destination_path );
 		}
 
-		if ( file_exists( $temp_path ) ) {
-			wp_delete_file( $temp_path );
-		}
+		// wp_delete_file() unlinks unconditionally — a missing temp file (native
+		// rename path) is a silent no-op, while the copy path still needs cleanup.
+		wp_delete_file( $temp_path );
 
 		if ( ! $moved || ! file_exists( $destination_path ) ) {
 			return new \WP_Error( 'googledrive_move_failed', 'Failed to move downloaded file to destination.' );
@@ -514,7 +514,7 @@ class GoogleDriveClient {
 	 * with Retry-After respect), and generic HTTP errors.
 	 *
 	 * @param int          $status_code HTTP status.
-	 * @param array|object $response    wp_remote_* response.
+	 * @param array        $response    wp_remote_* response (post is_wp_error check).
 	 * @param string|null  $body        Body string if already retrieved.
 	 * @return \WP_Error
 	 */

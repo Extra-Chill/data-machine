@@ -94,7 +94,7 @@ class GoogleSheetsFetch extends FetchHandler {
 		$headers          = array();
 		$data_start_index = 0;
 
-		if ( $has_header_row && ! empty( $rows ) ) {
+		if ( $has_header_row ) {
 			$headers          = array_map( 'trim', $rows[0] );
 			$data_start_index = 1;
 			$context->log(
@@ -118,6 +118,25 @@ class GoogleSheetsFetch extends FetchHandler {
 	}
 
 	/**
+	 * Whether a spreadsheet row contains any non-empty cell.
+	 *
+	 * Replacement for array_filter( $row, 'strlen' ): keeps cells whose string
+	 * value is non-empty (matching strlen() coercion for scalars) while staying
+	 * type-safe for null or non-scalar cells.
+	 *
+	 * @param array $row Row cells.
+	 * @return bool True when at least one cell has content.
+	 */
+	private static function row_has_content( array $row ): bool {
+		foreach ( $row as $cell ) {
+			if ( is_scalar( $cell ) && '' !== (string) $cell ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Process entire spreadsheet as single data packet.
 	 */
 	private function process_full_spreadsheet( $rows, $headers, $data_start_index, $spreadsheet_id, $worksheet_name, ExecutionContext $context ) {
@@ -137,7 +156,7 @@ class GoogleSheetsFetch extends FetchHandler {
 		$all_data = array();
 		for ( $i = $data_start_index; $i < count( $rows ); $i++ ) {
 			$row = $rows[ $i ];
-			if ( empty( array_filter( $row, 'strlen' ) ) ) {
+			if ( ! self::row_has_content( $row ) ) {
 				continue;
 			}
 
@@ -189,7 +208,7 @@ class GoogleSheetsFetch extends FetchHandler {
 		for ( $i = $data_start_index; $i < count( $rows ); $i++ ) {
 			$row = $rows[ $i ];
 
-			if ( empty( array_filter( $row, 'strlen' ) ) ) {
+			if ( ! self::row_has_content( $row ) ) {
 				continue;
 			}
 

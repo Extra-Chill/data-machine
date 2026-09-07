@@ -23,9 +23,6 @@ final class AgentsMdSections {
 		}
 
 		$registry = '\\DataMachine\\Engine\\AI\\SectionRegistry';
-		if ( ! is_callable( array( $registry, 'register' ) ) ) {
-			return;
-		}
 
 		call_user_func(
 			array( $registry, 'register' ),

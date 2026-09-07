@@ -59,7 +59,6 @@ class SlackAuth extends BaseAuthProvider {
 	public function is_authenticated(): bool {
 		$account = $this->get_account();
 		return ! empty( $account ) &&
-			is_array( $account ) &&
 			! empty( $account['bot_id'] ) &&
 			! empty( $account['team_id'] );
 	}
@@ -202,7 +201,7 @@ class SlackAuth extends BaseAuthProvider {
 	 */
 	public function get_account_details(): ?array {
 		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) || empty( $account['bot_id'] ) ) {
+		if ( empty( $account ) || empty( $account['bot_id'] ) ) {
 			return null;
 		}
 

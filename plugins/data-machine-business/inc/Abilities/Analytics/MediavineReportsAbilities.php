@@ -191,7 +191,6 @@ class MediavineReportsAbilities {
 			'cpm'                    => array( 'type' => 'number' ),
 			'viewability'            => array( 'type' => 'number' ),
 			'fillRate'               => array( 'type' => 'number' ),
-			'impressionsPerPageview' => array( 'type' => 'number' ),
 			'period'                 => array( 'type' => 'string' ),
 			'earnings'               => array( 'type' => 'number' ),
 			'pageviews'              => array( 'type' => 'integer' ),
@@ -1588,6 +1587,9 @@ class MediavineReportsAbilities {
 		$ts    = '' !== $value ? strtotime( $value ) : false;
 		if ( false === $ts ) {
 			$ts = strtotime( $fallback );
+		}
+		if ( false === $ts ) {
+			$ts = time();
 		}
 		return gmdate( 'Y-m-d', $ts );
 	}

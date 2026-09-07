@@ -287,9 +287,13 @@ class GscOpportunityAbility {
 
 		$days            = ! empty( $input['days'] ) ? max( 1, (int) $input['days'] ) : self::DEFAULT_DAYS;
 		$end_date        = ! empty( $input['end_date'] ) ? sanitize_text_field( $input['end_date'] ) : gmdate( 'Y-m-d', strtotime( '-3 days' ) );
+		$start_ts        = strtotime( $end_date . ' -' . ( $days - 1 ) . ' days' );
+		if ( false === $start_ts ) {
+			$start_ts = time() - ( $days - 1 ) * DAY_IN_SECONDS;
+		}
 		$start_date      = ! empty( $input['start_date'] )
 			? sanitize_text_field( $input['start_date'] )
-			: gmdate( 'Y-m-d', strtotime( $end_date . ' -' . ( $days - 1 ) . ' days' ) );
+			: gmdate( 'Y-m-d', $start_ts );
 		$min_impressions = isset( $input['min_impressions'] ) ? max( 1, (int) $input['min_impressions'] ) : self::DEFAULT_MIN_IMPRESSIONS;
 		$good_position   = isset( $input['good_position'] ) ? (float) $input['good_position'] : self::DEFAULT_GOOD_POSITION;
 		$ctr_gap_factor  = isset( $input['ctr_gap_factor'] ) ? (float) $input['ctr_gap_factor'] : self::DEFAULT_CTR_GAP_FACTOR;

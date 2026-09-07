@@ -42,7 +42,7 @@ class GoogleSearchConsoleAnalytics {
 	}
 
 	public static function check_permission( $request ) {
-		$request;
+		unset( $request );
 		if ( ! PermissionHelper::can( 'view_analytics' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',

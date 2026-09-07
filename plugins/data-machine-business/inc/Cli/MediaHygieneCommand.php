@@ -133,7 +133,7 @@ class MediaHygieneCommand extends BaseCommand {
 
 			$result = $this->execute_one( $input );
 
-			$summary = is_array( $result ) && isset( $result['summary'] ) && is_array( $result['summary'] )
+			$summary = isset( $result['summary'] ) && is_array( $result['summary'] )
 				? $result['summary']
 				: array();
 
@@ -149,12 +149,12 @@ class MediaHygieneCommand extends BaseCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $rows, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( (string) wp_json_encode( $rows, JSON_PRETTY_PRINT ) );
 			return;
 		}
 
 		// Pick a stable column set across rows for table output.
-		$fields = ! empty( $rows ) ? array_keys( $rows[0] ) : array( 'blog_id', 'url' );
+		$fields = array_keys( $rows[0] );
 		\WP_CLI\Utils\format_items( 'table', $rows, $fields );
 	}
 
@@ -186,7 +186,7 @@ class MediaHygieneCommand extends BaseCommand {
 	 */
 	private function emit( array $result, string $format ): void {
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT ) );
 			return;
 		}
 
@@ -216,7 +216,7 @@ class MediaHygieneCommand extends BaseCommand {
 		}
 
 		// Per-item results table.
-		$fields = array_keys( reset( $results ) );
+		$fields = array_map( 'strval', array_keys( reset( $results ) ) );
 		\WP_CLI\Utils\format_items( $format, $results, $fields );
 	}
 }

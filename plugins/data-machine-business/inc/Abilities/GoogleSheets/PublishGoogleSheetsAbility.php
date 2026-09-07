@@ -167,7 +167,7 @@ class PublishGoogleSheetsAbility {
 					'Authorization' => 'Bearer ' . $access_token,
 					'Content-Type'  => 'application/json',
 				),
-				'body'    => wp_json_encode( $body ),
+				'body'    => (string) wp_json_encode( $body ),
 			)
 		);
 

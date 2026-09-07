@@ -70,7 +70,7 @@ class AuthHelper {
 			return $token;
 		}
 
-		if ( ! is_string( $token ) || '' === $token ) {
+		if ( '' === $token ) {
 			return new \WP_Error(
 				'googledrive_token_missing',
 				__( 'Failed to obtain a Google access token.', 'data-machine-business' )

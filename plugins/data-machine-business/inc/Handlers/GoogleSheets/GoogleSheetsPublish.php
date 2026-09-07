@@ -79,8 +79,7 @@ class GoogleSheetsPublish extends PublishHandler {
 		}
 
 		return $this->successResponse(
-			$result['data'] ?? array(),
-			'googlesheets_publish'
+			$result['data'] ?? array()
 		);
 	}
 

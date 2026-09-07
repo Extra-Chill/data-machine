@@ -20,7 +20,6 @@ class PageSpeedTool extends BaseTool {
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		$tool_def;
 		$ability = wp_get_ability( 'datamachine/pagespeed' );
 
 		if ( ! $ability ) {

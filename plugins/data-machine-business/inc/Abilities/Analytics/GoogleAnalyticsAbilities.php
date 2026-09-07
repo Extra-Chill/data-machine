@@ -868,6 +868,7 @@ class GoogleAnalyticsAbilities {
 			);
 		}
 
+		$config      = self::get_config();
 		$property_id = ! empty( $input['property_id'] ) ? sanitize_text_field( $input['property_id'] ) : ( $config['property_id'] ?? '' );
 
 		if ( empty( $property_id ) ) {

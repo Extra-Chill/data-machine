@@ -182,16 +182,16 @@ class GoogleSearchConsole extends BaseTool {
 		return self::get_config();
 	}
 
-	/**
-	 * Save configuration from settings page.
-	 *
-	 * @param string $tool_id     Tool identifier.
-	 * @param array  $config_data Configuration data.
-	 */
 	protected function get_config_option_name(): string {
 		return GoogleSearchConsoleAbilities::CONFIG_OPTION;
 	}
 
+	/**
+	 * Validate and build configuration from settings page data.
+	 *
+	 * @param array $config_data Configuration data.
+	 * @return array
+	 */
 	protected function validate_and_build_config( array $config_data ): array {
 		$service_account_json = $config_data['service_account_json'] ?? '';
 		$site_url             = sanitize_text_field( $config_data['site_url'] ?? '' );

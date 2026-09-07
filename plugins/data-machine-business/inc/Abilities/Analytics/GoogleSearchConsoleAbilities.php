@@ -202,6 +202,7 @@ class GoogleSearchConsoleAbilities {
 			);
 		}
 
+		$config   = self::get_config();
 		$site_url = self::resolve_site_url( $input, $config );
 
 		if ( is_wp_error( $site_url ) ) {

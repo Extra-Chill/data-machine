@@ -139,7 +139,7 @@ class FetchMessagesDiscordAbility {
 		}
 
 		// Discord returns messages as an array (newest first)
-		$messages = is_array( $response ) ? $response : array();
+		$messages = $response;
 
 		// Strip to essential fields for cleaner output
 		$clean_messages = array_map( function ( $msg ) {

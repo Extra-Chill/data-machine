@@ -94,7 +94,7 @@ class PageSpeedCommand extends BaseCommand {
 		}
 
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT ) );
 			return;
 		}
 

@@ -77,7 +77,7 @@ class GoogleAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		// Normalize: trim, drop empties, de-duplicate, preserve order.
 		$normalized = array();
 		foreach ( (array) $scopes as $scope ) {
-			$scope = is_string( $scope ) ? trim( $scope ) : '';
+			$scope = trim( $scope );
 			if ( '' === $scope ) {
 				continue;
 			}
@@ -118,7 +118,6 @@ class GoogleAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	public function is_authenticated(): bool {
 		$account = $this->get_account();
 		return ! empty( $account ) &&
-			is_array( $account ) &&
 			! empty( $account['access_token'] ) &&
 			! empty( $account['refresh_token'] );
 	}
@@ -283,7 +282,7 @@ class GoogleAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		$existing = $this->get_account();
 
 		$account_data = array_merge(
-			is_array( $existing ) ? $existing : array(),
+			$existing,
 			array(
 				'access_token'      => $access_token,
 				'refresh_token'     => $refresh_token,
@@ -396,7 +395,7 @@ class GoogleAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	 */
 	public function get_account_details(): ?array {
 		$account = $this->get_account();
-		if ( empty( $account ) || ! is_array( $account ) || empty( $account['access_token'] ) || empty( $account['refresh_token'] ) ) {
+		if ( empty( $account ) || empty( $account['access_token'] ) || empty( $account['refresh_token'] ) ) {
 			return null;
 		}
 		return $account;

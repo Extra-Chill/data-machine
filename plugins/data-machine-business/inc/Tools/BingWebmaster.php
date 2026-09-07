@@ -27,7 +27,6 @@ class BingWebmaster extends BaseTool {
 	 * @return array<string,mixed> Tool result.
 	 */
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		$tool_def;
 		$ability = wp_get_ability( 'datamachine/bing-webmaster' );
 
 		if ( ! $ability ) {

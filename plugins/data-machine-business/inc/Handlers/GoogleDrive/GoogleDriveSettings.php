@@ -63,6 +63,13 @@ class GoogleDriveSettings {
 			);
 		}
 
+		if ( ! method_exists( $auth_provider, 'has_scope' ) ) {
+			return new \WP_Error(
+				'googledrive_auth_unavailable',
+				__( 'Google authentication provider does not support scope validation.', 'data-machine-business' )
+			);
+		}
+
 		foreach ( self::required_scopes() as $scope ) {
 			if ( ! $auth_provider->has_scope( $scope ) ) {
 				return new \WP_Error(

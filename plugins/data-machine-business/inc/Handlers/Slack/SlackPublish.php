@@ -95,8 +95,7 @@ class SlackPublish extends PublishHandler {
 		}
 
 		return $this->successResponse(
-			$result['data'] ?? array(),
-			'slack_publish'
+			$result['data'] ?? array()
 		);
 	}
 

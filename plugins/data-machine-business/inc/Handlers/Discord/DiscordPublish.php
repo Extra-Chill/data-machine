@@ -84,8 +84,7 @@ class DiscordPublish extends PublishHandler {
 		}
 
 		return $this->successResponse(
-			$result['data'] ?? array(),
-			'discord_publish'
+			$result['data'] ?? array()
 		);
 	}
 
