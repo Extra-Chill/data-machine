@@ -7,26 +7,10 @@
  */
 
 use DataMachine\Core\FilesRepository\DirectoryManager;
-use DataMachine\Engine\Agents\AgentRegistry;
+use DataMachine\Engine\Agents\AgentMaterializer;
 use DataMachine\Engine\Agents\PersistedAgentProjector;
 
 defined( 'ABSPATH' ) || exit;
-
-/**
- * Register a Data Machine agent.
- *
- * Existing Data Machine-named wrapper for the in-place transition. New
- * declarations should use `wp_register_agent()` from `wp_agents_api_init`.
- *
- * @since 0.71.0
- *
- * @param string $slug Unique agent slug.
- * @param array  $args Registration arguments. See AgentRegistry::register().
- * @return void
- */
-function datamachine_register_agent( string $slug, array $args = array() ): void {
-	AgentRegistry::register( $slug, $args );
-}
 
 /**
  * Reconcile registered agents on `init`.
@@ -35,12 +19,26 @@ function datamachine_register_agent( string $slug, array $args = array() ): void
  * ability is available when reconciliation triggers SOUL/MEMORY creation for
  * newly-materialized agents, and before the existing `datamachine_needs_scaffold`
  * transient check at priority 20.
+ *
+ * @return array{created: string[], existing: string[], definition_only: string[], skipped: string[]}
  */
+function datamachine_reconcile_registered_agents(): array {
+	if ( class_exists( \DataMachine\Core\Bootstrap\ActivationServiceProvider::class ) ) {
+		\DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
+	}
+
+	$definitions = array_map(
+		static fn( \WP_Agent $agent ): array => $agent->to_array(),
+		// @phpstan-ignore-next-line Bundled Agents API functions are absent from the WordPress stubs.
+		wp_get_agents()
+	);
+
+	return AgentMaterializer::reconcile( $definitions );
+}
+
 add_action(
 	'init',
-	static function (): void {
-		AgentRegistry::reconcile();
-	},
+	'datamachine_reconcile_registered_agents',
 	15
 );
 
@@ -52,44 +50,38 @@ add_action(
  * @param array  $context  Scaffolding context with `agent_slug`.
  * @return string
  */
-add_filter(
-	'datamachine_scaffold_content',
-	static function ( string $content, string $filename, array $context ): string {
-		if ( '' !== $content ) {
-			return $content;
-		}
+function datamachine_registered_agent_memory_seed( string $content, string $filename, array $context ): string {
+	if ( '' !== $content ) {
+		return $content;
+	}
 
-		$agent_slug = isset( $context['agent_slug'] ) ? (string) $context['agent_slug'] : '';
-		if ( '' === $agent_slug ) {
-			return $content;
-		}
+	$agent_slug = isset( $context['agent_slug'] ) ? (string) $context['agent_slug'] : '';
+	// @phpstan-ignore-next-line Bundled Agents API functions are absent from the WordPress stubs.
+	if ( '' === $agent_slug || ! wp_has_agent( $agent_slug ) ) {
+		return $content;
+	}
 
-		$def = AgentRegistry::get( $agent_slug );
-		if ( ! $def || empty( $def['memory_seeds'] ) ) {
-			return $content;
-		}
+	// @phpstan-ignore-next-line Bundled Agents API functions are absent from the WordPress stubs.
+	$agent = wp_get_agent( $agent_slug );
+	if ( ! $agent instanceof \WP_Agent ) {
+		return $content;
+	}
 
-		$filename_key = sanitize_file_name( $filename );
-		$seeds        = $def['memory_seeds'];
-		if ( ! isset( $seeds[ $filename_key ] ) ) {
-			return $content;
-		}
+	$seeds        = $agent->get_memory_seeds();
+	$filename_key = sanitize_file_name( $filename );
+	if ( ! isset( $seeds[ $filename_key ] ) ) {
+		return $content;
+	}
 
-		$path = (string) $seeds[ $filename_key ];
-		if ( '' === $path || ! is_readable( $path ) ) {
-			return $content;
-		}
+	$path = (string) $seeds[ $filename_key ];
+	if ( '' === $path || ! is_readable( $path ) ) {
+		return $content;
+	}
 
-		$bundled = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-		if ( false === $bundled || '' === $bundled ) {
-			return $content;
-		}
-
-		return $bundled;
-	},
-	5,
-	3
-);
+	$bundled = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+	return false !== $bundled && '' !== $bundled ? $bundled : $content;
+}
+add_filter( 'datamachine_scaffold_content', 'datamachine_registered_agent_memory_seed', 5, 3 );
 
 /**
  * DM core dogfood — register the default site administrator agent.
@@ -133,6 +125,7 @@ function datamachine_register_default_admin_agent(): void {
 		}
 	}
 
+	// @phpstan-ignore-next-line Bundled Agents API functions are absent from the WordPress stubs.
 	wp_register_agent(
 		$slug,
 		array(
@@ -168,7 +161,7 @@ add_action( 'wp_agents_api_init', 'datamachine_register_persisted_agents', 20 );
  */
 function datamachine_reconcile_runtime_agent_bundle_import( $result ) {
 	if ( is_array( $result ) && ! empty( $result['success'] ) && ! empty( $result['agent_slug'] ) ) {
-		AgentRegistry::reconcile();
+		datamachine_reconcile_registered_agents();
 	}
 
 	return $result;

@@ -173,7 +173,6 @@ agents_api_memory_assert( class_exists( WP_Agent_Memory_Write_Result::class ), '
 agents_api_memory_assert( class_exists( WP_Agent_Memory_List_Entry::class ), 'WP_Agent_Memory_List_Entry is available' );
 agents_api_memory_assert( interface_exists( WP_Agent_Memory_Store::class ), 'WP_Agent_Memory_Store is available' );
 agents_api_memory_assert( ! class_exists( 'DataMachine\Core\FilesRepository\DiskAgentMemoryStore', false ), 'DiskAgentMemoryStore is not loaded by agents-api bootstrap' );
-agents_api_memory_assert( ! class_exists( 'DataMachine\Core\FilesRepository\AgentMemoryStoreFactory', false ), 'Data Machine memory factory is not loaded by agents-api bootstrap' );
 
 echo "\n[2] Fake store satisfies the contract shape in isolation:\n";
 $store = new AgentsApiMemoryFakeStore();

@@ -25,14 +25,14 @@ class ChatCommand extends BaseCommand {
 	 * Pipeline transcript sessions (mode='pipeline') are hidden from the
 	 * default listing because they're forensic captures of AI conversation
 	 * loops, not human chats. Use --include-transcripts to include them, or
-	 * --context=pipeline to list only pipeline-mode sessions.
+	 * --session-context=pipeline to list only pipeline-mode sessions.
 	 *
 	 * ## OPTIONS
 	 *
-	 * [--user=<id>]
+	 * [--owner-user=<id>]
 	 * : User ID to list sessions for. Defaults to current user.
 	 *
-	 * [--context=<type>]
+	 * [--session-context=<type>]
 	 * : Filter by execution context (chat, pipeline, system). When set, the
 	 *   --include-transcripts flag is implicitly on for pipeline contexts.
 	 *
@@ -69,19 +69,19 @@ class ChatCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # List human chat sessions for user 1 (transcripts hidden)
-	 *     wp datamachine chat list --user=1
+	 *     wp datamachine chat list --owner-user=1
 	 *
 	 *     # List chat-context sessions explicitly
-	 *     wp datamachine chat list --user=1 --context=chat
+	 *     wp datamachine chat list --owner-user=1 --session-context=chat
 	 *
 	 *     # Include pipeline transcripts in the list
-	 *     wp datamachine chat list --user=1 --include-transcripts
+	 *     wp datamachine chat list --owner-user=1 --include-transcripts
 	 *
 	 *     # List only pipeline transcripts
-	 *     wp datamachine chat list --user=1 --context=pipeline
+	 *     wp datamachine chat list --owner-user=1 --session-context=pipeline
 	 *
 	 *     # Get session IDs only
-	 *     wp datamachine chat list --user=1 --format=ids
+	 *     wp datamachine chat list --owner-user=1 --format=ids
 	 *
 	 * @subcommand list
 	 */
@@ -89,7 +89,7 @@ class ChatCommand extends BaseCommand {
 		$user_id = $this->get_user_id( $assoc_args );
 		$limit   = min( 100, max( 1, (int) ( $assoc_args['limit'] ?? 20 ) ) );
 		$offset  = max( 0, (int) ( $assoc_args['offset'] ?? 0 ) );
-		$context = ! empty( $assoc_args['context'] ) ? sanitize_text_field( $assoc_args['context'] ) : null;
+		$context = ! empty( $assoc_args['session-context'] ) ? sanitize_text_field( $assoc_args['session-context'] ) : null;
 
 		$include_transcripts = isset( $assoc_args['include-transcripts'] );
 
@@ -98,7 +98,7 @@ class ChatCommand extends BaseCommand {
 		$total    = $chat_db->get_user_session_count( $user_id, $context );
 
 		// Hide pipeline transcripts unless explicitly opted in or filtered to.
-		// When the caller passes an explicit --context, they've already chosen
+		// When the caller passes an explicit --session-context, they've already chosen
 		// what they want — don't second-guess them.
 		if ( null === $context && ! $include_transcripts ) {
 			$filtered = array_values(
@@ -177,7 +177,7 @@ class ChatCommand extends BaseCommand {
 	 * <session_id>
 	 * : Session ID to retrieve.
 	 *
-	 * [--user=<id>]
+	 * [--owner-user=<id>]
 	 * : User ID for ownership verification. Defaults to current user.
 	 *
 	 * [--format=<format>]
@@ -268,13 +268,13 @@ class ChatCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
-	 * [--user=<id>]
+	 * [--owner-user=<id>]
 	 * : User ID who owns the session. Defaults to current user.
 	 *
 	 * [--agent-id=<id>]
 	 * : First-class agent ID for this session.
 	 *
-	 * [--context=<type>]
+	 * [--session-context=<type>]
 	 * : Execution context (chat, pipeline, system).
 	 * ---
 	 * default: chat
@@ -289,15 +289,15 @@ class ChatCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Create a session for user 1
-	 *     wp datamachine chat create --user=1
+	 *     wp datamachine chat create --owner-user=1
 	 *
 	 *     # Create a session with agent ID
-	 *     wp datamachine chat create --user=1 --agent-id=5
+	 *     wp datamachine chat create --owner-user=1 --agent-id=5
 	 */
 	public function create( array $args, array $assoc_args ): void {
 		$user_id  = $this->get_user_id( $assoc_args );
 		$agent_id = (int) ( $assoc_args['agent-id'] ?? 0 );
-		$context  = sanitize_text_field( $assoc_args['context'] ?? 'chat' );
+		$context  = sanitize_text_field( $assoc_args['session-context'] ?? 'chat' );
 		$source   = sanitize_text_field( $assoc_args['source'] ?? 'cli' );
 
 		$metadata = array(
@@ -326,7 +326,7 @@ class ChatCommand extends BaseCommand {
 	 * <session_id>
 	 * : Session ID to delete.
 	 *
-	 * [--user=<id>]
+	 * [--owner-user=<id>]
 	 * : User ID for ownership verification. Defaults to current user.
 	 *
 	 * [--yes]
@@ -438,14 +438,14 @@ class ChatCommand extends BaseCommand {
 	}
 
 	/**
-	 * Get user ID from args or current user.
+	 * Get the session owner ID from args or current user.
 	 *
 	 * @param array $assoc_args Command arguments.
 	 * @return int User ID.
 	 */
 	private function get_user_id( array $assoc_args ): int {
-		if ( isset( $assoc_args['user'] ) ) {
-			return (int) $assoc_args['user'];
+		if ( isset( $assoc_args['owner-user'] ) ) {
+			return (int) $assoc_args['owner-user'];
 		}
 
 		return get_current_user_id() ? get_current_user_id() : 1;

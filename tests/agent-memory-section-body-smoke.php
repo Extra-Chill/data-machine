@@ -104,7 +104,6 @@ datamachine_tests_require_agents_api();
 require_once __DIR__ . '/../inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DirectoryManager.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreFactory.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemory.php';
 
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_List_Entry;

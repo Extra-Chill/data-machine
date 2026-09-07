@@ -2,7 +2,7 @@
 
 Declarative agent registration uses the Agents API `wp_agents_api_init` action. Plugins and Data Machine declare agent roles once; Data Machine's materializer reconciles the registered definitions against the `datamachine_agents` table on `init`.
 
-**Source:** `agents-api/inc/class-wp-agent.php`, `agents-api/inc/class-wp-agents-registry.php`, `agents-api/inc/register-agents.php`, `inc/Engine/Agents/AgentRegistry.php`, `inc/Engine/Agents/datamachine-register-agents.php`
+**Source:** `vendor/wordpress/agents-api/src/Registry/class-wp-agent.php`, `vendor/wordpress/agents-api/src/Registry/class-wp-agents-registry.php`, `vendor/wordpress/agents-api/src/Registry/register-agents.php`, `inc/Engine/Agents/AgentMaterializer.php`, `inc/Engine/Agents/datamachine-register-agents.php`
 
 ## Why
 
@@ -48,7 +48,7 @@ That's it. On the next request where `init` fires, DM reconciles the registratio
 
 ### Slug semantics
 
-Slugs are passed through `sanitize_title()`. Empty slugs are rejected. They must be unique across a site because the database column has a unique constraint on `agent_slug`. When two plugins register the same slug, the registration at the later hook priority wins.
+Slugs are passed through `sanitize_title()`. Empty slugs are rejected. They must be unique across a site because the database column has a unique constraint on `agent_slug`. When two plugins register the same slug, the first definition remains registered and the duplicate emits a `_doing_it_wrong()` notice.
 
 `WP_Agent` is a prepared definition object, not a database row. It validates property types, normalizes the slug and memory seed filenames, and exposes getters (`get_slug()`, `get_label()`, `get_description()`, `get_memory_seeds()`, `get_owner_resolver()`, `get_default_config()`, `get_meta()`).
 
@@ -56,23 +56,21 @@ Invalid property types reject the definition with a `_doing_it_wrong()` notice w
 
 ## Registration Lifecycle
 
-The Agents API registry initializes lazily on its first read or registration. Data Machine's materializer reads it from `init` priority 15. Extensions register definitions during `wp_agents_api_init`; direct registration before materialization is also supported.
+The Agents API registry initializes on `init` priority 10 and fires `wp_agents_api_init`. Data Machine's materializer reads it from `init` priority 15, after extensions have registered their definitions.
 
 ## Reconciliation
 
 Reconciliation runs on `init` at priority 15:
 
-- Priority 10: `wp_abilities_api_init` fires. Abilities register.
-- **Priority 15: `AgentRegistry::reconcile()` fires the `wp_agents_api_init` action, collects registrations, creates missing DB rows, scaffolds agent-layer memory files.**
+- Priority 10: Agents API initializes and fires `wp_agents_api_init`; extensions register definitions. Abilities are also available by this point.
+- **Priority 15: `datamachine_reconcile_registered_agents()` reads `wp_get_agents()`, converts each canonical `WP_Agent` definition to an array, and passes the definitions to `AgentMaterializer::reconcile()`. Missing DB rows and agent-layer memory files are created.**
 - Priority 20: existing `datamachine_needs_scaffold` transient check. No-op when the registry has already scaffolded.
-
-The `wp_agents_api_init` action is also fired lazily by `AgentRegistry::get_all()` / `get()` / `reconcile()`, so callers can query the registry regardless of hook ordering. Extensions use the Agents API registration functions and `wp_agents_api_init` lifecycle.
 
 ## Memory seed resolution
 
 Registered `memory_seeds` entries flow into scaffold content via the existing `datamachine_scaffold_content` filter chain:
 
-1. **Priority 5** — registry's generator. For any filename being scaffolded, checks `AgentRegistry::get($agent_slug)['memory_seeds'][$filename]`. If a readable bundle path is registered, its contents become the scaffold content.
+1. **Priority 5** — registered-agent generator. For any filename being scaffolded, resolves the canonical `WP_Agent` with `wp_get_agent()` and checks its `memory_seeds` definition. If a readable bundle path is registered, its contents become the scaffold content.
 2. **Priority 10** — DM's default generators (`datamachine_scaffold_soul_content`, `datamachine_scaffold_memory_content`, etc.). Produce generic site-context content using agent display name + site metadata.
 
 Registered agents with a `memory_seeds` entry for a filename win at priority 5. Filenames without a seed entry fall through to priority 10. Agents created imperatively via `AgentAbilities::createAgent()` (with no registry entry) likewise fall through for every filename.
@@ -83,7 +81,7 @@ Seeds apply to any filename registered via `MemoryFileRegistry::register()`. `SO
 
 ## Reconciliation outcomes
 
-`AgentRegistry::reconcile()` returns a summary for logging / testing:
+`datamachine_reconcile_registered_agents()` returns the `AgentMaterializer` summary for logging and testing:
 
 ```php
 [

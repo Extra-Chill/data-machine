@@ -6,7 +6,7 @@
 
 Fires once per request when the Agents API registry is first consumed. Plugins declare agent roles inside this callback; Data Machine reconciles declarations against the `datamachine_agents` table on `init` priority 15.
 
-Data Machine uses the same API to register the default site administrator agent. Registrations are collected statically; last-wins on slug collision so plugins can override via hook priority.
+Data Machine uses the same API to register the default site administrator agent. Registrations are collected statically; the first definition remains registered when a later callback attempts the same slug.
 
 **Since:** 0.99.0
 
@@ -29,7 +29,7 @@ See `docs/core-system/agent-registration.md` for the full registration contract.
 
 ### `datamachine_registered_agent_reconciled`
 
-Fires for each registered agent that was just materialized into the `datamachine_agents` table by `AgentRegistry::reconcile()`. Does not fire for registrations whose DB row already existed.
+Fires for each registered agent that was just materialized into the `datamachine_agents` table by `AgentMaterializer::reconcile()`. Does not fire for registrations whose DB row already existed.
 
 **Since:** 0.71.0
 

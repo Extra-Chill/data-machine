@@ -9,6 +9,7 @@ namespace DataMachine\Core\Bootstrap;
 
 defined( 'ABSPATH' ) || exit;
 
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
 use DataMachine\Abilities\AbilityScopePermissionFilter;
 use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Abilities\Chat\AgentsChatHandler;
@@ -21,6 +22,7 @@ use DataMachine\Core\Auth\AgentAccessFilterBridge;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
 use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Core\FilesRepository\DiskAgentMemoryStore;
 use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
 use DataMachine\Core\OAuth\HttpBasicAuthProvider;
 use DataMachine\Core\PluginSettings;
@@ -39,6 +41,7 @@ final class HostIntegrationServiceProvider {
 	 * Register integrations in the historical bootstrap order.
 	 */
 	public static function register(): void {
+		self::register_memory_store();
 		add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
 		AbilityScopePermissionFilter::register();
 		ContentFormat::register();
@@ -93,6 +96,19 @@ final class HostIntegrationServiceProvider {
 		}
 
 		add_action( 'init', array( \DataMachine\Engine\AI\ComposableFileInvalidation::class, 'register_hooks' ) );
+	}
+
+	/** Register Data Machine's disk-backed default through the canonical store seam. */
+	public static function register_memory_store(): void {
+		if ( false === has_filter( 'wp_agent_memory_store', array( self::class, 'memory_store' ) ) ) {
+			add_filter( 'wp_agent_memory_store', array( self::class, 'memory_store' ), PHP_INT_MAX, 2 );
+		}
+	}
+
+	/** @param array<string,mixed> $context Resolver context. */
+	public static function memory_store( $store, array $context ): WP_Agent_Memory_Store {
+		unset( $context );
+		return $store instanceof WP_Agent_Memory_Store ? $store : new DiskAgentMemoryStore();
 	}
 
 	/** @param array<string, object> $providers Authentication providers. */
