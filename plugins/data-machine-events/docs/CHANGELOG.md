@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.57.0] - 2026-09-07
+
+### Added
+- surface ICS UID and occurrence identity from IcsExtractor
+
+### Fixed
+- honor WP_Error contract in geocode search REST controller
+- surface ICS CLASS, STATUS, and TRANSP from IcsExtractor
+
 ## [0.56.1] - 2026-08-26
 
 ### Changed
