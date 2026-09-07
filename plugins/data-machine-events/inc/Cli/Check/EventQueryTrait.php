@@ -98,6 +98,43 @@ trait EventQueryTrait {
 	}
 
 	/**
+	 * Parse a comma-separated reviewed candidate ID list.
+	 *
+	 * @param string $value Raw --reviewed value.
+	 * @return string[] Unique trimmed candidate IDs.
+	 */
+	private function parse_reviewed_candidate_ids( string $value ): array {
+		$ids = array_filter( array_map( 'trim', explode( ',', $value ) ) );
+
+		return array_values( array_unique( $ids ) );
+	}
+
+	/**
+	 * Restrict candidate actions to the reviewed candidate IDs.
+	 *
+	 * Fails closed when any reviewed ID is unknown, so an apply can only
+	 * act on rows from the exact dry run being approved.
+	 *
+	 * @param array    $actions    Candidate rows keyed by candidate_id.
+	 * @param string[] $reviewed   Reviewed candidate IDs.
+	 * @param string   $error_code Error code for the stale-review failure.
+	 * @return array|\WP_Error Reviewed actions or error.
+	 */
+	private function select_reviewed_actions( array $actions, array $reviewed, string $error_code = 'stale_duplicate_review' ): array|\WP_Error {
+		$by_id   = array_column( $actions, null, 'candidate_id' );
+		$missing = array_diff( $reviewed, array_keys( $by_id ) );
+
+		if ( ! empty( $missing ) ) {
+			return new \WP_Error(
+				$error_code,
+				'Reviewed candidate IDs are stale or outside the requested scope; no changes made: ' . implode( ', ', $missing )
+			);
+		}
+
+		return array_values( array_intersect_key( $by_id, array_flip( $reviewed ) ) );
+	}
+
+	/**
 	 * Sort events by date (ascending for upcoming, descending for past).
 	 *
 	 * @param array  $events Array of event info arrays with 'date' key.

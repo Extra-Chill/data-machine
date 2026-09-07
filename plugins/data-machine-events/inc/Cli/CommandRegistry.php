@@ -39,55 +39,55 @@ class CommandRegistry {
 
 		return array(
 			// Handler / scraper testing.
-			'data-machine-events test-event-scraper'     => array(
+			'data-machine-events test-event-scraper'      => array(
 				'file'  => $cli . 'UniversalWebScraperTestCommand.php',
 				'class' => UniversalWebScraperTestCommand::class,
 			),
-			'data-machine-events test-ticketmaster'      => array(
+			'data-machine-events test-ticketmaster'       => array(
 				'file'  => $cli . 'TicketmasterTestCommand.php',
 				'class' => TicketmasterTestCommand::class,
 			),
-			'data-machine-events test-dice-fm'           => array(
+			'data-machine-events test-dice-fm'            => array(
 				'file'  => $cli . 'DiceFmTestCommand.php',
 				'class' => DiceFmTestCommand::class,
 			),
 
 			// Settings + venue event lookups.
-			'data-machine-events settings'               => array(
+			'data-machine-events settings'                => array(
 				'file'  => $cli . 'SettingsCommand.php',
 				'class' => SettingsCommand::class,
 			),
-			'data-machine-events get-venue-events'       => array(
+			'data-machine-events get-venue-events'        => array(
 				'file'  => $cli . 'GetVenueEventsCommand.php',
 				'class' => GetVenueEventsCommand::class,
 			),
 
 			// Data quality checks (each a leaf __invoke command).
-			'data-machine-events check times'            => array(
+			'data-machine-events check times'             => array(
 				'file'  => $cli . 'Check/CheckTimesCommand.php',
 				'class' => Check\CheckTimesCommand::class,
 			),
-			'data-machine-events check venues'           => array(
+			'data-machine-events check venues'            => array(
 				'file'  => $cli . 'Check/CheckVenuesCommand.php',
 				'class' => Check\CheckVenuesCommand::class,
 			),
-			'data-machine-events check encoding'         => array(
+			'data-machine-events check encoding'          => array(
 				'file'  => $cli . 'Check/CheckEncodingCommand.php',
 				'class' => Check\CheckEncodingCommand::class,
 			),
-			'data-machine-events check duration'         => array(
+			'data-machine-events check duration'          => array(
 				'file'  => $cli . 'Check/CheckDurationCommand.php',
 				'class' => Check\CheckDurationCommand::class,
 			),
-			'data-machine-events check duplicates'       => array(
+			'data-machine-events check duplicates'        => array(
 				'file'  => $cli . 'Check/CheckDuplicatesCommand.php',
 				'class' => Check\CheckDuplicatesCommand::class,
 			),
-			'data-machine-events check clean-duplicates' => array(
+			'data-machine-events check clean-duplicates'  => array(
 				'file'  => $cli . 'Check/CleanDuplicatesCommand.php',
 				'class' => Check\CleanDuplicatesCommand::class,
 			),
-			'data-machine-events check merged-bills'     => array(
+			'data-machine-events check merged-bills'      => array(
 				'file'  => $cli . 'Check/CheckMergedBillsCommand.php',
 				'class' => Check\CheckMergedBillsCommand::class,
 			),
@@ -99,19 +99,19 @@ class CommandRegistry {
 				'file'  => $cli . 'Check/CheckMissingVenueAddressesCommand.php',
 				'class' => Check\CheckMissingVenueAddressesCommand::class,
 			),
-			'data-machine-events check orphan-venues'    => array(
+			'data-machine-events check orphan-venues'     => array(
 				'file'  => $cli . 'Check/CheckOrphanVenuesCommand.php',
 				'class' => Check\CheckOrphanVenuesCommand::class,
 			),
-			'data-machine-events check orphan-pipelines' => array(
+			'data-machine-events check orphan-pipelines'  => array(
 				'file'  => $cli . 'Check/CheckOrphanPipelinesCommand.php',
 				'class' => Check\CheckOrphanPipelinesCommand::class,
 			),
-			'data-machine-events check quality'          => array(
+			'data-machine-events check quality'           => array(
 				'file'  => $cli . 'Check/CheckQualityCommand.php',
 				'class' => Check\CheckQualityCommand::class,
 			),
-			'data-machine-events check malformed-dates'  => array(
+			'data-machine-events check malformed-dates'   => array(
 				'file'  => $cli . 'Check/CheckMalformedDatesCommand.php',
 				'class' => Check\CheckMalformedDatesCommand::class,
 			),
@@ -119,41 +119,45 @@ class CommandRegistry {
 				'file'  => $cli . 'Check/CheckEventDateStatusCommand.php',
 				'class' => Check\CheckEventDateStatusCommand::class,
 			),
-			'data-machine-events check all'              => array(
+			'data-machine-events check stale-listings'    => array(
+				'file'  => $cli . 'Check/CheckStaleListingsCommand.php',
+				'class' => Check\CheckStaleListingsCommand::class,
+			),
+			'data-machine-events check all'               => array(
 				'file'  => $cli . 'Check/CheckAllCommand.php',
 				'class' => Check\CheckAllCommand::class,
 			),
 
 			// Event + venue maintenance.
-			'data-machine-events update-event'           => array(
+			'data-machine-events update-event'            => array(
 				'file'  => $cli . 'UpdateEventCommand.php',
 				'class' => UpdateEventCommand::class,
 			),
-			'data-machine-events batch-time-fix'         => array(
+			'data-machine-events batch-time-fix'          => array(
 				'file'  => $cli . 'BatchTimeFixCommand.php',
 				'class' => BatchTimeFixCommand::class,
 			),
-			'data-machine-events fix-encoding'           => array(
+			'data-machine-events fix-encoding'            => array(
 				'file'  => $cli . 'EncodingFixCommand.php',
 				'class' => EncodingFixCommand::class,
 			),
-			'data-machine-events resync-ticket-urls'     => array(
+			'data-machine-events resync-ticket-urls'      => array(
 				'file'  => $cli . 'TicketUrlResyncCommand.php',
 				'class' => TicketUrlResyncCommand::class,
 			),
-			'data-machine-events geocode-venues'         => array(
+			'data-machine-events geocode-venues'          => array(
 				'file'  => $cli . 'GeocodeVenuesCommand.php',
 				'class' => GeocodeVenuesCommand::class,
 			),
-			'data-machine-events audit-venues'           => array(
+			'data-machine-events audit-venues'            => array(
 				'file'  => $cli . 'AuditVenuesCommand.php',
 				'class' => AuditVenuesCommand::class,
 			),
-			'data-machine-events backfill-event-dates'   => array(
+			'data-machine-events backfill-event-dates'    => array(
 				'file'  => $cli . 'BackfillEventDatesCommand.php',
 				'class' => BackfillEventDatesCommand::class,
 			),
-			'data-machine-events recover-batch-actions'  => array(
+			'data-machine-events recover-batch-actions'   => array(
 				'file'  => $cli . 'BatchActionRecoveryCommand.php',
 				'class' => BatchActionRecoveryCommand::class,
 			),

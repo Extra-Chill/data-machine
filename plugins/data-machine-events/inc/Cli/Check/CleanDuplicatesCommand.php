@@ -251,26 +251,6 @@ class CleanDuplicatesCommand {
 		return $actions;
 	}
 
-	private function parse_reviewed_candidate_ids( string $value ): array {
-		$ids = array_filter( array_map( 'trim', explode( ',', $value ) ) );
-
-		return array_values( array_unique( $ids ) );
-	}
-
-	private function select_reviewed_actions( array $actions, array $reviewed ): array|\WP_Error {
-		$by_id   = array_column( $actions, null, 'candidate_id' );
-		$missing = array_diff( $reviewed, array_keys( $by_id ) );
-
-		if ( ! empty( $missing ) ) {
-			return new \WP_Error(
-				'stale_duplicate_review',
-				'Reviewed candidate IDs are stale or outside the requested scope; no changes made: ' . implode( ', ', $missing )
-			);
-		}
-
-		return array_values( array_intersect_key( $by_id, array_flip( $reviewed ) ) );
-	}
-
 	private function apply_actions( array $actions ): array {
 		$trashed = 0;
 		$merged  = 0;
