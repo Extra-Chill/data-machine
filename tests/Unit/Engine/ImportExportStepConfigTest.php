@@ -374,7 +374,11 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 		$csv  = "format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n";
 		$csv .= '1.0,flow,77,"Malformed Metadata",,,,42,"Named Flow",{}' . "\n";
 
-		$this->assertFalse( $this->import_export->handle_import( 'pipelines', $csv ) );
+		$result = $this->import_export->handle_import( 'pipelines', $csv );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'invalid_pipeline_csv', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
 		$this->assertNull( $this->find_pipeline_id( 'Malformed Metadata' ) );
 	}
 

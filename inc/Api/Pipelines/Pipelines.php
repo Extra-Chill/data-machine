@@ -19,7 +19,6 @@ use DataMachine\Abilities\Pipeline\ImportExportAbility;
 use DataMachine\Abilities\Pipeline\UpdatePipelineAbility;
 use DataMachine\Api\RestAbilityExecutor;
 use DataMachine\Api\RestResultSpec;
-use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\AbilityResult;
 use WP_REST_Server;
 
@@ -145,29 +144,6 @@ class Pipelines {
 							'type'        => 'array',
 							'description' => __( 'Flow configuration', 'data-machine' ),
 						),
-						'batch_import'  => array(
-							'required'          => false,
-							'type'              => 'boolean',
-							'default'           => false,
-							'description'       => __( 'Enable batch import mode', 'data-machine' ),
-							'sanitize_callback' => 'rest_sanitize_boolean',
-						),
-						'format'        => array(
-							'required'          => false,
-							'type'              => 'string',
-							'default'           => 'json',
-							'enum'              => array( 'json', 'csv' ),
-							'description'       => __( 'Import format (json or csv)', 'data-machine' ),
-							'sanitize_callback' => 'sanitize_text_field',
-						),
-						'data'          => array(
-							'required'          => false,
-							'type'              => 'string',
-							'description'       => __( 'CSV data for batch import', 'data-machine' ),
-							'sanitize_callback' => function ( $param ) {
-								return wp_unslash( $param );
-							},
-						),
 					),
 				),
 			)
@@ -286,7 +262,7 @@ class Pipelines {
 	 * Check if user has permission to access pipelines
 	 */
 	public static function check_permission( $request ) {
-		$request;
+		unset( $request );
 		if ( ! PermissionHelper::can( 'manage_flows' ) ) {
 			return new \WP_Error(
 				'rest_forbidden',
@@ -651,23 +627,5 @@ class Pipelines {
 				'message' => __( 'Memory files updated successfully.', 'data-machine' ),
 			)
 		);
-	}
-
-	/**
-	 * Add formatted display fields for timestamps.
-	 *
-	 * @param array $pipeline Pipeline data
-	 * @return array Pipeline data with *_display fields added
-	 */
-	private static function add_display_fields( array $pipeline ): array {
-		if ( isset( $pipeline['created_at'] ) ) {
-			$pipeline['created_at_display'] = DateFormatter::format_for_display( $pipeline['created_at'] );
-		}
-
-		if ( isset( $pipeline['updated_at'] ) ) {
-			$pipeline['updated_at_display'] = DateFormatter::format_for_display( $pipeline['updated_at'] );
-		}
-
-		return $pipeline;
 	}
 }

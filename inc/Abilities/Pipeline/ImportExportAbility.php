@@ -126,6 +126,10 @@ class ImportExportAbility {
 		$import_export = new ImportExport();
 		$result        = $import_export->handle_import( 'pipelines', $data );
 
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
 		if ( false === $result ) {
 			return new \WP_Error( 'pipeline_import_failed', 'Import failed', array( 'status' => 500 ) );
 		}

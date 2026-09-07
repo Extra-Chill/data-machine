@@ -57,7 +57,11 @@ class ImportExport {
 			$parsed_rows = $this->parse_csv_rows( $data );
 		} catch ( \InvalidArgumentException $e ) {
 			do_action( 'datamachine_log', 'error', 'Import: ' . $e->getMessage() );
-			return false;
+			return new \WP_Error(
+				'invalid_pipeline_csv',
+				$e->getMessage(),
+				array( 'status' => 400 )
+			);
 		}
 		if ( ! $this->validate_destination_compatibility( $parsed_rows ) ) {
 			return false;
