@@ -72,6 +72,40 @@ class FlowsEndpointTest extends WP_UnitTestCase {
 		$this->assertGreaterThan(0, count($data['data']['flows']));
 	}
 
+	public function test_repeated_rest_creation_preserves_distinct_sibling_flows(): void {
+		$created_ids = array();
+
+		foreach ( array( 'First REST sibling', 'Second REST sibling' ) as $flow_name ) {
+			$request = new WP_REST_Request( 'POST', '/datamachine/v1/flows' );
+			$request->set_body_params(
+				array(
+					'pipeline_id' => $this->test_pipeline_id,
+					'flow_name'   => $flow_name,
+				)
+			);
+
+			$response = rest_do_request( $request );
+			$data     = $response->get_data();
+
+			$this->assertSame( 200, $response->get_status() );
+			$this->assertTrue( $data['success'] );
+			$this->assertArrayNotHasKey( 'code', $data );
+			$created_ids[] = (int) $data['data']['flow_id'];
+		}
+
+		$this->assertCount( 2, array_unique( $created_ids ) );
+
+		$request = new WP_REST_Request( 'GET', '/datamachine/v1/flows' );
+		$request->set_param( 'pipeline_id', $this->test_pipeline_id );
+		$response = rest_do_request( $request );
+		$data     = $response->get_data();
+		$flow_ids = array_map( 'intval', array_column( $data['data']['flows'], 'flow_id' ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertTrue( $data['success'] );
+		$this->assertEmpty( array_diff( $created_ids, $flow_ids ) );
+	}
+
 	public function test_pagination(): void {
 		$request = new WP_REST_Request('GET', '/datamachine/v1/flows');
 		$request->set_param('pipeline_id', $this->test_pipeline_id);
