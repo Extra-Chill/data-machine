@@ -4,7 +4,10 @@
  *
  * Bandzoogle is a self-serve website builder popular with small indie venues
  * and DIY rooms. Calendars live at venue-specific paths (e.g. /calendar,
- * /gigs, /shows) and the markup is platform-specific.
+ * /gigs, /shows) and the markup is platform-specific. Artist sites use the
+ * same `event-detail` markup for tour/show pages; there the per-event
+ * location is the real venue (often with a full address) and the page
+ * itself carries no venue identity (#770).
  *
  * The current Bandzoogle "anthem" generation of themes renders an event
  * list using:
@@ -50,6 +53,66 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class BandzoogleExtractor extends BaseExtractor {
+
+	/**
+	 * Country tokens that mark a page as non-US.
+	 *
+	 * Artist tour pages list international stops ("Visby, SWE") while the
+	 * page-level venue default is 'US'. When a stop's title/location
+	 * clearly carries a non-US country token, leaving venueCountry empty
+	 * is preferable to a wrong default. Word-boundary, case-sensitive —
+	 * "Cabana" never matches "CAN".
+	 *
+	 * @since 0.57.1
+	 */
+	private const NON_US_COUNTRY_TOKENS = array(
+		'SWE',
+		'NOR',
+		'DEN',
+		'FIN',
+		'GBR',
+		'UK',
+		'IRL',
+		'FRA',
+		'DEU',
+		'NLD',
+		'BEL',
+		'ESP',
+		'ITA',
+		'PRT',
+		'AUT',
+		'CHE',
+		'POL',
+		'CAN',
+		'MEX',
+		'AUS',
+		'NZL',
+		'JPN',
+	);
+
+	/**
+	 * Injectable "now" for deterministic date inference (tests).
+	 *
+	 * @var \DateTimeImmutable|null
+	 */
+	private ?\DateTimeImmutable $now = null;
+
+	/**
+	 * Inject a reference "now" used for year inference on year-less dates.
+	 *
+	 * Bandzoogle artist tour pages omit the year entirely; the fallback
+	 * inference compares each date against "now". Tests inject a fixed
+	 * instant so expectations do not depend on the wall clock.
+	 *
+	 * @since 0.57.1
+	 */
+	public function setNow( \DateTimeImmutable $now ): void {
+		$this->now = $now;
+	}
+
+	private function now(): \DateTimeImmutable {
+		return $this->now ?? new \DateTimeImmutable( 'now' );
+	}
 
 	/**
 	 * Detect Bandzoogle.
@@ -211,13 +274,42 @@ class BandzoogleExtractor extends BaseExtractor {
 			$this->parseDatetimeFragment( $event, $dt_match[1], $calendar_year );
 		}
 
-		// Sub-venue / room (e.g. "🐘6pm" at Elephant Room). Only override the
-		// venue NAME — keep page-level address. Many Bandzoogle venues do not
-		// expose per-event addresses.
+		// Per-event location. On artist tour pages (#770) the page-level
+		// venue is a bare <title>-derived guess ("Tour", the artist name)
+		// and each event's event-location carries the real venue — often
+		// with a full comma-separated address. On venue sites (Elephant
+		// Room) event-location holds sub-room labels ("🐘6pm") that must
+		// not replace the venue name.
+		//
+		// Rule: a location naming a real place (not a bare time label) is
+		// authoritative for the venue NAME; address components it carries
+		// override the page-level address fields. A time-like label
+		// overrides nothing.
 		if ( preg_match( '/<p[^>]*class="[^"]*event-location[^"]*"[^>]*>(.*?)<\/p>/is', $html, $loc_match ) ) {
 			$loc_text = trim( html_entity_decode( wp_strip_all_tags( $loc_match[1] ), ENT_QUOTES, 'UTF-8' ) );
-			if ( '' !== $loc_text && empty( $event['venue'] ) ) {
-				$event['venue'] = $this->sanitizeText( $loc_text );
+			if ( '' !== $loc_text ) {
+				$location = $this->parseLocationText( $loc_text );
+
+				if ( '' !== $location['venue'] && ! $this->isSubRoomTimeLabel( $loc_text ) ) {
+					$event['venue'] = $location['venue'];
+				}
+
+				// When the location parsed into address components it is
+				// authoritative for ALL address fields — otherwise a
+				// partial location (e.g. "Lake Oconee, Greensboro, GA")
+				// would mix with a page-level address scraped from
+				// another event on the page.
+				$owns_address_fields = '' !== $location['venueAddress']
+					|| '' !== $location['venueCity']
+					|| '' !== $location['venueZip'];
+
+				foreach ( array( 'venueAddress', 'venueCity', 'venueState', 'venueZip' ) as $venue_field ) {
+					if ( '' !== $location[ $venue_field ] || $owns_address_fields ) {
+						$event[ $venue_field ] = $location[ $venue_field ];
+					}
+				}
+
+				$this->clearWrongCountryDefault( $event, $loc_text );
 			}
 		}
 
@@ -270,9 +362,18 @@ class BandzoogleExtractor extends BaseExtractor {
 					$event['startDate'] = $parsed['date'];
 					$event['startTime'] = $parsed['time'];
 					$start_set          = true;
-				} elseif ( $is_end && ! empty( $parsed['date'] ) ) {
-					$event['endDate'] = $parsed['date'];
-					$event['endTime'] = $parsed['time'];
+				} elseif ( $is_end ) {
+					// Bandzoogle's `to` block often carries the time only
+					// (no date span). Reuse the start date so the end time
+					// is not dropped (#770).
+					if ( ! empty( $parsed['date'] ) ) {
+						$event['endDate'] = $parsed['date'];
+					} elseif ( '' !== $event['startDate'] ) {
+						$event['endDate'] = $event['startDate'];
+					}
+					if ( '' !== $parsed['time'] ) {
+						$event['endTime'] = $parsed['time'];
+					}
 				}
 			}
 		}
@@ -328,7 +429,7 @@ class BandzoogleExtractor extends BaseExtractor {
 					$out['date'] = '';
 				}
 			} else {
-				$out['date'] = $this->inferDateFromMonthDay( $month_name, (string) $day );
+				$out['date'] = $this->inferDateFromMonthDay( $month_name, (string) $day, $this->now() );
 			}
 		}
 
@@ -337,6 +438,126 @@ class BandzoogleExtractor extends BaseExtractor {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Split an event-location string into venue name + address components.
+	 *
+	 * Artist tour locations arrive as "Island Cabana Bar, 50 Immigration
+	 * St , Charleston, SC 29403". The first comma segment is the venue
+	 * name; the remainder is parsed with the same address heuristics the
+	 * page-level extractor uses (PageVenueExtractor). A trailing
+	 * "City, ST" without ZIP ("Lake Oconee, Greensboro, GA") also splits.
+	 * A single-segment location ("Rootsy Visby") is the whole name.
+	 *
+	 * @since 0.57.1
+	 * @param string $loc_text Decoded, tag-stripped location text.
+	 * @return array Keys: venue, venueAddress, venueCity, venueState, venueZip.
+	 */
+	private function parseLocationText( string $loc_text ): array {
+		$out = array(
+			'venue'        => $this->sanitizeText( $loc_text ),
+			'venueAddress' => '',
+			'venueCity'    => '',
+			'venueState'   => '',
+			'venueZip'     => '',
+		);
+
+		if ( false === strpos( $loc_text, ',' ) ) {
+			return $out;
+		}
+
+		$segments = array_map( 'trim', explode( ',', $loc_text ) );
+		$segments = array_values(
+			array_filter(
+				$segments,
+				static function ( $segment ) {
+					return '' !== $segment;
+				}
+			)
+		);
+
+		if ( count( $segments ) < 2 ) {
+			return $out;
+		}
+
+		$name = $segments[0];
+		$rest = implode( ', ', array_slice( $segments, 1 ) );
+		$last = $segments[ count( $segments ) - 1 ];
+
+		$csz    = PageVenueExtractor::extractCityStateZip( $rest );
+		$street = PageVenueExtractor::extractStreetAddress( $rest );
+
+		if ( '' !== $csz['venueCity'] || '' !== $street ) {
+			// "Name, Street, City, ST ZIP".
+			$out['venue']        = $this->sanitizeText( $name );
+			$out['venueAddress'] = $street;
+			$out['venueCity']    = $csz['venueCity'];
+			$out['venueState']   = $csz['venueState'];
+			$out['venueZip']     = $csz['venueZip'];
+		} elseif ( count( $segments ) >= 3 && preg_match( '/^[A-Z]{2}$/', $last ) ) {
+			// "Name, City, ST" without ZIP.
+			$out['venue']      = $this->sanitizeText( $name );
+			$out['venueCity']  = $this->sanitizeText( $segments[ count( $segments ) - 2 ] );
+			$out['venueState'] = $last;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Whether a location string is a sub-room / time label rather than a
+	 * venue name.
+	 *
+	 * Venue Bandzoogle sites decorate each event with a room or set-time
+	 * label ("🐘6pm", "9:30", "Doors 8pm") in event-location. These must
+	 * not replace the page-level venue name. A label is time-like once
+	 * emoji are stripped: at most a doors/show prefix plus digits and an
+	 * optional AM/PM.
+	 *
+	 * @since 0.57.1
+	 * @param string $loc_text Decoded, tag-stripped location text.
+	 * @return bool
+	 */
+	private function isSubRoomTimeLabel( string $loc_text ): bool {
+		$stripped = preg_replace(
+			'/[\x{1F000}-\x{1FAFF}\x{2190}-\x{21FF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE00}-\x{FE0F}\x{200D}]/u',
+			'',
+			trim( $loc_text )
+		);
+		$stripped = trim( (string) $stripped );
+
+		if ( '' === $stripped ) {
+			return true;
+		}
+
+		return (bool) preg_match(
+			'/^(?:(?:doors|show(?:time)?)\s*)?\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?(?:\s*(?:show|set|doors|start))?$/i',
+			$stripped
+		);
+	}
+
+	/**
+	 * Clear the 'US' venueCountry default when the event clearly points
+	 * at a non-US country.
+	 *
+	 * The page-level venue default is 'US'; on artist tour pages listing
+	 * international stops that default is wrong. An empty country is
+	 * preferred over a wrong one. No general country inference.
+	 *
+	 * @since 0.57.1
+	 * @param array  $event    Event array (venueCountry modified in place).
+	 * @param string $loc_text Decoded, tag-stripped location text.
+	 */
+	private function clearWrongCountryDefault( array &$event, string $loc_text ): void {
+		$haystack = $event['title'] . ' ' . $loc_text;
+
+		foreach ( self::NON_US_COUNTRY_TOKENS as $token ) {
+			if ( preg_match( '/\b' . $token . '\b/', $haystack ) ) {
+				$event['venueCountry'] = '';
+				return;
+			}
+		}
 	}
 
 	/**

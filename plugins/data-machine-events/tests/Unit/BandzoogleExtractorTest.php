@@ -175,4 +175,97 @@ class BandzoogleExtractorTest extends WP_UnitTestCase {
 		$this->assertSame( '20:00', $event['startTime'] );
 		$this->assertSame( 'https://example.com/tickets/brownout', $event['ticketUrl'] );
 	}
+
+	/**
+	 * Artist tour page (Johnny Delaware): per-event locations are the real
+	 * venues and must not be dropped in favor of the title-derived page
+	 * venue ("Tour"). The fixture has no calendar year header or ?year=
+	 * pagination, so dates fall back to inference against an injected
+	 * "now" of 2026-09-07 (#770).
+	 */
+	public function test_extract_artist_tour_page_uses_per_event_venue_names() {
+		$html = $this->loadFixture( 'bandzoogle-johnny-delaware-tour.html' );
+		$this->extractor->setNow( new \DateTimeImmutable( '2026-09-07 12:00:00' ) );
+
+		$events = $this->extractor->extract( $html, 'https://johnnydelaware.com/tour' );
+
+		$this->assertCount( 5, $events, 'The tour fixture contains 5 event-detail blocks.' );
+
+		$first = $events[0];
+		$this->assertSame( 'Visby, SWE', $first['title'] );
+		$this->assertSame( '2026-09-09', $first['startDate'] );
+		$this->assertSame( 'Rootsy Visby', $first['venue'] );
+
+		$this->assertSame( 'Gripsholms värdshus', $events[1]['venue'] );
+		$this->assertSame( 'MS Blidösund', $events[2]['venue'] );
+
+		foreach ( $events as $event ) {
+			$this->assertNotSame(
+				'US',
+				$event['venueCountry'],
+				'Tour stops in Sweden must not inherit the US country default.'
+			);
+		}
+	}
+
+	/**
+	 * Artist show list (Mel Washington): a comma-separated per-event
+	 * location splits into venue name + street + city/state/zip, and a
+	 * date only one day in the past (Sep 6 vs injected now Sep 7) keeps
+	 * the current year instead of rolling into 2027 (#770).
+	 */
+	public function test_extract_artist_show_page_splits_location_address() {
+		$html = $this->loadFixture( 'bandzoogle-mel-washington-shows.html' );
+		$this->extractor->setNow( new \DateTimeImmutable( '2026-09-07 12:00:00' ) );
+
+		$events = $this->extractor->extract( $html, 'https://melwashington.com/shows' );
+
+		$this->assertCount( 10, $events, 'The shows fixture contains 10 event-detail blocks.' );
+
+		$first = $events[0];
+		$this->assertSame( 'Island Cabana Bar', $first['venue'] );
+		$this->assertStringContainsString( '50 Immigration St', $first['venueAddress'] );
+		$this->assertSame( 'Charleston', $first['venueCity'] );
+		$this->assertSame( 'SC', $first['venueState'] );
+		$this->assertSame( '29403', $first['venueZip'] );
+		$this->assertSame( '2026-09-06', $first['startDate'], 'A date 1 day in the past must keep the current year.' );
+		$this->assertSame( '13:00', $first['startTime'] );
+		$this->assertSame( '16:00', $first['endTime'], 'End time must survive a to-block that carries time only.' );
+	}
+
+	/**
+	 * Venue site (Elephant Room): event-location holds sub-room labels
+	 * ("🐘6pm", "🐘7pm Show") that must never replace the page-level
+	 * venue name (#770).
+	 */
+	public function test_extract_venue_site_keeps_page_venue_over_sub_room_labels() {
+		$html   = $this->loadFixture( 'bandzoogle-elephant-room.html' );
+		$events = $this->extractor->extract( $html, 'https://elephantroom.com/calendar' );
+
+		$this->assertNotEmpty( $events );
+
+		foreach ( $events as $event ) {
+			$this->assertSame(
+				'Elephant Room',
+				$event['venue'],
+				'Sub-room labels in event-location must not replace the venue name.'
+			);
+		}
+	}
+
+	/**
+	 * Load a fixture relative to tests/Fixtures.
+	 */
+	private function loadFixture( string $filename ): string {
+		$path = __DIR__ . '/../Fixtures/' . $filename;
+		if ( ! file_exists( $path ) ) {
+			$this->markTestSkipped( 'Fixture not present: ' . $filename );
+		}
+
+		$html = file_get_contents( $path );
+		$this->assertNotFalse( $html, 'Fixture must be readable: ' . $filename );
+		$this->assertTrue( $this->extractor->canExtract( $html ), 'Fixture should match Bandzoogle detection: ' . $filename );
+
+		return $html;
+	}
 }

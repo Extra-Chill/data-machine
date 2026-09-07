@@ -250,26 +250,44 @@ abstract class BaseExtractor implements ExtractorInterface {
 	}
 
 	/**
+	 * Grace window (days) for year inference on year-less dates.
+	 *
+	 * Artist tour pages and venue calendars print "September 6" with no
+	 * year. Rolling a date that is only slightly in the past into next
+	 * year fabricates a show ~12 months out. Dates within this window
+	 * keep the current year; anything older rolls forward.
+	 *
+	 * @since 0.57.1
+	 */
+	private const PAST_DATE_GRACE_DAYS = 14;
+
+	/**
 	 * Infer a full Y-m-d date from month name and day number.
 	 *
-	 * Assumes the current year. If that date has already passed,
-	 * bumps to the next year. Useful for venue calendars that
-	 * display "January 15" without a year.
+	 * Assumes the current year. If that date has already passed by more
+	 * than the grace window, bumps to the next year. Useful for venue
+	 * calendars that display "January 15" without a year.
 	 *
 	 * @since 0.15.1
-	 * @param string $month Month name (e.g., "January", "Jan")
-	 * @param string $day   Day number (e.g., "15")
+	 * @since 0.57.1 Added optional $now for deterministic inference and a
+	 *               14-day past-date grace window before rolling forward.
+	 * @param string                 $month Month name (e.g., "January", "Jan")
+	 * @param string                 $day   Day number (e.g., "15")
+	 * @param \DateTimeImmutable|null $now  Reference "now"; defaults to wall clock.
 	 * @return string Date in Y-m-d format, or empty string on failure.
 	 */
-	protected function inferDateFromMonthDay( string $month, string $day ): string {
-		$year     = (int) gmdate( 'Y' );
+	protected function inferDateFromMonthDay( string $month, string $day, ?\DateTimeImmutable $now = null ): string {
+		$now      = $now ?? new \DateTimeImmutable( 'now' );
+		$year     = (int) $now->format( 'Y' );
 		$date_str = "{$month} {$day} {$year}";
 
 		try {
-			$dt    = new \DateTime( $date_str );
-			$today = new \DateTime( 'today' );
+			$dt = new \DateTime( $date_str, $now->getTimezone() );
 
-			if ( $dt < $today ) {
+			$interval = $dt->diff( $now );
+			$is_past  = ! $interval->invert;
+
+			if ( $is_past && (int) $interval->days > self::PAST_DATE_GRACE_DAYS ) {
 				$dt->modify( '+1 year' );
 			}
 

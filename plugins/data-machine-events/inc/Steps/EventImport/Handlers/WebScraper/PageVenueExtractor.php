@@ -500,10 +500,14 @@ class PageVenueExtractor {
 	/**
 	 * Extract street address from text.
 	 *
+	 * Public so per-event location parsers (e.g. Bandzoogle artist tour
+	 * pages) can reuse the same address heuristics as page-level parsing.
+	 *
+	 * @since 0.57.1 Promoted from private to public for extractor reuse.
 	 * @param string $text Text to search
 	 * @return string Street address or empty string
 	 */
-	private static function extractStreetAddress( string $text ): string {
+	public static function extractStreetAddress( string $text ): string {
 		// Look for common street suffixes with a leading number
 		// Allows optional letter/hyphen suffix after number (e.g., "610-A", "123B")
 		$street_pattern = '/(\d+[-A-Za-z]*\s+[A-Za-z0-9. ]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Way|Court|Ct|Circle|Cir|Highway|Hwy|Pkwy|Parkway|Plaza|Pl|Square|Sq|Trail|Trl|Loop|Broadway)[.]?)/i';
@@ -532,10 +536,14 @@ class PageVenueExtractor {
 	/**
 	 * Extract city, state, and ZIP from text.
 	 *
+	 * Public so per-event location parsers (e.g. Bandzoogle artist tour
+	 * pages) can reuse the same address heuristics as page-level parsing.
+	 *
+	 * @since 0.57.1 Promoted from private to public for extractor reuse.
 	 * @param string $text Text to search
 	 * @return array With keys: venueCity, venueState, venueZip
 	 */
-	private static function extractCityStateZip( string $text ): array {
+	public static function extractCityStateZip( string $text ): array {
 		$data = array(
 			'venueCity'  => '',
 			'venueState' => '',
