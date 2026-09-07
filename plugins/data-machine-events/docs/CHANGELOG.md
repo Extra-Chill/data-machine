@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.58.0] - 2026-09-07
+
+### Added
+- add closed-vocabulary event_type taxonomy
+
+### Fixed
+- use per-event venue names and grace-window years on Bandzoogle artist tour pages
+
 ## [0.57.0] - 2026-09-07
 
 ### Added
