@@ -7,7 +7,7 @@
 
 namespace DataMachineEvents\Abilities;
 
-use DataMachineEvents\Core\EventSchemaProvider;
+use DataMachineEvents\Core\Event_Type_Taxonomy;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
@@ -283,7 +283,7 @@ class EventUpsertAbilities {
 						'previousStartDate' => $string,
 						'eventType'         => array(
 							'type' => 'string',
-							'enum' => EventSchemaProvider::EVENT_TYPES,
+							'enum' => Event_Type_Taxonomy::get_vocabulary_names(),
 						),
 					),
 				),

@@ -16,6 +16,7 @@ namespace DataMachineEvents\Abilities;
 use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventSchemaProvider;
+use DataMachineEvents\Core\Event_Type_Taxonomy;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -129,8 +130,8 @@ class EventUpdateAbilities {
 							),
 							'eventType'       => array(
 								'type'        => 'string',
-								'enum'        => array( 'Event', 'MusicEvent', 'Festival', 'ComedyEvent', 'DanceEvent', 'TheaterEvent', 'SportsEvent', 'ExhibitionEvent' ),
-								'description' => 'Event type for Schema.org',
+								'enum'        => Event_Type_Taxonomy::get_vocabulary_names(),
+								'description' => 'Event format. Choose one of the allowed values; never invent a value.',
 							),
 							'occurrenceDates' => array(
 								'type'        => 'array',
@@ -553,6 +554,19 @@ class EventUpdateAbilities {
 				}
 			}
 
+			// Keep the `event_type` taxonomy — the input of record (#761) — in
+			// sync with the requested value. Resolution goes through the closed
+			// vocabulary, so an unrecognized value never creates a term.
+			if ( array_key_exists( 'eventType', $event_update ) ) {
+				$event_type_term_id = Event_Type_Taxonomy::resolve_term_id( $event_update['eventType'] );
+				if ( $event_type_term_id > 0 ) {
+					$assigned = wp_set_object_terms( $post_id, array( $event_type_term_id ), Event_Type_Taxonomy::TAXONOMY );
+					if ( is_wp_error( $assigned ) ) {
+						$warnings[] = $assigned->get_error_message();
+					}
+				}
+			}
+
 			$lifecycle_result = array(
 				'post_id'        => $post_id,
 				'title'          => $post->post_title,
@@ -665,8 +679,15 @@ class EventUpdateAbilities {
 				continue;
 			}
 
-			if ( 'eventType' === $field && ! in_array( $value, EventSchemaProvider::EVENT_TYPES, true ) ) {
-				continue;
+			// eventType is resolved through the closed `event_type` vocabulary
+			// (#761). The block attribute stores the derived Schema.org @type,
+			// never the raw editorial label a consumer vocabulary may use.
+			if ( 'eventType' === $field ) {
+				$schema_type = is_string( $value ) ? Event_Type_Taxonomy::resolve_schema_type( $value ) : '';
+				if ( '' === $schema_type ) {
+					continue;
+				}
+				$value = $schema_type;
 			}
 
 			if ( ( $existing_attrs[ $field ] ?? null ) !== $value ) {
@@ -842,8 +863,8 @@ class EventUpdateAbilities {
 			) );
 		}
 		if ( array_key_exists( 'eventType', $input )
-			&& ( ! is_string( $input['eventType'] ) || ! in_array( $input['eventType'], EventSchemaProvider::EVENT_TYPES, true ) ) ) {
-			return new \WP_Error( 'source_event_update_input_invalid', 'eventType must be a supported Schema.org event type.', array(
+			&& ( ! is_string( $input['eventType'] ) || ! Event_Type_Taxonomy::is_valid_value( $input['eventType'] ) ) ) {
+			return new \WP_Error( 'source_event_update_input_invalid', 'eventType must be a value from the event_type vocabulary.', array(
 				'status'    => 400,
 				'retryable' => false,
 			) );
@@ -1141,7 +1162,7 @@ class EventUpdateAbilities {
 				'previousStartDate'    => $string,
 				'eventType'            => array(
 					'type' => 'string',
-					'enum' => array( 'Event', 'MusicEvent', 'Festival', 'ComedyEvent', 'DanceEvent', 'TheaterEvent', 'SportsEvent', 'ExhibitionEvent' ),
+					'enum' => Event_Type_Taxonomy::get_vocabulary_names(),
 				),
 			),
 			'required'             => array( 'event', 'source', 'source_id', 'source_identity', 'expected_fingerprint' ),

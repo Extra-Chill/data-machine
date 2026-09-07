@@ -493,6 +493,11 @@ class EventUpsert extends UpsertHandler {
 			// re-stamp the pipeline-center term. See data-machine-events#379.
 			$location_handled = $this->taxonomy_assigner->processLocation( $post_id, $parameters, $engine, $handler_config );
 
+			// Resolve the canonical eventType against the closed `event_type`
+			// vocabulary. When a value was supplied, this owns the assignment
+			// and the generic pass must not re-run it. See #761.
+			$event_type_handled = $this->taxonomy_assigner->processEventType( $post_id, $parameters, $engine );
+
 			// Map performer to artist taxonomy if not explicitly provided.
 			if ( empty( $parameters['artist'] ) && ! empty( $event_data['performer'] ) ) {
 				$parameters['artist'] = $event_data['performer'];
@@ -503,6 +508,9 @@ class EventUpsert extends UpsertHandler {
 			$handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
 			if ( $location_handled ) {
 				$handler_config_for_tax['taxonomy_location_selection'] = 'skip';
+			}
+			if ( $event_type_handled ) {
+				$handler_config_for_tax[ 'taxonomy_' . \DataMachineEvents\Core\Event_Type_Taxonomy::TAXONOMY . '_selection' ] = 'skip';
 			}
 			$engine_data_array = $engine->all();
 			$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );

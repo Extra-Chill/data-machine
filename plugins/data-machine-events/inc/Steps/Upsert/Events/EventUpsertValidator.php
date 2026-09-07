@@ -17,6 +17,7 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\EngineData;
 use DataMachineEvents\Core\EventSchemaProvider;
+use DataMachineEvents\Core\Event_Type_Taxonomy;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 
 defined( 'ABSPATH' ) || exit;
@@ -181,9 +182,9 @@ class EventUpsertValidator {
 			$event_type = $parameters['eventType'];
 		}
 		if ( ( null !== $event_type && '' !== $event_type ) || array_key_exists( 'eventType', $parameters ) ) {
-			if ( ! is_string( $event_type ) || ! in_array( $event_type, EventSchemaProvider::EVENT_TYPES, true ) ) {
+			if ( ! is_string( $event_type ) || ! Event_Type_Taxonomy::is_valid_value( $event_type ) ) {
 				return $this->gateRejection(
-					'eventType must be a supported Schema.org event type.',
+					'eventType must be a value from the event_type vocabulary.',
 					array( 'eventType' => $event_type ),
 					'invalid_event_type'
 				);

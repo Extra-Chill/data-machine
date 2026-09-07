@@ -52,6 +52,31 @@ class EventSchemaProvider {
 		'PreOrder',
 	);
 
+	/**
+	 * Default vocabulary backing the `event_type` taxonomy.
+	 *
+	 * Schema.org event types, each self-mapped to its own `@type`. This is the
+	 * standards-correct out-of-the-box vocabulary; consumers replace or extend
+	 * it through the `data_machine_events_event_type_vocabulary` filter. No
+	 * non-Schema.org term belongs here.
+	 *
+	 * @return array<int,array{name:string,slug:string,schema_type:string,default:bool}>
+	 */
+	public static function default_event_type_vocabulary(): array {
+		$vocabulary = array();
+
+		foreach ( self::EVENT_TYPES as $type ) {
+			$vocabulary[] = array(
+				'name'        => $type,
+				'slug'        => sanitize_title( $type ),
+				'schema_type' => $type,
+				'default'     => 'Event' === $type,
+			);
+		}
+
+		return $vocabulary;
+	}
+
 	private const CORE_FIELDS = array(
 		'title'           => array(
 			'type'            => 'string',
@@ -191,16 +216,33 @@ class EventSchemaProvider {
 		),
 	);
 
-	private const TYPE_FIELDS = array(
-		'eventType' => array(
-			'type'            => 'string',
-			'required'        => false,
-			'description'     => 'Type of event for rich result categorization (MusicEvent, Festival, ComedyEvent, etc.)',
-			'schema_property' => '@type',
-			'enum'            => array( 'Event', 'MusicEvent', 'Festival', 'ComedyEvent', 'DanceEvent', 'TheaterEvent', 'SportsEvent', 'ExhibitionEvent' ),
-			'default'         => 'Event',
-		),
-	);
+	/**
+	 * Event-type field declaration, derived from the active vocabulary.
+	 *
+	 * The enum is resolved at call time from the `event_type` taxonomy
+	 * vocabulary (data-machine-events#761) so the AI tool schema and the
+	 * taxonomy can never disagree about what values are legal.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	private static function typeFields(): array {
+		$names   = Event_Type_Taxonomy::get_vocabulary_names();
+		$default = Event_Type_Taxonomy::get_default_entry();
+
+		return array(
+			'eventType' => array(
+				'type'            => 'string',
+				'required'        => false,
+				'description'     => sprintf(
+					'The format of this event. Choose exactly one value from the allowed list: %s. This is a closed vocabulary — never invent a value.',
+					implode( ', ', $names )
+				),
+				'schema_property' => '@type',
+				'enum'            => array_values( $names ),
+				'default'         => (string) ( $default['name'] ?? 'Event' ),
+			),
+		);
+	}
 
 	public static function getAllFields(): array {
 		return array_merge(
@@ -209,7 +251,7 @@ class EventSchemaProvider {
 			self::PERFORMER_FIELDS,
 			self::ORGANIZER_FIELDS,
 			self::STATUS_FIELDS,
-			self::TYPE_FIELDS
+			self::typeFields()
 		);
 	}
 
@@ -256,7 +298,7 @@ class EventSchemaProvider {
 			self::PERFORMER_FIELDS,
 			self::ORGANIZER_FIELDS,
 			self::STATUS_FIELDS,
-			self::TYPE_FIELDS
+			self::typeFields()
 		);
 		$fragment      = self::fieldsToToolParameters( $schema_fields );
 		return static::filterByEngineData( $fragment, $engine_data );
@@ -280,7 +322,7 @@ class EventSchemaProvider {
 			'performer' => array_keys( self::PERFORMER_FIELDS ),
 			'organizer' => array_keys( self::ORGANIZER_FIELDS ),
 			'status' => array_keys( self::STATUS_FIELDS ),
-			'type' => array_keys( self::TYPE_FIELDS ),
+			'type' => array_keys( self::typeFields() ),
 			default => array_keys( self::getAllFields() )
 		};
 	}
@@ -384,7 +426,7 @@ class EventSchemaProvider {
 	}
 
 	public static function generateSchemaOrg( array $event_data, array $venue_data, array $organizer_data = array(), int $post_id = 0 ): array {
-		$event_type = $event_data['eventType'] ?? 'Event';
+		$event_type = self::resolveSchemaEventType( $event_data, $post_id );
 
 		$schema = array(
 			'@context' => 'https://schema.org',
@@ -449,6 +491,35 @@ class EventSchemaProvider {
 		}
 
 		return $schema;
+	}
+
+	/**
+	 * Resolve the JSON-LD `@type` for an event.
+	 *
+	 * The `event_type` taxonomy term's `_schema_type` meta is authoritative
+	 * (data-machine-events#761). The block attribute is derived output kept as
+	 * a fallback for events that predate the taxonomy, and is itself resolved
+	 * through the vocabulary so an editorial term never leaks into JSON-LD.
+	 *
+	 * @param array $event_data Event data, possibly carrying the legacy attribute.
+	 * @param int   $post_id    Event post ID.
+	 * @return string Schema.org `@type`.
+	 */
+	private static function resolveSchemaEventType( array $event_data, int $post_id ): string {
+		$term_schema_type = Event_Type_Taxonomy::get_schema_type_for_post( $post_id );
+		if ( '' !== $term_schema_type ) {
+			return $term_schema_type;
+		}
+
+		$attribute = $event_data['eventType'] ?? '';
+		if ( is_string( $attribute ) && '' !== $attribute ) {
+			$resolved = Event_Type_Taxonomy::resolve_schema_type( $attribute );
+			if ( '' !== $resolved ) {
+				return $resolved;
+			}
+		}
+
+		return 'Event';
 	}
 
 	private static function resolveStartDate( array $event_data, int $post_id ): array {

@@ -640,6 +640,7 @@ class DATAMACHINE_Events {
 	public function register_taxonomies() {
 		\DataMachineEvents\Core\Venue_Taxonomy::register();
 		\DataMachineEvents\Core\Promoter_Taxonomy::register();
+		\DataMachineEvents\Core\Event_Type_Taxonomy::register();
 	}
 	/**
 	 * @param array|null $allowed_block_types Current allowed block types

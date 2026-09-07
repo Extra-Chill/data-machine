@@ -89,8 +89,8 @@ class UpdateEvent extends BaseTool {
 					),
 					'eventType'       => array(
 						'type'        => 'string',
-						'description' => 'Event type for Schema.org',
-						'enum'        => array( 'Event', 'MusicEvent', 'Festival', 'ComedyEvent', 'DanceEvent', 'TheaterEvent', 'SportsEvent', 'ExhibitionEvent' ),
+						'description' => 'Event format. Choose one of the allowed values; never invent a value.',
+						'enum'        => \DataMachineEvents\Core\Event_Type_Taxonomy::get_vocabulary_names(),
 					),
 					'occurrenceDates' => array(
 						'type'        => 'array',

@@ -56,7 +56,9 @@ Event scheduling status:
 ### Type Fields
 Event categorization for rich results:
 
-- `eventType` - Event type (Event, MusicEvent, Festival, ComedyEvent, etc.)
+- `eventType` - Event format, resolved through the closed `event_type` taxonomy vocabulary. The tool-parameter `enum` and default are derived at call time from `Event_Type_Taxonomy::get_vocabulary_names()`, so the AI schema and the taxonomy can never disagree.
+
+`generateSchemaOrg()` derives JSON-LD `@type` from the event's assigned `event_type` term (`_schema_type` term meta). The `eventType` block attribute is **derived output** and is only consulted as a fallback for events that predate the taxonomy — and even then it is resolved through the vocabulary, so an out-of-vocabulary value never leaks into JSON-LD. See `docs/event-type-taxonomy.md`.
 
 ## Usage Examples
 

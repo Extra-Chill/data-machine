@@ -397,9 +397,10 @@ class Event_Post_Type {
 		$allowed_items = apply_filters(
 			'data_machine_events_post_type_menu_items',
 			array(
-				'venue'    => true,
-				'promoter' => true,
-				'settings' => true,
+				'venue'      => true,
+				'promoter'   => true,
+				'event_type' => true,
+				'settings'   => true,
 			)
 		);
 
@@ -438,9 +439,10 @@ class Event_Post_Type {
 		$allowed_items = apply_filters(
 			'data_machine_events_post_type_menu_items',
 			array(
-				'venue'    => true,
-				'promoter' => true,
-				'settings' => true,
+				'venue'      => true,
+				'promoter'   => true,
+				'event_type' => true,
+				'settings'   => true,
 			)
 		);
 
@@ -465,9 +467,10 @@ class Event_Post_Type {
 			$allowed_items = apply_filters(
 				'data_machine_events_post_type_menu_items',
 				array(
-					'venue'    => true,
-					'promoter' => true,
-					'settings' => true,
+					'venue'      => true,
+					'promoter'   => true,
+					'event_type' => true,
+					'settings'   => true,
 				)
 			);
 

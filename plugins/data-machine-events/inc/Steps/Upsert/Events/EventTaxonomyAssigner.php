@@ -21,6 +21,7 @@ use DataMachineEvents\Steps\Upsert\Events\Promoter;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Core\Event_Type_Taxonomy;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -218,16 +219,16 @@ class EventTaxonomyAssigner {
 		}
 
 		$venue_metadata = array(
-			'address'     => $this->getParameterValue( $parameters, 'venueAddress' ) ?: ( $engine->get( 'venueAddress' ) ?? '' ),
-			'city'        => $this->getParameterValue( $parameters, 'venueCity' ) ?: ( $engine->get( 'venueCity' ) ?? '' ),
-			'state'       => $this->getParameterValue( $parameters, 'venueState' ) ?: ( $engine->get( 'venueState' ) ?? '' ),
-			'zip'         => $this->getParameterValue( $parameters, 'venueZip' ) ?: ( $engine->get( 'venueZip' ) ?? '' ),
-			'country'     => $this->getParameterValue( $parameters, 'venueCountry' ) ?: ( $engine->get( 'venueCountry' ) ?? '' ),
-			'phone'       => $this->getParameterValue( $parameters, 'venuePhone' ) ?: ( $engine->get( 'venuePhone' ) ?? '' ),
-			'website'     => $website,
+			'address'       => $this->getParameterValue( $parameters, 'venueAddress' ) ?: ( $engine->get( 'venueAddress' ) ?? '' ),
+			'city'          => $this->getParameterValue( $parameters, 'venueCity' ) ?: ( $engine->get( 'venueCity' ) ?? '' ),
+			'state'         => $this->getParameterValue( $parameters, 'venueState' ) ?: ( $engine->get( 'venueState' ) ?? '' ),
+			'zip'           => $this->getParameterValue( $parameters, 'venueZip' ) ?: ( $engine->get( 'venueZip' ) ?? '' ),
+			'country'       => $this->getParameterValue( $parameters, 'venueCountry' ) ?: ( $engine->get( 'venueCountry' ) ?? '' ),
+			'phone'         => $this->getParameterValue( $parameters, 'venuePhone' ) ?: ( $engine->get( 'venuePhone' ) ?? '' ),
+			'website'       => $website,
 			'ticketing_url' => $ticketing_url,
-			'coordinates' => $this->getParameterValue( $parameters, 'venueCoordinates' ) ?: ( $engine->get( 'venueCoordinates' ) ?? '' ),
-			'capacity'    => $this->getParameterValue( $parameters, 'venueCapacity' ) ?: ( $engine->get( 'venueCapacity' ) ?? '' ),
+			'coordinates'   => $this->getParameterValue( $parameters, 'venueCoordinates' ) ?: ( $engine->get( 'venueCoordinates' ) ?? '' ),
+			'capacity'      => $this->getParameterValue( $parameters, 'venueCapacity' ) ?: ( $engine->get( 'venueCapacity' ) ?? '' ),
 		);
 
 		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
@@ -326,6 +327,56 @@ class EventTaxonomyAssigner {
 			'success' => false,
 			'error'   => 'Failed to create or find promoter',
 		);
+	}
+
+	/**
+	 * Process the closed-vocabulary `event_type` taxonomy assignment.
+	 *
+	 * The canonical `eventType` field carried by an upsert (from the AI tool,
+	 * an extractor, or a direct ability caller) is resolved against the
+	 * `event_type` vocabulary and assigned as an existing term. Unrecognized
+	 * values never create a term — they resolve to the vocabulary's declared
+	 * default. See data-machine-events#761.
+	 *
+	 * @param int        $post_id    Event post ID.
+	 * @param array      $parameters Event parameters.
+	 * @param EngineData $engine     Engine data helper.
+	 * @return bool True when this method owned the assignment (the generic
+	 *              taxonomy pass should skip `event_type`); false otherwise.
+	 */
+	public function processEventType( int $post_id, array $parameters, EngineData $engine ): bool {
+		if ( ! taxonomy_exists( Event_Type_Taxonomy::TAXONOMY ) ) {
+			return false;
+		}
+
+		$value = $parameters['eventType'] ?? $engine->get( 'eventType' ) ?? '';
+		if ( ! is_scalar( $value ) || '' === trim( (string) $value ) ) {
+			// Nothing declared for this event — leave whatever the generic
+			// taxonomy pass (or a previous assignment) decided in place.
+			return false;
+		}
+
+		$term_id = Event_Type_Taxonomy::resolve_term_id( $value );
+		if ( $term_id <= 0 ) {
+			return false;
+		}
+
+		$result = wp_set_object_terms( $post_id, array( $term_id ), Event_Type_Taxonomy::TAXONOMY );
+		if ( is_wp_error( $result ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Event type assignment failed',
+				array(
+					'post_id' => $post_id,
+					'term_id' => $term_id,
+					'error'   => $result->get_error_message(),
+				)
+			);
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

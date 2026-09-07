@@ -11,6 +11,8 @@
 
 namespace DataMachineEvents\Steps\Upsert\Events;
 
+use DataMachineEvents\Core\Event_Type_Taxonomy;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -47,7 +49,11 @@ class EventBlockContentBuilder {
 			'priceCurrency'     => $event_data['priceCurrency'] ?? 'USD',
 			'offerAvailability' => $event_data['offerAvailability'] ?? 'InStock',
 			'validFrom'         => $event_data['validFrom'] ?? '',
-			'eventType'         => $event_data['eventType'] ?? '',
+			// Derived output only. The `event_type` taxonomy term is the input
+			// of record (#761); this attribute mirrors the Schema.org @type the
+			// resolved term maps to, so an editorial consumer term never leaks
+			// into block markup or JSON-LD.
+			'eventType'         => Event_Type_Taxonomy::resolve_schema_type( $event_data['eventType'] ?? '' ),
 
 			'showVenue'         => true,
 			'showPrice'         => true,
