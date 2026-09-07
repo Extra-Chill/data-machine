@@ -81,7 +81,7 @@ class EventSchemaProvider {
 		'title'           => array(
 			'type'            => 'string',
 			'required'        => true,
-			'description'     => 'Event title. The original scraped title is in data packet metadata (original_title). Use it directly if clear and complete, or write a better title if the original is unclear, truncated, ALL CAPS, contains emojis, dates, or unnecessary formatting.',
+			'description'     => 'Event title: the public name of the event, worded so a reader knows what it is without any other context. The original scraped title is in data packet metadata (original_title). Reuse it when it already does that job cleanly. Otherwise compose one from the packet — what is happening, who is presenting it, and where — since some sources list events by only one of those fields.',
 			'schema_property' => 'name',
 		),
 		'startDate'       => array(
