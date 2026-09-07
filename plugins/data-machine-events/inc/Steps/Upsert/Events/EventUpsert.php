@@ -132,7 +132,7 @@ class EventUpsert extends UpsertHandler {
 
 		// Extract event identity fields (AI title takes precedence, engine data fallback for other fields)
 		$title     = sanitize_text_field( $parameters['title'] ?? $engine->get( 'title' ) ?? '' );
-		$venue     = $engine->get( 'venue' ) ?? $parameters['venue'] ?? '';
+		$venue     = VenueParameterProvider::resolveField( 'venue', $parameters, $engine->all() );
 		$startDate = $engine->get( 'startDate' ) ?? $parameters['startDate'] ?? '';
 		$ticketUrl = $engine->get( 'ticketUrl' ) ?? $parameters['ticketUrl'] ?? '';
 
@@ -186,10 +186,10 @@ class EventUpsert extends UpsertHandler {
 			$identity_start,
 			(string) ( $parameters['source_identity'] ?? '' ),
 			array(
-				'address' => (string) ( $engine->get( 'venueAddress' ) ?? $parameters['venueAddress'] ?? '' ),
-				'city'    => (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' ),
-				'state'   => (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' ),
-				'country' => (string) ( $engine->get( 'venueCountry' ) ?? $parameters['venueCountry'] ?? '' ),
+				'address' => VenueParameterProvider::resolveField( 'venueAddress', $parameters, $engine->all() ),
+				'city'    => VenueParameterProvider::resolveField( 'venueCity', $parameters, $engine->all() ),
+				'state'   => VenueParameterProvider::resolveField( 'venueState', $parameters, $engine->all() ),
+				'country' => VenueParameterProvider::resolveField( 'venueCountry', $parameters, $engine->all() ),
 			),
 			absint( $parameters['event_id'] ?? 0 )
 		);
@@ -294,10 +294,10 @@ class EventUpsert extends UpsertHandler {
 		// through whenever the incoming venue string differs from the
 		// canonical taxonomy term name. See issue #252.
 		// A missing duplicate contract is retryable; it must never become a create.
-		$venueAddress     = (string) ( $engine->get( 'venueAddress' ) ?? $parameters['venueAddress'] ?? '' );
-		$venueCity        = (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' );
-		$venueState       = (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' );
-		$venueCountry     = (string) ( $engine->get( 'venueCountry' ) ?? $parameters['venueCountry'] ?? '' );
+		$venueAddress     = VenueParameterProvider::resolveField( 'venueAddress', $parameters, $engine->all() );
+		$venueCity        = VenueParameterProvider::resolveField( 'venueCity', $parameters, $engine->all() );
+		$venueState       = VenueParameterProvider::resolveField( 'venueState', $parameters, $engine->all() );
+		$venueCountry     = VenueParameterProvider::resolveField( 'venueCountry', $parameters, $engine->all() );
 		$source_identity  = (string) ( $parameters['source_identity'] ?? '' );
 		$existing_post_id = $this->resolveExistingEventCandidate(
 			$source_identity,

@@ -190,6 +190,59 @@ class VenueParameterProvider {
 	}
 
 	/**
+	 * Merge scraper (engine) venue fields over AI tool parameters.
+	 *
+	 * Scraper data is authoritative when it actually found a value; an empty
+	 * scraper field must not shadow a value the AI step supplied. Engine data
+	 * always carries every venue* key (EventEngineData::buildEngineData()),
+	 * so a plain array_merge() would wipe AI-supplied city/country whenever
+	 * the source page lacked them — which then leaves the venue without
+	 * enough evidence to resolve a timezone. See #782.
+	 *
+	 * @param array $parameters AI tool call parameters.
+	 * @param array $engine     Engine data (EngineData::all() or equivalent).
+	 * @return array Parameters with non-empty engine venue fields applied on top.
+	 */
+	public static function mergeEngineOverParameters( array $parameters, array $engine ): array {
+		$merged = $parameters;
+
+		foreach ( array_keys( self::PARAMETER_TO_META_MAP ) as $param_key ) {
+			if ( ! array_key_exists( $param_key, $engine ) ) {
+				continue;
+			}
+			$value = $engine[ $param_key ];
+			if ( null === $value || '' === $value || array() === $value ) {
+				continue;
+			}
+			$merged[ $param_key ] = $value;
+		}
+
+		return $merged;
+	}
+
+	/**
+	 * Resolve one venue field with scraper-first, AI-fallback precedence.
+	 *
+	 * @param string $param_key  Venue parameter name (e.g. venueCountry).
+	 * @param array  $parameters AI tool call parameters.
+	 * @param array  $engine     Engine data.
+	 * @return string Resolved value, or '' when neither side has one.
+	 */
+	public static function resolveField( string $param_key, array $parameters, array $engine ): string {
+		$engine_value = $engine[ $param_key ] ?? null;
+		if ( null !== $engine_value && '' !== $engine_value ) {
+			return (string) $engine_value;
+		}
+
+		$param_value = $parameters[ $param_key ] ?? null;
+		if ( null !== $param_value && '' !== $param_value ) {
+			return (string) $param_value;
+		}
+
+		return '';
+	}
+
+	/**
 	 * Extract venue metadata from event data array.
 	 * Used by EventImportHandler subclasses.
 	 *

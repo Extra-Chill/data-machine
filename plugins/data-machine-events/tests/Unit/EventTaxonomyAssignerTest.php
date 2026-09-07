@@ -89,6 +89,111 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		wp_delete_term( $terms[0]->term_id, 'venue' );
 	}
 
+	/**
+	 * Empty scraper venue fields must not erase AI-supplied city/country (#782).
+	 *
+	 * EventEngineData always emits every venue* key, as '' when the source
+	 * page lacked it. A plain array_merge( $parameters, $engine ) therefore
+	 * wiped the AI's values, the venue was created blank, and the timezone
+	 * guard refused publication.
+	 */
+	public function test_process_venue_keeps_ai_city_and_country_when_scraper_fields_are_empty(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Venue Precedence Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+
+		$venue_name = 'Baggelycke Gard ' . uniqid();
+		$engine     = new \DataMachine\Core\EngineData(
+			array(
+				'venue'        => $venue_name,
+				'venueAddress' => '',
+				'venueCity'    => '',
+				'venueState'   => '',
+				'venueZip'     => '',
+				'venueCountry' => '',
+				'venueTimezone' => '',
+			),
+			0
+		);
+		$parameters = array(
+			'venue'        => $venue_name,
+			'venueCity'    => 'Vadstena',
+			'venueCountry' => 'Sweden',
+		);
+
+		// Keep geocoding offline so the timezone must come from the country rule.
+		$block_http = static fn() => new \WP_Error( 'blocked', 'No network in tests.' );
+		add_filter( 'pre_http_request', $block_http );
+		$result = $this->assigner->processVenue( $post_id, $parameters, $engine );
+		remove_filter( 'pre_http_request', $block_http );
+		$this->assertTrue( $result['success'] );
+
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms );
+		$term_id = (int) $terms[0]->term_id;
+
+		$this->assertSame( 'Vadstena', get_term_meta( $term_id, '_venue_city', true ) );
+		$this->assertSame( 'Sweden', get_term_meta( $term_id, '_venue_country', true ) );
+		$this->assertSame(
+			'Europe/Stockholm',
+			get_term_meta( $term_id, '_venue_timezone', true ),
+			'Single-zone country supplied by the AI must be enough to resolve a timezone offline.'
+		);
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $term_id, 'venue' );
+	}
+
+	/**
+	 * Populated scraper venue fields still win over AI parameters (#782).
+	 */
+	public function test_process_venue_prefers_populated_scraper_fields_over_ai_parameters(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Venue Precedence Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+
+		$venue_name = 'Scraper Wins Venue ' . uniqid();
+		$engine     = new \DataMachine\Core\EngineData(
+			array(
+				'venue'        => $venue_name,
+				'venueCity'    => 'Charleston',
+				'venueState'   => 'SC',
+				'venueCountry' => 'US',
+			),
+			0
+		);
+		$parameters = array(
+			'venue'        => $venue_name,
+			'venueCity'    => 'Somewhere Else',
+			'venueState'   => 'TX',
+			'venueCountry' => 'Sweden',
+		);
+
+		$result = $this->assigner->processVenue( $post_id, $parameters, $engine );
+		$this->assertTrue( $result['success'] );
+
+		$terms   = wp_get_object_terms( $post_id, 'venue' );
+		$term_id = (int) $terms[0]->term_id;
+
+		$this->assertSame( 'Charleston', get_term_meta( $term_id, '_venue_city', true ) );
+		$this->assertSame( 'SC', get_term_meta( $term_id, '_venue_state', true ) );
+		$this->assertSame( 'US', get_term_meta( $term_id, '_venue_country', true ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $term_id, 'venue' );
+	}
+
 	public function test_lofi_eventbrite_url_cannot_replace_canonical_official_website(): void {
 		$source_url = 'https://www.eventbrite.com/o/lo-fi-brewing-14959647606';
 		$ticket_url = 'https://www.eventbrite.com/e/lo-fi-test-event-123';

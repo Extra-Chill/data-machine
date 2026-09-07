@@ -85,7 +85,7 @@ class EventTaxonomyAssigner {
 	 * @return array{term_id:int, action:string} Venue resolution.
 	 */
 	public function resolveVenue( array $parameters, EngineData $engine, array $handler_config = array(), int $post_id = 0 ): array {
-		$venue_name = $engine->get( 'venue' ) ?? $parameters['venue'] ?? '';
+		$venue_name = VenueParameterProvider::resolveField( 'venue', $parameters, $engine->all() );
 
 		if ( empty( $venue_name ) ) {
 			$venue_context = $engine->get( 'venue_context' );
@@ -118,8 +118,9 @@ class EventTaxonomyAssigner {
 			);
 		}
 
-		// Merge engine data with AI parameters (engine takes precedence)
-		$merged_params  = array_merge( $parameters, $engine->all() );
+		// Scraper data wins when it found a value; an empty scraper field must
+		// not erase what the AI step supplied (#782).
+		$merged_params  = VenueParameterProvider::mergeEngineOverParameters( $parameters, $engine->all() );
 		$venue_metadata = VenueParameterProvider::extractFromParameters( $merged_params );
 
 		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
@@ -535,9 +536,9 @@ class EventTaxonomyAssigner {
 		}
 
 		return array(
-			'city'  => trim( (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' ) ),
-			'state' => trim( (string) ( $engine->get( 'venueState' ) ?? $parameters['venueState'] ?? '' ) ),
-			'zip'   => trim( (string) ( $engine->get( 'venueZip' ) ?? $parameters['venueZip'] ?? '' ) ),
+			'city'  => trim( VenueParameterProvider::resolveField( 'venueCity', $parameters, $engine->all() ) ),
+			'state' => trim( VenueParameterProvider::resolveField( 'venueState', $parameters, $engine->all() ) ),
+			'zip'   => trim( VenueParameterProvider::resolveField( 'venueZip', $parameters, $engine->all() ) ),
 		);
 	}
 
