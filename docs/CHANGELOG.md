@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.5] - 2026-09-07
+
+### Fixed
+- preserve sanitizer-derived keys in handler config patches
+
 ## [0.176.4] - 2026-09-07
 
 ### Changed
