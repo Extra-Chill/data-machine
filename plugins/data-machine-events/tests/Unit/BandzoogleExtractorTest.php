@@ -13,6 +13,8 @@
 namespace DataMachineEvents\Tests\Unit;
 
 use WP_UnitTestCase;
+use DataMachine\Core\ExecutionContext;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Enrichers\DetailPageEnricher;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandzoogleExtractor;
 
 class BandzoogleExtractorTest extends WP_UnitTestCase {
@@ -251,6 +253,80 @@ class BandzoogleExtractorTest extends WP_UnitTestCase {
 				'Sub-room labels in event-location must not replace the venue name.'
 			);
 		}
+	}
+
+	/**
+	 * The extractor opts into second-hop enrichment for start time only.
+	 */
+	public function test_needs_detail_enrichment_declares_start_time() {
+		$this->assertSame( array( 'startTime' ), $this->extractor->needsDetailEnrichment() );
+	}
+
+	/**
+	 * Second-hop enrichment fills missing start times from the ticket/detail
+	 * pages the tour page links to (#776).
+	 *
+	 * Fake fetcher maps the Johnny Delaware tour ticket URLs to the real
+	 * captured detail pages:
+	 *   - Vadstena → tickster event page ("Startar 12 sep 20:00") → 20:00
+	 *   - Hultsfred → hotellhulingen.se ("På scen kl. 20:00") → 20:00
+	 *   - Mariefred → Bandzoogle event-detail page with no time → ''
+	 *   - Visby → no ticket link, detail page not mapped → ''
+	 */
+	public function test_enrichment_fills_start_times_from_ticket_pages() {
+		$html = $this->loadFixture( 'bandzoogle-johnny-delaware-tour.html' );
+		$this->extractor->setNow( new \DateTimeImmutable( '2026-09-07 12:00:00' ) );
+
+		$tickster_vadstena = 'https://www.tickster.com/se/sv/events/45x2dppenfkku5v/2026-09-12/down-on-the-farm-johnny-delaware';
+		$hotell_hulingen   = 'https://www.hotellhulingen.se/evenemang/e/873/johnny-delaware/';
+		$mariefred_detail  = 'https://johnnydelaware.com/event/6669310/772840026/mariefred-swe';
+
+		$pages = array(
+			$tickster_vadstena => $this->loadDetailFixture( 'tickster-vadstena-johnny-delaware.html' ),
+			$hotell_hulingen   => $this->loadDetailFixture( 'hotellhulingen-hultsfred-johnny-delaware.html' ),
+			$mariefred_detail  => $this->loadDetailFixture( 'bandzoogle-mariefred-event-detail.html' ),
+		);
+
+		$events = $this->extractor->extract( $html, 'https://johnnydelaware.com/tour' );
+
+		$enricher = new DetailPageEnricher(
+			static fn( string $url ): ?string => $pages[ $url ] ?? null
+		);
+		$context  = ExecutionContext::direct( 'universal_web_scraper' );
+		$enriched = $enricher->run( $events, $this->extractor->needsDetailEnrichment(), 'https://johnnydelaware.com/tour', $context );
+
+		$by_title = array_column( $enriched, null, 'title' );
+
+		$this->assertSame( '20:00', $by_title['Vadstena, SWE']['startTime'], 'Tickster page must fill the Vadstena start time.' );
+		$this->assertSame( '20:00', $by_title['Hultsfred, SWE']['startTime'], 'Hotell Hulingen page must fill the Hultsfred start time.' );
+		$this->assertSame( '', $by_title['Visby, SWE']['startTime'], 'Visby has no ticket link and stays empty.' );
+		$this->assertSame( '', $by_title['Mariefred, SWE']['startTime'], 'Mariefred detail page has no time and stays empty.' );
+
+		$this->assertSame(
+			array(
+				'value'  => '20:00',
+				'source' => 'time_text',
+				'url'    => $tickster_vadstena,
+			),
+			$by_title['Vadstena, SWE']['enrichment']['startTime'],
+			'Provenance must record the filled value, source method, and followed URL.'
+		);
+		$this->assertSame( array( 'time_text' ), $enricher->getLastRunSources() );
+	}
+
+	/**
+	 * Load a detail-page fixture relative to tests/Fixtures/detail-pages.
+	 */
+	private function loadDetailFixture( string $filename ): string {
+		$path = __DIR__ . '/../Fixtures/detail-pages/' . $filename;
+		if ( ! file_exists( $path ) ) {
+			$this->markTestSkipped( 'Fixture not present: ' . $filename );
+		}
+
+		$html = file_get_contents( $path );
+		$this->assertNotFalse( $html, 'Fixture must be readable: ' . $filename );
+
+		return $html;
 	}
 
 	/**

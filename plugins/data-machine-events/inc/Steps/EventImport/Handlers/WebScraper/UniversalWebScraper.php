@@ -44,6 +44,10 @@
  *     - Square Online (__BOOTSTRAP_STATE__ JSON images)
  *     - Standard HTML <img> tag detection
  *
+ * After an extractor yields events, an opt-in Enrichers stage
+ * (inc/.../WebScraper/Enrichers/) may follow per-event detail/ticket URLs
+ * to fill missing fields (currently startTime for Bandzoogle tour pages).
+ *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper
  */
 
@@ -94,6 +98,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProc
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\PaginatorInterface;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\JsonApiPaginator;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\HtmlLinkPaginator;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Enrichers\DetailPageEnricher;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -117,12 +122,19 @@ class UniversalWebScraper extends EventImportHandler {
 	/** @var PaginatorInterface[] */
 	private array $paginators;
 
+	/**
+	 * Second-hop enrichment stage, run for extractors that opt in via
+	 * needsDetailEnrichment().
+	 */
+	private DetailPageEnricher $detail_enricher;
+
 	public function __construct() {
 		parent::__construct( 'universal_web_scraper' );
 
-		$this->processor  = new StructuredDataProcessor( $this );
-		$this->extractors = $this->getExtractors();
-		$this->paginators = $this->getPaginators();
+		$this->processor       = new StructuredDataProcessor( $this );
+		$this->extractors      = $this->getExtractors();
+		$this->paginators      = $this->getPaginators();
+		$this->detail_enricher = new DetailPageEnricher();
 
 		self::registerHandler(
 			'universal_web_scraper',
@@ -228,6 +240,9 @@ class UniversalWebScraper extends EventImportHandler {
 			);
 			return array();
 		}
+
+		// The detail-page enrichment budget spans the whole fetch cycle.
+		$this->detail_enricher->resetBudget();
 
 		$context->log(
 			'info',
@@ -460,9 +475,12 @@ class UniversalWebScraper extends EventImportHandler {
 				)
 			);
 
+			$extraction_method = $extractor->getMethod();
+			$events            = $this->runDetailEnrichers( $extractor, $events, $current_url, $context, $extraction_method );
+
 			$result = $this->processor->process(
 				$events,
-				$extractor->getMethod(),
+				$extraction_method,
 				$current_url,
 				$config,
 				$context
@@ -474,6 +492,48 @@ class UniversalWebScraper extends EventImportHandler {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Run the detail-page enrichment stage for extractors that opt in.
+	 *
+	 * Extractors declare the fields they want enriched via
+	 * needsDetailEnrichment() (e.g. Bandzoogle declares startTime). When a
+	 * source fills at least one field, the passed-by-reference
+	 * extraction_method gains a provenance suffix:
+	 * "bandzoogle+detail:time_text".
+	 *
+	 * @param object           $extractor         Extractor that produced the events.
+	 * @param array            $events            Extracted events.
+	 * @param string           $current_url       Listing page URL.
+	 * @param ExecutionContext $context           Execution context.
+	 * @param string           $extraction_method Extraction method (modified by reference).
+	 * @return array Events after enrichment.
+	 */
+	private function runDetailEnrichers(
+		object $extractor,
+		array $events,
+		string $current_url,
+		ExecutionContext $context,
+		string &$extraction_method
+	): array {
+		if ( ! method_exists( $extractor, 'needsDetailEnrichment' ) ) {
+			return $events;
+		}
+
+		$fields = (array) $extractor->needsDetailEnrichment();
+		if ( empty( $fields ) ) {
+			return $events;
+		}
+
+		$events = $this->detail_enricher->run( $events, $fields, $current_url, $context );
+
+		$detail_sources = $this->detail_enricher->getLastRunSources();
+		if ( ! empty( $detail_sources ) ) {
+			$extraction_method .= '+detail:' . implode( ',', $detail_sources );
+		}
+
+		return $events;
 	}
 
 	/**
@@ -847,7 +907,7 @@ class UniversalWebScraper extends EventImportHandler {
 				'debug',
 				'Universal Web Scraper: Matched event section selector',
 				array(
-					'selector' => $event_section['selector'] ?? '',
+					'selector' => $event_section['selector'],
 					'url'      => $url,
 				)
 			);
@@ -954,9 +1014,12 @@ class UniversalWebScraper extends EventImportHandler {
 		foreach ( $queries as $query ) {
 			$nodes = $xpath->query( $query );
 			if ( false !== $nodes && $nodes->length > 0 ) {
-				$text = trim( $nodes->item( 0 )->textContent );
-				if ( ! empty( $text ) ) {
-					return $text;
+				$first = $nodes->item( 0 );
+				if ( $first instanceof \DOMElement ) {
+					$text = trim( $first->textContent );
+					if ( ! empty( $text ) ) {
+						return $text;
+					}
 				}
 			}
 		}

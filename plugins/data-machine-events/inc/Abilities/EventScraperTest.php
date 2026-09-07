@@ -156,6 +156,7 @@ class EventScraperTest {
 										'raw_section_count',
 										'flyer_candidate_count',
 										'context_supplied',
+										'enrichment',
 									),
 									'properties'           => array(
 										'packet_title'     => array( 'type' => 'string' ),
@@ -208,6 +209,23 @@ class EventScraperTest {
 										'context_supplied' => array( 'type' => 'boolean' ),
 										'requires_ai_step' => array( 'type' => 'boolean' ),
 										'image_file_stored' => array( 'type' => 'boolean' ),
+										'enrichment'       => array(
+											'type'       => 'object',
+											'additionalProperties' => false,
+											'required'   => array( 'followed', 'filled' ),
+											'properties' => array(
+												'followed' => array(
+													'type' => 'integer',
+													'minimum' => 0,
+													'description' => 'Detail/ticket pages followed by the enrichment stage.',
+												),
+												'filled'   => array(
+													'type' => 'object',
+													'additionalProperties' => array( 'type' => 'integer' ),
+													'description' => 'Fields filled by enrichment, keyed by field name with fill counts.',
+												),
+											),
+										),
 									),
 								),
 								'coverage_issues' => array(
@@ -305,7 +323,7 @@ class EventScraperTest {
 				array_filter(
 					$logs,
 					static function ( array $entry ): bool {
-						return in_array( $entry['level'] ?? '', array( 'warning', 'error' ), true );
+						return in_array( $entry['level'], array( 'warning', 'error' ), true );
 					}
 				)
 			);
@@ -351,6 +369,7 @@ class EventScraperTest {
 		$extraction_info['packet_title']      = $packet_data['title'] ?? '';
 		$extraction_info['source_type']       = $packet_meta['source_type'] ?? '';
 		$extraction_info['extraction_method'] = $packet_meta['extraction_method'] ?? '';
+		$extraction_info['enrichment']        = $this->enrichmentSummary( $logs );
 
 		if ( is_array( $payload ) && isset( $payload['raw_html'] ) && is_string( $payload['raw_html'] ) ) {
 			return array(
@@ -427,7 +446,7 @@ class EventScraperTest {
 		$venue_state = (string) ( $event['venueState'] ?? '' );
 		$venue_zip   = (string) ( $event['venueZip'] ?? '' );
 
-		if ( is_array( $payload ) && isset( $payload['venue_metadata'] ) && is_array( $payload['venue_metadata'] ) ) {
+		if ( isset( $payload['venue_metadata'] ) && is_array( $payload['venue_metadata'] ) ) {
 			$venue_meta  = $payload['venue_metadata'];
 			$venue_addr  = '' !== $venue_addr ? $venue_addr : (string) ( $venue_meta['venueAddress'] ?? '' );
 			$venue_city  = '' !== $venue_city ? $venue_city : (string) ( $venue_meta['venueCity'] ?? '' );
@@ -481,7 +500,7 @@ class EventScraperTest {
 			array_filter(
 				$logs,
 				static function ( array $entry ): bool {
-					return ( $entry['level'] ?? '' ) === 'warning';
+					return 'warning' === $entry['level'];
 				}
 			)
 		);
@@ -504,10 +523,6 @@ class EventScraperTest {
 			'warnings'        => $warnings,
 			'logs'            => array_slice( $logs, -20 ),
 		);
-	}
-
-	private function buildErrorResponse( string $message ): \WP_Error {
-		return new \WP_Error( 'test_error', $message, array( 'status' => 400 ) );
 	}
 
 	/**
@@ -629,6 +644,39 @@ class EventScraperTest {
 				'flyer_candidate_count'     => $flyer_candidate_count,
 				'context_supplied'          => $context_supplied,
 			),
+		);
+	}
+
+	/**
+	 * Aggregate enrichment-stage summaries from the collected run logs.
+	 *
+	 * The Detail Page Enricher emits one info log per run
+	 * ("Detail Page Enricher: Run summary") with followed/filled/skipped
+	 * counts; multi-page runs log once per page, so counts are summed.
+	 *
+	 * @param array $logs Collected datamachine_log entries.
+	 * @return array{followed: int, filled: array<string,int>}
+	 */
+	private function enrichmentSummary( array $logs ): array {
+		$followed = 0;
+		$filled   = array();
+
+		foreach ( $logs as $entry ) {
+			if ( 'Detail Page Enricher: Run summary' !== ( $entry['message'] ?? '' ) ) {
+				continue;
+			}
+
+			$context   = is_array( $entry['context'] ?? null ) ? $entry['context'] : array();
+			$followed += (int) ( $context['followed'] ?? 0 );
+
+			foreach ( ( $context['filled'] ?? array() ) as $field => $count ) {
+				$filled[ $field ] = ( $filled[ $field ] ?? 0 ) + (int) $count;
+			}
+		}
+
+		return array(
+			'followed' => $followed,
+			'filled'   => $filled,
 		);
 	}
 }
