@@ -26,7 +26,7 @@ class EmailAbilityRestTest extends WP_UnitTestCase {
 		wp_set_current_user( $user_id );
 	}
 
-	private function run_ability( string $slug, array $input ): array {
+	private function run_ability( string $slug, array $input ): \WP_REST_Response {
 		$request = new WP_REST_Request( 'POST', '/wp-abilities/v1/abilities/datamachine/' . $slug . '/run' );
 		$request->set_header( 'content-type', 'application/json' );
 		$request->set_body( wp_json_encode( array( 'input' => $input ) ) );
