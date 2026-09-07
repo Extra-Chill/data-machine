@@ -279,7 +279,7 @@ class SimilarityEngine {
 	 * @return bool True when the token distinguishes one instance from another.
 	 */
 	private static function isOrdinalToken( string $token ): bool {
-		// Bare numbers: "1", "02", "2026".
+		// Bare numeric tokens such as 1, 02 or 2026.
 		if ( ctype_digit( $token ) ) {
 			return true;
 		}
