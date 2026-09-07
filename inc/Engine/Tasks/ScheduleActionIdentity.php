@@ -85,6 +85,69 @@ final class ScheduleActionIdentity {
 		return false;
 	}
 
+	/**
+	 * Batch-resolve the earliest pending scheduled date for logical identities.
+	 *
+	 * Aggregates one hook's pending actions in a single query and matches
+	 * stored args through the logical identity, so legacy and generated
+	 * argument shapes both resolve. Rows are not filtered by AS group; the
+	 * hook is expected to be plugin-namespaced.
+	 *
+	 * @param string            $hook              AS hook.
+	 * @param array<int, array> $logical_args_list Logical signatures keyed by caller keys (e.g. flow IDs).
+	 * @return array<int|string, string|null> Earliest pending UTC datetime per input key, null when none pending.
+	 */
+	public static function nextScheduledDates( string $hook, array $logical_args_list ): array {
+		$result = array_fill_keys( array_keys( $logical_args_list ), null );
+		if ( empty( $logical_args_list ) ) {
+			return $result;
+		}
+
+		$wanted = array();
+		foreach ( $logical_args_list as $caller_key => $logical_args ) {
+			$encoded_request = wp_json_encode( $logical_args );
+			if ( is_string( $encoded_request ) ) {
+				$wanted[ $encoded_request ] = $caller_key;
+			}
+		}
+
+		global $wpdb;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Identity resolution requires fresh AS runtime state across batch callers; the generated SQL pairs one %s/%i set with $values.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT args, MIN(scheduled_date_gmt) AS next_run
+				FROM %i
+				WHERE hook = %s
+				AND status = 'pending'
+				GROUP BY args",
+				$wpdb->prefix . 'actionscheduler_actions',
+				$hook
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		if ( ! is_array( $rows ) ) {
+			return $result;
+		}
+
+		foreach ( $rows as $row ) {
+			$decoded = json_decode( (string) ( $row['args'] ?? '' ), true );
+			if ( ! is_array( $decoded ) ) {
+				continue;
+			}
+			$encoded = wp_json_encode( self::logicalArgs( $decoded ) );
+			if ( null !== $encoded && isset( $wanted[ $encoded ] ) ) {
+				$caller_key = $wanted[ $encoded ];
+				if ( null === $result[ $caller_key ] ) {
+					$result[ $caller_key ] = (string) ( $row['next_run'] ?? '' );
+				}
+			}
+		}
+
+		return $result;
+	}
+
 	public static function countPending( string $hook, array $args, string $group ): int {
 		$count = 0;
 		foreach ( self::actions( $hook, $group, 'pending' ) as $action ) {
