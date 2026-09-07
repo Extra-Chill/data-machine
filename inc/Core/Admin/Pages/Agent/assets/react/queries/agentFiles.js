@@ -151,36 +151,3 @@ export const useDeleteDailyFile = () => {
 		},
 	} );
 };
-
-// Context memory hooks.
-
-const CONTEXT_KEYS = {
-	detail: ( slug, agentId ) => [ 'context-files', slug, { agentId } ],
-};
-
-export const useContextFile = ( slug ) => {
-	const agentId = useSelectedAgentId();
-	return useQuery( {
-		queryKey: CONTEXT_KEYS.detail( slug, agentId ),
-		queryFn: () => api.getContextFile( slug ),
-		enabled: !! slug,
-		select: ( response ) => response?.data ?? response ?? {},
-	} );
-};
-
-export const useSaveContextFile = () => {
-	const queryClient = useQueryClient();
-	const agentId = useSelectedAgentId();
-	return useMutation( {
-		mutationFn: ( { slug, content } ) =>
-			api.putContextFile( slug, content ),
-		onSuccess: ( _data, { slug } ) => {
-			queryClient.invalidateQueries( {
-				queryKey: CONTEXT_KEYS.detail( slug, agentId ),
-			} );
-			queryClient.invalidateQueries( {
-				queryKey: KEYS.list( agentId ),
-			} );
-		},
-	} );
-};

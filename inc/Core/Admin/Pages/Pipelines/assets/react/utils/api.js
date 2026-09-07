@@ -491,7 +491,16 @@ export const removeFlowHandler = async ( flowStepId, handlerSlug ) => {
  * @return {Promise<Object>} Array of scheduling intervals
  */
 export const getSchedulingIntervals = async () => {
-	return await client.get( '/settings/scheduling-intervals' );
+	const result = await executeAbility( 'get-scheduling-intervals' );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: result.intervals ?? [],
+	};
 };
 
 /**
@@ -663,7 +672,19 @@ export const updateFlowMemoryFiles = async ( flowId, memoryFiles ) => {
  * @return {Promise<Object>} Array of agent files
  */
 export const fetchAgentFiles = async () => {
-	return await client.get( '/files/agent' );
+	const { selectedAgentId } = useAgentStore.getState();
+	const result = await executeAbility( 'list-agent-files', {
+		...( selectedAgentId ? { agent_id: selectedAgentId } : {} ),
+	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: result.files ?? [],
+	};
 };
 
 /**
@@ -673,7 +694,9 @@ export const fetchAgentFiles = async () => {
  * @return {Promise<Object>} Handler details including basic info, settings schema, and AI tool definition
  */
 export const fetchHandlerDetails = async ( handlerSlug ) => {
-	return await client.get( `/handlers/${ handlerSlug }` );
+	return await executeAbility( 'get-handler-detail', {
+		handler_slug: handlerSlug,
+	} );
 };
 
 /**
@@ -682,7 +705,16 @@ export const fetchHandlerDetails = async ( handlerSlug ) => {
  * @return {Promise<Object>} Step types configuration
  */
 export const getStepTypes = async () => {
-	return await client.get( '/step-types' );
+	const result = await executeAbility( 'get-step-types' );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: result.step_types ?? {},
+	};
 };
 
 /**
@@ -703,8 +735,16 @@ export const getTools = async ( context = null ) => {
  * @return {Promise<Object>} Handlers configuration
  */
 export const getHandlers = async ( stepType = null ) => {
-	const params = stepType ? { step_type: stepType } : {};
-	return await client.get( '/handlers', params );
+	const result = await executeAbility( 'get-handlers', stepType ? { step_type: stepType } : {} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: result.handlers ?? {},
+	};
 };
 
 /**

@@ -1592,7 +1592,7 @@ underneath.
 
 Higher-level consumers all go through this facade rather than instantiating store types directly:
 
-- `\DataMachine\Abilities\File\AgentFileAbilities` — whole-file ops backing the `/datamachine/v1/files/agent` REST routes (the React Agent UI)
+- `\DataMachine\Abilities\File\AgentFileAbilities` — whole-file ops backing the agent memory abilities (the React Agent UI)
 - `\DataMachine\Engine\AI\Directives\CoreMemoryFilesDirective` — file content injected into every AI conversation
 - `\DataMachine\Engine\AI\System\Tasks\DailyMemoryTask` — full-file rewrite during scheduled compaction
 - `\DataMachine\Abilities\AgentMemoryAbilities` — Abilities API surface for memory operations

@@ -1,19 +1,17 @@
 # Files Endpoint
 
-**Implementation**: `inc/Api/FlowFiles.php`, `inc/Api/AgentFiles.php`
+**Implementation**: `inc/Api/FlowFiles.php`, `inc/Abilities/File/AgentFileAbilities.php`, `inc/Abilities/DailyMemoryAbilities.php`
 
 **Base URL**: `/wp-json/datamachine/v1/files`
 
 ## Overview
 
-The Files endpoint handles two distinct scopes:
-
-1. **Flow files** — File uploads for pipeline processing with flow-isolated storage, security validation, and automatic URL generation (`inc/Api/FlowFiles.php`)
-2. **Agent files** — Agent memory file management with 3-layer directory resolution for SOUL.md, MEMORY.md, USER.md, and daily memory journals (`inc/Api/AgentFiles.php`)
+1. **Flow files** — File uploads for pipeline processing with flow-isolated storage, security validation, and automatic URL generation (`inc/Api/FlowFiles.php`). Multipart upload is a retained transport route.
+2. **Agent files** — Agent memory file management for SOUL.md, MEMORY.md, USER.md, and daily memory journals, handled entirely by REST-visible abilities since #3456.
 
 ## Authentication
 
-Requires authenticated user. Agent file endpoints use scoped permissions — users can access their own agent files, and users with `manage_agents` capability can access any agent's files.
+The flow-file upload route requires an authenticated user plus `PermissionHelper::can_manage()`. The agent-file abilities enforce the Data Machine management surface (`PermissionHelper::can_manage()`) and resolve the acting user from the input context (`user_id`, defaulting to the current user).
 
 ## Flow File Endpoints
 
@@ -81,199 +79,39 @@ POST /wp-json/wp-abilities/v1/abilities/datamachine/delete-flow-file/run
 
 `list-flow-files` returns `{ "success": true, "files": [ ... ] }`; `delete-flow-file` returns `{ "success": true, "message": "..." }`.
 
-## Agent File Endpoints
+## Agent File Abilities
 
-**Implementation**: `inc/Api/AgentFiles.php` (@since v0.38.0)
+**Implementation**: `inc/Abilities/File/AgentFileAbilities.php` (`datamachine-memory` category)
 
-Agent files use a 3-layer directory resolution system:
+The `datamachine/v1/files/agent` REST routes were retired in #3456. Agent memory files are managed through REST-visible abilities executed through WordPress core's ability runner:
+
+```
+POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run
+Content-Type: application/json
+
+{ "input": { ... } }
+```
+
+The admin Agent page calls these through the shared `executeAbility()` client (`inc/Core/Admin/shared/utils/api.js`). Agent files use a layered directory resolution system:
+
 1. **Shared layer** — Site-wide files like SITE.md
 2. **Agent layer** — Agent-specific files: SOUL.md, MEMORY.md
 3. **User layer** — User-specific files: USER.md
 
-The `user_id` parameter controls which user context to resolve. Defaults to the current authenticated user. Users with `manage_agents` capability can access other users' files.
+The `user_id` input (default `0`) controls which user context to resolve; `agent_id` selects a specific agent's layer.
 
-### GET /files/agent
-
-List agent files for the current user context.
-
-**Permission**: Authenticated user (own files) or `manage_agents` capability (other users)
-
-**Parameters**:
-- `user_id` (integer, optional): WordPress user ID for layered context resolution
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "filename": "SOUL.md",
-      "size": 2048,
-      "modified": 1704153600,
-      "layer": "agent"
-    },
-    {
-      "filename": "MEMORY.md",
-      "size": 4096,
-      "modified": 1704240000,
-      "layer": "agent"
-    }
-  ]
-}
-```
-
-### GET /files/agent/{filename}
-
-Read an agent memory file (SOUL.md, MEMORY.md, USER.md, etc.).
-
-**Permission**: Authenticated user (own files) or `manage_agents` capability
-
-**Parameters**:
-- `filename` (string, required): Agent memory file (e.g., `SOUL.md`, `MEMORY.md`)
-- `user_id` (integer, optional): WordPress user ID for context
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "filename": "MEMORY.md",
-    "content": "# Agent Memory\n\n## State\n...",
-    "size": 4096,
-    "modified": 1704240000
-  }
-}
-```
-
-### PUT /files/agent/{filename}
-
-Write/update an agent memory file.
-
-**Permission**: Authenticated user (own files) or `manage_agents` capability
-
-**Parameters**:
-- `filename` (string, required): Agent memory file
-- `content` (string, required): New file content
-- `user_id` (integer, optional): WordPress user ID for context
-
-**Example**:
-```bash
-curl -X PUT https://example.com/wp-json/datamachine/v1/files/agent/MEMORY.md \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{"content": "# Agent Memory\n\nI know how to..."}'
-```
-
-### DELETE /files/agent/{filename}
-
-Delete an agent file.
-
-**Permission**: Authenticated user (own files) or `manage_agents` capability
-
-**Parameters**:
-- `filename` (string, required): Agent file to delete
-- `user_id` (integer, optional): WordPress user ID for context
-
-## Daily Memory Endpoints
-
-**Implementation**: `inc/Api/AgentFiles.php` (lines 121-195)
-
-Daily memory files store temporal session logs in the agent daily-memory tree by year, month, and day. These endpoints manage the daily memory journal separate from persistent memory files.
-
-### GET /files/agent/daily
-
-List all daily memory files for the agent.
-
-**Permission**: Authenticated user (own files) or `manage_agents` capability
-
-**Parameters**:
-- `user_id` (integer, optional): WordPress user ID for context
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "date": "2026-03-15",
-      "size": 1024,
-      "path": "daily/2026/03/15.md"
-    },
-    {
-      "date": "2026-03-14",
-      "size": 2048,
-      "path": "daily/2026/03/14.md"
-    }
-  ]
-}
-```
-
-### GET /files/agent/daily/{year}/{month}/{day}
-
-Read a specific daily memory file.
-
-**Permission**: Authenticated user (own files) or `manage_agents` capability
-
-**Parameters**:
-- `year` (string, required): 4-digit year (e.g., `2026`)
-- `month` (string, required): 2-digit month (`01`-`12`)
-- `day` (string, required): 2-digit day (`01`-`31`)
-- `user_id` (integer, optional): WordPress user ID for context
-
-**Example Request**:
-```bash
-curl https://example.com/wp-json/datamachine/v1/files/agent/daily/2026/03/15 \
-  -u username:application_password
-```
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "date": "2026-03-15",
-    "content": "# Daily Memory — 2026-03-15\n\n## Session Activity\n...",
-    "size": 1024
-  }
-}
-```
-
-### PUT /files/agent/daily/{year}/{month}/{day}
-
-Write or update a daily memory file.
-
-**Permission**: Authenticated user (own files) or `manage_agents` capability
-
-**Parameters**:
-- `year` (string, required): 4-digit year
-- `month` (string, required): 2-digit month
-- `day` (string, required): 2-digit day
-- `content` (string, required): File content
-- `user_id` (integer, optional): WordPress user ID for context
-
-**Example Request**:
-```bash
-curl -X PUT https://example.com/wp-json/datamachine/v1/files/agent/daily/2026/03/15 \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{"content": "# Daily Memory — 2026-03-15\n\n## Session Activity\nUpdated docs..."}'
-```
-
-### DELETE /files/agent/daily/{year}/{month}/{day}
-
-Delete a daily memory file.
-
-**Permission**: Authenticated user (own files) or `manage_agents` capability
-
-**Parameters**:
-- `year` (string, required): 4-digit year
-- `month` (string, required): 2-digit month
-- `day` (string, required): 2-digit day
-- `user_id` (integer, optional): WordPress user ID for context
+| Ability slug | Purpose |
+| --- | --- |
+| `datamachine/list-agent-files` | List memory files from all layers, including the daily memory summary entry (`files`). |
+| `datamachine/get-agent-file` | Read one file with content (`file`: `filename`, `size`, `modified`, `content`). |
+| `datamachine/write-agent-file` | Write or update a file (`filename`, `content`, optional `layer`). Registry editability is enforced. |
+| `datamachine/delete-agent-file` | Delete a file; protected files are rejected. |
+| `datamachine/upload-agent-file` | Upload a file into a memory layer directory (`file_data`). |
+| `datamachine/daily-memory-list` | List daily memory months (`months`). |
+| `datamachine/daily-memory-read` | Read one day (`date` as `YYYY-MM-DD`) → `date`, `content`. |
+| `datamachine/daily-memory-write` | Write or append (`date`, `content`, `mode`). Requires `daily_memory_enabled`. |
+| `datamachine/daily-memory-delete` | Delete one day (`date`). Requires `daily_memory_enabled`. |
+| `datamachine/search-daily-memory` | Full-text search across daily memory (`query`, optional date bounds). |
 
 ## Error Responses
 
@@ -456,37 +294,40 @@ else:
 ### JavaScript Agent Memory Access
 
 ```javascript
-const axios = require('axios');
+const abilityRunUrl =
+  'https://example.com/wp-json/wp-abilities/v1/abilities/datamachine';
 
-const agentFilesAPI = {
-  baseURL: 'https://example.com/wp-json/datamachine/v1/files/agent',
-  auth: { username: 'admin', password: 'application_password' }
-};
+async function runAbility(slug, input) {
+  const response = await fetch(`${abilityRunUrl}/${slug}/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-WP-Nonce': wpApiSettings.nonce,
+    },
+    body: JSON.stringify({ input }),
+  });
+  return response.json();
+}
 
 // Read MEMORY.md
 async function readMemory() {
-  const response = await axios.get(`${agentFilesAPI.baseURL}/MEMORY.md`, {
-    auth: agentFilesAPI.auth
-  });
-  return response.data.data.content;
+  const result = await runAbility('get-agent-file', { filename: 'MEMORY.md' });
+  return result.file.content;
 }
 
 // Update MEMORY.md
 async function updateMemory(content) {
-  const response = await axios.put(`${agentFilesAPI.baseURL}/MEMORY.md`, 
-    { content },
-    { auth: agentFilesAPI.auth }
-  );
-  return response.data.success;
+  const result = await runAbility('write-agent-file', {
+    filename: 'MEMORY.md',
+    content,
+  });
+  return result.success;
 }
 
-// Read today's daily memory
-async function readDailyMemory(year, month, day) {
-  const response = await axios.get(
-    `${agentFilesAPI.baseURL}/daily/${year}/${month}/${day}`,
-    { auth: agentFilesAPI.auth }
-  );
-  return response.data.data.content;
+// Read one day of daily memory
+async function readDailyMemory(date) {
+  const result = await runAbility('daily-memory-read', { date });
+  return result.content;
 }
 ```
 
@@ -510,12 +351,12 @@ curl -X POST https://example.com/wp-json/datamachine/v1/files \
 ## Related Documentation
 
 - Execute Endpoint - Workflow execution
-- Flows Endpoints - Flow management
-- Handlers Endpoint - Available handlers
+- Flows Abilities - Flow management
+- Handlers Abilities - Available handlers
 - Authentication - Auth methods
 
 ---
 
-**Base URL**: `/wp-json/datamachine/v1/files`
-**Implementation**: `inc/Api/FlowFiles.php` (flow files), `inc/Api/AgentFiles.php` (agent files)
+**Base URL**: `/wp-json/datamachine/v1/files` (flow-file upload transport route only)
+**Implementation**: `inc/Api/FlowFiles.php` (flow files), `inc/Abilities/File/AgentFileAbilities.php` + `inc/Abilities/DailyMemoryAbilities.php` (agent files)
 **Max File Size**: WordPress `wp_max_upload_size()` setting

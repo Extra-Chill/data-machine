@@ -92,7 +92,9 @@ class LogAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'clear' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					// Aligned with the retired /datamachine/v1/logs wrapper
+					// permission so log-page viewers keep access (#3456).
+					'permission_callback' => fn() => PermissionHelper::can( 'view_logs' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -160,7 +162,9 @@ class LogAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'readLogs' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					// Aligned with the retired /datamachine/v1/logs wrapper
+					// permission so log-page viewers keep access (#3456).
+					'permission_callback' => fn() => PermissionHelper::can( 'view_logs' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -191,7 +195,9 @@ class LogAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'getMetadata' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					// Aligned with the retired /datamachine/v1/logs wrapper
+					// permission so log-page viewers keep access (#3456).
+					'permission_callback' => fn() => PermissionHelper::can( 'view_logs' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

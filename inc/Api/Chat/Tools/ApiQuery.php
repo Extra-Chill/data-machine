@@ -43,7 +43,7 @@ class ApiQuery extends BaseTool {
 				'properties' => array(
 					'endpoint' => array(
 						'type'        => 'string',
-						'description' => 'Single mode: REST API endpoint path (e.g., /datamachine/v1/handlers)',
+						'description' => 'Single mode: REST API endpoint path (e.g., /datamachine/v1/flows). Ability-backed resources are documented below.',
 					),
 					'requests' => array(
 						'type'        => 'array',
@@ -67,15 +67,13 @@ MODES:
 - Single: {endpoint}
 - Batch: {requests: [{endpoint, key?}, ...]}
 
-KEY ENDPOINTS:
-/datamachine/v1/handlers - List handlers (?step_type=fetch|publish|upsert)
-/datamachine/v1/handlers/{slug} - Handler config schema
-/datamachine/v1/flows/{id} - Flow details
-/datamachine/v1/jobs - List jobs (?flow_id, ?status)
-
-PIPELINES (via ability runner, POST /wp-abilities/v1/abilities/datamachine/{slug}/run):
-get-pipelines - List pipelines or fetch one by pipeline_id
-get-pipeline-steps - Steps for a pipeline';
+ABILITY DISCOVERY (via ability runner, POST /wp-abilities/v1/abilities/datamachine/{slug}/run):
+get-handlers - List handlers (input: {step_type}) or one handler (input: {handler_slug})
+get-handler-detail - Handler info, settings field state, and AI tool definition (input: {handler_slug})
+get-step-types - Registered step types
+get-jobs - List jobs (input: {flow_id, status, ...}) or fetch one by job_id
+read-logs - Read log entries (input: {agent_id, level, job_id, ...})
+get-flows - List flows or fetch one by flow_id';
 	}
 
 	/**

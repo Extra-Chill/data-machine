@@ -303,12 +303,83 @@ class HandlerAbilities {
 
 		$handlers = $this->getAllHandlers( $step_type );
 
+		// Enrich with auth_type, auth_fields, and authentication status.
+		// Ported from the retired /datamachine/v1/handlers wrapper route (#3456).
+		$auth_abilities = new AuthAbilities();
+
+		foreach ( $handlers as $slug => &$handler ) {
+			if ( ! is_array( $handler ) ) {
+				unset( $handlers[ $slug ] );
+				continue;
+			}
+
+			$handler = array_merge(
+				array(
+					'type'              => '',
+					'class'             => '',
+					'label'             => $slug,
+					'description'       => '',
+					'requires_auth'     => false,
+					'auth_provider_key' => null,
+					'meta'              => array(),
+				),
+				$handler
+			);
+
+			$auth_key      = $handler['auth_provider_key'] ?? $slug;
+			$auth_instance = $auth_abilities->getProvider( $auth_key );
+			if ( ! empty( $handler['requires_auth'] ) && $auth_instance ) {
+				$auth_type            = self::detectAuthType( $auth_instance );
+				$handler['auth_type'] = $auth_type;
+
+				// Add auth fields if available (regardless of auth type).
+				if ( method_exists( $auth_instance, 'get_config_fields' ) ) {
+					$handler['auth_fields'] = $auth_instance->get_config_fields();
+				}
+
+				// Add callback URL for OAuth providers (user must configure this externally).
+				if ( ( 'oauth1' === $auth_type || 'oauth2' === $auth_type ) && method_exists( $auth_instance, 'get_callback_url' ) ) {
+					$handler['callback_url'] = $auth_instance->get_callback_url();
+				}
+
+				// Check if already authenticated.
+				$handler['is_authenticated'] = false;
+				if ( method_exists( $auth_instance, 'is_authenticated' ) ) {
+					$handler['is_authenticated'] = $auth_instance->is_authenticated();
+				}
+
+				// Get account details if authenticated.
+				if ( $handler['is_authenticated'] && method_exists( $auth_instance, 'get_account_details' ) ) {
+					$handler['account_details'] = $auth_instance->get_account_details();
+				}
+			}
+		}
+		unset( $handler );
+
 		return array(
 			'success'   => true,
 			'handlers'  => $handlers,
 			'count'     => count( $handlers ),
 			'step_type' => $step_type,
 		);
+	}
+
+	/**
+	 * Detect authentication type from an auth class instance.
+	 *
+	 * @param object $auth_instance Auth provider instance.
+	 * @return string Auth type: 'oauth2', 'oauth1', or 'simple'.
+	 */
+	private static function detectAuthType( $auth_instance ): string {
+		if ( $auth_instance instanceof \DataMachine\Core\OAuth\BaseOAuth2Provider ) {
+			return 'oauth2';
+		}
+		if ( $auth_instance instanceof \DataMachine\Core\OAuth\BaseOAuth1Provider ) {
+			return 'oauth1';
+		}
+
+		// Default to simple auth for any other provider type (API Key, Basic Auth, etc.).
+		return 'simple';
 	}
 
 	/**

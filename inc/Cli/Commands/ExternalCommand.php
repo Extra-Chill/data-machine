@@ -327,11 +327,22 @@ class ExternalCommand extends BaseCommand {
 			)
 		);
 
-		// Test 2: Agent memory access.
-		$memory = RemoteAgentClient::request( $site, $agent_slug, 'GET', '/wp-json/datamachine/v1/files/agent', array( 'timeout' => 15 ) );
+		// Test 2: Agent memory access. The /files/agent wrapper routes were
+		// retired in #3456 — probe the list-agent-files ability run route.
+		$memory = RemoteAgentClient::request(
+			$site,
+			$agent_slug,
+			'POST',
+			'/wp-json/wp-abilities/v1/abilities/datamachine/list-agent-files/run',
+			array(
+				'body'    => array( 'input' => new \stdClass() ),
+				'timeout' => 15,
+			)
+		);
 
 		if ( $memory['success'] ) {
-			$files = is_array( $memory['body'] ) ? $memory['body'] : array();
+			$body  = is_array( $memory['body'] ) ? $memory['body'] : array();
+			$files = is_array( $body['files'] ?? null ) ? $body['files'] : array();
 			WP_CLI::log( sprintf( '  Memory:    OK — %d file(s) accessible', count( $files ) ) );
 		} else {
 			WP_CLI::log( sprintf( '  Memory:    HTTP %d (Data Machine may not be active on this site)', $memory['status_code'] ) );

@@ -46,7 +46,7 @@ class ExecuteWorkflowTool extends BaseTool {
 
 STEP FORMAT: {step_type: "' . $types_list . '", handler_slugs?, handler_configs?, flow_step_settings?, user_message?, system_prompt?, agent_modes?}
 
-Use api_query GET /datamachine/v1/handlers/{slug} for handler_configs fields.
+Use the get-handler-detail ability (input: {handler_slug}) for handler_configs fields.
 
 EXAMPLE:
 [

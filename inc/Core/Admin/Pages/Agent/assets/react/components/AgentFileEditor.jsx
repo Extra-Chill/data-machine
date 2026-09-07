@@ -25,8 +25,6 @@ import {
 	useSaveAgentFile,
 	useDailyFile,
 	useSaveDailyFile,
-	useContextFile,
-	useSaveContextFile,
 } from '../queries/agentFiles';
 
 /**
@@ -212,93 +210,7 @@ const DailyFileEditor = ( { year, month, day } ) => {
 };
 
 /**
- * Context file editor — uses context memory API routes.
- * @param {Object} root0      Component props.
- * @param {string} root0.slug Context slug.
- */
-const ContextFileEditor = ( { slug } ) => {
-	const { data: file, isLoading, error } = useContextFile( slug );
-	const saveMutation = useSaveContextFile();
-	const [ content, setContent ] = useState( '' );
-
-	useEffect( () => {
-		if ( file?.content !== undefined ) {
-			setContent( file.content );
-		}
-	}, [ file ] );
-
-	const { saveStatus, hasChanges, markChanged, handleSave, setHasChanges } =
-		useSaveStatus( {
-			onSave: async () => {
-				await saveMutation.mutateAsync( { slug, content } );
-			},
-		} );
-
-	const handleContentChange = useCallback(
-		( e ) => {
-			setContent( e.target.value );
-			markChanged();
-		},
-		[ markChanged ]
-	);
-
-	useEffect( () => {
-		setHasChanges( false );
-	}, [ slug, setHasChanges ] );
-
-	if ( isLoading ) {
-		return (
-			<div className="datamachine-agent-editor">
-				<div className="datamachine-agent-editor-loading">
-					<Spinner />
-					<span>Loading context file...</span>
-				</div>
-			</div>
-		);
-	}
-
-	if ( error ) {
-		return (
-			<div className="datamachine-agent-editor">
-				<div className="datamachine-agent-editor-error">
-					Failed to load context file:{' '}
-					{ error.message || 'Unknown error' }
-				</div>
-			</div>
-		);
-	}
-
-	return (
-		<div className="datamachine-agent-editor">
-			<div className="datamachine-agent-editor-header">
-				<h3>
-					<span className="datamachine-agent-context-badge">
-						ctx
-					</span>
-					{ slug }.md
-				</h3>
-			</div>
-			<div className="datamachine-agent-editor-context-hint">
-				This file is injected when the execution context is &ldquo;
-				{ slug }&rdquo;.
-			</div>
-			<textarea
-				className="datamachine-agent-editor-textarea code"
-				value={ content }
-				onChange={ handleContentChange }
-				spellCheck={ false }
-			/>
-			<SettingsSaveBar
-				hasChanges={ hasChanges }
-				saveStatus={ saveStatus }
-				onSave={ handleSave }
-			/>
-		</div>
-	);
-};
-
-/**
- * Router component — dispatches to core, daily, or context editor.
+ * Router component — dispatches to core or daily editor.
  * @param {Object} root0              Component props.
  * @param {Object} root0.selectedFile Selected file metadata.
  */
@@ -315,10 +227,6 @@ const AgentFileEditor = ( { selectedFile } ) => {
 				day={ selectedFile.day }
 			/>
 		);
-	}
-
-	if ( selectedFile.type === 'context' ) {
-		return <ContextFileEditor slug={ selectedFile.contextSlug } />;
 	}
 
 	return (

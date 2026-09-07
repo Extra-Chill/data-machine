@@ -1,14 +1,14 @@
 /**
  * Tool Configuration Query Hooks
  *
- * TanStack Query hooks for tool configuration endpoints.
+ * TanStack Query hooks for tool configuration abilities.
  */
 
 /**
  * External dependencies
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { client } from '@shared/utils/api';
+import { executeAbility } from '@shared/utils/api';
 /**
  * Internal dependencies
  */
@@ -21,7 +21,9 @@ export const useToolConfig = ( toolId, enabled = true ) => {
 		queryKey: toolConfigKey( toolId ),
 		enabled: Boolean( toolId && enabled ),
 		queryFn: async () => {
-			const response = await client.get( `/settings/tools/${ toolId }` );
+			const response = await executeAbility( 'get-tool-config', {
+				tool_id: toolId,
+			} );
 			if ( ! response.success ) {
 				throw new Error(
 					response.message || 'Failed to fetch tool configuration'
@@ -37,7 +39,8 @@ export const useSaveToolConfig = () => {
 
 	return useMutation( {
 		mutationFn: async ( { toolId, configData } ) => {
-			const response = await client.post( `/settings/tools/${ toolId }`, {
+			const response = await executeAbility( 'save-tool-config', {
+				tool_id: toolId,
 				config_data: configData,
 			} );
 			if ( ! response.success ) {

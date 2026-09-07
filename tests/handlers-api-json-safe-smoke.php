@@ -8,6 +8,7 @@
 define( 'ABSPATH', __DIR__ );
 
 require_once __DIR__ . '/smoke-wp-stubs.php';
+require_once __DIR__ . '/smoke-ability-registration-stub.php';
 
 if ( ! function_exists( '__' ) ) {
 	function __( string $text, string $domain = 'default' ): string {
@@ -41,31 +42,6 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	}
 }
 
-if ( ! class_exists( 'WP_REST_Request' ) ) {
-	class WP_REST_Request {
-		public function get_param( string $key ) {
-			unset( $key );
-			return null;
-		}
-	}
-}
-
-if ( ! function_exists( 'rest_ensure_response' ) ) {
-	function rest_ensure_response( $data ) {
-		return new class( $data ) {
-			private $data;
-
-			public function __construct( $data ) {
-				$this->data = $data;
-			}
-
-			public function get_data() {
-				return $this->data;
-			}
-		};
-	}
-}
-
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $value ): string {
 		return (string) json_encode( $value );
@@ -74,11 +50,9 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 
 require_once __DIR__ . '/../inc/Abilities/HandlerAbilities.php';
 require_once __DIR__ . '/../inc/Abilities/AuthAbilities.php';
-require_once __DIR__ . '/../inc/Api/Handlers.php';
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\HandlerAbilities;
-use DataMachine\Api\Handlers;
 
 $passes = 0;
 $fails  = 0;
@@ -119,19 +93,18 @@ add_filter(
 HandlerAbilities::clearCache();
 AuthAbilities::clearCache();
 
-$response = Handlers::handle_get_handlers( new WP_REST_Request() );
+$result = ( new HandlerAbilities() )->executeGetHandlers( array() );
 restore_error_handler();
 
-$data     = $response->get_data();
-$handlers = $data['data'] ?? array();
+$handlers = $result['handlers'] ?? array();
 
-$assert( 'response succeeds', true === ( $data['success'] ?? false ) );
+$assert( 'response succeeds', true === ( $result['success'] ?? false ) );
 $assert( 'minimal handler remains present', isset( $handlers['minimal'] ) );
 $assert( 'missing requires_auth defaults false', false === ( $handlers['minimal']['requires_auth'] ?? null ) );
 $assert( 'missing auth_provider_key defaults null', array_key_exists( 'auth_provider_key', $handlers['minimal'] ) && null === $handlers['minimal']['auth_provider_key'] );
 $assert( 'malformed non-array handler is omitted', ! isset( $handlers['not_array'] ) );
 $assert( 'handler enrichment emitted no PHP warnings', array() === $warnings );
-$assert( 'response is JSON encodable', '' !== wp_json_encode( $data ) );
+$assert( 'result is JSON encodable', '' !== wp_json_encode( $result ) );
 
 echo "\n=== Results ===\n";
 echo "Passed: {$passes}\n";

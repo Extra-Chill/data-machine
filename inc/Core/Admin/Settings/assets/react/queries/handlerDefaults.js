@@ -1,14 +1,14 @@
 /**
  * Handler Defaults Query Hooks
  *
- * TanStack Query hooks for handler defaults API operations.
+ * TanStack Query hooks for handler defaults abilities.
  */
 
 /**
  * External dependencies
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { client } from '@shared/utils/api';
+import { executeAbility } from '@shared/utils/api';
 
 /**
  * Query key for handler defaults
@@ -22,13 +22,13 @@ export const useHandlerDefaults = () => {
 	return useQuery( {
 		queryKey: HANDLER_DEFAULTS_KEY,
 		queryFn: async () => {
-			const response = await client.get( '/settings/handler-defaults' );
+			const response = await executeAbility( 'get-handler-defaults' );
 			if ( ! response.success ) {
 				throw new Error(
 					response.message || 'Failed to fetch handler defaults'
 				);
 			}
-			return response.data;
+			return response.defaults ?? {};
 		},
 	} );
 };
@@ -41,10 +41,10 @@ export const useUpdateHandlerDefaults = () => {
 
 	return useMutation( {
 		mutationFn: async ( { handlerSlug, defaults } ) => {
-			const response = await client.put(
-				`/settings/handler-defaults/${ handlerSlug }`,
-				{ defaults }
-			);
+			const response = await executeAbility( 'update-handler-defaults', {
+				handler_slug: handlerSlug,
+				defaults,
+			} );
 			if ( ! response.success ) {
 				throw new Error(
 					response.message || 'Failed to update handler defaults'

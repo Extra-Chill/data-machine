@@ -85,7 +85,7 @@ For scheduled execution:
 
 - **Asynchronous**: All executions run in background via WordPress Action Scheduler
 - **Job Tracking**: Each execution creates a job record for monitoring
-- **Status Monitoring**: Use `api_query` with `GET /datamachine/v1/jobs/{job_id}` to check status
+- **Status Monitoring**: Use the `get-jobs` ability with `{"job_id": <id>}` to check status
 - **Logging**: Comprehensive execution logs available through the logging system
 
 ## Job Status Values
@@ -102,8 +102,8 @@ For scheduled execution:
 This tool integrates with the monitoring ecosystem:
 
 1. Execute flow with `run_flow`
-2. Monitor execution with `api_query` to `/datamachine/v1/jobs/{job_id}`
-3. View detailed logs with `api_query` to `/datamachine/v1/logs/content?job_id={job_id}`
+2. Monitor execution with the `get-jobs` ability (`job_id` input)
+3. View detailed logs with the `read-logs` ability (`job_id` input)
 4. Check flow status and history through the flows API
 
 ## Validation

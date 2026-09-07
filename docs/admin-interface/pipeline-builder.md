@@ -181,7 +181,7 @@ The builder exposes three file surfaces:
 | Pipeline context files | `fetchContextFiles`, `uploadContextFile`, `deleteContextFile` | `POST /files` (multipart upload, retained); listing/deletion route the `list-flow-files`/`delete-flow-file` abilities |
 | Pipeline memory files | `fetchPipelineMemoryFiles`, `updatePipelineMemoryFiles` | `POST /wp-abilities/v1/abilities/datamachine/{get,update}-pipeline-memory-files/run` |
 | Flow memory files | `fetchFlowMemoryFiles`, `updateFlowMemoryFiles` | `POST /wp-abilities/v1/abilities/datamachine/{get,update}-flow-memory-files/run` |
-| Available agent files | `fetchAgentFiles` | `GET /files/agent` |
+| Available agent files | `fetchAgentFiles` | `datamachine/list-agent-files` ability |
 
 Context files are uploaded against a pipeline. Memory files are selected by filename at either pipeline or flow scope. Agent files are read as an inventory for the selector UI.
 

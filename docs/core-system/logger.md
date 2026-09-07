@@ -80,5 +80,5 @@ The logging system is multisite-aware, maintaining separate log files per site w
 ---
 
 **Implementation**: `inc/Engine/Logger.php`, `inc/Abilities/LogAbilities.php`
-**API Endpoints**: `/wp-json/datamachine/v1/logs`
+**Abilities**: `datamachine/read-logs`, `datamachine/get-log-metadata`, `datamachine/clear-logs` (REST-visible; run through `/wp-abilities/v1/abilities/datamachine/<slug>/run`)
 **Related**: [Logs API](../api/endpoints/logs.md)

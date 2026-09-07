@@ -100,7 +100,7 @@ Some routes accept any logged-in user and then scope data by the current user or
 
 - `/agents` lists agents visible to the current user.
 - `/agents/me` returns the active agent or user's default agent.
-- `/files/agent/*` allows a user to access their own files; `manage_agents` is required to access another user's files.
+- Agent-file abilities resolve the acting user from the input context; the retired `/files/agent/*` wrapper routes enforced the same scoping at the route layer.
 - `/users/me` returns current-user preferences.
 
 ## Security Best Practices

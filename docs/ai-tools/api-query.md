@@ -10,7 +10,7 @@ The `api_query` tool enables chat agents to query the Data Machine REST API (via
 
 ### Single request
 
-- **endpoint** (string, required): REST API endpoint path (e.g., `/datamachine/v1/handlers`)
+- **endpoint** (string, required): REST API endpoint path (e.g., `/datamachine/v1/tools`)
 - **method** (string, optional): HTTP method (defaults to `GET`)
 - **data** (object, optional): Request body data for `POST`, `PUT`, or `PATCH`
 
@@ -21,9 +21,7 @@ The `api_query` tool enables chat agents to query the Data Machine REST API (via
 ## Available Endpoints
 
 ### Discovery
-- `GET /datamachine/v1/handlers` - List all handlers
-- `GET /datamachine/v1/handlers?step_type={fetch|publish|upsert}` - Filter by type
-- `GET /datamachine/v1/handlers/{slug}` - Handler details and config schema
+- Handlers, step types, and handler details were retired from `datamachine/v1` (#3456); query the ability runner routes instead (see below)
 - `GET /datamachine/v1/auth/{handler}/status` - Check OAuth connection status
 - `GET /datamachine/v1/providers` - List AI providers and models
 - `GET /datamachine/v1/tools` - List available AI tools
@@ -40,20 +38,22 @@ Flow routes were retired (#3456); query the ability runner routes instead:
 - `POST /wp-abilities/v1/abilities/datamachine/get-problem-flows/run` with `{"input": {}}` - List flows flagged for review due to consecutive failures/no items
 
 ### Jobs & Monitoring
-- `GET /datamachine/v1/jobs` - List all jobs
-- `GET /datamachine/v1/jobs?flow_id={id}` - Jobs for specific flow
-- `GET /datamachine/v1/jobs?status={pending|processing|completed|failed|completed_no_items|agent_skipped}` - Filter by status.
-- `GET /datamachine/v1/jobs/{id}` - Job details
+Jobs routes were retired (#3456); query the ability runner routes instead:
+- `POST /wp-abilities/v1/abilities/datamachine/get-jobs/run` with `{"input": {}}` - List all jobs
+- `POST /wp-abilities/v1/abilities/datamachine/get-jobs/run` with `{"input": {"flow_id": 123}}` - Jobs for specific flow
+- `POST /wp-abilities/v1/abilities/datamachine/get-jobs/run` with `{"input": {"status": "failed"}}` - Filter by status
+- `POST /wp-abilities/v1/abilities/datamachine/get-jobs/run` with `{"input": {"job_id": 456}}` - Job details
 
 ### Logs
-- `GET /datamachine/v1/logs/content` - Get log content
-- `GET /datamachine/v1/logs/content?job_id={id}` - Logs for specific job
-- `DELETE /datamachine/v1/logs` - Clear logs
-- `PUT /datamachine/v1/logs/level` - Set log level
+Log routes were retired (#3456); query the ability runner routes instead:
+- `POST /wp-abilities/v1/abilities/datamachine/read-logs/run` with `{"input": {"job_id": 456}}` - Logs for specific job
+- `POST /wp-abilities/v1/abilities/datamachine/get-log-metadata/run` with `{"input": {}}` - Log counts and time range
 
 ### System
-- `GET /datamachine/v1/settings` - Get plugin settings
-- `PATCH /datamachine/v1/settings` - Update settings (partial)
+Settings routes were retired (#3456); query the ability runner routes instead:
+- `POST /wp-abilities/v1/abilities/datamachine/get-settings/run` with `{"input": {}}` - Get plugin settings
+- `POST /wp-abilities/v1/abilities/datamachine/get-step-types/run` with `{"input": {}}` - List step types
+- `POST /wp-abilities/v1/abilities/datamachine/get-handlers/run` with `{"input": {}}` - List handlers
 
 ### Files
 - `GET /datamachine/v1/files` listing and `DELETE /datamachine/v1/files/{filename}` were retired (#3456) — use the `datamachine/list-flow-files` and `datamachine/delete-flow-file` ability run routes (`flow_step_id` required)
@@ -64,8 +64,9 @@ Flow routes were retired (#3456); query the ability runner routes instead:
 ### List All Handlers
 ```json
 {
-  "endpoint": "/datamachine/v1/handlers",
-  "method": "GET"
+  "endpoint": "/wp-abilities/v1/abilities/datamachine/get-handlers/run",
+  "method": "POST",
+  "body": { "input": {} }
 }
 ```
 
@@ -89,8 +90,9 @@ Flow routes were retired (#3456); query the ability runner routes instead:
 ### Monitor Job Status
 ```json
 {
-  "endpoint": "/datamachine/v1/jobs/456",
-  "method": "GET"
+  "endpoint": "/wp-abilities/v1/abilities/datamachine/get-jobs/run",
+  "method": "POST",
+  "body": { "input": { "job_id": 456 } }
 }
 ```
 
