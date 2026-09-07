@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.1] - 2026-09-07
+
+### Fixed
+- match near-identical short colon suffixes in SimilarityEngine
+
 ## [0.176.0] - 2026-09-04
 
 ### Added
