@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.60.2] - 2026-09-07
+
+### Fixed
+- keep venue city/country/timezone params exposed when the scraper found only a venue name
+
 ## [0.60.1] - 2026-09-07
 
 ### Fixed
