@@ -59,7 +59,7 @@
         },
         {
           "context": "line",
-          "description": "Replace '(class_exists(WP_Abilities_Registry) ? WP_Abilities_Registry::get_instance() : null)' with a direct call \u2014 the ternary is unreachable.",
+          "description": "Replace '(class_exists(WP_Abilities_Registry) ? WP_Abilities_Registry::get_instance() : null)' with a direct call — the ternary is unreachable.",
           "files": "inc/**/*.php",
           "find": "class_exists\\( 'WP_Abilities_Registry' \\) \\? \\\\WP_Abilities_Registry::get_instance\\(\\) : null",
           "id": "ternary_registry_guard",
