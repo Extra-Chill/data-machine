@@ -40,23 +40,36 @@ class FlowsAbilityRestTest extends WP_UnitTestCase {
 	private function create_flow_with_ai_step(): array {
 		$created = $this->run_ability( 'create-pipeline', array( 'pipeline_name' => 'Ability Flows Pipeline' ) );
 		$this->assertNotEmpty( $created['pipeline_id'] );
-		$this->assertNotEmpty( $created['flow_id'] );
+		$pipeline_id = (int) $created['pipeline_id'];
 
+		// Add the step before creating the flow so the flow config is
+		// materialized against it (create-pipeline only creates a default
+		// flow when flow_config/workflow input is supplied).
 		$added = $this->run_ability(
 			'add-pipeline-step',
 			array(
-				'pipeline_id' => (int) $created['pipeline_id'],
+				'pipeline_id' => $pipeline_id,
 				'step_type'   => 'ai',
 			)
 		);
 		$this->assertNotEmpty( $added['pipeline_step_id'] );
 
-		$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $added['pipeline_step_id'], (int) $created['flow_id'] );
+		$flow = $this->run_ability(
+			'create-flow',
+			array(
+				'pipeline_id' => $pipeline_id,
+				'flow_name'   => 'Ability Flows Flow',
+			)
+		);
+		$this->assertNotEmpty( $flow['flow_id'] );
+		$flow_id = (int) $flow['flow_id'];
+
+		$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $added['pipeline_step_id'], $flow_id );
 		$this->assertNotEmpty( $flow_step_id );
 
 		return array(
-			'pipeline_id'      => (int) $created['pipeline_id'],
-			'flow_id'          => (int) $created['flow_id'],
+			'pipeline_id'      => $pipeline_id,
+			'flow_id'          => $flow_id,
 			'flow_step_id'     => (string) $flow_step_id,
 			'pipeline_step_id' => (string) $added['pipeline_step_id'],
 		);

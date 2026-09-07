@@ -441,8 +441,7 @@ export const updateFlowHandler = async (
  * Update flow step configuration
  *
  * @param {string} flowStepId - Flow step ID
- * @param {Object} config     - Partial step configuration (handler_slug,
- *                              handler_config, user_message)
+ * @param {Object} config     - Partial step config (handler_slug, handler_config, user_message)
  * @return {Promise<Object>} Updated flow step data
  */
 export const updateFlowStepConfig = async ( flowStepId, config ) => {
