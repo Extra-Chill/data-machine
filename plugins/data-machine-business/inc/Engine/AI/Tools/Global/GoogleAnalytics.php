@@ -64,22 +64,71 @@ class GoogleAnalytics extends BaseTool {
 	/**
 	 * Get tool definition for AI agents.
 	 *
+	 * The model-facing `parameters` schema MUST be a single `type: object`.
+	 * Provider function-calling APIs (OpenAI, Anthropic) reject a top-level
+	 * `oneOf`/`anyOf`/`allOf` with a 400 for the entire request, which takes
+	 * down every AI step that carries this global tool (#123).
+	 *
+	 * The strict per-action `oneOf` contract still lives on the ability's
+	 * `input_schema` (GoogleAnalyticsAbilities::inputSchema()) and is enforced
+	 * on every call, because handle_tool_call() delegates to
+	 * `$ability->execute()`. This flattened schema only guides the model.
+	 *
 	 * @return array Tool definition array.
 	 */
 	public function getToolDefinition(): array {
-		$valid_actions = array_merge( array_keys( GoogleAnalyticsAbilities::ACTION_REPORTS ), array( 'realtime', 'path_sequence', 'aggregate_report' ) );
-		$legacy_actions = array_values( array_diff( $valid_actions, array( 'aggregate_report' ) ) );
+		$valid_actions     = array_merge( array_keys( GoogleAnalyticsAbilities::ACTION_REPORTS ), array( 'realtime', 'path_sequence', 'aggregate_report' ) );
+		$aggregate_schema  = GoogleAnalyticsAbilities::aggregateInputSchema();
+		$aggregate_fields  = array_diff_key( $aggregate_schema['properties'], array(
+			'action'      => true,
+			'property_id' => true,
+			'limit'       => true,
+		) );
 		$legacy_properties = array(
-			'action'      => array( 'type' => 'string', 'enum' => $legacy_actions, 'description' => 'Choose a bounded preset report. landing_page_acquisition uses session-entry landingPage x session source/medium and discloses material `(not set)` coverage without filtering it. page_acquisition uses touched pagePath x session source/medium. page_audience uses touched pagePath x country/device.' ),
-			'property_id' => array( 'type' => 'string', 'description' => 'GA4 property ID (numeric). Defaults to the configured property ID.' ),
-			'start_date'  => array( 'type' => 'string', 'description' => 'Start date in YYYY-MM-DD format (defaults to 28 days ago). Not used for realtime action.' ),
-			'end_date'    => array( 'type' => 'string', 'description' => 'End date in YYYY-MM-DD format (defaults to yesterday). Not used for realtime action.' ),
-			'limit'       => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => GoogleAnalyticsAbilities::MAX_LIMIT, 'description' => 'Row limit (default: 25, max: 10000).' ),
-			'page_filter' => array( 'type' => 'string', 'description' => 'Filter results to pages with paths containing this string.' ),
-			'hostname'    => array( 'type' => 'string', 'description' => 'Filter to pages on this hostname (for multisite GA4 properties).' ),
-			'sort_by'     => array( 'type' => 'string', 'description' => 'Sort results by this metric or dimension field name (e.g. bounceRate, sessions, engagementRate).' ),
-			'order'       => array( 'type' => 'string', 'enum' => array( 'asc', 'desc' ), 'description' => 'Sort direction: asc or desc (default: desc).' ),
-			'compare'     => array( 'type' => 'boolean', 'description' => 'Compare against the previous period of equal length. Adds delta percentage columns.' ),
+			'action'      => array(
+				'type'        => 'string',
+				'enum'        => array_values( $valid_actions ),
+				'description' => 'Choose a bounded preset report, or aggregate_report for a bounded read-only aggregate query (requires date_range and metrics). landing_page_acquisition uses session-entry landingPage x session source/medium and discloses material `(not set)` coverage without filtering it. page_acquisition uses touched pagePath x session source/medium. page_audience uses touched pagePath x country/device.',
+			),
+			'property_id' => array(
+				'type'        => 'string',
+				'description' => 'GA4 property ID (numeric). Defaults to the configured property ID.',
+			),
+			'start_date'  => array(
+				'type'        => 'string',
+				'description' => 'Start date in YYYY-MM-DD format (defaults to 28 days ago). Not used for realtime action.',
+			),
+			'end_date'    => array(
+				'type'        => 'string',
+				'description' => 'End date in YYYY-MM-DD format (defaults to yesterday). Not used for realtime action.',
+			),
+			'limit'       => array(
+				'type'        => 'integer',
+				'minimum'     => 1,
+				'maximum'     => GoogleAnalyticsAbilities::MAX_LIMIT,
+				'description' => 'Row limit (default: 25, max: 10000).',
+			),
+			'page_filter' => array(
+				'type'        => 'string',
+				'description' => 'Filter results to pages with paths containing this string.',
+			),
+			'hostname'    => array(
+				'type'        => 'string',
+				'description' => 'Filter to pages on this hostname (for multisite GA4 properties).',
+			),
+			'sort_by'     => array(
+				'type'        => 'string',
+				'description' => 'Sort results by this metric or dimension field name (e.g. bounceRate, sessions, engagementRate).',
+			),
+			'order'       => array(
+				'type'        => 'string',
+				'enum'        => array( 'asc', 'desc' ),
+				'description' => 'Sort direction: asc or desc (default: desc).',
+			),
+			'compare'     => array(
+				'type'        => 'boolean',
+				'description' => 'Compare against the previous period of equal length. Adds delta percentage columns.',
+			),
 		);
 
 		return array(
@@ -88,10 +137,9 @@ class GoogleAnalytics extends BaseTool {
 			'description'     => 'Fetch visitor analytics from Google Analytics (GA4). Fixed actions retain their existing presets. aggregate_report is a bounded, read-only aggregate query with exact dates, reviewed fields, totals, quota, and explicit coverage limitations.',
 			'requires_config' => true,
 			'parameters'      => array(
-				'oneOf' => array(
-					array( 'type' => 'object', 'required' => array( 'action' ), 'properties' => $legacy_properties ),
-					GoogleAnalyticsAbilities::aggregateInputSchema(),
-				),
+				'type'       => 'object',
+				'required'   => array( 'action' ),
+				'properties' => array_merge( $legacy_properties, $aggregate_fields ),
 			),
 		);
 	}
