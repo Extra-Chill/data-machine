@@ -67,6 +67,11 @@ class SettingsCommand extends WP_CLI_Command {
 		$abilities = new SettingsAbilities();
 		$result    = $abilities->executeGetSettings( array( 'key' => $key ) );
 
+		if ( $result instanceof \WP_Error ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( ! empty( $result['error'] ) ) {
 			WP_CLI::error( $result['error'] );
 		}
@@ -75,7 +80,7 @@ class SettingsCommand extends WP_CLI_Command {
 
 		if ( 'json' === $format ) {
 			WP_CLI::log(
-				wp_json_encode(
+				(string) wp_json_encode(
 					array(
 						'key'   => $key,
 						'value' => $value,
@@ -84,7 +89,7 @@ class SettingsCommand extends WP_CLI_Command {
 				)
 			);
 		} elseif ( is_array( $value ) || is_object( $value ) ) {
-			WP_CLI::log( wp_json_encode( $value, JSON_PRETTY_PRINT ) );
+			WP_CLI::log( (string) wp_json_encode( $value, JSON_PRETTY_PRINT ) );
 		} elseif ( is_bool( $value ) ) {
 			WP_CLI::log( $value ? 'true' : 'false' );
 		} else {
@@ -123,6 +128,11 @@ class SettingsCommand extends WP_CLI_Command {
 				'value' => $value,
 			)
 		);
+
+		if ( $result instanceof \WP_Error ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( ! empty( $result['error'] ) ) {
 			WP_CLI::error( $result['error'] );
@@ -163,6 +173,11 @@ class SettingsCommand extends WP_CLI_Command {
 		$abilities = new SettingsAbilities();
 		$result    = $abilities->executeGetSettings( array() );
 
+		if ( $result instanceof \WP_Error ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( ! empty( $result['error'] ) ) {
 			WP_CLI::error( $result['error'] );
 		}
@@ -175,7 +190,7 @@ class SettingsCommand extends WP_CLI_Command {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		} else {
 			$rows = array();
 			foreach ( $settings as $key => $value ) {
@@ -202,7 +217,7 @@ class SettingsCommand extends WP_CLI_Command {
 			return $value ? 'true' : 'false';
 		}
 		if ( is_array( $value ) ) {
-			return wp_json_encode( $value );
+			return (string) wp_json_encode( $value );
 		}
 		return (string) $value;
 	}

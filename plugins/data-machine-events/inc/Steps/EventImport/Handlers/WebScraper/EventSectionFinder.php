@@ -20,6 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class EventSectionFinder {
 
+	use QueriesDom;
+
 	/**
 	 * @var FreshCandidateCollector
 	 */
@@ -60,13 +62,13 @@ final class EventSectionFinder {
 		$rules = EventSectionSelectors::get_rules();
 
 		foreach ( $rules as $rule ) {
-			$selector = $rule['xpath'] ?? '';
+			$selector = $rule['xpath'];
 			if ( '' === $selector ) {
 				continue;
 			}
 
-			$nodes = $xpath->query( $selector );
-			if ( ! $nodes ) {
+			$nodes = $this->queryElements( $xpath, $selector );
+			if ( empty( $nodes ) ) {
 				continue;
 			}
 
@@ -103,9 +105,15 @@ final class EventSectionFinder {
 					}
 
 					// Return JSON as "html" field - AI will process the structured data
+					$event_json = wp_json_encode( $event_data, JSON_PRETTY_PRINT );
+					$raw_html   = $dom->saveHTML( $node );
+					if ( false === $event_json || ! is_string( $raw_html ) ) {
+						continue;
+					}
+
 					return array(
-						'html'       => wp_json_encode( $event_data, JSON_PRETTY_PRINT ),
-						'raw_html'   => $dom->saveHTML( $node ),
+						'html'       => $event_json,
+						'raw_html'   => $raw_html,
 						'identifier' => $event_identifier,
 						'selector'   => $selector,
 						'url'        => $url,
@@ -153,8 +161,8 @@ final class EventSectionFinder {
 	}
 
 	private function is_table_header_row( \DOMXPath $xpath, \DOMNode $row ): bool {
-		$th_count = $xpath->query( './/th', $row )->length;
-		$td_count = $xpath->query( './/td', $row )->length;
+		$th_count = count( $this->queryElements( $xpath, './/th', $row ) );
+		$td_count = count( $this->queryElements( $xpath, './/td', $row ) );
 
 		return $th_count > 0 && 0 === $td_count;
 	}
@@ -175,26 +183,26 @@ final class EventSectionFinder {
 
 	private function extract_date_text_from_table_row( \DOMXPath $xpath, \DOMNode $row ): ?string {
 		$datetime = $xpath->query( './/td[contains(@class, "event-date")]//time/@datetime', $row );
-		if ( $datetime && $datetime->length > 0 ) {
+		if ( $datetime instanceof \DOMNodeList && $datetime->length > 0 ) {
 			$value = trim( (string) $datetime->item( 0 )->nodeValue );
 			return '' !== $value ? $value : null;
 		}
 
-		$time_text = $xpath->query( './/td[contains(@class, "event-date")]//time', $row );
-		if ( $time_text && $time_text->length > 0 ) {
-			$value = trim( (string) $time_text->item( 0 )->textContent );
+		$time_node = $this->queryFirstElement( $xpath, './/td[contains(@class, "event-date")]//time', $row );
+		if ( null !== $time_node ) {
+			$value = trim( $time_node->textContent );
 			return '' !== $value ? $value : null;
 		}
 
-		$span_date_text = $xpath->query( './/td[contains(@class, "event-date")]//span[contains(@class, "date")]', $row );
-		if ( $span_date_text && $span_date_text->length > 0 ) {
-			$value = trim( (string) $span_date_text->item( 0 )->textContent );
+		$span_node = $this->queryFirstElement( $xpath, './/td[contains(@class, "event-date")]//span[contains(@class, "date")]', $row );
+		if ( null !== $span_node ) {
+			$value = trim( $span_node->textContent );
 			return '' !== $value ? $value : null;
 		}
 
-		$cell_text = $xpath->query( './/td[contains(@class, "event-date")]', $row );
-		if ( $cell_text && $cell_text->length > 0 ) {
-			$value = trim( (string) $cell_text->item( 0 )->textContent );
+		$cell_node = $this->queryFirstElement( $xpath, './/td[contains(@class, "event-date")]', $row );
+		if ( null !== $cell_node ) {
+			$value = trim( $cell_node->textContent );
 			return '' !== $value ? $value : null;
 		}
 

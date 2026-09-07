@@ -66,6 +66,14 @@ class FixEventTimezone extends BaseTool {
 
 		$result = $abilities->executeFixAbility( $parameters );
 
+		if ( $result instanceof \WP_Error ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'fix_event_timezone',
+			);
+		}
+
 		if ( isset( $result['success'] ) && false === $result['success'] ) {
 			return array(
 				'success'   => false,

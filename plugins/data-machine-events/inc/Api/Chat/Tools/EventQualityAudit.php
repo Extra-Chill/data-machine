@@ -66,6 +66,14 @@ class EventQualityAudit extends BaseTool {
 		$abilities = new EventQualityAuditAbilities();
 		$result    = $abilities->executeAudit( $parameters );
 
+		if ( $result instanceof \WP_Error ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'event_quality_audit',
+			);
+		}
+
 		if ( isset( $result['error'] ) ) {
 			return array(
 				'success'   => false,

@@ -14,12 +14,15 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
 use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\PriceFormatter;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\QueriesDom;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 abstract class BaseExtractor implements ExtractorInterface {
+
+	use QueriesDom;
 
 	/** {@inheritdoc} */
 	abstract public function canExtract( string $html ): bool;

@@ -250,7 +250,7 @@ class TimelyExtractor extends BaseExtractor {
 		$dialog_id = 'tw-event-dialog-' . $event_id;
 
 		// Find dialog by ID
-		$dialog = $xpath->query( "//*[@id='{$dialog_id}']" )->item( 0 );
+		$dialog = $this->queryFirstElement( $xpath, "//*[@id='{$dialog_id}']" );
 		if ( ! $dialog ) {
 			return;
 		}
@@ -263,7 +263,7 @@ class TimelyExtractor extends BaseExtractor {
 		);
 
 		foreach ( $description_selectors as $selector ) {
-			$desc_node = $xpath->query( $selector, $dialog )->item( 0 );
+			$desc_node = $this->queryFirstElement( $xpath, $selector, $dialog );
 			if ( $desc_node ) {
 				$description = $this->cleanHtml( $desc_node->textContent );
 				if ( ! empty( $description ) ) {
@@ -281,7 +281,7 @@ class TimelyExtractor extends BaseExtractor {
 		);
 
 		foreach ( $ticket_selectors as $selector ) {
-			$ticket_node = $xpath->query( $selector, $dialog )->item( 0 );
+			$ticket_node = $this->queryFirstElement( $xpath, $selector, $dialog );
 			if ( $ticket_node && $ticket_node->hasAttribute( 'href' ) ) {
 				$href = $ticket_node->getAttribute( 'href' );
 				if ( ! empty( $href ) && '#' !== $href ) {
@@ -292,27 +292,27 @@ class TimelyExtractor extends BaseExtractor {
 		}
 
 		// Extract venue from dialog
-		$venue_node = $xpath->query( ".//*[contains(@class, 'tw-calendar-venue')]", $dialog )->item( 0 );
-		if ( ! $venue_node ) {
-			$venue_node = $xpath->query( ".//*[contains(@class, 'tw-cal-full-venue')]", $dialog )->item( 0 );
+		$venue_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'tw-calendar-venue')]", $dialog );
+		if ( null === $venue_node ) {
+			$venue_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'tw-cal-full-venue')]", $dialog );
 		}
 		if ( $venue_node ) {
 			$event['venue'] = $this->sanitizeText( $venue_node->textContent );
 		}
 
 		// Extract price info
-		$price_node = $xpath->query( ".//*[contains(@class, 'tw-info-price')]", $dialog )->item( 0 );
+		$price_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'tw-info-price')]", $dialog );
 		if ( $price_node ) {
 			$event['price'] = $this->sanitizeText( $price_node->textContent );
 		}
 
 		// Extract full date/time from dialog (may be more detailed)
-		$datetime_node = $xpath->query( ".//*[contains(@class, 'tw-event-date-complete')]", $dialog )->item( 0 );
+		$datetime_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'tw-event-date-complete')]", $dialog );
 		if ( $datetime_node ) {
 			$event['dateTimeDisplay'] = $this->sanitizeText( $datetime_node->textContent );
 		}
 
-		$time_complete_node = $xpath->query( ".//*[contains(@class, 'tw-event-time-complete')]", $dialog )->item( 0 );
+		$time_complete_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'tw-event-time-complete')]", $dialog );
 		if ( $time_complete_node ) {
 			$event['timeDisplay'] = $this->sanitizeText( $time_complete_node->textContent );
 		}

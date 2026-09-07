@@ -28,16 +28,16 @@ class MicrodataExtractor extends BaseExtractor {
 		$loaded = $this->loadDom( $html );
 		$xpath  = $loaded['xpath'];
 
-		$event_elements = $xpath->query( "//*[@itemtype='https://schema.org/Event' or @itemtype='http://schema.org/Event']" );
+		$event_elements = $this->queryElements( $xpath, "//*[@itemtype='https://schema.org/Event' or @itemtype='http://schema.org/Event']" );
 
-		if ( 0 === $event_elements->length ) {
+		if ( empty( $event_elements ) ) {
 			return array();
 		}
 
 		$events = array();
 
-		for ( $i = 0; $i < $event_elements->length; $i++ ) {
-			$event = $this->parseEventElement( $xpath, $event_elements->item( $i ) );
+		foreach ( $event_elements as $event_element ) {
+			$event = $this->parseEventElement( $xpath, $event_element );
 
 			if ( ! empty( $event['title'] ) && ! empty( $event['startDate'] ) ) {
 				$events[] = $event;
@@ -54,11 +54,11 @@ class MicrodataExtractor extends BaseExtractor {
 	/**
 	 * Parse event data from a Schema.org Event microdata element.
 	 *
-	 * @param \DOMXPath $xpath XPath query object
-	 * @param \DOMNode $event_element Event element node
+	 * @param \DOMXPath  $xpath         XPath query object
+	 * @param \DOMElement $event_element Event element
 	 * @return array Parsed event data
 	 */
-	private function parseEventElement( \DOMXPath $xpath, \DOMNode $event_element ): array {
+	private function parseEventElement( \DOMXPath $xpath, \DOMElement $event_element ): array {
 		$event = array();
 
 		$this->parseBasicProperties( $xpath, $event_element, $event );
@@ -74,15 +74,15 @@ class MicrodataExtractor extends BaseExtractor {
 	/**
 	 * Parse basic event properties (name, description).
 	 */
-	private function parseBasicProperties( \DOMXPath $xpath, \DOMNode $event_element, array &$event ): void {
-		$name = $xpath->query( ".//*[@itemprop='name']", $event_element );
-		if ( $name->length > 0 ) {
-			$event['title'] = trim( $name->item( 0 )->textContent );
+	private function parseBasicProperties( \DOMXPath $xpath, \DOMElement $event_element, array &$event ): void {
+		$name = $this->queryFirstElement( $xpath, ".//*[@itemprop='name']", $event_element );
+		if ( null !== $name ) {
+			$event['title'] = trim( $name->textContent );
 		}
 
-		$description = $xpath->query( ".//*[@itemprop='description']", $event_element );
-		if ( $description->length > 0 ) {
-			$event['description'] = trim( $description->item( 0 )->textContent );
+		$description = $this->queryFirstElement( $xpath, ".//*[@itemprop='description']", $event_element );
+		if ( null !== $description ) {
+			$event['description'] = trim( $description->textContent );
 		}
 	}
 
@@ -91,10 +91,10 @@ class MicrodataExtractor extends BaseExtractor {
 	 *
 	 * Microdata dates typically include timezone offset (ISO 8601 format).
 	 */
-	private function parseDates( \DOMXPath $xpath, \DOMNode $event_element, array &$event ): void {
-		$start_date = $xpath->query( ".//*[@itemprop='startDate']", $event_element );
-		if ( $start_date->length > 0 ) {
-			$datetime = $this->extractDatetime( $start_date->item( 0 ) );
+	private function parseDates( \DOMXPath $xpath, \DOMElement $event_element, array &$event ): void {
+		$start_date = $this->queryFirstElement( $xpath, ".//*[@itemprop='startDate']", $event_element );
+		if ( null !== $start_date ) {
+			$datetime = $this->extractDatetime( $start_date );
 			if ( ! empty( $datetime ) ) {
 				$parsed             = $this->parseDatetime( $datetime );
 				$event['startDate'] = $parsed['date'];
@@ -102,9 +102,9 @@ class MicrodataExtractor extends BaseExtractor {
 			}
 		}
 
-		$end_date = $xpath->query( ".//*[@itemprop='endDate']", $event_element );
-		if ( $end_date->length > 0 ) {
-			$datetime = $this->extractDatetime( $end_date->item( 0 ) );
+		$end_date = $this->queryFirstElement( $xpath, ".//*[@itemprop='endDate']", $event_element );
+		if ( null !== $end_date ) {
+			$datetime = $this->extractDatetime( $end_date );
 			if ( ! empty( $datetime ) ) {
 				$parsed           = $this->parseDatetime( $datetime );
 				$event['endDate'] = $parsed['date'];
@@ -116,24 +116,24 @@ class MicrodataExtractor extends BaseExtractor {
 	/**
 	 * Parse performer and organizer.
 	 */
-	private function parsePerformerAndOrganizer( \DOMXPath $xpath, \DOMNode $event_element, array &$event ): void {
-		$performer = $xpath->query( ".//*[@itemprop='performer']", $event_element );
-		if ( $performer->length > 0 ) {
-			$performer_name = $xpath->query( ".//*[@itemprop='name']", $performer->item( 0 ) );
-			if ( $performer_name->length > 0 ) {
-				$event['performer'] = trim( $performer_name->item( 0 )->textContent );
+	private function parsePerformerAndOrganizer( \DOMXPath $xpath, \DOMElement $event_element, array &$event ): void {
+		$performer = $this->queryFirstElement( $xpath, ".//*[@itemprop='performer']", $event_element );
+		if ( null !== $performer ) {
+			$performer_name = $this->queryFirstElement( $xpath, ".//*[@itemprop='name']", $performer );
+			if ( null !== $performer_name ) {
+				$event['performer'] = trim( $performer_name->textContent );
 			} else {
-				$event['performer'] = trim( $performer->item( 0 )->textContent );
+				$event['performer'] = trim( $performer->textContent );
 			}
 		}
 
-		$organizer = $xpath->query( ".//*[@itemprop='organizer']", $event_element );
-		if ( $organizer->length > 0 ) {
-			$organizer_name = $xpath->query( ".//*[@itemprop='name']", $organizer->item( 0 ) );
-			if ( $organizer_name->length > 0 ) {
-				$event['organizer'] = trim( $organizer_name->item( 0 )->textContent );
+		$organizer = $this->queryFirstElement( $xpath, ".//*[@itemprop='organizer']", $event_element );
+		if ( null !== $organizer ) {
+			$organizer_name = $this->queryFirstElement( $xpath, ".//*[@itemprop='name']", $organizer );
+			if ( null !== $organizer_name ) {
+				$event['organizer'] = trim( $organizer_name->textContent );
 			} else {
-				$event['organizer'] = trim( $organizer->item( 0 )->textContent );
+				$event['organizer'] = trim( $organizer->textContent );
 			}
 		}
 	}
@@ -141,73 +141,69 @@ class MicrodataExtractor extends BaseExtractor {
 	/**
 	 * Parse location/venue data.
 	 */
-	private function parseLocation( \DOMXPath $xpath, \DOMNode $event_element, array &$event ): void {
-		$location = $xpath->query( ".//*[@itemprop='location']", $event_element );
-		if ( 0 === $location->length ) {
+	private function parseLocation( \DOMXPath $xpath, \DOMElement $event_element, array &$event ): void {
+		$location = $this->queryFirstElement( $xpath, ".//*[@itemprop='location']", $event_element );
+		if ( null === $location ) {
 			return;
 		}
 
-		$location_element = $location->item( 0 );
-
-		$venue_name = $xpath->query( ".//*[@itemprop='name']", $location_element );
-		if ( $venue_name->length > 0 ) {
-			$event['venue'] = trim( $venue_name->item( 0 )->textContent );
+		$venue_name = $this->queryFirstElement( $xpath, ".//*[@itemprop='name']", $location );
+		if ( null !== $venue_name ) {
+			$event['venue'] = trim( $venue_name->textContent );
 		}
 
-		$this->parseAddress( $xpath, $location_element, $event );
-		$this->parseLocationDetails( $xpath, $location_element, $event );
-		$this->parseGeo( $xpath, $location_element, $event );
+		$this->parseAddress( $xpath, $location, $event );
+		$this->parseLocationDetails( $xpath, $location, $event );
+		$this->parseGeo( $xpath, $location, $event );
 	}
 
 	/**
 	 * Parse address components.
 	 */
-	private function parseAddress( \DOMXPath $xpath, \DOMNode $location_element, array &$event ): void {
-		$address = $xpath->query( ".//*[@itemprop='address']", $location_element );
-		if ( 0 === $address->length ) {
+	private function parseAddress( \DOMXPath $xpath, \DOMElement $location_element, array &$event ): void {
+		$address = $this->queryFirstElement( $xpath, ".//*[@itemprop='address']", $location_element );
+		if ( null === $address ) {
 			return;
 		}
 
-		$address_element = $address->item( 0 );
-
-		$street = $xpath->query( ".//*[@itemprop='streetAddress']", $address_element );
-		if ( $street->length > 0 ) {
-			$event['venueAddress'] = trim( $street->item( 0 )->textContent );
+		$street = $this->queryFirstElement( $xpath, ".//*[@itemprop='streetAddress']", $address );
+		if ( null !== $street ) {
+			$event['venueAddress'] = trim( $street->textContent );
 		}
 
-		$locality = $xpath->query( ".//*[@itemprop='addressLocality']", $address_element );
-		if ( $locality->length > 0 ) {
-			$event['venueCity'] = trim( $locality->item( 0 )->textContent );
+		$locality = $this->queryFirstElement( $xpath, ".//*[@itemprop='addressLocality']", $address );
+		if ( null !== $locality ) {
+			$event['venueCity'] = trim( $locality->textContent );
 		}
 
-		$region = $xpath->query( ".//*[@itemprop='addressRegion']", $address_element );
-		if ( $region->length > 0 ) {
-			$event['venueState'] = trim( $region->item( 0 )->textContent );
+		$region = $this->queryFirstElement( $xpath, ".//*[@itemprop='addressRegion']", $address );
+		if ( null !== $region ) {
+			$event['venueState'] = trim( $region->textContent );
 		}
 
-		$postal = $xpath->query( ".//*[@itemprop='postalCode']", $address_element );
-		if ( $postal->length > 0 ) {
-			$event['venueZip'] = trim( $postal->item( 0 )->textContent );
+		$postal = $this->queryFirstElement( $xpath, ".//*[@itemprop='postalCode']", $address );
+		if ( null !== $postal ) {
+			$event['venueZip'] = trim( $postal->textContent );
 		}
 
-		$country = $xpath->query( ".//*[@itemprop='addressCountry']", $address_element );
-		if ( $country->length > 0 ) {
-			$event['venueCountry'] = trim( $country->item( 0 )->textContent );
+		$country = $this->queryFirstElement( $xpath, ".//*[@itemprop='addressCountry']", $address );
+		if ( null !== $country ) {
+			$event['venueCountry'] = trim( $country->textContent );
 		}
 	}
 
 	/**
 	 * Parse phone and website from location.
 	 */
-	private function parseLocationDetails( \DOMXPath $xpath, \DOMNode $location_element, array &$event ): void {
-		$telephone = $xpath->query( ".//*[@itemprop='telephone']", $location_element );
-		if ( $telephone->length > 0 ) {
-			$event['venuePhone'] = trim( $telephone->item( 0 )->textContent );
+	private function parseLocationDetails( \DOMXPath $xpath, \DOMElement $location_element, array &$event ): void {
+		$telephone = $this->queryFirstElement( $xpath, ".//*[@itemprop='telephone']", $location_element );
+		if ( null !== $telephone ) {
+			$event['venuePhone'] = trim( $telephone->textContent );
 		}
 
-		$url = $xpath->query( ".//*[@itemprop='url']", $location_element );
-		if ( $url->length > 0 ) {
-			$website = $this->extractHrefOrContent( $url->item( 0 ) );
+		$url = $this->queryFirstElement( $xpath, ".//*[@itemprop='url']", $location_element );
+		if ( null !== $url ) {
+			$website = $this->extractHrefOrContent( $url );
 			if ( ! empty( $website ) ) {
 				$event['venueWebsite'] = trim( $website );
 			}
@@ -217,19 +213,18 @@ class MicrodataExtractor extends BaseExtractor {
 	/**
 	 * Parse geo coordinates from location.
 	 */
-	private function parseGeo( \DOMXPath $xpath, \DOMNode $location_element, array &$event ): void {
-		$geo = $xpath->query( ".//*[@itemprop='geo']", $location_element );
-		if ( 0 === $geo->length ) {
+	private function parseGeo( \DOMXPath $xpath, \DOMElement $location_element, array &$event ): void {
+		$geo = $this->queryFirstElement( $xpath, ".//*[@itemprop='geo']", $location_element );
+		if ( null === $geo ) {
 			return;
 		}
 
-		$geo_element = $geo->item( 0 );
-		$latitude    = $xpath->query( ".//*[@itemprop='latitude']", $geo_element );
-		$longitude   = $xpath->query( ".//*[@itemprop='longitude']", $geo_element );
+		$latitude  = $this->queryFirstElement( $xpath, ".//*[@itemprop='latitude']", $geo );
+		$longitude = $this->queryFirstElement( $xpath, ".//*[@itemprop='longitude']", $geo );
 
-		if ( $latitude->length > 0 && $longitude->length > 0 ) {
-			$lat                       = trim( $latitude->item( 0 )->textContent );
-			$lng                       = trim( $longitude->item( 0 )->textContent );
+		if ( null !== $latitude && null !== $longitude ) {
+			$lat                       = trim( $latitude->textContent );
+			$lng                       = trim( $longitude->textContent );
 			$event['venueCoordinates'] = $lat . ',' . $lng;
 		}
 	}
@@ -237,22 +232,20 @@ class MicrodataExtractor extends BaseExtractor {
 	/**
 	 * Parse offers/pricing data.
 	 */
-	private function parseOffers( \DOMXPath $xpath, \DOMNode $event_element, array &$event ): void {
-		$offers = $xpath->query( ".//*[@itemprop='offers']", $event_element );
-		if ( 0 === $offers->length ) {
+	private function parseOffers( \DOMXPath $xpath, \DOMElement $event_element, array &$event ): void {
+		$offers = $this->queryFirstElement( $xpath, ".//*[@itemprop='offers']", $event_element );
+		if ( null === $offers ) {
 			return;
 		}
 
-		$offers_element = $offers->item( 0 );
-
-		$price = $xpath->query( ".//*[@itemprop='price']", $offers_element );
-		if ( $price->length > 0 ) {
-			$event['price'] = trim( $price->item( 0 )->textContent );
+		$price = $this->queryFirstElement( $xpath, ".//*[@itemprop='price']", $offers );
+		if ( null !== $price ) {
+			$event['price'] = trim( $price->textContent );
 		}
 
-		$ticket_url = $xpath->query( ".//*[@itemprop='url']", $offers_element );
-		if ( $ticket_url->length > 0 ) {
-			$url = $this->extractHrefOrContent( $ticket_url->item( 0 ) );
+		$ticket_url = $this->queryFirstElement( $xpath, ".//*[@itemprop='url']", $offers );
+		if ( null !== $ticket_url ) {
+			$url = $this->extractHrefOrContent( $ticket_url );
 			if ( ! empty( $url ) ) {
 				$event['ticketUrl'] = trim( $url );
 			}
@@ -262,22 +255,15 @@ class MicrodataExtractor extends BaseExtractor {
 	/**
 	 * Parse image data.
 	 */
-	private function parseImage( \DOMXPath $xpath, \DOMNode $event_element, array &$event ): void {
-		$image = $xpath->query( ".//*[@itemprop='image']", $event_element );
-		if ( 0 === $image->length ) {
+	private function parseImage( \DOMXPath $xpath, \DOMElement $event_element, array &$event ): void {
+		$image_node = $this->queryFirstElement( $xpath, ".//*[@itemprop='image']", $event_element );
+		if ( null === $image_node ) {
 			return;
 		}
 
-		$image_node  = $image->item( 0 );
-		$image_value = '';
-
-		if ( $image_node instanceof \DOMElement ) {
-			$image_value = $image_node->getAttribute( 'src' )
-				?: $image_node->getAttribute( 'href' )
-				?: $image_node->textContent;
-		} elseif ( $image_node ) {
-			$image_value = $image_node->textContent;
-		}
+		$image_value = $image_node->getAttribute( 'src' )
+			?: $image_node->getAttribute( 'href' )
+			?: $image_node->textContent;
 
 		if ( ! empty( $image_value ) ) {
 			$event['imageUrl'] = trim( $image_value );
@@ -287,20 +273,14 @@ class MicrodataExtractor extends BaseExtractor {
 	/**
 	 * Extract datetime from element (attribute or content).
 	 */
-	private function extractDatetime( \DOMNode $node ): string {
-		if ( $node instanceof \DOMElement ) {
-			return $node->getAttribute( 'datetime' ) ?: $node->textContent;
-		}
-		return $node->textContent;
+	private function extractDatetime( \DOMElement $node ): string {
+		return $node->getAttribute( 'datetime' ) ?: $node->textContent;
 	}
 
 	/**
 	 * Extract href attribute or text content from element.
 	 */
-	private function extractHrefOrContent( \DOMNode $node ): string {
-		if ( $node instanceof \DOMElement ) {
-			return $node->getAttribute( 'href' ) ?: $node->textContent;
-		}
-		return $node->textContent;
+	private function extractHrefOrContent( \DOMElement $node ): string {
+		return $node->getAttribute( 'href' ) ?: $node->textContent;
 	}
 }

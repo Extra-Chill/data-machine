@@ -109,31 +109,31 @@ class EventEngineData {
 		);
 
 		$metadata = array(
-			'name'        => $flattened['venue'] ?? '',
-			'address'     => $flattened['venueAddress'] ?? '',
-			'city'        => $flattened['venueCity'] ?? '',
-			'state'       => $flattened['venueState'] ?? '',
-			'zip'         => $flattened['venueZip'] ?? '',
-			'country'     => $flattened['venueCountry'] ?? '',
-			'phone'       => $flattened['venuePhone'] ?? '',
-			'website'     => $flattened['venueWebsite'] ?? '',
-			'ticketing_url' => $flattened['venueTicketingUrl'] ?? '',
-			'coordinates' => $flattened['venueCoordinates'] ?? '',
-			'capacity'    => $flattened['venueCapacity'] ?? '',
-			'timezone'    => $flattened['venueTimezone'] ?? '',
+			'name'        => $flattened['venue'],
+			'address'     => $flattened['venueAddress'],
+			'city'        => $flattened['venueCity'],
+			'state'       => $flattened['venueState'],
+			'zip'         => $flattened['venueZip'],
+			'country'     => $flattened['venueCountry'],
+			'phone'       => $flattened['venuePhone'],
+			'website'     => $flattened['venueWebsite'],
+			'ticketing_url' => $flattened['venueTicketingUrl'],
+			'coordinates' => $flattened['venueCoordinates'],
+			'capacity'    => $flattened['venueCapacity'],
+			'timezone'    => $flattened['venueTimezone'],
 		);
 
 		$payload = array_filter(
 			$flattened,
 			static function ( $value ) {
-				return '' !== $value && null !== $value;
+				return '' !== $value;
 			}
 		);
 
 		$metadata_clean = array_filter(
 			$metadata,
 			static function ( $value ) {
-				return '' !== $value && null !== $value;
+				return '' !== $value;
 			}
 		);
 
@@ -178,7 +178,7 @@ class EventEngineData {
 		$payload = array_filter(
 			$core_fields,
 			static function ( $value ) {
-				return '' !== $value && null !== $value;
+				return '' !== $value;
 			}
 		);
 
@@ -221,7 +221,7 @@ class EventEngineData {
 		$venue_fields_clean = array_filter(
 			$venue_fields,
 			static function ( $value ) {
-				return '' !== $value && null !== $value;
+				return '' !== $value;
 			}
 		);
 
@@ -247,7 +247,7 @@ class EventEngineData {
 			$context_clean = array_filter(
 				$context_map,
 				static function ( $value ) {
-					return '' !== $value && null !== $value;
+					return '' !== $value;
 				}
 			);
 
@@ -276,7 +276,7 @@ class EventEngineData {
 		$core_clean = array_filter(
 			$core_fields,
 			static function ( $value ) {
-				return '' !== $value && null !== $value;
+				return '' !== $value;
 			}
 		);
 

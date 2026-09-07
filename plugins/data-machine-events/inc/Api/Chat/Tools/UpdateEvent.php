@@ -106,6 +106,14 @@ class UpdateEvent extends BaseTool {
 		$abilities = new EventUpdateAbilities();
 		$result    = $abilities->executeUpdateEvent( $parameters );
 
+		if ( $result instanceof \WP_Error ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'update_event',
+			);
+		}
+
 		if ( isset( $result['error'] ) ) {
 			return array(
 				'success'   => false,

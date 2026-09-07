@@ -27,9 +27,9 @@ class RhpEventsExtractor extends BaseExtractor {
 	public function extract( string $html, string $source_url ): array {
 		$loaded      = $this->loadDom( $html );
 		$xpath       = $loaded['xpath'];
-		$event_nodes = $xpath->query( "//*[contains(@class, 'rhpSingleEvent')]" );
+		$event_nodes = $this->queryElements( $xpath, "//*[contains(@class, 'rhpSingleEvent')]" );
 
-		if ( 0 === $event_nodes->length ) {
+		if ( empty( $event_nodes ) ) {
 			return array();
 		}
 
@@ -61,7 +61,7 @@ class RhpEventsExtractor extends BaseExtractor {
 	 * RHP Events displays month separators like "December 2025" which include the year.
 	 */
 	private function detectYear( \DOMXPath $xpath ): int {
-		$month_separators = $xpath->query( "//*[contains(@class, 'rhp-events-list-separator-month')]" );
+		$month_separators = $this->queryElements( $xpath, "//*[contains(@class, 'rhp-events-list-separator-month')]" );
 
 		foreach ( $month_separators as $separator ) {
 			$text = trim( $separator->textContent );
@@ -103,7 +103,7 @@ class RhpEventsExtractor extends BaseExtractor {
 		);
 
 		foreach ( $selectors as $selector ) {
-			$title_node = $xpath->query( $selector, $node )->item( 0 );
+			$title_node = $this->queryFirstElement( $xpath, $selector, $node );
 			if ( $title_node ) {
 				return $this->sanitizeText( $title_node->textContent );
 			}
@@ -118,7 +118,7 @@ class RhpEventsExtractor extends BaseExtractor {
 	 * RHP displays dates like "Fri, Dec 26" without year.
 	 */
 	private function parseDate( array &$event, \DOMXPath $xpath, \DOMElement $node, int $year ): void {
-		$date_node = $xpath->query( ".//*[contains(@class, 'singleEventDate')]", $node )->item( 0 );
+		$date_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'singleEventDate')]", $node );
 		if ( ! $date_node ) {
 			return;
 		}
@@ -135,7 +135,10 @@ class RhpEventsExtractor extends BaseExtractor {
 			if ( false !== $timestamp ) {
 				// If the parsed date is in the past, try next year
 				if ( $timestamp < strtotime( '-1 day' ) ) {
-					$timestamp = strtotime( "{$month} {$day}, " . ( $year + 1 ) );
+					$next_year = strtotime( "{$month} {$day}, " . ( $year + 1 ) );
+					if ( false !== $next_year ) {
+						$timestamp = $next_year;
+					}
 				}
 				$event['startDate'] = date( 'Y-m-d', $timestamp );
 			}
@@ -156,7 +159,7 @@ class RhpEventsExtractor extends BaseExtractor {
 
 		$time_node = null;
 		foreach ( $selectors as $selector ) {
-			$time_node = $xpath->query( $selector, $node )->item( 0 );
+			$time_node = $this->queryFirstElement( $xpath, $selector, $node );
 			if ( $time_node ) {
 				break;
 			}
@@ -195,7 +198,7 @@ class RhpEventsExtractor extends BaseExtractor {
 	 * RHP displays venue in the tagline area.
 	 */
 	private function parseVenue( array &$event, \DOMXPath $xpath, \DOMElement $node ): void {
-		$venue_node = $xpath->query( ".//*[contains(@class, 'eventTagLine')]", $node )->item( 0 );
+		$venue_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'eventTagLine')]", $node );
 		if ( $venue_node ) {
 			$event['venue'] = $this->sanitizeText( $venue_node->textContent );
 		}
@@ -207,7 +210,7 @@ class RhpEventsExtractor extends BaseExtractor {
 	 * RHP displays prices like "$12.70" or "$24.20 / Day Of : $30.05"
 	 */
 	private function parsePrice( array &$event, \DOMXPath $xpath, \DOMElement $node ): void {
-		$price_node = $xpath->query( ".//*[contains(@class, 'rhp-event__cost-text--list')]", $node )->item( 0 );
+		$price_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'rhp-event__cost-text--list')]", $node );
 		if ( ! $price_node ) {
 			return;
 		}
@@ -234,7 +237,7 @@ class RhpEventsExtractor extends BaseExtractor {
 		);
 
 		foreach ( $selectors as $selector ) {
-			$img_node = $xpath->query( $selector, $node )->item( 0 );
+			$img_node = $this->queryFirstElement( $xpath, $selector, $node );
 			if ( $img_node && $img_node->hasAttribute( 'src' ) ) {
 				$event['imageUrl'] = esc_url_raw( $img_node->getAttribute( 'src' ) );
 				return;
@@ -247,7 +250,7 @@ class RhpEventsExtractor extends BaseExtractor {
 	 */
 	private function parseLinks( array &$event, \DOMXPath $xpath, \DOMElement $node, string $source_url ): void {
 		// Ticket URL - look for Buy Tickets link
-		$ticket_node = $xpath->query( ".//*[contains(@class, 'rhp-event-cta')]//a[contains(@href, 'etix') or contains(@href, 'ticket') or contains(text(), 'Ticket')]", $node )->item( 0 );
+		$ticket_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'rhp-event-cta')]//a[contains(@href, 'etix') or contains(@href, 'ticket') or contains(text(), 'Ticket')]", $node );
 		if ( $ticket_node && $ticket_node->hasAttribute( 'href' ) ) {
 			$event['ticketUrl'] = esc_url_raw( $ticket_node->getAttribute( 'href' ) );
 		}
@@ -260,7 +263,7 @@ class RhpEventsExtractor extends BaseExtractor {
 		);
 
 		foreach ( $detail_selectors as $selector ) {
-			$detail_node = $xpath->query( $selector, $node )->item( 0 );
+			$detail_node = $this->queryFirstElement( $xpath, $selector, $node );
 			if ( $detail_node && $detail_node->hasAttribute( 'href' ) ) {
 				$href = $detail_node->getAttribute( 'href' );
 				// Make absolute if relative
@@ -279,7 +282,7 @@ class RhpEventsExtractor extends BaseExtractor {
 	 * Parse age restriction.
 	 */
 	private function parseAgeRestriction( array &$event, \DOMXPath $xpath, \DOMElement $node ): void {
-		$age_node = $xpath->query( ".//*[contains(@class, 'rhp-event__age-restriction')]", $node )->item( 0 );
+		$age_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'rhp-event__age-restriction')]", $node );
 		if ( $age_node ) {
 			$event['ageRestriction'] = $this->sanitizeText( $age_node->textContent );
 		}

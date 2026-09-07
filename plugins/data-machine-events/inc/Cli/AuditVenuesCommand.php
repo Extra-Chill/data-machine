@@ -64,12 +64,17 @@ class AuditVenuesCommand {
 			)
 		);
 
+		if ( $result instanceof \WP_Error ) {
+			\WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( isset( $result['error'] ) ) {
 			\WP_CLI::error( $result['error'] );
 		}
 
 		if ( 'json' === $format ) {
-			\WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			\WP_CLI::log( (string) wp_json_encode( $result, JSON_PRETTY_PRINT ) );
 			return;
 		}
 
@@ -142,8 +147,9 @@ class AuditVenuesCommand {
 	 */
 	private function auditTicketingUrls( string $format, int $limit ): void {
 		$result = ( new VenueAbilities() )->executeHealthCheck( array( 'limit' => $limit ) );
-		if ( is_wp_error( $result ) ) {
+		if ( $result instanceof \WP_Error ) {
 			\WP_CLI::error( $result->get_error_message() );
+			return;
 		}
 
 		$candidates = $result['suspicious_website'] ?? array(
@@ -161,7 +167,7 @@ class AuditVenuesCommand {
 		);
 
 		if ( 'json' === $format ) {
-			\WP_CLI::log( wp_json_encode( $output, JSON_PRETTY_PRINT ) );
+			\WP_CLI::log( (string) wp_json_encode( $output, JSON_PRETTY_PRINT ) );
 			return;
 		}
 		if ( 'summary' === $format ) {

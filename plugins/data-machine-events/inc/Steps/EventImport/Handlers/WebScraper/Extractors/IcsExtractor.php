@@ -53,7 +53,7 @@ class IcsExtractor extends BaseExtractor {
 
 			$ical->initString( $content );
 
-			$events = $ical->events() ?? array();
+			$events = $ical->events();
 
 			if ( empty( $events ) ) {
 				return array();
@@ -196,12 +196,9 @@ class IcsExtractor extends BaseExtractor {
 		}
 
 		if ( ! empty( $ical_event->dtstart ) && $ical_event->dtstart instanceof \DateTime ) {
-			$tz = $ical_event->dtstart->getTimezone();
-			if ( $tz ) {
-				$tz_name = $tz->getName();
-				if ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
-					return $tz_name;
-				}
+			$tz_name = $ical_event->dtstart->getTimezone()->getName();
+			if ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
+				return $tz_name;
 			}
 		}
 
@@ -216,8 +213,7 @@ class IcsExtractor extends BaseExtractor {
 			$is_date_only  = isset( $dtstart_array[0]['VALUE'] ) && 'DATE' === $dtstart_array[0]['VALUE'];
 
 			if ( $start_datetime instanceof \DateTime ) {
-				$tz      = $start_datetime->getTimezone();
-				$tz_name = $tz ? $tz->getName() : '';
+				$tz_name = $start_datetime->getTimezone()->getName();
 
 				$is_explicit_utc = $this->hasUtcMarker( $dtstart_array );
 				$is_floating     = ! $is_explicit_utc && ! $this->hasExplicitTimezone( $dtstart_array );
@@ -241,11 +237,9 @@ class IcsExtractor extends BaseExtractor {
 						$event['startTime']     = $local_dt->format( 'H:i' );
 						$event['venueTimezone'] = $event_timezone;
 					} else {
-						$event['startDate'] = $start_datetime->format( 'Y-m-d' );
-						$event['startTime'] = $start_datetime->format( 'H:i' );
-						if ( ! empty( $event_timezone ) ) {
-							$event['venueTimezone'] = $event_timezone;
-						}
+						$event['startDate']     = $start_datetime->format( 'Y-m-d' );
+						$event['startTime']     = $start_datetime->format( 'H:i' );
+						$event['venueTimezone'] = $event_timezone;
 					}
 				} elseif ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
 					$event['startDate']     = $start_datetime->format( 'Y-m-d' );
@@ -285,8 +279,7 @@ class IcsExtractor extends BaseExtractor {
 			$is_date_only = isset( $dtend_array[0]['VALUE'] ) && 'DATE' === $dtend_array[0]['VALUE'];
 
 			if ( $end_datetime instanceof \DateTime ) {
-				$tz      = $end_datetime->getTimezone();
-				$tz_name = $tz ? $tz->getName() : '';
+				$tz_name = $end_datetime->getTimezone()->getName();
 
 				$is_explicit_utc = $this->hasUtcMarker( $dtend_array );
 				$is_floating     = ! $is_explicit_utc && ! $this->hasExplicitTimezone( $dtend_array );
@@ -377,7 +370,7 @@ class IcsExtractor extends BaseExtractor {
 		}
 
 		$date_str = sprintf( '%s-%s-%s', $m[1], $m[2], $m[3] );
-		$time_str = isset( $m[4] ) ? sprintf( '%s:%s:%s', $m[4], $m[5], $m[6] ?? '00' ) : '00:00:00';
+		$time_str = isset( $m[4] ) ? sprintf( '%s:%s:%s', $m[4], $m[5] ?? '', $m[6] ?? '00' ) : '00:00:00';
 
 		try {
 			return new \DateTime( $date_str . ' ' . $time_str, new \DateTimeZone( $timezone ) );
@@ -409,7 +402,10 @@ class IcsExtractor extends BaseExtractor {
 		// Standard: "America/Chicago" (value after colon)
 		// Non-standard: "VALUE=TEXT;US/Mountain" (timezone is the last ;-delimited segment)
 		$segments = preg_split( '/[;:]/', $line_value );
-		$raw_tz   = trim( end( $segments ) );
+		if ( false === $segments || empty( $segments ) ) {
+			return $current_timezone;
+		}
+		$raw_tz = trim( end( $segments ) );
 
 		if ( empty( $raw_tz ) ) {
 			return $current_timezone;

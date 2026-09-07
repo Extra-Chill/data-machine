@@ -54,6 +54,14 @@ class EventHealthCheck extends BaseTool {
 		$abilities = new EventHealthAbilities();
 		$result    = $abilities->executeHealthCheck( $parameters );
 
+		if ( $result instanceof \WP_Error ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'event_health_check',
+			);
+		}
+
 		if ( isset( $result['error'] ) ) {
 			return array(
 				'success'   => false,

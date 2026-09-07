@@ -14,11 +14,15 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators;
 
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\QueriesDom;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class HtmlLinkPaginator implements PaginatorInterface {
+
+	use QueriesDom;
 
 	/**
 	 * Check if this paginator can handle the given URL/content combination.
@@ -54,24 +58,21 @@ class HtmlLinkPaginator implements PaginatorInterface {
 		$xpath = new \DOMXPath( $dom );
 
 		// Priority 1: Standard HTML5 rel="next" on links
-		$next_links = $xpath->query( '//a[@rel="next"]' );
-		if ( $next_links->length > 0 ) {
-			$href = $this->extractValidHref( $next_links->item( 0 ), $current_url, $current_host );
+		$next_links = $this->queryElements( $xpath, '//a[@rel="next"]' );
+		if ( ! empty( $next_links ) ) {
+			$href = $this->extractValidHref( $next_links[0], $current_url, $current_host );
 			if ( $href ) {
 				return $href;
 			}
 		}
 
 		// Priority 2: Link element with rel="next" (SEO pagination)
-		$link_next = $xpath->query( '//link[@rel="next"]' );
-		if ( $link_next->length > 0 ) {
-			$node = $link_next->item( 0 );
-			if ( $node instanceof \DOMElement ) {
-				$href     = $node->getAttribute( 'href' );
-				$resolved = $this->resolveUrl( $href, $current_url, $current_host );
-				if ( $resolved ) {
-					return $resolved;
-				}
+		$link_next = $this->queryFirstElement( $xpath, '//link[@rel="next"]' );
+		if ( null !== $link_next ) {
+			$href     = $link_next->getAttribute( 'href' );
+			$resolved = $this->resolveUrl( $href, $current_url, $current_host );
+			if ( $resolved ) {
+				return $resolved;
 			}
 		}
 
@@ -83,7 +84,7 @@ class HtmlLinkPaginator implements PaginatorInterface {
 		);
 
 		foreach ( $next_class_patterns as $pattern ) {
-			$nodes = $xpath->query( $pattern );
+			$nodes = $this->queryElements( $xpath, $pattern );
 			foreach ( $nodes as $node ) {
 				$href = $this->extractValidHref( $node, $current_url, $current_host );
 				if ( $href ) {
@@ -101,12 +102,8 @@ class HtmlLinkPaginator implements PaginatorInterface {
 		);
 
 		foreach ( $pagination_containers as $container_pattern ) {
-			$nodes = $xpath->query( $container_pattern );
+			$nodes = $this->queryElements( $xpath, $container_pattern );
 			foreach ( $nodes as $node ) {
-				if ( ! ( $node instanceof \DOMElement ) ) {
-					continue;
-				}
-
 				$text       = strtolower( trim( $node->textContent ) );
 				$class      = strtolower( $node->getAttribute( 'class' ) );
 				$aria_label = strtolower( $node->getAttribute( 'aria-label' ) );

@@ -24,6 +24,7 @@ class Settings_Page {
 
 	const PAGE_SLUG = 'data-machine-events-settings';
 
+	/** @var array<string, bool|string> */
 	private $defaults = array(
 		'include_in_archives'  => false,
 		'include_in_search'    => true,
@@ -129,7 +130,7 @@ class Settings_Page {
 	}
 
 	/**
-	 * @param WP_Query $query
+	 * @param \WP_Query $query
 	 */
 	public function control_archive_queries( $query ) {
 		if ( is_admin() || ! $query->is_main_query() ) {

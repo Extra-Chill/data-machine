@@ -54,13 +54,11 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 		$timezone = $calendar_data['timezone'] ? $calendar_data['timezone'] : $page_venue['venueTimezone'];
 
 		$events = array();
-		if ( is_array( $ical_events ) ) {
-			foreach ( $ical_events as $ical_event ) {
-				$normalized = $this->normalizeEvent( $ical_event, $page_venue, $calendar_timezone );
+		foreach ( $ical_events as $ical_event ) {
+			$normalized = $this->normalizeEvent( $ical_event, $page_venue, $calendar_timezone );
 
-				if ( ! empty( $normalized['title'] ) ) {
-					$events[] = $normalized;
-				}
+			if ( ! empty( $normalized['title'] ) ) {
+				$events[] = $normalized;
 			}
 		}
 
@@ -96,7 +94,7 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 
 		parse_str( $parsed_url['query'], $query_params );
 
-		if ( ! empty( $query_params['src'] ) ) {
+		if ( ! empty( $query_params['src'] ) && is_string( $query_params['src'] ) ) {
 			$src = $query_params['src'];
 
 			// Check if ID is Base64 encoded (common in some Squarespace embeds)
@@ -186,8 +184,8 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 				$calendar_timezone = $extracted_timezone;
 			}
 
-			$events = $ical->events() ?? array();
 			$events = $this->constrainRecurrenceHorizon(
+				$ical->events(),
 				$events,
 				array(
 					'source_url' => $source_url,
@@ -266,8 +264,7 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 			$start = $ical_event->dtstart;
 
 			if ( $start instanceof \DateTime ) {
-				$tz      = $start->getTimezone();
-				$tz_name = $tz ? $tz->getName() : '';
+				$tz_name = $start->getTimezone()->getName();
 
 				$event['startDate'] = $start->format( 'Y-m-d' );
 
@@ -293,8 +290,7 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 			$end = $ical_event->dtend;
 
 			if ( $end instanceof \DateTime ) {
-				$tz      = $end->getTimezone();
-				$tz_name = $tz ? $tz->getName() : '';
+				$tz_name = $end->getTimezone()->getName();
 
 				$event['endDate'] = $end->format( 'Y-m-d' );
 

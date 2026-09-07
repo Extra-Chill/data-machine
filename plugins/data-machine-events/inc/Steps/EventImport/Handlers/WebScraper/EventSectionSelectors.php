@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class EventSectionSelectors {
 
 	/**
-	 * @return array<int, array{xpath: string, enable_table_row_date_filter: bool}>
+	 * @return array<int, array{xpath: string, enable_table_row_date_filter: bool, extract_base64_event?: bool}>
 	 */
 	public static function get_rules(): array {
 		$rules = array(

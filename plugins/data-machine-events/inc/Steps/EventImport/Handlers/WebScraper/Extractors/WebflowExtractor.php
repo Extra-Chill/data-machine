@@ -98,7 +98,7 @@ class WebflowExtractor extends BaseExtractor {
 		}
 
 		$xpath = new \DOMXPath( $dom );
-		$nodes = $xpath->query( '//*[contains(concat(" ", normalize-space(@class), " "), " w-dyn-item ")]' );
+		$nodes = $this->queryElements( $xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " w-dyn-item ")]' );
 		$items = array();
 
 		foreach ( $nodes as $node ) {

@@ -46,8 +46,8 @@ class ShowtimeExtractor extends BaseExtractor {
 		$loaded = $this->loadDom( $html );
 		$xpath  = $loaded['xpath'];
 
-		$event_nodes = $xpath->query( "//*[contains(@class, 'eventItem')]" );
-		if ( ! $event_nodes || 0 === $event_nodes->length ) {
+		$event_nodes = $this->queryElements( $xpath, "//*[contains(@class, 'eventItem')]" );
+		if ( empty( $event_nodes ) ) {
 			return array();
 		}
 
@@ -84,50 +84,50 @@ class ShowtimeExtractor extends BaseExtractor {
 		$event = array();
 
 		// Title — from h3.title > a
-		$title_link = $xpath->query( ".//*[contains(@class, 'title')]//a", $node );
-		if ( $title_link && $title_link->length > 0 ) {
-			$event['title'] = $this->sanitizeText( $title_link->item( 0 )->textContent );
+		$title_link = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'title')]//a", $node );
+		if ( null !== $title_link ) {
+			$event['title'] = $this->sanitizeText( $title_link->textContent );
 
-			$href = $title_link->item( 0 )->getAttribute( 'href' );
+			$href = $title_link->getAttribute( 'href' );
 			if ( ! empty( $href ) ) {
 				$event['sourceUrl'] = $this->resolveUrl( $href, $source_url );
 			}
 		}
 
 		// Tagline — from h4.tagline (optional subtitle)
-		$tagline = $xpath->query( ".//*[contains(@class, 'tagline')]", $node );
-		if ( $tagline && $tagline->length > 0 ) {
-			$tagline_text = $this->sanitizeText( $tagline->item( 0 )->textContent );
+		$tagline = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'tagline')]", $node );
+		if ( null !== $tagline ) {
+			$tagline_text = $this->sanitizeText( $tagline->textContent );
 			if ( ! empty( $tagline_text ) ) {
 				$event['description'] = $tagline_text;
 			}
 		}
 
 		// Date — from div.date
-		$date_node = $xpath->query( ".//*[contains(@class, 'date')]", $node );
-		if ( $date_node && $date_node->length > 0 ) {
-			$this->parseDateText( $event, $this->sanitizeText( $date_node->item( 0 )->textContent ) );
+		$date_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'date')]", $node );
+		if ( null !== $date_node ) {
+			$this->parseDateText( $event, $this->sanitizeText( $date_node->textContent ) );
 		}
 
 		// Venue — from div.location
-		$location_node = $xpath->query( ".//*[contains(@class, 'location')]", $node );
-		if ( $location_node && $location_node->length > 0 ) {
-			$event['venue'] = $this->sanitizeText( $location_node->item( 0 )->textContent );
+		$location_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'location')]", $node );
+		if ( null !== $location_node ) {
+			$event['venue'] = $this->sanitizeText( $location_node->textContent );
 		}
 
 		// Ticket URL — from a.tickets
-		$ticket_link = $xpath->query( ".//a[contains(@class, 'tickets')]", $node );
-		if ( $ticket_link && $ticket_link->length > 0 ) {
-			$ticket_href = $ticket_link->item( 0 )->getAttribute( 'href' );
+		$ticket_link = $this->queryFirstElement( $xpath, ".//a[contains(@class, 'tickets')]", $node );
+		if ( null !== $ticket_link ) {
+			$ticket_href = $ticket_link->getAttribute( 'href' );
 			if ( ! empty( $ticket_href ) ) {
 				$event['ticketUrl'] = esc_url_raw( $ticket_href );
 			}
 		}
 
 		// Image — from div.thumb img
-		$img = $xpath->query( ".//div[contains(@class, 'thumb')]//img", $node );
-		if ( $img && $img->length > 0 ) {
-			$img_src = $img->item( 0 )->getAttribute( 'src' );
+		$img = $this->queryFirstElement( $xpath, ".//div[contains(@class, 'thumb')]//img", $node );
+		if ( null !== $img ) {
+			$img_src = $img->getAttribute( 'src' );
 			if ( ! empty( $img_src ) ) {
 				$event['imageUrl'] = esc_url_raw( $this->resolveUrl( $img_src, $source_url ) );
 			}

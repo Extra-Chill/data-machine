@@ -178,7 +178,7 @@ function datamachine_unwrap_affiliate_url( string $url ): string {
 
 	// Try common redirect parameter names
 	foreach ( array( 'u', 'url', 'murl', 'destination' ) as $param ) {
-		if ( ! empty( $query_params[ $param ] ) ) {
+		if ( ! empty( $query_params[ $param ] ) && is_string( $query_params[ $param ] ) ) {
 			$inner_url = urldecode( $query_params[ $param ] );
 			// Validate it looks like a URL
 			if ( filter_var( $inner_url, FILTER_VALIDATE_URL ) ) {
@@ -197,9 +197,9 @@ function datamachine_unwrap_affiliate_url( string $url ): string {
  * and writes the computed datetime to the datamachine_event_dates table (the
  * query source of truth). Ticket URL meta is also synced for dedup queries.
  *
- * @param int     $post_id Post ID.
- * @param WP_Post $post    Post object.
- * @param bool    $update  Whether this is an update.
+ * @param int      $post_id Post ID.
+ * @param \WP_Post $post    Post object.
+ * @param bool     $update  Whether this is an update.
  */
 function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	// Only for data_machine_events post type.
@@ -312,7 +312,10 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 
 					// A time-only end before the start is an implicit overnight event.
 					if ( $end_datetime_val < $datetime ) {
-						$end_datetime_val = gmdate( 'Y-m-d H:i:s', strtotime( $end_datetime_val . ' +1 day' ) );
+						$overnight_ts = strtotime( $end_datetime_val . ' +1 day' );
+						if ( false !== $overnight_ts ) {
+							$end_datetime_val = gmdate( 'Y-m-d H:i:s', $overnight_ts );
+						}
 					}
 				} else {
 					$end_datetime_val = null;
@@ -373,9 +376,9 @@ add_action( 'save_post', __NAMESPACE__ . '\\data_machine_events_sync_datetime_me
  * Keeps the denormalized post_status column in sync so that date queries
  * can filter by status without joining the full posts table.
  *
- * @param string  $new_status New post status.
- * @param string  $old_status Old post status.
- * @param WP_Post $post       Post object.
+ * @param string   $new_status New post status.
+ * @param string   $old_status Old post status.
+ * @param \WP_Post $post       Post object.
  */
 function data_machine_events_sync_status( $new_status, $old_status, $post ) {
 	if ( Event_Post_Type::POST_TYPE !== $post->post_type ) {
@@ -392,8 +395,8 @@ add_action( 'transition_post_status', __NAMESPACE__ . '\\data_machine_events_syn
  * Trash and untrash remain status transitions; only permanent deletion removes
  * the derived row.
  *
- * @param int     $post_id Deleted post ID.
- * @param WP_Post $post    Deleted post object.
+ * @param int      $post_id Deleted post ID.
+ * @param \WP_Post $post    Deleted post object.
  */
 function data_machine_events_delete_dates( $post_id, $post ) {
 	if ( Event_Post_Type::POST_TYPE === $post->post_type ) {

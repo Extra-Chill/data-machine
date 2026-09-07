@@ -45,9 +45,9 @@ class NocodeflowExtractor extends BaseExtractor {
 		$xpath  = $parsed['xpath'];
 
 		// Find all ncf-date-template blocks — each is one event.
-		$templates = $xpath->query( "//*[contains(@class, 'ncf-date-template')]" );
+		$templates = $this->queryElements( $xpath, "//*[contains(@class, 'ncf-date-template')]" );
 
-		if ( false === $templates || 0 === $templates->length ) {
+		if ( empty( $templates ) ) {
 			return array();
 		}
 
@@ -81,16 +81,16 @@ class NocodeflowExtractor extends BaseExtractor {
 		$date_attr = '';
 
 		// Extract the data-date attribute from the .identifyer element.
-		$identifiers = $xpath->query( ".//*[contains(@class, 'identifyer')]", $template );
-		if ( $identifiers && $identifiers->length > 0 ) {
-			$date_attr = $identifiers->item( 0 )->getAttribute( 'data-date' );
+		$identifier = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'identifyer')]", $template );
+		if ( null !== $identifier ) {
+			$date_attr = $identifier->getAttribute( 'data-date' );
 		}
 
 		// Extract text from child divs in order.
 		// Nocodeflow uses numbered text-block classes for different fields.
-		$divs = $xpath->query( './/div[starts-with(@class, "text-block-")]', $template );
+		$divs = $this->queryElements( $xpath, './/div[starts-with(@class, "text-block-")]', $template );
 
-		if ( $divs && $divs->length > 0 ) {
+		if ( ! empty( $divs ) ) {
 			foreach ( $divs as $i => $div ) {
 				$text = trim( $div->textContent );
 				if ( empty( $text ) ) {

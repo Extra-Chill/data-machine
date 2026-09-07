@@ -35,9 +35,9 @@ class RedRocksExtractor extends BaseExtractor {
 	public function extract( string $html, string $source_url ): array {
 		$loaded      = $this->loadDom( $html );
 		$xpath       = $loaded['xpath'];
-		$event_nodes = $xpath->query( "//*[contains(@class, 'card-event')]" );
+		$event_nodes = $this->queryElements( $xpath, "//*[contains(@class, 'card-event')]" );
 
-		if ( 0 === $event_nodes->length ) {
+		if ( empty( $event_nodes ) ) {
 			return array();
 		}
 
@@ -45,10 +45,6 @@ class RedRocksExtractor extends BaseExtractor {
 		$events       = array();
 
 		foreach ( $event_nodes as $event_node ) {
-			if ( ! ( $event_node instanceof \DOMElement ) ) {
-				continue;
-			}
-
 			$normalized = $this->normalizeEvent( $xpath, $event_node, $current_year, $source_url );
 			if ( ! empty( $normalized['title'] ) ) {
 				$events[] = $normalized;
@@ -63,7 +59,7 @@ class RedRocksExtractor extends BaseExtractor {
 	}
 
 	private function detectYear( \DOMXPath $xpath ): int {
-		$month_headers = $xpath->query( "//*[contains(@class, 'month-header')] | //h2[contains(@class, 'month')]" );
+		$month_headers = $this->queryElements( $xpath, "//*[contains(@class, 'month-header')] | //h2[contains(@class, 'month')]" );
 
 		foreach ( $month_headers as $header ) {
 			$text = trim( $header->textContent );
@@ -96,7 +92,7 @@ class RedRocksExtractor extends BaseExtractor {
 	}
 
 	private function extractTitle( \DOMXPath $xpath, \DOMElement $node ): string {
-		$title_node = $xpath->query( ".//*[contains(@class, 'card-title')]", $node )->item( 0 );
+		$title_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'card-title')]", $node );
 		if ( $title_node ) {
 			return $this->sanitizeText( $title_node->textContent );
 		}
@@ -112,7 +108,7 @@ class RedRocksExtractor extends BaseExtractor {
 		);
 
 		foreach ( $selectors as $selector ) {
-			$desc_node = $xpath->query( $selector, $node )->item( 0 );
+			$desc_node = $this->queryFirstElement( $xpath, $selector, $node );
 			if ( $desc_node ) {
 				$text = $this->sanitizeText( $desc_node->textContent );
 				if ( ! empty( $text ) ) {
@@ -130,7 +126,7 @@ class RedRocksExtractor extends BaseExtractor {
 	 * Red Rocks displays dates like "Wed, Apr 15, 7:30 pm" in the .date element.
 	 */
 	private function parseEventDateTime( array &$event, \DOMXPath $xpath, \DOMElement $node, int $year ): void {
-		$date_node = $xpath->query( ".//*[contains(@class, 'date')]", $node )->item( 0 );
+		$date_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'date')]", $node );
 		if ( ! $date_node ) {
 			return;
 		}
@@ -147,7 +143,10 @@ class RedRocksExtractor extends BaseExtractor {
 
 			if ( false !== $timestamp ) {
 				if ( $timestamp < strtotime( '-1 day' ) ) {
-					$timestamp = strtotime( "{$month} {$day}, " . ( $year + 1 ) );
+					$next_year = strtotime( "{$month} {$day}, " . ( $year + 1 ) );
+					if ( false !== $next_year ) {
+						$timestamp = $next_year;
+					}
 				}
 				$event['startDate'] = date( 'Y-m-d', $timestamp );
 			}
@@ -166,8 +165,8 @@ class RedRocksExtractor extends BaseExtractor {
 	}
 
 	private function parseImage( array &$event, \DOMXPath $xpath, \DOMElement $node ): void {
-		$img_node = $xpath->query( './/img[@data-image]', $node )->item( 0 );
-		if ( $img_node && $img_node instanceof \DOMElement ) {
+		$img_node = $this->queryFirstElement( $xpath, './/img[@data-image]', $node );
+		if ( null !== $img_node ) {
 			$image_url = $img_node->getAttribute( 'data-image' );
 			if ( ! empty( $image_url ) ) {
 				$event['imageUrl'] = esc_url_raw( $image_url );
@@ -175,8 +174,8 @@ class RedRocksExtractor extends BaseExtractor {
 			}
 		}
 
-		$img_node = $xpath->query( './/img[@src]', $node )->item( 0 );
-		if ( $img_node && $img_node instanceof \DOMElement ) {
+		$img_node = $this->queryFirstElement( $xpath, './/img[@src]', $node );
+		if ( null !== $img_node ) {
 			$src = $img_node->getAttribute( 'src' );
 			if ( ! empty( $src ) && strpos( $src, 'data:' ) !== 0 ) {
 				$event['imageUrl'] = esc_url_raw( $src );
@@ -193,8 +192,8 @@ class RedRocksExtractor extends BaseExtractor {
 		);
 
 		foreach ( $selectors as $selector ) {
-			$link_node = $xpath->query( $selector, $node )->item( 0 );
-			if ( $link_node && $link_node instanceof \DOMElement && $link_node->hasAttribute( 'href' ) ) {
+			$link_node = $this->queryFirstElement( $xpath, $selector, $node );
+			if ( null !== $link_node && $link_node->hasAttribute( 'href' ) ) {
 				$href = $link_node->getAttribute( 'href' );
 				if ( ! empty( $href ) && '#' !== $href ) {
 					$event['ticketUrl'] = esc_url_raw( $href );
@@ -205,8 +204,8 @@ class RedRocksExtractor extends BaseExtractor {
 	}
 
 	private function parseEventUrl( array &$event, \DOMXPath $xpath, \DOMElement $node, string $source_url ): void {
-		$link_node = $xpath->query( ".//a[contains(@class, 'card-link')] | .//a[contains(@href, '/event/')]", $node )->item( 0 );
-		if ( $link_node && $link_node instanceof \DOMElement && $link_node->hasAttribute( 'href' ) ) {
+		$link_node = $this->queryFirstElement( $xpath, ".//a[contains(@class, 'card-link')] | .//a[contains(@href, '/event/')]", $node );
+		if ( null !== $link_node && $link_node->hasAttribute( 'href' ) ) {
 			$href = $link_node->getAttribute( 'href' );
 			if ( ! empty( $href ) && '#' !== $href ) {
 				if ( strpos( $href, 'http' ) !== 0 ) {

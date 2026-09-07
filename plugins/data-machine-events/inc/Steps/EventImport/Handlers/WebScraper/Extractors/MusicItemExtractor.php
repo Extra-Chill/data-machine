@@ -27,9 +27,9 @@ class MusicItemExtractor extends BaseExtractor {
 	public function extract( string $html, string $source_url ): array {
 		$loaded      = $this->loadDom( $html );
 		$xpath       = $loaded['xpath'];
-		$event_nodes = $xpath->query( "//*[contains(concat(' ', normalize-space(@class), ' '), ' music__item ')]" );
+		$event_nodes = $this->queryElements( $xpath, "//*[contains(concat(' ', normalize-space(@class), ' '), ' music__item ')]" );
 
-		if ( 0 === $event_nodes->length ) {
+		if ( empty( $event_nodes ) ) {
 			return array();
 		}
 		$page_venue   = PageVenueExtractor::extract( $html, $source_url );
@@ -74,7 +74,7 @@ class MusicItemExtractor extends BaseExtractor {
 	 * Extract artist/band name as event title.
 	 */
 	private function extractArtist( \DOMXPath $xpath, \DOMElement $node ): string {
-		$artist_node = $xpath->query( ".//*[contains(@class, 'music__artist')]", $node )->item( 0 );
+		$artist_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'music__artist')]", $node );
 		if ( $artist_node ) {
 			return $this->sanitizeText( $artist_node->textContent );
 		}
@@ -86,7 +86,7 @@ class MusicItemExtractor extends BaseExtractor {
 	 * Extract event description.
 	 */
 	private function extractDescription( \DOMXPath $xpath, \DOMElement $node ): string {
-		$desc_node = $xpath->query( ".//*[contains(@class, 'music__description')]", $node )->item( 0 );
+		$desc_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'music__description')]", $node );
 		if ( $desc_node ) {
 			return $this->cleanHtml( $desc_node->textContent );
 		}
@@ -100,7 +100,7 @@ class MusicItemExtractor extends BaseExtractor {
 	 * Format: "Friday, January 9" (day of week, month, day - no year)
 	 */
 	private function parseDate( array &$event, \DOMXPath $xpath, \DOMElement $node, int $year ): void {
-		$date_node = $xpath->query( ".//*[contains(@class, 'music__date')]", $node )->item( 0 );
+		$date_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'music__date')]", $node );
 		if ( ! $date_node ) {
 			return;
 		}
@@ -128,7 +128,10 @@ class MusicItemExtractor extends BaseExtractor {
 
 			if ( false !== $timestamp ) {
 				if ( $timestamp < strtotime( '-1 day' ) ) {
-					$timestamp = strtotime( "{$month} {$day}, " . ( $year + 1 ) );
+					$next_year = strtotime( "{$month} {$day}, " . ( $year + 1 ) );
+					if ( false !== $next_year ) {
+						$timestamp = $next_year;
+					}
 				}
 				$event['startDate'] = date( 'Y-m-d', $timestamp );
 			}
@@ -141,7 +144,7 @@ class MusicItemExtractor extends BaseExtractor {
 	 * Format: "8-11" (start-end hours, assumes PM for evening venues)
 	 */
 	private function parseTime( array &$event, \DOMXPath $xpath, \DOMElement $node ): void {
-		$time_node = $xpath->query( ".//*[contains(@class, 'music__time')]", $node )->item( 0 );
+		$time_node = $this->queryFirstElement( $xpath, ".//*[contains(@class, 'music__time')]", $node );
 		if ( ! $time_node ) {
 			return;
 		}
@@ -150,9 +153,9 @@ class MusicItemExtractor extends BaseExtractor {
 
 		if ( preg_match( '/(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?/', $time_text, $matches ) ) {
 			$start_hour = (int) $matches[1];
-			$start_min  = isset( $matches[2] ) && '' !== $matches[2] ? $matches[2] : '00';
+			$start_min  = strlen( $matches[2] ) > 0 ? $matches[2] : '00';
 			$end_hour   = (int) $matches[3];
-			$end_min    = isset( $matches[4] ) && '' !== $matches[4] ? $matches[4] : '00';
+			$end_min    = strlen( $matches[4] ) > 0 ? $matches[4] : '00';
 
 			if ( $start_hour < 12 && $start_hour >= 1 ) {
 				$start_hour += 12;
@@ -177,7 +180,7 @@ class MusicItemExtractor extends BaseExtractor {
 		);
 
 		foreach ( $selectors as $selector ) {
-			$img_node = $xpath->query( $selector, $node )->item( 0 );
+			$img_node = $this->queryFirstElement( $xpath, $selector, $node );
 			if ( $img_node && $img_node->hasAttribute( 'src' ) ) {
 				$src               = $img_node->getAttribute( 'src' );
 				$event['imageUrl'] = $this->resolveUrl( $src, $source_url );
@@ -197,7 +200,7 @@ class MusicItemExtractor extends BaseExtractor {
 		);
 
 		foreach ( $selectors as $selector ) {
-			$link_node = $xpath->query( $selector, $node )->item( 0 );
+			$link_node = $this->queryFirstElement( $xpath, $selector, $node );
 			if ( $link_node && $link_node->hasAttribute( 'href' ) ) {
 				$event['eventUrl'] = esc_url_raw( $link_node->getAttribute( 'href' ) );
 				return;

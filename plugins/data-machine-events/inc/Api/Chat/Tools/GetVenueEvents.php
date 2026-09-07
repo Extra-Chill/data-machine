@@ -61,6 +61,14 @@ class GetVenueEvents extends BaseTool {
 		$abilities = new EventQueryAbilities();
 		$result    = $abilities->executeGetVenueEvents( $parameters );
 
+		if ( $result instanceof \WP_Error ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'get_venue_events',
+			);
+		}
+
 		if ( isset( $result['error'] ) ) {
 			return array(
 				'success'   => false,

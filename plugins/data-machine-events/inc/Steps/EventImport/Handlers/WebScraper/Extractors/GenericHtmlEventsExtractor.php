@@ -197,8 +197,9 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 
 					if ( false !== $date_nodes && $date_nodes->length > 0 ) {
 						$path = $container->getNodePath();
-						if ( is_string( $path ) ) {
-							$containers[ $path ] = $dom->saveHTML( $container );
+						$html = $dom->saveHTML( $container );
+						if ( is_string( $path ) && is_string( $html ) ) {
+							$containers[ $path ] = $html;
 						}
 						break;
 					}
@@ -229,10 +230,7 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 		);
 
 		foreach ( $queries as $query ) {
-			$nodes = $xpath->query( $query );
-			if ( false === $nodes ) {
-				continue;
-			}
+			$nodes = $this->queryElements( $xpath, $query );
 
 			foreach ( $nodes as $node ) {
 				$html = $dom->saveHTML( $node );
@@ -376,7 +374,10 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 	private function parseDateField( array &$event, string $value ): void {
 		// Handle date ranges — take the start date.
 		$range_sep = preg_split( '/\s*[—–\-]\s*(?=[A-Z])/', $value, 2 );
-		$date_str  = trim( $range_sep[0] );
+		if ( false === $range_sep || empty( $range_sep ) ) {
+			return;
+		}
+		$date_str = trim( $range_sep[0] );
 
 		if ( count( $range_sep ) > 1 ) {
 			$end_str = trim( $range_sep[1] );

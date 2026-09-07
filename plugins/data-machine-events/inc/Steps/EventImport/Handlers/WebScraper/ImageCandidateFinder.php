@@ -102,8 +102,8 @@ final class ImageCandidateFinder {
 	private function scoreImage( \DOMElement $img, \DOMXPath $xpath, string $url ): int {
 		$score = 0;
 
-		$alt       = strtolower( $img->getAttribute( 'alt' ) ?? '' );
-		$css_class = strtolower( $img->getAttribute( 'class' ) ?? '' );
+		$alt       = strtolower( $img->getAttribute( 'alt' ) );
+		$css_class = strtolower( $img->getAttribute( 'class' ) );
 		$src       = strtolower( $url );
 
 		// Positive signals
@@ -228,7 +228,7 @@ final class ImageCandidateFinder {
 		if ( $parent_link && $parent_link->length > 0 ) {
 			$link = $parent_link->item( 0 );
 			if ( $link instanceof \DOMElement ) {
-				$href = strtolower( $link->getAttribute( 'href' ) ?? '' );
+				$href = strtolower( $link->getAttribute( 'href' ) );
 				if ( strpos( $href, 'event' ) !== false || strpos( $href, 'ticket' ) !== false ) {
 					return 15;
 				}
