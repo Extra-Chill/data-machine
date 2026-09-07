@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.60.1] - 2026-09-07
+
+### Fixed
+- empty scraper venue fields no longer overwrite AI-supplied venue city/country
+
 ## [0.60.0] - 2026-09-07
 
 ### Added
