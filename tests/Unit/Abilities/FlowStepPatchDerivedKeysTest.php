@@ -14,6 +14,7 @@
 namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\HandlerAbilities;
+use DataMachine\Abilities\SettingsAbilities;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Steps\Settings\SettingsHandler;
@@ -144,7 +145,7 @@ class FlowStepPatchDerivedKeysTest extends WP_UnitTestCase {
 		remove_filter( 'datamachine_handlers', $this->handlers_filter, 10 );
 		remove_filter( 'datamachine_handler_settings', $this->settings_filter, 10 );
 		HandlerAbilities::clearCache();
-		delete_option( 'datamachine_handler_defaults' );
+		delete_option( SettingsAbilities::HANDLER_DEFAULTS_OPTION );
 
 		parent::tear_down();
 	}
