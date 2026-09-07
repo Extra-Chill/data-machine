@@ -109,14 +109,14 @@ class PipelinesAbilityRestTest extends WP_UnitTestCase {
 			'update-pipeline-memory-files',
 			array(
 				'pipeline_id'  => $pipeline_id,
-				'memory_files' => array( 'agent-memory/notes.md', 'agent-memory/style.md' ),
+				'memory_files' => array( 'notes.md', 'style.md' ),
 			)
 		);
 
 		$this->assertTrue( $updated['success'] );
-		$this->assertSame( array( 'agent-memory/notes.md', 'agent-memory/style.md' ), $updated['memory_files'] );
+		$this->assertSame( array( 'notes.md', 'style.md' ), $updated['memory_files'] );
 		$this->assertSame(
-			array( 'agent-memory/notes.md', 'agent-memory/style.md' ),
+			array( 'notes.md', 'style.md' ),
 			$this->run_ability( 'get-pipeline-memory-files', array( 'pipeline_id' => $pipeline_id ) )['memory_files']
 		);
 	}

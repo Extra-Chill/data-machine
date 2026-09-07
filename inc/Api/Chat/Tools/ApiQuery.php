@@ -221,13 +221,6 @@ get-pipeline-steps - Steps for a pipeline';
 
 		$response = rest_do_request( $request );
 
-		if ( is_wp_error( $response ) ) {
-			return array(
-				'success' => false,
-				'error'   => $response->get_error_message(),
-			);
-		}
-
 		$data   = $response->get_data();
 		$status = $response->get_status();
 
@@ -274,12 +267,8 @@ get-pipeline-steps - Steps for a pipeline';
 		// If there's an ID (numeric second segment), append it
 		if ( ! empty( $segments ) ) {
 			$next = array_shift( $segments );
-			if ( is_numeric( $next ) ) {
-				$resource .= '_' . $next;
-			} elseif ( ! empty( $next ) ) {
-				// Sub-resource like /pipelines/5/steps
-				$resource .= '_' . $next;
-			}
+			// Numeric ID or sub-resource like /flows/5/queue — both append.
+			$resource .= '_' . $next;
 		}
 
 		return $resource;

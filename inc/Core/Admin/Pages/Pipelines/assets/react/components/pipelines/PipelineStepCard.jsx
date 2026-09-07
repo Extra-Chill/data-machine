@@ -134,9 +134,7 @@ export default function PipelineStepCard( {
 			try {
 				const response = await updateSystemPrompt(
 					step.pipeline_step_id,
-					prompt,
-					step.step_type,
-					pipelineId
+					prompt
 				);
 
 				if ( ! response.success ) {

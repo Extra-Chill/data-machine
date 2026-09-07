@@ -214,8 +214,8 @@ export const useDeletePipeline = () => {
 export const useAddPipelineStep = () => {
 	const queryClient = useQueryClient();
 	return useMutation( {
-		mutationFn: ( { pipelineId, stepType, executionOrder } ) =>
-			addPipelineStep( pipelineId, stepType, executionOrder ),
+		mutationFn: ( { pipelineId, stepType } ) =>
+			addPipelineStep( pipelineId, stepType ),
 		onSuccess: ( response, { pipelineId } ) => {
 			// Update cache with response data immediately (API is source of truth)
 			if ( response?.data?.step_data ) {

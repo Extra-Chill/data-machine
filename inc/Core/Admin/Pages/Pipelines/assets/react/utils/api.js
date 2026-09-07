@@ -145,16 +145,14 @@ export const deletePipeline = async ( pipelineId ) => {
 /**
  * Add a step to a pipeline
  *
- * @param {number} pipelineId     - Pipeline ID
- * @param {string} stepType       - Step type (fetch, ai, publish, upsert)
- * @param {number} executionOrder - Step position (informational; order is derived)
+ * Execution order and label are derived by the ability (appended last,
+ * labelled from the step-type registry).
+ *
+ * @param {number} pipelineId - Pipeline ID
+ * @param {string} stepType   - Step type (fetch, ai, publish, upsert)
  * @return {Promise<Object>} Created step data
  */
-export const addPipelineStep = async (
-	pipelineId,
-	stepType,
-	executionOrder
-) => {
+export const addPipelineStep = async ( pipelineId, stepType ) => {
 	const result = await executeAbility( 'add-pipeline-step', {
 		pipeline_id: pipelineId,
 		step_type: stepType,
@@ -222,18 +220,11 @@ export const reorderPipelineSteps = async ( pipelineId, steps ) => {
 /**
  * Update AI step configuration
  *
- * @param {string} stepId     - Pipeline step ID
- * @param {string} prompt     - System prompt content
- * @param {string} stepType   - Step type (unused; only 'ai' steps are configurable)
- * @param {number} pipelineId - Pipeline ID (unused; resolved from the step)
+ * @param {string} stepId - Pipeline step ID
+ * @param {string} prompt - System prompt content
  * @return {Promise<Object>} Updated step data
  */
-export const updateSystemPrompt = async (
-	stepId,
-	prompt,
-	stepType = 'ai',
-	pipelineId = null
-) => {
+export const updateSystemPrompt = async ( stepId, prompt ) => {
 	// Model/provider/tools are managed via context system, not per-pipeline.
 	return await executeAbility( 'update-pipeline-step', {
 		pipeline_step_id: stepId,

@@ -114,7 +114,7 @@ class AIStep extends Step {
 		// Model/provider are resolved exclusively via the mode system
 		// (agent mode_models → site → network → default). There are no
 		// per-pipeline-step model/provider fields: the editor does not write
-		// them (see datamachine/update-pipeline-step) and AIStep does not read them.
+		// them (see Api\Pipelines\PipelineSteps) and AIStep does not read them.
 		$execution_modes = self::resolveExecutionModes( $pipeline_step_config, $this->flow_step_config );
 		$mode_model      = self::resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot );
 		$provider_name   = $mode_model['provider'];
