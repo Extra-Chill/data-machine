@@ -121,7 +121,9 @@ class FlowsAbilityRestTest extends WP_UnitTestCase {
 
 		$reread = $this->run_ability( 'get-flow-steps', array( 'flow_step_id' => $context['flow_step_id'] ) );
 		$this->assertTrue( $reread['success'] );
-		$this->assertSame( 'Ability user message', $reread['steps'][0]['user_message'] );
+		// user_message is persisted as the single static prompt_queue entry (#1291).
+		$this->assertSame( 'static', $reread['steps'][0]['queue_mode'] );
+		$this->assertSame( 'Ability user message', $reread['steps'][0]['prompt_queue'][0]['prompt'] );
 	}
 
 	public function test_rest_visible_queue_round_trip(): void {
