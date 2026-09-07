@@ -93,5 +93,15 @@
       "file": "package.json",
       "pattern": "\"version\":\\s*\"([0-9.]+)\""
     }
-  ]
+  ],
+  "scopes": {
+    "release": {
+      "exclude": [
+        "bench/**",
+        "eslint.config.js",
+        "jsconfig.json",
+        "webpack.config.js"
+      ]
+    }
+  }
 }
