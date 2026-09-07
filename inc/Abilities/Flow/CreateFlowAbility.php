@@ -195,6 +195,28 @@ class CreateFlowAbility {
 			}
 		}
 
+		// Final fallback: inherit the parent pipeline's agent (#3450). A flow
+		// created on an agent-owned pipeline should be owned by that pipeline's
+		// agent out of the box — every sibling flow already carries it, and a
+		// NULL-owned flow dies on its first run at the AI step with
+		// `ai_agent_context_required`. DuplicateFlowAbility propagates from the
+		// source flow for the same reason.
+		if ( null === $agent_id || $agent_id <= 0 ) {
+			$pipeline_agent_id = isset( $pipeline['agent_id'] ) ? (int) $pipeline['agent_id'] : 0;
+			if ( $pipeline_agent_id > 0 ) {
+				$agent_id = $pipeline_agent_id;
+				do_action(
+					'datamachine_log',
+					'info',
+					'Flow creation inherited agent from parent pipeline',
+					array(
+						'pipeline_id'        => $pipeline_id,
+						'inherited_agent_id' => $pipeline_agent_id,
+					)
+				);
+			}
+		}
+
 		// Validate and resolve interval aliases before storing.
 		$validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
 		if ( ! $validation['valid'] ) {

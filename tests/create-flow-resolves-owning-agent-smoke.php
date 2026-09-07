@@ -51,15 +51,26 @@ function datamachine_resolve_agent_id( array $context = array() ): ?int {
  * row stays DEFAULT NULL).
  *
  * @param int|null $input_agent_id The agent_id from caller input (or null).
+ * @param int|null $pipeline_agent_id The parent pipeline's agent_id (or null).
  * @return int|null Effective agent_id to persist.
  */
-function resolve_effective_agent_id( ?int $input_agent_id ): ?int {
+function resolve_effective_agent_id( ?int $input_agent_id, ?int $pipeline_agent_id = null ): ?int {
 	$agent_id = ( null !== $input_agent_id ) ? (int) $input_agent_id : null;
 
 	if ( ( null === $agent_id || $agent_id <= 0 ) && function_exists( 'datamachine_resolve_agent_id' ) ) {
 		$resolved_agent_id = datamachine_resolve_agent_id();
 		if ( null !== $resolved_agent_id && $resolved_agent_id > 0 ) {
 			$agent_id = $resolved_agent_id;
+		}
+	}
+
+	// Pipeline inheritance fallback (#3450): an agent-owned pipeline's new
+	// flow is owned by the pipeline's agent even when neither the caller nor
+	// any runtime context supplies one.
+	if ( null === $agent_id || $agent_id <= 0 ) {
+		$pipeline_agent_id = ( null !== $pipeline_agent_id ) ? (int) $pipeline_agent_id : 0;
+		if ( $pipeline_agent_id > 0 ) {
+			$agent_id = $pipeline_agent_id;
 		}
 	}
 
@@ -161,6 +172,42 @@ smoke_assert(
 	'batch-imported flow with active events-bot context is owned by 6, not orphaned',
 	6 === $result,
 	'got ' . var_export( $result, true ) . ' — pre-fix: 72 flows shipped as NULL, lost on bundle round-trip'
+);
+
+// ─── Test 5: pipeline inheritance fallback (#3450) ─────────────────
+
+echo "\n[5] Pipeline inheritance fallback (#3450)\n";
+
+$GLOBALS['__smoke_resolved_agent_id'] = null; // plain WP-CLI, no --user/--agent
+$result = resolve_effective_agent_id( null, 6 );
+smoke_assert(
+	'no input + no context + pipeline agent_id=6 → inherits 6',
+	6 === $result,
+	'got ' . var_export( $result, true ) . ' — pre-fix bug #3450: flow persisted NULL, first run died ai_agent_context_required'
+);
+
+$GLOBALS['__smoke_resolved_agent_id'] = null;
+$result = resolve_effective_agent_id( 3, 6 );
+smoke_assert(
+	'explicit input agent_id=3 wins over pipeline agent_id=6',
+	3 === $result,
+	'got ' . var_export( $result, true )
+);
+
+$GLOBALS['__smoke_resolved_agent_id'] = 9;
+$result = resolve_effective_agent_id( null, 6 );
+smoke_assert(
+	'context agent_id=9 wins over pipeline agent_id=6 (inheritance is last fallback)',
+	9 === $result,
+	'got ' . var_export( $result, true )
+);
+
+$GLOBALS['__smoke_resolved_agent_id'] = null;
+$result = resolve_effective_agent_id( null, null );
+smoke_assert(
+	'unowned pipeline + no input + no context → persists NULL (unchanged)',
+	null === $result,
+	'got ' . var_export( $result, true )
 );
 
 // ─── Done ──────────────────────────────────────────────────────────

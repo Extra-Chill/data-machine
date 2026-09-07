@@ -197,6 +197,121 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	}
 
 	// =========================================================================
+	// CreateFlowAbility — pipeline agent_id inheritance (#3450)
+	// =========================================================================
+
+	/**
+	 * Create an administrator who owns no agent, so neither an explicit
+	 * agent_id nor any resolvable agent context is present.
+	 */
+	private function switch_to_agentless_admin(): int {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
+		return $user_id;
+	}
+
+	/**
+	 * Test creating a flow without agent_id or context inherits the parent
+	 * pipeline's agent_id (#3450). Regression: plain WP-CLI on an agent-owned
+	 * pipeline persisted agent_id=NULL and the flow died on its first run
+	 * with ai_agent_context_required.
+	 */
+	public function test_create_flow_without_agent_or_context_inherits_pipeline_agent(): void {
+		// Pipeline explicitly owned by the test agent.
+		$pipeline_result = $this->create_pipeline_ability->execute(
+			array(
+				'pipeline_name' => 'Inheritance Pipeline',
+				'agent_id'      => $this->agent_id,
+			)
+		);
+		$pipeline_id     = $pipeline_result['pipeline_id'];
+
+		// Agentless admin: no explicit agent, no owned agent to resolve.
+		$this->switch_to_agentless_admin();
+
+		$result = wp_get_ability( 'datamachine/create-flow' )->execute(
+			array(
+				'pipeline_id' => $pipeline_id,
+				'flow_name'   => 'Inherited Agent Flow',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$db_flows = new Flows();
+		$flow     = $db_flows->get_flow( $result['flow_id'] );
+		$this->assertEquals( $this->agent_id, (int) $flow['agent_id'] );
+	}
+
+	/**
+	 * Test an explicit input agent_id wins over the pipeline's agent.
+	 */
+	public function test_create_flow_explicit_agent_wins_over_pipeline_agent(): void {
+		$pipeline_result = $this->create_pipeline_ability->execute(
+			array(
+				'pipeline_name' => 'Explicit Wins Pipeline',
+				'agent_id'      => $this->agent_id,
+			)
+		);
+		$pipeline_id     = $pipeline_result['pipeline_id'];
+
+		// A different agent to request explicitly.
+		$other_admin_id = $this->switch_to_agentless_admin();
+		$other_agent_id = ( new Agents() )->create_if_missing(
+			'other-explicit-agent',
+			'Other Explicit Agent',
+			$other_admin_id
+		);
+		$this->assertGreaterThan( 0, $other_agent_id );
+		$this->assertNotSame( $this->agent_id, $other_agent_id );
+
+		$result = wp_get_ability( 'datamachine/create-flow' )->execute(
+			array(
+				'pipeline_id' => $pipeline_id,
+				'flow_name'   => 'Explicit Agent Flow',
+				'agent_id'    => $other_agent_id,
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$db_flows = new Flows();
+		$flow     = $db_flows->get_flow( $result['flow_id'] );
+		$this->assertEquals( $other_agent_id, (int) $flow['agent_id'] );
+	}
+
+	/**
+	 * Test a flow on an unowned pipeline (agent_id NULL) with no context
+	 * still persists agent_id NULL — unchanged unowned/system behavior.
+	 */
+	public function test_create_flow_stays_unowned_when_pipeline_unowned_and_no_context(): void {
+		// Agentless admin: pipeline creation resolves no agent → NULL.
+		$this->switch_to_agentless_admin();
+
+		$pipeline_result = $this->create_pipeline_ability->execute(
+			array( 'pipeline_name' => 'Unowned Inheritance Pipeline' )
+		);
+		$pipeline_id     = $pipeline_result['pipeline_id'];
+
+		$db_pipelines = new Pipelines();
+		$pipeline     = $db_pipelines->get_pipeline( $pipeline_id );
+		$this->assertTrue( empty( $pipeline['agent_id'] ) );
+
+		$result = wp_get_ability( 'datamachine/create-flow' )->execute(
+			array(
+				'pipeline_id' => $pipeline_id,
+				'flow_name'   => 'Unowned Flow',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$db_flows = new Flows();
+		$flow     = $db_flows->get_flow( $result['flow_id'] );
+		$this->assertTrue( empty( $flow['agent_id'] ) );
+	}
+
+	// =========================================================================
 	// DuplicatePipelineAbility — agent_id carried or overridden
 	// =========================================================================
 
