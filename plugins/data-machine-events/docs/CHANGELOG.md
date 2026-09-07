@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.59.0] - 2026-09-07
+
+### Added
+- add dry-run-first check stale-listings reconciliation command
+
+### Fixed
+- emit today's occurrence, map full venue config, support overnight end times
+- sparse handler-config patches no longer wipe venue term meta
+- derive timezone on first geocode pass and fall back offline when GeoNames is unavailable
+
 ## [0.58.0] - 2026-09-07
 
 ### Added
