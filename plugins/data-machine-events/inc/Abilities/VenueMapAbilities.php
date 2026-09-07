@@ -154,14 +154,15 @@ class VenueMapAbilities {
 	 * @return array Venue list with optional distance data.
 	 */
 	public function executeListVenues( array $input ): array {
-		$lat            = isset( $input['lat'] ) ? (float) $input['lat'] : null;
-		$lng            = isset( $input['lng'] ) ? (float) $input['lng'] : null;
-		$radius         = isset( $input['radius'] ) ? (int) $input['radius'] : 25;
-		$radius_unit    = $input['radius_unit'] ?? 'mi';
-		$bounds         = $input['bounds'] ?? '';
-		$taxonomy       = $input['taxonomy'] ?? '';
-		$term_id        = isset( $input['term_id'] ) ? (int) $input['term_id'] : 0;
-		$include_events = ! empty( $input['include_events'] );
+		$lat             = isset( $input['lat'] ) ? (float) $input['lat'] : null;
+		$lng             = isset( $input['lng'] ) ? (float) $input['lng'] : null;
+		$radius          = isset( $input['radius'] ) ? (int) $input['radius'] : 25;
+		$radius_unit     = $input['radius_unit'] ?? 'mi';
+		$bounds          = $input['bounds'] ?? '';
+		$taxonomy        = $input['taxonomy'] ?? '';
+		$term_id         = isset( $input['term_id'] ) ? (int) $input['term_id'] : 0;
+		$include_events  = ! empty( $input['include_events'] );
+		$has_term_filter = ! empty( $taxonomy ) && $term_id > 0;
 
 		$has_geo    = null !== $lat && null !== $lng && Geo_Query::validate_params( $lat, $lng, $radius );
 		$has_bounds = ! empty( $bounds );
@@ -205,9 +206,9 @@ class VenueMapAbilities {
 			}
 		}
 
-		// Taxonomy filter: get venue IDs with events matching the term.
+		// Taxonomy filter: get venue IDs with upcoming events matching the term.
 		$taxonomy_venue_ids = null;
-		if ( ! empty( $taxonomy ) && $term_id > 0 ) {
+		if ( $has_term_filter ) {
 			$taxonomy_venue_ids = $this->getVenueIdsForTaxonomyTerm( $taxonomy, $term_id );
 			if ( empty( $taxonomy_venue_ids ) ) {
 				return array(
@@ -306,21 +307,45 @@ class VenueMapAbilities {
 		// This is what the popup label promises ("X upcoming events") rather
 		// than $term->count, which is the lifetime total of all published
 		// events ever assigned to the venue (past + future).
+		//
+		// Term-filtered requests scope the count to upcoming events carrying
+		// that term (#785) — the venue-wide count would mislabel e.g. an
+		// artist page popup with the venue's total upcoming slate.
 		if ( ! empty( $venues ) ) {
-			$venue_ids       = array_map( 'intval', array_column( $venues, 'term_id' ) );
-			$upcoming_counts = $this->getUpcomingCountsForVenues( $venue_ids );
+			$venue_ids = array_map( 'intval', array_column( $venues, 'term_id' ) );
+			if ( $has_term_filter ) {
+				$upcoming_counts = $this->getUpcomingCountsForVenuesAtTerm( $venue_ids, $taxonomy, $term_id );
+			} else {
+				$upcoming_counts = $this->getUpcomingCountsForVenues( $venue_ids );
+			}
 
 			foreach ( $venues as &$venue ) {
 				$venue['event_count'] = (int) ( $upcoming_counts[ $venue['term_id'] ] ?? 0 );
 			}
 			unset( $venue );
 
+			// Term-filtered responses must not include venues with zero
+			// term-scoped upcoming events (e.g. injected via the
+			// map_query_args filter after the upcoming-scoped venue
+			// selection). Unfiltered responses keep every venue, including
+			// zero-count ones, for the location-archive map.
+			if ( $has_term_filter ) {
+				$venues = array_values(
+					array_filter(
+						$venues,
+						static function ( array $venue ): bool {
+							return ( $venue['event_count'] ?? 0 ) > 0;
+						}
+					)
+				);
+			}
+
 			// Opt-in per-venue event list. Only attached when caller asked
 			// for it AND a taxonomy/term filter is in play — otherwise this
 			// would balloon to every venue's every upcoming event regardless
 			// of scope. The chronological sort/grouping for route rendering
 			// happens client-side.
-			if ( $include_events && ! empty( $taxonomy ) && $term_id > 0 ) {
+			if ( $include_events && $has_term_filter ) {
 				$events_by_venue = $this->getUpcomingEventsForVenuesAtTerm( $venue_ids, $taxonomy, $term_id );
 				foreach ( $venues as &$venue ) {
 					$venue['upcoming_events_at_venue'] = $events_by_venue[ $venue['term_id'] ] ?? array();
@@ -611,6 +636,83 @@ class VenueMapAbilities {
 	}
 
 	/**
+	 * Get upcoming-event counts for venues, scoped to a co-occurring taxonomy term.
+	 *
+	 * Term-scoped variant of getUpcomingCountsForVenues() (#785): counts
+	 * only upcoming published events that carry both the venue term and
+	 * the filter term, as a `venue_term_id => count` map. Venues with zero
+	 * term-scoped upcoming events are absent from the map; callers should
+	 * default to 0 on missing keys.
+	 *
+	 * Must stay correct independently of the `include_events` flag — the
+	 * count drives the popup label and venue selection even when the
+	 * per-venue event list is not requested.
+	 *
+	 * @param int[]  $venue_ids       Venue term IDs scoping the lookup.
+	 * @param string $filter_taxonomy Co-occurring taxonomy slug.
+	 * @param int    $filter_term_id  Term ID in that taxonomy.
+	 * @return array<int,int> Map of venue term_id => term-scoped upcoming event count.
+	 */
+	private function getUpcomingCountsForVenuesAtTerm( array $venue_ids, string $filter_taxonomy, int $filter_term_id ): array {
+		if ( empty( $venue_ids ) || empty( $filter_taxonomy ) || $filter_term_id <= 0 ) {
+			return array();
+		}
+
+		global $wpdb;
+
+		$post_type = Event_Post_Type::POST_TYPE;
+		$upcoming  = UpcomingFilter::upcoming_where( current_time( 'mysql' ) );
+
+		$placeholders = implode( ',', array_fill( 0, count( $venue_ids ), '%d' ) );
+
+		// Same row shape as getUpcomingEventsForVenuesAtTerm(), collapsed
+		// to a per-venue COUNT. DISTINCT p.ID because recurring events can
+		// hold multiple event_dates rows per post.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholder list is generated from validated integer venue IDs; values are passed separately to prepare().
+		$query = $wpdb->prepare(
+			"SELECT venue_tt.term_id, COUNT(DISTINCT p.ID) AS upcoming_count
+			FROM {$wpdb->term_relationships} venue_tr
+			INNER JOIN {$wpdb->term_taxonomy} venue_tt
+				ON venue_tr.term_taxonomy_id = venue_tt.term_taxonomy_id
+			INNER JOIN {$wpdb->posts} p
+				ON venue_tr.object_id = p.ID
+			INNER JOIN {$wpdb->prefix}datamachine_event_dates ed
+				ON p.ID = ed.post_id
+			INNER JOIN {$wpdb->term_relationships} filter_tr
+				ON filter_tr.object_id = p.ID
+			INNER JOIN {$wpdb->term_taxonomy} filter_tt
+				ON filter_tr.term_taxonomy_id = filter_tt.term_taxonomy_id
+			WHERE venue_tt.taxonomy = 'venue'
+			AND venue_tt.term_id IN ($placeholders)
+			AND p.post_type = %s
+			AND p.post_status = 'publish'
+			AND {$upcoming}
+			AND filter_tt.taxonomy = %s
+			AND filter_tt.term_id = %d
+			GROUP BY venue_tt.term_id",
+			array_merge(
+				$venue_ids,
+				array( $post_type, $filter_taxonomy, $filter_term_id )
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results( $query );
+
+		if ( empty( $rows ) ) {
+			return array();
+		}
+
+		$counts = array();
+		foreach ( $rows as $row ) {
+			$counts[ (int) $row->term_id ] = (int) $row->upcoming_count;
+		}
+
+		return $counts;
+	}
+
+	/**
 	 * Get upcoming events at each venue, scoped to a co-occurring taxonomy term.
 	 *
 	 * Returns a `venue_term_id => list of event rows` map. Each event row contains
@@ -714,9 +816,12 @@ class VenueMapAbilities {
 	}
 
 	/**
-	 * Get venue term IDs that have events matching a taxonomy term.
+	 * Get venue term IDs that have upcoming events matching a taxonomy term.
 	 *
 	 * Uses a single SQL query instead of N+1 wp_get_post_terms calls.
+	 * "Upcoming" delegates to UpcomingFilter so a venue whose only events
+	 * with the term already ended is excluded (#785) — its term-scoped
+	 * count would be zero and it must not render on term-scoped maps.
 	 *
 	 * @param string $taxonomy Taxonomy slug.
 	 * @param int    $term_id  Term ID.
@@ -726,10 +831,11 @@ class VenueMapAbilities {
 		global $wpdb;
 
 		$post_type = Event_Post_Type::POST_TYPE;
+		$upcoming  = UpcomingFilter::upcoming_where( current_time( 'mysql' ) );
 
-		// Single query: find all venue term IDs associated with events
-		// that belong to the given taxonomy term.
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// Single query: find all venue term IDs associated with upcoming
+		// events that belong to the given taxonomy term.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholder list is generated from validated inputs; the interpolated fragment is UpcomingFilter's prepared WHERE clause.
 		$query = $wpdb->prepare(
 			"SELECT DISTINCT venue_tr.term_taxonomy_id AS venue_tt_id, venue_tt.term_id
 			FROM {$wpdb->term_relationships} tax_tr
@@ -737,6 +843,8 @@ class VenueMapAbilities {
 				ON tax_tr.term_taxonomy_id = tax_tt.term_taxonomy_id
 			INNER JOIN {$wpdb->posts} p
 				ON tax_tr.object_id = p.ID
+			INNER JOIN {$wpdb->prefix}datamachine_event_dates ed
+				ON p.ID = ed.post_id
 			INNER JOIN {$wpdb->term_relationships} venue_tr
 				ON p.ID = venue_tr.object_id
 			INNER JOIN {$wpdb->term_taxonomy} venue_tt
@@ -745,11 +853,13 @@ class VenueMapAbilities {
 			AND tax_tt.term_id = %d
 			AND p.post_type = %s
 			AND p.post_status = 'publish'
+			AND {$upcoming}
 			AND venue_tt.taxonomy = 'venue'",
 			$taxonomy,
 			$term_id,
 			$post_type
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$results = $wpdb->get_col( $query, 1 );

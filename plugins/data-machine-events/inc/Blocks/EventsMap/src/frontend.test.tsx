@@ -90,6 +90,38 @@ jest.mock( 'leaflet', () => {
 			this.removed = true;
 			this.handlers.clear();
 		}
+
+		fitBoundsArg: {
+			getSouth: () => number;
+			getNorth: () => number;
+			getWest: () => number;
+			getEast: () => number;
+		} | null = null;
+
+		// Span-modeled bounds fitting. The mock has no tile projection or
+		// pane sizing, so this approximates Leaflet's fitBounds zoom: each
+		// zoom level halves the visible span, anchored at ~45° visible
+		// span for zoom 0 (a ~11.5° padded route therefore fits near
+		// zoom 2, matching the real-world fitting zoom of ~3.9-4 for the
+		// bug's route in a desktop pane).
+		fitBounds( bounds: {
+			getSouth: () => number;
+			getNorth: () => number;
+			getWest: () => number;
+			getEast: () => number;
+		} ): this {
+			this.fitBoundsArg = bounds;
+			const span = Math.max(
+				bounds.getNorth() - bounds.getSouth(),
+				bounds.getEast() - bounds.getWest()
+			);
+			this.zoom = Math.max( 0, Math.round( Math.log2( 45 / span ) ) );
+			this.center = {
+				lat: ( bounds.getNorth() + bounds.getSouth() ) / 2,
+				lng: ( bounds.getEast() + bounds.getWest() ) / 2,
+			};
+			return this;
+		}
 	}
 
 	const cluster = () => ( {
@@ -105,15 +137,47 @@ jest.mock( 'leaflet', () => {
 		bindPopup: jest.fn().mockReturnThis(),
 		setPopupContent: jest.fn(),
 	} );
+	const polyline = () => ( {
+		addTo: jest.fn().mockReturnThis(),
+	} );
 	const leaflet = {
 		map: jest.fn( () => {
 			const map = new MockMap();
 			mockMapInstances.push( map );
 			return map;
 		} ),
-		tileLayer: jest.fn( () => ( { addTo: jest.fn() } ) ),
+		tileLayer: jest.fn( ( _url: string, options: unknown ) => ( {
+			options,
+			addTo: jest.fn(),
+		} ) ),
 		markerClusterGroup: jest.fn( cluster ),
 		marker: jest.fn( marker ),
+		polyline: jest.fn( polyline ),
+		latLngBounds: jest.fn( ( latlngs: Array< [ number, number ] > ) => {
+			const lats = latlngs.map( ( p ) => p[ 0 ] );
+			const lngs = latlngs.map( ( p ) => p[ 1 ] );
+			const south = Math.min( ...lats );
+			const north = Math.max( ...lats );
+			const west = Math.min( ...lngs );
+			const east = Math.max( ...lngs );
+			const pad = ( ratio: number ) => {
+				const padLat = ( north - south ) * ratio;
+				const padLng = ( east - west ) * ratio;
+				return {
+					getSouth: () => south - padLat,
+					getNorth: () => north + padLat,
+					getWest: () => west - padLng,
+					getEast: () => east + padLng,
+				};
+			};
+			return {
+				getSouth: () => south,
+				getNorth: () => north,
+				getWest: () => west,
+				getEast: () => east,
+				pad,
+			};
+		} ),
 		divIcon: jest.fn( () => ( {} ) ),
 	};
 
@@ -130,6 +194,7 @@ import { createRoot } from '@wordpress/element';
  * External dependencies
  */
 import { act } from 'react';
+import L from 'leaflet';
 
 /**
  * Internal dependencies
@@ -240,6 +305,89 @@ describe( 'EventsMap collapsible disclosure', () => {
 		expect( toggle.getAttribute( 'aria-expanded' ) ).toBe( 'false' );
 		expect( toggle.textContent ).toBe( 'Show map' );
 		expect( region.hidden ).toBe( true );
+	} );
+} );
+
+describe( 'EventsMap chronological-route mode', () => {
+	beforeEach( () => {
+		jest.useFakeTimers();
+		mockMapInstances.length = 0;
+		document.body.innerHTML = '';
+	} );
+
+	afterEach( () => {
+		jest.runOnlyPendingTimers();
+		jest.useRealTimers();
+	} );
+
+	function routeVenue(
+		termId: number,
+		lat: number,
+		lon: number,
+		day: number
+	) {
+		return {
+			term_id: termId,
+			name: `Venue ${ termId }`,
+			slug: `venue-${ termId }`,
+			lat,
+			lon,
+			address: '',
+			url: '',
+			event_count: 1,
+			upcoming_events_at_venue: [
+				{
+					post_id: termId,
+					start_date: `2026-10-${ String( day ).padStart( 2, '0' ) }`,
+					start_time: '20:00:00',
+					title: `Show ${ termId }`,
+					permalink: '',
+				},
+			],
+		};
+	}
+
+	it( 'creates the tile layer without a minZoom clamp, fits the full route below the old clamp, and adds a marker per route venue', () => {
+		// Malmö → Luleå: ~10° of latitude, matching the reported bug's
+		// multi-region route (real fitting zoom ~3.9 in a desktop pane).
+		const venues = [
+			routeVenue( 11, 55.605, 13.003, 1 ),
+			routeVenue( 22, 59.329, 18.069, 5 ),
+			routeVenue( 33, 60.674, 17.142, 9 ),
+			routeVenue( 44, 63.828, 20.259, 14 ),
+			routeVenue( 55, 65.583, 22.155, 20 ),
+		];
+		const { root, map } = renderMap(
+			props( { chronologicalRouteMode: true, venues } )
+		);
+
+		// Regression guard for the minZoom:8 fitBounds clamp: the tile
+		// layer must not impose a zoom floor.
+		const tileLayerOptions = ( L.tileLayer as jest.Mock ).mock.calls.at(
+			-1
+		)![ 1 ] as Record< string, unknown >;
+		expect( tileLayerOptions.minZoom ).toBeUndefined();
+		expect( tileLayerOptions.maxZoom ).toBe( 18 );
+
+		// fitBounds ran once over the padded full-route bounds.
+		expect( map.fitBoundsArg ).not.toBeNull();
+		expect( map.fitBoundsArg!.getSouth() ).toBeLessThan( 55.605 );
+		expect( map.fitBoundsArg!.getNorth() ).toBeGreaterThan( 65.583 );
+
+		// The modeled fitting zoom for this >5° span stays below the
+		// removed clamp (see MockMap.fitBounds for the model's limits).
+		expect( map.getZoom() ).toBeLessThan( 8 );
+
+		// Every route venue got a marker in the cluster group.
+		const cluster = ( L.markerClusterGroup as jest.Mock ).mock.results.at(
+			-1
+		)!.value;
+		expect( cluster.addLayers ).toHaveBeenCalledTimes( 1 );
+		expect( cluster.addLayers.mock.calls[ 0 ][ 0 ] ).toHaveLength(
+			venues.length
+		);
+
+		act( () => root.unmount() );
 	} );
 } );
 

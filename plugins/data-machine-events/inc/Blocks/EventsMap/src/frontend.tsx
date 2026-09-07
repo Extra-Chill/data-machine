@@ -802,10 +802,12 @@ export function EventsMap( props: MapProps ): JSX.Element | null {
 
 		// Tile layer.
 		const tileUrl = TILE_URLS[ mapType ] || TILE_URLS[ 'osm-standard' ];
+		// No minZoom here: a clamped layer minimum would cap
+		// fitBounds() in chronological-route mode, pinning multi-region
+		// routes to city-level zoom with most stops off-screen.
 		L.tileLayer( tileUrl, {
 			attribution: '',
 			maxZoom: 18,
-			minZoom: 8,
 		} ).addTo( map );
 
 		// Initialize marker cluster group.
