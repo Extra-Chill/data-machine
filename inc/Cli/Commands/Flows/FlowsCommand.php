@@ -1125,6 +1125,26 @@ class FlowsCommand extends BaseCommand {
 		WP_CLI::log( sprintf( 'Pipeline ID: %d', $result['pipeline_id'] ) );
 		WP_CLI::log( sprintf( 'Synced steps: %d', $result['synced_steps'] ?? 0 ) );
 
+		// Belt-and-suspenders check (#3450): warn when the flow landed unowned
+		// on a pipeline that carries an agent. The create-flow ability should
+		// inherit the pipeline's agent_id; if this fires, something resolved
+		// the agent away after inheritance.
+		if ( empty( $result['flow_data']['agent_id'] ) ) {
+			$pipeline = ( new \DataMachine\Core\Database\Pipelines\Pipelines() )->get_pipeline( (int) $result['pipeline_id'] );
+			if ( $pipeline && ! empty( $pipeline['agent_id'] ) ) {
+				WP_CLI::warning(
+					sprintf(
+						'Flow %d has no agent but pipeline %d is owned by agent %d. First run will fail with ai_agent_context_required — fix with: wp datamachine flows update %d --agent=%d',
+						$result['flow_id'],
+						(int) $result['pipeline_id'],
+						(int) $pipeline['agent_id'],
+						$result['flow_id'],
+						(int) $pipeline['agent_id']
+					)
+				);
+			}
+		}
+
 		if ( ! empty( $result['configured_steps'] ) ) {
 			WP_CLI::log( sprintf( 'Configured steps: %s', implode( ', ', $result['configured_steps'] ) ) );
 		}
