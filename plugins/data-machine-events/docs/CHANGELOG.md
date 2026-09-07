@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.60.0] - 2026-09-07
+
+### Added
+- add Enrichers stage to fill missing start times from detail/ticket pages
+- declare venue as a sanitizer-derived config key
+
 ## [0.59.0] - 2026-09-07
 
 ### Added
