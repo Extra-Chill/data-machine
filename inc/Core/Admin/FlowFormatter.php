@@ -13,6 +13,7 @@ namespace DataMachine\Core\Admin;
 
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Core\Steps\Settings\SettingsDisplayService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -30,7 +31,7 @@ class FlowFormatter {
 	 * Cached service instances to avoid re-creation per flow in batch formatting.
 	 */
 	private static ?HandlerAbilities $handler_abilities_cache = null;
-	private static ?object $settings_display_cache            = null;
+	private static ?SettingsDisplayService $settings_display_cache = null;
 
 	public static function format_flow_for_response( array $flow, ?array $latest_job = null, ?array $next_runs = null ): array {
 		$flow_config = $flow['flow_config'] ?? array();
@@ -66,21 +67,19 @@ class FlowFormatter {
 			);
 
 			// Apply defaults to the primary config slot.
-			if ( ! empty( $effective_slug ) ) {
-				$primary_config = FlowStepConfig::getPrimaryHandlerConfig( $step_data );
-				$with_defaults  = $handler_abilities->applyDefaults( $effective_slug, $primary_config );
+			$primary_config = FlowStepConfig::getPrimaryHandlerConfig( $step_data );
+			$with_defaults  = $handler_abilities->applyDefaults( $effective_slug, $primary_config );
 
-				if ( FlowStepConfig::usesHandler( $step_data ) ) {
-					$handler_slugs = FlowStepConfig::getHandlerSlugs( $step_data );
-					if ( ! in_array( $effective_slug, $handler_slugs, true ) ) {
-						$handler_slugs[] = $effective_slug;
-					}
-					$step_data['handler_slugs']                      = $handler_slugs;
-					$step_data['handler_configs'][ $effective_slug ] = $with_defaults;
-					unset( $step_data['handler_slug'], $step_data['handler_config'] );
-				} else {
-					$step_data['handler_config'] = $with_defaults;
+			if ( FlowStepConfig::usesHandler( $step_data ) ) {
+				$handler_slugs = FlowStepConfig::getHandlerSlugs( $step_data );
+				if ( ! in_array( $effective_slug, $handler_slugs, true ) ) {
+					$handler_slugs[] = $effective_slug;
 				}
+				$step_data['handler_slugs']                      = $handler_slugs;
+				$step_data['handler_configs'][ $effective_slug ] = $with_defaults;
+				unset( $step_data['handler_slug'], $step_data['handler_config'] );
+			} else {
+				$step_data['handler_config'] = $with_defaults;
 			}
 
 			if ( ! empty( $step_data['settings_display'] ) && is_array( $step_data['settings_display'] ) ) {
@@ -168,7 +167,13 @@ class FlowFormatter {
 			'data-machine'
 		);
 
-		return $next_timestamp ? wp_date( 'Y-m-d H:i:s', $next_timestamp, new \DateTimeZone( 'UTC' ) ) : null;
+		if ( ! is_int( $next_timestamp ) || $next_timestamp <= 0 ) {
+			return null;
+		}
+
+		$formatted = wp_date( 'Y-m-d H:i:s', $next_timestamp, new \DateTimeZone( 'UTC' ) );
+
+		return is_string( $formatted ) ? $formatted : null;
 	}
 
 	/**
@@ -181,7 +186,7 @@ class FlowFormatter {
 			return false;
 		}
 
-		if ( ! class_exists( '\ActionScheduler' ) || ! method_exists( '\ActionScheduler', 'is_initialized' ) ) {
+		if ( ! class_exists( '\ActionScheduler' ) ) {
 			return true;
 		}
 
@@ -218,8 +223,9 @@ class FlowFormatter {
 			$logical_args
 		);
 
-		foreach ( $dates as $flow_id => $date ) {
-			if ( null !== $date ) {
+		foreach ( array_keys( $logical_args ) as $flow_id ) {
+			$date = $dates[ $flow_id ] ?? null;
+			if ( is_string( $date ) ) {
 				$result[ $flow_id ] = $date;
 			}
 		}

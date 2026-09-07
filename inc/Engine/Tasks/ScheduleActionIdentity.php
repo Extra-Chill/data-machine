@@ -75,7 +75,10 @@ final class ScheduleActionIdentity {
 	 */
 	public static function nextTimestamp( string $hook, array $args, string $group ) {
 		foreach ( self::actions( $hook, $group, 'pending', true ) as $action ) {
-			if ( ! is_object( $action ) || ! method_exists( $action, 'get_args' ) || self::logicalArgs( $action->get_args() ) !== $args ) {
+			if ( ! is_object( $action )
+				|| ! method_exists( $action, 'get_args' )
+				|| ! method_exists( $action, 'get_schedule' )
+				|| self::logicalArgs( $action->get_args() ) !== $args ) {
 				continue;
 			}
 			$date = $action->get_schedule()->get_date();
@@ -137,7 +140,7 @@ final class ScheduleActionIdentity {
 				continue;
 			}
 			$encoded = wp_json_encode( self::logicalArgs( $decoded ) );
-			if ( null !== $encoded && isset( $wanted[ $encoded ] ) ) {
+			if ( is_string( $encoded ) && isset( $wanted[ $encoded ] ) ) {
 				$caller_key = $wanted[ $encoded ];
 				if ( null === $result[ $caller_key ] ) {
 					$result[ $caller_key ] = (string) ( $row['next_run'] ?? '' );
@@ -202,7 +205,7 @@ final class ScheduleActionIdentity {
 			),
 			'ids'
 		);
-		$action_id  = is_array( $action_ids ) ? reset( $action_ids ) : 0;
+		$action_id  = reset( $action_ids );
 
 		return is_numeric( $action_id ) && (int) $action_id > 0 ? (int) $action_id : 0;
 	}
@@ -223,7 +226,7 @@ final class ScheduleActionIdentity {
 			'ids'
 		);
 
-		return is_array( $actions ) ? count( $actions ) : 0;
+		return count( $actions );
 	}
 
 	public static function cancelExact( int $action_id ): bool {
@@ -233,8 +236,8 @@ final class ScheduleActionIdentity {
 
 		try {
 			$store = \ActionScheduler_Store::instance();
-			$store->cancel_action( $action_id );
-			return \ActionScheduler_Store::STATUS_CANCELED === $store->get_status( $action_id );
+			$store->cancel_action( (string) $action_id );
+			return \ActionScheduler_Store::STATUS_CANCELED === $store->get_status( (string) $action_id );
 		} catch ( \Throwable $throwable ) {
 			unset( $throwable );
 			return false;
@@ -276,6 +279,6 @@ final class ScheduleActionIdentity {
 		}
 
 		$actions = as_get_scheduled_actions( $query, 'OBJECT' );
-		return is_array( $actions ) ? $actions : array();
+		return $actions;
 	}
 }
