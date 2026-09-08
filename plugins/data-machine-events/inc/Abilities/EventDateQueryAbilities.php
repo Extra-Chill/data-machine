@@ -961,7 +961,7 @@ class EventDateQueryAbilities {
 	 * @return string SQL selecting start_date, end_date, and bucket_count.
 	 */
 	public function buildMatchingEventDateAggregateSql( array $input, string $start_expression, string $end_expression ): string {
-		$input                                       = $this->applyVenueTierConstraint( $input );
+		$input                                      = $this->applyVenueTierConstraint( $input );
 		$input['fields']                            = 'ids';
 		$input['per_page']                          = -1;
 		$input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] = array(
