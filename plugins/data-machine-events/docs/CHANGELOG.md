@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.61.0] - 2026-09-08
+
+### Added
+- register closed-vocabulary venue tier term meta with calendar filter dimension
+
+### Changed
+- align venue tier constraint assignment
+
+### Fixed
+- exclude dead taxonomy_event_type_selection from handler settings
+
 ## [0.60.3] - 2026-09-08
 
 ### Changed
