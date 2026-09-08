@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.3] - 2026-09-08
+
+### Changed
+- cover configured property_id / site_url resolution
+- pay down phpstan baseline 48 -> 1
+
 ## [0.17.2] - 2026-09-07
 
 ### Fixed
