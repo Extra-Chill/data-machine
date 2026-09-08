@@ -9,7 +9,6 @@
 
 namespace DataMachine\Tests\Unit\Abilities;
 
-use DataMachine\Api\Settings as SettingsApi;
 use DataMachine\Abilities\SettingsAbilities;
 use WP_UnitTestCase;
 
@@ -318,17 +317,6 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'tool_not_found', $result->get_error_code() );
-	}
-
-	public function test_get_tool_config_rest_boundary_preserves_wp_error(): void {
-		$request = new \WP_REST_Request( 'GET', '/datamachine/v1/settings/tools/nonexistent_tool' );
-		$request->set_param( 'tool_id', 'nonexistent_tool' );
-
-		$result = SettingsApi::handle_get_tool_config( $request );
-
-		$this->assertInstanceOf( \WP_Error::class, $result );
-		$this->assertSame( 'tool_not_found', $result->get_error_code() );
-		$this->assertSame( 404, $result->get_error_data()['status'] );
 	}
 
 	public function test_get_handler_defaults_returns_grouped_defaults(): void {

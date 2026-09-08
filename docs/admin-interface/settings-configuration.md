@@ -5,7 +5,7 @@ React admin page for configuring Data Machine’s global settings, agent default
 ## Architecture
 
 - **Frontend location**: `inc/Core/Admin/Settings/assets/react/`
-- **REST endpoints**: `/wp-json/datamachine/v1/settings` (see `inc/Api/Settings.php`)
+- **Abilities**: `datamachine/get-settings`, `datamachine/update-settings` (see `inc/Abilities/SettingsAbilities.php`)
 - **Data fetching**: TanStack Query (`@tanstack/react-query`) with the shared `queryClient`
 - **REST client**: `@wordpress/api-fetch` wrapper at `inc/Core/Admin/shared/utils/api.js`
 - **Auth**: WordPress REST nonce (`X-WP-Nonce`) and `manage_options` capability

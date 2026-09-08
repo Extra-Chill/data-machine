@@ -1,14 +1,27 @@
 /**
  * Jobs API Operations
  *
- * REST API calls for job management operations.
+ * Ability-backed job management operations, executed through WordPress
+ * core's ability runner (see #3456).
  */
 
 /**
  * External dependencies
  */
-import { client, executeAbility } from '@shared/utils/api';
+import { executeAbility } from '@shared/utils/api';
 import { useAgentStore } from '@shared/stores/agentStore';
+
+/**
+ * Get the agent_id ability input for the selected agent, if any.
+ * The shared client param interceptor only applies to datamachine/v1
+ * GET requests, so ability inputs carry it explicitly.
+ *
+ * @return {Object} Object with agent_id if one is selected, empty otherwise.
+ */
+const getAgentScope = () => {
+	const { selectedAgentId } = useAgentStore.getState();
+	return selectedAgentId !== null ? { agent_id: selectedAgentId } : {};
+};
 
 /**
  * Fetch jobs list with pagination
@@ -20,26 +33,36 @@ import { useAgentStore } from '@shared/stores/agentStore';
  * @param {boolean} params.hideChildren Hide child jobs in the main list
  * @return {Promise<Object>} Jobs list response
  */
-export const fetchJobs = ( {
+export const fetchJobs = async ( {
 	page = 1,
 	perPage = 50,
 	status,
 	hideChildren = true,
 } = {} ) => {
 	const offset = ( page - 1 ) * perPage;
-	const params = {
+	const input = {
 		orderby: 'job_id',
 		order: 'DESC',
 		per_page: perPage,
 		offset,
-		hide_children: hideChildren ? 1 : 0,
+		hide_children: !! hideChildren,
+		...getAgentScope(),
 	};
 
 	if ( status && status !== 'all' ) {
-		params.status = status;
+		input.status = status;
 	}
 
-	return client.get( '/jobs', params );
+	const result = await executeAbility( 'get-jobs', input );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: result.jobs ?? [],
+	};
 };
 
 /**
@@ -48,14 +71,23 @@ export const fetchJobs = ( {
  * @param {number} parentJobId Parent job ID
  * @return {Promise<Object>} Child jobs list response
  */
-export const fetchChildJobs = ( parentJobId ) => {
-	return client.get( '/jobs', {
+export const fetchChildJobs = async ( parentJobId ) => {
+	const result = await executeAbility( 'get-jobs', {
 		parent_job_id: parentJobId,
 		orderby: 'job_id',
 		order: 'ASC',
 		per_page: 100,
 		offset: 0,
 	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: result.jobs ?? [],
+	};
 };
 
 /**
@@ -66,9 +98,9 @@ export const fetchChildJobs = ( parentJobId ) => {
  * @return {Promise<Object>}  Clear operation result
  */
 export const clearJobs = ( type, cleanupProcessed = false ) =>
-	client.delete( '/jobs', {
+	executeAbility( 'delete-jobs', {
 		type,
-		cleanup_processed: cleanupProcessed ? '1' : '0',
+		cleanup_processed: !! cleanupProcessed,
 	} );
 
 /**
@@ -79,7 +111,7 @@ export const clearJobs = ( type, cleanupProcessed = false ) =>
  * @return {Promise<Object>}  Clear operation result
  */
 export const clearProcessedItems = ( clearType, targetId ) =>
-	client.delete( '/processed-items', {
+	executeAbility( 'clear-processed-items', {
 		clear_type: clearType,
 		target_id: targetId,
 	} );

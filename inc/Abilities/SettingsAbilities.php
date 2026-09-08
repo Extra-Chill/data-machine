@@ -45,9 +45,57 @@ class SettingsAbilities {
 			$this->registerSaveToolConfig();
 			$this->registerGetHandlerDefaults();
 			$this->registerUpdateHandlerDefaults();
+			$this->registerGeneratePingSecret();
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	private function registerGeneratePingSecret(): void {
+		wp_register_ability(
+			'datamachine/generate-ping-secret',
+			array(
+				'label'               => __( 'Generate Ping Secret', 'data-machine' ),
+				'description'         => __( 'Generate and store a new agent ping secret, returning it once.', 'data-machine' ),
+				'category'            => 'datamachine-settings',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success' => array( 'type' => 'boolean' ),
+						'secret'  => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeGeneratePingSecret' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Execute generate-ping-secret ability.
+	 *
+	 * Owns the behavior formerly exposed by the datamachine/v1
+	 * /settings/generate-ping-secret wrapper route (see #3456).
+	 *
+	 * @param array $input Input parameters (unused).
+	 * @return array Result with the new secret.
+	 */
+	public function executeGeneratePingSecret( array $input ): array {
+		unset( $input );
+
+		$secret = wp_generate_password( 32, false );
+
+		PluginSettings::update( array( 'chat_ping_secret' => $secret ) );
+
+		return array(
+			'success' => true,
+			'secret'  => $secret,
+		);
 	}
 
 	private function registerGetSettings(): void {

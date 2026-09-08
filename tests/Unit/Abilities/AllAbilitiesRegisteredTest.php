@@ -84,7 +84,7 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/clear-processed-items',
 			'datamachine/check-processed-item',
 			'datamachine/has-processed-history',
-			// SettingsAbilities (7)
+			// SettingsAbilities (8)
 			'datamachine/get-settings',
 			'datamachine/update-settings',
 			'datamachine/get-scheduling-intervals',
@@ -92,12 +92,15 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/save-tool-config',
 			'datamachine/get-handler-defaults',
 			'datamachine/update-handler-defaults',
+			'datamachine/generate-ping-secret',
 			// HandlerAbilities (5)
 			'datamachine/get-handlers',
 			'datamachine/validate-handler',
 			'datamachine/get-handler-config-fields',
 			'datamachine/apply-handler-defaults',
 			'datamachine/get-handler-site-defaults',
+			// HandlerDetailAbility (1)
+			'datamachine/get-handler-detail',
 			// StepTypeAbilities (2)
 			'datamachine/get-step-types',
 			'datamachine/validate-step-type',

@@ -33,7 +33,7 @@ class RunFlow extends BaseTool {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',
-			'description' => 'Execute an existing flow immediately or schedule it for later. For IMMEDIATE execution: provide only flow_id (do NOT include timestamp). For SCHEDULED execution: provide flow_id AND a future Unix timestamp. Flows run asynchronously in the background. Use api_query with GET /datamachine/v1/jobs/{job_id} to check execution status.',
+			'description' => 'Execute an existing flow immediately or schedule it for later. For IMMEDIATE execution: provide only flow_id (do NOT include timestamp). For SCHEDULED execution: provide flow_id AND a future Unix timestamp. Flows run asynchronously in the background. Use the get-jobs ability (input: {job_id}) to check execution status.',
 			'parameters'  => array(
 				'type'       => 'object',
 				'properties' => array(

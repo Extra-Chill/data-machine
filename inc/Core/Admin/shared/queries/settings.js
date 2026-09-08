@@ -8,7 +8,7 @@
  * External dependencies
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { client } from '@shared/utils/api';
+import { executeAbility } from '@shared/utils/api';
 
 export const SETTINGS_KEY = [ 'settings' ];
 
@@ -21,7 +21,7 @@ export const useSettings = () =>
 	useQuery( {
 		queryKey: SETTINGS_KEY,
 		queryFn: async () => {
-			const result = await client.get( '/settings' );
+			const result = await executeAbility( 'get-settings' );
 			if ( ! result.success ) {
 				throw new Error( result.message || 'Failed to fetch settings' );
 			}
@@ -38,7 +38,10 @@ export const useUpdateSettings = () => {
 
 	return useMutation( {
 		mutationFn: async ( updates ) => {
-			const response = await client.patch( '/settings', updates );
+			const response = await executeAbility(
+				'update-settings',
+				updates
+			);
 			if ( ! response.success ) {
 				throw new Error(
 					response.message || 'Failed to update settings'

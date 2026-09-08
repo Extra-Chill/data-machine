@@ -346,16 +346,16 @@ Bundles can declare `run_artifacts.daily_memory` egress policy to let downstream
 
 ## REST API
 
-**Source:** `inc/Api/AgentFiles.php`
+**Source:** `inc/Abilities/DailyMemoryAbilities.php`
 
 Daily memory endpoints are registered alongside other agent file endpoints:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/datamachine/v1/files/agent/daily` | List all daily memory files |
-| `GET` | `/datamachine/v1/files/agent/daily/{year}/{month}/{day}` | Read a specific daily file |
-| `PUT` | `/datamachine/v1/files/agent/daily/{year}/{month}/{day}` | Write/replace a daily file |
-| `DELETE` | `/datamachine/v1/files/agent/daily/{year}/{month}/{day}` | Delete a daily file |
+| `datamachine/daily-memory-list` | List all daily memory files (`months`) |
+| `datamachine/daily-memory-read` | Read a specific daily file (`date`) |
+| `datamachine/daily-memory-write` | Write/replace a daily file (`date`, `content`, `mode`) |
+| `datamachine/daily-memory-delete` | Delete a daily file (`date`) |
 
 Daily memory endpoints require a logged-in user. Users can access their own files; accessing another user's files requires `PermissionHelper::can( 'manage_agents' )`. The `PUT` endpoint accepts content as a JSON body parameter or raw body and always uses `mode: 'write'` (replace). An optional `user_id` query parameter enables multi-agent scoping.
 
@@ -419,4 +419,4 @@ The AI tool and REST API go through the Abilities layer. The CLI accesses the `D
 | `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php` | Opt-in chat + pipeline context injection (Priority 35, since v0.71.0) |
 | `inc/Engine/AI/Tools/Global/AgentDailyMemory.php` | AI chat tool for daily memory access |
 | `inc/Cli/Commands/MemoryCommand.php` | CLI subcommands (daily list/read/write/append/delete/search) |
-| `inc/Api/AgentFiles.php` | REST endpoints for daily file operations |
+| `inc/Abilities/DailyMemoryAbilities.php` | REST-visible daily memory abilities |

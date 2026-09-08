@@ -15,7 +15,7 @@ import { Button, Notice } from '@wordpress/components';
  * External dependencies
  */
 import { useSettings, useUpdateSettings } from '@shared/queries/settings';
-import { client } from '@shared/utils/api';
+import { executeAbility } from '@shared/utils/api';
 import { useFormState } from '@shared/hooks/useFormState';
 import SettingsSaveBar, {
 	useSaveStatus,
@@ -64,8 +64,8 @@ const AgentSettings = () => {
 		setPingError( '' );
 		setPingGenerating( true );
 		try {
-			const response = await client.post(
-				'/settings/generate-ping-secret'
+			const response = await executeAbility(
+				'generate-ping-secret'
 			);
 			if ( response.success && response.secret ) {
 				setPingSecret( response.secret );

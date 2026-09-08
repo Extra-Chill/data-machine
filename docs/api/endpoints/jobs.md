@@ -1,93 +1,30 @@
-# Jobs Endpoints
+# Jobs Abilities
 
-**Implementation**: `inc/Api/Jobs.php`
+**Implementation**: `inc/Abilities/Job/GetJobsAbility.php`, `inc/Abilities/Job/DeleteJobsAbility.php`
 
-**Base URL**: `/wp-json/datamachine/v1/jobs`
+The `datamachine/v1/jobs` REST routes were retired in #3456. Jobs are managed through the REST-visible Data Machine abilities, executed through WordPress core's ability runner:
 
-Jobs expose workflow execution history and cleanup operations.
+```
+POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run
+Content-Type: application/json
+
+{ "input": { ... } }
+```
+
+The admin Jobs page calls these through the shared `executeAbility()` client (`inc/Core/Admin/shared/utils/api.js`).
 
 ## Authentication
 
-Requires the Data Machine `manage_flows` permission (`PermissionHelper::can( 'manage_flows' )`). Requests may be user-scoped or agent-scoped through `PermissionHelper`.
+Each ability's permission callback enforces Data Machine permissions (`PermissionHelper::can_manage()` for the jobs family). Row-level ownership is enforced inside the abilities (see `DirectJobOwnershipTest`). The core ability runner also requires `show_in_rest` and a valid REST nonce for cookie-authenticated callers.
 
-## Routes
+## Response Envelope
 
-### GET `/wp-json/datamachine/v1/jobs`
+The ability runner returns the ability's output directly. Errors return standard REST error objects (`code`, `message`, `data.status`).
 
-List jobs with filtering, sorting, and pagination.
+## Job Abilities
 
-**Query parameters**:
-
-- `orderby` (string, optional, default `job_id`): field to order by.
-- `order` (string, optional, default `DESC`): `ASC` or `DESC`.
-- `per_page` (integer, optional, default `50`, max `100`): page size.
-- `offset` (integer, optional, default `0`): pagination offset.
-- `pipeline_id` (integer, optional): filter by pipeline.
-- `flow_id` (integer, optional): filter by flow.
-- `status` (string, optional): filter by job status.
-- `user_id` (integer, optional): filter by user when allowed by the permission scope.
-- `parent_job_id` (integer, optional): filter child jobs by parent job.
-- `hide_children` (boolean, optional, default `false`): omit child jobs from top-level lists.
-
-**Success response**:
-
-```json
-{
-  "success": true,
-  "data": [],
-  "total": 0,
-  "per_page": 50,
-  "offset": 0
-}
-```
-
-### GET `/wp-json/datamachine/v1/jobs/{id}`
-
-Get one job by ID.
-
-**Success response**:
-
-```json
-{
-  "success": true,
-  "data": {}
-}
-```
-
-**Errors**:
-
-- `job_not_found` (404): no matching job.
-
-### DELETE `/wp-json/datamachine/v1/jobs`
-
-Clear jobs.
-
-**Body parameters**:
-
-- `type` (string, required): `all` or `failed`.
-- `cleanup_processed` (boolean, optional, default `false`): also clear processed item tracking.
-
-**Success response**:
-
-```json
-{
-  "success": true,
-  "message": "Jobs cleared successfully.",
-  "jobs_deleted": 42,
-  "processed_items_cleaned": false
-}
-```
-
-## Batch Jobs
-
-Batch processing uses parent/child jobs. Use `parent_job_id` to list children and `hide_children=true` for a top-level-only job list.
-
-```bash
-curl "https://example.com/wp-json/datamachine/v1/jobs?parent_job_id=100" \
-  -u username:application_password
-```
-
-## Notes for Agents
-
-- REST does not expose job undo. Undo is CLI-only via `wp datamachine jobs undo <job_id>`.
-- Job objects are returned by `GetJobsAbility`; fields depend on stored job data and may include `engine_data` for task effects.
+| Ability slug | Purpose |
+| --- | --- |
+| `datamachine/get-jobs` | List jobs with filtering (`pipeline_id`, `flow_id`, `status`, `source`, `handler`, `parent_job_id`, `hide_children`, `user_id`, `agent_id`, `metadata`), sorting (`orderby`, `order`), and pagination (`per_page`, `offset`). A `job_id` input fetches a single job (empty result when missing). |
+| `datamachine/delete-jobs` | Delete jobs by `type` (`all` or `failed`), optionally `cleanup_processed` to also clear processed-items tracking. |
+| `datamachine/clear-processed-items` | Clear processed-items deduplication tracking by `clear_type` (`pipeline` or `flow`) and `target_id`. |

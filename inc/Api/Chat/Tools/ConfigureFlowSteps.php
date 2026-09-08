@@ -47,7 +47,7 @@ class ConfigureFlowSteps extends BaseTool {
 			. '- flow_configs: [{flow_id: 9, handler_config: {source_url: "..."}}]' . "\n"
 			. '- Per-flow config merges with shared handler_config (per-flow takes precedence)' . "\n\n"
 			. 'BEFORE CONFIGURING:' . "\n"
-			. '- Use get_handler_defaults or api_query (/datamachine/v1/handlers/{slug}) to discover available handlers and their config fields' . "\n"
+			. '- Use get_handler_defaults or get-handler-detail (ability runner) to discover available handlers and their config fields' . "\n"
 			. '- Query existing flows to learn established patterns' . "\n"
 			. '- Only use handler_config fields returned by discovery - unknown fields are rejected';
 

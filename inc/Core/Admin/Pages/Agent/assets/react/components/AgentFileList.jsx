@@ -233,15 +233,9 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 		} ) );
 	}, [] );
 
-	// Separate core files from daily summary and context files.
+	// Separate core files from the daily summary.
 	const coreFiles = files
-		? files.filter(
-				( f ) =>
-					f.type !== 'daily_summary' && f.type !== 'context'
-		  )
-		: [];
-	const contextFiles = files
-		? files.filter( ( f ) => f.type === 'context' )
+		? files.filter( ( f ) => f.type !== 'daily_summary' )
 		: [];
 	const dailySummary = files?.find( ( f ) => f.type === 'daily_summary' );
 
@@ -268,7 +262,6 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 
 	const sortedSharedFiles = sortLayer( sharedFiles );
 	const sortedAgentFiles = sortLayer( agentFiles );
-	const sortedContextFiles = sortLayer( contextFiles );
 	const sortedUserFiles = sortLayer( userFiles );
 
 	if ( isLoading ) {
@@ -352,54 +345,36 @@ const AgentFileList = ( { selectedFile, onSelectFile } ) => {
 			) }
 
 			<div className="datamachine-agent-file-items">
-				{ /* Render a layer section with header and file items */ }
-				{ [ ...( sortedSharedFiles.length > 0
-					? [ { label: 'Site', files: sortedSharedFiles, layerKey: 'shared' } ]
-					: [] ),
-				...( sortedAgentFiles.length > 0
-					? [ { label: 'Agent', files: sortedAgentFiles, layerKey: 'agent' } ]
-					: [] ),
-				...( sortedContextFiles.length > 0
-					? [ { label: 'Contexts', files: sortedContextFiles, layerKey: 'context' } ]
-					: [] ),
-				...( sortedUserFiles.length > 0
-					? [ { label: 'User', files: sortedUserFiles, layerKey: 'user' } ]
-					: [] ),
-				].map( ( section ) => (
-					<div key={ section.layerKey } className="datamachine-agent-file-layer">
-						<div className="datamachine-agent-file-layer-header">
-							<span className="datamachine-agent-file-layer-label">
-								{ section.label }
-							</span>
-						</div>
-					{ section.files.map( ( file ) => {
-						const isContext =
-							section.layerKey === 'context';
-						const selected = isContext
-							? selectedFile?.type === 'context' &&
-							  selectedFile?.contextSlug ===
-									file.context_slug
-							: isSelected( selectedFile, 'core', {
-									filename: file.filename,
-							  } );
-						const isShared = section.layerKey === 'shared';
+			{ /* Render a layer section with header and file items */ }
+			{ [ ...( sortedSharedFiles.length > 0
+				? [ { label: 'Site', files: sortedSharedFiles, layerKey: 'shared' } ]
+				: [] ),
+			...( sortedAgentFiles.length > 0
+				? [ { label: 'Agent', files: sortedAgentFiles, layerKey: 'agent' } ]
+				: [] ),
+			...( sortedUserFiles.length > 0
+				? [ { label: 'User', files: sortedUserFiles, layerKey: 'user' } ]
+				: [] ),
+			].map( ( section ) => (
+				<div key={ section.layerKey } className="datamachine-agent-file-layer">
+					<div className="datamachine-agent-file-layer-header">
+						<span className="datamachine-agent-file-layer-label">
+							{ section.label }
+						</span>
+					</div>
+				{ section.files.map( ( file ) => {
+					const selected = isSelected( selectedFile, 'core', {
+						filename: file.filename,
+					} );
+					const isShared = section.layerKey === 'shared';
 
-						const handleSelect = () => {
-							if ( isContext ) {
-								onSelectFile( {
-									type: 'context',
-									contextSlug: file.context_slug,
-									filename: file.filename,
-								} );
-							} else {
-								onSelectFile( {
-									type: 'core',
-									filename: file.filename,
-									editable:
-										file.editable !== false,
-								} );
-							}
-						};
+					const handleSelect = () => {
+						onSelectFile( {
+							type: 'core',
+							filename: file.filename,
+							editable: file.editable !== false,
+						} );
+					};
 
 						return (
 							<div

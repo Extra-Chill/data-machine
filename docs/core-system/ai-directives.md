@@ -76,7 +76,7 @@ Reads core memory files from three directory layers and injects them as system m
 - File size warning logged when any file exceeds `AgentMemory::MAX_FILE_SIZE` (8KB).
 - Empty files are silently skipped.
 
-**Configuration**: Edit files via the Agent admin page file browser or REST API (`PUT /datamachine/v1/files/agent/{filename}`).
+**Configuration**: Edit files via the Agent admin page file browser or the `datamachine/write-agent-file` ability.
 
 ### AgentModeDirective (Priority 22)
 

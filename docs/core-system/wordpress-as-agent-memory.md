@@ -52,7 +52,7 @@ The **CoreMemoryFilesDirective** loads all files from the **MemoryFileRegistry**
 
 **Technical details:**
 - Protected by `index.php` silence files (standard WordPress pattern)
-- CRUD via REST API: `GET/PUT/DELETE /datamachine/v1/files/agent/{filename}`
+- CRUD via REST API: the `datamachine/get-agent-file` / `datamachine/write-agent-file` / `datamachine/delete-agent-file` abilities
 - Editable through the WordPress admin Agent page
 - No serialization — plain markdown, human-readable, git-friendly
 - Core files created on activation with starter templates
@@ -448,26 +448,32 @@ This is the recommended discovery method for external consumers (CI scripts, AGE
 
 ### Reading Memory via REST API
 
-Remote agents can read and write memory files over HTTP:
+Remote agents can read and write memory files over HTTP through the ability runner:
 
 ```bash
 # Read MEMORY.md
-curl -s https://example.com/wp-json/datamachine/v1/files/agent/MEMORY.md \
-  -H "Authorization: Bearer $TOKEN"
+curl -s -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/get-agent-file/run \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"filename": "MEMORY.md"}}'
 
 # Update MEMORY.md
-curl -X PUT https://example.com/wp-json/datamachine/v1/files/agent/MEMORY.md \
+curl -s -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/write-agent-file/run \
   -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: text/plain" \
-  --data-binary @MEMORY.md
+  -H "Content-Type: application/json" \
+  -d '{"input": {"filename": "MEMORY.md", "content": "..."}}'
 
 # List daily memory files
-curl -s https://example.com/wp-json/datamachine/v1/files/agent/daily \
-  -H "Authorization: Bearer $TOKEN"
+curl -s -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/daily-memory-list/run \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": {}}'
 
 # Read a specific daily file
-curl -s https://example.com/wp-json/datamachine/v1/files/agent/daily/2026/03/15 \
-  -H "Authorization: Bearer $TOKEN"
+curl -s -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/daily-memory-read/run \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"date": "2026-03-15"}}'
 ```
 
 This makes WordPress the single source of truth for agent memory, regardless of where the agent runs.
@@ -602,21 +608,23 @@ Rather than letting MEMORY.md grow indefinitely, the daily memory system provide
 
 ### Agent Files
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/datamachine/v1/files/agent` | List all agent files |
-| `GET` | `/datamachine/v1/files/agent/{filename}` | Get file content |
-| `PUT` | `/datamachine/v1/files/agent/{filename}` | Create or update (raw body = content) |
-| `DELETE` | `/datamachine/v1/files/agent/{filename}` | Delete file (blocked for SOUL.md, MEMORY.md) |
+The agent-file REST routes were retired in #3456. Agent files are managed through REST-visible abilities run through the core ability runner (`POST /wp-abilities/v1/abilities/datamachine/<slug>/run` with `{"input": {...}}`):
+
+| Ability | Description |
+|---------|-------------|
+| `datamachine/list-agent-files` | List all agent files |
+| `datamachine/get-agent-file` | Get file content (`filename`) |
+| `datamachine/write-agent-file` | Create or update (`filename`, `content`) |
+| `datamachine/delete-agent-file` | Delete file (blocked for SOUL.md, MEMORY.md) |
 
 ### Daily Memory Files
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/datamachine/v1/files/agent/daily` | List daily memory files (grouped by month) |
-| `GET` | `/datamachine/v1/files/agent/daily/{YYYY}/{MM}/{DD}` | Get daily file content |
-| `PUT` | `/datamachine/v1/files/agent/daily/{YYYY}/{MM}/{DD}` | Write daily file |
-| `DELETE` | `/datamachine/v1/files/agent/daily/{YYYY}/{MM}/{DD}` | Delete daily file |
+| Ability | Description |
+|---------|-------------|
+| `datamachine/daily-memory-list` | List daily memory files (`months`) |
+| `datamachine/daily-memory-read` | Get daily file content (`date`) |
+| `datamachine/daily-memory-write` | Write daily file (`date`, `content`) |
+| `datamachine/daily-memory-delete` | Delete daily file (`date`) |
 
 ### Flow Files
 
