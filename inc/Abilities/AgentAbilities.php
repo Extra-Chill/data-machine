@@ -2955,9 +2955,9 @@ class AgentAbilities {
 	 *
 	 *     @type bool $dry_run Default true. When true, return candidates without deleting.
 	 * }
-	 * @return array|\WP_Error Result with candidates and counts, or WP_Error when a delete fails.
+	 * @return array Result with candidates and counts.
 	 */
-	public static function pruneAgents( array $input ): array|\WP_Error {
+	public static function pruneAgents( array $input ): array {
 		$dry_run = $input['dry_run'] ?? true;
 
 		$agents_repo = new Agents();

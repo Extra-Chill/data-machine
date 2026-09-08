@@ -143,7 +143,7 @@ const request = async (
  * The route is transport-agnostic: permission checks, input normalization,
  * and error mapping are owned by the ability and the core REST runner.
  *
- * @param {string} slug    Ability slug without the `datamachine/` prefix.
+ * @param {string} slug    Ability slug. Bare slugs resolve under `datamachine/`; pass a qualified slug (e.g. `agents/list-agent-users`) to target another namespace.
  * @param {Object} input   Ability input object.
  * @param {Object} options Optional. `{ method: 'GET' }` for read-only abilities.
  * @return {Promise<Object>} `{ success, data, message, ...abilityOutput }`
@@ -151,7 +151,8 @@ const request = async (
 export const executeAbility = async ( slug, input = {}, options = {} ) => {
 	const config = getConfig();
 	const method = options.method || 'POST';
-	const path = `/wp-abilities/v1/abilities/datamachine/${ slug }/run`;
+	const qualified = slug.includes( '/' ) ? slug : `datamachine/${ slug }`;
+	const path = `/wp-abilities/v1/abilities/${ qualified }/run`;
 	try {
 		const response = await apiFetch(
 			'GET' === method

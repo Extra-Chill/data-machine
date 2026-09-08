@@ -8,7 +8,9 @@
 /**
  * External dependencies
  */
-import { client, executeAbility } from '@shared/utils/api';
+import { executeAbility } from '@shared/utils/api';
+import apiFetch from '@wordpress/api-fetch';
+import { addQueryArgs } from '@wordpress/url';
 
 /**
  * Fetch all agents accessible to the current user.
@@ -97,27 +99,64 @@ export const deleteAgent = ( agentId, deleteFiles = false ) =>
 	} );
 
 /**
- * Fetch access grants for an agent.
+ * Fetch access grants for an agent, enriched with WP user display fields.
  *
- * Access routes are retained on datamachine/v1 until Agents API ships
- * grant/revoke/list-users abilities (Automattic/agents-api#537).
+ * Access is owned by the Agents API substrate (`agents/list-agent-users`);
+ * the registry keys agents by slug. User display enrichment is presentation
+ * and stays here.
  *
- * @param {number} agentId Agent ID.
- * @return {Promise<Object>} API response with access grants array.
+ * @param {string} agentSlug Agent slug.
+ * @return {Promise<Object>} Result with the enriched grants array in `data`.
  */
-export const fetchAgentAccess = ( agentId ) =>
-	client.get( `/agents/${ agentId }/access` );
+export const fetchAgentAccess = async ( agentSlug ) => {
+	const result = await executeAbility(
+		'agents/list-agent-users',
+		{ agent: agentSlug },
+		{ method: 'GET' }
+	);
+	if ( ! result.success ) {
+		return result;
+	}
+	const grants = result.users ?? [];
+	const userIds = grants.map( ( g ) => g.user_id ).filter( Boolean );
+	let usersById = {};
+	if ( userIds.length ) {
+		try {
+			const users = await apiFetch( {
+				path: addQueryArgs( '/wp/v2/users', {
+					include: userIds.join( ',' ),
+					per_page: 100,
+					context: 'edit',
+				} ),
+			} );
+			usersById = Object.fromEntries(
+				users.map( ( u ) => [ u.id, u ] )
+			);
+		} catch ( e ) {
+			// Enrichment is best-effort; grants still render by user_id.
+		}
+	}
+	return {
+		...result,
+		data: grants.map( ( g ) => ( {
+			...g,
+			display_name: usersById[ g.user_id ]?.name ?? `#${ g.user_id }`,
+			user_email: usersById[ g.user_id ]?.email ?? '',
+		} ) ),
+	};
+};
 
 /**
  * Grant a user access to an agent.
  *
- * @param {number} agentId Agent ID.
- * @param {number} userId  WordPress user ID.
- * @param {string} role    Access role (admin, operator, viewer).
- * @return {Promise<Object>} API response.
+ * @param {string} agentSlug Agent slug.
+ * @param {number} userId    WordPress user ID.
+ * @param {string} role      Access role (admin, operator, viewer).
+ * @return {Promise<Object>} Ability result.
  */
-export const grantAccess = ( agentId, userId, role = 'viewer' ) =>
-	client.post( `/agents/${ agentId }/access`, {
+export const grantAccess = ( agentSlug, userId, role = 'viewer' ) =>
+	executeAbility( 'agents/grant-agent-access', {
+		agent: agentSlug,
 		user_id: userId,
 		role,
 	} );
@@ -125,9 +164,12 @@ export const grantAccess = ( agentId, userId, role = 'viewer' ) =>
 /**
  * Revoke a user's access to an agent.
  *
- * @param {number} agentId Agent ID.
- * @param {number} userId  WordPress user ID.
- * @return {Promise<Object>} API response.
+ * @param {string} agentSlug Agent slug.
+ * @param {number} userId    WordPress user ID.
+ * @return {Promise<Object>} Ability result.
  */
-export const revokeAccess = ( agentId, userId ) =>
-	client.delete( `/agents/${ agentId }/access/${ userId }` );
+export const revokeAccess = ( agentSlug, userId ) =>
+	executeAbility( 'agents/revoke-agent-access', {
+		agent: agentSlug,
+		user_id: userId,
+	} );

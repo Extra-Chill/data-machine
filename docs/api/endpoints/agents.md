@@ -4,7 +4,7 @@
 
 ## Overview
 
-Agent record and token management is exposed as REST-visible Data Machine abilities and executed through WordPress core's ability runner (`POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run`). The former `datamachine/v1` `/agents*` wrapper routes were retired in #3456, except the access-grant routes (`GET/POST /agents/{id}/access`, `DELETE /agents/{id}/access/{user_id}`), which remain until Agents API ships `agents/grant-agent-access`, `agents/revoke-agent-access`, and `agents/list-agent-users` (Automattic/agents-api#537). The browser authorization flow (`/agent/authorize`, `/agent/auth/*`) remains on `datamachine/v1` because it is a browser-facing redirect/callback transport.
+Agent record and token management is exposed as REST-visible Data Machine abilities and executed through WordPress core's ability runner (`POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run`). The former `datamachine/v1` `/agents*` wrapper routes were retired in #3456. Access grants are managed through the Agents API substrate abilities `agents/list-agent-users`, `agents/grant-agent-access`, and `agents/revoke-agent-access` (Automattic/agents-api#538), keyed by agent slug. The browser authorization flow (`/agent/authorize`, `/agent/auth/*`) remains on `datamachine/v1` because it is a browser-facing redirect/callback transport.
 
 ## Authentication
 

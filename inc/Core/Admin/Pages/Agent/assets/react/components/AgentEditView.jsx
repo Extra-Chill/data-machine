@@ -45,7 +45,7 @@ const ROLE_OPTIONS = [
  * Access Management Panel
  *
  * @param {Object} props         Component props.
- * @param {number} props.agentId Agent ID.
+ * @param {string} props.agentId Agent slug (Agents API keys access by slug).
  * @param {number} props.ownerId Agent owner ID (cannot be revoked).
  */
 const AccessPanel = ( { agentId, ownerId } ) => {
@@ -377,7 +377,7 @@ const AgentEditView = ( { agentId, onBack } ) => {
 			</Card>
 
 			<AccessPanel
-				agentId={ agentId }
+				agentId={ agent.agent_slug }
 				ownerId={ agent.owner_id }
 			/>
 		</div>
