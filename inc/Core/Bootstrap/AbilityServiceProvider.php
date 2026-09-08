@@ -113,6 +113,7 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\Taxonomy\UpdateTaxonomyTermAbility();
 		new \DataMachine\Abilities\Taxonomy\DeleteTaxonomyTermAbility();
 		new \DataMachine\Abilities\AgentAbilities();
+		new \DataMachine\Abilities\AgentAccessAbilities();
 		new \DataMachine\Abilities\AgentTokenAbilities();
 		new \DataMachine\Abilities\AgentMemoryAbilities();
 		new \DataMachine\Abilities\InjectableMemoryFilesAbility();

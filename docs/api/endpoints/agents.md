@@ -1,99 +1,95 @@
-# Agents Endpoints
+# Agents
 
-**Implementation**: `inc/Api/Agents.php`, `inc/Core/Auth/AgentAuthorize.php`, `inc/Core/Auth/AgentAuthCallback.php`
-
-**Base URL**: `/wp-json/datamachine/v1`
+**Implementation**: `inc/Abilities/AgentAbilities.php`, `inc/Abilities/AgentAccessAbilities.php`, `inc/Abilities/AgentTokenAbilities.php`, `inc/Core/Auth/AgentAuthorize.php`, `inc/Core/Auth/AgentAuthCallback.php`
 
 ## Overview
 
-Agent endpoints manage agent records, user access grants, runtime bearer tokens, and the browser authorization flow used by external agent clients.
+Agent record, access, and token management is exposed as REST-visible Data Machine abilities and executed through WordPress core's ability runner (`POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run`). The former `datamachine/v1` `/agents*` wrapper routes were retired in #3456. The browser authorization flow (`/agent/authorize`, `/agent/auth/*`) remains on `datamachine/v1` because it is a browser-facing redirect/callback transport.
 
 ## Authentication
 
-There are three auth modes:
+- All agent abilities use the current WordPress user and Data Machine agent capabilities via `PermissionHelper` (`manage_agents`, `create_own_agent`, or `chat` depending on the ability).
+- Agent bearer tokens populate `PermissionHelper` agent context. Token capabilities can be restricted by a capability ceiling, so a token can be narrower than the owning agent's full Data Machine capability set.
+- The `/agent/authorize` and `/agent/auth/callback` routes are browser-facing flow endpoints with open REST permissions, then validate login cookies, nonces, redirect URIs, or callback payloads inside the handler.
 
-- Agent CRUD, access, and token management use the current WordPress user and Data Machine agent capabilities.
-- `GET /agents/me` accepts either an agent bearer token context or a logged-in WordPress user.
-- `/agent/authorize` and `/agent/auth/callback` are browser-facing flow endpoints with open REST permissions, then validate login cookies, nonces, redirect URIs, or callback payloads inside the handler.
+Token values are sensitive. `create-agent-token` returns `raw_token` once; `list-agent-tokens` returns token metadata only.
 
-Token values are sensitive. `POST /agents/{agent}/tokens` returns `raw_token` once; list endpoints return token metadata only.
+## Ability Reference
 
-Agent bearer-token requests populate `PermissionHelper` agent context. Token capabilities can be restricted by a capability ceiling, so a token can be narrower than the owning agent's full Data Machine capability set.
+| Ability | Permission | Purpose |
+|---|---|---|
+| `datamachine/list-agents` | `chat` or `manage_agents` | List agents accessible to the caller. `scope=mine` (default, owned + granted) or `scope=all` (admin only). `user_id` for admin queries, `site_id` to filter by site scope, `include_role` to enrich rows with the resolved user's role. |
+| `datamachine/get-agent` | `manage_agents` | Fetch one agent by `agent_slug` or `agent_id`, including access grants and directory info. `me: true` resolves the acting principal's own agent (agent-token context, else the user's default agent) and includes `site` metadata — replaces the retired `GET /agents/me`. |
+| `datamachine/create-agent` | `manage_agents` or `create_own_agent` | Create an agent. `agent_slug` required; `agent_name` defaults to the slug; `owner_id` defaults to the acting user (admins may pass another user); `config` and `site_scope` optional. Non-admins can only create for themselves, subject to a per-user limit. |
+| `datamachine/update-agent` | `manage_agents` | Update `agent_name` and/or `agent_config` on `agent` (slug or ID). |
+| `datamachine/delete-agent` | `manage_agents` | Delete an agent and its access grants. `delete_files: true` also removes the filesystem directory. |
+| `datamachine/manage-agent-access` | `manage_agents` | `action: list` returns enriched per-user grants; `action: grant` adds `user_id` with `role` (`admin`, `operator`, `viewer`; default `viewer`); `action: revoke` removes `user_id`. The owner's grant cannot be revoked. |
+| `datamachine/create-agent-token` | `manage_agents` plus admin access to the agent | Create a bearer token. `label`, `capabilities` (null = all agent capabilities), `expires_in` (seconds) optional. |
+| `datamachine/list-agent-tokens` | `manage_agents` plus operator access to the agent | List token metadata for an agent. |
+| `datamachine/revoke-agent-token` | `manage_agents` plus admin access to the agent | Revoke a token by `token_id`. The token stops working immediately. |
 
-## Route Table
+Ability inputs are passed as `{ "input": { ... } }` in the run-request body. Errors surface as native REST errors with HTTP status codes (404 unknown agent, 400 validation, 403 access denied).
+
+## Retained Browser Authorization Routes
 
 | Method | Route | Auth model | Purpose |
 |---|---|---|---|
-| GET | `/agents` | Logged-in user | List agents visible to the caller. |
-| POST | `/agents` | `manage_agents` or `create_own_agent` | Create an agent. |
-| GET | `/agents/me` | Agent token or logged-in user | Discover the current agent identity. |
-| GET | `/agents/{agent}` | `manage_agents` | Fetch an agent by slug or numeric ID. |
-| PUT/PATCH | `/agents/{agent}` | `manage_agents` | Update agent display name or config. |
-| DELETE | `/agents/{agent}` | `manage_agents` | Delete an agent. |
-| GET | `/agents/{agent}/access` | `manage_agents` | List user access grants. |
-| POST | `/agents/{agent}/access` | `manage_agents` | Grant user access. |
-| DELETE | `/agents/{agent}/access/{user_id}` | `manage_agents` | Revoke user access. |
-| GET | `/agents/{agent}/tokens` | `manage_agents` plus agent access check | List token metadata. |
-| POST | `/agents/{agent}/tokens` | `manage_agents` plus admin access to agent | Create a bearer token. |
-| DELETE | `/agents/{agent}/tokens/{token_id}` | `manage_agents` plus admin access to agent | Revoke a token. |
 | GET | `/agent/authorize` | Browser session | Show consent or redirect to login. |
 | POST | `/agent/authorize` | Browser session plus nonce | Approve or deny authorization. |
 | GET | `/agent/auth/callback` | Callback payload | Receive and store an external token. |
 | GET | `/agent/auth/tokens` | `manage_options` | List stored external token metadata. |
 | GET | `/agent/auth/tokens/{key}` | `manage_options` | Return one stored external token record. |
 
-`{agent}` accepts an agent slug (`sarai`) or numeric agent ID (`42`). Slug routes are preferred.
+### Browser Authorization Parameters
 
-## Core Parameters
-
-### Agent CRUD
-
-| Parameter | Routes | Type | Notes |
-|---|---|---|---|
-| `agent_slug` | `POST /agents`, authorize flow | string | Required when creating or authorizing. Sanitized as a slug. |
-| `agent_name` | `POST /agents`, `PUT/PATCH /agents/{agent}` | string | Display name. Defaults to slug on create. |
-| `config` | `POST /agents` | object | Initial config object. |
-| `agent_config` | `PUT/PATCH /agents/{agent}` | object | Replaces existing config. |
-| `delete_files` | `DELETE /agents/{agent}` | boolean | Also remove the agent filesystem directory. Default `false`. |
-| `scope` | `GET /agents` | string | `mine` or `all`; `all` requires admin privileges. |
-| `user_id` | `GET /agents`, access routes | integer | Admin-only filter for list, required for grants/revokes. |
-| `include_role` | `GET /agents` | boolean | Include caller role data. Enabled by default for REST UI payloads. |
-
-### Access And Tokens
-
-| Parameter | Routes | Type | Notes |
-|---|---|---|---|
-| `role` | `POST /agents/{agent}/access` | string | `admin`, `operator`, or `viewer`. Default `viewer`. |
-| `label` | `POST /agents/{agent}/tokens`, authorize flow | string | Human-readable token label such as `kimaki-prod`. |
-| `capabilities` | `POST /agents/{agent}/tokens` | array | Optional allowed capability subset. Omit/null for all agent capabilities. |
-| `expires_in` | `POST /agents/{agent}/tokens` | integer | Expiry in seconds from now. Omit/null for no expiry. |
-| `token_id` | `DELETE /agents/{agent}/tokens/{token_id}` | integer | Token metadata ID to revoke. |
-
-### Browser Authorization
-
-| Parameter | Routes | Type | Notes |
+| Parameter | Route | Type | Notes |
 |---|---|---|---|
 | `redirect_uri` | `/agent/authorize` | string | Required. Validated against the agent allowlist or localhost rules. |
-| `action` | `POST /agent/authorize` | string | `authorize` or `deny`. |
-| `_authorize_nonce` | `POST /agent/authorize` | string | WordPress nonce from the consent form. |
+| `action` | `/agent/authorize` | string | `authorize` or `deny`. |
+| `_authorize_nonce` | `/agent/authorize` | string | WordPress nonce from the consent form. |
 | `code_challenge` | `/agent/authorize` | string | Optional PKCE-style challenge. |
 | `code_challenge_method` | `/agent/authorize` | string | Optional challenge method. |
 | `state` | `/agent/authorize` | string | Optional opaque client state echoed through redirects. |
 | `token`, `agent_slug`, `agent_id`, `error` | `/agent/auth/callback` | mixed | Callback result fields from the remote authorizing site. |
 | `key` | `/agent/auth/tokens/{key}` | string | Storage key in the form `remote-site/agent-slug`. |
 
-## Response Shape
+## Response Shapes
 
-Most agent management responses use:
+`get-agent` returns the full agent record:
 
 ```json
 {
   "success": true,
-  "data": {}
+  "agent": {
+    "agent_id": 2,
+    "agent_slug": "sarai",
+    "agent_name": "Sarai",
+    "owner_id": 1,
+    "agent_config": {},
+    "created_at": "2026-01-01 00:00:00",
+    "updated_at": "2026-01-01 00:00:00",
+    "agent_dir": "/path/to/agent",
+    "has_files": true,
+    "access": [],
+    "principal_access": []
+  }
 }
 ```
 
-List responses return `data` as an array of agent or grant objects. Token ability responses return ability-native objects such as:
+With `me: true`, identity lookups additionally return site metadata:
+
+```json
+{
+  "success": true,
+  "agent": { "agent_id": 2, "agent_slug": "sarai" },
+  "site": {
+    "site_url": "https://example.com",
+    "site_name": "Example"
+  }
+}
+```
+
+`create-agent-token` returns the token once:
 
 ```json
 {
@@ -105,38 +101,24 @@ List responses return `data` as an array of agent or grant objects. Token abilit
 }
 ```
 
-`GET /agents/me` returns identity metadata:
-
-```json
-{
-  "success": true,
-  "data": {
-    "agent_id": 2,
-    "agent_slug": "sarai",
-    "agent_name": "Sarai",
-    "owner_id": 1,
-    "site_url": "https://example.com",
-    "site_name": "Example"
-  }
-}
-```
-
-## Agent Usage Examples
+## Usage Examples
 
 Create a token for an external agent client:
 
 ```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/agents/sarai/tokens \
+curl -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/create-agent-token/run \
   -H "Content-Type: application/json" \
   -u username:application_password \
-  -d '{"label":"kimaki-prod","expires_in":2592000}'
+  -d '{"input":{"agent_id":2,"label":"kimaki-prod","expires_in":2592000}}'
 ```
 
 Use the returned bearer token to discover the active identity:
 
 ```bash
-curl https://example.com/wp-json/datamachine/v1/agents/me \
-  -H "Authorization: Bearer datamachine_..."
+curl -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/get-agent/run \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer datamachine_..." \
+  -d '{"input":{"me":true}}'
 ```
 
 Start the browser authorization flow for a local client:

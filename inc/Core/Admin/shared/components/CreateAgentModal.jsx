@@ -26,7 +26,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 /**
  * Internal dependencies
  */
-import { client } from '@shared/utils/api';
+import { executeAbility } from '@shared/utils/api';
 import { AGENTS_KEY } from '@shared/queries/agents';
 
 /**
@@ -38,7 +38,7 @@ const useCreateAgentMutation = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation( {
-		mutationFn: ( data ) => client.post( '/agents', data ),
+		mutationFn: ( data ) => executeAbility( 'create-agent', data ),
 		onSuccess: () => {
 			queryClient.invalidateQueries( { queryKey: AGENTS_KEY } );
 		},

@@ -43,6 +43,8 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/write-agent-file',
 			'datamachine/delete-agent-file',
 			'datamachine/upload-agent-file',
+			// AgentAccessAbilities (1)
+			'datamachine/manage-agent-access',
 			// FlowFileAbilities (5)
 			'datamachine/list-flow-files',
 			'datamachine/get-flow-file',
