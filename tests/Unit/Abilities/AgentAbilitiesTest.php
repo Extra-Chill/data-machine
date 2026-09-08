@@ -66,7 +66,7 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
-		$this->assertStringContainsString( 'Owner', $result->get_error_message() );
+		$this->assertSame( 'agent_owner_unresolved', $result->get_error_code() );
 	}
 
 	public function test_createAgent_defaults_owner_to_acting_user(): void {

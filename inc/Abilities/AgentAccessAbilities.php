@@ -160,14 +160,16 @@ class AgentAccessAbilities {
 
 		$data = array();
 		foreach ( $grants as $grant ) {
-			/** @var \WP_Agent_Access_Grant $grant Grant objects despite the repository's array[] docblock. */
-			$user   = get_user_by( 'id', $grant->user_id );
+			// Cast handles both array rows and WP_Agent_Access_Grant objects
+			// (public promoted properties cast to plain string keys).
+			$row    = (array) $grant;
+			$user   = get_user_by( 'id', (int) ( $row['user_id'] ?? 0 ) );
 			$data[] = array(
-				'user_id'      => (int) $grant->user_id,
+				'user_id'      => (int) ( $row['user_id'] ?? 0 ),
 				'display_name' => $user ? $user->display_name : __( '(unknown user)', 'data-machine' ),
 				'user_email'   => $user ? $user->user_email : '',
-				'role'         => $grant->role,
-				'granted_at'   => $grant->granted_at ?? '',
+				'role'         => (string) ( $row['role'] ?? '' ),
+				'granted_at'   => (string) ( $row['granted_at'] ?? '' ),
 			);
 		}
 
