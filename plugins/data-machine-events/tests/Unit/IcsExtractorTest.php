@@ -303,6 +303,59 @@ ICS;
 	}
 
 	/**
+	 * The exact #796 production pattern: Google Calendar publishes a
+	 * weekly RRULE parent plus one modified instance as a separate
+	 * VEVENT carrying RECURRENCE-ID. The parent expansion and the
+	 * override must both survive extraction, and the override must
+	 * carry its own occurrence identity, edited title, and shifted
+	 * start time.
+	 */
+	public function test_rrule_parent_with_recurrence_id_override() {
+		$parent_date  = gmdate( 'Ymd', strtotime( '+7 days' ) );
+		$override_date = gmdate( 'Ymd', strtotime( '+14 days' ) );
+
+		$ics = <<<ICS
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Google Inc//Calendar 70.0//EN
+X-WR-TIMEZONE:America/New_York
+BEGIN:VEVENT
+UID:weekly-series-uid
+DTSTART;TZID=America/New_York:{$parent_date}T200000
+DTEND;TZID=America/New_York:{$parent_date}T230000
+RRULE:FREQ=WEEKLY;BYDAY=WE
+SUMMARY:Burgundy: Extra Chill Wednesdays
+LOCATION:The Starlight Motor Inn
+END:VEVENT
+BEGIN:VEVENT
+UID:weekly-series-uid
+RECURRENCE-ID;TZID=America/New_York:{$override_date}T200000
+DTSTART;TZID=America/New_York:{$override_date}T210000
+DTEND;TZID=America/New_York:{$override_date}T233000
+SUMMARY:Burgundy: Extra Chill Wednesdays ft. Chris Wilcox
+LOCATION:The Starlight Motor Inn
+END:VEVENT
+END:VCALENDAR
+ICS;
+
+		$events = $this->extractor->extract( $ics, 'https://example.com/events.ics' );
+
+		$this->assertGreaterThanOrEqual( 2, count( $events ), 'Parent expansion and override must both be extracted' );
+
+		$overrides = array_values(
+			array_filter(
+				$events,
+				static fn( array $event ): bool => '' !== $event['recurrenceId']
+			)
+		);
+
+		$this->assertCount( 1, $overrides, 'Exactly one extracted event carries the RECURRENCE-ID override' );
+		$this->assertSame( 'Burgundy: Extra Chill Wednesdays ft. Chris Wilcox', $overrides[0]['title'] );
+		$this->assertSame( '21:00', $overrides[0]['startTime'] );
+		$this->assertSame( 'weekly-series-uid::' . $override_date . 'T200000', $overrides[0]['occurrenceIdentity'] );
+	}
+
+	/**
 	 * A modified instance is published as its own VEVENT carrying
 	 * RECURRENCE-ID. That is the authoritative discriminator for the instance
 	 * it replaces, so it must win over the occurrence start date.

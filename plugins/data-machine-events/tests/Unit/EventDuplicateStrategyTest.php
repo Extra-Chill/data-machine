@@ -686,11 +686,11 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->cleanup( $term_id, $existing_post_id );
 	}
 
-	public function test_pre_ai_gate_skips_exact_venue_show_within_time_window(): void {
+	public function test_pre_ai_gate_skips_unchanged_duplicate(): void {
 		$venue_name = 'Pre AI Exact Venue Within ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Pre AI Showcase',
-			'2026-05-23 13:30:00',
+			'2026-05-23 15:00:00',
 			$venue_name
 		);
 
@@ -703,6 +703,11 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertTrue( $result['skip'] );
+		$this->assertStringContainsString(
+			(string) $existing_post_id,
+			$result['reason'],
+			'The skip reason must report the concrete matched post id (#497).'
+		);
 		$this->cleanup( $term_id, $existing_post_id );
 	}
 

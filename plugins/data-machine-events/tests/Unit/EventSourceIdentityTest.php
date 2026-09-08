@@ -106,6 +106,38 @@ class EventSourceIdentityTest extends WP_UnitTestCase {
 		$this->assertFalse( $repository->has_item_been_processed( $this->flow_step_id, $this->source_type, $current ) );
 	}
 
+	/**
+	 * #796 design decision: ICS occurrence identities (UID::RECURRENCE-ID)
+	 * deliberately do NOT participate in item identity.
+	 *
+	 * Item identity must stay keyed on mutable content so an edited
+	 * occurrence arrives as a NEW fetch item. A stable occurrence identity
+	 * would instead freeze repeat edits at fetch: once the occurrence is
+	 * processed, every later edit of the same occurrence (same UID, same
+	 * RECURRENCE-ID, new title) resolves to the already-processed identifier
+	 * and is skipped before the dedup gate or upsert ever sees it.
+	 *
+	 * Changed revisions are instead let through by PreAIEventDedupGate, so
+	 * resolve() must ignore occurrenceIdentity entirely.
+	 */
+	public function test_occurrence_identity_does_not_change_item_identity(): void {
+		$event = $this->event();
+		$event['uid']                = 'weekly-series-uid';
+		$event['recurrenceId']       = '20260909T210000Z';
+		$event['occurrenceIdentity'] = 'weekly-series-uid::20260909T210000Z';
+
+		$context = $this->context();
+		$plain   = EventSourceIdentity::resolve( $this->event(), $context );
+		$with    = EventSourceIdentity::resolve( $event, $context );
+
+		$this->assertSame( $plain, $with, 'occurrenceIdentity must not alter identity resolution.' );
+		$this->assertSame(
+			$this->currentIdentifier( $event ),
+			$with['item_identifier'],
+			'Item identity must stay keyed on content so edited occurrences re-enter the pipeline.'
+		);
+	}
+
 	private function event(): array {
 		return array(
 			'title'         => 'Motown Throwdown ' . $this->flow_step_id,
