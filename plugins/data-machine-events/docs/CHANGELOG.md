@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.61.2] - 2026-09-08
+
+### Fixed
+- resolve venue_name flows instead of requiring a pinned venue term
+- partial incoming address is not a geographic conflict against a stored street address
+
 ## [0.61.1] - 2026-09-08
 
 ### Fixed
