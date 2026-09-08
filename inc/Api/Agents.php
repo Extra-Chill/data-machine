@@ -16,6 +16,7 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Agents\Agents as AgentsRepository;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use WP_REST_Request;
@@ -127,7 +128,6 @@ class Agents {
 			)
 			);
 		}
-
 	}
 
 	/**
@@ -305,4 +305,31 @@ class Agents {
 	// ---------------------------------------------------------------
 	// Token handlers
 	// ---------------------------------------------------------------
+
+	// ---------------------------------------------------------------
+	// Helpers
+	// ---------------------------------------------------------------
+
+	/**
+	 * Resolve a REST route agent parameter to the internal agent ID.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return int|WP_Error Agent ID or REST error.
+	 */
+	private static function resolve_request_agent_id( WP_REST_Request $request ): int|WP_Error {
+		$agent = $request->get_param( 'agent' );
+		if ( null === $agent || '' === $agent ) {
+			$agent = $request->get_param( 'agent_id' );
+		}
+
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_id( (string) $agent );
+		} catch ( \InvalidArgumentException $e ) {
+			return new WP_Error(
+				'agent_not_found',
+				$e->getMessage(),
+				array( 'status' => 404 )
+			);
+		}
+	}
 }
