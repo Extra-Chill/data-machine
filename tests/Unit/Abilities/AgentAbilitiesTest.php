@@ -55,6 +55,10 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_createAgent_requires_owner(): void {
+		// Owner defaults to the acting user, so the owner requirement only
+		// fails when no user can be resolved at all (e.g. logged-out CLI/REST).
+		wp_set_current_user( 0 );
+
 		$result = AgentAbilities::createAgent(
 			array(
 				'agent_slug' => 'orphan-bot',
@@ -63,6 +67,17 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertStringContainsString( 'Owner', $result->get_error_message() );
+	}
+
+	public function test_createAgent_defaults_owner_to_acting_user(): void {
+		$result = AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'default-owner-bot',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $this->admin_id, $result['owner_id'] );
 	}
 
 	public function test_createAgent_rejects_duplicate_slug(): void {

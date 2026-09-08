@@ -35,9 +35,12 @@ export const fetchAgents = async () => {
  * @return {Promise<Object>} Result with the agent data in `data`.
  */
 export const fetchAgent = async ( agentId ) => {
-	const result = await executeAbility( 'get-agent', {
-		agent_id: agentId,
-	} );
+	// get-agent is annotated readonly, so the core runner requires GET.
+	const result = await executeAbility(
+		'get-agent',
+		{ agent_id: agentId },
+		{ method: 'GET' }
+	);
 
 	if ( ! result.success ) {
 		return result;

@@ -160,6 +160,7 @@ class AgentAccessAbilities {
 
 		$data = array();
 		foreach ( $grants as $grant ) {
+			/** @var \WP_Agent_Access_Grant $grant Grant objects despite the repository's array[] docblock. */
 			$user   = get_user_by( 'id', $grant->user_id );
 			$data[] = array(
 				'user_id'      => (int) $grant->user_id,
@@ -207,6 +208,7 @@ class AgentAccessAbilities {
 
 		$access_repo = new AgentAccess();
 		try {
+			// @phpstan-ignore-next-line The agents-api grant class resolves to a constructor-less stub in static analysis.
 			$access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $user_id, $role ) );
 			$ok = true;
 		} catch ( \Throwable $e ) {

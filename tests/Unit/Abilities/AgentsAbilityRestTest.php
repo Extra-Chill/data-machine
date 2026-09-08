@@ -33,10 +33,9 @@ class AgentsAbilityRestTest extends WP_UnitTestCase {
 		parent::tear_down();
 	}
 
-	private function run_ability( string $slug, array $input = array() ): array {
-		$request = new WP_REST_Request( 'POST', '/wp-abilities/v1/abilities/datamachine/' . $slug . '/run' );
-		$request->set_header( 'content-type', 'application/json' );
-		$request->set_body( wp_json_encode( array( 'input' => $input ) ) );
+	private function run_ability( string $slug, array $input = array(), string $method = 'POST' ): array {
+		$request = new WP_REST_Request( $method, '/wp-abilities/v1/abilities/datamachine/' . $slug . '/run' );
+		$this->set_input( $request, $input, $method );
 
 		$response = rest_do_request( $request );
 
@@ -45,12 +44,25 @@ class AgentsAbilityRestTest extends WP_UnitTestCase {
 		return $response->get_data();
 	}
 
-	private function run_ability_status( string $slug, array $input = array() ): int {
-		$request = new WP_REST_Request( 'POST', '/wp-abilities/v1/abilities/datamachine/' . $slug . '/run' );
-		$request->set_header( 'content-type', 'application/json' );
-		$request->set_body( wp_json_encode( array( 'input' => $input ) ) );
+	private function run_ability_status( string $slug, array $input = array(), string $method = 'POST' ): int {
+		$request = new WP_REST_Request( $method, '/wp-abilities/v1/abilities/datamachine/' . $slug . '/run' );
+		$this->set_input( $request, $input, $method );
 
 		return rest_do_request( $request )->get_status();
+	}
+
+	/**
+	 * Abilities annotated readonly require GET, which carries input as the
+	 * `input` query parameter per the core run-controller contract.
+	 */
+	private function set_input( WP_REST_Request $request, array $input, string $method ): void {
+		if ( 'GET' === $method ) {
+			$request->set_query_params( array( 'input' => $input ) );
+			return;
+		}
+
+		$request->set_header( 'content-type', 'application/json' );
+		$request->set_body( wp_json_encode( array( 'input' => $input ) ) );
 	}
 
 	public function test_rest_visible_agent_crud_round_trip(): void {
@@ -68,7 +80,7 @@ class AgentsAbilityRestTest extends WP_UnitTestCase {
 		$this->assertSame( get_current_user_id(), $created['owner_id'] );
 		$agent_id = (int) $created['agent_id'];
 
-		$single = $this->run_ability( 'get-agent', array( 'agent_id' => $agent_id ) );
+		$single = $this->run_ability( 'get-agent', array( 'agent_id' => $agent_id ), 'GET' );
 		$this->assertTrue( $single['success'] );
 		$this->assertSame( 'agents-ability-rest-bot', $single['agent']['agent_slug'] );
 		$this->assertArrayHasKey( 'access', $single['agent'] );
@@ -108,14 +120,14 @@ class AgentsAbilityRestTest extends WP_UnitTestCase {
 		$this->assertTrue( $deleted['success'] );
 		$this->assertTrue( $deleted['files_deleted'] );
 
-		$this->assertSame( 404, $this->run_ability_status( 'get-agent', array( 'agent_id' => $agent_id ) ) );
+		$this->assertSame( 404, $this->run_ability_status( 'get-agent', array( 'agent_id' => $agent_id ), 'GET' ) );
 	}
 
 	public function test_rest_visible_get_agent_me_resolves_owner_default_and_site(): void {
 		$created = $this->run_ability( 'create-agent', array( 'agent_slug' => 'agents-ability-me-bot' ) );
 		$this->assertTrue( $created['success'] );
 
-		$me = $this->run_ability( 'get-agent', array( 'me' => true ) );
+		$me = $this->run_ability( 'get-agent', array( 'me' => true ), 'GET' );
 		$this->assertTrue( $me['success'] );
 		$this->assertSame( 'agents-ability-me-bot', $me['agent']['agent_slug'] );
 		$this->assertArrayHasKey( 'site', $me );
