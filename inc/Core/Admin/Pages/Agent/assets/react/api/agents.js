@@ -6,11 +6,15 @@
  */
 
 /**
- * External dependencies
+ * WordPress dependencies
  */
-import { executeAbility } from '@shared/utils/api';
 import apiFetch from '@wordpress/api-fetch';
 import { addQueryArgs } from '@wordpress/url';
+
+/**
+ * Internal dependencies
+ */
+import { executeAbility } from '@shared/utils/api';
 
 /**
  * Fetch all agents accessible to the current user.
@@ -132,7 +136,7 @@ export const fetchAgentAccess = async ( agentSlug ) => {
 			usersById = Object.fromEntries(
 				users.map( ( u ) => [ u.id, u ] )
 			);
-		} catch ( e ) {
+		} catch {
 			// Enrichment is best-effort; grants still render by user_id.
 		}
 	}
