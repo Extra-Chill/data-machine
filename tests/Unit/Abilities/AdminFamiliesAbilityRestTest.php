@@ -213,7 +213,10 @@ class AdminFamiliesAbilityRestTest extends WP_UnitTestCase {
 		$this->assertSame( 'admin_families_detail', $detail['slug'] );
 		$this->assertSame( 'Admin Families Detail', $detail['info']['label'] );
 		$this->assertArrayHasKey( 'settings', $detail );
-		$this->assertNull( $detail['ai_tool'] );
+		// The ToolManager resolves the generic fetch-flow tools for a plain
+		// fetch handler, so ai_tool is populated rather than null.
+		$this->assertIsArray( $detail['ai_tool'] );
+		$this->assertArrayHasKey( 'tool_name', $detail['ai_tool'] );
 
 		remove_filter( 'datamachine_handlers', $add_handler, 10 );
 		\DataMachine\Abilities\HandlerAbilities::clearCache();

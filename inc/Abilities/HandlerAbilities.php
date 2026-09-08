@@ -110,7 +110,12 @@ class HandlerAbilities {
 						'success'   => array( 'type' => 'boolean' ),
 						'handlers'  => array( 'type' => 'object' ),
 						'count'     => array( 'type' => 'integer' ),
-						'step_type' => array( 'type' => 'string' ),
+						'step_type' => array(
+							'anyOf' => array(
+								array( 'type' => 'string' ),
+								array( 'type' => 'null' ),
+							),
+						),
 						'error'     => array( 'type' => 'string' ),
 					),
 				),

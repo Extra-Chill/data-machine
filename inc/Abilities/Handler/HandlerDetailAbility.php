@@ -58,7 +58,12 @@ class HandlerDetailAbility {
 							'slug'     => array( 'type' => 'string' ),
 							'info'     => array( 'type' => 'object' ),
 							'settings' => array( 'type' => 'object' ),
-							'ai_tool'  => array( 'type' => array( 'object', 'null' ) ),
+							'ai_tool'  => array(
+								'anyOf' => array(
+									array( 'type' => 'object' ),
+									array( 'type' => 'null' ),
+								),
+							),
 							'error'    => array( 'type' => 'string' ),
 						),
 					),
