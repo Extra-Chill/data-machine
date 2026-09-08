@@ -51,8 +51,11 @@ namespace {
 	$input = array( 'action' => 'aggregate_report', 'date_range' => array( 'start_date' => '2026-01-01', 'end_date' => '2026-01-31' ), 'metrics' => array( 'sessions' ) );
 	$method = new \ReflectionMethod( GoogleAnalyticsAbilities::class, 'fetchAggregateReport' );
 	$tool = ( new \ReflectionClass( GoogleAnalytics::class ) )->newInstanceWithoutConstructor();
-	$parameters = $tool->getToolDefinition()['parameters']['oneOf'];
-	$assert( GoogleAnalyticsAbilities::MAX_LIMIT === $parameters[0]['properties']['limit']['maximum'] && GoogleAnalyticsAbilities::AGGREGATE_MAX_ROWS === $parameters[1]['properties']['limit']['maximum'], 'advertises action-specific legacy and aggregate row bounds' );
+	// The model-facing schema is a single flat object (#124); the aggregate
+	// row bound lives in the ability input schema, not the tool definition.
+	$parameters = $tool->getToolDefinition()['parameters'];
+	$aggregate  = GoogleAnalyticsAbilities::aggregateInputSchema();
+	$assert( GoogleAnalyticsAbilities::MAX_LIMIT === $parameters['properties']['limit']['maximum'] && GoogleAnalyticsAbilities::AGGREGATE_MAX_ROWS === $aggregate['properties']['limit']['maximum'], 'advertises action-specific legacy and aggregate row bounds' );
 
 	$fixture = json_decode( file_get_contents( $root . '/tests/fixtures/ga4-aggregate-batch-response.json' ), true );
 	HttpClient::$response = array( 'success' => true, 'data' => json_encode( $fixture ) );

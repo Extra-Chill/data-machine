@@ -230,18 +230,23 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		$reflection = new \ReflectionClass( GoogleAnalytics::class );
 		$tool       = $reflection->newInstanceWithoutConstructor();
 		$definition = $tool->getToolDefinition();
-		$legacy_parameters = $definition['parameters']['oneOf'][0]['properties'];
-		$aggregate_parameters = $definition['parameters']['oneOf'][1]['properties'];
+		// The model-facing schema is one flat object (#124): a top-level oneOf is
+		// rejected by OpenAI and Anthropic function calling. Strict per-action
+		// bounds live in the ability input schema.
+		$parameters = $definition['parameters'];
+		$aggregate  = GoogleAnalyticsAbilities::aggregateInputSchema();
 
-		$this->assertContains( 'landing_page_acquisition', $legacy_parameters['action']['enum'] );
-		$this->assertContains( 'page_acquisition', $legacy_parameters['action']['enum'] );
-		$this->assertContains( 'page_audience', $legacy_parameters['action']['enum'] );
-		$this->assertNotContains( 'aggregate_report', $legacy_parameters['action']['enum'] );
-		$this->assertSame( array( 'asc', 'desc' ), $legacy_parameters['order']['enum'] );
-		$this->assertSame( 1, $legacy_parameters['limit']['minimum'] );
-		$this->assertSame( GoogleAnalyticsAbilities::MAX_LIMIT, $legacy_parameters['limit']['maximum'] );
-		$this->assertSame( array( 'aggregate_report' ), $aggregate_parameters['action']['enum'] );
-		$this->assertSame( GoogleAnalyticsAbilities::AGGREGATE_MAX_ROWS, $aggregate_parameters['limit']['maximum'] );
+		$this->assertSame( 'object', $parameters['type'] );
+		$this->assertArrayNotHasKey( 'oneOf', $parameters );
+		$this->assertContains( 'landing_page_acquisition', $parameters['properties']['action']['enum'] );
+		$this->assertContains( 'page_acquisition', $parameters['properties']['action']['enum'] );
+		$this->assertContains( 'page_audience', $parameters['properties']['action']['enum'] );
+		$this->assertContains( 'aggregate_report', $parameters['properties']['action']['enum'] );
+		$this->assertSame( array( 'asc', 'desc' ), $parameters['properties']['order']['enum'] );
+		$this->assertSame( 1, $parameters['properties']['limit']['minimum'] );
+		$this->assertSame( GoogleAnalyticsAbilities::MAX_LIMIT, $parameters['properties']['limit']['maximum'] );
+		$this->assertSame( array( 'aggregate_report' ), $aggregate['properties']['action']['enum'] );
+		$this->assertSame( GoogleAnalyticsAbilities::AGGREGATE_MAX_ROWS, $aggregate['properties']['limit']['maximum'] );
 	}
 
 	public function test_report_rows_keep_dimensions_and_cast_numeric_metrics(): void {

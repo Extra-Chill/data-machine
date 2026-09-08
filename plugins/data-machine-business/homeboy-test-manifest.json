@@ -8,6 +8,7 @@
     "tests/data-machine-http-client-contract-smoke.php": { "environment": "wordpress" },
     "tests/google-analytics-aggregate-http-smoke.php": { "environment": "standalone-php" },
     "tests/google-analytics-aggregate-schema-smoke.php": { "environment": "wordpress" },
+    "tests/google-analytics-tool-schema-smoke.php": { "environment": "wordpress" },
     "tests/google-search-tool-smoke.php": { "environment": "standalone-php" },
     "tests/gsc-business-registration-smoke.php": { "environment": "standalone-php" },
     "tests/gsc-site-url-guard-smoke.php": { "environment": "standalone-php" },
@@ -17,10 +18,10 @@
     "tests/image-optimization-scheduling-context-smoke.php": { "environment": "standalone-php" },
     "tests/indexnow-ownership-smoke.php": { "environment": "standalone-php" },
     "tests/indexnow-registration-smoke.php": { "environment": "standalone-php" },
+    "tests/manifest-contract-smoke.php": { "environment": "standalone-php" },
     "tests/mediavine-dimensional-smoke.php": { "environment": "standalone-php" },
     "tests/pagespeed-ownership-smoke.php": { "environment": "standalone-php" },
     "tests/provider-bootstrap-smoke.php": { "environment": "standalone-php" },
-    "tests/sendy-campaign-abilities-smoke.php": { "environment": "standalone-php" },
-    "tests/test-manifest-contract-smoke.php": { "environment": "standalone-php" }
+    "tests/sendy-campaign-abilities-smoke.php": { "environment": "standalone-php" }
   }
 }

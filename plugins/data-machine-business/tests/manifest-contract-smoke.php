@@ -2,7 +2,7 @@
 /**
  * Ensure every standalone or WordPress smoke declares its execution environment.
  *
- * Run with: php tests/test-manifest-contract-smoke.php
+ * Run with: php tests/manifest-contract-smoke.php
  *
  * @package DataMachineBusiness\Tests
  */
@@ -23,6 +23,17 @@ foreach ( $files as $file ) {
 	}
 }
 sort( $expected );
+
+// A smoke named test-*.php also matches the PHPUnit file convention. The managed
+// WP Codebox bootstrap then loads it as a test file, its exit(1) kills the PHP
+// process before PHPUnit starts, and the whole gate reports zero executed tests.
+foreach ( $expected as $path ) {
+	if ( str_starts_with( basename( $path ), 'test-' ) ) {
+		fwrite( STDERR, "Smoke test {$path} must not use the PHPUnit test-*.php filename convention.\n" );
+		exit( 1 );
+	}
+}
+
 $declared = array_keys( $manifest['tests'] );
 sort( $declared );
 
@@ -34,6 +45,7 @@ if ( $expected !== $declared ) {
 $wordpress_smokes = array(
 	'tests/data-machine-http-client-contract-smoke.php',
 	'tests/google-analytics-aggregate-schema-smoke.php',
+	'tests/google-analytics-tool-schema-smoke.php',
 );
 foreach ( $manifest['tests'] as $path => $test ) {
 	$expected_environment = in_array( $path, $wordpress_smokes, true ) ? 'wordpress' : 'standalone-php';

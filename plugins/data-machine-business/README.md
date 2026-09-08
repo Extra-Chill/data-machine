@@ -307,6 +307,10 @@ Create a Discord application and bot, grant it Send Messages and Read Message Hi
 
 Configure the Bing Webmaster API key and site URL in Data Machine settings. Existing values stored under the original Data Machine option are adopted automatically. See [Bing Webmaster Tools](docs/bing-webmaster.md).
 
+### PageSpeed Insights
+
+Audits run without credentials at the public quota. To use a higher quota, store a Google PageSpeed Insights API key as `api_key` in the `datamachine_pagespeed_config` network option.
+
 ### Amazon Associates
 
 Join Amazon Associates, create Amazon Creators API credentials, and configure the credential ID, credential secret, partner tag, and marketplace in the `amazon_affiliate_link` tool settings. See [Amazon Affiliate Link](docs/amazon-affiliate-link.md).
