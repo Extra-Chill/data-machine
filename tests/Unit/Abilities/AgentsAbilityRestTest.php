@@ -2,7 +2,7 @@
 /**
  * Agents family ability REST-runner tests.
  *
- * Covers the agent CRUD, token, and access abilities the admin consumes
+ * Covers the agent CRUD and token abilities the admin consumes
  * after the datamachine/v1 wrapper routes were deleted for #3456.
  *
  * @package DataMachine\Tests\Unit\Abilities
@@ -172,80 +172,6 @@ class AgentsAbilityRestTest extends WP_UnitTestCase {
 				array(
 					'agent_id' => $agent_id,
 					'token_id' => $token_id,
-				)
-			)
-		);
-	}
-
-	public function test_rest_visible_access_grant_list_revoke_round_trip(): void {
-		$created   = $this->run_ability( 'create-agent', array( 'agent_slug' => 'agents-ability-access-bot' ) );
-		$agent_id  = (int) $created['agent_id'];
-		$owner_id  = get_current_user_id();
-		$member_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-
-		$granted = $this->run_ability(
-			'manage-agent-access',
-			array(
-				'action'   => 'grant',
-				'agent_id' => $agent_id,
-				'user_id'  => $member_id,
-				'role'     => 'operator',
-			)
-		);
-		$this->assertTrue( $granted['success'] );
-		$this->assertSame( $member_id, $granted['user_id'] );
-		$this->assertSame( 'operator', $granted['role'] );
-
-		$listed = $this->run_ability(
-			'manage-agent-access',
-			array(
-				'action'   => 'list',
-				'agent_id' => $agent_id,
-			)
-		);
-		$this->assertTrue( $listed['success'] );
-		$this->assertNotEmpty( $listed['grants'] );
-		$grant = null;
-		foreach ( $listed['grants'] as $row ) {
-			if ( (int) $row['user_id'] === $member_id ) {
-				$grant = $row;
-			}
-		}
-		$this->assertNotNull( $grant );
-		$this->assertSame( 'operator', $grant['role'] );
-
-		$revoked = $this->run_ability(
-			'manage-agent-access',
-			array(
-				'action'   => 'revoke',
-				'agent_id' => $agent_id,
-				'user_id'  => $member_id,
-			)
-		);
-		$this->assertTrue( $revoked['success'] );
-		$this->assertTrue( $revoked['revoked'] );
-
-		// The owner's grant cannot be revoked through the ability.
-		$this->assertSame(
-			400,
-			$this->run_ability_status(
-				'manage-agent-access',
-				array(
-					'action'   => 'revoke',
-					'agent_id' => $agent_id,
-					'user_id'  => $owner_id,
-				)
-			)
-		);
-
-		// Unknown agents surface as 404 through the core runner.
-		$this->assertSame(
-			404,
-			$this->run_ability_status(
-				'manage-agent-access',
-				array(
-					'action'   => 'list',
-					'agent_id' => 999999,
 				)
 			)
 		);

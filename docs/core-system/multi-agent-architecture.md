@@ -205,7 +205,7 @@ Creating an agent:
 
 ## REST API
 
-**Source:** `inc/Abilities/AgentAbilities.php`, `inc/Abilities/AgentAccessAbilities.php`, `inc/Abilities/AgentTokenAbilities.php`
+**Source:** `inc/Abilities/AgentAbilities.php`, `inc/Abilities/AgentTokenAbilities.php`
 **Since:** v0.41.0 (full CRUD + access management in v0.43.0); migrated from `datamachine/v1` wrapper routes to REST-visible abilities in #3456
 
 Agent management executes through the core ability runner at `POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run`:
@@ -217,14 +217,13 @@ Agent management executes through the core ability runner at `POST /wp-json/wp-a
 | `datamachine/create-agent` | Create new agent (owner defaults to the acting user) | `manage_agents` or `create_own_agent` |
 | `datamachine/update-agent` | Update agent fields (`agent_name`, `agent_config`) | `manage_agents` |
 | `datamachine/delete-agent` | Delete agent (optional `delete_files`) | `manage_agents` |
-| `datamachine/manage-agent-access` | List, grant, or revoke per-user access grants (`action: list\|grant\|revoke`) | `manage_agents` |
 | `datamachine/create-agent-token` | Create a bearer token (raw value returned once) | `manage_agents` plus admin agent access |
 | `datamachine/list-agent-tokens` | List token metadata | `manage_agents` plus operator agent access |
 | `datamachine/revoke-agent-token` | Revoke a token | `manage_agents` plus admin agent access |
 
 **List scoping:** `datamachine/list-agents` is accessible to any caller with `chat` or `manage_agents`. Admins see all agents (with `scope=all`). Non-admin users only see agents they own or have explicit access grants for — the ability unions `Agents::get_all_by_owner_id()` with `AgentAccess::get_agent_ids_for_user()`.
 
-**Owner protection:** The `revoke` action of `datamachine/manage-agent-access` prevents revoking the owner's access. Ownership must be transferred before the owner's grant can be removed.
+**Owner protection:** `DELETE /agents/{id}/access/{user_id}` refuses to revoke the owner's grant. Ownership must be transferred first.
 
 ## CLI
 
@@ -304,8 +303,6 @@ This is used across many CLI commands (`memory`, `workspace`, `flows`, etc.) to 
 | `inc/Core/Database/Agents/Agents.php` | Agents table repository (CRUD) |
 | `inc/Core/Database/Agents/AgentAccess.php` | Agent access grants repository |
 | `inc/Abilities/AgentAbilities.php` | WordPress 6.9 Abilities registration (agent CRUD family) |
-| `inc/Abilities/AgentAccessAbilities.php` | `datamachine/manage-agent-access` ability (list/grant/revoke) |
-| `inc/Abilities/AgentTokenAbilities.php` | Agent bearer-token abilities |
 | `inc/Abilities/PermissionHelper.php` | Permission checks with agent/user scoping |
 | `inc/Cli/Commands/AgentsCommand.php` | WP-CLI commands for agent management |
 | `inc/Cli/AgentResolver.php` | CLI helper for `--agent` flag resolution |

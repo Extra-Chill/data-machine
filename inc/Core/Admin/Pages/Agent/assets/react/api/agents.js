@@ -8,7 +8,7 @@
 /**
  * External dependencies
  */
-import { executeAbility } from '@shared/utils/api';
+import { client, executeAbility } from '@shared/utils/api';
 
 /**
  * Fetch all agents accessible to the current user.
@@ -99,24 +99,14 @@ export const deleteAgent = ( agentId, deleteFiles = false ) =>
 /**
  * Fetch access grants for an agent.
  *
+ * Access routes are retained on datamachine/v1 until Agents API ships
+ * grant/revoke/list-users abilities (Automattic/agents-api#537).
+ *
  * @param {number} agentId Agent ID.
- * @return {Promise<Object>} Result with the access grants array in `data`.
+ * @return {Promise<Object>} API response with access grants array.
  */
-export const fetchAgentAccess = async ( agentId ) => {
-	const result = await executeAbility( 'manage-agent-access', {
-		action: 'list',
-		agent_id: agentId,
-	} );
-
-	if ( ! result.success ) {
-		return result;
-	}
-
-	return {
-		...result,
-		data: result.grants ?? [],
-	};
-};
+export const fetchAgentAccess = ( agentId ) =>
+	client.get( `/agents/${ agentId }/access` );
 
 /**
  * Grant a user access to an agent.
@@ -124,12 +114,10 @@ export const fetchAgentAccess = async ( agentId ) => {
  * @param {number} agentId Agent ID.
  * @param {number} userId  WordPress user ID.
  * @param {string} role    Access role (admin, operator, viewer).
- * @return {Promise<Object>} Ability result.
+ * @return {Promise<Object>} API response.
  */
 export const grantAccess = ( agentId, userId, role = 'viewer' ) =>
-	executeAbility( 'manage-agent-access', {
-		action: 'grant',
-		agent_id: agentId,
+	client.post( `/agents/${ agentId }/access`, {
 		user_id: userId,
 		role,
 	} );
@@ -139,11 +127,7 @@ export const grantAccess = ( agentId, userId, role = 'viewer' ) =>
  *
  * @param {number} agentId Agent ID.
  * @param {number} userId  WordPress user ID.
- * @return {Promise<Object>} Ability result.
+ * @return {Promise<Object>} API response.
  */
 export const revokeAccess = ( agentId, userId ) =>
-	executeAbility( 'manage-agent-access', {
-		action: 'revoke',
-		agent_id: agentId,
-		user_id: userId,
-	} );
+	client.delete( `/agents/${ agentId }/access/${ userId }` );

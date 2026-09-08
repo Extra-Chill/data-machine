@@ -1,10 +1,10 @@
 # Agents
 
-**Implementation**: `inc/Abilities/AgentAbilities.php`, `inc/Abilities/AgentAccessAbilities.php`, `inc/Abilities/AgentTokenAbilities.php`, `inc/Core/Auth/AgentAuthorize.php`, `inc/Core/Auth/AgentAuthCallback.php`
+**Implementation**: `inc/Abilities/AgentAbilities.php`, `inc/Abilities/AgentTokenAbilities.php`, `inc/Core/Auth/AgentAuthorize.php`, `inc/Core/Auth/AgentAuthCallback.php`
 
 ## Overview
 
-Agent record, access, and token management is exposed as REST-visible Data Machine abilities and executed through WordPress core's ability runner (`POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run`). The former `datamachine/v1` `/agents*` wrapper routes were retired in #3456. The browser authorization flow (`/agent/authorize`, `/agent/auth/*`) remains on `datamachine/v1` because it is a browser-facing redirect/callback transport.
+Agent record and token management is exposed as REST-visible Data Machine abilities and executed through WordPress core's ability runner (`POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run`). The former `datamachine/v1` `/agents*` wrapper routes were retired in #3456, except the access-grant routes (`GET/POST /agents/{id}/access`, `DELETE /agents/{id}/access/{user_id}`), which remain until Agents API ships `agents/grant-agent-access`, `agents/revoke-agent-access`, and `agents/list-agent-users` (Automattic/agents-api#537). The browser authorization flow (`/agent/authorize`, `/agent/auth/*`) remains on `datamachine/v1` because it is a browser-facing redirect/callback transport.
 
 ## Authentication
 
@@ -23,7 +23,6 @@ Token values are sensitive. `create-agent-token` returns `raw_token` once; `list
 | `datamachine/create-agent` | `manage_agents` or `create_own_agent` | Create an agent. `agent_slug` required; `agent_name` defaults to the slug; `owner_id` defaults to the acting user (admins may pass another user); `config` and `site_scope` optional. Non-admins can only create for themselves, subject to a per-user limit. |
 | `datamachine/update-agent` | `manage_agents` | Update `agent_name` and/or `agent_config` on `agent` (slug or ID). |
 | `datamachine/delete-agent` | `manage_agents` | Delete an agent and its access grants. `delete_files: true` also removes the filesystem directory. |
-| `datamachine/manage-agent-access` | `manage_agents` | `action: list` returns enriched per-user grants; `action: grant` adds `user_id` with `role` (`admin`, `operator`, `viewer`; default `viewer`); `action: revoke` removes `user_id`. The owner's grant cannot be revoked. |
 | `datamachine/create-agent-token` | `manage_agents` plus admin access to the agent | Create a bearer token. `label`, `capabilities` (null = all agent capabilities), `expires_in` (seconds) optional. |
 | `datamachine/list-agent-tokens` | `manage_agents` plus operator access to the agent | List token metadata for an agent. |
 | `datamachine/revoke-agent-token` | `manage_agents` plus admin access to the agent | Revoke a token by `token_id`. The token stops working immediately. |
