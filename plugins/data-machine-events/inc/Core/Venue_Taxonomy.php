@@ -693,6 +693,10 @@ class Venue_Taxonomy {
 	 * Determine whether supplied geography contradicts stored venue evidence.
 	 *
 	 * Missing values on either side are incomplete evidence, not a conflict.
+	 * A partial incoming address with no street component (city/zip/country
+	 * only) is likewise incomplete evidence, as is an address that is a less
+	 * specific subset of the stored one (#798). A different street is still
+	 * a conflict, protecting same-name venues in different locations.
 	 *
 	 * @param int   $term_id    Venue term ID.
 	 * @param array $venue_data Incoming venue metadata.
@@ -707,19 +711,71 @@ class Venue_Taxonomy {
 				continue;
 			}
 
-			$incoming = 'address' === $field
+			if ( 'address' === $field && ! self::address_has_street_component( (string) $incoming ) ) {
+				continue;
+			}
+
+			$incoming_normalized = 'address' === $field
 				? self::normalize_address_for_matching( (string) $incoming )
 				: self::normalize_geographic_value( (string) $incoming, $field );
-			$stored   = 'address' === $field
+			$stored_normalized   = 'address' === $field
 				? self::normalize_address_for_matching( (string) $stored )
 				: self::normalize_geographic_value( (string) $stored, $field );
 
-			if ( $incoming !== $stored ) {
+			if ( 'address' === $field && self::normalized_address_is_subset( $incoming_normalized, $stored_normalized ) ) {
+				continue;
+			}
+
+			if ( $incoming_normalized !== $stored_normalized ) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	/**
+	 * Determine whether an address string carries a street component.
+	 *
+	 * A street component requires a digit-led leading token (house number)
+	 * followed by a recognized street-type word somewhere in the string.
+	 * City/zip/country-only strings ("Charleston, SC 29492-2901, United
+	 * States") and bare postal codes hold no street evidence and cannot
+	 * contradict a stored street address (#798).
+	 *
+	 * @param string $address Raw address string.
+	 * @return bool
+	 */
+	public static function address_has_street_component( string $address ): bool {
+		$normalized = self::normalize_address_for_matching( $address );
+
+		if ( '' === $normalized ) {
+			return false;
+		}
+
+		$tokens = explode( ' ', $normalized );
+
+		if ( ! preg_match( '/^\d/', $tokens[0] ) ) {
+			return false;
+		}
+
+		return 1 === preg_match( '/\b(st|ave|blvd|dr|rd|ln|ct|ste|apt|hwy|pkwy|pl|cir)\b/', $normalized );
+	}
+
+	/**
+	 * Determine whether one normalized address is a word-boundary subset of the other.
+	 *
+	 * @param string $incoming Normalized incoming address.
+	 * @param string $stored   Normalized stored address.
+	 * @return bool
+	 */
+	private static function normalized_address_is_subset( string $incoming, string $stored ): bool {
+		if ( '' === $incoming || '' === $stored || $incoming === $stored ) {
+			return false;
+		}
+
+		return 1 === preg_match( '/\b' . preg_quote( $incoming, '/' ) . '\b/', $stored )
+			|| 1 === preg_match( '/\b' . preg_quote( $stored, '/' ) . '\b/', $incoming );
 	}
 
 	/**
