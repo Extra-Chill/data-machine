@@ -149,6 +149,7 @@ class StaleListingReconciler {
 
 		$source_url    = trim( (string) ( $handler_config['source_url'] ?? '' ) );
 		$venue_term_id = (int) ( $handler_config['venue'] ?? 0 );
+		$venue_name    = trim( (string) ( $handler_config['venue_name'] ?? '' ) );
 
 		if ( '' === $source_url ) {
 			return new \WP_Error(
@@ -157,12 +158,33 @@ class StaleListingReconciler {
 			);
 		}
 
+		// Flows may pin their venue by name (+ optional geography) instead of
+		// a term ID. Resolve that to the existing venue term through the same
+		// identity resolver the upsert path uses — read-only: an unresolvable
+		// name errors instead of creating a term.
+		if ( $venue_term_id <= 0 && '' !== $venue_name ) {
+			$identity = Venue_Taxonomy::resolve_venue_identity(
+				$venue_name,
+				array(
+					'address' => (string) ( $handler_config['venue_address'] ?? '' ),
+					'city'    => (string) ( $handler_config['venue_city'] ?? '' ),
+					'state'   => (string) ( $handler_config['venue_state'] ?? '' ),
+					'country' => (string) ( $handler_config['venue_country'] ?? '' ),
+				)
+			);
+
+			if ( 'matched' === $identity['match_status'] && (int) ( $identity['term_id'] ?? 0 ) > 0 ) {
+				$venue_term_id = (int) $identity['term_id'];
+			}
+		}
+
 		if ( $venue_term_id <= 0 ) {
 			return new \WP_Error(
 				'stale_listings_venue_not_pinned',
 				sprintf(
-					'Flow %d handler config has no fixed venue term; stale-listing reconciliation only runs on venue-pinned flows.',
-					$flow_id
+					'Flow %1$d handler config has no fixed venue term and its venue_name (%2$s) could not be resolved to an existing venue term; stale-listing reconciliation only runs on venue-pinned flows.',
+					$flow_id,
+					'' !== $venue_name ? $venue_name : 'none configured'
 				)
 			);
 		}

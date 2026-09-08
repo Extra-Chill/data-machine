@@ -214,6 +214,35 @@ class StaleListingReconcilerTest extends WP_UnitTestCase {
 		$this->assertSame( 'stale_listings_venue_not_pinned', $result->get_error_code() );
 	}
 
+	public function test_venue_name_config_resolves_to_term_id(): void {
+		$venue_id = $this->createVenue( 'Name Pinned Venue' );
+		$flow_id  = 48;
+		$venue    = get_term( $venue_id, 'venue' );
+
+		$reconciler = new StaleListingReconciler(
+			fn() => $this->venueNameFlowConfig( $flow_id, $venue->name ),
+			null
+		);
+		$result = $reconciler->loadVenuePinnedScraperConfig( $flow_id );
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'https://venue.example.com/schedule', $result['source_url'] );
+		$this->assertSame( $venue_id, $result['venue_term_id'] );
+	}
+
+	public function test_unresolvable_venue_name_returns_pinned_error(): void {
+		$flow_id = 49;
+
+		$reconciler = new StaleListingReconciler(
+			fn() => $this->venueNameFlowConfig( $flow_id, 'Definitely Not A Real Venue ' . uniqid() ),
+			null
+		);
+		$result = $reconciler->loadVenuePinnedScraperConfig( $flow_id );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'stale_listings_venue_not_pinned', $result->get_error_code() );
+	}
+
 	public function test_venue_pinned_config_rejects_non_scraper_handler(): void {
 		$venue_id = $this->createVenue();
 		$flow_id  = 43;
@@ -296,6 +325,30 @@ class StaleListingReconcilerTest extends WP_UnitTestCase {
 		);
 	}
 
+	/**
+	 * Flow config that pins the venue by name (no venue term ID), the shape
+	 * venue_name-based flows use.
+	 */
+	private function venueNameFlowConfig( int $flow_id, string $venue_name, array $venue_geo = array() ): array {
+		return array(
+			$flow_id . '_step_fetch' => array(
+				'flow_step_id'  => $flow_id . '_step_fetch',
+				'step_type'     => 'event_import',
+				'enabled'       => true,
+				'handler_slugs' => array( 'universal_web_scraper' ),
+				'handler_configs' => array(
+					'universal_web_scraper' => array_merge(
+						array(
+							'source_url' => 'https://venue.example.com/schedule',
+							'venue_name' => $venue_name,
+						),
+						$venue_geo
+					),
+				),
+			),
+		);
+	}
+
 	private function sourceEvent( string $title, string $when ): array {
 		return array(
 			'title'     => $title,
@@ -319,8 +372,8 @@ class StaleListingReconcilerTest extends WP_UnitTestCase {
 		return $post_id;
 	}
 
-	private function createVenue(): int {
-		$venue = wp_insert_term( 'Stale listings venue ' . uniqid(), 'venue' );
+	private function createVenue( string $prefix = 'Stale listings venue ' ): int {
+		$venue = wp_insert_term( $prefix . uniqid(), 'venue' );
 		$this->assertNotWPError( $venue );
 
 		return (int) $venue['term_id'];
