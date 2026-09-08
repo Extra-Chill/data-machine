@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.60.3] - 2026-09-08
+
+### Changed
+- pay down phpstan lint baseline (issue #767) — DOM scraper cluster first
+
+### Fixed
+- unclamp route fitBounds zoom; scope term-filtered venues API counts to the term
+- title guidance describes what a title must do for a reader
+
 ## [0.60.2] - 2026-09-07
 
 ### Fixed
