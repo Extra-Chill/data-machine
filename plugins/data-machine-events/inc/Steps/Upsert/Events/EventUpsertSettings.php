@@ -13,6 +13,7 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\WordPress\WordPressSettingsHandler;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\Event_Type_Taxonomy;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -70,10 +71,12 @@ class EventUpsertSettings {
 		// Add dynamic taxonomy fields using core WordPressSettingsHandler
 		// Venue is excluded because it has a custom handler registered in EventUpsert.php
 		// Category and post_tag are excluded as they are not valid for event upsert
+		// event_type is excluded because the closed-vocabulary eventType parameter
+		// owns its assignment (processEventType); the selection is dead config.
 		$taxonomy_fields = WordPressSettingsHandler::get_taxonomy_fields(
 			array(
 				'post_type'            => Event_Post_Type::POST_TYPE,
-				'exclude_taxonomies'   => array( 'venue', 'category', 'post_tag' ),
+				'exclude_taxonomies'   => array( 'venue', Event_Type_Taxonomy::TAXONOMY, 'category', 'post_tag' ),
 				'field_suffix'         => '_selection',
 				'first_options'        => array(
 					'skip'       => __( 'Skip', 'data-machine-events' ),
@@ -117,13 +120,15 @@ class EventUpsertSettings {
 		// Sanitize dynamic taxonomy selections using core WordPressSettingsHandler
 		// Venue is excluded because it has a custom handler registered in EventUpsert.php
 		// Category and post_tag are excluded as they are not valid for event upsert
+		// event_type is excluded so persisted configs carrying the dead
+		// taxonomy_event_type_selection key shed it on their next save. See #792.
 		$sanitized = array_merge(
 			$sanitized,
 			WordPressSettingsHandler::sanitize_taxonomy_fields(
 				$raw_settings,
 				array(
 					'post_type'          => Event_Post_Type::POST_TYPE,
-					'exclude_taxonomies' => array( 'venue', 'category', 'post_tag' ),
+					'exclude_taxonomies' => array( 'venue', Event_Type_Taxonomy::TAXONOMY, 'category', 'post_tag' ),
 					'field_suffix'       => '_selection',
 					'allowed_values'     => array( 'skip', 'ai_decides' ),
 					'default_value'      => 'skip',

@@ -494,9 +494,9 @@ class EventUpsert extends UpsertHandler {
 			$location_handled = $this->taxonomy_assigner->processLocation( $post_id, $parameters, $engine, $handler_config );
 
 			// Resolve the canonical eventType against the closed `event_type`
-			// vocabulary. When a value was supplied, this owns the assignment
-			// and the generic pass must not re-run it. See #761.
-			$event_type_handled = $this->taxonomy_assigner->processEventType( $post_id, $parameters, $engine );
+			// vocabulary. This owns the assignment; the generic taxonomy pass
+			// below is always blocked for event_type. See #761, #792.
+			$this->taxonomy_assigner->processEventType( $post_id, $parameters, $engine );
 
 			// Map performer to artist taxonomy if not explicitly provided.
 			if ( empty( $parameters['artist'] ) && ! empty( $event_data['performer'] ) ) {
@@ -509,9 +509,10 @@ class EventUpsert extends UpsertHandler {
 			if ( $location_handled ) {
 				$handler_config_for_tax['taxonomy_location_selection'] = 'skip';
 			}
-			if ( $event_type_handled ) {
-				$handler_config_for_tax[ 'taxonomy_' . \DataMachineEvents\Core\Event_Type_Taxonomy::TAXONOMY . '_selection' ] = 'skip';
-			}
+			// event_type is owned by the eventType parameter (processEventType
+			// above), never by the generic pass — regardless of whether a value
+			// was declared. See #792.
+			$handler_config_for_tax[ 'taxonomy_' . \DataMachineEvents\Core\Event_Type_Taxonomy::TAXONOMY . '_selection' ] = 'skip';
 			$engine_data_array = $engine->all();
 			$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
 

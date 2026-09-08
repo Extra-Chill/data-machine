@@ -11,6 +11,7 @@ use DataMachine\Core\EngineData;
 use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\Event_Type_Taxonomy;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 use WP_UnitTestCase;
@@ -572,6 +573,37 @@ class EventUpsertLifecycleTest extends WP_UnitTestCase {
 		$this->assertSame( 409, $result['status'] );
 		$this->assertSame( $before_content, get_post( $post_id )->post_content );
 		$this->assertEqualsCanonicalizing( array_merge( $first_venue_ids, array( (int) $second_venue['term_id'] ) ), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
+	}
+
+	/**
+	 * The #792 runtime guarantee: event_type assignment is owned by the
+	 * closed-vocabulary `eventType` parameter even when a (now-dead)
+	 * `taxonomy_event_type_selection => 'skip'` rides along in the config.
+	 */
+	public function test_upsert_assigns_event_type_from_eventType_despite_skip_selection(): void {
+		if ( ! taxonomy_exists( Event_Type_Taxonomy::TAXONOMY ) ) {
+			Event_Type_Taxonomy::register();
+			Event_Type_Taxonomy::seed_vocabulary();
+		}
+
+		$result = $this->invoke_upsert(
+			array(
+				'title'     => 'Event Type Skip Selection ' . uniqid(),
+				'venue'     => 'Event Type Skip Venue ' . uniqid(),
+				'startDate' => '2027-03-08',
+				'startTime' => '20:00',
+				'eventType' => 'Festival',
+			),
+			array(
+				'taxonomy_' . Event_Type_Taxonomy::TAXONOMY . '_selection' => 'skip',
+			)
+		);
+
+		$this->assertTrue( $result['success'] ?? false, wp_json_encode( $result ) );
+		$post_id = (int) $result['data']['post_id'];
+		$terms   = wp_get_object_terms( $post_id, Event_Type_Taxonomy::TAXONOMY );
+		$this->assertCount( 1, $terms );
+		$this->assertSame( 'Festival', $terms[0]->name );
 	}
 
 	/**
