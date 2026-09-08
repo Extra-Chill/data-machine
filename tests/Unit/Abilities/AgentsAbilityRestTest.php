@@ -156,24 +156,15 @@ class AgentsAbilityRestTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $listed['tokens'] );
 		$this->assertSame( 'ability-rest-client', $listed['tokens'][0]['label'] );
 
-		$revoked = $this->run_ability(
-			'revoke-agent-token',
-			array(
-				'agent_id' => $agent_id,
-				'token_id' => $token_id,
-			)
+		$revoke_input = array(
+			'agent_id' => $agent_id,
+			'token_id' => $token_id,
 		);
+
+		$revoked = $this->run_ability( 'revoke-agent-token', $revoke_input );
 		$this->assertTrue( $revoked['success'] );
 
-		$this->assertSame(
-			404,
-			$this->run_ability_status(
-				'revoke-agent-token',
-				array(
-					'agent_id' => $agent_id,
-					'token_id' => $token_id,
-				)
-			)
-		);
+		// Second revoke of the same token is a 404, not a silent no-op.
+		$this->assertSame( 404, $this->run_ability_status( 'revoke-agent-token', $revoke_input ) );
 	}
 }
