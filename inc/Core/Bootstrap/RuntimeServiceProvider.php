@@ -123,6 +123,7 @@ final class RuntimeServiceProvider {
 		\DataMachine\Api\AgentPing::register();
 		\DataMachine\Api\FlowFiles::register();
 		\DataMachine\Api\Users::register();
+		\DataMachine\Api\Agents::register();
 		\DataMachine\Api\Auth::register();
 		\DataMachine\Api\Chat\Chat::register();
 		\DataMachine\Api\System\System::register();
