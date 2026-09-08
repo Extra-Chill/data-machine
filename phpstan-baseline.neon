@@ -118,3 +118,6 @@ parameters:
 		-
 			message: '#WP_Agent_Access_Grant#'
 			path: inc/Cli/Commands/AgentsCommand.php
+		-
+			message: '#Cannot access property \$(user_id|role|granted_at) on array\.#'
+			path: inc/Cli/Commands/AgentsCommand.php
