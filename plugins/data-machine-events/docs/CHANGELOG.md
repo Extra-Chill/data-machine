@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.61.1] - 2026-09-08
+
+### Fixed
+- let ICS RECURRENCE-ID overrides reach upsert instead of being skipped as duplicates
+- select the external MySQL provider instead of Docker (homeboy#14426)
+
 ## [0.61.0] - 2026-09-08
 
 ### Added
