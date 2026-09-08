@@ -115,3 +115,6 @@ parameters:
 		-
 			message: '#resolve_import_auth_refs\(\) should return#'
 			path: inc/Abilities/AgentAbilities.php
+		-
+			message: '#WP_Agent_Access_Grant#'
+			path: inc/Cli/Commands/AgentsCommand.php
