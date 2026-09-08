@@ -676,7 +676,7 @@ class AgentAbilities {
 				'datamachine/get-agent',
 				array(
 					'label'               => 'Get Agent',
-					'description'         => 'Retrieve a single agent by slug or ID with access grants and directory info',
+					'description'         => 'Retrieve a single agent by slug or ID with access grants and directory info, or the acting principal\'s own agent via me',
 					'category'            => 'datamachine-agent',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -689,6 +689,10 @@ class AgentAbilities {
 								'type'        => 'integer',
 								'description' => 'Agent ID (provide this or agent_slug).',
 							),
+							'me'         => array(
+								'type'        => 'boolean',
+								'description' => 'Resolve the acting principal\'s own agent (agent-token context, else the user\'s default agent) and include site metadata. Ignored when agent, agent_slug, or agent_id is provided.',
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -696,6 +700,13 @@ class AgentAbilities {
 						'properties' => array(
 							'success' => array( 'type' => 'boolean' ),
 							'agent'   => array( 'type' => 'object' ),
+							'site'    => array(
+								'type'       => 'object',
+								'properties' => array(
+									'site_url'  => array( 'type' => 'string' ),
+									'site_name' => array( 'type' => 'string' ),
+								),
+							),
 							'error'   => array( 'type' => 'string' ),
 						),
 					),
@@ -2186,6 +2197,12 @@ class AgentAbilities {
 		$owner_id = (int) ( $input['owner_id'] ?? 0 );
 		$config   = $input['config'] ?? array();
 
+		// Default the owner to the acting user when unspecified — the
+		// datamachine/v1 wrapper route used to inject this default.
+		if ( $owner_id <= 0 ) {
+			$owner_id = PermissionHelper::acting_user_id();
+		}
+
 		// Scope is first-class on create. Default (key absent) is network-wide
 		// via the DB column default. An explicit null also means network-wide;
 		// a positive integer scopes the agent to that single blog.
@@ -2405,13 +2422,23 @@ class AgentAbilities {
 	}
 
 	/**
-	 * Get a single agent by slug or ID.
+	 * Get a single agent by slug or ID, or the acting principal's own agent.
 	 *
-	 * @param array $input { agent_slug or agent_id }.
+	 * @param array $input { agent_slug or agent_id, or me: true }.
 	 * @return array Agent data or error.
 	 */
 	public static function getAgent( array $input ): array|\WP_Error {
-		$agent_id = self::resolve_agent_input_id( $input );
+		$me_mode = ! empty( $input['me'] )
+			&& empty( $input['agent'] )
+			&& empty( $input['agent_slug'] )
+			&& empty( $input['agent_id'] );
+
+		if ( $me_mode ) {
+			$agent_id = self::resolve_acting_agent_id();
+		} else {
+			$agent_id = self::resolve_agent_input_id( $input );
+		}
+
 		if ( is_wp_error( $agent_id ) ) {
 			return $agent_id;
 		}
@@ -2442,7 +2469,7 @@ class AgentAbilities {
 		$directory_manager = new DirectoryManager();
 		$agent_dir         = $directory_manager->get_agent_identity_directory( $agent['agent_slug'] );
 
-		return array(
+		$result = array(
 			'success' => true,
 			'agent'   => array(
 				'agent_id'         => (int) $agent['agent_id'],
@@ -2460,6 +2487,53 @@ class AgentAbilities {
 				'principal_access' => $principal_access,
 			),
 		);
+
+		// Identity lookups (`me`) additionally carry site metadata, matching
+		// the retired datamachine/v1 /agents/me route payload.
+		if ( $me_mode ) {
+			$result['site'] = array(
+				'site_url'  => get_site_url(),
+				'site_name' => get_bloginfo( 'name' ),
+			);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Resolve the acting principal's own agent ID for `me` lookups.
+	 *
+	 * In agent bearer-token context this is the authenticated agent;
+	 * otherwise it is the acting user's default (first owned) agent.
+	 *
+	 * @return int|\WP_Error Agent ID or error.
+	 */
+	private static function resolve_acting_agent_id(): int|\WP_Error {
+		$acting_agent_id = PermissionHelper::get_acting_agent_id();
+
+		if ( null !== $acting_agent_id ) {
+			return (int) $acting_agent_id;
+		}
+
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return new \WP_Error(
+				'not_authenticated',
+				'Authentication required.',
+				array( 'status' => 401 )
+			);
+		}
+
+		$agent = ( new Agents() )->get_by_owner_id( $user_id );
+		if ( ! $agent ) {
+			return new \WP_Error(
+				'no_agent',
+				'No agent found for this user.',
+				array( 'status' => 404 )
+			);
+		}
+
+		return (int) $agent['agent_id'];
 	}
 
 	/**
@@ -2881,9 +2955,9 @@ class AgentAbilities {
 	 *
 	 *     @type bool $dry_run Default true. When true, return candidates without deleting.
 	 * }
-	 * @return array Result with candidates and counts.
+	 * @return array|\WP_Error Result with candidates and counts, or WP_Error when a delete fails.
 	 */
-	public static function pruneAgents( array $input ): array {
+	public static function pruneAgents( array $input ): array|\WP_Error {
 		$dry_run = $input['dry_run'] ?? true;
 
 		$agents_repo = new Agents();

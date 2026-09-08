@@ -72,7 +72,7 @@ Some routes are intentionally public at the WordPress REST layer and authenticat
 
 - `/trigger/{flow_id}` validates per-flow bearer tokens or HMAC signatures before executing the flow.
 - `/agent-ping/*` validates `Authorization: Bearer <token>` against the configured callback token.
-- Agent bearer tokens populate `PermissionHelper` agent context for routes such as `/agents/me`.
+- Agent bearer tokens populate `PermissionHelper` agent context for ability execution such as `datamachine/get-agent` with `me: true`.
 
 ## Permission Model
 
@@ -98,8 +98,8 @@ Public read routes exist for discovery-style surfaces such as providers, tools, 
 
 Some routes accept any logged-in user and then scope data by the current user or agent context:
 
-- `/agents` lists agents visible to the current user.
-- `/agents/me` returns the active agent or user's default agent.
+- `datamachine/list-agents` lists agents visible to the current user (owner + explicit grants for non-admins).
+- `datamachine/get-agent` with `me: true` returns the acting agent or user's default agent.
 - Agent-file abilities resolve the acting user from the input context; the retired `/files/agent/*` wrapper routes enforced the same scoping at the route layer.
 - `/users/me` returns current-user preferences.
 

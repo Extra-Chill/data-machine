@@ -9,7 +9,7 @@
  * External dependencies
  */
 import { useQuery } from '@tanstack/react-query';
-import { client } from '@shared/utils/api';
+import { executeAbility } from '@shared/utils/api';
 
 export const AGENTS_KEY = [ 'agents' ];
 
@@ -22,13 +22,13 @@ export const useAgents = () =>
 	useQuery( {
 		queryKey: AGENTS_KEY,
 		queryFn: async () => {
-			const result = await client.get( '/agents' );
+			const result = await executeAbility( 'list-agents' );
 			if ( ! result.success ) {
 				throw new Error(
 					result.message || 'Failed to fetch agents'
 				);
 			}
-			return result.data;
+			return result.agents ?? [];
 		},
 		staleTime: 10 * 60 * 1000, // 10 minutes — agents rarely change
 	} );

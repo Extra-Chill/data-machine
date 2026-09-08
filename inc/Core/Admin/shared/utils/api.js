@@ -136,24 +136,42 @@ const request = async (
  *   res.data.pipelines; // legacy envelope shape
  *   res.pipelines;      // direct ability output
  *
+ * Abilities annotated `readonly` must be executed with GET (the core runner
+ * rejects POST with 405); pass `{ method: 'GET' }` and the input travels as
+ * the `input` query parameter, per the core run-controller contract.
+ *
  * The route is transport-agnostic: permission checks, input normalization,
  * and error mapping are owned by the ability and the core REST runner.
  *
- * @param {string} slug  Ability slug without the `datamachine/` prefix.
- * @param {Object} input Ability input object.
+ * @param {string} slug    Ability slug. Bare slugs resolve under `datamachine/`; pass a qualified slug (e.g. `agents/list-agent-users`) to target another namespace.
+ * @param {Object} input   Ability input object.
+ * @param {Object} options Optional. `{ method: 'GET' }` for read-only abilities.
  * @return {Promise<Object>} `{ success, data, message, ...abilityOutput }`
  */
-export const executeAbility = async ( slug, input = {} ) => {
+export const executeAbility = async ( slug, input = {}, options = {} ) => {
 	const config = getConfig();
+	const method = options.method || 'POST';
+	const qualified = slug.includes( '/' ) ? slug : `datamachine/${ slug }`;
+	const path = `/wp-abilities/v1/abilities/${ qualified }/run`;
 	try {
-		const response = await apiFetch( {
-			path: `/wp-abilities/v1/abilities/datamachine/${ slug }/run`,
-			method: 'POST',
-			data: { input },
-			headers: {
-				'X-WP-Nonce': config.restNonce,
-			},
-		} );
+		const response = await apiFetch(
+			'GET' === method
+				? {
+						path: addQueryArgs( path, { input } ),
+						method: 'GET',
+						headers: {
+							'X-WP-Nonce': config.restNonce,
+						},
+				  }
+				: {
+						path,
+						method: 'POST',
+						data: { input },
+						headers: {
+							'X-WP-Nonce': config.restNonce,
+						},
+				  }
+		);
 		return {
 			success: true,
 			data: response,
@@ -161,11 +179,7 @@ export const executeAbility = async ( slug, input = {} ) => {
 			...response,
 		};
 	} catch ( error ) {
-		reportApiFailure(
-			'POST',
-			`/wp-abilities/v1/abilities/datamachine/${ slug }/run`,
-			error?.message
-		);
+		reportApiFailure( method, path, error?.message );
 		return {
 			success: false,
 			data: null,

@@ -205,32 +205,25 @@ Creating an agent:
 
 ## REST API
 
-**Source:** `inc/Api/Agents.php`
-**Since:** v0.41.0 (full CRUD + access management in v0.43.0)
+**Source:** `inc/Abilities/AgentAbilities.php`, `inc/Abilities/AgentTokenAbilities.php`
+**Since:** v0.41.0 (full CRUD + access management in v0.43.0); migrated from `datamachine/v1` wrapper routes to REST-visible abilities in #3456
 
-### Agent CRUD
+Agent management executes through the core ability runner at `POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run`:
 
-| Method | Endpoint | Description | Permission |
-|--------|----------|-------------|------------|
-| `GET` | `/datamachine/v1/agents` | List agents (scoped by access grants for non-admins) | Logged-in user |
-| `POST` | `/datamachine/v1/agents` | Create new agent | `manage_agents` |
-| `GET` | `/datamachine/v1/agents/{agent_slug}` | Get single agent with details | `manage_agents` |
-| `PUT/PATCH` | `/datamachine/v1/agents/{agent_slug}` | Update agent fields | `manage_agents` |
-| `DELETE` | `/datamachine/v1/agents/{agent_slug}` | Delete agent (optional `delete_files`) | `manage_agents` |
+| Ability | Description | Permission |
+|--------|-------------|------------|
+| `datamachine/list-agents` | List agents (owned + granted for non-admins; `scope=all` for admins) | `chat` or `manage_agents` |
+| `datamachine/get-agent` | Get single agent with details; `me: true` resolves the acting principal's own agent | `manage_agents` |
+| `datamachine/create-agent` | Create new agent (owner defaults to the acting user) | `manage_agents` or `create_own_agent` |
+| `datamachine/update-agent` | Update agent fields (`agent_name`, `agent_config`) | `manage_agents` |
+| `datamachine/delete-agent` | Delete agent (optional `delete_files`) | `manage_agents` |
+| `datamachine/create-agent-token` | Create a bearer token (raw value returned once) | `manage_agents` plus admin agent access |
+| `datamachine/list-agent-tokens` | List token metadata | `manage_agents` plus operator agent access |
+| `datamachine/revoke-agent-token` | Revoke a token | `manage_agents` plus admin agent access |
 
-### Access Management
+**List scoping:** `datamachine/list-agents` is accessible to any caller with `chat` or `manage_agents`. Admins see all agents (with `scope=all`). Non-admin users only see agents they own or have explicit access grants for — the ability unions `Agents::get_all_by_owner_id()` with `AgentAccess::get_agent_ids_for_user()`.
 
-| Method | Endpoint | Description | Permission |
-|--------|----------|-------------|------------|
-| `GET` | `/datamachine/v1/agents/{agent_slug}/access` | List access grants (enriched with user display names) | `manage_agents` |
-| `POST` | `/datamachine/v1/agents/{agent_slug}/access` | Grant access (`user_id` + `role`) | `manage_agents` |
-| `DELETE` | `/datamachine/v1/agents/{agent_slug}/access/{user_id}` | Revoke access (blocked for owner) | `manage_agents` |
-
-Numeric `{agent_id}` routes remain supported for compatibility, but new public integrations should use `{agent_slug}`.
-
-**List scoping:** The `GET /agents` endpoint is accessible to any logged-in user. Admins see all agents. Non-admin users only see agents they have explicit access grants for — the endpoint queries `AgentAccess::get_agent_ids_for_user()` to filter results.
-
-**Owner protection:** The `DELETE /agents/{agent_slug}/access/{user_id}` endpoint prevents revoking the owner's access. Ownership must be transferred before the owner's grant can be removed.
+**Owner protection:** `DELETE /agents/{id}/access/{user_id}` refuses to revoke the owner's grant. Ownership must be transferred first.
 
 ## CLI
 
@@ -284,7 +277,7 @@ This is used across many CLI commands (`memory`, `workspace`, `flows`, etc.) to 
                     REST API                CLI                  AI Chat
                        |                    |                      |
                        v                    v                      v
-               inc/Api/Agents.php   AgentsCommand.php      (tools via Abilities)
+        AgentAbilities.php (+Access/Tokens)   AgentsCommand.php      (tools via Abilities)
                        |                    |                      |
                        +--------+-----------+----------------------+
                                 |
@@ -309,8 +302,7 @@ This is used across many CLI commands (`memory`, `workspace`, `flows`, etc.) to 
 |------|---------|
 | `inc/Core/Database/Agents/Agents.php` | Agents table repository (CRUD) |
 | `inc/Core/Database/Agents/AgentAccess.php` | Agent access grants repository |
-| `inc/Api/Agents.php` | REST API controller for agents and access management |
-| `inc/Abilities/AgentAbilities.php` | WordPress 6.9 Abilities registration (6 abilities) |
+| `inc/Abilities/AgentAbilities.php` | WordPress 6.9 Abilities registration (agent CRUD family) |
 | `inc/Abilities/PermissionHelper.php` | Permission checks with agent/user scoping |
 | `inc/Cli/Commands/AgentsCommand.php` | WP-CLI commands for agent management |
 | `inc/Cli/AgentResolver.php` | CLI helper for `--agent` flag resolution |
