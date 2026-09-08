@@ -130,8 +130,6 @@ final class RuntimeServiceProvider {
 		\DataMachine\Api\Tools::register();
 		\DataMachine\Api\Providers::register();
 		\DataMachine\Api\Analytics::register();
-		\DataMachine\Api\InternalLinks::register();
-		\DataMachine\Api\Email::register();
 
 		new \DataMachine\Core\Auth\AgentAuthMiddleware();
 		new \DataMachine\Core\Auth\AgentAuthorize();

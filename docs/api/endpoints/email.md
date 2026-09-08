@@ -1,128 +1,57 @@
-# Email Endpoints
+# Email Abilities
 
-**Implementation**: `inc/Api/Email.php`
+**Implementation**: `inc/Abilities/Email/EmailAbilities.php`, `inc/Abilities/Fetch/FetchEmailAbility.php`, `inc/Abilities/Publish/SendEmailAbility.php`, `inc/Abilities/Publish/SendEmailQueuedAbility.php`
 
-**Base URL**: `/wp-json/datamachine/v1/email`
+The `datamachine/v1/email` REST routes were retired in #3456. Email operations are exposed through the REST-visible Data Machine abilities, executed through WordPress core's ability runner:
 
-## Overview
+```
+POST /wp-json/wp-abilities/v1/abilities/datamachine/<slug>/run
+Content-Type: application/json
 
-Email endpoints expose Data Machine email abilities over REST for sending mail, reading IMAP inboxes, replying, moving, flagging, deleting, unsubscribing, and testing the stored IMAP connection.
+{ "input": { ... } }
+```
 
 ## Authentication
 
-All email routes require Data Machine manage permission via `PermissionHelper::can_manage()`.
+Each ability's permission callback requires Data Machine manage permission (`PermissionHelper::can( 'use_tools' )` or `PermissionHelper::can_manage()`, meaning `manage_flows`, `manage_settings`, or `manage_agents`; administrators pass through the `manage_options` fallback). Agent tokens are additionally scoped per ability and category by the global `wp_ability_permission_result` filter. The core ability runner also requires `show_in_rest` and a valid REST nonce for cookie-authenticated callers.
 
-`PermissionHelper::can_manage()` passes when the caller has `manage_flows`, `manage_settings`, or `manage_agents`. Administrators also pass through the `manage_options` fallback built into `PermissionHelper`.
+Inbox operations require a configured `email_imap` auth provider; missing IMAP credentials return an `email_*` error with HTTP 400.
 
-External REST clients should use WordPress application passwords or cookie auth. Inbox operations also require a configured `email_imap` auth provider; missing IMAP credentials return `not_configured` with HTTP 400.
+## Response Envelope
 
-## Route Table
+The ability runner returns the ability's output directly (no `{success, data}` wrapper). Errors return standard REST error objects (`code`, `message`, `data.status`).
 
-| Method | Route | Ability | Purpose |
-|---|---|---|---|
-| POST | `/email/send` | `datamachine/send-email` | Send an email with optional headers and attachments. |
-| GET | `/email/fetch` | `datamachine/fetch-email` | Fetch messages from an IMAP folder. |
-| GET | `/email/{uid}/read` | `datamachine/fetch-email` | Read one message by UID. |
-| POST | `/email/reply` | `datamachine/email-reply` | Reply with threading headers. |
-| DELETE | `/email/{uid}` | `datamachine/email-delete` | Delete one message by UID. |
-| POST | `/email/{uid}/move` | `datamachine/email-move` | Move one message to another folder. |
-| POST | `/email/{uid}/flag` | `datamachine/email-flag` | Set or clear an IMAP flag. |
-| POST | `/email/batch/move` | `datamachine/email-batch-move` | Move messages matching an IMAP search. |
-| POST | `/email/batch/flag` | `datamachine/email-batch-flag` | Flag messages matching an IMAP search. |
-| POST | `/email/batch/delete` | `datamachine/email-batch-delete` | Delete messages matching an IMAP search. |
-| POST | `/email/{uid}/unsubscribe` | `datamachine/email-unsubscribe` | Unsubscribe from a list using one message's headers. |
-| POST | `/email/batch/unsubscribe` | `datamachine/email-batch-unsubscribe` | Unsubscribe from lists matching an IMAP search. |
-| POST | `/email/test-connection` | `datamachine/email-test-connection` | Test stored IMAP credentials. |
+## Email Abilities
 
-## Core Parameters
+Every ability takes `auth_ref` (non-secret mailbox auth ref, for example `email_imap:default`; default `email_imap:default`).
 
-### Send And Reply
+| Ability slug | Purpose |
+| --- | --- |
+| `datamachine/send-email` | Send an email (`to`, `subject`, `body`, optional `cc`, `bcc`, `from_name`, `from_email`, `reply_to`, `content_type`, `attachments`). Subject supports `{month}`, `{year}`, `{site_name}`, and `{date}` placeholders. |
+| `datamachine/send-email-queued` | Queue an email for delivery via Action Scheduler (`send_at`, `priority`). |
+| `datamachine/fetch-email` | Fetch messages (`folder`, `search_criteria`, `max_messages`, `offset`, `headers_only`, `mark_as_read`, `download_attachments`) or read one by `uid`. |
+| `datamachine/email-reply` | Reply with threading headers (`in_reply_to`, optional `references`). |
+| `datamachine/email-delete` | Delete one message by `uid`. |
+| `datamachine/email-move` | Move one message to `destination` folder. |
+| `datamachine/email-flag` | Set or clear an IMAP `flag` (`Seen`, `Flagged`, ...) with `action` `set`/`clear`. |
+| `datamachine/email-batch-move` | Move messages matching an IMAP `search` (`destination`, `max`). |
+| `datamachine/email-batch-flag` | Flag messages matching an IMAP `search` (`flag`, `action`, `max`). |
+| `datamachine/email-batch-delete` | Delete messages matching an IMAP `search` (`max`). |
+| `datamachine/email-unsubscribe` | Unsubscribe from a list using one message's headers (`uid`). |
+| `datamachine/email-batch-unsubscribe` | Unsubscribe from lists matching an IMAP `search` (`max`). |
+| `datamachine/email-test-connection` | Test stored IMAP credentials for the mailbox. |
 
-| Parameter | Type | Required | Notes |
-|---|---|---|---|
-| `to` | string | yes | Recipient email address or comma-separated addresses for send. |
-| `subject` | string | yes | Subject line. Send supports `{month}`, `{year}`, `{site_name}`, and `{date}` placeholders. |
-| `body` | string | yes | HTML or plain-text body. |
-| `cc`, `bcc` | string | no | Comma-separated addresses. `bcc` is send-only. |
-| `from_name`, `from_email`, `reply_to` | string | no | Send headers. Defaults use site name/admin email when omitted. |
-| `content_type` | string | no | `text/html` by default; `text/plain` is also supported. |
-| `attachments` | array | no | Server file paths for `wp_mail()` attachments. |
-| `in_reply_to` | string | reply only | Message-ID of the email being replied to. |
-| `references` | string | no | References header chain for threading. |
+## Search Strings
 
-### Fetch And Message Operations
+IMAP search strings follow the IMAP SEARCH syntax, for example `ALL`, `UNSEEN`, `FROM "github.com"`, or `SINCE "1-Mar-2026"`.
 
-| Parameter | Type | Default | Notes |
-|---|---|---|---|
-| `folder` | string | `INBOX` | Source IMAP folder. |
-| `uid` | integer | route param | Message UID for read/delete/move/flag/unsubscribe. |
-| `search` | string | `UNSEEN` for fetch | IMAP search string, for example `ALL`, `UNSEEN`, `FROM "github.com"`, or `SINCE "1-Mar-2026"`. |
-| `max` | integer | route-specific | Safety limit for fetch or batch operations. |
-| `offset` | integer | `0` | Pagination offset for fetch. |
-| `headers_only` | boolean | `false` | Fast list mode; skips body parsing. |
-| `mark_as_read` | boolean | `false` | Mark fetched messages as read. |
-| `download_attachments` | boolean | `false` | Download attachments into local storage. |
-| `destination` | string | required for move | Target IMAP folder, such as `Archive` or `[Gmail]/All Mail`. |
-| `flag` | string | required for flag | IMAP flag such as `Seen`, `Flagged`, `Answered`, `Deleted`, or `Draft`. |
-| `action` | string | `set` | `set` or `clear` for flag endpoints. |
+## Example
 
-## Response Shape
-
-Email endpoints return ability-native success objects. Failed ability results are normalized to an `email_error` REST error with HTTP 400.
-
-Send response shape:
-
-```json
-{
-  "success": true,
-  "message": "Email sent successfully",
-  "recipients": ["editor@example.com"],
-  "subject": "Weekly report",
-  "logs": []
-}
-```
-
-Fetch response shape:
-
-```json
-{
-  "success": true,
-  "data": {
-    "items": [],
-    "count": 10,
-    "total_matches": 42,
-    "offset": 0,
-    "has_more": true
-  },
-  "logs": []
-}
-```
-
-Batch operation response shapes include counters such as `moved_count`, `flagged_count`, `deleted_count`, `unsubscribed`, `failed`, or `no_header` depending on the route.
-
-## Agent Usage Examples
-
-List unread message headers without marking them read:
+List unread message headers through the ability runner:
 
 ```bash
-curl "https://example.com/wp-json/datamachine/v1/email/fetch?search=UNSEEN&headers_only=1&max=20" \
-  -u username:application_password
-```
-
-Move GitHub notifications to an archive folder:
-
-```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/email/batch/move \
+curl -X POST https://example.com/wp-json/wp-abilities/v1/abilities/datamachine/fetch-email/run \
   -H "Content-Type: application/json" \
   -u username:application_password \
-  -d '{"search":"FROM \"github.com\"","destination":"Archive","max":100}'
-```
-
-Send a concise agent report:
-
-```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/email/send \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{"to":"editor@example.com","subject":"Daily agent summary","body":"<p>No blockers.</p>"}'
+  -d '{"input":{"search_criteria":"UNSEEN","headers_only":true,"max_messages":20}}'
 ```

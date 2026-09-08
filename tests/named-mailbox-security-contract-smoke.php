@@ -5,14 +5,13 @@
  * @package DataMachine\Tests
  */
 
-$root       = dirname( __DIR__ );
-$fetch      = (string) file_get_contents( $root . '/inc/Abilities/Fetch/FetchEmailAbility.php' );
-$email      = (string) file_get_contents( $root . '/inc/Abilities/Email/EmailAbilities.php' );
-$api        = (string) file_get_contents( $root . '/inc/Api/Email.php' );
-$cli        = (string) file_get_contents( $root . '/inc/Cli/Commands/EmailCommand.php' );
-$handler    = (string) file_get_contents( $root . '/inc/Core/Steps/Fetch/Handlers/Email/Email.php' );
-$queue      = (string) file_get_contents( $root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php' );
-$failures   = array();
+$root     = dirname( __DIR__ );
+$fetch    = (string) file_get_contents( $root . '/inc/Abilities/Fetch/FetchEmailAbility.php' );
+$email    = (string) file_get_contents( $root . '/inc/Abilities/Email/EmailAbilities.php' );
+$cli      = (string) file_get_contents( $root . '/inc/Cli/Commands/EmailCommand.php' );
+$handler  = (string) file_get_contents( $root . '/inc/Core/Steps/Fetch/Handlers/Email/Email.php' );
+$queue    = (string) file_get_contents( $root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php' );
+$failures = array();
 
 $assert = static function ( bool $condition, string $message ) use ( &$failures ): void {
 	if ( $condition ) {
@@ -30,8 +29,8 @@ $assert( str_contains( $email, "array( \$operation, 'search' )" ), 'batch flag r
 $assert( str_contains( $email, "array( 'delete', 'search' )" ), 'batch delete requires delete and search' );
 $assert( str_contains( $email, "\$headers[] = 'From: ' . \$identity" ) && str_contains( $email, "\$headers[] = 'Reply-To: ' . \$identity" ), 'mailto unsubscribe uses the authorized mailbox identity' );
 $assert( str_contains( $email, "0 === stripos( \$header, 'From:' )" ), 'synthetic Sent copies suppress duplicate From headers' );
-$assert( substr_count( $api, '...self::mailbox_args()' ) >= 12 && str_contains( $api, "'args'                => self::mailbox_args()" ), 'all email REST routes advertise mailbox selectors' );
-$assert( str_contains( $api, "'auth_ref' => array(" ) && str_contains( $api, "'mailbox'  => array(" ), 'REST schema declares auth_ref and mailbox' );
+$assert( substr_count( $email, 'self::authRefProperty()' ) >= 10, 'every email ability input schema advertises the auth_ref mailbox selector' );
+$assert( str_contains( $fetch, "'auth_ref'             => array(" ) && str_contains( $fetch, "'email_imap:default'" ), 'fetch-email ability schema declares auth_ref with the default mailbox' );
 $assert( substr_count( $cli, '[--auth-ref=<ref>]' ) >= 14 && substr_count( $cli, '[--mailbox=<name>]' ) >= 14, 'all email CLI commands document both mailbox selectors' );
 $assert( str_contains( $handler, "'legacy_default_auth'   => (string) ( \$config['_legacy_default_auth'] ?? '' )" ), 'email handler forwards only the persisted legacy marker into trusted execution context' );
 $assert( strpos( $queue, 'verifyMailboxGrant( $payload )' ) < strpos( $queue, "wp_get_ability( 'datamachine/send-email' )" ), 'queue worker verifies signed authorization before ability execution' );
