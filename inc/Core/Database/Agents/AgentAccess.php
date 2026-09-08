@@ -413,7 +413,7 @@ class AgentAccess extends BaseRepository {
 	 * Get all users with access to an agent.
 	 *
 	 * @param int $agent_id Agent ID.
-	 * @return \WP_Agent_Access_Grant[] Grants for the agent.
+	 * @return array[] Array of access rows.
 	 */
 	public function get_users_for_agent( string $agent_id, ?string $workspace_id = null ): array {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
