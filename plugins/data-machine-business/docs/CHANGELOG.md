@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.4] - 2026-09-08
+
+### Changed
+- restore the PHPUnit gate and align smokes with the flattened GA schema
+
 ## [0.17.3] - 2026-09-08
 
 ### Changed
