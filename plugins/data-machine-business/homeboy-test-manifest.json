@@ -3,6 +3,7 @@
   "tests": {
     "tests/ability-registration-lifecycle-smoke.php": { "environment": "standalone-php" },
     "tests/amazon-affiliate-tool-smoke.php": { "environment": "standalone-php" },
+    "tests/analytics-config-resolution-smoke.php": { "environment": "standalone-php" },
     "tests/bing-webmaster-ability-smoke.php": { "environment": "standalone-php" },
     "tests/data-machine-http-client-contract-smoke.php": { "environment": "wordpress" },
     "tests/google-analytics-aggregate-http-smoke.php": { "environment": "standalone-php" },
