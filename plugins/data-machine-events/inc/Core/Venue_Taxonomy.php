@@ -19,6 +19,27 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Venue_Taxonomy {
 
+	/** Term meta key holding the venue tier slug. */
+	public const TIER_META_KEY = '_venue_tier';
+
+	/**
+	 * Default closed vocabulary for venue tiers, slug => label.
+	 *
+	 * Generic room classifications only — site-specific tier definitions are
+	 * a consumer config change made through the
+	 * `data_machine_events_venue_tier_vocabulary` filter, never a code
+	 * change here. See #786.
+	 *
+	 * @var array<string,string>
+	 */
+	private const DEFAULT_TIER_VOCABULARY = array(
+		'bar_gig'        => 'Bar / restaurant gig — music incidental to the business',
+		'listening_room' => 'Small, music-first, seated/attentive',
+		'club'           => 'Standing music venue, ticketed shows',
+		'concert_hall'   => 'Large ticketed room',
+		'amphitheater'   => 'Outdoor large-format',
+	);
+
 	public static array $meta_fields = array(
 		'address'            => '_venue_address',
 		'city'               => '_venue_city',
@@ -29,6 +50,7 @@ class Venue_Taxonomy {
 		'website'            => '_venue_website',
 		'ticketing_url'      => '_venue_ticketing_url',
 		'capacity'           => '_venue_capacity',
+		'tier'               => self::TIER_META_KEY,
 		'logo_attachment_id' => '_venue_logo_attachment_id',
 		'coordinates'        => '_venue_coordinates',
 		'timezone'           => '_venue_timezone',
@@ -45,6 +67,7 @@ class Venue_Taxonomy {
 		'website'            => 'Official Website',
 		'ticketing_url'      => 'Ticketing URL',
 		'capacity'           => 'Capacity',
+		'tier'               => 'Tier',
 		'logo_attachment_id' => 'Logo Attachment ID',
 		'coordinates'        => 'Coordinates',
 		'timezone'           => 'Timezone',
@@ -224,6 +247,199 @@ class Venue_Taxonomy {
 		}
 
 		register_taxonomy_for_object_type( 'venue', Event_Post_Type::POST_TYPE );
+
+		register_term_meta(
+			'venue',
+			self::TIER_META_KEY,
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'description'       => 'Closed-vocabulary venue tier slug. Empty string = unclassified.',
+				'sanitize_callback' => array( __CLASS__, 'sanitize_venue_tier_meta_value' ),
+				'show_in_rest'      => false,
+			)
+		);
+	}
+
+	/* ---------------------------------------------------------------------
+	 * Venue tier vocabulary (#786)
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * The default venue tier vocabulary, slug => label.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function default_venue_tier_vocabulary(): array {
+		return self::DEFAULT_TIER_VOCABULARY;
+	}
+
+	/**
+	 * Resolve the active venue tier vocabulary.
+	 *
+	 * Mirrors the closed-vocabulary shape of Event_Type_Taxonomy::get_vocabulary()
+	 * but tiers are term meta values, not taxonomy terms: there is no seeding
+	 * and no AI assignment surface. An empty or malformed filtered vocabulary
+	 * falls back to the defaults.
+	 *
+	 * @return array<string,string> Slug => label, deduped by slug.
+	 */
+	public static function get_venue_tier_vocabulary(): array {
+		/**
+		 * Filters the closed vocabulary backing the `_venue_tier` term meta.
+		 *
+		 * Accepted entry shapes:
+		 *  - `'bar_gig' => 'Bar / restaurant gig'` (slug keyed to label)
+		 *  - `array( 'slug' => 'bar_gig', 'label' => 'Bar / restaurant gig' )`
+		 *    (optional string key provides the slug when `slug` is absent)
+		 *
+		 * @since 0.61.0
+		 *
+		 * @param mixed $vocabulary Default generic vocabulary, slug => label.
+		 */
+		$vocabulary = apply_filters( 'data_machine_events_venue_tier_vocabulary', self::default_venue_tier_vocabulary() );
+
+		$normalized = self::normalize_venue_tier_vocabulary( is_array( $vocabulary ) ? $vocabulary : array() );
+
+		return empty( $normalized ) ? self::normalize_venue_tier_vocabulary( self::DEFAULT_TIER_VOCABULARY ) : $normalized;
+	}
+
+	/**
+	 * Coerce arbitrary vocabulary declarations into the canonical slug => label map.
+	 *
+	 * @param array $vocabulary Raw vocabulary declaration.
+	 * @return array<string,string>
+	 */
+	private static function normalize_venue_tier_vocabulary( array $vocabulary ): array {
+		$normalized = array();
+
+		foreach ( $vocabulary as $key => $entry ) {
+			if ( is_string( $entry ) ) {
+				// Shape: 'slug' => 'Label'. A bare string with no string key
+				// carries no slug and is malformed.
+				if ( ! is_string( $key ) ) {
+					continue;
+				}
+				$slug  = $key;
+				$label = $entry;
+			} elseif ( is_array( $entry ) ) {
+				$slug  = (string) ( $entry['slug'] ?? ( is_string( $key ) ? $key : '' ) );
+				$label = (string) ( $entry['label'] ?? '' );
+			} else {
+				continue;
+			}
+
+			$slug  = sanitize_key( $slug );
+			$label = trim( $label );
+
+			if ( '' === $slug || '' === $label || isset( $normalized[ $slug ] ) ) {
+				continue;
+			}
+
+			$normalized[ $slug ] = $label;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Resolve an arbitrary value to its canonical vocabulary slug.
+	 *
+	 * Matches on slug or label, case-insensitively. Unknown values resolve to
+	 * an empty string (unclassified) rather than being passed through.
+	 *
+	 * @param mixed $value Candidate value.
+	 * @return string Canonical slug, or '' when unresolved.
+	 */
+	public static function resolve_venue_tier( $value ): string {
+		if ( ! is_scalar( $value ) ) {
+			return '';
+		}
+
+		$needle = strtolower( trim( (string) $value ) );
+		if ( '' === $needle ) {
+			return '';
+		}
+
+		foreach ( self::get_venue_tier_vocabulary() as $slug => $label ) {
+			if ( $needle === strtolower( $slug ) || $needle === strtolower( $label ) ) {
+				return $slug;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Whether a value belongs to the active tier vocabulary.
+	 *
+	 * @param mixed $value Candidate value.
+	 */
+	public static function is_valid_venue_tier( $value ): bool {
+		return '' !== self::resolve_venue_tier( $value );
+	}
+
+	/**
+	 * Sanitize callback for the `_venue_tier` term meta registration.
+	 *
+	 * Values outside the resolved vocabulary are rejected to '' (unclassified
+	 * is valid); known slugs or labels are normalized to the canonical slug.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_venue_tier_meta_value( $value ): string {
+		return self::resolve_venue_tier( $value );
+	}
+
+	/**
+	 * The resolved label for a tier slug, or '' when unknown.
+	 *
+	 * @param string $tier Tier slug.
+	 */
+	public static function get_venue_tier_label( string $tier ): string {
+		return self::get_venue_tier_vocabulary()[ sanitize_key( $tier ) ] ?? '';
+	}
+
+	/**
+	 * Venue term IDs whose `_venue_tier` meta matches a vocabulary slug.
+	 *
+	 * Query-side primitive for the calendar `venue_tier` filter dimension:
+	 * the result feeds the existing venue tax_query path. Unknown or
+	 * out-of-vocabulary tiers return an empty set so callers can fail closed.
+	 *
+	 * @param string $tier Tier slug.
+	 * @return int[]
+	 */
+	public static function get_venue_term_ids_by_tier( string $tier ): array {
+		$tier = sanitize_key( $tier );
+
+		if ( '' === $tier || ! isset( self::get_venue_tier_vocabulary()[ $tier ] ) ) {
+			return array();
+		}
+
+		$terms = get_terms(
+			array(
+				'taxonomy'               => 'venue',
+				'hide_empty'             => false,
+				'fields'                 => 'ids',
+				'number'                 => 0,
+				'orderby'                => 'none',
+				'update_term_meta_cache' => false,
+				'meta_query'             => array(
+					array(
+						'key'   => self::TIER_META_KEY,
+						'value' => $tier,
+					),
+				),
+			)
+		);
+
+		if ( is_wp_error( $terms ) ) {
+			return array();
+		}
+
+		return array_values( array_unique( array_map( 'absint', (array) $terms ) ) );
 	}
 
 	/**
@@ -250,6 +466,12 @@ class Venue_Taxonomy {
 	 * @return array Array with keys: term_id, was_created, and match_status.
 	 */
 	public static function find_or_create_venue( $venue_name, $venue_data = array() ) {
+		// Venue tier is human/CLI-owned classification (#786). Every AI and
+		// scraper-driven venue write funnels through this method, so the tier
+		// key is stripped unconditionally before matching or merging. Human
+		// writes go through the admin term screen or update_venue_meta().
+		unset( $venue_data['tier'] );
+
 		// Strip a trailing address blob baked into the venue name (AI
 		// extraction sometimes returns "Venue Name, street, city, ST zip"
 		// as a single string). Must run first: it both cleans the name used
@@ -1461,7 +1683,9 @@ class Venue_Taxonomy {
 			echo '<div class="form-field">';
 			echo "<label for='$meta_key'>$label</label>";
 
-			if ( 'address' === $key ) {
+			if ( 'tier' === $key ) {
+				self::render_venue_tier_select( '' );
+			} elseif ( 'address' === $key ) {
 				echo "<input type='text' name='$meta_key' id='$meta_key' value='' class='regular-text venue-address-autocomplete' ";
 				echo "data-city-field='_venue_city' data-state-field='_venue_state' data-zip-field='_venue_zip' data-country-field='_venue_country' />";
 			} else {
@@ -1479,7 +1703,11 @@ class Venue_Taxonomy {
 			echo '<tr class="form-field">';
 			echo "<th scope='row'><label for='$meta_key'>$label</label></th>";
 
-			if ( 'address' === $key ) {
+			if ( 'tier' === $key ) {
+				echo '<td>';
+				self::render_venue_tier_select( (string) $value );
+				echo '</td>';
+			} elseif ( 'address' === $key ) {
 				echo "<td><input type='text' name='$meta_key' id='$meta_key' value='" . esc_attr( $value ) . "' class='regular-text venue-address-autocomplete' ";
 				echo "data-city-field='_venue_city' data-state-field='_venue_state' data-zip-field='_venue_zip' data-country-field='_venue_country' /></td>";
 			} else {
@@ -1488,6 +1716,27 @@ class Venue_Taxonomy {
 
 			echo '</tr>';
 		}
+	}
+
+	/**
+	 * Render the closed-vocabulary tier select used on both venue term screens.
+	 *
+	 * The empty option is "Unclassified" — an empty stored value is valid and
+	 * is the default state for every venue. Save handling rides the existing
+	 * save_venue_meta() loop (the select always submits `_venue_tier`, so
+	 * choosing Unclassified clears the value).
+	 *
+	 * @param string $selected_value Currently stored tier slug.
+	 */
+	private static function render_venue_tier_select( string $selected_value ): void {
+		echo "<select name='" . esc_attr( self::TIER_META_KEY ) . "' id='" . esc_attr( self::TIER_META_KEY ) . "'>";
+		echo '<option value="">' . esc_html__( 'Unclassified', 'data-machine-events' ) . '</option>';
+
+		foreach ( self::get_venue_tier_vocabulary() as $slug => $label ) {
+			echo '<option value="' . esc_attr( $slug ) . '"' . selected( $selected_value, $slug, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+
+		echo '</select>';
 	}
 
 	public static function save_venue_meta( $term_id ) {

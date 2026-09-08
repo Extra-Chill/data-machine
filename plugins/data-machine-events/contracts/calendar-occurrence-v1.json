@@ -21,7 +21,8 @@
             "country": "US",
             "coordinates": "32.000000,-80.000000",
             "timezone": "America/New_York",
-            "website": "https://venue.invalid"
+            "website": "https://venue.invalid",
+            "tier": "concert_hall"
         },
         "organizer": {
             "name": "Seeded Productions",

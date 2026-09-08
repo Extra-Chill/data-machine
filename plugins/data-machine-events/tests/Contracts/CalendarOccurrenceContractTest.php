@@ -64,7 +64,7 @@ final class CalendarOccurrenceContractTest extends TestCase {
 				$this->assertNotSame( '', $term['slug'] );
 			}
 		}
-		foreach ( array( 'address', 'formatted_address', 'city', 'state', 'zip', 'country', 'coordinates', 'timezone' ) as $field ) {
+		foreach ( array( 'address', 'formatted_address', 'city', 'state', 'zip', 'country', 'coordinates', 'timezone', 'tier' ) as $field ) {
 			$this->assertNotSame( '', $event['venue'][ $field ], $field );
 		}
 		foreach ( array( 'is_multi_day', 'is_start_day', 'is_end_day', 'is_continuation', 'display_date', 'original_start_date', 'original_end_date', 'day_number', 'total_days' ) as $field ) {

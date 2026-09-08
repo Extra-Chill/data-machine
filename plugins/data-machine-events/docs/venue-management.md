@@ -15,7 +15,7 @@ Data Machine Events provides a complete venue management system through WordPres
 - **REST API Integration**: Venue data available via endpoints
 
 ### Meta Fields
-Venues include 10 comprehensive metadata fields:
+Venues include 11 comprehensive metadata fields:
 - **address**: Street address for venue location
 - **city**: Venue city or locality
 - **state**: State or province
@@ -24,6 +24,7 @@ Venues include 10 comprehensive metadata fields:
 - **phone**: Venue phone number
 - **website**: Venue website URL
 - **capacity**: Maximum venue capacity
+- **tier**: Closed-vocabulary room classification (human/CLI-owned, never AI-written) — see [venue-tier-meta.md](venue-tier-meta.md) (@since v0.61.0)
 - **coordinates**: GPS coordinates (latitude, longitude)
 - **venueTimezone**: IANA timezone identifier (e.g., "America/New_York") (@since v0.8.14)
 

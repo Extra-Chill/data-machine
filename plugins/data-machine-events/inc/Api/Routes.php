@@ -58,6 +58,12 @@ function register_routes() {
 						return $sanitized;
 					},
 				),
+				'venue_tier'       => array(
+					'type'              => 'string',
+					'default'           => '',
+					'sanitize_callback' => 'sanitize_key',
+					'description'       => 'Venue tier slug. Resolves to the venue terms carrying that tier and constrains events through the venue taxonomy filter path. Unknown values fail closed.',
+				),
 				'archive_taxonomy' => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_key',

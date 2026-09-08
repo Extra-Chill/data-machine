@@ -63,8 +63,9 @@ class Calendar {
 	 * v2 (#381): per-occurrence `display` block added to `grouping.by_date`.
 	 * v3 (#465): canonical server-rendered empty-state fragment added.
 	 * v4 (#507): complete performer, status, and venue context added.
+	 * v5 (#786): venue `tier` added to the serialized venue object.
 	 */
-	const DATA_SCHEMA_VERSION = 4;
+	const DATA_SCHEMA_VERSION = 5;
 
 	/**
 	 * Calendar endpoint implementation
@@ -480,6 +481,7 @@ class Calendar {
 			'coordinates'       => (string) ( $venue_data['coordinates'] ?? '' ),
 			'timezone'          => (string) ( $venue_data['timezone'] ?? $event_data['venueTimezone'] ?? '' ),
 			'website'           => (string) ( $venue_data['website'] ?? '' ),
+			'tier'              => (string) ( $venue_data['tier'] ?? '' ),
 		);
 	}
 

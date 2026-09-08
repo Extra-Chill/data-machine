@@ -504,6 +504,7 @@ class VenueMapAbilities {
 				'address'     => $address,
 				'url'         => is_string( $url ) ? $url : '',
 				'event_count' => 0,
+				'tier'        => (string) get_term_meta( $term->term_id, Venue_Taxonomy::TIER_META_KEY, true ),
 			);
 		}
 
@@ -565,6 +566,7 @@ class VenueMapAbilities {
 				'address'     => $address,
 				'url'         => is_string( $url ) ? $url : '',
 				'event_count' => 0,
+				'tier'        => (string) get_term_meta( $venue->term_id, Venue_Taxonomy::TIER_META_KEY, true ),
 			);
 		}
 

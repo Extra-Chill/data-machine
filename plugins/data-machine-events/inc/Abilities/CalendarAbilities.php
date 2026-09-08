@@ -74,6 +74,10 @@ class CalendarAbilities {
 								'type'        => 'object',
 								'description' => 'Taxonomy filters [taxonomy => [term_ids]]',
 							),
+							'venue_tier'       => array(
+								'type'        => 'string',
+								'description' => 'Venue tier slug. Resolves to the venue terms carrying that tier and constrains events through the venue taxonomy filter path. Unknown values fail closed.',
+							),
 							'archive_taxonomy' => array(
 								'type'        => 'string',
 								'description' => 'Archive constraint taxonomy slug',
@@ -166,6 +170,7 @@ class CalendarAbilities {
 		$user_date_start = $input['date_start'] ?? '';
 		$user_date_end   = $input['date_end'] ?? '';
 		$tax_filters     = is_array( $input['tax_filter'] ?? null ) ? $input['tax_filter'] : array();
+		$venue_tier      = sanitize_key( (string) ( $input['venue_tier'] ?? '' ) );
 
 		// Month-grid displays past and future dates inside one visible month.
 		// Month, explicit date, and resolved scope windows are independent
@@ -225,6 +230,7 @@ class CalendarAbilities {
 			'time_start'         => $scope_time_start,
 			'time_end'           => $scope_time_end,
 			'tax_filters'        => $tax_filters,
+			'venue_tier'         => $venue_tier,
 			'tax_query_override' => $tax_query_override,
 			'archive_taxonomy'   => $archive_taxonomy,
 			'archive_term_id'    => $archive_term_id,
@@ -705,6 +711,7 @@ class CalendarAbilities {
 		$ability_input = array(
 			'scope'       => ! empty( $params['show_past'] ) ? 'past' : 'upcoming',
 			'tax_filters' => is_array( $params['tax_filters'] ?? null ) ? $params['tax_filters'] : array(),
+			'venue_tier'  => $params['venue_tier'] ?? '',
 			'search'      => $params['search_query'] ?? '',
 			'order'       => ! empty( $params['show_past'] ) ? 'DESC' : 'ASC',
 			'scope_token' => $params['scope_token'] ?? '',
@@ -771,6 +778,7 @@ class CalendarAbilities {
 			! empty( $params['search_query'] )
 			|| ! empty( $params['scope_token'] )
 			|| ! empty( $params['archive_taxonomy'] )
+			|| ! empty( $params['venue_tier'] )
 			|| self::has_active_tax_filter( $params['tax_filters'] ?? array() )
 		) {
 			return true;

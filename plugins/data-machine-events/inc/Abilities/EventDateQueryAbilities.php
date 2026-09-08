@@ -19,6 +19,7 @@ use WP_Query;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\DateTimeParser;
+use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 
@@ -92,6 +93,10 @@ class EventDateQueryAbilities {
 							'tax_filters' => array(
 								'type'        => 'object',
 								'description' => 'Taxonomy filters as { taxonomy_slug: [term_ids] }.',
+							),
+							'venue_tier'  => array(
+								'type'        => 'string',
+								'description' => 'Venue tier slug. Resolves to the venue terms carrying that tier and constrains events through the venue taxonomy filter path. Unknown values fail closed.',
 							),
 							'search'      => array(
 								'type'        => 'string',
@@ -266,6 +271,7 @@ class EventDateQueryAbilities {
 	 * @return array { posts: array, total: int, post_count: int }
 	 */
 	public function executeQueryEvents( array $input ): array {
+		$input       = $this->applyVenueTierConstraint( $input );
 		$scope       = $input['scope'] ?? 'upcoming';
 		$date_start  = $input['date_start'] ?? '';
 		$date_end    = $input['date_end'] ?? '';
@@ -640,6 +646,47 @@ class EventDateQueryAbilities {
 	}
 
 	/**
+	 * Fold a venue-tier constraint into the taxonomy filter map.
+	 *
+	 * Term meta values cannot ride the taxonomy wire contract, so the
+	 * requested tier is resolved to the set of venue term IDs carrying it
+	 * and merged into the existing `venue` tax filter (intersecting with an
+	 * explicit venue term selection when both are present). The rest of the
+	 * query plumbing — tax_query, count SQL, bounded candidates, date
+	 * buckets — then treats it as an ordinary venue term constraint. See
+	 * #786.
+	 *
+	 * An unknown tier, or a known tier no venue carries yet, fails closed to
+	 * an impossible term list (mirroring the empty-geo handling).
+	 *
+	 * @param array $input Query-events ability input.
+	 * @return array Input with the venue tier merged into tax_filters.
+	 */
+	private function applyVenueTierConstraint( array $input ): array {
+		$tier = sanitize_key( (string) ( $input['venue_tier'] ?? '' ) );
+		if ( '' === $tier ) {
+			return $input;
+		}
+
+		$venue_ids = Venue_Taxonomy::get_venue_term_ids_by_tier( $tier );
+		if ( empty( $venue_ids ) ) {
+			$venue_ids = array( 0 );
+		}
+
+		$existing = is_array( $input['tax_filters'] ?? null ) ? $input['tax_filters'] : array();
+		if ( ! empty( $existing['venue'] ) ) {
+			$venue_ids = array_values( array_intersect( $venue_ids, array_map( 'absint', (array) $existing['venue'] ) ) );
+			if ( empty( $venue_ids ) ) {
+				$venue_ids = array( 0 );
+			}
+		}
+
+		$input['tax_filters'] = array_merge( $existing, array( 'venue' => $venue_ids ) );
+
+		return $input;
+	}
+
+	/**
 	 * Resolve term IDs to the exact term-taxonomy IDs used by WP_Tax_Query.
 	 *
 	 * @param string $taxonomy Taxonomy slug.
@@ -714,6 +761,8 @@ class EventDateQueryAbilities {
 	 */
 	public function buildMatchingTermCountSql( array $input, array $taxonomies ): string {
 		global $wpdb;
+
+		$input = $this->applyVenueTierConstraint( $input );
 
 		$db_engine     = defined( 'DB_ENGINE' ) ? strtolower( (string) constant( 'DB_ENGINE' ) ) : '';
 		$database_type = defined( 'DATABASE_TYPE' ) ? strtolower( (string) constant( 'DATABASE_TYPE' ) ) : '';
@@ -912,6 +961,7 @@ class EventDateQueryAbilities {
 	 * @return string SQL selecting start_date, end_date, and bucket_count.
 	 */
 	public function buildMatchingEventDateAggregateSql( array $input, string $start_expression, string $end_expression ): string {
+		$input                                       = $this->applyVenueTierConstraint( $input );
 		$input['fields']                            = 'ids';
 		$input['per_page']                          = -1;
 		$input[ self::CAPTURE_AGGREGATE_QUERY_VAR ] = array(

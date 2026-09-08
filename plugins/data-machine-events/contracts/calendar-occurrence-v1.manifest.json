@@ -2,7 +2,7 @@
   "name": "data-machine-events/calendar-occurrence",
   "version": 1,
   "producer": "DataMachineEvents\\Api\\Controllers\\Calendar::serialize_contract_occurrence",
-  "schema_version": 4,
+  "schema_version": 5,
   "file": "calendar-occurrence-v1.json",
-  "sha256": "fd1cbb79a52c405f747eaacf30b161f444c210c75c5189d9e446623d2badc84f"
+  "sha256": "4923b1da780f8bcf280bf0d81895aa603121fd9c81fc9fec15d37f2e699f4fe9"
 }

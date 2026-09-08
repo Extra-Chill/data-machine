@@ -92,6 +92,15 @@ final class CalendarRequest {
 	 */
 	private string $scope_token;
 
+	/**
+	 * Venue tier slug constraint (#786).
+	 *
+	 * Term meta cannot ride the `tax_filter` wire contract, so this travels
+	 * as its own scalar param. It is resolved to venue term IDs at query
+	 * time and merged into the venue taxonomy filter path.
+	 */
+	private string $venue_tier;
+
 	/** @var array<string,int[]> Sanitized taxonomy filter map. */
 	private array $tax_filter;
 
@@ -130,7 +139,8 @@ final class CalendarRequest {
 		string $geo_radius_unit,
 		string $format = '',
 		string $month = '',
-		string $scope_token = ''
+		string $scope_token = '',
+		string $venue_tier = ''
 	) {
 		$this->paged            = $paged;
 		$this->past             = $past;
@@ -148,6 +158,7 @@ final class CalendarRequest {
 		$this->format           = $format;
 		$this->month            = $month;
 		$this->scope_token      = $scope_token;
+		$this->venue_tier       = $venue_tier;
 	}
 
 	/**
@@ -188,6 +199,8 @@ final class CalendarRequest {
 
 		$scope_token = isset( $get['scope_token'] ) ? sanitize_text_field( wp_unslash( $get['scope_token'] ) ) : '';
 
+		$venue_tier = isset( $get['venue_tier'] ) ? sanitize_key( wp_unslash( $get['venue_tier'] ) ) : '';
+
 		return new self(
 			$paged,
 			$past,
@@ -204,7 +217,8 @@ final class CalendarRequest {
 			$geo_radius_unit,
 			'', // format is REST-only.
 			$month,
-			$scope_token
+			$scope_token,
+			$venue_tier
 		);
 	}
 
@@ -251,6 +265,8 @@ final class CalendarRequest {
 
 		$scope_token = sanitize_text_field( (string) ( $request->get_param( 'scope_token' ) ?? '' ) );
 
+		$venue_tier = sanitize_key( (string) ( $request->get_param( 'venue_tier' ) ?? '' ) );
+
 		return new self(
 			$paged,
 			$past,
@@ -267,7 +283,8 @@ final class CalendarRequest {
 			$geo_radius_unit,
 			$format,
 			$month,
-			$scope_token
+			$scope_token,
+			$venue_tier
 		);
 	}
 
@@ -315,6 +332,7 @@ final class CalendarRequest {
 			// consumer can re-apply a server-side constraint that must
 			// survive the REST round-trip. #160.
 			'scope_token'      => $this->scope_token,
+			'venue_tier'       => $this->venue_tier,
 		);
 	}
 
@@ -405,6 +423,14 @@ final class CalendarRequest {
 	 */
 	public function scopeToken(): string {
 		return $this->scope_token;
+	}
+
+	/**
+	 * Venue tier slug constraint, or empty string when none. See the
+	 * `$venue_tier` property doc for semantics. #786.
+	 */
+	public function venueTier(): string {
+		return $this->venue_tier;
 	}
 
 	/* ------------------------------------------------------------------ */

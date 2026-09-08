@@ -43,7 +43,7 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
   "success": true,
   "schema": {
     "name": "calendar-data",
-    "version": 4,
+    "version": 5,
     "phase": 1,
     "issue": 298
   },
@@ -83,7 +83,7 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
 ### `schema`
 
 Identifies the schema for forward compatibility. Clients should check
-`schema.name === 'calendar-data'` and `schema.version === 4` before
+`schema.name === 'calendar-data'` and `schema.version === 5` before
 reading the rest. Future phases bump `phase`; backward-incompatible
 shape changes bump `version`.
 
@@ -104,6 +104,11 @@ This closed the badge- and time-format drift bugs where client-rendered
 **v3 ([#465](https://github.com/Extra-Chill/data-machine-events/issues/465)):** empty
 responses carry `empty_html`, rendered from the existing `no-events.php`
 template. Non-empty responses carry an empty string.
+
+**v5 ([#786](https://github.com/Extra-Chill/data-machine-events/issues/786)):** the `venue`
+subobject carries `tier` — the closed-vocabulary venue tier slug, or an
+empty string when the venue is unclassified (v4 was never announced in
+this document; the bump from 4 covers the same shape window as #507).
 
 ### `events`
 
@@ -134,7 +139,8 @@ page — its multi-day expansion is represented in `grouping.by_date`.
     "zip": "29403",
     "country": "US",
     "coordinates": "32.8007,-79.9362",
-    "timezone": "America/New_York"
+    "timezone": "America/New_York",
+    "tier": "club"
   },
   "organizer": {
     "name": "Local Promoter",

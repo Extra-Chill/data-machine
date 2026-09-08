@@ -60,6 +60,7 @@ namespace DataMachineEvents\Core {
 				'coordinates'        => '32.000000,-80.000000',
 				'timezone'           => 'America/New_York',
 				'website'            => 'https://venue.invalid',
+				'tier'               => 'concert_hall',
 				'logo_attachment_id' => 0,
 				'logo'               => null,
 			);

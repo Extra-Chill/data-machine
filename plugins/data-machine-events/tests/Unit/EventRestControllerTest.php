@@ -194,7 +194,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$data     = $response->get_data();
 
 		$this->assertSame( 200, $response->get_status() );
-		$this->assertSame( 4, $data['schema']['version'] );
+		$this->assertSame( \DataMachineEvents\Api\Controllers\Calendar::DATA_SCHEMA_VERSION, $data['schema']['version'] );
 		$this->assertSame( array(), $data['grouping']['ordered_dates'] );
 		$this->assertStringContainsString( 'data-machine-events-no-events', $data['empty_html'] );
 		$this->assertStringContainsString( 'data-machine-events-no-events-today-link', $data['empty_html'] );
