@@ -6,15 +6,15 @@
  */
 
 /**
+ * External dependencies
+ */
+import { executeAbility } from '@shared/utils/api';
+
+/**
  * WordPress dependencies
  */
 import apiFetch from '@wordpress/api-fetch';
 import { addQueryArgs } from '@wordpress/url';
-
-/**
- * Internal dependencies
- */
-import { executeAbility } from '@shared/utils/api';
 
 /**
  * Fetch all agents accessible to the current user.
