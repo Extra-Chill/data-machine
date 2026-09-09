@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.61.4] - 2026-09-09
+
+### Fixed
+- align MusicItemExtractor minute guards with phpstan and phpcs
+- null-coalesce for the trailing optional minutes group in MusicItemExtractor
+- narrow the optional-minutes guard in MusicItemExtractor
+- create a distinct venue on geographic conflict instead of dropping the term; conflicts report
+- silence extractor notices in embedded-calendar and music-item parsing
+
 ## [0.61.3] - 2026-09-09
 
 ### Changed
