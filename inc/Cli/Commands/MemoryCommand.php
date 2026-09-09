@@ -1198,7 +1198,7 @@ class MemoryCommand extends BaseCommand {
 	 *     # List all sections across all composable files
 	 *     wp datamachine memory compose --list
 	 *
-		 * @subcommand compose
+	 * @subcommand compose
 	 */
 	public function compose( array $args, array $assoc_args ): void {
 		$filename = $args[0] ?? '';

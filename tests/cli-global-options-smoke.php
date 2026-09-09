@@ -11,13 +11,13 @@ if ( '1' === getenv( 'DATAMACHINE_CLI_REGISTRATION_BOOT' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 
 	spl_autoload_register(
-		static function ( string $class ): void {
+		static function ( string $class_name ): void {
 			$prefix = 'DataMachine\\';
-			if ( ! str_starts_with( $class, $prefix ) ) {
+			if ( ! str_starts_with( $class_name, $prefix ) ) {
 				return;
 			}
 
-			$path = dirname( __DIR__ ) . '/inc/' . str_replace( '\\', '/', substr( $class, strlen( $prefix ) ) ) . '.php';
+			$path = dirname( __DIR__ ) . '/inc/' . str_replace( '\\', '/', substr( $class_name, strlen( $prefix ) ) ) . '.php';
 			if ( is_file( $path ) ) {
 				require_once $path;
 			}
@@ -55,7 +55,14 @@ $assert = static function ( bool $condition, string $message ) use ( &$failures,
 };
 
 $run = static function ( array $command ): array {
-	$process = proc_open( $command, array( 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes );
+	$process = proc_open(
+		$command,
+		array(
+			1 => array( 'pipe', 'w' ),
+			2 => array( 'pipe', 'w' ),
+		),
+		$pipes
+	);
 	if ( ! is_resource( $process ) ) {
 		return array( 1, '', 'Failed to start WP-CLI.' );
 	}
@@ -97,14 +104,14 @@ $help_commands = array(
 putenv( 'DATAMACHINE_CLI_REGISTRATION_BOOT=1' );
 try {
 	foreach ( $help_commands as $command => $expected_options ) {
-		list( $status, $stdout, $stderr ) = $run(
+		list( $exit_code, $stdout, $stderr ) = $run(
 			array_merge(
 				array( 'wp', '--skip-wordpress', '--require=' . __FILE__, 'help', 'datamachine' ),
 				explode( ' ', $command )
 			)
 		);
 
-		$assert( 0 === $status, "fresh WP-CLI process registers datamachine {$command}" );
+		$assert( 0 === $exit_code, "fresh WP-CLI process registers datamachine {$command}" );
 		foreach ( $expected_options as $option ) {
 			$assert( str_contains( $stdout, $option ), "datamachine {$command} exposes {$option}" );
 		}
