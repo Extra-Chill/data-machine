@@ -216,6 +216,192 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 	}
 
 	// ---------------------------------------------------------------------
+	// Part A2: #803 directional/unit/ordinal variants are not conflicts
+	// ---------------------------------------------------------------------
+
+	public function test_directional_variant_matches(): void {
+		$name    = 'Far Out Lounge ' . uniqid();
+		$term_id = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '8504 South Congress Avenue',
+				'city'    => 'Austin',
+				'state'   => 'TX',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '8504 S Congress Ave',
+				'city'    => '',
+				'state'   => '',
+				'country' => '',
+			)
+		);
+
+		$this->assertSame( 'matched', $result['match_status'] );
+		$this->assertSame( $term_id, $result['term_id'] );
+	}
+
+	public function test_hyphenated_unit_suffix_and_directional_match(): void {
+		$name    = "Eddie's Attic " . uniqid();
+		$term_id = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '515 North Mcdonough Street',
+				'city'    => 'Decatur',
+				'state'   => 'GA',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '515-B N. McDonough St.',
+				'city'    => '',
+				'state'   => '',
+				'country' => '',
+			)
+		);
+
+		$this->assertSame( 'matched', $result['match_status'] );
+		$this->assertSame( $term_id, $result['term_id'] );
+	}
+
+	public function test_directional_and_spelled_ordinal_match(): void {
+		$name    = 'Moroccan Lounge ' . uniqid();
+		$term_id = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '901 East 1st Street',
+				'city'    => 'Los Angeles',
+				'state'   => 'CA',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '901 E 1st Street',
+				'city'    => '',
+				'state'   => '',
+				'country' => '',
+			)
+		);
+
+		$this->assertSame( 'matched', $result['match_status'] );
+		$this->assertSame( $term_id, $result['term_id'] );
+	}
+
+	public function test_directional_present_on_one_side_only_matches(): void {
+		$name    = 'T-Mobile Arena ' . uniqid();
+		$term_id = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '3780 Las Vegas Blvd.',
+				'city'    => 'Las Vegas',
+				'state'   => 'NV',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '3780 S Las Vegas Blvd',
+				'city'    => '',
+				'state'   => '',
+				'country' => '',
+			)
+		);
+
+		$this->assertSame( 'matched', $result['match_status'] );
+		$this->assertSame( $term_id, $result['term_id'] );
+	}
+
+	public function test_spelled_ordinal_matches_numeric_ordinal(): void {
+		$name    = 'First Ave Venue ' . uniqid();
+		$term_id = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '100 1st Ave',
+				'city'    => 'New York',
+				'state'   => 'NY',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '100 First Ave',
+				'city'    => '',
+				'state'   => '',
+				'country' => '',
+			)
+		);
+
+		$this->assertSame( 'matched', $result['match_status'] );
+		$this->assertSame( $term_id, $result['term_id'] );
+	}
+
+	public function test_different_house_number_with_directional_variants_still_ambiguous(): void {
+		$name = 'West Ave Conflict Venue ' . uniqid();
+		$this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '1101 N West Ave',
+				'city'    => 'Jacksonville',
+				'state'   => 'FL',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '1201 North West Avenue',
+				'city'    => '',
+				'state'   => '',
+				'country' => '',
+			)
+		);
+
+		$this->assertNull( $result['term_id'] );
+		$this->assertSame( 'ambiguous', $result['match_status'] );
+	}
+
+	public function test_different_street_with_directional_prefix_still_ambiguous(): void {
+		$name = 'Congress Lamar Conflict Venue ' . uniqid();
+		$this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '8504 S Lamar Blvd',
+				'city'    => 'Austin',
+				'state'   => 'TX',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '8504 S Congress Ave',
+				'city'    => '',
+				'state'   => '',
+				'country' => '',
+			)
+		);
+
+		$this->assertNull( $result['term_id'] );
+		$this->assertSame( 'ambiguous', $result['match_status'] );
+	}
+
+	// ---------------------------------------------------------------------
 	// Part B: address_has_street_component
 	// ---------------------------------------------------------------------
 
@@ -239,5 +425,48 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 
 	public function test_bare_postal_code_has_no_street_component(): void {
 		$this->assertFalse( Venue_Taxonomy::address_has_street_component( '29492' ) );
+	}
+
+	// ---------------------------------------------------------------------
+	// Part C: normalize_address_for_matching (#803)
+	// ---------------------------------------------------------------------
+
+	public function test_normalizer_canonicalizes_directional_after_house_number(): void {
+		$this->assertSame(
+			Venue_Taxonomy::normalize_address_for_matching( '8504 S Congress Ave' ),
+			Venue_Taxonomy::normalize_address_for_matching( '8504 South Congress Avenue' )
+		);
+	}
+
+	public function test_normalizer_strips_hyphenated_unit_suffix(): void {
+		$this->assertSame( '515 n mcdonough st', Venue_Taxonomy::normalize_address_for_matching( '515-B N. McDonough St.' ) );
+	}
+
+	public function test_normalizer_canonicalizes_directional_and_street_words(): void {
+		$this->assertSame( '901 e 1st st', Venue_Taxonomy::normalize_address_for_matching( '901 East 1st Street' ) );
+	}
+
+	public function test_normalizer_canonicalizes_full_directional_words(): void {
+		// 'west' is immediately followed by the street-type word 'avenue', so
+		// it is kept as a street-name token; only 'north' canonicalizes.
+		$this->assertSame( '1201 n west ave', Venue_Taxonomy::normalize_address_for_matching( '1201 North West Avenue' ) );
+	}
+
+	public function test_normalizer_maps_spelled_ordinals(): void {
+		$this->assertSame( '100 1st ave', Venue_Taxonomy::normalize_address_for_matching( '100 First Ave' ) );
+	}
+
+	public function test_normalizer_preserves_hyphenated_house_number_range(): void {
+		$this->assertSame( '36-38 broad st', Venue_Taxonomy::normalize_address_for_matching( '36-38 Broad St' ) );
+	}
+
+	public function test_normalizer_leaves_street_named_directional_before_street_type_untouched(): void {
+		// "West Street" — West is the street NAME; a directional immediately
+		// followed by a street-type word must not canonicalize (#803 follow-up).
+		$this->assertNotSame(
+			Venue_Taxonomy::normalize_address_for_matching( '100 West Street' ),
+			Venue_Taxonomy::normalize_address_for_matching( '100 W Street' )
+		);
+		$this->assertSame( '100 west st', Venue_Taxonomy::normalize_address_for_matching( '100 West Street' ) );
 	}
 }

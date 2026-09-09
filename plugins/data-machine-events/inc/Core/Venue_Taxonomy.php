@@ -40,6 +40,57 @@ class Venue_Taxonomy {
 		'amphitheater'   => 'Outdoor large-format',
 	);
 
+	/**
+	 * Directional tokens mapped to their canonical abbreviation (#803).
+	 *
+	 * Abbreviations map to themselves so the canonical form is idempotent.
+	 *
+	 * @var array<string,string>
+	 */
+	private const DIRECTIONAL_ALIASES = array(
+		'north'     => 'n',
+		'south'     => 's',
+		'east'      => 'e',
+		'west'      => 'w',
+		'northeast' => 'ne',
+		'northwest' => 'nw',
+		'southeast' => 'se',
+		'southwest' => 'sw',
+		'n'         => 'n',
+		's'         => 's',
+		'e'         => 'e',
+		'w'         => 'w',
+		'ne'        => 'ne',
+		'nw'        => 'nw',
+		'se'        => 'se',
+		'sw'        => 'sw',
+	);
+
+	/**
+	 * Canonical street-type abbreviations (post-street-type-word-map).
+	 *
+	 * @var string[]
+	 */
+	private const STREET_TYPE_TOKENS = array( 'st', 'ave', 'blvd', 'dr', 'rd', 'ln', 'ct', 'hwy', 'pkwy', 'pl', 'cir', 'way' );
+
+	/**
+	 * Bounded ordinal word map for address matching (#803).
+	 *
+	 * @var array<string,string>
+	 */
+	private const ORDINAL_ALIASES = array(
+		'first'   => '1st',
+		'second'  => '2nd',
+		'third'   => '3rd',
+		'fourth'  => '4th',
+		'fifth'   => '5th',
+		'sixth'   => '6th',
+		'seventh' => '7th',
+		'eighth'  => '8th',
+		'ninth'   => '9th',
+		'tenth'   => '10th',
+	);
+
 	public static array $meta_fields = array(
 		'address'            => '_venue_address',
 		'city'               => '_venue_city',
@@ -463,9 +514,10 @@ class Venue_Taxonomy {
 	 *
 	 * @param string $venue_name Venue name
 	 * @param array $venue_data Venue metadata (address, city, state, etc.)
+	 * @param array $log_context Optional log context (e.g. post_id) merged into the ambiguous-match log entry.
 	 * @return array Array with keys: term_id, was_created, and match_status.
 	 */
-	public static function find_or_create_venue( $venue_name, $venue_data = array() ) {
+	public static function find_or_create_venue( $venue_name, $venue_data = array(), array $log_context = array() ) {
 		// Venue tier is human/CLI-owned classification (#786). Every AI and
 		// scraper-driven venue write funnels through this method, so the tier
 		// key is stripped unconditionally before matching or merging. Human
@@ -505,13 +557,19 @@ class Venue_Taxonomy {
 		}
 
 		if ( 'ambiguous' === $identity['match_status'] ) {
+			// A published event left without its venue term is an error
+			// condition (#803), so this is retained at error level with the
+			// caller-supplied context (post_id when available).
 			do_action(
 				'datamachine_log',
-				'warning',
+				'error',
 				'Venue name match rejected due to ambiguous or conflicting geographic evidence',
-				array(
-					'venue_name' => $venue_name,
-					'venue_data' => $venue_data,
+				array_merge(
+					array(
+						'venue_name' => $venue_name,
+						'venue_data' => $venue_data,
+					),
+					$log_context
 				)
 			);
 
@@ -711,19 +769,41 @@ class Venue_Taxonomy {
 				continue;
 			}
 
-			if ( 'address' === $field && ! self::address_has_street_component( (string) $incoming ) ) {
-				continue;
-			}
+			if ( 'address' === $field ) {
+				if ( ! self::address_has_street_component( (string) $incoming ) ) {
+					continue;
+				}
 
-			$incoming_normalized = 'address' === $field
-				? self::normalize_address_for_matching( (string) $incoming )
-				: self::normalize_geographic_value( (string) $incoming, $field );
-			$stored_normalized   = 'address' === $field
-				? self::normalize_address_for_matching( (string) $stored )
-				: self::normalize_geographic_value( (string) $stored, $field );
+				$incoming_normalized = self::normalize_address_for_matching( (string) $incoming );
+				$stored_normalized   = self::normalize_address_for_matching( (string) $stored );
 
-			if ( 'address' === $field && self::normalized_address_is_subset( $incoming_normalized, $stored_normalized ) ) {
-				continue;
+				// A less-specific subset of the stored address ("880 Island
+				// Park Dr" against "880 Island Park Dr, Charleston, SC
+				// 29492") is incomplete evidence, not a conflict (#798).
+				// Must short-circuit BEFORE the reduced-key comparison,
+				// which would flag the trailing city/state/zip tokens.
+				if ( self::normalized_address_is_subset( $incoming_normalized, $stored_normalized ) ) {
+					continue;
+				}
+
+				// Both sides carry a street: compare the reduced street identity
+				// key (#803). Directional, ordinal, and unit-suffix variants of
+				// the same house number + street name are not a conflict — the
+				// reduced key strips directionals and street-type words, so
+				// "3780 S Las Vegas Blvd" and "3780 Las Vegas Blvd." match.
+				if ( self::address_has_street_component( (string) $stored ) ) {
+					if ( self::street_identity_key( (string) $incoming ) !== self::street_identity_key( (string) $stored ) ) {
+						return true;
+					}
+					continue;
+				}
+
+				// Stored address carries no street component and the subset
+				// check did not pass — fall through to the strict equality
+				// comparison below.
+			} else {
+				$incoming_normalized = self::normalize_geographic_value( (string) $incoming, $field );
+				$stored_normalized   = self::normalize_geographic_value( (string) $stored, $field );
 			}
 
 			if ( $incoming_normalized !== $stored_normalized ) {
@@ -776,6 +856,52 @@ class Venue_Taxonomy {
 
 		return 1 === preg_match( '/\b' . preg_quote( $incoming, '/' ) . '\b/', $stored )
 			|| 1 === preg_match( '/\b' . preg_quote( $stored, '/' ) . '\b/', $incoming );
+	}
+
+	/**
+	 * Reduce a normalized address to its street identity key (#803).
+	 *
+	 * The key is the house number plus street-name tokens with directionals
+	 * and street-type words removed, so "8504 S Congress Ave" and
+	 * "8504 South Congress Avenue" reduce to the same "8504 congress".
+	 * Mirroring the normalizer, a directional immediately followed by a
+	 * street-type word is a street NAME and is kept: "100 West Street"
+	 * reduces to "100 west", distinct from "100 W Street" ("100 w").
+	 * A differing key means a genuinely different street (or house number)
+	 * and remains a geographic conflict.
+	 *
+	 * @param string $address Raw address string.
+	 * @return string Space-separated identity key.
+	 */
+	private static function street_identity_key( string $address ): string {
+		$normalized = self::normalize_address_for_matching( $address );
+
+		if ( '' === $normalized ) {
+			return '';
+		}
+
+		$tokens = preg_split( '/\s+/', $normalized );
+		if ( ! is_array( $tokens ) ) {
+			return '';
+		}
+
+		$kept = array();
+		foreach ( $tokens as $i => $token ) {
+			if ( '' === $token || in_array( $token, self::STREET_TYPE_TOKENS, true ) ) {
+				continue;
+			}
+
+			// A canonical directional is stripped unless the next token is a
+			// street-type word, in which case it is a street-name token.
+			$next_is_street_type = isset( $tokens[ $i + 1 ] ) && in_array( $tokens[ $i + 1 ], self::STREET_TYPE_TOKENS, true );
+			if ( isset( self::DIRECTIONAL_ALIASES[ $token ] ) && ! $next_is_street_type ) {
+				continue;
+			}
+
+			$kept[] = $token;
+		}
+
+		return implode( ' ', $kept );
 	}
 
 	/**
@@ -1477,6 +1603,12 @@ class Venue_Taxonomy {
 		);
 		$address = preg_replace( '/#\s*[a-z0-9\-]+/i', '', $address );
 
+		// Strip a hyphenated unit suffix from the leading house-number token
+		// ("515-B N. McDonough St." → "515 N. McDonough St."). Only a letter
+		// suffix is stripped, so hyphenated house-number ranges ("36-38 Broad
+		// St") survive intact (#803).
+		$address = preg_replace( '/^(\d+)-[a-z]{1,2}\b/', '$1', $address );
+
 		$replacements = array(
 			'/\bstreet\b/'    => 'st',
 			'/\bavenue\b/'    => 'ave',
@@ -1491,12 +1623,41 @@ class Venue_Taxonomy {
 			'/\bparkway\b/'   => 'pkwy',
 			'/\bplace\b/'     => 'pl',
 			'/\bcircle\b/'    => 'cir',
-			'/[.,#]/'         => '',
 		);
+
+		// Bounded ordinal map (#803): "First Avenue" and "1st Avenue" are the
+		// same street for matching purposes.
+		foreach ( self::ORDINAL_ALIASES as $word => $ordinal ) {
+			$replacements[ '/\b' . $word . '\b/' ] = $ordinal;
+		}
+
+		$replacements['/[.,#]/'] = '';
 
 		foreach ( $replacements as $pattern => $replacement ) {
 			$address = preg_replace( $pattern, $replacement, $address );
 		}
+
+		// Canonicalize directional tokens (#803), bounded so a street *named*
+		// "West" is not rewritten: only a directional NOT immediately
+		// followed by a street-type word is canonicalized. "100 West Street"
+		// keeps 'west' (street named West), while "8504 S Congress Ave"
+		// canonicalizes ('s' is followed by 'congress').
+		$tokens = preg_split( '/\s+/', trim( $address ) );
+		if ( ! is_array( $tokens ) ) {
+			$tokens = array();
+		}
+		foreach ( $tokens as $i => $token ) {
+			if ( ! isset( self::DIRECTIONAL_ALIASES[ $token ] ) ) {
+				continue;
+			}
+
+			if ( isset( $tokens[ $i + 1 ] ) && in_array( $tokens[ $i + 1 ], self::STREET_TYPE_TOKENS, true ) ) {
+				continue;
+			}
+
+			$tokens[ $i ] = self::DIRECTIONAL_ALIASES[ $token ];
+		}
+		$address = implode( ' ', $tokens );
 
 		// Collapse whitespace and strip stray trailing separators
 		// (suite-suffix removal can leave a dangling comma).

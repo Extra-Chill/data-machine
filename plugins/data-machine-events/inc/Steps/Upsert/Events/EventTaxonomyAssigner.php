@@ -123,7 +123,7 @@ class EventTaxonomyAssigner {
 		$merged_params  = VenueParameterProvider::mergeEngineOverParameters( $parameters, $engine->all() );
 		$venue_metadata = VenueParameterProvider::extractFromParameters( $merged_params );
 
-		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
+		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata, array( 'post_id' => $post_id ) );
 
 		return array(
 			'term_id' => absint( $venue_result['term_id'] ?? 0 ),
@@ -232,7 +232,7 @@ class EventTaxonomyAssigner {
 			'capacity'      => $this->getParameterValue( $parameters, 'venueCapacity' ) ?: ( $engine->get( 'venueCapacity' ) ?? '' ),
 		);
 
-		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata );
+		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata, array( 'post_id' => $post_id ) );
 
 		if ( ! empty( $venue_result['term_id'] ) ) {
 			$assignment_result = Venue::assign_venue_to_event( $post_id, array( 'venue' => $venue_result['term_id'] ) );
@@ -504,7 +504,7 @@ class EventTaxonomyAssigner {
 			$term = get_term_by( 'slug', $selection, 'location' );
 		}
 
-		return ( $term && ! is_wp_error( $term ) ) ? (int) $term->term_id : 0;
+		return $term ? (int) $term->term_id : 0;
 	}
 
 	/**

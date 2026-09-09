@@ -5,10 +5,16 @@
  * Detects: missing venue assignment, missing venue timezone,
  * and events at venues without geocoded coordinates.
  *
+ * Also reports (and with --apply, performs) the missing-venue repair:
+ * resolving each venue-less event's venue from its own event-details
+ * block attributes and assigning the matched term. Dry run by default;
+ * terms are never created. See MissingVenueRepairer (#803).
+ *
  * Usage:
  *   wp data-machine-events check venues
  *   wp data-machine-events check venues --scope=all
  *   wp data-machine-events check venues --format=json
+ *   wp data-machine-events check venues --scope=all --apply
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -17,6 +23,7 @@
 namespace DataMachineEvents\Cli\Check;
 
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\MissingVenueRepairer;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -66,10 +73,16 @@ class CheckVenuesCommand {
 	 *   - csv
 	 * ---
 	 *
+	 * [--apply]
+	 * : Assign matched venue terms to venue-less events. Without this flag
+	 * the repair is a dry run: identical reporting, no writes. Terms are
+	 * never created.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp data-machine-events check venues
 	 *     wp data-machine-events check venues --scope=all
+	 *     wp data-machine-events check venues --scope=all --apply
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.
@@ -79,6 +92,7 @@ class CheckVenuesCommand {
 		$days_ahead = (int) ( $assoc_args['days-ahead'] ?? 90 );
 		$limit      = (int) ( $assoc_args['limit'] ?? 25 );
 		$format     = $assoc_args['format'] ?? 'table';
+		$apply      = isset( $assoc_args['apply'] );
 
 		$events = $this->query_events( $scope, $days_ahead );
 
@@ -100,6 +114,11 @@ class CheckVenuesCommand {
 		}
 
 		$this->sort_by_date( $missing_venue, $scope );
+
+		// Missing-venue repair pass: resolve identities from each event's own
+		// block attrs; assign matched terms only with --apply (#803).
+		$repairer        = new MissingVenueRepairer();
+		$repair          = $repairer->repair( $scope, $days_ahead, $apply );
 
 		// Broken timezone: delegate to existing ability if available
 		$broken_timezone = array();
@@ -123,11 +142,12 @@ class CheckVenuesCommand {
 		$missing_geocode = $this->find_venues_missing_geocode( $limit );
 
 		if ( 'json' === $format ) {
-			\WP_CLI::log( wp_json_encode(
+			\WP_CLI::log( (string) wp_json_encode(
 				array(
 					'total_scanned'   => count( $events ),
 					'scope'           => $scope,
 					'missing_venue'   => array_slice( $missing_venue, 0, $limit ),
+					'repair'          => $repair,
 					'broken_timezone' => array_slice( $broken_timezone, 0, $limit ),
 					'missing_geocode' => array_slice( $missing_geocode, 0, $limit ),
 					'no_venue_count'  => $no_venue_count,
@@ -156,6 +176,41 @@ class CheckVenuesCommand {
 				);
 			}
 			$this->output_results( $table, $format, array( 'ID', 'Title', 'Date' ) );
+		}
+		\WP_CLI::log( '' );
+
+		// Missing-venue repair report (#803).
+		$repair_mode = $apply ? 'APPLIED' : 'DRY RUN';
+		\WP_CLI::log( sprintf( '--- Missing Venue Repair (%s) ---', $repair_mode ) );
+		\WP_CLI::log(
+			sprintf(
+				'Scanned %d; missing %d; matched %d (assigned %d); ambiguous %d; no match %d; empty %d.',
+				$repair['scanned'],
+				$repair['missing'],
+				$repair['matched'],
+				$repair['assigned'],
+				$repair['ambiguous'],
+				$repair['no_match'],
+				$repair['empty']
+			)
+		);
+
+		if ( ! empty( $repair['candidates'] ) ) {
+			$table = array();
+			foreach ( array_slice( $repair['candidates'], 0, $limit ) as $candidate ) {
+				$table[] = array(
+					'ID'      => $candidate['post_id'],
+					'Venue'   => mb_substr( (string) $candidate['venue_name'], 0, 35 ),
+					'Address' => mb_substr( (string) $candidate['address'], 0, 35 ),
+					'Status'  => $candidate['match_status'],
+					'Term'    => mb_substr( (string) $candidate['term_name'], 0, 30 ),
+				);
+			}
+			$this->output_results( $table, $format, array( 'ID', 'Venue', 'Address', 'Status', 'Term' ) );
+		}
+
+		if ( ! $apply && $repair['matched'] > 0 ) {
+			\WP_CLI::log( 'Re-run with --apply to assign the matched venue terms.' );
 		}
 		\WP_CLI::log( '' );
 
