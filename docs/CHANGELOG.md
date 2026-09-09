@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.7] - 2026-09-09
+
+### Changed
+- converge flow and system-task scheduling on Agents API Routines
+- tranche 4 — migrate Agents admin calls to /wp-abilities/v1 and delete Agents.php; access via agents-api abilities
+- tranche 3b — migrate Jobs/Logs/Settings/StepTypes/Handlers/AgentFiles admin calls to /wp-abilities/v1 and delete wrapper routes
+- tranche 3a — delete Email and InternalLinks wrapper routes
+
+### Fixed
+- prevent global-option registration warnings
+
 ## [0.176.6] - 2026-09-07
 
 ### Changed
