@@ -72,6 +72,7 @@ jspm_packages/
 
 # Composer
 vendor/
+vendor
 composer.lock
 
 # Build artifacts
