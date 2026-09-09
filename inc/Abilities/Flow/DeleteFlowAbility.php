@@ -83,39 +83,17 @@ class DeleteFlowAbility {
 
 		$pipeline_id = (int) ( $flow['pipeline_id'] ?? 0 );
 
-		$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::commitDesiredSchedule(
-			'datamachine_run_flow_now',
-			array( $flow_id ),
-			'manual',
-			array( 'generation_argument_index' => \DataMachine\Api\Flows\FlowScheduling::GENERATION_ARGUMENT_INDEX ),
-			true,
-			fn(): bool => $this->db_flows->delete_flow( $flow_id ),
-			static function ( $result ) use ( $flow_id ): bool {
-				if ( is_wp_error( $result ) ) {
-					do_action(
-						'datamachine_log',
-						'error',
-						'Deleted flow has schedule reconciliation drift',
-						array_merge(
-							array( 'flow_id' => $flow_id ),
-							\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result )
-						)
-					);
-				}
-				return true;
-			}
-		);
-		if ( is_wp_error( $schedule_result ) ) {
+		// Cancel the flow's routine and one-time schedules first, then delete
+		// the row. A failed delete leaves the flow persisted but unscheduled,
+		// which is visible as manual rather than silently wrong.
+		\DataMachine\Engine\Scheduling\FlowRoutines::unschedule( $flow_id );
+
+		$deleted = $this->db_flows->delete_flow( $flow_id );
+		if ( ! $deleted ) {
 			return new \WP_Error(
-				$schedule_result->get_error_code(),
-				$schedule_result->get_error_message(),
-				array_merge(
-					array(
-						'status'                  => 500,
-						'desired_state_committed' => null === $this->db_flows->get_flow( $flow_id ),
-					),
-					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
-				)
+				'flow_delete_failed',
+				'Flow schedule was cancelled but the flow row could not be deleted.',
+				array( 'status' => 500 )
 			);
 		}
 

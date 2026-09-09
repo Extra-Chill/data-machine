@@ -18,7 +18,6 @@ use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\JobStatus;
 use DataMachine\Engine\ExecutionPlan;
-use DataMachine\Engine\Tasks\ScheduleActionIdentity;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -354,7 +353,7 @@ class RunFlowAbility {
 		 * @param array $pipeline        Pipeline row from the database.
 		 */
 		$filtered_snapshot = apply_filters( 'datamachine_engine_snapshot', $engine_snapshot, $job_id, $flow, $pipeline );
-		if ( is_array( $filtered_snapshot ) ) {
+		if ( array() !== $filtered_snapshot ) {
 			$engine_snapshot = $filtered_snapshot;
 		}
 		$engine_snapshot = \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot );
@@ -491,19 +490,24 @@ class RunFlowAbility {
 			// reschedule is skipped, and the run is silently dropped until the
 			// next recurring fire. Querying STATUS_PENDING only counts
 			// wake-ups that have not started yet.
-			$already_pending = 0 < ScheduleActionIdentity::exactActionId(
-				'datamachine_run_flow_now',
-				array( $flow_id ),
-				'data-machine',
-				'pending'
+			$pending_ids     = as_get_scheduled_actions(
+				array(
+					'hook'     => 'datamachine_run_flow_now',
+					'args'     => array( $flow_id ),
+					'group'    => \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP,
+					'status'   => 'pending',
+					'per_page' => 1,
+				),
+				'ids'
 			);
+			$already_pending = array() !== $pending_ids;
 
 			if ( ! $already_pending ) {
 				as_schedule_single_action(
 					time() + $delay,
 					'datamachine_run_flow_now',
 					array( $flow_id ),
-					'data-machine'
+					\DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP
 				);
 			}
 		}

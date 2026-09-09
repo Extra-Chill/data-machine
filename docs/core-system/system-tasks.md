@@ -242,15 +242,18 @@ Hooks the `datamachine_tasks` filter to register built-in task types:
 
 Schedules are registered separately from task handlers via the
 `datamachine_recurring_schedules` filter (see
-[recurring-scheduler.md](recurring-scheduler.md)). On `action_scheduler_init`
-the service provider reconciles every registered schedule with Action
-Scheduler:
+[routines-scheduling.md](routines-scheduling.md)). Each active schedule is a
+`system-<schedule_id>` routine registered by `FlowRoutines::boot()` on every
+request:
 
-- If the schedule's `enabled_setting` resolves to true and no AS action is
-  pending → schedule via `RecurringScheduler::ensureSchedule()`.
-- If the setting resolves to false → unschedule.
+- If the schedule's `enabled_setting` resolves to true, the routine is
+  registered and its wake executes `datamachine/dispatch-system-task`.
+- If the setting resolves to false, the routine is not registered and any
+  prior schedule is cancelled.
+- Drift repair runs through `Registry::reconcile()` via
+  `wp datamachine flows reconcile-schedules`.
 
-Recurring hooks are schedule-scoped because one task can have multiple schedules with different params or cadences. Task-scoped legacy hooks (`datamachine_recurring_<task_type>`) are unscheduled when the schedule-scoped hook is reconciled.
+Routine wakes are schedule-scoped because one task can have multiple schedules with different params or cadences.
 
 ## SystemTaskStep
 

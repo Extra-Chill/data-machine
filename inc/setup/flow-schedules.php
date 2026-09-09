@@ -3,7 +3,8 @@
  * Data Machine flow schedule reconciliation lifecycle.
  *
  * Activation and deploy-time migrations only mark the current site. The repair
- * runs after Action Scheduler initializes so datastore reads and writes are safe.
+ * runs after init so the routines adapter has re-declared the flow registry
+ * and Action Scheduler datastore reads and writes are safe.
  *
  * @package DataMachine
  */
@@ -27,11 +28,11 @@ function datamachine_mark_flow_schedule_reconciliation(): void {
 }
 
 /**
- * Repair marked flow schedules once Action Scheduler is ready.
+ * Repair marked flow schedules once the routines adapter is available.
  *
- * The marker is retained after transient failures so a later request can retry.
- * Paused, manual, one-time, and malformed schedule definitions are not repaired;
- * malformed definitions are reported without making the marker permanent.
+ * The marker is retained after failures so a later request can retry.
+ * FlowRoutines::reconcile() re-declares the registry before reconciling,
+ * so repairs classify against a fully populated routine set.
  *
  * @return void
  */
@@ -40,12 +41,12 @@ function datamachine_reconcile_marked_flow_schedules(): void {
 		return;
 	}
 
-	if ( ! \DataMachine\Engine\Tasks\RecurringScheduler::isReady() ) {
+	if ( ! \DataMachine\Engine\Scheduling\FlowRoutines::available() ) {
 		return;
 	}
 
-	$result = ( new \DataMachine\Api\Flows\FlowScheduleReconciler() )->reconcile( true );
-	if ( empty( $result['success'] ) && ! empty( $result['transient'] ) ) {
+	$result = \DataMachine\Engine\Scheduling\FlowRoutines::reconcile( true );
+	if ( empty( $result['success'] ) ) {
 		do_action(
 			'datamachine_log',
 			'error',
@@ -56,24 +57,16 @@ function datamachine_reconcile_marked_flow_schedules(): void {
 	}
 
 	delete_option( 'datamachine_flow_schedule_reconciliation_pending' );
-	if ( empty( $result['success'] ) ) {
-		do_action(
-			'datamachine_log',
-			'error',
-			'Deferred flow schedule reconciliation failed permanently; marker cleared',
-			array( 'result' => $result )
-		);
-		return;
-	}
 	do_action(
 		'datamachine_log',
 		'info',
 		'Deferred flow schedule reconciliation completed',
 		array(
-			'eligible' => (int) ( $result['eligible'] ?? 0 ),
-			'repaired' => (int) ( $result['repaired'] ?? 0 ),
+			'covered' => (int) ( $result['covered'] ?? 0 ),
+			'missing' => (int) ( $result['missing'] ?? 0 ),
+			'removed' => (int) ( $result['removed'] ?? 0 ),
 		)
 	);
 }
 
-add_action( 'action_scheduler_init', 'datamachine_reconcile_marked_flow_schedules', 20 );
+add_action( 'init', 'datamachine_reconcile_marked_flow_schedules', 10 );

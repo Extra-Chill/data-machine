@@ -160,13 +160,14 @@ SystemTask::setPromptOverride('daily_memory_generation', 'daily_memory', 'Your c
 
 Scheduling is registered separately from the task handler via the
 `datamachine_recurring_schedules` filter in `SystemAgentServiceProvider`.
-All AS plumbing runs through the shared `RecurringScheduler` primitive
-(see [recurring-scheduler.md](recurring-scheduler.md)).
+The recurring tick is an Agents API routine (`system-daily-memory-generation`)
+registered by `FlowRoutines::boot()` each request
+(see [routines-scheduling.md](routines-scheduling.md)).
 
-- **Hook:** `datamachine_recurring_daily_memory_generation`
-- **Schedule:** Daily; first run at tomorrow midnight UTC
+- **Hook:** `wp_agent_routine_run_scheduled` (routine id `system-daily-memory-generation`)
+- **Schedule:** Daily; first run staggered within the interval window
 - **Setting:** `daily_memory_enabled` (default: false) — when disabled, the
-  schedule is unregistered during reconciliation on `action_scheduler_init`
+  routine is not registered on boot and any prior schedule is cancelled
 - **Manual run:** Supported (`supports_run: true` in task meta) — can be
   triggered via CLI / REST / UI
 

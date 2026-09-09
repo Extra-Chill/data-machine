@@ -11,7 +11,6 @@
 
 namespace DataMachine\Engine\Actions;
 
-use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\FlowStepConfigFactory;
 use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
@@ -890,7 +889,7 @@ class ImportExport {
 	 * Remove scheduler-owned runtime observations from portable desired state.
 	 */
 	private function export_scheduling_config( array $scheduling_config ): array {
-		return AuthRefHandlerConfig::strip_secrets_for_export( FlowScheduling::portable_desired_config( $scheduling_config ) );
+		return AuthRefHandlerConfig::strip_secrets_for_export( \DataMachine\Engine\Scheduling\FlowRoutines::portable_desired_config( $scheduling_config ) );
 	}
 
 	/** Build the shared identity prefix for typed CSV rows. */

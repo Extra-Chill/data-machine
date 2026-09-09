@@ -8,7 +8,7 @@
  * can only fire do_action() calls.
  *
  * Execution cycle: datamachine_run_flow_now → datamachine_execute_step → datamachine_schedule_next_step
- * Scheduling cycle: datamachine_run_flow_later → Action Scheduler → datamachine_run_flow_now
+ * Scheduling cycle: Agents API Routines wake `datamachine/run-flow`; one-time runs use datamachine_run_flow_once.
  *
  * @package DataMachine\Engine\Actions
  */
@@ -91,6 +91,86 @@ function datamachine_execute_step_action( $job_id, string $flow_step_id, $operat
 	}
 }
 
+/**
+ * Log one routine lifecycle outcome with the derived flow id attached.
+ *
+ * @param string               $level     Log level.
+ * @param string               $message   Log message.
+ * @param array<string, mixed> $context   Log context.
+ * @param string               $routine_id Routine id, when known.
+ */
+function datamachine_log_routine_outcome( string $level, string $message, array $context = array(), string $routine_id = '' ): void {
+	$flow_id = \DataMachine\Engine\Scheduling\FlowRoutines::flow_id_from_routine_id( $routine_id );
+	if ( $flow_id > 0 ) {
+		$context['flow_id'] = $flow_id;
+	}
+	if ( '' !== $routine_id && ! isset( $context['routine_id'] ) ) {
+		$context['routine_id'] = $routine_id;
+	}
+
+	do_action( 'datamachine_log', $level, $message, $context );
+}
+
+/**
+ * Dispatch one flow run through the canonical run-flow ability.
+ *
+ * Shared by the datamachine_run_flow_now and datamachine_run_flow_once
+ * bridges; a missing flow is logged and dropped.
+ *
+ * @param int   $flow_id Flow ID.
+ * @param mixed $job_id  Optional pre-created job ID.
+ */
+function datamachine_dispatch_run_flow( $flow_id, $job_id = null ): void {
+	$flow_id = (int) $flow_id;
+
+	if ( ! datamachine_flow_exists( $flow_id ) ) {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Scheduled wake ignored for missing flow',
+			array( 'flow_id' => $flow_id )
+		);
+		return;
+	}
+
+	$ability = wp_get_ability( 'datamachine/run-flow' );
+	if ( $ability ) {
+		$ability->execute(
+			array(
+				'flow_id'        => $flow_id,
+				'job_id'         => null !== $job_id ? (int) $job_id : null,
+				'respect_paused' => true,
+			)
+		);
+	}
+}
+
+/**
+ * Bridge for the legacy datamachine_run_flow_now hook.
+ *
+ * Positional wakes (`[ flow_id ]`, `[ flow_id, job_id ]`) from backpressure
+ * deferrals and stuck-job recovery still dispatch. A legacy recurring action
+ * carries the schedule generation marker at args[2]; after the routines
+ * migration those must not run, or they would double-fire beside the
+ * routine. TODO(3458): drop the legacy branch after one release.
+ *
+ * @param int   $flow_id             Flow ID.
+ * @param mixed $job_id              Optional pre-created job ID.
+ * @param mixed $schedule_generation Legacy generation marker, if any.
+ */
+function datamachine_dispatch_scheduled_flow_wake( $flow_id, $job_id = null, $schedule_generation = null ): void {
+	if ( null !== $schedule_generation ) {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Legacy recurring schedule action ignored after routines migration',
+			array( 'flow_id' => (int) $flow_id )
+		);
+		return;
+	}
+	datamachine_dispatch_run_flow( $flow_id, $job_id );
+}
+
 /** Validate durable resume ownership before entering canonical step execution. */
 function datamachine_resume_ai_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '', $ai_resume_generation = 0 ): void {
 	$job_id               = (int) $job_id;
@@ -117,88 +197,97 @@ function datamachine_resume_ai_step_action( $job_id, string $flow_step_id, $oper
  *
  * Action Scheduler fires do_action() — these hooks delegate immediately
  * to the corresponding ability via wp_get_ability()->execute().
+ *
+ * Recurring scheduling runs through Agents API Routines: scheduled wakes
+ * fire `wp_agent_routine_run_scheduled` and the substrate executes
+ * `datamachine/run-flow` directly. This engine registers the routines
+ * adapter on init plus wake observability below.
  */
 function datamachine_register_execution_engine() {
+
+	// Boot the routines adapter before Action Scheduler processes the queue.
+	add_action( 'init', array( \DataMachine\Engine\Scheduling\FlowRoutines::class, 'boot' ), 5 );
+
+	/**
+	 * Routine wake observability: log every scheduled flow/system run.
+	 *
+	 * @param mixed $routine The waking routine value object.
+	 * @param mixed $result  Ability or chat output.
+	 */
+	add_action(
+		'wp_agent_routine_run_completed',
+		static function ( $routine, $result = null ): void {
+			unset( $result );
+			if ( ! is_object( $routine ) || ! method_exists( $routine, 'get_id' ) ) {
+				return;
+			}
+
+			datamachine_log_routine_outcome(
+				'info',
+				'Scheduled routine run completed',
+				array(),
+				(string) $routine->get_id()
+			);
+		},
+		10,
+		2
+	);
+
+	/**
+	 * Routine dispatch failure observability.
+	 *
+	 * @param string $code   Failure code from the substrate.
+	 * @param mixed  $context Failure context (routine_id, ability, ...).
+	 */
+	add_action(
+		'agents_run_routine_dispatch_failed',
+		static function ( $code, $context = array() ): void {
+			$context = is_array( $context ) ? $context : array();
+			if ( isset( $context['routine_id'] ) && is_string( $context['routine_id'] ) ) {
+				$context['error_code'] = is_string( $code ) ? $code : 'unknown';
+				datamachine_log_routine_outcome( 'error', 'Scheduled routine dispatch failed', $context, $context['routine_id'] );
+				return;
+			}
+
+			datamachine_log_routine_outcome(
+				'error',
+				'Scheduled routine dispatch failed',
+				array( 'error_code' => is_string( $code ) ? $code : 'unknown' )
+			);
+		},
+		10,
+		2
+	);
 
 	/**
 	 * Bridge: datamachine_run_flow_now → datamachine/run-flow ability.
 	 *
-	 * Includes defensive check for orphaned scheduled actions. If the flow
-	 * no longer exists (e.g., was deleted without cleanup), cancels all
-	 * scheduled actions for that flow to prevent recurring errors.
+	 * Still a live execution path for one-off wakes: queue backpressure
+	 * deferrals and stuck-job recovery re-runs schedule this hook with
+	 * positional args `[ flow_id ]` / `[ flow_id, job_id ]`. Recurring
+	 * schedules moved to Agents API Routines; a legacy recurring action
+	 * (identified by the generation marker at args[2]) that is still pending
+	 * after migration is ignored and logged so it cannot double-fire beside
+	 * its routine. TODO(3458): drop the legacy branch after one release.
 	 */
 	add_action(
 		'datamachine_run_flow_now',
-		function ( $flow_id, $job_id = null, $schedule_generation = null ) {
-			$flow_id = (int) $flow_id;
-			if ( null !== $schedule_generation
-				&& ! \DataMachine\Engine\Tasks\RecurringScheduler::isActionGenerationCurrent(
-					\DataMachine\Api\Flows\FlowScheduling::FLOW_HOOK,
-					array( $flow_id ),
-					\DataMachine\Engine\Tasks\RecurringScheduler::GROUP,
-					$schedule_generation
-				) ) {
-				do_action( 'datamachine_log', 'warning', 'Stale schedule generation skipped', array( 'flow_id' => $flow_id ) );
-				return;
-			}
-
-			if ( null === $schedule_generation && \DataMachine\Engine\Tasks\RecurringScheduler::isExecutingRecurringAction() ) {
-				$adopted = \DataMachine\Api\Flows\FlowScheduling::adopt_legacy_action( $flow_id );
-				if ( is_wp_error( $adopted ) ) {
-					do_action(
-						'datamachine_log',
-						'warning',
-						'Legacy scheduled action skipped during bounded generation adoption',
-						array_merge( array( 'flow_id' => $flow_id ), \DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $adopted ) )
-					);
-					return;
-				}
-			}
-
-			// Defensive: Check if flow exists before executing.
-			// If flow was deleted without cleaning up scheduled actions,
-			// cancel the orphaned actions to prevent recurring errors.
-			if ( ! datamachine_flow_exists( $flow_id ) ) {
-				$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::ensureSchedule(
-					'datamachine_run_flow_now',
-					array( $flow_id ),
-					'manual',
-					array( 'generation_argument_index' => \DataMachine\Api\Flows\FlowScheduling::GENERATION_ARGUMENT_INDEX )
-				);
-				if ( is_wp_error( $schedule_result ) ) {
-					do_action(
-						'datamachine_log',
-						'error',
-						'Orphaned schedule cleanup deferred after ownership failure',
-						array_merge(
-							array( 'flow_id' => $flow_id ),
-							\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result )
-						)
-					);
-					return;
-				}
-				do_action(
-					'datamachine_log',
-					'warning',
-					'Orphaned scheduled action cleaned up for deleted flow',
-					array( 'flow_id' => $flow_id )
-				);
-				return;
-			}
-
-			$ability = wp_get_ability( 'datamachine/run-flow' );
-			if ( $ability ) {
-				$ability->execute(
-					array(
-						'flow_id'        => $flow_id,
-						'job_id'         => $job_id ? (int) $job_id : null,
-						'respect_paused' => true,
-					)
-				);
-			}
-		},
+		'datamachine_dispatch_scheduled_flow_wake',
 		10,
 		3
+	);
+
+	/**
+	 * Bridge: datamachine_run_flow_once → datamachine/run-flow ability.
+	 *
+	 * One-time (timestamp) flow runs are plain Action Scheduler single
+	 * actions — routines are recurring by definition.
+	 */
+	add_action(
+		'datamachine_run_flow_once',
+		'datamachine_dispatch_run_flow',
+		10,
+		1
 	);
 
 	/**

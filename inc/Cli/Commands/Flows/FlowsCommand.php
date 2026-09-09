@@ -46,7 +46,7 @@ class FlowsCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * [<args>...]
-	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <flow_id>, run <flow_id>, create, delete <flow_id>, update <flow_id>, reconcile-schedules, repair-escaped-config <flow_id>.
+	 * : Subcommand and arguments. Accepts: list [pipeline_id], get <flow_id>, run <flow_id>, create, delete <flow_id>, update <flow_id>, reconcile-schedules, migrate-routines, repair-escaped-config <flow_id>.
 	 *
 	 * [--handler=<slug>]
 	 * : Filter flows using this handler slug (any step that uses this handler).
@@ -168,9 +168,6 @@ class FlowsCommand extends BaseCommand {
 	 * [--apply]
 	 * : Apply a repair command. Without this flag repair commands are dry-runs.
 	 *
-	 * [--spread-hours=<hours>]
-	 * : Explicit first-run distribution window for reconcile-schedules (1-24).
-	 *
 	 * [--pipeline=<id>]
 	 * : Pipeline ID for pause/resume scoping.
 	 *
@@ -283,7 +280,11 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 *     # Audit or repair recurring schedule coverage
 	 *     wp datamachine flows reconcile-schedules --format=json
-	 *     wp datamachine flows reconcile-schedules --apply --spread-hours=24
+	 *     wp datamachine flows reconcile-schedules --apply
+	 *
+	 *     # Inspect (then apply) the one-shot legacy schedule migration
+	 *     wp datamachine flows migrate-routines
+	 *     wp datamachine flows migrate-routines --apply
 	 *
 	 *     # Audit literal JSON solidus escapes, then explicitly repair reviewed candidates
 	 *     wp datamachine flows repair-escaped-config 52 --format=json
@@ -296,6 +297,11 @@ class FlowsCommand extends BaseCommand {
 
 		if ( ! empty( $args ) && 'reconcile-schedules' === $args[0] ) {
 			$this->reconcileSchedules( $assoc_args );
+			return;
+		}
+
+		if ( ! empty( $args ) && 'migrate-routines' === $args[0] ) {
+			$this->migrateRoutines( $assoc_args );
 			return;
 		}
 
@@ -548,23 +554,16 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
-		$spread_hours = isset( $assoc_args['spread-hours'] ) ? (int) $assoc_args['spread-hours'] : null;
-		if ( null !== $spread_hours && ( $spread_hours < 1 || $spread_hours > 24 ) ) {
-			WP_CLI::error( '--spread-hours must be between 1 and 24.' );
-			return;
-		}
-
 		$ability = wp_get_ability( 'datamachine/reconcile-flow-schedules' );
 		$result  = $ability->execute(
 			array(
-				'apply'        => isset( $assoc_args['apply'] ),
-				'spread_hours' => $spread_hours,
+				'apply' => isset( $assoc_args['apply'] ),
 			)
 		);
 
 		if ( 'json' === $format ) {
 			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
-			if ( empty( $result['success'] ) || (int) ( $result['invalid'] ?? 0 ) > 0 ) {
+			if ( empty( $result['success'] ) ) {
 				WP_CLI::halt( 1 );
 			}
 			return;
@@ -573,34 +572,97 @@ class FlowsCommand extends BaseCommand {
 		if ( empty( $result['success'] ) && isset( $result['error'] ) ) {
 			WP_CLI::error( (string) $result['error'], false );
 			WP_CLI::halt( 1 );
-			return;
 		}
 
 		WP_CLI::log( ! empty( $result['applied'] ) ? 'Mode: apply' : 'Mode: dry-run' );
 		WP_CLI::log(
 			sprintf(
-				'Eligible: %d | Covered: %d | Missing: %d | Blocked: %d | Invalid: %d | Repaired: %d | Failed: %d | Spread: %dh',
-				(int) ( $result['eligible'] ?? 0 ),
+				'Covered: %d | Missing: %d | Removed orphans: %d | Errors: %d',
 				(int) ( $result['covered'] ?? 0 ),
 				(int) ( $result['missing'] ?? 0 ),
-				(int) ( $result['blocked'] ?? 0 ),
-				(int) ( $result['invalid'] ?? 0 ),
-				(int) ( $result['repaired'] ?? 0 ),
-				(int) ( $result['failed'] ?? 0 ),
-				(int) ( $result['distribution_window_hours'] ?? 1 )
+				(int) ( $result['removed'] ?? 0 ),
+				count( (array) ( $result['errors'] ?? array() ) )
 			)
 		);
 
-		$details = $result['details'] ?? array();
-		if ( ! empty( $details ) ) {
-			WP_CLI\Utils\format_items( 'table', $details, array( 'flow_id', 'flow_name', 'interval', 'status', 'error' ) );
+		$missing = (array) ( $result['routine_ids']['missing'] ?? array() );
+		if ( ! empty( $missing ) ) {
+			WP_CLI::log( 'Missing routine schedules:' );
+			WP_CLI\Utils\format_items(
+				'table',
+				array_map( static fn( $id ) => array( 'routine_id' => $id ), $missing ),
+				array( 'routine_id' )
+			);
 		}
-		if ( ! empty( $result['details_truncated'] ) ) {
-			WP_CLI::warning( 'Detail output was truncated; use summary counts to assess the full fleet.' );
+
+		$errors = (array) ( $result['errors'] ?? array() );
+		if ( ! empty( $errors ) ) {
+			WP_CLI::log( 'Errors:' );
+			foreach ( $errors as $key => $message ) {
+				WP_CLI::log( sprintf( '  %s: %s', $key, (string) $message ) );
+			}
 		}
-		if ( empty( $result['success'] ) || (int) ( $result['failed'] ?? 0 ) > 0 || (int) ( $result['invalid'] ?? 0 ) > 0 ) {
+
+		if ( empty( $result['success'] ) ) {
 			WP_CLI::halt( 1 );
 		}
+	}
+
+	/**
+	 * Show (or run) the one-shot legacy schedule migration.
+	 *
+	 * @param array $assoc_args WP-CLI arguments.
+	 * @return void
+	 */
+	private function migrateRoutines( array $assoc_args ): void {
+		$dry_run = ! isset( $assoc_args['dry-run'] ) && ! isset( $assoc_args['apply'] );
+
+		$plan = \DataMachine\Engine\Scheduling\FlowRoutines::migrate_legacy_schedules( $dry_run );
+
+		$format = (string) ( $assoc_args['format'] ?? 'table' );
+		if ( 'json' === $format ) {
+			WP_CLI::line( (string) wp_json_encode( $plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			if ( ! empty( $plan['errors'] ) ) {
+				WP_CLI::halt( 1 );
+			}
+			return;
+		}
+
+		WP_CLI::log( $dry_run ? 'Mode: dry-run' : 'Mode: apply' );
+		WP_CLI::log(
+			sprintf(
+				'Legacy pending actions: %d | Cancelled: %d | Errors: %d',
+				(int) ( $plan['legacy_actions'] ?? 0 ),
+				(int) ( $plan['cancelled'] ?? 0 ),
+				count( (array) ( $plan['errors'] ?? array() ) )
+			)
+		);
+
+		$flows = array_slice( (array) ( $plan['flows'] ?? array() ), 0, 50 );
+		if ( ! empty( $flows ) ) {
+			WP_CLI\Utils\format_items(
+				'table',
+				array_map(
+					static fn( $entry ) => array(
+						'flow_id'     => (int) ( $entry['flow_id'] ?? 0 ),
+						'routine_id'  => (string) ( $entry['routine_id'] ?? '' ),
+						'old_actions' => count( (array) ( $entry['legacy_action_ids'] ?? array() ) ),
+						'cancelled'   => ! empty( $entry['cancelled'] ) ? 'yes' : ( $dry_run ? 'planned' : 'no' ),
+					),
+					$flows
+				),
+				array( 'flow_id', 'routine_id', 'old_actions', 'cancelled' )
+			);
+			if ( ! empty( $plan['details_truncated'] ) ) {
+				WP_CLI::warning( 'Detail output was truncated; use --format=json for the full plan.' );
+			}
+		}
+
+		if ( ! empty( $plan['errors'] ) ) {
+			WP_CLI::error( 'Migration completed with errors; rerun to retry.' );
+		}
+
+		WP_CLI::success( $dry_run ? 'Dry run complete. Rerun with --apply to cancel the legacy actions.' : 'Migration applied.' );
 	}
 
 	/**
@@ -721,7 +783,7 @@ class FlowsCommand extends BaseCommand {
 		WP_CLI::log( sprintf( 'Name:         %s', $flow['flow_name'] ) );
 		WP_CLI::log( sprintf( 'Pipeline ID:  %s', $flow['pipeline_id'] ?? 'N/A' ) );
 		if ( 'cron' === $interval && ! empty( $scheduling['cron_expression'] ) ) {
-			$cron_desc = \DataMachine\Engine\Tasks\RecurringScheduler::describeCronExpression( $scheduling['cron_expression'] );
+			$cron_desc = \DataMachine\Engine\Scheduling\FlowRoutines::describe_cron_expression( $scheduling['cron_expression'] );
 			WP_CLI::log( sprintf( 'Scheduling:   cron (%s) — %s', $scheduling['cron_expression'], $cron_desc ) );
 		} else {
 			WP_CLI::log( sprintf( 'Scheduling:   %s', $interval ) );
@@ -1036,10 +1098,6 @@ class FlowsCommand extends BaseCommand {
 			$decoded = JsonInput::decode_array( (string) $assoc_args['step_configs'] );
 			if ( null === $decoded && '' !== $assoc_args['step_configs'] ) {
 				WP_CLI::error( 'Invalid JSON in --step_configs' );
-				return;
-			}
-			if ( null !== $decoded && ! is_array( $decoded ) ) {
-				WP_CLI::error( '--step_configs must be a JSON object' );
 				return;
 			}
 			$step_configs = $decoded ?? array();
@@ -2400,7 +2458,7 @@ class FlowsCommand extends BaseCommand {
 			\WP_CLI::error( 'one_time scheduling requires --scheduled-at=<datetime> (ISO-8601 format).' );
 		}
 
-		if ( \DataMachine\Engine\Tasks\RecurringScheduler::looksLikeCronExpression( $scheduling ) ) {
+		if ( \DataMachine\Engine\Scheduling\FlowRoutines::looks_like_cron_expression( $scheduling ) ) {
 			return array(
 				'interval'        => 'cron',
 				'cron_expression' => $scheduling,
@@ -2536,7 +2594,7 @@ class FlowsCommand extends BaseCommand {
 		);
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( array(
+			WP_CLI::line( (string) wp_json_encode( array(
 				'total' => $total,
 				'flows' => $items,
 			), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

@@ -87,60 +87,31 @@ class DeletePipelineAbility {
 		$pipeline_name  = $pipeline['pipeline_name'];
 		$affected_flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
 
-		$deleted_flows     = 0;
-		$schedule_failures = array();
+		$deleted_flows = 0;
 		foreach ( $affected_flows as $flow ) {
 			$flow_id = (int) ( $flow['flow_id'] ?? 0 );
 			if ( $flow_id <= 0 ) {
 				continue;
 			}
 
-			$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::commitDesiredSchedule(
-				'datamachine_run_flow_now',
-				array( $flow_id ),
-				'manual',
-				array( 'generation_argument_index' => \DataMachine\Api\Flows\FlowScheduling::GENERATION_ARGUMENT_INDEX ),
-				true,
-				fn(): bool => $this->db_flows->delete_flow( $flow_id ),
-				static function ( $result ) use ( $flow_id ): bool {
-					if ( is_wp_error( $result ) ) {
-						do_action(
-							'datamachine_log',
-							'error',
-							'Deleted pipeline flow has schedule reconciliation drift',
-							array_merge(
-								array( 'flow_id' => $flow_id ),
-								\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result )
-							)
-						);
-					}
-					return true;
-				}
-			);
-			if ( is_wp_error( $schedule_result ) ) {
-				$schedule_failures[ $flow_id ] = array_merge(
-					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result ),
-					array( 'desired_state_committed' => null === $this->db_flows->get_flow( $flow_id ) )
+			// Cancel the flow's routine and one-time schedules first, then
+			// delete the row. A failed row delete is logged and skipped; the
+			// flow remains persisted but unscheduled, visible as manual.
+			\DataMachine\Engine\Scheduling\FlowRoutines::unschedule( $flow_id );
+
+			if ( ! $this->db_flows->delete_flow( $flow_id ) ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Flow row delete failed during pipeline deletion',
+					array(
+						'pipeline_id' => $pipeline_id,
+						'flow_id'     => $flow_id,
+					)
 				);
 				continue;
 			}
 			++$deleted_flows;
-		}
-
-		$commit_failures = array_filter(
-			$schedule_failures,
-			static fn(array $failure): bool => empty( $failure['desired_state_committed'] )
-		);
-		if ( ! empty( $commit_failures ) ) {
-			return new \WP_Error(
-				'pipeline_flow_deletion_incomplete',
-				'Pipeline deletion did not commit every flow deletion.',
-				array(
-					'status'            => 500,
-					'schedule_failures' => $schedule_failures,
-					'deleted_flows'     => $deleted_flows,
-				)
-			);
 		}
 
 		$cleanup            = new FileCleanup();
@@ -174,7 +145,7 @@ class DeletePipelineAbility {
 		);
 
 		$result = array(
-			'success'          => empty( $schedule_failures ),
+			'success'          => true,
 			'pipeline_id'      => $pipeline_id,
 			'pipeline_name'    => $pipeline_name,
 			'deleted_flows'    => $deleted_flows,
@@ -185,11 +156,6 @@ class DeletePipelineAbility {
 				$deleted_flows
 			),
 		);
-		if ( ! empty( $schedule_failures ) ) {
-			$result['error']             = 'Pipeline was deleted with retryable schedule reconciliation drift.';
-			$result['error_code']        = 'pipeline_schedule_reconciliation_drift';
-			$result['schedule_failures'] = $schedule_failures;
-		}
 
 		return $result;
 	}

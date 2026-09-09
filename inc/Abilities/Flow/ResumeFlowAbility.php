@@ -16,7 +16,7 @@
 
 namespace DataMachine\Abilities\Flow;
 
-use DataMachine\Api\Flows\FlowScheduling;
+use DataMachine\Engine\Scheduling\FlowRoutines;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -118,15 +118,13 @@ class ResumeFlowAbility {
 
 			// Commit resumed intent and reconcile under the shared schedule lease.
 			unset( $scheduling['enabled'] );
-			$result = FlowScheduling::handle_scheduling_update( $fid, $scheduling, true );
+			$result = FlowRoutines::sync( $fid, $scheduling, true );
 			if ( is_wp_error( $result ) ) {
 				++$errors;
-				$details[] = array_merge(
-					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result ),
-					array(
-						'flow_id' => $fid,
-						'status'  => 'resume_error',
-					)
+				$details[] = array(
+					'flow_id' => $fid,
+					'status'  => 'resume_error',
+					'error'   => $result->get_error_message(),
 				);
 				continue;
 			}

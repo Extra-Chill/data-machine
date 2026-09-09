@@ -14,6 +14,8 @@
 
 namespace DataMachine\Abilities\Engine;
 
+use DataMachine\Engine\Scheduling\FlowRoutines;
+
 defined( 'ABSPATH' ) || exit;
 
 class ScheduleFlowAbility {
@@ -57,7 +59,7 @@ class ScheduleFlowAbility {
 							'success'        => array( 'type' => 'boolean' ),
 							'flow_id'        => array( 'type' => 'integer' ),
 							'schedule_type'  => array( 'type' => 'string' ),
-							'action_id'      => array( 'type' => 'integer' ),
+							'action_id'      => array( 'anyOf' => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ) ),
 							'scheduled_time' => array( 'type' => 'string' ),
 							'error'          => array( 'type' => 'string' ),
 							'error_code'     => array( 'type' => 'string' ),
@@ -106,7 +108,7 @@ class ScheduleFlowAbility {
 
 		// Detect cron expressions and route to cron scheduling.
 		if ( is_string( $interval_or_timestamp )
-			&& \DataMachine\Engine\Tasks\RecurringScheduler::looksLikeCronExpression( $interval_or_timestamp )
+			&& FlowRoutines::looks_like_cron_expression( $interval_or_timestamp )
 		) {
 			return $this->scheduleCron( $flow_id, $interval_or_timestamp );
 		}
@@ -121,7 +123,7 @@ class ScheduleFlowAbility {
 	 * @return array Result.
 	 */
 	private function clearSchedule( int $flow_id ): array|\WP_Error {
-		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+		$result = FlowRoutines::sync(
 			$flow_id,
 			array( 'interval' => 'manual' ),
 			true
@@ -151,7 +153,7 @@ class ScheduleFlowAbility {
 	 * @return array Result.
 	 */
 	private function scheduleOneTime( int $flow_id, int $timestamp ): array|\WP_Error {
-		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+		$result = FlowRoutines::sync(
 			$flow_id,
 			array(
 				'interval'  => 'one_time',
@@ -162,8 +164,6 @@ class ScheduleFlowAbility {
 		if ( is_wp_error( $result ) ) {
 			return $this->scheduleError( $result );
 		}
-		$scheduling = ( new \DataMachine\Core\Database\Flows\Flows() )->get_flow_scheduling( $flow_id );
-		$action_id  = is_array( $scheduling ) ? (int) ( $scheduling['action_id'] ?? 0 ) : 0;
 
 		do_action(
 			'datamachine_log',
@@ -173,7 +173,6 @@ class ScheduleFlowAbility {
 				'flow_id'        => $flow_id,
 				'timestamp'      => $timestamp,
 				'scheduled_time' => wp_date( 'c', $timestamp ),
-				'action_id'      => $action_id,
 			)
 		);
 
@@ -181,7 +180,7 @@ class ScheduleFlowAbility {
 			'success'        => true,
 			'flow_id'        => $flow_id,
 			'schedule_type'  => 'one_time',
-			'action_id'      => $action_id,
+			'action_id'      => null,
 			'scheduled_time' => wp_date( 'c', $timestamp ),
 		);
 	}
@@ -189,15 +188,15 @@ class ScheduleFlowAbility {
 	/**
 	 * Schedule execution using a cron expression.
 	 *
-	 * Delegates to FlowScheduling::handle_scheduling_update() which uses
-	 * Action Scheduler's native as_schedule_cron_action().
+	 * Delegates to FlowRoutines::sync() which registers the flow as an
+	 * Agents API routine with a cron-expression trigger.
 	 *
 	 * @param int    $flow_id         Flow ID.
 	 * @param string $cron_expression Cron expression string (e.g. "0 9 * * 1-5").
 	 * @return array Result.
 	 */
 	private function scheduleCron( int $flow_id, string $cron_expression ): array|\WP_Error {
-		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+		$result = FlowRoutines::sync(
 			$flow_id,
 			array(
 				'interval'        => 'cron',
@@ -209,33 +208,27 @@ class ScheduleFlowAbility {
 			return $this->scheduleError( $result );
 		}
 
-		// Read back the scheduling config to get the computed next run.
-		$flow              = $this->db_flows->get_flow( $flow_id );
-		$scheduling_config = $flow && is_array( $flow['scheduling_config'] ?? null )
-			? $flow['scheduling_config']
-			: array();
-
 		return array(
 			'success'         => true,
 			'flow_id'         => $flow_id,
 			'schedule_type'   => 'cron',
 			'cron_expression' => $cron_expression,
-			'scheduled_time'  => $scheduling_config['first_run'] ?? null,
+			'scheduled_time'  => FlowRoutines::next_run( $flow_id ),
 		);
 	}
 
 	/**
 	 * Schedule recurring execution at a defined interval.
 	 *
-	 * Delegates to FlowScheduling::handle_scheduling_update() which is the
-	 * single source of truth for recurring scheduling logic (including stagger).
+	 * Delegates to FlowRoutines::sync() which is the single source of truth
+	 * for recurring scheduling (stagger included).
 	 *
 	 * @param int    $flow_id  Flow ID.
 	 * @param string $interval Interval key from datamachine_scheduler_intervals filter.
 	 * @return array Result.
 	 */
 	private function scheduleRecurring( int $flow_id, string $interval ): array|\WP_Error {
-		$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+		$result = FlowRoutines::sync(
 			$flow_id,
 			array( 'interval' => $interval )
 		);
@@ -244,17 +237,11 @@ class ScheduleFlowAbility {
 			return $this->scheduleError( $result );
 		}
 
-		// Read back the scheduling config to get the computed first_run.
-		$flow              = $this->db_flows->get_flow( $flow_id );
-		$scheduling_config = $flow && is_array( $flow['scheduling_config'] ?? null )
-			? $flow['scheduling_config']
-			: array();
-
 		return array(
 			'success'        => true,
 			'flow_id'        => $flow_id,
 			'schedule_type'  => 'recurring',
-			'scheduled_time' => $scheduling_config['first_run'] ?? null,
+			'scheduled_time' => FlowRoutines::next_run( $flow_id ),
 		);
 	}
 

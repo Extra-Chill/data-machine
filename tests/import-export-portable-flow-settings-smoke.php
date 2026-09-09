@@ -81,7 +81,7 @@ require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
 require_once __DIR__ . '/../inc/Engine/PortableFlowStepFields.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AuthRefHandlerConfig.php';
-require_once __DIR__ . '/../inc/Api/Flows/FlowScheduling.php';
+require_once __DIR__ . '/../inc/Engine/Scheduling/FlowRoutines.php';
 require_once __DIR__ . '/../inc/Engine/Actions/ImportExport.php';
 
 use DataMachine\Engine\Actions\ImportExport;
@@ -106,7 +106,7 @@ function assert_csv_equals( $expected, $actual, string $name, array &$failures, 
 
 function call_import_export_private( ImportExport $import_export, string $method, array $arg ): array {
 	$reflection = new ReflectionMethod( ImportExport::class, $method );
-	$result = $reflection->invoke( $import_export, $arg );
+	$result     = $reflection->invoke( $import_export, $arg );
 	return is_array( $result ) ? $result : array();
 }
 
@@ -114,7 +114,7 @@ echo "import-export-portable-flow-settings-smoke\n";
 
 $import_export = new ImportExport();
 
-$parse_csv = new ReflectionMethod( ImportExport::class, 'parse_csv_rows' );
+$parse_csv      = new ReflectionMethod( ImportExport::class, 'parse_csv_rows' );
 $canonical_rows = $parse_csv->invoke(
 	$import_export,
 	"format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings\n1.0,pipeline_step,1,Example,0,fetch,{},,,"
@@ -216,7 +216,7 @@ $secure_settings = call_import_export_private(
 		),
 	)
 );
-$secure_json = json_encode( $secure_settings );
+$secure_json     = json_encode( $secure_settings );
 assert_csv_equals( 'custom:destination', $secure_settings['handler_configs']['custom_api']['auth_ref'] ?? null, 'CSV settings preserve auth_ref', $failures, $passes );
 assert_csv_equals( 'https://api.example.test', $secure_settings['handler_configs']['custom_api']['endpoint'] ?? null, 'CSV settings preserve ordinary handler config', $failures, $passes );
 assert_csv_equals( 'application/json', $secure_settings['handler_configs']['custom_api']['headers']['accept'] ?? null, 'CSV settings preserve nested ordinary config', $failures, $passes );
@@ -231,7 +231,7 @@ for ( $index = 0; $index < 12; ++$index ) {
 }
 assert_csv_equals( $ordered_list, AuthRefHandlerConfig::strip_secrets_for_export( $ordered_list ), 'credential projection preserves ordered lists', $failures, $passes );
 
-$secure_csv = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
+$secure_csv  = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
 $secure_csv .= '1.0,pipeline_step,1,Secure,0,fetch,{},,,' . "\n";
 $secure_csv .= '1.0,flow,1,Secure,,,,9,Destination,"{ ""scheduling_config"": { ""interval"": ""manual"" }, ""portable_slug"": ""destination"" }"' . "\n";
 $secure_csv .= '1.0,flow_step,1,Secure,0,fetch,{},9,Destination,' . '"' . str_replace( '"', '""', (string) $secure_json ) . '"';
@@ -356,7 +356,7 @@ assert_csv_equals( true, $threw, 'string enabled state fails before writes', $fa
 
 $threw = false;
 try {
-	$invalid_handler_csv = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
+	$invalid_handler_csv  = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
 	$invalid_handler_csv .= '1.0,pipeline_step,1,Example,0,fetch,{},,,' . "\n";
 	$invalid_handler_csv .= '1.0,flow,1,Example,,,,42,Named Flow,"{ ""scheduling_config"": { ""interval"": ""manual"" }, ""portable_slug"": ""named-flow"" }"' . "\n";
 	$invalid_handler_csv .= '1.0,flow_step,1,Example,0,fetch,{},42,Named Flow,"{ ""handler_slugs"": [""rss""], ""handler_configs"": ""bad"" }"';
@@ -416,7 +416,7 @@ foreach ( array( 'abc', '0.5' ) as $invalid_position ) {
 
 $threw = false;
 try {
-	$mismatched_step_csv = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
+	$mismatched_step_csv  = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
 	$mismatched_step_csv .= '1.0,pipeline_step,1,Example,0,fetch,{},,,' . "\n";
 	$mismatched_step_csv .= '1.0,flow,1,Example,,,,42,Named Flow,"{ ""scheduling_config"": { ""interval"": ""manual"" }, ""portable_slug"": ""named-flow"" }"' . "\n";
 	$mismatched_step_csv .= '1.0,flow_step,1,Example,0,publish,{},42,Named Flow,"{ ""enabled"": true }"';
@@ -428,7 +428,7 @@ assert_csv_equals( true, $threw, 'mismatched flow-step type fails before writes'
 
 $threw = false;
 try {
-	$duplicate_slug_csv = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
+	$duplicate_slug_csv  = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
 	$duplicate_slug_csv .= '1.0,flow,1,Example,,,,41,First,"{ ""scheduling_config"": { ""interval"": ""manual"" }, ""portable_slug"": ""Foo Bar"" }"' . "\n";
 	$duplicate_slug_csv .= '1.0,flow,1,Example,,,,42,Second,"{ ""scheduling_config"": { ""interval"": ""manual"" }, ""portable_slug"": ""foo-bar"" }"';
 	$parse_csv->invoke( $import_export, $duplicate_slug_csv );
@@ -439,7 +439,7 @@ assert_csv_equals( true, $threw, 'duplicate portable flow identities fail before
 
 $threw = false;
 try {
-	$pipeline_mismatch_csv = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
+	$pipeline_mismatch_csv  = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
 	$pipeline_mismatch_csv .= '1.0,pipeline_step,1,Example,0,fetch,{},,,' . "\n";
 	$pipeline_mismatch_csv .= '1.0,flow,2,Example,,,,42,Named Flow,"{ ""scheduling_config"": { ""interval"": ""manual"" }, ""portable_slug"": ""named-flow"" }"';
 	$parse_csv->invoke( $import_export, $pipeline_mismatch_csv );
@@ -450,7 +450,7 @@ assert_csv_equals( true, $threw, 'inconsistent source pipeline identity fails be
 
 $threw = false;
 try {
-	$source_name_mismatch_csv = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
+	$source_name_mismatch_csv  = 'format_version,row_type,pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,settings' . "\n";
 	$source_name_mismatch_csv .= '1.0,pipeline_step,1,First Pipeline,0,fetch,{},,,' . "\n";
 	$source_name_mismatch_csv .= '1.0,flow,1,Second Pipeline,,,,42,Named Flow,"{ ""scheduling_config"": { ""interval"": ""manual"" }, ""portable_slug"": ""named-flow"" }"';
 	$parse_csv->invoke( $import_export, $source_name_mismatch_csv );

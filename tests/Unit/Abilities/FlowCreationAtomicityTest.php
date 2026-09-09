@@ -10,14 +10,12 @@ namespace DataMachine\Tests\Unit\Abilities;
 use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Abilities\HandlerAbilities;
-use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Cli\Commands\Flows\FlowsCommand;
 use DataMachine\Cli\Commands\PipelinesCommand;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Steps\Settings\SettingsHandler;
-use DataMachine\Engine\Tasks\RecurringScheduler;
 use ReflectionMethod;
 use WP_UnitTestCase;
 
@@ -160,8 +158,8 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 	}
 
 	public function test_dry_run_executes_deep_validation_without_persisting(): void {
-		$before = $this->flowCount();
-		$input  = $this->validInput( 'Dry Run Flow' );
+		$before                 = $this->flowCount();
+		$input                  = $this->validInput( 'Dry Run Flow' );
 		$input['validate_only'] = true;
 
 		$result = wp_get_ability( 'datamachine/create-flow' )->execute( $input );
@@ -176,12 +174,12 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 	 */
 	public function test_malformed_aliases_fail_in_dry_run_and_write_mode( string $alias ): void {
 		foreach ( array( false, true ) as $validate_only ) {
-			$input = $this->validInput( 'Malformed Alias Flow' );
+			$input                                 = $this->validInput( 'Malformed Alias Flow' );
 			$input['step_configs']['event_import'] = array(
 				$alias => array( 'source_api' ),
 			);
-			$input['validate_only'] = $validate_only;
-			$before = $this->flowCount();
+			$input['validate_only']                = $validate_only;
+			$before                                = $this->flowCount();
 
 			$result = wp_get_ability( 'datamachine/create-flow' )->execute( $input );
 
@@ -214,7 +212,7 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 	}
 
 	public function test_empty_user_message_clears_prompt_queue(): void {
-		$input = $this->validInput( 'Empty Message Flow' );
+		$input                                       = $this->validInput( 'Empty Message Flow' );
 		$input['step_configs']['ai']['user_message'] = '';
 
 		$result = wp_get_ability( 'datamachine/create-flow' )->execute( $input );
@@ -242,10 +240,10 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 	}
 
 	public function test_scheduled_dry_run_rolls_back_action_side_effects(): void {
-		$input = $this->validInput( 'Scheduled Dry Run Flow' );
+		$input                      = $this->validInput( 'Scheduled Dry Run Flow' );
 		$input['scheduling_config'] = array( 'interval' => 'hourly' );
-		$input['validate_only'] = true;
-		$before = $this->scheduledFlowActionCount();
+		$input['validate_only']     = true;
+		$before                     = $this->scheduledFlowActionCount();
 
 		$result = wp_get_ability( 'datamachine/create-flow' )->execute( $input );
 
@@ -254,7 +252,7 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 	}
 
 	public function test_invalid_config_rolls_back_scheduled_action(): void {
-		$input = $this->validInput( 'Scheduled Rollback Flow' );
+		$input                      = $this->validInput( 'Scheduled Rollback Flow' );
 		$input['scheduling_config'] = array( 'interval' => 'hourly' );
 		$input['step_configs']['upsert']['handler_config'] = array( 'unknown_field' => 'event' );
 		$before = $this->scheduledFlowActionCount();
@@ -266,10 +264,10 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 	}
 
 	public function test_scheduling_failure_rolls_back_flow_and_actions(): void {
-		$input = $this->validInput( 'Scheduling Failure Flow' );
+		$input                      = $this->validInput( 'Scheduling Failure Flow' );
 		$input['scheduling_config'] = array( 'interval' => 'one_time' );
-		$flow_count   = $this->flowCount();
-		$action_count = $this->scheduledFlowActionCount();
+		$flow_count                 = $this->flowCount();
+		$action_count               = $this->scheduledFlowActionCount();
 
 		$result = wp_get_ability( 'datamachine/create-flow' )->execute( $input );
 
@@ -307,10 +305,10 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 	}
 
 	public function test_bulk_validation_rejects_invalid_config_before_creating_any_flow(): void {
-		$valid                                             = $this->validInput( 'Valid Bulk Flow' );
-		$invalid                                           = $this->validInput( 'Invalid Bulk Flow' );
+		$valid   = $this->validInput( 'Valid Bulk Flow' );
+		$invalid = $this->validInput( 'Invalid Bulk Flow' );
 		$invalid['step_configs']['upsert']['handler_config'] = array( 'unknown_field' => 'event' );
-		$before                                            = $this->flowCount();
+		$before = $this->flowCount();
 
 		$result = wp_get_ability( 'datamachine/create-flow' )->execute(
 			array(
@@ -323,7 +321,7 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 	}
 
 	public function test_owned_parent_and_child_are_visible_in_agent_export(): void {
-		$agent = AgentAbilities::createAgent(
+		$agent    = AgentAbilities::createAgent(
 			array(
 				'agent_slug' => 'atomic-export-agent',
 				'agent_name' => 'Atomic Export Agent',
@@ -339,7 +337,7 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 				'steps'         => array( array( 'step_type' => 'ai' ) ),
 			)
 		);
-		$flow = wp_get_ability( 'datamachine/create-flow' )->execute(
+		$flow     = wp_get_ability( 'datamachine/create-flow' )->execute(
 			array(
 				'pipeline_id' => $pipeline['pipeline_id'],
 				'flow_name'   => 'Owned Export Flow',
@@ -429,8 +427,8 @@ class FlowCreationAtomicityTest extends WP_UnitTestCase {
 		return count(
 			as_get_scheduled_actions(
 				array(
-					'hook'   => FlowScheduling::FLOW_HOOK,
-					'group'  => RecurringScheduler::GROUP,
+					'hook'   => 'datamachine_run_flow_now',
+					'group'  => 'data-machine',
 					'status' => \ActionScheduler_Store::STATUS_PENDING,
 				),
 				'ids'

@@ -136,7 +136,7 @@ require_once __DIR__ . '/inc/bootstrap.php';
  * new \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility().
  * RuntimeServiceProvider: AuthRefHandlerConfig::register().
  * HostIntegrationServiceProvider: agents_pending_action_permission.
- * AlwaysOnServiceProvider: RecurringScheduler::registerGenerationFence().
+ * AlwaysOnServiceProvider: Action Scheduler log/persistence policies.
  */
 
 \DataMachine\Core\Bootstrap\AlwaysOnServiceProvider::register_scheduler();

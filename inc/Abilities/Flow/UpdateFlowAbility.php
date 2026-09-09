@@ -10,7 +10,7 @@
 
 namespace DataMachine\Abilities\Flow;
 
-use DataMachine\Api\Flows\FlowScheduling;
+use DataMachine\Engine\Scheduling\FlowRoutines;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -107,7 +107,7 @@ class UpdateFlowAbility {
 		if ( null !== $scheduling_config ) {
 			$validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
 			if ( ! $validation['valid'] ) {
-				return new \WP_Error( 'update_failed', $validation['error'], array( 'status' => 400 ) );
+				return new \WP_Error( 'update_failed', (string) ( $validation['error'] ?? 'Invalid interval.' ), array( 'status' => 400 ) );
 			}
 			$scheduling_config['interval'] = $validation['resolved'];
 		}
@@ -140,7 +140,7 @@ class UpdateFlowAbility {
 		}
 
 		if ( null !== $scheduling_config ) {
-			$result = FlowScheduling::handle_scheduling_update( $flow_id, $scheduling_config );
+			$result = FlowRoutines::sync( $flow_id, $scheduling_config );
 			if ( is_wp_error( $result ) ) {
 				return new \WP_Error( 'update_failed', $result->get_error_message(), array( 'status' => 400 ) );
 			}

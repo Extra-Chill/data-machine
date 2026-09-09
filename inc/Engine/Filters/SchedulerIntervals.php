@@ -97,7 +97,7 @@ function datamachine_resolve_interval_alias( string $interval ): string {
  *
  * @param string $interval Interval key, alias, or cron expression.
  * @param array  $config Optional scheduling configuration for special-key requirements.
- * @return array{valid: bool, resolved: string, error?: string, available?: string[]}
+ * @return array{valid: bool, resolved: string, error?: string, available?: list<int|string>}
  */
 function datamachine_validate_interval( string $interval, array $config = array() ): array {
 	// Special scheduling types are always valid.
@@ -120,8 +120,8 @@ function datamachine_validate_interval( string $interval, array $config = array(
 		return $validation;
 	}
 
-	// Cron expressions are valid (further validation happens in RecurringScheduler).
-	if ( \DataMachine\Engine\Tasks\RecurringScheduler::looksLikeCronExpression( $interval ) ) {
+	// Cron expressions are valid (further validation happens in FlowRoutines).
+	if ( \DataMachine\Engine\Scheduling\FlowRoutines::looks_like_cron_expression( $interval ) ) {
 		return array(
 			'valid'    => true,
 			'resolved' => $interval,

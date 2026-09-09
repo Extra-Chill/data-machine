@@ -81,7 +81,7 @@ if ( ! function_exists( 'datamachine_test_reset_scheduler' ) ) {
 		}
 
 		$hooks = array(
-			\DataMachine\Api\Flows\FlowScheduling::FLOW_HOOK,
+			'datamachine_run_flow_now',
 			\DataMachine\Core\DirectJobEnqueuer::HOOK,
 			\DataMachine\Abilities\Engine\PipelineBatchScheduler::BATCH_HOOK,
 			\DataMachine\Engine\Tasks\TaskScheduler::BATCH_HOOK,
