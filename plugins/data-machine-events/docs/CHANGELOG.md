@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.61.3] - 2026-09-09
+
+### Changed
+- align assignment groups flagged by phpcs in check venues repair path
+
+### Fixed
+- normalize directionals/units/ordinals in address matching; add check venues --apply repair
+
 ## [0.61.2] - 2026-09-08
 
 ### Fixed
