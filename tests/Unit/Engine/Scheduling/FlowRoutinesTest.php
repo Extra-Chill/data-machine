@@ -184,6 +184,36 @@ class FlowRoutinesTest extends WP_UnitTestCase {
 		$this->assertIsArray( $marker, 'Apply must set the one-shot migrated marker.' );
 	}
 
+	public function test_legacy_recurring_wake_is_ignored_but_positional_wakes_still_dispatch(): void {
+		$flow_id  = $this->create_flow( 'Legacy wake flow' );
+		$executed = array();
+		$spy      = static function ( $name, $input ) use ( &$executed ): void {
+			if ( 'datamachine/run-flow' === $name ) {
+				$executed[] = (int) ( $input['flow_id'] ?? 0 );
+			}
+		};
+		add_action( 'wp_ability_invoked', $spy, 10, 2 );
+
+		$logged = array();
+		$log    = static function ( $level, $message ) use ( &$logged ): void {
+			$logged[] = array( $level, $message );
+		};
+		add_action( 'datamachine_log', $log, 10, 2 );
+
+		try {
+			// A stale generated chain (generation marker at args[2]) must not run.
+			do_action( 'datamachine_run_flow_now', $flow_id, null, array( '_datamachine_schedule_generation' => 'stale' ) );
+			$this->assertSame( array(), $executed, 'Legacy recurring wake must not dispatch the flow.' );
+			$this->assertNotEmpty(
+				array_filter( $logged, static fn( $entry ) => 'Legacy recurring schedule action ignored after routines migration' === $entry[1] ),
+				'Ignored legacy wake must be logged.'
+			);
+		} finally {
+			remove_action( 'wp_ability_invoked', $spy, 10 );
+			remove_action( 'datamachine_log', $log, 10 );
+		}
+	}
+
 	private function create_flow( string $name ): int {
 		$result           = wp_get_ability( 'datamachine/create-flow' )->execute(
 			array(

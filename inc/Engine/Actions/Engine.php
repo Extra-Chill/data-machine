@@ -236,16 +236,30 @@ function datamachine_register_execution_engine() {
 	/**
 	 * Bridge: datamachine_run_flow_now → datamachine/run-flow ability.
 	 *
-	 * Still a live execution path: recurring wakes migrated to Agents API
-	 * Routines, but queue backpressure deferrals and stuck-job recovery
-	 * re-runs schedule this hook with positional args. Defensive flow-exists
-	 * check keeps a wake for a deleted flow from erroring forever.
+	 * Still a live execution path for one-off wakes: queue backpressure
+	 * deferrals and stuck-job recovery re-runs schedule this hook with
+	 * positional args `[ flow_id ]` / `[ flow_id, job_id ]`. Recurring
+	 * schedules moved to Agents API Routines; a legacy recurring action
+	 * (identified by the generation marker at args[2]) that is still pending
+	 * after migration is ignored and logged so it cannot double-fire beside
+	 * its routine. TODO(3458): drop the legacy branch after one release.
 	 */
 	add_action(
 		'datamachine_run_flow_now',
-		'datamachine_dispatch_run_flow',
+		static function ( $flow_id, $job_id = null, $schedule_generation = null ): void {
+			if ( null !== $schedule_generation ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Legacy recurring schedule action ignored after routines migration',
+					array( 'flow_id' => (int) $flow_id )
+				);
+				return;
+			}
+			datamachine_dispatch_run_flow( $flow_id, $job_id );
+		},
 		10,
-		2
+		3
 	);
 
 	/**
