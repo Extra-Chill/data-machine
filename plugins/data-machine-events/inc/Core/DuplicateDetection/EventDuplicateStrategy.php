@@ -108,10 +108,12 @@ class EventDuplicateStrategy {
 			}
 		}
 
-		// A geographically conflicting venue name must not fall through to the
-		// later name-only confirmations. Ticket identity remains authoritative,
-		// but venue/title strategies cannot safely mark this event duplicate.
-		if ( 'ambiguous' === $venue_identity['match_status'] ) {
+		// An ambiguous or geographically conflicting venue name must not fall
+		// through to the later name-only confirmations. Ticket identity remains
+		// authoritative, but a different venue is never a duplicate by name —
+		// conflict candidates belong to a distinct venue that the upsert path
+		// will create (#806).
+		if ( in_array( $venue_identity['match_status'], array( 'ambiguous', 'conflict' ), true ) ) {
 			return null;
 		}
 
@@ -539,7 +541,7 @@ class EventDuplicateStrategy {
 	 * @param string $city    Optional city.
 	 * @param string $state   Optional state or region.
 	 * @param string $country Optional country.
-	 * @return array{term: \WP_Term|null, term_id: int|null, match_status: string, venue_name: string}
+	 * @return array{term: \WP_Term|null, term_id: int|null, match_status: string, conflicting_term_ids: int[], venue_name: string}
 	 */
 	private static function resolveVenueIdentity(
 		string $venue,

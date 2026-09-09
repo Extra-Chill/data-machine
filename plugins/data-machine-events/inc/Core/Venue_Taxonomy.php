@@ -71,7 +71,35 @@ class Venue_Taxonomy {
 	 *
 	 * @var string[]
 	 */
-	private const STREET_TYPE_TOKENS = array( 'st', 'ave', 'blvd', 'dr', 'rd', 'ln', 'ct', 'hwy', 'pkwy', 'pl', 'cir', 'way' );
+	private const STREET_TYPE_TOKENS = array(
+		'st',
+		'ave',
+		'blvd',
+		'dr',
+		'rd',
+		'ln',
+		'ct',
+		'hwy',
+		'pkwy',
+		'pl',
+		'cir',
+		'way',
+		'walk',
+		'trl',
+		'ter',
+		'sq',
+		'loop',
+		'row',
+		'aly',
+		'plz',
+		'ctr',
+		'park',
+		'path',
+		'run',
+		'xing',
+		'rte',
+		'tpke',
+	);
 
 	/**
 	 * Bounded ordinal word map for address matching (#803).
@@ -512,9 +540,16 @@ class Venue_Taxonomy {
 	 *             "Reggie's Rock Club" = "Reggies Rock Club",
 	 *             "RADIO/EAST" = "Radio East"
 	 *
+	 * Conflict outcome (#806): when name candidates exist but every one is
+	 * rejected by supplied geography, that is a different venue, not an
+	 * ambiguity — a new term is created with a disambiguated slug when the
+	 * incoming side carries a street address with a house number or a city.
+	 * Without distinguishing geography the event stays venue-less and the
+	 * rejection is logged at error level.
+	 *
 	 * @param string $venue_name Venue name
 	 * @param array $venue_data Venue metadata (address, city, state, etc.)
-	 * @param array $log_context Optional log context (e.g. post_id) merged into the ambiguous-match log entry.
+	 * @param array $log_context Optional log context (e.g. post_id) merged into the conflict/ambiguity log entries.
 	 * @return array Array with keys: term_id, was_created, and match_status.
 	 */
 	public static function find_or_create_venue( $venue_name, $venue_data = array(), array $log_context = array() ) {
@@ -563,7 +598,7 @@ class Venue_Taxonomy {
 			do_action(
 				'datamachine_log',
 				'error',
-				'Venue name match rejected due to ambiguous or conflicting geographic evidence',
+				'Venue name match rejected due to ambiguous geographic evidence',
 				array_merge(
 					array(
 						'venue_name' => $venue_name,
@@ -578,6 +613,10 @@ class Venue_Taxonomy {
 				'was_created'  => false,
 				'match_status' => 'ambiguous',
 			);
+		}
+
+		if ( 'conflict' === $identity['match_status'] ) {
+			return self::create_venue_on_geographic_conflict( $venue_name, $venue_data, $identity, $log_context );
 		}
 
 		// Create new venue
@@ -613,6 +652,161 @@ class Venue_Taxonomy {
 	}
 
 	/**
+	 * Create a distinct venue term after a geographic conflict (#806).
+	 *
+	 * Same name + different place is a different venue, so when the incoming
+	 * side carries enough geography to be a distinct place — a street address
+	 * with a house number or a city — a new term is created with a
+	 * disambiguated slug ("the-foundry-cleveland", or "-2" without a city) and
+	 * the incoming geography. Without distinguishing geography nothing can be
+	 * justified, so the previous behaviour stands: no term, error log.
+	 *
+	 * @param string               $venue_name  Cleaned venue name.
+	 * @param array                $venue_data  Incoming venue metadata.
+	 * @param array<string, mixed> $identity    Result of resolve_venue_identity().
+	 * @param array                $log_context Caller log context (e.g. post_id).
+	 * @return array Array with keys: term_id, was_created, and match_status.
+	 */
+	private static function create_venue_on_geographic_conflict( string $venue_name, array $venue_data, array $identity, array $log_context ): array {
+		$city            = trim( (string) ( $venue_data['city'] ?? '' ) );
+		$has_street      = self::address_has_street_component( (string) ( $venue_data['address'] ?? '' ) );
+		$conflicting_ids = is_array( $identity['conflicting_term_ids'] ?? null ) ? $identity['conflicting_term_ids'] : array();
+
+		if ( ! $has_street && '' === $city ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Venue conflict detected but incoming geography cannot distinguish a new venue',
+				array_merge(
+					array(
+						'venue_name'           => $venue_name,
+						'venue_data'           => $venue_data,
+						'conflicting_term_ids' => $conflicting_ids,
+					),
+					$log_context
+				)
+			);
+
+			return array(
+				'term_id'      => null,
+				'was_created'  => false,
+				'match_status' => 'conflict',
+			);
+		}
+
+		$term_id = self::insert_venue_term_with_slug( $venue_name, $city );
+
+		if ( null === $term_id ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to create distinct venue term after geographic conflict',
+				array_merge(
+					array(
+						'venue_name'           => $venue_name,
+						'conflicting_term_ids' => $conflicting_ids,
+					),
+					$log_context
+				)
+			);
+
+			return array(
+				'term_id'      => null,
+				'was_created'  => false,
+				'match_status' => 'error',
+			);
+		}
+
+		self::update_venue_meta( $term_id, $venue_data );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Distinct venue term created after geographic conflict',
+			array_merge(
+				array(
+					'venue_name'           => $venue_name,
+					'new_term_id'          => $term_id,
+					'conflicting_term_ids' => $conflicting_ids,
+				),
+				$log_context
+			)
+		);
+
+		return array(
+			'term_id'      => $term_id,
+			'was_created'  => true,
+			'match_status' => 'created',
+		);
+	}
+
+	/**
+	 * Insert a venue term under the first available disambiguated slug (#806).
+	 *
+	 * The venue name already belongs to an existing term, so core's
+	 * name-existence guard would refuse a plain insert; supplying an unused
+	 * slug lets wp_insert_term create the distinct term.
+	 *
+	 * @param string $venue_name Venue name.
+	 * @param string $city       Incoming city for slug disambiguation, may be empty.
+	 * @return int|null New term ID, or null when insertion failed.
+	 */
+	private static function insert_venue_term_with_slug( string $venue_name, string $city ): ?int {
+		foreach ( self::conflict_slug_candidates( $venue_name, $city ) as $slug ) {
+			$result = wp_insert_term( $venue_name, 'venue', array( 'slug' => $slug ) );
+
+			if ( ! is_wp_error( $result ) ) {
+				return (int) $result['term_id'];
+			}
+
+			if ( 'term_exists' !== $result->get_error_code() ) {
+				return null;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Build ordered slug candidates for a conflict-created venue (#806).
+	 *
+	 * The sanitized city is appended when present ("the-foundry-cleveland");
+	 * otherwise numeric suffixes disambiguate ("the-foundry-2", "-3"). Only
+	 * slugs unused in the venue taxonomy are returned.
+	 *
+	 * @param string $venue_name Cleaned venue name.
+	 * @param string $city       Incoming city, may be empty.
+	 * @return string[]
+	 */
+	private static function conflict_slug_candidates( string $venue_name, string $city ): array {
+		$base = sanitize_title( $venue_name );
+
+		if ( '' === $base ) {
+			return array();
+		}
+
+		$candidates = array();
+
+		if ( '' !== $city ) {
+			$city_slug    = sanitize_title( $city );
+			$candidates[] = '' !== $city_slug ? $base . '-' . $city_slug : $base . '-2';
+		}
+
+		for ( $i = 2; $i <= 20; ++$i ) {
+			$candidates[] = $base . '-' . $i;
+		}
+
+		$available = array();
+		foreach ( $candidates as $candidate ) {
+			if ( ! get_term_by( 'slug', $candidate, 'venue' ) ) {
+				$available[] = $candidate;
+			}
+		}
+
+		return $available;
+	}
+
+	/**
 	 * Resolve an existing venue without creating a term or merging metadata.
 	 *
 	 * This exposes the same address-first and geographically qualified name
@@ -621,7 +815,7 @@ class Venue_Taxonomy {
 	 *
 	 * @param string $venue_name Venue name.
 	 * @param array  $venue_data Venue metadata.
-	 * @return array{term: \WP_Term|null, term_id: int|null, match_status: string, venue_name: string}
+	 * @return array{term: \WP_Term|null, term_id: int|null, match_status: string, conflicting_term_ids: int[], venue_name: string}
 	 */
 	public static function resolve_venue_identity( string $venue_name, array $venue_data = array() ): array {
 		$extracted_address = self::extract_address_from_name( $venue_name );
@@ -645,10 +839,11 @@ class Venue_Taxonomy {
 			$term = get_term( $address_match, 'venue' );
 			if ( $term instanceof \WP_Term ) {
 				return array(
-					'term'         => $term,
-					'term_id'      => (int) $term->term_id,
-					'match_status' => 'matched',
-					'venue_name'   => $venue_name,
+					'term'                 => $term,
+					'term_id'              => (int) $term->term_id,
+					'match_status'         => 'matched',
+					'conflicting_term_ids' => array(),
+					'venue_name'           => $venue_name,
 				);
 			}
 		}
@@ -657,11 +852,21 @@ class Venue_Taxonomy {
 		$name_match = self::find_venue_by_qualified_name( $venue_name, $venue_data );
 		$term       = $name_match['term'];
 
+		$match_status = 'no_match';
+		if ( $name_match['ambiguous'] ) {
+			$match_status = 'ambiguous';
+		} elseif ( $name_match['conflict'] ) {
+			$match_status = 'conflict';
+		} elseif ( $term ) {
+			$match_status = 'matched';
+		}
+
 		return array(
-			'term'         => $term,
-			'term_id'      => $term ? (int) $term->term_id : null,
-			'match_status' => $name_match['ambiguous'] ? 'ambiguous' : ( $term ? 'matched' : 'no_match' ),
-			'venue_name'   => $venue_name,
+			'term'                 => $term,
+			'term_id'              => $term ? (int) $term->term_id : null,
+			'match_status'         => $match_status,
+			'conflicting_term_ids' => $name_match['conflicting_term_ids'],
+			'venue_name'           => $venue_name,
 		);
 	}
 
@@ -670,13 +875,24 @@ class Venue_Taxonomy {
 	 *
 	 * Exact, article-toggle, and normalized matches retain their precedence. A
 	 * tier with one compatible candidate wins; multiple compatible candidates
-	 * or candidates rejected by supplied geography produce an ambiguous result.
+	 * are ambiguous (#803). A tier whose candidates are all rejected by
+	 * supplied geography is a conflict, not an ambiguity — same name, different
+	 * place is a different venue (#806). Conflicting tiers fall through to
+	 * later tiers; when every tier is exhausted the rejected candidate term
+	 * ids travel with the conflict result for logging and reporting.
 	 *
 	 * @param string $venue_name Venue name to resolve.
 	 * @param array  $venue_data Incoming venue metadata.
-	 * @return array{term: \WP_Term|null, ambiguous: bool}
+	 * @return array{term: \WP_Term|null, ambiguous: bool, conflict: bool, conflicting_term_ids: int[]}
 	 */
 	private static function find_venue_by_qualified_name( string $venue_name, array $venue_data ): array {
+		$no_match = array(
+			'term'                 => null,
+			'ambiguous'            => false,
+			'conflict'             => false,
+			'conflicting_term_ids' => array(),
+		);
+
 		$venues = get_terms(
 			array(
 				'taxonomy'   => 'venue',
@@ -686,10 +902,7 @@ class Venue_Taxonomy {
 		);
 
 		if ( is_wp_error( $venues ) || empty( $venues ) ) {
-			return array(
-				'term'      => null,
-				'ambiguous' => false,
-			);
+			return $no_match;
 		}
 
 		$alt_name              = 0 === stripos( $venue_name, 'The ' ) ? substr( $venue_name, 4 ) : 'The ' . $venue_name;
@@ -712,6 +925,7 @@ class Venue_Taxonomy {
 			$normalized_candidates,
 		);
 		$had_candidates        = false;
+		$conflicting_term_ids  = array();
 
 		foreach ( $tiers as $candidates ) {
 			if ( empty( $candidates ) ) {
@@ -719,31 +933,51 @@ class Venue_Taxonomy {
 			}
 
 			$had_candidates = true;
-			$compatible     = array_values(
-				array_filter(
-					$candidates,
-					static fn( $venue ) => ! self::has_geographic_conflict( $venue->term_id, $venue_data )
-				)
-			);
+			$compatible     = array();
+			$conflicting    = array();
+
+			foreach ( $candidates as $venue ) {
+				if ( self::has_geographic_conflict( (int) $venue->term_id, $venue_data ) ) {
+					$conflicting[] = $venue;
+				} else {
+					$compatible[] = $venue;
+				}
+			}
+
+			foreach ( $conflicting as $venue ) {
+				$conflicting_term_ids[] = (int) $venue->term_id;
+			}
 
 			if ( 1 === count( $compatible ) ) {
 				return array(
-					'term'      => $compatible[0],
-					'ambiguous' => false,
+					'term'                 => $compatible[0],
+					'ambiguous'            => false,
+					'conflict'             => false,
+					'conflicting_term_ids' => array(),
 				);
 			}
 
 			if ( count( $compatible ) > 1 ) {
 				return array(
-					'term'      => null,
-					'ambiguous' => true,
+					'term'                 => null,
+					'ambiguous'            => true,
+					'conflict'             => false,
+					'conflicting_term_ids' => array(),
 				);
 			}
 		}
 
+		if ( ! $had_candidates ) {
+			return $no_match;
+		}
+
+		// Candidates existed but every compatible one was rejected by the
+		// supplied geography — a distinct venue, not an ambiguity (#806).
 		return array(
-			'term'      => null,
-			'ambiguous' => $had_candidates,
+			'term'                 => null,
+			'ambiguous'            => false,
+			'conflict'             => true,
+			'conflicting_term_ids' => array_values( array_unique( $conflicting_term_ids ) ),
 		);
 	}
 
@@ -821,7 +1055,10 @@ class Venue_Taxonomy {
 	 * followed by a recognized street-type word somewhere in the string.
 	 * City/zip/country-only strings ("Charleston, SC 29492-2901, United
 	 * States") and bare postal codes hold no street evidence and cannot
-	 * contradict a stored street address (#798).
+	 * contradict a stored street address (#798). The recognized list covers
+	 * the full canonical street-type vocabulary so real venue addresses on
+	 * ways, trails, terraces, squares, and the like count as evidence
+	 * (#806).
 	 *
 	 * @param string $address Raw address string.
 	 * @return bool
@@ -839,7 +1076,10 @@ class Venue_Taxonomy {
 			return false;
 		}
 
-		return 1 === preg_match( '/\b(st|ave|blvd|dr|rd|ln|ct|ste|apt|hwy|pkwy|pl|cir)\b/', $normalized );
+		return 1 === preg_match(
+			'/\b(st|ave|blvd|dr|rd|ln|ct|ste|apt|hwy|pkwy|pl|cir|way|walk|trl|ter|sq|loop|row|aly|plz|ctr|park|path|run|xing|rte|tpke)\b/',
+			$normalized
+		);
 	}
 
 	/**
@@ -1609,7 +1849,16 @@ class Venue_Taxonomy {
 		// St") survive intact (#803).
 		$address = preg_replace( '/^(\d+)-[a-z]{1,2}\b/', '$1', $address );
 
+		// Collapse spacing inside digit ranges ("9 - 17" → "9-17") so the
+		// same hyphenated range compares equal regardless of spacing (#806).
+		$address = preg_replace( '/(\d+)\s*-\s*(\d+)/', '$1-$2', $address );
+
 		$replacements = array(
+			// Trailing plurals singularize first so the abbreviation map below
+			// canonicalizes them ("Streets" → "street" → "st") (#806).
+			'/\bstreets\b/'   => 'street',
+			'/\bavenues\b/'   => 'avenue',
+			'/\broads\b/'     => 'road',
 			'/\bstreet\b/'    => 'st',
 			'/\bavenue\b/'    => 'ave',
 			'/\bboulevard\b/' => 'blvd',
@@ -1623,6 +1872,19 @@ class Venue_Taxonomy {
 			'/\bparkway\b/'   => 'pkwy',
 			'/\bplace\b/'     => 'pl',
 			'/\bcircle\b/'    => 'cir',
+			// Additional street-type words with standard abbreviations; way,
+			// walk, loop, row, park, path, and run are already canonical
+			// (#806).
+			'/\bterrace\b/'   => 'ter',
+			'/\btrail\b/'     => 'trl',
+			'/\bsquare\b/'    => 'sq',
+			'/\bcentre\b/'    => 'ctr',
+			'/\bcenter\b/'    => 'ctr',
+			'/\bcrossing\b/'  => 'xing',
+			'/\bturnpike\b/'  => 'tpke',
+			'/\bplaza\b/'     => 'plz',
+			'/\balley\b/'     => 'aly',
+			'/\broute\b/'     => 'rte',
 		);
 
 		// Bounded ordinal map (#803): "First Avenue" and "1st Avenue" are the
@@ -1647,6 +1909,17 @@ class Venue_Taxonomy {
 			$tokens = array();
 		}
 		foreach ( $tokens as $i => $token ) {
+			// "saint" immediately after a house number (or house number +
+			// directional) is the "st" street token: "111 Saint Claude Rd" =
+			// "111 St Claude Rd" (#806). Elsewhere it is left untouched, as
+			// a leading "Saint" may be a proper place name.
+			if ( 'saint' === $token && $i > 0 ) {
+				$prev = $tokens[ $i - 1 ];
+				if ( 1 === preg_match( '/^\d/', $prev ) || isset( self::DIRECTIONAL_ALIASES[ $prev ] ) ) {
+					$tokens[ $i ] = 'st';
+				}
+			}
+
 			if ( ! isset( self::DIRECTIONAL_ALIASES[ $token ] ) ) {
 				continue;
 			}

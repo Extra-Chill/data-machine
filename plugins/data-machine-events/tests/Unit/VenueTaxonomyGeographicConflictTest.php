@@ -163,7 +163,7 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		$this->assertSame( $term_id, $result['term_id'] );
 	}
 
-	public function test_different_street_address_same_city_still_ambiguous(): void {
+	public function test_different_street_address_same_city_is_conflict(): void {
 		$name = 'Street Conflict Venue ' . uniqid();
 		$this->create_venue_with_meta(
 			$name,
@@ -186,10 +186,11 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		);
 
 		$this->assertNull( $result['term_id'] );
-		$this->assertSame( 'ambiguous', $result['match_status'] );
+		$this->assertSame( 'conflict', $result['match_status'] );
+		$this->assertNotEmpty( $result['conflicting_term_ids'] );
 	}
 
-	public function test_different_city_still_ambiguous(): void {
+	public function test_different_city_is_conflict(): void {
 		$name = 'City Conflict Venue ' . uniqid();
 		$this->create_venue_with_meta(
 			$name,
@@ -212,7 +213,8 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		);
 
 		$this->assertNull( $result['term_id'] );
-		$this->assertSame( 'ambiguous', $result['match_status'] );
+		$this->assertSame( 'conflict', $result['match_status'] );
+		$this->assertNotEmpty( $result['conflicting_term_ids'] );
 	}
 
 	// ---------------------------------------------------------------------
@@ -349,7 +351,7 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		$this->assertSame( $term_id, $result['term_id'] );
 	}
 
-	public function test_different_house_number_with_directional_variants_still_ambiguous(): void {
+	public function test_different_house_number_with_directional_variants_is_conflict(): void {
 		$name = 'West Ave Conflict Venue ' . uniqid();
 		$this->create_venue_with_meta(
 			$name,
@@ -372,10 +374,10 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		);
 
 		$this->assertNull( $result['term_id'] );
-		$this->assertSame( 'ambiguous', $result['match_status'] );
+		$this->assertSame( 'conflict', $result['match_status'] );
 	}
 
-	public function test_different_street_with_directional_prefix_still_ambiguous(): void {
+	public function test_different_street_with_directional_prefix_is_conflict(): void {
 		$name = 'Congress Lamar Conflict Venue ' . uniqid();
 		$this->create_venue_with_meta(
 			$name,
@@ -398,7 +400,7 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		);
 
 		$this->assertNull( $result['term_id'] );
-		$this->assertSame( 'ambiguous', $result['match_status'] );
+		$this->assertSame( 'conflict', $result['match_status'] );
 	}
 
 	// ---------------------------------------------------------------------
@@ -425,6 +427,17 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 
 	public function test_bare_postal_code_has_no_street_component(): void {
 		$this->assertFalse( Venue_Taxonomy::address_has_street_component( '29492' ) );
+	}
+
+	public function test_address_with_new_street_types_has_street_component(): void {
+		// Real venue addresses use more street types than the core set (#806).
+		$this->assertTrue( Venue_Taxonomy::address_has_street_component( '101 Founders Way' ) );
+		$this->assertTrue( Venue_Taxonomy::address_has_street_component( '1 River Trail' ) );
+		$this->assertTrue( Venue_Taxonomy::address_has_street_component( '9 Waterfront Square' ) );
+		$this->assertTrue( Venue_Taxonomy::address_has_street_component( '500 Center' ) );
+		$this->assertTrue( Venue_Taxonomy::address_has_street_component( '300 Turnpike' ) );
+		$this->assertTrue( Venue_Taxonomy::address_has_street_component( '22 The Terrace' ) );
+		$this->assertTrue( Venue_Taxonomy::address_has_street_component( '12 Crossing' ) );
 	}
 
 	// ---------------------------------------------------------------------
@@ -468,5 +481,213 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 			Venue_Taxonomy::normalize_address_for_matching( '100 W Street' )
 		);
 		$this->assertSame( '100 west st', Venue_Taxonomy::normalize_address_for_matching( '100 West Street' ) );
+	}
+
+	public function test_normalizer_collapses_spaced_digit_ranges(): void {
+		$this->assertSame( '9-17 market st', Venue_Taxonomy::normalize_address_for_matching( '9 - 17 Market Street' ) );
+		$this->assertSame(
+			Venue_Taxonomy::normalize_address_for_matching( '9 - 17 Market St' ),
+			Venue_Taxonomy::normalize_address_for_matching( '9-17 Market Street' )
+		);
+	}
+
+	public function test_normalizer_maps_saint_after_house_number(): void {
+		$this->assertSame(
+			Venue_Taxonomy::normalize_address_for_matching( '111 St Claude Rd' ),
+			Venue_Taxonomy::normalize_address_for_matching( '111 Saint Claude Road' )
+		);
+		$this->assertSame( '111 st claude rd', Venue_Taxonomy::normalize_address_for_matching( '111 Saint Claude Rd' ) );
+	}
+
+	public function test_normalizer_maps_saint_after_directional(): void {
+		$this->assertSame(
+			Venue_Taxonomy::normalize_address_for_matching( '12 N Saint Louis St' ),
+			Venue_Taxonomy::normalize_address_for_matching( '12 North Saint Louis Street' )
+		);
+	}
+
+	public function test_normalizer_keeps_leading_saint_untouched(): void {
+		// "Saint" as the first token may be a proper place name — the
+		// conservative rule only rewrites it after a house number/directional.
+		$this->assertSame( 'saint claude rd', Venue_Taxonomy::normalize_address_for_matching( 'Saint Claude Road' ) );
+		$this->assertNotSame(
+			Venue_Taxonomy::normalize_address_for_matching( 'Saint Claude Road' ),
+			Venue_Taxonomy::normalize_address_for_matching( 'St Claude Road' )
+		);
+	}
+
+	public function test_normalizer_singularizes_plural_street_words(): void {
+		$this->assertSame( '5 townes st', Venue_Taxonomy::normalize_address_for_matching( '5 Townes Streets' ) );
+		$this->assertSame( '100 georgia ave', Venue_Taxonomy::normalize_address_for_matching( '100 Georgia Avenues' ) );
+		$this->assertSame( '9 county rd', Venue_Taxonomy::normalize_address_for_matching( '9 County Roads' ) );
+	}
+
+	public function test_normalizer_maps_new_street_type_words(): void {
+		$this->assertSame( '450 ter', Venue_Taxonomy::normalize_address_for_matching( '450 Terrace' ) );
+		$this->assertSame( '1 river trl', Venue_Taxonomy::normalize_address_for_matching( '1 River Trail' ) );
+		$this->assertSame( '9 waterfront sq', Venue_Taxonomy::normalize_address_for_matching( '9 Waterfront Square' ) );
+		$this->assertSame( '500 ctr', Venue_Taxonomy::normalize_address_for_matching( '500 Center' ) );
+		$this->assertSame( '500 ctr', Venue_Taxonomy::normalize_address_for_matching( '500 Centre' ) );
+		$this->assertSame( '300 tpke', Venue_Taxonomy::normalize_address_for_matching( '300 Turnpike' ) );
+		$this->assertSame( '12 xing', Venue_Taxonomy::normalize_address_for_matching( '12 Crossing' ) );
+		$this->assertSame( '2 plz', Venue_Taxonomy::normalize_address_for_matching( '2 Plaza' ) );
+		$this->assertSame( '101 founders way', Venue_Taxonomy::normalize_address_for_matching( '101 Founders Way' ) );
+	}
+
+	// ---------------------------------------------------------------------
+	// Part D: geographic conflict creates a distinct venue (#806)
+	// ---------------------------------------------------------------------
+
+	public function test_conflict_city_with_street_creates_distinct_term(): void {
+		$name        = 'The Foundry ' . uniqid();
+		$original_id = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '250 W Washington St',
+				'city'    => 'Athens',
+				'state'   => 'GA',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '4256 Pearl Rd',
+				'city'    => 'Cleveland',
+				'state'   => 'OH',
+				'country' => 'US',
+			)
+		);
+
+		$this->assertSame( 'created', $result['match_status'] );
+		$this->assertTrue( $result['was_created'] );
+		$this->assertNotNull( $result['term_id'] );
+		$this->assertNotSame( $original_id, $result['term_id'] );
+
+		$term = get_term( $result['term_id'], 'venue' );
+		$this->assertInstanceOf( \WP_Term::class, $term );
+		$this->assertSame( $name, $term->name );
+		$this->assertSame( sanitize_title( $name ) . '-cleveland', $term->slug );
+		$this->assertSame( '4256 Pearl Rd', get_term_meta( (int) $result['term_id'], '_venue_address', true ) );
+		$this->assertSame( 'Cleveland', get_term_meta( (int) $result['term_id'], '_venue_city', true ) );
+
+		// The conflicting stored term stays untouched.
+		$this->assertSame( '250 W Washington St', get_term_meta( $original_id, '_venue_address', true ) );
+		$this->assertSame( 'Athens', get_term_meta( $original_id, '_venue_city', true ) );
+	}
+
+	public function test_conflict_street_same_city_creates_distinct_term(): void {
+		// Bucket C: a stored address that is wrong/stale still conflicts, and
+		// creation is acceptable — the operator merges terms afterwards.
+		$name        = 'Wind Creek Event Center ' . uniqid();
+		$original_id = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '77 Sands Blvd',
+				'city'    => 'Bethlehem',
+				'state'   => 'PA',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '101 Founders Way',
+				'city'    => 'Bethlehem',
+				'state'   => 'PA',
+				'country' => 'US',
+			)
+		);
+
+		$this->assertSame( 'created', $result['match_status'] );
+		$this->assertNotNull( $result['term_id'] );
+		$this->assertNotSame( $original_id, $result['term_id'] );
+
+		$term = get_term( $result['term_id'], 'venue' );
+		$this->assertInstanceOf( \WP_Term::class, $term );
+		$this->assertSame( sanitize_title( $name ) . '-bethlehem', $term->slug );
+		$this->assertSame( '101 Founders Way', get_term_meta( (int) $result['term_id'], '_venue_address', true ) );
+	}
+
+	public function test_conflict_without_distinguishing_geography_does_not_create(): void {
+		$name = 'State Only Conflict Venue ' . uniqid();
+		$this->create_venue_with_meta(
+			$name,
+			array(
+				'city'    => 'Charleston',
+				'state'   => 'SC',
+				'country' => 'US',
+			)
+		);
+
+		$before = (int) wp_count_terms( array( 'taxonomy' => 'venue', 'hide_empty' => false ) );
+
+		// State-only conflict: no street, no city — nothing to distinguish a
+		// new venue with, so no term is created (#806).
+		$result = Venue_Taxonomy::find_or_create_venue(
+			$name,
+			array(
+				'address' => '',
+				'city'    => '',
+				'state'   => 'GA',
+				'country' => 'US',
+			)
+		);
+
+		$this->assertNull( $result['term_id'] );
+		$this->assertFalse( $result['was_created'] );
+		$this->assertSame( 'conflict', $result['match_status'] );
+		$this->assertSame( $before, (int) wp_count_terms( array( 'taxonomy' => 'venue', 'hide_empty' => false ) ) );
+	}
+
+	public function test_alt_name_conflict_falls_through_to_creation(): void {
+		$suffix      = uniqid();
+		$stored_name = 'Troubadour ' . $suffix;
+		$original_id = $this->create_venue_with_meta(
+			$stored_name,
+			array(
+				'address' => '9081 Sunset Blvd',
+				'city'    => 'West Hollywood',
+				'state'   => 'CA',
+				'country' => 'US',
+			)
+		);
+
+		// Same suffix so the alt-name tier ("The X" ↔ "X") actually collides.
+		$incoming_name = 'The Troubadour ' . $suffix;
+		$result        = Venue_Taxonomy::find_or_create_venue(
+			$incoming_name,
+			array(
+				'address' => '265 Old Brompton Rd',
+				'city'    => 'London',
+				'state'   => '',
+				'country' => 'UK',
+			)
+		);
+
+		$this->assertSame( 'created', $result['match_status'] );
+		$this->assertNotNull( $result['term_id'] );
+		$this->assertNotSame( $original_id, $result['term_id'] );
+
+		$term = get_term( $result['term_id'], 'venue' );
+		$this->assertInstanceOf( \WP_Term::class, $term );
+		$this->assertSame( $incoming_name, $term->name );
+		$this->assertSame( sanitize_title( $incoming_name ) . '-london', $term->slug );
+		$this->assertSame( 'West Hollywood', get_term_meta( $original_id, '_venue_city', true ) );
+	}
+
+	public function test_two_compatible_exact_name_candidates_still_ambiguous(): void {
+		$name  = 'Ambiguous Twins Venue ' . uniqid();
+		$first = wp_insert_term( $name, 'venue' );
+		$this->assertNotWPError( $first );
+		$second = wp_insert_term( $name, 'venue', array( 'slug' => sanitize_title( $name ) . '-2' ) );
+		$this->assertNotWPError( $second );
+
+		$result = Venue_Taxonomy::find_or_create_venue( $name, array() );
+
+		$this->assertNull( $result['term_id'] );
+		$this->assertSame( 'ambiguous', $result['match_status'] );
 	}
 }

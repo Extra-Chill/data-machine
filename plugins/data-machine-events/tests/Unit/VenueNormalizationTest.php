@@ -230,7 +230,7 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 		);
 	}
 
-	public function test_same_name_in_different_city_returns_ambiguity_without_merging(): void {
+	public function test_same_name_in_different_city_creates_distinct_term_without_merging(): void {
 		$name  = 'The Foundry Collision ' . uniqid();
 		$first = Venue_Taxonomy::find_or_create_venue(
 			$name,
@@ -252,9 +252,16 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertNull( $result['term_id'] );
-		$this->assertSame( 'ambiguous', $result['match_status'] );
-		$this->assertSame( '', get_term_meta( $first['term_id'], '_venue_phone', true ) );
+		// Same name, different place is a different venue: create it (#806).
+		$this->assertNotNull( $result['term_id'] );
+		$this->assertNotSame( $first['term_id'], $result['term_id'] );
+		$this->assertSame( 'created', $result['match_status'] );
+		$this->assertTrue( $result['was_created'] );
+		$this->assertSame( '555-0100', get_term_meta( (int) $result['term_id'], '_venue_phone', true ) );
+
+		// The original term is untouched by the conflict creation.
+		$this->assertSame( '', get_term_meta( (int) $first['term_id'], '_venue_phone', true ) );
+		$this->assertSame( 'Charleston', get_term_meta( (int) $first['term_id'], '_venue_city', true ) );
 	}
 
 	public function test_missing_address_preserves_safe_name_match(): void {
@@ -279,7 +286,7 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 		$this->assertSame( '555-0101', get_term_meta( $first['term_id'], '_venue_phone', true ) );
 	}
 
-	public function test_state_and_country_conflicts_reject_address_identity(): void {
+	public function test_state_and_country_conflicts_reject_address_identity_and_create_distinct_terms(): void {
 		$name  = 'Border Venue ' . uniqid();
 		$first = Venue_Taxonomy::find_or_create_venue(
 			$name,
@@ -291,6 +298,11 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 			)
 		);
 
+		// Before creation, the conflicting state has no address identity to find.
+		$this->assertNull(
+			Venue_Taxonomy::find_venue_by_address( '400 State St.', 'Springfield', 'MO', 'US' )
+		);
+
 		$state_conflict = Venue_Taxonomy::find_or_create_venue(
 			$name,
 			array(
@@ -300,6 +312,24 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 				'country' => 'US',
 			)
 		);
+
+		$this->assertNotNull( $first['term_id'] );
+		$this->assertNotNull( $state_conflict['term_id'] );
+		$this->assertNotSame( $first['term_id'], $state_conflict['term_id'] );
+		$this->assertSame( 'created', $state_conflict['match_status'] );
+		$this->assertSame( 'MO', get_term_meta( (int) $state_conflict['term_id'], '_venue_state', true ) );
+
+		// The created term is now the address identity for the MO geography.
+		$this->assertSame(
+			(int) $state_conflict['term_id'],
+			Venue_Taxonomy::find_venue_by_address( '400 State St.', 'Springfield', 'MO', 'US' )
+		);
+
+		// Before creation, the conflicting country has no address identity either.
+		$this->assertNull(
+			Venue_Taxonomy::find_venue_by_address( '400 State St.', 'Springfield', 'IL', 'CA' )
+		);
+
 		$country_conflict = Venue_Taxonomy::find_or_create_venue(
 			$name,
 			array(
@@ -310,17 +340,21 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertNotNull( $first['term_id'] );
-		$this->assertNull(
-			Venue_Taxonomy::find_venue_by_address( '400 State St.', 'Springfield', 'MO', 'US' )
-		);
-		$this->assertNull(
+		$this->assertNotNull( $country_conflict['term_id'] );
+		$this->assertNotSame( $first['term_id'], $country_conflict['term_id'] );
+		$this->assertNotSame( $state_conflict['term_id'], $country_conflict['term_id'] );
+		$this->assertSame( 'created', $country_conflict['match_status'] );
+		$this->assertSame( 'CA', get_term_meta( (int) $country_conflict['term_id'], '_venue_country', true ) );
+
+		// The created term is now the address identity for the CA geography.
+		$this->assertSame(
+			(int) $country_conflict['term_id'],
 			Venue_Taxonomy::find_venue_by_address( '400 State St.', 'Springfield', 'IL', 'CA' )
 		);
-		$this->assertNull( $state_conflict['term_id'] );
-		$this->assertNull( $country_conflict['term_id'] );
-		$this->assertSame( 'ambiguous', $state_conflict['match_status'] );
-		$this->assertSame( 'ambiguous', $country_conflict['match_status'] );
+
+		// The original term is untouched.
+		$this->assertSame( 'IL', get_term_meta( (int) $first['term_id'], '_venue_state', true ) );
+		$this->assertSame( 'US', get_term_meta( (int) $first['term_id'], '_venue_country', true ) );
 	}
 
 	public function test_equivalent_state_and_country_forms_preserve_identity(): void {
@@ -358,7 +392,7 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 		$this->assertSame( 'matched', $country_code['match_status'] );
 	}
 
-	public function test_article_toggle_does_not_cross_city_boundaries(): void {
+	public function test_article_toggle_conflict_creates_distinct_venue_across_cities(): void {
 		$base  = 'Article Collision ' . uniqid();
 		$first = Venue_Taxonomy::find_or_create_venue(
 			'The ' . $base,
@@ -375,12 +409,17 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 			)
 		);
 
+		// The alt-name candidate ("The X" ↔ "X") rejected by geography is a
+		// different venue and must never block creation (#806).
 		$this->assertNotNull( $first['term_id'] );
-		$this->assertNull( $result['term_id'] );
-		$this->assertSame( 'ambiguous', $result['match_status'] );
+		$this->assertNotNull( $result['term_id'] );
+		$this->assertNotSame( $first['term_id'], $result['term_id'] );
+		$this->assertSame( 'created', $result['match_status'] );
+		$this->assertSame( 'Austin', get_term_meta( (int) $result['term_id'], '_venue_city', true ) );
+		$this->assertSame( 'Nashville', get_term_meta( (int) $first['term_id'], '_venue_city', true ) );
 	}
 
-	public function test_normalized_name_collision_does_not_cross_city_boundaries(): void {
+	public function test_normalized_name_conflict_creates_distinct_venue_across_cities(): void {
 		$suffix = uniqid();
 		$first  = Venue_Taxonomy::find_or_create_venue(
 			'Rock - House ' . $suffix,
@@ -397,9 +436,14 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 			)
 		);
 
+		// The normalized-name candidate rejected by geography is a different
+		// venue and must never block creation (#806).
 		$this->assertNotNull( $first['term_id'] );
-		$this->assertNull( $result['term_id'] );
-		$this->assertSame( 'ambiguous', $result['match_status'] );
+		$this->assertNotNull( $result['term_id'] );
+		$this->assertNotSame( $first['term_id'], $result['term_id'] );
+		$this->assertSame( 'created', $result['match_status'] );
+		$this->assertSame( 'Phoenix', get_term_meta( (int) $result['term_id'], '_venue_city', true ) );
+		$this->assertSame( 'Denver', get_term_meta( (int) $first['term_id'], '_venue_city', true ) );
 	}
 
 	public function test_compatible_identity_fills_empty_metadata_without_overwriting(): void {

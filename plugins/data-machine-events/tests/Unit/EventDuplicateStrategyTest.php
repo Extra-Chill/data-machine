@@ -178,6 +178,48 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->cleanup( $term_id, $existing_post_id );
 	}
 
+	/**
+	 * An alt-name ("The X" ↔ "X") candidate rejected by supplied geography is
+	 * a distinct venue (#806), never a duplicate by name. The duplicate gate
+	 * must treat `conflict` exactly like `ambiguous`.
+	 */
+	public function test_alt_name_geographic_conflict_is_not_a_duplicate(): void {
+		$stored_name = 'Intersection Duplicate Guard ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Same Night Show',
+			'2026-08-15 20:00:00',
+			$stored_name
+		);
+
+		$incoming = array(
+			'address' => '',
+			'city'    => 'Grand Rapids',
+			'state'   => 'MI',
+			'country' => 'US',
+		);
+
+		$identity = Venue_Taxonomy::resolve_venue_identity( 'The ' . $stored_name, $incoming );
+		$this->assertSame( 'conflict', $identity['match_status'] );
+		$this->assertSame( array( $term_id ), $identity['conflicting_term_ids'] );
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Same Night Show',
+				'context' => array_merge(
+					array(
+						'venue'     => 'The ' . $stored_name,
+						'startDate' => '2026-08-15T20:30:00',
+						'ticketUrl' => '',
+					),
+					$incoming
+				),
+			)
+		);
+
+		$this->assertNull( $result, 'An alt-name candidate rejected by geography is a distinct venue, never a duplicate.' );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
 	public function test_equivalent_geography_forms_still_allow_duplicate_match(): void {
 		$venue_name = 'Equivalent Geography Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(

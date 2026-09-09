@@ -7,14 +7,17 @@
  *
  * Also reports (and with --apply, performs) the missing-venue repair:
  * resolving each venue-less event's venue from its own event-details
- * block attributes and assigning the matched term. Dry run by default;
- * terms are never created. See MissingVenueRepairer (#803).
+ * block attributes and assigning the matched term. Conflict candidates
+ * (#806) get a distinct venue created through the same find_or_create_venue
+ * path upsert uses and have it assigned. Dry run by default.
+ * See MissingVenueRepairer (#803).
  *
  * Usage:
  *   wp data-machine-events check venues
  *   wp data-machine-events check venues --scope=all
  *   wp data-machine-events check venues --format=json
  *   wp data-machine-events check venues --scope=all --apply
+ *   wp data-machine-events check venues --report=conflicts
  *
  * @package DataMachineEvents\Cli\Check
  * @since   0.14.0
@@ -74,15 +77,25 @@ class CheckVenuesCommand {
 	 * ---
 	 *
 	 * [--apply]
-	 * : Assign matched venue terms to venue-less events. Without this flag
-	 * the repair is a dry run: identical reporting, no writes. Terms are
-	 * never created.
+	 * : Assign matched venue terms and create distinct conflict venues
+	 * (#806). Without this flag the repair is a dry run: identical
+	 * reporting, no writes.
+	 *
+	 * [--report=<report>]
+	 * : Focused report instead of the full check. 'conflicts' groups
+	 * still-unresolved geographic-conflict candidates by venue name (#806).
+	 * ---
+	 * default: <empty>
+	 * options:
+	 *   - conflicts
+	 * ---
 	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp data-machine-events check venues
 	 *     wp data-machine-events check venues --scope=all
 	 *     wp data-machine-events check venues --scope=all --apply
+	 *     wp data-machine-events check venues --scope=all --report=conflicts
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.
@@ -93,6 +106,11 @@ class CheckVenuesCommand {
 		$limit      = (int) ( $assoc_args['limit'] ?? 25 );
 		$format     = $assoc_args['format'] ?? 'table';
 		$apply      = isset( $assoc_args['apply'] );
+
+		if ( 'conflicts' === ( $assoc_args['report'] ?? '' ) ) {
+			$this->output_conflicts_report( $scope, $days_ahead, $format );
+			return;
+		}
 
 		$events = $this->query_events( $scope, $days_ahead );
 
@@ -184,10 +202,12 @@ class CheckVenuesCommand {
 		\WP_CLI::log( sprintf( '--- Missing Venue Repair (%s) ---', $repair_mode ) );
 		\WP_CLI::log(
 			sprintf(
-				'Scanned %d; missing %d; matched %d (assigned %d); ambiguous %d; no match %d; empty %d.',
+				'Scanned %d; missing %d; matched %d; created %d; conflict %d (assigned %d); ambiguous %d; no match %d; empty %d.',
 				$repair['scanned'],
 				$repair['missing'],
 				$repair['matched'],
+				$repair['created'],
+				$repair['conflict'],
 				$repair['assigned'],
 				$repair['ambiguous'],
 				$repair['no_match'],
@@ -209,8 +229,8 @@ class CheckVenuesCommand {
 			$this->output_results( $table, $format, array( 'ID', 'Venue', 'Address', 'Status', 'Term' ) );
 		}
 
-		if ( ! $apply && $repair['matched'] > 0 ) {
-			\WP_CLI::log( 'Re-run with --apply to assign the matched venue terms.' );
+		if ( ! $apply && ( $repair['matched'] > 0 || $repair['conflict'] > 0 ) ) {
+			\WP_CLI::log( 'Re-run with --apply to assign matched venue terms and create distinct conflict venues (#806).' );
 		}
 		\WP_CLI::log( '' );
 
@@ -250,6 +270,73 @@ class CheckVenuesCommand {
 		} else {
 			\WP_CLI::warning( sprintf( '%d venue issue(s) found.', $total_issues ) );
 		}
+	}
+
+	/**
+	 * Print the unresolved geographic-conflict report (#806).
+	 *
+	 * Groups venue-less events whose identity resolves to conflict by venue
+	 * name, with the incoming address set, the stored term id/address/city,
+	 * event count, and flow ids. Read-only.
+	 *
+	 * @param string $scope      Event scope.
+	 * @param int    $days_ahead Days ahead for the upcoming scope.
+	 * @param string $format     Output format.
+	 */
+	private function output_conflicts_report( string $scope, int $days_ahead, string $format ): void {
+		$repairer = new MissingVenueRepairer();
+		$groups   = $repairer->conflicts_report( $scope, $days_ahead );
+
+		if ( 'json' === $format ) {
+			\WP_CLI::log( (string) wp_json_encode(
+				array(
+					'scope'           => $scope,
+					'conflict_groups' => $groups,
+				),
+				JSON_PRETTY_PRINT
+			) );
+			return;
+		}
+
+		\WP_CLI::log( sprintf( '--- Unresolved Venue Conflicts (%s scope) ---', $scope ) );
+
+		if ( empty( $groups ) ) {
+			\WP_CLI::success( 'No unresolved venue conflicts found.' );
+			return;
+		}
+
+		$total_events = 0;
+		$table        = array();
+
+		foreach ( $groups as $group ) {
+			$total_events += (int) $group['event_count'];
+
+			$stored_rows = array();
+			foreach ( (array) $group['stored'] as $stored ) {
+				$stored_address = trim( (string) $stored['address'] );
+				$stored_city    = trim( (string) $stored['city'] );
+
+				$stored_rows[] = sprintf(
+					'#%d %s (%s)',
+					$stored['term_id'],
+					'' !== $stored_address ? $stored_address : 'no stored address',
+					'' !== $stored_city ? $stored_city : 'no city'
+				);
+			}
+
+			$table[] = array(
+				'Venue'    => mb_substr( (string) $group['venue_name'], 0, 30 ),
+				'Events'   => $group['event_count'],
+				'Incoming' => mb_substr( implode( ' | ', (array) $group['incoming_addresses'] ), 0, 40 ),
+				'Stored'   => mb_substr( implode( ' | ', $stored_rows ), 0, 60 ),
+				'Flows'    => implode( ',', (array) $group['flow_ids'] ),
+			);
+		}
+
+		$this->output_results( $table, $format, array( 'Venue', 'Events', 'Incoming', 'Stored', 'Flows' ) );
+		\WP_CLI::warning(
+			sprintf( '%d unresolved venue conflict group(s) across %d event(s); review stored term meta for bucket C merges.', count( $groups ), $total_events )
+		);
 	}
 
 	/**

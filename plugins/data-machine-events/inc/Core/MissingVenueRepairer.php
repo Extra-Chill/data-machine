@@ -6,8 +6,9 @@
  * from the post's own event-details block attributes via
  * Venue_Taxonomy::resolve_venue_identity() and — with apply enabled —
  * assigns the matched term through the same helper the upsert path uses.
- * Terms are never created here; ambiguous and unmatched events are only
- * reported (#803).
+ * Conflict candidates (#806) create a distinct venue through the same
+ * find_or_create_venue() path upsert uses and assign it; ambiguous and
+ * unmatched events are only reported (#803).
  *
  * Reconciliation logic lives in this class so a future maintenance hook can
  * call the same surface; the check venues CLI command is a thin adapter.
@@ -34,11 +35,12 @@ class MissingVenueRepairer {
 	 *
 	 * @param string $scope      Event scope: 'upcoming', 'past', or 'all'.
 	 * @param int    $days_ahead Days to look ahead for the upcoming scope.
-	 * @param bool   $apply      Assign matched venue terms. False = dry run.
+	 * @param bool   $apply      Assign matched terms and create distinct conflict venues. False = dry run.
 	 * @param int    $limit      Max missing-venue events to process (0 = no cap).
 	 * @return array{
 	 *   scope: string, scanned: int, missing: int, matched: int,
-	 *   assigned: int, ambiguous: int, no_match: int, empty: int,
+	 *   created: int, conflict: int, assigned: int, ambiguous: int,
+	 *   no_match: int, empty: int,
 	 *   candidates: array<int, array<string, mixed>>
 	 * }
 	 */
@@ -48,6 +50,8 @@ class MissingVenueRepairer {
 			'scanned'    => 0,
 			'missing'    => 0,
 			'matched'    => 0,
+			'created'    => 0,
+			'conflict'   => 0,
 			'assigned'   => 0,
 			'ambiguous'  => 0,
 			'no_match'   => 0,
@@ -98,7 +102,7 @@ class MissingVenueRepairer {
 	 * @param array<string,mixed> $attrs      Event-details block attributes.
 	 * @param string              $venue_name Venue name from the block.
 	 * @param bool                $apply      Whether to assign the matched term.
-	 * @return array{tally: 'matched'|'ambiguous'|'no_match', assigned: bool, candidate: array<string,mixed>}
+	 * @return array{tally: 'matched'|'created'|'conflict'|'ambiguous'|'no_match', assigned: bool, candidate: array<string,mixed>}
 	 */
 	private function resolve_event( int $post_id, string $title, array $attrs, string $venue_name, bool $apply ): array {
 		$address  = trim( (string) ( $attrs['address'] ?? '' ) );
@@ -121,6 +125,7 @@ class MissingVenueRepairer {
 			'match_status' => (string) $identity['match_status'],
 			'term_id'      => null,
 			'term_name'    => '',
+			'created'      => false,
 			'assigned'     => false,
 		);
 
@@ -146,6 +151,44 @@ class MissingVenueRepairer {
 				}
 				break;
 
+			case 'conflict':
+				// A conflicting name candidate is a different venue (#806):
+				// with apply, create it through the same path upsert uses and
+				// assign the new term. Dry run stays read-only.
+				$tally = 'conflict';
+
+				if ( $apply ) {
+					$creation = Venue_Taxonomy::find_or_create_venue(
+						$venue_name,
+						array(
+							'address' => $address,
+							'city'    => trim( (string) ( $attrs['city'] ?? '' ) ),
+							'state'   => trim( (string) ( $attrs['state'] ?? '' ) ),
+							'country' => trim( (string) ( $attrs['country'] ?? '' ) ),
+						),
+						array( 'post_id' => $post_id )
+					);
+
+					$created_term_id = (int) ( $creation['term_id'] ?? 0 );
+
+					if ( $created_term_id > 0 ) {
+						$tally                  = ! empty( $creation['was_created'] ) ? 'created' : 'matched';
+						$term                   = get_term( $created_term_id, 'venue' );
+						$candidate['term_id']   = $created_term_id;
+						$candidate['term_name'] = $term instanceof \WP_Term ? $term->name : '';
+						$candidate['created']   = ! empty( $creation['was_created'] );
+
+						$assignment = Venue::assign_venue_to_event( $post_id, array( 'venue' => $created_term_id ) );
+
+						if ( ! empty( $assignment['success'] ) && empty( $assignment['skipped'] ) ) {
+							update_post_meta( $post_id, self::REPAIRED_AT_META, gmdate( 'Y-m-d H:i:s' ) );
+							$assigned              = true;
+							$candidate['assigned'] = true;
+						}
+					}
+				}
+				break;
+
 			case 'ambiguous':
 				$tally = 'ambiguous';
 				break;
@@ -156,6 +199,102 @@ class MissingVenueRepairer {
 			'assigned'  => $assigned,
 			'candidate' => $candidate,
 		);
+	}
+
+	/**
+	 * Group venue-less events whose venue identity resolves to a conflict.
+	 *
+	 * Operator-facing bucket C report (#806): unresolved candidates grouped
+	 * by venue name with the incoming address set, the stored term's
+	 * id/address/city, event count, and the flow ids that produced the
+	 * events. Read-only; safe to run without apply.
+	 *
+	 * @param string $scope      Event scope: 'upcoming', 'past', or 'all'.
+	 * @param int    $days_ahead Days to look ahead for the upcoming scope.
+	 * @return array<int, array{venue_name: string, event_count: int, incoming_addresses: string[], stored: array<int, array{term_id: int, name: string, address: string, city: string}>, flow_ids: int[]}>
+	 */
+	public function conflicts_report( string $scope = 'upcoming', int $days_ahead = 90 ): array {
+		$groups = array();
+
+		foreach ( $this->query_events( $scope, $days_ahead ) as $event ) {
+			if ( $this->has_venue_term( (int) $event->ID ) ) {
+				continue;
+			}
+
+			$attrs      = $this->extract_block_attributes( (int) $event->ID );
+			$venue_name = trim( (string) ( $attrs['venue'] ?? '' ) );
+
+			if ( '' === $venue_name ) {
+				continue;
+			}
+
+			$address  = trim( (string) ( $attrs['address'] ?? '' ) );
+			$identity = Venue_Taxonomy::resolve_venue_identity(
+				$venue_name,
+				array(
+					'address' => $address,
+					'city'    => trim( (string) ( $attrs['city'] ?? '' ) ),
+					'state'   => trim( (string) ( $attrs['state'] ?? '' ) ),
+					'country' => trim( (string) ( $attrs['country'] ?? '' ) ),
+				)
+			);
+
+			if ( 'conflict' !== $identity['match_status'] ) {
+				continue;
+			}
+
+			$group_key = mb_strtolower( $venue_name );
+
+			if ( ! isset( $groups[ $group_key ] ) ) {
+				$groups[ $group_key ] = array(
+					'venue_name'         => $venue_name,
+					'event_count'        => 0,
+					'incoming_addresses' => array(),
+					'stored'             => array(),
+					'flow_ids'           => array(),
+				);
+			}
+
+			$group = $groups[ $group_key ];
+
+			++$group['event_count'];
+
+			if ( '' !== $address && ! in_array( $address, $group['incoming_addresses'], true ) ) {
+				$group['incoming_addresses'][] = $address;
+			}
+
+			$stored_ids = array_map( 'intval', array_column( $group['stored'], 'term_id' ) );
+
+			foreach ( $identity['conflicting_term_ids'] as $term_id ) {
+				$term_id = (int) $term_id;
+
+				if ( $term_id <= 0 || in_array( $term_id, $stored_ids, true ) ) {
+					continue;
+				}
+
+				$term = get_term( $term_id, 'venue' );
+				if ( ! $term instanceof \WP_Term ) {
+					continue;
+				}
+
+				$group['stored'][] = array(
+					'term_id' => $term_id,
+					'name'    => $term->name,
+					'address' => (string) get_term_meta( $term_id, '_venue_address', true ),
+					'city'    => (string) get_term_meta( $term_id, '_venue_city', true ),
+				);
+				$stored_ids[]      = $term_id;
+			}
+
+			$flow_id = (int) get_post_meta( $event->ID, '_datamachine_post_flow_id', true );
+			if ( $flow_id > 0 && ! in_array( $flow_id, $group['flow_ids'], true ) ) {
+				$group['flow_ids'][] = $flow_id;
+			}
+
+			$groups[ $group_key ] = $group;
+		}
+
+		return array_values( $groups );
 	}
 
 	/**
