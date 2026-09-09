@@ -129,7 +129,7 @@ class FlowRoutinesTest extends WP_UnitTestCase {
 	}
 
 	public function test_migration_dry_run_reports_plan_without_cancelling(): void {
-		$flow_id  = $this->create_flow( 'Migration flow' );
+		$flow_id = $this->create_flow( 'Migration flow' );
 		$this->assertTrue( FlowRoutines::sync( $flow_id, array( 'interval' => 'hourly' ) ) );
 
 		$legacy_id = as_schedule_single_action(
@@ -157,10 +157,10 @@ class FlowRoutinesTest extends WP_UnitTestCase {
 	}
 
 	public function test_migration_apply_cancels_generated_chains_only(): void {
-		$flow_id  = $this->create_flow( 'Migration apply flow' );
+		$flow_id = $this->create_flow( 'Migration apply flow' );
 		$this->assertTrue( FlowRoutines::sync( $flow_id, array( 'interval' => 'hourly' ) ) );
 
-		$legacy_id = as_schedule_single_action(
+		$legacy_id   = as_schedule_single_action(
 			time() + HOUR_IN_SECONDS,
 			'datamachine_run_flow_now',
 			array( $flow_id, null, array( '_datamachine_schedule_generation' => wp_generate_uuid4() ) ),
@@ -185,14 +185,14 @@ class FlowRoutinesTest extends WP_UnitTestCase {
 	}
 
 	private function create_flow( string $name ): int {
-		$result  = wp_get_ability( 'datamachine/create-flow' )->execute(
+		$result           = wp_get_ability( 'datamachine/create-flow' )->execute(
 			array(
 				'pipeline_id'       => $this->pipeline_id,
 				'flow_name'         => $name,
 				'scheduling_config' => array( 'interval' => 'manual' ),
 			)
 		);
-		$flow_id = (int) $result['flow_id'];
+		$flow_id          = (int) $result['flow_id'];
 		$this->flow_ids[] = $flow_id;
 
 		return $flow_id;
@@ -213,12 +213,12 @@ class FlowRoutinesTest extends WP_UnitTestCase {
 	 */
 	private function legacy_action_pending( int $action_id ): int {
 		try {
-			$action = \ActionScheduler_Store::instance()->fetch_action( $action_id );
+			$status = \ActionScheduler_Store::instance()->get_status( (string) $action_id );
 		} catch ( \Throwable $throwable ) {
 			unset( $throwable );
 			return 0;
 		}
 
-		return \ActionScheduler_Store::STATUS_PENDING === $action->get_status() ? $action_id : 0;
+		return \ActionScheduler_Store::STATUS_PENDING === $status ? $action_id : 0;
 	}
 }

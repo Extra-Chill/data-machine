@@ -762,7 +762,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$flow_id  = (int) $flow['flow_id'];
 
 		\DataMachine\Engine\Scheduling\FlowRoutines::unschedule( $flow_id );
-		$this->assertSame( null, as_next_scheduled_action( \DataMachine\Engine\Scheduling\FlowRoutines::ROUTINE_HOOK, array( 'routine_id' => \DataMachine\Engine\Scheduling\FlowRoutines::routine_id( $flow_id ) ), \DataMachine\Engine\Scheduling\FlowRoutines::ROUTINE_GROUP ), 'Test setup removes the scheduled action while preserving flow row scheduling.' );
+		$this->assertFalse( as_next_scheduled_action( \DataMachine\Engine\Scheduling\FlowRoutines::ROUTINE_HOOK, array( 'routine_id' => \DataMachine\Engine\Scheduling\FlowRoutines::routine_id( $flow_id ) ), \DataMachine\Engine\Scheduling\FlowRoutines::ROUTINE_GROUP ), 'Test setup removes the scheduled action while preserving flow row scheduling.' );
 
 		$second = $this->bundler->import(
 			$bundle,
@@ -1058,7 +1058,10 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	public function test_subagent_skill_policy_survives_persisted_graph_projection(): void {
 		$bundle                         = $this->fixture_bundle( 'policy-coordinator' );
 		$bundle['agent']['subagents']   = array( 'policy-writer' );
-		$bundle['agent']['tool_policy'] = array( 'mode' => 'allow', 'tools' => array( 'datamachine/search' ) );
+		$bundle['agent']['tool_policy'] = array(
+'mode' => 'allow',
+'tools' => array( 'datamachine/search' )
+);
 		$bundle['subagents']            = array(
 			array(
 				'slug'         => 'policy-writer',
@@ -1066,8 +1069,14 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'description'  => 'Writes with an explicit skill policy.',
 				'agent_config' => array(),
 				'memory'       => array( 'SOUL.md' => "# Policy Writer\n" ),
-				'tool_policy'  => array( 'mode' => 'allow', 'tools' => array( 'datamachine/read' ) ),
-				'skill_policy' => array( 'mode' => 'explicit', 'allowed' => array( 'write.md' ) ),
+				'tool_policy'  => array(
+'mode' => 'allow',
+'tools' => array( 'datamachine/read' )
+),
+				'skill_policy' => array(
+'mode' => 'explicit',
+'allowed' => array( 'write.md' )
+),
 				'skills'       => array( 'write.md' => "# Write\n" ),
 				'references'   => array(),
 				'subagents'    => array(),
@@ -1083,13 +1092,25 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$nodes = array_column( $projection['nodes'] ?? array(), null, 'slug' );
 		$root  = $this->agents_repo->get_by_slug( 'policy-coordinator' );
 		$child = $this->agents_repo->get_by_slug( 'policy-writer' );
-		$this->assertSame( array( 'mode' => 'allow', 'tools' => array( 'datamachine/search' ), 'categories' => array() ), $root['agent_config']['tool_policy'] ?? null, 'Root policy is persisted where runtime enforcement reads it.' );
-		$this->assertSame( array( 'mode' => 'allow', 'tools' => array( 'datamachine/read' ), 'categories' => array() ), $child['agent_config']['tool_policy'] ?? null, 'Child policy is persisted where runtime enforcement reads it.' );
+		$this->assertSame( array(
+'mode' => 'allow',
+'tools' => array( 'datamachine/search' ),
+'categories' => array()
+), $root['agent_config']['tool_policy'] ?? null, 'Root policy is persisted where runtime enforcement reads it.' );
+		$this->assertSame( array(
+'mode' => 'allow',
+'tools' => array( 'datamachine/read' ),
+'categories' => array()
+), $child['agent_config']['tool_policy'] ?? null, 'Child policy is persisted where runtime enforcement reads it.' );
 		$policy_provider = new DataMachineAgentToolPolicyProvider();
 		$this->assertSame( $root['agent_config']['tool_policy'], $policy_provider->getForAgent( (int) $root['agent_id'] ), 'Runtime policy provider resolves the imported root policy.' );
 		$this->assertSame( $child['agent_config']['tool_policy'], $policy_provider->getForAgent( (int) $child['agent_id'] ), 'Runtime policy provider resolves the imported child policy.' );
 		$this->assertSame(
-			array( 'mode' => 'explicit', 'allowed' => array( 'write.md' ), 'paths' => array( 'write.md' ) ),
+			array(
+'mode' => 'explicit',
+'allowed' => array( 'write.md' ),
+'paths' => array( 'write.md' )
+),
 			$nodes['policy-writer']['skill_policy'] ?? null,
 			'Persisted graph projection retains the child policy and installed skill paths.'
 		);
@@ -1100,8 +1121,15 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$bundle['agent']['subagents'] = array( 'unsupported-writer' );
 		$bundle['subagents']          = array(
 			array(
-				'slug' => 'unsupported-writer', 'label' => 'Writer', 'description' => '', 'agent_config' => array(),
-				'memory' => array(), 'tool_policy' => array(), 'skills' => array(), 'references' => array(), 'subagents' => array(),
+				'slug' => 'unsupported-writer',
+'label' => 'Writer',
+'description' => '',
+'agent_config' => array(),
+				'memory' => array(),
+'tool_policy' => array(),
+'skills' => array(),
+'references' => array(),
+'subagents' => array(),
 			),
 		);
 		$remove_graph_capability      = static fn( array $capabilities ): array => array_values( array_diff( $capabilities, array( AgentSubagentGraph::CAPABILITY ) ) );
@@ -1318,7 +1346,10 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 		$exports = array();
 		foreach ( array( 'share', 'backup', 'fork' ) as $profile ) {
-			$result = $this->bundler->export_directory_object( 'backup-source', array( 'profile' => $profile, 'reproducible' => true ) );
+			$result = $this->bundler->export_directory_object( 'backup-source', array(
+'profile' => $profile,
+'reproducible' => true
+) );
 			$this->assertTrue( (bool) $result['success'], "{$profile} export succeeds." );
 			$this->assertInstanceOf( AgentBundleDirectory::class, $result['directory'] ?? null );
 			$exports[ $profile ] = AgentBundleArrayAdapter::to_array_bundle( $result['directory'] );
@@ -1340,7 +1371,10 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 		$nested_exports = array();
 		foreach ( array( 'share', 'backup', 'fork' ) as $profile ) {
-			$result = $this->bundler->export_directory_object( 'profile-coordinator', array( 'profile' => $profile, 'reproducible' => true ) );
+			$result = $this->bundler->export_directory_object( 'profile-coordinator', array(
+'profile' => $profile,
+'reproducible' => true
+) );
 			$this->assertTrue( (bool) $result['success'], "{$profile} nested export succeeds." );
 			$nested_exports[ $profile ] = AgentBundleArrayAdapter::to_array_bundle( $result['directory'] );
 		}
@@ -1365,7 +1399,10 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 			$this->assertArrayNotHasKey( 'datamachine_bundle', $fork_child );
 		}
 
-		$repeat = $this->bundler->export_directory_object( 'profile-coordinator', array( 'profile' => 'backup', 'reproducible' => true ) );
+		$repeat = $this->bundler->export_directory_object( 'profile-coordinator', array(
+'profile' => 'backup',
+'reproducible' => true
+) );
 		$this->assertTrue( (bool) $repeat['success'] );
 		$this->assertSame( $nested_exports['backup'], AgentBundleArrayAdapter::to_array_bundle( $repeat['directory'] ) );
 

@@ -234,7 +234,20 @@ final class FlowRoutines {
 				? datamachine_resolve_interval_alias( $scheduling_config['interval'] )
 				: $scheduling_config['interval'] )
 			: null;
-		$enabled  = false !== ( $scheduling_config['enabled'] ?? true );
+
+		// A bare cron expression normalizes to interval=cron + cron_expression,
+		// matching the stored desired-state shape the old scheduler wrote.
+		if ( null !== $interval
+			&& ! in_array( $interval, array( 'manual', 'one_time', 'cron' ), true )
+			&& self::looks_like_cron_expression( $interval )
+		) {
+			$scheduling_config['cron_expression'] = is_string( $scheduling_config['cron_expression'] ?? null )
+				? (string) $scheduling_config['cron_expression']
+				: $interval;
+			$interval                             = 'cron';
+		}
+
+		$enabled = false !== ( $scheduling_config['enabled'] ?? true );
 
 		if ( ! $force && self::scheduling_unchanged( $current, $scheduling_config, $interval, $enabled, $flow_id ) ) {
 			return true;
