@@ -322,6 +322,7 @@ class SystemAbilities {
 		}
 
 		$message = match ( $status ) {
+			'unavailable' => __( 'Action Scheduler is unavailable', 'data-machine' ),
 			'ok'          => __( 'scheduler current', 'data-machine' ),
 			'failing'     => $coverage_failed ? __( 'flow routine coverage audit failed', 'data-machine' ) : ( $missing_flow_schedules > 0 ? sprintf(
 				/* translators: %d: number of enabled recurring flows missing scheduler coverage. */
@@ -352,7 +353,6 @@ class SystemAbilities {
 				count( $rejected_schedules )
 			) ) ),
 			'stale'       => __( 'scheduler has overdue work; invoke WordPress cron, run wp datamachine drain, or run a specific task with wp datamachine system run <task_type> --wait', 'data-machine' ),
-			'unavailable' => __( 'Action Scheduler is unavailable', 'data-machine' ),
 			default       => __( 'scheduler status unknown', 'data-machine' ),
 		};
 
@@ -377,7 +377,7 @@ class SystemAbilities {
 			'action_scheduler'        => array(
 				'available'        => DependencyChecker::has( DependencyChecker::CHECK_ACTION_SCHEDULER ),
 				'class_loaded'     => class_exists( '\\ActionScheduler' ),
-				'is_initialized'   => class_exists( '\\ActionScheduler' ) && method_exists( '\\ActionScheduler', 'is_initialized' ) ? \ActionScheduler::is_initialized() : null,
+				'is_initialized'   => class_exists( '\\ActionScheduler' ) ? \ActionScheduler::is_initialized() : null,
 				'group'            => GroupRegistrar::GROUP,
 				'pending_count'    => $pending['count'],
 				'due_count'        => $due['count'],

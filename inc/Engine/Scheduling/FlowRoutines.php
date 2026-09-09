@@ -111,8 +111,7 @@ final class FlowRoutines {
 	public static function available(): bool {
 		if ( null === self::$available ) {
 			self::$available = class_exists( WP_Agent_Routine_Registry::class )
-				&& interface_exists( '\AgentsAPI\AI\Routines\WP_Agent_Routine_Backend' )
-				&& method_exists( WP_Agent_Routine_Registry::class, 'reconcile' );
+				&& interface_exists( '\AgentsAPI\AI\Routines\WP_Agent_Routine_Backend' );
 		}
 
 		return self::$available;
@@ -596,11 +595,6 @@ final class FlowRoutines {
 			'ids'
 		);
 
-		if ( ! is_array( $ids ) ) {
-			$plan['errors']['_action_scheduler'] = 'Unable to query pending legacy actions.';
-			return $plan;
-		}
-
 		$by_flow = array();
 		foreach ( $ids as $id ) {
 			$action_id = (int) $id;
@@ -609,7 +603,7 @@ final class FlowRoutines {
 			}
 
 			try {
-				$action = \ActionScheduler_Store::instance()->fetch_action( $action_id );
+				$action = \ActionScheduler_Store::instance()->fetch_action( (string) $action_id );
 			} catch ( \Throwable $error ) {
 				unset( $error );
 				continue;
@@ -640,7 +634,7 @@ final class FlowRoutines {
 			if ( ! $dry_run ) {
 				foreach ( $action_ids as $action_id ) {
 					try {
-						\ActionScheduler_Store::instance()->cancel_action( $action_id );
+						\ActionScheduler_Store::instance()->cancel_action( (string) $action_id );
 						++$plan['cancelled'];
 					} catch ( \Throwable $error ) {
 						unset( $error );
@@ -1152,6 +1146,7 @@ final class FlowRoutines {
 	 */
 	private static function next_runs_direct( array $result ): ?array {
 		global $wpdb;
+		/** @var \wpdb $wpdb */
 
 		if ( ! class_exists( '\ActionScheduler' ) || ! class_exists( '\ActionScheduler_DBStore' ) ) {
 			return null;

@@ -353,7 +353,7 @@ class RunFlowAbility {
 		 * @param array $pipeline        Pipeline row from the database.
 		 */
 		$filtered_snapshot = apply_filters( 'datamachine_engine_snapshot', $engine_snapshot, $job_id, $flow, $pipeline );
-		if ( is_array( $filtered_snapshot ) ) {
+		if ( array() !== $filtered_snapshot ) {
 			$engine_snapshot = $filtered_snapshot;
 		}
 		$engine_snapshot = \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot );
@@ -500,7 +500,7 @@ class RunFlowAbility {
 				),
 				'ids'
 			);
-			$already_pending = is_array( $pending_ids ) && array() !== $pending_ids;
+			$already_pending = array() !== $pending_ids;
 
 			if ( ! $already_pending ) {
 				as_schedule_single_action(

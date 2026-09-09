@@ -107,7 +107,7 @@ class DeletePipelineAbility {
 			++$deleted_flows;
 		}
 
-		if ( ! empty( $schedule_failures ) ) {
+		if ( array() !== $schedule_failures ) {
 			return new \WP_Error(
 				'pipeline_flow_deletion_incomplete',
 				'Pipeline deletion did not commit every flow deletion.',
@@ -150,7 +150,7 @@ class DeletePipelineAbility {
 		);
 
 		$result = array(
-			'success'          => empty( $schedule_failures ),
+			'success'          => array() === $schedule_failures,
 			'pipeline_id'      => $pipeline_id,
 			'pipeline_name'    => $pipeline_name,
 			'deleted_flows'    => $deleted_flows,

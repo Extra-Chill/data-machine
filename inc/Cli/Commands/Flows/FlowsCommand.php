@@ -572,7 +572,6 @@ class FlowsCommand extends BaseCommand {
 		if ( empty( $result['success'] ) && isset( $result['error'] ) ) {
 			WP_CLI::error( (string) $result['error'], false );
 			WP_CLI::halt( 1 );
-			return;
 		}
 
 		WP_CLI::log( ! empty( $result['applied'] ) ? 'Mode: apply' : 'Mode: dry-run' );
@@ -1099,10 +1098,6 @@ class FlowsCommand extends BaseCommand {
 			$decoded = JsonInput::decode_array( (string) $assoc_args['step_configs'] );
 			if ( null === $decoded && '' !== $assoc_args['step_configs'] ) {
 				WP_CLI::error( 'Invalid JSON in --step_configs' );
-				return;
-			}
-			if ( null !== $decoded && ! is_array( $decoded ) ) {
-				WP_CLI::error( '--step_configs must be a JSON object' );
 				return;
 			}
 			$step_configs = $decoded ?? array();
@@ -2599,7 +2594,7 @@ class FlowsCommand extends BaseCommand {
 		);
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( array(
+			WP_CLI::line( (string) wp_json_encode( array(
 				'total' => $total,
 				'flows' => $items,
 			), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );

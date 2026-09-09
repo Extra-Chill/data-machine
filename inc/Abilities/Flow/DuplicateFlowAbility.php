@@ -130,10 +130,10 @@ class DuplicateFlowAbility {
 					array(
 						'source_pipeline_id' => $source_pipeline_id,
 						'target_pipeline_id' => $target_pipeline_id,
-						'error'              => $compatibility['error'],
+						'error'              => (string) ( $compatibility['error'] ?? 'Incompatible pipelines.' ),
 					)
 				);
-				return new \WP_Error( 'incompatible_pipelines', $compatibility['error'], array( 'status' => 400 ) );
+				return new \WP_Error( 'incompatible_pipelines', (string) ( $compatibility['error'] ?? 'Incompatible pipelines.' ), array( 'status' => 400 ) );
 			}
 		}
 

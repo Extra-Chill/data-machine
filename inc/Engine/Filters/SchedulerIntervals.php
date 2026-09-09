@@ -97,7 +97,7 @@ function datamachine_resolve_interval_alias( string $interval ): string {
  *
  * @param string $interval Interval key, alias, or cron expression.
  * @param array  $config Optional scheduling configuration for special-key requirements.
- * @return array{valid: bool, resolved: string, error?: string, available?: string[]}
+ * @return array{valid: bool, resolved: string, error?: string, available?: list<int|string>}
  */
 function datamachine_validate_interval( string $interval, array $config = array() ): array {
 	// Special scheduling types are always valid.

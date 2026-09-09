@@ -219,7 +219,7 @@ class CreateFlowAbility {
 		// Validate and resolve interval aliases before storing.
 		$validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
 		if ( ! $validation['valid'] ) {
-			return new \WP_Error( 'invalid_schedule', $validation['error'], array( 'status' => 400 ) );
+			return new \WP_Error( 'invalid_schedule', (string) ( $validation['error'] ?? 'Invalid interval.' ), array( 'status' => 400 ) );
 		}
 		$scheduling_config['interval'] = $validation['resolved'];
 
@@ -268,7 +268,7 @@ class CreateFlowAbility {
 			$synced_steps = count( $pipeline_config );
 		}
 
-		if ( isset( $scheduling_config['interval'] ) && 'manual' !== $scheduling_config['interval'] ) {
+		if ( 'manual' !== $scheduling_config['interval'] ) {
 			$scheduling_result = FlowRoutines::sync( $flow_id, $scheduling_config, true );
 			if ( is_wp_error( $scheduling_result ) ) {
 				do_action(
@@ -321,10 +321,7 @@ class CreateFlowAbility {
 
 		if ( $validate_only ) {
 			$this->rollbackCreationTransactionScope( $transaction_scope );
-			$schedule_error = $this->compensateFlowSchedule( $flow_id );
-			if ( $schedule_error ) {
-				return new \WP_Error( 'flow_schedule_cleanup_failed', $schedule_error->get_error_message(), array( 'status' => 500 ) );
-			}
+			$this->compensateFlowSchedule( $flow_id );
 
 			return array(
 				'success'      => true,
@@ -335,7 +332,7 @@ class CreateFlowAbility {
 						'pipeline_id'        => $pipeline_id,
 						'pipeline_name'      => $pipeline['pipeline_name'] ?? '',
 						'flow_name'          => $flow_name,
-						'scheduling'         => $scheduling_config['interval'] ?? 'manual',
+						'scheduling'         => $scheduling_config['interval'],
 						'step_configs_count' => count( $step_configs ),
 					),
 				),
@@ -382,18 +379,15 @@ class CreateFlowAbility {
 	 * @param int    $flow_id Flow ID allocated in the transaction.
 	 * @param string $error Error message.
 	 * @param array  $configuration_errors Optional structured configuration errors.
-	 * @return array Failure result.
+	 * @return \WP_Error Failure result.
 	 */
 	private function rollbackCreation( TransactionScope $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): \WP_Error {
 		$this->rollbackCreationTransactionScope( $transaction_scope );
-		$schedule_error = $this->compensateFlowSchedule( $flow_id );
+		$this->compensateFlowSchedule( $flow_id );
 
 		$data = array( 'status' => 500 );
 		if ( ! empty( $configuration_errors ) ) {
 			$data['configuration_errors'] = $configuration_errors;
-		}
-		if ( $schedule_error ) {
-			$data['schedule_cleanup'] = array( 'error' => $schedule_error->get_error_message() );
 		}
 
 		return new \WP_Error( 'flow_creation_failed', $error, $data );
@@ -432,9 +426,8 @@ class CreateFlowAbility {
 	 *
 	 * @param int $flow_id Flow ID allocated in this scope.
 	 */
-	private function compensateFlowSchedule( int $flow_id ): ?\WP_Error {
+	private function compensateFlowSchedule( int $flow_id ): void {
 		FlowRoutines::unschedule( $flow_id );
-		return null;
 	}
 
 	/**

@@ -107,7 +107,7 @@ class UpdateFlowAbility {
 		if ( null !== $scheduling_config ) {
 			$validation = datamachine_validate_interval( $scheduling_config['interval'] ?? 'manual', $scheduling_config );
 			if ( ! $validation['valid'] ) {
-				return new \WP_Error( 'update_failed', $validation['error'], array( 'status' => 400 ) );
+				return new \WP_Error( 'update_failed', (string) ( $validation['error'] ?? 'Invalid interval.' ), array( 'status' => 400 ) );
 			}
 			$scheduling_config['interval'] = $validation['resolved'];
 		}
