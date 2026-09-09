@@ -153,9 +153,9 @@ class MusicItemExtractor extends BaseExtractor {
 
 		if ( preg_match( '/(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?/', $time_text, $matches ) ) {
 			$start_hour = (int) $matches[1];
-			$start_min  = strlen( $matches[2] ) > 0 ? $matches[2] : '00';
+			$start_min  = '' !== ( $matches[2] ?? '' ) ? $matches[2] : '00';
 			$end_hour   = (int) $matches[3];
-			$end_min    = strlen( $matches[4] ) > 0 ? $matches[4] : '00';
+			$end_min    = '' !== ( $matches[4] ?? '' ) ? $matches[4] : '00';
 
 			if ( $start_hour < 12 && $start_hour >= 1 ) {
 				$start_hour += 12;

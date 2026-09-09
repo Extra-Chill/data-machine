@@ -186,7 +186,6 @@ class EmbeddedCalendarExtractor extends BaseExtractor {
 
 			$events = $this->constrainRecurrenceHorizon(
 				$ical->events(),
-				$events,
 				array(
 					'source_url' => $source_url,
 					'method'     => $this->getMethod(),
