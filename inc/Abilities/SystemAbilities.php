@@ -27,7 +27,7 @@ use DataMachine\Engine\Tasks\TaskScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
 
-defined('ABSPATH') || exit;
+defined( 'ABSPATH' ) || exit;
 
 class SystemAbilities {
 
@@ -321,40 +321,43 @@ class SystemAbilities {
 			$status = 'stale';
 		}
 
-		$message = match ( $status ) {
+		$failing_message = $coverage_failed ? __( 'flow routine coverage audit failed', 'data-machine' ) : ( $missing_flow_schedules > 0 ? sprintf(
+			/* translators: %d: number of enabled recurring flows missing scheduler coverage. */
+			_n(
+				'%d enabled recurring flow is missing routine schedule coverage',
+				'%d enabled recurring flows are missing routine schedule coverage',
+				$missing_flow_schedules,
+				'data-machine'
+			),
+			$missing_flow_schedules
+		) : ( $coverage_errors > 0 ? sprintf(
+			/* translators: %d: number of routine reconciliation errors. */
+			_n(
+				'%d recurring flow schedule reconciliation error',
+				'%d recurring flow schedule reconciliation errors',
+				$coverage_errors,
+				'data-machine'
+			),
+			$coverage_errors
+		) : sprintf(
+			/* translators: %d: number of recurring schedules rejected on every tick. */
+			_n(
+				'%d recurring schedule rejected on every tick and never running',
+				'%d recurring schedules rejected on every tick and never running',
+				count( $rejected_schedules ),
+				'data-machine'
+			),
+			count( $rejected_schedules )
+		) ) );
+
+		$messages = array(
 			'unavailable' => __( 'Action Scheduler is unavailable', 'data-machine' ),
 			'ok'          => __( 'scheduler current', 'data-machine' ),
-			'failing'     => $coverage_failed ? __( 'flow routine coverage audit failed', 'data-machine' ) : ( $missing_flow_schedules > 0 ? sprintf(
-				/* translators: %d: number of enabled recurring flows missing scheduler coverage. */
-				_n(
-					'%d enabled recurring flow is missing routine schedule coverage',
-					'%d enabled recurring flows are missing routine schedule coverage',
-					$missing_flow_schedules,
-					'data-machine'
-				),
-				$missing_flow_schedules
-			) : ( $coverage_errors > 0 ? sprintf(
-				/* translators: %d: number of routine reconciliation errors. */
-				_n(
-					'%d recurring flow schedule reconciliation error',
-					'%d recurring flow schedule reconciliation errors',
-					$coverage_errors,
-					'data-machine'
-				),
-				$coverage_errors
-			) : sprintf(
-				/* translators: %d: number of recurring schedules rejected on every tick. */
-				_n(
-					'%d recurring schedule rejected on every tick and never running',
-					'%d recurring schedules rejected on every tick and never running',
-					count( $rejected_schedules ),
-					'data-machine'
-				),
-				count( $rejected_schedules )
-			) ) ),
+			'failing'     => $failing_message,
 			'stale'       => __( 'scheduler has overdue work; invoke WordPress cron, run wp datamachine drain, or run a specific task with wp datamachine system run <task_type> --wait', 'data-machine' ),
-			default       => __( 'scheduler status unknown', 'data-machine' ),
-		};
+		);
+
+		$message = $messages[ $status ];
 
 		// Compact, render-friendly view of each persistently-rejected binding.
 		$rejected_report = array();
@@ -696,10 +699,17 @@ class SystemAbilities {
 
 		$task_params = $validation['task_params'];
 
-		$job_id = TaskScheduler::schedule( $task_type, array_merge( $task_params, array(
-			'source'       => 'admin_run_now',
-			'triggered_by' => get_current_user_id(),
-		) ), $task_context );
+		$job_id = TaskScheduler::schedule(
+			$task_type,
+			array_merge(
+				$task_params,
+				array(
+					'source'       => 'admin_run_now',
+					'triggered_by' => get_current_user_id(),
+				)
+			),
+			$task_context
+		);
 
 		if ( ! $job_id ) {
 			$scheduler_error = TaskScheduler::getLastScheduleError();
@@ -876,7 +886,7 @@ class SystemAbilities {
 		$force      = $input['force'] ?? false;
 
 		$chat_db = ConversationStoreFactory::get();
-		$session = $chat_db->get_session($session_id);
+		$session = $chat_db->get_session( $session_id );
 
 		if ( ! $session ) {
 			return new \WP_Error(
@@ -890,7 +900,7 @@ class SystemAbilities {
 		}
 
 		// Check if title already exists and we're not forcing regeneration
-		if ( ! empty($session['title']) && ! $force ) {
+		if ( ! empty( $session['title'] ) && ! $force ) {
 			return array(
 				'success' => true,
 				'title'   => $session['title'],
@@ -900,7 +910,7 @@ class SystemAbilities {
 		}
 
 		$messages = $session['messages'] ?? array();
-		if ( empty($messages) ) {
+		if ( empty( $messages ) ) {
 			return new \WP_Error(
 				'session_messages_missing',
 				'No messages found',
@@ -921,9 +931,9 @@ class SystemAbilities {
 			$content = $msg['content'] ?? '';
 			$content = is_string( $content ) ? $content : wp_json_encode( $content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 
-			if ( 'user' === $role && null === $first_user_message && ! empty($content) ) {
+			if ( 'user' === $role && null === $first_user_message && ! empty( $content ) ) {
 				$first_user_message = $content;
-			} elseif ( 'assistant' === $role && null === $first_assistant_response && ! empty($content) ) {
+			} elseif ( 'assistant' === $role && null === $first_assistant_response && ! empty( $content ) ) {
 				$first_assistant_response = $content;
 			}
 
@@ -944,11 +954,11 @@ class SystemAbilities {
 		}
 
 		// Check if AI titles are enabled
-		$ai_titles_enabled = PluginSettings::get('chat_ai_titles_enabled', true);
+		$ai_titles_enabled = PluginSettings::get( 'chat_ai_titles_enabled', true );
 
 		if ( ! $ai_titles_enabled ) {
-			$title   = self::generateTruncatedTitle($first_user_message);
-			$success = $chat_db->update_title($session_id, $title);
+			$title   = self::generateTruncatedTitle( $first_user_message );
+			$success = $chat_db->update_title( $session_id, $title );
 			if ( ! $success ) {
 				return new \WP_Error( 'session_title_update_failed', 'Failed to update session title', array( 'status' => 500 ) );
 			}
@@ -962,30 +972,30 @@ class SystemAbilities {
 		}
 
 		// Try AI generation
-		$title = self::generateAITitle($first_user_message, $first_assistant_response);
+		$title = self::generateAITitle( $first_user_message, $first_assistant_response );
 
 		if ( null === $title ) {
-			$title  = self::generateTruncatedTitle($first_user_message);
+			$title  = self::generateTruncatedTitle( $first_user_message );
 			$method = 'fallback';
 		} else {
 			$method = 'ai';
 		}
 
-		$success = $chat_db->update_title($session_id, $title);
+		$success = $chat_db->update_title( $session_id, $title );
 		if ( ! $success ) {
 			return new \WP_Error( 'session_title_update_failed', 'Failed to update session title', array( 'status' => 500 ) );
 		}
 
 		do_action(
-				'datamachine_log',
-				'debug',
-				'Session title generated',
-				array(
-					'session_id' => $session_id,
-					'title'      => $title,
-					'method'     => $method,
-					'context'    => 'system',
-				)
+			'datamachine_log',
+			'debug',
+			'Session title generated',
+			array(
+				'session_id' => $session_id,
+				'title'      => $title,
+				'method'     => $method,
+				'context'    => 'system',
+			)
 		);
 
 		return array(
@@ -1001,7 +1011,7 @@ class SystemAbilities {
 		$provider      = $chat_defaults['provider'];
 		$model         = $chat_defaults['model'];
 
-		if ( empty($provider) || empty($model) ) {
+		if ( empty( $provider ) || empty( $model ) ) {
 			do_action(
 				'datamachine_log',
 				'warning',
@@ -1011,9 +1021,9 @@ class SystemAbilities {
 			return null;
 		}
 
-		$context = 'User: ' . mb_substr($first_user_message, 0, 500);
+		$context = 'User: ' . mb_substr( $first_user_message, 0, 500 );
 		if ( $first_assistant_response ) {
-			$context .= "\n\nAssistant: " . mb_substr($first_assistant_response, 0, 500);
+			$context .= "\n\nAssistant: " . mb_substr( $first_assistant_response, 0, 500 );
 		}
 
 		$default_prompt = "Generate a concise title (3-6 words) for this conversation. Return ONLY the title text, nothing else.\n\n" . $context;
@@ -1080,14 +1090,14 @@ class SystemAbilities {
 			}
 
 			$content = RequestBuilder::resultText( $response );
-			if ( empty($content) ) {
+			if ( empty( $content ) ) {
 				return null;
 			}
 
 			// Clean up the response - remove quotes, trim, limit length
-			$title = trim($content);
-			$title = trim($title, '"\'');
-			$title = mb_substr($title, 0, 100); // Max title length
+			$title = trim( $content );
+			$title = trim( $title, '"\'' );
+			$title = mb_substr( $title, 0, 100 ); // Max title length
 
 			return $title;
 		} catch ( \Exception $e ) {
@@ -1105,14 +1115,14 @@ class SystemAbilities {
 	}
 
 	private static function generateTruncatedTitle( string $first_message ): string {
-		$title = trim($first_message);
+		$title = trim( $first_message );
 
 		// Remove newlines and excessive whitespace
-		$title = preg_replace('/\s+/', ' ', $title);
+		$title = preg_replace( '/\s+/', ' ', $title );
 
 		// Truncate to max length
-		if ( mb_strlen($title) > 97 ) { // Leave room for "..."
-			$title = mb_substr($title, 0, 97) . '...';
+		if ( mb_strlen( $title ) > 97 ) { // Leave room for "..."
+			$title = mb_substr( $title, 0, 97 ) . '...';
 		}
 
 		return $title;

@@ -250,7 +250,11 @@ final class FlowRoutines {
 			return new \WP_Error(
 				'schedule_persist_failed',
 				"Desired schedule for flow {$flow_id} could not be persisted.",
-				array( 'status' => 503, 'retryable' => true, 'retry_after_ms' => 250 )
+				array(
+					'status'         => 503,
+					'retryable'      => true,
+					'retry_after_ms' => 250,
+				)
 			);
 		}
 
@@ -260,7 +264,10 @@ final class FlowRoutines {
 				return new \WP_Error(
 					'routines_unavailable',
 					'Agents API routines substrate is unavailable; the schedule was persisted but not registered.',
-					array( 'status' => 503, 'retryable' => true )
+					array(
+						'status'    => 503,
+						'retryable' => true,
+					)
 				);
 			}
 
@@ -540,22 +547,22 @@ final class FlowRoutines {
 			HashGatedRoutineBackend::persist();
 		}
 
-		$enqueued = is_array( $report['enqueued'] ?? null ) ? $report['enqueued'] : array();
-		$removed  = is_array( $report['removed'] ?? null ) ? $report['removed'] : array();
-		$covered  = is_array( $report['unchanged'] ?? null ) ? $report['unchanged'] : array();
-		$errors   = is_array( $report['errors'] ?? null ) ? $report['errors'] : array();
+		$enqueued = $report['enqueued'];
+		$removed  = $report['removed'];
+		$covered  = $report['unchanged'];
+		$errors   = $report['errors'];
 
 		return array(
-			'success' => array() === $errors,
-			'applied' => $apply,
-			'covered' => count( $covered ),
-			'missing' => count( $enqueued ),
-			'removed' => count( $removed ),
+			'success'     => array() === $errors,
+			'applied'     => $apply,
+			'covered'     => count( $covered ),
+			'missing'     => count( $enqueued ),
+			'removed'     => count( $removed ),
 			'routine_ids' => array(
 				'missing' => $enqueued,
 				'removed' => $removed,
 			),
-			'errors'  => $errors,
+			'errors'      => $errors,
 		);
 	}
 
@@ -572,12 +579,12 @@ final class FlowRoutines {
 	 */
 	public static function migrate_legacy_schedules( bool $dry_run = false ): array {
 		$plan = array(
-			'dry_run'         => $dry_run,
-			'legacy_actions'  => 0,
-			'cancelled'       => 0,
-			'flows'           => array(),
+			'dry_run'           => $dry_run,
+			'legacy_actions'    => 0,
+			'cancelled'         => 0,
+			'flows'             => array(),
 			'details_truncated' => false,
-			'errors'          => array(),
+			'errors'            => array(),
 		);
 
 		if ( ! function_exists( 'as_get_scheduled_actions' ) || ! class_exists( '\ActionScheduler_Store' ) ) {
@@ -610,9 +617,9 @@ final class FlowRoutines {
 			}
 
 			$args    = $action->get_args();
-			$flow_id = is_array( $args ) && isset( $args[0] ) ? (int) $args[0] : 0;
+			$flow_id = isset( $args[0] ) ? (int) $args[0] : 0;
 
-			if ( $flow_id <= 0 || ! is_array( $args ) || ! isset( $args[2] ) || ! is_array( $args[2] ) ) {
+			if ( $flow_id <= 0 || ! isset( $args[2] ) || ! is_array( $args[2] ) ) {
 				// Not a generated recurring chain (e.g. a backpressure
 				// deferral tick with args `[flow_id]`): leave it alone.
 				continue;
@@ -914,7 +921,10 @@ final class FlowRoutines {
 			return new \WP_Error(
 				'routines_unavailable',
 				'Action Scheduler is unavailable; the one-time run was not scheduled.',
-				array( 'status' => 503, 'retryable' => true )
+				array(
+					'status'    => 503,
+					'retryable' => true,
+				)
 			);
 		}
 
@@ -1065,12 +1075,12 @@ final class FlowRoutines {
 		self::$backend_installed = true;
 		add_filter(
 			'wp_agent_routine_backend',
-			static function ( $default ) {
-				if ( ! $default instanceof \AgentsAPI\AI\Routines\WP_Agent_Routine_Backend ) {
-					return $default;
+			static function ( $resolved_backend ) {
+				if ( ! $resolved_backend instanceof \AgentsAPI\AI\Routines\WP_Agent_Routine_Backend ) {
+					return $resolved_backend;
 				}
 
-				return new HashGatedRoutineBackend( $default );
+				return new HashGatedRoutineBackend( $resolved_backend );
 			},
 			10
 		);

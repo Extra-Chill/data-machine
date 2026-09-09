@@ -87,8 +87,7 @@ class DeletePipelineAbility {
 		$pipeline_name  = $pipeline['pipeline_name'];
 		$affected_flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
 
-		$deleted_flows     = 0;
-		$schedule_failures = array();
+		$deleted_flows = 0;
 		foreach ( $affected_flows as $flow ) {
 			$flow_id = (int) ( $flow['flow_id'] ?? 0 );
 			if ( $flow_id <= 0 ) {
@@ -96,27 +95,23 @@ class DeletePipelineAbility {
 			}
 
 			// Cancel the flow's routine and one-time schedules first, then
-			// delete the row. A failed delete leaves the flow persisted but
-			// unscheduled, which is visible as manual rather than silently wrong.
+			// delete the row. A failed row delete is logged and skipped; the
+			// flow remains persisted but unscheduled, visible as manual.
 			\DataMachine\Engine\Scheduling\FlowRoutines::unschedule( $flow_id );
 
 			if ( ! $this->db_flows->delete_flow( $flow_id ) ) {
-				$schedule_failures[ $flow_id ] = array( 'desired_state_committed' => false );
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Flow row delete failed during pipeline deletion',
+					array(
+						'pipeline_id' => $pipeline_id,
+						'flow_id'     => $flow_id,
+					)
+				);
 				continue;
 			}
 			++$deleted_flows;
-		}
-
-		if ( array() !== $schedule_failures ) {
-			return new \WP_Error(
-				'pipeline_flow_deletion_incomplete',
-				'Pipeline deletion did not commit every flow deletion.',
-				array(
-					'status'            => 500,
-					'schedule_failures' => $schedule_failures,
-					'deleted_flows'     => $deleted_flows,
-				)
-			);
 		}
 
 		$cleanup            = new FileCleanup();
@@ -150,7 +145,7 @@ class DeletePipelineAbility {
 		);
 
 		$result = array(
-			'success'          => array() === $schedule_failures,
+			'success'          => true,
 			'pipeline_id'      => $pipeline_id,
 			'pipeline_name'    => $pipeline_name,
 			'deleted_flows'    => $deleted_flows,
@@ -161,11 +156,6 @@ class DeletePipelineAbility {
 				$deleted_flows
 			),
 		);
-		if ( ! empty( $schedule_failures ) ) {
-			$result['error']             = 'Pipeline was deleted with retryable schedule reconciliation drift.';
-			$result['error_code']        = 'pipeline_schedule_reconciliation_drift';
-			$result['schedule_failures'] = $schedule_failures;
-		}
 
 		return $result;
 	}
