@@ -85,7 +85,6 @@ class CheckVenuesCommand {
 	 * : Focused report instead of the full check. 'conflicts' groups
 	 * still-unresolved geographic-conflict candidates by venue name (#806).
 	 * ---
-	 * default: <empty>
 	 * options:
 	 *   - conflicts
 	 * ---
