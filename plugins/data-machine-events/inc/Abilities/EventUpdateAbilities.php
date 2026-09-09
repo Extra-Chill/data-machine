@@ -524,9 +524,10 @@ class EventUpdateAbilities {
 
 			if ( ! empty( array_diff( $updated_fields, array( 'venue' ) ) ) ) {
 				$blocks[ $block_index ]['attrs'] = $new_attrs;
-				$new_content                     = serialize_blocks( $blocks );
-				$dates_error                     = null;
-				$capture_dates_error             = static function ( \WP_Error $error, int $failed_post_id ) use ( &$dates_error, $post_id ): void {
+				/** @var array<int, array{blockName: string|null, attrs: array<string,mixed>, innerBlocks: array<int,array>, innerHTML: string, innerContent: array<int,string|null>}> $blocks Same shape parse_blocks() returns; restated because the by-reference inner-block and attrs writes above lose the element shape to static analysis (runtime shape is unchanged). */
+				$new_content         = serialize_blocks( $blocks );
+				$dates_error         = null;
+				$capture_dates_error = static function ( \WP_Error $error, int $failed_post_id ) use ( &$dates_error, $post_id ): void {
 					if ( $post_id === $failed_post_id ) {
 						$dates_error = $error;
 					}
@@ -663,10 +664,6 @@ class EventUpdateAbilities {
 				}
 			}
 
-			if ( 'description' === $field ) {
-				$value = wp_kses_post( $value );
-			}
-
 			if ( 'ticketUrl' === $field ) {
 				$value = esc_url_raw( $value );
 			}
@@ -778,6 +775,14 @@ class EventUpdateAbilities {
 					'error'   => $result,
 				);
 			}
+
+			if ( false === $result ) {
+				return array(
+					'success' => false,
+					'warning' => 'Failed to assign venue: wp_set_post_terms returned false.',
+					'error'   => new \WP_Error( 'event_venue_assignment_failed', 'wp_set_post_terms returned false.' ),
+				);
+			}
 			$result = array_values( array_unique( array_filter( array_map( 'absint', $result ) ) ) );
 
 			return array( 'success' => true );
@@ -789,7 +794,7 @@ class EventUpdateAbilities {
 			 * @param int[]           $next_venue_ids     Requested venue term IDs.
 			 * @param int[]           $previous_venue_ids Previously assigned venue term IDs.
 			 * @param string          $context            Mutation context.
-			 * @param int[]|\WP_Error|null $result         Canonical assigned term-taxonomy IDs, an error, or null.
+			 * @param int[]|false|\WP_Error|null $result Canonical assigned term-taxonomy IDs, false on failure, an error, or null.
 			 */
 			do_action(
 				'datamachine_events_after_event_venue_mutation',
@@ -911,7 +916,9 @@ class EventUpdateAbilities {
 		}
 		$this->source_transaction_active = true;
 		$locked                          = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE ID = %d FOR UPDATE", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Exact event transaction lock.
-		if ( $post_id !== (int) $locked || '' !== (string) $wpdb->last_error ) {
+		/** @var string $lock_error The shared wpdb stub pins this property to the literal '' default; at runtime it carries the last DB error. */
+		$lock_error = $wpdb->last_error;
+		if ( $post_id !== (int) $locked || '' !== $lock_error ) {
 			$rollback = $this->rollbackSourceTransaction( $post_id );
 			return is_wp_error( $rollback ) ? $rollback : $this->sourceTransactionError( 'source_event_lock_failed', 'The source-owned event could not be locked.' );
 		}
@@ -1229,6 +1236,9 @@ class EventUpdateAbilities {
 
 		$description = wp_kses_post( $description );
 		$paragraphs  = preg_split( '/<\/p>\s*<p[^>]*>|<\/p>\s*<p>|\n\n+/', $description );
+		if ( false === $paragraphs || array() === $paragraphs ) {
+			return array();
+		}
 
 		$blocks = array();
 		foreach ( $paragraphs as $para ) {

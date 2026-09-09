@@ -287,7 +287,7 @@ class Event_Post_Type {
 
 		global $wp_query;
 
-		if ( ! $wp_query->is_404() ) {
+		if ( ! $wp_query instanceof \WP_Query || ! $wp_query->is_404() ) {
 			return;
 		}
 
@@ -302,7 +302,7 @@ class Event_Post_Type {
 				// extract the leaf slug for lookup.
 				$slug = basename( $wp_query->query[ $taxonomy ] );
 				$term = get_term_by( 'slug', $slug, $taxonomy );
-				if ( $term && ! is_wp_error( $term ) ) {
+				if ( $term instanceof \WP_Term ) {
 					$wp_query->is_404     = false;
 					$wp_query->is_tax     = true;
 					$wp_query->is_archive = true;
@@ -407,7 +407,11 @@ class Event_Post_Type {
 		if ( isset( $submenu[ $post_type_menu ] ) ) {
 			foreach ( $submenu[ $post_type_menu ] as $key => $menu_item ) {
 				if ( strpos( $menu_item[2], 'taxonomy=' ) !== false ) {
-					parse_str( wp_parse_url( $menu_item[2], PHP_URL_QUERY ), $query_vars );
+					$menu_query = wp_parse_url( $menu_item[2], PHP_URL_QUERY );
+					if ( ! is_string( $menu_query ) ) {
+						continue;
+					}
+					parse_str( $menu_query, $query_vars );
 					$taxonomy = $query_vars['taxonomy'] ?? '';
 
 					if ( $taxonomy && ! isset( $allowed_items[ $taxonomy ] ) ) {

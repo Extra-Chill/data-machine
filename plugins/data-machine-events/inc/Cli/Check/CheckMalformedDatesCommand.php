@@ -81,7 +81,7 @@ class CheckMalformedDatesCommand {
 		$total = count( $zero_rows ) + count( $block_placeholders );
 
 		if ( 'json' === $format ) {
-			\WP_CLI::log( wp_json_encode(
+			\WP_CLI::log( (string) wp_json_encode(
 				array(
 					'zero_date_rows'     => $zero_rows,
 					'block_placeholders' => $block_placeholders,

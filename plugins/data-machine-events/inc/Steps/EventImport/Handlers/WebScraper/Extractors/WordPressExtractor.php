@@ -58,7 +58,7 @@ class WordPressExtractor extends BaseExtractor {
 	public function extract( string $html, string $source_url ): array {
 		// Skip domains with non-functional Tribe installations
 		$host = wp_parse_url( $source_url, PHP_URL_HOST );
-		$host = preg_replace( '/^www\./', '', $host );
+		$host = is_string( $host ) ? preg_replace( '/^www\./', '', $host ) : '';
 		if ( in_array( $host, self::SKIP_DOMAINS, true ) ) {
 			return array();
 		}
@@ -205,7 +205,7 @@ class WordPressExtractor extends BaseExtractor {
 		}
 
 		// Array of events
-		if ( is_array( $response ) && ! empty( $response ) && isset( $response[0]['id'] ) ) {
+		if ( ! empty( $response ) && isset( $response[0]['id'] ) ) {
 			// Tribe via WP REST: has _EventStartDate meta
 			if ( isset( $response[0]['start_date'] ) || isset( $response[0]['meta']['_EventStartDate'] ) ) {
 				return 'tribe_wp';
@@ -224,7 +224,7 @@ class WordPressExtractor extends BaseExtractor {
 			return $response['events'] ?? array();
 		}
 
-		if ( is_array( $response ) && ! empty( $response ) && isset( $response[0] ) ) {
+		if ( ! empty( $response ) && isset( $response[0] ) ) {
 			return $response;
 		}
 
@@ -436,8 +436,7 @@ class WordPressExtractor extends BaseExtractor {
 
 		$image_url = $event['_embedded']['wp:featuredmedia'][0]['source_url']
 			?? $event['image']['url']
-			?? ( is_string( $event['image'] ?? null ) ? $event['image'] : '' )
-			?? '';
+			?? ( is_string( $event['image'] ?? null ) ? $event['image'] : '' );
 
 		return array(
 			'title'        => sanitize_text_field( $title ),

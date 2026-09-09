@@ -57,7 +57,8 @@ class EventRenderer {
 		if ( empty( $paged_date_groups ) && empty( $deferred_dates ) ) {
 			ob_start();
 			Template_Loader::include_template( 'no-events' );
-			return ob_get_clean();
+			$html = ob_get_clean();
+			return is_string( $html ) ? $html : '';
 		}
 
 		ob_start();
@@ -127,7 +128,10 @@ class EventRenderer {
 
 		// Render deferred date groups (progressive mode — shells only, loaded via REST on scroll).
 		foreach ( $deferred_dates as $date_string ) {
-			$date_obj             = date_create( $date_string, wp_timezone() );
+			$date_obj = date_create( $date_string, wp_timezone() );
+			if ( ! $date_obj ) {
+				continue;
+			}
 			$day_of_week          = strtolower( $date_obj->format( 'l' ) );
 			$formatted_date_label = $date_obj->format( 'l, F jS' );
 			$event_count          = $events_per_date[ $date_string ] ?? 0;
@@ -147,7 +151,8 @@ class EventRenderer {
 			echo '</div><!-- .data-machine-date-group -->';
 		}
 
-		return ob_get_clean();
+		$html = ob_get_clean();
+		return is_string( $html ) ? $html : '';
 	}
 
 	/**
@@ -221,7 +226,7 @@ class EventRenderer {
 				</div>
 			</div>',
 			esc_attr( implode( ' ', $item_classes ) ),
-			esc_attr( wp_json_encode( $placeholder_data ) )
+			esc_attr( (string) wp_json_encode( $placeholder_data ) )
 		);
 	}
 }

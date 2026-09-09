@@ -139,7 +139,7 @@ final class MonthGridBuilder {
 			'next_month'   => $first->modify( '+1 month' )->format( 'Y-m' ),
 			'today_month'  => self::today_month( $today_date ),
 			'rows'         => $rows,
-			'weekday_keys' => array_values( self::DAYS_OF_WEEK ),
+			'weekday_keys' => self::DAYS_OF_WEEK,
 		);
 	}
 
@@ -269,7 +269,7 @@ final class MonthGridBuilder {
 		}
 		unset( $ribbon );
 
-		return array_values( $ribbons_by_post );
+		return $ribbons_by_post;
 	}
 
 	/**
@@ -324,7 +324,7 @@ final class MonthGridBuilder {
 			'span'            => $span,
 			'continues_left'  => $continues_left,
 			'continues_right' => $continues_right,
-			'day_of_week'     => self::DAYS_OF_WEEK[ $dow_index ] ?? '',
+			'day_of_week'     => self::DAYS_OF_WEEK[ $dow_index ],
 		);
 	}
 
@@ -368,7 +368,7 @@ final class MonthGridBuilder {
 			'next_month'   => '',
 			'today_month'  => self::today_month( $today_date ),
 			'rows'         => array(),
-			'weekday_keys' => array_values( self::DAYS_OF_WEEK ),
+			'weekday_keys' => self::DAYS_OF_WEEK,
 		);
 	}
 

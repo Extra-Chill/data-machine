@@ -47,7 +47,9 @@ class UpdateEventCommand {
 	 * @param array $assoc_args Named arguments.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+		// wp-cli stubs unconditionally define WP_CLI, so static analysis cannot
+		// see this guard; argv distinguishes the real CLI runtime.
+		if ( empty( $_SERVER['argv'] ) ) {
 			return;
 		}
 
@@ -74,6 +76,11 @@ class UpdateEventCommand {
 
 		$abilities = new EventUpdateAbilities();
 		$result    = $this->executeUpdate( $abilities, $event_ids, $fields );
+
+		if ( $result instanceof \WP_Error ) {
+			\WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		if ( isset( $result['error'] ) ) {
 			\WP_CLI::error( $result['error'] );
@@ -138,7 +145,7 @@ class UpdateEventCommand {
 		return $fields;
 	}
 
-	private function executeUpdate( EventUpdateAbilities $abilities, array $event_ids, array $fields ): array {
+	private function executeUpdate( EventUpdateAbilities $abilities, array $event_ids, array $fields ): array|\WP_Error {
 		if ( count( $event_ids ) === 1 ) {
 			$params          = $fields;
 			$params['event'] = $event_ids[0];
@@ -156,7 +163,7 @@ class UpdateEventCommand {
 	}
 
 	private function outputJson( array $data ): void {
-		\WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT ) );
+		\WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT ) );
 	}
 
 	private function outputTable( array $data ): void {

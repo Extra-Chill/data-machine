@@ -93,7 +93,7 @@ class SettingsAbilities {
 				),
 				'execute_callback'    => array( $this, 'executeGetSettings' ),
 				'permission_callback' => function () {
-					return current_user_can( 'manage_options' ) || ( defined( 'WP_CLI' ) && WP_CLI );
+					return current_user_can( 'manage_options' ) || ( defined( 'WP_CLI' ) && ! empty( $_SERVER['argv'] ) );
 				},
 				'meta'                => array( 'show_in_rest' => true ),
 			)
@@ -161,7 +161,7 @@ class SettingsAbilities {
 				),
 				'execute_callback'    => array( $this, 'executeUpdateSetting' ),
 				'permission_callback' => function () {
-					return current_user_can( 'manage_options' ) || ( defined( 'WP_CLI' ) && WP_CLI );
+					return current_user_can( 'manage_options' ) || ( defined( 'WP_CLI' ) && ! empty( $_SERVER['argv'] ) );
 				},
 				'meta'                => array( 'show_in_rest' => true ),
 			)

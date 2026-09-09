@@ -362,7 +362,7 @@ class EventsByTermAbilities {
 		}
 
 		$permalink = get_permalink( $post_id );
-		if ( ! $permalink || is_wp_error( $permalink ) ) {
+		if ( empty( $permalink ) ) {
 			return null;
 		}
 

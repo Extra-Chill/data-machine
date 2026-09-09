@@ -84,12 +84,10 @@ class DateTimeParser {
 	private static function siteTimezoneName(): string {
 		if ( function_exists( 'wp_timezone' ) ) {
 			try {
-				$tz = wp_timezone();
-				if ( $tz instanceof DateTimeZone ) {
-					$name = $tz->getName();
-					if ( self::isValidTimezone( $name ) ) {
-						return $name;
-					}
+				$tz   = wp_timezone();
+				$name = $tz->getName();
+				if ( self::isValidTimezone( $name ) ) {
+					return $name;
 				}
 			} catch ( Exception $e ) {
 				// Fall through to UTC.
@@ -162,7 +160,7 @@ class DateTimeParser {
 
 			$result['date']     = $dt->format( 'Y-m-d' );
 			$result['time']     = $dt->format( 'H:i' );
-			$result['timezone'] = $tz ? $tz->getName() : '';
+			$result['timezone'] = $tz->getName();
 		} catch ( Exception $e ) {
 			// Invalid datetime format, return empty result
 		}
@@ -208,7 +206,7 @@ class DateTimeParser {
 			}
 
 			$tz      = $dt->getTimezone();
-			$tz_name = $tz ? $tz->getName() : '';
+			$tz_name = $tz->getName();
 
 			$result['date']     = $dt->format( 'Y-m-d' );
 			$result['time']     = $dt->format( 'H:i' );
@@ -248,7 +246,7 @@ class DateTimeParser {
 				: null;
 			$dt              = new DateTime( $datetime, $constructor_tz );
 			$tz              = $dt->getTimezone();
-			$tz_name         = $tz ? $tz->getName() : '';
+			$tz_name         = $tz->getName();
 
 			if ( null !== $constructor_tz ) {
 				$tz_name = $fallback_timezone;

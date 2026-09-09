@@ -387,7 +387,7 @@ class EventHealthAbilities {
 
 		foreach ( $blocks as $block ) {
 			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
-				return $block['attrs'] ?? array();
+				return $block['attrs'];
 			}
 		}
 

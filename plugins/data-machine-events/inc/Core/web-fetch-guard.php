@@ -99,8 +99,8 @@ function blocked_web_fetch_hosts(): array {
  *
  * @param false|array|\WP_Error $preempt Short-circuit return value. Default false.
  * @param array                 $args    HTTP request arguments.
- * @param string                $url     The request URL.
- * @return false|\WP_Error False to allow the request, WP_Error to block it.
+ * @param mixed                 $url     The request URL (string when delivered by the HTTP API).
+ * @return false|array|\WP_Error Passthrough of any earlier short-circuit, false to allow the request, WP_Error to block it.
  */
 function block_ticketing_web_fetch( $preempt, $args, $url ) {
 	// Respect any earlier short-circuit.

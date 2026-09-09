@@ -39,7 +39,7 @@ add_action(
 			'data-machine-events-venue-autocomplete',
 			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-autocomplete.js',
 			array( 'jquery' ),
-			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js' ),
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-autocomplete.js' ),
 			true
 		);
 
@@ -58,7 +58,7 @@ add_action(
 			'data-machine-events-venue-selector',
 			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/venue-selector.js',
 			array( 'jquery', 'data-machine-events-venue-autocomplete' ),
-			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-selector.js' ),
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/venue-selector.js' ),
 			true
 		);
 
@@ -77,7 +77,7 @@ add_action(
 			'data-machine-events-venue-autocomplete',
 			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/css/venue-autocomplete.css',
 			array(),
-			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css' )
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/css/venue-autocomplete.css' )
 		);
 
 		// Enqueue pipeline hooks JavaScript (extends core React via @wordpress/hooks)
@@ -85,7 +85,7 @@ add_action(
 			'data-machine-events-pipeline-hooks',
 			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/pipeline-hooks.js',
 			array( 'datamachine-pipelines-react', 'wp-hooks', 'wp-api-fetch' ),
-			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-hooks.js' ),
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-hooks.js' ),
 			true
 		);
 
@@ -94,7 +94,7 @@ add_action(
 			'data-machine-events-pipeline-components',
 			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/pipeline-components.js',
 			array( 'datamachine-pipelines-react', 'wp-element', 'wp-components', 'wp-hooks', 'wp-i18n' ),
-			filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-components.js' ),
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/pipeline-components.js' ),
 			true
 		);
 	}

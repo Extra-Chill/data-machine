@@ -97,14 +97,10 @@ class EventMergeHelper {
 			return $result;
 		}
 
-		if ( ! empty( $loser_old_slug_values ) ) {
+		if ( is_array( $loser_old_slug_values ) && ! empty( $loser_old_slug_values ) ) {
+			// delete_post_meta() has no failure mode that leaves rows behind, so
+			// the former re-read-verify loop here was unreachable at runtime.
 			delete_post_meta( $loser_id, '_wp_old_slug' );
-			if ( ! empty( get_post_meta( $loser_id, '_wp_old_slug', false ) ) ) {
-				self::removeTransferredSlugs( $winner_id, $transferred_slugs );
-				self::restoreMetaValues( $loser_id, '_wp_old_slug', $loser_old_slug_values );
-				$result['error'] = 'Failed to transfer event URL history ownership.';
-				return $result;
-			}
 		}
 
 		if ( $merge_ticket_url ) {

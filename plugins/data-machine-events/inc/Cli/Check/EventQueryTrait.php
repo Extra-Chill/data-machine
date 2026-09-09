@@ -57,7 +57,7 @@ trait EventQueryTrait {
 
 		foreach ( $blocks as $block ) {
 			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
-				return $block['attrs'] ?? array();
+				return $block['attrs'];
 			}
 		}
 
@@ -157,7 +157,7 @@ trait EventQueryTrait {
 	 */
 	private function output_results( array $items, string $format, array $columns = array( 'ID', 'Title', 'Date', 'Venue' ) ): void {
 		if ( 'json' === $format ) {
-			\WP_CLI::log( wp_json_encode( $items, JSON_PRETTY_PRINT ) );
+			\WP_CLI::log( (string) wp_json_encode( $items, JSON_PRETTY_PRINT ) );
 			return;
 		}
 

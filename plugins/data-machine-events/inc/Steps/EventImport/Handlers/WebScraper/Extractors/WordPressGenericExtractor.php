@@ -539,7 +539,7 @@ class WordPressGenericExtractor extends BaseExtractor {
 			if ( preg_match( '/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t)?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:,\s*(\d{4}))?\b/i', $text, $dm ) ) {
 				$month_name = $dm[1];
 				$day        = $dm[2];
-				$year       = isset( $dm[3] ) && '' !== $dm[3] ? (int) $dm[3] : 0;
+				$year       = ! empty( $dm[3] ) ? (int) $dm[3] : 0;
 				if ( $year > 0 ) {
 					try {
 						$dt         = new \DateTime( sprintf( '%s %d %d', $month_name, (int) $day, $year ) );

@@ -47,7 +47,7 @@ $context = array(
 
 if ( is_tax() ) {
 	$queried = get_queried_object();
-	if ( $queried && isset( $queried->term_id ) ) {
+	if ( $queried instanceof \WP_Term ) {
 		$context['is_taxonomy'] = true;
 		$context['taxonomy']    = $queried->taxonomy;
 		$context['term_id']     = $queried->term_id;
@@ -185,9 +185,9 @@ $hide_label = __( 'Hide map', 'data-machine-events' );
 		data-default-collapsed="1"
 		<?php endif; ?>
 		<?php endif; ?>
-		data-height="<?php echo esc_attr( $height ); ?>"
+		data-height="<?php echo esc_attr( (string) $height ); ?>"
 		data-sync-id="<?php echo esc_attr( $sync_id ); ?>"
-		data-zoom="<?php echo esc_attr( $zoom ); ?>"
+		data-zoom="<?php echo esc_attr( (string) $zoom ); ?>"
 		data-map-type="<?php echo esc_attr( $map_type ); ?>"
 		data-center-lat="<?php echo esc_attr( $center['lat'] ?? '' ); ?>"
 		data-center-lon="<?php echo esc_attr( $center['lon'] ?? '' ); ?>"
@@ -196,7 +196,7 @@ $hide_label = __( 'Hide map', 'data-machine-events' );
 		data-user-lon="<?php echo esc_attr( $user_location['lon'] ); ?>"
 		<?php endif; ?>
 		data-taxonomy="<?php echo esc_attr( $context['taxonomy'] ); ?>"
-		data-term-id="<?php echo esc_attr( $context['term_id'] ); ?>"
+		data-term-id="<?php echo esc_attr( (string) $context['term_id'] ); ?>"
 		data-rest-url="<?php echo esc_attr( $rest_url ); ?>"
 		<?php if ( $show_location_search ) : ?>
 		data-show-location-search="1"
@@ -216,7 +216,8 @@ $hide_label = __( 'Hide map', 'data-machine-events' );
 	/**
 	 * Fires after the map summary, inside the block wrapper.
 	 *
-	 * @param array $context Map context with taxonomy/term info.
+	 * @param array $attributes First hook argument (unused; always an empty array here).
+	 * @param array $context    Map context with taxonomy/term info.
 	 */
 	do_action( 'data_machine_events_map_after_summary', array(), $context );
 	?>

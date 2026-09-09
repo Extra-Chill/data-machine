@@ -57,7 +57,11 @@ final class CalendarOccurrenceArtifact {
 			return false;
 		}
 
-		if ( ! is_readable( $file ) || ! hash_equals( (string) ( $manifest['sha256'] ?? '' ), hash_file( 'sha256', $file ) ) ) {
+		if ( ! is_readable( $file ) ) {
+			return false;
+		}
+		$fixture_hash = hash_file( 'sha256', $file );
+		if ( ! is_string( $fixture_hash ) || ! hash_equals( (string) ( $manifest['sha256'] ?? '' ), $fixture_hash ) ) {
 			return false;
 		}
 

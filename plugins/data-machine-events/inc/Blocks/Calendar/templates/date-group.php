@@ -15,7 +15,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$events_count = $events_count ?? 0;
 ?>
 
 <?php
@@ -26,7 +25,7 @@ $events_count = $events_count ?? 0;
  * Note: The closing </div> is handled separately in the render.php loop.
  */
 ?>
-<div class="data-machine-date-group data-machine-day-<?php echo esc_attr( $day_of_week ); ?>" data-date="<?php echo esc_attr( $date_obj->format( 'Y-m-d' ) ); ?>" data-event-count="<?php echo esc_attr( $events_count ); ?>">
+<div class="data-machine-date-group data-machine-day-<?php echo esc_attr( $day_of_week ); ?>" data-date="<?php echo esc_attr( $date_obj->format( 'Y-m-d' ) ); ?>" data-event-count="<?php echo esc_attr( (string) $events_count ); ?>">
 	<div class="data-machine-day-header">
 		<div class="data-machine-day-badge data-machine-day-badge-<?php echo esc_attr( $day_of_week ); ?>" 
 			data-date-label="<?php echo esc_attr( $formatted_date_label ); ?>" 

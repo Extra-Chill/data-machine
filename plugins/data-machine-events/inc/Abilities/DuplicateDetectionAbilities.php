@@ -194,7 +194,7 @@ class DuplicateDetectionAbilities {
 			'post_id'        => $match['post_id'] ?? 0,
 			'matched_title'  => $match['title'] ?? '',
 			'matched_venue'  => '',
-			'match_strategy' => $result['strategy'] ?? 'event_date_query',
+			'match_strategy' => $result['strategy'],
 		);
 	}
 }

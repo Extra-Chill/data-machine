@@ -167,9 +167,13 @@ class NominatimClient {
 		$cache_key = self::CACHE_PREFIX . md5( strtolower( $query ) );
 		$cached    = get_transient( $cache_key );
 
-		if ( false !== $cached && is_array( $cached ) ) {
-			$cached['cached'] = true;
-			return $cached;
+		if ( false !== $cached && is_array( $cached ) && isset( $cached['lat'], $cached['lng'], $cached['display_name'] ) ) {
+			return array(
+				'lat'          => (string) $cached['lat'],
+				'lng'          => (string) $cached['lng'],
+				'display_name' => (string) $cached['display_name'],
+				'cached'       => true,
+			);
 		}
 
 		$url = add_query_arg(

@@ -1282,7 +1282,8 @@ class EventDateQueryAbilities {
 			// datetime range so MySQL can use the start_datetime index.
 			if ( ! empty( $date_match ) ) {
 				$start             = $date_match . ' 00:00:00';
-				$end               = gmdate( 'Y-m-d H:i:s', strtotime( $start . ' +1 day' ) );
+				$end_ts            = strtotime( $start . ' +1 day' );
+				$end               = false !== $end_ts ? gmdate( 'Y-m-d H:i:s', $end_ts ) : '';
 				$clauses['where'] .= $wpdb->prepare( ' AND ed.start_datetime >= %s AND ed.start_datetime < %s', $start, $end );
 			} elseif ( ! empty( $date_start ) || ! empty( $date_end ) ) {
 				// Explicit date range — delegates to UpcomingFilter.
@@ -1338,7 +1339,7 @@ class EventDateQueryAbilities {
 
 		$dates     = EventDatesTable::get( (int) $post->ID );
 		$permalink = get_permalink( $post );
-		if ( ! $dates || ! is_string( $permalink ) ) {
+		if ( ! $dates || empty( $permalink ) ) {
 			return null;
 		}
 
@@ -1378,7 +1379,7 @@ class EventDateQueryAbilities {
 			if ( __CLASS__ === $class || 'WP_Query' === $class ) {
 				continue;
 			}
-			$caller = $class . '::' . ( $frame['function'] ?? 'unknown' );
+			$caller = $class . '::' . $frame['function'];
 			break;
 		}
 

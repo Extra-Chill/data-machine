@@ -67,7 +67,9 @@ class EncodingFixCommand {
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+		// wp-cli stubs unconditionally define WP_CLI, so static analysis cannot
+		// see this guard; argv distinguishes the real CLI runtime.
+		if ( empty( $_SERVER['argv'] ) ) {
 			return;
 		}
 
@@ -91,12 +93,17 @@ class EncodingFixCommand {
 			)
 		);
 
+		if ( $result instanceof \WP_Error ) {
+			\WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
 		if ( isset( $result['error'] ) ) {
 			\WP_CLI::error( $result['error'] );
 		}
 
 		if ( 'json' === $format ) {
-			\WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE ) );
+			\WP_CLI::log( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE ) );
 			return;
 		}
 

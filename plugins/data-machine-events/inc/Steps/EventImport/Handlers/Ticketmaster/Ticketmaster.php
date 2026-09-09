@@ -167,7 +167,7 @@ class Ticketmaster extends EventImportHandler {
 		$context->log( 'info', 'Ticketmaster: Starting event import' );
 
 		$auth = $this->getAuthProvider( 'ticketmaster' );
-		if ( ! $auth ) {
+		if ( ! $auth || ! method_exists( $auth, 'get_account' ) ) {
 			$context->log( 'error', 'Ticketmaster: Authentication provider not found' );
 			return array();
 		}
@@ -334,8 +334,8 @@ class Ticketmaster extends EventImportHandler {
 		$claimed_items  = array();
 
 		foreach ( $eligible_items as $item ) {
-			$item_id    = (string) ( $item['metadata']['source_item_id'] ?? '' );
-			$revision   = (string) ( $item['metadata']['source_revision'] ?? '' );
+			$item_id    = (string) $item['metadata']['source_item_id'];
+			$revision   = (string) $item['metadata']['source_revision'];
 			$source_ref = (string) ( $item['metadata']['_engine_data']['ticketUrl'] ?? '' );
 			$claim      = $context->claimItemOwnership(
 				TicketmasterSourceIdentity::CLAIM_SCOPE,
@@ -680,9 +680,7 @@ class Ticketmaster extends EventImportHandler {
 			}
 
 			++$attempt;
-		} while ( $attempt <= self::RATE_LIMIT_MAX_RETRIES );
-
-		return $result;
+		} while ( true );
 	}
 
 	/**
@@ -724,14 +722,14 @@ class Ticketmaster extends EventImportHandler {
 	private function rate_limit_backoff_seconds( array $result, int $attempt ): int {
 		$retry_after = $this->retry_after_seconds( $result );
 		if ( null !== $retry_after ) {
-			return min( max( $retry_after, 0 ), self::RATE_LIMIT_BACKOFF_MAX_SECONDS );
+			return (int) min( max( $retry_after, 0 ), self::RATE_LIMIT_BACKOFF_MAX_SECONDS );
 		}
 
 		$base   = self::RATE_LIMIT_BACKOFF_BASE_SECONDS * ( 2 ** $attempt );
 		$base   = min( $base, self::RATE_LIMIT_BACKOFF_MAX_SECONDS );
 		$jitter = wp_rand( 0, 1 );
 
-		return min( $base + $jitter, self::RATE_LIMIT_BACKOFF_MAX_SECONDS );
+		return (int) min( $base + $jitter, self::RATE_LIMIT_BACKOFF_MAX_SECONDS );
 	}
 
 	/**

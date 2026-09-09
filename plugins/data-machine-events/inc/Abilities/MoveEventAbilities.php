@@ -277,9 +277,6 @@ class MoveEventAbilities {
 		}
 
 		$term = reset( $terms );
-		if ( ! $term instanceof \WP_Term ) {
-			return null;
-		}
 
 		return array(
 			'id'   => (int) $term->term_id,

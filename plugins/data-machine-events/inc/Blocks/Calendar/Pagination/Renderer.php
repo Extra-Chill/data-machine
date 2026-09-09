@@ -37,7 +37,7 @@ class Renderer {
 		}
 
 		// Preserve all GET parameters except 'paged'
-		$get_params = isset( $_GET ) ? self::sanitize_query_params( wp_unslash( $_GET ) ) : array();
+		$get_params = self::sanitize_query_params( wp_unslash( $_GET ) );
 		unset( $get_params['paged'] );
 		// Build default pagination arguments
 		$pagination_args = array(
@@ -78,7 +78,7 @@ class Renderer {
 		$pagination_links = paginate_links( $pagination_args );
 
 		// Only render if pagination links were generated
-		if ( empty( $pagination_links ) || trim( $pagination_links ) === '' ) {
+		if ( ! is_string( $pagination_links ) || '' === trim( $pagination_links ) ) {
 			return '';
 		}
 
@@ -112,6 +112,6 @@ class Renderer {
 			return array_map( array( self::class, 'sanitize_query_params' ), $value );
 		}
 
-		return is_scalar( $value ) ? sanitize_text_field( $value ) : $value;
+		return is_scalar( $value ) ? sanitize_text_field( (string) $value ) : $value;
 	}
 }

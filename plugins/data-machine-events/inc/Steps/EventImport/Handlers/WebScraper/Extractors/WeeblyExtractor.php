@@ -585,7 +585,7 @@ class WeeblyExtractor extends BaseExtractor {
 		}
 
 		$parts = explode( ' ', trim( $clean ), 2 );
-		$month = $parts[0] ?? '';
+		$month = $parts[0];
 		$day   = $parts[1] ?? '';
 
 		if ( empty( $month ) || empty( $day ) ) {

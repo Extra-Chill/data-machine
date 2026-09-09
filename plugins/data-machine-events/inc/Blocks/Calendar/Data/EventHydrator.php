@@ -37,7 +37,7 @@ class EventHydrator {
 
 		foreach ( $blocks as $block ) {
 			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
-				$event_data = $block['attrs'] ?? array();
+				$event_data = $block['attrs'];
 				break;
 			}
 		}

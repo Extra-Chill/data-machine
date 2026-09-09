@@ -45,6 +45,14 @@ class VenueHealthCheck extends BaseTool {
 		$abilities = new VenueAbilities();
 		$result    = $abilities->executeHealthCheck( $parameters );
 
+		if ( $result instanceof \WP_Error ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'venue_health_check',
+			);
+		}
+
 		if ( isset( $result['error'] ) ) {
 			return array(
 				'success'   => false,

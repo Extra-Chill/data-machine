@@ -212,7 +212,7 @@ abstract class BaseExtractor implements ExtractorInterface {
 		foreach ( $patterns as $pattern ) {
 			if ( preg_match( $pattern, $text, $matches ) ) {
 				$hour    = (int) $matches[1];
-				$minutes = isset( $matches[2] ) && '' !== $matches[2] ? $matches[2] : '00';
+				$minutes = ! empty( $matches[2] ) ? $matches[2] : '00';
 				$period  = strtoupper( $matches[3] );
 
 				if ( 'PM' === $period && $hour < 12 ) {

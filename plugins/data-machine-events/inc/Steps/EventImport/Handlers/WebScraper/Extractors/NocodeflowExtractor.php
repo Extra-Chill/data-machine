@@ -113,10 +113,8 @@ class NocodeflowExtractor extends BaseExtractor {
 		$start_time = '';
 
 		if ( ! empty( $date_attr ) ) {
-			$parts = explode( 'T', $date_attr );
-			if ( count( $parts ) >= 1 ) {
-				$start_date = $parts[0];
-			}
+			$parts      = explode( 'T', $date_attr );
+			$start_date = $parts[0];
 		}
 
 		// Always use the display time text for the time component.

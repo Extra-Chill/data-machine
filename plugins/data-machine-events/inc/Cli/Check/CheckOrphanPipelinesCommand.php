@@ -163,7 +163,7 @@ class CheckOrphanPipelinesCommand {
 	 * which still have at least one flow referencing them.
 	 *
 	 * @param int $only_pipeline Optional single pipeline_id to restrict to.
-	 * @return array<int,object> Rows with pipeline_id, pipeline_name, flow_count.
+	 * @return list<array<string,mixed>> Rows with pipeline_id, pipeline_name, flow_count.
 	 */
 	private function find_broken_pipelines( int $only_pipeline = 0 ): array {
 		global $wpdb;
@@ -191,28 +191,36 @@ class CheckOrphanPipelinesCommand {
 		$prepared = empty( $params ) ? $sql : $wpdb->prepare( $sql, $params );
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$results = $wpdb->get_results( $prepared );
+		$results = $wpdb->get_results( $prepared, ARRAY_A );
 
-		return is_array( $results ) ? $results : array();
+		$rows = array();
+		if ( is_array( $results ) ) {
+			foreach ( $results as $row ) {
+				/** @var array<string, mixed> $row Each ARRAY_A row is an associative array. */
+				$rows[] = $row;
+			}
+		}
+
+		return $rows;
 	}
 
 	/**
 	 * Audit (and optionally repair) a single broken pipeline.
 	 *
-	 * @param object $candidate      Row from find_broken_pipelines().
+	 * @param array<string,mixed> $candidate Row from find_broken_pipelines().
 	 * @param bool   $dry_run        When true, do not write.
 	 * @param bool   $rebuild_config When true (and not dry-run), write the rebuilt config.
 	 * @return array<string,mixed> Result row for the output table.
 	 */
-	private function process_candidate( object $candidate, bool $dry_run, bool $rebuild_config ): array {
-		$pipeline_id = (int) $candidate->pipeline_id;
+	private function process_candidate( array $candidate, bool $dry_run, bool $rebuild_config ): array {
+		$pipeline_id = (int) $candidate['pipeline_id'];
 
 		$reconstructed = $this->reconstruct_config_from_flows( $pipeline_id );
 
 		$base = array(
 			'pipeline_id'       => $pipeline_id,
-			'pipeline_name'     => (string) $candidate->pipeline_name,
-			'flow_count'        => (int) $candidate->flow_count,
+			'pipeline_name'     => (string) $candidate['pipeline_name'],
+			'flow_count'        => (int) $candidate['flow_count'],
 			'steps_recoverable' => count( $reconstructed ),
 		);
 

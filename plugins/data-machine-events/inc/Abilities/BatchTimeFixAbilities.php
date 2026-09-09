@@ -170,10 +170,6 @@ class BatchTimeFixAbilities {
 
 		$events = $this->queryEvents( $venue_term_ids, $before, $after, $source_pattern, $where_time, $limit );
 
-		if ( is_wp_error( $events ) ) {
-			return new \WP_Error( 'query_failed', 'Query failed: ' . $events->get_error_message(), array( 'status' => 500 ) );
-		}
-
 		if ( empty( $events ) ) {
 			return array(
 				'dry_run'       => $dry_run,
@@ -300,7 +296,7 @@ class BatchTimeFixAbilities {
 			if ( ! $term ) {
 				$term = get_term_by( 'slug', sanitize_title( $name ), 'venue' );
 			}
-			if ( $term && ! is_wp_error( $term ) ) {
+			if ( $term instanceof \WP_Term ) {
 				$term_ids[] = $term->term_id;
 			}
 		}
@@ -317,9 +313,9 @@ class BatchTimeFixAbilities {
 	 * @param string $source_pattern Source URL pattern
 	 * @param string $where_time Filter by current time
 	 * @param int    $limit Maximum results
-	 * @return array|\WP_Error
+	 * @return array
 	 */
-	private function queryEvents( array $venue_term_ids, string $before, string $after, string $source_pattern, string $where_time, int $limit ): array|\WP_Error {
+	private function queryEvents( array $venue_term_ids, string $before, string $after, string $source_pattern, string $where_time, int $limit ): array {
 		$args = array(
 			'post_type'      => Event_Post_Type::POST_TYPE,
 			'post_status'    => 'publish',
@@ -347,7 +343,7 @@ class BatchTimeFixAbilities {
 		}
 
 		if ( ! empty( $source_pattern ) ) {
-			$args['meta_query']   = $args['meta_query'] ?? array();
+			$args['meta_query']   = array();
 			$args['meta_query'][] = array(
 				'key'     => '_datamachine_source_url',
 				'value'   => $source_pattern,
@@ -362,6 +358,9 @@ class BatchTimeFixAbilities {
 			$events = array_filter(
 				$events,
 				function ( $event ) use ( $where_time ) {
+					if ( ! $event instanceof \WP_Post ) {
+						return false;
+					}
 					$attrs      = $this->extractBlockAttributes( $event->ID );
 					$start_time = $attrs['startTime'] ?? '';
 					$normalized = $this->normalizeTime( $start_time );
@@ -390,7 +389,7 @@ class BatchTimeFixAbilities {
 		$blocks = parse_blocks( $post->post_content );
 		foreach ( $blocks as $block ) {
 			if ( self::BLOCK_NAME === $block['blockName'] ) {
-				return $block['attrs'] ?? array();
+				return $block['attrs'];
 			}
 		}
 
@@ -513,8 +512,10 @@ class BatchTimeFixAbilities {
 			return false;
 		}
 
-		$blocks[ $block_index ]['attrs']['startTime'] = $new_time;
-		$new_content                                  = serialize_blocks( $blocks );
+		$updated_block                       = $blocks[ $block_index ];
+		$updated_block['attrs']['startTime'] = $new_time;
+		$blocks[ $block_index ]              = $updated_block;
+		$new_content                         = serialize_blocks( $blocks );
 
 		$result = wp_update_post(
 			array(

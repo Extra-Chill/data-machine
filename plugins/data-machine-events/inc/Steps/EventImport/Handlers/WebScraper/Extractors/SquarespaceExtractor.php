@@ -38,13 +38,8 @@ class SquarespaceExtractor extends BaseExtractor {
 			}
 		}
 
-		// Defensive default so empty/missing $data still lets the HTML-based
-		// strategies (4, 7, 8, 9) run. Previously this method bailed early on
-		// empty $data, which prevented the new collection-deref strategies
-		// from firing on pages where ?format=json returns nothing useful.
-		if ( ! is_array( $data ) ) {
-			$data = array();
-		}
+		// The native array parameter guarantees $data is an array; the
+		// HTML-based strategies (4, 7, 8, 9) run on empty arrays as well.
 
 		$raw_items = $this->extractEventsFromCollection( $data );
 
@@ -1055,10 +1050,8 @@ class SquarespaceExtractor extends BaseExtractor {
 
 		// Parse addressLine2 for city, state, zip (format: "City, ST, ZIPCODE")
 		if ( ! empty( $location['addressLine2'] ) ) {
-			$parts = array_map( 'trim', explode( ',', $location['addressLine2'] ) );
-			if ( count( $parts ) >= 1 ) {
-				$event['venueCity'] = $this->sanitizeText( $parts[0] );
-			}
+			$parts              = array_map( 'trim', explode( ',', $location['addressLine2'] ) );
+			$event['venueCity'] = $this->sanitizeText( $parts[0] );
 			if ( count( $parts ) >= 2 ) {
 				$event['venueState'] = $this->sanitizeText( $parts[1] );
 			}
@@ -1125,7 +1118,7 @@ class SquarespaceExtractor extends BaseExtractor {
 	 */
 	private function parseSquarespaceTimestamp( $value, string $timezone ): array {
 		if ( is_numeric( $value ) ) {
-			return $this->parseUtcTimestamp( $value, $timezone );
+			return $this->parseUtcTimestamp( (string) $value, $timezone );
 		}
 
 		return $this->parseDatetime( (string) $value, $timezone );

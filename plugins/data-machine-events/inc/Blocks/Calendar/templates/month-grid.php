@@ -26,11 +26,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( empty( $grid ) || ! is_array( $grid ) ) {
+if ( empty( $grid ) ) {
 	return;
 }
 
-$base_url = isset( $base_url ) ? (string) $base_url : '';
+$base_url = (string) $base_url;
 
 $build_month_url = static function ( string $month_yyyymm ) use ( $base_url ): string {
 	if ( '' === $month_yyyymm ) {

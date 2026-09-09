@@ -24,10 +24,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class VisionExtractionProcessor {
 
-	private EventImportHandler $handler;
-
 	public function __construct( EventImportHandler $handler ) {
-		$this->handler = $handler;
+		// $handler retained for construction compatibility; no longer read internally.
+		unset( $handler );
 	}
 
 	/**

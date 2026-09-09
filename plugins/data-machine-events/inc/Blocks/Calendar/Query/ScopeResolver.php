@@ -199,9 +199,10 @@ class ScopeResolver {
 			);
 		}
 
+		$next_day_ts = strtotime( $display_day . ' +1 day' );
 		return array(
 			'date_start' => $display_day,
-			'date_end'   => gmdate( 'Y-m-d', strtotime( $display_day . ' +1 day' ) ),
+			'date_end'   => false !== $next_day_ts ? gmdate( 'Y-m-d', $next_day_ts ) : $display_day,
 			'time_start' => sprintf( '%02d:00:00', $cutoff ),
 			'time_end'   => sprintf( '%02d:59:59', $cutoff - 1 ),
 		);

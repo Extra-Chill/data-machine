@@ -63,7 +63,7 @@ class EventBlockContentBuilder {
 		$block_attributes = array_filter(
 			$block_attributes,
 			function ( $value ) {
-				return '' !== $value && null !== $value;
+				return '' !== $value;
 			}
 		);
 
@@ -96,6 +96,9 @@ class EventBlockContentBuilder {
 
 		// Split on closing/opening p tags or double line breaks
 		$paragraphs = preg_split( '/<\/p>\s*<p[^>]*>|<\/p>\s*<p>|\n\n+/', $description );
+		if ( false === $paragraphs ) {
+			return '';
+		}
 
 		$blocks = array();
 		foreach ( $paragraphs as $para ) {

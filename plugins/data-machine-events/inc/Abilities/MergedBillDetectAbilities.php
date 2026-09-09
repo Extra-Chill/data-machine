@@ -194,7 +194,7 @@ class MergedBillDetectAbilities {
 		usort(
 			$pairs,
 			static function ( $left, $right ) {
-				return ( $right['score'] ?? 0 ) <=> ( $left['score'] ?? 0 );
+				return $right['score'] <=> $left['score'];
 			}
 		);
 
@@ -227,8 +227,9 @@ class MergedBillDetectAbilities {
 		$tt             = $wpdb->term_relationships;
 		$tx             = $wpdb->term_taxonomy;
 
-		$now_mysql = current_time( 'mysql' );
-		$horizon   = gmdate( 'Y-m-d H:i:s', strtotime( $now_mysql . ' +' . $days_ahead . ' days' ) );
+		$now_mysql  = current_time( 'mysql' );
+		$horizon_ts = strtotime( $now_mysql . ' +' . $days_ahead . ' days' );
+		$horizon    = false !== $horizon_ts ? gmdate( 'Y-m-d H:i:s', $horizon_ts ) : '';
 
 		// Pull all candidate rows: upcoming published events with a venue
 		// term resolved. Use the identity index for title_hash + source_url
@@ -282,7 +283,7 @@ class MergedBillDetectAbilities {
 			}
 			$groups[] = array(
 				'key'  => $key,
-				'rows' => array_values( $bucket ),
+				'rows' => $bucket,
 			);
 		}
 
@@ -308,18 +309,18 @@ class MergedBillDetectAbilities {
 
 		// Matching canonical ticket identity (+5). Stable provider IDs remain
 		// authoritative when affiliate wrappers or lineup-derived slugs drift.
-		if ( $this->ticketIdentitiesMatch( $detail_a['ticket_url'] ?? '', $detail_b['ticket_url'] ?? '' ) ) {
+		if ( $this->ticketIdentitiesMatch( $detail_a['ticket_url'], $detail_b['ticket_url'] ) ) {
 			$signals['matching_ticket_identity'] = true;
 		}
 
 		// Mutual lineup mention (+5).
 		$mutual = $this->hasMutualLineupMention(
 			$a['title'],
-			$detail_a['performer'] ?? '',
-			$detail_a['body_text'] ?? '',
+			$detail_a['performer'],
+			$detail_a['body_text'],
 			$b['title'],
-			$detail_b['performer'] ?? '',
-			$detail_b['body_text'] ?? ''
+			$detail_b['performer'],
+			$detail_b['body_text']
 		);
 		if ( $mutual ) {
 			$signals['mutual_lineup_mention'] = true;
@@ -333,7 +334,7 @@ class MergedBillDetectAbilities {
 		}
 
 		// Matching price (+1).
-		if ( $this->pricesMatch( $detail_a['price'] ?? '', $detail_b['price'] ?? '' ) ) {
+		if ( $this->pricesMatch( $detail_a['price'], $detail_b['price'] ) ) {
 			$signals['matching_price'] = true;
 		}
 
@@ -491,7 +492,7 @@ class MergedBillDetectAbilities {
 		$blocks = parse_blocks( $post->post_content );
 		foreach ( $blocks as $block ) {
 			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
-				$attrs     = $block['attrs'] ?? array();
+				$attrs     = $block['attrs'];
 				$performer = (string) ( $attrs['performer'] ?? '' );
 				$price     = (string) ( $attrs['price'] ?? '' );
 

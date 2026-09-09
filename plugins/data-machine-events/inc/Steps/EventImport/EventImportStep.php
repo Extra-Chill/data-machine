@@ -124,10 +124,14 @@ class EventImportStep extends Step {
 
 			$result = $handler->get_fetch_data( $pipeline_id, $handler_config, (string) $this->job_id );
 
-			// Handle both processed_items format and direct DataPacket arrays
-			if ( isset( $result['processed_items'] ) && is_array( $result['processed_items'] ) ) {
+			// Handle both processed_items format and direct DataPacket arrays.
+			// Upstream get_fetch_data() can deliver either shape; its phpdoc does
+			// not capture the union, so the payload is validated as mixed.
+			/** @var mixed $processed_items */
+			$processed_items = $result['processed_items'] ?? null;
+			if ( is_array( $processed_items ) ) {
 				// Process items from processed_items format
-				foreach ( $result['processed_items'] as $item ) {
+				foreach ( $processed_items as $item ) {
 					if ( $item instanceof \DataMachine\Core\DataPacket ) {
 						$this->dataPackets = $item->addTo( $this->dataPackets );
 					}
@@ -136,14 +140,10 @@ class EventImportStep extends Step {
 			} elseif ( is_array( $result ) ) {
 				// Process direct DataPacket arrays (new standardized format)
 				foreach ( $result as $item ) {
-					if ( $item instanceof \DataMachine\Core\DataPacket ) {
-						$this->dataPackets = $item->addTo( $this->dataPackets );
-					}
+					$this->dataPackets = $item->addTo( $this->dataPackets );
 				}
 				return $this->dataPackets;
 			}
-
-			return $this->dataPackets;
 		}
 
 		// Legacy Handler Support (execute method)

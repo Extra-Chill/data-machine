@@ -267,8 +267,8 @@ class ShowareExtractor extends BaseExtractor {
 		$parsed = $this->parseIsoDatetime( $cleaned );
 
 		return array(
-			'date' => $parsed['date'] ?? '',
-			'time' => $parsed['time'] ?? '',
+			'date' => $parsed['date'],
+			'time' => $parsed['time'],
 		);
 	}
 

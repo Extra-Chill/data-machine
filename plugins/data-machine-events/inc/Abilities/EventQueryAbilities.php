@@ -191,6 +191,10 @@ class EventQueryAbilities {
 		$include_description = ! empty( $input['include_description'] );
 
 		foreach ( $query->posts as $post ) {
+			if ( ! $post instanceof \WP_Post ) {
+				continue;
+			}
+
 			$dates      = \DataMachineEvents\Core\EventDatesTable::get( $post->ID );
 			$start_date = $dates ? $dates->start_datetime : null;
 			$end_date   = $dates ? $dates->end_datetime : null;

@@ -106,7 +106,7 @@ class JsonApiPaginator implements PaginatorInterface {
 
 		$query['page'] = $page;
 
-		$url = ( $parsed['scheme'] ?? 'https' ) . '://' . $parsed['host'];
+		$url = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
 		if ( ! empty( $parsed['port'] ) ) {
 			$url .= ':' . $parsed['port'];
 		}

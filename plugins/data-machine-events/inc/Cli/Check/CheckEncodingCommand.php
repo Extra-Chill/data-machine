@@ -102,7 +102,7 @@ class CheckEncodingCommand {
 		$this->sort_by_date( $invalid_encoding, $scope );
 
 		if ( 'json' === $format ) {
-			\WP_CLI::log( wp_json_encode(
+			\WP_CLI::log( (string) wp_json_encode(
 				array(
 					'total_scanned'    => count( $events ),
 					'scope'            => $scope,

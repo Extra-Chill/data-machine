@@ -39,7 +39,9 @@ class GetVenueEventsCommand {
 	 * @param array $assoc_args Named arguments.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+		// wp-cli stubs unconditionally define WP_CLI, so static analysis cannot
+		// see this guard; argv distinguishes the real CLI runtime.
+		if ( empty( $_SERVER['argv'] ) ) {
 			return;
 		}
 
@@ -68,6 +70,11 @@ class GetVenueEventsCommand {
 
 		$abilities = new EventQueryAbilities();
 		$result    = $abilities->executeGetVenueEvents( $input );
+
+		if ( $result instanceof \WP_Error ) {
+			\WP_CLI::error( $result->get_error_message() );
+			return;
+		}
 
 		$this->outputResult( $result, $include_description );
 	}

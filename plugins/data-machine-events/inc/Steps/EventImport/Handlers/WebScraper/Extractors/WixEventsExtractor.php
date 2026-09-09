@@ -37,8 +37,6 @@ class WixEventsExtractor extends BaseExtractor {
 	/**
 	 * Statuses that indicate a usable (non-canceled) event.
 	 */
-	private const ACTIVE_STATUSES = array( 'ACTIVE', 'SCHEDULED', 'OPEN' );
-
 	public function canExtract( string $html ): bool {
 		return strpos( $html, 'id="wix-warmup-data"' ) !== false
 			|| strpos( $html, "id='wix-warmup-data'" ) !== false;

@@ -25,7 +25,7 @@ class Filters {
 	 * Get filter options with real-time cross-filtering and archive context support
 	 *
 	 * @param WP_REST_Request $request Request object with optional active filters, date context, and archive context.
-	 * @return \WP_REST_Response
+	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function get( WP_REST_Request $request ) {
 		// Browser-direct navigations get redirected to the canonical

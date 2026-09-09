@@ -20,6 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Template_Loader {
 
+	/** @var string */
 	private static $template_path = '';
 
 	public static function init() {
@@ -49,7 +50,8 @@ class Template_Loader {
 		}
 		ob_start();
 		include $template_file;
-		return ob_get_clean();
+		$html = ob_get_clean();
+		return is_string( $html ) ? $html : '';
 	}
 
 	/**

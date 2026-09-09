@@ -115,9 +115,6 @@ function event_ai_blocked_tools(): array {
  */
 function is_event_upsert_ai_step( array $args ): bool {
 	$modes = is_array( $args['modes'] ?? null ) ? $args['modes'] : array( $args['mode'] ?? '' );
-	if ( ! is_array( $modes ) ) {
-		$modes = array( $modes );
-	}
 	$modes = array_map( 'strval', $modes );
 
 	if ( ! in_array( 'pipeline', $modes, true ) ) {

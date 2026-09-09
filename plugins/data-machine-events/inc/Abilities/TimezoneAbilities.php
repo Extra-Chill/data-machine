@@ -256,8 +256,11 @@ class TimezoneAbilities {
 				continue;
 			}
 
-			$venue_id          = $venue_terms[0];
-			$venue_term        = get_term( $venue_id );
+			$venue_id   = $venue_terms[0];
+			$venue_term = get_term( $venue_id );
+			if ( ! $venue_term instanceof \WP_Term ) {
+				continue;
+			}
 			$venue_timezone    = get_term_meta( $venue_id, '_venue_timezone', true );
 			$venue_coordinates = get_term_meta( $venue_id, '_venue_coordinates', true );
 
@@ -269,7 +272,7 @@ class TimezoneAbilities {
 					'startTime'         => $block_attrs['startTime'] ?? '',
 					'venue'             => $venue_term->name,
 					'venue_id'          => $venue_id,
-					'venue_timezone'    => $venue_timezone ? $venue_timezone : '',
+					'venue_timezone'    => '',
 					'venue_coordinates' => $venue_coordinates ? $venue_coordinates : '',
 					'reason'            => 'no_timezone',
 				);
@@ -281,8 +284,8 @@ class TimezoneAbilities {
 					'startTime'         => $block_attrs['startTime'] ?? '',
 					'venue'             => $venue_term->name,
 					'venue_id'          => $venue_id,
-					'venue_timezone'    => $venue_timezone ? $venue_timezone : '',
-					'venue_coordinates' => $venue_coordinates ? $venue_coordinates : '',
+					'venue_timezone'    => $venue_timezone,
+					'venue_coordinates' => '',
 					'reason'            => 'no_coordinates',
 				);
 			}
@@ -418,7 +421,7 @@ class TimezoneAbilities {
 					'timezone' => $timezone,
 				)
 			);
-		} elseif ( ! empty( $timezone ) ) {
+		} else {
 			$result = \DataMachineEvents\Core\VenueProfileMutations::updateSystem( (int) $venue_id, array( 'timezone' => $timezone ) );
 			if ( is_wp_error( $result ) ) {
 				return array(
@@ -462,7 +465,7 @@ class TimezoneAbilities {
 
 		foreach ( $blocks as $block ) {
 			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
-				return $block['attrs'] ?? array();
+				return $block['attrs'];
 			}
 		}
 

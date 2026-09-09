@@ -26,7 +26,7 @@ class Admin_Bar {
 	/**
 	 * Add Events menu to admin bar
 	 *
-	 * @param WP_Admin_Bar $wp_admin_bar
+	 * @param \WP_Admin_Bar $wp_admin_bar
 	 */
 	public function add_events_menu( $wp_admin_bar ) {
 		if ( ! current_user_can( 'edit_posts' ) ) {

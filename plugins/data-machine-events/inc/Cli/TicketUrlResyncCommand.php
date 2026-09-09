@@ -68,7 +68,9 @@ class TicketUrlResyncCommand {
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+		// wp-cli stubs unconditionally define WP_CLI, so static analysis cannot
+		// see this guard; argv distinguishes the real CLI runtime.
+		if ( empty( $_SERVER['argv'] ) ) {
 			return;
 		}
 
@@ -92,7 +94,7 @@ class TicketUrlResyncCommand {
 		}
 
 		if ( 'json' === $format ) {
-			\WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			\WP_CLI::log( (string) wp_json_encode( $result, JSON_PRETTY_PRINT ) );
 			return;
 		}
 

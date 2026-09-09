@@ -71,7 +71,7 @@ class Calendar {
 	 * Calendar endpoint implementation
 	 *
 	 * @param WP_REST_Request $request REST request object.
-	 * @return \WP_REST_Response
+	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function calendar( WP_REST_Request $request ) {
 		// Browser-direct navigations (address-bar paste, middle-click on

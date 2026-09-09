@@ -344,8 +344,4 @@ class DiceFmTest {
 			);
 		}
 	}
-
-	private function buildErrorResponse( string $message ): \WP_Error {
-		return new \WP_Error( 'test_error', $message, array( 'status' => 400 ) );
-	}
 }

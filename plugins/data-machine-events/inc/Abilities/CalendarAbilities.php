@@ -322,7 +322,7 @@ class CalendarAbilities {
 			// when the page has enough events to benefit from deferred loading.
 			// Gated on ! $user_date_range because a single-day request from the
 			// day-loader has nothing to defer.
-			if ( $progressive && $range_start && $range_end ) {
+			if ( $progressive && $range_start ) {
 				// Get the dates within this page's range.
 				$page_dates = array_filter(
 					$unique_dates,

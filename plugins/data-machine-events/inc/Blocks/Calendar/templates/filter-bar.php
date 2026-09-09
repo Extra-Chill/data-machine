@@ -33,6 +33,9 @@ $archive_context     = $archive_context ?? array(
 );
 $has_archive_context = ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_id'] );
 
+$date_start = $date_start ?? '';
+$date_end   = $date_end ?? '';
+
 $hide_filter_button_when_inactive = $hide_filter_button_when_inactive ?? false;
 $hide_filter_button_attr          = $hide_filter_button_when_inactive ? ' hidden data-hide-when-inactive="1"' : '';
 

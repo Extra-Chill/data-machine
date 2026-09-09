@@ -97,6 +97,14 @@ class UpdateVenue extends BaseTool {
 		$abilities = new VenueAbilities();
 		$result    = $abilities->executeUpdateVenue( $parameters );
 
+		if ( $result instanceof \WP_Error ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'update_venue',
+			);
+		}
+
 		if ( isset( $result['error'] ) ) {
 			return array(
 				'success'   => false,

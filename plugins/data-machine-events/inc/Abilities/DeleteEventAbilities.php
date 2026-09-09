@@ -143,7 +143,7 @@ class DeleteEventAbilities {
 			if ( isset( $result['deleted'] ) ) {
 				$deleted[] = $result['deleted'];
 			} else {
-				$skipped[] = $result['skipped'];
+				$skipped[] = $result['skipped'] ?? array();
 			}
 		}
 

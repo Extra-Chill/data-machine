@@ -115,9 +115,6 @@ class EventQualityAuditAbilities {
 		}
 
 		$events = $this->queryEvents( $scope, $days_ahead, $flow_id, $location );
-		if ( is_wp_error( $events ) ) {
-			return new \WP_Error( 'query_failed', $events->get_error_message(), array( 'status' => 500 ) );
-		}
 
 		$missing_start_date  = array();
 		$missing_start_time  = array();
@@ -169,14 +166,14 @@ class EventQualityAuditAbilities {
 
 			$duplicate_groups[] = array(
 				'count'  => count( $group ),
-				'date'   => $group[0]['startDate'] ?? '',
+				'date'   => $group[0]['startDate'],
 				'title'  => $group[0]['title'] ?? '',
-				'venue'  => $group[0]['venue'] ?? '',
+				'venue'  => $group[0]['venue'],
 				'events' => $group,
 			);
 
 			foreach ( $group as $item ) {
-				$this->incrementFlowCount( $culprit_flow_counts, (int) ( $item['flow_id'] ?? 0 ), $item['flow_name'] ?? '' );
+				$this->incrementFlowCount( $culprit_flow_counts, (int) $item['flow_id'], $item['flow_name'] );
 			}
 		}
 
@@ -258,7 +255,7 @@ class EventQualityAuditAbilities {
 		);
 	}
 
-	private function queryEvents( string $scope, int $days_ahead, int $flow_id = 0, int $location_term_id = 0 ): array|\WP_Error {
+	private function queryEvents( string $scope, int $days_ahead, int $flow_id = 0, int $location_term_id = 0 ): array {
 		$input = array(
 			'scope' => $scope,
 			'order' => 'ASC',
@@ -297,7 +294,7 @@ class EventQualityAuditAbilities {
 		$blocks = parse_blocks( $post->post_content );
 		foreach ( $blocks as $block ) {
 			if ( 'data-machine-events/event-details' === ( $block['blockName'] ?? '' ) ) {
-				return $block['attrs'] ?? array();
+				return $block['attrs'];
 			}
 		}
 

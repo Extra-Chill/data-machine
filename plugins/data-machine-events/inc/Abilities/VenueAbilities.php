@@ -70,36 +70,36 @@ class VenueAbilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'total_venues'        => array( 'type' => 'integer' ),
-						'missing_address'     => array(
+						'total_venues'         => array( 'type' => 'integer' ),
+						'missing_address'      => array(
 							'type'       => 'object',
 							'properties' => array(
 								'count'  => array( 'type' => 'integer' ),
 								'venues' => array( 'type' => 'array' ),
 							),
 						),
-						'missing_coordinates' => array(
+						'missing_coordinates'  => array(
 							'type'       => 'object',
 							'properties' => array(
 								'count'  => array( 'type' => 'integer' ),
 								'venues' => array( 'type' => 'array' ),
 							),
 						),
-						'missing_timezone'    => array(
+						'missing_timezone'     => array(
 							'type'       => 'object',
 							'properties' => array(
 								'count'  => array( 'type' => 'integer' ),
 								'venues' => array( 'type' => 'array' ),
 							),
 						),
-						'missing_website'     => array(
+						'missing_website'      => array(
 							'type'       => 'object',
 							'properties' => array(
 								'count'  => array( 'type' => 'integer' ),
 								'venues' => array( 'type' => 'array' ),
 							),
 						),
-						'suspicious_website'  => array(
+						'suspicious_website'   => array(
 							'type'       => 'object',
 							'properties' => array(
 								'count'  => array( 'type' => 'integer' ),
@@ -113,7 +113,7 @@ class VenueAbilities {
 								'flows' => array( 'type' => 'array' ),
 							),
 						),
-						'message'             => array( 'type' => 'string' ),
+						'message'              => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeHealthCheck' ),
@@ -406,24 +406,24 @@ class VenueAbilities {
 		}
 
 		return array(
-			'total_venues'        => $total,
-			'missing_address'     => array(
+			'total_venues'         => $total,
+			'missing_address'      => array(
 				'count'  => count( $missing_address ),
 				'venues' => array_slice( $missing_address, 0, $limit ),
 			),
-			'missing_coordinates' => array(
+			'missing_coordinates'  => array(
 				'count'  => count( $missing_coordinates ),
 				'venues' => array_slice( $missing_coordinates, 0, $limit ),
 			),
-			'missing_timezone'    => array(
+			'missing_timezone'     => array(
 				'count'  => count( $missing_timezone ),
 				'venues' => array_slice( $missing_timezone, 0, $limit ),
 			),
-			'missing_website'     => array(
+			'missing_website'      => array(
 				'count'  => count( $missing_website ),
 				'venues' => array_slice( $missing_website, 0, $limit ),
 			),
-			'suspicious_website'  => array(
+			'suspicious_website'   => array(
 				'count'  => count( $suspicious_website ),
 				'venues' => array_slice( $suspicious_website, 0, $limit ),
 			),
@@ -431,7 +431,7 @@ class VenueAbilities {
 				'count' => count( $ticketing_host_flows ),
 				'flows' => array_slice( $ticketing_host_flows, 0, $limit ),
 			),
-			'message'             => $message,
+			'message'              => $message,
 		);
 	}
 
@@ -471,14 +471,15 @@ class VenueAbilities {
 		}
 
 		$updated_term = get_term( $term->term_id, 'venue' );
+		$updated_name = $updated_term instanceof \WP_Term ? $updated_term->name : $term->name;
 		$venue_data   = Venue_Taxonomy::get_venue_data( $term->term_id );
 
 		return array(
 			'term_id'        => $term->term_id,
-			'name'           => $updated_term->name,
+			'name'           => $updated_name,
 			'updated_fields' => $result['updated_fields'],
 			'venue_data'     => $venue_data,
-			'message'        => "Updated venue '{$updated_term->name}': " . implode( ', ', $result['updated_fields'] ),
+			'message'        => "Updated venue '{$updated_name}': " . implode( ', ', $result['updated_fields'] ),
 		);
 	}
 
@@ -636,7 +637,7 @@ class VenueAbilities {
 			return array();
 		}
 
-		$rows = $wpdb->get_results(
+		$rows  = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT flow_id, flow_name, flow_config FROM %i
 				 WHERE scheduling_config NOT IN ('', '[]', '{}')",

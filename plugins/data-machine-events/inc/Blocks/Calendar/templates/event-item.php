@@ -49,7 +49,7 @@ if ( $is_multi_day ) {
 		<?php echo \DataMachineEvents\Blocks\Calendar\Taxonomy\Badges::render_taxonomy_badges( $event_post->ID ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Badge renderer escapes each taxonomy label and URL. ?>
 
 		<h4 class="data-machine-event-title">
-			<a href="<?php echo esc_url( get_the_permalink() ); ?>">
+			<a href="<?php echo esc_url( (string) get_the_permalink() ); ?>">
 				<?php the_title(); ?>
 			</a>
 		</h4>
@@ -72,7 +72,7 @@ if ( $is_multi_day ) {
 				</div>
 			<?php endif; ?>
 
-			<a href="<?php echo esc_url( get_the_permalink() ); ?>" 
+			<a href="<?php echo esc_url( (string) get_the_permalink() ); ?>" 
 				class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_more_info_button_classes', array( 'data-machine-more-info-button' ) ) ) ); ?>">
 				<?php esc_html_e( 'More Info', 'data-machine-events' ); ?>
 			</a>

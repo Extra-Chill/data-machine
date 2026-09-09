@@ -42,7 +42,7 @@ class AbilityPermissions {
 	 */
 	public static function canWrite(): \Closure {
 		return static function () {
-			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			if ( defined( 'WP_CLI' ) && ! empty( $_SERVER['argv'] ) ) {
 				return true;
 			}
 
@@ -74,7 +74,7 @@ class AbilityPermissions {
 	 */
 	public static function canRead(): \Closure {
 		return static function () {
-			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			if ( defined( 'WP_CLI' ) && ! empty( $_SERVER['argv'] ) ) {
 				return true;
 			}
 

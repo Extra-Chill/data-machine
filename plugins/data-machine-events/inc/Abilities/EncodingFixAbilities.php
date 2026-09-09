@@ -237,7 +237,7 @@ class EncodingFixAbilities {
 		$blocks = parse_blocks( $post->post_content );
 		foreach ( $blocks as $block ) {
 			if ( self::BLOCK_NAME === $block['blockName'] ) {
-				return $block['attrs'] ?? array();
+				return $block['attrs'];
 			}
 		}
 

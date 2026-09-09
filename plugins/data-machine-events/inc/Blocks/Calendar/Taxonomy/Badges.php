@@ -171,7 +171,7 @@ class Badges {
 				$taxonomy_object                      = get_taxonomy( $result->taxonomy );
 				$used_taxonomies[ $result->taxonomy ] = array(
 					'slug'  => $result->taxonomy,
-					'label' => $taxonomy_object && is_object( $taxonomy_object->labels ) && isset( $taxonomy_object->labels->name )
+					'label' => $taxonomy_object && isset( $taxonomy_object->labels->name )
 						? $taxonomy_object->labels->name
 						: $result->taxonomy,
 				);

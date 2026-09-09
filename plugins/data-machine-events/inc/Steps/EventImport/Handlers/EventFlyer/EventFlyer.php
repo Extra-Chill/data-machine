@@ -189,7 +189,8 @@ class EventFlyer extends EventImportHandler {
 
 	private function getMimeType( string $file_path ): string {
 		$file_info = wp_check_filetype( $file_path );
-		return $file_info['type'] ?? 'application/octet-stream';
+		$mime      = $file_info['type'];
+		return $mime ? $mime : 'application/octet-stream';
 	}
 
 	/**

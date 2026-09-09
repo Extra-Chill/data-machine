@@ -135,7 +135,8 @@ class Promoter {
         "
 		);
 
-		$total_promoters = wp_count_terms( array( 'taxonomy' => 'promoter' ) );
+		$count           = wp_count_terms( array( 'taxonomy' => 'promoter' ) );
+		$total_promoters = is_string( $count ) ? $count : '0';
 
 		$events_with_promoters = $wpdb->get_var(
 			"

@@ -32,7 +32,7 @@ $address          = $decode_unicode( $attributes['address'] ?? '' );
 $price            = $decode_unicode( $attributes['price'] ?? '' );
 $ticket_url       = $attributes['ticketUrl'] ?? '';
 $occurrence_dates = $attributes['occurrenceDates'] ?? array();
-$post_id = get_the_ID();
+$post_id = (int) get_the_ID();
 
 /*
  * Event timing state: 'upcoming' | 'ongoing' | 'past'.
@@ -288,7 +288,7 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 				<div class="data-machine-venue-map-section">
 					<h3 class="venue-map-title"><?php echo esc_html__( 'Venue Location', 'data-machine-events' ); ?></h3>
 					<div
-						id="venue-map-<?php echo esc_attr( $post_id ); ?>"
+						id="venue-map-<?php echo esc_attr( (string) $post_id ); ?>"
 						class="data-machine-venue-map"
 						data-lat="<?php echo esc_attr( $lat ); ?>"
 						data-lon="<?php echo esc_attr( $lon ); ?>"

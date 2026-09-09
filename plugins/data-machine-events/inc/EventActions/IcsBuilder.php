@@ -171,7 +171,7 @@ class IcsBuilder {
 		$window_end   = $end->modify( '+1 year' )->getTimestamp();
 
 		$transitions = $tz->getTransitions( $window_start, $window_end );
-		if ( ! is_array( $transitions ) || count( $transitions ) < 2 ) {
+		if ( count( $transitions ) < 2 ) {
 			// `getTransitions()` always returns at least a synthetic "window
 			// start" snapshot entry as element 0. We need at least one real
 			// transition AFTER it to build a meaningful VTIMEZONE.
@@ -180,10 +180,8 @@ class IcsBuilder {
 
 		// Element 0 is the window-start snapshot (current state at $window_start)
 		// — not a real transition. Skip it. Real transitions follow.
+		// (count >= 2 above guarantees at least one real transition.)
 		$real = array_slice( $transitions, 1 );
-		if ( empty( $real ) ) {
-			return array();
-		}
 
 		// Find the first real daylight and the first real standard transition.
 		$daylight = null;
@@ -216,7 +214,7 @@ class IcsBuilder {
 				}
 				$prev = $t;
 			}
-			return $prev ? (int) $prev['offset'] : (int) $target['offset'];
+			return (int) $prev['offset'];
 		};
 
 		$lines   = array();

@@ -40,9 +40,9 @@ function cache_last_post_time(): void {
 /**
  * Return a transient-cached last-modified time instead of running the slow query.
  *
- * @param string|false $lastpostmodified Pre-filtered value (false to run query).
- * @param string       $timezone         Timezone context.
- * @param string       $post_type        Post type filter.
+ * @param string|false                  $lastpostmodified Pre-filtered value (false to run query).
+ * @param 'blog'|'gmt'|'server'         $timezone         Timezone context.
+ * @param string                        $post_type        Post type filter.
  * @return string|false Cached timestamp or false on first call.
  */
 function get_cached_lastpostmodified( $lastpostmodified, string $timezone, string $post_type ) {
@@ -60,6 +60,7 @@ function get_cached_lastpostmodified( $lastpostmodified, string $timezone, strin
 
 	// Let WordPress run the query this once, then cache the result.
 	remove_filter( 'pre_get_lastpostmodified', __NAMESPACE__ . '\\get_cached_lastpostmodified', 10 );
+	/** @var string|false $value The core stub types this string-only; the real API returns false on failure. */
 	$value = get_lastpostmodified( $timezone, $post_type );
 	add_filter( 'pre_get_lastpostmodified', __NAMESPACE__ . '\\get_cached_lastpostmodified', 10, 3 );
 

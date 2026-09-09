@@ -61,7 +61,7 @@ class DiceFm extends EventImportHandler {
 
 		// Get API configuration from Data Machine auth system
 		$auth = $this->getAuthProvider( 'dice_fm' );
-		if ( ! $auth ) {
+		if ( ! $auth || ! method_exists( $auth, 'get_account' ) ) {
 			$context->log( 'error', 'DiceFm: Authentication provider not found' );
 			return array();
 		}

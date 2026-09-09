@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Preserve all GET parameters except 'paged' and 'past'
-$get_params = isset( $_GET ) ? data_machine_events_sanitize_query_params( wp_unslash( $_GET ) ) : array();
+$get_params = data_machine_events_sanitize_query_params( wp_unslash( $_GET ) );
 unset( $get_params['paged'] );
 unset( $get_params['past'] );
 

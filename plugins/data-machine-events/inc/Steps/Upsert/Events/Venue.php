@@ -147,7 +147,8 @@ class Venue {
         "
 		);
 
-		$total_venues = wp_count_terms( array( 'taxonomy' => 'venue' ) );
+		$count        = wp_count_terms( array( 'taxonomy' => 'venue' ) );
+		$total_venues = is_string( $count ) ? $count : '0';
 
 		$events_with_venues = $wpdb->get_var(
 			"

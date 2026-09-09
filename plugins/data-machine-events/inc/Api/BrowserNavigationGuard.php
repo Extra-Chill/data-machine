@@ -66,7 +66,7 @@ class BrowserNavigationGuard {
 		if ( $archive_taxonomy && $archive_term_id ) {
 			$term_link = get_term_link( $archive_term_id, $archive_taxonomy );
 
-			if ( ! is_wp_error( $term_link ) && is_string( $term_link ) && $term_link ) {
+			if ( ! is_wp_error( $term_link ) && '' !== $term_link ) {
 				$past = $request->get_param( 'past' );
 				if ( $past ) {
 					$term_link = add_query_arg( 'past', rawurlencode( (string) $past ), $term_link );

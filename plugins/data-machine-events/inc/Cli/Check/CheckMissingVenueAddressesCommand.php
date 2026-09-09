@@ -234,7 +234,7 @@ class CheckMissingVenueAddressesCommand {
 		if ( '' !== trim( $coords ) ) {
 			$parsed = $this->reverse_geocode( $coords );
 
-			if ( null !== $parsed && '' !== trim( (string) ( $parsed['address'] ?? '' ) ) ) {
+			if ( null !== $parsed && '' !== trim( (string) $parsed['address'] ) ) {
 				$filled = $this->apply_smart_merge( $term->term_id, $parsed, $dry_run );
 				if ( ! empty( $filled ) ) {
 					$row['action_taken']  = 'geocoded';
@@ -255,13 +255,13 @@ class CheckMissingVenueAddressesCommand {
 		if ( '' !== trim( $city ) ) {
 			$candidate = $this->places_lookup( (string) $term->name, $city );
 
-			if ( null !== $candidate && '' !== trim( (string) ( $candidate['address'] ?? '' ) ) ) {
+			if ( null !== $candidate && '' !== trim( (string) $candidate['address'] ) ) {
 				// Name-similarity gate: reject the lookup unless the
 				// candidate's display name overlaps the term name well
 				// enough. Mirrors the VenueMergeHelper guard so we do
 				// not silently rewrite "The Local Bar" → "Texas Music
 				// Theater" just because Nominatim returned a top hit.
-				$candidate_name = (string) ( $candidate['display_name_short'] ?? '' );
+				$candidate_name = (string) $candidate['display_name_short'];
 
 				if ( '' === $candidate_name
 					|| ! VenueMergeHelper::names_are_similar( (string) $term->name, $candidate_name )
