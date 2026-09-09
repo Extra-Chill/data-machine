@@ -177,7 +177,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 			array(
 				'hook'     => 'datamachine_run_flow_now',
 				'args'     => array( $flow_id ),
-				'group'    => 'data-machine',
+				'group'    => \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP,
 				'status'   => \ActionScheduler_Store::STATUS_PENDING,
 				'per_page' => 10,
 			)
@@ -276,7 +276,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 			array(
 				'hook'     => 'datamachine_run_flow_now',
 				'args'     => array( $flow_id ),
-				'group'    => 'data-machine',
+				'group'    => \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP,
 				'status'   => \ActionScheduler_Store::STATUS_PENDING,
 				'per_page' => 1,
 			)

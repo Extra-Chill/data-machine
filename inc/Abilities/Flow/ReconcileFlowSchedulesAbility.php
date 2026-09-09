@@ -3,7 +3,7 @@
  * Reconcile Flow Schedules Ability.
  *
  * Thin adapter over FlowRoutines::reconcile(), which wraps the Agents API
- * routine registry's reconcile algorithm.
+ * routine registry reconcile algorithm.
  *
  * @package DataMachine\Abilities\Flow
  */
