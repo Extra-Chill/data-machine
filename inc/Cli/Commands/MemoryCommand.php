@@ -1198,9 +1198,6 @@ class MemoryCommand extends BaseCommand {
 	 *     # List all sections across all composable files
 	 *     wp datamachine memory compose --list
 	 *
-	 *     # Suppress informational output with WP-CLI's global option
-	 *     wp --quiet datamachine memory compose
-	 *
 	 * @subcommand compose
 	 */
 	public function compose( array $args, array $assoc_args ): void {
