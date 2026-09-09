@@ -494,7 +494,7 @@ class RunFlowAbility {
 				array(
 					'hook'     => 'datamachine_run_flow_now',
 					'args'     => array( $flow_id ),
-					'group'    => 'data-machine',
+					'group'    => \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP,
 					'status'   => 'pending',
 					'per_page' => 1,
 				),
@@ -507,7 +507,7 @@ class RunFlowAbility {
 					time() + $delay,
 					'datamachine_run_flow_now',
 					array( $flow_id ),
-					'data-machine'
+					\DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP
 				);
 			}
 		}

@@ -28,6 +28,7 @@ namespace DataMachine\Engine\Scheduling;
 
 use AgentsAPI\AI\Routines\WP_Agent_Routine;
 use AgentsAPI\AI\Routines\WP_Agent_Routine_Registry;
+use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
 
@@ -63,7 +64,7 @@ final class FlowRoutines {
 	/**
 	 * Data Machine's own Action Scheduler group (legacy actions + one_time).
 	 */
-	public const LEGACY_GROUP = 'data-machine';
+	public const LEGACY_GROUP = GroupRegistrar::GROUP;
 
 	/**
 	 * Option marking the one-shot legacy-action migration as done.
@@ -476,19 +477,11 @@ final class FlowRoutines {
 				continue;
 			}
 
-			$registered = WP_Agent_Routine_Registry::register( self::routine_id( $flow_id ), $args );
-			if ( is_wp_error( $registered ) ) {
-				do_action(
-					'datamachine_log',
-					'error',
-					'Flow routine registration failed',
-					array(
-						'flow_id'    => $flow_id,
-						'routine_id' => self::routine_id( $flow_id ),
-						'error'      => $registered->get_error_message(),
-					)
-				);
-			}
+			self::register_routine_logged(
+				self::routine_id( $flow_id ),
+				$args,
+				array( 'flow_id' => $flow_id )
+			);
 		}
 
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
@@ -507,23 +500,42 @@ final class FlowRoutines {
 				continue;
 			}
 
-			$registered = WP_Agent_Routine_Registry::register( self::system_routine_id( $schedule_id ), $args );
-			if ( is_wp_error( $registered ) ) {
-				do_action(
-					'datamachine_log',
-					'error',
-					'System schedule routine registration failed',
-					array(
-						'schedule_id' => $schedule_id,
-						'routine_id'  => self::system_routine_id( $schedule_id ),
-						'error'       => $registered->get_error_message(),
-					)
-				);
-			}
+			self::register_routine_logged(
+				self::system_routine_id( $schedule_id ),
+				$args,
+				array( 'schedule_id' => $schedule_id )
+			);
 		}
 
 		self::maybe_migrate();
 		HashGatedRoutineBackend::persist();
+	}
+
+	/**
+	 * Register one routine and log any registration error.
+	 *
+	 * @param string               $routine_id  Routine id.
+	 * @param array<string, mixed> $args        Registry args.
+	 * @param array<string, mixed> $log_context Extra identifiers for the error log.
+	 */
+	private static function register_routine_logged( string $routine_id, array $args, array $log_context ): void {
+		$registered = WP_Agent_Routine_Registry::register( $routine_id, $args );
+		if ( ! is_wp_error( $registered ) ) {
+			return;
+		}
+
+		do_action(
+			'datamachine_log',
+			'error',
+			'Routine registration failed',
+			array_merge(
+				$log_context,
+				array(
+					'routine_id' => $routine_id,
+					'error'      => $registered->get_error_message(),
+				)
+			)
+		);
 	}
 
 	/**

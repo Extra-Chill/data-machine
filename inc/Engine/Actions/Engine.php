@@ -91,6 +91,60 @@ function datamachine_execute_step_action( $job_id, string $flow_step_id, $operat
 	}
 }
 
+/**
+ * Log one routine lifecycle outcome with the derived flow id attached.
+ *
+ * @param string               $level     Log level.
+ * @param string               $message   Log message.
+ * @param array<string, mixed> $context   Log context.
+ * @param string               $routine_id Routine id, when known.
+ */
+function datamachine_log_routine_outcome( string $level, string $message, array $context = array(), string $routine_id = '' ): void {
+	$flow_id = \DataMachine\Engine\Scheduling\FlowRoutines::flow_id_from_routine_id( $routine_id );
+	if ( $flow_id > 0 ) {
+		$context['flow_id'] = $flow_id;
+	}
+	if ( '' !== $routine_id && ! isset( $context['routine_id'] ) ) {
+		$context['routine_id'] = $routine_id;
+	}
+
+	do_action( 'datamachine_log', $level, $message, $context );
+}
+
+/**
+ * Dispatch one flow run through the canonical run-flow ability.
+ *
+ * Shared by the datamachine_run_flow_now and datamachine_run_flow_once
+ * bridges; a missing flow is logged and dropped.
+ *
+ * @param int   $flow_id Flow ID.
+ * @param mixed $job_id  Optional pre-created job ID.
+ */
+function datamachine_dispatch_run_flow( $flow_id, $job_id = null ): void {
+	$flow_id = (int) $flow_id;
+
+	if ( ! datamachine_flow_exists( $flow_id ) ) {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Scheduled wake ignored for missing flow',
+			array( 'flow_id' => $flow_id )
+		);
+		return;
+	}
+
+	$ability = wp_get_ability( 'datamachine/run-flow' );
+	if ( $ability ) {
+		$ability->execute(
+			array(
+				'flow_id'        => $flow_id,
+				'job_id'         => null !== $job_id ? (int) $job_id : null,
+				'respect_paused' => true,
+			)
+		);
+	}
+}
+
 /** Validate durable resume ownership before entering canonical step execution. */
 function datamachine_resume_ai_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '', $ai_resume_generation = 0 ): void {
 	$job_id               = (int) $job_id;
@@ -142,16 +196,11 @@ function datamachine_register_execution_engine() {
 				return;
 			}
 
-			$routine_id = (string) $routine->get_id();
-			$flow_id    = \DataMachine\Engine\Scheduling\FlowRoutines::flow_id_from_routine_id( $routine_id );
-			do_action(
-				'datamachine_log',
+			datamachine_log_routine_outcome(
 				'info',
 				'Scheduled routine run completed',
-				array(
-					'routine_id' => $routine_id,
-					'flow_id'    => $flow_id > 0 ? $flow_id : null,
-				)
+				array(),
+				(string) $routine->get_id()
 			);
 		},
 		10,
@@ -167,15 +216,18 @@ function datamachine_register_execution_engine() {
 	add_action(
 		'agents_run_routine_dispatch_failed',
 		static function ( $code, $context = array() ): void {
-			$context                   = is_array( $context ) ? $context : array();
-			$log_context               = $context;
-			$log_context['error_code'] = is_string( $code ) ? $code : 'unknown';
-			$routine_id                = is_string( $context['routine_id'] ?? null ) ? $context['routine_id'] : '';
-			$flow_id                   = \DataMachine\Engine\Scheduling\FlowRoutines::flow_id_from_routine_id( $routine_id );
-			if ( $flow_id > 0 ) {
-				$log_context['flow_id'] = $flow_id;
+			$context = is_array( $context ) ? $context : array();
+			if ( isset( $context['routine_id'] ) && is_string( $context['routine_id'] ) ) {
+				$context['error_code'] = is_string( $code ) ? $code : 'unknown';
+				datamachine_log_routine_outcome( 'error', 'Scheduled routine dispatch failed', $context, $context['routine_id'] );
+				return;
 			}
-			do_action( 'datamachine_log', 'error', 'Scheduled routine dispatch failed', $log_context );
+
+			datamachine_log_routine_outcome(
+				'error',
+				'Scheduled routine dispatch failed',
+				array( 'error_code' => is_string( $code ) ? $code : 'unknown' )
+			);
 		},
 		10,
 		2
@@ -191,33 +243,7 @@ function datamachine_register_execution_engine() {
 	 */
 	add_action(
 		'datamachine_run_flow_now',
-		function ( $flow_id, $job_id = null ): void {
-			$flow_id = (int) $flow_id;
-
-			// Defensive: Check if flow exists before executing.
-			// If flow was deleted without cleaning up scheduled actions,
-			// log and drop; routine lifecycle keeps schedules in sync.
-			if ( ! datamachine_flow_exists( $flow_id ) ) {
-				do_action(
-					'datamachine_log',
-					'warning',
-					'Scheduled wake ignored for missing flow',
-					array( 'flow_id' => $flow_id )
-				);
-				return;
-			}
-
-			$ability = wp_get_ability( 'datamachine/run-flow' );
-			if ( $ability ) {
-				$ability->execute(
-					array(
-						'flow_id'        => $flow_id,
-						'job_id'         => null !== $job_id ? (int) $job_id : null,
-						'respect_paused' => true,
-					)
-				);
-			}
-		},
+		'datamachine_dispatch_run_flow',
 		10,
 		2
 	);
@@ -230,22 +256,7 @@ function datamachine_register_execution_engine() {
 	 */
 	add_action(
 		'datamachine_run_flow_once',
-		function ( $flow_id ): void {
-			$flow_id = (int) $flow_id;
-			if ( ! datamachine_flow_exists( $flow_id ) ) {
-				return;
-			}
-
-			$ability = wp_get_ability( 'datamachine/run-flow' );
-			if ( $ability ) {
-				$ability->execute(
-					array(
-						'flow_id'        => $flow_id,
-						'respect_paused' => true,
-					)
-				);
-			}
-		},
+		'datamachine_dispatch_run_flow',
 		10,
 		1
 	);

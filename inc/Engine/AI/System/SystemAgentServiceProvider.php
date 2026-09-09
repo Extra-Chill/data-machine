@@ -432,55 +432,83 @@ class SystemAgentServiceProvider {
 				$agent_params['agent_id'] = $agent_id;
 				$agent_params['user_id']  = $owner_id;
 
-				$scheduled = TaskScheduler::schedule(
-					$task_type,
-					$agent_params,
-					array(
-						'agent_id' => $agent_id,
-						'user_id'  => $owner_id,
-					)
-				);
+				$scheduled = self::schedule_tick( $task_type, $agent_params, $agent_id, $owner_id );
 				if ( false !== $scheduled ) {
 					$job_ids[] = (int) $scheduled;
 				}
 			}
 
-			if ( array() !== $job_ids ) {
-				RecurringRejectionTracker::record_success( $schedule_id );
-			} else {
-				RecurringRejectionTracker::record_rejection(
-					$schedule_id,
-					$task_type,
-					'task_scheduler_rejected'
-				);
-			}
+			$accepted = array() !== $job_ids;
+			self::record_tick_outcome( $schedule_id, $task_type, $accepted );
 
-			return array(
-				'success'     => array() !== $job_ids,
-				'schedule_id' => $schedule_id,
-				'job_ids'     => $job_ids,
-				'message'     => array() !== $job_ids ? 'Per-agent fan-out accepted.' : 'Every agent fan-out was rejected.',
-			);
-		}
-
-		$scheduled = TaskScheduler::schedule( $task_type, $params );
-		if ( false !== $scheduled ) {
-			$job_ids[] = (int) $scheduled;
-			RecurringRejectionTracker::record_success( $schedule_id );
-		} else {
-			RecurringRejectionTracker::record_rejection(
+			return self::tick_result(
+				$accepted,
 				$schedule_id,
-				$task_type,
-				'task_scheduler_rejected'
+				$job_ids,
+				$accepted ? 'Per-agent fan-out accepted.' : 'Every agent fan-out was rejected.'
 			);
 		}
 
+		$scheduled = self::schedule_tick( $task_type, $params );
+		$accepted  = false !== $scheduled;
+		if ( $accepted ) {
+			$job_ids[] = (int) $scheduled;
+		}
+		self::record_tick_outcome( $schedule_id, $task_type, $accepted );
+
+		return self::tick_result(
+			$accepted,
+			$schedule_id,
+			$job_ids,
+			$accepted ? 'Task scheduled.' : 'TaskScheduler rejected the tick.'
+		);
+	}
+
+	/**
+	 * Build the recurring-tick ability result.
+	 *
+	 * @param array<int, int> $job_ids Accepted job ids.
+	 */
+	private static function tick_result( bool $accepted, string $schedule_id, array $job_ids, string $message ): array {
 		return array(
-			'success'     => array() !== $job_ids,
+			'success'     => $accepted,
 			'schedule_id' => $schedule_id,
 			'job_ids'     => $job_ids,
-			'message'     => array() !== $job_ids ? 'Task scheduled.' : 'TaskScheduler rejected the tick.',
+			'message'     => $message,
 		);
+	}
+
+	/**
+	 * Schedule one recurring-tick job via TaskScheduler.
+	 *
+	 * @param string               $task_type Task type.
+	 * @param array<string, mixed> $params    Task params.
+	 * @param int|null             $agent_id  Optional acting agent for the tick.
+	 * @param int|null             $user_id   Optional acting user for the tick.
+	 * @return int|false Scheduled job id, or false when rejected.
+	 */
+	private static function schedule_tick( string $task_type, array $params, ?int $agent_id = null, ?int $user_id = null ): int|false {
+		$context = array();
+		if ( null !== $agent_id && null !== $user_id ) {
+			$context = array(
+				'agent_id' => $agent_id,
+				'user_id'  => $user_id,
+			);
+		}
+
+		return TaskScheduler::schedule( $task_type, $params, $context );
+	}
+
+	/**
+	 * Record the rejection telemetry outcome for one schedule tick.
+	 */
+	private static function record_tick_outcome( string $schedule_id, string $task_type, bool $accepted ): void {
+		if ( $accepted ) {
+			RecurringRejectionTracker::record_success( $schedule_id );
+			return;
+		}
+
+		RecurringRejectionTracker::record_rejection( $schedule_id, $task_type, 'task_scheduler_rejected' );
 	}
 
 	/**
