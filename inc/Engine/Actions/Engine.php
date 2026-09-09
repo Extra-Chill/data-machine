@@ -145,6 +145,32 @@ function datamachine_dispatch_run_flow( $flow_id, $job_id = null ): void {
 	}
 }
 
+/**
+ * Bridge for the legacy datamachine_run_flow_now hook.
+ *
+ * Positional wakes (`[ flow_id ]`, `[ flow_id, job_id ]`) from backpressure
+ * deferrals and stuck-job recovery still dispatch. A legacy recurring action
+ * carries the schedule generation marker at args[2]; after the routines
+ * migration those must not run, or they would double-fire beside the
+ * routine. TODO(3458): drop the legacy branch after one release.
+ *
+ * @param int   $flow_id             Flow ID.
+ * @param mixed $job_id              Optional pre-created job ID.
+ * @param mixed $schedule_generation Legacy generation marker, if any.
+ */
+function datamachine_dispatch_scheduled_flow_wake( $flow_id, $job_id = null, $schedule_generation = null ): void {
+	if ( null !== $schedule_generation ) {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Legacy recurring schedule action ignored after routines migration',
+			array( 'flow_id' => (int) $flow_id )
+		);
+		return;
+	}
+	datamachine_dispatch_run_flow( $flow_id, $job_id );
+}
+
 /** Validate durable resume ownership before entering canonical step execution. */
 function datamachine_resume_ai_step_action( $job_id, string $flow_step_id, $operation_generation = 0, $operation_claim_token = '', $ai_resume_generation = 0 ): void {
 	$job_id               = (int) $job_id;
@@ -246,18 +272,7 @@ function datamachine_register_execution_engine() {
 	 */
 	add_action(
 		'datamachine_run_flow_now',
-		static function ( $flow_id, $job_id = null, $schedule_generation = null ): void {
-			if ( null !== $schedule_generation ) {
-				do_action(
-					'datamachine_log',
-					'warning',
-					'Legacy recurring schedule action ignored after routines migration',
-					array( 'flow_id' => (int) $flow_id )
-				);
-				return;
-			}
-			datamachine_dispatch_run_flow( $flow_id, $job_id );
-		},
+		'datamachine_dispatch_scheduled_flow_wake',
 		10,
 		3
 	);
