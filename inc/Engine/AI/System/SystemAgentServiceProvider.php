@@ -16,6 +16,7 @@ namespace DataMachine\Engine\AI\System;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Engine\AI\System\Tasks\AgentCallTask;
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
 use DataMachine\Engine\AI\System\Tasks\Corpus\CorpusEmbedChunksTask;
@@ -44,7 +45,6 @@ use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\AI\System\Tasks\WakeBriefingTask;
 use DataMachine\Engine\Tasks\RecurringRejectionTracker;
 use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
-use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\Tasks\TaskScheduler;
 
@@ -52,15 +52,18 @@ class SystemAgentServiceProvider {
 
 	/**
 	 * Constructor - registers all task infrastructure.
+	 *
+	 * Recurring schedule registration runs through Agents API Routines —
+	 * FlowRoutines::boot() re-declares `system-<schedule_id>` routines each
+	 * request and the `datamachine/dispatch-system-task` wake target below
+	 * fans ticks out into DM jobs.
 	 */
 	public function __construct() {
 		$this->registerTaskHandlers();
 		$this->registerBuiltInSchedules();
+		$this->registerDispatchAbility();
 		$this->registerActionSchedulerHooks();
 		RetentionActionSchedulerTask::registerNativeRetention();
-		// Action Scheduler owns the daily reconciliation cadence so this does not
-		// repeat across every request that initializes its datastore.
-		add_action( 'action_scheduler_ensure_recurring_actions', array( $this, 'manageRecurringTaskSchedules' ) );
 		WakeBriefingTask::registerStalenessGuard();
 	}
 
@@ -284,7 +287,10 @@ class SystemAgentServiceProvider {
 	 *   - datamachine_task_process_batch  → process batch chunks
 	 *   - datamachine_task_retry          → retry polling tasks (e.g. image generation)
 	 *   - datamachine_system_agent_set_featured_image → deferred featured image
-	 *   - datamachine_recurring_<schedule> → per-schedule ticks via TaskScheduler
+	 *
+	 * Per-schedule recurring ticks moved to Agents API Routines: each
+	 * schedule is a `system-<schedule_id>` routine whose wake target is the
+	 * `datamachine/dispatch-system-task` ability registered below.
 	 *
 	 * @since 0.72.0
 	 */
@@ -297,171 +303,184 @@ class SystemAgentServiceProvider {
 			10,
 			3
 		);
-
-		// Generic per-schedule handler: one action hook per registered
-		// recurring schedule. Action Scheduler fires the hook; the closure
-		// enqueues an ephemeral DM job with the task's params via TaskScheduler.
-		//
-		// When the schedule declares per_agent => true, the closure
-		// iterates every active agent and fires one job per agent with
-		// that agent's identity in $context. Without this, recurring
-		// per-agent tasks (daily memory) only run against the install's
-		// primary agent.
-		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
-			$hook        = RecurringScheduleRegistry::hookFor( $schedule );
-			$task_type   = $schedule['task_type'];
-			$schedule_id = $schedule['schedule_id'];
-			if ( '' === $hook ) {
-				continue;
-			}
-
-			$dispatch_schedule = static function () use ( $schedule_id, $task_type ): void {
-				$def = RecurringScheduleRegistry::get( $schedule_id );
-				if ( null === $def || ! self::isScheduleOwnedByCurrentSite( $def ) ) {
-					return;
-				}
-
-				$params = $def['task_params'] ?? array();
-				if ( ! empty( $def['task_params_callback'] ) && is_callable( $def['task_params_callback'] ) ) {
-					$params = (array) call_user_func( $def['task_params_callback'] );
-				}
-
-				if ( ! empty( $def['per_agent'] ) ) {
-					$agents_repo = new Agents();
-					$agents      = $agents_repo->get_all();
-
-					if ( empty( $agents ) ) {
-						do_action(
-							'datamachine_log',
-							'warning',
-							'SystemAgentServiceProvider: per-agent recurring task skipped because no active agents exist',
-							array(
-								'schedule_id' => $schedule_id,
-								'task_type'   => $task_type,
-								'error_code'  => 'recurring_task_agent_context_required',
-							)
-						);
-						// A persistent "no agents" condition is the same class of
-						// silent recurring-binding failure as a gate rejection:
-						// nothing ever runs. Track it so it escalates.
-						RecurringRejectionTracker::record_rejection(
-							$schedule_id,
-							$task_type,
-							'recurring_task_agent_context_required'
-						);
-						return;
-					}
-
-					// For per-agent schedules, a tick "ran" if at least one
-					// agent fan-out was accepted. Only when every fan-out is
-					// rejected is the recurring binding effectively dead.
-					$any_scheduled = false;
-					foreach ( $agents as $agent ) {
-						$agent_id = (int) ( $agent['agent_id'] ?? 0 );
-						$owner_id = (int) ( $agent['owner_id'] ?? 0 );
-
-						if ( $agent_id <= 0 ) {
-							continue;
-						}
-
-						$agent_params             = $params;
-						$agent_params['agent_id'] = $agent_id;
-						$agent_params['user_id']  = $owner_id;
-
-						$scheduled = TaskScheduler::schedule(
-							$task_type,
-							$agent_params,
-							array(
-								'agent_id' => $agent_id,
-								'user_id'  => $owner_id,
-							)
-						);
-						if ( false !== $scheduled ) {
-							$any_scheduled = true;
-						}
-					}
-
-					if ( $any_scheduled ) {
-						RecurringRejectionTracker::record_success( $schedule_id );
-					} else {
-						RecurringRejectionTracker::record_rejection(
-							$schedule_id,
-							$task_type,
-							'task_scheduler_rejected'
-						);
-					}
-					return;
-				}
-
-				$scheduled = TaskScheduler::schedule( $task_type, $params );
-				if ( false === $scheduled ) {
-					RecurringRejectionTracker::record_rejection(
-						$schedule_id,
-						$task_type,
-						'task_scheduler_rejected'
-					);
-				} else {
-					RecurringRejectionTracker::record_success( $schedule_id );
-				}
-			};
-
-			add_action( $hook, $dispatch_schedule );
-		}
 	}
 
 	/**
-	 * Reconcile all registered recurring schedules with Action Scheduler.
+	 * Register the recurring system-task wake target.
 	 *
-	 * @since 0.71.0
+	 * FlowRoutines::boot() registers one `system-<schedule_id>` routine per
+	 * active schedule definition; each wake executes this ability with the
+	 * schedule id. The ability resolves the definition, fans per-agent
+	 * schedules out into one DM job per active agent, and records rejection
+	 * telemetry so a persistently-rejected binding escalates.
 	 */
-	public function manageRecurringTaskSchedules(): void {
-		if ( function_exists( 'wp_installing' ) && wp_installing() ) {
-			return;
+	private function registerDispatchAbility(): void {
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine/dispatch-system-task',
+				array(
+					'label'               => __( 'Dispatch Recurring System Task', 'data-machine' ),
+					'description'         => __( 'Routine wake target: fan a recurring schedule tick out into DM jobs via TaskScheduler.', 'data-machine' ),
+					'category'            => 'datamachine-system',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'schedule_id' ),
+						'properties' => array(
+							'schedule_id' => array(
+								'type'        => 'string',
+								'description' => 'Recurring schedule identifier from RecurringScheduleRegistry.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'     => array( 'type' => 'boolean' ),
+							'schedule_id' => array( 'type' => 'string' ),
+							'job_ids'     => array( 'type' => 'array' ),
+							'message'     => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'dispatchSchedule' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => false ),
+				)
+			);
+		};
+
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/**
+	 * Execute one recurring schedule tick.
+	 *
+	 * @param array<string, mixed> $input { schedule_id: string }.
+	 * @return array Result with the fanned-out job ids.
+	 */
+	public static function dispatchSchedule( array $input ): array {
+		$schedule_id = is_string( $input['schedule_id'] ?? null ) ? $input['schedule_id'] : '';
+		if ( '' === $schedule_id ) {
+			return array(
+				'success'     => false,
+				'schedule_id' => '',
+				'job_ids'     => array(),
+				'message'     => 'schedule_id is required.',
+			);
 		}
 
-		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
-			$hook    = RecurringScheduleRegistry::hookFor( $schedule );
-			$enabled = self::isScheduleOwnedByCurrentSite( $schedule )
-				&& RecurringScheduleRegistry::isEnabled( $schedule );
+		$def = RecurringScheduleRegistry::get( $schedule_id );
+		if ( null === $def || ! self::isScheduleOwnedByCurrentSite( $def ) ) {
+			return array(
+				'success'     => false,
+				'schedule_id' => $schedule_id,
+				'job_ids'     => array(),
+				'message'     => 'Unknown schedule or not owned by the current site.',
+			);
+		}
 
-			$options = array();
-			if ( ! empty( $schedule['cron_expression'] ) ) {
-				$options['cron_expression'] = $schedule['cron_expression'];
+		$task_type = (string) ( $def['task_type'] ?? '' );
+		$params    = $def['task_params'] ?? array();
+		if ( ! empty( $def['task_params_callback'] ) && is_callable( $def['task_params_callback'] ) ) {
+			$params = (array) call_user_func( $def['task_params_callback'] );
+		}
+
+		$job_ids = array();
+
+		if ( ! empty( $def['per_agent'] ) ) {
+			$agents_repo = new Agents();
+			$agents      = $agents_repo->get_all();
+
+			if ( empty( $agents ) ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'SystemAgentServiceProvider: per-agent recurring task skipped because no active agents exist',
+					array(
+						'schedule_id' => $schedule_id,
+						'task_type'   => $task_type,
+						'error_code'  => 'recurring_task_agent_context_required',
+					)
+				);
+				// A persistent "no agents" condition is the same class of
+				// silent recurring-binding failure as a gate rejection:
+				// nothing ever runs. Track it so it escalates.
+				RecurringRejectionTracker::record_rejection(
+					$schedule_id,
+					$task_type,
+					'recurring_task_agent_context_required'
+				);
+				return array(
+					'success'     => false,
+					'schedule_id' => $schedule_id,
+					'job_ids'     => array(),
+					'message'     => 'No active agents for per-agent fan-out.',
+				);
 			}
-			if ( ! empty( $schedule['first_run_callback'] ) && is_callable( $schedule['first_run_callback'] ) ) {
-				$first_run = call_user_func( $schedule['first_run_callback'], $schedule['first_run_arg'] ?? null );
-				if ( is_int( $first_run ) && $first_run > 0 ) {
-					$options['first_run_timestamp'] = $first_run;
+
+			// For per-agent schedules, a tick "ran" if at least one
+			// agent fan-out was accepted. Only when every fan-out is
+			// rejected is the recurring binding effectively dead.
+			foreach ( $agents as $agent ) {
+				$agent_id = (int) ( $agent['agent_id'] ?? 0 );
+				$owner_id = (int) ( $agent['owner_id'] ?? 0 );
+
+				if ( $agent_id <= 0 ) {
+					continue;
+				}
+
+				$agent_params             = $params;
+				$agent_params['agent_id'] = $agent_id;
+				$agent_params['user_id']  = $owner_id;
+
+				$scheduled = TaskScheduler::schedule(
+					$task_type,
+					$agent_params,
+					array(
+						'agent_id' => $agent_id,
+						'user_id'  => $owner_id,
+					)
+				);
+				if ( false !== $scheduled ) {
+					$job_ids[] = (int) $scheduled;
 				}
 			}
 
-			$result = RecurringScheduler::ensureSchedule(
-				$hook,
-				array(),
-				$schedule['interval'],
-				$options,
-				$enabled
-			);
-
-			if ( $result instanceof \WP_Error ) {
-				$error_code = $result->get_error_code();
-				$level      = in_array( $error_code, array( 'schedule_lock_timeout', 'schedule_lock_lost' ), true )
-					? 'debug'
-					: 'warning';
-				do_action(
-					'datamachine_log',
-					$level,
-					'Recurring schedule reconciliation failed: ' . $result->get_error_message(),
-					array(
-						'schedule_id' => $schedule['schedule_id'],
-						'task_type'   => $schedule['task_type'],
-						'hook'        => $hook,
-						'interval'    => $schedule['interval'],
-						'error_code'  => $error_code,
-					)
+			if ( array() !== $job_ids ) {
+				RecurringRejectionTracker::record_success( $schedule_id );
+			} else {
+				RecurringRejectionTracker::record_rejection(
+					$schedule_id,
+					$task_type,
+					'task_scheduler_rejected'
 				);
 			}
+
+			return array(
+				'success'     => array() !== $job_ids,
+				'schedule_id' => $schedule_id,
+				'job_ids'     => $job_ids,
+				'message'     => array() !== $job_ids ? 'Per-agent fan-out accepted.' : 'Every agent fan-out was rejected.',
+			);
 		}
+
+		$scheduled = TaskScheduler::schedule( $task_type, $params );
+		if ( false !== $scheduled ) {
+			$job_ids[] = (int) $scheduled;
+			RecurringRejectionTracker::record_success( $schedule_id );
+		} else {
+			RecurringRejectionTracker::record_rejection(
+				$schedule_id,
+				$task_type,
+				'task_scheduler_rejected'
+			);
+		}
+
+		return array(
+			'success'     => array() !== $job_ids,
+			'schedule_id' => $schedule_id,
+			'job_ids'     => $job_ids,
+			'message'     => array() !== $job_ids ? 'Task scheduled.' : 'TaskScheduler rejected the tick.',
+		);
 	}
 
 	/**

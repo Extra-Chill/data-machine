@@ -63,7 +63,7 @@ Queue consumption, fan-out, AI iterations, and recurring flow schedules are inde
 
 ## Scheduling
 
-Action Scheduler is the durable execution queue. `ScheduleFlowAbility`, `Api\Flows\FlowScheduling`, and `Engine\Tasks\RecurringScheduler` own schedule creation, reconciliation, and generation fencing. Supported interval keys come from the scheduling API and `datamachine_scheduler_intervals`; see [Scheduling Intervals](../api/endpoints/intervals.md).
+Action Scheduler is the durable execution queue. Recurring schedules run on Agents API Routines through the `Engine\Scheduling\FlowRoutines` adapter; `ScheduleFlowAbility` and `FlowRoutines::sync()` own schedule creation, and `Registry::reconcile()` covers repair. Supported interval keys come from the scheduling API and `datamachine_scheduler_intervals`; see [Routines Scheduling](routines-scheduling.md) and [Scheduling Intervals](../api/endpoints/intervals.md).
 
 The scheduler also carries recovery metadata and AI-concurrency resume actions. Retry and recovery paths re-enter the same `datamachine/execute-step` ability rather than implementing a parallel engine.
 

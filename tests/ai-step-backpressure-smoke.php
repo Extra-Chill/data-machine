@@ -28,13 +28,13 @@ if ( ! function_exists( 'assert_ai_backpressure_smoke' ) ) {
 	}
 }
 
-$GLOBALS['datamachine_ai_backpressure_options'] = array();
-$GLOBALS['datamachine_ai_backpressure_actions'] = array();
-$GLOBALS['datamachine_ai_backpressure_schedule_error'] = false;
-$GLOBALS['datamachine_ai_backpressure_schedule_calls'] = 0;
-$GLOBALS['datamachine_ai_backpressure_next_action_id'] = 1;
-$GLOBALS['datamachine_ai_backpressure_registered_hooks'] = array();
-$GLOBALS['datamachine_ai_backpressure_ability_inputs'] = array();
+$GLOBALS['datamachine_ai_backpressure_options']                  = array();
+$GLOBALS['datamachine_ai_backpressure_actions']                  = array();
+$GLOBALS['datamachine_ai_backpressure_schedule_error']           = false;
+$GLOBALS['datamachine_ai_backpressure_schedule_calls']           = 0;
+$GLOBALS['datamachine_ai_backpressure_next_action_id']           = 1;
+$GLOBALS['datamachine_ai_backpressure_registered_hooks']         = array();
+$GLOBALS['datamachine_ai_backpressure_ability_inputs']           = array();
 $GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter'] = null;
 
 if ( ! class_exists( 'DataMachineAIBackpressureSmokeAction' ) ) {
@@ -170,7 +170,7 @@ if ( ! function_exists( 'as_schedule_single_action' ) ) {
 			}
 		}
 
-		$action_id = $GLOBALS['datamachine_ai_backpressure_next_action_id']++;
+		$action_id                                        = $GLOBALS['datamachine_ai_backpressure_next_action_id']++;
 		$GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressureSmokeAction(
 			array(
 				'action_id' => $action_id,
@@ -201,7 +201,6 @@ require_once __DIR__ . '/../inc/Core/NetworkSettings.php';
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/OptionLeaseStore.php';
 require_once __DIR__ . '/../inc/Core/ActionScheduler/GroupRegistrar.php';
-require_once __DIR__ . '/../inc/Engine/Tasks/ScheduleActionIdentity.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLease.php';
 require_once __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLimiter.php';
 require_once __DIR__ . '/../inc/Engine/AI/AIConcurrencyBackpressure.php';
@@ -223,7 +222,7 @@ if ( $is_wordpress_runtime ) {
 			? $limit
 			: (int) $GLOBALS['datamachine_ai_backpressure_concurrency_limit_filter'];
 	};
-	$throttle_filter = static fn(): int => 7;
+	$throttle_filter    = static fn(): int => 7;
 	add_filter( 'datamachine_pipeline_ai_concurrency_limit', $concurrency_filter, PHP_INT_MAX );
 	add_filter( 'datamachine_pipeline_ai_throttle_delay', $throttle_filter, PHP_INT_MAX );
 
@@ -316,22 +315,22 @@ $GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressur
 		),
 	)
 );
-$after_advanced_owner = PipelineAIConcurrencyLimiter::acquire( 'openai', array( 'job_id' => 202, 'flow_step_id' => 'ai-new' ) );
+$after_advanced_owner                             = PipelineAIConcurrencyLimiter::acquire( 'openai', array( 'job_id' => 202, 'flow_step_id' => 'ai-new' ) );
 assert_ai_backpressure_smoke( 'advanced owner lease does not block new AI work', true === $after_advanced_owner['acquired'] );
 $after_advanced_owner['lease']->release();
 $GLOBALS['datamachine_ai_backpressure_actions'] = array();
 
 echo "Case 5: production wiring preserves pipeline semantics\n";
 datamachine_register_execution_engine();
-$ai_src       = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';
-$engine_src   = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';
-$retry_src    = file_get_contents( __DIR__ . '/../inc/Core/JobRetryPolicy.php' ) ?: '';
-$backpressure_src = file_get_contents( __DIR__ . '/../inc/Engine/AI/AIConcurrencyBackpressure.php' ) ?: '';
+$ai_src               = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';
+$engine_src           = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';
+$retry_src            = file_get_contents( __DIR__ . '/../inc/Core/JobRetryPolicy.php' ) ?: '';
+$backpressure_src     = file_get_contents( __DIR__ . '/../inc/Engine/AI/AIConcurrencyBackpressure.php' ) ?: '';
 $schedule_failure_src = file_get_contents( __DIR__ . '/../inc/Engine/AI/AIConcurrencyScheduleFailure.php' ) ?: '';
-$reconciler_src = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/LegacyAIConcurrencyReconciler.php' ) ?: '';
-$fetch_src    = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/FetchStep.php' ) ?: '';
-$upsert_files = glob( __DIR__ . '/../inc/Core/Steps/Upsert/*.php' ) ?: array();
-$upsert_src   = implode( "\n", array_map( static fn( string $path ): string => file_get_contents( $path ) ?: '', $upsert_files ) );
+$reconciler_src       = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/LegacyAIConcurrencyReconciler.php' ) ?: '';
+$fetch_src            = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/FetchStep.php' ) ?: '';
+$upsert_files         = glob( __DIR__ . '/../inc/Core/Steps/Upsert/*.php' ) ?: array();
+$upsert_src           = implode( "\n", array_map( static fn( string $path ): string => file_get_contents( $path ) ?: '', $upsert_files ) );
 
 assert_ai_backpressure_smoke( 'AIStep acquires before prompt queue consumption', strpos( $ai_src, 'PipelineAIConcurrencyLimiter::acquire' ) < strpos( $ai_src, 'consumeFromPromptQueue' ) );
 assert_ai_backpressure_smoke( 'AIStep throttles by rescheduling same step', str_contains( $ai_src, 'deferForAIConcurrency' ) && str_contains( $backpressure_src, 'datamachine_resume_ai_step' ) );
@@ -381,10 +380,10 @@ $GLOBALS['datamachine_ai_backpressure_actions'] = array(
 		)
 	),
 );
-$args   = array( 'job_id' => 301, 'flow_step_id' => 'ai-1', 'operation_generation' => 0, 'operation_claim_token' => '', 'ai_resume_generation' => 1 );
+$args      = array( 'job_id' => 301, 'flow_step_id' => 'ai-1', 'operation_generation' => 0, 'operation_claim_token' => '', 'ai_resume_generation' => 1 );
 $same_hook = as_schedule_single_action( $now + 60, 'datamachine_execute_step', $args, 'data-machine', true );
-$first  = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $args );
-$second = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $args );
+$first     = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $args );
+$second    = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $args );
 assert_ai_backpressure_smoke( 'running action blocks same-hook same-group uniqueness regardless of args', 0 === $same_hook );
 assert_ai_backpressure_smoke( 'first continuation is scheduled with a positive ID', $first['success'] && $first['action_id'] > 0 );
 assert_ai_backpressure_smoke( 'dedicated resume hook is not blocked by running execute hook', 'datamachine_resume_ai_step' === $GLOBALS['datamachine_ai_backpressure_actions'][1]->get_field( 'hook' ) );
@@ -395,16 +394,16 @@ $other_job = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 
 assert_ai_backpressure_smoke( 'another job uses a separate uniqueness group', $other_job['success'] && 3 === count( $GLOBALS['datamachine_ai_backpressure_actions'] ) );
 
 $GLOBALS['datamachine_ai_backpressure_schedule_error'] = true;
-$schedule_error = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 'job_id' => 302, 'flow_step_id' => 'ai-1' ) );
+$schedule_error                                        = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 'job_id' => 302, 'flow_step_id' => 'ai-1' ) );
 $GLOBALS['datamachine_ai_backpressure_schedule_error'] = false;
 assert_ai_backpressure_smoke( 'zero without a matching pending action is a retryable scheduling failure', ! $schedule_error['success'] && 0 === $schedule_error['action_id'] && 3 === $schedule_error['attempts'] && $schedule_error['retryable'] );
 assert_ai_backpressure_smoke( 'scheduler call requests native uniqueness', 1 === preg_match( '/\$group,\s+true/', $backpressure_src ) );
 
 $GLOBALS['datamachine_ai_backpressure_schedule_error'] = 1;
-$transient_schedule = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 'job_id' => 304, 'flow_step_id' => 'ai-1' ) );
+$transient_schedule                                    = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 'job_id' => 304, 'flow_step_id' => 'ai-1' ) );
 assert_ai_backpressure_smoke( 'transient scheduler failure succeeds on a bounded retry', $transient_schedule['success'] && 2 === $transient_schedule['attempts'] && ! $transient_schedule['reused'] );
 
-$running_args = array( 'job_id' => 305, 'flow_step_id' => 'ai-1', 'ai_resume_generation' => 1 );
+$running_args                                     = array( 'job_id' => 305, 'flow_step_id' => 'ai-1', 'ai_resume_generation' => 1 );
 $GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressureSmokeAction(
 	array(
 		'action_id' => 905,
@@ -414,7 +413,7 @@ $GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressur
 		'status'    => 'in-progress',
 	)
 );
-$running_schedule = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $running_args );
+$running_schedule                                 = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $running_args );
 assert_ai_backpressure_smoke( 'equivalent in-progress continuation is reused without pending handoff', $running_schedule['success'] && $running_schedule['reused'] && 905 === $running_schedule['action_id'] && 'in-progress' === $running_schedule['action_status'] );
 
 echo "Case 9: slot recovery archives and clears active contention\n";
@@ -432,8 +431,8 @@ assert_ai_backpressure_smoke( 'initial execution mints resume generation one', 1
 assert_ai_backpressure_smoke( 'running generation one atomically mints generation two', 2 === $generation_two['generation'] && 1 === $generation_two['source_generation'] );
 assert_ai_backpressure_smoke( 'duplicate generation-two claim reuses original owner token', 'token-2' === $duplicate_two['token'] );
 
-$generation_one_args = array( 'job_id' => 401, 'flow_step_id' => 'ai-1', 'operation_generation' => 0, 'operation_claim_token' => '', 'ai_resume_generation' => 1 );
-$generation_two_args = array( 'job_id' => 401, 'flow_step_id' => 'ai-1', 'operation_generation' => 0, 'operation_claim_token' => '', 'ai_resume_generation' => 2 );
+$generation_one_args                            = array( 'job_id' => 401, 'flow_step_id' => 'ai-1', 'operation_generation' => 0, 'operation_claim_token' => '', 'ai_resume_generation' => 1 );
+$generation_two_args                            = array( 'job_id' => 401, 'flow_step_id' => 'ai-1', 'operation_generation' => 0, 'operation_claim_token' => '', 'ai_resume_generation' => 2 );
 $GLOBALS['datamachine_ai_backpressure_actions'] = array(
 	new DataMachineAIBackpressureSmokeAction(
 		array(
@@ -445,8 +444,8 @@ $GLOBALS['datamachine_ai_backpressure_actions'] = array(
 		)
 	),
 );
-$scheduled_two = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $generation_two_args );
-$duplicate_schedule_two = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $generation_two_args );
+$scheduled_two                                  = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $generation_two_args );
+$duplicate_schedule_two                         = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $generation_two_args );
 assert_ai_backpressure_smoke( 'running generation one does not block generation two schedule', $scheduled_two['success'] && ! $scheduled_two['reused'] );
 assert_ai_backpressure_smoke( 'duplicate generation two schedule collapses to one action', $duplicate_schedule_two['success'] && $duplicate_schedule_two['reused'] && 2 === count( $GLOBALS['datamachine_ai_backpressure_actions'] ) );
 assert_ai_backpressure_smoke( 'stale generation one replay cannot claim newer ownership', null === AIConcurrencyBackpressure::beginGenerationState( $generation_two, 'ai-1', 1, $now + 3 ) );

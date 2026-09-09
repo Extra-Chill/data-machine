@@ -57,7 +57,7 @@ class JobCompleteHandler {
 			: (array) $stored_scheduling;
 
 		if ( ( $scheduling['interval'] ?? '' ) === 'one_time' ) {
-			$result = \DataMachine\Api\Flows\FlowScheduling::handle_scheduling_update(
+			$result = \DataMachine\Engine\Scheduling\FlowRoutines::sync(
 				$flow_id,
 				array( 'interval' => 'manual' ),
 				true
@@ -69,7 +69,7 @@ class JobCompleteHandler {
 					'One-time flow completion left schedule reconciliation drift',
 					array_merge(
 						array( 'flow_id' => $flow_id ),
-						\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result )
+						array( 'error' => $result->get_error_message() )
 					)
 				);
 			}

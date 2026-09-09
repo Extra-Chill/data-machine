@@ -201,24 +201,23 @@ class SystemCommand extends BaseCommand {
 					WP_CLI::log( sprintf( '  WP-Cron lag:    %d seconds', (int) $wp_cron['action_scheduler_run_queue_overdue_seconds'] ) );
 				}
 			}
-			if ( isset( $check_result['daily_memory'] ) && is_array( $check_result['daily_memory'] ) ) {
-				$daily_memory = $check_result['daily_memory'];
-				if ( ! empty( $daily_memory['next_pending_gmt'] ) ) {
-					WP_CLI::log( sprintf( '  Daily memory:   next %s GMT', $daily_memory['next_pending_gmt'] ) );
+			if ( isset( $check_result['routines'] ) && is_array( $check_result['routines'] ) ) {
+				$routines = $check_result['routines'];
+				if ( ! empty( $routines['next_pending_gmt'] ) ) {
+					WP_CLI::log( sprintf( '  Routines:       next %s GMT', $routines['next_pending_gmt'] ) );
 				}
-				if ( ! empty( $daily_memory['last_attempt_gmt'] ) ) {
-					WP_CLI::log( sprintf( '  Daily memory:   last attempted %s GMT', $daily_memory['last_attempt_gmt'] ) );
+				if ( ! empty( $routines['last_attempt_gmt'] ) ) {
+					WP_CLI::log( sprintf( '  Routines:       last attempted %s GMT', $routines['last_attempt_gmt'] ) );
 				}
 			}
 			if ( isset( $check_result['flow_schedule_coverage'] ) && is_array( $check_result['flow_schedule_coverage'] ) ) {
 				$coverage = $check_result['flow_schedule_coverage'];
 				WP_CLI::log(
 					sprintf(
-						'  Flow schedules: %d covered, %d missing, %d blocked, %d invalid',
+						'  Flow schedules: %d covered, %d missing, %d orphaned removed',
 						(int) ( $coverage['covered'] ?? 0 ),
-						(int) ( $coverage['remaining_missing'] ?? 0 ),
-						(int) ( $coverage['blocked'] ?? 0 ),
-						(int) ( $coverage['invalid'] ?? 0 )
+						(int) ( $coverage['missing'] ?? 0 ),
+						(int) ( $coverage['removed'] ?? 0 )
 					)
 				);
 			}

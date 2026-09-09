@@ -163,9 +163,9 @@ namespace DataMachine\Engine\Debug {
 	class SyncRunner {}
 }
 
-namespace DataMachine\Engine\Tasks {
-	class RecurringScheduler {
-		public static function looksLikeCronExpression( string $value ): bool {
+namespace DataMachine\Engine\Scheduling {
+	class FlowRoutines {
+		public static function looks_like_cron_expression( string $value ): bool {
 			return false;
 		}
 	}
@@ -262,10 +262,10 @@ namespace DataMachine\Core\Database\Flows {
 
 		public function compare_and_swap_flow_config( int $flow_id, string $expected, array $replacement ): bool {
 			if ( $GLOBALS['flow_config_cli_conflict'] ) {
-				$current                                  = json_decode( $GLOBALS['flow_config_cli_raw'], true );
-				$current['step']['prompt_queue'][]         = array( 'prompt' => 'concurrent work' );
-				$GLOBALS['flow_config_cli_raw']             = json_encode( $current );
-				$GLOBALS['flow_config_cli_conflict']        = false;
+				$current                             = json_decode( $GLOBALS['flow_config_cli_raw'], true );
+				$current['step']['prompt_queue'][]   = array( 'prompt' => 'concurrent work' );
+				$GLOBALS['flow_config_cli_raw']      = json_encode( $current );
+				$GLOBALS['flow_config_cli_conflict'] = false;
 			}
 
 			$GLOBALS['flow_config_cli_cas_calls'][] = array(
@@ -322,7 +322,7 @@ $semantic = array(
 	'path'       => 'C:\\Temp\\events.json',
 	'regexp'     => '\\d+\\s+events',
 );
-$json = json_encode( $semantic );
+$json     = json_encode( $semantic );
 
 echo "=== Flow config CLI round trips (#2914) ===\n";
 
@@ -419,7 +419,7 @@ $message = 'Process start/end from C:\\Temp with \\d+ items.';
 flow_config_cli_invoke( 'updateFlow', array( 52, array( 'step' => 'step', 'set-user-message' => $message ) ) );
 flow_config_cli_assert_same( $message, $GLOBALS['flow_config_cli_ability_calls'][0]['input']['user_message'] ?? null, 'set-user-message preserves semantic backslashes' );
 
-$corrupt = array(
+$corrupt                        = array(
 	'step' => array(
 		'source_url'   => 'https:\\/\\/example.com\\/',
 		'prompt_queue' => array( array( 'prompt' => 'Process start\\/end.' ) ),

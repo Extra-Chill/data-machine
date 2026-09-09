@@ -26,7 +26,6 @@ final class AlwaysOnServiceProvider {
 
 		\DataMachine\Core\ActionScheduler\LogPersistencePolicy::register();
 		\DataMachine\Core\Database\CanonicalPersistencePolicy::register();
-		\DataMachine\Engine\Tasks\RecurringScheduler::registerGenerationFence();
 
 		add_action(
 			'action_scheduler_init',

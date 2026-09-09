@@ -28,7 +28,6 @@ use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Agents\Agents as AgentsRepository;
@@ -40,7 +39,6 @@ use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Policy\DataMachineAgentToolPolicyProvider;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
-use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
@@ -125,9 +123,9 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	private PipelinesRepository $pipelines_repo;
 	private FlowsRepository $flows_repo;
 	private int $owner_id;
-	private $memory_store_filter = null;
+	private $memory_store_filter            = null;
 	private $agent_config_projection_filter = null;
-	private $transaction_available_filter = null;
+	private $transaction_available_filter   = null;
 
 	public function set_up(): void {
 		parent::set_up();
@@ -226,7 +224,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	}
 
 	public function test_legacy_import_persists_template_metadata_with_existing_precedence(): void {
-		$bundle = $this->fixture_bundle( 'template-metadata-agent' );
+		$bundle                      = $this->fixture_bundle( 'template-metadata-agent' );
 		$bundle['template_slug']     = 'top-level-template';
 		$bundle['template_version']  = ' 4.5.6 ';
 		$bundle['source_ref']        = ' refs/tags/v4.5.6 ';
@@ -256,7 +254,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	}
 
 	public function test_legacy_import_preserves_explicit_empty_template_slug_semantics(): void {
-		$bundle = $this->fixture_bundle( 'empty-template-slug-agent' );
+		$bundle                  = $this->fixture_bundle( 'empty-template-slug-agent' );
 		$bundle['template_slug'] = '';
 		$bundle['template']      = array(
 			'slug'    => 'nested-template',
@@ -273,7 +271,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	}
 
 	public function test_legacy_import_rejects_explicit_empty_template_version(): void {
-		$bundle = $this->fixture_bundle( 'empty-template-version-agent' );
+		$bundle                     = $this->fixture_bundle( 'empty-template-version-agent' );
 		$bundle['template_version'] = ' ';
 		$bundle['template']         = array( 'version' => '2.0.0' );
 
@@ -284,7 +282,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	}
 
 	public function test_legacy_import_validates_nested_source_metadata_before_mutation(): void {
-		$bundle = $this->fixture_bundle( 'oversized-source-agent' );
+		$bundle                      = $this->fixture_bundle( 'oversized-source-agent' );
 		$bundle['template_metadata'] = array( 'source_ref' => str_repeat( 'x', 192 ) );
 
 		$this->expectException( BundleValidationException::class );
@@ -298,7 +296,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	}
 
 	public function test_import_honors_scheduled_bundle_flows_on_create(): void {
-		$bundle = $this->fixture_bundle( 'scheduled-agent' );
+		$bundle                                  = $this->fixture_bundle( 'scheduled-agent' );
 		$bundle['flows'][0]['scheduling_config'] = array(
 			'enabled'  => true,
 			'interval' => 'daily',
@@ -342,8 +340,8 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	}
 
 	public function test_flow_config_strings_are_idempotent_across_import_and_export_round_trips(): void {
-		$bundle = $this->fixture_bundle( 'flow-string-round-trip-agent' );
-		$step   = &$bundle['flows'][0]['flow_config']['1_step-uuid_1'];
+		$bundle                  = $this->fixture_bundle( 'flow-string-round-trip-agent' );
+		$step                    = &$bundle['flows'][0]['flow_config']['1_step-uuid_1'];
 		$step['step_type']       = 'fetch';
 		$step['handler_slugs']   = array( 'fixture' );
 		$step['handler_configs'] = array(
@@ -468,7 +466,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'enabled'            => false,
 			)
 		);
-		$bundle['flows'][0]['scheduling_config'] = array(
+		$bundle['flows'][0]['scheduling_config']            = array(
 			'enabled'  => true,
 			'interval' => 'daily',
 			'max_items' => array(
@@ -631,9 +629,9 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->memory_store_filter = static fn( $default, array $context ) => $store;
 		add_filter( 'wp_agent_memory_store', $this->memory_store_filter, 10, 2 );
 
-		$bundle = $this->fixture_bundle( 'daily-memory-agent' );
+		$bundle                                 = $this->fixture_bundle( 'daily-memory-agent' );
 		$bundle['files']['daily/2026/05/09.md'] = "# Daily Memory: 2026-05-09\n\nImported bundle memory with alpha-sentinel.\n";
-		$bundle_dir = sys_get_temp_dir() . '/datamachine-daily-memory-bundle-' . getmypid();
+		$bundle_dir                             = sys_get_temp_dir() . '/datamachine-daily-memory-bundle-' . getmypid();
 		$this->remove_tree( $bundle_dir );
 		$this->assertTrue( $this->bundler->to_directory( $bundle, $bundle_dir ), 'Bundle directory write succeeds.' );
 		$this->assertFileExists( $bundle_dir . '/memory/agent/daily/2026/05/09.md', 'Daily memory is represented under memory/agent/daily in the bundle directory.' );
@@ -675,11 +673,11 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		add_filter( 'wp_agent_memory_store', $this->memory_store_filter, 10, 2 );
 
 		// Fresh install: a flow-less, memory-bearing bundle carrying authored SOUL.
-		$bundle                          = $this->fixture_bundle( 'soul-upgrade-agent' );
-		$bundle['pipelines']             = array();
-		$bundle['flows']                 = array();
-		$bundle['files']['SOUL.md']      = "# Identity\n\noriginal soul\n";
-		$bundle_dir                      = sys_get_temp_dir() . '/datamachine-soul-bundle-' . getmypid();
+		$bundle                     = $this->fixture_bundle( 'soul-upgrade-agent' );
+		$bundle['pipelines']        = array();
+		$bundle['flows']            = array();
+		$bundle['files']['SOUL.md'] = "# Identity\n\noriginal soul\n";
+		$bundle_dir                 = sys_get_temp_dir() . '/datamachine-soul-bundle-' . getmypid();
 		$this->remove_tree( $bundle_dir );
 		$this->assertTrue( $this->bundler->to_directory( $bundle, $bundle_dir ), 'Bundle directory write succeeds.' );
 		$install_bundle = $this->bundler->from_directory( $bundle_dir );
@@ -746,7 +744,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 			$this->markTestSkipped( 'Action Scheduler functions are required for schedule re-enqueue assertions.' );
 		}
 
-		$bundle = $this->fixture_bundle( 'scheduled-action-repair-agent' );
+		$bundle                                  = $this->fixture_bundle( 'scheduled-action-repair-agent' );
 		$bundle['flows'][0]['scheduling_config'] = array(
 			'enabled'  => true,
 			'interval' => 'daily',
@@ -763,13 +761,8 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
 		$flow_id  = (int) $flow['flow_id'];
 
-		RecurringScheduler::unschedule(
-			FlowScheduling::FLOW_HOOK,
-			array( $flow_id ),
-			GroupRegistrar::GROUP,
-			array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
-		);
-		$this->assertFalse( RecurringScheduler::hasLogicalCoverage( FlowScheduling::FLOW_HOOK, array( $flow_id ), GroupRegistrar::GROUP ), 'Test setup removes the scheduled action while preserving flow row scheduling.' );
+		\DataMachine\Engine\Scheduling\FlowRoutines::unschedule( $flow_id );
+		$this->assertSame( null, as_next_scheduled_action( \DataMachine\Engine\Scheduling\FlowRoutines::ROUTINE_HOOK, array( 'routine_id' => \DataMachine\Engine\Scheduling\FlowRoutines::routine_id( $flow_id ) ), \DataMachine\Engine\Scheduling\FlowRoutines::ROUTINE_GROUP ), 'Test setup removes the scheduled action while preserving flow row scheduling.' );
 
 		$second = $this->bundler->import(
 			$bundle,
@@ -780,7 +773,11 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 
 		$this->assertTrue( (bool) $second['success'], 'Upgrade import succeeds when only the scheduled action is missing.' );
-		$this->assertTrue( RecurringScheduler::hasLogicalCoverage( FlowScheduling::FLOW_HOOK, array( $flow_id ), GroupRegistrar::GROUP ), 'Importer re-creates the missing scheduled action for an enabled non-manual flow.' );
+		$this->assertGreaterThan(
+			0,
+			(int) as_next_scheduled_action( \DataMachine\Engine\Scheduling\FlowRoutines::ROUTINE_HOOK, array( 'routine_id' => \DataMachine\Engine\Scheduling\FlowRoutines::routine_id( $flow_id ) ), \DataMachine\Engine\Scheduling\FlowRoutines::ROUTINE_GROUP ),
+			'Importer re-creates the missing scheduled action for an enabled non-manual flow.'
+		);
 	}
 
 	public function test_reconcile_runtime_replaces_local_modified_flow_queue_and_schedule(): void {
@@ -806,7 +803,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'queue_mode'         => 'loop',
 			)
 		);
-		$bundle['flows'][0]['scheduling_config'] = array(
+		$bundle['flows'][0]['scheduling_config']            = array(
 			'enabled'  => true,
 			'interval' => 'daily',
 			'max_items' => array(
@@ -854,9 +851,9 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 
 		$upgrade = $bundle;
-		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['handler_config']['max_items'] = 50;
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['handler_config']['max_items']         = 50;
 		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['handler_configs']['mcp']['max_items'] = 50;
-		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['config_patch_queue'] = array(
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['config_patch_queue']                  = array(
 			array( 'patch' => array( 'query' => 'target-a' ) ),
 			array( 'patch' => array( 'query' => 'target-b' ) ),
 			array( 'patch' => array( 'query' => 'target-c' ) ),
@@ -912,7 +909,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'queue_mode'         => 'loop',
 			)
 		);
-		$bundle['flows'][0]['scheduling_config'] = array(
+		$bundle['flows'][0]['scheduling_config']            = array(
 			'enabled'   => false,
 			'interval'  => 'manual',
 			'max_items' => array( 'mcp' => 5 ),
@@ -927,12 +924,12 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$config   = $flow['flow_config'];
 		$step_id  = array_key_first( $config );
 
-		$config[ $step_id ]['config_patch_queue'] = array(
+		$config[ $step_id ]['config_patch_queue']                  = array(
 			array( 'patch' => array( 'query' => 'live-a' ) ),
 			array( 'patch' => array( 'query' => 'live-b' ) ),
 		);
-		$config[ $step_id ]['queue_mode'] = 'drain';
-		$config[ $step_id ]['_queue_consume_revision'] = 'live-rev';
+		$config[ $step_id ]['queue_mode']                          = 'drain';
+		$config[ $step_id ]['_queue_consume_revision']             = 'live-rev';
 		$config[ $step_id ]['handler_configs']['mcp']['max_items'] = 1;
 		$this->flows_repo->update_flow(
 			(int) $flow['flow_id'],
@@ -947,11 +944,11 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 
 		$upgrade = $bundle;
-		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['config_patch_queue'] = array(
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['config_patch_queue']                  = array(
 			array( 'patch' => array( 'query' => 'target-a' ) ),
 			array( 'patch' => array( 'query' => 'target-b' ) ),
 		);
-		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['queue_mode'] = 'loop';
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['queue_mode']                          = 'loop';
 		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['handler_configs']['mcp']['max_items'] = 50;
 		$upgrade['flows'][0]['scheduling_config'] = array(
 			'enabled'   => false,
@@ -1059,10 +1056,10 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	}
 
 	public function test_subagent_skill_policy_survives_persisted_graph_projection(): void {
-		$bundle                              = $this->fixture_bundle( 'policy-coordinator' );
-		$bundle['agent']['subagents']        = array( 'policy-writer' );
-		$bundle['agent']['tool_policy']      = array( 'mode' => 'allow', 'tools' => array( 'datamachine/search' ) );
-		$bundle['subagents']                 = array(
+		$bundle                         = $this->fixture_bundle( 'policy-coordinator' );
+		$bundle['agent']['subagents']   = array( 'policy-writer' );
+		$bundle['agent']['tool_policy'] = array( 'mode' => 'allow', 'tools' => array( 'datamachine/search' ) );
+		$bundle['subagents']            = array(
 			array(
 				'slug'         => 'policy-writer',
 				'label'        => 'Policy Writer',
@@ -1107,7 +1104,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'memory' => array(), 'tool_policy' => array(), 'skills' => array(), 'references' => array(), 'subagents' => array(),
 			),
 		);
-		$remove_graph_capability = static fn( array $capabilities ): array => array_values( array_diff( $capabilities, array( AgentSubagentGraph::CAPABILITY ) ) );
+		$remove_graph_capability      = static fn( array $capabilities ): array => array_values( array_diff( $capabilities, array( AgentSubagentGraph::CAPABILITY ) ) );
 		add_filter( 'datamachine_agent_bundle_host_capabilities', $remove_graph_capability );
 
 		try {
@@ -1176,7 +1173,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		};
 		add_filter( 'datamachine_agent_config_artifact_projection_policies', $this->agent_config_projection_filter, 10, 1 );
 
-		$bundle = $this->fixture_bundle( 'context-agent' );
+		$bundle                          = $this->fixture_bundle( 'context-agent' );
 		$bundle['agent']['agent_config'] = array(
 			'example' => array(
 				'runtime_endpoints' => array(
@@ -1251,17 +1248,17 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'merge'    => 'preserve_local',
 				'reason'   => 'preserve_plugin_runtime_config',
 			);
-			$policies['example.auth_refs'] = array(
+			$policies['example.auth_refs']         = array(
 				'tracking' => 'exclude',
 				'merge'    => 'preserve_local',
 				'reason'   => 'preserve_plugin_runtime_config',
 			);
-			$policies['plugin_runtime'] = array(
+			$policies['plugin_runtime']            = array(
 				'tracking' => 'exclude',
 				'merge'    => 'preserve_local',
 				'reason'   => 'preserve_plugin_runtime_config',
 			);
-			$policies['backup_private'] = array(
+			$policies['backup_private']            = array(
 				'tracking'      => 'exclude',
 				'backup_egress' => 'exclude',
 				'merge'         => 'preserve_local',
@@ -1277,7 +1274,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 			'backup_private'     => array( 'token' => 'grandchild-secret' ),
 			'datamachine_bundle' => array( 'source_revision' => 'grandchild-source-revision' ),
 		);
-		$grandchild_id = $this->agents_repo->create_if_missing( 'backup-grandchild', 'Backup Grandchild', $this->owner_id, $grandchild_config, 7 );
+		$grandchild_id     = $this->agents_repo->create_if_missing( 'backup-grandchild', 'Backup Grandchild', $this->owner_id, $grandchild_config, 7 );
 		$this->assertIsInt( $grandchild_id );
 
 		$child_config = array(
@@ -1287,7 +1284,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 			'datamachine_bundle' => array( 'source_revision' => 'child-source-revision' ),
 			'subagents'          => array( 'backup-grandchild' ),
 		);
-		$child_id = $this->agents_repo->create_if_missing( 'backup-child', 'Backup Child', $this->owner_id, $child_config, 7 );
+		$child_id     = $this->agents_repo->create_if_missing( 'backup-child', 'Backup Child', $this->owner_id, $child_config, 7 );
 		$this->assertIsInt( $child_id );
 		$coordinator_id = $this->agents_repo->create_if_missing(
 			'profile-coordinator',
@@ -1316,7 +1313,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 				'source_revision'  => 'source-only-revision',
 			),
 		);
-		$source_id = $this->agents_repo->create_if_missing( 'backup-source', 'Backup Source', $this->owner_id, $source_config, 7 );
+		$source_id     = $this->agents_repo->create_if_missing( 'backup-source', 'Backup Source', $this->owner_id, $source_config, 7 );
 		$this->assertIsInt( $source_id );
 
 		$exports = array();
@@ -1355,9 +1352,9 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 			'backup-grandchild' => 'https://grandchild-runtime.example.test',
 		);
 		foreach ( $subagent_endpoints as $subagent_slug => $expected_endpoint ) {
-			$share_child      = $share_subagents[ $subagent_slug ]['agent_config'] ?? array();
-			$backup_child     = $backup_subagents[ $subagent_slug ]['agent_config'] ?? array();
-			$fork_child       = $fork_subagents[ $subagent_slug ]['agent_config'] ?? array();
+			$share_child  = $share_subagents[ $subagent_slug ]['agent_config'] ?? array();
+			$backup_child = $backup_subagents[ $subagent_slug ]['agent_config'] ?? array();
+			$fork_child   = $fork_subagents[ $subagent_slug ]['agent_config'] ?? array();
 
 			$this->assertArrayNotHasKey( 'plugin_runtime', $share_child, "Share applies tracking exclusions to {$subagent_slug}." );
 			$this->assertArrayNotHasKey( 'plugin_runtime', $fork_child, "Fork applies tracking exclusions to {$subagent_slug}." );

@@ -95,43 +95,19 @@ class DeletePipelineAbility {
 				continue;
 			}
 
-			$schedule_result = \DataMachine\Engine\Tasks\RecurringScheduler::commitDesiredSchedule(
-				'datamachine_run_flow_now',
-				array( $flow_id ),
-				'manual',
-				array( 'generation_argument_index' => \DataMachine\Api\Flows\FlowScheduling::GENERATION_ARGUMENT_INDEX ),
-				true,
-				fn(): bool => $this->db_flows->delete_flow( $flow_id ),
-				static function ( $result ) use ( $flow_id ): bool {
-					if ( is_wp_error( $result ) ) {
-						do_action(
-							'datamachine_log',
-							'error',
-							'Deleted pipeline flow has schedule reconciliation drift',
-							array_merge(
-								array( 'flow_id' => $flow_id ),
-								\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $result )
-							)
-						);
-					}
-					return true;
-				}
-			);
-			if ( is_wp_error( $schedule_result ) ) {
-				$schedule_failures[ $flow_id ] = array_merge(
-					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result ),
-					array( 'desired_state_committed' => null === $this->db_flows->get_flow( $flow_id ) )
-				);
+			// Cancel the flow's routine and one-time schedules first, then
+			// delete the row. A failed delete leaves the flow persisted but
+			// unscheduled, which is visible as manual rather than silently wrong.
+			\DataMachine\Engine\Scheduling\FlowRoutines::unschedule( $flow_id );
+
+			if ( ! $this->db_flows->delete_flow( $flow_id ) ) {
+				$schedule_failures[ $flow_id ] = array( 'desired_state_committed' => false );
 				continue;
 			}
 			++$deleted_flows;
 		}
 
-		$commit_failures = array_filter(
-			$schedule_failures,
-			static fn(array $failure): bool => empty( $failure['desired_state_committed'] )
-		);
-		if ( ! empty( $commit_failures ) ) {
+		if ( ! empty( $schedule_failures ) ) {
 			return new \WP_Error(
 				'pipeline_flow_deletion_incomplete',
 				'Pipeline deletion did not commit every flow deletion.',

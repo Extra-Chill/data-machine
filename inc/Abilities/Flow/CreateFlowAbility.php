@@ -11,9 +11,8 @@
 namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Abilities\AbilityRegistration;
-use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Core\Database\TransactionScope;
-use DataMachine\Engine\Tasks\RecurringScheduler;
+use DataMachine\Engine\Scheduling\FlowRoutines;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -270,7 +269,7 @@ class CreateFlowAbility {
 		}
 
 		if ( isset( $scheduling_config['interval'] ) && 'manual' !== $scheduling_config['interval'] ) {
-			$scheduling_result = FlowScheduling::handle_scheduling_update( $flow_id, $scheduling_config, true );
+			$scheduling_result = FlowRoutines::sync( $flow_id, $scheduling_config, true );
 			if ( is_wp_error( $scheduling_result ) ) {
 				do_action(
 					'datamachine_log',
@@ -322,10 +321,9 @@ class CreateFlowAbility {
 
 		if ( $validate_only ) {
 			$this->rollbackCreationTransactionScope( $transaction_scope );
-			RecurringScheduler::invalidateGenerationCache( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
 			$schedule_error = $this->compensateFlowSchedule( $flow_id );
 			if ( $schedule_error ) {
-				return new \WP_Error( 'flow_schedule_cleanup_failed', $schedule_error->get_error_message(), array( 'status' => 500 ) + RecurringScheduler::errorMetadata( $schedule_error ) );
+				return new \WP_Error( 'flow_schedule_cleanup_failed', $schedule_error->get_error_message(), array( 'status' => 500 ) );
 			}
 
 			return array(
@@ -388,7 +386,6 @@ class CreateFlowAbility {
 	 */
 	private function rollbackCreation( TransactionScope $transaction_scope, int $flow_id, string $error, array $configuration_errors = array() ): \WP_Error {
 		$this->rollbackCreationTransactionScope( $transaction_scope );
-		RecurringScheduler::invalidateGenerationCache( FlowScheduling::FLOW_HOOK, array( $flow_id ) );
 		$schedule_error = $this->compensateFlowSchedule( $flow_id );
 
 		$data = array( 'status' => 500 );
@@ -396,7 +393,7 @@ class CreateFlowAbility {
 			$data['configuration_errors'] = $configuration_errors;
 		}
 		if ( $schedule_error ) {
-			$data['schedule_cleanup'] = RecurringScheduler::errorMetadata( $schedule_error );
+			$data['schedule_cleanup'] = array( 'error' => $schedule_error->get_error_message() );
 		}
 
 		return new \WP_Error( 'flow_creation_failed', $error, $data );
@@ -431,18 +428,13 @@ class CreateFlowAbility {
 	}
 
 	/**
-	 * Remove any Action Scheduler side effect created for a rolled-back flow.
+	 * Remove any scheduling side effect created for a rolled-back flow.
 	 *
 	 * @param int $flow_id Flow ID allocated in this scope.
 	 */
 	private function compensateFlowSchedule( int $flow_id ): ?\WP_Error {
-		$result = RecurringScheduler::ensureSchedule(
-			FlowScheduling::FLOW_HOOK,
-			array( $flow_id ),
-			'manual',
-			array( 'generation_argument_index' => FlowScheduling::GENERATION_ARGUMENT_INDEX )
-		);
-		return is_wp_error( $result ) ? $result : null;
+		FlowRoutines::unschedule( $flow_id );
+		return null;
 	}
 
 	/**

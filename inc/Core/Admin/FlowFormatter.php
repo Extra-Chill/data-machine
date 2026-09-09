@@ -157,48 +157,11 @@ class FlowFormatter {
 			return null;
 		}
 
-		if ( ! self::is_action_scheduler_datastore_ready() ) {
-			return null;
-		}
-
-		$next_timestamp = \DataMachine\Engine\Tasks\RecurringScheduler::nextLogicalScheduledAction(
-			'datamachine_run_flow_now',
-			array( $flow_id ),
-			'data-machine'
-		);
-
-		if ( ! is_int( $next_timestamp ) || $next_timestamp <= 0 ) {
-			return null;
-		}
-
-		$formatted = wp_date( 'Y-m-d H:i:s', $next_timestamp, new \DateTimeZone( 'UTC' ) );
-
-		return is_string( $formatted ) ? $formatted : null;
-	}
-
-	/**
-	 * Check whether Action Scheduler's datastore is ready for procedural API reads.
-	 *
-	 * @return bool True when Action Scheduler can safely query scheduled actions.
-	 */
-	private static function is_action_scheduler_datastore_ready(): bool {
-		if ( function_exists( 'did_action' ) && 0 === did_action( 'action_scheduler_init' ) ) {
-			return false;
-		}
-
-		if ( ! class_exists( '\ActionScheduler' ) ) {
-			return true;
-		}
-
-		return \ActionScheduler::is_initialized();
+		return \DataMachine\Engine\Scheduling\FlowRoutines::next_run( $flow_id );
 	}
 
 	/**
 	 * Batch-fetch next run times for multiple flows in a single query.
-	 *
-	 * Replaces per-flow as_next_scheduled_action() calls (N queries → 1).
-	 * Identity matching is delegated to ScheduleActionIdentity so pending
-	 * actions resolve across legacy and generated argument shapes (#3462).
 	 *
 	 * @since 0.55.0
 	 *
@@ -206,30 +169,6 @@ class FlowFormatter {
 	 * @return array<int, string|null> Flow ID → next run datetime (UTC) or null.
 	 */
 	public static function batch_get_next_run_times( array $flow_ids ): array {
-		$result = array_fill_keys( array_map( 'intval', $flow_ids ), null );
-
-		if ( empty( $flow_ids ) ) {
-			return $result;
-		}
-
-		$logical_args = array();
-		foreach ( $flow_ids as $flow_id ) {
-			$flow_id                  = (int) $flow_id;
-			$logical_args[ $flow_id ] = array( $flow_id );
-		}
-
-		$dates = \DataMachine\Engine\Tasks\ScheduleActionIdentity::nextScheduledDates(
-			'datamachine_run_flow_now',
-			$logical_args
-		);
-
-		foreach ( array_keys( $logical_args ) as $flow_id ) {
-			$date = $dates[ $flow_id ] ?? null;
-			if ( is_string( $date ) ) {
-				$result[ $flow_id ] = $date;
-			}
-		}
-
-		return $result;
+		return \DataMachine\Engine\Scheduling\FlowRoutines::next_runs( $flow_ids );
 	}
 }

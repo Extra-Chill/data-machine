@@ -40,7 +40,7 @@ These adapters commonly execute abilities, but they are not accidental wrappers 
 
 ### Execution and Scheduling
 
-Action Scheduler is the durable queue. The hooks `datamachine_run_flow_now`, `datamachine_execute_step`, `datamachine_schedule_next_step`, and `datamachine_run_flow_later` are scheduler-compatible bridges into engine abilities. `RecurringScheduler` and the flow scheduling API own recurring schedule reconciliation and generation fencing; they are not a second workflow engine.
+Action Scheduler is the durable queue. The hooks `datamachine_run_flow_now`, `datamachine_execute_step`, `datamachine_schedule_next_step`, `datamachine_run_flow_later`, and `datamachine_run_flow_once` are scheduler-compatible bridges into engine abilities. Recurring schedules run on Agents API Routines through the `Engine\Scheduling\FlowRoutines` adapter (see [Routines Scheduling](core-system/routines-scheduling.md)); they are not a second workflow engine.
 
 The engine normally processes one primary item per child job. A fetch step may produce multiple packets, in which case `PipelineBatchScheduler` fans them out into isolated child jobs. Queue consumption, batch fan-out, per-step iteration, and recurring runs are separate execution axes. See [Pipeline Execution Axes](architecture/pipeline-execution-axes.md).
 

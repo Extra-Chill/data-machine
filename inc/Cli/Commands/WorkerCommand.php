@@ -600,7 +600,9 @@ class WorkerCommand extends BaseCommand {
 	 */
 	private static function bootstrapHooks(): array {
 		return array(
+			\DataMachine\Engine\Scheduling\FlowRoutines::ROUTINE_HOOK,
 			'datamachine_run_flow_now',
+			'datamachine_run_flow_once',
 			'datamachine_recurring_wiki_brain_refill',
 			'datamachine_recurring_wiki_generated_page_decision',
 			'datamachine_recurring_wiki_graph_maintain',

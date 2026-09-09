@@ -120,8 +120,8 @@ function datamachine_validate_interval( string $interval, array $config = array(
 		return $validation;
 	}
 
-	// Cron expressions are valid (further validation happens in RecurringScheduler).
-	if ( \DataMachine\Engine\Tasks\RecurringScheduler::looksLikeCronExpression( $interval ) ) {
+	// Cron expressions are valid (further validation happens in FlowRoutines).
+	if ( \DataMachine\Engine\Scheduling\FlowRoutines::looks_like_cron_expression( $interval ) ) {
 		return array(
 			'valid'    => true,
 			'resolved' => $interval,

@@ -10,7 +10,7 @@
 
 namespace DataMachine\Abilities\Flow;
 
-use DataMachine\Api\Flows\FlowScheduling;
+use DataMachine\Engine\Scheduling\FlowRoutines;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -188,7 +188,7 @@ class DuplicateFlowAbility {
 		);
 
 		if ( isset( $scheduling_config['interval'] ) && 'manual' !== $scheduling_config['interval'] ) {
-			$scheduling_result = FlowScheduling::handle_scheduling_update( $new_flow_id, $scheduling_config );
+			$scheduling_result = FlowRoutines::sync( $new_flow_id, $scheduling_config );
 			if ( is_wp_error( $scheduling_result ) ) {
 				do_action(
 					'datamachine_log',

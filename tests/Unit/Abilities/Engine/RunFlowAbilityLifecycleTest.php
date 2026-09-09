@@ -11,8 +11,6 @@ use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
-use DataMachine\Api\Flows\FlowScheduling;
-use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Core\JobStatus;
 use WP_UnitTestCase;
 
@@ -38,7 +36,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 	public function tear_down(): void {
 		remove_action( 'datamachine_schedule_next_step', $this->schedule_capture, 1 );
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( FlowScheduling::FLOW_HOOK );
+			as_unschedule_all_actions( 'datamachine_run_flow_now' );
 		}
 		wp_set_current_user( 0 );
 
@@ -98,7 +96,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 				'user_id'         => get_current_user_id(),
 			)
 		);
-		$flow_id = ( new Flows() )->create_flow(
+		$flow_id     = ( new Flows() )->create_flow(
 			array(
 				'pipeline_id'       => $pipeline_id,
 				'flow_name'         => 'Backpressure Flow',
@@ -177,9 +175,9 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 		$pending_ids = \ActionScheduler_Store::instance()->query_actions(
 			array(
-				'hook'     => FlowScheduling::FLOW_HOOK,
+				'hook'     => 'datamachine_run_flow_now',
 				'args'     => array( $flow_id ),
-				'group'    => RecurringScheduler::GROUP,
+				'group'    => 'data-machine',
 				'status'   => \ActionScheduler_Store::STATUS_PENDING,
 				'per_page' => 10,
 			)
@@ -276,9 +274,9 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 	private function first_pending_tick_action_id( int $flow_id ): int {
 		$ids = \ActionScheduler_Store::instance()->query_actions(
 			array(
-				'hook'     => FlowScheduling::FLOW_HOOK,
+				'hook'     => 'datamachine_run_flow_now',
 				'args'     => array( $flow_id ),
-				'group'    => RecurringScheduler::GROUP,
+				'group'    => 'data-machine',
 				'status'   => \ActionScheduler_Store::STATUS_PENDING,
 				'per_page' => 1,
 			)
@@ -299,7 +297,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 				'user_id'         => get_current_user_id(),
 			)
 		);
-		$flow_id = ( new Flows() )->create_flow(
+		$flow_id     = ( new Flows() )->create_flow(
 			array(
 				'pipeline_id'       => $pipeline_id,
 				'flow_name'         => 'No Throttle Flow',

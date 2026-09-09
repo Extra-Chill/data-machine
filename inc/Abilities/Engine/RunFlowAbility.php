@@ -18,7 +18,6 @@ use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\JobStatus;
 use DataMachine\Engine\ExecutionPlan;
-use DataMachine\Engine\Tasks\ScheduleActionIdentity;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -491,12 +490,17 @@ class RunFlowAbility {
 			// reschedule is skipped, and the run is silently dropped until the
 			// next recurring fire. Querying STATUS_PENDING only counts
 			// wake-ups that have not started yet.
-			$already_pending = 0 < ScheduleActionIdentity::exactActionId(
-				'datamachine_run_flow_now',
-				array( $flow_id ),
-				'data-machine',
-				'pending'
+			$pending_ids     = as_get_scheduled_actions(
+				array(
+					'hook'     => 'datamachine_run_flow_now',
+					'args'     => array( $flow_id ),
+					'group'    => 'data-machine',
+					'status'   => 'pending',
+					'per_page' => 1,
+				),
+				'ids'
 			);
+			$already_pending = is_array( $pending_ids ) && array() !== $pending_ids;
 
 			if ( ! $already_pending ) {
 				as_schedule_single_action(

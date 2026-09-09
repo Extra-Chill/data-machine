@@ -17,7 +17,7 @@
 
 namespace DataMachine\Abilities\Flow;
 
-use DataMachine\Api\Flows\FlowScheduling;
+use DataMachine\Engine\Scheduling\FlowRoutines;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -117,15 +117,13 @@ class PauseFlowAbility {
 			}
 
 			$scheduling['enabled'] = false;
-			$schedule_result       = FlowScheduling::handle_scheduling_update( $fid, $scheduling, true );
+			$schedule_result       = FlowRoutines::sync( $fid, $scheduling, true );
 			if ( is_wp_error( $schedule_result ) ) {
 				++$errors;
-				$details[] = array_merge(
-					\DataMachine\Engine\Tasks\RecurringScheduler::errorMetadata( $schedule_result ),
-					array(
-						'flow_id' => $fid,
-						'status'  => 'pause_error',
-					)
+				$details[] = array(
+					'flow_id' => $fid,
+					'status'  => 'pause_error',
+					'error'   => $schedule_result->get_error_message(),
 				);
 				continue;
 			}

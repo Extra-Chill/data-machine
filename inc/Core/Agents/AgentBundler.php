@@ -18,7 +18,6 @@ use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
-use DataMachine\Api\Flows\FlowScheduling;
 use WP_Agent_Package;
 use WP_Agent_Package_Artifact_Hasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactPayloads;
@@ -2058,7 +2057,7 @@ class AgentBundler {
 			return;
 		}
 
-		$result = FlowScheduling::handle_scheduling_update( $flow_id, $config );
+		$result = \DataMachine\Engine\Scheduling\FlowRoutines::sync( $flow_id, $config );
 		if ( is_wp_error( $result ) ) {
 			throw new \RuntimeException(
 				sprintf(

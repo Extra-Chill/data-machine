@@ -8,7 +8,6 @@
 namespace DataMachine\Engine\AI;
 
 use DataMachine\Core\EngineData;
-use DataMachine\Engine\Tasks\ScheduleActionIdentity;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -341,7 +340,17 @@ class AIConcurrencyBackpressure {
 	/** @return array{action_id:int,status:string} */
 	private static function activeContinuation( array $args, string $group ): array {
 		foreach ( array( 'pending', 'in-progress' ) as $status ) {
-			$action_id = ScheduleActionIdentity::exactActionId( self::RESUME_HOOK, $args, $group, $status );
+			$action_ids = as_get_scheduled_actions(
+				array(
+					'hook'     => self::RESUME_HOOK,
+					'args'     => $args,
+					'group'    => $group,
+					'status'   => $status,
+					'per_page' => 1,
+				),
+				'ids'
+			);
+			$action_id  = is_array( $action_ids ) ? (int) reset( $action_ids ) : 0;
 			if ( $action_id > 0 ) {
 				return array(
 					'action_id' => $action_id,

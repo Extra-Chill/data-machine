@@ -2,13 +2,16 @@
 /**
  * Reconcile Flow Schedules Ability.
  *
+ * Thin adapter over FlowRoutines::reconcile(), which wraps the Agents API
+ * routine registry's reconcile algorithm.
+ *
  * @package DataMachine\Abilities\Flow
  */
 
 namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Api\Flows\FlowScheduleReconciler;
+use DataMachine\Engine\Scheduling\FlowRoutines;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -24,41 +27,29 @@ class ReconcileFlowSchedulesAbility {
 				'datamachine/reconcile-flow-schedules',
 				array(
 					'label'               => __( 'Reconcile Flow Schedules', 'data-machine' ),
-					'description'         => __( 'Audit recurring flow schedule coverage and optionally restore missing Action Scheduler actions.', 'data-machine' ),
+					'description'         => __( 'Audit recurring flow routine coverage and optionally restore missing schedules.', 'data-machine' ),
 					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'apply'        => array(
+							'apply' => array(
 								'type'        => 'boolean',
 								'default'     => false,
 								'description' => __( 'Restore missing schedules. Defaults to dry-run.', 'data-machine' ),
-							),
-							'spread_hours' => array(
-								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
-								'minimum'     => 1,
-								'maximum'     => 24,
-								'description' => __( 'Explicit fleet distribution window in hours (1-24).', 'data-machine' ),
 							),
 						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'           => array( 'type' => 'boolean' ),
-							'transient'         => array( 'type' => 'boolean' ),
-							'code'              => array( 'type' => 'string' ),
-							'applied'           => array( 'type' => 'boolean' ),
-							'eligible'          => array( 'type' => 'integer' ),
-							'covered'           => array( 'type' => 'integer' ),
-							'missing'           => array( 'type' => 'integer' ),
-							'blocked'           => array( 'type' => 'integer' ),
-							'repaired'          => array( 'type' => 'integer' ),
-							'failed'            => array( 'type' => 'integer' ),
-							'remaining_missing' => array( 'type' => 'integer' ),
-							'invalid'           => array( 'type' => 'integer' ),
-							'details'           => array( 'type' => 'array' ),
-							'error'             => array( 'type' => 'string' ),
+							'success'     => array( 'type' => 'boolean' ),
+							'applied'     => array( 'type' => 'boolean' ),
+							'covered'     => array( 'type' => 'integer' ),
+							'missing'     => array( 'type' => 'integer' ),
+							'removed'     => array( 'type' => 'integer' ),
+							'routine_ids' => array( 'type' => 'object' ),
+							'errors'      => array( 'type' => 'object' ),
+							'error'       => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -78,7 +69,6 @@ class ReconcileFlowSchedulesAbility {
 	 * @return array Reconciliation report.
 	 */
 	public function execute( array $input ): array {
-		$spread_hours = isset( $input['spread_hours'] ) ? (int) $input['spread_hours'] : null;
-		return ( new FlowScheduleReconciler() )->reconcile( ! empty( $input['apply'] ), $spread_hours );
+		return FlowRoutines::reconcile( ! empty( $input['apply'] ) );
 	}
 }
