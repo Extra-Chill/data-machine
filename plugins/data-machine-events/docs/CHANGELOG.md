@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.61.5] - 2026-09-09
+
+### Fixed
+- check venues --report must be optional; drop invalid empty default
+
 ## [0.61.4] - 2026-09-09
 
 ### Fixed
