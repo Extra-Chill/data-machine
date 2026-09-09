@@ -152,12 +152,12 @@ class MusicItemExtractor extends BaseExtractor {
 		$time_text = trim( $time_node->textContent );
 
 		if ( preg_match( '/(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?/', $time_text, $matches ) ) {
-			$start_hour = (int) $matches[1];
 			// preg_match() omits only trailing unmatched groups: [2] is always
 			// present (possibly ''), [4] is absent when the end time has no minutes.
+			$start_hour = (int) $matches[1];
 			$start_min  = '' !== $matches[2] ? $matches[2] : '00';
 			$end_hour   = (int) $matches[3];
-			$end_min    = isset( $matches[4] ) && '' !== $matches[4] ? $matches[4] : '00';
+			$end_min    = $matches[4] ?? '00';
 
 			if ( $start_hour < 12 && $start_hour >= 1 ) {
 				$start_hour += 12;
