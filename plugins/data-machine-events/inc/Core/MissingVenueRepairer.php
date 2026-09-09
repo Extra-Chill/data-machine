@@ -140,7 +140,7 @@ class MissingVenueRepairer {
 
 					if ( ! empty( $assignment['success'] ) && empty( $assignment['skipped'] ) ) {
 						update_post_meta( $post_id, self::REPAIRED_AT_META, gmdate( 'Y-m-d H:i:s' ) );
-						$assigned = true;
+						$assigned              = true;
 						$candidate['assigned'] = true;
 					}
 				}
