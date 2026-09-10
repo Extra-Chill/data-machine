@@ -423,8 +423,10 @@ class JobsCommand extends BaseCommand {
 	 * Diagnose liveness for processing jobs and pending backpressure deferrals.
 	 *
 	 * Processing is a broad lifecycle state. This command reports whether each
-	 * processing job is actively executing, waiting on a scheduler action, or
-	 * scheduler-starved by overdue pending Action Scheduler work.
+	 * processing job is actively executing, waiting on a scheduler action,
+	 * scheduler-starved by overdue pending Action Scheduler work, or older
+	 * than the scheduler evidence window (evidence_pruned — its Action
+	 * Scheduler rows have been pruned, so liveness can no longer be observed).
 	 *
 	 * ## OPTIONS
 	 *
@@ -498,6 +500,7 @@ class JobsCommand extends BaseCommand {
 			'scheduler_starved'       => 0,
 			'stale_in_progress'       => 0,
 			'no_scheduler_path'       => 0,
+			'evidence_pruned'         => 0,
 			'ai_concurrency_deferred' => 0,
 		);
 
@@ -511,6 +514,7 @@ class JobsCommand extends BaseCommand {
 		}
 
 		if ( 'json' === $format || 'yaml' === $format ) {
+			$summary['scheduler_retention_hours'] = (int) round( JobLivenessClassifier::schedulerRetentionSeconds() / HOUR_IN_SECONDS );
 			WP_CLI::print_value(
 				array(
 					'success'         => true,
@@ -539,7 +543,7 @@ class JobsCommand extends BaseCommand {
 			WP_CLI::log( 'Liveness scope includes processing jobs plus pending AI concurrency deferrals; recover-stuck also handles expired deferrals with absent exact action receipts.' );
 			WP_CLI::log(
 				sprintf(
-					'Inspected %d active jobs: %d active, %d queued, %d AI concurrency-deferred, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',
+					'Inspected %d active jobs: %d active, %d queued, %d AI concurrency-deferred, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path, %d beyond the %d-hour scheduler evidence window.',
 					$summary['total'],
 					$summary['active_processing'],
 					$summary['queued_next_step'],
@@ -547,7 +551,9 @@ class JobsCommand extends BaseCommand {
 					$summary['waiting_children'],
 					$summary['scheduler_starved'],
 					$summary['stale_in_progress'],
-					$summary['no_scheduler_path']
+					$summary['no_scheduler_path'],
+					$summary['evidence_pruned'],
+					(int) round( JobLivenessClassifier::schedulerRetentionSeconds() / HOUR_IN_SECONDS )
 				)
 			);
 		}

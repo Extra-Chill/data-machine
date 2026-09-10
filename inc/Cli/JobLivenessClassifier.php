@@ -13,6 +13,13 @@ defined( 'ABSPATH' ) || exit;
 
 class JobLivenessClassifier {
 	/**
+	 * Action Scheduler's default retention window: 31 days in seconds.
+	 *
+	 * Mirrors ActionScheduler_QueueCleaner::$month_in_seconds.
+	 */
+	private const ACTION_SCHEDULER_DEFAULT_RETENTION_SECONDS = 2678400;
+
+	/**
 	 * Classify one job from persisted engine state and scheduler evidence.
 	 *
 	 * @param array<string,mixed>              $job Job row with decoded engine_data.
@@ -99,7 +106,8 @@ class JobLivenessClassifier {
 		} elseif ( $active_children > 0 || ( $batch_total > 0 && $total_children < $batch_total ) ) {
 			$classification = 'waiting_children';
 		} else {
-			$classification = 'no_scheduler_path';
+			$age_seconds    = self::ageSeconds( (string) ( $job['created_at'] ?? '' ), $now );
+			$classification = $age_seconds > self::schedulerRetentionSeconds() ? 'evidence_pruned' : 'no_scheduler_path';
 		}
 
 		$last_activity = $engine_data['run_metrics']['last_activity_at'] ?? null;
@@ -134,6 +142,24 @@ class JobLivenessClassifier {
 		);
 	}
 
+	/**
+	 * Effective Action Scheduler retention window in seconds.
+	 *
+	 * Reads the live `action_scheduler_retention_period` filter so the
+	 * evidence boundary tracks runtime configuration. Non-positive filtered
+	 * values fall back to Action Scheduler's default rather than treating
+	 * the whole history as pruned.
+	 *
+	 * @return int
+	 */
+	public static function schedulerRetentionSeconds(): int {
+		$default  = self::ACTION_SCHEDULER_DEFAULT_RETENTION_SECONDS;
+		$filtered = function_exists( 'apply_filters' )
+			? (int) apply_filters( 'action_scheduler_retention_period', $default )
+			: $default;
+		return $filtered > 0 ? $filtered : $default;
+	}
+
 	/** @param array<int,array<string,mixed>> $actions */
 	private static function actionDatetime( array $actions, string $field, bool $latest ): string {
 		$values = array_values(
@@ -158,8 +184,12 @@ class JobLivenessClassifier {
 			: (string) ( $action['scheduled_date_gmt'] ?? '' );
 	}
 
-	private static function minutesSince( string $datetime, int $now ): int {
+	private static function ageSeconds( string $datetime, int $now ): int {
 		$timestamp = strtotime( $datetime . ' UTC' );
-		return false === $timestamp ? 0 : max( 0, (int) floor( ( $now - $timestamp ) / MINUTE_IN_SECONDS ) );
+		return false === $timestamp ? 0 : max( 0, $now - $timestamp );
+	}
+
+	private static function minutesSince( string $datetime, int $now ): int {
+		return (int) floor( self::ageSeconds( $datetime, $now ) / MINUTE_IN_SECONDS );
 	}
 }

@@ -3,6 +3,8 @@
 
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'MINUTE_IN_SECONDS', 60 );
+define( 'HOUR_IN_SECONDS', 3600 );
+define( 'YEAR_IN_SECONDS', 31536000 );
 
 require_once __DIR__ . '/../inc/Core/ChildJobRecoveryPolicy.php';
 require_once __DIR__ . '/../inc/Cli/JobLivenessClassifier.php';
@@ -20,6 +22,14 @@ $assert = static function ( string $label, bool $condition ) use ( &$failed, &$t
 	++$failed;
 	echo "  [FAIL] {$label}\n";
 };
+
+$GLOBALS['test_as_retention_periods'] = array();
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, $value ) {
+		return $GLOBALS['test_as_retention_periods'][ $hook ] ?? $value;
+	}
+}
 
 $now = strtotime( '2026-07-22 12:00:00 UTC' );
 $job = static fn( array $engine = array() ): array => array(
@@ -132,6 +142,39 @@ $assert( 'zero action receipt is not a liveness path', 'no_scheduler_path' === $
 
 $historical = $classify( $job(), array( $action( 'complete', '2026-07-01 00:00:00', array(), 'datamachine_execute_step', 55 ) ) );
 $assert( 'old historical action is not scheduler ownership', 'no_scheduler_path' === $historical['classification'] && array() === $historical['owner_action_ids'] );
+
+$old_job               = $job();
+$old_job['created_at'] = '2026-06-01 08:00:00';
+$young_no_path         = $classify( $job() );
+$default_window        = JobLivenessClassifier::schedulerRetentionSeconds();
+$assert( 'default retention window matches Action Scheduler 31-day default', 2678400 === $default_window );
+$assert( 'young job without actions still has no scheduler path', 'no_scheduler_path' === $young_no_path['classification'] );
+
+$pruned = $classify( $old_job );
+$assert( 'job past the retention window without actions is evidence pruned', 'evidence_pruned' === $pruned['classification'] );
+
+$GLOBALS['test_as_retention_periods']['action_scheduler_retention_period'] = 10 * YEAR_IN_SECONDS;
+$config_old = $classify( $old_job );
+$assert( 'widened filter window keeps old job classified as no scheduler path', 'no_scheduler_path' === $config_old['classification'] );
+
+$GLOBALS['test_as_retention_periods']['action_scheduler_retention_period'] = HOUR_IN_SECONDS;
+$config_narrow = $classify( $job() );
+$assert( 'narrow filter window classifies young job as evidence pruned', 'evidence_pruned' === $config_narrow['classification'] );
+
+$GLOBALS['test_as_retention_periods']['action_scheduler_retention_period'] = 0;
+$assert( 'zero filter value falls back to the 31-day default', 2678400 === JobLivenessClassifier::schedulerRetentionSeconds() );
+$assert( 'zero filter window still prunes the old job', 'evidence_pruned' === $classify( $old_job )['classification'] );
+$assert( 'zero filter window keeps young job actionable as no scheduler path', 'no_scheduler_path' === $classify( $job() )['classification'] );
+$GLOBALS['test_as_retention_periods'] = array();
+
+$old_pending = $classify( $old_job, array( $action( 'pending', '2026-06-01 08:30:00' ) ) );
+$assert( 'old job with overdue pending action is scheduler starved despite age', 'scheduler_starved' === $old_pending['classification'] );
+
+$old_fresh_progress = $classify( $old_job, array( $action( 'in-progress', '2026-07-22 11:30:00' ) ) );
+$assert( 'old job with fresh in-progress action is active despite age', 'active_processing' === $old_fresh_progress['classification'] );
+
+$old_stale_progress = $classify( $old_job, array( $action( 'in-progress', '2026-06-01 09:00:00' ) ) );
+$assert( 'old job with stale in-progress action is stale despite age', 'stale_in_progress' === $old_stale_progress['classification'] );
 
 echo "\nJob liveness CLI smoke complete: {$total} assertions, {$failed} failures.\n";
 exit( $failed > 0 ? 1 : 0 );
