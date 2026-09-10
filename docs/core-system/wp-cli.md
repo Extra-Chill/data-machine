@@ -321,6 +321,9 @@ echo "- New lesson" | wp datamachine memory write "Lessons Learned" - --mode=app
 # Search memory
 wp datamachine memory search "deployment" --section="State"
 
+# Regenerate composable files quietly with WP-CLI's global option.
+wp --quiet datamachine memory compose
+
 # Daily memory operations
 wp datamachine memory daily list
 wp datamachine memory daily read 2026-03-15
@@ -522,6 +525,10 @@ wp datamachine analytics ga engagement --compare
 
 Authentication management. **Since**: 0.36.0
 
+WP-CLI's global `--user=<id>` selects the bootstrap user and must precede the
+command. `auth revoke --target-user=<id>` instead selects the per-user
+credential slot to revoke.
+
 ```bash
 # Check auth status for all providers
 wp datamachine auth status
@@ -550,6 +557,10 @@ wp datamachine auth config reddit --client_id=xxx --client_secret=xxx
 ### datamachine chat
 
 Manage chat sessions. **Since**: 0.40.0
+
+WP-CLI's global `--user=<id>` selects the bootstrap user. Chat's
+`--owner-user=<id>` selects a session owner, and `--session-context=<type>`
+selects a chat-session mode; neither changes WordPress bootstrap context.
 
 ```bash
 # List chat sessions
@@ -826,6 +837,9 @@ Send email and operate on an IMAP mailbox through configured email auth.
 ```bash
 # Send mail
 wp datamachine email send --to=user@example.com --subject="Report" --body="<p>Hello</p>"
+
+# Queue a template email with Data Machine template data.
+wp datamachine email send-queued --to=user@example.com --subject="Digest" --template=weekly-digest --template-context='{"week":"2026-W14"}'
 
 # Fetch and read mail
 wp datamachine email fetch --search=UNSEEN --max=10
