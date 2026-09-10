@@ -12,6 +12,7 @@
 
 namespace DataMachineEvents\Blocks\Calendar\Data;
 
+use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\Promoter_Taxonomy;
 
@@ -36,7 +37,7 @@ class EventHydrator {
 		$event_data = array();
 
 		foreach ( $blocks as $block ) {
-			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
 				$event_data = $block['attrs'];
 				break;
 			}

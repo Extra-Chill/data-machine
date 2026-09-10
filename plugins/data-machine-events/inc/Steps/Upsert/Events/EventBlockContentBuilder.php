@@ -11,6 +11,7 @@
 
 namespace DataMachineEvents\Steps\Upsert\Events;
 
+use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Event_Type_Taxonomy;
 
 defined( 'ABSPATH' ) || exit;
@@ -76,11 +77,11 @@ class EventBlockContentBuilder {
 
 		$inner_blocks = $this->generate_description_blocks( $description );
 
-		return '<!-- wp:data-machine-events/event-details ' . $block_json . ' -->' . "\n" .
+		return '<!-- wp:' . Event_Post_Type::EVENT_DETAILS_BLOCK_NAME . ' ' . $block_json . ' -->' . "\n" .
 				'<div class="wp-block-data-machine-events-event-details">' .
 				( $inner_blocks ? "\n" . $inner_blocks . "\n" : '' ) .
 				'</div>' . "\n" .
-				'<!-- /wp:data-machine-events/event-details -->';
+				'<!-- /wp:' . Event_Post_Type::EVENT_DETAILS_BLOCK_NAME . ' -->';
 	}
 
 	/**

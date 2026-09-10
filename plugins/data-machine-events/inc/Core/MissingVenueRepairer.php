@@ -345,7 +345,7 @@ class MissingVenueRepairer {
 		}
 
 		foreach ( parse_blocks( $post->post_content ) as $block ) {
-			if ( 'data-machine-events/event-details' === $block['blockName'] ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
 				return $block['attrs'];
 			}
 		}
