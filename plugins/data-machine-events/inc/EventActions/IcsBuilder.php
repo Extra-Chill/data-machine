@@ -170,8 +170,27 @@ class IcsBuilder {
 		$window_start = $start->modify( '-1 year' )->getTimestamp();
 		$window_end   = $end->modify( '+1 year' )->getTimestamp();
 
+		// `getTransitions()` returns `false` — not an empty array — for
+		// fixed-offset zones with no transition data (e.g. a "+00:00"
+		// timezone produced by `wp_timezone_string()` when the site sets a
+		// numeric UTC offset instead of a literal "UTC"/named timezone
+		// string; also possible for other fixed-offset identifiers),
+		// confirmed empirically: `(new DateTimeZone('+00:00'))->getTransitions(...)`
+		// returns `bool(false)` on PHP 8.4, matching the PHP manual's
+		// documented `array|false` return type. PHPStan's bundled stub
+		// narrows this to plain `array` (dropping the `|false`), so any
+		// type-narrowing check against the raw call result — a literal
+		// `false === $transitions` comparison, or an `! is_array()` guard —
+		// gets flagged as unreachable dead code by a different rule
+		// (`identical.alwaysFalse` / `function.alreadyNarrowedType`
+		// respectively), even though the branch is reachable at runtime.
+		// The `@var` override below corrects PHPStan's type information for
+		// this variable at the source, matching the documented return type,
+		// rather than suppressing whichever downstream rule the incorrect
+		// narrowing trips next.
+		/** @var list<array{ts: int, time: string, offset: int, isdst: bool, abbr: string}>|false $transitions */
 		$transitions = $tz->getTransitions( $window_start, $window_end );
-		if ( count( $transitions ) < 2 ) {
+		if ( false === $transitions || count( $transitions ) < 2 ) {
 			// `getTransitions()` always returns at least a synthetic "window
 			// start" snapshot entry as element 0. We need at least one real
 			// transition AFTER it to build a meaningful VTIMEZONE.
@@ -333,6 +352,26 @@ class IcsBuilder {
 	/**
 	 * Build the description body shared with the Google/Outlook URL builders.
 	 *
+	 * The ticket URL itself is never embedded here. Some ticket vendors wrap
+	 * outbound links in affiliate redirectors, and the .ics DESCRIPTION field
+	 * is served from a public endpoint with no JS required — a crawler that
+	 * fetches the file recovers any embedded URL intact. The permalink line
+	 * instead points at the event permalink, where the gated ticket button
+	 * handles the actual click-through (see #817). This is unconditional —
+	 * not limited to affiliate hosts — because a calendar entry pointing
+	 * back at our own event page is better UX regardless of ticket vendor
+	 * (the page carries venue, time, and lineup context a raw vendor link
+	 * does not), and it keeps this builder free of any affiliate-host
+	 * knowledge.
+	 *
+	 * Exactly one permalink line is emitted, labelled by intent: when the
+	 * event has a ticket URL the line reads "Tickets:" (the permalink is
+	 * where the actual ticket purchase happens); otherwise it reads
+	 * "More info:". The two labels are never both printed — same
+	 * destination, no reason to duplicate it. When no permalink is
+	 * available, no line is emitted at all, rather than falling back to the
+	 * raw ticket URL.
+	 *
 	 * @param array $event
 	 * @param int   $post_id
 	 * @return string
@@ -350,15 +389,11 @@ class IcsBuilder {
 			$parts[] = sprintf( __( 'Performer: %s', 'data-machine-events' ), wp_strip_all_tags( $performer ) );
 		}
 
-		if ( $post_id > 0 ) {
-			$permalink = get_permalink( $post_id );
-			if ( $permalink ) {
-				$parts[] = __( 'More info:', 'data-machine-events' ) . ' ' . $permalink;
-			}
-		}
+		$permalink = $post_id > 0 ? get_permalink( $post_id ) : '';
 
-		if ( ! empty( $event['ticketUrl'] ) ) {
-			$parts[] = __( 'Tickets:', 'data-machine-events' ) . ' ' . (string) $event['ticketUrl'];
+		if ( $permalink ) {
+			$label   = ! empty( $event['ticketUrl'] ) ? __( 'Tickets:', 'data-machine-events' ) : __( 'More info:', 'data-machine-events' );
+			$parts[] = $label . ' ' . $permalink;
 		}
 
 		/** This filter is documented in inc/EventActions/CalendarUrlBuilder.php */
