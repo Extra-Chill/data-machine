@@ -103,7 +103,9 @@ class StaleClaimReconcilerTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $summary['terminalized'] );
 		$this->assertSame( 'terminalized', $summary['details'][0]['outcome'] );
 		$this->assertSame( 'resume_attempt_bound_reached', $summary['details'][0]['detail'] );
-		$this->assertSame( 'failed - stale_claim_resume_exhausted', $this->jobs->get_job( $job_id )['status'] );
+		$job = $this->jobs->get_job( $job_id );
+		$this->assertSame( JobStatus::FAILED, $job['status'] );
+		$this->assertSame( 'stale_claim_resume_exhausted', $job['engine_data']['job_status_reason'] ?? '' );
 	}
 
 	public function test_direct_job_with_begun_effects_terminalizes_rather_than_resumes(): void {
@@ -146,7 +148,9 @@ class StaleClaimReconcilerTest extends WP_UnitTestCase {
 
 		$this->assertSame( 1, $summary['terminalized'] );
 		$this->assertSame( 'terminalized', $summary['details'][0]['outcome'] );
-		$this->assertSame( 'failed - scheduler_path_lost_after_effects', $this->jobs->get_job( $job_id )['status'] );
+		$job = $this->jobs->get_job( $job_id );
+		$this->assertSame( JobStatus::FAILED, $job['status'] );
+		$this->assertSame( 'scheduler_path_lost_after_effects', $job['engine_data']['job_status_reason'] ?? '' );
 	}
 
 	public function test_mid_step_death_terminalizes_with_worker_died_reason(): void {
@@ -163,8 +167,10 @@ class StaleClaimReconcilerTest extends WP_UnitTestCase {
 		$summary = ( new StaleClaimReconciler() )->reconcile();
 
 		$this->assertSame( 1, $summary['terminalized'] );
-		$this->assertSame( 'worker_died_mid_step', $summary['details'][0]['detail'] );
-		$this->assertSame( 'failed - worker_died_mid_step', $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( 'incomplete_step_already_started', $summary['details'][0]['detail'] );
+		$job = $this->jobs->get_job( $job_id );
+		$this->assertSame( JobStatus::FAILED, $job['status'] );
+		$this->assertSame( 'worker_died_mid_step', $job['engine_data']['job_status_reason'] ?? '' );
 	}
 
 	public function test_recent_activity_is_not_reconciled(): void {
