@@ -138,6 +138,46 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_exact_transactional_table_capability_can_replace_the_engine_check(): void {
+		global $wpdb;
+
+		$this->assertNotFalse( $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ENGINE=MyISAM', $this->repository->get_table_name() ) ) );
+		$original = $wpdb;
+		$capable  = new class( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST ) extends \wpdb {
+			public array $supported_tables = array();
+			public bool $throws = false;
+
+			public function supports_transactional_tables( array $tables ): bool {
+				if ( $this->throws ) {
+					throw new \RuntimeException( 'Unsupported transactional table capability.' );
+				}
+				return $tables === $this->supported_tables;
+			}
+		};
+		$capable->set_prefix( $original->prefix );
+		$wpdb = $capable;
+
+		try {
+			$repository = new PostIdentityReservations();
+			$capable->supported_tables = array( $repository->get_table_name() );
+			$incomplete = $repository->validate_schema();
+			$this->assertWPError( $incomplete );
+			$this->assertSame( 'identity_schema_engine', $incomplete->get_error_code() );
+
+			$capable->throws = true;
+			$thrown = $repository->validate_schema();
+			$this->assertWPError( $thrown );
+			$this->assertSame( 'identity_schema_engine', $thrown->get_error_code() );
+
+			$capable->throws = false;
+			$capable->supported_tables = array( $repository->get_table_name(), $capable->posts );
+			$this->assertTrue( $repository->validate_schema() );
+		} finally {
+			$wpdb = $original;
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ENGINE=InnoDB', $this->repository->get_table_name() ) );
+		}
+	}
+
 	public function test_create_table_repairs_myisam_to_innodb(): void {
 		global $wpdb;
 

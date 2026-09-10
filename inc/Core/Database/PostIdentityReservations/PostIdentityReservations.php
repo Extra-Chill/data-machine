@@ -213,9 +213,7 @@ class PostIdentityReservations extends BaseRepository {
 				$this->table_name
 			)
 		);
-		if ( 'INNODB' !== strtoupper( (string) $engine ) ) {
-			return new \WP_Error( 'identity_schema_engine', 'Post identity reservation table must use InnoDB.' );
-		}
+		$uses_innodb = 'INNODB' === strtoupper( (string) $engine );
 
 		$required_columns = array(
 			'identity_hash'      => array(
@@ -323,6 +321,9 @@ class PostIdentityReservations extends BaseRepository {
 		}
 		if ( ! $has_nonunique_post_id || $has_unique_post_id ) {
 			return new \WP_Error( 'identity_schema_post_index', 'Post identity reservation post_id requires a nonunique index.' );
+		}
+		if ( ! $uses_innodb && ! $this->supports_transactional_tables( array( $this->table_name, $this->wpdb->posts ) ) ) {
+			return new \WP_Error( 'identity_schema_engine', 'Post identity reservation table must use InnoDB.' );
 		}
 
 		return true;
@@ -705,6 +706,9 @@ class PostIdentityReservations extends BaseRepository {
 				return new \WP_Error( 'identity_storage_invalid', 'Post identity storage has an invalid table name.' );
 			}
 		}
+		if ( $this->supports_transactional_tables( $tables ) ) {
+			return true;
+		}
 
 		$placeholders = implode( ',', array_fill( 0, count( $tables ), '%s' ) );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -727,6 +731,24 @@ class PostIdentityReservations extends BaseRepository {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Ask an optional database implementation to prove one atomic table set.
+	 *
+	 * The capability is deliberately exact: it may replace the InnoDB engine
+	 * check only when every table in this reservation operation participates.
+	 */
+	private function supports_transactional_tables( array $tables ): bool {
+		if ( ! method_exists( $this->wpdb, 'supports_transactional_tables' ) ) {
+			return false;
+		}
+
+		try {
+			return true === $this->wpdb->supports_transactional_tables( $tables );
+		} catch ( \Throwable ) {
+			return false;
+		}
 	}
 
 	/** @return int[] */
