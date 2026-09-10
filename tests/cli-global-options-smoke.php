@@ -138,7 +138,7 @@ $assert( str_contains( $chat, "\$assoc_args['owner-user']" ), 'chat commands rec
 $assert( str_contains( $chat, "\$assoc_args['session-context']" ), 'chat commands receive --session-context' );
 $assert( str_contains( $email, "\$assoc_args['template-context']" ) && str_contains( $email, "\$input['context'] = \$decoded" ), 'queued email maps --template-context to the internal context payload' );
 $assert( ! str_contains( $memory, "get_flag_value( \$assoc_args, 'quiet'" ), 'memory compose relies on WP-CLI global quiet handling' );
-$assert( str_contains( $documentation, '--target-user=42' ) && str_contains( $documentation, '--owner-user=1' ) && str_contains( $documentation, '--session-context=sidebar' ) && str_contains( $documentation, '--template-context=' ) && str_contains( $documentation, 'wp --quiet datamachine memory compose' ), 'public CLI documentation distinguishes application options from WP-CLI globals' );
+$assert( str_contains( $documentation, '--target-user=42' ) && str_contains( $documentation, '--owner-user=1' ) && str_contains( $documentation, '--session-context=sidebar' ) && str_contains( $documentation, '--template-context=' ) && str_contains( $documentation, 'wp --quiet datamachine memory compose' ) && ! str_contains( $documentation, 'must precede the command' ), 'public CLI documentation distinguishes application options from WP-CLI globals' );
 
 $help_commands = array(
 	'auth revoke'    => array( '--target-user=<id>' ),
@@ -156,6 +156,13 @@ list( $exit_code, $stdout, $stderr ) = $run(
 );
 $assert( 0 === $exit_code, 'fresh WP-CLI process registers every Data Machine command' );
 $assert( ! str_contains( $stderr, 'conflicts with a global argument' ), 'full CommandRegistry registration emits no global-argument conflict warnings' );
+
+list( $exit_code, $stdout, $stderr ) = $run(
+	array( 'wp', '--skip-wordpress', '--require=' . __FILE__, 'help', 'datamachine', 'auth', 'revoke', '--user=42' ),
+	array( 'DATAMACHINE_CLI_REGISTRATION_BOOT' => '1' )
+);
+$assert( 0 === $exit_code, 'WP-CLI accepts global --user after a Data Machine subcommand' );
+$assert( ! str_contains( $stderr, 'conflicts with a global argument' ), 'post-subcommand global --user emits no registration collision warning' );
 
 foreach ( $help_commands as $command => $expected_options ) {
 	list( $exit_code, $stdout, $stderr ) = $run(

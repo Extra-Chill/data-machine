@@ -525,9 +525,8 @@ wp datamachine analytics ga engagement --compare
 
 Authentication management. **Since**: 0.36.0
 
-WP-CLI's global `--user=<id>` selects the bootstrap user and must precede the
-command. `auth revoke --target-user=<id>` instead selects the per-user
-credential slot to revoke.
+WP-CLI's global `--user=<id>` selects the bootstrap user. `auth revoke
+--target-user=<id>` instead selects the per-user credential slot to revoke.
 
 ```bash
 # Check auth status for all providers
