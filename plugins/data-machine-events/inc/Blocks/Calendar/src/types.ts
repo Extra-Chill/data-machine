@@ -194,7 +194,17 @@ export interface CalendarEventItem {
 	date: CalendarEventDate;
 	venue: CalendarEventVenue | null;
 	organizer: CalendarEventOrganizer | null;
-	ticket: { url: string };
+	/**
+	 * `url` is empty and `is_affiliate` is true when the ticket URL is an
+	 * affiliate/redirect wrapper (Ticketmaster compliance, issue #816) —
+	 * the raw URL never ships in the JSON envelope. Consumers gate a
+	 * `data-ticket-ref="<id>"` element instead, using this event's own
+	 * `id` as the ref; `ticket-link-gate.js` resolves the real
+	 * destination first-party at click/pointerdown time.
+	 * `is_affiliate` is optional for backward compatibility with cached
+	 * envelopes from before schema v6.
+	 */
+	ticket: { url: string; is_affiliate?: boolean };
 	performer: { name: string; type: string };
 	status: string;
 	address: string;
@@ -337,13 +347,22 @@ export interface EventDisplayVars {
 	multi_day_label: string;
 	venue_name: string;
 	iso_start_date: string;
+	/** Empty when the ticket URL is an affiliate/redirect wrapper. See `is_affiliate_ticket`. */
 	ticket_url: string;
+	/**
+	 * True when the ticket URL is an affiliate/redirect wrapper (issue
+	 * #816) — `ticket_url` above is empty in that case, and the gated
+	 * ref is this placeholder's own `id` (top-level on `EventPlaceholderData`).
+	 */
+	is_affiliate_ticket?: boolean;
 	show_ticket_link: boolean;
 	is_continuation?: boolean;
 	is_multi_day?: boolean;
 }
 
 export interface EventPlaceholderData {
+	/** Event post ID. Also the gated ticket ref for `data-ticket-ref` (issue #816). */
+	id: number;
 	title: string;
 	permalink: string;
 	badges_html: string;

@@ -110,6 +110,15 @@ subobject carries `tier` — the closed-vocabulary venue tier slug, or an
 empty string when the venue is unclassified (v4 was never announced in
 this document; the bump from 4 covers the same shape window as #507).
 
+**v6 ([#816](https://github.com/Extra-Chill/data-machine-events/issues/816)):** Ticketmaster
+compliance. `ticket.is_affiliate` was added; `ticket.url` is emptied
+(`""`) whenever the ticket URL is an affiliate/redirect wrapper, so the
+affiliate URL and affiliate ID never appear in the JSON response.
+Clients render a JS-gated ticket button using this event's own `id` as
+the ref (`/wp-json/extrachill/v1/events/tickets/<id>/go`) instead of a
+direct `href`. `is_affiliate` is optional on the client type for
+backward compatibility with envelopes cached before this bump.
+
 ### `events`
 
 Array of structured event objects, **deduplicated on `id`**. A multi-day
@@ -147,7 +156,7 @@ page — its multi-day expansion is represented in `grouping.by_date`.
     "url":  "https://example.com",
     "type": "Organization"
   },
-  "ticket":    { "url": "https://etix.com/..." },
+  "ticket":    { "url": "https://etix.com/...", "is_affiliate": false },
   "performer": { "name": "Headliner Name", "type": "MusicGroup" },
   "status": "EventScheduled",
   "address":   "970 Morrison Dr, Charleston, SC 29403",
@@ -167,6 +176,11 @@ Notes:
 - `venue` and `organizer` are `null` when no term is attached. The legacy
   HTML templates rendered an empty slot in that case; clients should do
   the same.
+- `ticket.url` is `""` and `ticket.is_affiliate` is `true` when the
+  ticket URL is a known affiliate/redirect wrapper (see
+  `data_machine_events_is_affiliate_ticket_url()`). Clients must not
+  fall back to any other field to recover the affiliate URL — render a
+  gated button keyed on `event.id` instead (see #816).
 - `taxonomies` honors the `data_machine_events_excluded_taxonomies`
   filter (context: `'badge'`), so the data envelope matches what the
   legacy badge HTML would have surfaced.

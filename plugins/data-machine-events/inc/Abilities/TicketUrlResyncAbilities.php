@@ -18,6 +18,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use DataMachineEvents\Core\Event_Post_Type;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -27,7 +28,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class TicketUrlResyncAbilities {
 
 	private const DEFAULT_LIMIT = -1;
-	private const BLOCK_NAME    = 'data-machine-events/event-details';
 
 	private static bool $registered = false;
 
@@ -184,7 +184,7 @@ class TicketUrlResyncAbilities {
 	 */
 	private function findTicketUrlInBlocks( array $blocks ): string {
 		foreach ( $blocks as $block ) {
-			if ( self::BLOCK_NAME === $block['blockName'] ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
 				return $block['attrs']['ticketUrl'] ?? '';
 			}
 			if ( ! empty( $block['innerBlocks'] ) ) {

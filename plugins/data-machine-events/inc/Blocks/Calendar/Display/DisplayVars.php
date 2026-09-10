@@ -17,6 +17,7 @@ use DateTime;
 use DateTimeZone;
 use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
 use DataMachineEvents\Core\DateTimeParser;
+use function DataMachineEvents\Core\data_machine_events_is_affiliate_ticket_url;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -36,6 +37,15 @@ class DisplayVars {
 		$start_time = $event_data['startTime'] ?? '';
 		$end_date   = $event_data['endDate'] ?? '';
 		$end_time   = $event_data['endTime'] ?? '';
+
+		// Ticketmaster compliance (issue #816): affiliate ticket URLs must
+		// never appear in raw HTML/JSON. `ticket_url` is emptied when the
+		// URL is an affiliate/redirect wrapper; consumers gate a
+		// `data-ticket-ref` button on `is_affiliate_ticket` instead — the
+		// ref is the event's own post ID, already known independently by
+		// every caller of this method.
+		$raw_ticket_url      = (string) ( $event_data['ticketUrl'] ?? '' );
+		$is_affiliate_ticket = '' !== $raw_ticket_url && data_machine_events_is_affiliate_ticket_url( $raw_ticket_url );
 
 		$formatted_time_display = '';
 		$iso_start_date         = '';
@@ -86,6 +96,8 @@ class DisplayVars {
 			'show_performer'         => false,
 			'show_price'             => $event_data['showPrice'] ?? true,
 			'show_ticket_link'       => $event_data['showTicketLink'] ?? true,
+			'ticket_url'             => $is_affiliate_ticket ? '' : $raw_ticket_url,
+			'is_affiliate_ticket'    => $is_affiliate_ticket,
 			'multi_day_label'        => $multi_day_label,
 			'is_continuation'        => $display_context['is_continuation'] ?? false,
 			'is_multi_day'           => $display_context['is_multi_day'] ?? false,

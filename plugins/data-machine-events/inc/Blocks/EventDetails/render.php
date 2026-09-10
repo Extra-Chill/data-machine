@@ -18,6 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\EventSchemaProvider;
+use function DataMachineEvents\Core\data_machine_events_is_affiliate_ticket_url;
 
 $decode_unicode = function ( $str ) {
 	return html_entity_decode( preg_replace( '/\\\\u([0-9a-fA-F]{4})/', '&#x$1;', $str ), ENT_NOQUOTES, 'UTF-8' );
@@ -240,10 +241,34 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 			if ( $is_past ) {
 				$ticket_classes[] = 'ticket-button--past';
 			}
+			$is_affiliate_ticket = data_machine_events_is_affiliate_ticket_url( $ticket_url );
 			?>
-			<a href="<?php echo esc_url( $ticket_url ); ?>" class="<?php echo esc_attr( implode( ' ', $ticket_classes ) ); ?>" target="_blank" rel="noopener">
-				<?php echo esc_html( $ticket_button_text ); ?>
-			</a>
+			<?php if ( $is_affiliate_ticket ) : ?>
+				<?php
+				/**
+				 * Ticketmaster compliance (issue #816): affiliate ticket URLs must
+				 * never appear in raw HTML. This anchor has NO href — the ticket-
+				 * link-gate.js script assembles the first-party redirect href
+				 * (`/wp-json/extrachill/v1/events/tickets/<post_id>/go`) only in
+				 * response to a genuine pointer or keyboard interaction. The
+				 * affiliate URL and affiliate ID never ship in page source or in
+				 * any JS bundle.
+				 */
+				wp_enqueue_script( 'data-machine-events-ticket-link-gate' );
+				?>
+				<a class="<?php echo esc_attr( implode( ' ', $ticket_classes ) ); ?>" data-ticket-ref="<?php echo esc_attr( (string) $post_id ); ?>" role="button" tabindex="0" target="_blank" rel="noopener nofollow">
+					<?php echo esc_html( $ticket_button_text ); ?>
+				</a>
+				<noscript>
+					<a href="<?php echo esc_url( (string) get_permalink( $post_id ) ); ?>" class="<?php echo esc_attr( implode( ' ', $ticket_classes ) ); ?> ticket-button--noscript">
+						<?php echo esc_html( $ticket_button_text ); ?>
+					</a>
+				</noscript>
+			<?php else : ?>
+				<a href="<?php echo esc_url( $ticket_url ); ?>" class="<?php echo esc_attr( implode( ' ', $ticket_classes ) ); ?>" target="_blank" rel="noopener">
+					<?php echo esc_html( $ticket_button_text ); ?>
+				</a>
+			<?php endif; ?>
 		<?php endif; ?>
 
 		<?php

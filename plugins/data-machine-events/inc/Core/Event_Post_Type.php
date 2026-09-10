@@ -23,6 +23,21 @@ class Event_Post_Type {
 
 	const POST_TYPE = 'data_machine_events';
 
+	/**
+	 * Canonical block name for the Event Details block.
+	 *
+	 * New code should reference this constant instead of the raw
+	 * `'data-machine-events/event-details'` string literal. Several
+	 * existing ability classes (DeleteEventAbilities, EncodingFixAbilities,
+	 * BatchTimeFixAbilities, EventUpdateAbilities, TicketUrlResyncAbilities)
+	 * each carry their own private copy of this same literal predating this
+	 * constant; consolidating those is a separate cleanup, not done here to
+	 * avoid touching unrelated files mid-flight.
+	 *
+	 * @since 0.62.0
+	 */
+	const EVENT_DETAILS_BLOCK_NAME = 'data-machine-events/event-details';
+
 	public static function register() {
 		$labels = array(
 			'name'                  => _x( 'Events', 'Post type general name', 'data-machine-events' ),

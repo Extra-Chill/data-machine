@@ -46,6 +46,7 @@ use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
 use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 use DataMachineEvents\Blocks\Calendar\Taxonomy\Badges;
 use DataMachineEvents\Blocks\Calendar\Template_Loader;
+use function DataMachineEvents\Core\data_machine_events_is_affiliate_ticket_url;
 
 /**
  * Calendar API controller
@@ -64,8 +65,11 @@ class Calendar {
 	 * v3 (#465): canonical server-rendered empty-state fragment added.
 	 * v4 (#507): complete performer, status, and venue context added.
 	 * v5 (#786): venue `tier` added to the serialized venue object.
+	 * v6 (#816): `ticket.is_affiliate` added; `ticket.url` is emptied when
+	 * the ticket URL is an affiliate/redirect wrapper (JS-gated ticket
+	 * links — the client uses `event.id` as the gated ref instead).
 	 */
-	const DATA_SCHEMA_VERSION = 5;
+	const DATA_SCHEMA_VERSION = 6;
 
 	/**
 	 * Calendar endpoint implementation
@@ -369,6 +373,14 @@ class Calendar {
 		$event_data = $event_entry['event_data'] ?? array();
 		$title      = (string) ( $event_entry['title'] ?? get_the_title( $post_id ) );
 
+		// Ticketmaster compliance (issue #816): `ticket.url` is emptied when
+		// the URL is an affiliate/redirect wrapper. Clients gate a
+		// `data-ticket-ref` button on `ticket.is_affiliate` instead, using
+		// the event's own `id` (already top-level on this object) as the
+		// ref — no separate ref field needed.
+		$ticket_url          = (string) ( $event_data['ticketUrl'] ?? '' );
+		$is_affiliate_ticket = '' !== $ticket_url && data_machine_events_is_affiliate_ticket_url( $ticket_url );
+
 		return array(
 			'id'             => $post_id,
 			'title'          => $title,
@@ -383,7 +395,8 @@ class Calendar {
 			'venue'          => $this->serialize_venue( $post_id, $event_data ),
 			'organizer'      => $this->serialize_organizer( $event_data ),
 			'ticket'         => array(
-				'url' => (string) ( $event_data['ticketUrl'] ?? '' ),
+				'url'          => $is_affiliate_ticket ? '' : $ticket_url,
+				'is_affiliate' => $is_affiliate_ticket,
 			),
 			'performer'      => array(
 				'name' => (string) ( $event_data['performer'] ?? '' ),

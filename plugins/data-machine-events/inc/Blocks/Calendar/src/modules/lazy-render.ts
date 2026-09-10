@@ -103,6 +103,7 @@ function hydratePlaceholder( placeholder: HTMLElement ): void {
 	const venueName = displayVars.venue_name || '';
 	const isoStartDate = displayVars.iso_start_date || '';
 	const ticketUrl = displayVars.ticket_url || '';
+	const isAffiliateTicket = displayVars.is_affiliate_ticket === true;
 	const showTicketLink = displayVars.show_ticket_link !== false;
 
 	const itemClasses = [ 'data-machine-event-item' ];
@@ -164,10 +165,20 @@ function hydratePlaceholder( placeholder: HTMLElement ): void {
 	placeholder.setAttribute( 'data-venue', venueName );
 	placeholder.setAttribute( 'data-performer', performerName );
 	placeholder.setAttribute( 'data-date', isoStartDate );
-	placeholder.setAttribute( 'data-ticket-url', ticketUrl );
+	// Ticketmaster compliance (issue #816): when the ticket URL is an
+	// affiliate/redirect wrapper, `ticketUrl` above is already empty (see
+	// DisplayVars::build()) and we expose the gated ref (this placeholder's
+	// own event ID) instead of a `data-ticket-url` attribute.
+	if ( isAffiliateTicket ) {
+		placeholder.setAttribute( 'data-ticket-ref', String( data.id ) );
+	} else {
+		placeholder.setAttribute( 'data-ticket-url', ticketUrl );
+	}
 	placeholder.setAttribute(
 		'data-has-tickets',
-		showTicketLink && ticketUrl ? 'true' : 'false'
+		showTicketLink && ( ticketUrl !== '' || isAffiliateTicket )
+			? 'true'
+			: 'false'
 	);
 	placeholder.innerHTML = html;
 }

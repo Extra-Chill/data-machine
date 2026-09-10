@@ -47,6 +47,17 @@ namespace {
 }
 
 namespace DataMachineEvents\Core {
+	/**
+	 * Faithful double for the affiliate-detection helper (issue #816). The
+	 * seeded fixture ticket URL (`https://tickets.invalid/seeded-show`) is
+	 * not an affiliate host, so `false` matches the real helper's behavior
+	 * for that input without pulling `wp_parse_url()` into this portable,
+	 * WordPress-free test run.
+	 */
+	function data_machine_events_is_affiliate_ticket_url( string $url ): bool {
+		return false;
+	}
+
 	final class Venue_Taxonomy {
 		public static function get_venue_data( int $term_id ): array {
 			return array(

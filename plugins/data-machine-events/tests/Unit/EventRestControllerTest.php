@@ -200,6 +200,70 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'data-machine-events-no-events-today-link', $data['empty_html'] );
 	}
 
+	/**
+	 * Ticketmaster compliance (issue #816): `format=data` must never surface
+	 * the affiliate ticket URL. `ticket.url` is emptied and `ticket.is_affiliate`
+	 * is true instead; clients gate on `event.id` for the redirect ref.
+	 */
+	public function test_calendar_data_response_empties_affiliate_ticket_url() {
+		$affiliate_url = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=' . rawurlencode( 'https://www.ticketmaster.com/event/Z7r9jZ1A7JFo-' ) . '&utm_medium=affiliate';
+		$post_id       = wp_insert_post(
+			array(
+				'post_title'   => 'Affiliate Ticket REST Test Event ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"ticketUrl":"' . $affiliate_url . '"} --><div></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		CalendarCache::invalidate();
+
+		$request  = $this->calendar_request();
+		$request->set_param( 'format', 'data' );
+		$response = $this->server->dispatch( $request );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$event = $data['events'][0];
+		$this->assertSame( $post_id, $event['id'] );
+		$this->assertSame( '', $event['ticket']['url'] );
+		$this->assertTrue( $event['ticket']['is_affiliate'] );
+
+		$raw_response = wp_json_encode( $data );
+		$this->assertStringNotContainsString( 'evyy.net', $raw_response );
+		$this->assertStringNotContainsString( '1191134', $raw_response );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_calendar_data_response_keeps_direct_ticket_url() {
+		$direct_url = 'https://www.ticketmaster.com/event/direct-123';
+		$post_id    = wp_insert_post(
+			array(
+				'post_title'   => 'Direct Ticket REST Test Event ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"ticketUrl":"' . $direct_url . '"} --><div></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		CalendarCache::invalidate();
+
+		$request  = $this->calendar_request();
+		$request->set_param( 'format', 'data' );
+		$response = $this->server->dispatch( $request );
+		$event    = $response->get_data()['events'][0];
+
+		$this->assertSame( $direct_url, $event['ticket']['url'] );
+		$this->assertFalse( $event['ticket']['is_affiliate'] );
+
+		wp_delete_post( $post_id, true );
+	}
+
 	public function test_filters_endpoint_returns_taxonomies() {
 		$request  = new WP_REST_Request( 'GET', '/' . API_NAMESPACE . '/events/filters' );
 		$response = $this->server->dispatch( $request );

@@ -26,7 +26,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EventUpdateAbilities {
 	public const SOURCE_ABILITY_NAME = 'data-machine-events/update-source-event';
 
-	private const BLOCK_NAME       = 'data-machine-events/event-details';
 	private const UPDATABLE_FIELDS = array(
 		'startDate',
 		'startTime',
@@ -613,7 +612,7 @@ class EventUpdateAbilities {
 	 */
 	private function findEventBlockIndex( array $blocks ): ?int {
 		foreach ( $blocks as $index => $block ) {
-			if ( self::BLOCK_NAME === $block['blockName'] ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
 				return $index;
 			}
 		}

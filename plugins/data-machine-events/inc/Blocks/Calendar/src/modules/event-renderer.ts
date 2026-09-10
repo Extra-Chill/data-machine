@@ -57,14 +57,26 @@ export function renderEventCard(
 	const venueName = display.venue_name || '';
 	const performerName = display.performer_name || '';
 	const ticketUrl = event.ticket?.url || '';
+	// Ticketmaster compliance (issue #816): `is_affiliate` is optional so
+	// cached pre-v6 envelopes (no ticket.is_affiliate at all) degrade to
+	// "not affiliate" rather than silently dropping a real ticket link.
+	const isAffiliateTicket = event.ticket?.is_affiliate === true;
 	const showTicketLink = display.show_ticket_link !== false;
-	const hasTickets = showTicketLink && ticketUrl !== '';
+	const hasTickets =
+		showTicketLink && ( ticketUrl !== '' || isAffiliateTicket );
 
 	item.dataset.title = event.title;
 	item.dataset.venue = venueName;
 	item.dataset.performer = performerName;
 	item.dataset.date = display.iso_start_date || '';
-	item.dataset.ticketUrl = ticketUrl;
+	// When affiliate, `ticketUrl` is already empty (server-emptied, see
+	// Calendar::serialize_event()) and the gated ref is this event's own
+	// `id` — no separate ref field needed on the ticket object.
+	if ( isAffiliateTicket ) {
+		item.dataset.ticketRef = String( event.id );
+	} else {
+		item.dataset.ticketUrl = ticketUrl;
+	}
 	item.dataset.hasTickets = hasTickets ? 'true' : 'false';
 
 	const link = document.createElement( 'div' );

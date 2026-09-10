@@ -30,7 +30,8 @@
             "type": "Organization"
         },
         "ticket": {
-            "url": "https://tickets.invalid/seeded-show"
+            "url": "https://tickets.invalid/seeded-show",
+            "is_affiliate": false
         },
         "performer": {
             "name": "The Seeded Performers",

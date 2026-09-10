@@ -255,6 +255,25 @@ if ( 'past' === data_machine_events_get_timing( $post_id ) ) {
 }
 ```
 
+### `data_machine_events_is_affiliate_ticket_url( string $url ): bool`
+
+Return whether a ticket URL is a known affiliate/redirect wrapper (e.g. the
+Ticketmaster/Impact Radius `evyy.net` family). This is the single source of
+truth for that question — filterable via `data_machine_events_affiliate_ticket_hosts`
+(bare registrable domains, matched exact-or-subdomain, case-insensitively).
+
+Consumers rendering anything derived from an event's ticket URL (structured
+data, social previews, etc.) should call this instead of maintaining a second
+copy of the affiliate host list, and should never render the raw affiliate
+URL when it returns `true` — see
+[issue #816](https://github.com/Extra-Chill/data-machine-events/issues/816).
+
+```php
+if ( data_machine_events_is_affiliate_ticket_url( $ticket_url ) ) {
+    // Render a gated CTA instead of a plain <a href="$ticket_url">.
+}
+```
+
 ### Pre-existing helpers (kept stable)
 
 These functions predate this document and remain part of the public API:

@@ -27,7 +27,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class BatchTimeFixAbilities {
 
 	private const DEFAULT_LIMIT = 100;
-	private const BLOCK_NAME    = 'data-machine-events/event-details';
 
 	private static bool $registered = false;
 
@@ -388,7 +387,7 @@ class BatchTimeFixAbilities {
 
 		$blocks = parse_blocks( $post->post_content );
 		foreach ( $blocks as $block ) {
-			if ( self::BLOCK_NAME === $block['blockName'] ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
 				return $block['attrs'];
 			}
 		}
@@ -502,7 +501,7 @@ class BatchTimeFixAbilities {
 		$block_index = null;
 
 		foreach ( $blocks as $index => $block ) {
-			if ( self::BLOCK_NAME === $block['blockName'] ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
 				$block_index = $index;
 				break;
 			}

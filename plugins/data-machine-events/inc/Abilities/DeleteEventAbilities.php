@@ -29,8 +29,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class DeleteEventAbilities {
 
-	private const BLOCK_NAME = 'data-machine-events/event-details';
-
 	private static bool $registered = false;
 
 	public function __construct() {
@@ -310,7 +308,7 @@ class DeleteEventAbilities {
 	private function lookupStartDate( \WP_Post $post ): string {
 		$blocks = parse_blocks( $post->post_content );
 		foreach ( $blocks as $block ) {
-			if ( self::BLOCK_NAME === ( $block['blockName'] ?? '' ) ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === ( $block['blockName'] ?? '' ) ) {
 				return (string) ( $block['attrs']['startDate'] ?? '' );
 			}
 		}

@@ -26,11 +26,23 @@ const EVENT_TICKET_URL_META_KEY = '_datamachine_ticket_url';
  * - 'u' = redirect URL (Ticketmaster affiliate via evyy.net)
  * - 'e' = event ID (DoStuff, some redirect services)
  *
- * @since 0.8.39 Original implementation (stripped all query params - bug)
+ * The `_datamachine_ticket_url` meta this writes (`EVENT_TICKET_URL_META_KEY`)
+ * is a DEDUP COMPARISON KEY, not a redirect-safe canonical URL — every
+ * existing consumer of that meta only ever compares/matches it, never sends
+ * a real visitor to it. Do not read that meta expecting the complete,
+ * as-authored ticket URL (query string and all); parse the Event Details
+ * block's `ticketUrl` attribute directly instead. See
+ * https://github.com/Extra-Chill/data-machine-events/issues/816 (the bug
+ * this exact confusion caused) and
+ * https://github.com/Extra-Chill/data-machine-events/issues/821 (tracking
+ * the footgun this meta key's name/shape presents to future consumers).
+ *
+ * @since 0.8.39  Original implementation (stripped all query params - bug)
  * @since 0.10.11 Fixed to preserve identity parameters for affiliate URLs
  *
  * @param string $url Raw ticket URL
- * @return string Normalized URL (scheme + host + path + identity params)
+ * @return string Normalized URL (scheme + host + path + identity params) — a
+ *                comparison key, not a URL to redirect a visitor to.
  */
 function datamachine_normalize_ticket_url( string $url ): string {
 	if ( empty( $url ) ) {
@@ -134,43 +146,24 @@ function datamachine_extract_ticket_identity( string $url ): string {
 /**
  * Unwrap affiliate/redirect URLs to extract the canonical ticket URL.
  *
- * Known affiliate wrappers:
- * - evyy.net (Ticketmaster affiliate): ?u=<encoded_url>
- * - redirect.viglink.com: ?u=<encoded_url>
- * - click.linksynergy.com: ?u=<encoded_url>
+ * Delegates the "is this an affiliate wrapper?" question to
+ * `data_machine_events_is_affiliate_ticket_url()` (see affiliate-links.php) —
+ * the single source of truth for the affiliate host list, shared with the
+ * ticket-link JS-gating surface. This function only owns the ?u=-style
+ * redirect-parameter unwrapping, not the host match.
+ *
+ * @since 0.62.0 Host list extracted to `data_machine_events_is_affiliate_ticket_url()`.
  *
  * @param string $url Possibly wrapped URL
  * @return string Unwrapped URL, or original if not an affiliate wrapper
  */
 function datamachine_unwrap_affiliate_url( string $url ): string {
-	$parsed = wp_parse_url( $url );
-	if ( ! $parsed || empty( $parsed['host'] ) || empty( $parsed['query'] ) ) {
+	if ( ! data_machine_events_is_affiliate_ticket_url( $url ) ) {
 		return $url;
 	}
 
-	// Known affiliate/redirect hosts that wrap ticket URLs in a ?u= parameter
-	$affiliate_hosts = array(
-		'evyy.net',
-		'viglink.com',
-		'linksynergy.com',
-		'shareasale.com',
-		'anrdoezrs.net',
-		'jdoqocy.com',
-		'dpbolvw.net',
-		'kqzyfj.com',
-		'tkqlhce.com',
-	);
-
-	$host         = strtolower( $parsed['host'] );
-	$is_affiliate = false;
-	foreach ( $affiliate_hosts as $affiliate_host ) {
-		if ( $host === $affiliate_host || str_ends_with( $host, '.' . $affiliate_host ) ) {
-			$is_affiliate = true;
-			break;
-		}
-	}
-
-	if ( ! $is_affiliate ) {
+	$parsed = wp_parse_url( $url );
+	if ( ! $parsed || empty( $parsed['query'] ) ) {
 		return $url;
 	}
 
@@ -234,7 +227,7 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 	$event_details_found = false;
 
 	foreach ( $blocks as $block ) {
-		if ( 'data-machine-events/event-details' === $block['blockName'] ) {
+		if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
 			$event_details_found = true;
 			$start_date          = $block['attrs']['startDate'] ?? '';
 			$start_time          = $block['attrs']['startTime'] ?? '';

@@ -75,6 +75,9 @@ vendor/
 vendor
 composer.lock
 
+# PHPUnit
+.phpunit.result.cache
+
 # Build artifacts
 build/
 dist/

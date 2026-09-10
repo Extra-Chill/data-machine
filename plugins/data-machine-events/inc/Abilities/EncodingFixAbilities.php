@@ -18,6 +18,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use DataMachineEvents\Core\Event_Post_Type;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -26,7 +27,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EncodingFixAbilities {
 
 	private const DEFAULT_LIMIT = 100;
-	private const BLOCK_NAME    = 'data-machine-events/event-details';
 
 	private static bool $registered = false;
 
@@ -236,7 +236,7 @@ class EncodingFixAbilities {
 
 		$blocks = parse_blocks( $post->post_content );
 		foreach ( $blocks as $block ) {
-			if ( self::BLOCK_NAME === $block['blockName'] ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
 				return $block['attrs'];
 			}
 		}
@@ -323,7 +323,7 @@ class EncodingFixAbilities {
 		$block_index = null;
 
 		foreach ( $blocks as $index => $block ) {
-			if ( self::BLOCK_NAME === $block['blockName'] ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
 				$block_index = $index;
 				break;
 			}

@@ -17,8 +17,12 @@ $formatted_time_display = $display_vars['formatted_time_display'] ?? '';
 $venue_name             = $display_vars['venue_name'] ?? '';
 $performer_name         = $display_vars['performer_name'] ?? '';
 $price                  = $display_vars['price'] ?? '';
-$ticket_url             = $display_vars['ticket_url'] ?? '';
-$iso_start_date         = $display_vars['iso_start_date'] ?? '';
+// Empty when the ticket URL is an affiliate/redirect wrapper — see
+// DisplayVars::build(). The gated ref (the event's own post ID) is used
+// instead so the affiliate URL never appears in raw HTML (issue #816).
+$ticket_url          = $display_vars['ticket_url'] ?? '';
+$is_affiliate_ticket = ! empty( $display_vars['is_affiliate_ticket'] );
+$iso_start_date      = $display_vars['iso_start_date'] ?? '';
 
 $show_performer   = $display_vars['show_performer'] ?? true;
 $show_price       = $display_vars['show_price'] ?? true;
@@ -35,6 +39,10 @@ if ( $is_continuation ) {
 if ( $is_multi_day ) {
 	$item_classes[] = 'data-machine-event-multi-day';
 }
+
+if ( $is_affiliate_ticket ) {
+	wp_enqueue_script( 'data-machine-events-ticket-link-gate' );
+}
 ?>
 
 <div class="<?php echo esc_attr( implode( ' ', $item_classes ) ); ?>"
@@ -42,8 +50,12 @@ if ( $is_multi_day ) {
 	data-venue="<?php echo esc_attr( $venue_name ); ?>"
 	data-performer="<?php echo esc_attr( $performer_name ); ?>"
 	data-date="<?php echo esc_attr( $iso_start_date ); ?>"
+	<?php if ( $is_affiliate_ticket ) : ?>
+	data-ticket-ref="<?php echo esc_attr( (string) $event_post->ID ); ?>"
+	<?php else : ?>
 	data-ticket-url="<?php echo esc_url( $ticket_url ); ?>"
-	data-has-tickets="<?php echo ( $show_ticket_link && ! empty( $ticket_url ) ) ? 'true' : 'false'; ?>">
+	<?php endif; ?>
+	data-has-tickets="<?php echo ( $show_ticket_link && ( ! empty( $ticket_url ) || $is_affiliate_ticket ) ) ? 'true' : 'false'; ?>">
 
 	<div class="data-machine-event-link">
 		<?php echo \DataMachineEvents\Blocks\Calendar\Taxonomy\Badges::render_taxonomy_badges( $event_post->ID ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Badge renderer escapes each taxonomy label and URL. ?>

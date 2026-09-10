@@ -197,6 +197,18 @@ class EventRenderer {
 		array $display_vars,
 		array $display_context
 	): void {
+		// Ticketmaster compliance (issue #816): `$event_data` is the raw
+		// Event Details block attribute payload and is embedded verbatim
+		// into `data-event-json` below. Strip the affiliate ticket URL from
+		// it the same way `$display_vars['ticket_url']` was already
+		// emptied by `DisplayVars::build()` — otherwise the raw block
+		// attributes would leak it right back into page source through
+		// this second copy.
+		if ( ! empty( $display_vars['is_affiliate_ticket'] ) ) {
+			unset( $event_data['ticketUrl'] );
+			wp_enqueue_script( 'data-machine-events-ticket-link-gate' );
+		}
+
 		$placeholder_data = array(
 			'id'              => $event_post->ID,
 			'title'           => get_the_title( $event_post ),
