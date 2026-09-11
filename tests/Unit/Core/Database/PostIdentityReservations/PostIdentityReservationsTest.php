@@ -121,9 +121,10 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_nontransactional_reservation_table_fails_closed(): void {
+	public function test_nontransactional_reservation_table_fails_closed_without_the_capability(): void {
 		global $wpdb;
 
+		$this->assertFalse( method_exists( $wpdb, 'supports_transactional_tables' ) );
 		$changed = $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ENGINE=MyISAM', $this->repository->get_table_name() ) );
 		$this->assertNotFalse( $changed );
 		try {
@@ -135,6 +136,80 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 			$this->assertSame( 'identity_schema_engine', $result->get_error_code() );
 		} finally {
 			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ENGINE=InnoDB', $this->repository->get_table_name() ) );
+		}
+	}
+
+	/** This fake wpdb covers consumer routing, not native capability conformance. */
+	public function test_exact_transactional_table_capability_routes_only_a_complete_valid_schema(): void {
+		global $wpdb;
+
+		$this->assertNotFalse( $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ENGINE=MyISAM', $this->repository->get_table_name() ) ) );
+		$original = $wpdb;
+		$capable  = new class( $original ) extends \wpdb {
+			private \wpdb $delegate;
+			public array $supported_tables = array();
+			public mixed $capability_result = false;
+
+			public function __construct( \wpdb $delegate ) {
+				$this->delegate    = $delegate;
+				$this->prefix      = $delegate->prefix;
+				$this->base_prefix = $delegate->base_prefix;
+				$this->posts       = $delegate->posts;
+			}
+
+			public function prepare( $query, ...$args ) {
+				return $this->delegate->prepare( $query, ...$args );
+			}
+
+			public function query( $query ) {
+				return $this->delegate->query( $query );
+			}
+
+			public function get_var( $query = null, $x = 0, $y = 0 ) {
+				return $this->delegate->get_var( $query, $x, $y );
+			}
+
+			public function get_results( $query = null, $output = OBJECT ) {
+				return $this->delegate->get_results( $query, $output );
+			}
+
+			public function supports_transactional_tables( array $tables ) {
+				if ( 'throw' === $this->capability_result ) {
+					throw new \RuntimeException( 'Unsupported transactional table capability.' );
+				}
+				return $tables === $this->supported_tables ? $this->capability_result : false;
+			}
+		};
+		$wpdb = $capable;
+
+		try {
+			$repository = new PostIdentityReservations();
+			$capable->supported_tables = array( $repository->get_table_name() );
+			$incomplete = $repository->validate_schema();
+			$this->assertWPError( $incomplete );
+			$this->assertSame( 'identity_schema_engine', $incomplete->get_error_code() );
+
+			$capable->supported_tables = array( $repository->get_table_name(), $capable->posts );
+			$capable->capability_result = 1;
+			$strict_false = $repository->validate_schema();
+			$this->assertWPError( $strict_false );
+			$this->assertSame( 'identity_schema_engine', $strict_false->get_error_code() );
+
+			$capable->capability_result = 'throw';
+			$thrown = $repository->validate_schema();
+			$this->assertWPError( $thrown );
+			$this->assertSame( 'identity_schema_engine', $thrown->get_error_code() );
+
+			$capable->capability_result = true;
+			$this->assertTrue( $repository->validate_schema() );
+
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP COLUMN completed_at', $repository->get_table_name() ) );
+			$invalid_schema = $repository->validate_schema();
+			$this->assertWPError( $invalid_schema );
+			$this->assertSame( 'identity_schema_columns', $invalid_schema->get_error_code() );
+		} finally {
+			$wpdb = $original;
+			PostIdentityReservations::create_table();
 		}
 	}
 
