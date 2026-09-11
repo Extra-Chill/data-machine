@@ -151,8 +151,10 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 			public mixed $capability_result = false;
 
 			public function __construct( \wpdb $delegate ) {
-				$this->delegate = $delegate;
-				$this->set_prefix( $delegate->prefix );
+				$this->delegate    = $delegate;
+				$this->prefix      = $delegate->prefix;
+				$this->base_prefix = $delegate->base_prefix;
+				$this->posts       = $delegate->posts;
 			}
 
 			public function prepare( $query, ...$args ) {
