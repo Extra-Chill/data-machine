@@ -206,7 +206,7 @@ class PostIdentityReservations extends BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$database = (string) $this->wpdb->get_var( 'SELECT DATABASE()' );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$engine = $this->wpdb->get_var(
+		$engine      = $this->wpdb->get_var(
 			$this->wpdb->prepare(
 				'SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s',
 				$database,
