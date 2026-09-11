@@ -65,6 +65,11 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails/add-to-ca
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/affiliate-links.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/AffiliateRedirectShape.php';
 
+// Canonical ticket-URL storage + resolve-time affiliate wrapper assembly
+// config (issue #818). Depends on affiliate-links.php; must load before
+// event-dates-sync.php consumers that normalize ticket URLs.
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/ticket-destination.php';
+
 // Load event dates sync (monitors Event Details block saves → datamachine_event_dates table).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-dates-sync.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventDatesTable.php';
@@ -280,6 +285,7 @@ class DATAMACHINE_Events {
 			\DataMachineEvents\Abilities\TicketUrlResyncAbilities::class,
 			\DataMachineEvents\Abilities\AffiliateRedirectRepairAbilities::class,
 			\DataMachineEvents\Abilities\ResolveTicketDestinationAbilities::class,
+			\DataMachineEvents\Abilities\TicketUrlCanonicalBackfillAbilities::class,
 			\DataMachineEvents\Abilities\BatchActionRecoveryAbilities::class,
 			\DataMachineEvents\Abilities\TicketmasterTest::class,
 			\DataMachineEvents\Abilities\DiceFmTest::class,
@@ -443,6 +449,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/ResolveTicketDestinationAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/ResolveTicketDestinationAbilities.php';
 			new \DataMachineEvents\Abilities\ResolveTicketDestinationAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlCanonicalBackfillAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlCanonicalBackfillAbilities.php';
+			new \DataMachineEvents\Abilities\TicketUrlCanonicalBackfillAbilities();
 		}
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchActionRecoveryAbilities.php' ) ) {

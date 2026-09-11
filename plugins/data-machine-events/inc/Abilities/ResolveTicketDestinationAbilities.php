@@ -19,6 +19,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Core\Event_Post_Type;
+use function DataMachineEvents\Core\data_machine_events_assemble_affiliate_wrapper;
 use function DataMachineEvents\Core\data_machine_events_is_affiliate_ticket_url;
 use function DataMachineEvents\Core\datamachine_decode_stored_url_artifacts;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
@@ -147,6 +148,15 @@ class ResolveTicketDestinationAbilities {
 	 * any future consumer, even though every consumer audited today is
 	 * dedup-only and unaffected).
 	 *
+	 * Stored-shape tolerance (issue #818): rows hold either the legacy
+	 * fully-assembled affiliate wrapper or the post-#818 canonical vendor
+	 * URL. A stored wrapper is returned as-is; a canonical URL for a
+	 * monetized vendor has the wrapper assembled from config at resolve
+	 * time (`data_machine_events_assemble_affiliate_wrapper()`), and any
+	 * other direct URL passes through untouched. Both stored shapes
+	 * therefore resolve to the same wire destination — which is what makes
+	 * the one-time backfill non-blocking and independently revertible.
+	 *
 	 * @param int      $event_id Event post ID.
 	 * @param \WP_Post $post     Event post object.
 	 * @return string Ticket URL, or empty string when none is set.
@@ -156,20 +166,38 @@ class ResolveTicketDestinationAbilities {
 		$block_url = $this->findTicketUrlInBlocks( $blocks );
 
 		if ( '' !== $block_url ) {
-			return $this->normalizeResolvedUrl( $block_url );
+			$ticket_url = $this->normalizeResolvedUrl( $block_url );
+		} else {
+			$meta_url   = get_post_meta( $event_id, EVENT_TICKET_URL_META_KEY, true );
+			$ticket_url = $this->normalizeResolvedUrl( is_string( $meta_url ) ? $meta_url : '' );
 		}
 
-		$meta_url = get_post_meta( $event_id, EVENT_TICKET_URL_META_KEY, true );
-		return $this->normalizeResolvedUrl( is_string( $meta_url ) ? $meta_url : '' );
+		if ( '' === $ticket_url ) {
+			return $ticket_url;
+		}
+
+		// Wrapper stored -> return as-is. Canonical stored for a monetized
+		// vendor -> assemble. Direct non-monetized URL -> unchanged.
+		if ( data_machine_events_is_affiliate_ticket_url( $ticket_url ) ) {
+			return $ticket_url;
+		}
+
+		return data_machine_events_assemble_affiliate_wrapper( $ticket_url );
 	}
 
 	/**
 	 * Normalize a resolved ticket URL for use as a redirect destination.
 	 *
-	 * Guarantee: returns the stored URL verbatim except for reversing HTML
-	 * entity encoding introduced by however it was authored into
-	 * `post_content` (`&amp;` -> `&`, etc.) — no path/host rewriting, no
-	 * query reordering, no affiliate unwrapping.
+	 * Delegates to the shared `datamachine_decode_stored_url_artifacts()`
+	 * (event-dates-sync.php, issue #823), which this method's logic was
+	 * moved into so the resolve ability, the issue #818 canonical-URL
+	 * backfill, and future redirect-purpose consumers share one version
+	 * instead of private copies.
+	 *
+	 * Guarantee (unchanged): returns the stored URL verbatim except for
+	 * reversing HTML entity encoding introduced by however it was authored
+	 * into `post_content` (`&amp;` -> `&`, etc.) — no path/host rewriting,
+	 * no query reordering, no affiliate unwrapping.
 	 *
 	 * Roughly 54% of this network's ~74,600 published events with an
 	 * affiliate ticket URL store it with the ampersand HTML-entity-encoded
@@ -195,7 +223,9 @@ class ResolveTicketDestinationAbilities {
 	 *
 	 * @since 0.63.0 Delegates to the shared `datamachine_decode_stored_url_artifacts()`
 	 *              helper (issue #823) instead of duplicating the same two
-	 *              normalization steps a third time.
+	 *              normalization steps a third time. Issue #818's canonical-
+	 *              storage backfill and resolve-time wrapper assembly also
+	 *              consume this one shared helper, not a private copy.
 	 *
 	 * @param string $url Raw ticket URL as stored (block content or meta).
 	 * @return string Normalized URL suitable for a redirect `Location` header.

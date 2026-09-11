@@ -82,8 +82,32 @@ class ResolveTicketDestinationAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'no_ticket_url', $result->get_error_code() );
 	}
 
-	public function test_resolves_direct_ticket_url_as_non_affiliate(): void {
-		$url      = 'https://www.ticketmaster.com/event/Z7r9jZ1A7JFo-';
+	/**
+	 * Issue #818: canonical-stored URLs are now the expected shape. The
+	 * ability assembles the affiliate wrapper from config at resolve time —
+	 * the destination served is identical to the pre-#818 stored wrapper.
+	 */
+	public function test_resolves_canonical_ticketmaster_url_as_assembled_wrapper(): void {
+		$canonical = 'https://www.ticketmaster.com/event/Z7r9jZ1A7JFo-';
+		$event_id  = $this->makeEvent( $canonical );
+
+		$result = $this->ability->executeResolveTicketDestination( array( 'event_id' => $event_id ) );
+
+		$this->assertIsArray( $result );
+		$this->assertSame(
+			'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=' . rawurlencode( $canonical ) . '&utm_medium=affiliate',
+			$result['url'],
+			'Canonical-stored URL must resolve to the config-assembled wrapper.'
+		);
+		$this->assertTrue( $result['is_affiliate'] );
+	}
+
+	/**
+	 * Direct URLs to vendors we do not monetize must pass through verbatim —
+	 * no wrapping, no gating, is_affiliate false.
+	 */
+	public function test_resolves_direct_non_monetized_url_verbatim(): void {
+		$url      = 'https://link.dice.fm/abc123';
 		$event_id = $this->makeEvent( $url );
 
 		$result = $this->ability->executeResolveTicketDestination( array( 'event_id' => $event_id ) );
@@ -91,6 +115,36 @@ class ResolveTicketDestinationAbilitiesTest extends WP_UnitTestCase {
 		$this->assertIsArray( $result );
 		$this->assertSame( $url, $result['url'] );
 		$this->assertFalse( $result['is_affiliate'] );
+	}
+
+	/**
+	 * Issue #818: rotating the affiliate ID is a config edit. The resolved
+	 * wrapper reflects the new ID immediately, and post_content is untouched
+	 * — zero content writes, verified end-to-end.
+	 */
+	public function test_affiliate_id_rotation_changes_resolution_with_zero_content_writes(): void {
+		$canonical = 'https://www.ticketmaster.com/event/Z7r9jZ1A7JFo-';
+		$event_id  = $this->makeEvent( $canonical );
+		$before    = (string) get_post( $event_id )->post_content;
+
+		add_filter(
+			'data_machine_events_ticket_wrapper_config',
+			static function ( array $config ): array {
+				$config['affiliate_id'] = '9999999';
+				return $config;
+			}
+		);
+
+		try {
+			$result = $this->ability->executeResolveTicketDestination( array( 'event_id' => $event_id ) );
+		} finally {
+			remove_all_filters( 'data_machine_events_ticket_wrapper_config' );
+		}
+
+		$this->assertIsArray( $result );
+		$this->assertStringContainsString( '/c/9999999/264167/4272?u=', $result['url'] );
+		$this->assertStringContainsString( rawurlencode( $canonical ), $result['url'] );
+		$this->assertSame( $before, (string) get_post( $event_id )->post_content, 'Rotation must not write content.' );
 	}
 
 	public function test_resolves_affiliate_ticket_url_as_affiliate(): void {
@@ -207,8 +261,13 @@ class ResolveTicketDestinationAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( $url, $result['url'], 'Must return the full block-content URL, not the tracking-param-stripped dedup meta.' );
 	}
 
+	/**
+	 * Meta fallback with a canonical-stored URL: the wrapper is assembled at
+	 * resolve time, same as the block-content path. Issue #818.
+	 */
 	public function test_falls_back_to_meta_when_block_content_has_no_ticket_url(): void {
-		$event_id = self::factory()->post->create(
+		$canonical = 'https://www.ticketmaster.com/event/fallback-only';
+		$event_id  = self::factory()->post->create(
 			array(
 				'post_title'   => 'Meta-Only Ticket Event ' . uniqid(),
 				'post_type'    => Event_Post_Type::POST_TYPE,
@@ -222,12 +281,17 @@ class ResolveTicketDestinationAbilitiesTest extends WP_UnitTestCase {
 		// ticket URL independently of (missing) block content — e.g.
 		// written by an older import path. The ability should still
 		// resolve it rather than returning nothing.
-		update_post_meta( $event_id, '_datamachine_ticket_url', 'https://www.ticketmaster.com/event/fallback-only' );
+		update_post_meta( $event_id, '_datamachine_ticket_url', $canonical );
 
 		$result = $this->ability->executeResolveTicketDestination( array( 'event_id' => $event_id ) );
 
 		$this->assertIsArray( $result );
-		$this->assertSame( 'https://www.ticketmaster.com/event/fallback-only', $result['url'] );
+		$this->assertSame(
+			'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=' . rawurlencode( $canonical ) . '&utm_medium=affiliate',
+			$result['url'],
+			'Canonical URL in meta must assemble to the wrapper at resolve time.'
+		);
+		$this->assertTrue( $result['is_affiliate'] );
 	}
 
 	private function makeEvent( string $ticket_url, string $status = 'publish' ): int {

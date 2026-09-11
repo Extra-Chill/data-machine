@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\EventSchemaProvider;
-use function DataMachineEvents\Core\data_machine_events_is_affiliate_ticket_url;
+use function DataMachineEvents\Core\data_machine_events_is_gated_ticket_url;
 
 $decode_unicode = function ( $str ) {
 	return html_entity_decode( preg_replace( '/\\\\u([0-9a-fA-F]{4})/', '&#x$1;', $str ), ENT_NOQUOTES, 'UTF-8' );
@@ -241,7 +241,12 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 			if ( $is_past ) {
 				$ticket_classes[] = 'ticket-button--past';
 			}
-			$is_affiliate_ticket = data_machine_events_is_affiliate_ticket_url( $ticket_url );
+			// Issue #818: gate on "routes through the first-party redirect",
+			// not on the stored shape — a canonical-stored monetized URL only
+			// becomes a wrapper at resolve time, so the gate is also what
+			// preserves monetization through the 302 endpoint after the
+			// backfill migrates rows to canonical storage.
+			$is_affiliate_ticket = data_machine_events_is_gated_ticket_url( $ticket_url );
 			?>
 			<?php if ( $is_affiliate_ticket ) : ?>
 				<?php

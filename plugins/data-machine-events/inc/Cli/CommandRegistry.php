@@ -149,6 +149,10 @@ class CommandRegistry {
 				'file'  => $cli . 'AffiliateRedirectRepairCommand.php',
 				'class' => AffiliateRedirectRepairCommand::class,
 			),
+			'data-machine-events backfill-canonical-ticket-urls' => array(
+				'file'  => $cli . 'TicketUrlCanonicalBackfillCommand.php',
+				'class' => TicketUrlCanonicalBackfillCommand::class,
+			),
 			'data-machine-events geocode-venues'          => array(
 				'file'  => $cli . 'GeocodeVenuesCommand.php',
 				'class' => GeocodeVenuesCommand::class,

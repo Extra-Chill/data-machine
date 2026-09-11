@@ -735,6 +735,53 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertEquals( '', $result['venue'] ?? '' );
 	}
 
+	/**
+	 * Issue #818: the Discovery API returns an Impact Radius affiliate
+	 * wrapper (our API key is affiliate-linked). The handler must store the
+	 * CANONICAL vendor URL — no affiliate ID may be frozen into post_content.
+	 */
+	public function test_map_event_stores_canonical_url_from_affiliate_wrapper() {
+		$method    = $this->getProtectedMethod( 'map_ticketmaster_event' );
+		$canonical = 'https://www.ticketmaster.com/event/Z7r9jZ1A7JFo-';
+
+		$api_event                  = $this->ticketmasterEvent( 'TM818', 'Canonical Storage Event' );
+		$api_event['url']           = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=' . rawurlencode( $canonical ) . '&utm_medium=affiliate';
+
+		$result = $method->invoke( $this->handler, $api_event );
+
+		$this->assertSame( $canonical, $result['ticketUrl'], 'Import must store the canonical vendor URL, not the affiliate wrapper.' );
+		$this->assertStringNotContainsString( 'evyy.net', $result['ticketUrl'] );
+	}
+
+	public function test_map_event_keeps_already_canonical_url_unchanged() {
+		$method    = $this->getProtectedMethod( 'map_ticketmaster_event' );
+		$canonical = 'https://www.ticketmaster.com/event/123';
+
+		$api_event        = $this->ticketmasterEvent( 'TM819', 'Already Canonical Event' );
+		$api_event['url'] = $canonical;
+
+		$result = $method->invoke( $this->handler, $api_event );
+
+		$this->assertSame( $canonical, $result['ticketUrl'] );
+	}
+
+	/**
+	 * A mangled wrapper (`u=httpswww...`, inner URL no longer valid) cannot
+	 * be unwrapped — the safe fallback is storing the wrapper as-is (all
+	 * read paths handle both shapes); unwrapping must not corrupt the URL.
+	 */
+	public function test_map_event_falls_back_to_wrapper_when_inner_url_is_mangled() {
+		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
+		$stored = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=httpswww.ticketmaster.comeventZ7r9jZ1A7jv1d&utm_medium=affiliate';
+
+		$api_event        = $this->ticketmasterEvent( 'TM820', 'Mangled Wrapper Event' );
+		$api_event['url'] = $stored;
+
+		$result = $method->invoke( $this->handler, $api_event );
+
+		$this->assertSame( $stored, $result['ticketUrl'], 'Unrecoverable wrapper must be stored verbatim, not mangled further.' );
+	}
+
 	public function test_map_event_handles_price_ranges() {
 		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 

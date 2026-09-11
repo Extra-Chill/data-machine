@@ -13,6 +13,8 @@ use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
+use function DataMachineEvents\Core\data_machine_events_is_affiliate_ticket_url;
+use function DataMachineEvents\Core\datamachine_unwrap_affiliate_url;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -899,7 +901,33 @@ class Ticketmaster extends EventImportHandler {
 			);
 		}
 
-		$ticket_url = $tm_event['url'] ?? '';
+		// Issue #818: the Discovery API returns an Impact Radius affiliate
+		// wrapper (our API key is affiliate-linked). Store the CANONICAL
+		// vendor URL — the affiliate ID, campaign ID, and ad ID must not be
+		// frozen into post_content. The wrapper is re-assembled from config
+		// at resolve time (see inc/Core/ticket-destination.php and
+		// ResolveTicketDestinationAbilities). The existing unwrapper is
+		// reused (no second extractor); it is a no-op on an already-canonical
+		// `url`, so this stays correct if the API key ever stops being
+		// affiliate-linked.
+		$ticket_url = datamachine_unwrap_affiliate_url( (string) ( $tm_event['url'] ?? '' ) );
+
+		if ( '' !== $ticket_url && data_machine_events_is_affiliate_ticket_url( $ticket_url ) ) {
+			// Unwrapping failed (e.g. the v0.8.39-era mangled `u=httpswww...`
+			// shape whose inner URL no longer validates). Storing the wrapper
+			// is the safe fallback — every read path handles both shapes and
+			// the compliance gate still routes it through the redirect — but
+			// surface it so ops can see a fresh mangled row the day it lands.
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Ticketmaster ticket URL remained affiliate-wrapped after unwrapping; storing as-is',
+				array(
+					'title'     => $title,
+					'source_id' => (string) ( $tm_event['id'] ?? '' ),
+				)
+			);
+		}
 
 		return array(
 			'title'            => $this->sanitizeText( $title ),

@@ -238,8 +238,44 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		wp_delete_post( $post_id, true );
 	}
 
-	public function test_calendar_data_response_keeps_direct_ticket_url() {
+	/**
+	 * Issue #818: a canonical-stored Ticketmaster URL routes through the
+	 * first-party redirect (wrapper assembled at resolve time), so the REST
+	 * payload empties `ticket.url` and flags `is_affiliate`, same as a
+	 * stored wrapper — the affiliate ID never reaches the client either way.
+	 */
+	public function test_calendar_data_response_gates_canonical_ticketmaster_url() {
 		$direct_url = 'https://www.ticketmaster.com/event/direct-123';
+		$post_id    = wp_insert_post(
+			array(
+				'post_title'   => 'Canonical Ticket REST Test Event ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"ticketUrl":"' . $direct_url . '"} --><div></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		CalendarCache::invalidate();
+
+		$request  = $this->calendar_request();
+		$request->set_param( 'format', 'data' );
+		$response = $this->server->dispatch( $request );
+		$event    = $response->get_data()['events'][0];
+
+		$this->assertSame( '', $event['ticket']['url'] );
+		$this->assertTrue( $event['ticket']['is_affiliate'] );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	/**
+	 * Direct URLs to vendors we do not monetize keep their URL in the REST
+	 * payload — clients render a plain href.
+	 */
+	public function test_calendar_data_response_keeps_non_monetized_direct_ticket_url() {
+		$direct_url = 'https://link.dice.fm/direct-123';
 		$post_id    = wp_insert_post(
 			array(
 				'post_title'   => 'Direct Ticket REST Test Event ' . uniqid(),
