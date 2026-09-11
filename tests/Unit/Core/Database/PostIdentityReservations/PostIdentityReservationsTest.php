@@ -145,9 +145,31 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 
 		$this->assertNotFalse( $wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ENGINE=MyISAM', $this->repository->get_table_name() ) ) );
 		$original = $wpdb;
-		$capable  = new class( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST ) extends \wpdb {
+		$capable  = new class( $original ) extends \wpdb {
+			private \wpdb $delegate;
 			public array $supported_tables = array();
 			public mixed $capability_result = false;
+
+			public function __construct( \wpdb $delegate ) {
+				$this->delegate = $delegate;
+				$this->set_prefix( $delegate->prefix );
+			}
+
+			public function prepare( $query, ...$args ) {
+				return $this->delegate->prepare( $query, ...$args );
+			}
+
+			public function query( $query ) {
+				return $this->delegate->query( $query );
+			}
+
+			public function get_var( $query = null, $x = 0, $y = 0 ) {
+				return $this->delegate->get_var( $query, $x, $y );
+			}
+
+			public function get_results( $query = null, $output = OBJECT ) {
+				return $this->delegate->get_results( $query, $output );
+			}
 
 			public function supports_transactional_tables( array $tables ) {
 				if ( 'throw' === $this->capability_result ) {
@@ -156,7 +178,6 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 				return $tables === $this->supported_tables ? $this->capability_result : false;
 			}
 		};
-		$capable->set_prefix( $original->prefix );
 		$wpdb = $capable;
 
 		try {
