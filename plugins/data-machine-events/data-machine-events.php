@@ -63,6 +63,7 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails/add-to-ca
 // host list, consumed by the ticket URL unwrapper below and the JS-gated
 // ticket button surfaces (issue #816). Must load before event-dates-sync.php.
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/affiliate-links.php';
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/AffiliateRedirectShape.php';
 
 // Load event dates sync (monitors Event Details block saves → datamachine_event_dates table).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-dates-sync.php';
@@ -277,6 +278,7 @@ class DATAMACHINE_Events {
 			\DataMachineEvents\Abilities\VenueMapAbilities::class,
 			\DataMachineEvents\Abilities\CalendarAbilities::class,
 			\DataMachineEvents\Abilities\TicketUrlResyncAbilities::class,
+			\DataMachineEvents\Abilities\AffiliateRedirectRepairAbilities::class,
 			\DataMachineEvents\Abilities\ResolveTicketDestinationAbilities::class,
 			\DataMachineEvents\Abilities\BatchActionRecoveryAbilities::class,
 			\DataMachineEvents\Abilities\TicketmasterTest::class,
@@ -431,6 +433,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlResyncAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketUrlResyncAbilities.php';
 			new \DataMachineEvents\Abilities\TicketUrlResyncAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AffiliateRedirectRepairAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AffiliateRedirectRepairAbilities.php';
+			new \DataMachineEvents\Abilities\AffiliateRedirectRepairAbilities();
 		}
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/ResolveTicketDestinationAbilities.php' ) ) {

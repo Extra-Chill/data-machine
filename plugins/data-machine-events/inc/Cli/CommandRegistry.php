@@ -145,6 +145,10 @@ class CommandRegistry {
 				'file'  => $cli . 'TicketUrlResyncCommand.php',
 				'class' => TicketUrlResyncCommand::class,
 			),
+			'data-machine-events repair-affiliate-redirects' => array(
+				'file'  => $cli . 'AffiliateRedirectRepairCommand.php',
+				'class' => AffiliateRedirectRepairCommand::class,
+			),
 			'data-machine-events geocode-venues'          => array(
 				'file'  => $cli . 'GeocodeVenuesCommand.php',
 				'class' => GeocodeVenuesCommand::class,

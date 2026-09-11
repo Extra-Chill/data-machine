@@ -144,6 +144,47 @@ function datamachine_extract_ticket_identity( string $url ): string {
 }
 
 /**
+ * Find the first present affiliate redirect parameter in a URL's query string.
+ *
+ * Shared extraction primitive for everything that needs to look inside an
+ * affiliate wrapper's redirect parameter: `datamachine_unwrap_affiliate_url()`
+ * consumes it for unwrapping, and the corrupted-redirect detector
+ * (`AffiliateRedirectShape`, see issue #823) consumes it to inspect the value
+ * when unwrapping refuses. There is one redirect-parameter scanner and this
+ * is it — do not grow a second param-name list elsewhere.
+ *
+ * @since 0.63.0 Extracted from `datamachine_unwrap_affiliate_url()` so the
+ *              detector can reuse the same param scan (issue #823).
+ *
+ * @param string $url URL whose query string is scanned.
+ * @return array{param:string, value:string}|null Array of parameter name and
+ *                                                urldecoded value for the
+ *                                                first present known redirect
+ *                                                parameter, or null when none
+ *                                                is present.
+ */
+function datamachine_find_affiliate_redirect_param( string $url ): ?array {
+	$parsed = wp_parse_url( $url );
+	if ( ! $parsed || empty( $parsed['query'] ) ) {
+		return null;
+	}
+
+	parse_str( $parsed['query'], $query_params );
+
+	// Try common redirect parameter names
+	foreach ( array( 'u', 'url', 'murl', 'destination' ) as $param ) {
+		if ( ! empty( $query_params[ $param ] ) && is_string( $query_params[ $param ] ) ) {
+			return array(
+				'param' => $param,
+				'value' => urldecode( $query_params[ $param ] ),
+			);
+		}
+	}
+
+	return null;
+}
+
+/**
  * Unwrap affiliate/redirect URLs to extract the canonical ticket URL.
  *
  * Delegates the "is this an affiliate wrapper?" question to
@@ -153,6 +194,13 @@ function datamachine_extract_ticket_identity( string $url ): string {
  * redirect-parameter unwrapping, not the host match.
  *
  * @since 0.62.0 Host list extracted to `data_machine_events_is_affiliate_ticket_url()`.
+ * @since 0.63.0 Redirect-parameter scan delegated to
+ *              `datamachine_find_affiliate_redirect_param()`. Behavior change
+ *              in one pathological case only: when an earlier redirect param
+ *              is present but invalid and a later one is valid, this now
+ *              returns the original URL instead of silently unwrapping to the
+ *              later param — masking a corrupt first param was the wrong
+ *              default (issue #823).
  *
  * @param string $url Possibly wrapped URL
  * @return string Unwrapped URL, or original if not an affiliate wrapper
@@ -162,25 +210,55 @@ function datamachine_unwrap_affiliate_url( string $url ): string {
 		return $url;
 	}
 
-	$parsed = wp_parse_url( $url );
-	if ( ! $parsed || empty( $parsed['query'] ) ) {
+	$redirect = datamachine_find_affiliate_redirect_param( $url );
+	if ( null === $redirect ) {
 		return $url;
 	}
 
-	parse_str( $parsed['query'], $query_params );
-
-	// Try common redirect parameter names
-	foreach ( array( 'u', 'url', 'murl', 'destination' ) as $param ) {
-		if ( ! empty( $query_params[ $param ] ) && is_string( $query_params[ $param ] ) ) {
-			$inner_url = urldecode( $query_params[ $param ] );
-			// Validate it looks like a URL
-			if ( filter_var( $inner_url, FILTER_VALIDATE_URL ) ) {
-				return $inner_url;
-			}
-		}
+	// Validate it looks like a URL
+	if ( filter_var( $redirect['value'], FILTER_VALIDATE_URL ) ) {
+		return $redirect['value'];
 	}
 
 	return $url;
+}
+
+/**
+ * Reverse the storage artifacts a stored ticket/organizer URL can carry.
+ *
+ * Two known artifact layers accumulate on values authored into
+ * `post_content`:
+ *
+ * 1. A literal six-character `\u0026` JSON-escape sequence inside the URL
+ *    string itself (double-JSON-encoded at import time) rather than an
+ *    actual ampersand. `wp_specialchars_decode()` does not recognize it.
+ * 2. HTML-entity encoding (`&amp;` etc.) from `esc_html()`/`esc_attr()`-
+ *    family authoring — correct for `href` embedding, wrong for values
+ *    assembled into HTTP `Location` headers or re-parsed as query strings.
+ *
+ * This is the same normalization
+ * `ResolveTicketDestinationAbilities::normalizeResolvedUrl()` applies before
+ * using a stored URL as a redirect destination. Any consumer that re-parses
+ * a stored URL (rather than handing it to a browser) must normalize through
+ * this helper first, or `&amp;utm_medium` parses as an `amp;utm_medium`
+ * parameter and `\u0026` splits the value at the wrong boundary. Kept in
+ * sync with that method; see issue #823.
+ *
+ * @since 0.63.0
+ *
+ * @param string $url Raw URL as stored.
+ * @return string URL with storage artifacts reversed.
+ */
+function datamachine_decode_stored_url_artifacts( string $url ): string {
+	if ( '' === $url ) {
+		return $url;
+	}
+
+	// Normalize the literal \u0026 sequence to an ampersand first;
+	// wp_specialchars_decode() does not recognize it.
+	$url = str_replace( '\u0026', '&', $url );
+
+	return wp_specialchars_decode( $url, ENT_QUOTES );
 }
 
 /**

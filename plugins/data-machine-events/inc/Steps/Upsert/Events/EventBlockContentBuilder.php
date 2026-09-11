@@ -11,6 +11,7 @@
 
 namespace DataMachineEvents\Steps\Upsert\Events;
 
+use DataMachineEvents\Core\AffiliateRedirectShape;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Event_Type_Taxonomy;
 
@@ -29,6 +30,8 @@ class EventBlockContentBuilder {
 	 * @return string Block content
 	 */
 	public function generate_event_block_content( array $event_data, array $parameters = array() ): string {
+		$this->guard_affiliate_redirect_urls( $event_data );
+
 		$block_attributes = array(
 			'startDate'         => $event_data['startDate'] ?? '',
 			'startTime'         => $event_data['startTime'] ?? '',
@@ -113,5 +116,54 @@ class EventBlockContentBuilder {
 		}
 
 		return implode( "\n", $blocks );
+	}
+
+	/**
+	 * Write-path guard: heal corrupted affiliate redirect URLs before storage.
+	 *
+	 * The import pipeline's AI step constructs the affiliate wrappers, and
+	 * occasionally transcribes the redirect parameter with its URL punctuation
+	 * stripped (`?u=httpswww.ticketmaster.comevent...`). Once stored, such a
+	 * wrapper redirects real visitors to a garbage destination. Production
+	 * evidence (post 405414, imported 2026-09-09) showed this class of
+	 * corruption was still being produced by live import flows — see issue
+	 * #823.
+	 *
+	 * When the corrupted destination reconstructs with confidence it is
+	 * replaced here, so no import path can persist the corruption. When it
+	 * does NOT reconstruct confidently the value is stored as-is (blanking an
+	 * URL would be silent data loss) and the quality-audit detector
+	 * (`AffiliateRedirectShape::find_corrupted_redirect()`, surfaced via
+	 * `wp data-machine-events check quality`) remains the safety net. Healthy
+	 * URLs pass through untouched.
+	 *
+	 * @param array $event_data Event data (by reference; URL attrs may be healed).
+	 */
+	private function guard_affiliate_redirect_urls( array &$event_data ): void {
+		foreach ( array( 'ticketUrl', 'organizerUrl' ) as $attr ) {
+			$candidate = (string) ( $event_data[ $attr ] ?? '' );
+			if ( '' === $candidate ) {
+				continue;
+			}
+
+			$repair = AffiliateRedirectShape::repair_stored_url( $candidate );
+			if ( null === $repair ) {
+				continue;
+			}
+
+			$event_data[ $attr ] = $repair['after'];
+
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Import URL carried a corrupted affiliate redirect parameter; destination reconstructed at write time',
+				array(
+					'attribute'   => $attr,
+					'before'      => $repair['before'],
+					'after'       => $repair['after'],
+					'destination' => $repair['destination'],
+				)
+			);
+		}
 	}
 }

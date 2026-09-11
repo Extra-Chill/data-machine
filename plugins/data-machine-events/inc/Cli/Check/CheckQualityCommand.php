@@ -54,6 +54,7 @@ class CheckQualityCommand {
 	 *   - missing_start_time
 	 *   - missing_venue
 	 *   - duplicates
+	 *   - corrupted_affiliate_redirect
 	 * ---
 	 *
 	 * [--limit=<limit>]
@@ -123,10 +124,29 @@ class CheckQualityCommand {
 				'Category' => 'Probable Duplicates',
 				'Count'    => $result['probable_duplicates']['count'] ?? 0,
 			),
+			array(
+				'Category' => 'Corrupted Affiliate Redirects',
+				'Count'    => $result['corrupted_affiliate_redirect']['count'] ?? 0,
+			),
 		);
 
 		\WP_CLI\Utils\format_items( 'table', $rows, array( 'Category', 'Count' ) );
 		\WP_CLI::log( '' );
+
+		if ( ! empty( $result['corrupted_affiliate_redirect']['events'] ) ) {
+			\WP_CLI::log( '--- Corrupted Affiliate Redirects ---' );
+			$redirect_rows = array();
+			foreach ( $result['corrupted_affiliate_redirect']['events'] as $event ) {
+				$redirect_rows[] = array(
+					'ID'        => $event['id'] ?? 0,
+					'Title'     => mb_substr( (string) ( $event['title'] ?? '' ), 0, 40 ),
+					'Attribute' => $event['attribute'] ?? '',
+					'Value'     => mb_substr( (string) ( $event['value'] ?? '' ), 0, 60 ),
+				);
+			}
+			\WP_CLI\Utils\format_items( 'table', $redirect_rows, array( 'ID', 'Title', 'Attribute', 'Value' ) );
+			\WP_CLI::log( '' );
+		}
 
 		if ( ! empty( $result['culprit_flows'] ) ) {
 			\WP_CLI::log( '--- Top Culprit Flows ---' );

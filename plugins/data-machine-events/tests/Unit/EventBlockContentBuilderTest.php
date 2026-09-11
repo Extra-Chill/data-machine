@@ -152,4 +152,74 @@ class EventBlockContentBuilderTest extends WP_UnitTestCase {
 
 		$this->assertStringNotContainsString( '<!-- wp:paragraph -->', $content );
 	}
+
+	// ---------------------------------------------------------------
+	// Corrupted affiliate redirect write-path guard (issue #823)
+	// ---------------------------------------------------------------
+
+	public function test_guard_heals_corrupted_redirect_before_storage() {
+		$content = $this->builder->generate_event_block_content(
+			array(
+				'startDate' => '2026-08-01',
+				'ticketUrl' => 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=httpswww.ticketmaster.comeventZ7r9jZ1A7jv1d&utm_medium=affiliate',
+			)
+		);
+
+		// The corrupted `u=` value is replaced with the reconstructed
+		// destination in the healthy percent-encoded shape.
+		$this->assertStringContainsString(
+			'u=https%3A%2F%2Fwww.ticketmaster.com%2Fevent%2FZ7r9jZ1A7jv1d&utm_medium=affiliate',
+			$content
+		);
+		$this->assertStringNotContainsString( 'httpswww.', $content );
+	}
+
+	public function test_guard_keeps_unreconstructable_corruption_visible() {
+		// Ticketweb destination: detected but deliberately not reconstructed
+		// yet. The guard must NOT blank the URL (silent data loss) — it
+		// stores as-is and the quality-audit detector remains the safety net.
+		$content = $this->builder->generate_event_block_content(
+			array(
+				'startDate'    => '2026-08-01',
+				'organizerUrl' => 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=httpswww.ticketweb.comeventold-school-rb-crescent-ballroom-tickets14280894&utm_medium=affiliate',
+			)
+		);
+
+		$this->assertStringContainsString( 'httpswww.ticketweb.comeventold-school', $content );
+	}
+
+	public function test_guard_leaves_healthy_wrappers_untouched() {
+		$healthy = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=https%3A%2F%2Fwww.ticketmaster.com%2Fevent%2FZ7r9jZ1A7jv1d&utm_medium=affiliate';
+
+		$content = $this->builder->generate_event_block_content(
+			array(
+				'startDate' => '2026-08-01',
+				'ticketUrl' => $healthy,
+			)
+		);
+
+		// wp_json_encode() escapes forward slashes, so assert on the
+		// distinctive percent-encoded `u=` value rather than the full URL.
+		$this->assertStringContainsString(
+			'u=https%3A%2F%2Fwww.ticketmaster.com%2Fevent%2FZ7r9jZ1A7jv1d&utm_medium=affiliate',
+			$content
+		);
+		$this->assertStringNotContainsString( 'httpswww.', $content );
+	}
+
+	public function test_guard_keeps_ambiguous_corruption_visible() {
+		// Query-stripped variant: reconstruction not confident. The guard
+		// must NOT blank the URL (silent data loss) — it stores as-is and
+		// the quality-audit detector remains the safety net.
+		$ambiguous = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=httpswww.ticketweb.comeventvalgur-andy-loebs-zom6ii-nikki-lopez-philly-tickets14178484REFERRAL_IDtmfeed&utm_medium=affiliate';
+
+		$content = $this->builder->generate_event_block_content(
+			array(
+				'startDate'    => '2026-08-01',
+				'organizerUrl' => $ambiguous,
+			)
+		);
+
+		$this->assertStringContainsString( 'REFERRAL_IDtmfeed', $content );
+	}
 }

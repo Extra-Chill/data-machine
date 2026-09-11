@@ -20,6 +20,7 @@ namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Core\Event_Post_Type;
 use function DataMachineEvents\Core\data_machine_events_is_affiliate_ticket_url;
+use function DataMachineEvents\Core\datamachine_decode_stored_url_artifacts;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -192,22 +193,15 @@ class ResolveTicketDestinationAbilities {
 	 * does not attempt to unwind double-encoding (`&amp;amp;`), for which
 	 * there is no evidence in the current catalogue.
 	 *
+	 * @since 0.63.0 Delegates to the shared `datamachine_decode_stored_url_artifacts()`
+	 *              helper (issue #823) instead of duplicating the same two
+	 *              normalization steps a third time.
+	 *
 	 * @param string $url Raw ticket URL as stored (block content or meta).
 	 * @return string Normalized URL suitable for a redirect `Location` header.
 	 */
 	private function normalizeResolvedUrl( string $url ): string {
-		if ( '' === $url ) {
-			return $url;
-		}
-
-		// A handful of legacy-imported posts store a literal six-character
-		// `\u0026` JSON-escape sequence inside the ticketUrl string itself
-		// (double-JSON-encoded at import time) rather than an actual
-		// backslash-u character in the decoded value. wp_specialchars_decode()
-		// does not recognize it, so normalize it to a literal ampersand first.
-		$url = str_replace( '\u0026', '&', $url );
-
-		return wp_specialchars_decode( $url, ENT_QUOTES );
+		return datamachine_decode_stored_url_artifacts( $url );
 	}
 
 	/**

@@ -14,6 +14,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use DataMachineEvents\Core\AffiliateRedirectShape;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 
@@ -65,7 +66,7 @@ class EventQualityAuditAbilities {
 							),
 							'issue'            => array(
 								'type'        => 'string',
-								'enum'        => array( 'all', 'missing_start_date', 'missing_start_time', 'missing_venue', 'duplicates' ),
+								'enum'        => array( 'all', 'missing_start_date', 'missing_start_time', 'missing_venue', 'duplicates', 'corrupted_affiliate_redirect' ),
 								'description' => 'Optional issue filter.',
 							),
 							'limit'            => array(
@@ -77,14 +78,15 @@ class EventQualityAuditAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'total_scanned'       => array( 'type' => 'integer' ),
-							'scope'               => array( 'type' => 'string' ),
-							'missing_start_date'  => array( 'type' => 'object' ),
-							'missing_start_time'  => array( 'type' => 'object' ),
-							'missing_venue'       => array( 'type' => 'object' ),
-							'probable_duplicates' => array( 'type' => 'object' ),
-							'culprit_flows'       => array( 'type' => 'array' ),
-							'message'             => array( 'type' => 'string' ),
+							'total_scanned'                => array( 'type' => 'integer' ),
+							'scope'                        => array( 'type' => 'string' ),
+							'missing_start_date'           => array( 'type' => 'object' ),
+							'missing_start_time'           => array( 'type' => 'object' ),
+							'missing_venue'                => array( 'type' => 'object' ),
+							'probable_duplicates'          => array( 'type' => 'object' ),
+							'corrupted_affiliate_redirect' => array( 'type' => 'object' ),
+							'culprit_flows'                => array( 'type' => 'array' ),
+							'message'                      => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'executeAudit' ),
@@ -121,6 +123,7 @@ class EventQualityAuditAbilities {
 		$missing_start_time  = array();
 		$missing_venue       = array();
 		$duplicate_groups    = array();
+		$corrupted_redirects = array();
 		$culprit_flow_counts = array();
 		$by_duplicate_key    = array();
 
@@ -151,6 +154,32 @@ class EventQualityAuditAbilities {
 
 			if ( empty( $venue_name ) ) {
 				$missing_venue[] = $info;
+				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
+			}
+
+			// Affiliate wrappers whose redirect parameter is not a parseable
+			// absolute URL — shape-based detection covering the whole
+			// punctuation-stripping corruption class (issue #823).
+			foreach ( array( 'ticketUrl', 'organizerUrl' ) as $url_attr ) {
+				$attr_url = (string) ( $block_attrs[ $url_attr ] ?? '' );
+				if ( '' === $attr_url ) {
+					continue;
+				}
+
+				$corrupted = AffiliateRedirectShape::find_corrupted_redirect( $attr_url );
+				if ( null === $corrupted ) {
+					continue;
+				}
+
+				$corrupted_redirects[] = array(
+					'id'        => $event->ID,
+					'title'     => $event->post_title,
+					'attribute' => $url_attr,
+					'param'     => $corrupted['param'],
+					'value'     => $corrupted['value'],
+					'flow_id'   => $flow_id,
+					'flow_name' => $info['flow_name'],
+				);
 				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
 			}
 
@@ -201,6 +230,9 @@ class EventQualityAuditAbilities {
 		if ( ! empty( $duplicate_groups ) && ( 'all' === $issue || 'duplicates' === $issue ) ) {
 			$message_parts[] = count( $duplicate_groups ) . ' probable duplicate groups';
 		}
+		if ( ! empty( $corrupted_redirects ) && ( 'all' === $issue || 'corrupted_affiliate_redirect' === $issue ) ) {
+			$message_parts[] = count( $corrupted_redirects ) . ' corrupted affiliate redirect params';
+		}
 
 		$missing_start_date_result = ( 'all' === $issue || 'missing_start_date' === $issue )
 			? array(
@@ -242,15 +274,26 @@ class EventQualityAuditAbilities {
 				'groups' => array(),
 			);
 
+		$corrupted_redirect_result = ( 'all' === $issue || 'corrupted_affiliate_redirect' === $issue )
+			? array(
+				'count'  => count( $corrupted_redirects ),
+				'events' => array_slice( $corrupted_redirects, 0, $limit ),
+			)
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
+
 		return array(
-			'total_scanned'       => count( $events ),
-			'scope'               => $scope,
-			'missing_start_date'  => $missing_start_date_result,
-			'missing_start_time'  => $missing_start_time_result,
-			'missing_venue'       => $missing_venue_result,
-			'probable_duplicates' => $duplicate_result,
-			'culprit_flows'       => array_slice( $culprit_flow_counts, 0, $limit ),
-			'message'             => empty( $message_parts )
+			'total_scanned'                => count( $events ),
+			'scope'                        => $scope,
+			'missing_start_date'           => $missing_start_date_result,
+			'missing_start_time'           => $missing_start_time_result,
+			'missing_venue'                => $missing_venue_result,
+			'probable_duplicates'          => $duplicate_result,
+			'corrupted_affiliate_redirect' => $corrupted_redirect_result,
+			'culprit_flows'                => array_slice( $culprit_flow_counts, 0, $limit ),
+			'message'                      => empty( $message_parts )
 				? 'No major quality issues found.'
 				: 'Found issues: ' . implode( ', ', $message_parts ) . '.',
 		);
