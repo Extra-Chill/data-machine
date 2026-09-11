@@ -147,13 +147,13 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		$original = $wpdb;
 		$capable  = new class( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST ) extends \wpdb {
 			public array $supported_tables = array();
-			public mixed $result = false;
+			public mixed $capability_result = false;
 
 			public function supports_transactional_tables( array $tables ) {
-				if ( 'throw' === $this->result ) {
+				if ( 'throw' === $this->capability_result ) {
 					throw new \RuntimeException( 'Unsupported transactional table capability.' );
 				}
-				return $tables === $this->supported_tables ? $this->result : false;
+				return $tables === $this->supported_tables ? $this->capability_result : false;
 			}
 		};
 		$capable->set_prefix( $original->prefix );
@@ -167,17 +167,17 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 			$this->assertSame( 'identity_schema_engine', $incomplete->get_error_code() );
 
 			$capable->supported_tables = array( $repository->get_table_name(), $capable->posts );
-			$capable->result = 1;
+			$capable->capability_result = 1;
 			$strict_false = $repository->validate_schema();
 			$this->assertWPError( $strict_false );
 			$this->assertSame( 'identity_schema_engine', $strict_false->get_error_code() );
 
-			$capable->result = 'throw';
+			$capable->capability_result = 'throw';
 			$thrown = $repository->validate_schema();
 			$this->assertWPError( $thrown );
 			$this->assertSame( 'identity_schema_engine', $thrown->get_error_code() );
 
-			$capable->result = true;
+			$capable->capability_result = true;
 			$this->assertTrue( $repository->validate_schema() );
 
 			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP COLUMN completed_at', $repository->get_table_name() ) );
