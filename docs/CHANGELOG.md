@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.8] - 2026-09-12
+
+### Changed
+- Accept proven transactional table backends for identity reservation
+- cover global option collisions
+
+### Fixed
+- add Connect/Reconnect button to the Auth Providers settings panel
+
 ## [0.176.7] - 2026-09-09
 
 ### Changed
