@@ -244,6 +244,40 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	}
 
 	/**
+	 * WP_Error code returned when the Page access token required by the
+	 * Messaging API is not stored on the account (requires re-auth).
+	 */
+	const PAGE_TOKEN_ERROR_CODE = 'instagram_page_token_required';
+
+	/**
+	 * Resolve the Page ID and Page access token required by the Messaging API.
+	 *
+	 * When either value is absent (account connected before Page tokens were
+	 * stored), callers get a clear reconnect instruction instead of a raw
+	 * Graph authorization error.
+	 *
+	 * @since 0.21.0
+	 * @return array{id: string, access_token: string}|\WP_Error
+	 */
+	public function get_page_context(): array|\WP_Error {
+		$page_id    = $this->get_page_id();
+		$page_token = $this->get_page_access_token();
+
+		if ( empty( $page_id ) || empty( $page_token ) ) {
+			return new \WP_Error(
+				self::PAGE_TOKEN_ERROR_CODE,
+				__( 'Instagram messaging requires a Page access token. Reconnect Instagram to grant one.', 'data-machine-socials' ),
+				array( 'status' => 401 )
+			);
+		}
+
+		return array(
+			'id'           => $page_id,
+			'access_token' => $page_token,
+		);
+	}
+
+	/**
 	 * Get stored Instagram User ID
 	 *
 	 * @return string|null User ID or null

@@ -47,6 +47,19 @@ class InstagramReadAbility extends AbstractSocialAbility {
 	 */
 	const DETAIL_FIELDS = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,media_product_type,is_shared_to_feed';
 
+	/**
+	 * Fields to request when listing direct-message conversations.
+	 */
+	const CONVERSATION_FIELDS = 'id,updated_time,participants,unread_count';
+
+	/**
+	 * Fields to request for messages in a conversation.
+	 *
+	 * Meta constraint: only the 20 most recent messages in a conversation
+	 * have detail; older message IDs error as deleted.
+	 */
+	const MESSAGE_FIELDS = 'messages{id,created_time,from,to,message,attachments,is_unsupported}';
+
 	public function __construct() {
 		$this->registerAbility( $this->registerCallback(), true );
 	}
@@ -65,13 +78,21 @@ class InstagramReadAbility extends AbstractSocialAbility {
 						'properties' => array(
 							'action'   => array(
 								'type'        => 'string',
-								'enum'        => array( 'list', 'get', 'comments', 'comments_all' ),
+								'enum'        => array( 'list', 'get', 'comments', 'comments_all', 'conversations', 'messages' ),
 								'default'     => 'list',
-								'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized)', 'data-machine-socials' ),
+								'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized), conversations (DM threads), messages (messages in one DM thread)', 'data-machine-socials' ),
 							),
 							'media_id' => array(
 								'type'        => 'string',
 								'description' => __( 'Instagram media ID (required for get and comments actions)', 'data-machine-socials' ),
+							),
+							'conversation_id' => array(
+								'type'        => 'string',
+								'description' => __( 'Instagram conversation ID (required for the messages action)', 'data-machine-socials' ),
+							),
+							'user_id'  => array(
+								'type'        => 'string',
+								'description' => __( 'Instagram-scoped user ID (IGSID) to fetch a single conversation thread (optional, conversations action only)', 'data-machine-socials' ),
 							),
 							'limit'    => array(
 								'type'        => 'integer',
@@ -151,8 +172,17 @@ class InstagramReadAbility extends AbstractSocialAbility {
 				}
 				return $this->getAllComments( $access_token, $input['media_id'] );
 
+			case 'conversations':
+				return $this->getConversations( $auth, $input );
+
+			case 'messages':
+				if ( empty( $input['conversation_id'] ) ) {
+					return new \WP_Error( 'missing_param', 'conversation_id is required for the messages action', array( 'status' => 400 ) );
+				}
+				return $this->getMessages( $auth, $input['conversation_id'] );
+
 			default:
-				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use list, get, or comments.", array( 'status' => 500 ) );
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use list, get, comments, conversations, or messages.", array( 'status' => 500 ) );
 		}
 	}
 
@@ -417,6 +447,204 @@ class InstagramReadAbility extends AbstractSocialAbility {
 			'mentions'        => $mentions,
 			'parent_id'       => null, // Top-level comments; replies would be fetched separately.
 			'raw'             => $comment,
+		);
+	}
+
+	/**
+	 * List direct-message conversations on the connected Instagram Business account.
+	 *
+	 * Uses the Facebook Graph Messaging API, which requires the Page access
+	 * token and page_id stored on the account.
+	 *
+	 * @param InstagramAuth $auth  Auth provider.
+	 * @param array         $input Input parameters.
+	 * @return array Result with normalized conversations.
+	 */
+	private function getConversations( InstagramAuth $auth, array $input ): array|\WP_Error {
+		$page = $auth->get_page_context();
+		if ( is_wp_error( $page ) ) {
+			return $page;
+		}
+
+		$limit  = min( absint( $input['limit'] ?? 25 ), 100 );
+		$params = array(
+			'platform'     => 'instagram',
+			'fields'       => self::CONVERSATION_FIELDS,
+			'limit'        => $limit,
+			'access_token' => $page['access_token'],
+		);
+
+		if ( ! empty( $input['user_id'] ) ) {
+			$params['user_id'] = sanitize_text_field( (string) $input['user_id'] );
+		}
+
+		if ( ! empty( $input['after'] ) ) {
+			$params['after'] = sanitize_text_field( (string) $input['after'] );
+		}
+
+		$url    = self::GRAPH_API_URL . '/' . rawurlencode( $page['id'] ) . '/conversations?' . http_build_query( $params );
+		$result = HttpClient::get( $url, array( 'context' => 'Instagram Messages' ) );
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'api_error', 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
+		}
+
+		$data = json_decode( $result['data'], true );
+
+		if ( 200 !== $result['status_code'] || isset( $data['error'] ) ) {
+			$error_msg = $data['error']['message'] ?? 'Failed to fetch Instagram conversations';
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
+		}
+
+		$ig_user_id = (string) ( $auth->get_user_id() ?? '' );
+		$items      = array();
+
+		foreach ( $data['data'] ?? array() as $conversation ) {
+			$items[] = self::normalizeConversation( $conversation, $ig_user_id );
+		}
+
+		$paging = $data['paging'] ?? array();
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'conversations' => $items,
+				'count'         => count( $items ),
+				'cursors'       => $paging['cursors'] ?? null,
+				'has_next'      => ! empty( $paging['next'] ),
+			),
+		);
+	}
+
+	/**
+	 * Get the messages in a single direct-message conversation.
+	 *
+	 * Meta constraint: only the 20 most recent messages in a conversation
+	 * have detail; older message IDs error as deleted on Instagram.
+	 *
+	 * @param InstagramAuth $auth            Auth provider.
+	 * @param string        $conversation_id Instagram conversation ID.
+	 * @return array Result with normalized messages.
+	 */
+	private function getMessages( InstagramAuth $auth, string $conversation_id ): array|\WP_Error {
+		$page = $auth->get_page_context();
+		if ( is_wp_error( $page ) ) {
+			return $page;
+		}
+
+		$params = array(
+			'fields'       => self::MESSAGE_FIELDS,
+			'access_token' => $page['access_token'],
+		);
+
+		$url    = self::GRAPH_API_URL . '/' . rawurlencode( $conversation_id ) . '?' . http_build_query( $params );
+		$result = HttpClient::get( $url, array( 'context' => 'Instagram Messages' ) );
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'api_error', 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
+		}
+
+		$data = json_decode( $result['data'], true );
+
+		if ( 200 !== $result['status_code'] || isset( $data['error'] ) ) {
+			$error_msg = $data['error']['message'] ?? 'Failed to fetch Instagram messages';
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
+		}
+
+		$ig_user_id = (string) ( $auth->get_user_id() ?? '' );
+		$items      = array();
+
+		foreach ( $data['messages']['data'] ?? array() as $message ) {
+			$items[] = self::normalizeMessage( $message, $conversation_id, $ig_user_id );
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'conversation_id' => $conversation_id,
+				'messages'        => $items,
+				'count'           => count( $items ),
+			),
+		);
+	}
+
+
+	/**
+	 * Normalize an Instagram conversation into the generic conversation shape.
+	 *
+	 * Shape: { id, platform, participant: {id, username}, updated_time,
+	 *          unread_count, raw }
+	 *
+	 * The participant is the external party: the first participant whose ID
+	 * does not match the connected Instagram Business account.
+	 *
+	 * @param array  $conversation Raw Instagram API conversation data.
+	 * @param string $ig_user_id   Connected Instagram Business account ID.
+	 * @return array Normalized conversation.
+	 */
+	public static function normalizeConversation( array $conversation, string $ig_user_id = '' ): array {
+		$participants = $conversation['participants']['data'] ?? array();
+		$participant  = array();
+
+		foreach ( $participants as $person ) {
+			$person_id = (string) ( $person['id'] ?? '' );
+			if ( '' === $person_id ) {
+				continue;
+			}
+			if ( '' === $ig_user_id || $person_id !== $ig_user_id ) {
+				$participant = array(
+					'id'       => $person_id,
+					'username' => (string) ( $person['username'] ?? '' ),
+				);
+				break;
+			}
+		}
+
+		if ( empty( $participant ) && ! empty( $participants ) ) {
+			$first = $participants[0];
+			$participant = array(
+				'id'       => (string) ( $first['id'] ?? '' ),
+				'username' => (string) ( $first['username'] ?? '' ),
+			);
+		}
+
+		return array(
+			'id'           => (string) ( $conversation['id'] ?? '' ),
+			'platform'     => 'instagram',
+			'participant'  => $participant,
+			'updated_time' => (string) ( $conversation['updated_time'] ?? '' ),
+			'unread_count' => (int) ( $conversation['unread_count'] ?? 0 ),
+			'raw'          => $conversation,
+		);
+	}
+
+	/**
+	 * Normalize an Instagram direct message into the generic message shape.
+	 *
+	 * Shape: { id, platform, conversation_id, from: {id, username},
+	 *          is_echo, text, attachments[], created_time, raw }
+	 *
+	 * @param array  $message         Raw Instagram API message data.
+	 * @param string $conversation_id Parent conversation ID.
+	 * @param string $ig_user_id      Connected Instagram Business account ID.
+	 * @return array Normalized message.
+	 */
+	public static function normalizeMessage( array $message, string $conversation_id = '', string $ig_user_id = '' ): array {
+		$from_id = (string) ( $message['from']['id'] ?? '' );
+
+		return array(
+			'id'              => (string) ( $message['id'] ?? '' ),
+			'platform'        => 'instagram',
+			'conversation_id' => $conversation_id,
+			'from'            => array(
+				'id'       => $from_id,
+				'username' => (string) ( $message['from']['username'] ?? $message['from']['name'] ?? '' ),
+			),
+			'is_echo'         => ! empty( $message['is_echo'] ) || ( '' !== $ig_user_id && $from_id === $ig_user_id ),
+			'text'            => (string) ( $message['message'] ?? '' ),
+			'attachments'     => array_values( $message['attachments']['data'] ?? array() ),
+			'created_time'    => (string) ( $message['created_time'] ?? '' ),
+			'raw'             => $message,
 		);
 	}
 

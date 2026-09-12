@@ -27,6 +27,7 @@ class CommandRegistry {
 	public static function map() {
 		return array(
 			'datamachine-socials comments'  => Commands\CommentsCommand::class,
+			'datamachine-socials messages'  => Commands\MessagesCommand::class,
 			'datamachine-socials linkedin'  => Commands\LinkedInCommand::class,
 			'datamachine-socials pinterest' => Commands\PinterestCommand::class,
 			'datamachine-socials tumblr'    => Commands\TumblrCommand::class,

@@ -108,4 +108,15 @@ abstract class AbstractSocialAbility {
 	protected function apiError( string $message, int $status = 500 ): \WP_Error {
 		return new \WP_Error( 'api_error', $message, array( 'status' => $status ) );
 	}
+
+	/**
+	 * Extract a human-readable message from a provider ability result.
+	 *
+	 * @param array|\WP_Error $result   Provider result envelope or error.
+	 * @param string          $fallback Message when the result carries none.
+	 * @return string
+	 */
+	protected function errorMessage( $result, string $fallback ): string {
+		return is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? $fallback );
+	}
 }

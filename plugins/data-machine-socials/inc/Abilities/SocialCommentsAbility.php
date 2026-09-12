@@ -230,8 +230,4 @@ class SocialCommentsAbility extends AbstractSocialAbility {
 	protected function getProviderAbility( string $provider ) {
 		return wp_get_ability( self::PROVIDERS[ $provider ] );
 	}
-
-	private function errorMessage( $result, string $fallback ): string {
-		return is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? $fallback );
-	}
 }
