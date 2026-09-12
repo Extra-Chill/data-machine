@@ -98,11 +98,9 @@ namespace DataMachine\Engine\Tasks {
 	}
 }
 
-namespace DataMachine\Core\ActionScheduler {
-	class GroupRegistrar {
-		public const GROUP = 'data-machine';
-	}
-}
+// GroupRegistrar is required from its real file below (not stubbed): it is
+// a plain constant holder plus DB-touching methods this smoke never calls,
+// and requiring it avoids hand-duplicating its GROUP slug literal here.
 
 // Spy replacing the real HashGatedRoutineBackend: same namespace as
 // FlowRoutines, so its unqualified `HashGatedRoutineBackend::persist()`
@@ -292,6 +290,7 @@ namespace {
 
 	$wpdb = new DatamachineSmokeWpdb();
 
+	require_once __DIR__ . '/../inc/Core/ActionScheduler/GroupRegistrar.php';
 	require_once __DIR__ . '/../inc/Api/Flows/FlowScheduleReconciliationLock.php';
 	require_once __DIR__ . '/../inc/Engine/Scheduling/FlowRoutines.php';
 

@@ -54,11 +54,9 @@ namespace DataMachine\Engine\Scheduling {
 	}
 }
 
-namespace DataMachine\Core\ActionScheduler {
-	class GroupRegistrar {
-		public const GROUP = 'data-machine';
-	}
-}
+// GroupRegistrar is required from its real file below (not stubbed): it is
+// a plain constant holder plus DB-touching methods this smoke never calls,
+// and requiring it avoids hand-duplicating its GROUP slug literal here.
 
 namespace {
 
@@ -124,6 +122,7 @@ namespace {
 		return count( $GLOBALS['datamachine_smoke_as_actions'] );
 	}
 
+	require_once __DIR__ . '/../inc/Core/ActionScheduler/GroupRegistrar.php';
 	require_once __DIR__ . '/../inc/setup/flow-schedules.php';
 
 	use DataMachine\Engine\Scheduling\FlowRoutines;
