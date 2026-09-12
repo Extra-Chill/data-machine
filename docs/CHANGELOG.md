@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.9] - 2026-09-12
+
+### Fixed
+- classify evidence-pruned jobs separately from no_scheduler_path
+- read SectionRegistry inspection back from the agents-api context registry
+
 ## [0.176.8] - 2026-09-12
 
 ### Changed
