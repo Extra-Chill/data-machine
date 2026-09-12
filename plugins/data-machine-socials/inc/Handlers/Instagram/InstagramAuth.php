@@ -25,7 +25,7 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	const TOKEN_URL     = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION . '/oauth/access_token';
 	const GRAPH_API_URL = 'https://graph.instagram.com';
 	const FB_API_URL    = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
-	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_messages,instagram_manage_comments,pages_read_engagement';
+	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_messages,instagram_manage_comments,pages_read_engagement,pages_manage_metadata';
 
 	public function __construct() {
 		parent::__construct( 'instagram' );
@@ -66,7 +66,17 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	/**
 	 * Perform Instagram-specific token refresh.
 	 *
-	 * Instagram long-lived tokens are refreshed via the ig_refresh_token grant.
+	 * Tokens obtained via Facebook Login are Facebook-flavored long-lived User
+	 * tokens, which graph.instagram.com rejects ("Cannot parse access token").
+	 * They are refreshed via the fb_exchange_token grant on graph.facebook.com.
+	 * Legacy Instagram Basic Display tokens (IG-flavored) are refreshed via the
+	 * ig_refresh_token grant on graph.instagram.com, kept here as a fallback
+	 * for when the Facebook exchange fails.
+	 *
+	 * Accounts with a stored Page token never reach this method —
+	 * get_valid_access_token() returns the Page token directly and
+	 * schedule_proactive_refresh() is a no-op for them.
+	 *
 	 * Delegates to BaseOAuth2Provider::get_valid_access_token() for on-demand
 	 * refresh with 7-day buffer (inherited default).
 	 *
@@ -75,6 +85,34 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	 * @return array|\WP_Error|null Token data on success, WP_Error on failure.
 	 */
 	protected function do_refresh_token( string $current_token ): array|\WP_Error|null {
+		$config = $this->get_config();
+
+		if ( ! empty( $config['app_id'] ) && ! empty( $config['app_secret'] ) ) {
+			$params = array(
+				'grant_type'        => 'fb_exchange_token',
+				'client_id'         => $config['app_id'],
+				'client_secret'     => $config['app_secret'],
+				'fb_exchange_token' => $current_token,
+			);
+			$url    = self::FB_API_URL . '/oauth/access_token?' . http_build_query( $params );
+
+			$result = HttpClient::get( $url, array( 'context' => 'Instagram OAuth' ) );
+
+			if ( $result['success'] ) {
+				$data = json_decode( $result['data'], true );
+
+				if ( 200 === $result['status_code'] && ! empty( $data['access_token'] ) ) {
+					$expires_in = $data['expires_in'] ?? 3600 * 24 * 60;
+
+					return array(
+						'access_token' => $data['access_token'],
+						'expires_at'   => time() + intval( $expires_in ),
+					);
+				}
+			}
+			// Fall through to the Instagram refresh fallback (legacy IG tokens).
+		}
+
 		$url    = self::GRAPH_API_URL . '/refresh_access_token';
 		$params = array(
 			'grant_type'   => 'ig_refresh_token',
@@ -103,6 +141,106 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'access_token' => $data['access_token'],
 			'expires_at'   => $expires_at,
 		);
+	}
+
+	/**
+	 * Get a valid access token for Instagram API calls.
+	 *
+	 * When a Page access token is stored (accounts connected via Facebook
+	 * Login after this fix), it is returned directly. Page tokens derived
+	 * from a long-lived User token never expire, so the expiry/refresh
+	 * lifecycle in BaseOAuth2Provider::get_valid_access_token() is skipped.
+	 *
+	 * Legacy accounts without a Page token fall back to the parent
+	 * implementation (expiry check + do_refresh_token()).
+	 *
+	 * @since 0.20.3
+	 * @return string|null Valid access token, or null if unavailable/expired.
+	 */
+	public function get_valid_access_token(): ?string {
+		$account = $this->get_account();
+		if ( is_array( $account ) && ! empty( $account['page_access_token'] ) ) {
+			return $account['page_access_token'];
+		}
+
+		return parent::get_valid_access_token();
+	}
+
+	/**
+	 * Check if Instagram authentication is valid.
+	 *
+	 * Accounts with a stored Page token remain authenticated even after the
+	 * underlying User token expires — every Instagram API call uses the
+	 * non-expiring Page token (see get_valid_access_token()).
+	 *
+	 * @since 0.20.3
+	 * @return bool True if authenticated
+	 */
+	public function is_authenticated(): bool {
+		$account = $this->get_account();
+		if ( empty( $account ) || ! is_array( $account ) || empty( $account['access_token'] ) ) {
+			return false;
+		}
+
+		if ( ! empty( $account['page_access_token'] ) ) {
+			return true;
+		}
+
+		if ( isset( $account['token_expires_at'] ) && time() > intval( $account['token_expires_at'] ) ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Schedule a proactive WP-Cron token refresh.
+	 *
+	 * No-op when a Page token is stored — Page tokens never expire, so there
+	 * is nothing to refresh and any scheduled event would only produce
+	 * refresh failures. Any existing scheduled event is cleared.
+	 *
+	 * @since 0.20.3
+	 * @return bool True if an event was scheduled, false otherwise.
+	 */
+	public function schedule_proactive_refresh(): bool {
+		$account = $this->get_account();
+		if ( is_array( $account ) && ! empty( $account['page_access_token'] ) ) {
+			wp_clear_scheduled_hook( $this->get_cron_hook_name() );
+			return false;
+		}
+
+		return parent::schedule_proactive_refresh();
+	}
+
+	/**
+	 * Get stored Facebook Page ID linked to the Instagram Business account.
+	 *
+	 * @since 0.20.3
+	 * @return string|null Page ID or null
+	 */
+	public function get_page_id(): ?string {
+		$account = $this->get_account();
+		if ( empty( $account ) || ! is_array( $account ) || empty( $account['page_id'] ) ) {
+			return null;
+		}
+		return $account['page_id'];
+	}
+
+	/**
+	 * Get stored Page access token.
+	 *
+	 * Non-expiring when derived from a long-lived User token during OAuth.
+	 *
+	 * @since 0.20.3
+	 * @return string|null Page access token or null
+	 */
+	public function get_page_access_token(): ?string {
+		$account = $this->get_account();
+		if ( empty( $account ) || ! is_array( $account ) || empty( $account['page_access_token'] ) ) {
+			return null;
+		}
+		return $account['page_access_token'];
 	}
 
 	/**
@@ -171,9 +309,13 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				 * Fetch Instagram Business Account ID from Facebook Graph API.
 				 * resolve_instagram_account_from_facebook_token() returns both id and
 				 * username in one call, so we capture both up front and avoid a second
-				 * round trip below.
+				 * round trip below. It also returns the linked Page's id and
+				 * access_token — a Page token derived from the long-lived User token
+				 * never expires and is what all Instagram API calls should use.
 				 */
 																				$resolved_username = '';
+				$page_id           = '';
+				$page_access_token = '';
 				$user_id = $short_lived_token_data['user_id'] ?? null;
 				if ( empty( $user_id ) ) {
 					$resolved = $this->resolve_instagram_account_from_facebook_token( $access_token );
@@ -182,6 +324,8 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 					}
 					$user_id           = $resolved['id'];
 					$resolved_username = $resolved['username'] ?? '';
+					$page_id           = $resolved['page_id'] ?? '';
+					$page_access_token = $resolved['page_access_token'] ?? '';
 				}
 
 				if ( empty( $user_id ) ) {
@@ -203,6 +347,13 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				}
 
 				$long_lived['user_id'] = $user_id;
+
+				if ( '' !== $page_id ) {
+					$long_lived['page_id'] = $page_id;
+				}
+				if ( '' !== $page_access_token ) {
+					$long_lived['page_access_token'] = $page_access_token;
+				}
 
 				/*
 				 * Username preference: use the value already resolved from /me/accounts
@@ -241,14 +392,15 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	 * Resolve the Instagram Business Account from a Facebook User Access Token.
 	 *
 	 * Queries the user's Facebook Pages and extracts the first connected
-	 * Instagram Business Account, returning both id and username so callers
-	 * can avoid a separate username lookup.
+	 * Instagram Business Account, returning its id and username plus the
+	 * owning Page's id and access_token so callers can store a non-expiring
+	 * Page token in the same round trip.
 	 *
 	 * @param string $access_token Facebook User Access Token.
-	 * @return array{id: string, username: string}|\WP_Error Account data or error.
+	 * @return array{id: string, username: string, page_id: string, page_access_token: string}|\WP_Error Account data or error.
 	 */
 	private function resolve_instagram_account_from_facebook_token( string $access_token ): array|\WP_Error {
-		$url = self::FB_API_URL . '/me/accounts?fields=instagram_business_account{id,username}&access_token=' . $access_token;
+		$url = self::FB_API_URL . '/me/accounts?fields=access_token,id,instagram_business_account{id,username}&access_token=' . $access_token;
 
 		$result = HttpClient::get( $url, array( 'context' => 'Instagram OAuth - Resolve IG Account' ) );
 
@@ -272,8 +424,10 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		foreach ( $data['data'] as $page ) {
 			if ( ! empty( $page['instagram_business_account']['id'] ) ) {
 				return array(
-					'id'       => (string) $page['instagram_business_account']['id'],
-					'username' => (string) ( $page['instagram_business_account']['username'] ?? '' ),
+					'id'                => (string) $page['instagram_business_account']['id'],
+					'username'          => (string) ( $page['instagram_business_account']['username'] ?? '' ),
+					'page_id'           => (string) ( $page['id'] ?? '' ),
+					'page_access_token' => (string) ( $page['access_token'] ?? '' ),
 				);
 			}
 		}

@@ -339,7 +339,13 @@ class InstagramCommand {
 		}
 
 		$details = $provider->get_account_details();
-		if ( $details && ! empty( $details['token_expires_at'] ) ) {
+		if ( $details && ! empty( $details['page_access_token'] ) ) {
+			WP_CLI::log( 'Token type:   Page token (no expiry)' );
+			if ( ! empty( $details['page_id'] ) ) {
+				WP_CLI::log( 'Page ID:      ' . $details['page_id'] );
+			}
+		} elseif ( $details && ! empty( $details['token_expires_at'] ) ) {
+			WP_CLI::log( 'Token type:   User token (legacy)' );
 			$expires_at = intval( $details['token_expires_at'] );
 			$remaining  = $expires_at - time();
 

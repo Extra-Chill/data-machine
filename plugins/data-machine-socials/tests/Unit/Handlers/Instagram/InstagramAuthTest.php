@@ -159,6 +159,79 @@ class InstagramAuthTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'access_token=ig_old_tok', $captured_url );
 	}
 
+	public function test_legacy_refresh_uses_fb_exchange_token_grant(): void {
+		$captured_url = null;
+
+		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) use ( &$captured_url ) {
+			$captured_url = $url;
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( array(
+					'access_token' => 'fb_refreshed_tok',
+					'expires_in'   => 5184000,
+				) ),
+			);
+		}, 10, 3 );
+
+		$this->auth->save_config( array(
+			'app_id'     => 'app_123',
+			'app_secret' => 'secret_456',
+		) );
+		$this->auth->save_account( array(
+			'access_token'    => 'fb_flavored_tok',
+			'token_expires_at' => time() - 100, // Expired — triggers refresh.
+		) );
+
+		$token = $this->auth->get_valid_access_token();
+
+		$this->assertSame( 'fb_refreshed_tok', $token );
+		$this->assertNotNull( $captured_url );
+		$this->assertStringContainsString( 'graph.facebook.com/v23.0/oauth/access_token', $captured_url );
+		$this->assertStringContainsString( 'grant_type=fb_exchange_token', $captured_url );
+		$this->assertStringContainsString( 'fb_exchange_token=fb_flavored_tok', $captured_url );
+	}
+
+	public function test_refresh_falls_back_to_ig_refresh_token_when_fb_exchange_fails(): void {
+		$urls = array();
+
+		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) use ( &$urls ) {
+			$urls[] = $url;
+			if ( str_contains( $url, 'graph.facebook.com' ) ) {
+				return array(
+					'response' => array( 'code' => 400 ),
+					'body'     => wp_json_encode( array(
+						'error' => array( 'message' => 'Invalid OAuth access token' ),
+					) ),
+				);
+			}
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( array(
+					'access_token' => 'ig_refreshed_tok',
+					'expires_in'   => 5184000,
+				) ),
+			);
+		}, 10, 3 );
+
+		$this->auth->save_config( array(
+			'app_id'     => 'app_123',
+			'app_secret' => 'secret_456',
+		) );
+		$this->auth->save_account( array(
+			'access_token'    => 'ig_basic_display_tok',
+			'token_expires_at' => time() - 100,
+		) );
+
+		$token = $this->auth->get_valid_access_token();
+
+		$this->assertSame( 'ig_refreshed_tok', $token );
+		$this->assertCount( 2, $urls );
+		$this->assertStringContainsString( 'graph.facebook.com', $urls[0] );
+		$this->assertStringContainsString( 'grant_type=fb_exchange_token', $urls[0] );
+		$this->assertStringContainsString( 'graph.instagram.com/refresh_access_token', $urls[1] );
+		$this->assertStringContainsString( 'grant_type=ig_refresh_token', $urls[1] );
+	}
+
 	public function test_successful_refresh_updates_stored_account(): void {
 		add_filter( 'pre_http_request', function () {
 			return array(
@@ -227,6 +300,76 @@ class InstagramAuthTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'ig_fresh_tok', $token );
 		$this->assertFalse( $refresh_called );
+	}
+
+	/*
+	 * -------------------------------------------------------------------------
+	 * Page access token (non-expiring)
+	 * -------------------------------------------------------------------------
+	 */
+
+	public function test_page_token_takes_precedence_over_expired_user_token(): void {
+		$http_called = false;
+
+		add_filter( 'pre_http_request', function () use ( &$http_called ) {
+			$http_called = true;
+			return array(
+				'response' => array( 'code' => 500 ),
+				'body'     => '{}',
+			);
+		} );
+
+		$this->auth->save_account( array(
+			'access_token'      => 'fb_user_tok',
+			'page_access_token' => 'page_tok_abc',
+			'page_id'           => '998877',
+			'token_expires_at'  => time() - 100, // User token long expired.
+		) );
+
+		$this->assertSame( 'page_tok_abc', $this->auth->get_valid_access_token() );
+		$this->assertFalse( $http_called );
+	}
+
+	public function test_get_page_accessors_return_stored_values(): void {
+		$this->auth->save_account( array(
+			'access_token'      => 'fb_user_tok',
+			'page_access_token' => 'page_tok_abc',
+			'page_id'           => '998877',
+		) );
+
+		$this->assertSame( '998877', $this->auth->get_page_id() );
+		$this->assertSame( 'page_tok_abc', $this->auth->get_page_access_token() );
+	}
+
+	public function test_get_page_accessors_return_null_without_page_token(): void {
+		$this->auth->save_account( array( 'access_token' => 'tok' ) );
+
+		$this->assertNull( $this->auth->get_page_id() );
+		$this->assertNull( $this->auth->get_page_access_token() );
+	}
+
+	public function test_is_authenticated_with_page_token_and_expired_user_token(): void {
+		$this->auth->save_account( array(
+			'access_token'      => 'fb_user_tok',
+			'page_access_token' => 'page_tok_abc',
+			'token_expires_at'  => time() - 100,
+		) );
+
+		$this->assertTrue( $this->auth->is_authenticated() );
+	}
+
+	public function test_page_token_account_skips_proactive_refresh(): void {
+		$this->auth->save_account( array(
+			'access_token'      => 'fb_user_tok',
+			'page_access_token' => 'page_tok_abc',
+			'token_expires_at'  => time() + ( 30 * DAY_IN_SECONDS ),
+		) );
+
+		// Pre-schedule via the legacy path to prove the no-op clears it.
+		wp_schedule_single_event( time() + 100, $this->auth->get_cron_hook_name() );
+
+		$this->assertFalse( $this->auth->schedule_proactive_refresh() );
+		$this->assertFalse( wp_next_scheduled( $this->auth->get_cron_hook_name() ) );
 	}
 
 	/*
