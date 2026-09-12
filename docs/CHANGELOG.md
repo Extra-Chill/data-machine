@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.10] - 2026-09-12
+
+### Fixed
+- lock flow schedule reconcile before boot(), not after
+
 ## [0.176.9] - 2026-09-12
 
 ### Fixed
