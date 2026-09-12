@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.21.0] - 2026-09-12
+
+### Added
+- Instagram direct messaging — conversations, messages, send
+- add Facebook comment reply ability for unified comments reply
+
+### Changed
+- pass explicit messages action in SocialMessagesAbility echo-flag test
+
+### Fixed
+- clear phpcs findings blocking release lint gate
+- use non-expiring Instagram Page token; repair FB-flavored token refresh
+
 ## [0.20.2] - 2026-08-25
 
 ### Changed
