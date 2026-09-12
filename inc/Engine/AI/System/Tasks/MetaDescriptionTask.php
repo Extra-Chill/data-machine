@@ -1,0 +1,278 @@
+<?php
+/**
+ * Meta Description Generation Task for System Agent.
+ *
+ * Generates AI-powered meta descriptions for posts. Gathers post title,
+ * content, and taxonomy context, sends to the configured AI provider,
+ * normalizes the response, and saves to the WordPress post_excerpt field.
+ *
+ * @package DataMachine\Engine\AI\System\Tasks
+ * @since 0.31.0
+ * @since 0.72.0 Migrated to getWorkflow() + executeTask() contract.
+ */
+
+namespace DataMachine\Engine\AI\System\Tasks;
+
+defined( 'ABSPATH' ) || exit;
+
+use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\ConversationManager;
+use DataMachine\Engine\AI\RequestBuilder;
+
+class MetaDescriptionTask extends SystemTask {
+
+	const MAX_LENGTH             = 155;
+	const CONTENT_EXCERPT_LENGTH = 1500;
+
+	/**
+	 * Execute meta description generation for a specific post.
+	 *
+	 * @param int   $jobId  Job ID from DM Jobs table.
+	 * @param array $params Task parameters from engine_data.
+	 */
+	public function executeTask( int $jobId, array $params ): void {
+		$post_id = absint( $params['post_id'] ?? 0 );
+		$force   = ! empty( $params['force'] );
+
+		if ( $post_id <= 0 ) {
+			$this->failJob( $jobId, 'Missing or invalid post_id' );
+			return;
+		}
+
+		$post = get_post( $post_id );
+
+		if ( ! $post instanceof \WP_Post ) {
+			$this->failJob( $jobId, "Post #{$post_id} not found" );
+			return;
+		}
+
+		$post_status = get_post_status( $post_id );
+		if ( 'publish' !== $post_status && 'future' !== $post_status ) {
+			$this->failJob( $jobId, "Post #{$post_id} is not published (status: {$post_status})" );
+			return;
+		}
+
+		$current_excerpt = get_post_field( 'post_excerpt', $post_id );
+		$current_excerpt = is_string( $current_excerpt ) ? trim( $current_excerpt ) : '';
+
+		if ( ! $force && '' !== $current_excerpt ) {
+			$this->completeJob( $jobId, array(
+				'skipped' => true,
+				'post_id' => $post_id,
+				'reason'  => 'Post excerpt already exists',
+			) );
+			return;
+		}
+
+		$system_defaults = $this->resolveSystemModel( $params );
+		$provider        = $system_defaults['provider'];
+		$model           = $system_defaults['model'];
+
+		if ( empty( $provider ) || empty( $model ) ) {
+			$this->failJob( $jobId, 'No default AI provider/model configured' );
+			return;
+		}
+
+		$prompt   = $this->buildPrompt( $post );
+		$messages = array(
+			ConversationManager::buildConversationMessage( 'user', $prompt ),
+		);
+
+		$ai_payload = array(
+			'post_id'         => $post_id,
+			// System tasks run without a human caller — calling_user_id is 0 so
+			// tools that resolve per-user OAuth credentials know not to look up
+			// any specific user's storage slot.
+			'calling_user_id' => 0,
+		);
+		if ( ! empty( $params['agent_id'] ) ) {
+			$ai_payload['agent_id'] = (int) $params['agent_id'];
+		}
+		if ( ! empty( $params['user_id'] ) ) {
+			$ai_payload['user_id'] = (int) $params['user_id'];
+		}
+
+		$response = RequestBuilder::build(
+			$messages,
+			$provider,
+			$model,
+			array(),
+			array( 'system' ),
+			$ai_payload
+		);
+
+		if ( $response instanceof \WP_Error ) {
+			$this->failJob( $jobId, 'AI request failed: ' . $response->get_error_message() );
+			return;
+		}
+
+		$content     = RequestBuilder::resultText( $response );
+		$description = $this->normalizeDescription( $content );
+
+		if ( empty( $description ) ) {
+			$this->failJob( $jobId, 'AI returned empty meta description' );
+			return;
+		}
+
+		$result = wp_update_post(
+			array(
+				'ID'           => $post_id,
+				'post_excerpt' => $description,
+			),
+			true
+		);
+
+		if ( is_wp_error( $result ) ) {
+			$this->failJob( $jobId, 'Failed to update post excerpt: ' . $result->get_error_message() );
+			return;
+		}
+
+		$effects = array(
+			array(
+				'type'           => 'post_field_set',
+				'target'         => array(
+					'post_id' => $post_id,
+					'field'   => 'post_excerpt',
+				),
+				'previous_value' => '' !== $current_excerpt ? $current_excerpt : null,
+			),
+		);
+
+		$this->completeJob( $jobId, array(
+			'meta_description' => $description,
+			'post_id'          => $post_id,
+			'char_count'       => mb_strlen( $description ),
+			'effects'          => $effects,
+			'completed_at'     => current_time( 'mysql' ),
+		) );
+	}
+
+	/**
+	 * @return string
+	 */
+	public function getTaskType(): string {
+		return 'meta_description_generation';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public static function getTaskMeta(): array {
+		return array(
+			'label'           => 'Meta Description Generation',
+			'description'     => 'Generate SEO meta descriptions and save to post excerpt.',
+			'setting_key'     => 'meta_description_auto_generate_enabled',
+			'default_enabled' => true,
+			'trigger'         => 'On demand via CLI or chat',
+			'trigger_type'    => 'manual',
+			'supports_run'    => false,
+		);
+	}
+
+	/**
+	 * @return bool
+	 */
+	public function supportsUndo(): bool {
+		return true;
+	}
+
+	/**
+	 * @return array
+	 * @since 0.41.0
+	 */
+	public function getPromptDefinitions(): array {
+		return array(
+			'generate' => array(
+				'label'       => __( 'Meta Description Prompt', 'data-machine' ),
+				'description' => __( 'Prompt used to generate meta descriptions for posts.', 'data-machine' ),
+				'default'     => "Write a meta description for this page. Use your knowledge of this site's voice and audience.\n\n"
+					. "Guidelines:\n"
+					. '- Maximum ' . self::MAX_LENGTH . " characters (strict limit)\n"
+					. "- Lead with the direct answer or hook — what will the reader learn or get?\n"
+					. "- Include the primary topic/keyword naturally\n"
+					. "- Create curiosity or value to encourage clicks\n"
+					. "- Don't duplicate the title — expand on it\n"
+					. "- No quotes around the description\n"
+					. "- One or two sentences\n\n"
+					. "Return ONLY the meta description text, nothing else.\n\n"
+					. "Page context:\n{{context}}",
+				'variables'   => array(
+					'context' => 'Post title, content excerpt, categories, and tags',
+				),
+			),
+		);
+	}
+
+	/**
+	 * Build the AI prompt with post context.
+	 *
+	 * @param \WP_Post $post Post object.
+	 * @return string Prompt text.
+	 */
+	private function buildPrompt( \WP_Post $post ): string {
+		$context_lines = array();
+
+		$post_data = (array) $post;
+		$title     = isset( $post_data['post_title'] ) && is_string( $post_data['post_title'] ) ? wp_strip_all_tags( $post_data['post_title'] ) : '';
+		if ( ! empty( $title ) ) {
+			$context_lines[] = 'Title: ' . $title;
+		}
+
+		$post_content = get_post_field( 'post_content', $post->ID );
+		$content      = is_string( $post_content ) ? wp_strip_all_tags( strip_shortcodes( $post_content ) ) : '';
+		$content      = preg_replace( '/\s+/', ' ', trim( $content ) );
+		if ( ! empty( $content ) ) {
+			$snippet = mb_substr( $content, 0, self::CONTENT_EXCERPT_LENGTH );
+			if ( mb_strlen( $content ) > self::CONTENT_EXCERPT_LENGTH ) {
+				$snippet .= '…';
+			}
+			$context_lines[] = 'Content: ' . $snippet;
+		}
+
+		$categories = wp_get_post_categories( $post->ID, array( 'fields' => 'names' ) );
+		if ( is_array( $categories ) && ! empty( $categories ) ) {
+			$context_lines[] = 'Categories: ' . implode( ', ', $categories );
+		}
+
+		$tags = wp_get_post_tags( $post->ID, array( 'fields' => 'names' ) );
+		if ( is_array( $tags ) && ! empty( $tags ) ) {
+			$context_lines[] = 'Tags: ' . implode( ', ', $tags );
+		}
+
+		$context = ! empty( $context_lines ) ? implode( "\n", $context_lines ) : '';
+
+		return $this->buildPromptFromTemplate( 'generate', array( 'context' => $context ) );
+	}
+
+	/**
+	 * Normalize AI response to a clean meta description string.
+	 *
+	 * @param string $raw Raw AI response.
+	 * @return string Normalized meta description.
+	 */
+	private function normalizeDescription( string $raw ): string {
+		$description = trim( $raw );
+		$description = trim( $description, " \t\n\r\0\x0B\"'" );
+		$description = preg_replace( '/^#+\s*/', '', $description );
+		$description = preg_replace( '/\*\*(.*?)\*\*/', '$1', $description );
+		$description = sanitize_text_field( $description );
+
+		if ( '' === $description ) {
+			return '';
+		}
+
+		if ( mb_strlen( $description ) > self::MAX_LENGTH ) {
+			$description = mb_substr( $description, 0, self::MAX_LENGTH );
+			$last_space  = mb_strrpos( $description, ' ' );
+			if ( false !== $last_space && $last_space > self::MAX_LENGTH - 30 ) {
+				$description = mb_substr( $description, 0, $last_space );
+			}
+			$description = rtrim( $description, ' ,;:-' );
+			if ( ! preg_match( '/[.!?]$/', $description ) ) {
+				$description .= '.';
+			}
+		}
+
+		return $description;
+	}
+}
