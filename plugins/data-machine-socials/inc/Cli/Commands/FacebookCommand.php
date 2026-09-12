@@ -19,11 +19,12 @@ defined( 'ABSPATH' ) || exit;
  *
  * ## EXAMPLES
  *
- *     wp datamachine-socials facebook posts
- *     wp datamachine-socials facebook post 123456789
- *     wp datamachine-socials facebook comments 123456789
- *     wp datamachine-socials facebook status
- */
+	 *     wp datamachine-socials facebook posts
+	 *     wp datamachine-socials facebook post 123456789
+	 *     wp datamachine-socials facebook comments 123456789
+	 *     wp datamachine-socials facebook reply-comment 987654321 "Thanks!"
+	 *     wp datamachine-socials facebook status
+	 */
 class FacebookCommand {
 
 	/**
@@ -221,6 +222,50 @@ class FacebookCommand {
 	}
 
 	/**
+	 * Reply to a Facebook Page comment.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <comment_id>
+	 * : The Facebook comment ID to reply to.
+	 *
+	 * <message>
+	 * : The reply text.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials facebook reply-comment 987654321 "Thanks for listening!"
+	 */
+	public function reply_comment( $args ) {
+		$comment_id = $args[0] ?? '';
+		$message    = $args[1] ?? '';
+		$ability    = $this->get_comment_reply_ability();
+
+		if ( empty( $comment_id ) ) {
+			WP_CLI::error( 'Comment ID is required.' );
+		}
+
+		if ( empty( $message ) ) {
+			WP_CLI::error( 'Reply message is required.' );
+		}
+
+		$result = $ability->execute(
+			array(
+				'comment_id' => $comment_id,
+				'message'    => $message,
+			)
+		);
+
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
+		}
+
+		WP_CLI::success( 'Facebook comment reply posted successfully!' );
+		WP_CLI::log( 'Comment ID: ' . ( $result['data']['comment_id'] ?? $comment_id ) );
+		WP_CLI::log( 'Reply ID:   ' . ( $result['data']['reply_id'] ?? '' ) );
+	}
+
+	/**
 	 * Show Facebook authentication status.
 	 *
 	 * ## EXAMPLES
@@ -382,6 +427,20 @@ class FacebookCommand {
 		$ability = wp_get_ability( 'datamachine/facebook-publish' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/facebook-publish ability not registered.' );
+		}
+
+		return $ability;
+	}
+
+	/**
+	 * Get the Facebook comment reply ability.
+	 *
+	 * @return \DataMachineSocials\Abilities\Facebook\FacebookCommentReplyAbility
+	 */
+	private function get_comment_reply_ability() {
+		$ability = wp_get_ability( 'datamachine/facebook-comment-reply' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/facebook-comment-reply ability not registered.' );
 		}
 
 		return $ability;

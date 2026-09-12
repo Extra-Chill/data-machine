@@ -31,8 +31,11 @@ defined( 'ABSPATH' ) || exit;
  *     # List comments in JSON (pipe-friendly)
  *     wp datamachine-socials comments list instagram 17891234567890 --format=json
  *
- *     # Reply to a comment
- *     wp datamachine-socials comments reply instagram 17891234567890 "Thanks!"
+	 *     # Reply to a comment
+	 *     wp datamachine-socials comments reply instagram 17891234567890 "Thanks!"
+	 *
+	 *     # Reply to a Facebook Page comment
+	 *     wp datamachine-socials comments reply facebook 1234567890 "Thanks!"
  *
  *     # Show only comments that contain @mentions
  *     wp datamachine-socials comments list instagram 17891234567890 --has-mentions
@@ -52,6 +55,7 @@ class CommentsCommand {
 	 */
 	private const REPLY_SLUG_MAP = array(
 		'instagram' => 'datamachine/instagram-comment-reply',
+		'facebook'  => 'datamachine/facebook-comment-reply',
 	);
 
 	/**
@@ -235,7 +239,7 @@ class CommentsCommand {
 	 * ## OPTIONS
 	 *
 	 * <platform>
-	 * : Platform slug (instagram).
+	 * : Platform slug (instagram, facebook).
 	 *
 	 * <comment_id>
 	 * : The comment ID to reply to.
@@ -246,6 +250,7 @@ class CommentsCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine-socials comments reply instagram 1789000000000 "Thanks for entering!"
+	 *     wp datamachine-socials comments reply facebook 1234567890 "Thanks for entering!"
 	 */
 	public function reply( $args ) {
 		$platform   = $args[0] ?? '';
