@@ -112,7 +112,7 @@ class SocialMessagesAbilityTest extends WP_UnitTestCase {
 			}
 		};
 
-		$result = $ability->execute( array( 'provider' => 'instagram', 'conversation_id' => 'thread-1' ) );
+		$result = $ability->execute( array( 'action' => 'messages', 'provider' => 'instagram', 'conversation_id' => 'thread-1' ) );
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'msg-1', $result['data']['messages'][0]['id'] );
