@@ -1,10 +1,13 @@
 # Routines Scheduling
 
 All recurring scheduling in Data Machine — flow schedules and built-in system
-task schedules — runs on **Agents API Routines** (v0.11.0+). Data Machine no
+task schedules — runs on **Agents API Routines** (v0.11.1+). Data Machine no
 longer owns a bespoke scheduler; the adapter lives at
-`inc/Engine/Scheduling/FlowRoutines.php` with the hash-gated backend decorator
-at `inc/Engine/Scheduling/HashGatedRoutineBackend.php`.
+`inc/Engine/Scheduling/FlowRoutines.php`. Registration idempotency is owned by
+the substrate: the Agents API Action Scheduler bridge's `register()` is itself
+idempotent (Automattic/agents-api#555), so DM does not layer its own
+schedule-fingerprint gate on top (Extra-Chill/data-machine#3497 removed the
+consumer-side decorator that used to do this).
 
 ## Identity contract
 
@@ -30,9 +33,10 @@ at `inc/Engine/Scheduling/HashGatedRoutineBackend.php`.
   telemetry via `RecurringRejectionTracker`.
 - **Boot:** the registry is in-memory per request, so `FlowRoutines::boot()`
   re-declares every persisted flow and active system schedule on `init`. The
-  backend decorator gates registration on a persisted schedule fingerprint
-  (option `datamachine_routine_schedule_hashes`), so unchanged routines never
-  reach Action Scheduler and timers are never reset by unrelated updates.
+  substrate's own `register()` is idempotent — it compares a pending action's
+  recurrence (interval seconds / cron expression) against the routine and is a
+  read-only no-op when nothing changed — so unchanged routines never reach
+  Action Scheduler and timers are never reset by unrelated updates.
 - **Permission:** the substrate defaults to deny for scheduled ability
   execution. `FlowRoutines::filter_ability_permission()` allows only routines
   actually registered this request, targeting `datamachine/run-flow` or
