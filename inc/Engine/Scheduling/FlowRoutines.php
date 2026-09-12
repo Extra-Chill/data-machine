@@ -28,6 +28,7 @@ namespace DataMachine\Engine\Scheduling;
 
 use AgentsAPI\AI\Routines\WP_Agent_Routine;
 use AgentsAPI\AI\Routines\WP_Agent_Routine_Registry;
+use DataMachine\Api\Flows\FlowScheduleReconciliationLock;
 use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
@@ -449,6 +450,16 @@ final class FlowRoutines {
 	 * Runs on `init` of every full-runtime request. Registration is cheap:
 	 * the hash-gated backend stops unchanged routines from reaching Action
 	 * Scheduler. Also performs the one-shot legacy-action migration.
+	 *
+	 * The whole body runs inside a try/finally so a single routine that
+	 * throws (e.g. a Redis exception from `update_option()` inside the
+	 * Action Scheduler bridge) never skips {@see HashGatedRoutineBackend::persist()}.
+	 * A lost persist() would make the next boot() see no fingerprint for
+	 * every routine registered so far this request and re-schedule all of
+	 * them again — the self-sustaining failure mode in
+	 * Extra-Chill/data-machine#3492. Per-routine registration is further
+	 * isolated with its own try/catch so one bad routine does not stop the
+	 * rest of the set from registering.
 	 */
 	public static function boot(): void {
 		if ( ! self::available() ) {
@@ -459,67 +470,91 @@ final class FlowRoutines {
 		self::install_backend();
 		self::install_permission_filter();
 
-		$flows_db = new Flows();
-		foreach ( $flows_db->get_flow_schedules() as $row ) {
-			$flow_id    = (int) ( $row['flow_id'] ?? 0 );
-			$scheduling = $row['scheduling_config'] ?? array();
-			if ( ! is_array( $scheduling ) ) {
-				$scheduling = json_decode( (string) $scheduling, true ) ?? array();
+		try {
+			$flows_db = new Flows();
+			foreach ( $flows_db->get_flow_schedules() as $row ) {
+				$flow_id    = (int) ( $row['flow_id'] ?? 0 );
+				$scheduling = $row['scheduling_config'] ?? array();
+				if ( ! is_array( $scheduling ) ) {
+					$scheduling = json_decode( (string) $scheduling, true ) ?? array();
+				}
+
+				if ( $flow_id <= 0 ) {
+					continue;
+				}
+
+				$flow_name = is_string( $row['flow_name'] ?? null ) ? (string) $row['flow_name'] : '';
+				$args      = self::flow_routine_args( $flow_id, $scheduling, $flow_name );
+				if ( null === $args ) {
+					continue;
+				}
+
+				self::register_routine_logged(
+					self::routine_id( $flow_id ),
+					$args,
+					array( 'flow_id' => $flow_id )
+				);
 			}
 
-			if ( $flow_id <= 0 ) {
-				continue;
+			foreach ( RecurringScheduleRegistry::all() as $schedule ) {
+				$schedule_id = (string) ( $schedule['schedule_id'] ?? '' );
+				if ( '' === $schedule_id ) {
+					continue;
+				}
+
+				if ( ! self::system_schedule_active( $schedule ) ) {
+					self::unregister_routine( self::system_routine_id( $schedule_id ) );
+					continue;
+				}
+
+				$args = self::system_routine_args( $schedule );
+				if ( null === $args ) {
+					continue;
+				}
+
+				self::register_routine_logged(
+					self::system_routine_id( $schedule_id ),
+					$args,
+					array( 'schedule_id' => $schedule_id )
+				);
 			}
 
-			$flow_name = is_string( $row['flow_name'] ?? null ) ? (string) $row['flow_name'] : '';
-			$args      = self::flow_routine_args( $flow_id, $scheduling, $flow_name );
-			if ( null === $args ) {
-				continue;
-			}
-
-			self::register_routine_logged(
-				self::routine_id( $flow_id ),
-				$args,
-				array( 'flow_id' => $flow_id )
-			);
+			self::maybe_migrate();
+		} finally {
+			HashGatedRoutineBackend::persist();
 		}
-
-		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
-			$schedule_id = (string) ( $schedule['schedule_id'] ?? '' );
-			if ( '' === $schedule_id ) {
-				continue;
-			}
-
-			if ( ! self::system_schedule_active( $schedule ) ) {
-				self::unregister_routine( self::system_routine_id( $schedule_id ) );
-				continue;
-			}
-
-			$args = self::system_routine_args( $schedule );
-			if ( null === $args ) {
-				continue;
-			}
-
-			self::register_routine_logged(
-				self::system_routine_id( $schedule_id ),
-				$args,
-				array( 'schedule_id' => $schedule_id )
-			);
-		}
-
-		self::maybe_migrate();
-		HashGatedRoutineBackend::persist();
 	}
 
 	/**
-	 * Register one routine and log any registration error.
+	 * Register one routine and log any registration error or thrown exception.
+	 *
+	 * Never lets a thrown exception escape: one routine's registration
+	 * failure must not abort the rest of the boot loop or skip the trailing
+	 * `persist()` call.
 	 *
 	 * @param string               $routine_id  Routine id.
 	 * @param array<string, mixed> $args        Registry args.
 	 * @param array<string, mixed> $log_context Extra identifiers for the error log.
 	 */
 	private static function register_routine_logged( string $routine_id, array $args, array $log_context ): void {
-		$registered = WP_Agent_Routine_Registry::register( $routine_id, $args );
+		try {
+			$registered = WP_Agent_Routine_Registry::register( $routine_id, $args );
+		} catch ( \Throwable $error ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Routine registration threw',
+				array_merge(
+					$log_context,
+					array(
+						'routine_id' => $routine_id,
+						'error'      => $error->getMessage(),
+					)
+				)
+			);
+			return;
+		}
+
 		if ( ! is_wp_error( $registered ) ) {
 			return;
 		}
@@ -546,8 +581,20 @@ final class FlowRoutines {
 	 * the reconcile algorithm runs — an empty registry would classify every
 	 * pending routine action as an orphan.
 	 *
+	 * A DM-owned reconcile guard ({@see FlowScheduleReconciliationLock}) is
+	 * acquired BEFORE `boot()` runs. Under contention this makes a losing
+	 * caller's cost one option read: it never re-registers the full routine
+	 * set. Extra-Chill/data-machine#3492 was caused by the opposite order —
+	 * `boot()` ran first and only the (much cheaper) registry-level reconcile
+	 * step was guarded, so every concurrent request paid the full boot()
+	 * cost before finding out someone else already held the lock.
+	 *
 	 * @param bool $apply Repair missing coverage when true; dry-run otherwise.
-	 * @return array<string, mixed> Reconciliation report.
+	 * @return array<string, mixed> Reconciliation report. A caller that lost
+	 *                              the lock race gets back `skipped => true`
+	 *                              with `success => true` — lock contention is
+	 *                              not a failure, it means another reconcile is
+	 *                              already in flight.
 	 */
 	public static function reconcile( bool $apply = false ): array {
 		if ( ! self::available() ) {
@@ -562,14 +609,32 @@ final class FlowRoutines {
 			);
 		}
 
-		self::boot();
+		$lock_token = FlowScheduleReconciliationLock::acquire();
+		if ( is_wp_error( $lock_token ) ) {
+			return array(
+				'success' => true,
+				'applied' => $apply,
+				'skipped' => true,
+				'reason'  => 'locked',
+				'covered' => 0,
+				'missing' => 0,
+				'removed' => 0,
+				'errors'  => array(),
+			);
+		}
 
-		HashGatedRoutineBackend::set_verification_mode( true );
 		try {
-			$report = WP_Agent_Routine_Registry::reconcile( array( 'dry_run' => ! $apply ) );
+			self::boot();
+
+			HashGatedRoutineBackend::set_verification_mode( true );
+			try {
+				$report = WP_Agent_Routine_Registry::reconcile( array( 'dry_run' => ! $apply ) );
+			} finally {
+				HashGatedRoutineBackend::set_verification_mode( false );
+				HashGatedRoutineBackend::persist();
+			}
 		} finally {
-			HashGatedRoutineBackend::set_verification_mode( false );
-			HashGatedRoutineBackend::persist();
+			FlowScheduleReconciliationLock::release( $lock_token );
 		}
 
 		$enqueued = $report['enqueued'];

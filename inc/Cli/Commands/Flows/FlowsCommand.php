@@ -574,6 +574,11 @@ class FlowsCommand extends BaseCommand {
 			WP_CLI::halt( 1 );
 		}
 
+		if ( ! empty( $result['skipped'] ) ) {
+			WP_CLI::log( 'Skipped: another flow schedule reconciliation is already running. Try again shortly.' );
+			return;
+		}
+
 		WP_CLI::log( ! empty( $result['applied'] ) ? 'Mode: apply' : 'Mode: dry-run' );
 		WP_CLI::log(
 			sprintf(

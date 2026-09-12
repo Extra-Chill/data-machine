@@ -44,6 +44,8 @@ class ReconcileFlowSchedulesAbility {
 						'properties' => array(
 							'success'     => array( 'type' => 'boolean' ),
 							'applied'     => array( 'type' => 'boolean' ),
+							'skipped'     => array( 'type' => 'boolean' ),
+							'reason'      => array( 'type' => 'string' ),
 							'covered'     => array( 'type' => 'integer' ),
 							'missing'     => array( 'type' => 'integer' ),
 							'removed'     => array( 'type' => 'integer' ),
