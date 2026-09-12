@@ -14,7 +14,6 @@ use AgentsAPI\AI\Routines\WP_Agent_Routine_Registry;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Engine\Scheduling\FlowRoutines;
-use DataMachine\Engine\Scheduling\HashGatedRoutineBackend;
 use WP_UnitTestCase;
 
 class FlowRoutinesTest extends WP_UnitTestCase {
@@ -47,8 +46,6 @@ class FlowRoutinesTest extends WP_UnitTestCase {
 			}
 		}
 		WP_Agent_Routine_Registry::reset();
-		HashGatedRoutineBackend::reset_state();
-		delete_option( 'datamachine_routine_schedule_hashes' );
 		delete_option( FlowRoutines::MIGRATED_OPTION );
 
 		parent::tear_down();

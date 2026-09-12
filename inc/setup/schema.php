@@ -130,6 +130,13 @@ function datamachine_maybe_ensure_current_schema(): void {
 function datamachine_run_deferred_site_setup(): void {
 	\DataMachine\Core\Bootstrap\ActivationServiceProvider::register_capabilities();
 	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_defaults_for_site();
+
+	// One-shot cleanup (Extra-Chill/data-machine#3497): the hash-gated
+	// routine backend decorator that wrote this option was removed once the
+	// Agents API Action Scheduler bridge's own register() became idempotent
+	// (wordpress/agents-api v0.11.1). delete_option() on an already-absent
+	// row is a cheap no-op, so this is safe to run on every version bump.
+	delete_option( 'datamachine_routine_schedule_hashes' );
 }
 
 // Ensure schema early in plugins_loaded (priority 5) so that

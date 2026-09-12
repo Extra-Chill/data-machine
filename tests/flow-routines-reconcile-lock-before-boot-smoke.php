@@ -1,7 +1,7 @@
 <?php
 /**
  * Pure-PHP behavioral smoke for FlowRoutines::reconcile()'s lock-before-boot
- * ordering and boot()'s persist-survives-a-throw guarantee.
+ * ordering and boot()'s throw-tolerance guarantee.
  *
  * Regression coverage for Extra-Chill/data-machine#3492: a deploy-time
  * reconcile marker caused `FlowRoutines::reconcile(true)` to run on every
@@ -11,13 +11,18 @@
  * held the lock. This smoke proves:
  *
  *  (a) with the DM reconcile guard held, reconcile() returns a `skipped`
- *      result WITHOUT ever calling boot() (zero registry registration calls,
- *      zero persist() calls) — and that normal operation resumes once the
- *      guard is released.
- *  (c) boot() calls HashGatedRoutineBackend::persist() even when a routine
- *      registration throws, and even when something outside the per-routine
- *      try/catch throws — a lost persist() is what made the real incident
- *      self-sustaining (lost fingerprints reschedule everything again).
+ *      result WITHOUT ever calling boot() (zero registry registration
+ *      calls) — and that normal operation resumes once the guard is
+ *      released.
+ *  (c) boot() continues past a throwing routine registration and still
+ *      registers the remaining routines in the set, and a throw outside the
+ *      per-routine try/catch (see {@see register_routine_logged()})
+ *      propagates out of boot() without losing already-registered routines.
+ *
+ * Extra-Chill/data-machine#3497 removed the consumer-side idempotency
+ * decorator this smoke used to also exercise via a `persist()` call-count
+ * spy, now that the Agents API Action Scheduler bridge's own `register()`
+ * is idempotent (wordpress/agents-api v0.11.1).
  *
  * Run with: php tests/flow-routines-reconcile-lock-before-boot-smoke.php
  *
@@ -101,27 +106,6 @@ namespace DataMachine\Engine\Tasks {
 // GroupRegistrar is required from its real file below (not stubbed): it is
 // a plain constant holder plus DB-touching methods this smoke never calls,
 // and requiring it avoids hand-duplicating its GROUP slug literal here.
-
-// Spy replacing the real HashGatedRoutineBackend: same namespace as
-// FlowRoutines, so its unqualified `HashGatedRoutineBackend::persist()`
-// calls resolve here instead of the real (unrequired) file.
-namespace DataMachine\Engine\Scheduling {
-	final class HashGatedRoutineBackend {
-		public static int $persist_calls = 0;
-
-		public static function persist(): void {
-			++self::$persist_calls;
-		}
-
-		public static function set_verification_mode( bool $mode ): void {
-			unset( $mode );
-		}
-
-		public static function reset_state(): void {
-			self::$persist_calls = 0;
-		}
-	}
-}
 
 namespace {
 
@@ -298,7 +282,6 @@ namespace {
 	use DataMachine\Api\Flows\FlowScheduleReconciliationLock;
 	use DataMachine\Core\Database\Flows\Flows;
 	use DataMachine\Engine\Scheduling\FlowRoutines;
-	use DataMachine\Engine\Scheduling\HashGatedRoutineBackend;
 	use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
 
 	function datamachine_smoke_assert( bool $condition, string $message ): void {
@@ -313,7 +296,6 @@ namespace {
 
 	function datamachine_smoke_reset(): void {
 		WP_Agent_Routine_Registry::reset();
-		HashGatedRoutineBackend::reset_state();
 		RecurringScheduleRegistry::$throw_on_all         = false;
 		$GLOBALS['datamachine_smoke_logs']               = array();
 		$GLOBALS['datamachine_smoke_db']                 = array();
@@ -350,7 +332,6 @@ namespace {
 	datamachine_smoke_assert( true === ( $result['skipped'] ?? null ), 'locked reconcile() reports skipped => true' );
 	datamachine_smoke_assert( 'locked' === ( $result['reason'] ?? null ), 'locked reconcile() reports a machine-readable reason' );
 	datamachine_smoke_assert( array() === WP_Agent_Routine_Registry::$register_calls, 'locked reconcile() never calls boot() — zero registry register() calls' );
-	datamachine_smoke_assert( 0 === HashGatedRoutineBackend::$persist_calls, 'locked reconcile() never calls persist()' );
 
 	datamachine_smoke_assert( FlowScheduleReconciliationLock::release( $other_owner ), 'teardown: release the concurrent lock' );
 
@@ -361,9 +342,8 @@ namespace {
 	datamachine_smoke_assert( true === ( $result['success'] ?? null ), 'unlocked reconcile() succeeds' );
 	datamachine_smoke_assert( empty( $result['skipped'] ), 'unlocked reconcile() is not marked skipped' );
 	datamachine_smoke_assert( array( 'flow-1' ) === WP_Agent_Routine_Registry::$register_calls, 'unlocked reconcile() actually boots and registers the flow routine' );
-	datamachine_smoke_assert( 2 === HashGatedRoutineBackend::$persist_calls, 'unlocked reconcile() persists from both boot() and the registry-reconcile finally' );
 
-	// --- (c) a throwing registration must not skip persist(). ---
+	// --- (c) boot() continues past a throwing register() and still registers the remaining routines. ---
 	Flows::$schedules = array(
 		array(
 			'flow_id'           => 1,
@@ -391,13 +371,12 @@ namespace {
 		array( 'flow-1', 'flow-2' ) === WP_Agent_Routine_Registry::$register_calls,
 		'boot() continues to the next routine after one registration throws'
 	);
-	datamachine_smoke_assert( 1 === HashGatedRoutineBackend::$persist_calls, 'boot() still persists once even though a registration threw' );
 	datamachine_smoke_assert( 1 === count( $GLOBALS['datamachine_smoke_logs'] ), 'the throw is logged once via datamachine_log' );
 	$logged_error = $GLOBALS['datamachine_smoke_logs'][0];
 	datamachine_smoke_assert( 'error' === ( $logged_error[0] ?? null ), 'the throw is logged at error level' );
 	datamachine_smoke_assert( 'flow-1' === ( $logged_error[2]['routine_id'] ?? null ), 'the log identifies the routine that threw' );
 
-	// --- boot()'s top-level finally must persist even on a throw outside the per-routine catch. ---
+	// --- a throw outside the per-routine catch propagates out of boot() without losing prior registrations. ---
 	datamachine_smoke_reset();
 	RecurringScheduleRegistry::$throw_on_all = true;
 
@@ -414,7 +393,6 @@ namespace {
 		array( 'flow-1', 'flow-2' ) === WP_Agent_Routine_Registry::$register_calls,
 		'both flow routines from the first loop still registered before the second loop threw'
 	);
-	datamachine_smoke_assert( 1 === HashGatedRoutineBackend::$persist_calls, 'boot() persists via its top-level finally even when it ultimately rethrows' );
 
 	// --- Cache/DB split: a ghost cache entry with no backing DB row must never block acquisition. ---
 	//

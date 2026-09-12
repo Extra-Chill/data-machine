@@ -16,9 +16,11 @@
  *
  * `boot()` runs on every request that loads the full runtime: the routine
  * registry is in-memory by design, so persisted flows and schedules are
- * re-declared each boot. The {@see HashGatedRoutineBackend} decorator keeps
- * that cheap — registration only reaches Action Scheduler when the routine's
- * schedule fingerprint is new or changed.
+ * re-declared each boot. That stays cheap because the Agents API Action
+ * Scheduler bridge's `register()` is itself idempotent — it only reaches
+ * Action Scheduler when a routine's schedule (interval seconds / cron
+ * expression) is missing or has actually changed; an unchanged routine is a
+ * read-only no-op.
  *
  * @package DataMachine\Engine\Scheduling
  * @since   1.0.0
@@ -91,11 +93,6 @@ final class FlowRoutines {
 	 * Cached availability of the Agents API routines substrate.
 	 */
 	private static ?bool $available = null;
-
-	/**
-	 * Whether the backend decorator filter has been installed.
-	 */
-	private static bool $backend_installed = false;
 
 	/**
 	 * Whether the ability-permission filter has been installed.
@@ -313,8 +310,6 @@ final class FlowRoutines {
 			}
 		}
 
-		HashGatedRoutineBackend::persist();
-
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -348,7 +343,6 @@ final class FlowRoutines {
 
 		self::unregister_routine( self::routine_id( $flow_id ) );
 		self::cancel_one_time( $flow_id );
-		HashGatedRoutineBackend::persist();
 	}
 
 	/**
@@ -448,17 +442,13 @@ final class FlowRoutines {
 	 * Register every persisted flow and system schedule as a routine.
 	 *
 	 * Runs on `init` of every full-runtime request. Registration is cheap:
-	 * the hash-gated backend stops unchanged routines from reaching Action
-	 * Scheduler. Also performs the one-shot legacy-action migration.
+	 * the Agents API Action Scheduler bridge's `register()` is itself
+	 * idempotent, so re-declaring an unchanged routine on every boot never
+	 * reaches Action Scheduler. Also performs the one-shot legacy-action
+	 * migration.
 	 *
-	 * The whole body runs inside a try/finally so a single routine that
-	 * throws (e.g. a Redis exception from `update_option()` inside the
-	 * Action Scheduler bridge) never skips {@see HashGatedRoutineBackend::persist()}.
-	 * A lost persist() would make the next boot() see no fingerprint for
-	 * every routine registered so far this request and re-schedule all of
-	 * them again — the self-sustaining failure mode in
-	 * Extra-Chill/data-machine#3492. Per-routine registration is further
-	 * isolated with its own try/catch so one bad routine does not stop the
+	 * Per-routine registration is isolated with its own try/catch (see
+	 * {@see register_routine_logged()}) so one bad routine does not stop the
 	 * rest of the set from registering.
 	 */
 	public static function boot(): void {
@@ -467,70 +457,64 @@ final class FlowRoutines {
 			return;
 		}
 
-		self::install_backend();
 		self::install_permission_filter();
 
-		try {
-			$flows_db = new Flows();
-			foreach ( $flows_db->get_flow_schedules() as $row ) {
-				$flow_id    = (int) ( $row['flow_id'] ?? 0 );
-				$scheduling = $row['scheduling_config'] ?? array();
-				if ( ! is_array( $scheduling ) ) {
-					$scheduling = json_decode( (string) $scheduling, true ) ?? array();
-				}
-
-				if ( $flow_id <= 0 ) {
-					continue;
-				}
-
-				$flow_name = is_string( $row['flow_name'] ?? null ) ? (string) $row['flow_name'] : '';
-				$args      = self::flow_routine_args( $flow_id, $scheduling, $flow_name );
-				if ( null === $args ) {
-					continue;
-				}
-
-				self::register_routine_logged(
-					self::routine_id( $flow_id ),
-					$args,
-					array( 'flow_id' => $flow_id )
-				);
+		$flows_db = new Flows();
+		foreach ( $flows_db->get_flow_schedules() as $row ) {
+			$flow_id    = (int) ( $row['flow_id'] ?? 0 );
+			$scheduling = $row['scheduling_config'] ?? array();
+			if ( ! is_array( $scheduling ) ) {
+				$scheduling = json_decode( (string) $scheduling, true ) ?? array();
 			}
 
-			foreach ( RecurringScheduleRegistry::all() as $schedule ) {
-				$schedule_id = (string) ( $schedule['schedule_id'] ?? '' );
-				if ( '' === $schedule_id ) {
-					continue;
-				}
-
-				if ( ! self::system_schedule_active( $schedule ) ) {
-					self::unregister_routine( self::system_routine_id( $schedule_id ) );
-					continue;
-				}
-
-				$args = self::system_routine_args( $schedule );
-				if ( null === $args ) {
-					continue;
-				}
-
-				self::register_routine_logged(
-					self::system_routine_id( $schedule_id ),
-					$args,
-					array( 'schedule_id' => $schedule_id )
-				);
+			if ( $flow_id <= 0 ) {
+				continue;
 			}
 
-			self::maybe_migrate();
-		} finally {
-			HashGatedRoutineBackend::persist();
+			$flow_name = is_string( $row['flow_name'] ?? null ) ? (string) $row['flow_name'] : '';
+			$args      = self::flow_routine_args( $flow_id, $scheduling, $flow_name );
+			if ( null === $args ) {
+				continue;
+			}
+
+			self::register_routine_logged(
+				self::routine_id( $flow_id ),
+				$args,
+				array( 'flow_id' => $flow_id )
+			);
 		}
+
+		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
+			$schedule_id = (string) ( $schedule['schedule_id'] ?? '' );
+			if ( '' === $schedule_id ) {
+				continue;
+			}
+
+			if ( ! self::system_schedule_active( $schedule ) ) {
+				self::unregister_routine( self::system_routine_id( $schedule_id ) );
+				continue;
+			}
+
+			$args = self::system_routine_args( $schedule );
+			if ( null === $args ) {
+				continue;
+			}
+
+			self::register_routine_logged(
+				self::system_routine_id( $schedule_id ),
+				$args,
+				array( 'schedule_id' => $schedule_id )
+			);
+		}
+
+		self::maybe_migrate();
 	}
 
 	/**
 	 * Register one routine and log any registration error or thrown exception.
 	 *
 	 * Never lets a thrown exception escape: one routine's registration
-	 * failure must not abort the rest of the boot loop or skip the trailing
-	 * `persist()` call.
+	 * failure must not abort the rest of the boot loop.
 	 *
 	 * @param string               $routine_id  Routine id.
 	 * @param array<string, mixed> $args        Registry args.
@@ -626,13 +610,7 @@ final class FlowRoutines {
 		try {
 			self::boot();
 
-			HashGatedRoutineBackend::set_verification_mode( true );
-			try {
-				$report = WP_Agent_Routine_Registry::reconcile( array( 'dry_run' => ! $apply ) );
-			} finally {
-				HashGatedRoutineBackend::set_verification_mode( false );
-				HashGatedRoutineBackend::persist();
-			}
+			$report = WP_Agent_Routine_Registry::reconcile( array( 'dry_run' => ! $apply ) );
 		} finally {
 			FlowScheduleReconciliationLock::release( $lock_token );
 		}
@@ -1152,28 +1130,6 @@ final class FlowRoutines {
 		}
 
 		return true;
-	}
-
-	/**
-	 * Install the hash-gated backend decorator.
-	 */
-	private static function install_backend(): void {
-		if ( self::$backend_installed ) {
-			return;
-		}
-
-		self::$backend_installed = true;
-		add_filter(
-			'wp_agent_routine_backend',
-			static function ( $resolved_backend ) {
-				if ( ! $resolved_backend instanceof \AgentsAPI\AI\Routines\WP_Agent_Routine_Backend ) {
-					return $resolved_backend;
-				}
-
-				return new HashGatedRoutineBackend( $resolved_backend );
-			},
-			10
-		);
 	}
 
 	/**
