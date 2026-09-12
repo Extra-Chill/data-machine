@@ -87,3 +87,37 @@ export const useDisconnectAuth = () => {
 		},
 	} );
 };
+
+/**
+ * Fetch the server-generated OAuth authorization URL for a provider.
+ *
+ * The URL must come from the server on every attempt because the provider's
+ * auth handler mints a single-use `state` parameter as a side effect of
+ * building it. Callers navigate to the returned URL; the provider redirects
+ * back to the settings page with `auth_success` / `auth_error`, which
+ * SettingsApp already turns into a notice.
+ */
+export const useAuthorizeProvider = () => {
+	return useMutation( {
+		mutationFn: async ( providerKey ) => {
+			const response = await client.get(
+				`/auth/${ providerKey }/status`
+			);
+			if ( ! response.success ) {
+				throw new Error(
+					response.message ||
+						'Failed to get authorization URL'
+				);
+			}
+
+			const oauthUrl = response.data?.oauth_url;
+			if ( ! oauthUrl ) {
+				throw new Error(
+					'This provider did not return an authorization URL.'
+				);
+			}
+
+			return oauthUrl;
+		},
+	} );
+};
