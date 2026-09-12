@@ -350,7 +350,7 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 																				$resolved_username = '';
 				$page_id           = '';
 				$page_access_token = '';
-				$user_id = $short_lived_token_data['user_id'] ?? null;
+				$user_id           = $short_lived_token_data['user_id'] ?? null;
 				if ( empty( $user_id ) ) {
 					$resolved = $this->resolve_instagram_account_from_facebook_token( $access_token );
 					if ( is_wp_error( $resolved ) ) {

@@ -120,7 +120,7 @@ if ( file_exists( $image_path ) ) {
  * navigate to a deterministic editor URL (/wp-admin/post.php?post=4321&...).
  */
 $pinned_post_id = 4321;
-$post_id        = wp_insert_post( array(
+$seeded_post_id = wp_insert_post( array(
 	'import_id'    => $pinned_post_id,
 	'post_title'   => 'DMS Crop Modal Smoke Post',
 	'post_content' => '<!-- wp:paragraph --><p>Seeded post for exercising the data-machine-socials crop modal under React 19.</p><!-- /wp:paragraph -->',
@@ -129,12 +129,12 @@ $post_id        = wp_insert_post( array(
 	'post_author'  => 1,
 ) );
 
-if ( is_wp_error( $post_id ) || ! $post_id ) {
+if ( is_wp_error( $seeded_post_id ) || ! $seeded_post_id ) {
 	throw new RuntimeException( 'Failed to create smoke post' );
 }
 
 if ( $attachment_id && ! is_wp_error( $attachment_id ) ) {
-	set_post_thumbnail( $post_id, $attachment_id );
+	set_post_thumbnail( $seeded_post_id, $attachment_id );
 }
 
 /*
@@ -160,7 +160,7 @@ $socials_asset = file_exists( $socials_asset_path ) ? ( require $socials_asset_p
 	'dependencies' => array( 'wp-element', 'wp-components', 'wp-edit-post', 'wp-plugins', 'wp-api-fetch', 'wp-i18n' ),
 	'version'      => '0',
 );
-$asset_export = var_export(
+$asset_export  = var_export( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export -- generating PHP source for a sandbox harness stub.
 	array(
 		'dependencies' => $socials_asset['dependencies'],
 		'version'      => (string) $socials_asset['version'],
@@ -257,7 +257,7 @@ add_action( 'enqueue_block_editor_assets', function () use ( \$dms_smoke ) {
 PHP;
 
 $stub_path    = trailingslashit( $mu_dir ) . 'dms-crop-modal-smoke-harness.php';
-$stub_written = (bool) file_put_contents( $stub_path, $stub_code );
+$stub_written = (bool) file_put_contents( $stub_path, $stub_code ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- disposable sandbox seed.
 
 /*
  * 5. Dismiss the Gutenberg welcome guide for the admin user so the canvas is
@@ -267,15 +267,18 @@ $prefs = get_user_meta( 1, 'wp_persisted_preferences', true );
 if ( ! is_array( $prefs ) ) {
 	$prefs = array();
 }
-$prefs['core/edit-post'] = array_merge(
+$prefs['core/edit-post']   = array_merge(
 	isset( $prefs['core/edit-post'] ) && is_array( $prefs['core/edit-post'] ) ? $prefs['core/edit-post'] : array(),
-	array( 'welcomeGuide' => false, 'fullscreenMode' => false )
+	array(
+		'welcomeGuide'   => false,
+		'fullscreenMode' => false,
+	)
 );
 $prefs['core/preferences'] = array_merge(
 	isset( $prefs['core/preferences'] ) && is_array( $prefs['core/preferences'] ) ? $prefs['core/preferences'] : array(),
 	array( 'welcomeGuide' => false )
 );
-$prefs['_modified'] = gmdate( 'c' );
+$prefs['_modified']        = gmdate( 'c' );
 update_user_meta( 1, 'wp_persisted_preferences', $prefs );
 
 // Pretty permalinks (belt-and-suspenders for any URL resolution).
@@ -288,18 +291,18 @@ $wp_rewrite->flush_rules( false );
 wp_set_auth_cookie( 1, true );
 
 echo wp_json_encode( array(
-	'post_id'             => (int) $post_id,
-	'attachment_id'       => (int) $attachment_id,
-	'attachment_url'      => $attachment_id ? wp_get_attachment_url( $attachment_id ) : null,
-	'editor_url'          => admin_url( 'post.php?post=' . (int) $post_id . '&action=edit' ),
-	'editor_url_relative' => '/wp-admin/post.php?post=' . (int) $post_id . '&action=edit',
-	'socials_plugin'      => $socials_plugin,
-	'socials_bundle_url'  => $socials_build_url,
+	'post_id'               => (int) $seeded_post_id,
+	'attachment_id'         => (int) $attachment_id,
+	'attachment_url'        => $attachment_id ? wp_get_attachment_url( $attachment_id ) : null,
+	'editor_url'            => admin_url( 'post.php?post=' . (int) $seeded_post_id . '&action=edit' ),
+	'editor_url_relative'   => '/wp-admin/post.php?post=' . (int) $seeded_post_id . '&action=edit',
+	'socials_plugin'        => $socials_plugin,
+	'socials_bundle_url'    => $socials_build_url,
 	'socials_bundle_exists' => file_exists( $socials_build_path ),
-	'harness_written'     => $stub_written,
-	'harness_path'        => $stub_path,
-	'stubbed_dependency'  => 'GET /datamachine/v1/socials/auth/status (normally served by Data Machine core AuthAbilities). The editor BUNDLE itself is the real built artifact.',
-	'admin_url'           => admin_url(),
-	'home_url'            => home_url( '/' ),
+	'harness_written'       => $stub_written,
+	'harness_path'          => $stub_path,
+	'stubbed_dependency'    => 'GET /datamachine/v1/socials/auth/status (normally served by Data Machine core AuthAbilities). The editor BUNDLE itself is the real built artifact.',
+	'admin_url'             => admin_url(),
+	'home_url'              => home_url( '/' ),
 ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 echo "\n";

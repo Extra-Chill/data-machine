@@ -76,13 +76,13 @@ class InstagramReadAbility extends AbstractSocialAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'action'   => array(
+							'action'          => array(
 								'type'        => 'string',
 								'enum'        => array( 'list', 'get', 'comments', 'comments_all', 'conversations', 'messages' ),
 								'default'     => 'list',
 								'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized), conversations (DM threads), messages (messages in one DM thread)', 'data-machine-socials' ),
 							),
-							'media_id' => array(
+							'media_id'        => array(
 								'type'        => 'string',
 								'description' => __( 'Instagram media ID (required for get and comments actions)', 'data-machine-socials' ),
 							),
@@ -90,16 +90,16 @@ class InstagramReadAbility extends AbstractSocialAbility {
 								'type'        => 'string',
 								'description' => __( 'Instagram conversation ID (required for the messages action)', 'data-machine-socials' ),
 							),
-							'user_id'  => array(
+							'user_id'         => array(
 								'type'        => 'string',
 								'description' => __( 'Instagram-scoped user ID (IGSID) to fetch a single conversation thread (optional, conversations action only)', 'data-machine-socials' ),
 							),
-							'limit'    => array(
+							'limit'           => array(
 								'type'        => 'integer',
 								'default'     => 25,
 								'description' => __( 'Number of items to return (max 100)', 'data-machine-socials' ),
 							),
-							'after'    => array(
+							'after'           => array(
 								'type'        => 'string',
 								'description' => __( 'Pagination cursor for next page', 'data-machine-socials' ),
 							),
@@ -601,7 +601,7 @@ class InstagramReadAbility extends AbstractSocialAbility {
 		}
 
 		if ( empty( $participant ) && ! empty( $participants ) ) {
-			$first = $participants[0];
+			$first       = $participants[0];
 			$participant = array(
 				'id'       => (string) ( $first['id'] ?? '' ),
 				'username' => (string) ( $first['username'] ?? '' ),
