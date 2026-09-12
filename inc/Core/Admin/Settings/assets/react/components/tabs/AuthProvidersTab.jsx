@@ -25,6 +25,7 @@ import {
 	useAuthProviders,
 	useSaveAuthConfig,
 	useDisconnectAuth,
+	useAuthorizeProvider,
 } from '../../queries/authProviders';
 
 /**
@@ -286,24 +287,36 @@ const CallbackUrlDisplay = ( { url } ) => {
  * @param {Object}   root0.provider        Provider metadata.
  * @param {Function} root0.onSave          Save callback.
  * @param {Function} root0.onDisconnect    Disconnect callback.
+ * @param {Function} root0.onAuthorize     Start-OAuth callback.
  * @param {boolean}  root0.isSaving        Whether a save is in progress.
  * @param {boolean}  root0.isDisconnecting Whether a disconnect is in progress.
+ * @param {boolean}  root0.isAuthorizing   Whether an authorization is starting.
  */
 const ProviderCard = ( {
 	provider,
 	onSave,
 	onDisconnect,
+	onAuthorize,
 	isSaving,
 	isDisconnecting,
+	isAuthorizing,
 } ) => {
 	const [ showConfig, setShowConfig ] = useState( false );
 	const [ feedback, setFeedback ] = useState( null );
 	const [ isDisconnectConfirmOpen, setIsDisconnectConfirmOpen ] = useState( false );
+	const supportsOAuth = provider.auth_type !== 'simple';
 	let configButtonLabel = __( 'Configure', 'data-machine' );
 	if ( showConfig ) {
 		configButtonLabel = __( 'Hide Config', 'data-machine' );
 	} else if ( provider.is_authenticated ) {
 		configButtonLabel = __( 'Edit Config', 'data-machine' );
+	}
+
+	let connectButtonLabel = __( 'Connect Account', 'data-machine' );
+	if ( isAuthorizing ) {
+		connectButtonLabel = __( 'Connecting\u2026', 'data-machine' );
+	} else if ( provider.is_authenticated ) {
+		connectButtonLabel = __( 'Reconnect', 'data-machine' );
 	}
 
 	const handleSave = useCallback(
@@ -326,6 +339,20 @@ const ProviderCard = ( {
 		},
 		[ onSave ]
 	);
+
+	const handleAuthorize = useCallback( async () => {
+		setFeedback( null );
+		try {
+			await onAuthorize( provider.provider_key );
+		} catch ( err ) {
+			setFeedback( {
+				type: 'error',
+				message:
+					err.message ||
+					__( 'Failed to start authorization.', 'data-machine' ),
+			} );
+		}
+	}, [ onAuthorize, provider.provider_key ] );
 
 	const handleDisconnect = useCallback( async () => {
 		setIsDisconnectConfirmOpen( false );
@@ -383,6 +410,18 @@ const ProviderCard = ( {
 			) }
 
 			<div className="datamachine-auth-card-actions">
+				{ supportsOAuth && (
+					<Button
+						variant="primary"
+						onClick={ handleAuthorize }
+						isBusy={ isAuthorizing }
+						disabled={ isAuthorizing || ! provider.is_configured }
+						className="button-small"
+					>
+						{ connectButtonLabel }
+					</Button>
+				) }
+
 				{ provider.is_authenticated && (
 					<Button
 						variant="secondary"
@@ -408,6 +447,15 @@ const ProviderCard = ( {
 					</Button>
 				) }
 			</div>
+
+			{ supportsOAuth && ! provider.is_configured && (
+				<p className="description">
+					{ __(
+						'Save this provider\u2019s credentials before connecting an account.',
+						'data-machine'
+					) }
+				</p>
+			) }
 
 			{ showConfig && (
 				<div className="datamachine-auth-card-config">
@@ -438,8 +486,10 @@ const AuthProvidersTab = () => {
 	const { data: providers, isLoading, error } = useAuthProviders();
 	const saveMutation = useSaveAuthConfig();
 	const disconnectMutation = useDisconnectAuth();
+	const authorizeMutation = useAuthorizeProvider();
 	const [ savingProvider, setSavingProvider ] = useState( null );
 	const [ disconnectingProvider, setDisconnectingProvider ] = useState( null );
+	const [ authorizingProvider, setAuthorizingProvider ] = useState( null );
 
 	const handleSave = async ( providerKey, config ) => {
 		setSavingProvider( providerKey );
@@ -447,6 +497,19 @@ const AuthProvidersTab = () => {
 			await saveMutation.mutateAsync( { providerKey, config } );
 		} finally {
 			setSavingProvider( null );
+		}
+	};
+
+	const handleAuthorize = async ( providerKey ) => {
+		setAuthorizingProvider( providerKey );
+		try {
+			const oauthUrl = await authorizeMutation.mutateAsync( providerKey );
+			// Full-page navigation: the provider redirects back to this page
+			// with auth_success / auth_error, which SettingsApp surfaces.
+			window.location.href = oauthUrl;
+		} catch ( err ) {
+			setAuthorizingProvider( null );
+			throw err;
 		}
 	};
 
@@ -511,9 +574,13 @@ const AuthProvidersTab = () => {
 						provider={ provider }
 						onSave={ handleSave }
 						onDisconnect={ handleDisconnect }
+						onAuthorize={ handleAuthorize }
 						isSaving={ savingProvider === provider.provider_key }
 						isDisconnecting={
 							disconnectingProvider === provider.provider_key
+						}
+						isAuthorizing={
+							authorizingProvider === provider.provider_key
 						}
 					/>
 				) ) }
