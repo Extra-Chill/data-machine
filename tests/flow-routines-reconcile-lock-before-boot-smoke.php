@@ -128,6 +128,7 @@ namespace DataMachine\Engine\Scheduling {
 namespace {
 
 	define( 'ABSPATH', __DIR__ );
+	define( 'ARRAY_A', 'ARRAY_A' );
 
 	class WP_Error {
 		public function __construct( private string $code = '', private string $message = '' ) {}
@@ -145,7 +146,15 @@ namespace {
 		return $thing instanceof WP_Error;
 	}
 
+	// The object cache and `wp_options` are modeled as two INDEPENDENT
+	// stores, exactly like a real Redis-backed object cache sitting in
+	// front of MySQL. FlowScheduleReconciliationLock must never trust the
+	// cache store for a locking decision — see the "ghost cache entry"
+	// scenario below, which reproduces the Extra-Chill/data-machine#3492
+	// failure mode where a killed request left a cache entry with no
+	// backing DB row.
 	$GLOBALS['datamachine_smoke_options'] = array();
+	$GLOBALS['datamachine_smoke_db']      = array();
 
 	function get_option( string $name, $default = false ) {
 		return $GLOBALS['datamachine_smoke_options'][ $name ] ?? $default;
@@ -175,8 +184,22 @@ namespace {
 		return is_array( $value ) || is_object( $value ) ? serialize( $value ) : (string) $value;
 	}
 
+	function maybe_unserialize( $value ) {
+		if ( ! is_string( $value ) ) {
+			return $value;
+		}
+		$unserialized = @unserialize( $value );
+		return ( false !== $unserialized || 'b:0;' === $value ) ? $unserialized : $value;
+	}
+
+	$GLOBALS['datamachine_smoke_cache_delete_calls'] = array();
+
 	function wp_cache_delete( string $key, string $group ): bool {
-		unset( $key, $group );
+		$GLOBALS['datamachine_smoke_cache_delete_calls'][] = array( $key, $group );
+		// A real persistent object cache actually removes the entry —
+		// model that so tests can prove a ghost cache entry doesn't
+		// survive the class's own defensive wp_cache_delete() calls.
+		unset( $GLOBALS['datamachine_smoke_options'][ $key ] );
 		return true;
 	}
 
@@ -212,25 +235,54 @@ namespace {
 			return array( $query, $args );
 		}
 
+		/**
+		 * Every locking decision reads straight from the `datamachine_smoke_db`
+		 * store — never `datamachine_smoke_options` (the cache).
+		 */
+		public function get_row( array $prepared, $output = null ) {
+			unset( $output );
+			list( $query, $args ) = $prepared;
+			if ( ! str_starts_with( $query, 'SELECT' ) ) {
+				return null;
+			}
+
+			list( , $option_name ) = $args;
+			if ( ! array_key_exists( $option_name, $GLOBALS['datamachine_smoke_db'] ) ) {
+				return null;
+			}
+
+			return array( 'option_value' => $GLOBALS['datamachine_smoke_db'][ $option_name ] );
+		}
+
 		public function query( array $prepared ): int {
 			list( $query, $args ) = $prepared;
-			if ( str_starts_with( $query, 'UPDATE' ) ) {
-				list( , $replacement, $option_name, $expected ) = $args;
-				$current                                        = $GLOBALS['datamachine_smoke_options'][ $option_name ] ?? null;
-				if ( maybe_serialize( $current ) !== $expected ) {
+
+			if ( str_starts_with( $query, 'INSERT IGNORE' ) ) {
+				list( , $option_name, $value ) = $args;
+				if ( array_key_exists( $option_name, $GLOBALS['datamachine_smoke_db'] ) ) {
 					return 0;
 				}
-				$GLOBALS['datamachine_smoke_options'][ $option_name ] = unserialize( $replacement );
+				$GLOBALS['datamachine_smoke_db'][ $option_name ] = $value;
+				return 1;
+			}
+
+			if ( str_starts_with( $query, 'UPDATE' ) ) {
+				list( , $replacement, $option_name, $expected_raw ) = $args;
+				$current_raw                                        = $GLOBALS['datamachine_smoke_db'][ $option_name ] ?? null;
+				if ( $current_raw !== $expected_raw ) {
+					return 0;
+				}
+				$GLOBALS['datamachine_smoke_db'][ $option_name ] = $replacement;
 				return 1;
 			}
 
 			if ( str_starts_with( $query, 'DELETE' ) ) {
-				list( , $option_name, $expected ) = $args;
-				$current                          = $GLOBALS['datamachine_smoke_options'][ $option_name ] ?? null;
-				if ( maybe_serialize( $current ) !== $expected ) {
+				list( , $option_name, $expected_raw ) = $args;
+				$current_raw                          = $GLOBALS['datamachine_smoke_db'][ $option_name ] ?? null;
+				if ( $current_raw !== $expected_raw ) {
 					return 0;
 				}
-				unset( $GLOBALS['datamachine_smoke_options'][ $option_name ] );
+				unset( $GLOBALS['datamachine_smoke_db'][ $option_name ] );
 				return 1;
 			}
 
@@ -263,16 +315,19 @@ namespace {
 	function datamachine_smoke_reset(): void {
 		WP_Agent_Routine_Registry::reset();
 		HashGatedRoutineBackend::reset_state();
-		RecurringScheduleRegistry::$throw_on_all = false;
-		$GLOBALS['datamachine_smoke_logs']       = array();
+		RecurringScheduleRegistry::$throw_on_all         = false;
+		$GLOBALS['datamachine_smoke_logs']               = array();
+		$GLOBALS['datamachine_smoke_db']                 = array();
+		$GLOBALS['datamachine_smoke_options']            = array( FlowRoutines::MIGRATED_OPTION => true );
+		$GLOBALS['datamachine_smoke_cache_delete_calls'] = array();
 	}
 
 	echo "=== flow-routines-reconcile-lock-before-boot-smoke ===\n";
 
-	// The one-shot legacy-action migration is out of scope for this smoke;
-	// mark it done so boot() doesn't reach for as_get_scheduled_actions()
-	// (Action Scheduler is not stubbed here).
-	$GLOBALS['datamachine_smoke_options'][ FlowRoutines::MIGRATED_OPTION ] = true;
+	// datamachine_smoke_reset() primes FlowRoutines::MIGRATED_OPTION in the
+	// cache store so boot() doesn't reach for as_get_scheduled_actions()
+	// (Action Scheduler is not stubbed here) — the one-shot legacy-action
+	// migration is out of scope for this smoke.
 
 	// --- (a) lock held elsewhere: reconcile() must skip without booting. ---
 	Flows::$schedules = array(
@@ -361,6 +416,57 @@ namespace {
 		'both flow routines from the first loop still registered before the second loop threw'
 	);
 	datamachine_smoke_assert( 1 === HashGatedRoutineBackend::$persist_calls, 'boot() persists via its top-level finally even when it ultimately rethrows' );
+
+	// --- Cache/DB split: a ghost cache entry with no backing DB row must never block acquisition. ---
+	//
+	// Reproduces the Extra-Chill/data-machine#3492 recovery-time failure
+	// mode observed on the underlying agents-api registry lock: a killed
+	// request leaves the lock cached (Redis) with no row in `wp_options`.
+	// A lock built on add_option()/get_option() would see the cached
+	// payload, treat it as live for up to STALE_AFTER seconds, and then
+	// fail its compare-and-set forever (there is no DB row to match against).
+	datamachine_smoke_reset();
+	$lock_option = 'datamachine_flow_schedule_reconciliation_lock';
+
+	datamachine_smoke_assert( ! array_key_exists( $lock_option, $GLOBALS['datamachine_smoke_db'] ), 'setup: no DB row backs the lock' );
+
+	// A "fresh" (not stale) cached payload from a request that died right
+	// after writing the cache but before (or without) ever writing the DB row.
+	$GLOBALS['datamachine_smoke_options'][ $lock_option ] = array(
+		'token'       => 'ghost-owner-token',
+		'acquired_at' => time(),
+	);
+
+	$acquired = FlowScheduleReconciliationLock::acquire();
+
+	datamachine_smoke_assert( is_string( $acquired ), 'a ghost cache entry with no DB row never blocks acquire() — the DB, not the cache, is authoritative' );
+	datamachine_smoke_assert( $acquired !== 'ghost-owner-token', 'the new owner gets its own token, independent of the ghost cache payload' );
+	datamachine_smoke_assert( array_key_exists( $lock_option, $GLOBALS['datamachine_smoke_db'] ), 'acquire() actually wrote a backing DB row' );
+	datamachine_smoke_assert(
+		! array_key_exists( $lock_option, $GLOBALS['datamachine_smoke_options'] ),
+		'the ghost cache entry was cleared, not left to mislead the next reader'
+	);
+	datamachine_smoke_assert(
+		! empty( $GLOBALS['datamachine_smoke_cache_delete_calls'] ),
+		'acquiring against a cache-only ghost entry defensively calls wp_cache_delete()'
+	);
+	datamachine_smoke_assert( FlowScheduleReconciliationLock::release( $acquired ), 'teardown: release the lock acquired over the ghost cache entry' );
+
+	// --- Two acquires race against an empty DB: exactly one wins. ---
+	datamachine_smoke_reset();
+	datamachine_smoke_assert( array() === $GLOBALS['datamachine_smoke_db'], 'setup: the DB starts with no lock row at all' );
+
+	$racer_a = FlowScheduleReconciliationLock::acquire();
+	$racer_b = FlowScheduleReconciliationLock::acquire();
+
+	datamachine_smoke_assert( is_string( $racer_a ), 'the first racer against an empty DB wins the lock' );
+	datamachine_smoke_assert( is_wp_error( $racer_b ), 'the second racer against the now-occupied DB loses' );
+	datamachine_smoke_assert(
+		'flow_schedule_reconciliation_locked' === $racer_b->get_error_code(),
+		'the losing racer gets the machine-readable lock error, not a crash or a silently-granted duplicate token'
+	);
+	datamachine_smoke_assert( 1 === count( $GLOBALS['datamachine_smoke_db'] ), 'exactly one lock row exists after the race — no duplicate rows, no torn state' );
+	datamachine_smoke_assert( FlowScheduleReconciliationLock::release( $racer_a ), 'teardown: release the winning racer\'s lock' );
 
 	echo "\nAll flow-routines-reconcile-lock-before-boot assertions passed.\n";
 }
