@@ -794,12 +794,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "96806e2e07f14677ed666f33ae8f11ed7cd72025"
+                "reference": "8ce133c00027a4d5225313d5716b3673cfa17535"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/96806e2e07f14677ed666f33ae8f11ed7cd72025",
-                "reference": "96806e2e07f14677ed666f33ae8f11ed7cd72025",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/8ce133c00027a4d5225313d5716b3673cfa17535",
+                "reference": "8ce133c00027a4d5225313d5716b3673cfa17535",
                 "shasum": ""
             },
             "require": {
@@ -979,7 +979,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-09-09T02:07:56+00:00"
+            "time": "2026-09-12T20:22:01+00:00"
         }
     ],
     "packages-dev": [
@@ -3448,17 +3448,17 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "wordpress/agents-api": 20,
-        "automattic/blocks-engine-php-transformer": 20
+        "automattic/blocks-engine-php-transformer": 20,
+        "wordpress/agents-api": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
         "php": ">=8.2"
     },
-    "platform-dev": [],
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.2.0"
     },
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
