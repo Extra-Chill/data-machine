@@ -23,13 +23,6 @@ use WP_Agent_Context_Section_Registry;
 class SectionRegistry {
 
 	/**
-	 * Registered sections, keyed by filename then slug.
-	 *
-	 * @var array<string, array<string, array>> Filename => slug => section metadata.
-	 */
-	private static array $sections = array();
-
-	/**
 	 * Whether the action has been fired.
 	 *
 	 * @var bool
@@ -70,10 +63,6 @@ class SectionRegistry {
 			return;
 		}
 
-		if ( ! isset( self::$sections[ $filename ] ) ) {
-			self::$sections[ $filename ] = array();
-		}
-
 		$section_callback = static function ( array $context, array $section ) use ( $callback ) {
 			unset( $section );
 			return call_user_func( $callback, $context );
@@ -84,44 +73,30 @@ class SectionRegistry {
 		$site_id    = isset( $args['site_id'] ) ? (int) $args['site_id'] : ( function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 0 );
 		$site_url   = isset( $args['site_url'] ) ? (string) $args['site_url'] : ( function_exists( 'get_home_url' ) && $site_id > 0 ? (string) get_home_url( $site_id, '/' ) : '' );
 
-		self::$sections[ $filename ][ $slug ] = array(
-			'slug'            => $slug,
-			'priority'        => $priority,
-			'callback'        => $section_callback,
-			'label'           => $args['label'] ?? self::slug_to_label( $slug ),
-			'description'     => $args['description'] ?? '',
-			'owner'           => is_string( $owner ) && '' !== trim( $owner ) ? trim( $owner ) : '-',
-			'freshness'       => isset( $args['freshness'] ) && is_string( $args['freshness'] ) && '' !== trim( $args['freshness'] ) ? trim( $args['freshness'] ) : '-',
-			'conditions'      => isset( $args['conditions'] ) && is_string( $args['conditions'] ) && '' !== trim( $args['conditions'] ) ? trim( $args['conditions'] ) : '-',
-			'source_plugin'   => $provenance['source_plugin'],
-			'source_file'     => $provenance['source_file'],
-			'source_callback' => $provenance['source_callback'],
-			'registered_at'   => $provenance['registered_at'],
-			'site_id'         => $site_id,
-			'site_url'        => $site_url,
-		);
-
+		// The agents-api context registry is the single source of truth. Every
+		// DM-specific attribute travels in `meta` so get_sections() can read it
+		// back without keeping a parallel copy here.
 		WP_Agent_Context_Section_Registry::register(
 			MemoryFileRegistry::context_slug_for_filename( $filename ),
 			$slug,
 			$priority,
 			$section_callback,
 			array(
-				'label'            => self::$sections[ $filename ][ $slug ]['label'],
-				'description'      => self::$sections[ $filename ][ $slug ]['description'],
+				'label'            => $args['label'] ?? self::slug_to_label( $slug ),
+				'description'      => $args['description'] ?? '',
 				'retrieval_policy' => $args['retrieval_policy'] ?? null,
 				'modes'            => $args['modes'] ?? array( MemoryFileRegistry::MODE_ALL ),
 				'meta'             => array(
 					'filename'        => $filename,
-					'owner'           => self::$sections[ $filename ][ $slug ]['owner'],
-					'freshness'       => self::$sections[ $filename ][ $slug ]['freshness'],
-					'conditions'      => self::$sections[ $filename ][ $slug ]['conditions'],
-					'source_plugin'   => self::$sections[ $filename ][ $slug ]['source_plugin'],
-					'source_file'     => self::$sections[ $filename ][ $slug ]['source_file'],
-					'source_callback' => self::$sections[ $filename ][ $slug ]['source_callback'],
-					'registered_at'   => self::$sections[ $filename ][ $slug ]['registered_at'],
-					'site_id'         => self::$sections[ $filename ][ $slug ]['site_id'],
-					'site_url'        => self::$sections[ $filename ][ $slug ]['site_url'],
+					'owner'           => is_string( $owner ) && '' !== trim( $owner ) ? trim( $owner ) : '-',
+					'freshness'       => isset( $args['freshness'] ) && is_string( $args['freshness'] ) && '' !== trim( $args['freshness'] ) ? trim( $args['freshness'] ) : '-',
+					'conditions'      => isset( $args['conditions'] ) && is_string( $args['conditions'] ) && '' !== trim( $args['conditions'] ) ? trim( $args['conditions'] ) : '-',
+					'source_plugin'   => $provenance['source_plugin'],
+					'source_file'     => $provenance['source_file'],
+					'source_callback' => $provenance['source_callback'],
+					'registered_at'   => $provenance['registered_at'],
+					'site_id'         => $site_id,
+					'site_url'        => $site_url,
 				),
 			)
 		);
@@ -140,7 +115,6 @@ class SectionRegistry {
 		$filename = sanitize_file_name( $filename );
 		$slug     = sanitize_key( $slug );
 
-		unset( self::$sections[ $filename ][ $slug ] );
 		WP_Agent_Context_Section_Registry::unregister( MemoryFileRegistry::context_slug_for_filename( $filename ), $slug );
 	}
 
@@ -149,6 +123,10 @@ class SectionRegistry {
 	 *
 	 * @since 0.66.0
 	 *
+	 * Reads back from the agents-api context registry, so sections registered
+	 * directly on `WP_Agent_Context_Section_Registry` by plugins that do not
+	 * depend on Data Machine are reported alongside DM-registered ones.
+	 *
 	 * @param string $filename Composable filename.
 	 * @return array<string, array> Slug => section metadata, sorted by priority ascending.
 	 */
@@ -156,15 +134,14 @@ class SectionRegistry {
 		self::ensure_action_fired();
 
 		$filename = sanitize_file_name( $filename );
-		$sections = self::$sections[ $filename ] ?? array();
+		if ( '' === $filename ) {
+			return array();
+		}
 
-		uasort(
-			$sections,
-			function ( $a, $b ) {
-				$priority = $a['priority'] <=> $b['priority'];
-				return 0 !== $priority ? $priority : strcmp( $a['slug'], $b['slug'] );
-			}
-		);
+		$sections = array();
+		foreach ( WP_Agent_Context_Section_Registry::get_sections( MemoryFileRegistry::context_slug_for_filename( $filename ) ) as $slug => $section ) {
+			$sections[ $slug ] = self::from_context_section( $filename, $section );
+		}
 
 		return $sections;
 	}
@@ -276,7 +253,11 @@ class SectionRegistry {
 		self::ensure_action_fired();
 
 		$filename = sanitize_file_name( $filename );
-		return ! empty( self::$sections[ $filename ] );
+		if ( '' === $filename ) {
+			return false;
+		}
+
+		return ! empty( WP_Agent_Context_Section_Registry::get_sections( MemoryFileRegistry::context_slug_for_filename( $filename ) ) );
 	}
 
 	/**
@@ -289,10 +270,15 @@ class SectionRegistry {
 	public static function get_filenames(): array {
 		self::ensure_action_fired();
 
-		return array_keys( array_filter(
-			self::$sections,
-			function ( $sections ) {
-				return ! empty( $sections );
+		$context_slugs = WP_Agent_Context_Section_Registry::get_context_slugs();
+		if ( empty( $context_slugs ) ) {
+			return array();
+		}
+
+		return array_values( array_filter(
+			MemoryFileRegistry::get_filenames(),
+			static function ( string $filename ) use ( $context_slugs ): bool {
+				return in_array( MemoryFileRegistry::context_slug_for_filename( $filename ), $context_slugs, true );
 			}
 		) );
 	}
@@ -305,7 +291,6 @@ class SectionRegistry {
 	 * @return void
 	 */
 	public static function reset(): void {
-		self::$sections     = array();
 		self::$action_fired = false;
 		WP_Agent_Context_Section_Registry::reset();
 	}
@@ -324,12 +309,56 @@ class SectionRegistry {
 			 * SectionRegistry::register() inside this action callback.
 			 *
 			 * @since 0.66.0
-			 *
-			 * @param array<string, array<string, array>> $sections Current registry state (read-only snapshot).
 			 */
-			do_action( 'datamachine_sections', self::$sections );
+			do_action( 'datamachine_sections' );
 			self::$action_fired = true;
 		}
+	}
+
+	/**
+	 * Map an agents-api context section back to Data Machine's section shape.
+	 *
+	 * DM-registered sections carry their operator metadata in `meta`; sections
+	 * registered directly on the substrate by other plugins may carry none, so
+	 * every DM-specific column falls back to '-' rather than being dropped.
+	 *
+	 * @param string $filename Composable filename.
+	 * @param array  $section  Section as stored by WP_Agent_Context_Section_Registry.
+	 * @return array<string, mixed>
+	 */
+	private static function from_context_section( string $filename, array $section ): array {
+		$meta = is_array( $section['meta'] ?? null ) ? $section['meta'] : array();
+		$slug = is_string( $section['slug'] ?? null ) ? $section['slug'] : '';
+
+		$string_meta = static function ( string $key ) use ( $meta ): string {
+			$value = $meta[ $key ] ?? null;
+			return is_string( $value ) && '' !== trim( $value ) ? trim( $value ) : '-';
+		};
+
+		$owner = $string_meta( 'owner' );
+		if ( '-' === $owner ) {
+			$owner = $string_meta( 'source_plugin' );
+		}
+
+		$site_id = isset( $meta['site_id'] ) ? (int) $meta['site_id'] : 0;
+
+		return array(
+			'slug'            => $slug,
+			'priority'        => (int) ( $section['priority'] ?? 10 ),
+			'callback'        => $section['callback'],
+			'label'           => is_string( $section['label'] ?? null ) && '' !== $section['label'] ? $section['label'] : self::slug_to_label( $slug ),
+			'description'     => is_string( $section['description'] ?? null ) ? $section['description'] : '',
+			'owner'           => $owner,
+			'freshness'       => $string_meta( 'freshness' ),
+			'conditions'      => $string_meta( 'conditions' ),
+			'source_plugin'   => $string_meta( 'source_plugin' ),
+			'source_file'     => $string_meta( 'source_file' ),
+			'source_callback' => $string_meta( 'source_callback' ),
+			'registered_at'   => $string_meta( 'registered_at' ),
+			'site_id'         => $site_id,
+			'site_url'        => is_string( $meta['site_url'] ?? null ) ? $meta['site_url'] : '',
+			'filename'        => is_string( $meta['filename'] ?? null ) && '' !== $meta['filename'] ? $meta['filename'] : $filename,
+		);
 	}
 
 	/**
