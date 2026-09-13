@@ -25,7 +25,15 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	const TOKEN_URL     = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION . '/oauth/access_token';
 	const GRAPH_API_URL = 'https://graph.instagram.com';
 	const FB_API_URL    = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
-	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_messages,instagram_manage_comments,pages_read_engagement,pages_manage_metadata';
+	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_messages,instagram_manage_comments,pages_read_engagement,pages_manage_metadata,pages_messaging';
+
+	/**
+	 * Page fields subscribed to during OAuth so the Conversations API can
+	 * deliver Instagram/Messenger messaging events to this app.
+	 *
+	 * @since 0.21.1
+	 */
+	const PAGE_SUBSCRIBED_FIELDS = array( 'messages', 'messaging_postbacks', 'messaging_seen', 'message_reactions' );
 
 	public function __construct() {
 		parent::__construct( 'instagram' );
@@ -278,6 +286,105 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	}
 
 	/**
+	 * Subscribe the app to the Facebook Page's messaging fields.
+	 *
+	 * `GET /{page-id}/subscribed_apps` returns an empty list until an app
+	 * explicitly subscribes to the Page, which is why the Conversations API
+	 * refuses fully-granted Page tokens with "Requires permission:
+	 * pages_messaging" / "Application does not have the capability". This
+	 * call is what wires the app into the Page so messaging endpoints work.
+	 *
+	 * Non-fatal by design: called during handle_oauth_callback() after the
+	 * account is otherwise resolved. A subscription failure here must never
+	 * break a connect that is already valid for publishing and comments —
+	 * it is logged and the outcome is stored so `instagram status` can
+	 * surface it instead.
+	 *
+	 * @since 0.21.1
+	 * @param string $page_id           Facebook Page ID.
+	 * @param string $page_access_token Page access token (requires pages_manage_metadata, already granted).
+	 * @return array{subscribed: bool, fields: array} Outcome to store on the account.
+	 */
+	private function subscribe_app_to_page( string $page_id, string $page_access_token ): array {
+		$result = HttpClient::post(
+			self::FB_API_URL . '/' . rawurlencode( $page_id ) . '/subscribed_apps',
+			array(
+				'context' => 'Instagram OAuth - Subscribe App to Page',
+				'timeout' => 30,
+				'body'    => array(
+					'subscribed_fields' => implode( ',', self::PAGE_SUBSCRIBED_FIELDS ),
+					'access_token'      => $page_access_token,
+				),
+			)
+		);
+
+		$body    = ! empty( $result['success'] ) ? json_decode( $result['data'], true ) : null;
+		$success = ! empty( $result['success'] ) && ! empty( $body['success'] );
+
+		if ( ! $success ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Instagram OAuth: failed to subscribe app to Page for messaging. Messaging endpoints will remain unavailable until this succeeds. Connect otherwise proceeded normally.',
+				array(
+					'page_id' => $page_id,
+					'error'   => $result['error'] ?? ( $body['error']['message'] ?? 'Unknown error' ),
+				)
+			);
+		}
+
+		return array(
+			'subscribed' => $success,
+			'fields'     => $success ? self::PAGE_SUBSCRIBED_FIELDS : array(),
+		);
+	}
+
+	/**
+	 * Check the Page's live subscribed_apps state via the Graph API.
+	 *
+	 * Used by `wp datamachine-socials instagram status` to report the real
+	 * subscription state rather than the value stored at connect time, which
+	 * can drift if the subscription is later revoked or fails after storage.
+	 *
+	 * @since 0.21.1
+	 * @return array{subscribed: bool, fields: array}|null Live status, or null if the account has no Page context or the check failed.
+	 */
+	public function get_live_page_subscription_status(): ?array {
+		$page_id    = $this->get_page_id();
+		$page_token = $this->get_page_access_token();
+
+		if ( empty( $page_id ) || empty( $page_token ) ) {
+			return null;
+		}
+
+		$result = HttpClient::get(
+			self::FB_API_URL . '/' . rawurlencode( $page_id ) . '/subscribed_apps?access_token=' . rawurlencode( $page_token ),
+			array( 'context' => 'Instagram OAuth - Check Page Subscription' )
+		);
+
+		if ( empty( $result['success'] ) ) {
+			return null;
+		}
+
+		$data = json_decode( $result['data'], true );
+		if ( ! is_array( $data ) || ! isset( $data['data'] ) || ! is_array( $data['data'] ) ) {
+			return null;
+		}
+
+		$fields = array();
+		foreach ( $data['data'] as $app ) {
+			if ( ! empty( $app['subscribed_fields'] ) && is_array( $app['subscribed_fields'] ) ) {
+				$fields = array_unique( array_merge( $fields, $app['subscribed_fields'] ) );
+			}
+		}
+
+		return array(
+			'subscribed' => ! empty( $data['data'] ),
+			'fields'     => array_values( $fields ),
+		);
+	}
+
+	/**
 	 * Get stored Instagram User ID
 	 *
 	 * @return string|null User ID or null
@@ -387,6 +494,19 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				}
 				if ( '' !== $page_access_token ) {
 					$long_lived['page_access_token'] = $page_access_token;
+				}
+
+				/*
+				 * Subscribe the app to the Page so the Conversations API can deliver
+				 * Instagram/Messenger messaging events. Without this, subscribed_apps
+				 * stays empty and messaging endpoints refuse even fully-granted tokens.
+				 * Non-fatal: a subscription failure must never break a connect that is
+				 * otherwise valid for publishing and comments.
+				 */
+				if ( '' !== $page_id && '' !== $page_access_token ) {
+					$subscription                        = $this->subscribe_app_to_page( $page_id, $page_access_token );
+					$long_lived['page_subscribed']        = $subscription['subscribed'];
+					$long_lived['page_subscribed_fields'] = $subscription['fields'];
 				}
 
 				/*

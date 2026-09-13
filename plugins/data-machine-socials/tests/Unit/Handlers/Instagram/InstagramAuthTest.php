@@ -402,6 +402,89 @@ class InstagramAuthTest extends WP_UnitTestCase {
 
 	/*
 	 * -------------------------------------------------------------------------
+	 * get_live_page_subscription_status() (#265)
+	 * -------------------------------------------------------------------------
+	 */
+
+	public function test_live_page_subscription_status_returns_null_without_page_context(): void {
+		$this->auth->save_account( array( 'access_token' => 'tok' ) );
+
+		$this->assertNull( $this->auth->get_live_page_subscription_status() );
+	}
+
+	public function test_live_page_subscription_status_reports_subscribed_with_fields(): void {
+		$captured_url = null;
+
+		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) use ( &$captured_url ) {
+			$captured_url = $url;
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( array(
+					'data' => array(
+						array(
+							'subscribed_fields' => array( 'messages', 'messaging_postbacks' ),
+							'id'                => 'app_123',
+						),
+					),
+				) ),
+			);
+		}, 10, 3 );
+
+		$this->auth->save_account( array(
+			'access_token'      => 'fb_user_tok',
+			'page_access_token' => 'page_tok_abc',
+			'page_id'           => '998877',
+		) );
+
+		$status = $this->auth->get_live_page_subscription_status();
+
+		$this->assertNotNull( $status );
+		$this->assertTrue( $status['subscribed'] );
+		$this->assertSame( array( 'messages', 'messaging_postbacks' ), $status['fields'] );
+		$this->assertStringContainsString( '998877/subscribed_apps', $captured_url );
+		$this->assertStringContainsString( 'access_token=page_tok_abc', $captured_url );
+	}
+
+	public function test_live_page_subscription_status_reports_not_subscribed_when_empty(): void {
+		add_filter( 'pre_http_request', function () {
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( array( 'data' => array() ) ),
+			);
+		} );
+
+		$this->auth->save_account( array(
+			'access_token'      => 'fb_user_tok',
+			'page_access_token' => 'page_tok_abc',
+			'page_id'           => '998877',
+		) );
+
+		$status = $this->auth->get_live_page_subscription_status();
+
+		$this->assertNotNull( $status );
+		$this->assertFalse( $status['subscribed'] );
+		$this->assertSame( array(), $status['fields'] );
+	}
+
+	public function test_live_page_subscription_status_returns_null_on_http_failure(): void {
+		add_filter( 'pre_http_request', function () {
+			return array(
+				'response' => array( 'code' => 500 ),
+				'body'     => '{}',
+			);
+		} );
+
+		$this->auth->save_account( array(
+			'access_token'      => 'fb_user_tok',
+			'page_access_token' => 'page_tok_abc',
+			'page_id'           => '998877',
+		) );
+
+		$this->assertNull( $this->auth->get_live_page_subscription_status() );
+	}
+
+	/*
+	 * -------------------------------------------------------------------------
 	 * remove_account() cleanup
 	 * -------------------------------------------------------------------------
 	 */

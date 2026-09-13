@@ -343,6 +343,21 @@ class InstagramCommand {
 			WP_CLI::log( 'Token type:   Page token (no expiry)' );
 			if ( ! empty( $details['page_id'] ) ) {
 				WP_CLI::log( 'Page ID:      ' . $details['page_id'] );
+
+				$live = method_exists( $provider, 'get_live_page_subscription_status' )
+					? $provider->get_live_page_subscription_status()
+					: null;
+
+				if ( null !== $live ) {
+					$subscribed = $live['subscribed'];
+					$fields     = $live['fields'];
+				} else {
+					$subscribed = ! empty( $details['page_subscribed'] );
+					$fields     = $details['page_subscribed_fields'] ?? array();
+				}
+
+				$fields_suffix = ( $subscribed && ! empty( $fields ) ) ? ' (' . implode( ', ', $fields ) . ')' : '';
+				WP_CLI::log( 'Subscribed:   ' . ( $subscribed ? 'Yes' : 'No' ) . $fields_suffix . ( null === $live ? ' [stored value; live check failed]' : '' ) );
 			}
 		} elseif ( $details && ! empty( $details['token_expires_at'] ) ) {
 			WP_CLI::log( 'Token type:   User token (legacy)' );
