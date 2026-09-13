@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.12] - 2026-09-13
+
+### Changed
+- remove HashGatedRoutineBackend; rely on idempotent agents-api bridge
+
 ## [0.176.11] - 2026-09-12
 
 ### Changed
