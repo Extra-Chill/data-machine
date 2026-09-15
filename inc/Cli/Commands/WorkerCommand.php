@@ -16,7 +16,9 @@ use DataMachine\Cli\WorkerLock;
 use DataMachine\Cli\WorkerProcessDeadline;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
+use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
 use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
@@ -652,6 +654,12 @@ class WorkerCommand extends BaseCommand {
 		$heartbeat_state = 'held' !== (string) ( $lock['lock_status'] ?? '' )
 			? 'absent'
 			: ( null !== $heartbeat_age && $heartbeat_age <= $threshold ? 'fresh' : 'stale' );
+		$ai_lease_utilization = PipelineAIConcurrencyLimiter::utilization();
+		$ai_resume_deferred   = AIConcurrencyBackpressure::deferredSnapshot();
+		$ai_provider_scopes   = array();
+		foreach ( is_array( $ai_lease_utilization['providers'] ?? null ) ? $ai_lease_utilization['providers'] : array() as $ai_provider => $ai_scope ) {
+			$ai_provider_scopes[] = $ai_provider . ':' . (int) ( $ai_scope['held'] ?? 0 ) . '/' . (int) ( $ai_scope['limit'] ?? 0 );
+		}
 		$dispatch_evidence = array(
 			'scope'                                  => '' === $lane ? 'global' : 'lane',
 			'due_count'                              => (int) ( $drain_status['due_pending'] ?? 0 ),
@@ -682,7 +690,15 @@ class WorkerCommand extends BaseCommand {
 			'lane'                  => $lane,
 			'health'                => $health,
 			'dispatch_evidence'     => $dispatch_evidence,
-		) + self::publicLockStatus( $lock );
+		) + self::publicLockStatus( $lock ) + array(
+			'ai_lease_site_slots_held'    => (int) ( $ai_lease_utilization['site']['held'] ?? 0 ),
+			'ai_lease_site_limit'         => (int) ( $ai_lease_utilization['site']['limit'] ?? 0 ),
+			'ai_lease_provider_scopes'    => implode( '|', $ai_provider_scopes ),
+			'ai_resume_pending_actions'   => (int) ( $ai_resume_deferred['pending'] ?? 0 ),
+			'ai_resume_sampled_actions'   => (int) ( $ai_resume_deferred['sampled'] ?? 0 ),
+			'ai_resume_generation_median' => $ai_resume_deferred['generation_median'],
+			'ai_resume_generation_max'    => $ai_resume_deferred['generation_max'],
+		);
 	}
 
 	/**

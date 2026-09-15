@@ -58,10 +58,13 @@ class AIStep extends Step {
 
 	/**
 	 * Ceiling (seconds) for the exponential backoff applied between AI
-	 * concurrency defers. Keeps a long-saturated queue from hammering the
-	 * limiter on the base throttle delay for the full attempt budget.
+	 * concurrency defers. A lease release wakes the earliest deferred step
+	 * immediately (#3499), so this cap only bounds recovery when a wake-up
+	 * is missed.
+	 *
+	 * Filterable via `datamachine_ai_concurrency_max_defer_delay`.
 	 */
-	private const AI_CONCURRENCY_MAX_DEFER_DELAY = 600;
+	private const AI_CONCURRENCY_MAX_DEFER_DELAY = 120;
 
 	/**
 	 * Initialize AI step.
@@ -648,6 +651,10 @@ class AIStep extends Step {
 		} finally {
 			if ( $ai_concurrency_lease instanceof PipelineAIConcurrencyLease ) {
 				$ai_concurrency_lease->release();
+				// A slot just freed: pull the earliest backoff-waiting
+				// continuation forward so idle slots stop starving deferred
+				// jobs (#3499). Best-effort; never breaks the release.
+				AIConcurrencyBackpressure::wakeEarliestDeferred();
 			}
 		}
 	}
@@ -717,15 +724,24 @@ class AIStep extends Step {
 			return;
 		}
 
-		// Exponential backoff between defers, capped, so a long-saturated queue
-		// backs off instead of polling the limiter on the base delay forever.
-		$base_delay    = max( 1, (int) ( $lease_result['delay'] ?? 10 ) );
-		$delay_seconds = AIConcurrencyBackpressure::delaySeconds(
+		// Exponential backoff between defers, capped so a missed wake-up still
+		// recovers on its own instead of waiting out a stale schedule.
+		$base_delay      = max( 1, (int) ( $lease_result['delay'] ?? 10 ) );
+		$max_defer_delay = max(
+			1,
+			(int) apply_filters(
+				'datamachine_ai_concurrency_max_defer_delay',
+				self::AI_CONCURRENCY_MAX_DEFER_DELAY,
+				$provider_name,
+				$this->job_id
+			)
+		);
+		$delay_seconds   = AIConcurrencyBackpressure::delaySeconds(
 			$base_delay,
 			$prior_attempts,
-			self::AI_CONCURRENCY_MAX_DEFER_DELAY
+			$max_defer_delay
 		);
-		$timestamp     = $now + $delay_seconds;
+		$timestamp       = $now + $delay_seconds;
 		$action_args   = array(
 			'job_id'                => $this->job_id,
 			'flow_step_id'          => $this->flow_step_id,
