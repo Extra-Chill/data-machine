@@ -31,7 +31,7 @@ class ReadInstagramMessages extends AbstractSocialTool {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',
-			'description' => 'Read Instagram direct messages. List DM conversations or read the messages in one conversation. Requires Instagram OAuth with a Page access token.',
+			'description' => 'Read Instagram direct messages. List DM conversations or read the messages in one conversation. Requires Instagram OAuth with a Page access token. Note: Meta does not expose message requests from non-followers, so an absent thread is not proof the DM does not exist.',
 			'parameters'  => array(
 				'type'       => 'object',
 				'properties' => array(
@@ -115,15 +115,20 @@ class ReadInstagramMessages extends AbstractSocialTool {
 			return array(
 				'success'   => true,
 				'data'      => null,
-				'message'   => 'No Instagram conversations found.',
+				'message'   => 'No Instagram conversations found. Note: Meta does not expose message requests from non-followers, so an absent thread is not proof the DM does not exist.',
 				'tool_name' => $tool_name,
 			);
+		}
+
+		$message = sprintf( 'Found %d Instagram conversations.', $data['count'] ?? count( $conversations ) );
+		if ( ! empty( $data['degraded'] ) && ! empty( $data['note'] ) ) {
+			$message .= ' ' . $data['note'];
 		}
 
 		return array(
 			'success'   => true,
 			'data'      => $data,
-			'message'   => sprintf( 'Found %d Instagram conversations.', $data['count'] ?? count( $conversations ) ),
+			'message'   => $message,
 			'tool_name' => $tool_name,
 			'guidance'  => array(
 				'has_next'  => $data['has_next'] ?? false,

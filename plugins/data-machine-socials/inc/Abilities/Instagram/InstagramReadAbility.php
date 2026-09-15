@@ -60,6 +60,22 @@ class InstagramReadAbility extends AbstractSocialAbility {
 	 */
 	const MESSAGE_FIELDS = 'messages{id,created_time,from,to,message,attachments,is_unsupported}';
 
+	/**
+	 * Timeout for Instagram messaging reads (seconds).
+	 *
+	 * Meta messaging pages on some Pages routinely take 30-90s to respond;
+	 * use the full HttpClient ceiling so slow pages can complete.
+	 */
+	const MESSAGING_TIMEOUT = 120;
+
+	/**
+	 * Maximum HttpClient attempts for a single messaging Graph GET.
+	 *
+	 * Meta messaging reads intermittently return HTTP 500 code 1 "An unknown
+	 * error occurred" or time out, then succeed seconds later on retry.
+	 */
+	const MESSAGING_MAX_ATTEMPTS = 3;
+
 	public function __construct() {
 		$this->registerAbility( $this->registerCallback(), true );
 	}
@@ -80,7 +96,7 @@ class InstagramReadAbility extends AbstractSocialAbility {
 								'type'        => 'string',
 								'enum'        => array( 'list', 'get', 'comments', 'comments_all', 'conversations', 'messages' ),
 								'default'     => 'list',
-								'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized), conversations (DM threads), messages (messages in one DM thread)', 'data-machine-socials' ),
+								'description' => __( 'Action: list (recent posts), get (single post), comments (one page), comments_all (all pages, normalized), conversations (DM threads), messages (messages in one DM thread). Note: Meta does not expose Instagram message requests from non-followers, so an absent thread is not proof the DM does not exist.', 'data-machine-socials' ),
 							),
 							'media_id'        => array(
 								'type'        => 'string',
@@ -456,6 +472,11 @@ class InstagramReadAbility extends AbstractSocialAbility {
 	 * Uses the Facebook Graph Messaging API, which requires the Page access
 	 * token and page_id stored on the account.
 	 *
+	 * Meta constraint: on some Pages the Conversations API rejects any
+	 * limit > 1 with HTTP 500 code 1 ("Please reduce the amount of data
+	 * you're asking for"). When that refusal is detected, this read degrades
+	 * to a limit=1 cursor walk and marks the result with 'degraded' => true.
+	 *
 	 * @param InstagramAuth $auth  Auth provider.
 	 * @param array         $input Input parameters.
 	 * @return array Result with normalized conversations.
@@ -483,9 +504,13 @@ class InstagramReadAbility extends AbstractSocialAbility {
 		}
 
 		$url    = self::GRAPH_API_URL . '/' . rawurlencode( $page['id'] ) . '/conversations?' . http_build_query( $params );
-		$result = HttpClient::get( $url, array( 'context' => 'Instagram Messages' ) );
+		$result = $this->graphGetWithRetry( $url );
 
 		if ( ! $result['success'] ) {
+			if ( $this->isDataVolumeRefusal( $result ) ) {
+				return $this->walkConversationsOneAtATime( $auth, $page, $limit, $input );
+			}
+
 			return new \WP_Error( 'api_error', 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
 		}
 
@@ -517,10 +542,137 @@ class InstagramReadAbility extends AbstractSocialAbility {
 	}
 
 	/**
+	 * Collect conversations one at a time when Meta refuses larger page sizes.
+	 *
+	 * Walks the conversations edge with limit=1, following cursors, until the
+	 * requested limit is collected, the pages run out, or a hard cap on page
+	 * requests is hit. Preserves the caller envelope: 'conversations' up to N,
+	 * 'count', 'cursors' (the last page's cursors), 'has_next'. Adds
+	 * 'degraded' => true plus a 'note' explaining the degraded mode.
+	 *
+	 * @param InstagramAuth $auth  Auth provider.
+	 * @param array         $page  Page context (id, access_token).
+	 * @param int           $limit Requested conversation count.
+	 * @param array         $input Original ability input (user_id, after).
+	 * @return array Result with normalized conversations.
+	 */
+	private function walkConversationsOneAtATime( InstagramAuth $auth, array $page, int $limit, array $input ): array|\WP_Error {
+		$ig_user_id   = (string) ( $auth->get_user_id() ?? '' );
+		$items        = array();
+		$after        = ! empty( $input['after'] ) ? sanitize_text_field( (string) $input['after'] ) : '';
+		$cursors      = null;
+		$has_next     = false;
+		$max_pages    = $limit + 5;
+		$pages        = 0;
+
+		while ( count( $items ) < $limit && $pages < $max_pages ) {
+			++$pages;
+
+			$params = array(
+				'platform'     => 'instagram',
+				'fields'       => self::CONVERSATION_FIELDS,
+				'limit'        => 1,
+				'access_token' => $page['access_token'],
+			);
+
+			if ( ! empty( $input['user_id'] ) ) {
+				$params['user_id'] = sanitize_text_field( (string) $input['user_id'] );
+			}
+
+			if ( '' !== $after ) {
+				$params['after'] = $after;
+			}
+
+			$url    = self::GRAPH_API_URL . '/' . rawurlencode( $page['id'] ) . '/conversations?' . http_build_query( $params );
+			$result = $this->graphGetWithRetry( $url );
+
+			if ( ! $this->isSuccessfulConversationPage( $result, $items ) ) {
+				if ( empty( $items ) ) {
+					return new \WP_Error( 'api_error', 'Instagram API request failed: ' . $this->extractGraphErrorMessage( $result ), array( 'status' => 500 ) );
+				}
+
+				return $this->degradedConversationsResult( $items, $cursors, $has_next, $this->extractGraphErrorMessage( $result ) );
+			}
+
+			$data = json_decode( (string) $result['data'], true );
+
+			foreach ( $data['data'] ?? array() as $conversation ) {
+				$items[] = self::normalizeConversation( $conversation, $ig_user_id );
+			}
+
+			$paging   = $data['paging'] ?? array();
+			$cursors  = $paging['cursors'] ?? null;
+			$after    = (string) ( $paging['cursors']['after'] ?? '' );
+			$has_next = ! empty( $paging['next'] ) && '' !== $after;
+
+			if ( ! $has_next ) {
+				break;
+			}
+		}
+
+		return $this->degradedConversationsResult( $items, $cursors, $has_next, '' );
+	}
+
+	/**
+	 * Whether a walked conversations page succeeded, or is a partial-walk
+	 * interruption (some conversations already collected).
+	 *
+	 * @param array $result          HttpClient result.
+	 * @param array $collected_so_far Conversations collected before this page.
+	 * @return bool True when the page can be parsed normally.
+	 */
+	private function isSuccessfulConversationPage( array $result, array $collected_so_far ): bool {
+		if ( ! empty( $result['success'] ) ) {
+			$data = json_decode( (string) ( $result['data'] ?? '' ), true );
+			return 200 === (int) ( $result['status_code'] ?? 0 ) && ! isset( $data['error'] );
+		}
+
+		// Mid-walk failure: keep what we already collected rather than failing whole.
+		return empty( $collected_so_far );
+	}
+
+	/**
+	 * Build the degraded-mode conversations result envelope.
+	 *
+	 * @param array       $items    Collected conversations.
+	 * @param array|null  $cursors  Last page's cursors.
+	 * @param bool        $has_next Whether more pages exist.
+	 * @param string      $error    Empty when the walk completed; otherwise why it was interrupted.
+	 * @return array Result.
+	 */
+	private function degradedConversationsResult( array $items, ?array $cursors, bool $has_next, string $error ): array {
+		$note = __( "Meta's Conversations API capped this Page's reads to one conversation per request; results were collected with a limit=1 cursor walk.", 'data-machine-socials' );
+
+		if ( '' !== $error ) {
+			$note .= ' ' . sprintf(
+				/* translators: %s: underlying API error. */
+				__( 'The walk was interrupted partway: %s', 'data-machine-socials' ),
+				$error
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'conversations' => $items,
+				'count'         => count( $items ),
+				'cursors'       => $cursors,
+				'has_next'      => $has_next,
+				'degraded'      => true,
+				'note'          => $note,
+			),
+		);
+	}
+
+	/**
 	 * Get the messages in a single direct-message conversation.
 	 *
 	 * Meta constraint: only the 20 most recent messages in a conversation
 	 * have detail; older message IDs error as deleted on Instagram.
+	 *
+	 * Meta constraint: message requests from non-followers are not exposed
+	 * through the Conversations API, so an absent thread is not proof the
+	 * DM does not exist.
 	 *
 	 * @param InstagramAuth $auth            Auth provider.
 	 * @param string        $conversation_id Instagram conversation ID.
@@ -538,7 +690,7 @@ class InstagramReadAbility extends AbstractSocialAbility {
 		);
 
 		$url    = self::GRAPH_API_URL . '/' . rawurlencode( $conversation_id ) . '?' . http_build_query( $params );
-		$result = HttpClient::get( $url, array( 'context' => 'Instagram Messages' ) );
+		$result = $this->graphGetWithRetry( $url );
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error( 'api_error', 'Instagram API request failed: ' . ( $result['error'] ?? 'unknown' ), array( 'status' => 500 ) );
@@ -568,6 +720,109 @@ class InstagramReadAbility extends AbstractSocialAbility {
 		);
 	}
 
+
+	/**
+	 * Perform a messaging Graph GET with bounded retry for transient failures.
+	 *
+	 * Retries up to MESSAGING_MAX_ATTEMPTS with short backoff (1s, 2s) when
+	 * the transport errors or times out, or when Meta returns code 1
+	 * "An unknown error occurred" or code 2. Auth/permission and other 4xx
+	 * failures are returned immediately without retry.
+	 *
+	 * @param string $url Request URL.
+	 * @return array HttpClient result.
+	 */
+	private function graphGetWithRetry( string $url ): array {
+		$result = array( 'success' => false, 'error' => 'not attempted' );
+
+		for ( $attempt = 1; $attempt <= self::MESSAGING_MAX_ATTEMPTS; ++$attempt ) {
+			$result = HttpClient::get(
+				$url,
+				array(
+					'context' => 'Instagram Messages',
+					'timeout' => self::MESSAGING_TIMEOUT,
+				)
+			);
+
+			if ( ! empty( $result['success'] ) || ! $this->isTransientMessagingFailure( $result ) ) {
+				return $result;
+			}
+
+			if ( $attempt < self::MESSAGING_MAX_ATTEMPTS ) {
+				sleep( $attempt );
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Whether a failed messaging GET is worth retrying.
+	 *
+	 * Transport failures (no HTTP response at all) and Meta code 2, plus the
+	 * transient variant of Meta code 1 ("An unknown error occurred"), are
+	 * retried. The data-volume variant of code 1 and all auth/permission
+	 * errors are not.
+	 *
+	 * @param array $result HttpClient result.
+	 * @return bool
+	 */
+	private function isTransientMessagingFailure( array $result ): bool {
+		// Transport failure (timeout/connection): no HTTP status was received.
+		if ( ! isset( $result['status_code'] ) ) {
+			return true;
+		}
+
+		if ( 500 !== (int) $result['status_code'] ) {
+			return false;
+		}
+
+		$body = json_decode( (string) ( $result['data'] ?? '' ), true );
+		$code = $body['error']['code'] ?? null;
+
+		if ( 2 === $code ) {
+			return true;
+		}
+
+		if ( 1 === $code ) {
+			return str_contains( (string) ( $body['error']['message'] ?? '' ), 'unknown error' );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Whether a failed conversations GET is Meta's limit refusal
+	 * (HTTP 500, error code 1) that warrants the limit=1 cursor walk.
+	 *
+	 * @param array $result HttpClient result.
+	 * @return bool
+	 */
+	private function isDataVolumeRefusal( array $result ): bool {
+		if ( ! empty( $result['success'] ) || ! isset( $result['status_code'] ) || 500 !== (int) $result['status_code'] ) {
+			return false;
+		}
+
+		$body = json_decode( (string) ( $result['data'] ?? '' ), true );
+
+		return 1 === ( $body['error']['code'] ?? null );
+	}
+
+	/**
+	 * Best-effort human-readable Graph error message from an HttpClient result.
+	 *
+	 * @param array $result HttpClient result.
+	 * @return string
+	 */
+	private function extractGraphErrorMessage( array $result ): string {
+		$body = json_decode( (string) ( $result['data'] ?? '' ), true );
+
+		if ( isset( $body['error']['message'] ) && is_string( $body['error']['message'] ) && '' !== $body['error']['message'] ) {
+			return $body['error']['message'];
+		}
+
+		return (string) ( $result['error'] ?? 'unknown error' );
+	}
 
 	/**
 	 * Normalize an Instagram conversation into the generic conversation shape.

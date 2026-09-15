@@ -73,7 +73,7 @@ class SocialMessagesAbility extends AbstractSocialAbility {
 							'limit'           => array(
 								'type'        => 'integer',
 								'default'     => 25,
-								'description' => __( 'Maximum conversations to return.', 'data-machine-socials' ),
+								'description' => __( 'Maximum conversations to return. Instagram may degrade to a limit=1 cursor walk when Meta caps the page size; degraded results are flagged with degraded=true and a note.', 'data-machine-socials' ),
 							),
 							'user_id'         => array(
 								'type'        => 'string',
@@ -178,6 +178,11 @@ class SocialMessagesAbility extends AbstractSocialAbility {
 
 		$base['count']       = count( $base['conversations'] );
 		$base['next_cursor'] = $result['data']['cursors']['after'] ?? null;
+
+		if ( ! empty( $result['data']['degraded'] ) ) {
+			$base['degraded'] = true;
+			$base['note']     = (string) ( $result['data']['note'] ?? '' );
+		}
 
 		return array(
 			'success' => true,

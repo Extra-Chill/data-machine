@@ -56,6 +56,12 @@ class MessagesCommand {
 	/**
 	 * List direct-message conversations.
 	 *
+	 * Instagram note: Meta's Conversations API does not expose message
+	 * requests from non-followers, so an absent thread is not proof the DM
+	 * does not exist. Some Pages also cap reads to one conversation per
+	 * request; when that happens results are collected with a limit=1
+	 * cursor walk and a degraded-mode warning is printed.
+	 *
 	 * ## OPTIONS
 	 *
 	 * <platform>
@@ -110,6 +116,10 @@ class MessagesCommand {
 			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
 		}
 
+		if ( ! empty( $result['data']['degraded'] ) ) {
+			WP_CLI::warning( (string) ( $result['data']['note'] ?? 'Conversations were collected in degraded mode (limit=1 cursor walk).' ) );
+		}
+
 		$conversations = $result['data']['conversations'] ?? array();
 		$count         = count( $conversations );
 
@@ -162,6 +172,9 @@ class MessagesCommand {
 	 *
 	 * Only the 20 most recent messages in an Instagram conversation have
 	 * detail; older message IDs error as deleted on Instagram.
+	 *
+	 * Instagram note: Meta does not expose message requests from
+	 * non-followers, so an absent thread is not proof the DM does not exist.
 	 *
 	 * ## OPTIONS
 	 *
