@@ -332,7 +332,7 @@ class AIConcurrencyBackpressure {
 				),
 				'OBJECT'
 			);
-			$action  = is_array( $actions ) ? reset( $actions ) : false;
+			$action  = reset( $actions );
 			if ( ! is_object( $action ) || ! method_exists( $action, 'get_id' ) || ! method_exists( $action, 'get_args' ) ) {
 				$result['reason'] = 'no_deferred_waiter';
 				return $result;
@@ -368,7 +368,7 @@ class AIConcurrencyBackpressure {
 				return $result;
 			}
 
-			\ActionScheduler_Store::instance()->cancel_action( $previous_action_id );
+			\ActionScheduler_Store::instance()->cancel_action( (string) $previous_action_id );
 			self::repointScheduledAction( $job_id, $flow_step_id, $generation, $previous_action_id, $next_action_id );
 
 			$result['woke']      = true;
@@ -435,7 +435,7 @@ class AIConcurrencyBackpressure {
 			);
 
 			$generations = array();
-			foreach ( is_array( $actions ) ? $actions : array() as $action ) {
+			foreach ( $actions as $action ) {
 				$args = is_object( $action ) && method_exists( $action, 'get_args' ) ? (array) $action->get_args() : array();
 				if ( (int) ( $args['ai_resume_generation'] ?? 0 ) > 0 ) {
 					$generations[] = (int) $args['ai_resume_generation'];
@@ -475,7 +475,7 @@ class AIConcurrencyBackpressure {
 			return false;
 		}
 
-		if ( ! class_exists( '\ActionScheduler_Store' ) || ! method_exists( '\ActionScheduler_Store', 'instance' ) ) {
+		if ( ! class_exists( '\ActionScheduler_Store' ) ) {
 			return false;
 		}
 
