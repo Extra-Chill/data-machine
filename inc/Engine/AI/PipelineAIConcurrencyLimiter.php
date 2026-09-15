@@ -70,21 +70,10 @@ class PipelineAIConcurrencyLimiter {
 	 * @return array<int,array{name:string,limit:int}>
 	 */
 	private static function resolveScopes( string $provider, array $context ): array {
-		$site_limit = max( 1, (int) PluginSettings::resolve( 'pipeline_ai_concurrency_limit', PluginSettings::DEFAULT_PIPELINE_AI_CONCURRENCY_LIMIT ) );
-
-		/**
-		 * Filter site-wide pipeline AI concurrency.
-		 *
-		 * @param int    $site_limit Site-wide limit.
-		 * @param string $provider   Provider slug.
-		 * @param array  $context    Execution context.
-		 */
-		$site_limit = max( 1, (int) apply_filters( 'datamachine_pipeline_ai_concurrency_limit', $site_limit, $provider, $context ) );
-
 		$scopes = array(
 			array(
 				'name'  => 'site',
-				'limit' => $site_limit,
+				'limit' => self::siteLimit( $provider, $context ),
 			),
 		);
 
@@ -108,6 +97,94 @@ class PipelineAIConcurrencyLimiter {
 		}
 
 		return $scopes;
+	}
+
+	/**
+	 * Resolve the site-wide pipeline AI concurrency limit.
+	 *
+	 * @param string $provider Provider slug.
+	 * @param array  $context  Execution context.
+	 */
+	private static function siteLimit( string $provider, array $context ): int {
+		$site_limit = max( 1, (int) PluginSettings::resolve( 'pipeline_ai_concurrency_limit', PluginSettings::DEFAULT_PIPELINE_AI_CONCURRENCY_LIMIT ) );
+
+		/**
+		 * Filter site-wide pipeline AI concurrency.
+		 *
+		 * @param int    $site_limit Site-wide limit.
+		 * @param string $provider   Provider slug.
+		 * @param array  $context    Execution context.
+		 */
+		return max( 1, (int) apply_filters( 'datamachine_pipeline_ai_concurrency_limit', $site_limit, $provider, $context ) );
+	}
+
+	/**
+	 * Report lease utilization across the configured concurrency scopes.
+	 *
+	 * Read-only operator telemetry for `wp datamachine worker status`. Held
+	 * counts include expired leases not yet reclaimed by an acquire attempt —
+	 * they still occupy their slot row until takeover.
+	 *
+	 * @param array $context Execution context.
+	 * @return array{site:array{limit:int,held:int},providers:array<string,array{limit:int,held:int}>}
+	 */
+	public static function utilization( array $context = array() ): array {
+		$now        = time();
+		$site_limit = self::siteLimit( '', $context );
+
+		$provider_limits = PluginSettings::resolve( 'pipeline_ai_provider_concurrency_limits', array() );
+		$providers       = array();
+		foreach ( is_array( $provider_limits ) ? $provider_limits : array() as $provider => $configured_limit ) {
+			$provider         = sanitize_key( (string) $provider );
+			$configured_limit = (int) $configured_limit;
+			if ( '' === $provider || $configured_limit <= 0 ) {
+				continue;
+			}
+
+			/**
+			 * Filter provider-specific pipeline AI concurrency. Return 0 to disable.
+			 *
+			 * @param int    $provider_limit Provider limit, or 0 when disabled.
+			 * @param string $provider       Provider slug.
+			 * @param array  $context        Execution context.
+			 */
+			$limit = max( 1, (int) apply_filters( 'datamachine_pipeline_ai_provider_concurrency_limit', $configured_limit, $provider, $context ) );
+
+			$providers[ $provider ] = array(
+				'limit' => $limit,
+				'held'  => self::heldSlots( 'provider_' . $provider, $limit, $now ),
+			);
+		}
+
+		return array(
+			'site'      => array(
+				'limit' => $site_limit,
+				'held'  => self::heldSlots( 'site', $site_limit, $now ),
+			),
+			'providers' => $providers,
+		);
+	}
+
+	/**
+	 * Count occupied slot rows in one scope.
+	 *
+	 * @param string $scope Lease scope.
+	 * @param int    $limit Maximum slots in scope.
+	 * @param int    $now   Current timestamp (unused; rows count regardless of expiry).
+	 */
+	private static function heldSlots( string $scope, int $limit, int $now ): int {
+		unset( $now );
+
+		$held  = 0;
+		$limit = max( 1, $limit );
+		for ( $slot = 1; $slot <= $limit; ++$slot ) {
+			$payload = get_option( OptionLeaseStore::slotOptionName( self::OPTION_PREFIX, $scope, $slot ), array() );
+			if ( is_array( $payload ) && ! empty( $payload ) ) {
+				++$held;
+			}
+		}
+
+		return $held;
 	}
 
 	/**
