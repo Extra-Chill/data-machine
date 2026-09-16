@@ -73,7 +73,7 @@ namespace {
 		$GLOBALS['wake_canceled'] = array();
 	}
 
-	function wake_add_action( int $action_id, array $args, int $scheduled_at, string $status = 'pending', string $hook = 'datamachine_resume_ai_step', string $group = '' ): void {
+	function wake_add_action( int $action_id, array $args, int $scheduled_at, string $status = 'pending', string $hook = \DataMachine\Engine\AI\AIConcurrencyBackpressure::RESUME_HOOK, string $group = '' ): void {
 		$GLOBALS['wake_actions'][] = array(
 			'action_id' => $action_id,
 			'hook'      => $hook,

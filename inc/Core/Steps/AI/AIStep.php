@@ -727,20 +727,8 @@ class AIStep extends Step {
 		// Exponential backoff between defers, capped so a missed wake-up still
 		// recovers on its own instead of waiting out a stale schedule.
 		$base_delay      = max( 1, (int) ( $lease_result['delay'] ?? 10 ) );
-		$max_defer_delay = max(
-			1,
-			(int) apply_filters(
-				'datamachine_ai_concurrency_max_defer_delay',
-				self::AI_CONCURRENCY_MAX_DEFER_DELAY,
-				$provider_name,
-				$this->job_id
-			)
-		);
-		$delay_seconds   = AIConcurrencyBackpressure::delaySeconds(
-			$base_delay,
-			$prior_attempts,
-			$max_defer_delay
-		);
+		$max_defer_delay = max( 1, (int) apply_filters( 'datamachine_ai_concurrency_max_defer_delay', self::AI_CONCURRENCY_MAX_DEFER_DELAY, $provider_name, $this->job_id ) );
+		$delay_seconds   = AIConcurrencyBackpressure::delaySeconds( $base_delay, $prior_attempts, $max_defer_delay );
 		$timestamp       = $now + $delay_seconds;
 		$action_args     = array(
 			'job_id'                => $this->job_id,
