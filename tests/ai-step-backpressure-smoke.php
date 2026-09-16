@@ -191,6 +191,12 @@ if ( ! function_exists( 'did_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( mixed $thing ): bool {
+		return $thing instanceof \WP_Error;
+	}
+}
+
 if ( ! function_exists( 'sanitize_key' ) ) {
     function sanitize_key( string $key ): string {
     	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', $key ) ?? '' );
@@ -365,7 +371,10 @@ $stranded = AIConcurrencyBackpressure::nextState( $state, 'ai-1', $now + DAY_IN_
 assert_ai_backpressure_smoke( 'maximum contention age marks work stranded', 'stranded' === $stranded['state'] );
 assert_ai_backpressure_smoke( 'stranded work is cancelled instead of failed', str_contains( $reconciler_src, 'cancelled - ai_concurrency_stranded' ) && str_contains( $ai_src, 'cancelled - ai_concurrency_stranded' ) );
 assert_ai_backpressure_smoke( 'maximum contention age is filterable', str_contains( $ai_src, 'datamachine_ai_concurrency_max_defer_age' ) );
-assert_ai_backpressure_smoke( 'backoff remains capped', 600 === AIConcurrencyBackpressure::delaySeconds( 10, 30, 600 ) );
+assert_ai_backpressure_smoke( 'backoff remains capped', 120 === AIConcurrencyBackpressure::delaySeconds( 10, 30, 120 ) );
+assert_ai_backpressure_smoke( 'AI step backoff cap defaults to 120 seconds', str_contains( $ai_src, 'AI_CONCURRENCY_MAX_DEFER_DELAY = 120' ) );
+assert_ai_backpressure_smoke( 'AI step backoff cap is filterable', str_contains( $ai_src, 'datamachine_ai_concurrency_max_defer_delay' ) );
+assert_ai_backpressure_smoke( 'AI step wakes the earliest deferred step on lease release', strpos( $ai_src, '$ai_concurrency_lease->release();' ) < strpos( $ai_src, 'AIConcurrencyBackpressure::wakeEarliestDeferred();' ) );
 assert_ai_backpressure_smoke( 'only one matching future action is retained', str_contains( $backpressure_src, 'scheduleContinuation' ) );
 
 echo "Case 8: unique scheduling closes concurrent duplicate races\n";

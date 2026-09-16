@@ -256,6 +256,236 @@ class AIConcurrencyBackpressure {
 		return ! empty( $result['success'] );
 	}
 
+	/** Repoint the recorded Action Scheduler ID after a wake-up reschedule. */
+	public static function repointScheduledAction( int $job_id, string $flow_step_id, int $generation, int $previous_action_id, int $next_action_id ): bool {
+		if ( $previous_action_id <= 0 || $next_action_id <= 0 || $previous_action_id === $next_action_id ) {
+			return false;
+		}
+
+		$result = EngineData::mutate(
+			$job_id,
+			static function ( array $engine ) use ( $flow_step_id, $generation, $previous_action_id, $next_action_id ): ?array {
+				$state = is_array( $engine[ self::OWNERSHIP_KEY ] ?? null ) ? $engine[ self::OWNERSHIP_KEY ] : array();
+				if ( (string) ( $state['flow_step_id'] ?? '' ) !== $flow_step_id
+					|| (int) ( $state['generation'] ?? 0 ) !== $generation
+					|| (int) ( $state['action_id'] ?? 0 ) !== $previous_action_id
+					|| 'scheduled' !== (string) ( $state['status'] ?? '' )
+				) {
+					return null;
+				}
+
+				$state['action_id']            = $next_action_id;
+				$engine[ self::OWNERSHIP_KEY ] = $state;
+				return $engine;
+			},
+			'ai_resume_action_repointed'
+		);
+
+		return ! empty( $result['success'] );
+	}
+
+	/**
+	 * Pull the earliest future-scheduled deferred continuation forward to now.
+	 *
+	 * Called on the release side of an AI concurrency lease: a slot just freed
+	 * while waiters are still sleeping on exponential backoff. Best-effort —
+	 * every failure mode resolves to a report array, never an exception, so a
+	 * failed wake-up cannot break the releasing job.
+	 *
+	 * The wake replaces the waiter's pending action (schedule first, then
+	 * cancel the predecessor, then repoint ownership) instead of mutating the
+	 * existing action's scheduled date, because the Action Scheduler store has
+	 * no scheduled-date update API. Uniqueness stays consistent: the
+	 * replacement reuses the exact same args and continuation group, ownership
+	 * is fenced by the previous action ID, and even a transient two-live-actions
+	 * window is execution-fenced by beginGeneration().
+	 *
+	 * @return array{woke:bool,previous_action_id:int,action_id:int,job_id:int,flow_step_id:string,generation:int,reason:string}
+	 */
+	public static function wakeEarliestDeferred( int $now = 0 ): array {
+		$now    = $now > 0 ? $now : time();
+		$result = array(
+			'woke'               => false,
+			'previous_action_id' => 0,
+			'action_id'          => 0,
+			'job_id'             => 0,
+			'flow_step_id'       => '',
+			'generation'         => 0,
+			'reason'             => '',
+		);
+
+		if ( ! self::isSchedulerReady() ) {
+			$result['reason'] = 'scheduler_unavailable';
+			return $result;
+		}
+
+		try {
+			$actions = as_get_scheduled_actions(
+				array(
+					'hook'         => self::RESUME_HOOK,
+					'status'       => 'pending',
+					'date'         => new \DateTime( '@' . $now ),
+					'date_compare' => '>',
+					'orderby'      => 'date',
+					'order'        => 'ASC',
+					'per_page'     => 1,
+				),
+				'OBJECT'
+			);
+			$action  = reset( $actions );
+			if ( ! is_object( $action ) || ! method_exists( $action, 'get_id' ) || ! method_exists( $action, 'get_args' ) ) {
+				$result['reason'] = 'no_deferred_waiter';
+				return $result;
+			}
+
+			$args         = (array) $action->get_args();
+			$job_id       = max( 0, (int) ( $args['job_id'] ?? 0 ) );
+			$flow_step_id = (string) ( $args['flow_step_id'] ?? '' );
+			$generation   = max( 0, (int) ( $args['ai_resume_generation'] ?? 0 ) );
+			if ( $job_id <= 0 || '' === $flow_step_id || $generation <= 0 ) {
+				$result['reason'] = 'unrecognized_waiter_args';
+				return $result;
+			}
+
+			$previous_action_id           = (int) $action->get_id();
+			$result['previous_action_id'] = $previous_action_id;
+			$result['job_id']             = $job_id;
+			$result['flow_step_id']       = $flow_step_id;
+			$result['generation']         = $generation;
+
+			// Schedule the replacement first (unique=false: the still-pending
+			// predecessor would block a unique schedule), then cancel the
+			// predecessor so the waiter never loses its continuation.
+			$next_action_id = (int) as_schedule_single_action(
+				$now,
+				self::RESUME_HOOK,
+				$args,
+				self::continuationGroup( $args ),
+				false
+			);
+			if ( $next_action_id <= 0 ) {
+				$result['reason'] = 'reschedule_failed';
+				return $result;
+			}
+
+			\ActionScheduler_Store::instance()->cancel_action( (string) $previous_action_id );
+			self::repointScheduledAction( $job_id, $flow_step_id, $generation, $previous_action_id, $next_action_id );
+
+			$result['woke']      = true;
+			$result['action_id'] = $next_action_id;
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'AI concurrency lease release woke the earliest deferred AI step',
+				array(
+					'job_id'             => $job_id,
+					'flow_step_id'       => $flow_step_id,
+					'resume_generation'  => $generation,
+					'previous_action_id' => $previous_action_id,
+					'action_id'          => $next_action_id,
+				)
+			);
+
+			return $result;
+		} catch ( \Throwable $wake_error ) {
+			$result['reason'] = 'wake_failed: ' . $wake_error->getMessage();
+			return $result;
+		}
+	}
+
+	/**
+	 * Snapshot the deferred AI continuation queue for operator status.
+	 *
+	 * @param int $sample_limit Maximum actions sampled for generation stats.
+	 * @return array{available:bool,pending:int,sampled:int,sample_capped:bool,generation_median:?float,generation_max:?int}
+	 */
+	public static function deferredSnapshot( int $sample_limit = 500 ): array {
+		$empty = array(
+			'available'         => false,
+			'pending'           => 0,
+			'sampled'           => 0,
+			'sample_capped'     => false,
+			'generation_median' => null,
+			'generation_max'    => null,
+		);
+
+		if ( ! self::isSchedulerReady() ) {
+			return $empty;
+		}
+
+		try {
+			$query   = array(
+				'hook'   => self::RESUME_HOOK,
+				'status' => 'pending',
+			);
+			$pending = (int) \ActionScheduler_Store::instance()->query_actions( $query, 'count' );
+			if ( $pending <= 0 ) {
+				return array( 'available' => true ) + $empty;
+			}
+
+			$sample_limit = max( 1, $sample_limit );
+			$actions      = as_get_scheduled_actions(
+				$query + array(
+					'orderby'  => 'date',
+					'order'    => 'ASC',
+					'per_page' => $sample_limit,
+				),
+				'OBJECT'
+			);
+
+			$generations = array();
+			foreach ( $actions as $action ) {
+				$args = is_object( $action ) && method_exists( $action, 'get_args' ) ? (array) $action->get_args() : array();
+				if ( (int) ( $args['ai_resume_generation'] ?? 0 ) > 0 ) {
+					$generations[] = (int) $args['ai_resume_generation'];
+				}
+			}
+
+			$median = null;
+			$max    = null;
+			if ( ! empty( $generations ) ) {
+				sort( $generations );
+				$count  = count( $generations );
+				$middle = intdiv( $count, 2 );
+				$median = 1 === $count % 2 ? (float) $generations[ $middle ] : ( $generations[ $middle - 1 ] + $generations[ $middle ] ) / 2;
+				$max    = (int) end( $generations );
+			}
+
+			return array(
+				'available'         => true,
+				'pending'           => $pending,
+				'sampled'           => count( $generations ),
+				'sample_capped'     => $pending > $sample_limit,
+				'generation_median' => $median,
+				'generation_max'    => $max,
+			);
+		} catch ( \Throwable ) {
+			return $empty;
+		}
+	}
+
+	/** Check whether Action Scheduler can safely answer scheduled-action queries. */
+	private static function isSchedulerReady(): bool {
+		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return false;
+		}
+
+		if ( function_exists( 'did_action' ) && 0 === did_action( 'action_scheduler_init' ) ) {
+			return false;
+		}
+
+		if ( ! class_exists( '\ActionScheduler_Store' ) ) {
+			return false;
+		}
+
+		if ( class_exists( '\ActionScheduler' ) && ! \ActionScheduler::is_initialized() ) {
+			return false;
+		}
+
+		return true;
+	}
+
 	/** Release an exact generation that never acquired scheduler ownership. */
 	public static function releaseUnscheduledGeneration( int $job_id, string $flow_step_id, int $generation, string $token ): bool {
 		$result = EngineData::mutate(
