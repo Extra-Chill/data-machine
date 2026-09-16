@@ -479,7 +479,7 @@ class AIConcurrencyBackpressure {
 			return false;
 		}
 
-		if ( class_exists( '\ActionScheduler' ) && method_exists( '\ActionScheduler', 'is_initialized' ) && ! \ActionScheduler::is_initialized() ) {
+		if ( class_exists( '\ActionScheduler' ) && ! \ActionScheduler::is_initialized() ) {
 			return false;
 		}
 

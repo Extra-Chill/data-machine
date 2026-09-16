@@ -333,8 +333,8 @@ class AIStep extends Step {
 
 			$max_turns                   = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 			$transcript_consent_decision = PipelineTranscriptPolicy::decision( $this->engine );
-			$persist_transcript          = method_exists( $transcript_consent_decision, 'is_allowed' ) && (bool) call_user_func( array( $transcript_consent_decision, 'is_allowed' ) );
-			$transcript_consent_payload  = method_exists( $transcript_consent_decision, 'to_array' ) ? (array) call_user_func( array( $transcript_consent_decision, 'to_array' ) ) : array();
+			$persist_transcript          = $transcript_consent_decision->is_allowed();
+			$transcript_consent_payload  = $transcript_consent_decision->to_array();
 
 			$payload = array(
 				'job_id'                      => $this->job_id,
