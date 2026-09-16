@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.21.1] - 2026-09-16
+
+### Changed
+- satisfy release lint gate on Instagram messaging changes
+
+### Fixed
+- degrade Instagram conversations read to limit=1 cursor walk with retry
+- request pages_messaging and subscribe the app to the Page during Instagram OAuth
+
 ## [0.21.0] - 2026-09-12
 
 ### Added
