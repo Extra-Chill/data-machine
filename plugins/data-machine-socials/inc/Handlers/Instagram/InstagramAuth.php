@@ -504,7 +504,7 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				 * otherwise valid for publishing and comments.
 				 */
 				if ( '' !== $page_id && '' !== $page_access_token ) {
-					$subscription                        = $this->subscribe_app_to_page( $page_id, $page_access_token );
+					$subscription                         = $this->subscribe_app_to_page( $page_id, $page_access_token );
 					$long_lived['page_subscribed']        = $subscription['subscribed'];
 					$long_lived['page_subscribed_fields'] = $subscription['fields'];
 				}

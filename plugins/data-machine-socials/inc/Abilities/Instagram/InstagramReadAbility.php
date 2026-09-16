@@ -557,15 +557,16 @@ class InstagramReadAbility extends AbstractSocialAbility {
 	 * @return array Result with normalized conversations.
 	 */
 	private function walkConversationsOneAtATime( InstagramAuth $auth, array $page, int $limit, array $input ): array|\WP_Error {
-		$ig_user_id   = (string) ( $auth->get_user_id() ?? '' );
-		$items        = array();
-		$after        = ! empty( $input['after'] ) ? sanitize_text_field( (string) $input['after'] ) : '';
-		$cursors      = null;
-		$has_next     = false;
-		$max_pages    = $limit + 5;
-		$pages        = 0;
+		$ig_user_id = (string) ( $auth->get_user_id() ?? '' );
+		$items      = array();
+		$after      = ! empty( $input['after'] ) ? sanitize_text_field( (string) $input['after'] ) : '';
+		$cursors    = null;
+		$has_next   = false;
+		$max_pages  = $limit + 5;
+		$pages      = 0;
+		$collected  = 0;
 
-		while ( count( $items ) < $limit && $pages < $max_pages ) {
+		while ( $collected < $limit && $pages < $max_pages ) {
 			++$pages;
 
 			$params = array(
@@ -598,6 +599,7 @@ class InstagramReadAbility extends AbstractSocialAbility {
 
 			foreach ( $data['data'] ?? array() as $conversation ) {
 				$items[] = self::normalizeConversation( $conversation, $ig_user_id );
+				++$collected;
 			}
 
 			$paging   = $data['paging'] ?? array();
@@ -733,7 +735,10 @@ class InstagramReadAbility extends AbstractSocialAbility {
 	 * @return array HttpClient result.
 	 */
 	private function graphGetWithRetry( string $url ): array {
-		$result = array( 'success' => false, 'error' => 'not attempted' );
+		$result = array(
+			'success' => false,
+			'error'   => 'not attempted',
+		);
 
 		for ( $attempt = 1; $attempt <= self::MESSAGING_MAX_ATTEMPTS; ++$attempt ) {
 			$result = HttpClient::get(
