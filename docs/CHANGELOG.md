@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.13] - 2026-09-16
+
+### Fixed
+- wake deferred AI step on lease release, cap backoff at 120s, expose lease utilization
+
 ## [0.176.12] - 2026-09-13
 
 ### Changed
