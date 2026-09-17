@@ -204,7 +204,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 			return null;
 		}
 
-		$token                       = 'mem-lock-' . ++$this->lock_counter;
+		$token                      = 'mem-lock-' . ( ++$this->lock_counter );
 		$this->locks[ $session_id ] = array(
 			'token'      => $token,
 			'expires_at' => $now + max( 1, $ttl_seconds ),
@@ -472,10 +472,24 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 	}
 
 	public function list_sessions_for_day( string $date ): array {
+		return $this->list_sessions_for_day_scoped( $date, array() );
+	}
+
+	public function list_sessions_for_day_scoped( string $date, array $scope ): array {
 		$result = array();
+
+		$scope_user  = isset( $scope['user_id'] ) ? (int) $scope['user_id'] : null;
+		$scope_agent = isset( $scope['agent_id'] ) ? (int) $scope['agent_id'] : null;
 
 		foreach ( $this->sessions as $session ) {
 			if ( substr( (string) $session['created_at'], 0, 10 ) !== $date ) {
+				continue;
+			}
+			if ( null !== $scope_user && (int) ( $session['user_id'] ?? 0 ) !== $scope_user ) {
+				continue;
+			}
+			$session_agent = isset( $session['agent_id'] ) ? (int) $session['agent_id'] : 0;
+			if ( null !== $scope_agent && $session_agent !== $scope_agent ) {
 				continue;
 			}
 			$result[] = array(

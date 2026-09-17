@@ -4,6 +4,10 @@
  *
  * Run with: php tests/agent-daily-memory-pipeline-scope-smoke.php
  *
+ * This smoke substitutes the WordPress abilities registry with an in-memory
+ * spy, so it asserts nothing under real WordPress.
+ * homeboy:host-smoke-backend = standalone
+ *
  * @package DataMachine\Tests
  */
 
@@ -58,6 +62,7 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_get_ability' ) ) {
 	function wp_get_ability( string $name ) {
 		return new class( $name ) {
 			private string $name;
@@ -73,6 +78,7 @@ namespace {
 				return array( 'success' => true );
 			}
 		};
+	}
 	}
 
 	if ( ! function_exists( 'is_wp_error' ) ) {

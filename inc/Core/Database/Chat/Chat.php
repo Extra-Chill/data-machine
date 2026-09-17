@@ -2456,6 +2456,24 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * @return array<int, array{session_id: string, title: string|null, mode: string, created_at: string}>
 	 */
 	public function list_sessions_for_day( string $date ): array {
+		return $this->list_sessions_for_day_scoped( $date, array() );
+	}
+
+	/**
+	 * List lightweight session summaries for a single calendar day, narrowed
+	 * by an explicit authorization scope.
+	 *
+	 * The scope is applied as storage-query predicates (#3487): an absent
+	 * key narrows nothing, so every breadth — one principal, one
+	 * dimension's authorized aggregate, or the whole site day — is an
+	 * explicit choice by the caller. The day window uses a range predicate
+	 * pair over created_at so the query remains index-friendly.
+	 *
+	 * @param string $date  Date string in `Y-m-d` format.
+	 * @param array  $scope Authorization scope (`user_id`, `agent_id`).
+	 * @return array<int, array{session_id: string, title: string|null, mode: string, created_at: string}>
+	 */
+	public function list_sessions_for_day_scoped( string $date, array $scope ): array {
 		global $wpdb;
 
 		if ( ! self::table_exists() ) {
@@ -2464,18 +2482,37 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 
 		$table_name = self::get_prefixed_table_name();
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$where        = array(
+			'created_at >= %s',
+			'created_at < %s',
+		);
+		$where_values = array(
+			$date . ' 00:00:00',
+			gmdate( 'Y-m-d H:i:s', strtotime( $date . ' +1 day' ) ),
+		);
+
+		if ( isset( $scope['user_id'] ) ) {
+			$where[]        = 'user_id = %d';
+			$where_values[] = absint( $scope['user_id'] );
+		}
+
+		if ( isset( $scope['agent_id'] ) ) {
+			$where[]        = 'agent_id = %d';
+			$where_values[] = absint( $scope['agent_id'] );
+		}
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Fixed predicate fragments; every value is passed through prepare().
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT session_id, title, mode, created_at
 				 FROM %i
-				 WHERE DATE(created_at) = %s
+				 WHERE ' . implode( ' AND ', $where ) . '
 				 ORDER BY created_at ASC',
-				$table_name,
-				$date
+				array_merge( array( $table_name ), $where_values )
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
 		if ( ! $rows ) {
 			return array();

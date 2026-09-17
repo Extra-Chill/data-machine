@@ -4,6 +4,10 @@
  *
  * Run with: php tests/ai-concurrency-release-wakeup-smoke.php
  *
+ * This smoke replaces the WordPress options and hook APIs with in-memory
+ * doubles, so it asserts nothing under real WordPress.
+ * homeboy:host-smoke-backend = standalone
+ *
  * @package DataMachine\Tests
  */
 
@@ -64,8 +68,10 @@ namespace {
 		++$failed;
 	}
 
-	function wp_json_encode( mixed $value ): string|false {
-		return json_encode( $value );
+	if ( ! function_exists( 'wp_json_encode' ) ) {
+		function wp_json_encode( mixed $value ): string|false {
+			return json_encode( $value );
+		}
 	}
 
 	function wake_reset_actions(): void {

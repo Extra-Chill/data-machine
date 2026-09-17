@@ -951,6 +951,60 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * List lightweight job rows created on a calendar day, ownership-scoped.
+	 *
+	 * Backs the daily-memory activity context (#3487). The day window is a
+	 * range predicate over created_at ([midnight, next midnight)) so the
+	 * query stays index-friendly instead of wrapping the column in DATE().
+	 *
+	 * Scope semantics match the repository's ownership-filter idiom: an
+	 * absent scope key narrows nothing. Passing both `user_id` and
+	 * `agent_id` reads exactly one execution principal's jobs; passing only
+	 * one key is a deliberately authorized aggregate along that dimension;
+	 * passing neither is the site-wide day aggregate. Principal-bound
+	 * callers (ordinary daily-memory compaction) must pass both keys so the
+	 * breadth is an explicit authority choice, never an accident of
+	 * omitted predicates.
+	 *
+	 * @param string $date  Date string in `Y-m-d` format (UTC).
+	 * @param array  $scope Optional ownership scope: `user_id`, `agent_id`.
+	 * @return array<int, array<string, mixed>> Job rows ordered by job_id.
+	 * @since next
+	 */
+	public function get_jobs_for_day( string $date, array $scope = array() ): array {
+		$where        = array(
+			'created_at >= %s',
+			'created_at < %s',
+		);
+		$where_values = array(
+			$date . ' 00:00:00',
+			gmdate( 'Y-m-d H:i:s', strtotime( $date . ' +1 day' ) ),
+		);
+
+		if ( isset( $scope['user_id'] ) ) {
+			$where[]        = 'user_id = %d';
+			$where_values[] = absint( $scope['user_id'] );
+		}
+
+		if ( isset( $scope['agent_id'] ) ) {
+			$where[]        = 'agent_id = %d';
+			$where_values[] = absint( $scope['agent_id'] );
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Fixed predicate fragments; every value is passed through prepare().
+		$rows = $this->wpdb->get_results( $this->wpdb->prepare(
+			'SELECT job_id, user_id, agent_id, pipeline_id, flow_id, source, label, status, created_at, completed_at
+			 FROM %i
+			 WHERE ' . implode( ' AND ', $where ) . '
+			 ORDER BY job_id ASC',
+			array_merge( array( $this->table_name ), $where_values )
+		), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
 	 * Get memory-safe aggregate job summary counts.
 	 *
 	 * Uses grouped SQL queries so operator dashboards can inspect large job
