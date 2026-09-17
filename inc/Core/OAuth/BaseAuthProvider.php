@@ -1143,6 +1143,136 @@ abstract class BaseAuthProvider {
 	}
 
 	/**
+	 * Report which stored credentials can no longer be decrypted.
+	 *
+	 * Runs across every provider at once, so it derives the key itself rather
+	 * than asking an instance: key derivation is provider-independent — the
+	 * same wp_salt('auth') for all of them.
+	 *
+	 * Envelopes written since the key fingerprint landed are settled by
+	 * comparing that fingerprint, with no decryption attempted at all. Legacy
+	 * envelopes carry no fingerprint, so those — and only those — are decided
+	 * by a trial decryption. That keeps a diagnostic which runs on every wake
+	 * from doing crypto work it does not need to do, while still reporting
+	 * accurately on credentials stored before the fingerprint existed.
+	 *
+	 * Reports counts and provider slugs only. No secret material, and no
+	 * envelope, is returned.
+	 *
+	 * @since 0.177.0
+	 * @return array{has_credentials: bool, undecryptable_counts: array<string, int>}
+	 */
+	public static function audit_stored_credentials(): array {
+		$result = array(
+			'has_credentials'      => false,
+			'undecryptable_counts' => array(),
+		);
+
+		if ( ! function_exists( 'get_site_option' ) || ! function_exists( 'wp_salt' ) ) {
+			return $result;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		if ( ! is_array( $all_auth_data ) ) {
+			return $result;
+		}
+
+		$key = hash( 'sha256', wp_salt( 'auth' ) . 'datamachine-oauth', true );
+		$fingerprint = self::fingerprint_for_key( $key );
+
+		foreach ( $all_auth_data as $provider_slug => $provider_data ) {
+			if ( ! is_array( $provider_data ) ) {
+				continue;
+			}
+
+			if ( self::provider_slot_holds_credentials( $provider_data ) ) {
+				$result['has_credentials'] = true;
+			}
+
+			$undecryptable = 0;
+			self::count_undecryptable_values( $provider_data, $key, $fingerprint, $undecryptable );
+
+			if ( $undecryptable > 0 ) {
+				$result['undecryptable_counts'][ (string) $provider_slug ] = $undecryptable;
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Whether a provider slot holds anything worth auditing.
+	 *
+	 * @since 0.177.0
+	 * @param array $provider_data One provider's stored auth data.
+	 * @return bool
+	 */
+	private static function provider_slot_holds_credentials( array $provider_data ): bool {
+		foreach ( array( 'account', 'accounts', 'config' ) as $slot ) {
+			if ( ! empty( $provider_data[ $slot ] ) && is_array( $provider_data[ $slot ] ) ) {
+				return true;
+			}
+		}
+
+		foreach ( (array) ( $provider_data['principals'] ?? array() ) as $scoped ) {
+			if ( is_array( $scoped ) && self::provider_slot_holds_credentials( $scoped ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Count envelopes the current key cannot open, walking nested auth data.
+	 *
+	 * @since 0.177.0
+	 * @param mixed  $value       Node in the stored auth structure.
+	 * @param string $key         Binary encryption key for the current salt.
+	 * @param string $fingerprint Fingerprint of that key.
+	 * @param int    $count       Running total, by reference.
+	 */
+	private static function count_undecryptable_values( mixed $value, string $key, string $fingerprint, int &$count ): void {
+		if ( is_array( $value ) ) {
+			foreach ( $value as $child ) {
+				self::count_undecryptable_values( $child, $key, $fingerprint, $count );
+			}
+			return;
+		}
+
+		if ( ! is_string( $value ) || ! str_starts_with( $value, self::ENCRYPTION_PREFIX ) ) {
+			return;
+		}
+
+		$parts = explode( ':', substr( $value, strlen( self::ENCRYPTION_PREFIX ) ), 4 );
+
+		// Fingerprinted envelope: the fingerprint settles it without crypto.
+		if ( 4 === count( $parts ) ) {
+			if ( ! hash_equals( $fingerprint, strtolower( $parts[3] ) ) ) {
+				++$count;
+			}
+			return;
+		}
+
+		// Legacy envelope with no fingerprint: a trial decryption is the only
+		// way to know, so it is confined to this branch.
+		if ( 3 !== count( $parts ) ) {
+			++$count;
+			return;
+		}
+
+		$iv  = base64_decode( $parts[0], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding a binary crypto envelope field.
+		$tag = base64_decode( $parts[1], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding a binary crypto envelope field.
+		$ct  = base64_decode( $parts[2], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding a binary crypto envelope field.
+
+		if ( false === $iv || false === $tag || false === $ct
+			|| strlen( $tag ) !== self::AUTH_TAG_LENGTH
+			|| false === openssl_decrypt( $ct, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv, $tag ) ) {
+			++$count;
+		}
+	}
+
+	/**
 	 * Get the list of field names that should be encrypted at rest.
 	 *
 	 * Combines the built-in ENCRYPTED_FIELDS constant with any additions
@@ -1395,6 +1525,25 @@ abstract class BaseAuthProvider {
 	 * @param string $key Binary encryption key.
 	 * @return string Hex key fingerprint.
 	 */
+	private function key_fingerprint( string $key ): string {
+		return self::fingerprint_for_key( $key );
+	}
+
+	/**
+	 * Key fingerprint, without needing a provider instance.
+	 *
+	 * The audit in {@see self::audit_stored_credentials()} runs across every
+	 * provider at once and has no instance to ask, so the computation lives
+	 * here and the instance method above delegates to it.
+	 *
+	 * @since 0.177.0
+	 * @param string $key Binary encryption key.
+	 * @return string Hex key fingerprint.
+	 */
+	private static function fingerprint_for_key( string $key ): string {
+		return substr( bin2hex( hash( 'sha256', $key, true ) ), 0, 2 * self::KEY_FINGERPRINT_LENGTH );
+	}
+
 	/**
 	 * The WordPress auth salt the encryption key is derived from.
 	 *
@@ -1408,10 +1557,6 @@ abstract class BaseAuthProvider {
 	 */
 	protected function auth_salt(): ?string {
 		return function_exists( 'wp_salt' ) ? wp_salt( 'auth' ) : null;
-	}
-
-	private function key_fingerprint( string $key ): string {
-		return substr( bin2hex( hash( 'sha256', $key, true ) ), 0, 2 * self::KEY_FINGERPRINT_LENGTH );
 	}
 
 	/**
