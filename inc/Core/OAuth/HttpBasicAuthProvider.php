@@ -257,7 +257,7 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 	private function mark_undecryptable( string $account ): void {
 		$this->undecryptable_accounts[ $account ] = true;
 		if ( null === $this->undecryptable_error ) {
-			$error                  = $this->get_last_decryption_error();
+			$error                     = $this->get_last_decryption_error();
 			$this->undecryptable_error = $error ?? new \WP_Error(
 				'datamachine_auth_decrypt_failed',
 				__( 'A stored credential could not be decrypted and was withheld.', 'data-machine' )
@@ -274,7 +274,8 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 	 *
 	 * @param array $credential Account entry.
 	 * @param bool  $encrypt    True to encrypt, false to decrypt.
-	 * @return array<string, string>
+	 * @return array<string, string|null> A secret field is null when its stored
+	 *                                    envelope could not be decrypted.
 	 */
 	private function map_account_secrets( array $credential, bool $encrypt ): array {
 		foreach ( self::ACCOUNT_SECRET_FIELDS as $field ) {

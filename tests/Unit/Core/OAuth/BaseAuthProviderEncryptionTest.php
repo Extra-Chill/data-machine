@@ -86,6 +86,7 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 
 		// Load global-namespace stubs for wp_salt(), do_action(), apply_filters().
 		require_once __DIR__ . '/encryption-test-stubs.php';
+		require_once __DIR__ . '/class-wp-error-stub.php';
 	}
 
 	public static function getSalt(): string {
