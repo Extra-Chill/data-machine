@@ -34,6 +34,14 @@ class EncryptionTestProvider extends BaseAuthProvider {
 	}
 
 	/**
+	 * Control the salt directly rather than through a global wp_salt() stub,
+	 * which is skipped when the suite runs with WordPress already loaded.
+	 */
+	protected function auth_salt(): ?string {
+		return $this->test_salt;
+	}
+
+	/**
 	 * Expose encrypt_fields for testing.
 	 */
 	public function test_encrypt_fields( array $data ): array {
@@ -97,6 +105,7 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 		parent::setUp();
 		self::$current_salt = 'test-auth-salt-value-for-unit-tests';
 		$this->provider     = new EncryptionTestProvider( 'test_provider' );
+		$this->provider->set_test_salt( self::$current_salt );
 	}
 
 	// -------------------------------------------------------------------------
@@ -382,6 +391,7 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 	public function test_key_derivation_is_deterministic(): void {
 		// Same salt should produce consistent encrypt/decrypt across calls.
 		self::$current_salt = 'deterministic-salt-xyz';
+		$this->provider->set_test_salt( self::$current_salt );
 
 		$data = array( 'access_token' => 'test-token-123' );
 
@@ -420,6 +430,7 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 
 		// Simulate the site auth salt changing under the stored credential.
 		self::$current_salt = 'a-completely-different-salt';
+		$this->provider->set_test_salt( self::$current_salt );
 
 		$decrypted = $this->provider->test_decrypt_fields( $encrypted );
 
@@ -446,6 +457,7 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 		$parts[5] = base64_encode( 'corrupted-garbage-data' );
 
 		self::$current_salt = 'rotated-salt';
+		$this->provider->set_test_salt( self::$current_salt );
 		$decrypted          = $this->provider->test_decrypt_fields( array( 'access_token' => implode( ':', $parts ) ) );
 
 		$this->assertNull( $decrypted['access_token'] );
@@ -459,6 +471,7 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 		// Legacy envelopes carry no fingerprint, so decryption is attempted and
 		// fails on GCM authentication — still fail closed, never the envelope.
 		self::$current_salt = 'another-new-salt';
+		$this->provider->set_test_salt( self::$current_salt );
 
 		$decrypted = $this->provider->test_decrypt_fields( $legacy );
 		$this->assertNull( $decrypted['access_token'] );

@@ -1395,6 +1395,21 @@ abstract class BaseAuthProvider {
 	 * @param string $key Binary encryption key.
 	 * @return string Hex key fingerprint.
 	 */
+	/**
+	 * The WordPress auth salt the encryption key is derived from.
+	 *
+	 * Exists as a seam so tests can control the salt without redefining the
+	 * global wp_salt(). A global function stub cannot be relied on: when this
+	 * suite runs with WordPress loaded, the real wp_salt() is already defined,
+	 * the stub is skipped, and wp_salt() additionally caches its result for the
+	 * process — so salt rotation could not be exercised at all.
+	 *
+	 * @return string|null The salt, or null when WordPress is unavailable.
+	 */
+	protected function auth_salt(): ?string {
+		return function_exists( 'wp_salt' ) ? wp_salt( 'auth' ) : null;
+	}
+
 	private function key_fingerprint( string $key ): string {
 		return substr( bin2hex( hash( 'sha256', $key, true ) ), 0, 2 * self::KEY_FINGERPRINT_LENGTH );
 	}
@@ -1423,11 +1438,10 @@ abstract class BaseAuthProvider {
 	 * @return string|null 32-byte binary key, or null if derivation fails.
 	 */
 	private function derive_encryption_key(): ?string {
-		if ( ! function_exists( 'wp_salt' ) ) {
+		$salt = $this->auth_salt();
+		if ( null === $salt ) {
 			return null;
 		}
-
-		$salt = wp_salt( 'auth' );
 
 		// Warn if WordPress is using default salts (insecure but functional).
 		if ( 'put your unique phrase here' === $salt ) {
