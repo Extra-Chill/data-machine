@@ -1156,7 +1156,7 @@ abstract class BaseAuthProvider {
 		foreach ( $this->get_encrypted_fields() as $field ) {
 			if ( isset( $data[ $field ] ) && is_string( $data[ $field ] ) ) {
 				if ( str_starts_with( $data[ $field ], self::ENCRYPTION_PREFIX ) ) {
-					$decrypted = $this->decrypt_value( $data[ $field ] );
+					$decrypted = self::decrypt_value( $data[ $field ], $this->provider_slug );
 					if ( null !== $decrypted ) {
 						$data[ $field ] = $decrypted;
 					}
@@ -1180,7 +1180,7 @@ abstract class BaseAuthProvider {
 	 * @return string|null Encrypted envelope string, or null on failure.
 	 */
 	private function encrypt_value( string $plaintext ): ?string {
-		$key = $this->derive_encryption_key();
+		$key = self::derive_encryption_key( $this->provider_slug );
 		if ( null === $key ) {
 			return null;
 		}
@@ -1197,7 +1197,7 @@ abstract class BaseAuthProvider {
 		// be decrypted - so it is expressed with empty(), which PHPStan does
 		// not fold for by-reference output.
 		if ( false === $ciphertext || empty( $tag ) ) {
-			$this->log_encryption_error( 'Encryption failed' );
+			self::log_encryption_error( 'Encryption failed', $this->provider_slug );
 			return null;
 		}
 
@@ -1211,11 +1211,15 @@ abstract class BaseAuthProvider {
 	 * Expects input in format: dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
 	 *
 	 * @since 0.88.0
-	 * @param string $envelope The encrypted envelope string.
+	 * @param string      $envelope       The encrypted envelope string.
+	 * @param string|null $provider_slug Provider slug for failure-log context, or null to omit.
+	 * @param bool        $log_failures  Whether failures are logged. Integrity audits
+	 *                                   pass false so a recurring diagnostic never
+	 *                                   writes error rows of its own.
 	 * @return string|null Decrypted plaintext, or null on failure.
 	 */
-	private function decrypt_value( string $envelope ): ?string {
-		$key = $this->derive_encryption_key();
+	private static function decrypt_value( string $envelope, ?string $provider_slug = null, bool $log_failures = true ): ?string {
+		$key = self::derive_encryption_key( $provider_slug, $log_failures );
 		if ( null === $key ) {
 			return null;
 		}
@@ -1225,7 +1229,9 @@ abstract class BaseAuthProvider {
 		$parts   = explode( ':', $payload, 3 );
 
 		if ( 3 !== count( $parts ) ) {
-			$this->log_encryption_error( 'Malformed encryption envelope: missing separator' );
+			if ( $log_failures ) {
+				self::log_encryption_error( 'Malformed encryption envelope: missing separator', $provider_slug );
+			}
 			return null;
 		}
 
@@ -1237,25 +1243,33 @@ abstract class BaseAuthProvider {
 		$ciphertext = base64_decode( $parts[2], true );
 
 		if ( false === $iv || false === $tag || false === $ciphertext ) {
-			$this->log_encryption_error( 'Malformed encryption envelope: invalid base64' );
+			if ( $log_failures ) {
+				self::log_encryption_error( 'Malformed encryption envelope: invalid base64', $provider_slug );
+			}
 			return null;
 		}
 
 		$expected_iv_length = openssl_cipher_iv_length( self::CIPHER_ALGO );
 		if ( strlen( $iv ) !== $expected_iv_length ) {
-			$this->log_encryption_error( 'Malformed encryption envelope: invalid IV length' );
+			if ( $log_failures ) {
+				self::log_encryption_error( 'Malformed encryption envelope: invalid IV length', $provider_slug );
+			}
 			return null;
 		}
 
 		if ( strlen( $tag ) !== self::AUTH_TAG_LENGTH ) {
-			$this->log_encryption_error( 'Malformed encryption envelope: invalid authentication tag length' );
+			if ( $log_failures ) {
+				self::log_encryption_error( 'Malformed encryption envelope: invalid authentication tag length', $provider_slug );
+			}
 			return null;
 		}
 
 		$plaintext = openssl_decrypt( $ciphertext, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv, $tag );
 
 		if ( false === $plaintext ) {
-			$this->log_encryption_error( 'Decryption failed (wrong key or corrupted data)' );
+			if ( $log_failures ) {
+				self::log_encryption_error( 'Decryption failed (wrong key or corrupted data)', $provider_slug );
+			}
 			return null;
 		}
 
@@ -1270,9 +1284,11 @@ abstract class BaseAuthProvider {
 	 * ensures key isolation from other WordPress subsystems.
 	 *
 	 * @since 0.88.0
+	 * @param string|null $provider_slug Provider slug for warning-log context, or null to omit.
+	 * @param bool        $log_warnings  Whether the default-salt warning is logged.
 	 * @return string|null 32-byte binary key, or null if derivation fails.
 	 */
-	private function derive_encryption_key(): ?string {
+	private static function derive_encryption_key( ?string $provider_slug = null, bool $log_warnings = true ): ?string {
 		if ( ! function_exists( 'wp_salt' ) ) {
 			return null;
 		}
@@ -1280,10 +1296,11 @@ abstract class BaseAuthProvider {
 		$salt = wp_salt( 'auth' );
 
 		// Warn if WordPress is using default salts (insecure but functional).
-		if ( 'put your unique phrase here' === $salt ) {
-			$this->log_encryption_error(
+		if ( $log_warnings && 'put your unique phrase here' === $salt ) {
+			self::log_encryption_error(
 				'wp_salt(\'auth\') returns the WordPress default. '
-				. 'Set unique AUTH_KEY and AUTH_SALT in wp-config.php for proper security.'
+				. 'Set unique AUTH_KEY and AUTH_SALT in wp-config.php for proper security.',
+				$provider_slug
 			);
 		}
 
@@ -1295,16 +1312,131 @@ abstract class BaseAuthProvider {
 	 * Log an encryption-related error via the datamachine_log action.
 	 *
 	 * @since 0.88.0
-	 * @param string $message Error message.
+	 * @param string      $message Error message.
+	 * @param string|null $provider_slug Provider slug for context, or null to omit.
+	 * @return void
 	 */
-	private function log_encryption_error( string $message ): void {
+	private static function log_encryption_error( string $message, ?string $provider_slug = null ): void {
 		if ( function_exists( 'do_action' ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
 				'OAuth Encryption: ' . $message,
-				array( 'provider' => $this->provider_slug )
+				null === $provider_slug ? array() : array( 'provider' => $provider_slug )
 			);
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// Stored credential integrity
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Audit every stored credential for decryptability under the current key.
+	 *
+	 * Walks the shared `datamachine_auth_data` site option across every
+	 * provider, principal scope, and named-account slot, and attempts to
+	 * decrypt each stored value that carries the encryption envelope. A value
+	 * that carries the envelope but fails to decrypt is unrecoverable under
+	 * the current key — typically because wp_salt('auth') changed — and is a
+	 * silent, ongoing failure an operator cannot discover until a remote call
+	 * returns an opaque 401.
+	 *
+	 * Detection is envelope-prefix driven rather than field-name driven, so
+	 * provider-specific encrypted fields (e.g. `imap_password`, `password`)
+	 * added via `datamachine_auth_encrypted_fields` are covered without
+	 * enumeration. Failures are NOT logged — a recurring diagnostic must not
+	 * write error rows of its own; callers surface the result on their own
+	 * channels.
+	 *
+	 * @since 0.177.0
+	 * @return array{has_credentials:bool,undecryptable_counts:array<string,int>}
+	 *         `has_credentials` — any provider stores credential-shaped data
+	 *         (encrypted or legacy plaintext). `undecryptable_counts` — map of
+	 *         provider slug to the count of its stored values that carry the
+	 *         encryption envelope but cannot be decrypted.
+	 */
+	public static function audit_stored_credentials(): array {
+		$result = array(
+			'has_credentials'      => false,
+			'undecryptable_counts' => array(),
+		);
+
+		if ( ! function_exists( 'get_site_option' ) || ! function_exists( 'wp_salt' ) ) {
+			return $result;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		if ( ! is_array( $all_auth_data ) ) {
+			return $result;
+		}
+
+		foreach ( $all_auth_data as $provider_slug => $provider_data ) {
+			if ( ! is_array( $provider_data ) ) {
+				continue;
+			}
+
+			if ( self::provider_slot_holds_credentials( $provider_data ) ) {
+				$result['has_credentials'] = true;
+			}
+
+			$undecryptable = 0;
+			self::count_undecryptable_values( $provider_data, $undecryptable );
+
+			if ( $undecryptable > 0 ) {
+				$result['undecryptable_counts'][ (string) $provider_slug ] = $undecryptable;
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Whether a provider data node holds credential-shaped slots.
+	 *
+	 * Recurses through principal scopes so user/agent-owned accounts count
+	 * toward credential presence too.
+	 *
+	 * @since 0.177.0
+	 * @param array<string,mixed> $provider_data Provider node (provider root or a principal scope).
+	 * @return bool
+	 */
+	private static function provider_slot_holds_credentials( array $provider_data ): bool {
+		foreach ( array( 'account', 'accounts', 'config' ) as $slot ) {
+			if ( ! empty( $provider_data[ $slot ] ) && is_array( $provider_data[ $slot ] ) ) {
+				return true;
+			}
+		}
+
+		foreach ( (array) ( $provider_data['principals'] ?? array() ) as $scoped ) {
+			if ( is_array( $scoped ) && self::provider_slot_holds_credentials( $scoped ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Recursively count envelope-carrying values that cannot be decrypted.
+	 *
+	 * @since 0.177.0
+	 * @param mixed $value Any node of a provider's stored auth data.
+	 * @param int   $count Incremented in place for each undecryptable value.
+	 * @return void
+	 */
+	private static function count_undecryptable_values( mixed $value, int &$count ): void {
+		if ( is_array( $value ) ) {
+			foreach ( $value as $child ) {
+				self::count_undecryptable_values( $child, $count );
+			}
+			return;
+		}
+
+		if ( is_string( $value )
+			&& str_starts_with( $value, self::ENCRYPTION_PREFIX )
+			&& null === self::decrypt_value( $value, null, false ) ) {
+			++$count;
 		}
 	}
 }

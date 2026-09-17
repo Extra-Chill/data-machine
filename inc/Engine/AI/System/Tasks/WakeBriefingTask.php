@@ -7,7 +7,8 @@
  * writes it to a dedicated, always-injected memory file (WAKE.md). The goal is
  * felt continuity on wake: when an agent session starts, its context already
  * holds a short glance at anything red that happened across the install
- * recently — failing tasks, stuck jobs, new error signatures, mid-flight work.
+ * recently — failing tasks, stuck jobs, new error signatures, mid-flight work,
+ * plus standing integrity conditions (undecryptable stored credentials).
  *
  * ## Stateless rolling window (no shared clock)
  *
@@ -41,6 +42,7 @@ namespace DataMachine\Engine\AI\System\Tasks;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\FilesRepository\AgentMemory;
+use DataMachine\Core\OAuth\BaseAuthProvider;
 
 class WakeBriefingTask extends SystemTask {
 
@@ -77,6 +79,21 @@ class WakeBriefingTask extends SystemTask {
 	private const AS_MAX_BYTES = 2000000000;  // 2 GB.
 
 	/**
+	 * Site option recording (as a Unix timestamp) when the AUTH_KEY/AUTH_SALT
+	 * advisory was first emitted. Lets the advisory expire once the condition
+	 * is no longer new, and restart cleanly if it clears and later returns.
+	 */
+	private const SALT_ADVISORY_FIRST_SEEN_OPTION = 'datamachine_wake_briefing_salt_advisory_first_seen';
+
+	/**
+	 * How many days the AUTH_KEY/AUTH_SALT advisory stays in the briefing
+	 * after first detection. A permanent condition must not become permanent
+	 * noise in a digest whose whole value is that it stays quiet. Filterable;
+	 * 0 keeps the advisory indefinitely.
+	 */
+	private const SALT_ADVISORY_DAYS = 7;
+
+	/**
 	 * Max bytes of the debug.log tail to scan for PHP fatals. Bounds the read
 	 * so a runaway multi-GB log never blows the task up. 5 MiB of tail is far
 	 * more than a rolling window of fatals would ever occupy.
@@ -92,6 +109,16 @@ class WakeBriefingTask extends SystemTask {
 	 * @var bool
 	 */
 	private bool $disk_emitted = false;
+
+	/**
+	 * Memoized credential-integrity signal lines for the current run. Stored
+	 * auth data lives in one network-wide site option, so — like disk
+	 * pressure — the audit runs once per run, not once per blog under the
+	 * switch_to_blog() loop.
+	 *
+	 * @var string[]|null
+	 */
+	private ?array $credential_signals = null;
 
 	/**
 	 * This is pure site-scoped maintenance reading operational tables and
@@ -252,6 +279,15 @@ class WakeBriefingTask extends SystemTask {
 		$as_bloat = $this->getActionSchedulerBloat();
 		if ( ! empty( $as_bloat ) ) {
 			$signals[] = $as_bloat;
+		}
+
+		// Stored credentials live in one network-wide site option; audit them
+		// once per run, not once per blog (same rationale as disk above).
+		if ( null === $this->credential_signals ) {
+			$this->credential_signals = $this->getCredentialSignals();
+		}
+		foreach ( $this->credential_signals as $line ) {
+			$signals[] = $line;
 		}
 
 		return $signals;
@@ -776,6 +812,106 @@ class WakeBriefingTask extends SystemTask {
 	}
 
 	/**
+	 * Credential-integrity signals — the one failure class an agent cannot
+	 * otherwise discover until something fails remotely with an opaque 401.
+	 *
+	 * Two distinct conditions, each at most one terse line:
+	 *
+	 * 1. Undecryptable stored credentials: values carrying the encryption
+	 *    envelope that fail to decrypt under the current key — i.e. the key
+	 *    protecting them changed and they are unrecoverable as stored. One
+	 *    grouped line naming providers and counts ONLY; no secret material,
+	 *    ciphertext, or credential value ever appears in the output.
+	 * 2. AUTH_KEY/AUTH_SALT not defined in wp-config.php: core then keys
+	 *    every stored credential to database-stored salts, so a regeneration
+	 *    silently destroys them. Surfaced as a standing advisory that expires
+	 *    shortly after first detection so a permanent condition does not
+	 *    become permanent noise.
+	 *
+	 * Cheap — one option read plus one bounded decrypt probe per stored
+	 * envelope — and makes no outbound requests. Fail-soft: no lines when the
+	 * audit cannot run.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine/issues/3504
+	 * @return string[] Zero, one, or two signal lines.
+	 */
+	private function getCredentialSignals(): array {
+		if ( ! class_exists( BaseAuthProvider::class ) ) {
+			return array();
+		}
+
+		$audit   = BaseAuthProvider::audit_stored_credentials();
+		$signals = array();
+
+		$failures = $audit['undecryptable_counts'];
+		if ( ! empty( $failures ) ) {
+			$parts = array();
+			foreach ( $failures as $slug => $n ) {
+				$parts[] = $n > 1 ? sprintf( '%s×%d', $slug, $n ) : (string) $slug;
+			}
+
+			$signals[] = sprintf(
+				'⚠ **Credentials** — %d stored credential(s) cannot be decrypted (%s); encryption key changed. Re-authenticate.',
+				array_sum( $failures ),
+				implode( ', ', $parts )
+			);
+		}
+
+		$advisory = $this->getAuthSaltAdvisory( (bool) $audit['has_credentials'] );
+		if ( '' !== $advisory ) {
+			$signals[] = $advisory;
+		}
+
+		return $signals;
+	}
+
+	/**
+	 * Standing advisory for AUTH_KEY/AUTH_SALT missing from wp-config.php.
+	 *
+	 * Only emitted while stored credentials are actually at risk. Tracks
+	 * first detection in a site option so the line expires SALT_ADVISORY_DAYS
+	 * after the condition is first seen; the marker is dropped when the
+	 * condition clears (or nothing is left at risk) so a recurrence counts
+	 * as new again. Option writes happen only on state transitions, never
+	 * per run.
+	 *
+	 * @param bool $has_credentials Whether any provider stores credentials.
+	 * @return string Single advisory line, or ''.
+	 */
+	private function getAuthSaltAdvisory( bool $has_credentials ): string {
+		$salts_in_config = defined( 'AUTH_KEY' ) && defined( 'AUTH_SALT' );
+
+		if ( ! $has_credentials || $salts_in_config ) {
+			// Nothing left at risk — reset the marker so a future recurrence
+			// is treated as new again.
+			if ( get_site_option( self::SALT_ADVISORY_FIRST_SEEN_OPTION, 0 ) > 0 ) {
+				delete_site_option( self::SALT_ADVISORY_FIRST_SEEN_OPTION );
+			}
+			return '';
+		}
+
+		$first_seen = (int) get_site_option( self::SALT_ADVISORY_FIRST_SEEN_OPTION, 0 );
+		if ( $first_seen < 1 ) {
+			$first_seen = time();
+			update_site_option( self::SALT_ADVISORY_FIRST_SEEN_OPTION, $first_seen );
+		}
+
+		/**
+		 * Filter how many days the AUTH_KEY/AUTH_SALT advisory stays fresh in
+		 * the briefing after first detection. 0 keeps it indefinitely.
+		 *
+		 * @param int $days Default 7.
+		 */
+		$days = (int) apply_filters( 'datamachine_wake_briefing_salt_advisory_days', self::SALT_ADVISORY_DAYS );
+
+		if ( $days > 0 && ( time() - $first_seen ) > ( $days * DAY_IN_SECONDS ) ) {
+			return '';
+		}
+
+		return '**Credentials** — AUTH_KEY/AUTH_SALT are not set in wp-config.php; stored credentials are keyed to database-stored salts and will be lost if those are regenerated.';
+	}
+
+	/**
 	 * Format a byte count into a compact human-readable string (GB/MB/etc).
 	 *
 	 * @param float $bytes Byte count.
@@ -891,7 +1027,7 @@ class WakeBriefingTask extends SystemTask {
 	public static function getTaskMeta(): array {
 		return array(
 			'label'           => 'Wake Briefing',
-			'description'     => 'Composes a terse rolling-window digest of recent threshold-crossing activity (failing tasks, stuck jobs, grouped errors) into WAKE.md for passive injection into agent context.',
+			'description'     => 'Composes a terse rolling-window digest of recent threshold-crossing activity (failing tasks, stuck jobs, grouped errors, credential integrity) into WAKE.md for passive injection into agent context.',
 			'setting_key'     => 'wake_briefing_enabled',
 			'default_enabled' => false,
 			'supports_run'    => true,
