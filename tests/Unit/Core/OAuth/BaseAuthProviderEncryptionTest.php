@@ -276,29 +276,31 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 	// Malformed envelope handling
 	// -------------------------------------------------------------------------
 
-	public function test_malformed_envelope_missing_separator_returns_null(): void {
+	public function test_malformed_envelope_missing_separator_fails_closed(): void {
 		$data = array(
 			'access_token' => 'dm:enc:v1:missingsecondsegment',
 		);
 
 		$decrypted = $this->provider->test_decrypt_fields( $data );
 
-		// On failure, the encrypted blob should be returned as-is.
-		$this->assertSame( 'dm:enc:v1:missingsecondsegment', $decrypted['access_token'] );
+		// Fail closed: never hand the envelope back as if it were the secret.
+		$this->assertNull( $decrypted['access_token'] );
+		$this->assertNotNull( $this->provider->get_last_decryption_error() );
+		$this->assertSame( 'datamachine_auth_decrypt_failed', $this->provider->get_last_decryption_error()->get_error_code() );
 	}
 
-	public function test_malformed_envelope_invalid_base64_returns_original(): void {
+	public function test_malformed_envelope_invalid_base64_fails_closed(): void {
 		$data = array(
 			'access_token' => 'dm:enc:v1:!!!invalid!!!:!!!invalid!!!:!!!invalid!!!',
 		);
 
 		$decrypted = $this->provider->test_decrypt_fields( $data );
 
-		// Should return the encrypted blob as-is on failure.
-		$this->assertSame( 'dm:enc:v1:!!!invalid!!!:!!!invalid!!!:!!!invalid!!!', $decrypted['access_token'] );
+		$this->assertNull( $decrypted['access_token'] );
+		$this->assertSame( 'datamachine_auth_decrypt_failed', $this->provider->get_last_decryption_error()->get_error_code() );
 	}
 
-	public function test_malformed_envelope_wrong_iv_length_returns_original(): void {
+	public function test_malformed_envelope_wrong_iv_length_fails_closed(): void {
 		// Valid base64 but IV is too short (should be 12 bytes for AES-256-GCM).
 		$short_iv   = base64_encode( 'short' );
 		$tag        = base64_encode( str_repeat( 't', BaseAuthProvider::AUTH_TAG_LENGTH ) );
@@ -308,10 +310,23 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 		$data      = array( 'access_token' => $envelope );
 		$decrypted = $this->provider->test_decrypt_fields( $data );
 
-		$this->assertSame( $envelope, $decrypted['access_token'] );
+		$this->assertNull( $decrypted['access_token'] );
+		$this->assertSame( 'datamachine_auth_decrypt_failed', $this->provider->get_last_decryption_error()->get_error_code() );
 	}
 
-	public function test_corrupted_ciphertext_returns_original(): void {
+	public function test_malformed_envelope_invalid_fingerprint_fails_closed(): void {
+		$short_iv   = base64_encode( str_repeat( 'i', 12 ) );
+		$tag        = base64_encode( str_repeat( 't', BaseAuthProvider::AUTH_TAG_LENGTH ) );
+		$ciphertext = base64_encode( 'fakeciphertext' );
+		// Not 16 hex characters.
+		$envelope  = "dm:enc:v1:{$short_iv}:{$tag}:{$ciphertext}:nothex";
+		$decrypted = $this->provider->test_decrypt_fields( array( 'access_token' => $envelope ) );
+
+		$this->assertNull( $decrypted['access_token'] );
+		$this->assertSame( 'datamachine_auth_decrypt_failed', $this->provider->get_last_decryption_error()->get_error_code() );
+	}
+
+	public function test_corrupted_ciphertext_fails_closed(): void {
 		$data = array( 'access_token' => 'valid-token' );
 
 		$encrypted = $this->provider->test_encrypt_fields( $data );
@@ -324,8 +339,9 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 		$corrupted_data = array( 'access_token' => $corrupted_envelope );
 		$decrypted      = $this->provider->test_decrypt_fields( $corrupted_data );
 
-		// Should return corrupted blob as-is (not silently empty).
-		$this->assertSame( $corrupted_envelope, $decrypted['access_token'] );
+		// Fail closed: the envelope must never be returned as the field value.
+		$this->assertNull( $decrypted['access_token'] );
+		$this->assertSame( 'datamachine_auth_decrypt_failed', $this->provider->get_last_decryption_error()->get_error_code() );
 	}
 
 	// -------------------------------------------------------------------------
@@ -356,8 +372,10 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 
 		$decrypted = $this->provider->test_decrypt_fields( array( 'access_token' => $modified ) );
 
-		// Authenticated encryption must reject tampered envelopes.
-		$this->assertSame( $modified, $decrypted['access_token'] );
+		// Authenticated encryption must reject tampered envelopes, and the
+		// rejected envelope must never be returned as the field value.
+		$this->assertNull( $decrypted['access_token'] );
+		$this->assertSame( 'datamachine_auth_decrypt_failed', $this->provider->get_last_decryption_error()->get_error_code() );
 	}
 
 	public function test_key_derivation_is_deterministic(): void {
@@ -383,6 +401,102 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 	}
 
 	// -------------------------------------------------------------------------
+	// Key rotation / fail-closed reads
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Strip the fingerprint segment to reproduce a pre-fingerprint envelope.
+	 */
+	private function legacy_envelope( string $envelope ): string {
+		$parts = explode( ':', $envelope );
+		array_pop( $parts );
+		return implode( ':', $parts );
+	}
+
+	public function test_salt_rotation_never_returns_envelope_and_surfaces_error(): void {
+		$data      = array( 'access_token' => 'rotated-secret', 'username' => 'user' );
+		$encrypted = $this->provider->test_encrypt_fields( $data );
+
+		// Simulate the site auth salt changing under the stored credential.
+		self::$current_salt = 'a-completely-different-salt';
+
+		$decrypted = $this->provider->test_decrypt_fields( $encrypted );
+
+		// The envelope must never be emitted as the field value.
+		$this->assertNull( $decrypted['access_token'] );
+		$this->assertStringStartsNotWith( BaseAuthProvider::ENCRYPTION_PREFIX, (string) $decrypted['access_token'] );
+		// Non-encrypted fields are unaffected.
+		$this->assertSame( 'user', $decrypted['username'] );
+
+		// An explicit, actionable error is surfaced.
+		$error = $this->provider->get_last_decryption_error();
+		$this->assertNotNull( $error );
+		$this->assertSame( 'datamachine_auth_key_mismatch', $error->get_error_code() );
+		$this->assertStringContainsString( 'different key', $error->get_error_message() );
+	}
+
+	public function test_key_fingerprint_mismatch_reported_without_decryption(): void {
+		$encrypted = $this->provider->test_encrypt_fields( array( 'access_token' => 'secret' ) );
+
+		// Corrupt the ciphertext body but keep the fingerprint intact. If the
+		// fingerprint gate works, decryption is never attempted and the
+		// mismatch code — not a GCM failure code — is reported.
+		$parts    = explode( ':', $encrypted['access_token'] );
+		$parts[5] = base64_encode( 'corrupted-garbage-data' );
+
+		self::$current_salt = 'rotated-salt';
+		$decrypted          = $this->provider->test_decrypt_fields( array( 'access_token' => implode( ':', $parts ) ) );
+
+		$this->assertNull( $decrypted['access_token'] );
+		$this->assertSame( 'datamachine_auth_key_mismatch', $this->provider->get_last_decryption_error()->get_error_code() );
+	}
+
+	public function test_legacy_envelope_salt_rotation_fails_closed_with_decrypt_failed(): void {
+		$encrypted = $this->provider->test_encrypt_fields( array( 'access_token' => 'legacy-secret' ) );
+		$legacy    = array( 'access_token' => $this->legacy_envelope( $encrypted['access_token'] ) );
+
+		// Legacy envelopes carry no fingerprint, so decryption is attempted and
+		// fails on GCM authentication — still fail closed, never the envelope.
+		self::$current_salt = 'another-new-salt';
+
+		$decrypted = $this->provider->test_decrypt_fields( $legacy );
+		$this->assertNull( $decrypted['access_token'] );
+		$this->assertNotSame( $legacy['access_token'], $decrypted['access_token'] );
+		$this->assertSame( 'datamachine_auth_decrypt_failed', $this->provider->get_last_decryption_error()->get_error_code() );
+	}
+
+	public function test_legacy_envelope_without_rotation_still_decrypts(): void {
+		// Pre-fingerprint envelopes written by older versions must keep
+		// decrypting under the same key.
+		$encrypted = $this->provider->test_encrypt_fields( array( 'access_token' => 'old-format-secret' ) );
+		$legacy    = array( 'access_token' => $this->legacy_envelope( $encrypted['access_token'] ) );
+
+		$decrypted = $this->provider->test_decrypt_fields( $legacy );
+		$this->assertSame( 'old-format-secret', $decrypted['access_token'] );
+		$this->assertNull( $this->provider->get_last_decryption_error() );
+	}
+
+	public function test_successful_decrypt_leaves_no_error(): void {
+		$encrypted = $this->provider->test_encrypt_fields( array( 'access_token' => 'fine' ) );
+
+		$decrypted = $this->provider->test_decrypt_fields( $encrypted );
+
+		$this->assertSame( 'fine', $decrypted['access_token'] );
+		$this->assertNull( $this->provider->get_last_decryption_error() );
+	}
+
+	public function test_error_resets_between_decrypt_passes(): void {
+		$encrypted = $this->provider->test_encrypt_fields( array( 'access_token' => 'x' ) );
+		$this->provider->test_decrypt_fields( array( 'access_token' => 'dm:enc:v1:broken' ) );
+		$this->assertNotNull( $this->provider->get_last_decryption_error() );
+
+		// A subsequent clean read clears the stale error.
+		$decrypted = $this->provider->test_decrypt_fields( $encrypted );
+		$this->assertSame( 'x', $decrypted['access_token'] );
+		$this->assertNull( $this->provider->get_last_decryption_error() );
+	}
+
+	// -------------------------------------------------------------------------
 	// Envelope format verification
 	// -------------------------------------------------------------------------
 
@@ -392,15 +506,15 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 
 		$envelope = $encrypted['access_token'];
 
-		// Should match: dm:enc:v1:{base64}:{base64}:{base64}
+		// Should match: dm:enc:v1:{base64}:{base64}:{base64}:{fingerprint}
 		$this->assertMatchesRegularExpression(
-			'/^dm:enc:v1:[A-Za-z0-9+\/=]+:[A-Za-z0-9+\/=]+:[A-Za-z0-9+\/=]+$/',
+			'/^dm:enc:v1:[A-Za-z0-9+\/=]+:[A-Za-z0-9+\/=]+:[A-Za-z0-9+\/=]+:[0-9a-f]{16}$/',
 			$envelope
 		);
 
 		// Split and validate parts.
 		$parts = explode( ':', $envelope );
-		$this->assertCount( 6, $parts );
+		$this->assertCount( 7, $parts );
 		$this->assertSame( 'dm', $parts[0] );
 		$this->assertSame( 'enc', $parts[1] );
 		$this->assertSame( 'v1', $parts[2] );
@@ -417,6 +531,11 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 
 		// Ciphertext should be valid base64.
 		$this->assertNotFalse( base64_decode( $parts[5], true ) );
+
+		// Fingerprint should be the first 8 bytes (hex) of sha256(key).
+		$key         = hash( 'sha256', self::getSalt() . 'datamachine-oauth', true );
+		$fingerprint = substr( bin2hex( hash( 'sha256', $key, true ) ), 0, 2 * BaseAuthProvider::KEY_FINGERPRINT_LENGTH );
+		$this->assertSame( $fingerprint, $parts[6] );
 	}
 
 	// -------------------------------------------------------------------------

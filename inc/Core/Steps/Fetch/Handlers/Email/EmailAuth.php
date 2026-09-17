@@ -174,7 +174,11 @@ class EmailAuth extends BaseAuthProvider {
 			if ( ! $this->can_use_default( $context, $agent_id, $user_id ) ) {
 				return $this->audit_error( 'email_mailbox_forbidden', $ref, $operations, $context, $agent_id, $user_id );
 			}
-			$credentials = $this->get_config();
+			$credentials   = $this->get_config();
+			$decrypt_error = $this->get_last_decryption_error();
+			if ( null !== $decrypt_error ) {
+				return $this->decryption_failed_error( $decrypt_error, $ref, $operations, $context, $agent_id, $user_id );
+			}
 			if ( ! $this->valid_credentials( $credentials ) ) {
 				return $this->audit_error( 'auth_ref_unresolved', $ref, $operations, $context, $agent_id, $user_id );
 			}
@@ -196,6 +200,10 @@ class EmailAuth extends BaseAuthProvider {
 			$code = empty( $matches ) ? 'auth_ref_unresolved' : 'email_mailbox_forbidden';
 			if ( count( $allowed ) > 1 ) {
 				$code = 'email_mailbox_ambiguous';
+			}
+			$decrypt_error = $this->get_last_decryption_error();
+			if ( null !== $decrypt_error && ! empty( $matches ) ) {
+				return $this->decryption_failed_error( $decrypt_error, $ref, $operations, $context, $agent_id, $user_id );
 			}
 			return $this->audit_error( $code, $ref, $operations, $context, $agent_id, $user_id );
 		}
@@ -421,6 +429,36 @@ class EmailAuth extends BaseAuthProvider {
 				/* translators: %s: mailbox auth reference. */
 				__( 'Mailbox ref "%s" could not be resolved or authorized.', 'data-machine' ),
 				$ref
+			),
+			array( 'status' => 403 )
+		);
+	}
+
+	/**
+	 * Surface a stored-credential decryption failure for a mailbox ref.
+	 *
+	 * Reported locally with no network attempt, so a rotated auth salt is
+	 * diagnosable instead of surfacing as a remote IMAP authentication failure.
+	 */
+	private function decryption_failed_error( \WP_Error $error, string $ref, string|array $operations, array $context, int $agent_id, int $user_id ): \WP_Error {
+		$this->audit(
+			array(
+				'ref'   => $ref,
+				'owner' => null,
+			),
+			$operations,
+			$context,
+			$agent_id,
+			$user_id,
+			'denied'
+		);
+		return new \WP_Error(
+			$error->get_error_code(),
+			sprintf(
+				/* translators: 1: mailbox auth reference, 2: decryption failure reason. */
+				__( 'The stored mailbox credentials for ref "%1$s" cannot be read: %2$s', 'data-machine' ),
+				$ref,
+				$error->get_error_message()
 			),
 			array( 'status' => 403 )
 		);
