@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.14] - 2026-09-17
+
+### Changed
+- fail closed when a stored credential cannot be decrypted
+
+### Fixed
+- scope compaction context to its authorized agent and user
+
 ## [0.176.13] - 2026-09-16
 
 ### Fixed
