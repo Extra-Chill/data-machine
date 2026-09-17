@@ -427,6 +427,14 @@ class EmailAuth extends BaseAuthProvider {
 	}
 
 	private function audit( array $mailbox, string|array $operations, array $context, int $agent_id, int $user_id, string $result ): void {
+		// Permission-callback preflights (EmailMailboxPermission::authorizeMailboxRef())
+		// re-resolve the same ref that execute() resolves moments later. Skip the audit
+		// entry on the preflight pass so each real operation produces exactly one record
+		// instead of a duplicate "checked" entry ahead of it.
+		if ( ! empty( $context['_skip_audit'] ) ) {
+			return;
+		}
+
 		$acting_principal = $agent_id > 0
 			? array(
 				'type' => 'agent',

@@ -22,6 +22,7 @@
 namespace DataMachine\Abilities\Publish;
 
 use DataMachine\Abilities\AbilityRegistration;
+use DataMachine\Abilities\Email\EmailMailboxPermission;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentTokens;
@@ -29,6 +30,8 @@ use DataMachine\Core\Database\Agents\AgentTokens;
 defined( 'ABSPATH' ) || exit;
 
 class SendEmailQueuedAbility {
+
+	use EmailMailboxPermission;
 
 	private static bool $registered           = false;
 	private static bool $registration_pending = false;
@@ -282,10 +285,20 @@ class SendEmailQueuedAbility {
 	/**
 	 * Permission callback for ability.
 	 *
+	 * This is the queuing call only — always synchronous, always with live
+	 * ambient `PermissionHelper` context. The deferred send performed by
+	 * `runWorker()` is dispatched directly by Action Scheduler against the
+	 * `datamachine_send_email_worker` hook, never through
+	 * `wp_get_ability('datamachine/send-email-queued')->execute()`, so this
+	 * callback never runs inside that async context and needs no
+	 * `_mailbox_grant` special case (unlike `SendEmailAbility::checkPermission()`,
+	 * which the worker does reach via `datamachine/send-email`).
+	 *
+	 * @param mixed $input Normalized ability input.
 	 * @return bool True if user has permission.
 	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+	public function checkPermission( $input = null ): bool {
+		return $this->authorizeMailboxRef( $input, 'send' );
 	}
 
 	/**

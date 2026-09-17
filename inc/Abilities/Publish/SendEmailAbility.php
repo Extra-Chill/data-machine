@@ -23,11 +23,14 @@
 namespace DataMachine\Abilities\Publish;
 
 use DataMachine\Abilities\AbilityRegistration;
+use DataMachine\Abilities\Email\EmailMailboxPermission;
 use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
 
 class SendEmailAbility {
+
+	use EmailMailboxPermission;
 
 	private static bool $registered           = false;
 	private static bool $registration_pending = false;
@@ -203,10 +206,34 @@ class SendEmailAbility {
 	/**
 	 * Permission callback for ability.
 	 *
+	 * When the normalized input carries a signed `_mailbox_grant` — the
+	 * shape `SendEmailQueuedAbility`'s worker forwards on dispatch — mailbox
+	 * authorization is intentionally left to execute()'s
+	 * `verifiedMailboxContext()` + `resolve_mailbox_for_principal()` check
+	 * against the grant's own issuer identity. That grant was already
+	 * authorized once at queue time and is independently re-verified via its
+	 * HMAC signature at dispatch time; Action Scheduler's run-queue context
+	 * carries no ambient acting user/agent, so re-deriving ownership here
+	 * from `PermissionHelper`'s (empty) ambient context would incorrectly
+	 * deny a previously-authorized send. Only the capability floor applies
+	 * in that case — which the Action Scheduler bypass in
+	 * `PermissionHelper::can()` already satisfies.
+	 *
+	 * Every other call — direct REST/CLI/chat-tool invocation with an
+	 * explicit `auth_ref` and no grant — is gated on ownership of that ref,
+	 * closing the hole where any `use_tools` holder could send as whatever
+	 * mailbox happened to be configured.
+	 *
+	 * @param mixed $input Normalized ability input.
 	 * @return bool True if user has permission.
 	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+	public function checkPermission( $input = null ): bool {
+		$normalized = is_array( $input ) ? $input : array();
+		if ( isset( $normalized['_mailbox_grant'] ) ) {
+			return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+		}
+
+		return $this->authorizeMailboxRef( $input, 'send' );
 	}
 
 	/**
