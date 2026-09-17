@@ -204,7 +204,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 			return null;
 		}
 
-		$token                       = 'mem-lock-' . ++$this->lock_counter;
+		$token                      = 'mem-lock-' . ( ++$this->lock_counter );
 		$this->locks[ $session_id ] = array(
 			'token'      => $token,
 			'expires_at' => $now + max( 1, $ttl_seconds ),
