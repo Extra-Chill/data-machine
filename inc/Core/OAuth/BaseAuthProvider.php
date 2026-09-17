@@ -12,7 +12,18 @@
  * Sensitive fields (tokens, secrets) are encrypted at rest using AES-256-GCM with
  * a key derived from wp_salt('auth'). Encrypted values use an envelope format:
  *
- *     dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
+ *     dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}:{key_fingerprint}
+ *
+ * The trailing key fingerprint (first 8 bytes of sha256(key), hex) records which
+ * key generation encrypted the value. On read it is compared before decryption,
+ * so a rotated auth salt is reported as a key mismatch instead of surfacing as a
+ * remote HTTP 401. Envelopes written before the fingerprint existed decrypt the
+ * same way they always did.
+ *
+ * Decryption failure fails closed: the field is returned as null and the error
+ * is exposed via get_last_decryption_error(). The encrypted envelope itself is
+ * never returned to consumers, because emitting it has transmitted ciphertext
+ * to remote services as if it were the secret.
  *
  * Plaintext values without the envelope prefix are read as-is for backward
  * compatibility. Values get encrypted opportunistically on next save.
@@ -57,6 +68,14 @@ abstract class BaseAuthProvider {
 	 * @since 0.88.0
 	 */
 	const AUTH_TAG_LENGTH = 16;
+
+	/**
+	 * Length in bytes of the non-reversible key fingerprint stored in
+	 * encrypted envelopes. Serialized as hex (2x this length).
+	 *
+	 * @since 0.177.0
+	 */
+	const KEY_FINGERPRINT_LENGTH = 8;
 
 	/**
 	 * Fields that should be encrypted when stored.
@@ -621,7 +640,20 @@ abstract class BaseAuthProvider {
 			? ( $provider_data['account'] ?? array() )
 			: ( $provider_data['principals'][ $scope ]['account'] ?? array() );
 
-		return is_array( $account ) ? $this->decrypt_fields( $account ) : array();
+		if ( ! is_array( $account ) ) {
+			return array();
+		}
+
+		$decrypted = $this->decrypt_fields( $account );
+		if ( null !== $this->last_decryption_error ) {
+			// The envelope cannot be read under the current key. Merge updates
+			// must not overwrite it with nulls: keep the stored bytes so the
+			// credential stays recoverable if the auth salt is ever restored.
+			// Encrypted envelopes pass through encrypt_fields() untouched.
+			return $account;
+		}
+
+		return $decrypted;
 	}
 
 	/**
@@ -1087,6 +1119,30 @@ abstract class BaseAuthProvider {
 	// -------------------------------------------------------------------------
 
 	/**
+	 * Decryption failure recorded by the most recent decrypt_fields() pass.
+	 *
+	 * Non-null means at least one stored envelope could not be decrypted — most
+	 * commonly because wp_salt('auth') changed after the credential was stored.
+	 * Affected fields are returned as null so the envelope is never handed to a
+	 * consumer. Callers that surface errors should check this after a read,
+	 * before treating a missing credential as simply unconfigured.
+	 *
+	 * @since 0.177.0
+	 * @var \WP_Error|null
+	 */
+	private ?\WP_Error $last_decryption_error = null;
+
+	/**
+	 * Get the decryption failure recorded by the most recent credential read.
+	 *
+	 * @since 0.177.0
+	 * @return \WP_Error|null Error when a stored envelope failed to decrypt; null when the last read was clean.
+	 */
+	public function get_last_decryption_error(): ?\WP_Error {
+		return $this->last_decryption_error;
+	}
+
+	/**
 	 * Get the list of field names that should be encrypted at rest.
 	 *
 	 * Combines the built-in ENCRYPTED_FIELDS constant with any additions
@@ -1148,20 +1204,35 @@ abstract class BaseAuthProvider {
 	 * Only attempts decryption on fields that carry the encryption envelope
 	 * prefix. Plaintext values are returned unchanged for backward compatibility.
 	 *
+	 * Decryption failure fails closed: the field becomes null and the error is
+	 * recorded for get_last_decryption_error(). The stored envelope is never
+	 * returned as the field value.
+	 *
 	 * @since 0.88.0
 	 * @param array $data Stored data array (may contain encrypted or plaintext values).
-	 * @return array Data with sensitive fields decrypted.
+	 * @return array Data with sensitive fields decrypted, or null where decryption failed.
 	 */
 	protected function decrypt_fields( array $data ): array {
+		$this->last_decryption_error = null;
 		foreach ( $this->get_encrypted_fields() as $field ) {
 			if ( isset( $data[ $field ] ) && is_string( $data[ $field ] ) ) {
 				if ( str_starts_with( $data[ $field ], self::ENCRYPTION_PREFIX ) ) {
 					$decrypted = $this->decrypt_value( $data[ $field ] );
 					if ( null !== $decrypted ) {
 						$data[ $field ] = $decrypted;
+					} else {
+						/*
+						 * Fail closed. Returning the envelope here has leaked
+						 * ciphertext to remote services that read it as the
+						 * secret itself. Null the field; the stored envelope
+						 * stays in storage untouched for recovery.
+						 */
+						$data[ $field ] = null;
+						$this->record_decryption_error(
+							'datamachine_auth_decrypt_failed',
+							__( 'A stored credential could not be decrypted and was withheld. Re-authenticate the affected connection to restore access.', 'data-machine' )
+						);
 					}
-					// On decryption failure, leave the encrypted blob as-is
-					// so it doesn't silently become an empty string.
 				}
 				// else: plaintext legacy value — pass through unchanged.
 			}
@@ -1173,7 +1244,7 @@ abstract class BaseAuthProvider {
 	 * Encrypt a single value using AES-256-GCM.
 	 *
 	 * Returns the encrypted value in envelope format:
-	 *     dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
+	 *     dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}:{key_fingerprint}
 	 *
 	 * @since 0.88.0
 	 * @param string $plaintext The value to encrypt.
@@ -1202,13 +1273,18 @@ abstract class BaseAuthProvider {
 		}
 
 		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encoding binary crypto envelope fields, not obfuscation.
-		return self::ENCRYPTION_PREFIX . base64_encode( $iv ) . ':' . base64_encode( $tag ) . ':' . base64_encode( $ciphertext );
+		return self::ENCRYPTION_PREFIX . base64_encode( $iv ) . ':' . base64_encode( $tag ) . ':' . base64_encode( $ciphertext ) . ':' . $this->key_fingerprint( $key );
 	}
 
 	/**
 	 * Decrypt a single value from the encryption envelope format.
 	 *
-	 * Expects input in format: dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
+	 * Expects input in format: dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}[:{key_fingerprint}]
+	 *
+	 * When the trailing key fingerprint is present it is compared before any
+	 * decryption is attempted, so a credential encrypted under a different key
+	 * generation fails fast with `datamachine_auth_key_mismatch` instead of a
+	 * wrong-key GCM failure that reads as remote authentication rejection.
 	 *
 	 * @since 0.88.0
 	 * @param string $envelope The encrypted envelope string.
@@ -1217,15 +1293,46 @@ abstract class BaseAuthProvider {
 	private function decrypt_value( string $envelope ): ?string {
 		$key = $this->derive_encryption_key();
 		if ( null === $key ) {
+			$this->record_decryption_error(
+				'datamachine_auth_decrypt_failed',
+				__( 'A stored credential could not be decrypted because the encryption key could not be derived.', 'data-machine' )
+			);
 			return null;
 		}
 
-		// Strip prefix and split into iv:tag:ciphertext.
+		// Strip prefix and split into iv:tag:ciphertext[:fingerprint].
 		$payload = substr( $envelope, strlen( self::ENCRYPTION_PREFIX ) );
-		$parts   = explode( ':', $payload, 3 );
+		$parts   = explode( ':', $payload, 4 );
 
-		if ( 3 !== count( $parts ) ) {
+		if ( 4 === count( $parts ) ) {
+			$fingerprint = strtolower( $parts[3] );
+			if ( ! ctype_xdigit( $fingerprint ) || strlen( $fingerprint ) !== 2 * self::KEY_FINGERPRINT_LENGTH ) {
+				$this->log_encryption_error( 'Malformed encryption envelope: invalid key fingerprint' );
+				$this->record_decryption_error(
+					'datamachine_auth_decrypt_failed',
+					__( 'A stored credential envelope is malformed and cannot be decrypted.', 'data-machine' )
+				);
+				return null;
+			}
+
+			if ( ! hash_equals( $this->key_fingerprint( $key ), $fingerprint ) ) {
+				$this->log_encryption_error( 'Key fingerprint mismatch: credential was encrypted under a different key generation' );
+				$this->record_decryption_error(
+					'datamachine_auth_key_mismatch',
+					__( 'A stored credential was encrypted under a different key — the site auth salt may have changed. Re-authenticate the affected connection to restore access.', 'data-machine' )
+				);
+				// Refuse before attempting decryption: no key under this
+				// generation can open the envelope, and trying leaks nothing.
+				return null;
+			}
+
+			array_pop( $parts );
+		} elseif ( 3 !== count( $parts ) ) {
 			$this->log_encryption_error( 'Malformed encryption envelope: missing separator' );
+			$this->record_decryption_error(
+				'datamachine_auth_decrypt_failed',
+				__( 'A stored credential envelope is malformed and cannot be decrypted.', 'data-machine' )
+			);
 			return null;
 		}
 
@@ -1238,17 +1345,29 @@ abstract class BaseAuthProvider {
 
 		if ( false === $iv || false === $tag || false === $ciphertext ) {
 			$this->log_encryption_error( 'Malformed encryption envelope: invalid base64' );
+			$this->record_decryption_error(
+				'datamachine_auth_decrypt_failed',
+				__( 'A stored credential envelope is malformed and cannot be decrypted.', 'data-machine' )
+			);
 			return null;
 		}
 
 		$expected_iv_length = openssl_cipher_iv_length( self::CIPHER_ALGO );
 		if ( strlen( $iv ) !== $expected_iv_length ) {
 			$this->log_encryption_error( 'Malformed encryption envelope: invalid IV length' );
+			$this->record_decryption_error(
+				'datamachine_auth_decrypt_failed',
+				__( 'A stored credential envelope is malformed and cannot be decrypted.', 'data-machine' )
+			);
 			return null;
 		}
 
 		if ( strlen( $tag ) !== self::AUTH_TAG_LENGTH ) {
 			$this->log_encryption_error( 'Malformed encryption envelope: invalid authentication tag length' );
+			$this->record_decryption_error(
+				'datamachine_auth_decrypt_failed',
+				__( 'A stored credential envelope is malformed and cannot be decrypted.', 'data-machine' )
+			);
 			return null;
 		}
 
@@ -1256,10 +1375,56 @@ abstract class BaseAuthProvider {
 
 		if ( false === $plaintext ) {
 			$this->log_encryption_error( 'Decryption failed (wrong key or corrupted data)' );
+			$this->record_decryption_error(
+				'datamachine_auth_decrypt_failed',
+				__( 'A stored credential could not be decrypted — the site auth salt may have changed since it was saved, or the data is corrupted. Re-authenticate the affected connection.', 'data-machine' )
+			);
 			return null;
 		}
 
 		return $plaintext;
+	}
+
+	/**
+	 * Compute the non-reversible fingerprint of an encryption key.
+	 *
+	 * First KEY_FINGERPRINT_LENGTH bytes of sha256(key), hex-encoded. Stored in
+	 * envelopes so a rotated key generation is detectable before decryption.
+	 *
+	 * @since 0.177.0
+	 * @param string $key Binary encryption key.
+	 * @return string Hex key fingerprint.
+	 */
+	/**
+	 * The WordPress auth salt the encryption key is derived from.
+	 *
+	 * Exists as a seam so tests can control the salt without redefining the
+	 * global wp_salt(). A global function stub cannot be relied on: when this
+	 * suite runs with WordPress loaded, the real wp_salt() is already defined,
+	 * the stub is skipped, and wp_salt() additionally caches its result for the
+	 * process — so salt rotation could not be exercised at all.
+	 *
+	 * @return string|null The salt, or null when WordPress is unavailable.
+	 */
+	protected function auth_salt(): ?string {
+		return function_exists( 'wp_salt' ) ? wp_salt( 'auth' ) : null;
+	}
+
+	private function key_fingerprint( string $key ): string {
+		return substr( bin2hex( hash( 'sha256', $key, true ) ), 0, 2 * self::KEY_FINGERPRINT_LENGTH );
+	}
+
+	/**
+	 * Record the first decryption failure from the current decrypt_fields() pass.
+	 *
+	 * @since 0.177.0
+	 * @param string $code Error code.
+	 * @param string $message Error message.
+	 */
+	private function record_decryption_error( string $code, string $message ): void {
+		if ( null === $this->last_decryption_error ) {
+			$this->last_decryption_error = new \WP_Error( $code, $message );
+		}
 	}
 
 	/**
@@ -1273,11 +1438,10 @@ abstract class BaseAuthProvider {
 	 * @return string|null 32-byte binary key, or null if derivation fails.
 	 */
 	private function derive_encryption_key(): ?string {
-		if ( ! function_exists( 'wp_salt' ) ) {
+		$salt = $this->auth_salt();
+		if ( null === $salt ) {
 			return null;
 		}
-
-		$salt = wp_salt( 'auth' );
 
 		// Warn if WordPress is using default salts (insecure but functional).
 		if ( 'put your unique phrase here' === $salt ) {

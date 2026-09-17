@@ -30,3 +30,13 @@ if ( ! function_exists( 'apply_filters' ) ) {
 		return $value;
 	}
 }
+
+if ( ! function_exists( '__' ) ) {
+	/**
+	 * Minimal translation stub — decryption failure messages use __().
+	 */
+	function __( string $text, string $domain = 'default' ): string {
+		unset( $domain );
+		return $text;
+	}
+}

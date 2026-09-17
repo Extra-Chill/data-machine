@@ -24,6 +24,21 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 	/** Per-account fields that must never be stored in the clear. */
 	private const ACCOUNT_SECRET_FIELDS = array( 'password' );
 
+	/**
+	 * Account names whose stored secret could not be decrypted in the latest
+	 * stored_accounts() read, keyed by account name.
+	 *
+	 * @var array<string, true>
+	 */
+	private array $undecryptable_accounts = array();
+
+	/**
+	 * Decryption error for the accounts marked undecryptable in the latest read.
+	 *
+	 * @var \WP_Error|null
+	 */
+	private ?\WP_Error $undecryptable_error = null;
+
 	public function __construct() {
 		parent::__construct( self::PROVIDER_SLUG );
 	}
@@ -101,7 +116,20 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 	public function resolve_auth_ref( string $account, string $handler_slug = '', array $context = array() ): array|\WP_Error {
 		unset( $handler_slug );
 
-		$accounts   = $this->stored_accounts( $context );
+		$accounts = $this->stored_accounts( $context );
+
+		if ( isset( $this->undecryptable_accounts[ $account ] ) && null !== $this->undecryptable_error ) {
+			return new \WP_Error(
+				$this->undecryptable_error->get_error_code(),
+				sprintf(
+					/* translators: 1: auth ref account, 2: decryption failure reason. */
+					__( 'The stored HTTP Basic credential for auth ref "%1$s" cannot be read: %2$s No outbound request was attempted.', 'data-machine' ),
+					$account,
+					$this->undecryptable_error->get_error_message()
+				)
+			);
+		}
+
 		$credential = $accounts[ $account ] ?? null;
 
 		if ( ! is_array( $credential ) || empty( $credential['username'] ) || empty( $credential['password'] ) ) {
@@ -185,18 +213,56 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 				'proxy_url' => trim( (string) ( $config['proxy_url'] ?? '' ) ),
 			);
 
+			if ( $decrypt ) {
+				$this->undecryptable_accounts = array();
+				$this->undecryptable_error    = null;
+				// decrypt_fields() nulls a password it cannot decrypt; the
+				// fail-closed sentinel distinguishes that from an empty one.
+				if ( array_key_exists( 'password', $config ) && null === $config['password'] ) {
+					$this->mark_undecryptable( $legacy_account );
+				}
+			}
+
 			return array( $legacy_account => $decrypt ? $legacy : $this->map_account_secrets( $legacy, true ) );
 		}
 
 		$accounts = array();
+		if ( $decrypt ) {
+			$this->undecryptable_accounts = array();
+			$this->undecryptable_error    = null;
+		}
 		foreach ( $stored as $name => $credential ) {
 			if ( ! is_array( $credential ) ) {
 				continue;
 			}
-			$accounts[ (string) $name ] = $decrypt ? $this->map_account_secrets( $credential, false ) : $credential;
+			if ( ! $decrypt ) {
+				$accounts[ (string) $name ] = $credential;
+				continue;
+			}
+			$raw_secret = $credential['password'] ?? null;
+			$mapped     = $this->map_account_secrets( $credential, false );
+			if ( is_string( $raw_secret ) && str_starts_with( $raw_secret, BaseAuthProvider::ENCRYPTION_PREFIX ) && array_key_exists( 'password', $mapped ) && null === $mapped['password'] ) {
+				$this->mark_undecryptable( (string) $name );
+			}
+			$accounts[ (string) $name ] = $mapped;
 		}
 
 		return $accounts;
+	}
+
+	/**
+	 * Record an account whose stored envelope failed to decrypt, keeping the
+	 * first specific error for surfacing through resolve_auth_ref().
+	 */
+	private function mark_undecryptable( string $account ): void {
+		$this->undecryptable_accounts[ $account ] = true;
+		if ( null === $this->undecryptable_error ) {
+			$error                     = $this->get_last_decryption_error();
+			$this->undecryptable_error = $error ?? new \WP_Error(
+				'datamachine_auth_decrypt_failed',
+				__( 'A stored credential could not be decrypted and was withheld.', 'data-machine' )
+			);
+		}
 	}
 
 	/**
@@ -208,7 +274,8 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 	 *
 	 * @param array $credential Account entry.
 	 * @param bool  $encrypt    True to encrypt, false to decrypt.
-	 * @return array<string, string>
+	 * @return array<string, string|null> A secret field is null when its stored
+	 *                                    envelope could not be decrypted.
 	 */
 	private function map_account_secrets( array $credential, bool $encrypt ): array {
 		foreach ( self::ACCOUNT_SECRET_FIELDS as $field ) {
@@ -217,10 +284,12 @@ final class HttpBasicAuthProvider extends BaseAuthProvider {
 				continue;
 			}
 
-			$mapped               = $encrypt
+			$mapped = $encrypt
 				? $this->encrypt_fields( array( $field => $value ) )
 				: $this->decrypt_fields( array( $field => $value ) );
-			$credential[ $field ] = $mapped[ $field ] ?? $value;
+			// array_key_exists, not ?? : a decryption failure must stay null
+			// instead of falling back to the stored envelope.
+			$credential[ $field ] = array_key_exists( $field, $mapped ) ? $mapped[ $field ] : $value;
 		}
 
 		return $credential;

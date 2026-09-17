@@ -33,7 +33,7 @@ if ( ! function_exists( 'update_site_option' ) ) {
 }
 
 function wp_salt( string $scheme = 'auth' ): string {
-	return 'http-basic-smoke-salt-' . $scheme;
+	return $GLOBALS['datamachine_test_salt'] ?? ( 'http-basic-smoke-salt-' . $scheme );
 }
 
 if ( ! function_exists( 'apply_filters' ) ) {
@@ -204,6 +204,36 @@ $empty = new HttpBasicAuthProvider();
 $GLOBALS['datamachine_http_basic_options']['datamachine_auth_data']['http_basic']['config'] = array();
 if ( $empty->is_authenticated() || array() !== $empty->get_account_names() ) {
 	$fail( 'an unconfigured provider reported credentials' );
+}
+
+// A rotated site auth salt must fail closed: the stored envelope is never
+// emitted as the credential, and resolution reports the key mismatch explicitly
+// instead of letting the ciphertext travel as a Basic auth password.
+$provider->save_config( array( 'account' => 'logstash', 'username' => 'chubes4', 'password' => 'rotated' ) );
+$GLOBALS['datamachine_test_salt'] = 'rotated-smoke-salt-auth';
+$rotated = $provider->resolve_auth_ref( 'logstash' );
+if ( ! is_wp_error( $rotated ) ) {
+	$fail( 'resolving a credential under a rotated salt unexpectedly succeeded' );
+}
+if ( 'datamachine_auth_key_mismatch' !== $rotated->get_error_code() ) {
+	$fail( 'rotated salt did not report the explicit key mismatch, got: ' . $rotated->get_error_code() );
+}
+if ( str_contains( $rotated->get_error_message(), BaseAuthProvider::ENCRYPTION_PREFIX ) ) {
+	$fail( 'decryption failure error leaked the envelope' );
+}
+
+// The stored envelope must survive the failed read so the credential stays
+// recoverable.
+$stored_after = $stored_accounts()['logstash']['password'] ?? '';
+if ( ! is_string( $stored_after ) || ! str_starts_with( $stored_after, BaseAuthProvider::ENCRYPTION_PREFIX ) ) {
+	$fail( 'failed read destroyed the stored envelope' );
+}
+
+// Restoring the salt recovers the credential without re-authentication.
+unset( $GLOBALS['datamachine_test_salt'] );
+$recovered = $provider->resolve_auth_ref( 'logstash' );
+if ( is_wp_error( $recovered ) || 'rotated' !== ( $recovered['auth']['password'] ?? '' ) ) {
+	$fail( 'restoring the salt did not recover the stored credential' );
 }
 
 echo "=== http-basic-auth-provider-smoke: ALL PASS ===\n";
