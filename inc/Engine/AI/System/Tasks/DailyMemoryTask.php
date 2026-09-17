@@ -26,6 +26,7 @@ use AgentsAPI\AI\WP_Agent_Run_Outcome;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DailyMemory;
@@ -1111,19 +1112,45 @@ class DailyMemoryTask extends SystemTask {
 	}
 
 	/**
+	 * Gather the day's activity context for the AI prompt.
+	 *
+	 * Context collection is bound to the run's authorized execution
+	 * principal (#3487): the `user_id`/`agent_id` params injected by the
+	 * per-agent schedule fan-out or the system-task agent envelope. Only
+	 * records visible to that agent/user pair reach the model, so one
+	 * agent's compaction can never summarize another agent's or another
+	 * user's jobs and chat sessions into the wrong MEMORY.md.
+	 *
+	 * Two deliberate breadth choices exist:
+	 * - No principal bound at all (both IDs absent/0) collects NO context.
+	 *   The legacy behavior — silently summarizing the whole site's day —
+	 *   was an authorization accident, not an authorized aggregate.
+	 * - An explicitly authorized agent-wide maintenance run opts in via
+	 *   `context_scope: 'agent'`, spanning every user of that one agent.
+	 *   This is a caller-side authority decision; ordinary compaction
+	 *   never inherits it.
+	 *
 	 * @param array $params Task params.
 	 * @return string Combined context text.
 	 */
 	private function gatherContext( array $params ): string {
-		$date  = $params['date'] ?? gmdate( 'Y-m-d' );
+		$date     = $params['date'] ?? gmdate( 'Y-m-d' );
+		$user_id  = (int) ( $params['user_id'] ?? 0 );
+		$agent_id = (int) ( $params['agent_id'] ?? 0 );
+
+		$scope = $this->resolveContextScope( $params, $user_id, $agent_id );
+		if ( empty( $scope ) ) {
+			return '';
+		}
+
 		$parts = array();
 
-		$jobs_context = $this->getJobsContext( $date );
+		$jobs_context = $this->getJobsContext( $date, $scope );
 		if ( ! empty( $jobs_context ) ) {
 			$parts[] = "## Jobs completed on {$date}\n\n{$jobs_context}";
 		}
 
-		$chat_context = $this->getChatContext( $date );
+		$chat_context = $this->getChatContext( $date, $scope );
 		if ( ! empty( $chat_context ) ) {
 			$parts[] = "## Chat sessions on {$date}\n\n{$chat_context}";
 		}
@@ -1132,25 +1159,42 @@ class DailyMemoryTask extends SystemTask {
 	}
 
 	/**
-	 * @param string $date Date string (Y-m-d).
+	 * Resolve the authorization scope for context collection.
+	 *
+	 * @param array $params   Task params.
+	 * @param int   $user_id  Authorized user ID (0 when unbound).
+	 * @param int   $agent_id Authorized agent ID (0 when unbound).
+	 * @return array{user_id?: int, agent_id?: int} Scope keys for the
+	 *               storage reads, or an empty array when no record may
+	 *               reach the model.
+	 */
+	private function resolveContextScope( array $params, int $user_id, int $agent_id ): array {
+		if ( 'agent' === ( $params['context_scope'] ?? '' ) && $agent_id > 0 ) {
+			// Explicitly authorized agent-wide aggregate: every user of this
+			// one agent, no other agent.
+			return array( 'agent_id' => $agent_id );
+		}
+
+		// Principal scope: only bound dimensions narrow. An agentless
+		// delegated run (user bound, agent 0) reads the user's own records.
+		$scope = array();
+		if ( $user_id > 0 ) {
+			$scope['user_id'] = $user_id;
+		}
+		if ( $agent_id > 0 ) {
+			$scope['agent_id'] = $agent_id;
+		}
+
+		return $scope;
+	}
+
+	/**
+	 * @param string $date  Date string (Y-m-d).
+	 * @param array  $scope Authorization scope (`user_id`, `agent_id`).
 	 * @return string
 	 */
-	private function getJobsContext( string $date ): string {
-		global $wpdb;
-		$table = $wpdb->prefix . 'datamachine_jobs';
-
-		$jobs = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT job_id, pipeline_id, flow_id, source, label, status,
-						created_at, completed_at
-				 FROM %i
-				 WHERE DATE(created_at) = %s
-				 ORDER BY job_id ASC',
-				$table,
-				$date
-			),
-			ARRAY_A
-		);
+	private function getJobsContext( string $date, array $scope ): string {
+		$jobs = ( new Jobs() )->get_jobs_for_day( $date, $scope );
 
 		if ( empty( $jobs ) ) {
 			return '';
@@ -1168,11 +1212,12 @@ class DailyMemoryTask extends SystemTask {
 	}
 
 	/**
-	 * @param string $date Date string (Y-m-d).
+	 * @param string $date  Date string (Y-m-d).
+	 * @param array  $scope Authorization scope (`user_id`, `agent_id`).
 	 * @return string
 	 */
-	private function getChatContext( string $date ): string {
-		$sessions = ConversationStoreFactory::get()->list_sessions_for_day( $date );
+	private function getChatContext( string $date, array $scope ): string {
+		$sessions = ConversationStoreFactory::get()->list_sessions_for_day_scoped( $date, $scope );
 
 		if ( empty( $sessions ) ) {
 			return '';

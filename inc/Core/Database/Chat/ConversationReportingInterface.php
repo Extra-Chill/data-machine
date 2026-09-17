@@ -33,6 +33,33 @@ interface ConversationReportingInterface {
 	public function list_sessions_for_day( string $date ): array;
 
 	/**
+	 * List lightweight session summaries created on the given date, narrowed
+	 * by an explicit authorization scope.
+	 *
+	 * Principal-bound callers (ordinary daily-memory compaction) pass both
+	 * scope keys so only records visible to that agent/user pair reach the
+	 * model (#3487). A single key is a deliberately authorized aggregate
+	 * along that dimension (e.g. an agent-wide maintenance read spans all
+	 * users of that agent); an empty scope array is the site-wide day
+	 * aggregate. The breadth is therefore always an explicit authority
+	 * choice by the caller, never an accident of omitted predicates.
+	 *
+	 * Implementations MUST apply the scope as storage-query predicates, not
+	 * by filtering an already broad result in PHP. Scope keys:
+	 *
+	 * - `user_id` (int): only sessions owned by that user.
+	 * - `agent_id` (int): only sessions bound to that agent.
+	 *
+	 * @param string $date  Date string in `Y-m-d` format.
+	 * @param array  $scope Authorization scope. Keys are independent; absent
+	 *                      keys narrow nothing.
+	 * @return array<int, array<string, mixed>> Rows shaped like
+	 *                                            list_sessions_for_day().
+	 * @since next
+	 */
+	public function list_sessions_for_day_scoped( string $date, array $scope ): array;
+
+	/**
 	 * Report storage metrics for the retention CLI.
 	 *
 	 * Returns `['rows' => int, 'size_mb' => string]` for the default

@@ -13,33 +13,39 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 }
 
-class WP_CLI_Command {}
+if ( ! class_exists( 'WP_CLI_Command' ) ) {
+	class WP_CLI_Command {}
+}
 
-class WP_CLI {
-	public static array $logs = array();
+if ( ! class_exists( 'WP_CLI' ) ) {
+	class WP_CLI {
+		public static array $logs = array();
 
-	public static function log( string $message ): void {
-		self::$logs[] = $message;
-	}
+		public static function log( string $message ): void {
+			self::$logs[] = $message;
+		}
 
-	public static function warning( string $message ): void {
-		self::$logs[] = 'WARNING: ' . $message;
-	}
+		public static function warning( string $message ): void {
+			self::$logs[] = 'WARNING: ' . $message;
+		}
 
-	public static function error( string $message ): void {
-		throw new RuntimeException( $message );
+		public static function error( string $message ): void {
+			throw new RuntimeException( $message );
+		}
 	}
 }
 
-class WP_Error {
-	public function __construct( private string $code = '', private string $message = '' ) {}
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		public function __construct( private string $code = '', private string $message = '' ) {}
 
-	public function get_error_code(): string {
-		return $this->code;
-	}
+		public function get_error_code(): string {
+			return $this->code;
+		}
 
-	public function get_error_message(): string {
-		return $this->message;
+		public function get_error_message(): string {
+			return $this->message;
+		}
 	}
 }
 
@@ -74,6 +80,8 @@ if ( ! function_exists( 'apply_filters' ) ) {
 }
 
 if ( ! function_exists( 'do_action' ) ) {
+    define( 'DATAMACHINE_SMOKE_STUBBED_HOOKS', true );
+
     function do_action( string $tag, ...$args ): void {
     	if ( 'datamachine_log' === $tag ) {
     		$GLOBALS['datamachine_test_logs'][] = $args;
@@ -81,12 +89,29 @@ if ( ! function_exists( 'do_action' ) ) {
     }
 }
 
-function did_action( string $hook = '' ): int {
-	return 0;
+// Under real WordPress the stubs above are skipped, so capture the same log
+// entries through the real hook system instead of shadowing `do_action`.
+if ( ! defined( 'DATAMACHINE_SMOKE_STUBBED_HOOKS' ) ) {
+    add_action(
+    	'datamachine_log',
+    	static function ( ...$args ): void {
+    		$GLOBALS['datamachine_test_logs'][] = $args;
+    	},
+    	10,
+    	10
+    );
 }
 
-function doing_action( string $hook = '' ): bool {
-	return false;
+if ( ! function_exists( 'did_action' ) ) {
+    function did_action( string $hook = '' ): int {
+    	return 0;
+    }
+}
+
+if ( ! function_exists( 'doing_action' ) ) {
+    function doing_action( string $hook = '' ): bool {
+    	return false;
+    }
 }
 
 if ( ! function_exists( 'add_action' ) ) {
@@ -107,14 +132,22 @@ if ( ! function_exists( 'size_format' ) ) {
     }
 }
 
-function datamachine_merge_engine_data( int $job_id, array $data ): void {
-	$GLOBALS['datamachine_test_engine_data'][ $job_id ] = array_merge( $GLOBALS['datamachine_test_engine_data'][ $job_id ] ?? array(), $data );
+if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
+    function datamachine_merge_engine_data( int $job_id, array $data ): void {
+    	$GLOBALS['datamachine_test_engine_data'][ $job_id ] = array_merge( $GLOBALS['datamachine_test_engine_data'][ $job_id ] ?? array(), $data );
+    }
 }
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 require_once __DIR__ . '/agents-api-loader.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 datamachine_tests_require_agents_api();
+
+// `conversation-loop.php` declares namespaced functions rather than autoloadable
+// classes, so load it explicitly when the plugin bootstrap has not already run.
+if ( ! function_exists( 'DataMachine\\Engine\\AI\\datamachine_conversation_metadata' ) ) {
+	require_once dirname( __DIR__ ) . '/inc/Engine/AI/conversation-loop.php';
+}
 
 use DataMachine\Cli\Commands\JobsCommand;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
@@ -180,6 +213,7 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	public function cleanup_pipeline_transcripts( int $retention_days ): int { return 0; }
 	public function cleanup_orphaned_sessions( int $hours = 1 ): int { return 0; }
 	public function list_sessions_for_day( string $date ): array { return array(); }
+	public function list_sessions_for_day_scoped( string $date, array $scope ): array { return array(); }
 	public function get_storage_metrics(): ?array { return array( 'rows' => 0, 'size_mb' => '0.0' ); }
 }
 
