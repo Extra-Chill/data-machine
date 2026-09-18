@@ -2,6 +2,22 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.62.0] - 2026-09-18
+
+### Added
+- store canonical ticket URLs, assemble affiliate wrapper at resolve time
+- JS-gate affiliate ticket links for Ticketmaster compliance
+
+### Changed
+- consolidate remaining event-details block-name literals onto Event_Post_Type::EVENT_DETAILS_BLOCK_NAME
+- pay down phpstan lint baseline to zero (issue #767) — round 2
+
+### Fixed
+- set EventsMap data-initialized only after listeners attach; add data-machine-map-ready + dataset self-heal
+- classify after-midnight same-night ends as single-day in the calendar
+- detect and repair affiliate redirects with punctuation-stripped destinations
+- stop embedding affiliate ticket URLs in add-to-calendar deeplinks and .ics exports
+
 ## [0.61.5] - 2026-09-09
 
 ### Fixed
