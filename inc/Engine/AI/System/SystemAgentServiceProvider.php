@@ -41,6 +41,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionLogsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
 use DataMachine\Engine\AI\System\Tasks\SourceInventoryTask;
+use DataMachine\Engine\AI\System\Tasks\StaleClaimReconciliationTask;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\AI\System\Tasks\WakeBriefingTask;
 use DataMachine\Engine\Tasks\RecurringRejectionTracker;
@@ -112,6 +113,7 @@ class SystemAgentServiceProvider {
 		$tasks[ RetentionCleanup::TASK_FILES ]           = RetentionFilesTask::class;
 		$tasks[ RetentionCleanup::TASK_CHAT_SESSIONS ]   = RetentionChatSessionsTask::class;
 		$tasks[ RetentionCleanup::TASK_JOB_ARTIFACTS ]   = RetentionJobArtifactsTask::class;
+		$tasks['stale_claim_reconciliation']             = StaleClaimReconciliationTask::class;
 
 		return $tasks;
 	}
@@ -156,6 +158,22 @@ class SystemAgentServiceProvider {
 			'task_params_callback' => static function () {
 				return array();
 			},
+		);
+
+		// Crashed-run reconciliation must keep pace with job creation the
+		// same way high-churn AS cleanup does: a worker killed mid-step
+		// orphans its job until this detects it, so the detection cadence —
+		// not the operator — is the safety net. Five minutes keeps
+		// crash-to-recovery latency bounded while the per-pass candidate
+		// batch and the shared retry-attempt bound keep each tick cheap.
+		$schedules['stale_claim_reconciliation'] = array(
+			'task_type'          => 'stale_claim_reconciliation',
+			'interval'           => 'every_5_minutes',
+			'enabled_setting'    => 'stale_claim_reconciliation_enabled',
+			'default_enabled'    => true,
+			'label'              => 'Stale job-claim reconciliation (high-frequency)',
+			'first_run_callback' => 'strtotime',
+			'first_run_arg'      => '+5 minutes',
 		);
 
 		foreach ( self::getRetentionScheduleDefinitions() as $schedule_id => $schedule ) {
