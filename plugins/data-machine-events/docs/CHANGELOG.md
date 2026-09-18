@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.62.1] - 2026-09-18
+
+### Fixed
+- stop writing fabricated series-range ends onto single event occurrences
+- resolve calendar multi-day span policy and merge continuations into their date groups
+
 ## [0.62.0] - 2026-09-18
 
 ### Added
