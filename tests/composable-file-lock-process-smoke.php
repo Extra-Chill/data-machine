@@ -91,7 +91,52 @@ if ( ! $replacement['acquired'] || ! $replacement['lock'] instanceof ComposableF
 }
 $replacement['lock']->release();
 
+// A lock this process cannot write is replaceable only while nobody holds it
+// (#3512). Unlinking a held lock would leave the holder on the orphaned inode
+// and let a second composer start on a fresh one — two writers, no contention
+// reported, which is worse than the wedge the replacement exists to clear.
+$lock_path = $directory . '/.' . basename( $filepath ) . '.compose.lock';
+$holder_pid = pcntl_fork();
+if ( 0 === $holder_pid ) {
+	$held = ComposableFileLock::acquire( 'AGENTS.md', $filepath, 100 );
+	file_put_contents( $result_file, $held['acquired'] ? 'holding' : 'failed', LOCK_EX );
+	while ( true ) {
+		usleep( 100000 );
+	}
+}
+
+$deadline = microtime( true ) + 2.0;
+do {
+	if ( 'holding' === (string) file_get_contents( $result_file ) ) {
+		break;
+	}
+	usleep( 10000 );
+} while ( microtime( true ) < $deadline );
+
+if ( 'holding' !== (string) file_get_contents( $result_file ) ) {
+	posix_kill( $holder_pid, SIGKILL );
+	pcntl_waitpid( $holder_pid, $status );
+	$fail( 'holder did not acquire the lock.' );
+}
+
+$held_inode = fileinode( $lock_path );
+chmod( $lock_path, 0444 );
+$intruder = ComposableFileLock::acquire( 'AGENTS.md', $filepath, 100 );
+clearstatcache( true, $lock_path );
+
+$broke_in    = (bool) $intruder['acquired'];
+$replaced    = ! file_exists( $lock_path ) || fileinode( $lock_path ) !== $held_inode;
+posix_kill( $holder_pid, SIGKILL );
+pcntl_waitpid( $holder_pid, $status );
+
+if ( $broke_in ) {
+	$fail( 'an unwritable but actively held lock was broken into.' );
+}
+if ( $replaced ) {
+	$fail( 'a held lock file was replaced, orphaning its owner onto a stale inode.' );
+}
+
 @unlink( $result_file );
-@unlink( $directory . '/.' . basename( $filepath ) . '.compose.lock' );
+@unlink( $lock_path );
 @rmdir( $directory );
-echo "OK (live blocker and stale-owner recovery)\n";
+echo "OK (live blocker, stale-owner recovery, held-lock replacement refusal)\n";

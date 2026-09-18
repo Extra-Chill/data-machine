@@ -84,11 +84,29 @@ class ComposableFileGenerator {
 
 		$acquisition = ComposableFileLock::acquire( $filename, $filepath );
 		if ( ! $acquisition['acquired'] || ! $acquisition['lock'] instanceof ComposableFileLock ) {
+			$diagnostic = $acquisition['diagnostic'];
+
+			// "unusable" never waited, so reporting a timeout describes a
+			// contention that did not happen and hides a one-file permission
+			// fault behind a hunt for a process that does not exist.
+			if ( 'unusable' === ( $diagnostic['lock_status'] ?? '' ) ) {
+				return array(
+					'success'    => false,
+					'error_code' => 'composition_lock_unusable',
+					'message'    => sprintf(
+						'Composition lock file for "%s" cannot be opened for writing by this user (%s). It is not held by any process; remove it and retry.',
+						$filename,
+						(string) ( $diagnostic['lock_path'] ?? '' )
+					),
+					'blocker'    => $diagnostic,
+				);
+			}
+
 			return array(
 				'success'    => false,
 				'error_code' => 'composition_locked',
 				'message'    => sprintf( 'Composition lock unavailable for "%s" after 2 seconds.', $filename ),
-				'blocker'    => $acquisition['diagnostic'],
+				'blocker'    => $diagnostic,
 			);
 		}
 
