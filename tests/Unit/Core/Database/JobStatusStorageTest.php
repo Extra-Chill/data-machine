@@ -25,7 +25,9 @@ class JobStatusStorageTest extends WP_UnitTestCase {
 
 	public function test_long_failure_message_stores_bounded_status_and_separate_detail(): void {
 		$job_id  = $this->create_pending_job( 'Long failure' );
-		$detail  = 'wp-ai-client request failed: ' . str_repeat( 'cURL error 28: Operation timed out after 513455 milliseconds. ', 8 );
+		// rtrim: stored detail is trimmed, so building the expectation with a trailing
+		// space would assert whitespace the storage layer deliberately discards.
+		$detail  = rtrim( 'wp-ai-client request failed: ' . str_repeat( 'cURL error 28: Operation timed out after 513455 milliseconds. ', 8 ) );
 		$success = $this->jobs->complete_job( $job_id, JobStatus::failed( $detail )->toString() );
 
 		$this->assertTrue( $success );
