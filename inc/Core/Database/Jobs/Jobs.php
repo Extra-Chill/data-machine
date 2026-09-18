@@ -557,6 +557,7 @@ class Jobs extends BaseRepository {
 			$this->table_name,
 			array(
 				'status'                => JobStatus::PENDING,
+				'status_reason'         => null,
 				'operation_state'       => 'enqueued',
 				'operation_claimed_at'  => null,
 				'operation_claim_token' => $new_token,
@@ -568,7 +569,7 @@ class Jobs extends BaseRepository {
 				'job_id' => $job_id,
 				'status' => JobStatus::PROCESSING,
 			),
-			array( '%s', '%s', null, '%s', '%d', '%d', '%s' ),
+			array( '%s', null, '%s', null, '%s', '%d', '%d', '%s' ),
 			array( '%d', '%s' )
 		);
 		if ( 1 !== (int) $updated || ! $scope->commit() ) {
@@ -602,7 +603,7 @@ class Jobs extends BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$updated = $this->wpdb->query(
 			$this->wpdb->prepare(
-				"UPDATE %i SET status = 'pending', completed_at = NULL, terminal_accounting_state = NULL, terminal_accounting_owner = NULL, terminal_accounting_claimed_at = NULL, terminal_accounting_processed_count = 0, operation_state = 'preparing', operation_claimed_at = NULL, operation_claim_token = NULL, operation_action_id = NULL WHERE job_id = %d AND status LIKE %s",
+				"UPDATE %i SET status = 'pending', status_reason = NULL, completed_at = NULL, terminal_accounting_state = NULL, terminal_accounting_owner = NULL, terminal_accounting_claimed_at = NULL, terminal_accounting_processed_count = 0, operation_state = 'preparing', operation_claimed_at = NULL, operation_claim_token = NULL, operation_action_id = NULL WHERE job_id = %d AND status LIKE %s",
 				$this->table_name,
 				$job_id,
 				$failed_status
@@ -767,7 +768,7 @@ class Jobs extends BaseRepository {
 			return null;
 		}
 
-		$fields = 'job_id, user_id, agent_id, pipeline_id, flow_id, parent_job_id, source, label, status, created_at, completed_at, handler_slug, terminal_accounting_state, terminal_accounting_owner, terminal_accounting_claimed_at, terminal_accounting_processed_count, operation_state, operation_action_id, operation_claimed_at, operation_claim_token, operation_generation, operation_effects_begun_at, operation_step_id, operation_ref_hash, request_fingerprint';
+		$fields = 'job_id, user_id, agent_id, pipeline_id, flow_id, parent_job_id, source, label, status, status_reason, created_at, completed_at, handler_slug, terminal_accounting_state, terminal_accounting_owner, terminal_accounting_claimed_at, terminal_accounting_processed_count, operation_state, operation_action_id, operation_claimed_at, operation_claim_token, operation_generation, operation_effects_begun_at, operation_step_id, operation_ref_hash, request_fingerprint';
 		// phpcs:disable WordPress.DB.PreparedSQL -- The nested prepare binds the plugin table identifier and job ID.
 		$job = $this->wpdb->get_row( $this->wpdb->prepare( "SELECT {$fields} FROM %i WHERE job_id = %d", $this->table_name, $job_id ), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL
@@ -1413,6 +1414,7 @@ class Jobs extends BaseRepository {
 				'label'         => 'j.label',
 				'parent_job_id' => 'j.parent_job_id',
 				'status'        => 'j.status',
+				'status_reason' => 'j.status_reason',
 				'engine_data'   => 'j.engine_data',
 				'created_at'    => 'j.created_at',
 				'completed_at'  => 'j.completed_at',
@@ -1766,12 +1768,9 @@ class Jobs extends BaseRepository {
 	/**
 	 * Resolve a status prefix to known variants for indexed lookups.
 	 *
-	 * Falls back to a LIKE pattern when the prefix is not in STATUS_VARIANTS
-	 * (e.g. custom statuses from third-party handlers, or `failed` whose
-	 * compound forms embed arbitrary error text and cannot be enumerated).
-	 * The LIKE fallback is a prefix pattern (`prefix%`) so it still benefits
-	 * from idx_status_created and matches both the bare prefix and every
-	 * compound form.
+	 * Once status is a bounded vocabulary, exact IN matching is sufficient.
+	 * Prefix matching remains only while JobStatusMigration is incomplete so
+	 * leftover compound rows (`failed - …`, `failed:…`) still match.
 	 *
 	 * @param string $status_prefix The status prefix (e.g. 'completed', 'failed').
 	 * @return array{type: 'in', values: string[]} | array{type: 'like', pattern: string}
@@ -2588,12 +2587,15 @@ class Jobs extends BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The locked jobs row is the ownership boundary.
 		$updated = $this->wpdb->update(
 			$this->table_name,
-			array( 'status' => JobStatus::PROCESSING ),
+			array(
+				'status'        => JobStatus::PROCESSING,
+				'status_reason' => null,
+			),
 			array(
 				'job_id' => $job_id,
 				'status' => JobStatus::WAITING,
 			),
-			array( '%s' ),
+			array( '%s', null ),
 			array( '%d', '%s' )
 		);
 		if ( 1 !== (int) $updated ) {
@@ -2850,14 +2852,15 @@ class Jobs extends BaseRepository {
 		$updated = $this->wpdb->update(
 			$this->table_name,
 			array(
-				'status'      => JobStatus::PENDING,
-				'engine_data' => wp_json_encode( $engine ),
+				'status'        => JobStatus::PENDING,
+				'status_reason' => null,
+				'engine_data'   => wp_json_encode( $engine ),
 			),
 			array(
 				'job_id' => $job_id,
 				'status' => JobStatus::PROCESSING,
 			),
-			array( '%s', '%s' ),
+			array( '%s', null, '%s' ),
 			array( '%d', '%s' )
 		);
 		if ( 1 !== (int) $updated ) {
@@ -2947,17 +2950,19 @@ class Jobs extends BaseRepository {
 		}
 
 		$engine  = $this->engine_data_with_status_reason( $current_engine, $job_status );
+		$storage = $job_status->toStorage();
 		$updated = $this->wpdb->update(
 			$this->table_name,
 			array(
-				'status'      => $status,
-				'engine_data' => wp_json_encode( $engine ),
+				'status'        => $storage['status'],
+				'status_reason' => $storage['status_reason'],
+				'engine_data'   => wp_json_encode( $engine ),
 			),
 			array(
 				'job_id' => $job_id,
 				'status' => $current_status,
 			),
-			array( '%s', '%s' ),
+			array( '%s', $job_status->hasReason() ? '%s' : null, '%s' ),
 			array( '%d', '%s' )
 		);
 
@@ -3114,15 +3119,17 @@ class Jobs extends BaseRepository {
 		// The locked row makes this a non-retrying ownership CAS. Any failure rolls
 		// back the whole callback/claim/job unit instead of retrying one statement.
 		// phpcs:disable Generic.Formatting.MultipleStatementAlignment,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned -- Terminal recovery receipt extends the existing update envelope.
+		$storage     = $prepared_job_status->toStorage();
 		$update_data = array(
-			'status'                              => $status,
+			'status'                              => $storage['status'],
+			'status_reason'                       => $storage['status_reason'],
 			'completed_at'                        => current_time( 'mysql', true ),
 			'terminal_accounting_state'           => 0,
 			'terminal_accounting_owner'           => null,
 			'terminal_accounting_claimed_at'      => null,
 			'terminal_accounting_processed_count' => $processed_claim_count,
 		);
-		$update_formats = array( '%s', '%s', '%d', null, null, '%d' );
+		$update_formats = array( '%s', $prepared_job_status->hasReason() ? '%s' : null, '%s', '%d', null, null, '%d' );
 		$engine = $this->engine_data_with_status_reason( is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array(), $prepared_job_status );
 		$engine = (array) apply_filters( 'datamachine_job_terminal_engine_data', $engine, $job_id, $status );
 		$update_data['engine_data'] = wp_json_encode( $engine );
@@ -3850,6 +3857,7 @@ class Jobs extends BaseRepository {
             label varchar(255) NULL DEFAULT NULL,
             parent_job_id bigint(20) unsigned NULL DEFAULT NULL,
             status varchar(255) NOT NULL,
+            status_reason longtext NULL,
             engine_data longtext NULL,
             handler_slug varchar(100) NULL DEFAULT NULL,
             idempotency_key varchar(191) NULL DEFAULT NULL,
@@ -3888,6 +3896,7 @@ class Jobs extends BaseRepository {
 		dbDelta( $sql );
 
 		self::migrate_columns( $table_name );
+		self::migrate_status_reason_column( $table_name );
 		self::migrate_task_type_column( $table_name );
 		self::migrate_handler_slug_column( $table_name );
 		self::migrate_idempotency_key_column( $table_name );
@@ -4112,6 +4121,149 @@ class Jobs extends BaseRepository {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Add status_reason column and backfill compound status rows.
+	 *
+	 * Splits legacy `"<status> - <detail>"` / `"<status>:<detail>"` values at the
+	 * first established separator so `status` stays a bounded vocabulary while
+	 * the detail is preserved in `status_reason` (and `engine_data` until shed).
+	 *
+	 * @param string $table_name Fully qualified table name.
+	 */
+	private static function migrate_status_reason_column( string $table_name ): void {
+		global $wpdb;
+
+		if ( get_option( 'datamachine_status_reason_backfill_v1' ) ) {
+			return;
+		}
+
+		if ( ! BaseRepository::column_exists( $table_name, 'status_reason', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$result = $wpdb->query(
+				$wpdb->prepare(
+					'ALTER TABLE %i
+					 ADD COLUMN status_reason longtext NULL',
+					$table_name
+				)
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( false === $result && ! BaseRepository::column_exists( $table_name, 'status_reason', $wpdb ) ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Failed to add status_reason column to jobs table',
+					array(
+						'table_name' => $table_name,
+						'db_error'   => $wpdb->last_error,
+					)
+				);
+				return;
+			}
+		}
+
+		self::backfill_status_reason_column( $table_name, $wpdb );
+		update_option( 'datamachine_status_reason_backfill_v1', 1, false );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Added status_reason column to jobs table for bounded status storage',
+			array( 'table_name' => $table_name )
+		);
+	}
+
+	/**
+	 * Split compound statuses and copy existing JSON reasons into status_reason.
+	 *
+	 * @param string $table_name Fully qualified table name.
+	 * @param \wpdb  $wpdb       Database handle.
+	 */
+	private static function backfill_status_reason_column( string $table_name, \wpdb $wpdb ): void {
+		$canonical = JobStatus::ALL_STATUSES;
+		$like      = '%' . $wpdb->esc_like( '"job_status_reason"' ) . '%';
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Bounded plugin-owned jobs table backfill.
+		$max_id     = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(job_id) FROM %i', $table_name ) );
+		$chunk_size = 5000;
+
+		for ( $start = 0; $start < $max_id; $start += $chunk_size ) {
+			$end          = $start + $chunk_size;
+			$placeholders = implode( ', ', array_fill( 0, count( $canonical ), '%s' ) );
+			$rows         = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT job_id, status, engine_data
+					 FROM %i
+					 WHERE job_id > %d AND job_id <= %d
+					 AND ( status NOT IN ({$placeholders}) OR ( status_reason IS NULL AND engine_data IS NOT NULL AND engine_data LIKE %s ) )",
+					array_merge( array( $table_name, $start, $end ), $canonical, array( $like ) )
+				),
+				ARRAY_A
+			);
+
+			if ( empty( $rows ) ) {
+				continue;
+			}
+
+			foreach ( $rows as $row ) {
+				self::backfill_status_reason_row( $table_name, $wpdb, $row );
+			}
+		}
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
+	}
+
+	/**
+	 * Persist one row's bounded status and preserved detail.
+	 *
+	 * @param string               $table_name Fully qualified table name.
+	 * @param \wpdb                $wpdb       Database handle.
+	 * @param array<string, mixed> $row        Candidate job row.
+	 */
+	private static function backfill_status_reason_row( string $table_name, \wpdb $wpdb, array $row ): void {
+		$job_id = (int) ( $row['job_id'] ?? 0 );
+		if ( $job_id <= 0 ) {
+			return;
+		}
+
+		$parsed = JobStatus::fromString( (string) ( $row['status'] ?? '' ) );
+		if ( ! $parsed->isCanonical() ) {
+			return;
+		}
+
+		$stored_engine = $row['engine_data'] ?? null;
+		$engine        = null === $stored_engine || '' === $stored_engine ? array() : json_decode( (string) $stored_engine, true );
+		if ( ! is_array( $engine ) ) {
+			$engine = array();
+		}
+
+		$storage = $parsed->toStorage();
+		$reason  = $storage['status_reason'];
+		if ( null === $reason || '' === $reason ) {
+			$reason = is_string( $engine['job_status_reason'] ?? null ) ? $engine['job_status_reason'] : null;
+		}
+		if ( null !== $reason && '' !== $reason ) {
+			$engine['job_status_reason'] = $reason;
+		}
+
+		$encoded = wp_json_encode( $engine );
+		if ( ! is_string( $encoded ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time status_reason backfill of a plugin-owned jobs row.
+		$wpdb->update(
+			$table_name,
+			array(
+				'status'        => $storage['status'],
+				'status_reason' => ( null !== $reason && '' !== $reason ) ? $reason : null,
+				'engine_data'   => $encoded,
+			),
+			array( 'job_id' => $job_id ),
+			array( '%s', ( null !== $reason && '' !== $reason ) ? '%s' : null, '%s' ),
+			array( '%d' )
+		);
 	}
 
 	/**

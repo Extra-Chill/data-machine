@@ -49,7 +49,7 @@ The Jobs interface is a React-based admin dashboard that lists recent job execut
 
 ## Job Status Management
 
-The indexed `datamachine_jobs.status` column stores only Data Machine's bounded base-state vocabulary. Human-readable detail is stored as `engine_data.job_status_reason` and composed into `status_display` by job abilities, so list/detail output stays scannable without increasing status-index cardinality.
+The indexed `datamachine_jobs.status` column stores only Data Machine's bounded base-state vocabulary. Human-readable detail is stored as nullable `status_reason` (and mirrored into `engine_data.job_status_reason` until that blob is shed) and composed into `status_display` by job abilities, so list/detail output stays scannable without increasing status-index cardinality.
 
 ### Legacy Status Migration
 

@@ -9,6 +9,8 @@ require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/JobArtifactSurfaces.php';
 require_once __DIR__ . '/../inc/Abilities/Job/JobHelpers.php';
 
+use DataMachine\Core\JobStatus;
+
 class JobStatusPresentationHarness {
 	use DataMachine\Abilities\Job\JobHelpers;
 
@@ -20,6 +22,8 @@ class JobStatusPresentationHarness {
 $harness = new JobStatusPresentationHarness();
 $legacy = $harness->present( array( 'status' => 'agent_skipped - source-rejected', 'engine_data' => array() ) );
 $normalized = $harness->present( array( 'status' => 'failed', 'engine_data' => array( 'job_status_reason' => 'provider timeout' ) ) );
+$column = $harness->present( array( 'status' => 'failed', 'status_reason' => 'cURL error 28: Operation timed out', 'engine_data' => array() ) );
+$separator = JobStatus::fromString( 'failed - provider timeout - retry exhausted' );
 
 $failures = array();
 if ( 'agent_skipped' !== $legacy['base_status'] || 'agent_skipped - source-rejected' !== $legacy['status'] || 'source-rejected' !== $legacy['status_reason'] || 'agent_skipped - source-rejected' !== $legacy['status_display'] ) {
@@ -27,6 +31,12 @@ if ( 'agent_skipped' !== $legacy['base_status'] || 'agent_skipped - source-rejec
 }
 if ( 'failed' !== $normalized['base_status'] || 'failed - provider timeout' !== $normalized['status'] || 'provider timeout' !== $normalized['status_reason'] || 'failed - provider timeout' !== $normalized['status_display'] ) {
 	$failures[] = 'normalized row is not composed correctly';
+}
+if ( 'failed' !== $column['base_status'] || 'cURL error 28: Operation timed out' !== $column['status_reason'] || 'failed - cURL error 28: Operation timed out' !== $column['status_display'] ) {
+	$failures[] = 'status_reason column is not composed after engine_data is shed';
+}
+if ( JobStatus::FAILED !== $separator->getBaseStatus() || 'provider timeout - retry exhausted' !== $separator->getReason() ) {
+	$failures[] = 'separator inside the detail is preserved when splitting';
 }
 
 if ( $failures ) {

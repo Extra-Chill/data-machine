@@ -261,10 +261,25 @@ class JobStatus {
 	}
 
 	/**
-	 * Convert to string for database storage.
+	 * Bounded column values for database storage.
+	 *
+	 * `status` is always a canonical base state. Human-readable detail lives
+	 * in `status_reason` so the status column stays safe to index and aggregate.
+	 *
+	 * @return array{status: string, status_reason: ?string}
+	 */
+	public function toStorage(): array {
+		return array(
+			'status'        => $this->baseStatus,
+			'status_reason' => $this->hasReason() ? $this->reason : null,
+		);
+	}
+
+	/**
+	 * Convert to string for display and input boundaries.
 	 *
 	 * Returns compound format "base_status - reason" if reason exists,
-	 * otherwise just the base status.
+	 * otherwise just the base status. Do not persist this string in `status`.
 	 */
 	public function toString(): string {
 		if ( $this->hasReason() ) {

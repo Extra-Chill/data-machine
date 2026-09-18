@@ -50,6 +50,9 @@ class JobStatusMigrationWpdb extends wpdb {
 	}
 
 	public function get_var( $query = null, $x = 0, $y = 0 ) {
+		if ( ! is_array( $query ) ) {
+			return null;
+		}
 		$args      = $query[1];
 		$canonical = 1 === count( $args ) && is_array( $args[0] ) ? array_slice( $args[0], 1 ) : array_slice( $args, 1 );
 		return count( array_filter( $this->rows, static fn( array $row ): bool => ! in_array( $row['status'], $canonical, true ) ) );
@@ -74,6 +77,7 @@ class JobStatusMigrationWpdb extends wpdb {
 	}
 }
 
+require_once __DIR__ . '/../inc/Core/Database/TransactionScope.php';
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 
 if ( ! class_exists( 'DataMachine\\Core\\Database\\Jobs\\Jobs' ) ) {
@@ -116,6 +120,7 @@ $assert( 'failed - provider timeout' === $wpdb->rows[1]['status'], 'dry run does
 $first = $migration->apply( 1 );
 $engine = json_decode( $wpdb->rows[1]['engine_data'], true );
 $assert( 'failed' === $wpdb->rows[1]['status'], 'first bounded batch stores base status' );
+$assert( 'provider timeout' === $wpdb->rows[1]['status_reason'], 'first batch stores reason in status_reason' );
 $assert( 'provider timeout' === $engine['job_status_reason'], 'first batch preserves reason beside existing metadata' );
 $assert( array( 1 ) === $wpdb->selected_batches[0], 'first batch selects only the sparse noncanonical candidate' );
 $assert( 1 === $first['migrated'] && 'in_progress' === $first['status'], 'first bounded candidate batch exposes resumable progress' );
@@ -123,6 +128,7 @@ $assert( 1 === $first['migrated'] && 'in_progress' === $first['status'], 'first 
 $second = $migration->apply( 1 );
 $runtime_engine = json_decode( $wpdb->rows[1000000]['engine_data'], true );
 $assert( 'waiting' === $wpdb->rows[1000000]['status'], 'second batch normalizes explicit legacy state across a huge ID gap' );
+$assert( 'runtime_tool_request' === $wpdb->rows[1000000]['status_reason'], 'mapped legacy reason is stored in status_reason' );
 $assert( 'runtime_tool_request' === $runtime_engine['job_status_reason'], 'mapped legacy reason is persisted' );
 $assert( array( 1000000 ) === $wpdb->selected_batches[1], 'second batch skips the canonical row across the sparse ID gap' );
 $assert( 2 === $second['scanned'], 'scanned evidence counts candidates rather than canonical rows' );
