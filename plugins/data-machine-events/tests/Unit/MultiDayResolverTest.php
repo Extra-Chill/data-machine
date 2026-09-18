@@ -226,4 +226,91 @@ class MultiDayResolverTest extends WP_UnitTestCase {
 		$this->assertFalse( MultiDayResolver::is_same_night_end( '2026-07-10', '2026-07-10', '23:00:00' ), 'Same-day ends are not this helper’s concern.' );
 		$this->assertFalse( MultiDayResolver::is_same_night_end( '2026-07-??', '2026-07-11', '02:00:00' ), 'Placeholder dates are never same-night.' );
 	}
+
+	/**
+	 * Issue #199 display policy: spans within the continuous window keep
+	 * full day-by-day expansion. The window boundary itself (14 day diff,
+	 * 15 calendar days) stays continuous.
+	 */
+	public function test_get_display_dates_within_window_expands_continuously() {
+		$tz    = new DateTimeZone( 'America/New_York' );
+		$dates = MultiDayResolver::get_display_dates( '2026-07-01', '2026-07-15', $tz );
+
+		$this->assertCount( 15, $dates, 'A 15-calendar-day span at the window boundary expands every day.' );
+		$this->assertSame( '2026-07-01', $dates[0] );
+		$this->assertSame( '2026-07-15', $dates[14] );
+	}
+
+	/**
+	 * Issue #199 core reproduction: a weekly Monday series spanning
+	 * Apr 6 → May 11 with empty occurrenceDates must derive the six
+	 * Mondays, not all 36 calendar days.
+	 */
+	public function test_get_display_dates_long_same_weekday_span_derives_weekly_occurrences() {
+		$tz    = new DateTimeZone( 'America/New_York' );
+		$dates = MultiDayResolver::get_display_dates( '2026-04-06', '2026-05-11', $tz );
+
+		$this->assertSame(
+			array(
+				'2026-04-06',
+				'2026-04-13',
+				'2026-04-20',
+				'2026-04-27',
+				'2026-05-04',
+				'2026-05-11',
+			),
+			$dates,
+			'Only the Mondays between start and end are occurrences.'
+		);
+	}
+
+	/**
+	 * A long span whose weekdays do not match cannot be derived as a
+	 * series — it renders on a bounded leading window instead of
+	 * blanketing the calendar.
+	 */
+	public function test_get_display_dates_long_mismatched_weekday_span_truncates() {
+		$tz    = new DateTimeZone( 'America/New_York' );
+		$dates = MultiDayResolver::get_display_dates( '2026-07-10', '2026-08-10', $tz );
+
+		$this->assertCount( MultiDayResolver::TRUNCATED_SPAN_WINDOW, $dates );
+		$this->assertSame(
+			array( '2026-07-10', '2026-07-11', '2026-07-12', '2026-07-13', '2026-07-14', '2026-07-15', '2026-07-16' ),
+			$dates
+		);
+	}
+
+	public function test_get_display_dates_degrades_for_malformed_dates() {
+		$tz = new DateTimeZone( 'America/New_York' );
+
+		$this->assertSame( array(), MultiDayResolver::get_display_dates( '2026-07-??', '2026-07-??', $tz ) );
+		$this->assertSame( array( '2026-07-01' ), MultiDayResolver::get_display_dates( '2026-07-01', '2026-07-??', $tz ) );
+	}
+
+	public function test_is_likely_weekly_recurrence_requires_long_same_weekday_span() {
+		// Short same-weekday span: continuous window handles it, no heuristic.
+		$this->assertFalse( MultiDayResolver::is_likely_weekly_recurrence( '2026-07-10', '2026-07-17' ), 'A one-week Fri → Fri span stays continuous.' );
+		// At the window boundary: still continuous.
+		$this->assertFalse( MultiDayResolver::is_likely_weekly_recurrence( '2026-07-01', '2026-07-15' ), 'A 14-day diff is inside the continuous window.' );
+		// Long same-weekday span: the heuristic fires.
+		$this->assertTrue( MultiDayResolver::is_likely_weekly_recurrence( '2026-04-06', '2026-05-11' ), 'A five-week Monday → Monday span reads as a weekly series.' );
+		// Long mismatched-weekday span: no invented pattern.
+		$this->assertFalse( MultiDayResolver::is_likely_weekly_recurrence( '2026-07-10', '2026-08-10' ), 'Fri → Mon over a month is not provably weekly.' );
+		// Malformed dates never classify.
+		$this->assertFalse( MultiDayResolver::is_likely_weekly_recurrence( '2026-07-??', '2026-08-10' ) );
+	}
+
+	public function test_get_weekly_occurrence_dates_steps_seven_days_inclusively() {
+		$dates = MultiDayResolver::get_weekly_occurrence_dates( '2026-06-10', '2026-07-01' );
+
+		$this->assertSame(
+			array( '2026-06-10', '2026-06-17', '2026-06-24', '2026-07-01' ),
+			$dates,
+			'Start inclusive, weekly steps, end inclusive.'
+		);
+	}
+
+	public function test_get_weekly_occurrence_dates_returns_empty_for_malformed_dates() {
+		$this->assertSame( array(), MultiDayResolver::get_weekly_occurrence_dates( '2026-07-??', '2026-07-21' ) );
+	}
 }

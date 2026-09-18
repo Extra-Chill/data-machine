@@ -24,6 +24,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 class MultiDayResolver {
 
 	/**
+	 * Maximum start→end day distance that is expanded as one continuous
+	 * event. Genuine continuous multi-day events on a music calendar
+	 * (festivals, residencies) finish within about two weeks; spans beyond
+	 * this are, in production data, recurring series whose series-wide end
+	 * datetime leaked onto a single occurrence row at ingest (#199).
+	 *
+	 * Measured 2026-09-18: of 45 upcoming published rows spanning more than
+	 * 48 hours, 30 span more than 7 days, 16 more than 30 days, and 6 more
+	 * than 180 days — all recurring shapes (open mics, jams, seasonal
+	 * promos), none genuine continuous festivals.
+	 */
+	const CONTINUOUS_SPAN_LIMIT = 14;
+
+	/**
+	 * When a span exceeds CONTINUOUS_SPAN_LIMIT and cannot be derived as a
+	 * weekly recurrence, the event renders on at most this many leading
+	 * calendar days instead of its full range. Bounds the damage a bad row
+	 * can do (281 junk days → at most 7) without inventing a pattern the
+	 * data does not support.
+	 */
+	const TRUNCATED_SPAN_WINDOW = 7;
+
+	/**
 	 * Check if an event spans multiple days.
 	 *
 	 * Events ending before the next_day_cutoff time on the following day
@@ -150,6 +173,116 @@ class MultiDayResolver {
 			$dates[] = $start->format( 'Y-m-d' );
 			$start->modify( '+1 day' );
 			++$day_count;
+		}
+
+		return $dates;
+	}
+
+	/**
+	 * Resolve the calendar dates an event should appear on (#199).
+	 *
+	 * Decision policy for the ambiguous middle ground between "genuine
+	 * continuous multi-day event" and "recurring series whose series-wide
+	 * end leaked onto this row at ingest":
+	 *
+	 *   1. Span within CONTINUOUS_SPAN_LIMIT days → expand every calendar
+	 *      day. Everything a real festival or residency looks like fits
+	 *      comfortably inside this window, so no guessing is needed.
+	 *   2. Longer span with start and end on the same weekday → derive
+	 *      weekly occurrences (start date, +7 days, ... through the end).
+	 *      A multi-week span bounded by the same weekday is overwhelmingly
+	 *      a weekly series in production data — "Monday Night Funk Jam"
+	 *      Apr 6 → May 11 renders on six Mondays instead of all 36 days —
+	 *      and genuinely continuous multi-week same-weekday events are
+	 *      rare enough that the occasional misclassification costs two
+	 *      correctly-labelled listings instead of a month of "Ongoing"
+	 *      clutter.
+	 *   3. Longer span with mismatched weekdays → truncate to the first
+	 *      TRUNCATED_SPAN_WINDOW days. The data cannot distinguish a
+	 *      recurring series from a long residency here, so no pattern is
+	 *      invented; the row still appears (with its real start time) on a
+	 *      bounded window instead of blanketing the calendar.
+	 *
+	 * Malformed dates fall through to get_date_range()'s existing
+	 * degradation path.
+	 *
+	 * @param string       $start_date Start date (Y-m-d).
+	 * @param string       $end_date   End date (Y-m-d).
+	 * @param DateTimeZone $event_tz   Event timezone.
+	 * @return array Array of date strings (Y-m-d), ascending.
+	 */
+	public static function get_display_dates( string $start_date, string $end_date, DateTimeZone $event_tz ): array {
+		if ( ! DateTimeParser::isValidYmd( $start_date ) || ! DateTimeParser::isValidYmd( $end_date ) ) {
+			return self::get_date_range( $start_date, $end_date, $event_tz );
+		}
+
+		$start = new DateTime( $start_date );
+		$end   = new DateTime( $end_date );
+		$diff  = (int) $start->diff( $end )->days;
+
+		if ( $diff <= self::CONTINUOUS_SPAN_LIMIT ) {
+			return self::get_date_range( $start_date, $end_date, $event_tz );
+		}
+
+		if ( self::is_likely_weekly_recurrence( $start_date, $end_date ) ) {
+			return self::get_weekly_occurrence_dates( $start_date, $end_date );
+		}
+
+		return array_slice(
+			self::get_date_range( $start_date, $end_date, $event_tz ),
+			0,
+			self::TRUNCATED_SPAN_WINDOW
+		);
+	}
+
+	/**
+	 * Whether a long span bounded by the same weekday is treated as a
+	 * weekly recurring series for display grouping.
+	 *
+	 * Only spans beyond CONTINUOUS_SPAN_LIMIT days qualify — shorter spans
+	 * are expanded continuously without needing the heuristic.
+	 *
+	 * @param string $start_date Start date (Y-m-d).
+	 * @param string $end_date   End date (Y-m-d).
+	 * @return bool True when the span reads as a weekly recurrence.
+	 */
+	public static function is_likely_weekly_recurrence( string $start_date, string $end_date ): bool {
+		if ( ! DateTimeParser::isValidYmd( $start_date ) || ! DateTimeParser::isValidYmd( $end_date ) ) {
+			return false;
+		}
+
+		$start = new DateTime( $start_date );
+		$end   = new DateTime( $end_date );
+
+		if ( (int) $start->diff( $end )->days <= self::CONTINUOUS_SPAN_LIMIT ) {
+			return false;
+		}
+
+		return $start->format( 'w' ) === $end->format( 'w' );
+	}
+
+	/**
+	 * Derive weekly occurrence dates from a long same-weekday span.
+	 *
+	 * Returns the start date plus every seventh day through the end date,
+	 * inclusive.
+	 *
+	 * @param string $start_date Start date (Y-m-d).
+	 * @param string $end_date   End date (Y-m-d), same weekday as start.
+	 * @return array Array of date strings (Y-m-d), ascending.
+	 */
+	public static function get_weekly_occurrence_dates( string $start_date, string $end_date ): array {
+		if ( ! DateTimeParser::isValidYmd( $start_date ) || ! DateTimeParser::isValidYmd( $end_date ) ) {
+			return array();
+		}
+
+		$dates  = array();
+		$cursor = new DateTime( $start_date );
+		$end    = new DateTime( $end_date );
+
+		while ( $cursor <= $end ) {
+			$dates[] = $cursor->format( 'Y-m-d' );
+			$cursor->modify( '+7 days' );
 		}
 
 		return $dates;

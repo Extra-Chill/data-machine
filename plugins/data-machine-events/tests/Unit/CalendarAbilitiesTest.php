@@ -681,6 +681,72 @@ class CalendarAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '10 of 60 Events', $result['html']['counter'] );
 	}
 
+	/**
+	 * Issue #834: in progressive mode the first-day query matches events
+	 * still ongoing from earlier days. Those rows must be grouped into the
+	 * first day's group only — never expanded into standalone continuation
+	 * groups for later dates that also exist as deferred shells (which
+	 * produced duplicate, out-of-order day headings).
+	 */
+	public function test_progressive_page_never_groups_continuations_onto_deferred_dates(): void {
+		// The scope token below isolates this test's boundary caches from
+		// other default-scope tests (same pattern as the scope-token tests).
+		CalendarCache::invalidate();
+
+		$start = current_datetime()->modify( '+10 days' );
+
+		// 48 ordinary events on the first day push the page past the
+		// progressive threshold (50) once the ongoing event's expansion
+		// and the trailing day are counted.
+		for ( $event = 0; $event < 48; ++$event ) {
+			$this->seed_event( "First day filler {$event}", $start->format( 'Y-m-d 20:00:00' ), $start->format( 'Y-m-d 22:00:00' ) );
+		}
+
+		// A genuine multi-day event starting on the first day and spanning
+		// into two further days (within the continuous window).
+		$ongoing_id = $this->seed_event(
+			'Ongoing festival',
+			$start->format( 'Y-m-d 12:00:00' ),
+			$start->modify( '+2 days' )->format( 'Y-m-d 22:00:00' )
+		);
+
+		// A trailing day so the page has multiple dates.
+		$this->seed_event( 'Trailing day event', $start->modify( '+3 days' )->format( 'Y-m-d 20:00:00' ), $start->modify( '+3 days' )->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'scope_token'  => 'progressive-834',
+				'progressive'  => true,
+				'include_html' => true,
+			)
+		);
+
+		$grouped_dates = array_column( $result['paged_date_groups'], 'date' );
+		$deferred      = $result['deferred_dates'];
+
+		$this->assertSame( array( $start->format( 'Y-m-d' ) ), $grouped_dates, 'Only the queried first day is grouped — no standalone continuation groups.' );
+		$this->assertNotEmpty( $deferred, 'The page must actually be in progressive mode for this test to be meaningful.' );
+		$this->assertSame(
+			array(),
+			array_intersect( $grouped_dates, $deferred ),
+			'A grouped date must never also exist as a deferred shell (duplicate heading).'
+		);
+
+		$first_group_ids = array_column( $result['paged_date_groups'][0]['events'], 'post_id' );
+		$this->assertContains( $ongoing_id, $first_group_ids, 'The ongoing event renders on the queried first day.' );
+
+		$ongoing_context = null;
+		foreach ( $result['paged_date_groups'][0]['events'] as $event_entry ) {
+			if ( (int) $event_entry['post_id'] === $ongoing_id ) {
+				$ongoing_context = $event_entry['display_context'];
+				break;
+			}
+		}
+		$this->assertNotNull( $ongoing_context );
+		$this->assertTrue( $ongoing_context['is_start_day'] );
+		$this->assertFalse( $ongoing_context['is_continuation'] );
+	}
+
 	public function test_scope_token_preserves_multi_day_boundary_expansion(): void {
 		$start = current_datetime()->modify( '+60 days' );
 		$end   = $start->modify( '+2 days' );

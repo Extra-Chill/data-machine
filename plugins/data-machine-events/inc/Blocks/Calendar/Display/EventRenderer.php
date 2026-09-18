@@ -128,6 +128,13 @@ class EventRenderer {
 
 		// Render deferred date groups (progressive mode — shells only, loaded via REST on scroll).
 		foreach ( $deferred_dates as $date_string ) {
+			// Defensive (#834): a date that already rendered as a full group
+			// must never get a second shell — that is exactly the duplicate
+			// day heading the progressive path existed to avoid.
+			if ( isset( $paged_date_groups[ $date_string ] ) ) {
+				continue;
+			}
+
 			$date_obj = date_create( $date_string, wp_timezone() );
 			if ( ! $date_obj ) {
 				continue;

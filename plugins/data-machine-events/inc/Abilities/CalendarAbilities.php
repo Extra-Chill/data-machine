@@ -16,6 +16,7 @@ use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Blocks\Calendar\Data\EventHydrator;
 use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
 use DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff;
+use DataMachineEvents\Blocks\Calendar\Grouping\MultiDayResolver;
 use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
 use DataMachineEvents\Blocks\Calendar\Pagination\Renderer as PaginationRenderer;
@@ -256,6 +257,11 @@ class CalendarAbilities {
 		$progressive    = $input['progressive'] ?? false;
 		$deferred_dates = array();
 
+		// Range the grouping step expands into. Defaults to the queried page
+		// range; the progressive branch narrows it to the first day (#834).
+		$grouping_range_start = '';
+		$grouping_range_end   = '';
+
 		if ( $user_date_range ) {
 			// Caller passed an explicit date_start/date_end (e.g. progressive
 			// day-loader requesting a single deferred day). Honor the caller's
@@ -269,6 +275,9 @@ class CalendarAbilities {
 
 			$range_start = $effective_lower;
 			$range_end   = $effective_upper;
+
+			$grouping_range_start = $range_start;
+			$grouping_range_end   = $range_end;
 
 			$query_params['date_start'] = $user_date_start;
 			$query_params['date_end']   = $user_date_end;
@@ -312,6 +321,9 @@ class CalendarAbilities {
 				$range_start = $show_past ? $date_boundaries['end_date'] : $date_boundaries['start_date'];
 				$range_end   = $show_past ? $date_boundaries['start_date'] : $date_boundaries['end_date'];
 
+				$grouping_range_start = $range_start;
+				$grouping_range_end   = $range_end;
+
 				$query_params = array_merge(
 					$query_params,
 					self::query_bounds_for_display_range( $range_start, $range_end, $show_past )
@@ -322,6 +334,9 @@ class CalendarAbilities {
 			// when the page has enough events to benefit from deferred loading.
 			// Gated on ! $user_date_range because a single-day request from the
 			// day-loader has nothing to defer.
+			$grouping_range_start = $range_start;
+			$grouping_range_end   = $range_end;
+
 			if ( $progressive && $range_start ) {
 				// Get the dates within this page's range.
 				$page_dates = array_filter(
@@ -343,6 +358,16 @@ class CalendarAbilities {
 					$first_date     = $page_dates[0];
 					$query_params   = array_merge( $query_params, self::query_bounds_for_display_range( $first_date, $first_date, $show_past ) );
 					$deferred_dates = array_slice( $page_dates, 1 );
+
+					// Group over the queried range only (#834). The rows in
+					// hand belong to the first day; expanding them across the
+					// full page range would emit standalone continuation
+					// groups for later dates that ALSO exist as deferred
+					// shells — a duplicate heading, out of order. Events
+					// ongoing into a deferred day re-match that day's own
+					// REST fetch and land in its group then.
+					$grouping_range_start = $first_date;
+					$grouping_range_end   = $first_date;
 				}
 			}
 		}
@@ -361,8 +386,8 @@ class CalendarAbilities {
 		$paged_date_groups = DateGrouper::group_events_by_date(
 			$paged_events,
 			$show_past,
-			$range_start,
-			$range_end
+			$grouping_range_start,
+			$grouping_range_end
 		);
 
 		$gaps_detected = array();
@@ -837,21 +862,23 @@ class CalendarAbilities {
 			}
 
 			// Multi-day: each spanned date after the start also gets +$count.
+			// The span policy is the resolver's (#199): continuous within the
+			// window, weekly occurrences for long same-weekday spans, and a
+			// bounded leading window otherwise — mirroring DateGrouper so
+			// pagination boundaries and deferred-shell counts never fabricate
+			// dates the calendar will not render.
 			if ( $row->end_date && $row->end_date > $row->start_date ) {
-				$current = new \DateTime( $row->start_date );
-				$current->modify( '+1 day' );
-				$end_dt = new \DateTime( $row->end_date );
+				$spanned_dates = MultiDayResolver::get_display_dates( $row->start_date, $row->end_date, wp_timezone() );
 
-				while ( $current <= $end_dt ) {
-					$date = $current->format( 'Y-m-d' );
+				// Index 0 is the start bucket, already counted above.
+				$continuation_dates = array_slice( $spanned_dates, 1 );
 
+				foreach ( $continuation_dates as $date ) {
 					if ( ! $include_past_dates && $date < $current_date ) {
-						$current->modify( '+1 day' );
 						continue;
 					}
 
 					$events_per_date[ $date ] = ( $events_per_date[ $date ] ?? 0 ) + $count;
-					$current->modify( '+1 day' );
 				}
 			}
 		}

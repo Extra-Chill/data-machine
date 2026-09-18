@@ -1,11 +1,12 @@
 <?php
 /**
- * DateGrouper same-night classification tests (issue #833).
+ * DateGrouper grouping tests (issues #833, #199, #834).
  *
- * Guards the grouping layer against re-expanding single-night events into
- * multi-day continuations: a 9 PM → 2 AM bar show must appear once, under
- * its start date, without a "through" badge or a ghost "Ongoing" entry on
- * the following day.
+ * Guards the grouping layer's date-expansion policy: single-night events
+ * are never re-expanded into multi-day continuations (#833), recurring
+ * series with a leaked series end do not blanket the calendar (#199), and
+ * continuation entries merge into their date's group with exactly one
+ * group per calendar date in ascending order (#834).
  *
  * @package DataMachineEvents\Tests\Unit
  * @since   0.62.0
@@ -139,5 +140,101 @@ class DateGrouperTest extends WP_UnitTestCase {
 		$this->assertFalse( $event['display_context']['is_multi_day'] );
 		$this->assertFalse( $event['display_context']['is_continuation'] );
 		$this->assertTrue( $event['display_context']['is_start_day'] );
+	}
+
+	/**
+	 * Issue #199 core reproduction: a weekly Monday series (Apr 6 → May 11,
+	 * empty occurrenceDates) must appear on the six Mondays only — not on
+	 * every one of the 36 calendar days in the range.
+	 */
+	public function test_weekly_series_with_empty_occurrence_dates_appears_only_on_its_weekday() {
+		$groups = DateGrouper::group_events_by_date(
+			array( $this->make_item( '2026-04-06', '20:00:00', '2026-05-11', '22:00:00' ) ),
+			true
+		);
+
+		$this->assertSame(
+			array( '2026-05-11', '2026-05-04', '2026-04-27', '2026-04-20', '2026-04-13', '2026-04-06' ),
+			array_keys( $groups ),
+			'Exactly the Mondays in range, monotonically ordered (past mode reverses).'
+		);
+
+		foreach ( $groups as $date_key => $group ) {
+			$event = $group['events'][0];
+			$this->assertFalse( $event['display_context']['is_multi_day'], 'Each derived occurrence is a standalone night.' );
+			$this->assertFalse( $event['display_context']['is_continuation'], 'Derived occurrences are never continuations.' );
+			$this->assertTrue( $event['display_context']['is_start_day'] );
+			$this->assertSame( $date_key, $event['display_context']['display_date'] );
+		}
+	}
+
+	/**
+	 * A genuine multi-day event inside the continuous window still appears
+	 * on every calendar day it spans.
+	 */
+	public function test_genuine_multi_day_event_still_appears_on_every_day() {
+		$groups = DateGrouper::group_events_by_date(
+			array( $this->make_item( '2026-09-17', '12:00:00', '2026-09-21', '23:00:00' ) ),
+			true
+		);
+
+		$this->assertSame(
+			array( '2026-09-21', '2026-09-20', '2026-09-19', '2026-09-18', '2026-09-17' ),
+			array_keys( $groups ),
+			'Every spanned day gets a group (past mode reverses display order).'
+		);
+
+		$start = $groups['2026-09-17']['events'][0];
+		$this->assertTrue( $start['display_context']['is_multi_day'] );
+		$this->assertFalse( $start['display_context']['is_continuation'] );
+
+		$continuation = $groups['2026-09-20']['events'][0];
+		$this->assertTrue( $continuation['display_context']['is_multi_day'] );
+		$this->assertTrue( $continuation['display_context']['is_continuation'] );
+	}
+
+	/**
+	 * A long span with mismatched weekdays truncates to the bounded leading
+	 * window instead of expanding indefinitely (#199 fallback).
+	 */
+	public function test_long_mismatched_weekday_span_truncates_to_bounded_window() {
+		$groups = DateGrouper::group_events_by_date(
+			array( $this->make_item( '2026-07-10', '20:00:00', '2026-08-10', '22:00:00' ) ),
+			true
+		);
+
+		$this->assertCount( 7, $groups, 'A 32-day ambiguous span renders at most seven leading days.' );
+		$this->assertArrayNotHasKey( '2026-07-17', $groups );
+		$this->assertArrayHasKey( '2026-07-16', $groups );
+	}
+
+	/**
+	 * Continuation entries merge into their date's group: one group per
+	 * calendar date, dates unique, and keys monotonically ordered in the
+	 * display direction. No continuation entry may spawn its own separate
+	 * group (#834).
+	 */
+	public function test_continuations_merge_into_date_groups_without_duplicates_or_disorder() {
+		$festival = $this->make_item( '2026-09-17', '12:00:00', '2026-09-21', '23:00:00' );
+		$ordinary = $this->make_item( '2026-09-19', '20:00:00' );
+
+		$groups = DateGrouper::group_events_by_date( array( $festival, $ordinary ), true );
+
+		$keys = array_keys( $groups );
+		$this->assertSame( $keys, array_unique( $keys ), 'One group per calendar date — no duplicate headings.' );
+		$this->assertSame(
+			array( '2026-09-21', '2026-09-20', '2026-09-19', '2026-09-18', '2026-09-17' ),
+			$keys,
+			'Display order is monotonic in the group sort direction.'
+		);
+
+		// The festival's continuation lands inside Saturday's group beside
+		// the ordinary event — not in a standalone group of its own.
+		$saturday_ids = array_map(
+			static fn( array $item ): int => $item['post']->ID,
+			$groups['2026-09-19']['events']
+		);
+		$this->assertCount( 2, $saturday_ids );
+		$this->assertSame( $ordinary['post']->ID, $saturday_ids[0], 'Starts-today events sort before ongoing continuations within the day.' );
 	}
 }
