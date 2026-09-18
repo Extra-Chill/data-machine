@@ -39,18 +39,22 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
  */
 import { fetchVenues } from './api-client';
 import { createGeoAuthorityTracker, resolveInitialView } from './geo-authority';
+import {
+	dispatchBoundsChanged,
+	getBoundsFromMap,
+	isTargetedToMap,
+	moveWithAuthority,
+} from './map-bounds';
+import {
+	buildChronologicalRoutePopupHtml,
+	buildPopupHtml,
+	createChronologicalRouteIcon,
+	createVenueIcon,
+	createUserLocationIcon,
+	earliestEventKey,
+} from './map-markers';
 import { TILE_URLS } from './types';
-import type {
-	Venue,
-	MapProps,
-	MapType,
-	MapBounds,
-	BoundsChangedEvent,
-} from './types';
-import type {
-	GeoAuthoritySource,
-	GeoAuthorityOperation,
-} from './geo-authority';
+import type { Venue, MapProps, MapType, MapBounds } from './types';
 
 import './frontend.css';
 
@@ -59,288 +63,6 @@ import './frontend.css';
 /** Detect touch-primary devices (phones/tablets). */
 function isTouchDevice(): boolean {
 	return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-}
-
-function escapeHtml( text: string ): string {
-	const div = document.createElement( 'div' );
-	div.textContent = text;
-	return div.innerHTML;
-}
-
-function buildPopupHtml( venue: Venue ): string {
-	let html = '<div class="venue-popup">';
-
-	if ( venue.url ) {
-		html += `<a href="${ escapeHtml(
-			venue.url
-		) }" class="venue-popup-name">${ escapeHtml( venue.name ) }</a>`;
-	} else {
-		html += `<span class="venue-popup-name">${ escapeHtml(
-			venue.name
-		) }</span>`;
-	}
-
-	if ( venue.event_count > 0 ) {
-		html += `<span class="venue-popup-events">${
-			venue.event_count
-		} upcoming event${ venue.event_count !== 1 ? 's' : '' }</span>`;
-	}
-
-	if ( venue.address ) {
-		html += `<span class="venue-popup-address">${ escapeHtml(
-			venue.address
-		) }</span>`;
-	}
-
-	html += '</div>';
-	return html;
-}
-
-/**
- * Format YYYY-MM-DD (+ HH:MM:SS) into a short human label like
- * "Sep 23, 2099 · 8:00 PM". Falls back to the raw date if parsing fails so
- * the popup is never blank.
- *
- * @param date Event date.
- * @param time Event time.
- */
-function formatEventDateTime( date: string, time: string ): string {
-	if ( ! date ) {
-		return '';
-	}
-
-	// Build a date object using local time semantics. The server already
-	// stored start_datetime in the site timezone, so treat it as local.
-	const iso = time ? `${ date }T${ time }` : `${ date }T00:00:00`;
-	const parsed = new Date( iso );
-
-	if ( isNaN( parsed.getTime() ) ) {
-		return time ? `${ date } ${ time }` : date;
-	}
-
-	const datePart = parsed.toLocaleDateString( undefined, {
-		month: 'short',
-		day: 'numeric',
-		year: 'numeric',
-	} );
-
-	if ( ! time ) {
-		return datePart;
-	}
-
-	const timePart = parsed.toLocaleTimeString( undefined, {
-		hour: 'numeric',
-		minute: '2-digit',
-	} );
-
-	return `${ datePart } · ${ timePart }`;
-}
-
-/**
- * Chronological-route popup. Lists every upcoming show at this venue for the
- * scoped taxonomy term, chronologically. The same shape is used for first,
- * last, and middle markers — only the marker icon differs by route position.
- *
- * @param venue Venue whose events should be rendered.
- */
-function buildChronologicalRoutePopupHtml( venue: Venue ): string {
-	let html = '<div class="venue-popup venue-popup--chronological-route">';
-
-	if ( venue.url ) {
-		html += `<a href="${ escapeHtml(
-			venue.url
-		) }" class="venue-popup-name">${ escapeHtml( venue.name ) }</a>`;
-	} else {
-		html += `<span class="venue-popup-name">${ escapeHtml(
-			venue.name
-		) }</span>`;
-	}
-
-	if ( venue.address ) {
-		html += `<span class="venue-popup-address">${ escapeHtml(
-			venue.address
-		) }</span>`;
-	}
-
-	const shows = venue.upcoming_events_at_venue ?? [];
-	if ( shows.length > 0 ) {
-		html += '<ul class="venue-popup-shows">';
-		for ( const show of shows ) {
-			const label = formatEventDateTime(
-				show.start_date,
-				show.start_time
-			);
-			const title = show.title || label || 'Event';
-			if ( show.permalink ) {
-				html += `<li><a href="${ escapeHtml(
-					show.permalink
-				) }">${ escapeHtml( title ) }</a>`;
-			} else {
-				html += `<li><span>${ escapeHtml( title ) }</span>`;
-			}
-			if ( label && label !== title ) {
-				html += ` <span class="venue-popup-show-date">${ escapeHtml(
-					label
-				) }</span>`;
-			}
-			html += '</li>';
-		}
-		html += '</ul>';
-	}
-
-	html += '</div>';
-	return html;
-}
-
-function createVenueIcon(): L.DivIcon {
-	return L.divIcon( {
-		html: '<span style="font-size: 28px; line-height: 1; display: block;">📍</span>',
-		className: 'emoji-marker',
-		iconSize: [ 28, 28 ],
-		iconAnchor: [ 14, 28 ],
-		popupAnchor: [ 0, -28 ],
-	} );
-}
-
-/**
- * Chronological-route marker. `position` flags first/last for distinct color
- * treatment; middle stops fall through to the default pin look but in the
- * chronological-route className so site CSS can theme them as a set.
- *
- * Colors picked for high contrast against OSM tiles:
- *   - first = green  (#22c55e)
- *   - last  = red    (#ef4444)
- *   - middle = slate (#475569)
- *
- * v1 keeps numbered badges out of scope (per #310 design notes); revisit
- * once Chris weighs in on the live render.
- *
- * @param position Position of the venue in the route.
- */
-function createChronologicalRouteIcon(
-	position: 'first' | 'last' | 'middle'
-): L.DivIcon {
-	let color = '#475569';
-	if ( position === 'first' ) {
-		color = '#22c55e';
-	} else if ( position === 'last' ) {
-		color = '#ef4444';
-	}
-
-	const html = `<span class="chronological-route-pin chronological-route-pin--${ position }" style="background:${ color };"></span>`;
-
-	return L.divIcon( {
-		html,
-		className: `chronological-route-marker chronological-route-marker--${ position }`,
-		iconSize: [ 22, 22 ],
-		iconAnchor: [ 11, 22 ],
-		popupAnchor: [ 0, -22 ],
-	} );
-}
-
-/**
- * Earliest start_datetime (date + time) for a venue, as a sortable
- * "YYYY-MM-DD HH:MM:SS" string. Used to order venues chronologically when
- * drawing the chronological-route polyline. Returns null when no events
- * were attached (which means we should skip the venue from the route).
- *
- * @param venue Venue whose earliest event should be found.
- */
-function earliestEventKey( venue: Venue ): string | null {
-	const shows = venue.upcoming_events_at_venue ?? [];
-	if ( shows.length === 0 ) {
-		return null;
-	}
-
-	// The REST response already sorts ascending per venue, so shows[0] is
-	// the earliest. Defensive guard for callers that might re-order.
-	let earliest = '';
-	for ( const show of shows ) {
-		const key = `${ show.start_date || '' } ${
-			show.start_time || ''
-		}`.trim();
-		if ( ! key ) {
-			continue;
-		}
-		if ( ! earliest || key < earliest ) {
-			earliest = key;
-		}
-	}
-	return earliest || null;
-}
-
-function createUserLocationIcon(): L.DivIcon {
-	return L.divIcon( {
-		html: '<span class="user-location-dot"></span>',
-		className: 'user-location-marker',
-		iconSize: [ 16, 16 ],
-		iconAnchor: [ 8, 8 ],
-	} );
-}
-
-function getBoundsFromMap( map: L.Map ): MapBounds {
-	const bounds = map.getBounds();
-	const sw = bounds.getSouthWest();
-	const ne = bounds.getNorthEast();
-	return {
-		swLat: sw.lat,
-		swLng: sw.lng,
-		neLat: ne.lat,
-		neLng: ne.lng,
-	};
-}
-
-function dispatchBoundsChanged(
-	map: L.Map,
-	syncId: string,
-	operation: GeoAuthorityOperation
-): void {
-	const bounds = getBoundsFromMap( map );
-	const center = map.getCenter();
-
-	const detail: BoundsChangedEvent = {
-		syncId,
-		generation: operation.generation,
-		bounds,
-		zoom: map.getZoom(),
-		center: { lat: center.lat, lng: center.lng },
-		authority: operation.source,
-	};
-
-	document.dispatchEvent(
-		new CustomEvent( 'data-machine-map-bounds-changed', { detail } )
-	);
-}
-
-function moveWithAuthority(
-	map: L.Map,
-	syncId: string,
-	tracker: ReturnType< typeof createGeoAuthorityTracker >,
-	source: GeoAuthoritySource,
-	lat: number,
-	lng: number,
-	zoom: number
-): void {
-	const operation = tracker.prepare( source );
-	map.setView( [ lat, lng ], zoom );
-	const noOp = tracker.completeNoop( operation.generation );
-	if ( noOp ) {
-		dispatchBoundsChanged( map, syncId, noOp );
-	}
-}
-
-function isTargetedToMap(
-	targetSyncId: string | undefined,
-	syncId: string
-): boolean {
-	if ( targetSyncId ) {
-		return targetSyncId === syncId;
-	}
-
-	return (
-		document.querySelectorAll( '.data-machine-events-map-root' ).length ===
-		1
-	);
 }
 
 /* ---------- debounce ---------- */
@@ -959,12 +681,51 @@ export function EventsMap( props: MapProps ): JSX.Element | null {
 		};
 
 		document.addEventListener( 'data-machine-map-recenter', handler );
+
+		// Self-heal for the mount race (#832): a consumer may have written
+		// a pending centre to the root container's dataset and dispatched
+		// `data-machine-map-recenter` while these listeners were not yet
+		// attached, so the event was lost. near-me.js (and any consumer
+		// following the same contract) writes `centerLat`/`centerLon`
+		// before dispatching, so if the dataset now differs from the props
+		// the component mounted with, replay it as a user-location
+		// recenter.
+		const rootContainer = containerRef.current
+			? containerRef.current.closest< HTMLElement >(
+					'.data-machine-events-map-root'
+			  )
+			: null;
+		if ( rootContainer ) {
+			const pendingLat = parseFloat(
+				rootContainer.dataset.centerLat || ''
+			);
+			const pendingLng = parseFloat(
+				rootContainer.dataset.centerLon || ''
+			);
+			if (
+				Number.isFinite( pendingLat ) &&
+				Number.isFinite( pendingLng ) &&
+				( pendingLat !== centerLat || pendingLng !== centerLon )
+			) {
+				handler(
+					new CustomEvent( 'data-machine-map-recenter', {
+						detail: {
+							lat: pendingLat,
+							lng: pendingLng,
+							authority: 'user-location',
+						},
+					} )
+				);
+			}
+		}
+
 		return () => {
 			document.removeEventListener(
 				'data-machine-map-recenter',
 				handler
 			);
 		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ syncId ] );
 
 	/* --- listen for external user-location updates (e.g. geolocation) --- */
@@ -1011,13 +772,73 @@ export function EventsMap( props: MapProps ): JSX.Element | null {
 			'data-machine-map-set-user-location',
 			handler
 		);
+
+		// Self-heal for the mount race (#832): replay a user location the
+		// consumer wrote to the root container's dataset (`userLat`/
+		// `userLon`) while this listener was not yet attached, so the blue
+		// dot appears even though the `data-machine-map-set-user-location`
+		// event was lost.
+		const rootContainer = containerRef.current
+			? containerRef.current.closest< HTMLElement >(
+					'.data-machine-events-map-root'
+			  )
+			: null;
+		if ( rootContainer ) {
+			const pendingLat = parseFloat(
+				rootContainer.dataset.userLat || ''
+			);
+			const pendingLng = parseFloat(
+				rootContainer.dataset.userLon || ''
+			);
+			if (
+				Number.isFinite( pendingLat ) &&
+				Number.isFinite( pendingLng ) &&
+				( pendingLat !== userLat || pendingLng !== userLon )
+			) {
+				handler(
+					new CustomEvent( 'data-machine-map-set-user-location', {
+						detail: { lat: pendingLat, lng: pendingLng },
+					} )
+				);
+			}
+		}
+
 		return () => {
 			document.removeEventListener(
 				'data-machine-map-set-user-location',
 				handler
 			);
 		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ syncId ] );
+
+	/* --- signal readiness once external-event listeners are attached --- */
+	// #832: `data-initialized="1"` is the public contract consumers use to
+	// decide "safe to dispatch data-machine-map-* events instead of writing
+	// data attributes" (e.g. extrachill-events near-me.js). It must only be
+	// set once the recenter and set-user-location listeners above have
+	// attached, which is guaranteed here because effects run in declaration
+	// order. The bubbling `data-machine-map-ready` event carries `{ syncId }`
+	// so consumers can wait for readiness instead of polling the attribute.
+	// The mount-time idempotency guard lives separately on `data-mounting`
+	// (see mountMap).
+	useEffect( () => {
+		const rootContainer =
+			containerRef.current?.closest< HTMLElement >(
+				'.data-machine-events-map-root'
+			) ?? containerRef.current;
+		if ( ! rootContainer ) {
+			return;
+		}
+		rootContainer.dataset.initialized = '1';
+		rootContainer.dispatchEvent(
+			new CustomEvent( 'data-machine-map-ready', {
+				bubbles: true,
+				detail: { syncId },
+			} )
+		);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [] );
 
 	/* --- update markers when venues change (with diffing) --- */
 	useEffect( () => {
@@ -1348,20 +1169,28 @@ function parseMapProps( container: HTMLElement ): MapProps {
 /**
  * Mount the React map into its root container exactly once.
  *
- * Idempotent via the `initialized` dataset flag so the deferred-expand path
- * and the normal path can both call it safely.
+ * Idempotent via the internal `data-mounting` flag so the deferred-expand
+ * path and the normal path can both call it safely. The public
+ * `data-initialized="1"` contract is deliberately NOT set here: it is set by
+ * the component's ready effect once the recenter / set-user-location
+ * listeners are attached (#832), so `data-initialized` reliably means
+ * "safe to dispatch data-machine-map-* events" to consumers.
  *
  * @param container Map root container.
+ * @return The React root (for tests to unmount), or null when already mounted.
  */
-function mountMap( container: HTMLElement ): void {
-	if ( container.dataset.initialized === '1' ) {
-		return;
+export function mountMap(
+	container: HTMLElement
+): ReturnType< typeof createRoot > | null {
+	if ( container.dataset.mounting === '1' ) {
+		return null;
 	}
-	container.dataset.initialized = '1';
+	container.dataset.mounting = '1';
 
 	const props = parseMapProps( container );
 	const root = createRoot( container );
 	root.render( <EventsMap { ...props } /> );
+	return root;
 }
 
 /**
@@ -1386,8 +1215,10 @@ export function setupCollapsible( container: HTMLElement ): boolean {
 		return false;
 	}
 	if ( container.dataset.collapsibleBound === '1' ) {
-		// Already wired; report current defer state.
-		return container.dataset.initialized !== '1';
+		// Already wired; report current defer state via the internal mount
+		// guard (`data-initialized` only flips later, once the component's
+		// listeners are attached — see the ready effect).
+		return container.dataset.mounting !== '1';
 	}
 	container.dataset.collapsibleBound = '1';
 
@@ -1427,7 +1258,7 @@ export function setupCollapsible( container: HTMLElement ): boolean {
 
 		if ( expanded ) {
 			// Mount on first expand (deferred init), else just re-measure.
-			if ( container.dataset.initialized !== '1' ) {
+			if ( container.dataset.mounting !== '1' ) {
 				mountMap( container );
 			} else {
 				container.dispatchEvent(
@@ -1454,7 +1285,13 @@ function initEventsMap(): void {
 	);
 
 	containers.forEach( ( container ) => {
-		if ( container.dataset.initialized === '1' ) {
+		// `data-initialized` flips only when the component's listeners are
+		// attached (ready effect); `data-mounting` is the synchronous
+		// mountMap guard. Together they cover the whole mount window.
+		if (
+			container.dataset.initialized === '1' ||
+			container.dataset.mounting === '1'
+		) {
 			return;
 		}
 

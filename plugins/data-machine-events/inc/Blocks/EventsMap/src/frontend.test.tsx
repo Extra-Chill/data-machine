@@ -199,7 +199,7 @@ import L from 'leaflet';
 /**
  * Internal dependencies
  */
-import { EventsMap, setupCollapsible } from './frontend';
+import { EventsMap, mountMap, setupCollapsible } from './frontend';
 
 import type { MapProps } from './types';
 
@@ -233,6 +233,9 @@ function props( overrides: Partial< MapProps > = {} ): MapProps {
 
 function renderMap( mapProps: MapProps ) {
 	const host = document.createElement( 'div' );
+	// Production roots always carry this class (render.php); the ready
+	// effect and self-heal look it up via closest().
+	host.className = 'data-machine-events-map-root';
 	document.body.appendChild( host );
 	const root = createRoot( host );
 	act( () => root.render( <EventsMap { ...mapProps } /> ) );
@@ -682,6 +685,189 @@ describe( 'EventsMap geo authority integration', () => {
 		expect( bounds.events ).toHaveLength( count );
 		expect( second.map.removed ).toBe( true );
 		act( () => first.root.unmount() );
+		bounds.remove();
+	} );
+} );
+
+describe( 'EventsMap mount readiness (#832)', () => {
+	beforeEach( () => {
+		jest.useFakeTimers();
+		mockMapInstances.length = 0;
+		document.body.innerHTML = '';
+	} );
+
+	afterEach( () => {
+		jest.runOnlyPendingTimers();
+		jest.useRealTimers();
+	} );
+
+	// Production-shaped map root (render.php): class, id, syncId.
+	function buildMapContainer(
+		attrs: Record< string, string > = {}
+	): HTMLElement {
+		const container = document.createElement( 'div' );
+		container.className = 'data-machine-events-map-root';
+		container.id = 'map-ready-root';
+		container.dataset.syncId = 'map-ready';
+		container.dataset.height = '400';
+		container.dataset.zoom = '12';
+		for ( const [ key, value ] of Object.entries( attrs ) ) {
+			container.dataset[ key ] = value;
+		}
+		document.body.appendChild( container );
+		return container;
+	}
+
+	it( 'recovers a recenter and user location dispatched before the listeners attached', () => {
+		const bounds = collectBoundsEvents();
+		const container = buildMapContainer();
+
+		let root: ReturnType< typeof createRoot > | null = null;
+		act( () => {
+			root = mountMap( container );
+			// Simulate near-me.js racing the mount: write the pending
+			// coordinates to the root's dataset, then dispatch both
+			// events synchronously — before React has committed and
+			// attached any listeners, so both events are lost.
+			container.dataset.centerLat = '32.787600';
+			container.dataset.centerLon = '-79.940300';
+			container.dataset.userLat = '32.787600';
+			container.dataset.userLon = '-79.940300';
+			// syncId is passed so the dispatch stays hermetic: earlier
+			// suites in this file mount maps that are never unmounted, and
+			// their leaked document listeners must not react to these
+			// events. near-me.js dispatches without syncId against a
+			// single-map page; targeting is orthogonal to the recovery
+			// path under test.
+			document.dispatchEvent(
+				new CustomEvent( 'data-machine-map-recenter', {
+					detail: {
+						syncId: 'map-ready',
+						lat: 32.7876,
+						lng: -79.9403,
+						zoom: 12,
+						authority: 'user-location',
+					},
+				} )
+			);
+			document.dispatchEvent(
+				new CustomEvent( 'data-machine-map-set-user-location', {
+					detail: {
+						syncId: 'map-ready',
+						lat: 32.7876,
+						lng: -79.9403,
+					},
+				} )
+			);
+		} );
+
+		// Once the listeners attach, the lost recenter is replayed from
+		// the dataset: the map recenters with user-location authority...
+		const map = mockMapInstances.at( -1 )!;
+		expect( map.getCenter() ).toEqual( { lat: 32.7876, lng: -79.9403 } );
+		expect( bounds.events ).toEqual( [
+			expect.objectContaining( {
+				syncId: 'map-ready',
+				authority: 'user-location',
+				center: { lat: 32.7876, lng: -79.9403 },
+			} ),
+		] );
+		// ...and the lost user-location event is replayed as the marker.
+		const placedMarkers = ( L.marker as jest.Mock ).mock.calls.filter(
+			( [ coords ] ) =>
+				coords[ 0 ] === 32.7876 && coords[ 1 ] === -79.9403
+		);
+		expect( placedMarkers ).toHaveLength( 1 );
+
+		act( () => root!.unmount() );
+		bounds.remove();
+	} );
+
+	it( 'dispatches data-machine-map-ready only after the external listeners are attached', () => {
+		const container = buildMapContainer();
+		const readyDetails: Array< { syncId: string } > = [];
+		const handleReady = ( e: Event ) => {
+			readyDetails.push( ( e as CustomEvent ).detail );
+			// Prove the recenter listener is live by the time ready
+			// fires: dispatch from inside the ready handler and expect
+			// the map to move.
+			document.dispatchEvent(
+				new CustomEvent( 'data-machine-map-recenter', {
+					detail: {
+						syncId: 'map-ready',
+						lat: 40.7128,
+						lng: -74.006,
+						zoom: 12,
+					},
+				} )
+			);
+		};
+		document.addEventListener( 'data-machine-map-ready', handleReady );
+
+		let root: ReturnType< typeof createRoot > | null = null;
+		act( () => {
+			root = mountMap( container );
+		} );
+
+		expect( readyDetails ).toEqual( [ { syncId: 'map-ready' } ] );
+		expect( container.dataset.initialized ).toBe( '1' );
+		expect( mockMapInstances.at( -1 )!.getCenter() ).toEqual( {
+			lat: 40.7128,
+			lng: -74.006,
+		} );
+
+		act( () => root!.unmount() );
+		document.removeEventListener( 'data-machine-map-ready', handleReady );
+	} );
+
+	it( 'does not set data-initialized before the ready effect runs', () => {
+		const container = buildMapContainer();
+		const readyEvents: unknown[] = [];
+		const handleReady = ( e: Event ) =>
+			readyEvents.push( ( e as CustomEvent ).detail );
+		document.addEventListener( 'data-machine-map-ready', handleReady );
+
+		let root: ReturnType< typeof createRoot > | null = null;
+		act( () => {
+			root = mountMap( container );
+			// Mid-act, before the commit flushes effects: the mount is
+			// claimed by the internal guard, but the public ready
+			// contract has not flipped yet.
+			expect( container.dataset.mounting ).toBe( '1' );
+			expect( container.dataset.initialized ).toBeUndefined();
+			expect( readyEvents ).toHaveLength( 0 );
+		} );
+
+		expect( container.dataset.initialized ).toBe( '1' );
+		expect( readyEvents ).toHaveLength( 1 );
+
+		act( () => root!.unmount() );
+		document.removeEventListener( 'data-machine-map-ready', handleReady );
+	} );
+
+	it( 'does not self-heal when the pending dataset matches the mounted props', () => {
+		const bounds = collectBoundsEvents();
+		const container = buildMapContainer( {
+			centerLat: '32.7765',
+			centerLon: '-79.9311',
+		} );
+
+		let root: ReturnType< typeof createRoot > | null = null;
+		act( () => {
+			root = mountMap( container );
+		} );
+		act( () => jest.advanceTimersByTime( 200 ) );
+
+		// Only the initial server-authority bounds event; no replayed
+		// recenter on top of it.
+		expect( bounds.events ).toEqual( [
+			expect.objectContaining( {
+				syncId: 'map-ready',
+				authority: 'server',
+			} ),
+		] );
+
+		act( () => root!.unmount() );
 		bounds.remove();
 	} );
 } );
