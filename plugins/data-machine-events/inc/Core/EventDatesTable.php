@@ -9,13 +9,20 @@
  * dbDelta(), one-time backfill from legacy postmeta, and helper read/write
  * functions.
  *
- * The table includes a denormalized post_status column so that queries
- * can filter to published events without joining the posts table (which
- * is the primary bottleneck on sites with 30K+ events).
- *
- * @package DataMachineEvents\Core
- * @since   0.23.0
- */
+	 * The table includes a denormalized post_status column so that queries
+	 * can filter to published events without joining the posts table (which
+	 * is the primary bottleneck on sites with 30K+ events).
+	 *
+	 * Occurrence-span guard (#199): an end datetime more than
+	 * `data_machine_events_max_event_span_hours` (default 336h) past the
+	 * start is a fabricated series range, not an occurrence end. The row is
+	 * still written — the start is good data — but the end is stored as NULL
+	 * and the strip is logged, so no write path (save_post sync, backfill,
+	 * CLI, REST) can persist a months-long fabricated end.
+	 *
+	 * @package DataMachineEvents\Core
+	 * @since   0.23.0
+	 */
 
 namespace DataMachineEvents\Core;
 
@@ -123,6 +130,38 @@ class EventDatesTable {
 				)
 			);
 			return false;
+		}
+
+		// Occurrence-span guard (#199): strip a fabricated series-range end
+		// rather than persisting it. Defense in depth for every writer that
+		// bypasses the save_post derivation (backfill from legacy postmeta,
+		// CLI, future callers). The malformed-date checks above stay hard
+		// rejections; here the start is valid so only the implausible end is
+		// dropped, keeping the row's good data.
+		if ( null !== $end_datetime && ! EventSpanGuard::is_end_plausible( $start_datetime, $end_datetime ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'EventDatesTable::upsert stripped an end datetime exceeding the maximum plausible occurrence span (probable series range)',
+				array(
+					'post_id'        => $post_id,
+					'start_datetime' => $start_datetime,
+					'stripped_end'   => $end_datetime,
+					'max_span_hours' => EventSpanGuard::max_span_hours(),
+				)
+			);
+
+			/**
+			 * Fires when a stored end datetime is stripped for exceeding the
+			 * maximum plausible occurrence span.
+			 *
+			 * @param int    $post_id        Post ID.
+			 * @param string $start_datetime Start datetime.
+			 * @param string $end_datetime   Stripped end datetime.
+			 */
+			do_action( 'datamachine_event_dates_end_span_stripped', $post_id, $start_datetime, $end_datetime );
+
+			$end_datetime = null;
 		}
 
 		$post_status = $post->post_status;
@@ -295,7 +334,7 @@ class EventDatesTable {
 	 */
 	public static function repair_status_drift_row( int $post_id ): string {
 		global $wpdb;
-		$table          = self::table_name();
+		$table = self::table_name();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$indexed_status = $wpdb->get_var(
 			$wpdb->prepare( "SELECT post_status FROM {$table} WHERE post_id = %d", $post_id )

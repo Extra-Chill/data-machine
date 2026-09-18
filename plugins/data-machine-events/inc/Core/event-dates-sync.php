@@ -392,6 +392,39 @@ function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
 					$end_datetime_val = null;
 				}
 
+				// Occurrence-span guard (issue #199): a derived end more than a
+				// sane maximum past the start is a fabricated series range (the
+				// series' final occurrence stamped onto this one), not a real
+				// end. Prefer no end over an invented one — the calendar already
+				// renders a missing end — so strip it and log loudly instead of
+				// persisting the leak.
+				if ( null !== $end_datetime_val
+					&& ! EventSpanGuard::is_end_plausible( $datetime, $end_datetime_val ) ) {
+					do_action(
+						'datamachine_log',
+						'warning',
+						'Event date sync stripped an end datetime exceeding the maximum plausible occurrence span (probable series range leaked onto a single occurrence)',
+						array(
+							'post_id'        => $post_id,
+							'start_datetime' => $datetime,
+							'stripped_end'   => $end_datetime_val,
+							'max_span_hours' => EventSpanGuard::max_span_hours(),
+						)
+					);
+
+					/**
+					 * Fires when a derived end datetime is stripped for exceeding
+					 * the maximum plausible occurrence span.
+					 *
+					 * @param int    $post_id        Post ID.
+					 * @param string $start_datetime Start datetime.
+					 * @param string $end_datetime   Stripped end datetime.
+					 */
+					do_action( 'datamachine_event_dates_end_span_stripped', $post_id, $datetime, $end_datetime_val );
+
+					$end_datetime_val = null;
+				}
+
 				if ( EventDatesTable::upsert( $post_id, $datetime, $end_datetime_val ) ) {
 					/**
 					 * Fires after event dates are written to the event_dates table.

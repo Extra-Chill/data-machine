@@ -149,6 +149,10 @@ class CommandRegistry {
 				'file'  => $cli . 'AffiliateRedirectRepairCommand.php',
 				'class' => AffiliateRedirectRepairCommand::class,
 			),
+			'data-machine-events repair-series-ends'      => array(
+				'file'  => $cli . 'SeriesEndRepairCommand.php',
+				'class' => SeriesEndRepairCommand::class,
+			),
 			'data-machine-events backfill-canonical-ticket-urls' => array(
 				'file'  => $cli . 'TicketUrlCanonicalBackfillCommand.php',
 				'class' => TicketUrlCanonicalBackfillCommand::class,

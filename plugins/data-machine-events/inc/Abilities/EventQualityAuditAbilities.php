@@ -16,6 +16,7 @@ namespace DataMachineEvents\Abilities;
 use DataMachineEvents\Abilities\EventDateQueryAbilities;
 use DataMachineEvents\Core\AffiliateRedirectShape;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventSpanGuard;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -24,8 +25,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class EventQualityAuditAbilities {
 
-	private const DEFAULT_LIMIT      = 25;
-	private const DEFAULT_DAYS_AHEAD = 90;
+	private const DEFAULT_LIMIT          = 25;
+	private const DEFAULT_DAYS_AHEAD     = 90;
+	private const DEFAULT_MAX_SPAN_HOURS = 48;
 
 	private static bool $registered = false;
 
@@ -66,8 +68,12 @@ class EventQualityAuditAbilities {
 							),
 							'issue'            => array(
 								'type'        => 'string',
-								'enum'        => array( 'all', 'missing_start_date', 'missing_start_time', 'missing_venue', 'duplicates', 'corrupted_affiliate_redirect' ),
+								'enum'        => array( 'all', 'missing_start_date', 'missing_start_time', 'missing_venue', 'duplicates', 'corrupted_affiliate_redirect', 'long_span_no_occurrences' ),
 								'description' => 'Optional issue filter.',
+							),
+							'max_span_hours'   => array(
+								'type'        => 'integer',
+								'description' => 'Threshold in hours for the long_span_no_occurrences rule (published upcoming occurrence with no occurrenceDates spanning more than this).',
 							),
 							'limit'            => array(
 								'type'        => 'integer',
@@ -85,6 +91,7 @@ class EventQualityAuditAbilities {
 							'missing_venue'                => array( 'type' => 'object' ),
 							'probable_duplicates'          => array( 'type' => 'object' ),
 							'corrupted_affiliate_redirect' => array( 'type' => 'object' ),
+							'long_span_no_occurrences'     => array( 'type' => 'object' ),
 							'culprit_flows'                => array( 'type' => 'array' ),
 							'message'                      => array( 'type' => 'string' ),
 						),
@@ -102,12 +109,13 @@ class EventQualityAuditAbilities {
 	}
 
 	public function executeAudit( array $input ): array|\WP_Error {
-		$scope      = $input['scope'] ?? 'upcoming';
-		$days_ahead = (int) ( $input['days_ahead'] ?? self::DEFAULT_DAYS_AHEAD );
-		$flow_id    = (int) ( $input['flow_id'] ?? 0 );
-		$location   = (int) ( $input['location_term_id'] ?? 0 );
-		$issue      = $input['issue'] ?? 'all';
-		$limit      = (int) ( $input['limit'] ?? self::DEFAULT_LIMIT );
+		$scope          = $input['scope'] ?? 'upcoming';
+		$days_ahead     = (int) ( $input['days_ahead'] ?? self::DEFAULT_DAYS_AHEAD );
+		$flow_id        = (int) ( $input['flow_id'] ?? 0 );
+		$location       = (int) ( $input['location_term_id'] ?? 0 );
+		$issue          = $input['issue'] ?? 'all';
+		$limit          = (int) ( $input['limit'] ?? self::DEFAULT_LIMIT );
+		$max_span_hours = (int) ( $input['max_span_hours'] ?? self::DEFAULT_MAX_SPAN_HOURS );
 
 		if ( $days_ahead <= 0 ) {
 			$days_ahead = self::DEFAULT_DAYS_AHEAD;
@@ -117,6 +125,10 @@ class EventQualityAuditAbilities {
 			$limit = self::DEFAULT_LIMIT;
 		}
 
+		if ( $max_span_hours <= 0 ) {
+			$max_span_hours = self::DEFAULT_MAX_SPAN_HOURS;
+		}
+
 		$events = $this->queryEvents( $scope, $days_ahead, $flow_id, $location );
 
 		$missing_start_date  = array();
@@ -124,6 +136,7 @@ class EventQualityAuditAbilities {
 		$missing_venue       = array();
 		$duplicate_groups    = array();
 		$corrupted_redirects = array();
+		$long_span_events    = array();
 		$culprit_flow_counts = array();
 		$by_duplicate_key    = array();
 
@@ -187,6 +200,25 @@ class EventQualityAuditAbilities {
 			if ( ! empty( $duplicate_key ) ) {
 				$by_duplicate_key[ $duplicate_key ][] = $info;
 			}
+
+			// Long-span rule (#199): a published upcoming occurrence spanning
+			// more than the threshold with no occurrenceDates is almost always
+			// a fabricated series range (the series' final end stamped onto a
+			// single occurrence), not a real multi-day event.
+			$long_span = $this->detectLongSpanWithoutOccurrences( $block_attrs, $max_span_hours );
+			if ( null !== $long_span ) {
+				$long_span_events[] = array_merge(
+					array(
+						'id'        => $event->ID,
+						'title'     => $event->post_title,
+						'venue'     => $venue_name,
+						'flow_id'   => $flow_id,
+						'flow_name' => $info['flow_name'],
+					),
+					$long_span
+				);
+				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
+			}
 		}
 
 		foreach ( $by_duplicate_key as $group ) {
@@ -232,6 +264,13 @@ class EventQualityAuditAbilities {
 		}
 		if ( ! empty( $corrupted_redirects ) && ( 'all' === $issue || 'corrupted_affiliate_redirect' === $issue ) ) {
 			$message_parts[] = count( $corrupted_redirects ) . ' corrupted affiliate redirect params';
+		}
+		if ( ! empty( $long_span_events ) && ( 'all' === $issue || 'long_span_no_occurrences' === $issue ) ) {
+			$message_parts[] = sprintf(
+				'%d occurrence(s) spanning more than %d hours with no occurrenceDates',
+				count( $long_span_events ),
+				$max_span_hours
+			);
 		}
 
 		$missing_start_date_result = ( 'all' === $issue || 'missing_start_date' === $issue )
@@ -284,6 +323,18 @@ class EventQualityAuditAbilities {
 				'events' => array(),
 			);
 
+		$long_span_result = ( 'all' === $issue || 'long_span_no_occurrences' === $issue )
+			? array(
+				'count'          => count( $long_span_events ),
+				'max_span_hours' => $max_span_hours,
+				'events'         => array_slice( $long_span_events, 0, $limit ),
+			)
+			: array(
+				'count'          => 0,
+				'max_span_hours' => $max_span_hours,
+				'events'         => array(),
+			);
+
 		return array(
 			'total_scanned'                => count( $events ),
 			'scope'                        => $scope,
@@ -292,6 +343,7 @@ class EventQualityAuditAbilities {
 			'missing_venue'                => $missing_venue_result,
 			'probable_duplicates'          => $duplicate_result,
 			'corrupted_affiliate_redirect' => $corrupted_redirect_result,
+			'long_span_no_occurrences'     => $long_span_result,
 			'culprit_flows'                => array_slice( $culprit_flow_counts, 0, $limit ),
 			'message'                      => empty( $message_parts )
 				? 'No major quality issues found.'
@@ -343,6 +395,40 @@ class EventQualityAuditAbilities {
 		}
 
 		return array();
+	}
+
+	/**
+	 * Detect a long-span occurrence with no occurrenceDates (issue #199).
+	 *
+	 * Span derivation is shared with the sync/repair path via
+	 * EventSpanGuard::span_hours_from_block_attrs(). Returns null unless the
+	 * block has a measurable span exceeding the threshold and no
+	 * occurrenceDates.
+	 *
+	 * @param array $block_attrs    Event Details block attributes.
+	 * @param int   $max_span_hours Threshold in hours.
+	 * @return array{start_datetime:string,end_datetime:string,span_hours:int}|null
+	 */
+	private function detectLongSpanWithoutOccurrences( array $block_attrs, int $max_span_hours ): ?array {
+		if ( ! empty( $block_attrs['occurrenceDates'] ) ) {
+			return null;
+		}
+
+		$span_hours = EventSpanGuard::span_hours_from_block_attrs( $block_attrs );
+		if ( null === $span_hours || $span_hours <= $max_span_hours ) {
+			return null;
+		}
+
+		$start_date = (string) ( $block_attrs['startDate'] ?? '' );
+		$end_date   = (string) ( $block_attrs['endDate'] ?? '' );
+		$start_time = (string) ( $block_attrs['startTime'] ?? '' );
+		$end_time   = (string) ( $block_attrs['endTime'] ?? '' );
+
+		return array(
+			'start_datetime' => $start_date . ' ' . ( '' !== $start_time ? $start_time : '00:00:00' ),
+			'end_datetime'   => $end_date . ' ' . ( '' !== $end_time ? $end_time : '23:59:59' ),
+			'span_hours'     => $span_hours,
+		);
 	}
 
 	private function getVenueName( int $post_id ): string {

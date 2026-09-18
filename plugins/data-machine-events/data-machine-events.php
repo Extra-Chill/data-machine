@@ -71,6 +71,7 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/AffiliateRedirectShape.p
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/ticket-destination.php';
 
 // Load event dates sync (monitors Event Details block saves → datamachine_event_dates table).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventSpanGuard.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-dates-sync.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventDatesTable.php';
 
@@ -443,6 +444,7 @@ class DATAMACHINE_Events {
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AffiliateRedirectRepairAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AffiliateRedirectRepairAbilities.php';
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/SeriesEndRepairAbilities.php';
 			new \DataMachineEvents\Abilities\AffiliateRedirectRepairAbilities();
 		}
 

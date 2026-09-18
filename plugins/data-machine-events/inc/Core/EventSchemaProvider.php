@@ -93,7 +93,7 @@ class EventSchemaProvider {
 		'endDate'         => array(
 			'type'            => 'string',
 			'required'        => false,
-			'description'     => 'Event end date (YYYY-MM-DD format)',
+			'description'     => 'End date of THIS single event occurrence (YYYY-MM-DD format). For a genuine multi-day festival or run that continuously spans days, set this to that occurrence\'s final day. For a recurring series, weekly residency, tour with many dates, or a source page listing several shows: NEVER use the series/tour final date here — leave endDate empty and provide the specific date of the show being imported via startDate, or the concrete occurrence dates via occurrenceDates.',
 			'schema_property' => 'endDate',
 		),
 		'startTime'       => array(
