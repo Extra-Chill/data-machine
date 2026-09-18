@@ -204,7 +204,7 @@ class ComposableFileLock {
 		$reference = file_exists( $filepath ) ? $filepath : dirname( $lock_path );
 
 		$group = @filegroup( $reference ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-		if ( is_int( $group ) && $group !== @filegroup( $lock_path ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( is_int( $group ) && @filegroup( $lock_path ) !== $group ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 			@chgrp( $lock_path, $group ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chgrp,WordPress.PHP.NoSilencedErrors.Discouraged
 		}
 
@@ -256,6 +256,7 @@ class ComposableFileLock {
 		// is_file(), not file_exists(): a directory at this path opens read-only
 		// and flocks clean, which would read as an unheld lock and send the
 		// replacement into an unlink() that cannot succeed.
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable
 		if ( ! is_file( $lock_path ) || ! is_writable( dirname( $lock_path ) ) ) {
 			return false;
 		}
@@ -270,7 +271,7 @@ class ComposableFileLock {
 		}
 		fclose( $probe ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
-		if ( ! $unheld || ! @unlink( $lock_path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_unlink,WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( ! $unheld || ! @unlink( $lock_path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink,WordPress.PHP.NoSilencedErrors.Discouraged
 			return false;
 		}
 

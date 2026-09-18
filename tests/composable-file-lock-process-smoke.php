@@ -95,14 +95,20 @@ $replacement['lock']->release();
 // (#3512). Unlinking a held lock would leave the holder on the orphaned inode
 // and let a second composer start on a fresh one — two writers, no contention
 // reported, which is worse than the wedge the replacement exists to clear.
-$lock_path = $directory . '/.' . basename( $filepath ) . '.compose.lock';
+$lock_path  = $directory . '/.' . basename( $filepath ) . '.compose.lock';
 $holder_pid = pcntl_fork();
+// PHPStan's pcntl_fork() stub types the return as int<min,-1>|int<1,max>, which
+// omits the 0 the child receives — the one value this branch exists to catch.
+// @phpstan-ignore identical.alwaysFalse
 if ( 0 === $holder_pid ) {
 	$held = ComposableFileLock::acquire( 'AGENTS.md', $filepath, 100 );
 	file_put_contents( $result_file, $held['acquired'] ? 'holding' : 'failed', LOCK_EX );
-	while ( true ) {
+	// Bounded, not `while (true)`: the parent SIGKILLs this child long before
+	// 60s, and an unbounded child outlives a parent that dies unexpectedly.
+	for ( $tick = 0; $tick < 600; $tick++ ) {
 		usleep( 100000 );
 	}
+	exit( 0 );
 }
 
 $deadline = microtime( true ) + 2.0;

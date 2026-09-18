@@ -34,11 +34,20 @@ class ComposableFileLockPermissionsTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
-		foreach ( (array) glob( $this->directory . '/{,.}*', GLOB_BRACE ) as $entry ) {
-			if ( is_file( $entry ) ) {
-				@unlink( $entry );
-			} elseif ( is_dir( $entry ) && ! in_array( basename( $entry ), array( '.', '..' ), true ) ) {
-				@rmdir( $entry );
+		// scandir(), not glob() with GLOB_BRACE: that constant is not defined on
+		// every PHP build, and the lock file is a dotfile so it has to be matched
+		// somehow. An undefined constant here fails the test in teardown, which
+		// reports as a failure of whatever assertion just passed.
+		$entries = @scandir( $this->directory );
+		foreach ( false === $entries ? array() : $entries as $entry ) {
+			if ( '.' === $entry || '..' === $entry ) {
+				continue;
+			}
+			$path = $this->directory . '/' . $entry;
+			if ( is_dir( $path ) && ! is_link( $path ) ) {
+				@rmdir( $path );
+			} else {
+				@unlink( $path );
 			}
 		}
 		@rmdir( $this->directory );

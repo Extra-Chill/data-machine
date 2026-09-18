@@ -158,7 +158,7 @@ class FilesystemHelper {
 		if ( ! is_int( $group ) ) {
 			return false;
 		}
-		if ( $group === @filegroup( $filepath ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( @filegroup( $filepath ) === $group ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 			return true;
 		}
 
