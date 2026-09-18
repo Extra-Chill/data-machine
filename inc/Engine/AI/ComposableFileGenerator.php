@@ -268,6 +268,14 @@ class ComposableFileGenerator {
 		$written   = file_put_contents( $temp_path, $payload, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 		$file_mode = defined( 'FS_CHMOD_FILE' ) ? FS_CHMOD_FILE : 0644;
 		@chmod( $temp_path, $file_mode ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod,WordPress.PHP.NoSilencedErrors.Discouraged
+
+		// Before the rename, so the file is never visible in the wrong group.
+		// tempnam() gives the temp file the writing process's primary group, and
+		// rename() carries that onto the target — which is how a root-run
+		// composition leaves a root:root file that the service user can no
+		// longer replace, despite the 0664 applied just above.
+		FilesystemHelper::inherit_shared_group( $temp_path, $directory );
+
 		if ( strlen( $payload ) !== $written || ! @rename( $temp_path, $filepath ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename,WordPress.PHP.NoSilencedErrors.Discouraged
 			@unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink,WordPress.PHP.NoSilencedErrors.Discouraged
 			return false;

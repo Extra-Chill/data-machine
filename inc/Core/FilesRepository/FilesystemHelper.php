@@ -131,6 +131,45 @@ class FilesystemHelper {
 	}
 
 	/**
+	 * Put a file in the group that shares the directory holding it.
+	 *
+	 * 0664 only means "writable by both runtime users" when both are in the
+	 * file's group, and nothing guarantees that. A new file takes the creating
+	 * process's primary group unless the parent carries setgid, so a file
+	 * written by root lands `root:root` and the 0664 is worthless to the
+	 * service user — it is group-writable by a group that user is not in.
+	 *
+	 * The containing directory is the authority on which group shares the tree,
+	 * being the thing already maintained group-accessible for exactly that
+	 * reason.
+	 *
+	 * @since 0.176.15
+	 *
+	 * @param string $filepath  Absolute path to the file to reassign.
+	 * @param string $directory Absolute path to the directory it belongs to.
+	 * @return bool True when the file ends up in the directory's group.
+	 */
+	public static function inherit_shared_group( string $filepath, string $directory ): bool {
+		if ( ! file_exists( $filepath ) || ! is_dir( $directory ) ) {
+			return false;
+		}
+
+		$group = @filegroup( $directory ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( ! is_int( $group ) ) {
+			return false;
+		}
+		if ( $group === @filegroup( $filepath ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			return true;
+		}
+
+		// chgrp() only succeeds for the owner (and only into a group they
+		// belong to) or for root. Failure here is non-fatal: it leaves the
+		// previous behavior rather than making anything worse.
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chgrp, WordPress.PHP.NoSilencedErrors.Discouraged
+		return (bool) @chgrp( $filepath, $group );
+	}
+
+	/**
 	 * Make a shared directory accessible to both runtime users.
 	 *
 	 * @param string $directory Absolute directory path.
