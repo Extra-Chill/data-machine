@@ -1177,7 +1177,7 @@ abstract class BaseAuthProvider {
 			return $result;
 		}
 
-		$key = hash( 'sha256', wp_salt( 'auth' ) . 'datamachine-oauth', true );
+		$key         = hash( 'sha256', wp_salt( 'auth' ) . 'datamachine-oauth', true );
 		$fingerprint = self::fingerprint_for_key( $key );
 
 		foreach ( $all_auth_data as $provider_slug => $provider_data ) {
