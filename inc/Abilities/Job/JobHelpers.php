@@ -230,7 +230,10 @@ trait JobHelpers {
 		$stored_status = (string) ( $job['status'] ?? '' );
 		$status        = JobStatus::fromString( $stored_status );
 		$reason        = $status->getReason();
-		if ( null === $reason && is_array( $job['engine_data'] ?? null ) ) {
+		if ( ( null === $reason || '' === $reason ) && is_string( $job['status_reason'] ?? null ) && '' !== $job['status_reason'] ) {
+			$reason = $job['status_reason'];
+		}
+		if ( ( null === $reason || '' === $reason ) && is_array( $job['engine_data'] ?? null ) ) {
 			$reason = is_string( $job['engine_data']['job_status_reason'] ?? null ) ? $job['engine_data']['job_status_reason'] : null;
 		}
 		if ( $status->isCanonical() ) {

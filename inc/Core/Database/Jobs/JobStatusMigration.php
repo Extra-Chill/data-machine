@@ -199,17 +199,19 @@ class JobStatusMigration {
 			$scope->rollback();
 			return 'error';
 		}
+		$storage = $parsed->toStorage();
 		$updated = $this->wpdb->update(
 			$this->table,
 			array(
-				'status'      => $parsed->getBaseStatus(),
-				'engine_data' => $encoded,
+				'status'        => $storage['status'],
+				'status_reason' => $storage['status_reason'],
+				'engine_data'   => $encoded,
 			),
 			array(
 				'job_id' => $job_id,
 				'status' => $expected_status,
 			),
-			array( '%s', '%s' ),
+			array( '%s', $parsed->hasReason() ? '%s' : null, '%s' ),
 			array( '%d', '%s' )
 		);
 		if ( 1 !== (int) $updated || ! $scope->commit() ) {
