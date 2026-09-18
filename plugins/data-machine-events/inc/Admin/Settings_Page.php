@@ -209,12 +209,40 @@ class Settings_Page {
 	/**
 	 * Get next day cutoff time setting
 	 *
-	 * Events ending before this time on the following day are treated as single-day events.
+	 * Events ending before this time on the following day are treated as
+	 * single-day events (a 9 PM → 2 AM bar show is one night, not a
+	 * multi-day event). This is the single shared "same-night cutoff"
+	 * consumed by MultiDayResolver and DisplayVars so every render path
+	 * agrees on the classification.
+	 *
+	 * @since 0.62.0 Filterable via `data_machine_events_next_day_cutoff`.
 	 *
 	 * @return string Time in HH:MM format (default: 05:00)
 	 */
 	public static function get_next_day_cutoff(): string {
-		return self::get_setting( 'next_day_cutoff', '05:00' );
+		$cutoff = self::get_setting( 'next_day_cutoff', '05:00' );
+
+		/**
+		 * Filter the next-day cutoff time for same-night event classification.
+		 *
+		 * An event whose end lands on the calendar day after its start and
+		 * before this time is a single-night event, not a multi-day event.
+		 * Accepts HH:MM or HH:MM:SS. Set to 00:00 to disable the same-night
+		 * treatment entirely.
+		 *
+		 * @since 0.62.0
+		 *
+		 * @param string $cutoff Cutoff time (default: stored setting, 05:00).
+		 */
+
+		/** @var mixed $filtered The stub types this as string, but a filter callback may return anything at runtime — validate before trusting. */
+		$filtered = apply_filters( 'data_machine_events_next_day_cutoff', $cutoff );
+
+		if ( is_string( $filtered ) && preg_match( '/^\d{1,2}:\d{2}(:\d{2})?$/', $filtered ) ) {
+			return $filtered;
+		}
+
+		return $cutoff;
 	}
 
 	/**

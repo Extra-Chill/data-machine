@@ -102,4 +102,128 @@ class MultiDayResolverTest extends WP_UnitTestCase {
 			$range
 		);
 	}
+
+	/**
+	 * Issue #833: the Campbell & Sons shape — a 9 PM bar show ending 2 AM
+	 * the next morning — must classify as a single-day event, not multi-day.
+	 */
+	public function test_is_multi_day_false_for_after_midnight_end_before_cutoff() {
+		$result = MultiDayResolver::is_multi_day(
+			array(
+				'startDate' => '2026-07-10',
+				'startTime' => '21:00:00',
+				'endDate'   => '2026-07-11',
+				'endTime'   => '02:00:00',
+			)
+		);
+
+		$this->assertFalse( $result, 'A 21:00 → 02:00 next-day end is one night, not a multi-day event.' );
+	}
+
+	/**
+	 * Ends at or after the cutoff (default 05:00, strict comparison) are
+	 * genuinely multi-day and keep the existing treatment.
+	 */
+	public function test_is_multi_day_true_when_end_at_or_after_cutoff() {
+		$at_cutoff = MultiDayResolver::is_multi_day(
+			array(
+				'startDate' => '2026-07-10',
+				'startTime' => '21:00:00',
+				'endDate'   => '2026-07-11',
+				'endTime'   => '05:00:00',
+			)
+		);
+		$this->assertTrue( $at_cutoff, 'An end exactly at the cutoff is not same-night (strict comparison).' );
+
+		$after_cutoff = MultiDayResolver::is_multi_day(
+			array(
+				'startDate' => '2026-07-10',
+				'startTime' => '21:00:00',
+				'endDate'   => '2026-07-11',
+				'endTime'   => '06:00:00',
+			)
+		);
+		$this->assertTrue( $after_cutoff, 'A 21:00 → 06:00 end is a multi-day event at the default cutoff.' );
+	}
+
+	public function test_is_multi_day_true_for_week_long_span() {
+		$result = MultiDayResolver::is_multi_day(
+			array(
+				'startDate' => '2026-07-10',
+				'startTime' => '19:30:00',
+				'endDate'   => '2026-07-17',
+				'endTime'   => '11:30:00',
+			)
+		);
+
+		$this->assertTrue( $result );
+	}
+
+	public function test_is_multi_day_false_for_same_day_evening() {
+		$result = MultiDayResolver::is_multi_day(
+			array(
+				'startDate' => '2026-07-10',
+				'startTime' => '10:00:00',
+				'endDate'   => '2026-07-10',
+				'endTime'   => '22:00:00',
+			)
+		);
+
+		$this->assertFalse( $result );
+	}
+
+	public function test_is_multi_day_true_when_end_time_unknown_on_next_day() {
+		$result = MultiDayResolver::is_multi_day(
+			array(
+				'startDate' => '2026-07-10',
+				'startTime' => '21:00:00',
+				'endDate'   => '2026-07-11',
+			)
+		);
+
+		$this->assertTrue( $result, 'An unknown end time cannot prove same-night; keep multi-day.' );
+	}
+
+	/**
+	 * The same-night cutoff is filterable — pushing it to 06:00 pulls a
+	 * 05:30 end into single-day territory that the 05:00 default calls
+	 * multi-day.
+	 */
+	public function test_next_day_cutoff_filter_is_respected() {
+		$event = array(
+			'startDate' => '2026-07-10',
+			'startTime' => '21:00:00',
+			'endDate'   => '2026-07-11',
+			'endTime'   => '05:30:00',
+		);
+
+		$this->assertTrue( MultiDayResolver::is_multi_day( $event ), '05:30 end is multi-day at the 05:00 default.' );
+
+		add_filter(
+			'data_machine_events_next_day_cutoff',
+			static function () {
+				return '06:00';
+			}
+		);
+
+		$this->assertFalse( MultiDayResolver::is_multi_day( $event ), '05:30 end is same-night with the cutoff filtered to 06:00.' );
+
+		remove_all_filters( 'data_machine_events_next_day_cutoff' );
+
+		$this->assertTrue( MultiDayResolver::is_multi_day( $event ), 'Filter removal restores the default classification.' );
+	}
+
+	public function test_is_same_night_end_accepts_late_night_end() {
+		$this->assertTrue( MultiDayResolver::is_same_night_end( '2026-07-10', '2026-07-11', '02:00:00' ) );
+		$this->assertTrue( MultiDayResolver::is_same_night_end( '2026-07-10', '2026-07-11', '04:59' ) );
+	}
+
+	public function test_is_same_night_end_rejects_other_shapes() {
+		$this->assertFalse( MultiDayResolver::is_same_night_end( '2026-07-10', '2026-07-11', '05:00:00' ), 'End exactly at the cutoff is not same-night.' );
+		$this->assertFalse( MultiDayResolver::is_same_night_end( '2026-07-10', '2026-07-11', '11:00:00' ) );
+		$this->assertFalse( MultiDayResolver::is_same_night_end( '2026-07-10', '2026-07-11', '' ), 'Unknown end time is not same-night.' );
+		$this->assertFalse( MultiDayResolver::is_same_night_end( '2026-07-10', '2026-07-12', '02:00:00' ), 'End two days later is not same-night.' );
+		$this->assertFalse( MultiDayResolver::is_same_night_end( '2026-07-10', '2026-07-10', '23:00:00' ), 'Same-day ends are not this helper’s concern.' );
+		$this->assertFalse( MultiDayResolver::is_same_night_end( '2026-07-??', '2026-07-11', '02:00:00' ), 'Placeholder dates are never same-night.' );
+	}
 }

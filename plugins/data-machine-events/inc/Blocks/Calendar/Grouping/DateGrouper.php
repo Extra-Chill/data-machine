@@ -113,16 +113,21 @@ class DateGrouper {
 				// Single-day events get a late-night cutoff shift: a 1am show
 				// belongs to the previous night for human-friendly grouping.
 				// The underlying start_datetime stays untouched.
+				//
+				// MultiDayResolver::is_multi_day() has already returned false
+				// here, so the event is a single NIGHT: an end on the next
+				// calendar date before the cutoff (a 9 PM → 2 AM bar show,
+				// #833) or a start after midnight (1 AM → 2 AM). List it once
+				// under the cutoff-shifted display date and never force-expand
+				// it into a multi-day continuation — the old end_date >
+				// effective_start_date re-check overrode the resolver's verdict
+				// and produced "through <date>" badges plus ghost "Ongoing"
+				// entries on the following day.
 				$effective_start_date = LateNightCutoff::display_date_from_strings(
 					$start_date,
 					$event_data['startTime'] ?? ''
 				);
-				if ( $end_date > $effective_start_date ) {
-					$is_multi_day = true;
-					$event_dates  = MultiDayResolver::get_date_range( $effective_start_date, $end_date, $event_tz );
-				} else {
-					$event_dates = array( $effective_start_date );
-				}
+				$event_dates          = array( $effective_start_date );
 			}
 
 			// Filter out past dates when show_past is false.

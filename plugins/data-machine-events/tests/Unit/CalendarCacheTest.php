@@ -280,6 +280,22 @@ class CalendarCacheTest extends WP_UnitTestCase {
 	}
 
 	public function test_cached_unfiltered_and_title_search_expire_together_at_event_end(): void {
+		/*
+		 * The fixture (started one hour ago, ending in one minute) is only
+		 * visible on the live upcoming page while its night bucket is not
+		 * in the past. Same-night events are listed once under their start
+		 * night (#833): the bucket SQL shifts starts back by the late-night
+		 * cutoff (5h), so the fixture's display bucket is DATE(now - 6h),
+		 * which reads as yesterday — and is dropped from the upcoming page —
+		 * whenever "now" is before 06:00 site time. Skip those runs instead
+		 * of pinning an explicit window, which would trade the live
+		 * upcoming envelope for a fixed-window TTL and defeat the very
+		 * transition-bounded expiry this test verifies.
+		 */
+		if ( (int) current_time( 'G' ) < 6 ) {
+			$this->markTestSkipped( 'Fixture night falls before today before 06:00 site time; visibility assertions require a daytime run.' );
+		}
+
 		$venue = wp_insert_term( 'Cache transition venue ' . uniqid(), 'venue' );
 		$this->assertNotWPError( $venue );
 

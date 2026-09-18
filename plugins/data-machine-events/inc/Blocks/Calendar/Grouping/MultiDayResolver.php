@@ -27,7 +27,8 @@ class MultiDayResolver {
 	 * Check if an event spans multiple days.
 	 *
 	 * Events ending before the next_day_cutoff time on the following day
-	 * are treated as single-day events (typical late-night shows).
+	 * are treated as single-day events (typical late-night shows). See
+	 * is_same_night_end() for the shared same-night rule. See #833.
 	 *
 	 * @param array $event_data Event data array.
 	 * @return bool True if event spans multiple days.
@@ -56,20 +57,65 @@ class MultiDayResolver {
 		$end   = new DateTime( $end_date );
 		$diff  = $start->diff( $end )->days;
 
-		if ( 1 === $diff && ! empty( $end_time ) ) {
-			$cutoff         = Settings_Page::get_next_day_cutoff();
-			$cutoff_parts   = explode( ':', $cutoff );
-			$cutoff_seconds = ( (int) $cutoff_parts[0] * 3600 ) + ( (int) ( $cutoff_parts[1] ?? 0 ) * 60 );
-
-			$end_time_parts = explode( ':', $end_time );
-			$end_seconds    = ( (int) $end_time_parts[0] * 3600 ) + ( (int) ( $end_time_parts[1] ?? 0 ) * 60 );
-
-			if ( $end_seconds < $cutoff_seconds ) {
-				return false;
-			}
+		if ( 1 === $diff && self::is_same_night_end( $start_date, $end_date, $end_time ) ) {
+			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * Check if an event's end falls on the same "night" as its start.
+	 *
+	 * The shared same-night rule (#833): an end on the calendar day after
+	 * the start, with a time-of-day before the next-day cutoff (default
+	 * 05:00 site time via Settings_Page::get_next_day_cutoff()), is a
+	 * late-night continuation of the same evening — a 9 PM → 2 AM bar show,
+	 * not a multi-day event. Same-calendar-day ends are trivially the same
+	 * night and are handled by callers directly; ends on the start date or
+	 * later than start + 1 day, or with an unknown/absent end time, are
+	 * never classified as same-night here.
+	 *
+	 * Consumed by both is_multi_day() (classification) and
+	 * DisplayVars::format_time_range() (time-string rendering) so the two
+	 * cannot drift.
+	 *
+	 * @since 0.62.0
+	 *
+	 * @param string $start_date Start date (Y-m-d).
+	 * @param string $end_date   End date (Y-m-d).
+	 * @param string $end_time   End time (H:i or H:i:s). May be empty.
+	 * @return bool True if the end belongs to the same night as the start.
+	 */
+	public static function is_same_night_end( string $start_date, string $end_date, string $end_time ): bool {
+		if ( empty( $start_date ) || empty( $end_date ) || empty( $end_time ) ) {
+			return false;
+		}
+
+		if ( ! DateTimeParser::isValidYmd( $start_date ) || ! DateTimeParser::isValidYmd( $end_date ) ) {
+			return false;
+		}
+
+		$start = DateTime::createFromFormat( 'Y-m-d', $start_date );
+		$end   = DateTime::createFromFormat( 'Y-m-d', $end_date );
+
+		if ( ! $start || ! $end || 1 !== (int) $start->diff( $end )->days ) {
+			return false;
+		}
+
+		return self::time_to_seconds( $end_time ) < self::time_to_seconds( Settings_Page::get_next_day_cutoff() );
+	}
+
+	/**
+	 * Convert an H:i / H:i:s time string to seconds since midnight.
+	 *
+	 * @param string $time Time string.
+	 * @return int Seconds.
+	 */
+	private static function time_to_seconds( string $time ): int {
+		$parts = explode( ':', $time );
+
+		return ( (int) $parts[0] * 3600 ) + ( (int) ( $parts[1] ?? 0 ) * 60 );
 	}
 
 	/**

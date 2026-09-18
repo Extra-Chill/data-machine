@@ -99,8 +99,11 @@ class CalendarCache {
 				? hash( 'sha256', (string) $params['scope_token'] )
 				: '',
 			// Bucketing depends on the cutoff hour; fold it into the key so
-			// switching the filter at runtime invalidates stale buckets.
+			// switching the filter at runtime invalidates stale buckets. The
+			// same-night classification cutoff (#833) also shapes rendered
+			// output, so it rides along too.
 			'cutoff_hour'     => \DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff::cutoff_hour(),
+			'next_day_cutoff' => \DataMachineEvents\Admin\Settings_Page::get_next_day_cutoff(),
 			'next_transition' => $live_upcoming ? self::next_upcoming_transition() : '',
 		);
 
@@ -140,6 +143,8 @@ class CalendarCache {
 			'geo_radius'       => (int) ( $envelope['geo_radius'] ?? 0 ),
 			'geo_radius_unit'  => (string) ( $envelope['geo_radius_unit'] ?? '' ),
 			'cutoff_hour'      => \DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff::cutoff_hour(),
+			// Same-night classification cutoff (#833) shapes rendered output.
+			'next_day_cutoff'  => \DataMachineEvents\Admin\Settings_Page::get_next_day_cutoff(),
 			// Phase 1 of refactor #298: HTML and data-only responses
 			// have different shapes and MUST live in separate cache
 			// buckets — otherwise the first response shape served

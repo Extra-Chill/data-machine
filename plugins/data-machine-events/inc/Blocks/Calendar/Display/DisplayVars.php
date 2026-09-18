@@ -16,6 +16,7 @@ namespace DataMachineEvents\Blocks\Calendar\Display;
 use DateTime;
 use DateTimeZone;
 use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
+use DataMachineEvents\Blocks\Calendar\Grouping\MultiDayResolver;
 use DataMachineEvents\Core\DateTimeParser;
 use function DataMachineEvents\Core\data_machine_events_is_gated_ticket_url;
 
@@ -82,11 +83,15 @@ class DisplayVars {
 						$end_datetime_obj->format( 'M j' )
 					);
 				} else {
-					$multi_day_label        = sprintf(
+					$multi_day_label = sprintf(
 						__( 'through %s', 'data-machine-events' ),
 						$end_datetime_obj->format( 'M j' )
 					);
-					$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz );
+					// Multi-day events keep the start time only — the badge
+					// carries the span. This also keeps the portable
+					// calendar-occurrence contract bytes stable for
+					// multi-day-classified occurrences.
+					$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz, false );
 				}
 			} else {
 				$formatted_time_display = self::format_time_range( $start_datetime_obj, $end_date, $end_time, $event_tz );
@@ -115,13 +120,22 @@ class DisplayVars {
 	 * Formats start and end times into a readable range. When both times share
 	 * the same AM/PM period, only shows the period once (e.g., "7:30 - 10:00 PM").
 	 *
-	 * @param DateTime     $start_datetime_obj Start datetime object.
-	 * @param string       $end_date           End date (Y-m-d format).
-	 * @param string       $end_time           End time (H:i:s format).
-	 * @param DateTimeZone $event_tz           Event timezone.
+	 * A range is printed for same-day events and, when
+	 * $allow_same_night_range is set, for same-night events whose end lands
+	 * on the following calendar day before the next-day cutoff (a
+	 * 9 PM → 2 AM bar show reads "9:00 PM - 2:00 AM", #833). Genuinely
+	 * multi-day events keep the start time only — the "through <date>"
+	 * badge carries the span instead — so multi-day-classified occurrences
+	 * pass false and their serialized shape is unchanged.
+	 *
+	 * @param DateTime     $start_datetime_obj     Start datetime object.
+	 * @param string       $end_date               End date (Y-m-d format).
+	 * @param string       $end_time               End time (H:i:s format).
+	 * @param DateTimeZone $event_tz               Event timezone.
+	 * @param bool         $allow_same_night_range Whether a same-night next-day end may render as a range.
 	 * @return string Formatted time display.
 	 */
-	public static function format_time_range( DateTime $start_datetime_obj, string $end_date, string $end_time, DateTimeZone $event_tz ): string {
+	public static function format_time_range( DateTime $start_datetime_obj, string $end_date, string $end_time, DateTimeZone $event_tz, bool $allow_same_night_range = true ): string {
 		$start_formatted_full = $start_datetime_obj->format( 'g:i A' );
 
 		if ( empty( $end_date ) || empty( $end_time ) || self::is_sentinel_end_time( $end_time ) ) {
@@ -141,7 +155,7 @@ class DisplayVars {
 		}
 
 		$is_same_day = $start_datetime_obj->format( 'Y-m-d' ) === $end_datetime_obj->format( 'Y-m-d' );
-		if ( ! $is_same_day ) {
+		if ( ! $is_same_day && ( ! $allow_same_night_range || ! MultiDayResolver::is_same_night_end( $start_datetime_obj->format( 'Y-m-d' ), $end_date, $end_time ) ) ) {
 			return $start_formatted_full;
 		}
 
