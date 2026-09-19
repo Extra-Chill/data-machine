@@ -73,6 +73,7 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/ticket-destination.php';
 // Load event dates sync (monitors Event Details block saves → datamachine_event_dates table).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventSpanGuard.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-dates-sync.php';
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/term-classification-policy.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventDatesTable.php';
 
 // Rewrites legacy inline affiliate ticket-link anchors in post_content into
