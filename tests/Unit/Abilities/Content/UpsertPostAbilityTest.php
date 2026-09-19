@@ -231,6 +231,74 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 'publish', get_post_status( $post_id ) );
 	}
 
+	/**
+	 * An update must not restamp the publication date.
+	 *
+	 * Updates run through wp_insert_post() with an ID rather than
+	 * wp_update_post(), and wp_resolve_post_date() has no update branch — an
+	 * omitted post_date becomes current_time( 'mysql' ). A caller that
+	 * re-upserts unchanged content on a schedule therefore rewrote the date
+	 * every pass, fired post_updated, and turned a no-op into a
+	 * publish -> publish transition for everything listening.
+	 *
+	 * Measured on the events site before the fix: 37,703 posts carrying
+	 * _wp_old_date, one of them rewritten six separate times.
+	 */
+	public function test_update_preserves_the_existing_publication_date(): void {
+		$post_id  = $this->create_hashed_post( 'publish' );
+		$original = '2026-01-15 09:30:00';
+
+		wp_update_post(
+			array(
+				'ID'            => $post_id,
+				'post_date'     => $original,
+				'post_date_gmt' => get_gmt_from_date( $original ),
+			)
+		);
+		clean_post_cache( $post_id );
+
+		// Content differs, so this is a genuine update rather than a no-op.
+		$input            = $this->status_input( $post_id, 'publish' );
+		$changed          = '<!-- wp:paragraph --><p>Rewritten body</p><!-- /wp:paragraph -->';
+		$input['content'] = $changed;
+		$input['content_hash'] = hash( 'sha256', $changed );
+
+		$result = UpsertPostAbility::execute( $input );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame(
+			$original,
+			get_post_field( 'post_date', $post_id ),
+			'the update restamped post_date instead of preserving it'
+		);
+		$this->assertEmpty(
+			get_post_meta( $post_id, '_wp_old_date' ),
+			'core recorded a date change, so post_updated fired as a date rewrite'
+		);
+	}
+
+	/**
+	 * An explicit source date still wins — preserving is the fallback, not a
+	 * new rule that ignores the caller.
+	 */
+	public function test_explicit_source_date_still_overrides_the_stored_date(): void {
+		$post_id = $this->create_hashed_post( 'publish' );
+
+		$input                      = $this->status_input( $post_id, 'publish' );
+		$changed                    = '<!-- wp:paragraph --><p>Sourced body</p><!-- /wp:paragraph -->';
+		$input['content']           = $changed;
+		$input['content_hash']      = hash( 'sha256', $changed );
+		$input['original_date_gmt'] = '2025-03-04 12:00:00';
+
+		$result = UpsertPostAbility::execute( $input );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame(
+			'2025-03-04 12:00:00',
+			get_post_field( 'post_date_gmt', $post_id )
+		);
+	}
+
 	public function test_empty_partial_and_zero_identity_values_keep_slug_fallback_behavior(): void {
 		$cases = array(
 			array(),
