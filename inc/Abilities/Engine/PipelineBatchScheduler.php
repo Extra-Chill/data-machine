@@ -258,7 +258,7 @@ class PipelineBatchScheduler {
 				);
 			}
 
-			self::maybeCompleteParent( $parent_job_id );
+			self::reconcileParentCompletion( $parent_job_id );
 		}
 	}
 
@@ -558,7 +558,44 @@ class PipelineBatchScheduler {
 			return true; // Not a child job.
 		}
 
-		return self::maybeCompleteParent( (int) $parent_job_id );
+		return self::reconcileParentCompletion( (int) $parent_job_id );
+	}
+
+	/**
+	 * Bool contract for child-complete hooks: false marks the caller's
+	 * accounting stage retryable when a due completion could not be made
+	 * durable.
+	 *
+	 * @param int $parent_job_id Parent job ID.
+	 * @return bool Whether parent completion is durable or no completion is due.
+	 */
+	private static function reconcileParentCompletion( int $parent_job_id ): bool {
+		$result = self::reconcileParent( $parent_job_id );
+		return 'error' !== $result['outcome'];
+	}
+
+	/**
+	 * Re-evaluate one batch parent's children_complete obligation.
+	 *
+	 * Read-only variant of {@see self::reconcileParent()} for recovery tooling
+	 * that must preview the outcome before mutating anything.
+	 *
+	 * @param int $parent_job_id Parent job ID.
+	 * @return array{outcome:'due'|'not_due', parent_status:string} Predicted reconciliation outcome.
+	 */
+	public static function parentCompletionDue( int $parent_job_id ): array {
+		$inspection = self::inspectParent( $parent_job_id );
+		if ( null === $inspection ) {
+			return array(
+				'outcome'       => 'not_due',
+				'parent_status' => '',
+			);
+		}
+
+		return array(
+			'outcome'       => 'due',
+			'parent_status' => self::resolveParentStatus( $inspection['counts'], $inspection['engine'] ),
+		);
 	}
 
 	/**
@@ -569,28 +606,163 @@ class PipelineBatchScheduler {
 	 * a fully scheduled, fully terminal batch parent cannot remain processing with
 	 * no future scheduler action.
 	 *
+	 * The decision reads the parent's engine snapshot directly from the database:
+	 * EngineData::retrieve() serves a persistent object-cache snapshot whose
+	 * miss-fill can lose a race against a concurrent mutate() and then serve a
+	 * pre-worklist_complete snapshot indefinitely, because a stranded parent is
+	 * never written again. A stale read here used to strand the parent forever
+	 * with every early-return condition permanently false in the database.
+	 *
 	 * @param int $parent_job_id Parent job ID.
-	 * @return bool Whether parent completion is durable or no completion is due.
+	 * @return array{outcome:'completed'|'not_due'|'error', parent_status:string} Reconciliation result.
 	 */
-	private static function maybeCompleteParent( int $parent_job_id ): bool {
+	public static function reconcileParent( int $parent_job_id ): array {
+		$inspection = self::inspectParent( $parent_job_id );
+		if ( null === $inspection ) {
+			return array(
+				'outcome'       => 'not_due',
+				'parent_status' => '',
+			);
+		}
+
+		$jobs_db        = $inspection['jobs_db'];
+		$parent_engine  = $inspection['engine'];
+		$counts         = $inspection['counts'];
+		$total_children = $inspection['counts']['total'];
+		$active         = $inspection['active'];
+		$batch_pending  = $inspection['batch_pending'];
+
+		if ( $active > 0 || $total_children < (int) ( $parent_engine['batch_scheduled'] ?? $total_children ) ) {
+			return array(
+				'outcome'       => 'not_due',
+				'parent_status' => '',
+			);
+		}
+
+		if ( $batch_pending ) {
+			// Every child is terminal but the worklist was never fenced
+			// complete: the final chunk worker died before persisting it.
+			// Re-arm the idempotent chunk action; the scheduler path sees the
+			// completed worklist and re-runs this reconciliation.
+			self::scheduleCompletionRecheck( $parent_engine, $parent_job_id );
+			return array(
+				'outcome'       => 'not_due',
+				'parent_status' => '',
+			);
+		}
+
+		$parent_status = self::resolveParentStatus( $counts, $parent_engine );
+		$completed     = (int) $counts['completed'];
+		$failed        = (int) $counts['failed'];
+		$skipped       = (int) $counts['skipped'];
+
+		// Persist batch_results through compare-and-swap so a snapshot read
+		// before a concurrent mutation cannot clobber it (and re-poison the
+		// object cache with pre-completion state).
+		$persist_parent = apply_filters(
+			'datamachine_pipeline_batch_parent_engine_persister',
+			static function ( int $persist_job_id, array $persist_engine ) use ( $completed, $failed, $skipped, $total_children ): bool {
+				unset( $persist_engine );
+				$mutation = EngineData::mutate(
+					$persist_job_id,
+					static function ( array $current ) use ( $completed, $failed, $skipped, $total_children ): array {
+						$current['batch_results'] = array(
+							'completed' => $completed,
+							'failed'    => $failed,
+							'skipped'   => $skipped,
+							'total'     => $total_children,
+						);
+						return $current;
+					},
+					'pipeline_batch_results'
+				);
+				return ! empty( $mutation['success'] );
+			},
+			$parent_job_id,
+			$parent_engine
+		);
+		if ( ! is_callable( $persist_parent ) || false === call_user_func( $persist_parent, $parent_job_id, $parent_engine ) ) {
+			self::scheduleCompletionRecheck( $parent_engine, $parent_job_id );
+			return array(
+				'outcome'       => 'error',
+				'parent_status' => $parent_status,
+			);
+		}
+
+		$complete_parent = apply_filters(
+			'datamachine_pipeline_batch_parent_completer',
+			static function () use ( $jobs_db, $parent_job_id, $parent_status ): bool {
+				return $jobs_db->complete_job( (int) $parent_job_id, $parent_status );
+			},
+			$parent_job_id,
+			$parent_status
+		);
+		if ( ! is_callable( $complete_parent ) || false === call_user_func( $complete_parent, $parent_job_id, $parent_status ) ) {
+			self::scheduleCompletionRecheck( $parent_engine, $parent_job_id );
+			return array(
+				'outcome'       => 'error',
+				'parent_status' => $parent_status,
+			);
+		}
+		BatchScheduler::finalize( $parent_job_id );
+
+		$flow_name = $parent_engine['flow']['name'] ?? '';
+
+		do_action(
+			'datamachine_log',
+			'info',
+			sprintf(
+				'Pipeline batch complete: %d/%d succeeded for flow "%s"',
+				$completed,
+				$total_children,
+				$flow_name
+			),
+			array(
+				'parent_job_id' => $parent_job_id,
+				'completed'     => $completed,
+				'failed'        => $failed,
+				'skipped'       => $skipped,
+				'total'         => $total_children,
+			)
+		);
+
+		return array(
+			'outcome'       => 'completed',
+			'parent_status' => $parent_status,
+		);
+	}
+
+	/**
+	 * Read one processing batch parent's completion evidence with fresh state.
+	 *
+	 * Returns null when no reconciliation can apply: the job row is missing,
+	 * not processing, not a pipeline batch parent, or the child-count query
+	 * failed. Child counts and the worklist fence always come from the
+	 * database, never the object cache.
+	 *
+	 * @param int $parent_job_id Parent job ID.
+	 * @return array{jobs_db:Jobs, engine:array, counts:array<string,int>, total:int, active:int, batch_pending:bool}|null
+	 */
+	private static function inspectParent( int $parent_job_id ): ?array {
 		$jobs_db = new Jobs();
 		$parent  = $jobs_db->get_job( $parent_job_id );
 
 		if ( ! $parent || JobStatus::PROCESSING !== ( $parent['status'] ?? '' ) ) {
-			return true;
+			return null;
 		}
 
-		// Check parent is a pipeline batch.
-		$parent_engine = datamachine_get_engine_data( (int) $parent_job_id );
+		// Database-direct read: the persistent object cache can hold a stale
+		// snapshot for a parent that is never written again (see #3518).
+		$parent_engine = $jobs_db->retrieve_engine_data( $parent_job_id );
 		if ( empty( $parent_engine['batch'] ) ) {
-			return true; // Not a pipeline batch parent.
+			return null; // Not a pipeline batch parent.
 		}
 
 		// Pipeline-only — system-task batches use the same engine_data
 		// shape but their parent is completed inline by TaskScheduler.
 		$context = $parent_engine['batch_context'] ?? '';
 		if ( '' !== $context && self::BATCH_CONTEXT !== $context ) {
-			return true;
+			return null;
 		}
 
 		// Count child statuses.
@@ -619,89 +791,60 @@ class PipelineBatchScheduler {
 		);
 
 		if ( ! $counts ) {
-			return false;
+			return null;
 		}
 
-		$total_children  = (int) $counts['total'];
-		$active          = (int) $counts['active'];
-		$batch_scheduled = (int) ( $parent_engine['batch_scheduled'] ?? $total_children );
-		$batch_pending   = isset( $parent_engine['batch_state'] ) && empty( $parent_engine['batch_state']['worklist_complete'] );
+		$total = (int) $counts['total'];
 
-		// Still have active children or not all scheduled yet.
-		if ( $active > 0 || $batch_pending || $total_children < $batch_scheduled ) {
-			return true;
-		}
+		return array(
+			'jobs_db'       => $jobs_db,
+			'engine'        => $parent_engine,
+			'counts'        => array(
+				'total'     => $total,
+				'completed' => (int) $counts['completed'],
+				'failed'    => (int) $counts['failed'],
+				'skipped'   => (int) $counts['skipped'],
+				'active'    => (int) $counts['active'],
+			),
+			'total'         => $total,
+			'active'        => (int) $counts['active'],
+			'batch_pending' => isset( $parent_engine['batch_state'] ) && empty( $parent_engine['batch_state']['worklist_complete'] ),
+		);
+	}
 
-		// All children are done. Complete the parent.
-		$completed = (int) $counts['completed'];
-		$failed    = (int) $counts['failed'];
-		$skipped   = (int) $counts['skipped'];
-
+	/** Derive the parent's terminal status from aggregated child counts.
+	 *
+	 * @param array $counts        Aggregated child status counts.
+	 * @param array $parent_engine Parent engine snapshot.
+	 * @return string Terminal status string.
+	 */
+	private static function resolveParentStatus( array $counts, array $parent_engine ): string {
+		$total_children = (int) ( $counts['total'] ?? 0 );
 		if ( ! empty( $parent_engine['batch_item_failed'] ) ) {
-			$parent_status = JobStatus::failed( 'batch_item_attempts_exhausted' )->toString();
-		} elseif ( ! empty( $parent_engine['batch_schedule_failed'] ) ) {
-			$parent_status = JobStatus::failed( 'batch_schedule_failed' )->toString();
-		} elseif ( $completed > 0 ) {
-			$parent_status = JobStatus::COMPLETED;
-		} elseif ( $failed === $total_children ) {
-			$parent_status = JobStatus::failed(
+			return JobStatus::failed( 'batch_item_attempts_exhausted' )->toString();
+		}
+		if ( ! empty( $parent_engine['batch_schedule_failed'] ) ) {
+			return JobStatus::failed( 'batch_schedule_failed' )->toString();
+		}
+		if ( $counts['completed'] > 0 ) {
+			return JobStatus::COMPLETED;
+		}
+		if ( $counts['failed'] === $total_children ) {
+			return JobStatus::failed(
 				sprintf( 'All %d child jobs failed', $total_children )
 			)->toString();
-		} else {
-			$parent_status = JobStatus::COMPLETED_NO_ITEMS;
 		}
+		return JobStatus::COMPLETED_NO_ITEMS;
+	}
 
-		$parent_engine['batch_results'] = array(
-			'completed' => $completed,
-			'failed'    => $failed,
-			'skipped'   => $skipped,
-			'total'     => $total_children,
-		);
-
-		$persist_parent = apply_filters(
-			'datamachine_pipeline_batch_parent_engine_persister',
-			'datamachine_set_engine_data',
-			$parent_job_id,
-			$parent_engine
-		);
-		if ( ! is_callable( $persist_parent ) || false === call_user_func( $persist_parent, $parent_job_id, $parent_engine ) ) {
-			return false;
-		}
-
-		$complete_parent = apply_filters(
-			'datamachine_pipeline_batch_parent_completer',
-			static function () use ( $jobs_db, $parent_job_id, $parent_status ): bool {
-				return $jobs_db->complete_job( (int) $parent_job_id, $parent_status );
-			},
-			$parent_job_id,
-			$parent_status
-		);
-		if ( ! is_callable( $complete_parent ) || false === call_user_func( $complete_parent, $parent_job_id, $parent_status ) ) {
-			return false;
-		}
-		BatchScheduler::finalize( $parent_job_id );
-
-		$flow_name = $parent_engine['flow']['name'] ?? '';
-
-		do_action(
-			'datamachine_log',
-			'info',
-			sprintf(
-				'Pipeline batch complete: %d/%d succeeded for flow "%s"',
-				$completed,
-				$total_children,
-				$flow_name
-			),
-			array(
-				'parent_job_id' => $parent_job_id,
-				'completed'     => $completed,
-				'failed'        => $failed,
-				'skipped'       => $skipped,
-				'total'         => $total_children,
-			)
-		);
-
-		return true;
+	/** Re-arm the idempotent chunk action so a due completion is re-evaluated.
+	 *
+	 * @param array $parent_engine Parent engine snapshot.
+	 * @param int   $parent_job_id Parent job ID.
+	 * @return bool Whether a recheck action is scheduled.
+	 */
+	private static function scheduleCompletionRecheck( array $parent_engine, int $parent_job_id ): bool {
+		return BatchScheduler::scheduleFinalizeRetry( $parent_engine, $parent_job_id );
 	}
 
 	/**

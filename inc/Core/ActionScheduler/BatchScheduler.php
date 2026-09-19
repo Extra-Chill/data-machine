@@ -809,8 +809,14 @@ class BatchScheduler {
 		return $finalized;
 	}
 
-	/** Schedule an idempotent consumer replay when terminal cleanup is not durable. */
-	private static function scheduleFinalizeRetry( array $engine, int $parent_job_id ): bool {
+	/**
+	 * Schedule an idempotent consumer replay when terminal cleanup is not durable.
+	 *
+	 * Also public so consumers can re-arm the chunk action after a deferred
+	 * completion decision (e.g. a children_complete parent whose worklist
+	 * fence was never persisted).
+	 */
+	public static function scheduleFinalizeRetry( array $engine, int $parent_job_id ): bool {
 		$state = is_array( $engine['batch_state'] ?? null ) ? $engine['batch_state'] : array();
 		$hook  = (string) ( $state['hook'] ?? $engine['batch_hook'] ?? '' );
 		if ( '' === $hook ) {
