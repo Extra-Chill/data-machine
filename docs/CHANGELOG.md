@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.15] - 2026-09-19
+
+### Changed
+- Keep job status bounded and store error detail separately
+- wake-briefing: surface stored credentials that cannot be decrypted
+
+### Fixed
+- stop a root-run composition from stranding the service user
+
 ## [0.176.14] - 2026-09-17
 
 ### Changed
