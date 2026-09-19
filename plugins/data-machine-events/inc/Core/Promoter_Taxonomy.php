@@ -79,7 +79,10 @@ class Promoter_Taxonomy {
 	 * @return array Array with keys: term_id, was_created
 	 */
 	public static function find_or_create_promoter( $promoter_name, $promoter_data = array() ) {
-		$promoter_name = trim( (string) $promoter_name );
+		// Decode entities before resolution/creation (issue #844): the
+		// organizer name becomes the term name, and an entity-bearing string
+		// would create a distinct, mis-named term.
+		$promoter_name = trim( TextNormalization::decode_entities( (string) $promoter_name ) );
 
 		if ( '' === $promoter_name ) {
 			return array(

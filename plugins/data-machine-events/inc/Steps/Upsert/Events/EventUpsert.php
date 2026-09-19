@@ -24,6 +24,7 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\PluginSettings;
+use DataMachineEvents\Core\TextNormalization;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\Event_Post_Type;
@@ -131,10 +132,18 @@ class EventUpsert extends UpsertHandler {
 		}
 
 		// Extract event identity fields (AI title takes precedence, engine data fallback for other fields)
-		$title     = sanitize_text_field( $parameters['title'] ?? $engine->get( 'title' ) ?? '' );
-		$venue     = VenueParameterProvider::resolveField( 'venue', $parameters, $engine->all() );
-		$startDate = $engine->get( 'startDate' ) ?? $parameters['startDate'] ?? '';
-		$ticketUrl = $engine->get( 'ticketUrl' ) ?? $parameters['ticketUrl'] ?? '';
+		// The title is decoded BEFORE sanitization (issue #844): source feeds
+		// deliver HTML-entity-encoded titles ("Foo &amp; Bar"), and storing
+		// them verbatim pushes entities onto every non-HTML consumer. Decoding
+		// first also exposes markup hidden behind entities so the sanitizer
+		// strips it. The decoded title is written back onto $parameters so
+		// every downstream consumer (validation gate, advisory-lock keys,
+		// duplicate detection, buildEventData) keys on the same canonical form.
+		$title               = sanitize_text_field( TextNormalization::decode_entities( (string) ( $parameters['title'] ?? $engine->get( 'title' ) ?? '' ) ) );
+		$parameters['title'] = $title;
+		$venue               = VenueParameterProvider::resolveField( 'venue', $parameters, $engine->all() );
+		$startDate           = $engine->get( 'startDate' ) ?? $parameters['startDate'] ?? '';
+		$ticketUrl           = $engine->get( 'ticketUrl' ) ?? $parameters['ticketUrl'] ?? '';
 
 		// Run the consolidated pre-publish validation gate before any write.
 		//
@@ -148,7 +157,7 @@ class EventUpsert extends UpsertHandler {
 		// of duplicating them. See issue #417.
 		$start_time  = trim( (string) ( $engine->get( 'startTime' ) ?? $parameters['startTime'] ?? '' ) );
 		$source_type = (string) ( $engine->get( 'source_type' ) ?? $parameters['source_type'] ?? '' );
-		$artist      = (string) ( $engine->get( 'performer' ) ?? $parameters['performer'] ?? $parameters['artist'] ?? '' );
+		$artist      = sanitize_text_field( TextNormalization::decode_entities( (string) ( $engine->get( 'performer' ) ?? $parameters['performer'] ?? $parameters['artist'] ?? '' ) ) );
 
 		$rejection = $this->validateForPublish(
 			array(
@@ -439,7 +448,16 @@ class EventUpsert extends UpsertHandler {
 				return $this->lifecycleErrorResponse( $preflight, $title );
 			}
 
-			$result = AbilityResult::normalize( $ability->execute( $upsert_input ) );
+			// The kses save filters re-encode every bare "&" to "&amp;" for
+			// writing contexts without unfiltered_html (multisite authors,
+			// wp-cron with no user), which would re-create the #844 defect on
+			// the way into the database. Ingestion titles are already
+			// tag-free (sanitized above), so suspending kses on this bounded
+			// write removes a re-encoding side effect, not a sanitization
+			// layer; the exact prior filter state is restored afterwards.
+			$result = TextNormalization::with_kses_suspended(
+				static fn(): array => AbilityResult::normalize( $ability->execute( $upsert_input ) )
+			);
 
 			if ( empty( $result['success'] ) ) {
 				$error_data = $result['error_data'] ?? $result['wp_error_data'] ?? array();
@@ -1217,7 +1235,7 @@ class EventUpsert extends UpsertHandler {
 	 */
 	private function buildEventData( array $parameters, array $handler_config, EngineData $engine, int $existing_post_id = 0 ): array {
 		$event_data = array(
-			'title'       => sanitize_text_field( $parameters['title'] ?? $engine->get( 'title' ) ?? '' ),
+			'title'       => sanitize_text_field( TextNormalization::decode_entities( (string) ( $parameters['title'] ?? $engine->get( 'title' ) ?? '' ) ) ),
 			'description' => $parameters['description'] ?? '',
 		);
 
@@ -1229,7 +1247,12 @@ class EventUpsert extends UpsertHandler {
 		foreach ( $all_engine_fields as $field ) {
 			$value = $engine->get( $field );
 			if ( null !== $value && '' !== $value ) {
-				$event_data[ $field ] = $value;
+				// Free-text fields carry the same entity-encoding risk as the
+				// title (issue #844); dates, enums, and URLs must not be
+				// decoded.
+				$event_data[ $field ] = self::is_decodable_text_field( $field )
+					? TextNormalization::decode_entities( (string) $value )
+					: $value;
 			}
 		}
 
@@ -1239,7 +1262,9 @@ class EventUpsert extends UpsertHandler {
 				if ( 'ticketUrl' === $field ) {
 					$event_data[ $field ] = trim( $parameters[ $field ] );
 				} else {
-					$event_data[ $field ] = sanitize_text_field( $parameters[ $field ] );
+					// Decode before sanitizing so entity-hidden markup is
+					// stripped rather than stored (issue #844).
+					$event_data[ $field ] = sanitize_text_field( TextNormalization::decode_entities( (string) $parameters[ $field ] ) );
 				}
 			}
 		}
@@ -1257,6 +1282,40 @@ class EventUpsert extends UpsertHandler {
 		}
 
 		return $event_data;
+	}
+
+	/**
+	 * Whether an event field is free text that may carry HTML entities.
+	 *
+	 * Deliberately excludes URLs (decoding "&amp;" in a query string changes
+	 * the URL), dates/times (digits only), enums and closed vocabularies
+	 * (eventStatus, performerType, eventType, …), arrays (occurrenceDates),
+	 * and coordinate/timezone identifiers. Decoding is a byte-level no-op for
+	 * entity-free text, but the allowlist documents intent and keeps future
+	 * fields from being silently decoded.
+	 *
+	 * @param string $field Event or venue field key.
+	 * @return bool True when the field is decodable free text.
+	 */
+	private static function is_decodable_text_field( string $field ): bool {
+		return in_array(
+			$field,
+			array(
+				'title',
+				'venue',
+				'venueAddress',
+				'venueCity',
+				'venueState',
+				'venueZip',
+				'venueCountry',
+				'venuePhone',
+				'venueCapacity',
+				'performer',
+				'organizer',
+				'price',
+			),
+			true
+		);
 	}
 
 	private function hydrateStartDateFromMeta( int $post_id, array &$event_data ): void {

@@ -17,6 +17,7 @@ use DataMachineEvents\Abilities\EventDateQueryAbilities;
 use DataMachineEvents\Core\AffiliateRedirectShape;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventSpanGuard;
+use DataMachineEvents\Core\TextNormalization;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -68,7 +69,7 @@ class EventQualityAuditAbilities {
 							),
 							'issue'            => array(
 								'type'        => 'string',
-								'enum'        => array( 'all', 'missing_start_date', 'missing_start_time', 'missing_venue', 'duplicates', 'corrupted_affiliate_redirect', 'long_span_no_occurrences' ),
+								'enum'        => array( 'all', 'missing_start_date', 'missing_start_time', 'missing_venue', 'duplicates', 'corrupted_affiliate_redirect', 'long_span_no_occurrences', 'entity_title' ),
 								'description' => 'Optional issue filter.',
 							),
 							'max_span_hours'   => array(
@@ -92,6 +93,7 @@ class EventQualityAuditAbilities {
 							'probable_duplicates'          => array( 'type' => 'object' ),
 							'corrupted_affiliate_redirect' => array( 'type' => 'object' ),
 							'long_span_no_occurrences'     => array( 'type' => 'object' ),
+							'entity_title'                 => array( 'type' => 'object' ),
 							'culprit_flows'                => array( 'type' => 'array' ),
 							'message'                      => array( 'type' => 'string' ),
 						),
@@ -137,6 +139,7 @@ class EventQualityAuditAbilities {
 		$duplicate_groups    = array();
 		$corrupted_redirects = array();
 		$long_span_events    = array();
+		$entity_title_events = array();
 		$culprit_flow_counts = array();
 		$by_duplicate_key    = array();
 
@@ -199,6 +202,21 @@ class EventQualityAuditAbilities {
 			$duplicate_key = $this->buildDuplicateClusterKey( $event->post_title, $venue_name, $info['startDate'], $info['startTime'] );
 			if ( ! empty( $duplicate_key ) ) {
 				$by_duplicate_key[ $duplicate_key ][] = $info;
+			}
+
+			// Entity-title rule (#844): post_title must hold decoded UTF-8.
+			// An entity reference in the stored title means an ingestion or
+			// editorial write bypassed the decode contract; JSON consumers,
+			// search, and plain-text surfaces see the raw entity.
+			if ( TextNormalization::contains_entities( (string) $event->post_title ) ) {
+				$entity_title_events[] = array(
+					'id'        => $event->ID,
+					'title'     => $event->post_title,
+					'venue'     => $venue_name,
+					'flow_id'   => $flow_id,
+					'flow_name' => $info['flow_name'],
+				);
+				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
 			}
 
 			// Long-span rule (#199): a published upcoming occurrence spanning
@@ -272,6 +290,9 @@ class EventQualityAuditAbilities {
 				$max_span_hours
 			);
 		}
+		if ( ! empty( $entity_title_events ) && ( 'all' === $issue || 'entity_title' === $issue ) ) {
+			$message_parts[] = count( $entity_title_events ) . ' event title(s) containing HTML entities';
+		}
 
 		$missing_start_date_result = ( 'all' === $issue || 'missing_start_date' === $issue )
 			? array(
@@ -335,6 +356,16 @@ class EventQualityAuditAbilities {
 				'events'         => array(),
 			);
 
+		$entity_title_result = ( 'all' === $issue || 'entity_title' === $issue )
+			? array(
+				'count'  => count( $entity_title_events ),
+				'events' => array_slice( $entity_title_events, 0, $limit ),
+			)
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
+
 		return array(
 			'total_scanned'                => count( $events ),
 			'scope'                        => $scope,
@@ -344,6 +375,7 @@ class EventQualityAuditAbilities {
 			'probable_duplicates'          => $duplicate_result,
 			'corrupted_affiliate_redirect' => $corrupted_redirect_result,
 			'long_span_no_occurrences'     => $long_span_result,
+			'entity_title'                 => $entity_title_result,
 			'culprit_flows'                => array_slice( $culprit_flow_counts, 0, $limit ),
 			'message'                      => empty( $message_parts )
 				? 'No major quality issues found.'

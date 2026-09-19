@@ -239,6 +239,12 @@ class VenueParameterProvider {
 	/**
 	 * Resolve one venue field with scraper-first, AI-fallback precedence.
 	 *
+	 * Resolved values are entity-decoded (issue #844): venue names and
+	 * geography feed advisory-lock keys, dedup, taxonomy term names, and
+	 * block attributes, so the resolved string must be canonical decoded
+	 * text. Only free-text venue fields flow through this resolver; URL /
+	 * coordinate / timezone fields use their own handling.
+	 *
 	 * @param string $param_key  Venue parameter name (e.g. venueCountry).
 	 * @param array  $parameters AI tool call parameters.
 	 * @param array  $engine     Engine data.
@@ -247,12 +253,12 @@ class VenueParameterProvider {
 	public static function resolveField( string $param_key, array $parameters, array $engine ): string {
 		$engine_value = $engine[ $param_key ] ?? null;
 		if ( null !== $engine_value && '' !== $engine_value ) {
-			return (string) $engine_value;
+			return TextNormalization::decode_entities( (string) $engine_value );
 		}
 
 		$param_value = $parameters[ $param_key ] ?? null;
 		if ( null !== $param_value && '' !== $param_value ) {
-			return (string) $param_value;
+			return TextNormalization::decode_entities( (string) $param_value );
 		}
 
 		return '';

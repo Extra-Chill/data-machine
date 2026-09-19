@@ -153,6 +153,10 @@ class CommandRegistry {
 				'file'  => $cli . 'SeriesEndRepairCommand.php',
 				'class' => SeriesEndRepairCommand::class,
 			),
+			'data-machine-events repair-entity-titles'    => array(
+				'file'  => $cli . 'EntityTitleRepairCommand.php',
+				'class' => EntityTitleRepairCommand::class,
+			),
 			'data-machine-events backfill-canonical-ticket-urls' => array(
 				'file'  => $cli . 'TicketUrlCanonicalBackfillCommand.php',
 				'class' => TicketUrlCanonicalBackfillCommand::class,

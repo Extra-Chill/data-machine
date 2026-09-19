@@ -14,6 +14,7 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 use DataMachineEvents\Core\AffiliateRedirectShape;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Event_Type_Taxonomy;
+use DataMachineEvents\Core\TextNormalization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -75,8 +76,12 @@ class EventBlockContentBuilder {
 		$block_attributes['showPrice']      = true;
 		$block_attributes['showTicketLink'] = true;
 
-		$block_json  = wp_json_encode( $block_attributes, JSON_UNESCAPED_UNICODE );
-		$description = ! empty( $event_data['description'] ) ? wp_kses_post( $event_data['description'] ) : '';
+		$block_json = wp_json_encode( $block_attributes, JSON_UNESCAPED_UNICODE );
+		// Decode entities before kses (issue #844): source-fed descriptions
+		// carry the same encoded text as titles, and wp_kses_post normalizes
+		// rather than removes entities. Decoding first stores literal
+		// characters that render and serialize consistently.
+		$description = ! empty( $event_data['description'] ) ? wp_kses_post( TextNormalization::decode_entities( (string) $event_data['description'] ) ) : '';
 
 		$inner_blocks = $this->generate_description_blocks( $description );
 
