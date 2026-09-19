@@ -16,7 +16,9 @@ use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
 use DataMachine\Core\EngineData;
+use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
+use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -114,6 +116,7 @@ class RecoverStuckJobsAbility {
 							'pathless_policy_skipped' => array( 'type' => 'integer' ),
 							'pending_ai_terminalized' => array( 'type' => 'integer' ),
 							'pending_ai_guarded' => array( 'type' => 'integer' ),
+							'batch_parents_completed' => array( 'type' => 'integer' ),
 							'mutations'     => array( 'type' => 'integer' ),
 							'attempted'     => array(
 								'type'        => 'integer',
@@ -209,6 +212,7 @@ class RecoverStuckJobsAbility {
 		$exact_target_admitted = false;
 		$pending_ai_terminalized = 0;
 		$pending_ai_guarded      = 0;
+		$batch_parents_completed = 0;
 		$recovery_trigger = isset( $input['recovery_trigger'] ) ? sanitize_key( (string) $input['recovery_trigger'] ) : 'operator';
 
 		// Pending AI recovery is intentionally first so dry-run and apply inspect the
@@ -687,6 +691,59 @@ class RecoverStuckJobsAbility {
 					continue;
 				}
 
+				// Batch parents route through their completion logic, not the
+				// timeout path: a fully scheduled, fully terminal
+				// children_complete parent must complete from its child
+				// results, never fail. Runs before the scheduler-ownership
+				// guard because pruned Action Scheduler evidence would
+				// otherwise shield these parents from recovery forever.
+				if ( $this->isPipelineBatchParent( $engine_data ) ) {
+					if ( $dry_run ) {
+						$prediction = PipelineBatchScheduler::parentCompletionDue( $job_id );
+						if ( 'due' === $prediction['outcome'] ) {
+							++$batch_parents_completed;
+							$this->appendJobDetail( $jobs, $jobs_omitted, array(
+								'job_id'        => $job_id,
+								'flow_id'       => $job_flow_id,
+								'status'        => 'would_complete_batch_parent',
+								'target_status' => $prediction['parent_status'],
+							) );
+							continue;
+						}
+					} else {
+						if ( ! $this->hasTouchCapacity( $touched, $apply_limit, 1 ) || ! $this->consumeTouchBudget( $attempted, $touched, $target_attempts, $apply_limit, null !== $job_id_scope, $exact_target_admitted ) ) {
+							$limit_reached = true;
+							break 2;
+						}
+						$reconciliation = PipelineBatchScheduler::reconcileParent( $job_id );
+						if ( 'completed' === $reconciliation['outcome'] ) {
+							++$batch_parents_completed;
+							++$mutations;
+							++$mutated;
+							$this->appendJobDetail( $jobs, $jobs_omitted, array(
+								'job_id'        => $job_id,
+								'flow_id'       => $job_flow_id,
+								'status'        => 'completed_batch_parent',
+								'target_status' => $reconciliation['parent_status'],
+							) );
+							continue;
+						}
+						if ( 'error' === $reconciliation['outcome'] ) {
+							++$skipped;
+							$this->appendJobDetail( $jobs, $jobs_omitted, array(
+								'job_id'  => $job_id,
+								'flow_id' => $job_flow_id,
+								'status'  => 'skipped',
+								'reason'  => 'batch_parent_completion_not_durable',
+							) );
+							continue;
+						}
+						// not_due — children still running or worklist still
+						// draining: fall through to the standard ownership,
+						// pathless, and timeout handling below.
+					}
+				}
+
 				$scheduler_ownership = $this->getActiveSchedulerWork( $job_id, $engine_data, $timeout_hours );
 				if ( ! empty( $scheduler_ownership['owned'] ) ) {
 					++$skipped;
@@ -843,8 +900,8 @@ class RecoverStuckJobsAbility {
 		$limit_unit          = null === $job_id_scope ? 'logical_touch' : 'target';
 		$logical_touch_limit = $apply_limit;
 		$message = $dry_run
-			? sprintf( 'Dry run complete. Would terminalize %d expired pending AI deferrals, recover %d jobs, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, reconcile %d terminal-backed actions, guard %d pending AI deferrals, and guard %d pathless children requiring explicit authorization.', $pending_ai_terminalized, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped )
-			: sprintf( 'Recovery complete. Target attempts/logical touches/logical mutations: %d/%d/%d (%s input limit %d; requested limit %d %s; logical-touch safety cap %d), outcomes: %d, pending AI terminalized: %d, recovered: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, pending AI guarded: %d, policy-skipped: %d', $target_attempts, $touched, $mutated, $limit_mode, $input_limit, $limit_value, $limit_unit, $logical_touch_limit, $mutations, $pending_ai_terminalized, $recovered, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped );
+			? sprintf( 'Dry run complete. Would terminalize %d expired pending AI deferrals, recover %d jobs, complete %d batch parents, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, reconcile %d terminal-backed actions, guard %d pending AI deferrals, and guard %d pathless children requiring explicit authorization.', $pending_ai_terminalized, $recovered, $batch_parents_completed, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped )
+			: sprintf( 'Recovery complete. Target attempts/logical touches/logical mutations: %d/%d/%d (%s input limit %d; requested limit %d %s; logical-touch safety cap %d), outcomes: %d, pending AI terminalized: %d, recovered: %d, batch parents completed: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, pending AI guarded: %d, policy-skipped: %d', $target_attempts, $touched, $mutated, $limit_mode, $input_limit, $limit_value, $limit_unit, $logical_touch_limit, $mutations, $pending_ai_terminalized, $recovered, $batch_parents_completed, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped );
 
 		if ( ! $dry_run && ( $mutations > 0 || $claimed_elsewhere > 0 || $pathless_policy_skipped > 0 ) ) {
 			do_action(
@@ -862,6 +919,7 @@ class RecoverStuckJobsAbility {
 					'pathless_policy_skipped' => $pathless_policy_skipped,
 					'pending_ai_terminalized' => $pending_ai_terminalized,
 					'pending_ai_guarded' => $pending_ai_guarded,
+					'batch_parents_completed' => $batch_parents_completed,
 					'mutations'     => $mutations,
 					'attempted'     => $attempted,
 					'touched'       => $touched,
@@ -896,6 +954,7 @@ class RecoverStuckJobsAbility {
 			'pathless_policy_skipped' => $pathless_policy_skipped,
 			'pending_ai_terminalized' => $pending_ai_terminalized,
 			'pending_ai_guarded' => $pending_ai_guarded,
+			'batch_parents_completed' => $batch_parents_completed,
 			'mutations'      => $mutations,
 			'attempted'      => $attempted,
 			'touched'        => $touched,
@@ -925,6 +984,23 @@ class RecoverStuckJobsAbility {
 			'jobs_truncated' => $jobs_truncated,
 			'message'        => $message,
 		);
+	}
+
+	/** Whether this engine snapshot belongs to a children_complete pipeline batch parent.
+	 *
+	 * @param array $engine_data Job engine snapshot.
+	 * @return bool Whether completion routing applies.
+	 */
+	private function isPipelineBatchParent( array $engine_data ): bool {
+		if ( empty( $engine_data['batch'] ) ) {
+			return false;
+		}
+		$strategy = (string) ( $engine_data['batch_completion_strategy'] ?? '' );
+		if ( '' !== $strategy && BatchScheduler::COMPLETION_STRATEGY_CHILDREN_COMPLETE !== $strategy ) {
+			return false;
+		}
+		$context = (string) ( $engine_data['batch_context'] ?? '' );
+		return '' === $context || PipelineBatchScheduler::BATCH_CONTEXT === $context;
 	}
 
 	/**
