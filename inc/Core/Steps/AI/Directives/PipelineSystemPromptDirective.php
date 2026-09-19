@@ -1,0 +1,226 @@
+<?php
+/**
+ * Pipeline System Prompt Directive - Priority 50
+ *
+ * Injects user-configured task instructions and dynamic workflow visualization
+ * as the third directive in the 5-tier AI directive system. Provides both workflow
+ * context (step order and handlers) and clean user instructions defining what
+ * the AI should accomplish for this pipeline.
+ *
+ * Priority Order in Directive System:
+ * 1. Priority 10 - Plugin Core Directive
+ * 2. Priority 20 - Core Memory Files (SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md)
+ * 3. Priority 40 - Pipeline Memory Files (per-pipeline selectable)
+ * 4. Priority 50 - Pipeline System Prompt (THIS CLASS)
+ * 5. Priority 60 - Pipeline Context Files
+ * 6. Priority 70 - Tool Definitions and Workflow Context
+ * 7. Priority 80 - WordPress Site Context
+ */
+
+namespace DataMachine\Core\Steps\AI\Directives;
+
+use DataMachine\Abilities\Flow\QueueAbility;
+use DataMachine\Abilities\HandlerAbilities;
+use DataMachine\Core\Steps\FlowStepConfig;
+
+defined( 'ABSPATH' ) || exit;
+
+class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives\DirectiveInterface {
+
+	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
+		$pipeline_step_id = $step_id;
+		if ( empty( $pipeline_step_id ) || empty( $payload['job_id'] ) ) {
+			return array();
+		}
+
+		$engine_data     = datamachine_get_engine_data( $payload['job_id'] );
+		$pipeline_config = $engine_data['pipeline_config'] ?? array();
+		$step_config     = $pipeline_config[ $pipeline_step_id ] ?? array();
+		$system_prompt   = self::resolveSystemPrompt( $pipeline_step_id, $step_config, $payload, $engine_data );
+
+		if ( empty( $system_prompt ) ) {
+			return array();
+		}
+
+		$current_flow_step_id     = $payload['flow_step_id'] ?? null;
+		$current_pipeline_step_id = null;
+		if ( $current_flow_step_id ) {
+			$flow_parts               = apply_filters( 'datamachine_split_flow_step_id', null, $current_flow_step_id );
+			$current_pipeline_step_id = $flow_parts['pipeline_step_id'] ?? null;
+		}
+
+		$workflow_visualization = self::buildWorkflowVisualization( $pipeline_step_id, $current_pipeline_step_id, $payload );
+
+		$content = '';
+		if ( ! empty( $workflow_visualization ) ) {
+			$content .= 'WORKFLOW: ' . $workflow_visualization . "\n\n";
+		}
+		$content .= "PIPELINE GOALS:\n" . trim( $system_prompt );
+
+		return array(
+			array(
+				'type'    => 'system_text',
+				'content' => $content,
+			),
+		);
+	}
+
+	/**
+	 * Build workflow visualization string from flow configuration.
+	 *
+	 * @param string|null $pipeline_step_id Pipeline step ID for context
+	 * @param string|null $current_pipeline_step_id Currently executing pipeline step ID
+	 * @param array       $payload Execution payload for context
+	 * @return string Workflow visualization (e.g., "REDDIT FETCH → AI (YOU ARE HERE) → WordPress PUBLISH")
+	 */
+	private static function buildWorkflowVisualization( $pipeline_step_id, $current_pipeline_step_id = null, array $payload = array() ): string {
+		if ( empty( $pipeline_step_id ) ) {
+			return '';
+		}
+
+		// Get flow_id from current execution context
+		$current_flow_step_id = $payload['flow_step_id'] ?? null;
+		if ( ! $current_flow_step_id ) {
+			return '';
+		}
+
+		$flow_parts = apply_filters( 'datamachine_split_flow_step_id', null, $current_flow_step_id );
+		$flow_id    = $flow_parts['flow_id'] ?? null;
+
+		if ( ! $flow_id ) {
+			return '';
+		}
+
+		// Get flow config directly
+		$db_flows    = new \DataMachine\Core\Database\Flows\Flows();
+		$flow        = $db_flows->get_flow( (int) $flow_id );
+		$flow_config = $flow['flow_config'] ?? array();
+
+		if ( empty( $flow_config ) ) {
+			return '';
+		}
+
+		// Sort steps by execution_order.
+		//
+		// Reads every configured handler through FlowStepConfig's cardinality-
+		// agnostic helper because the visualization needs to render every
+		// handler in multi-handler steps, while still supporting scalar
+		// single-handler steps.
+		$sorted_steps = array();
+		foreach ( $flow_config as $flow_step_id => $step_config ) {
+			$execution_order = $step_config['execution_order'] ?? -1;
+			if ( $execution_order >= 0 ) {
+				// Extract pipeline_step_id for "YOU ARE HERE" matching
+				$step_parts            = apply_filters( 'datamachine_split_flow_step_id', null, $flow_step_id );
+				$step_pipeline_step_id = $step_parts['pipeline_step_id'] ?? '';
+
+				$sorted_steps[ $execution_order ] = array(
+					'pipeline_step_id' => $step_pipeline_step_id,
+					'step_type'        => $step_config['step_type'] ?? '',
+					'handler_slugs'    => FlowStepConfig::getConfiguredHandlerSlugs( $step_config ),
+				);
+			}
+		}
+		ksort( $sorted_steps );
+
+		// Build workflow visualization
+		$workflow_parts    = array();
+		$handler_abilities = new HandlerAbilities();
+
+		foreach ( $sorted_steps as $step_data ) {
+			$step_type             = $step_data['step_type'];
+			$handler_slugs         = $step_data['handler_slugs'];
+			$step_pipeline_step_id = $step_data['pipeline_step_id'];
+
+			if ( 'ai' === $step_type ) {
+				// Show "YOU ARE HERE" for currently executing AI step.
+				$is_current       = ( $current_pipeline_step_id && $step_pipeline_step_id === $current_pipeline_step_id );
+				$workflow_parts[] = $is_current ? 'AI (YOU ARE HERE)' : 'AI';
+			} elseif ( ! empty( $handler_slugs ) && count( $handler_slugs ) > 1 ) {
+				// Multi-handler step: show all handler labels.
+				$labels = array();
+				foreach ( $handler_slugs as $slug ) {
+					$handler_info = $handler_abilities->getHandler( $slug, $step_type );
+					$labels[]     = strtoupper( $handler_info['label'] ?? $slug );
+				}
+				$workflow_parts[] = implode( '+', $labels ) . ' ' . strtoupper( $step_type );
+			} elseif ( ! empty( $handler_slugs ) ) {
+				// Single handler step: show primary handler label.
+				$primary_slug     = $handler_slugs[0];
+				$handler_info     = $handler_abilities->getHandler( $primary_slug, $step_type );
+				$label            = strtoupper( $handler_info['label'] ?? 'UNKNOWN' );
+				$workflow_parts[] = $label . ' ' . strtoupper( $step_type );
+			} else {
+				$workflow_parts[] = strtoupper( $step_type );
+			}
+		}
+
+		$workflow_string = implode( ' → ', $workflow_parts );
+
+		return $workflow_string;
+	}
+
+	/**
+	 * Resolve the pipeline system prompt, optionally from a pipeline-step queue.
+	 *
+	 * Existing `system_prompt` behavior is preserved when no queue is configured.
+	 * When a queue is configured, `system_prompt_queue_mode` controls whether the
+	 * queue head is peeked, drained, or rotated.
+	 *
+	 * @param string $pipeline_step_id Pipeline step ID.
+	 * @param array  $step_config      Pipeline step config.
+	 * @param array  $payload          Directive payload.
+	 * @param array  $engine_data      Job engine data.
+	 * @return string Resolved system prompt.
+	 */
+	private static function resolveSystemPrompt( string $pipeline_step_id, array $step_config, array $payload, array $engine_data ): string {
+		$queue_present = array_key_exists( QueueAbility::SLOT_SYSTEM_PROMPT_QUEUE, $step_config )
+			&& is_array( $step_config[ QueueAbility::SLOT_SYSTEM_PROMPT_QUEUE ] );
+
+		if ( ! $queue_present ) {
+			return (string) ( $step_config['system_prompt'] ?? '' );
+		}
+
+		$queue_mode = $step_config[ QueueAbility::MODE_SYSTEM_PROMPT_QUEUE ] ?? 'static';
+		if ( ! in_array( $queue_mode, array( 'drain', 'loop', 'static' ), true ) ) {
+			$queue_mode = 'static';
+		}
+
+		$pipeline_id = $payload['pipeline_id'] ?? $engine_data['pipeline_id'] ?? $engine_data['job']['pipeline_id'] ?? 0;
+		$entry       = null;
+
+		if ( is_numeric( $pipeline_id ) && (int) $pipeline_id > 0 ) {
+			$entry = QueueAbility::consumeFromPipelineQueueSlot(
+				(int) $pipeline_id,
+				$pipeline_step_id,
+				QueueAbility::SLOT_SYSTEM_PROMPT_QUEUE,
+				$queue_mode
+			);
+		} elseif ( 'static' === $queue_mode ) {
+			$entry = $step_config[ QueueAbility::SLOT_SYSTEM_PROMPT_QUEUE ][0] ?? null;
+		}
+
+		if ( is_array( $entry ) && ! empty( $entry[ QueueAbility::FIELD_PROMPT ] ) ) {
+			return (string) $entry[ QueueAbility::FIELD_PROMPT ];
+		}
+
+		if ( in_array( $queue_mode, array( 'drain', 'loop' ), true ) ) {
+			return '';
+		}
+
+		return (string) ( $step_config['system_prompt'] ?? '' );
+	}
+}
+
+// Register with universal agent directive system (Priority 50 = pipeline system prompt)
+add_filter(
+	'datamachine_directives',
+	function ( $directives ) {
+		$directives[] = array(
+			'class'    => PipelineSystemPromptDirective::class,
+			'priority' => 50,
+			'modes'    => array( 'pipeline' ),
+		);
+		return $directives;
+	}
+);

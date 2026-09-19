@@ -1,0 +1,6 @@
+{
+  "id": "wp-native-gutenberg",
+  "extensions": {
+    "nodejs": {}
+  }
+}

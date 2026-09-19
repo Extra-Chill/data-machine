@@ -1,0 +1,859 @@
+name: 'Homeboy'
+description: 'Convention-driven CI with Homeboy. Reads homeboy.json for project config, infers commands from event context, auto-sets up the environment.'
+author: 'Extra Chill'
+
+branding:
+  icon: 'check-circle'
+  color: 'blue'
+
+inputs:
+  # ── Binary acquisition (pick one, or let it download latest) ──
+  version:
+    description: 'Homeboy version to install (e.g. "0.52.0", "latest"). Ignored when source or binary-path is set.'
+    required: false
+    default: 'latest'
+  source:
+    description: 'Path to build homeboy from source (e.g. "."). Falls back to release binary on build failure.'
+    required: false
+    default: ''
+  binary-path:
+    description: 'Path to a pre-built homeboy binary. Skips source build and release download.'
+    required: false
+    default: ''
+  prepare-only:
+    description: 'Install and identify Homeboy without running commands. Intended for reusable workflow binary preparation.'
+    required: false
+    default: 'false'
+  rust-toolchain:
+    description: 'Rust toolchain for source builds (default: stable).'
+    required: false
+    default: 'stable'
+  source-build-profile:
+    description: 'Cargo profile for source builds: release for shipped binaries or dev for read-only tooling such as planning.'
+    required: false
+    default: 'release'
+  setup-timeout-seconds:
+    description: 'Maximum wall-clock time for an action setup subprocess, including binary download, source build, and extension installation. Retains command output and exits with timeout evidence.'
+    required: false
+    default: '900'
+
+  # ── Extension ──
+  extension:
+    description: 'Single extension ID override. If empty, installs all extensions declared in homeboy.json.'
+    required: false
+    default: ''
+  extension-source:
+    description: 'Git URL or path to install the extension from.'
+    required: false
+    default: 'https://github.com/Extra-Chill/homeboy-extensions'
+  extension-ref:
+    description: 'Optional git revision to install from the extension source.'
+    required: false
+    default: ''
+
+  # ── Commands ──
+  commands:
+    description: 'Override commands to run. If empty, inferred from event context: PR/push/manual → review audit,review lint,review test; cron → release.'
+    required: false
+    default: ''
+  expected-commands:
+    description: 'Full set of command types expected to run across the workflow (e.g. "review audit,review lint,review test"). Used by auto-issue reconciliation to avoid closing issues owned by sibling invocations when a workflow splits review audit/lint/test across separate steps. Defaults to `commands` when empty.'
+    required: false
+    default: ''
+  component:
+    description: 'Component name override. Auto-detected from homeboy.json if not set.'
+    required: false
+    default: ''
+  args:
+    description: 'Additional arguments to pass to each command.'
+    required: false
+    default: ''
+  scope:
+    description: 'Execution scope: auto uses changed scope on PRs and full scope elsewhere; changed forces --changed-since when a base SHA is available; full scans the full workspace.'
+    required: false
+    default: 'auto'
+  rig:
+    description: 'Bench rig pair/list to pass to `homeboy bench --rig` when command includes bench.'
+    required: false
+    default: ''
+  scenario:
+    description: 'Bench scenario ID to pass to `homeboy bench --scenario` when command includes bench.'
+    required: false
+    default: ''
+  runs:
+    description: 'Bench run count to pass to `homeboy bench --runs` when command includes bench.'
+    required: false
+    default: ''
+  iterations:
+    description: 'Bench iteration count to pass to `homeboy bench --iterations` when command includes bench.'
+    required: false
+    default: ''
+  regression-threshold:
+    description: 'Bench regression threshold to pass to `homeboy bench --regression-threshold` when command includes bench.'
+    required: false
+    default: ''
+  differential-gating:
+    description: 'On PRs, compare audit/lint/test failure counts against the base SHA and fail only when the PR is worse.'
+    required: false
+    default: 'false'
+  baseline-commands:
+    description: 'Commands to rerun at the PR base when differential-gating is true. Use auto to rerun requested review audit/lint/test commands, a comma-separated subset such as review audit,review test, or none to skip baseline reruns.'
+    required: false
+    default: 'auto'
+  observation-window:
+    description: 'Duration window to export Homeboy observations after command execution (e.g. "24h", "7d", "30m"). Export is best-effort and non-fatal.'
+    required: false
+    default: '24h'
+  execution-timeout-seconds:
+    description: 'Maximum wall-clock time for a Homeboy command phase. Emits liveness notices and exits with actionable timeout evidence.'
+    required: false
+    default: '1800'
+  test-timeout-seconds:
+    description: 'Maximum wall-clock time for the Homeboy test child. Empty preserves HOMEBOY_TEST_TIMEOUT_SECONDS or Homeboy default. Must leave cleanup-timeout-seconds of margin below execution-timeout-seconds.'
+    required: false
+    default: ''
+  cleanup-timeout-seconds:
+    description: 'Maximum wall-clock time to terminate and verify a Homeboy command process group after command completion or timeout. Emits retained-log diagnostics and fails when cleanup cannot finish.'
+    required: false
+    default: '15'
+  phase-heartbeat-seconds:
+    description: 'Maximum interval between live phase-progress heartbeats.'
+    required: false
+    default: '60'
+  phase-budget-seconds:
+    description: 'Elapsed phase budget before Homeboy Action emits an owning-subsystem diagnostic.'
+    required: false
+    default: '300'
+  import-observations:
+    description: 'Download and import earlier homeboy-observations artifacts from the same workflow run before command execution. Import is best-effort and non-fatal.'
+    required: false
+    default: 'false'
+
+  # ── Environment setup ──
+  auto-setup:
+    description: 'Auto-install PHP/Composer/Node dependencies based on extension type. Set false to handle setup yourself.'
+    required: false
+    default: 'true'
+  php-version:
+    description: 'PHP version override. Auto-detected from homeboy.json or composer.json if not set.'
+    required: false
+    default: ''
+  node-version:
+    description: 'Node.js version override. Auto-detected from homeboy.json or package.json if not set.'
+    required: false
+    default: ''
+
+  # ── GitHub integration ──
+  app-token:
+    description: 'GitHub App token. Enables auto-issue filing and workflow re-triggers. Generate with actions/create-github-app-token.'
+    required: false
+    default: ''
+  auto-issue:
+    description: 'Override auto-issue filing. Default: auto-enabled on non-PR events.'
+    required: false
+    default: ''
+
+  # ── PR comments ──
+  comment-key:
+    description: 'Shared PR comment key. Defaults to workflow + component.'
+    required: false
+    default: ''
+  comment-section-key:
+    description: 'Section key within the shared PR comment.'
+    required: false
+    default: ''
+  comment-section-title:
+    description: 'Section title within the shared PR comment.'
+    required: false
+    default: ''
+  pr-comment:
+    description: 'Post the default Homeboy PR comment. Set false when the workflow publishes a domain-specific report.'
+    required: false
+    default: 'true'
+
+  # ── PR policy gate ──
+  pr-policy:
+    description: 'Path to a repo-local PR policy file. When set on pull_request events, classifies the PR for deterministic auto-merge eligibility.'
+    required: false
+    default: ''
+  pr-open-policy:
+    description: 'Path to a repo-local PR open/update policy file. Defaults to pr-policy when empty.'
+    required: false
+    default: ''
+  pr-policy-merge:
+    description: 'Merge the pull request when pr-policy marks it safe. Requires pr-policy and a token with pull request write permissions.'
+    required: false
+    default: 'false'
+  pr-policy-merge-method:
+    description: 'Merge method for pr-policy-merge: merge, squash, or rebase.'
+    required: false
+    default: 'squash'
+
+  # ── SSH (for fleet/deploy) ──
+  ssh-key:
+    description: 'SSH private key for fleet/deploy commands. Writes to ~/.ssh, starts ssh-agent, configures known_hosts. If empty, assumes SSH is pre-configured.'
+    required: false
+    default: ''
+  ssh-known-hosts:
+    description: 'Extra known_hosts entries for SSH connections to your servers.'
+    required: false
+    default: ''
+
+  # ── Release ──
+  release-dry-run:
+    description: 'Preview the release without making changes.'
+    required: false
+    default: 'false'
+  release-branch:
+    description: 'Branch that releases are allowed from.'
+    required: false
+    default: 'main'
+  release-verify-github-release:
+    description: 'Verify that a successful release has a GitHub Release for the emitted tag. Set false for tag-only release consumers.'
+    required: false
+    default: 'true'
+  release-skip-publish:
+    description: 'Pass --skip-publish to homeboy release. Skips the package and publish.<target> pipeline steps. Set true for components that publish artifacts outside the homeboy pipeline (binary cross-compile, hand-rolled gh release create, etc.). Defaults to false so components with release.publish-capable extensions ship artifacts through the standard pipeline.'
+    required: false
+    default: 'false'
+  release-skip-github-release:
+    description: 'Pass --no-github-release to homeboy release. Skips the github.release step that runs `gh release create`. Set true for components that create their GitHub Release through a separate workflow step (typically pairs with release-skip-publish=true). Defaults to false so components with a github.com remote get a GitHub Release on every tag.'
+    required: false
+    default: 'false'
+  release-head:
+    description: 'Pass --head to homeboy release. Use for finishing a release at an existing tag or release commit, often with release-from-artifacts.'
+    required: false
+    default: 'false'
+  release-from-artifacts:
+    description: 'Pass --from-artifacts <path> to homeboy release. Use to publish artifacts produced by an earlier build job through the native Homeboy release pipeline.'
+    required: false
+    default: ''
+
+outputs:
+  component:
+    description: 'Resolved component ID from portable configuration.'
+    value: ${{ steps.read-config.outputs.portable-id }}
+  results:
+    description: 'JSON object with pass/fail results for each command'
+    value: ${{ steps.select-results.outputs.results }}
+  pr-state-reason:
+    description: 'Final pre-execution PR lifecycle reason: active, pr_closed, pr_merged, or unknown.'
+    value: ${{ steps.check-pr-state.outputs.reason }}
+  pr-state:
+    description: 'Final pre-execution PR lifecycle state: open, closed, merged, or unknown.'
+    value: ${{ steps.check-pr-state.outputs.state }}
+  binary-source:
+    description: 'How the binary was obtained: "prebuilt", "source", "fallback", or "release"'
+    value: ${{ steps.resolve-binary.outputs.binary-source }}
+  scope-context:
+    description: 'Execution context: "pr", "push", "cron", or "manual"'
+    value: ${{ steps.resolve-scope.outputs.scope-context }}
+  scope-effective:
+    description: 'Effective execution scope: "changed" or "full"'
+    value: ${{ steps.resolve-scope.outputs.scope-mode }}
+  scope-is-fork:
+    description: 'Whether the PR is from a fork (true/false)'
+    value: ${{ steps.resolve-scope.outputs.scope-is-fork }}
+  operations-results:
+    description: 'JSON object with pass/fail results for each fleet/deploy command'
+    value: ${{ steps.run-operations.outputs.results }}
+  released:
+    description: 'Whether a release was created (true/false)'
+    value: ${{ steps.release.outputs.released }}
+  release-version:
+    description: 'The released version number (e.g. 1.2.3)'
+    value: ${{ steps.release.outputs.release-version }}
+  release-tag:
+    description: 'The release git tag (e.g. v1.2.3)'
+    value: ${{ steps.release.outputs.release-tag }}
+  release-bump-type:
+    description: 'The bump type used (patch, minor, major)'
+    value: ${{ steps.release.outputs.release-bump-type }}
+  skipped-reason:
+    description: 'Why release was skipped when released is false'
+    value: ${{ steps.release.outputs.skipped-reason }}
+  homeboy-version:
+    description: 'Resolved Homeboy CLI version string that actually ran (e.g. "homeboy 0.74.1")'
+    value: ${{ steps.tooling-metadata.outputs.homeboy-version }}
+  tooling-identity:
+    description: 'Cache-key-safe token identifying the resolved release tooling (homeboy CLI version + extension revision). Use to key per-SHA CI state so a tooling fix self-heals.'
+    value: ${{ steps.tooling-metadata.outputs.tooling-identity }}
+  pr-policy-safe:
+    description: 'Whether the PR policy marked this pull request safe for auto-merge (true/false)'
+    value: ${{ steps.pr-policy.outputs.safe }}
+  pr-policy-merged:
+    description: 'Whether the PR policy gate merged this pull request (true/false)'
+    value: ${{ steps.pr-policy.outputs.merged }}
+  pr-policy-report:
+    description: 'Markdown summary from the PR policy gate'
+    value: ${{ steps.pr-policy.outputs.report }}
+  phase-progress:
+    description: 'Path to the phase timing artifact for this action invocation.'
+    value: ${{ steps.phase-summary.outputs.phase-progress }}
+
+runs:
+  using: 'composite'
+  steps:
+    # ── Phase 1: Read project config ──
+
+    - name: Read portable config
+      id: read-config
+      shell: bash
+      env:
+        COMPONENT_NAME: ${{ inputs.component }}
+        EXTENSION_INPUT: ${{ inputs.extension }}
+      run: bash ${{ github.action_path }}/scripts/core/phase-progress.sh run preparation -- bash ${{ github.action_path }}/scripts/setup/read-portable-config.sh
+
+    # ── Phase 2: Resolve execution context ──
+
+    - name: Resolve execution scope
+      id: resolve-scope
+      shell: bash
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        SCOPE_INPUT: ${{ inputs.scope }}
+      run: bash ${{ github.action_path }}/scripts/core/phase-progress.sh run changed_scope_resolution -- bash ${{ github.action_path }}/scripts/scope/resolve.sh
+
+    - name: Resolve commands
+      id: resolve-commands
+      shell: bash
+      env:
+        COMMANDS_INPUT: ${{ inputs.commands }}
+        HOMEBOY_PREPARE_ONLY: ${{ inputs.prepare-only }}
+      run: bash ${{ github.action_path }}/scripts/core/phase-progress.sh run changed_scope_resolution -- bash ${{ github.action_path }}/scripts/core/resolve-commands.sh
+
+    - name: Validate timeout budgets
+      if: steps.resolve-commands.outputs.has-test == 'true'
+      shell: bash
+      env:
+        HOMEBOY_TEST_TIMEOUT_SECONDS: ${{ inputs.test-timeout-seconds || env.HOMEBOY_TEST_TIMEOUT_SECONDS || '1500' }}
+        HOMEBOY_ACTION_EXECUTION_TIMEOUT_SECONDS: ${{ inputs.execution-timeout-seconds }}
+        HOMEBOY_ACTION_CLEANUP_TIMEOUT_SECONDS: ${{ inputs.cleanup-timeout-seconds }}
+      run: bash ${{ github.action_path }}/scripts/core/validate-timeout-budgets.sh
+
+    # ── Phase 3: Install Homeboy ──
+    # Homeboy installs before PHP/Node so we can use `homeboy component env`
+    # to detect runtime requirements from the source files (e.g., WordPress
+    # "Requires PHP" header).
+
+    - name: Start dependency/build setup timing
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/core/phase-progress.sh start dependency_build_setup
+
+    - name: Install pre-built binary
+      id: install-prebuilt
+      if: inputs.binary-path != ''
+      shell: bash
+      run: |
+        BINARY="${{ inputs.binary-path }}"
+        if [ ! -f "${BINARY}" ]; then
+          echo "::error::Homeboy binary not found at '${BINARY}'. This is a CI build-artifact handoff problem, not a code finding — the upstream Build job may have failed, been skipped, or not uploaded the binary. Verify the Build job succeeded, the artifact was uploaded, and this workflow grants the 'actions: read' permission needed to download it."
+          exit 1
+        fi
+        chmod +x "${BINARY}"
+        sudo cp "${BINARY}" /usr/local/bin/homeboy
+        echo "Installed pre-built binary: $(homeboy --version)"
+
+    - name: Install Rust toolchain (source build)
+      if: inputs.binary-path == '' && inputs.source != ''
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ inputs.rust-toolchain }}
+
+    - name: Resolve source Cargo cache
+      id: source-cargo-cache
+      if: inputs.binary-path == '' && inputs.source != ''
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source }}
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'resolve source Cargo cache' -- bash ${{ github.action_path }}/scripts/setup/resolve-source-cargo-cache.sh
+
+    - name: Cache cargo (source build)
+      if: steps.source-cargo-cache.outputs.enabled == 'true'
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.source-cargo-cache.outputs.paths }}
+        key: ${{ runner.os }}-cargo-build-${{ steps.source-cargo-cache.outputs.fingerprint }}
+        restore-keys: ${{ runner.os }}-cargo-build-
+
+    - name: Build from source
+      id: source-build
+      if: inputs.binary-path == '' && inputs.source != ''
+      shell: bash
+      env:
+        SOURCE_PATH: ${{ inputs.source }}
+        SOURCE_BUILD_PROFILE: ${{ inputs.source-build-profile }}
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'build Homeboy from source' -- bash ${{ github.action_path }}/scripts/setup/build-source-homeboy.sh
+
+    - name: Resolve Homeboy version
+      id: resolve-version
+      if: inputs.binary-path == '' && (inputs.source == '' || steps.source-build.outputs.built != 'true')
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        HOMEBOY_VERSION: ${{ inputs.version }}
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'resolve Homeboy release version' -- bash ${{ github.action_path }}/scripts/setup/resolve-homeboy-version.sh
+
+    - name: Cache Homeboy
+      id: cache-homeboy
+      if: inputs.binary-path == '' && (inputs.source == '' || steps.source-build.outputs.built != 'true')
+      uses: actions/cache@v5
+      with:
+        path: |
+          /usr/local/bin/homeboy
+          ~/.config/homeboy/extensions/
+        key: homeboy-${{ steps.resolve-version.outputs.resolved-version }}-${{ steps.read-config.outputs.portable-extension }}-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Install Homeboy
+      if: inputs.binary-path == '' && (inputs.source == '' || steps.source-build.outputs.built != 'true') && steps.cache-homeboy.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        HOMEBOY_VERSION: ${{ steps.resolve-version.outputs.resolved-version }}
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'install Homeboy release' -- bash ${{ github.action_path }}/scripts/setup/install-homeboy-release.sh
+
+    - name: Resolve binary source
+      id: resolve-binary
+      shell: bash
+      env:
+        HAS_BINARY_PATH_INPUT: ${{ inputs.binary-path }}
+        HAS_SOURCE_INPUT: ${{ inputs.source }}
+        SOURCE_BUILT: ${{ steps.source-build.outputs.built }}
+      run: bash ${{ github.action_path }}/scripts/setup/resolve-binary-source.sh
+
+    - name: Detect Homeboy placement support
+      shell: bash
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'detect Homeboy placement support' -- bash ${{ github.action_path }}/scripts/setup/detect-homeboy-placement.sh
+
+    - name: Install extension
+      if: steps.read-config.outputs.portable-extension != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        EXTENSION_ID: ${{ steps.read-config.outputs.portable-extension }}
+        EXTENSION_INPUT: ${{ inputs.extension }}
+        EXTENSION_SOURCE: ${{ inputs.extension-source }}
+        EXTENSION_REF: ${{ inputs.extension-ref }}
+        COMPONENT_DIR: ${{ steps.read-config.outputs.component-dir }}
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'install Homeboy extension' -- bash ${{ github.action_path }}/scripts/setup/install-extension.sh
+
+    - name: Capture tooling metadata
+      id: tooling-metadata
+      shell: bash
+      env:
+        EXTENSION_SOURCE: ${{ inputs.extension-source }}
+        ACTION_REF: ${{ github.action_ref }}
+        ACTION_REPOSITORY: ${{ github.action_repository }}
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'capture tooling metadata' -- bash ${{ github.action_path }}/scripts/setup/capture-tooling-metadata.sh
+
+    # ── Phase 4: Detect runtime + setup environment ──
+    # Uses `homeboy component env` to detect PHP/Node versions from source
+    # files. For WordPress, reads "Requires PHP" from the plugin/theme header.
+    # Action input overrides take priority over detected values.
+
+    - name: Detect runtime environment
+      id: detect-env
+      shell: bash
+      env:
+        PHP_INPUT: ${{ inputs.php-version }}
+        NODE_INPUT: ${{ inputs.node-version }}
+        COMPONENT_DIR: ${{ steps.read-config.outputs.component-dir }}
+        PORTABLE_EXTENSION: ${{ steps.read-config.outputs.portable-extension }}
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'detect runtime environment' -- bash ${{ github.action_path }}/scripts/setup/detect-runtime-env.sh
+
+    - name: Resolve extension CI cache
+      id: extension-cache
+      shell: bash
+      env:
+        COMPONENT_DIR: ${{ steps.read-config.outputs.component-dir }}
+        PORTABLE_EXTENSION: ${{ steps.read-config.outputs.portable-extension }}
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'resolve extension CI cache' -- bash ${{ github.action_path }}/scripts/setup/resolve-extension-cache.sh
+
+    - name: Restore extension CI cache
+      if: steps.extension-cache.outputs.enabled == 'true'
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.extension-cache.outputs.paths }}
+        key: ${{ runner.os }}-${{ steps.extension-cache.outputs.namespace }}-quality-${{ steps.extension-cache.outputs.fingerprint }}
+        restore-keys: ${{ runner.os }}-${{ steps.extension-cache.outputs.namespace }}-quality-
+
+    - name: Setup PHP
+      if: steps.detect-env.outputs.portable-php != ''
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ steps.detect-env.outputs.portable-php }}
+        extensions: mbstring, intl, pdo_sqlite, mysqli
+        tools: composer:v2
+        coverage: none
+
+    - name: Setup Node.js
+      if: steps.detect-env.outputs.portable-node != ''
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ steps.detect-env.outputs.portable-node }}
+
+    # The Rust extension can select `cargo nextest` as its test runner
+    # (`rust_test_runner`), which gives process-per-test isolation instead of
+    # Cargo's shared-process threading. When nextest is absent the extension
+    # falls back to `cargo test` silently, so a component that selected nextest
+    # would keep running serialized here and nothing would say why.
+    #
+    # The sharded Test jobs in this repository's own ci.yml install nextest for
+    # planning and replay. This covers every OTHER caller — release gates and
+    # any unsharded `review test` — so the selection is honored wherever a test
+    # command actually runs.
+    - name: Install cargo-nextest
+      if: inputs.auto-setup == 'true' && steps.resolve-commands.outputs.has-test == 'true' && steps.read-config.outputs.portable-extension == 'rust'
+      uses: taiki-e/install-action@nextest
+
+    - name: Auto-setup environment
+      if: inputs.auto-setup == 'true'
+      shell: bash
+      run: HOMEBOY_ACTION_SETUP_TIMEOUT_SECONDS="${{ inputs.setup-timeout-seconds }}" bash ${{ github.action_path }}/scripts/core/run-setup-with-timeout.sh 'auto-setup environment' -- bash ${{ github.action_path }}/scripts/setup/auto-setup-environment.sh
+
+    - name: Finish dependency/build setup timing
+      if: always()
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/core/phase-progress.sh end dependency_build_setup
+
+    # ── Phase 4b: SSH setup (for fleet/deploy) ──
+
+    - name: Setup SSH
+      id: setup-ssh
+      if: contains(steps.resolve-commands.outputs.operations-commands, 'fleet') || contains(steps.resolve-commands.outputs.operations-commands, 'deploy') || inputs.ssh-key != ''
+      shell: bash
+      env:
+        SSH_KEY: ${{ inputs.ssh-key }}
+        SSH_KNOWN_HOSTS: ${{ inputs.ssh-known-hosts }}
+      run: bash ${{ github.action_path }}/scripts/setup/setup-ssh.sh
+
+    # ── Phase 5: Run commands ──
+
+    # Bail early if the PR was merged or closed while earlier jobs ran.
+    # The concurrency group cancels stale runs when a NEW push arrives,
+    # but merging doesn't trigger a new PR event — so the run continues.
+    # This guard prevents wasting CI minutes on zombie runs.
+    - name: Check PR state
+      id: check-pr-state
+      if: github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.app-token || github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: bash "${GITHUB_ACTION_PATH}/scripts/core/check-pr-state.sh"
+
+    - name: Download Homeboy observations
+      if: steps.check-pr-state.outputs.active != 'false' && steps.resolve-commands.outputs.resolved-commands != '' && inputs.import-observations == 'true'
+      continue-on-error: true
+      uses: actions/download-artifact@v7
+      with:
+        pattern: homeboy-observations-*
+        path: homeboy-observations-import
+
+    - name: Import Homeboy observations
+      if: steps.check-pr-state.outputs.active != 'false' && steps.resolve-commands.outputs.resolved-commands != '' && inputs.import-observations == 'true'
+      shell: bash
+      env:
+        HOMEBOY_OBSERVATION_IMPORT_DIR: ${{ github.workspace }}/homeboy-observations-import
+      run: bash ${{ github.action_path }}/scripts/core/import-observations.sh
+
+    - name: Run Homeboy commands
+      id: run-commands
+      continue-on-error: true
+      if: steps.check-pr-state.outputs.active != 'false' && steps.resolve-commands.outputs.resolved-commands != ''
+      shell: bash
+      env:
+        COMPONENT_NAME: ${{ steps.read-config.outputs.portable-id }}
+        EXTRA_ARGS: ${{ inputs.args }}
+        BENCH_RIG: ${{ inputs.rig }}
+        BENCH_SCENARIO: ${{ inputs.scenario }}
+        BENCH_RUNS: ${{ inputs.runs }}
+        BENCH_ITERATIONS: ${{ inputs.iterations }}
+        BENCH_REGRESSION_THRESHOLD: ${{ inputs.regression-threshold }}
+        HOMEBOY_DIFFERENTIAL_GATING: ${{ inputs.differential-gating }}
+        RUN_GROUP_PREFIX: homeboy
+        HOMEBOY_ACTION_EXECUTION_TIMEOUT_SECONDS: ${{ inputs.execution-timeout-seconds }}
+        HOMEBOY_ACTION_CLEANUP_TIMEOUT_SECONDS: ${{ inputs.cleanup-timeout-seconds }}
+        HOMEBOY_TEST_TIMEOUT_SECONDS: ${{ inputs.test-timeout-seconds || env.HOMEBOY_TEST_TIMEOUT_SECONDS || '1500' }}
+        HOMEBOY_ACTION_REQUIRE_CONTAINMENT_PROOF: true
+        HOMEBOY_ACTION_PHASE_HEARTBEAT_SECONDS: ${{ inputs.phase-heartbeat-seconds }}
+        HOMEBOY_ACTION_PHASE_BUDGET_SECONDS: ${{ inputs.phase-budget-seconds }}
+      run: bash ${{ github.action_path }}/scripts/core/run-homeboy-commands.sh
+
+    - name: Start artifact publication timing
+      if: always()
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/core/phase-progress.sh start artifact_publication
+
+    - name: Resolve artifact names
+      id: artifact-names
+      if: always()
+      shell: bash
+      env:
+        PORTABLE_ID_VALUE: ${{ steps.read-config.outputs.portable-id }}
+        COMMANDS_VALUE: ${{ steps.resolve-commands.outputs.resolved-commands }}
+        PHP_VALUE: ${{ steps.detect-env.outputs.portable-php }}
+        NODE_VALUE: ${{ steps.detect-env.outputs.portable-node }}
+        JOB_VALUE: ${{ github.job }}
+        RUNNER_OS_VALUE: ${{ runner.os }}
+      run: |
+        artifact_suffix="${PORTABLE_ID_VALUE}-${COMMANDS_VALUE}-${JOB_VALUE}-${RUNNER_OS_VALUE}"
+        if [ -n "${PHP_VALUE}" ]; then
+          artifact_suffix="${artifact_suffix}-php${PHP_VALUE}"
+        fi
+        if [ -n "${NODE_VALUE}" ]; then
+          artifact_suffix="${artifact_suffix}-node${NODE_VALUE}"
+        fi
+
+        artifact_suffix="$(printf '%s' "${artifact_suffix}" | tr -cs 'A-Za-z0-9._-' '-')"
+        artifact_suffix="${artifact_suffix#-}"
+        artifact_suffix="${artifact_suffix%-}"
+
+        if [ -z "${artifact_suffix}" ]; then
+          artifact_suffix="${JOB_VALUE:-homeboy}"
+        fi
+
+        echo "homeboy-ci-results=homeboy-ci-results-${artifact_suffix}" >> "${GITHUB_OUTPUT}"
+        echo "homeboy-observations=homeboy-observations-${artifact_suffix}" >> "${GITHUB_OUTPUT}"
+
+    - name: Upload Homeboy CI results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.artifact-names.outputs.homeboy-ci-results }}
+        path: homeboy-ci-results/*.json
+        if-no-files-found: ignore
+
+    - name: Export Homeboy observations
+      if: always() && steps.check-pr-state.outputs.active != 'false' && steps.resolve-commands.outputs.resolved-commands != ''
+      shell: bash
+      env:
+        HOMEBOY_OBSERVATION_WINDOW: ${{ inputs.observation-window }}
+      run: bash ${{ github.action_path }}/scripts/core/export-observations.sh
+
+    - name: Upload Homeboy observations
+      if: always() && steps.check-pr-state.outputs.active != 'false' && steps.resolve-commands.outputs.resolved-commands != ''
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.artifact-names.outputs.homeboy-observations }}
+        path: homeboy-observations/**
+        if-no-files-found: ignore
+
+    - name: Finish artifact publication timing
+      if: always()
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/core/phase-progress.sh end artifact_publication
+
+    - name: Run baseline Homeboy commands
+      id: run-baseline-commands
+      continue-on-error: true
+      if: |
+        steps.check-pr-state.outputs.active != 'false'
+        && github.event_name == 'pull_request'
+        && inputs.differential-gating == 'true'
+        && steps.resolve-commands.outputs.resolved-commands != ''
+      shell: bash
+      env:
+        COMMANDS: ${{ steps.resolve-commands.outputs.resolved-commands }}
+        COMPONENT_NAME: ${{ steps.read-config.outputs.portable-id }}
+        EXTRA_ARGS: ${{ inputs.args }}
+        BASELINE_COMMANDS: ${{ inputs.baseline-commands }}
+        # A baseline can only excuse a FAILING candidate, so commands whose
+        # candidate already passed skip theirs (homeboy#11751 W1-10).
+        CANDIDATE_RESULTS: ${{ steps.run-commands.outputs.results }}
+        HOMEBOY_DIFFERENTIAL_GATING: ${{ inputs.differential-gating }}
+        RUN_GROUP_PREFIX: homeboy baseline
+        HOMEBOY_ACTION_EXECUTION_TIMEOUT_SECONDS: ${{ inputs.execution-timeout-seconds }}
+        HOMEBOY_ACTION_CLEANUP_TIMEOUT_SECONDS: ${{ inputs.cleanup-timeout-seconds }}
+        HOMEBOY_TEST_TIMEOUT_SECONDS: ${{ inputs.test-timeout-seconds || env.HOMEBOY_TEST_TIMEOUT_SECONDS || '1500' }}
+        HOMEBOY_ACTION_REQUIRE_CONTAINMENT_PROOF: true
+        HOMEBOY_ACTION_PHASE_HEARTBEAT_SECONDS: ${{ inputs.phase-heartbeat-seconds }}
+        HOMEBOY_ACTION_PHASE_BUDGET_SECONDS: ${{ inputs.phase-budget-seconds }}
+      run: bash ${{ github.action_path }}/scripts/core/run-baseline-commands.sh
+
+    # ── Phase 6: Results and reporting ──
+
+    - name: Select final results
+      id: select-results
+      if: always()
+      shell: bash
+      env:
+        FIRST_RESULTS: ${{ steps.run-commands.outputs.results }}
+        COMMANDS: ${{ steps.resolve-commands.outputs.resolved-commands }}
+        HOMEBOY_DIFFERENTIAL_GATING: ${{ inputs.differential-gating }}
+        HOMEBOY_RUN_CANCELLED: ${{ steps.source-build.outcome == 'cancelled' || steps.run-commands.outcome == 'cancelled' }}
+      run: bash ${{ github.action_path }}/scripts/core/phase-progress.sh run finding_reconciliation -- bash ${{ github.action_path }}/scripts/core/select-final-results.sh
+
+    - name: Generate failure digest
+      if: |
+        always()
+        && steps.select-results.outputs.results != ''
+        && (
+          contains(steps.select-results.outputs.results, '"fail"')
+          || contains(steps.select-results.outputs.results, '"timeout"')
+          || contains(steps.select-results.outputs.results, '"baseline_red"')
+          || contains(steps.select-results.outputs.results, '"inconclusive"')
+          || contains(steps.select-results.outputs.results, '"no_measurement"')
+        )
+      shell: bash
+      env:
+        RESULTS: ${{ steps.select-results.outputs.results }}
+        COMMANDS: ${{ steps.resolve-commands.outputs.resolved-commands }}
+        COMPONENT_NAME: ${{ steps.read-config.outputs.portable-id }}
+        HOMEBOY_CI_RESULTS_ARTIFACT: ${{ steps.artifact-names.outputs.homeboy-ci-results }}
+        HOMEBOY_OBSERVATIONS_ARTIFACT: ${{ steps.artifact-names.outputs.homeboy-observations }}
+        GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
+        HOMEBOY_TEST_TIMEOUT_SECONDS: ${{ inputs.test-timeout-seconds || env.HOMEBOY_TEST_TIMEOUT_SECONDS || '1500' }}
+        HOMEBOY_ACTION_EXECUTION_TIMEOUT_SECONDS: ${{ inputs.execution-timeout-seconds }}
+      run: bash ${{ github.action_path }}/scripts/digest/generate-failure-digest.sh
+
+    - name: Upload Homeboy failure digest
+      if: always() && steps.select-results.outputs.results != ''
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.artifact-names.outputs.homeboy-ci-results }}-failure-digest
+        path: |
+          homeboy-ci-results/failure-digest.md
+          homeboy-ci-results/failure-digest-renderer.stderr
+        if-no-files-found: ignore
+
+    - name: Run release
+      id: release
+      if: steps.resolve-commands.outputs.release-commands != '' && github.event_name != 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.app-token || github.token }}
+        RELEASE_DRY_RUN: ${{ inputs.release-dry-run }}
+        RELEASE_BRANCH: ${{ inputs.release-branch }}
+        RELEASE_SKIP_PUBLISH: ${{ inputs.release-skip-publish }}
+        RELEASE_SKIP_GITHUB_RELEASE: ${{ inputs.release-skip-github-release }}
+        RELEASE_HEAD: ${{ inputs.release-head }}
+        RELEASE_FROM_ARTIFACTS: ${{ inputs.release-from-artifacts }}
+        HOMEBOY_VERIFY_GITHUB_RELEASE: ${{ inputs.release-verify-github-release }}
+        COMPONENT_NAME: ${{ steps.read-config.outputs.portable-id }}
+        HOMEBOY_ACTION_EXECUTION_TIMEOUT_SECONDS: ${{ inputs.execution-timeout-seconds }}
+        HOMEBOY_ACTION_CLEANUP_TIMEOUT_SECONDS: ${{ inputs.cleanup-timeout-seconds }}
+        HOMEBOY_ACTION_REQUIRE_CONTAINMENT_PROOF: true
+        HOMEBOY_ACTION_PHASE_HEARTBEAT_SECONDS: ${{ inputs.phase-heartbeat-seconds }}
+        HOMEBOY_ACTION_PHASE_BUDGET_SECONDS: ${{ inputs.phase-budget-seconds }}
+      run: bash ${{ github.action_path }}/scripts/release/run-release-with-liveness.sh
+
+    # ── Phase 7b: Operations (fleet/deploy) ──
+    # Runs after quality gates and release — the primary use case is
+    # "release then deploy" or "release then fleet exec upgrade".
+    # Only runs when operations commands are present.
+
+    - name: Run operations (fleet/deploy)
+      id: run-operations
+      if: steps.resolve-commands.outputs.operations-commands != ''
+      continue-on-error: true
+      shell: bash
+      env:
+        OPERATIONS_COMMANDS: ${{ steps.resolve-commands.outputs.operations-commands }}
+        EXTRA_ARGS: ${{ inputs.args }}
+        RUN_GROUP_PREFIX: homeboy
+        HOMEBOY_ACTION_EXECUTION_TIMEOUT_SECONDS: ${{ inputs.execution-timeout-seconds }}
+        HOMEBOY_ACTION_CLEANUP_TIMEOUT_SECONDS: ${{ inputs.cleanup-timeout-seconds }}
+        HOMEBOY_ACTION_REQUIRE_CONTAINMENT_PROOF: true
+      run: bash ${{ github.action_path }}/scripts/operations/run-operations.sh
+
+    # Re-check PR state just before enforcement/reporting. A PR can merge while
+    # quality commands are still running, and merged/closed PR runs should not
+    # fail as zombie CI after the branch is already gone.
+    - name: Check final PR state
+      id: final-pr-state
+      if: always() && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.app-token || github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: bash "${GITHUB_ACTION_PATH}/scripts/core/check-pr-state.sh"
+
+    - name: Enforce final status
+      id: enforce-status
+      if: always()
+      shell: bash
+      env:
+        RESULTS: ${{ steps.select-results.outputs.results }}
+        COMMANDS: ${{ steps.resolve-commands.outputs.resolved-commands }}
+        OPERATIONS_RESULTS: ${{ steps.run-operations.outputs.results }}
+        PR_ACTIVE: ${{ steps.final-pr-state.outputs.active || steps.check-pr-state.outputs.active }}
+        HOMEBOY_RUN_CANCELLED: ${{ steps.source-build.outcome == 'cancelled' || steps.run-commands.outcome == 'cancelled' }}
+      run: bash ${{ github.action_path }}/scripts/core/enforce-final-status.sh
+
+    - name: Evaluate PR policy
+      id: pr-policy
+      if: github.event_name == 'pull_request' && steps.final-pr-state.outputs.active != 'false' && inputs.pr-policy != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.app-token || github.token }}
+        POLICY_PATH: ${{ inputs.pr-policy }}
+        POLICY_MERGE: ${{ inputs.pr-policy-merge }}
+        POLICY_MERGE_METHOD: ${{ inputs.pr-policy-merge-method }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        REPOSITORY: ${{ github.repository }}
+      run: bash ${{ github.action_path }}/scripts/pr/policy-gate.sh
+
+    - name: Post PR comment
+      if: always() && github.event_name == 'pull_request' && steps.final-pr-state.outputs.active != 'false' && inputs.pr-comment != 'false'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.app-token }}
+        COMMANDS: ${{ steps.resolve-commands.outputs.resolved-commands }}
+        COMPONENT_NAME: ${{ steps.read-config.outputs.portable-id }}
+        RESULTS: ${{ steps.select-results.outputs.results }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        BINARY_SOURCE: ${{ steps.resolve-binary.outputs.binary-source }}
+        COMMENT_KEY_INPUT: ${{ inputs.comment-key }}
+        COMMENT_SECTION_KEY_INPUT: ${{ inputs.comment-section-key }}
+        COMMENT_SECTION_TITLE_INPUT: ${{ inputs.comment-section-title }}
+        HOMEBOY_CI_RESULTS_ARTIFACT: ${{ steps.artifact-names.outputs.homeboy-ci-results }}
+        HOMEBOY_OBSERVATIONS_ARTIFACT: ${{ steps.artifact-names.outputs.homeboy-observations }}
+        GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
+        HOMEBOY_TEST_TIMEOUT_SECONDS: ${{ inputs.test-timeout-seconds || env.HOMEBOY_TEST_TIMEOUT_SECONDS || '1500' }}
+        HOMEBOY_ACTION_EXECUTION_TIMEOUT_SECONDS: ${{ inputs.execution-timeout-seconds }}
+      run: bash ${{ github.action_path }}/scripts/pr/post-pr-comment.sh
+
+    # ── Phase 7: Auto-issue filing ──
+    # Default: enabled on non-PR events (auto when input is empty).
+
+    - name: Auto-file categorized issues
+      id: categorized-issues
+      if: |
+        always()
+        && github.event_name != 'pull_request'
+        && steps.select-results.outputs.results != ''
+        && (inputs.auto-issue == 'true' || (inputs.auto-issue == '' && github.event_name != 'pull_request'))
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.app-token || github.token }}
+        RESULTS: ${{ steps.select-results.outputs.results }}
+        COMMANDS: ${{ steps.resolve-commands.outputs.resolved-commands }}
+        EXPECTED_COMMANDS: ${{ inputs.expected-commands }}
+        COMPONENT_NAME: ${{ steps.read-config.outputs.portable-id }}
+        BINARY_SOURCE: ${{ steps.resolve-binary.outputs.binary-source }}
+      run: bash ${{ github.action_path }}/scripts/issues/auto-file-categorized-issues.sh
+
+    - name: Publish phase timing summary
+      id: phase-summary
+      if: always()
+      shell: bash
+      run: |
+        bash ${{ github.action_path }}/scripts/core/phase-progress.sh start cleanup
+        bash ${{ github.action_path }}/scripts/core/phase-progress.sh end cleanup
+        bash ${{ github.action_path }}/scripts/core/phase-progress.sh summary
+
+    - name: Upload Homeboy phase timings
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: homeboy-phase-progress-${{ github.job }}-${{ runner.os }}
+        path: ${{ steps.phase-summary.outputs.phase-progress }}
+        if-no-files-found: warn

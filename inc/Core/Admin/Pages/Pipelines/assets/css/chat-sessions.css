@@ -1,0 +1,263 @@
+/**
+ * Chat Sessions Styles
+ *
+ * Session switcher dropdown and session list view.
+ */
+
+/* ===== SESSION SWITCHER ===== */
+
+.datamachine-chat-session-switcher {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: 1;
+	min-width: 0;
+}
+
+.datamachine-chat-session-switcher__trigger {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: 1;
+	min-width: 0;
+	padding: 6px 10px;
+	background: #f0f0f0;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+	text-align: left;
+}
+
+.datamachine-chat-session-switcher__trigger:hover {
+	background: #e8e8e8;
+	border-color: #ccc;
+}
+
+.datamachine-chat-session-switcher__title {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: #1e1e1e;
+}
+
+.datamachine-chat-session-switcher__icon {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	color: #757575;
+	transition: transform 0.2s ease;
+}
+
+.datamachine-chat-session-switcher__icon.is-open {
+	transform: rotate(180deg);
+}
+
+.datamachine-chat-session-switcher__icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.datamachine-chat-session-switcher__dropdown {
+	position: absolute;
+	top: 100%;
+	left: 16px;
+	right: 16px;
+	margin-top: 4px;
+	background: #fff;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	z-index: 10;
+	max-height: 300px;
+	overflow-y: auto;
+}
+
+.datamachine-chat-session-switcher__loading {
+	padding: 16px;
+	text-align: center;
+}
+
+.datamachine-chat-session-switcher__empty {
+	padding: 16px;
+	text-align: center;
+	color: #757575;
+	font-size: 12px;
+}
+
+.datamachine-chat-session-switcher__list {
+	margin: 0;
+	padding: 4px 0;
+	list-style: none;
+}
+
+.datamachine-chat-session-switcher__item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	width: 100%;
+	padding: 10px 12px;
+	border: none;
+	background: transparent;
+	cursor: pointer;
+	text-align: left;
+	font-size: 12px;
+}
+
+.datamachine-chat-session-switcher__item:hover {
+	background: #f0f0f0;
+}
+
+.datamachine-chat-session-switcher__item.is-active {
+	background: #e8f4fc;
+}
+
+.datamachine-chat-session-switcher__item-title {
+	color: #1e1e1e;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.datamachine-chat-session-switcher__item-meta {
+	color: #757575;
+	font-size: 11px;
+}
+
+.datamachine-chat-session-switcher__show-more {
+	display: block;
+	width: 100%;
+	padding: 10px 12px;
+	border: none;
+	border-top: 1px solid #eee;
+	background: transparent;
+	color: #007cba;
+	font-size: 12px;
+	cursor: pointer;
+	text-align: center;
+}
+
+.datamachine-chat-session-switcher__show-more:hover {
+	background: #f9f9f9;
+	text-decoration: underline;
+}
+
+.datamachine-chat-session-switcher__new-btn {
+	flex-shrink: 0;
+}
+
+/* ===== SESSION LIST VIEW ===== */
+
+.datamachine-chat-session-list {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	overflow: hidden;
+}
+
+.datamachine-chat-session-list__header {
+	padding: 8px 16px;
+	border-bottom: 1px solid #eee;
+	flex-shrink: 0;
+}
+
+.datamachine-chat-session-list__back {
+	font-size: 12px;
+}
+
+.datamachine-chat-session-list__content {
+	flex: 1;
+	overflow-y: auto;
+	padding: 8px 0;
+}
+
+.datamachine-chat-session-list__loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 40px 16px;
+	color: #757575;
+	font-size: 13px;
+}
+
+.datamachine-chat-session-list__empty {
+	padding: 40px 16px;
+	text-align: center;
+	color: #757575;
+	font-size: 13px;
+}
+
+.datamachine-chat-session-list__empty p {
+	margin: 0 0 8px;
+}
+
+.datamachine-chat-session-list__items {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.datamachine-chat-session-list__item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 16px 4px 8px;
+	border-bottom: 1px solid #f0f0f0;
+}
+
+.datamachine-chat-session-list__item:last-child {
+	border-bottom: none;
+}
+
+.datamachine-chat-session-list__item.is-active {
+	background: #e8f4fc;
+}
+
+.datamachine-chat-session-list__item-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px;
+	border: none;
+	background: transparent;
+	cursor: pointer;
+	text-align: left;
+	min-width: 0;
+}
+
+.datamachine-chat-session-list__item-content:hover {
+	background: #f9f9f9;
+	border-radius: 4px;
+}
+
+.datamachine-chat-session-list__item-title {
+	font-size: 13px;
+	font-weight: 500;
+	color: #1e1e1e;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.datamachine-chat-session-list__item-meta {
+	font-size: 11px;
+	color: #757575;
+}
+
+.datamachine-chat-session-list__item-delete {
+	flex-shrink: 0;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+.datamachine-chat-session-list__item:hover .datamachine-chat-session-list__item-delete {
+	opacity: 1;
+}
+
+.datamachine-chat-session-list__item-delete:disabled {
+	opacity: 0.5;
+}

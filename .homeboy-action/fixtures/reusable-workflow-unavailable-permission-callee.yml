@@ -1,0 +1,11 @@
+# Deliberately incompatible callee contract. The matching caller fixture omits
+# actions permission, so GitHub would reject this workflow before scheduling a
+# job. Keep this fixture as the regression model for homeboy-action#327/#328.
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read

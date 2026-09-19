@@ -1,0 +1,21 @@
+# Canonical minimal caller for the documented Homeboy continuous-release
+# reusable-workflow contract. Keep this intentionally small: it proves that v2
+# can start for a caller which grants exactly the permissions release.yml
+# requests. `dry-run: true` so a manual dispatch of this fixture can never
+# publish a release.
+name: Minimal Homeboy release consumer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release:
+    uses: Extra-Chill/homeboy-action/.github/workflows/release.yml@v2
+    with:
+      dry-run: true
+    secrets: inherit

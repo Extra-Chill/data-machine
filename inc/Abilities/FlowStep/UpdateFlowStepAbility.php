@@ -1,0 +1,283 @@
+<?php
+/**
+ * Update Flow Step Ability
+ *
+ * Handles single flow step handler configuration or user message updates.
+ *
+ * @package DataMachine\Abilities\FlowStep
+ * @since 0.15.3
+ */
+
+namespace DataMachine\Abilities\FlowStep;
+
+use DataMachine\Core\Steps\FlowStepConfig;
+
+defined( 'ABSPATH' ) || exit;
+
+class UpdateFlowStepAbility {
+
+	use FlowStepHelpers;
+
+	public function __construct() {
+		$this->initDatabases();
+
+		$this->registerAbility();
+	}
+
+	private function registerAbility(): void {
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine/update-flow-step',
+				array(
+					'label'               => __( 'Update Flow Step', 'data-machine' ),
+					'description'         => __( 'Update a single flow step handler configuration or user message.', 'data-machine' ),
+					'category'            => 'datamachine-flow',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'flow_step_id' ),
+						'properties' => array(
+							'flow_step_id'       => array(
+								'type'        => 'string',
+								'description' => __( 'Flow step ID to update', 'data-machine' ),
+							),
+							'handler_slug'       => array(
+								'type'        => 'string',
+								'description' => __( 'Handler slug to set (uses existing if empty)', 'data-machine' ),
+							),
+							'handler_config'     => array(
+								'type'        => 'object',
+								'description' => __( 'Single handler configuration settings to merge. Prefer handler_configs for new callers.', 'data-machine' ),
+							),
+							'handler_configs'    => array(
+								'type'        => 'object',
+								'description' => __( 'Canonical handler configuration map keyed by handler slug.', 'data-machine' ),
+							),
+							'flow_step_settings' => array(
+								'type'        => 'object',
+								'description' => __( 'Canonical settings object for handler-free flow steps.', 'data-machine' ),
+							),
+							'user_message'       => array(
+								'type'        => 'string',
+								'description' => __( 'User message for AI steps', 'data-machine' ),
+							),
+							'add_handler'        => array(
+								'type'        => 'string',
+								'description' => __( 'Add an additional handler to this step (multi-handler mode). Provide handler slug.', 'data-machine' ),
+							),
+							'add_handler_config' => array(
+								'type'        => 'object',
+								'description' => __( 'Configuration for the handler being added via add_handler.', 'data-machine' ),
+							),
+							'remove_handler'     => array(
+								'type'        => 'string',
+								'description' => __( 'Remove a handler from this step (multi-handler mode). Provide handler slug to remove.', 'data-machine' ),
+							),
+							'validate_only'      => array(
+								'type'        => 'boolean',
+								'description' => __( 'Validate and return the effective update without persisting.', 'data-machine' ),
+								'default'     => false,
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'                  => array( 'type' => 'boolean' ),
+							'flow_step_id'             => array( 'type' => 'string' ),
+							'message'                  => array( 'type' => 'string' ),
+							'error'                    => array( 'type' => 'string' ),
+							'validate_only'            => array( 'type' => 'boolean' ),
+							'effective_handler_config' => array( 'type' => 'object' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'execute' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/**
+	 * Execute update flow step ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with update status.
+	 */
+	public function execute( array $input ): array|\WP_Error {
+		$flow_step_id       = $input['flow_step_id'] ?? null;
+		$handler_slug       = $input['handler_slug'] ?? null;
+		$handler_configs    = is_array( $input['handler_configs'] ?? null ) ? $input['handler_configs'] : array();
+		$flow_step_settings = is_array( $input['flow_step_settings'] ?? null ) ? $input['flow_step_settings'] : array();
+		$handler_config     = $input['handler_config'] ?? array();
+		$user_message       = $input['user_message'] ?? null;
+		$validate_only      = ! empty( $input['validate_only'] );
+
+		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
+			return new \WP_Error( 'invalid_flow_step_id', 'flow_step_id is required and must be a string', array( 'status' => 400 ) );
+		}
+
+		if ( empty( $handler_config ) && ! empty( $handler_configs ) ) {
+			$handler_slug   = is_string( $handler_slug ) && '' !== $handler_slug ? $handler_slug : array_key_first( $handler_configs );
+			$handler_config = is_string( $handler_slug ) && is_array( $handler_configs[ $handler_slug ] ?? null ) ? $handler_configs[ $handler_slug ] : array();
+		}
+		if ( empty( $handler_config ) && ! empty( $flow_step_settings ) ) {
+			$handler_config = $flow_step_settings;
+		}
+
+		$has_handler_update = ! empty( $handler_slug ) || ! empty( $handler_config ) || ! empty( $handler_configs ) || ! empty( $flow_step_settings );
+		$has_message_update = null !== $user_message;
+		$has_add_handler    = ! empty( $input['add_handler'] );
+		$has_remove_handler = ! empty( $input['remove_handler'] );
+
+		if ( $validate_only && ( $has_message_update || $has_add_handler || $has_remove_handler ) ) {
+			return new \WP_Error( 'invalid_validate_only_update', 'validate_only currently supports handler configuration updates only', array( 'status' => 400 ) );
+		}
+
+		if ( ! $has_handler_update && ! $has_message_update && ! $has_add_handler && ! $has_remove_handler ) {
+			return new \WP_Error( 'invalid_flow_step_update', 'At least one of handler_slug, handler_config, user_message, add_handler, or remove_handler is required', array( 'status' => 400 ) );
+		}
+
+		$validation = $this->validateFlowStepId( $flow_step_id );
+		if ( ! $validation['valid'] ) {
+			if ( is_array( $validation['error_response'] ?? null ) ) {
+				$error_response = $validation['error_response'];
+				$not_found      = 'not_found' === ( $error_response['error_type'] ?? '' );
+				return new \WP_Error(
+					$not_found ? 'flow_step_not_found' : 'invalid_flow_step_id',
+					$error_response['error'] ?? 'Invalid flow_step_id',
+					array(
+						'status'      => $not_found ? 404 : 400,
+						'diagnostic'  => $error_response['diagnostic'] ?? array(),
+						'remediation' => $error_response['remediation'] ?? array(),
+					)
+				);
+			}
+			return new \WP_Error( 'invalid_flow_step_id', 'Invalid flow_step_id', array( 'status' => 400 ) );
+		}
+
+		$existing_step = is_array( $validation['step_config'] ?? null ) ? $validation['step_config'] : array();
+
+		$updated_fields           = array();
+		$effective_handler_config = null;
+
+		if ( $has_handler_update ) {
+			$effective_slug = FlowStepConfig::getEffectiveSlug( $existing_step, $handler_slug ?? '' );
+
+			if ( empty( $effective_slug ) ) {
+				return new \WP_Error( 'invalid_handler', 'Unable to determine handler: no handler_slug provided, stored, or step_type available', array( 'status' => 400 ) );
+			}
+
+			if ( ! empty( $handler_config ) ) {
+				$validation_result = $this->validateHandlerConfig( $effective_slug, $handler_config );
+				if ( true !== $validation_result ) {
+					return new \WP_Error(
+						'invalid_handler_config',
+						$validation_result['error'],
+						array(
+							'status'         => 400,
+							'unknown_fields' => $validation_result['unknown_fields'],
+							'field_specs'    => $validation_result['field_specs'],
+						)
+					);
+				}
+			}
+
+			$handler_update = $this->updateHandler( $flow_step_id, $effective_slug, $handler_config, $validate_only );
+
+			if ( ! $handler_update ) {
+				return new \WP_Error( 'flow_step_update_failed', 'Failed to update handler configuration', array( 'status' => 500 ) );
+			}
+
+			if ( $validate_only && is_array( $handler_update ) ) {
+				$effective_handler_config = $handler_update['handler_config'] ?? array();
+			}
+
+			if ( ! empty( $handler_slug ) ) {
+				$updated_fields[] = 'handler_slug';
+			}
+			if ( ! empty( $handler_config ) ) {
+				$updated_fields[] = FlowStepConfig::usesHandler( $existing_step ) ? 'handler_config' : 'flow_step_settings';
+			}
+		}
+
+		// Handle add_handler operation.
+		$add_handler = $input['add_handler'] ?? null;
+		if ( ! empty( $add_handler ) ) {
+			if ( ! $this->handler_abilities->handlerExists( $add_handler ) ) {
+				return new \WP_Error( 'handler_not_found', "Handler '{$add_handler}' not found", array( 'status' => 404 ) );
+			}
+
+			$add_handler_config = $input['add_handler_config'] ?? array();
+			if ( ! empty( $add_handler_config ) ) {
+				$validation_result = $this->validateHandlerConfig( $add_handler, $add_handler_config );
+				if ( true !== $validation_result ) {
+					return new \WP_Error(
+						'invalid_handler_config',
+						$validation_result['error'],
+						array(
+							'status'         => 400,
+							'unknown_fields' => $validation_result['unknown_fields'],
+							'field_specs'    => $validation_result['field_specs'],
+						)
+					);
+				}
+			}
+
+			$success = $this->addHandler( $flow_step_id, $add_handler, $add_handler_config );
+			if ( ! $success ) {
+				return new \WP_Error( 'flow_step_update_failed', "Failed to add handler '{$add_handler}' to step", array( 'status' => 500 ) );
+			}
+			$updated_fields[] = 'add_handler:' . $add_handler;
+		}
+
+		// Handle remove_handler operation.
+		$remove_handler = $input['remove_handler'] ?? null;
+		if ( ! empty( $remove_handler ) ) {
+			$success = $this->removeHandler( $flow_step_id, $remove_handler );
+			if ( ! $success ) {
+				return new \WP_Error( 'flow_step_update_failed', "Failed to remove handler '{$remove_handler}' from step. It may be the only handler.", array( 'status' => 500 ) );
+			}
+			$updated_fields[] = 'remove_handler:' . $remove_handler;
+		}
+
+		if ( $has_message_update ) {
+			$success = $this->updateUserMessage( $flow_step_id, $user_message );
+
+			if ( ! $success ) {
+				return new \WP_Error( 'flow_step_update_failed', 'Failed to update user message. Verify the step exists.', array( 'status' => 500 ) );
+			}
+
+			$updated_fields[] = 'user_message';
+		}
+
+		if ( ! $validate_only ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Flow step updated via ability',
+				array(
+					'flow_step_id'   => $flow_step_id,
+					'updated_fields' => $updated_fields,
+				)
+			);
+		}
+
+		$result = array(
+			'success'      => true,
+			'flow_step_id' => $flow_step_id,
+			'message'      => ( $validate_only ? 'Flow step update validated. Fields: ' : 'Flow step updated successfully. Fields updated: ' ) . implode( ', ', $updated_fields ),
+		);
+
+		if ( $validate_only ) {
+			$result['validate_only'] = true;
+			if ( null !== $effective_handler_config ) {
+				$result['effective_handler_config'] = $effective_handler_config;
+			}
+		}
+
+		return $result;
+	}
+}

@@ -1,0 +1,19 @@
+# Canonical minimal caller for the documented Homeboy CI reusable-workflow
+# contract. Keep this intentionally small: it proves that v2 can start for a
+# caller which grants exactly the permissions ci.yml requests.
+name: Minimal Homeboy CI consumer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  homeboy:
+    uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
+    with:
+      commands: review lint
+    secrets: inherit

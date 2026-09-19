@@ -1,0 +1,18 @@
+{
+  "id": "homeboy-action",
+  "name": "Homeboy Action",
+  "source_path": ".",
+  "docs_dir": "docs",
+  "changelog_target": "docs/CHANGELOG.md",
+  "version_targets": [
+    {
+      "file": "VERSION",
+      "pattern": "(?m)^([0-9]+\\.[0-9]+\\.[0-9]+)$"
+    }
+  ],
+  "hooks": {
+    "post:release": [
+      "bash scripts/release/update-major-tag.sh"
+    ]
+  }
+}

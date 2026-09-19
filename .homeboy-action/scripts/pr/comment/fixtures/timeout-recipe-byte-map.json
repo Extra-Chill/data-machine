@@ -1,0 +1,24 @@
+{
+  "schema": "homeboy/command-result/v3",
+  "command": "review",
+  "success": false,
+  "status": "failed",
+  "exit_code": 124,
+  "data": {
+    "timeout": {
+      "phase": "command_execution",
+      "elapsed_seconds": 1500,
+      "budget_seconds": 1500
+    },
+    "selection": {
+      "selected_count": 282
+    },
+    "recipe_run": {
+      "semantic_diagnostic": "Recipe test selection did not finish before the budget; authorization: Bearer top-secret-token must be redacted; api_key=do-not-display.",
+      "byte_map": {
+        "0-63": "recipe payload bytes ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+        "64-127": "unbounded raw transport data"
+      }
+    }
+  }
+}
