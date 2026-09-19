@@ -241,10 +241,16 @@ class WakeBriefingTask extends SystemTask {
 	/**
 	 * Gather threshold-crossing signal lines for the current blog only.
 	 *
-	 * @param string $since Window start (UTC).
+	 * @param string $since       Window start (UTC).
+	 * @param bool   $scan_fatals Whether to include the debug.log PHP-fatals
+	 *                            scan in this call. `false` when the caller
+	 *                            (gatherNetworkSignals()) is about to run that
+	 *                            scan exactly once at network scope instead of
+	 *                            once per site — see gatherNetworkSignals()
+	 *                            docblock for why.
 	 * @return string[] Terse signal lines (may be empty).
 	 */
-	private function gatherSiteSignals( string $since ): array {
+	private function gatherSiteSignals( string $since, bool $scan_fatals = true ): array {
 		$signals = array();
 
 		$failing = $this->getRepeatedJobFailures( $since );
@@ -262,9 +268,11 @@ class WakeBriefingTask extends SystemTask {
 			$signals[] = $errors;
 		}
 
-		$fatals = $this->getPhpFatals( $since );
-		if ( ! empty( $fatals ) ) {
-			$signals[] = $fatals;
+		if ( $scan_fatals ) {
+			$fatals = $this->getPhpFatals( $since );
+			if ( ! empty( $fatals ) ) {
+				$signals[] = $fatals;
+			}
 		}
 
 		// Disk is host-global; emit it once per run, not once per blog.
@@ -294,8 +302,33 @@ class WakeBriefingTask extends SystemTask {
 	}
 
 	/**
-	 * Gather signals across every site in the network, one labeled line per
-	 * site that has anything to report.
+	 * Gather signals across every site in the network: one hoisted
+	 * network-wide line for host-global facts, plus one labeled line per
+	 * site that has anything genuinely site-specific to report.
+	 *
+	 * ## Why PHP fatals are scanned once here, not once per site
+	 *
+	 * `wp-content/debug.log` is a single file shared by every site on a
+	 * multisite network — WP_CONTENT_DIR is network-wide and
+	 * resolveDebugLogPath() never reads a per-site option. So calling
+	 * getPhpFatals() under the per-blog switch_to_blog() loop below does not
+	 * just risk duplicate *lines*; it re-reads and re-parses the same up-to-
+	 * 5MB tail N times for an identical result every time (see
+	 * https://github.com/Extra-Chill/data-machine/issues/3522). Rather than
+	 * scanning N times and then deduping N identical strings back down to
+	 * one, this scans once, at network scope, before the per-site loop, and
+	 * excludes it from each per-site gatherSiteSignals() call via
+	 * `$scan_fatals = false`. That is the root fix: no per-site fact is lost
+	 * (fatals were never a per-site fact to begin with — the same signature
+	 * and count would surface under any site chosen), and the I/O cost drops
+	 * from O(sites) to O(1) per run.
+	 *
+	 * A true "identical on N/N sites" heuristic was considered and rejected:
+	 * it would still pay the cost of scanning the file N times just to
+	 * discover the signatures are identical, and — because the file is
+	 * structurally shared, not coincidentally identical — there is no
+	 * meaningful "different" case for a same-vs-different threshold to guard
+	 * against.
 	 *
 	 * Runs the same per-site pulse queries under switch_to_blog() and collapses
 	 * each site's signals into a single site-tagged line. Sites with nothing to
@@ -303,11 +336,18 @@ class WakeBriefingTask extends SystemTask {
 	 * would defeat the 3-second-glance bar on a large network).
 	 *
 	 * @param string $since Window start (UTC).
-	 * @return string[] Per-site signal lines (may be empty when the whole
-	 *                  network is quiet).
+	 * @return string[] Network-wide line (if any) followed by per-site signal
+	 *                  lines (may be empty when the whole network is quiet).
 	 */
 	private function gatherNetworkSignals( string $since ): array {
 		$lines = array();
+
+		// Host-global: the shared debug.log is scanned exactly once here,
+		// ahead of the per-site loop — see docblock above.
+		$fatals = $this->getPhpFatals( $since );
+		if ( ! empty( $fatals ) ) {
+			$lines[] = sprintf( '**network-wide** — %s', $fatals );
+		}
 
 		$sites = get_sites(
 			array(
@@ -323,7 +363,7 @@ class WakeBriefingTask extends SystemTask {
 			$blog_id = (int) $blog_id;
 			switch_to_blog( $blog_id );
 			try {
-				$site_signals = $this->gatherSiteSignals( $since );
+				$site_signals = $this->gatherSiteSignals( $since, false );
 				$label        = $this->siteLabel( $blog_id );
 			} finally {
 				restore_current_blog();
