@@ -11,6 +11,7 @@ namespace DataMachine\Tests\Unit\Abilities\Engine;
 use DataMachine\Abilities\Engine\ExecuteStepAbility;
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
+use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
 use DataMachine\Core\Database\BatchItems\BatchItems;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -1223,8 +1224,118 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertSame( $completed_at, $this->jobs_db->get_job( $parent_id )['completed_at'] );
 	}
 
-	public function test_final_chunk_completes_parent_when_children_already_terminal(): void {
+	/**
+	 * Reproduces #3518: the completion decision read the parent's engine
+	 * snapshot through the persistent object cache. A cache entry poisoned
+	 * before the final chunk persisted worklist_complete made every child
+	 * callback see batch_pending and early-return, stranding the parent in
+	 * processing even though the database showed a fully scheduled, fully
+	 * terminal batch. The decision must read the database.
+	 */
+	public function test_stale_engine_cache_snapshot_cannot_strand_fully_terminal_batch_parent(): void {
 		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$packets   = array(
+			$this->make_data_packet( 'Event A' ),
+			$this->make_data_packet( 'Event B' ),
+		);
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', $packets, $engine );
+		$scheduler->processChunk( $parent_id );
+
+		global $wpdb;
+		$table    = $wpdb->prefix . 'datamachine_jobs';
+		$children = $wpdb->get_col(
+			$wpdb->prepare( "SELECT job_id FROM {$table} WHERE parent_job_id = %d ORDER BY job_id", $parent_id )
+		);
+		$this->assertCount( 2, $children );
+
+		// Poison the object cache with a snapshot that predates the final
+		// chunk's worklist_complete fence, the way a retrieve() miss-fill
+		// racing a concurrent mutate() does on production.
+		$stale_engine = $this->jobs_db->retrieve_engine_data( $parent_id );
+		$this->assertNotEmpty( $stale_engine['batch_state']['worklist_complete'] );
+		unset( $stale_engine['batch_state']['worklist_complete'] );
+		$stale_engine['batch_scheduled'] = 0;
+		wp_cache_set( $parent_id, $stale_engine, 'datamachine_engine_data' );
+
+		foreach ( $children as $child_id ) {
+			$this->assertTrue( $this->jobs_db->complete_job( (int) $child_id, JobStatus::COMPLETED ) );
+			$this->assertTrue( PipelineBatchScheduler::onChildComplete( (int) $child_id, JobStatus::COMPLETED ) );
+		}
+
+		$parent_job = $this->jobs_db->get_job( $parent_id );
+		$this->assertSame( JobStatus::COMPLETED, $parent_job['status'] );
+
+		$parent_engine = $this->jobs_db->retrieve_engine_data( $parent_id );
+		$this->assertSame( 2, (int) $parent_engine['batch_results']['completed'] );
+	}
+
+	/**
+	 * A dead final-chunk worker leaves the worklist unfenced: every child is
+	 * terminal but worklist_complete was never persisted. The child-complete
+	 * hook must not silently strand the parent — it re-arms the idempotent
+	 * chunk action, and the recheck completes the parent through the normal
+	 * scheduler path.
+	 */
+	public function test_unfenced_worklist_with_terminal_children_rearms_durable_recheck(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+		$packets   = array(
+			$this->make_data_packet( 'Event A' ),
+		);
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', $packets, $engine );
+		$scheduler->processChunk( $parent_id );
+
+		global $wpdb;
+		$table   = $wpdb->prefix . 'datamachine_jobs';
+		$child_id = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT job_id FROM {$table} WHERE parent_job_id = %d ORDER BY job_id LIMIT 1", $parent_id )
+		);
+		$this->assertGreaterThan( 0, $child_id );
+
+		// Simulate the chunk worker dying before finishV2State persisted the
+		// fence: the durable snapshot loses worklist_complete.
+		$stripped = EngineData::mutate(
+			$parent_id,
+			static function ( array $current ): array {
+				unset( $current['batch_state']['worklist_complete'] );
+				return $current;
+			},
+			'test_unfence_worklist'
+		);
+		$this->assertTrue( ! empty( $stripped['success'] ) );
+		$offset = (int) $stripped['snapshot']['batch_state']['offset'];
+
+		$this->assertTrue( $this->jobs_db->complete_job( $child_id, JobStatus::COMPLETED ) );
+		$this->assertTrue( PipelineBatchScheduler::onChildComplete( $child_id, JobStatus::COMPLETED ) );
+
+		// Not completable yet — but a durable recheck path must exist.
+		$this->assertSame( JobStatus::PROCESSING, $this->jobs_db->get_job( $parent_id )['status'] );
+		$rechecks = as_get_scheduled_actions(
+			array(
+				'hook'   => PipelineBatchScheduler::BATCH_HOOK,
+				'args'   => array(
+					'parent_job_id' => $parent_id,
+					'offset'        => $offset,
+				),
+				'group'  => GroupRegistrar::GROUP,
+				'status' => 'pending',
+			),
+			'ids'
+		);
+		$this->assertNotEmpty( $rechecks, 'unfenced worklist must re-arm the chunk action' );
+
+		// Running the recheck (what Action Scheduler does next) completes the
+		// parent through the normal scheduler path.
+		$scheduler->processChunk( $parent_id );
+		$this->assertSame( JobStatus::COMPLETED, $this->jobs_db->get_job( $parent_id )['status'] );
+	}
+
+	public function test_final_chunk_completes_parent_when_children_already_terminal(): void {		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
 
 		datamachine_merge_engine_data( $parent_id, array(
@@ -1438,6 +1549,68 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		$parent_job = $this->jobs_db->get_job( $parent_id );
 		$this->assertEquals( 'processing', $parent_job['status'] );
+	}
+
+	/**
+	 * #3518: recover-stuck must route a fully scheduled, fully terminal
+	 * children_complete batch parent through the completion logic instead of
+	 * the timeout path (which marks it failed). The child below terminalized
+	 * outside the normal accounting path, so the child-complete hook never
+	 * reconciled the parent — exactly the stranded state recovery exists for.
+	 */
+	public function test_recover_stuck_completes_fully_terminal_batch_parent_instead_of_failing_it(): void {
+		[ $parent_id, $child_id ] = $this->create_terminal_ready_batch();
+
+		// Terminalize the child without the terminal-accounting hooks, the
+		// way a historical accounting failure would leave it.
+		global $wpdb;
+		$wpdb->update(
+			$this->jobs_db->get_table_name(),
+			array(
+				'status'       => JobStatus::COMPLETED,
+				'completed_at' => current_time( 'mysql', true ),
+			),
+			array( 'job_id' => $child_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+		$this->assertSame( JobStatus::PROCESSING, $this->jobs_db->get_job( $parent_id )['status'] );
+
+		// Age the parent past the recovery timeout window.
+		$wpdb->update(
+			$this->jobs_db->get_table_name(),
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 5 * HOUR_IN_SECONDS ) ),
+			array( 'job_id' => $parent_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		$ability = wp_get_ability( 'datamachine/recover-stuck-jobs' );
+		$this->assertNotNull( $ability );
+
+		$dry_run = $ability->execute(
+			array(
+				'job_id'        => $parent_id,
+				'dry_run'       => true,
+				'timeout_hours' => 1,
+			)
+		);
+		$this->assertIsArray( $dry_run );
+		$this->assertContains( 'would_complete_batch_parent', wp_list_pluck( $dry_run['jobs'], 'status' ) );
+		$this->assertSame( JobStatus::PROCESSING, $this->jobs_db->get_job( $parent_id )['status'], 'dry run must not mutate' );
+
+		$applied = $ability->execute(
+			array(
+				'job_id'        => $parent_id,
+				'timeout_hours' => 1,
+			)
+		);
+		$this->assertIsArray( $applied );
+		$this->assertSame( 1, (int) ( $applied['batch_parents_completed'] ?? 0 ) );
+
+		$parent = $this->jobs_db->get_job( $parent_id );
+		$this->assertSame( JobStatus::COMPLETED, $parent['status'] );
+		$this->assertSame( 1, (int) $this->jobs_db->retrieve_engine_data( $parent_id )['batch_results']['completed'] );
 	}
 
 	/** @return array{int,int} */

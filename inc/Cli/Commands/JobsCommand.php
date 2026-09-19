@@ -321,6 +321,12 @@ class JobsCommand extends BaseCommand {
 			} elseif ( 'recovered' === $job['status'] ) {
 				$display_status = strlen( $job['target_status'] ) > 60 ? substr( $job['target_status'], 0, 60 ) . '...' : $job['target_status'];
 				WP_CLI::log( sprintf( 'Updated job %d to: %s', $job['job_id'], $display_status ) );
+			} elseif ( 'would_complete_batch_parent' === $job['status'] ) {
+				$display_status = strlen( (string) $job['target_status'] ) > 60 ? substr( (string) $job['target_status'], 0, 60 ) . '...' : (string) $job['target_status'];
+				WP_CLI::log( sprintf( 'Would complete batch parent %d (flow %d) to: %s', $job['job_id'], $job['flow_id'], $display_status ) );
+			} elseif ( 'completed_batch_parent' === $job['status'] ) {
+				$display_status = strlen( (string) $job['target_status'] ) > 60 ? substr( (string) $job['target_status'], 0, 60 ) . '...' : (string) $job['target_status'];
+				WP_CLI::log( sprintf( 'Completed batch parent %d (flow %d) to: %s', $job['job_id'], $job['flow_id'], $display_status ) );
 			} elseif ( 'would_timeout' === $job['status'] ) {
 				WP_CLI::log( sprintf( 'Would timeout job %d (flow %d)', $job['job_id'], $job['flow_id'] ) );
 			} elseif ( 'timed_out' === $job['status'] ) {
@@ -378,6 +384,7 @@ class JobsCommand extends BaseCommand {
 		$pathless_policy_skipped = (int) ( $result['pathless_policy_skipped'] ?? 0 );
 		$pending_ai_terminalized = (int) ( $result['pending_ai_terminalized'] ?? 0 );
 		$pending_ai_guarded = (int) ( $result['pending_ai_guarded'] ?? 0 );
+		$batch_parents_completed = (int) ( $result['batch_parents_completed'] ?? 0 );
 		$mutations         = (int) ( $result['mutations'] ?? 0 );
 		$attempted         = (int) ( $result['attempted'] ?? 0 );
 		$touched           = (int) ( $result['touched'] ?? 0 );
@@ -397,6 +404,7 @@ class JobsCommand extends BaseCommand {
 			'pathless_policy_skipped' => $pathless_policy_skipped,
 			'pending_ai_terminalized' => $pending_ai_terminalized,
 			'pending_ai_guarded' => $pending_ai_guarded,
+			'batch_parents_completed' => $batch_parents_completed,
 			'mutations'     => $mutations,
 			'attempted'     => $attempted,
 			'touched'       => $touched,
@@ -412,8 +420,8 @@ class JobsCommand extends BaseCommand {
 			'limit_unit'    => (string) ( $result['limit_unit'] ?? 'logical_touch' ),
 			'logical_touch_limit' => (int) ( $result['logical_touch_limit'] ?? $result['apply_limit'] ?? 0 ),
 			'limit_reached' => ! empty( $result['limit_reached'] ) ? 1 : 0,
-			'actionable'    => $pending_ai_terminalized + $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
-			'total'         => $pending_ai_terminalized + $recovered + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal + $skipped,
+			'actionable'    => $pending_ai_terminalized + $recovered + $batch_parents_completed + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
+			'total'         => $pending_ai_terminalized + $recovered + $batch_parents_completed + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal + $skipped,
 			'requeued'      => (int) ( $result['requeued'] ?? 0 ),
 			'jobs_omitted'  => (int) ( $result['jobs_omitted'] ?? 0 ),
 		);
