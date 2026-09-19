@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.16] - 2026-09-19
+
+### Fixed
+- batch parents stay processing after all children terminal — stale cache read + no durable recheck
+
 ## [0.176.15] - 2026-09-19
 
 ### Changed
