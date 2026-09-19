@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.63.0] - 2026-09-19
+
+### Added
+- skip term classification for events that already happened
+
 ## [0.62.1] - 2026-09-18
 
 ### Fixed
