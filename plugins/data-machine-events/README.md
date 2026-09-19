@@ -92,4 +92,3 @@ cd ../EventDetails && npm ci && npm run build
 - [docs/rest-api.md](docs/rest-api.md) — API reference
 - [docs/calendar-block.md](docs/calendar-block.md) — Calendar block usage
 - [docs/venue-management.md](docs/venue-management.md) — Venue features
-- [AGENTS.md](AGENTS.md) — Technical reference for contributors
