@@ -302,7 +302,11 @@ function datamachine_site_section_user_roles(): string {
 }
 
 /**
- * Active plugins (excluding Data Machine itself), with descriptions.
+ * Active plugins (excluding Data Machine itself), names only.
+ *
+ * Descriptions are deliberately omitted — this section is injected into
+ * every AI call as always-on context, and `wp plugin list` is one command
+ * away for anyone who needs the full metadata (see #3521).
  *
  * @since x.y.z
  * @return string
@@ -319,14 +323,19 @@ function datamachine_site_section_plugins(): string {
 	foreach ( $active_plugins as $plugin_file ) {
 		$plugin_file = (string) $plugin_file;
 		$plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
-		if ( function_exists( 'get_plugin_data' ) && file_exists( $plugin_path ) ) {
+
+		// Skip ghost entries: plugins recorded in the active_plugins option
+		// but deleted from disk without being deactivated first (#3521).
+		if ( ! file_exists( $plugin_path ) ) {
+			continue;
+		}
+
+		if ( function_exists( 'get_plugin_data' ) ) {
 			$plugin_data = get_plugin_data( $plugin_path, false, false );
 			$plugin_name = ! empty( $plugin_data['Name'] ) ? $plugin_data['Name'] : dirname( $plugin_file );
-			$plugin_desc = ! empty( $plugin_data['Description'] ) ? $plugin_data['Description'] : '';
 		} else {
 			$dir         = dirname( $plugin_file );
 			$plugin_name = '.' === $dir ? str_replace( '.php', '', basename( $plugin_file ) ) : $dir;
-			$plugin_desc = '';
 		}
 
 		// Skip Data Machine's own plugin entry — it's always active and adds noise.
@@ -334,10 +343,7 @@ function datamachine_site_section_plugins(): string {
 			continue;
 		}
 
-		$entries[] = array(
-			'name' => $plugin_name,
-			'desc' => $plugin_desc,
-		);
+		$entries[] = $plugin_name;
 	}
 
 	$lines   = array();
@@ -348,13 +354,8 @@ function datamachine_site_section_plugins(): string {
 		return implode( "\n", $lines );
 	}
 
-	foreach ( $entries as $entry ) {
-		$desc_suffix = '';
-		if ( ! empty( $entry['desc'] ) ) {
-			$desc        = wp_strip_all_tags( $entry['desc'] );
-			$desc_suffix = ' — ' . $desc;
-		}
-		$lines[] = '- **' . $entry['name'] . '**' . $desc_suffix;
+	foreach ( $entries as $plugin_name ) {
+		$lines[] = '- **' . $plugin_name . '**';
 	}
 
 	return implode( "\n", $lines );
@@ -580,7 +581,14 @@ function datamachine_network_section_plugins(): string {
 		}
 
 		$plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
-		if ( function_exists( 'get_plugin_data' ) && file_exists( $plugin_path ) ) {
+
+		// Skip ghost entries: plugins recorded in the network-active option
+		// but deleted from disk without being deactivated first (#3521).
+		if ( ! file_exists( $plugin_path ) ) {
+			continue;
+		}
+
+		if ( function_exists( 'get_plugin_data' ) ) {
 			$plugin_data    = get_plugin_data( $plugin_path, false, false );
 			$plugin_names[] = ! empty( $plugin_data['Name'] ) ? $plugin_data['Name'] : dirname( $plugin_file );
 		} else {
