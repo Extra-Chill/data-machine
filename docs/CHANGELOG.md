@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.17] - 2026-09-19
+
+### Changed
+- migrate release pipeline onto the reusable homeboy-action release workflow
+
 ## [0.176.16] - 2026-09-19
 
 ### Fixed
