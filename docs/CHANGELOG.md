@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.19] - 2026-09-20
+
+### Fixed
+- preserve the publication date when upserting an existing post
+
 ## [0.176.18] - 2026-09-19
 
 ### Fixed
