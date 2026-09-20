@@ -40,9 +40,22 @@ class MigrationRunner {
 		 *
 		 * @param list<Migration> $migrations Default migrations.
 		 */
+		/**
+		 * @var mixed $filtered
+		 */
 		$filtered = apply_filters( 'datamachine_migrations', $migrations );
+		if ( ! is_array( $filtered ) ) {
+			return $migrations;
+		}
 
-		return is_array( $filtered ) ? array_values( array_filter( $filtered, static fn( $item ): bool => $item instanceof Migration ) ) : $migrations;
+		$out = array();
+		foreach ( $filtered as $item ) {
+			if ( $item instanceof Migration ) {
+				$out[] = $item;
+			}
+		}
+
+		return $out;
 	}
 
 	/**

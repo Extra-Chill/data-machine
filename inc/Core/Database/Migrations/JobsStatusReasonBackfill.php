@@ -38,6 +38,9 @@ class JobsStatusReasonBackfill extends CursorJobBackfill {
 		return self::LEGACY_OPTION;
 	}
 
+	/**
+	 * @return array<int,array<string,mixed>>
+	 */
 	protected function fetchBatch( int $cursor, int $limit ): array {
 		global $wpdb;
 
@@ -55,10 +58,21 @@ class JobsStatusReasonBackfill extends CursorJobBackfill {
 			 LIMIT %d",
 			array_merge( array( $table, $cursor ), $canonical, array( $like, $limit ) )
 		);
-		$rows = $wpdb->get_results( $query, ARRAY_A );
+		$rows  = $wpdb->get_results( $query, ARRAY_A );
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
 
-		return is_array( $rows ) ? $rows : array();
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		$out = array();
+		foreach ( $rows as $row ) {
+			if ( is_array( $row ) ) {
+				$out[] = $row;
+			}
+		}
+
+		return $out;
 	}
 
 	protected function processRow( array $row ): void {

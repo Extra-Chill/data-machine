@@ -32,6 +32,9 @@ class JobsTaskTypeBackfill extends CursorJobBackfill {
 		return '';
 	}
 
+	/**
+	 * @return array<int,array<string,mixed>>
+	 */
 	protected function fetchBatch( int $cursor, int $limit ): array {
 		global $wpdb;
 
@@ -53,7 +56,18 @@ class JobsTaskTypeBackfill extends CursorJobBackfill {
 		);
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL
 
-		return is_array( $rows ) ? $rows : array();
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		$out = array();
+		foreach ( $rows as $row ) {
+			if ( is_array( $row ) ) {
+				$out[] = $row;
+			}
+		}
+
+		return $out;
 	}
 
 	protected function processRow( array $row ): void {

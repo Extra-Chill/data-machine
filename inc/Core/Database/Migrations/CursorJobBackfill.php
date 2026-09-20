@@ -31,7 +31,7 @@ abstract class CursorJobBackfill extends Migration {
 	/**
 	 * @param int $cursor Exclusive lower bound on job_id.
 	 * @param int $limit  Maximum rows.
-	 * @return list<array<string,mixed>>
+	 * @return array<int,array<string,mixed>>
 	 */
 	abstract protected function fetchBatch( int $cursor, int $limit ): array;
 
