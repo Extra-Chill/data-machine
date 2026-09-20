@@ -664,8 +664,16 @@ class WakeBriefingTask extends SystemTask {
 	 * @return string Absolute path (may not exist), or '' when undeterminable.
 	 */
 	private function resolveDebugLogPath(): string {
-		if ( defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG ) && '' !== WP_DEBUG_LOG ) {
-			return WP_DEBUG_LOG;
+		// Read through constant() rather than referencing WP_DEBUG_LOG directly.
+		// WordPress stubs declare this constant as bool, so a direct reference
+		// lets static analysis "prove" is_string() can never be true and mark
+		// every branch below it dead. At runtime the constant is genuinely
+		// either a bool or an explicit log path string, which is the case this
+		// method exists to handle. constant() yields mixed and keeps the real
+		// contract checkable.
+		$debug_log = defined( 'WP_DEBUG_LOG' ) ? constant( 'WP_DEBUG_LOG' ) : null;
+		if ( is_string( $debug_log ) && '' !== $debug_log ) {
+			return $debug_log;
 		}
 
 		$ini_path = ini_get( 'error_log' );
