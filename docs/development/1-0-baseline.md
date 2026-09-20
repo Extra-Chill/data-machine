@@ -5,7 +5,7 @@ Data Machine 1.0 supports one current schema and one current runtime contract. F
 ## Upgrade Boundary
 
 - The 1.0 package does not transform pre-1.0 flow, handler, queue, bundle, result, or import/export shapes.
-- Multisite chat-session convergence is canonical setup behavior. Every schema setup pass idempotently copies legacy per-site rows into the network table and records completion only after SQL success and anti-join parity.
+- Multisite chat-session convergence is the explicit `datamachine_converge_chat_sessions_to_network()` helper, not web `init`.
 - Pre-1.0 agent-owned flows that relied on the implicit default mailbox are not migrated seamlessly. Administrators must reset that mailbox configuration and explicitly reauthorize the named mailbox grant before the flow can run under 1.0. Runtime rejection of an absent or unauthorized mailbox is the canonical safety behavior.
 - An installation that did not cross that final pre-1.0 release must reset unsupported Data Machine configuration and runtime data, then recreate or import it using the canonical 1.0 contracts.
 - Current tables, columns, indexes, capabilities, defaults, memory scaffolding, and flow-schedule reconciliation remain idempotent bootstrap requirements. They are installation behavior, not compatibility migrations.
@@ -23,7 +23,7 @@ Compatibility is retained only for a named current external or persisted contrac
 
 The following grep-visible paths are intentionally retained and are not pre-1.0 API compatibility promises:
 
-- **Current schema/bootstrap:** repository `create_table()`, `migrate_columns()`, and `ensure_*_schema()` methods converge an existing current table on the canonical columns and indexes. Multisite chat convergence preserves per-site rows until verified in the network table.
+- **Current schema/bootstrap:** repository `create_table()` methods create missing tables via `dbDelta`. They must not `ALTER` existing tables, `SELECT`/`UPDATE` existing rows, or run chat-network convergence on web `init`. Operator repairs live in `MigrationRunner` (`wp datamachine migrate`) and named CLI commands.
 - **Concrete persisted production data:** compound job statuses, generation-less recurring actions, descriptor-less in-flight claims, pending-action numeric owner columns, installed bundle artifact config mirrors (including the concrete singular `handler_config` runtime overlay consumed by `AgentBundleRuntimeDrift` and `AgentBundleArtifactPayloads`), plaintext OAuth secrets awaiting opportunistic encryption, and existing memory directories remain readable so current queued work and operator data survive the production upgrade.
 - **Shipped external edges:** stable `datamachine/v1` REST error codes, the `datamachine_tools` and pending-action handler extension filters, OAuth implicit-flow support, and both possible PSR-16 namespaces are presentation, extension, or dependency boundaries rather than alternate internal models.
 - **Current pipeline delegation edge:** `ToolPolicyResolver` accepts top-level `runtime_tool_declarations` because the current pipeline policy consumer supplies run-scoped client declarations there. The namespaced client-context envelope remains supported for interactive runtime adapters.

@@ -152,7 +152,7 @@ CREATE TABLE wp_datamachine_processed_items (
 **Indexes**:
 - `flow_source_item` (UNIQUE) — point lookups + dedupe constraint.
 - `flow_step_id`, `source_type`, `job_id` — bulk deletes and filtered audits.
-- `flow_source_ts` (since 0.71.0) — covers time-windowed range scans used by `find_stale()` / `has_been_processed_within()`. `ProcessedItems::ensure_flow_source_ts_index()` backfills the index on existing installs since `dbDelta` does not reliably add indexes to populated tables.
+- `flow_source_ts` (since 0.71.0) — covers time-windowed range scans used by `find_stale()` / `has_been_processed_within()`.
 
 ### `wp_datamachine_tracked_items`
 

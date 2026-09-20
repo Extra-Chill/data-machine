@@ -15,8 +15,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Discovers migrations, refuses web context, and serializes apply() with a lease.
  *
- * create_table() / ensure_all_tables() must never call apply(). Schema ALTERs
- * stay on that path; row walks come through here, from WP-CLI only.
+ * create_table() / ensure_all_tables() must never call apply(). They create
+ * missing tables only. Schema repairs and row walks come through here, from WP-CLI only.
  */
 class MigrationRunner {
 

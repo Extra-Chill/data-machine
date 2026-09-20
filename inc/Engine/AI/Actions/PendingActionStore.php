@@ -127,65 +127,6 @@ class PendingActionStore {
 		) {$charset_collate};";
 
 		dbDelta( $sql );
-		self::ensure_workspace_columns();
-	}
-
-	/**
-	 * Ensure workspace columns exist on previously-created audit tables.
-	 *
-	 * @return void
-	 */
-	public static function ensure_workspace_columns(): void {
-		global $wpdb;
-
-		if ( ! self::has_database() ) {
-			return;
-		}
-
-		$table_name = self::get_table_name();
-		$workspace  = WordPressWorkspaceScope::current();
-
-		if ( ! self::column_exists( $table_name, 'workspace_type' ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN workspace_type varchar(50) NULL', $table_name ) );
-		}
-
-		if ( ! self::column_exists( $table_name, 'workspace_id' ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN workspace_id varchar(191) NULL', $table_name ) );
-		}
-
-		if ( ! self::column_exists( $table_name, 'receipt_nonce' ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN receipt_nonce varchar(64) NULL', $table_name ) );
-		}
-
-		if ( ! self::column_exists( $table_name, 'receipt_consumed_at' ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN receipt_consumed_at datetime NULL', $table_name ) );
-		}
-
-		if ( ! self::column_exists( $table_name, 'receipt_operation' ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN receipt_operation varchar(191) NULL', $table_name ) );
-		}
-
-		if ( ! self::column_exists( $table_name, 'receipt_evidence' ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN receipt_evidence longtext NULL', $table_name ) );
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query(
-			$wpdb->prepare(
-				'UPDATE %i SET workspace_type = %s, workspace_id = %s WHERE workspace_type IS NULL OR workspace_type = %s OR workspace_id IS NULL OR workspace_id = %s',
-				$table_name,
-				$workspace->workspace_type,
-				$workspace->workspace_id,
-				'',
-				''
-			)
-		);
 	}
 
 	/**
@@ -1298,18 +1239,6 @@ class PendingActionStore {
 			$where[] = 'agent = %s';
 			$args[]  = $agent;
 		}
-	}
-
-	/**
-	 * Check whether a pending-action table column exists.
-	 */
-	private static function column_exists( string $table_name, string $column ): bool {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, $column ) );
-
-		return null !== $result;
 	}
 
 	/**

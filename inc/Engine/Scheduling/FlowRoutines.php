@@ -444,8 +444,8 @@ final class FlowRoutines {
 	 * Runs on `init` of every full-runtime request. Registration is cheap:
 	 * the Agents API Action Scheduler bridge's `register()` is itself
 	 * idempotent, so re-declaring an unchanged routine on every boot never
-	 * reaches Action Scheduler. Also performs the one-shot legacy-action
-	 * migration.
+	 * reaches Action Scheduler. Legacy Action Scheduler schedule conversion
+	 * is `wp datamachine flows migrate-legacy-schedules`, not boot.
 	 *
 	 * Per-routine registration is isolated with its own try/catch (see
 	 * {@see register_routine_logged()}) so one bad routine does not stop the
@@ -506,8 +506,6 @@ final class FlowRoutines {
 				array( 'schedule_id' => $schedule_id )
 			);
 		}
-
-		self::maybe_migrate();
 	}
 
 	/**
@@ -1169,29 +1167,6 @@ final class FlowRoutines {
 		}
 
 		return false;
-	}
-
-	/**
-	 * Run the one-shot legacy-action migration when it has not run yet.
-	 */
-	private static function maybe_migrate(): void {
-		if ( get_option( self::MIGRATED_OPTION ) ) {
-			return;
-		}
-
-		$plan = self::migrate_legacy_schedules( false );
-
-		do_action(
-			'datamachine_log',
-			array() === $plan['errors'] ? 'info' : 'warning',
-			'Legacy flow schedule migration completed',
-			array(
-				'legacy_actions' => $plan['legacy_actions'],
-				'cancelled'      => $plan['cancelled'],
-				'flows'          => count( $plan['flows'] ),
-				'errors'         => count( $plan['errors'] ),
-			)
-		);
 	}
 
 	/**

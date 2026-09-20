@@ -173,8 +173,6 @@ final class ActivationServiceProvider {
 	 */
 	public static function create_network_agent_tables(): void {
 		\DataMachine\Core\Database\Agents\Agents::create_table();
-		\DataMachine\Core\Database\Agents\Agents::ensure_identity_scope_schema();
-		\DataMachine\Core\Database\Agents\Agents::ensure_site_scope_column();
 		\DataMachine\Core\Database\Agents\AgentAccess::create_table();
 		\DataMachine\Core\Database\Agents\AgentTokens::create_table();
 	}
@@ -189,11 +187,9 @@ final class ActivationServiceProvider {
 
 			$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
 			$db_pipelines->create_table();
-			$db_pipelines->migrate_columns();
 
 			$db_flows = new \DataMachine\Core\Database\Flows\Flows();
 			$db_flows->create_table();
-			$db_flows->migrate_columns();
 
 			$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
 			$db_jobs->create_table();
@@ -212,19 +208,9 @@ final class ActivationServiceProvider {
 			\DataMachine\Core\Database\RunMetadata\RunMetadata::create_table();
 
 			\DataMachine\Core\Database\Chat\Chat::create_table();
-			\DataMachine\Core\Database\Chat\Chat::ensure_owner_columns();
-			\DataMachine\Core\Database\Chat\Chat::ensure_mode_column();
-			\DataMachine\Core\Database\Chat\Chat::ensure_workspace_columns();
-			\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
-			\DataMachine\Core\Database\Chat\Chat::ensure_last_read_at_column();
-			\DataMachine\Core\Database\Chat\Chat::ensure_transcript_lock_columns();
 			\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
 		} catch ( \Throwable $error ) {
 			do_action( 'datamachine_log', 'error', 'Data Machine schema convergence threw an exception', array( 'error' => $error->getMessage() ) );
-			return false;
-		}
-
-		if ( function_exists( 'datamachine_converge_chat_sessions_to_network' ) && ! datamachine_converge_chat_sessions_to_network() ) {
 			return false;
 		}
 
@@ -297,8 +283,8 @@ final class ActivationServiceProvider {
 				'indexes' => array( 'PRIMARY', 'pipeline_id', 'user_id', 'agent_id', 'pipeline_portable_slug' ),
 			),
 			$site . 'datamachine_jobs'             => array(
-				'columns' => array( 'job_id', 'user_id', 'pipeline_id', 'flow_id', 'source', 'label', 'parent_job_id', 'status', 'engine_data', 'handler_slug', 'idempotency_key', 'request_fingerprint', 'operation_state', 'operation_step_id', 'operation_claimed_at', 'operation_claim_token', 'operation_generation', 'operation_action_id', 'operation_ref_hash', 'operation_effects_begun_at', 'operation_envelope', 'terminal_accounting_state', 'terminal_accounting_owner', 'terminal_accounting_claimed_at', 'terminal_accounting_processed_count', 'created_at', 'completed_at' ),
-				'indexes' => array( 'PRIMARY', 'status', 'pipeline_id', 'flow_id', 'source', 'parent_job_id', 'user_id', 'idx_created_at', 'idx_flow_created', 'idx_status_created', 'idx_source_created', 'idx_terminal_accounting', 'idx_idempotency_key', 'idx_operation_ref_hash' ),
+				'columns' => array( 'job_id', 'user_id', 'agent_id', 'pipeline_id', 'flow_id', 'source', 'label', 'parent_job_id', 'status', 'status_reason', 'engine_data', 'task_type', 'handler_slug', 'idempotency_key', 'request_fingerprint', 'operation_state', 'operation_step_id', 'operation_claimed_at', 'operation_claim_token', 'operation_generation', 'operation_action_id', 'operation_ref_hash', 'operation_effects_begun_at', 'operation_envelope', 'terminal_accounting_state', 'terminal_accounting_owner', 'terminal_accounting_claimed_at', 'terminal_accounting_processed_count', 'created_at', 'completed_at' ),
+				'indexes' => array( 'PRIMARY', 'status', 'pipeline_id', 'flow_id', 'source', 'parent_job_id', 'user_id', 'agent_id', 'idx_task_type', 'idx_handler_slug', 'idx_created_at', 'idx_flow_created', 'idx_status_created', 'idx_source_created', 'idx_terminal_accounting', 'idx_idempotency_key', 'idx_operation_ref_hash' ),
 			),
 			$site . 'datamachine_processed_items'  => array(
 				'columns' => array( 'id', 'flow_step_id', 'source_type', 'item_identifier', 'job_id', 'status', 'claim_expires_at', 'claim_token', 'deferral_count', 'last_deferral_job_id', 'deferred_at', 'last_seen_at', 'processed_timestamp' ),
