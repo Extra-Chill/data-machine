@@ -655,35 +655,21 @@ class WakeBriefingTask extends SystemTask {
 	}
 
 	/**
-	 * Resolve the active PHP error log path robustly.
+	 * Resolve the active PHP error log path.
 	 *
-	 * WP_DEBUG_LOG may be a bool (true => canonical wp-content/debug.log) or an
-	 * explicit path string. We also honor a real-file `error_log` ini target.
-	 * Always falls back to WP_CONTENT_DIR/debug.log so a sane default exists.
+	 * WordPress copies WP_DEBUG_LOG (bool true or an explicit path string) into
+	 * the `error_log` ini at boot (wp-includes/load.php). Reading that ini
+	 * value covers both cases without referencing the constant, whose stub
+	 * type is bool and cannot express the documented string-path contract.
 	 *
 	 * @return string Absolute path (may not exist), or '' when undeterminable.
 	 */
 	private function resolveDebugLogPath(): string {
-		// WordPress stubs type WP_DEBUG_LOG as bool, but the documented runtime
-		// contract is bool OR an explicit log path string — handling the string
-		// case is the entire reason this method exists. A direct reference (or
-		// constant() with a literal name) lets static analysis constant-fold to
-		// the stub type and declare the string branch dead. Resolving the name
-		// through a variable keeps the real, wider contract checkable without
-		// suppressing the rule or weakening the stub for everyone else.
-		$debug_log_constant = 'WP_DEBUG_LOG';
-		$debug_log          = defined( $debug_log_constant ) ? constant( $debug_log_constant ) : null;
-		if ( is_string( $debug_log ) && '' !== $debug_log ) {
-			return $debug_log;
-		}
-
 		$ini_path = ini_get( 'error_log' );
 		if ( is_string( $ini_path ) && '' !== $ini_path && 'syslog' !== $ini_path && false === strpos( $ini_path, '://' ) ) {
 			return $ini_path;
 		}
 
-		// WP_CONTENT_DIR is already typed as string by the stubs, so an
-		// is_string() guard here is provably redundant rather than defensive.
 		if ( defined( 'WP_CONTENT_DIR' ) && '' !== WP_CONTENT_DIR ) {
 			return rtrim( WP_CONTENT_DIR, '/\\' ) . '/debug.log';
 		}
