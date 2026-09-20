@@ -33,7 +33,7 @@ class AgentsMdSection {
 			"- Inspect share tracking for a WordPress post: `{$wp} datamachine-socials shares list <post-id>`",
 			'',
 			'**Safety**',
-			'Publishing, replies, deletes, and other mutations affect live social accounts. Confirm the target account, content, and requested action before running them.',
+			'Publishing, replies, deletes, and other mutations write to live social accounts. Confirm the target account, content, and action, then run.',
 			'',
 			'**Discovery**',
 			"Use `{$wp} datamachine-socials --help` for the current platform list and `{$wp} datamachine-socials <platform> --help` for that platform's live actions and options. Live `--help` output is authoritative.",
