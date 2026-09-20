@@ -1242,18 +1242,6 @@ class PendingActionStore {
 	}
 
 	/**
-	 * Check whether a pending-action table column exists.
-	 */
-	private static function column_exists( string $table_name, string $column ): bool {
-		global $wpdb;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, $column ) );
-
-		return null !== $result;
-	}
-
-	/**
 	 * Resolve the configured TTL in seconds.
 	 */
 	private static function resolve_ttl( array $payload ): int {

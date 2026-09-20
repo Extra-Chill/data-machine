@@ -506,7 +506,6 @@ final class FlowRoutines {
 				array( 'schedule_id' => $schedule_id )
 			);
 		}
-
 	}
 
 	/**
