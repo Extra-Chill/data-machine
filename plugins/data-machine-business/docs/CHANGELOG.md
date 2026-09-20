@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.5] - 2026-09-20
+
+### Fixed
+- phrase media-deletion AGENTS.md safety as the dry-run default
+
 ## [0.17.4] - 2026-09-08
 
 ### Changed
