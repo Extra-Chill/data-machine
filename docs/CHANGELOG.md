@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.22] - 2026-09-20
+
+### Changed
+- stop init-time schema ALTER and chat converge
+
 ## [0.176.21] - 2026-09-20
 
 ### Fixed
