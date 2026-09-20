@@ -664,14 +664,15 @@ class WakeBriefingTask extends SystemTask {
 	 * @return string Absolute path (may not exist), or '' when undeterminable.
 	 */
 	private function resolveDebugLogPath(): string {
-		// Read through constant() rather than referencing WP_DEBUG_LOG directly.
-		// WordPress stubs declare this constant as bool, so a direct reference
-		// lets static analysis "prove" is_string() can never be true and mark
-		// every branch below it dead. At runtime the constant is genuinely
-		// either a bool or an explicit log path string, which is the case this
-		// method exists to handle. constant() yields mixed and keeps the real
-		// contract checkable.
-		$debug_log = defined( 'WP_DEBUG_LOG' ) ? constant( 'WP_DEBUG_LOG' ) : null;
+		// WordPress stubs type WP_DEBUG_LOG as bool, but the documented runtime
+		// contract is bool OR an explicit log path string — handling the string
+		// case is the entire reason this method exists. A direct reference (or
+		// constant() with a literal name) lets static analysis constant-fold to
+		// the stub type and declare the string branch dead. Resolving the name
+		// through a variable keeps the real, wider contract checkable without
+		// suppressing the rule or weakening the stub for everyone else.
+		$debug_log_constant = 'WP_DEBUG_LOG';
+		$debug_log          = defined( $debug_log_constant ) ? constant( $debug_log_constant ) : null;
 		if ( is_string( $debug_log ) && '' !== $debug_log ) {
 			return $debug_log;
 		}
@@ -681,7 +682,9 @@ class WakeBriefingTask extends SystemTask {
 			return $ini_path;
 		}
 
-		if ( defined( 'WP_CONTENT_DIR' ) && is_string( WP_CONTENT_DIR ) && '' !== WP_CONTENT_DIR ) {
+		// WP_CONTENT_DIR is already typed as string by the stubs, so an
+		// is_string() guard here is provably redundant rather than defensive.
+		if ( defined( 'WP_CONTENT_DIR' ) && '' !== WP_CONTENT_DIR ) {
 			return rtrim( WP_CONTENT_DIR, '/\\' ) . '/debug.log';
 		}
 
