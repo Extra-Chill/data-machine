@@ -51,6 +51,7 @@ class MultisiteSectionAggregator {
 
 		$stored              = get_option( self::OPTION_NAME, array() );
 		$stored              = is_array( $stored ) ? $stored : array();
+		$previous_snapshot   = is_array( $stored[ $filename ] ?? null ) ? $stored[ $filename ] : array();
 		$stored[ $filename ] = $current_snapshot;
 		update_option( self::OPTION_NAME, $stored, false );
 
@@ -67,6 +68,8 @@ class MultisiteSectionAggregator {
 		$blog_ids[] = $current_blog_id;
 		$blog_ids   = array_values( array_unique( array_filter( array_map( 'intval', (array) $blog_ids ) ) ) );
 		sort( $blog_ids, SORT_NUMERIC );
+
+		self::propagate_dropped_slugs( $filename, $previous_snapshot, $current_snapshot, $blog_ids, $current_blog_id );
 
 		foreach ( $blog_ids as $blog_id ) {
 			if ( $current_blog_id === $blog_id ) {
@@ -111,11 +114,75 @@ class MultisiteSectionAggregator {
 		unset( $section );
 
 		return array(
-			'version'  => self::VERSION,
-			'site_id'  => $blog_id,
-			'site_url' => $site_url,
-			'sections' => $sections,
+			'version'      => self::VERSION,
+			'site_id'      => $blog_id,
+			'site_url'     => $site_url,
+			'generated_at' => time(),
+			'sections'     => $sections,
 		);
+	}
+
+	/**
+	 * Strip slugs this site just dropped from every other site's stored snapshot.
+	 *
+	 * Convention-path files merge by union, so a section retired from shared
+	 * code (mu-plugin, network-activated plugin) stays in the root file until
+	 * every site recomposes. switch_to_blog() cannot rediscover the other
+	 * site's plugins, but we can edit their stored arrays. A slug that left
+	 * this site's previous snapshot is removed from the others so one compose
+	 * converges the network.
+	 *
+	 * Site-specific sections this site never had are left untouched: they
+	 * are absent from $previous, so they are not in $dropped.
+	 *
+	 * @param string               $filename          Composable filename.
+	 * @param array<string,mixed>  $previous_snapshot This site's snapshot before the write.
+	 * @param array<string,mixed>  $current_snapshot  This site's newly written snapshot.
+	 * @param array<int,int>       $blog_ids          Network blog IDs in merge scope.
+	 * @param int                  $current_blog_id   Composing blog ID.
+	 */
+	private static function propagate_dropped_slugs( string $filename, array $previous_snapshot, array $current_snapshot, array $blog_ids, int $current_blog_id ): void {
+		if ( ! function_exists( 'update_blog_option' ) ) {
+			return;
+		}
+
+		$previous_slugs = array_keys( is_array( $previous_snapshot['sections'] ?? null ) ? $previous_snapshot['sections'] : array() );
+		$current_slugs  = array_keys( is_array( $current_snapshot['sections'] ?? null ) ? $current_snapshot['sections'] : array() );
+		$dropped        = array_values( array_diff( $previous_slugs, $current_slugs ) );
+		if ( array() === $dropped ) {
+			return;
+		}
+
+		foreach ( $blog_ids as $blog_id ) {
+			if ( $current_blog_id === $blog_id ) {
+				continue;
+			}
+
+			$site_snapshots = get_blog_option( $blog_id, self::OPTION_NAME, array() );
+			if ( ! is_array( $site_snapshots ) || ! isset( $site_snapshots[ $filename ] ) || ! is_array( $site_snapshots[ $filename ] ) ) {
+				continue;
+			}
+
+			$sections = $site_snapshots[ $filename ]['sections'] ?? null;
+			if ( ! is_array( $sections ) ) {
+				continue;
+			}
+
+			$changed = false;
+			foreach ( $dropped as $slug ) {
+				if ( isset( $sections[ $slug ] ) ) {
+					unset( $sections[ $slug ] );
+					$changed = true;
+				}
+			}
+
+			if ( ! $changed ) {
+				continue;
+			}
+
+			$site_snapshots[ $filename ]['sections'] = $sections;
+			update_blog_option( $blog_id, self::OPTION_NAME, $site_snapshots );
+		}
 	}
 
 	/**

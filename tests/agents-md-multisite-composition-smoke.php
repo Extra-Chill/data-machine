@@ -71,6 +71,11 @@ namespace {
 		return $GLOBALS['site_options'][ $blog_id ][ $name ] ?? $default;
 	}
 
+	function update_blog_option( int $blog_id, string $name, mixed $value ): bool {
+		$GLOBALS['site_options'][ $blog_id ][ $name ] = $value;
+		return true;
+	}
+
 	function assert_true( bool $condition, string $message ): void {
 		if ( ! $condition ) {
 			throw new \RuntimeException( $message );
@@ -118,6 +123,49 @@ namespace {
 	$after_removal = \DataMachine\Engine\AI\MultisiteSectionAggregator::compose( 'AGENTS.md' );
 	assert_true( str_contains( $after_removal, 'Provider One' ), 'refreshing one site does not erase another site' );
 	assert_true( ! str_contains( $after_removal, 'Provider Two' ), 'current site snapshot removes inactive providers' );
+
+	// #3529: a shared section retired from this site must leave the merged
+	// file even when another site has not recomposed and still stores it.
+	\DataMachine\Engine\AI\SectionRegistry::$sections = array(
+		1 => array(
+			'shared-retired' => array(
+				'slug'     => 'shared-retired',
+				'priority' => 10,
+				'content'  => "## Shared Retired\nwas live on both sites",
+			),
+			'provider-one'   => array(
+				'slug'     => 'provider-one',
+				'priority' => 20,
+				'content'  => "## Provider One\n`wp still here`",
+			),
+		),
+		2 => array(
+			'shared-retired' => array(
+				'slug'     => 'shared-retired',
+				'priority' => 10,
+				'content'  => "## Shared Retired\nwas live on both sites",
+			),
+		),
+	);
+	$GLOBALS['current_blog_id'] = 1;
+	\DataMachine\Engine\AI\MultisiteSectionAggregator::compose( 'AGENTS.md' );
+	$GLOBALS['current_blog_id'] = 2;
+	\DataMachine\Engine\AI\MultisiteSectionAggregator::compose( 'AGENTS.md' );
+
+	\DataMachine\Engine\AI\SectionRegistry::$sections[1] = array(
+		'provider-one' => array(
+			'slug'     => 'provider-one',
+			'priority' => 20,
+			'content'  => "## Provider One\n`wp still here`",
+		),
+	);
+	$GLOBALS['current_blog_id'] = 1;
+	$after_shared_drop          = \DataMachine\Engine\AI\MultisiteSectionAggregator::compose( 'AGENTS.md' );
+	assert_true( str_contains( $after_shared_drop, 'Provider One' ), 'site-owned section survives a shared-section retirement' );
+	assert_true( ! str_contains( $after_shared_drop, 'Shared Retired' ), 'dropping a slug this site previously rendered strips it from other sites\' stored snapshots' );
+
+	$site_two_store = get_blog_option( 2, 'datamachine_composable_section_snapshots', array() );
+	assert_true( ! isset( $site_two_store['AGENTS.md']['sections']['shared-retired'] ), 'other site snapshot no longer stores the retired slug' );
 
 	fwrite( STDOUT, "Multisite AGENTS.md composition smoke passed.\n" );
 }
