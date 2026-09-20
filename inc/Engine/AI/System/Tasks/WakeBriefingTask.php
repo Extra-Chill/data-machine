@@ -179,7 +179,7 @@ class WakeBriefingTask extends SystemTask {
 		$write  = $memory->replace_all( $content );
 
 		if ( empty( $write['success'] ) ) {
-			$this->failJob( $jobId, $write['message'] ?? 'Failed to write wake briefing.' );
+			$this->failJob( $jobId, $write['message'] );
 			return;
 		}
 
@@ -576,40 +576,27 @@ class WakeBriefingTask extends SystemTask {
 			fgets( $handle ); // Discard the partial first line after the seek.
 		}
 
-		$groups  = array(); // signature => [ 'count' => int, 'sample' => string ].
-		$total   = 0;
+		// First pass: split the tail into discrete (possibly multi-line) log
+		// entries via a plain collect-as-you-go array, not a by-reference
+		// `use (&$current)` closure flushed mid-loop. PHPStan cannot soundly
+		// narrow the type of a variable that is both read/reset inside a
+		// closure literal and mutated by the surrounding loop after that
+		// literal — it infers the variable as permanently stuck at its
+		// value from the closure-definition site, which made every branch
+		// below look like dead code reachable only through an
+		// always-null/always-zero state. Collecting entries first, then
+		// grouping them in a second, ordinary loop keeps every state
+		// transition inside straight-line control flow that is both
+		// correct and statically checkable.
+		$entries = array();
 		$current = null;
-
-		$flush = function () use ( &$current, &$groups, &$total, $since_ts ) {
-			if ( null === $current ) {
-				return;
-			}
-			$entry   = $current;
-			$current = null;
-
-			if ( null !== $entry['ts'] && $entry['ts'] < $since_ts ) {
-				return;
-			}
-
-			$norm = $this->normalizeFatal( $entry['raw'] );
-			if ( null === $norm ) {
-				return;
-			}
-
-			++$total;
-			if ( ! isset( $groups[ $norm['signature'] ] ) ) {
-				$groups[ $norm['signature'] ] = array(
-					'count'  => 0,
-					'sample' => $norm['sample'],
-				);
-			}
-			++$groups[ $norm['signature'] ]['count'];
-		};
 
 		for ( $line = fgets( $handle ); false !== $line; $line = fgets( $handle ) ) {
 			$ts = $this->parseLogTimestamp( $line );
 			if ( null !== $ts || ( '' !== $line && '[' === $line[0] ) ) {
-				$flush();
+				if ( null !== $current ) {
+					$entries[] = $current;
+				}
 				$current = array(
 					'ts'  => $ts,
 					'raw' => rtrim( $line, "\r\n" ),
@@ -620,10 +607,36 @@ class WakeBriefingTask extends SystemTask {
 				$current['raw'] .= "\n" . rtrim( $line, "\r\n" );
 			}
 		}
-		$flush();
+		if ( null !== $current ) {
+			$entries[] = $current;
+		}
 		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
-		if ( 0 === $total || empty( $groups ) ) {
+		// Second pass: filter to the rolling window, normalize, and group.
+		$groups = array(); // signature => [ 'count' => int, 'sample' => string ].
+		$total  = 0;
+
+		foreach ( $entries as $entry ) {
+			if ( null !== $entry['ts'] && $entry['ts'] < $since_ts ) {
+				continue;
+			}
+
+			$norm = $this->normalizeFatal( $entry['raw'] );
+			if ( null === $norm ) {
+				continue;
+			}
+
+			++$total;
+			if ( ! isset( $groups[ $norm['signature'] ] ) ) {
+				$groups[ $norm['signature'] ] = array(
+					'count'  => 0,
+					'sample' => $norm['sample'],
+				);
+			}
+			++$groups[ $norm['signature'] ]['count'];
+		}
+
+		if ( empty( $groups ) ) {
 			return '';
 		}
 
