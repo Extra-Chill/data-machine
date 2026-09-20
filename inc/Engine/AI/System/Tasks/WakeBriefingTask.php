@@ -179,7 +179,7 @@ class WakeBriefingTask extends SystemTask {
 		$write  = $memory->replace_all( $content );
 
 		if ( empty( $write['success'] ) ) {
-			$this->failJob( $jobId, $write['message'] ?? 'Failed to write wake briefing.' );
+			$this->failJob( $jobId, $write['message'] );
 			return;
 		}
 
@@ -241,10 +241,16 @@ class WakeBriefingTask extends SystemTask {
 	/**
 	 * Gather threshold-crossing signal lines for the current blog only.
 	 *
-	 * @param string $since Window start (UTC).
+	 * @param string $since       Window start (UTC).
+	 * @param bool   $scan_fatals Whether to include the debug.log PHP-fatals
+	 *                            scan in this call. `false` when the caller
+	 *                            (gatherNetworkSignals()) is about to run that
+	 *                            scan exactly once at network scope instead of
+	 *                            once per site — see gatherNetworkSignals()
+	 *                            docblock for why.
 	 * @return string[] Terse signal lines (may be empty).
 	 */
-	private function gatherSiteSignals( string $since ): array {
+	private function gatherSiteSignals( string $since, bool $scan_fatals = true ): array {
 		$signals = array();
 
 		$failing = $this->getRepeatedJobFailures( $since );
@@ -262,9 +268,11 @@ class WakeBriefingTask extends SystemTask {
 			$signals[] = $errors;
 		}
 
-		$fatals = $this->getPhpFatals( $since );
-		if ( ! empty( $fatals ) ) {
-			$signals[] = $fatals;
+		if ( $scan_fatals ) {
+			$fatals = $this->getPhpFatals( $since );
+			if ( ! empty( $fatals ) ) {
+				$signals[] = $fatals;
+			}
 		}
 
 		// Disk is host-global; emit it once per run, not once per blog.
@@ -294,8 +302,33 @@ class WakeBriefingTask extends SystemTask {
 	}
 
 	/**
-	 * Gather signals across every site in the network, one labeled line per
-	 * site that has anything to report.
+	 * Gather signals across every site in the network: one hoisted
+	 * network-wide line for host-global facts, plus one labeled line per
+	 * site that has anything genuinely site-specific to report.
+	 *
+	 * ## Why PHP fatals are scanned once here, not once per site
+	 *
+	 * `wp-content/debug.log` is a single file shared by every site on a
+	 * multisite network — WP_CONTENT_DIR is network-wide and
+	 * resolveDebugLogPath() never reads a per-site option. So calling
+	 * getPhpFatals() under the per-blog switch_to_blog() loop below does not
+	 * just risk duplicate *lines*; it re-reads and re-parses the same up-to-
+	 * 5MB tail N times for an identical result every time (see
+	 * https://github.com/Extra-Chill/data-machine/issues/3522). Rather than
+	 * scanning N times and then deduping N identical strings back down to
+	 * one, this scans once, at network scope, before the per-site loop, and
+	 * excludes it from each per-site gatherSiteSignals() call via
+	 * `$scan_fatals = false`. That is the root fix: no per-site fact is lost
+	 * (fatals were never a per-site fact to begin with — the same signature
+	 * and count would surface under any site chosen), and the I/O cost drops
+	 * from O(sites) to O(1) per run.
+	 *
+	 * A true "identical on N/N sites" heuristic was considered and rejected:
+	 * it would still pay the cost of scanning the file N times just to
+	 * discover the signatures are identical, and — because the file is
+	 * structurally shared, not coincidentally identical — there is no
+	 * meaningful "different" case for a same-vs-different threshold to guard
+	 * against.
 	 *
 	 * Runs the same per-site pulse queries under switch_to_blog() and collapses
 	 * each site's signals into a single site-tagged line. Sites with nothing to
@@ -303,11 +336,18 @@ class WakeBriefingTask extends SystemTask {
 	 * would defeat the 3-second-glance bar on a large network).
 	 *
 	 * @param string $since Window start (UTC).
-	 * @return string[] Per-site signal lines (may be empty when the whole
-	 *                  network is quiet).
+	 * @return string[] Network-wide line (if any) followed by per-site signal
+	 *                  lines (may be empty when the whole network is quiet).
 	 */
 	private function gatherNetworkSignals( string $since ): array {
 		$lines = array();
+
+		// Host-global: the shared debug.log is scanned exactly once here,
+		// ahead of the per-site loop — see docblock above.
+		$fatals = $this->getPhpFatals( $since );
+		if ( ! empty( $fatals ) ) {
+			$lines[] = sprintf( '**network-wide** — %s', $fatals );
+		}
 
 		$sites = get_sites(
 			array(
@@ -323,7 +363,7 @@ class WakeBriefingTask extends SystemTask {
 			$blog_id = (int) $blog_id;
 			switch_to_blog( $blog_id );
 			try {
-				$site_signals = $this->gatherSiteSignals( $since );
+				$site_signals = $this->gatherSiteSignals( $since, false );
 				$label        = $this->siteLabel( $blog_id );
 			} finally {
 				restore_current_blog();
@@ -536,40 +576,27 @@ class WakeBriefingTask extends SystemTask {
 			fgets( $handle ); // Discard the partial first line after the seek.
 		}
 
-		$groups  = array(); // signature => [ 'count' => int, 'sample' => string ].
-		$total   = 0;
+		// First pass: split the tail into discrete (possibly multi-line) log
+		// entries via a plain collect-as-you-go array, not a by-reference
+		// `use (&$current)` closure flushed mid-loop. PHPStan cannot soundly
+		// narrow the type of a variable that is both read/reset inside a
+		// closure literal and mutated by the surrounding loop after that
+		// literal — it infers the variable as permanently stuck at its
+		// value from the closure-definition site, which made every branch
+		// below look like dead code reachable only through an
+		// always-null/always-zero state. Collecting entries first, then
+		// grouping them in a second, ordinary loop keeps every state
+		// transition inside straight-line control flow that is both
+		// correct and statically checkable.
+		$entries = array();
 		$current = null;
-
-		$flush = function () use ( &$current, &$groups, &$total, $since_ts ) {
-			if ( null === $current ) {
-				return;
-			}
-			$entry   = $current;
-			$current = null;
-
-			if ( null !== $entry['ts'] && $entry['ts'] < $since_ts ) {
-				return;
-			}
-
-			$norm = $this->normalizeFatal( $entry['raw'] );
-			if ( null === $norm ) {
-				return;
-			}
-
-			++$total;
-			if ( ! isset( $groups[ $norm['signature'] ] ) ) {
-				$groups[ $norm['signature'] ] = array(
-					'count'  => 0,
-					'sample' => $norm['sample'],
-				);
-			}
-			++$groups[ $norm['signature'] ]['count'];
-		};
 
 		for ( $line = fgets( $handle ); false !== $line; $line = fgets( $handle ) ) {
 			$ts = $this->parseLogTimestamp( $line );
 			if ( null !== $ts || ( '' !== $line && '[' === $line[0] ) ) {
-				$flush();
+				if ( null !== $current ) {
+					$entries[] = $current;
+				}
 				$current = array(
 					'ts'  => $ts,
 					'raw' => rtrim( $line, "\r\n" ),
@@ -580,10 +607,36 @@ class WakeBriefingTask extends SystemTask {
 				$current['raw'] .= "\n" . rtrim( $line, "\r\n" );
 			}
 		}
-		$flush();
+		if ( null !== $current ) {
+			$entries[] = $current;
+		}
 		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
-		if ( 0 === $total || empty( $groups ) ) {
+		// Second pass: filter to the rolling window, normalize, and group.
+		$groups = array(); // signature => [ 'count' => int, 'sample' => string ].
+		$total  = 0;
+
+		foreach ( $entries as $entry ) {
+			if ( null !== $entry['ts'] && $entry['ts'] < $since_ts ) {
+				continue;
+			}
+
+			$norm = $this->normalizeFatal( $entry['raw'] );
+			if ( null === $norm ) {
+				continue;
+			}
+
+			++$total;
+			if ( ! isset( $groups[ $norm['signature'] ] ) ) {
+				$groups[ $norm['signature'] ] = array(
+					'count'  => 0,
+					'sample' => $norm['sample'],
+				);
+			}
+			++$groups[ $norm['signature'] ]['count'];
+		}
+
+		if ( empty( $groups ) ) {
 			return '';
 		}
 
@@ -602,25 +655,22 @@ class WakeBriefingTask extends SystemTask {
 	}
 
 	/**
-	 * Resolve the active PHP error log path robustly.
+	 * Resolve the active PHP error log path.
 	 *
-	 * WP_DEBUG_LOG may be a bool (true => canonical wp-content/debug.log) or an
-	 * explicit path string. We also honor a real-file `error_log` ini target.
-	 * Always falls back to WP_CONTENT_DIR/debug.log so a sane default exists.
+	 * WordPress copies WP_DEBUG_LOG (bool true or an explicit path string) into
+	 * the `error_log` ini at boot (wp-includes/load.php). Reading that ini
+	 * value covers both cases without referencing the constant, whose stub
+	 * type is bool and cannot express the documented string-path contract.
 	 *
 	 * @return string Absolute path (may not exist), or '' when undeterminable.
 	 */
 	private function resolveDebugLogPath(): string {
-		if ( defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG ) && '' !== WP_DEBUG_LOG ) {
-			return WP_DEBUG_LOG;
-		}
-
 		$ini_path = ini_get( 'error_log' );
 		if ( is_string( $ini_path ) && '' !== $ini_path && 'syslog' !== $ini_path && false === strpos( $ini_path, '://' ) ) {
 			return $ini_path;
 		}
 
-		if ( defined( 'WP_CONTENT_DIR' ) && is_string( WP_CONTENT_DIR ) && '' !== WP_CONTENT_DIR ) {
+		if ( defined( 'WP_CONTENT_DIR' ) && '' !== WP_CONTENT_DIR ) {
 			return rtrim( WP_CONTENT_DIR, '/\\' ) . '/debug.log';
 		}
 
