@@ -39,6 +39,7 @@ final class CliServiceProvider {
 			'datamachine flows'            => \DataMachine\Cli\Commands\Flows\FlowsCommand::class,
 			'datamachine alt-text'         => \DataMachine\Cli\Commands\AltTextCommand::class,
 			'datamachine jobs'             => \DataMachine\Cli\Commands\JobsCommand::class,
+			'datamachine migrate'          => \DataMachine\Cli\Commands\MigrateCommand::class,
 			'datamachine cycle'            => \DataMachine\Cli\Commands\CycleCommand::class,
 			'datamachine drain'            => \DataMachine\Cli\Commands\DrainCommand::class,
 			'datamachine worker'           => \DataMachine\Cli\Commands\WorkerCommand::class,

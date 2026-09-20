@@ -4124,7 +4124,7 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
-	 * Add status_reason column and backfill compound status rows.
+	 * Add status_reason column. Row backfill is operator-run via MigrationRunner.
 	 *
 	 * Splits legacy `"<status> - <detail>"` / `"<status>:<detail>"` values at the
 	 * first established separator so `status` stays a bounded vocabulary while
@@ -4135,38 +4135,33 @@ class Jobs extends BaseRepository {
 	private static function migrate_status_reason_column( string $table_name ): void {
 		global $wpdb;
 
-		if ( get_option( 'datamachine_status_reason_backfill_v1' ) ) {
+		if ( BaseRepository::column_exists( $table_name, 'status_reason', $wpdb ) ) {
 			return;
 		}
 
-		if ( ! BaseRepository::column_exists( $table_name, 'status_reason', $wpdb ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$result = $wpdb->query(
-				$wpdb->prepare(
-					'ALTER TABLE %i
-					 ADD COLUMN status_reason longtext NULL',
-					$table_name
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$result = $wpdb->query(
+			$wpdb->prepare(
+				'ALTER TABLE %i
+				 ADD COLUMN status_reason longtext NULL',
+				$table_name
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( false === $result && ! BaseRepository::column_exists( $table_name, 'status_reason', $wpdb ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to add status_reason column to jobs table',
+				array(
+					'table_name' => $table_name,
+					'db_error'   => $wpdb->last_error,
 				)
 			);
-			// phpcs:enable WordPress.DB.PreparedSQL
-
-			if ( false === $result && ! BaseRepository::column_exists( $table_name, 'status_reason', $wpdb ) ) {
-				do_action(
-					'datamachine_log',
-					'error',
-					'Failed to add status_reason column to jobs table',
-					array(
-						'table_name' => $table_name,
-						'db_error'   => $wpdb->last_error,
-					)
-				);
-				return;
-			}
+			return;
 		}
-
-		self::backfill_status_reason_column( $table_name, $wpdb );
-		update_option( 'datamachine_status_reason_backfill_v1', 1, false );
 
 		do_action(
 			'datamachine_log',
@@ -4177,102 +4172,12 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
-	 * Split compound statuses and copy existing JSON reasons into status_reason.
-	 *
-	 * @param string $table_name Fully qualified table name.
-	 * @param \wpdb  $wpdb       Database handle.
-	 */
-	private static function backfill_status_reason_column( string $table_name, \wpdb $wpdb ): void {
-		$canonical = JobStatus::ALL_STATUSES;
-		$like      = '%' . $wpdb->esc_like( '"job_status_reason"' ) . '%';
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders -- Bounded plugin-owned jobs table backfill.
-		$max_id     = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(job_id) FROM %i', $table_name ) );
-		$chunk_size = 5000;
-
-		for ( $start = 0; $start < $max_id; $start += $chunk_size ) {
-			$end          = $start + $chunk_size;
-			$placeholders = implode( ', ', array_fill( 0, count( $canonical ), '%s' ) );
-			$rows         = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT job_id, status, engine_data
-					 FROM %i
-					 WHERE job_id > %d AND job_id <= %d
-					 AND ( status NOT IN ({$placeholders}) OR ( status_reason IS NULL AND engine_data IS NOT NULL AND engine_data LIKE %s ) )",
-					array_merge( array( $table_name, $start, $end ), $canonical, array( $like ) )
-				),
-				ARRAY_A
-			);
-
-			if ( empty( $rows ) ) {
-				continue;
-			}
-
-			foreach ( $rows as $row ) {
-				self::backfill_status_reason_row( $table_name, $wpdb, $row );
-			}
-		}
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL,WordPress.DB.PreparedSQLPlaceholders
-	}
-
-	/**
-	 * Persist one row's bounded status and preserved detail.
-	 *
-	 * @param string               $table_name Fully qualified table name.
-	 * @param \wpdb                $wpdb       Database handle.
-	 * @param array<string, mixed> $row        Candidate job row.
-	 */
-	private static function backfill_status_reason_row( string $table_name, \wpdb $wpdb, array $row ): void {
-		$job_id = (int) ( $row['job_id'] ?? 0 );
-		if ( $job_id <= 0 ) {
-			return;
-		}
-
-		$parsed = JobStatus::fromString( (string) ( $row['status'] ?? '' ) );
-		if ( ! $parsed->isCanonical() ) {
-			return;
-		}
-
-		$stored_engine = $row['engine_data'] ?? null;
-		$engine        = null === $stored_engine || '' === $stored_engine ? array() : json_decode( (string) $stored_engine, true );
-		if ( ! is_array( $engine ) ) {
-			$engine = array();
-		}
-
-		$storage = $parsed->toStorage();
-		$reason  = $storage['status_reason'];
-		if ( null === $reason || '' === $reason ) {
-			$reason = is_string( $engine['job_status_reason'] ?? null ) ? $engine['job_status_reason'] : null;
-		}
-		if ( null !== $reason && '' !== $reason ) {
-			$engine['job_status_reason'] = $reason;
-		}
-
-		$encoded = wp_json_encode( $engine );
-		if ( ! is_string( $encoded ) ) {
-			return;
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time status_reason backfill of a plugin-owned jobs row.
-		$wpdb->update(
-			$table_name,
-			array(
-				'status'        => $storage['status'],
-				'status_reason' => ( null !== $reason && '' !== $reason ) ? $reason : null,
-				'engine_data'   => $encoded,
-			),
-			array( 'job_id' => $job_id ),
-			array( '%s', ( null !== $reason && '' !== $reason ) ? '%s' : null, '%s' ),
-			array( '%d' )
-		);
-	}
-
-	/**
 	 * Add task_type column for indexed system task lookups.
 	 *
 	 * Replaces JSON_EXTRACT(engine_data, '$.task_type') queries with a proper
 	 * indexed column. The column is populated by store_engine_data() when the
-	 * engine snapshot contains a task_type key, and backfilled from existing
-	 * engine_data on migration.
+	 * engine snapshot contains a task_type key. Existing rows are backfilled
+	 * by MigrationRunner (jobs.task-type-backfill), not from create_table().
 	 *
 	 * @since 0.30.0
 	 *
@@ -4311,36 +4216,6 @@ class Jobs extends BaseRepository {
 			return;
 		}
 
-		// Backfill task_type from engine_data for existing system/pipeline_system_task jobs.
-		// Uses PHP json_decode instead of MySQL JSON_UNQUOTE for SQLite compatibility.
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$backfill_rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT job_id, engine_data
-				 FROM %i
-				 WHERE source IN ('system', 'pipeline_system_task')
-				 AND engine_data IS NOT NULL
-				 AND task_type IS NULL",
-				$table_name
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL
-
-		foreach ( $backfill_rows as $row ) {
-			$engine_data = json_decode( $row->engine_data, true );
-			$task_type   = $engine_data['task_type'] ?? null;
-
-			if ( $task_type ) {
-				$wpdb->update(
-					$table_name,
-					array( 'task_type' => $task_type ),
-					array( 'job_id' => $row->job_id ),
-					array( '%s' ),
-					array( '%d' )
-				);
-			}
-		}
-
 		do_action(
 			'datamachine_log',
 			'info',
@@ -4357,10 +4232,9 @@ class Jobs extends BaseRepository {
 	 * engine_data longtext from terminal jobs without losing the handler stats
 	 * and filtering that previously REGEXP_SUBSTR-scanned the blob (#2622).
 	 *
-	 * The column is populated by store_engine_data() going forward and
-	 * backfilled here from existing engine_data on migration. Backfill runs in
-	 * bounded id-ranged chunks so it never loads or rewrites the whole table at
-	 * once on large installs.
+	 * The column is populated by store_engine_data() going forward.
+	 * Existing rows are backfilled by MigrationRunner (jobs.handler-slug-backfill),
+	 * not from create_table().
 	 *
 	 * @since TBD
 	 *
@@ -4397,54 +4271,6 @@ class Jobs extends BaseRepository {
 				)
 			);
 			return;
-		}
-
-		// Backfill handler_slug from engine_data in bounded id-ranged chunks.
-		// Uses PHP regex (not MySQL REGEXP) for SQLite compatibility, and walks
-		// job_id ranges so memory stays flat regardless of table size.
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$max_id     = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(job_id) FROM %i', $table_name ) );
-		$chunk_size = 5000;
-		// phpcs:enable WordPress.DB.PreparedSQL
-
-		for ( $start = 0; $start < $max_id; $start += $chunk_size ) {
-			$end = $start + $chunk_size;
-
-			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-			$rows = $wpdb->get_results(
-				$wpdb->prepare(
-					'SELECT job_id, engine_data
-					 FROM %i
-					 WHERE job_id > %d AND job_id <= %d
-					 AND engine_data IS NOT NULL
-					 AND engine_data LIKE %s
-					 AND handler_slug IS NULL',
-					$table_name,
-					$start,
-					$end,
-					'%' . $wpdb->esc_like( '"handler_slug"' ) . '%'
-				)
-			);
-			// phpcs:enable WordPress.DB.PreparedSQL
-
-			if ( empty( $rows ) ) {
-				continue;
-			}
-
-			foreach ( $rows as $row ) {
-				$handler_slug = self::extract_handler_slug( (string) $row->engine_data );
-				if ( '' === $handler_slug ) {
-					continue;
-				}
-
-				$wpdb->update(
-					$table_name,
-					array( 'handler_slug' => $handler_slug ),
-					array( 'job_id' => $row->job_id ),
-					array( '%s' ),
-					array( '%d' )
-				);
-			}
 		}
 
 		do_action(
