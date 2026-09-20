@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.21] - 2026-09-20
+
+### Fixed
+- invalidate retired AGENTS.md sections across multisite snapshots
+- scan the shared debug.log once at network scope, not per site
+
 ## [0.176.20] - 2026-09-20
 
 ### Fixed
