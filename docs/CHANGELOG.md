@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.176.20] - 2026-09-20
+
+### Fixed
+- run jobs table backfills through an operator-only migrations API
+
 ## [0.176.19] - 2026-09-20
 
 ### Fixed
