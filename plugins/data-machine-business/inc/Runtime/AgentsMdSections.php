@@ -61,7 +61,7 @@ Data Machine Business owns analytics, revenue, performance, and media-maintenanc
 - Media diagnostics and cleanup: `{$wp} datamachine media <action>`
 
 **Safety**
-Media deletion actions are dry runs unless explicitly passed `--apply`.
+Media deletion actions default to dry runs. Pass `--apply` to execute a deletion.
 
 **Discovery**
 Use `{$wp} datamachine --help` for the live command map, `{$wp} datamachine analytics --help` for analytics integrations, and the relevant nested `--help` for current actions. Use `{$wp} help <command>` for a command's complete positional arguments and options. Live help is authoritative.
