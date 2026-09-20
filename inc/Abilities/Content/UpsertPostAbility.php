@@ -686,6 +686,32 @@ class UpsertPostAbility {
 		if ( null !== $original_date_gmt ) {
 			$post_data['post_date_gmt'] = $original_date_gmt;
 			$post_data['post_date']     = get_date_from_gmt( $original_date_gmt );
+		} elseif ( $post instanceof \WP_Post && '0000-00-00 00:00:00' !== $post->post_date ) {
+			/*
+			 * Carry the stored publication date forward.
+			 *
+			 * Updates here go through wp_insert_post() with an ID rather than
+			 * wp_update_post(), because the reservation flow needs the insert
+			 * path. wp_update_post() is the function that merges omitted
+			 * fields with the existing row; wp_insert_post() does not, and
+			 * wp_resolve_post_date() has no update branch:
+			 *
+			 *   // If the date is empty, set the date to now.
+			 *   if ( empty( $post_date ) || '0000-00-00 00:00:00' === $post_date ) {
+			 *
+			 * So omitting post_date on an update silently restamps the post to
+			 * the moment of the write. For a caller that re-upserts unchanged
+			 * content on a schedule, that rewrites the date every pass, fires
+			 * post_updated, and turns a no-op into a publish -> publish
+			 * transition for everything listening.
+			 *
+			 * Measured on the events site before this fix: 37,703 posts
+			 * carrying _wp_old_date, one with six separate rewrites.
+			 */
+			$post_data['post_date'] = $post->post_date;
+			if ( '0000-00-00 00:00:00' !== $post->post_date_gmt ) {
+				$post_data['post_date_gmt'] = $post->post_date_gmt;
+			}
 		}
 
 		if ( $existing_id > 0 ) {
