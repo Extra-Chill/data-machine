@@ -1173,6 +1173,12 @@ class MemoryCommand extends BaseCommand {
 	 * [--list]
 	 * : List registered sections instead of regenerating.
 	 *
+	 * [--all-sites]
+	 * : Multisite only. Recompose on every public site via a fresh WP-CLI
+	 *   process with that site's --url, so each site's plugins are actually
+	 *   loaded. switch_to_blog() cannot do this. Use after retiring a
+	 *   section, or when a site has never seeded its snapshot.
+	 *
 	 * [--format=<format>]
 	 * : Output format for --list.
 	 * ---
@@ -1192,6 +1198,9 @@ class MemoryCommand extends BaseCommand {
 	 *     # Regenerate a specific file
 	 *     wp datamachine memory compose AGENTS.md
 	 *
+	 *     # Regenerate AGENTS.md on every site in the network
+	 *     wp datamachine memory compose AGENTS.md --all-sites
+	 *
 	 *     # List registered sections for a file
 	 *     wp datamachine memory compose --list AGENTS.md
 	 *
@@ -1201,11 +1210,20 @@ class MemoryCommand extends BaseCommand {
 	 * @subcommand compose
 	 */
 	public function compose( array $args, array $assoc_args ): void {
-		$filename = $args[0] ?? '';
-		$list     = \WP_CLI\Utils\get_flag_value( $assoc_args, 'list', false );
+		$filename  = $args[0] ?? '';
+		$list      = \WP_CLI\Utils\get_flag_value( $assoc_args, 'list', false );
+		$all_sites = \WP_CLI\Utils\get_flag_value( $assoc_args, 'all-sites', false );
 
 		if ( $list ) {
+			if ( $all_sites ) {
+				WP_CLI::error( '--all-sites cannot be combined with --list.' );
+			}
 			$this->compose_list( $filename, $assoc_args );
+			return;
+		}
+
+		if ( $all_sites ) {
+			$this->compose_all_sites( $filename, $assoc_args );
 			return;
 		}
 
@@ -1257,6 +1275,103 @@ class MemoryCommand extends BaseCommand {
 				CallerLivenessMonitor::stop();
 			}
 		}
+	}
+
+	/**
+	 * Recompose on every public site through a fresh WP-CLI process.
+	 *
+	 * Each subprocess uses that site's home URL so its plugins load. A site
+	 * whose home URL is domain-mapped onto a different blog is skipped and
+	 * reported: composing it would refresh the mapped blog twice and never
+	 * the unreachable one. Dropped-slug propagation in MultisiteSectionAggregator
+	 * still converges retired sections from that unreachable snapshot.
+	 *
+	 * @param string $filename   Optional composable filename.
+	 * @param array  $assoc_args Original assoc args (agent flags, etc).
+	 */
+	private function compose_all_sites( string $filename, array $assoc_args ): void {
+		if ( ! is_multisite() ) {
+			WP_CLI::error( '--all-sites requires WordPress multisite.' );
+		}
+
+		$sites = get_sites(
+			array(
+				'number'   => 0,
+				'archived' => 0,
+				'deleted'  => 0,
+				'spam'     => 0,
+			)
+		);
+
+		$failures   = 0;
+		$skipped    = 0;
+		$seen_hosts = array();
+
+		foreach ( $sites as $site ) {
+			$blog_id = (int) $site->blog_id;
+			$url     = untrailingslashit( (string) get_home_url( $blog_id, '/' ) );
+			$host    = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+
+			if ( '' !== $host && isset( $seen_hosts[ $host ] ) ) {
+				WP_CLI::warning(
+					sprintf(
+						'Skipping blog %d (%s): host already composed as blog %d. This site is unreachable via --url and cannot refresh its own snapshot.',
+						$blog_id,
+						$url,
+						$seen_hosts[ $host ]
+					)
+				);
+				++$skipped;
+				continue;
+			}
+			if ( '' !== $host ) {
+				$seen_hosts[ $host ] = $blog_id;
+			}
+
+			$command = 'datamachine memory compose';
+			if ( '' !== $filename ) {
+				$command .= ' ' . escapeshellarg( $filename );
+			}
+			if ( ! empty( $assoc_args['agent'] ) ) {
+				$command .= ' --agent=' . escapeshellarg( (string) $assoc_args['agent'] );
+			}
+			$command .= ' --url=' . escapeshellarg( $url );
+
+			WP_CLI::log( sprintf( 'Composing blog %d (%s)', $blog_id, $url ) );
+
+			$result = WP_CLI::runcommand(
+				$command,
+				array(
+					'return'     => 'all',
+					'exit_error' => false,
+					'launch'     => true,
+				)
+			);
+
+			$return_code = is_object( $result ) ? (int) ( $result->return_code ?? 1 ) : 1;
+			if ( 0 !== $return_code ) {
+				++$failures;
+				$stderr = is_object( $result ) ? trim( (string) ( $result->stderr ?? '' ) ) : '';
+				WP_CLI::warning(
+					sprintf(
+						'Blog %d failed%s',
+						$blog_id,
+						'' !== $stderr ? ': ' . $stderr : '.'
+					)
+				);
+			}
+		}
+
+		if ( $failures > 0 ) {
+			WP_CLI::error( sprintf( 'Compose finished with %d failure(s), %d skipped.', $failures, $skipped ) );
+		}
+
+		WP_CLI::success(
+			sprintf(
+				'Composed on every reachable site (%d skipped as unreachable).',
+				$skipped
+			)
+		);
 	}
 
 	/**
