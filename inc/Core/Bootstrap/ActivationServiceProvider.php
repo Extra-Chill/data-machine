@@ -173,8 +173,6 @@ final class ActivationServiceProvider {
 	 */
 	public static function create_network_agent_tables(): void {
 		\DataMachine\Core\Database\Agents\Agents::create_table();
-		\DataMachine\Core\Database\Agents\Agents::ensure_identity_scope_schema();
-		\DataMachine\Core\Database\Agents\Agents::ensure_site_scope_column();
 		\DataMachine\Core\Database\Agents\AgentAccess::create_table();
 		\DataMachine\Core\Database\Agents\AgentTokens::create_table();
 	}
@@ -189,11 +187,9 @@ final class ActivationServiceProvider {
 
 			$db_pipelines = new \DataMachine\Core\Database\Pipelines\Pipelines();
 			$db_pipelines->create_table();
-			$db_pipelines->migrate_columns();
 
 			$db_flows = new \DataMachine\Core\Database\Flows\Flows();
 			$db_flows->create_table();
-			$db_flows->migrate_columns();
 
 			$db_jobs = new \DataMachine\Core\Database\Jobs\Jobs();
 			$db_jobs->create_table();
@@ -212,19 +208,9 @@ final class ActivationServiceProvider {
 			\DataMachine\Core\Database\RunMetadata\RunMetadata::create_table();
 
 			\DataMachine\Core\Database\Chat\Chat::create_table();
-			\DataMachine\Core\Database\Chat\Chat::ensure_owner_columns();
-			\DataMachine\Core\Database\Chat\Chat::ensure_mode_column();
-			\DataMachine\Core\Database\Chat\Chat::ensure_workspace_columns();
-			\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
-			\DataMachine\Core\Database\Chat\Chat::ensure_last_read_at_column();
-			\DataMachine\Core\Database\Chat\Chat::ensure_transcript_lock_columns();
 			\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
 		} catch ( \Throwable $error ) {
 			do_action( 'datamachine_log', 'error', 'Data Machine schema convergence threw an exception', array( 'error' => $error->getMessage() ) );
-			return false;
-		}
-
-		if ( function_exists( 'datamachine_converge_chat_sessions_to_network' ) && ! datamachine_converge_chat_sessions_to_network() ) {
 			return false;
 		}
 

@@ -703,21 +703,5 @@ class BatchItems extends BaseRepository {
 		) ENGINE=InnoDB {$charset_collate};";
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
-		self::ensure_attempts_column( $table_name );
-	}
-
-	/** Add the attempts column on existing installs where dbDelta leaves it missing. */
-	public static function ensure_attempts_column( string $table_name = '' ): void {
-		global $wpdb;
-
-		if ( '' === $table_name ) {
-			$table_name = $wpdb->prefix . self::TABLE_NAME;
-		}
-		if ( self::column_exists( $table_name, 'attempts', $wpdb ) ) {
-			return;
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.NotPrepared -- Deploy-time schema convergence for existing batch-item tables.
-		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN attempts INT UNSIGNED NOT NULL DEFAULT 0', $table_name ) );
 	}
 }
