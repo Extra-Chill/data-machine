@@ -255,6 +255,11 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 				'post_date_gmt' => get_gmt_from_date( $original ),
 			)
 		);
+
+		// Moving the date in setup is itself a date change, so core records
+		// _wp_old_date for it. Clear that first, or the assertion below reads
+		// this test's own arrangement instead of what the upsert did.
+		delete_post_meta( $post_id, '_wp_old_date' );
 		clean_post_cache( $post_id );
 
 		// Content differs, so this is a genuine update rather than a no-op.
