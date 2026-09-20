@@ -9,6 +9,8 @@ namespace DataMachine\Tests\Unit\Core\Database;
 
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Jobs\JobStatusMigration;
+use DataMachine\Core\Database\Migrations\JobsStatusReasonBackfill;
+use DataMachine\Core\Database\Migrations\MigrationRunner;
 use DataMachine\Core\JobStatus;
 use WP_UnitTestCase;
 
@@ -85,8 +87,10 @@ class JobStatusStorageTest extends WP_UnitTestCase {
 			array( '%d' )
 		);
 
-		delete_option( 'datamachine_status_reason_backfill_v1' );
-		Jobs::create_table();
+		delete_option( JobsStatusReasonBackfill::LEGACY_OPTION );
+		delete_option( JobsStatusReasonBackfill::STATE_OPTION );
+		$result = MigrationRunner::run( 'jobs.status-reason-backfill', 250, true );
+		$this->assertTrue( $result['success'] );
 
 		$row = $this->raw_job_row( $job_id );
 		$this->assertSame( JobStatus::FAILED, $row['status'] );
