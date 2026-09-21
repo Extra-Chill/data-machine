@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.63.4] - 2026-09-21
+
+### Fixed
+- normalise non-array occurrenceDates before count() to stop HTTP 500s
+
 ## [0.63.3] - 2026-09-21
 
 ### Fixed
