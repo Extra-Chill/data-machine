@@ -3,16 +3,27 @@
  * Event OG Card Template
  *
  * Renders a 1200x630 Open Graph card for event posts via the Data Machine
- * GDRenderer + TemplateInterface contract. Brand identity (colors, fonts)
- * comes from BrandTokens which themes/plugins populate via filter — the
- * template is intentionally brand-agnostic.
+ * GDRenderer + TemplateInterface contract. Brand identity (colors, fonts,
+ * logo) comes from BrandTokens which themes/plugins populate via filter —
+ * the template is intentionally brand-agnostic.
  *
  * Layout:
- *   - Top accent stripe
  *   - Date pill (top-left), location pill (top-right, optional)
  *   - Event title (left-aligned, wrapped)
- *   - Venue + city in footer surface band
- *   - Brand strip with brand_text · site_label
+ *   - Venue + city, bottom-left, anchored to the canvas bottom
+ *   - Brand mark, bottom-right — logo when resolvable, otherwise text
+ *
+ * Brand mark resolution is a three-level fallback chain, split across two
+ * layers: BrandTokens::get() (data-machine) resolves an explicit
+ * `logo_path`/`logo_path_inverse` brand token if one is set, else falls
+ * back to the site's core WordPress site icon — that part is generic to
+ * every GD-rendered template, not just this one (see
+ * Extra-Chill/data-machine#3538). This template only does the layout-level
+ * third of the chain: resolve_logo() picks whichever variant matches this
+ * card's background and guards against an unreadable file, falling back to
+ * the legacy "<brand_text> · <site_label>" text pairing when nothing
+ * usable comes back. Every level degrades to the next rather than fatally
+ * erroring or silently rendering nothing.
  *
  * Required data fields:
  *   - event_name (string)
@@ -39,6 +50,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class EventOgCardTemplate implements TemplateInterface {
+
+	/**
+	 * Bounding box height (px) for the brand mark — a logo or the text
+	 * fallback — in the bottom-right corner. Kept modest so a corner mark
+	 * reads as a signature, not a second competing headline.
+	 */
+	private const LOGO_MAX_H = 88;
+
+	/**
+	 * Bounding box width (px) for the brand mark. Generous enough for the
+	 * ~1.18:1 Extra Chill wordmark at LOGO_MAX_H without crowding the
+	 * title's content width; a square site-icon fallback never approaches
+	 * this width since it is height-constrained to LOGO_MAX_H first.
+	 */
+	private const LOGO_MAX_W = 220;
+
+	/**
+	 * Clearance (px) between the canvas bottom edge and the bottom of the
+	 * brand mark's bounding box.
+	 */
+	private const LOGO_BOTTOM_MARGIN = 32;
 
 	public function get_id(): string {
 		return 'event_og_card';
@@ -113,29 +145,19 @@ class EventOgCardTemplate implements TemplateInterface {
 
 		// Surface colors for the card.
 		$bg             = $renderer->color_hex( 'bg', $colors['background'] );
-		$surface        = $renderer->color_hex( 'surface', $colors['surface'] );
 		$accent         = $renderer->color_hex( 'accent', $colors['accent'] );
 		$text_pri       = $renderer->color_hex( 'text_pri', $colors['text_primary'] );
 		$text_mute      = $renderer->color_hex( 'text_mute', $colors['text_muted'] );
 		$text_inv       = $renderer->color_hex( 'text_inv', $colors['text_inverse'] );
 		$text_on_accent = $renderer->color_hex( 'text_on_accent', $accent_text );
-		$header_bg      = $renderer->color_hex( 'header_bg', $colors['header_bg'] );
 
-		// Layout sections.
+		// Layout: single flat background. The accent stripe, surface footer
+		// band, and black brand strip that used to divide this canvas into
+		// three horizontal bands are gone — date/location pills already
+		// carry the accent color (see #856), and the brand mark (logo or
+		// fallback text) sits directly on this background rather than a
+		// dedicated strip.
 		$renderer->fill( $bg );
-
-		// Top accent band.
-		$renderer->filled_rect( 0, 0, $width, 8, $accent );
-
-		// Footer band (surface) where venue/city sit.
-		$footer_band_y = (int) ( $height * 0.72 );
-		$renderer->filled_rect( 0, $footer_band_y, $width, $height, $surface );
-
-		// Bottom branding strip (header_bg = deep black by default for
-		// brand text contrast).
-		$brand_strip_h = 64;
-		$brand_strip_y = $height - $brand_strip_h;
-		$renderer->filled_rect( 0, $brand_strip_y, $width, $height, $header_bg );
 
 		// Register fonts from brand tokens. GDRenderer handles fallback
 		// to system DejaVu when a path is missing or null.
@@ -217,7 +239,7 @@ class EventOgCardTemplate implements TemplateInterface {
 			);
 		}
 
-		// Venue + city in surface footer band.
+		// Venue + city, bottom-left, anchored to the canvas bottom edge.
 		$venue = $this->normalize_text( $data['venue'] ?? '' );
 		$city  = $this->normalize_text( $data['city'] ?? '' );
 
@@ -227,7 +249,7 @@ class EventOgCardTemplate implements TemplateInterface {
 		$has_venue = '' !== $venue;
 		$has_city  = '' !== $city;
 
-		[ $venue_baseline, $city_baseline ] = $this->compute_footer_baselines( $has_venue, $has_city, $brand_strip_y );
+		[ $venue_baseline, $city_baseline ] = $this->compute_footer_baselines( $has_venue, $has_city, $height );
 
 		if ( $has_venue ) {
 			$renderer->draw_text(
@@ -251,31 +273,51 @@ class EventOgCardTemplate implements TemplateInterface {
 			);
 		}
 
-		// Brand strip at the bottom — "<brand_text> · <site_label>".
-		// Uses the `body` font (typically Helvetica) instead of `brand`/`heading`
-		// because display fonts like Wilco Loft Sans lack punctuation glyphs.
-		if ( '' === $brand_text && '' === $site_label ) {
-			$combined_brand = '';
-		} else {
-			$combined_brand = $brand_text;
-			if ( '' !== $brand_text && '' !== $site_label ) {
-				$combined_brand .= '  ·  ' . $site_label;
-			} elseif ( '' === $brand_text ) {
-				$combined_brand = $site_label;
-			}
-		}
+		// Brand mark, bottom-right — a logo when one resolves (explicit
+		// token, then the site icon), otherwise the legacy
+		// "<brand_text> · <site_label>" text. See resolve_logo() for the
+		// full three-level chain and why it degrades this way.
+		$bg_is_dark   = $this->is_dark_hex( (string) $colors['background'] );
+		$box_right_x  = $width - $padding;
+		$box_bottom_y = $height - self::LOGO_BOTTOM_MARGIN;
 
-		if ( '' !== $combined_brand ) {
-			$brand_font_size = 24;
-			$brand_text_y    = $brand_strip_y + (int) ( ( $brand_strip_h + $brand_font_size ) / 2 ) - 4;
-			$renderer->draw_text(
-				$combined_brand,
-				$brand_font_size,
-				$padding,
-				$brand_text_y,
-				$text_inv,
-				'body'
-			);
+		$logo = $this->resolve_logo( $tokens, $bg_is_dark );
+
+		if ( null !== $logo ) {
+			[ $draw_w, $draw_h ] = $this->fit_within( $logo['width'], $logo['height'], self::LOGO_MAX_W, self::LOGO_MAX_H );
+			$logo_x              = $box_right_x - $draw_w;
+			$logo_y              = $box_bottom_y - $draw_h;
+			$renderer->overlay_image( $logo['path'], $logo_x, $logo_y, $draw_w, $draw_h, 100 );
+		} else {
+			// Level 3 — no logo resolved from a token or the site icon.
+			// Uses the `body` font (typically Helvetica) instead of
+			// `brand`/`heading` because display fonts like Wilco Loft Sans
+			// lack punctuation glyphs.
+			if ( '' === $brand_text && '' === $site_label ) {
+				$combined_brand = '';
+			} else {
+				$combined_brand = $brand_text;
+				if ( '' !== $brand_text && '' !== $site_label ) {
+					$combined_brand .= '  ·  ' . $site_label;
+				} elseif ( '' === $brand_text ) {
+					$combined_brand = $site_label;
+				}
+			}
+
+			if ( '' !== $combined_brand ) {
+				$brand_font_size = 24;
+				$brand_text_w    = $renderer->measure_text_width( $combined_brand, $brand_font_size, 'body' );
+				$brand_text_x    = $box_right_x - $brand_text_w;
+				$brand_text_y    = $box_bottom_y - (int) ( ( self::LOGO_MAX_H - $brand_font_size ) / 2 );
+				$renderer->draw_text(
+					$combined_brand,
+					$brand_font_size,
+					$brand_text_x,
+					$brand_text_y,
+					$bg_is_dark ? $text_inv : $text_mute,
+					'body'
+				);
+			}
 		}
 
 		// Save.
@@ -293,52 +335,186 @@ class EventOgCardTemplate implements TemplateInterface {
 	}
 
 	/**
-	 * Compute the venue and city text baselines within the footer band.
+	 * Compute the venue and city text baselines within the footer area.
 	 *
-	 * Anchored bottom-up from `$brand_strip_y` instead of top-down from
-	 * `$footer_band_y`: the last line's baseline is placed a fixed
-	 * clearance above the strip, so the block can never collide with it
-	 * regardless of how many lines are present. A top-down offset (the
-	 * previous, buggy approach — see issue #853) stays correct only for
-	 * as long as nobody changes a font size; anchoring to the strip is
-	 * self-correcting.
+	 * Anchored bottom-up from `$bottom_anchor_y` (the canvas bottom edge,
+	 * i.e. `$height`) rather than top-down from a footer band: the last
+	 * line's baseline is placed a fixed clearance above the anchor, so
+	 * the block can never collide with it regardless of how many lines
+	 * are present. A top-down offset (the original, buggy approach — see
+	 * issue #853) stays correct only for as long as nobody changes a font
+	 * size; anchoring to the bottom is self-correcting.
+	 *
+	 * #856 removed the black brand strip this method previously anchored
+	 * to ($brand_strip_y = $height - 64). The anchor is now the canvas
+	 * bottom edge itself, with the same clearance constant carried over
+	 * unchanged — the fix from #855 is preserved exactly, just re-pointed
+	 * at what still exists after the strip's removal.
 	 *
 	 * Pulled out as its own method (rather than inlined in render()) so
 	 * the geometry can be verified directly — this is the exact
 	 * computation regression tests assert against, independent of
 	 * whether the host environment can rasterise text with GD/FreeType.
 	 *
-	 * @param bool $has_venue     Whether a venue line will be drawn.
-	 * @param bool $has_city      Whether a city line will be drawn.
-	 * @param int  $brand_strip_y Y position of the top of the bottom brand strip.
+	 * @param bool $has_venue       Whether a venue line will be drawn.
+	 * @param bool $has_city        Whether a city line will be drawn.
+	 * @param int  $bottom_anchor_y Y position to anchor the last baseline
+	 *                              above (the canvas height/bottom edge).
 	 * @return array{0:int,1:int} [venue_baseline, city_baseline]. Both are
 	 *         always populated (even when the corresponding line isn't
 	 *         drawn) so callers never index into an unset value.
 	 */
-	private function compute_footer_baselines( bool $has_venue, bool $has_city, int $brand_strip_y ): array {
-		// Vertical gap between the last text baseline and the top of the
-		// brand strip. Sized to clear descenders (~20% of font size, so
+	private function compute_footer_baselines( bool $has_venue, bool $has_city, int $bottom_anchor_y ): array {
+		// Vertical gap between the last text baseline and the canvas
+		// bottom edge. Sized to clear descenders (~20% of font size, so
 		// ~7px for the 34px venue line) with comfortable margin to spare.
+		// Unchanged from #855.
 		$bottom_clearance = 16;
 		// Baseline-to-baseline distance between the venue and city lines
 		// when both are present. Matches the original design's spacing.
 		$baseline_gap = 44;
 
 		// Default: whichever line is drawn alone sits at the single-line
-		// anchor (bottom_clearance above the strip). When both lines are
+		// anchor (bottom_clearance above the anchor). When both lines are
 		// present, city stays at that anchor as the last line and venue
 		// is recomputed to stack above it. Defining both up front — rather
 		// than only inside a has_venue-only branch — means the
 		// venue-absent and city-absent cases each still resolve to a
 		// real, correctly positioned baseline instead of an unset value.
-		$venue_baseline = $brand_strip_y - $bottom_clearance;
-		$city_baseline  = $brand_strip_y - $bottom_clearance;
+		$venue_baseline = $bottom_anchor_y - $bottom_clearance;
+		$city_baseline  = $bottom_anchor_y - $bottom_clearance;
 
 		if ( $has_venue && $has_city ) {
 			$venue_baseline = $city_baseline - $baseline_gap;
 		}
 
 		return array( $venue_baseline, $city_baseline );
+	}
+
+	/**
+	 * Resolve a brand mark to draw in the bottom-right corner.
+	 *
+	 * Pure layout logic — reads whichever logo `BrandTokens::get()`
+	 * already resolved and picks the variant that matches this card's
+	 * background, guarding against an unreadable file. The resolution
+	 * chain itself (explicit token → WordPress core site icon → nothing)
+	 * lives one layer up in `BrandTokens::get()` (data-machine), not
+	 * here — that capability belongs to every GD-rendered template, not
+	 * just this one. See Extra-Chill/data-machine#3538.
+	 *
+	 * If a token exists but only for the *other* background variant
+	 * (e.g. `logo_path` is set but this card's background is dark and no
+	 * `logo_path_inverse` exists), it is treated as absent rather than
+	 * drawn invisibly — that is the whole reason it's a variant pair
+	 * instead of a single path. Returning `null` here means the caller
+	 * falls back to brand-strip text.
+	 *
+	 * @param array $tokens     Resolved brand tokens (see BrandTokens::get()).
+	 * @param bool  $bg_is_dark Whether the card background is dark.
+	 * @return array{path:string,width:int,height:int}|null
+	 */
+	private function resolve_logo( array $tokens, bool $bg_is_dark ): ?array {
+		$token_key = $bg_is_dark ? 'logo_path_inverse' : 'logo_path';
+		$logo_path = $tokens[ $token_key ] ?? null;
+
+		if ( ! is_string( $logo_path ) || '' === $logo_path ) {
+			return null;
+		}
+
+		$dims = $this->readable_image_dims( $logo_path );
+		if ( null === $dims ) {
+			return null;
+		}
+
+		return array(
+			'path'   => $logo_path,
+			'width'  => $dims[0],
+			'height' => $dims[1],
+		);
+	}
+
+	/**
+	 * Confirm a path is a real, GD-decodable raster image and return its
+	 * dimensions.
+	 *
+	 * Guards resolve_logo() against a DB record that no longer has a file
+	 * on disk, and against file types GDRenderer::overlay_image() cannot
+	 * decode (it supports PNG/JPEG/WEBP/GIF).
+	 *
+	 * @param string $path Absolute filesystem path.
+	 * @return array{0:int,1:int}|null [width, height], or null if the
+	 *                                 file is missing or not a supported
+	 *                                 raster image.
+	 */
+	private function readable_image_dims( string $path ): ?array {
+		if ( ! file_exists( $path ) ) {
+			return null;
+		}
+
+		$info = @getimagesize( $path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- getimagesize() warns on unreadable/corrupt files; a warning here must degrade to "no logo", not surface to the user.
+		if ( ! $info ) {
+			return null;
+		}
+
+		$supported = array( IMAGETYPE_PNG, IMAGETYPE_JPEG, IMAGETYPE_WEBP, IMAGETYPE_GIF );
+		if ( ! in_array( $info[2], $supported, true ) ) {
+			return null;
+		}
+
+		return array( $info[0], $info[1] );
+	}
+
+	/**
+	 * Scale (never stretch) an image to fit within a bounding box.
+	 *
+	 * Preserves aspect ratio so a ~1.18:1 wordmark and a 1:1 square site
+	 * icon both render correctly without distortion — the box is sized
+	 * by whichever dimension is the binding constraint for that asset's
+	 * shape.
+	 *
+	 * @param int $src_w Source width.
+	 * @param int $src_h Source height.
+	 * @param int $max_w Bounding box max width.
+	 * @param int $max_h Bounding box max height.
+	 * @return array{0:int,1:int} [draw_width, draw_height].
+	 */
+	private function fit_within( int $src_w, int $src_h, int $max_w, int $max_h ): array {
+		if ( $src_w <= 0 || $src_h <= 0 ) {
+			return array( 0, 0 );
+		}
+
+		$scale = min( $max_w / $src_w, $max_h / $src_h );
+
+		return array(
+			(int) round( $src_w * $scale ),
+			(int) round( $src_h * $scale ),
+		);
+	}
+
+	/**
+	 * Whether a hex color reads as visually "dark" (so inverse/light-ink
+	 * assets and text should be used against it).
+	 *
+	 * @param string $hex Hex color, with or without a leading '#'.
+	 * @return bool True when the color's perceptual luminance is below
+	 *              the midpoint.
+	 */
+	private function is_dark_hex( string $hex ): bool {
+		$hex = ltrim( $hex, '#' );
+		if ( 6 !== strlen( $hex ) || ! ctype_xdigit( $hex ) ) {
+			// Not a recognizable hex color — assume light, matching this
+			// template's default white background rather than guessing dark.
+			return false;
+		}
+
+		$r = hexdec( substr( $hex, 0, 2 ) );
+		$g = hexdec( substr( $hex, 2, 2 ) );
+		$b = hexdec( substr( $hex, 4, 2 ) );
+
+		// ITU-R BT.601 perceptual luminance.
+		$luminance = ( 0.299 * $r + 0.587 * $g + 0.114 * $b ) / 255;
+
+		return $luminance < 0.5;
 	}
 
 	/**

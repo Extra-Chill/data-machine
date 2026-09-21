@@ -1,11 +1,19 @@
 <?php
 /**
- * EventOgCardTemplate geometry regression tests (issue #853).
+ * EventOgCardTemplate geometry regression tests (issues #853, #855, #856).
  *
- * The bug: the venue/city footer block was positioned with a fixed
- * top-down offset from $footer_band_y, so the city line's baseline sat
- * below the top of the black brand strip on every card that had both a
- * venue and a city.
+ * The original bug (#853): the venue/city footer block was positioned
+ * with a fixed top-down offset from $footer_band_y, so the city line's
+ * baseline sat below the top of the black brand strip on every card
+ * that had both a venue and a city.
+ *
+ * #855 fixed it by anchoring bottom-up from the brand strip instead.
+ * #856 removed the brand strip entirely (replaced by a logo/brand-mark
+ * in the same corner) and re-pointed that same bottom-up anchor at the
+ * canvas bottom edge ($height) — the fix logic itself is unchanged, only
+ * what it anchors to. These tests cover both: the geometry is verified
+ * as exact arithmetic (see the long-standing rationale below for why),
+ * and the new brand-mark resolution chain is verified independently.
  *
  * The fix moved that computation into
  * EventOgCardTemplate::compute_footer_baselines() — a small, pure method
@@ -43,21 +51,39 @@ use WP_UnitTestCase;
 class EventOgCardTemplateTest extends WP_UnitTestCase {
 
 	/**
-	 * Top edge of the bottom brand strip. Mirrors the constant computed
-	 * inside EventOgCardTemplate::render() — height (630) minus strip
-	 * height (64).
+	 * Canvas height for the `open_graph` preset (1200x630). #856 removed
+	 * the black brand strip that venue/city baselines used to anchor to
+	 * ($height - 64 = 566); the anchor is now the canvas bottom edge
+	 * itself.
 	 */
-	private const BRAND_STRIP_Y = 566;
+	private const CANVAS_HEIGHT = 630;
 
 	/**
 	 * Minimum acceptable clearance (px) between a text baseline and the
-	 * top of the brand strip. Descenders extend below the baseline —
-	 * this is not zero-tolerance, it's "comfortably clear of the strip".
-	 * The venue line (34px font) has the largest descent at roughly 20%
-	 * of font size (~7px); 8px of headroom past that is a meaningful
-	 * regression guard without being so tight it flags harmless rounding.
+	 * canvas bottom edge. Descenders extend below the baseline — this is
+	 * not zero-tolerance, it's "comfortably clear of the edge". The venue
+	 * line (34px font) has the largest descent at roughly 20% of font
+	 * size (~7px); 8px of headroom past that is a meaningful regression
+	 * guard without being so tight it flags harmless rounding.
 	 */
 	private const MIN_CLEARANCE = 8;
+
+	/**
+	 * Temp files written during a test via make_temp_png(), cleaned up
+	 * in tearDown().
+	 *
+	 * @var string[]
+	 */
+	private array $temp_files = array();
+
+	public function tearDown(): void {
+		foreach ( $this->temp_files as $path ) {
+			wp_delete_file( $path );
+		}
+		$this->temp_files = array();
+
+		parent::tearDown();
+	}
 
 	/**
 	 * Call the private compute_footer_baselines() method directly.
@@ -71,17 +97,53 @@ class EventOgCardTemplateTest extends WP_UnitTestCase {
 		$method   = new ReflectionMethod( $template, 'compute_footer_baselines' );
 		$method->setAccessible( true );
 
-		return $method->invoke( $template, $has_venue, $has_city, self::BRAND_STRIP_Y );
+		return $method->invoke( $template, $has_venue, $has_city, self::CANVAS_HEIGHT );
 	}
 
-	public function test_venue_and_city_baselines_clear_the_brand_strip(): void {
+	/**
+	 * Call a private method on a fresh EventOgCardTemplate instance.
+	 *
+	 * @param string $name Method name.
+	 * @param mixed  ...$args Arguments to pass through.
+	 * @return mixed
+	 */
+	private function invoke_private( string $name, ...$args ) {
+		$template = new EventOgCardTemplate();
+		$method   = new ReflectionMethod( $template, $name );
+		$method->setAccessible( true );
+
+		return $method->invokeArgs( $template, $args );
+	}
+
+	/**
+	 * Write a tiny real PNG to a temp path inside the uploads directory,
+	 * tracked for cleanup in tearDown().
+	 *
+	 * @param int $w Width in pixels.
+	 * @param int $h Height in pixels.
+	 * @return string Absolute path to the written file.
+	 */
+	private function make_temp_png( int $w = 64, int $h = 64 ): string {
+		$upload_dir = wp_upload_dir();
+		$path       = trailingslashit( $upload_dir['path'] ) . 'ecogcard-test-' . uniqid() . '.png';
+
+		$image = imagecreatetruecolor( $w, $h );
+		imagepng( $image, $path );
+		imagedestroy( $image );
+
+		$this->temp_files[] = $path;
+
+		return $path;
+	}
+
+	public function test_venue_and_city_baselines_clear_the_canvas_bottom_edge(): void {
 		[ $venue_baseline, $city_baseline ] = $this->compute_baselines( true, true );
 
-		// City is the last line in this case — it must clear the strip.
+		// City is the last line in this case — it must clear the edge.
 		$this->assertLessThanOrEqual(
-			self::BRAND_STRIP_Y - self::MIN_CLEARANCE,
+			self::CANVAS_HEIGHT - self::MIN_CLEARANCE,
 			$city_baseline,
-			'City baseline must clear the brand strip with margin — this is the exact defect from issue #853'
+			'City baseline must clear the canvas bottom edge with margin — this is the exact defect from issue #853'
 		);
 
 		// Venue must sit strictly above the city line (no overlap), and
@@ -90,16 +152,16 @@ class EventOgCardTemplateTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, $city_baseline - $venue_baseline, 'Venue and city baselines must not collapse onto each other' );
 	}
 
-	public function test_venue_only_baseline_clears_the_brand_strip(): void {
+	public function test_venue_only_baseline_clears_the_canvas_bottom_edge(): void {
 		[ $venue_baseline, ] = $this->compute_baselines( true, false );
 
-		$this->assertLessThanOrEqual( self::BRAND_STRIP_Y - self::MIN_CLEARANCE, $venue_baseline );
+		$this->assertLessThanOrEqual( self::CANVAS_HEIGHT - self::MIN_CLEARANCE, $venue_baseline );
 	}
 
-	public function test_city_only_baseline_clears_the_brand_strip(): void {
+	public function test_city_only_baseline_clears_the_canvas_bottom_edge(): void {
 		[ , $city_baseline ] = $this->compute_baselines( false, true );
 
-		$this->assertLessThanOrEqual( self::BRAND_STRIP_Y - self::MIN_CLEARANCE, $city_baseline );
+		$this->assertLessThanOrEqual( self::CANVAS_HEIGHT - self::MIN_CLEARANCE, $city_baseline );
 	}
 
 	public function test_neither_case_still_returns_defined_baselines(): void {
@@ -112,6 +174,98 @@ class EventOgCardTemplateTest extends WP_UnitTestCase {
 
 		$this->assertIsInt( $venue_baseline );
 		$this->assertIsInt( $city_baseline );
+	}
+
+	// -------------------------------------------------------------------
+	// Brand mark resolution (#856): pure layout on top of BrandTokens.
+	//
+	// resolve_logo() here only picks a background-appropriate variant
+	// from whatever BrandTokens::get() already resolved and validates
+	// it's a readable image — it does NOT implement the explicit-token
+	// vs. site-icon fallback chain itself. That resolution now lives in
+	// BrandTokens::get() (data-machine), covered by
+	// tests/Unit/Abilities/Media/BrandTokensLogoTest.php there, so every
+	// GD-rendered template gets it, not just this one. See
+	// Extra-Chill/data-machine#3538.
+	// -------------------------------------------------------------------
+
+	public function test_is_dark_hex_classifies_light_and_dark_backgrounds(): void {
+		$this->assertFalse( $this->invoke_private( 'is_dark_hex', '#ffffff' ) );
+		$this->assertFalse( $this->invoke_private( 'is_dark_hex', '#f1f5f9' ) );
+		$this->assertTrue( $this->invoke_private( 'is_dark_hex', '#000000' ) );
+		$this->assertTrue( $this->invoke_private( 'is_dark_hex', '#0f0f0f' ) );
+		// Not a parseable hex color — must not throw, defaults to light.
+		$this->assertFalse( $this->invoke_private( 'is_dark_hex', 'not-a-color' ) );
+	}
+
+	public function test_fit_within_preserves_aspect_ratio_without_stretching(): void {
+		// Wordmark (~1.18:1), height-constrained by the box.
+		[ $w, $h ] = $this->invoke_private( 'fit_within', 1088, 923, 220, 88 );
+		$this->assertSame( 88, $h, 'Height should hit the box max' );
+		$this->assertLessThanOrEqual( 220, $w );
+		$this->assertEqualsWithDelta( 1088 / 923, $w / $h, 0.01, 'Aspect ratio must be preserved, not stretched' );
+
+		// Square site icon (1:1) — also height-constrained here, and must
+		// stay square (never distorted into a non-square box fit).
+		[ $sw, $sh ] = $this->invoke_private( 'fit_within', 1080, 1080, 220, 88 );
+		$this->assertSame( $sw, $sh, 'A square source must render as a square' );
+		$this->assertSame( 88, $sh );
+	}
+
+	public function test_resolve_logo_reads_logo_path_on_a_light_background(): void {
+		$token_path = $this->make_temp_png();
+		$tokens     = array( 'logo_path' => $token_path );
+
+		$logo = $this->invoke_private( 'resolve_logo', $tokens, false );
+
+		$this->assertNotNull( $logo );
+		$this->assertSame( $token_path, $logo['path'] );
+		$this->assertSame( 64, $logo['width'] );
+		$this->assertSame( 64, $logo['height'] );
+	}
+
+	public function test_resolve_logo_returns_null_when_no_token_is_resolved(): void {
+		// BrandTokens::get() already tried explicit token + site icon and
+		// came back empty — this template's only remaining move is to
+		// fall back to text, not fatal.
+		$logo = $this->invoke_private( 'resolve_logo', array(), false );
+
+		$this->assertNull( $logo );
+	}
+
+	public function test_resolve_logo_ignores_a_token_for_the_wrong_background_variant(): void {
+		// Only a light-background token is supplied, but the card
+		// background is dark — using it anyway would render invisible
+		// dark-on-dark ink. It must fall through, not render blindly.
+		$token_path = $this->make_temp_png();
+		$tokens     = array( 'logo_path' => $token_path );
+
+		$logo = $this->invoke_private( 'resolve_logo', $tokens, true );
+
+		$this->assertNull( $logo, 'A light-only token must not be used on a dark background' );
+	}
+
+	public function test_resolve_logo_uses_the_inverse_token_on_a_dark_background(): void {
+		$inverse_path = $this->make_temp_png();
+		$tokens       = array(
+			'logo_path'         => $this->make_temp_png(),
+			'logo_path_inverse' => $inverse_path,
+		);
+
+		$logo = $this->invoke_private( 'resolve_logo', $tokens, true );
+
+		$this->assertNotNull( $logo );
+		$this->assertSame( $inverse_path, $logo['path'] );
+	}
+
+	public function test_resolve_logo_ignores_a_token_path_that_does_not_exist_on_disk(): void {
+		// DB/config drift: a token points at a file that is no longer
+		// there. Must fall through to text, not fatal — this template has
+		// no further fallback level of its own to try.
+		$tokens = array( 'logo_path' => '/nonexistent/path/to/logo.png' );
+		$logo   = $this->invoke_private( 'resolve_logo', $tokens, false );
+
+		$this->assertNull( $logo );
 	}
 
 	/**
