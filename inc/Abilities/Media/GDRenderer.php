@@ -28,6 +28,17 @@ class GDRenderer {
 	private const DEFAULT_LINE_HEIGHT = 1.4;
 
 	/**
+	 * System-wide fallback font. Used both when a requested font file
+	 * cannot be resolved at all (register_font()) and per-character when
+	 * a resolved font's `cmap` table has no real glyph for a specific
+	 * codepoint (draw_text()). DejaVu Sans has broad Unicode coverage and
+	 * is the font already relied on elsewhere in this class, so reusing
+	 * it here keeps the fallback story to a single font instead of
+	 * introducing a second dependency.
+	 */
+	private const SYSTEM_FALLBACK_FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+
+	/**
 	 * Current GD image resource.
 	 *
 	 * @var \GdImage|null
@@ -61,6 +72,15 @@ class GDRenderer {
 	 * @var array<string, int>
 	 */
 	private array $colors = array();
+
+	/**
+	 * Parsed `cmap` glyph-coverage cache, keyed by font path. Shared across
+	 * instances (static) because font files are immutable for the life of
+	 * the process and re-parsing per-instance buys nothing.
+	 *
+	 * @var array<string, array|null>
+	 */
+	private static array $glyph_coverage_cache = array();
 
 	// -------------------------------------------------------------------------
 	// Canvas
@@ -258,7 +278,7 @@ class GDRenderer {
 		}
 
 		// System fallback.
-		$fallback             = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+		$fallback             = self::SYSTEM_FALLBACK_FONT;
 		$this->fonts[ $name ] = $fallback;
 
 		do_action(
@@ -281,7 +301,7 @@ class GDRenderer {
 	 * @return string Font path (falls back to system font if not registered).
 	 */
 	public function get_font( string $name ): string {
-		return $this->fonts[ $name ] ?? '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+		return $this->fonts[ $name ] ?? self::SYSTEM_FALLBACK_FONT;
 	}
 
 	// -------------------------------------------------------------------------
@@ -290,6 +310,14 @@ class GDRenderer {
 
 	/**
 	 * Draw text on the canvas.
+	 *
+	 * Splits the text into runs based on whether the requested font has a
+	 * real glyph for each character (see has_glyph_coverage()). Characters
+	 * the font can't render fall through to the system fallback font
+	 * instead of drawing that font's `.notdef` placeholder glyph. No
+	 * character list is involved — coverage is read directly from each
+	 * font's `cmap` table, so this applies uniformly to accented Latin,
+	 * Cyrillic, CJK, emoji, or anything else a caller passes in.
 	 *
 	 * @param string $text      Text to render.
 	 * @param int    $font_size Font size in points.
@@ -301,10 +329,387 @@ class GDRenderer {
 	 * @return self
 	 */
 	public function draw_text( string $text, int $font_size, int $x, int $y, int $color, string $font_name, float $angle = 0 ): self {
-		if ( $this->image ) {
-			imagettftext( $this->image, $font_size, $angle, $x, $y, $color, $this->get_font( $font_name ), $text );
+		if ( ! $this->image || '' === $text ) {
+			return $this;
 		}
+
+		$font_path = $this->get_font( $font_name );
+
+		// Angled text draws in a single imagettftext() call — run-splitting
+		// assumes a horizontal baseline for advancing $x between runs, which
+		// doesn't hold once the text is rotated. No caller currently passes
+		// non-ASCII text through an angled draw, so skip fallback there
+		// rather than getting rotated-run positioning wrong.
+		if ( 0.0 !== $angle ) {
+			imagettftext( $this->image, $font_size, $angle, $x, $y, $color, $font_path, $text );
+			return $this;
+		}
+
+		foreach ( $this->split_by_glyph_coverage( $text, $font_path ) as $run ) {
+			imagettftext( $this->image, $font_size, 0, $x, $y, $color, $run['font'], $run['text'] );
+			$x += $this->bbox_width( imagettfbbox( $font_size, 0, $run['font'], $run['text'] ) );
+		}
+
 		return $this;
+	}
+
+	/**
+	 * Width in pixels between an `imagettfbbox()` result's left and right
+	 * extents. `imagettfbbox()` is typed to return `array|false` (it can
+	 * fail to open the requested font file), so this centralizes the
+	 * false-safe read instead of indexing the result directly at each
+	 * call site.
+	 *
+	 * @param array|false $bbox Return value of imagettfbbox().
+	 * @return int
+	 */
+	private function bbox_width( array|false $bbox ): int {
+		if ( false === $bbox ) {
+			return 0;
+		}
+		return (int) abs( $bbox[4] - $bbox[0] );
+	}
+
+	/**
+	 * Split text into runs of consecutive characters grouped by whether
+	 * `$font_path` has a real glyph for each one.
+	 *
+	 * @param string $text      Text to split.
+	 * @param string $font_path Primary font path.
+	 * @return array<int, array{text:string, font:string}> Ordered runs, each
+	 *         tagged with the font path that should render it.
+	 */
+	private function split_by_glyph_coverage( string $text, string $font_path ): array {
+		// The system fallback font has nothing further to fall back to.
+		if ( self::SYSTEM_FALLBACK_FONT === $font_path ) {
+			return array(
+				array(
+					'text' => $text,
+					'font' => $font_path,
+				),
+			);
+		}
+
+		$chars                  = mb_str_split( $text );
+		$runs                   = array();
+		$current                = '';
+		$current_needs_fallback = null;
+
+		foreach ( $chars as $char ) {
+			$codepoint      = mb_ord( $char );
+			$needs_fallback = ! $this->has_glyph_coverage( $font_path, $codepoint );
+
+			if ( null === $current_needs_fallback || $needs_fallback === $current_needs_fallback ) {
+				$current                = $current . $char;
+				$current_needs_fallback = $needs_fallback;
+				continue;
+			}
+
+			$runs[]                 = array(
+				'text' => $current,
+				'font' => $current_needs_fallback ? self::SYSTEM_FALLBACK_FONT : $font_path,
+			);
+			$current                = $char;
+			$current_needs_fallback = $needs_fallback;
+		}
+
+		if ( '' !== $current ) {
+			$runs[] = array(
+				'text' => $current,
+				'font' => $current_needs_fallback ? self::SYSTEM_FALLBACK_FONT : $font_path,
+			);
+		}
+
+		return $runs;
+	}
+
+	/**
+	 * Read a big-endian unsigned 16-bit integer from a byte string.
+	 *
+	 * `unpack()` is typed `array|false` (it can fail on a malformed format
+	 * string, never on the fixed literal formats used here, but PHPStan
+	 * doesn't know that) — centralizing the read here means every cmap
+	 * parsing call site gets a plain `int` back instead of repeating a
+	 * false-check at each of the ~20 unpack() call sites this parser needs.
+	 *
+	 * @param string $data   Byte string to read from.
+	 * @param int    $offset Byte offset to read at.
+	 * @return int 0 when the offset is out of range or unpack() fails.
+	 */
+	private function read_uint16( string $data, int $offset ): int {
+		if ( $offset < 0 || $offset + 2 > strlen( $data ) ) {
+			return 0;
+		}
+		$unpacked = unpack( 'n', substr( $data, $offset, 2 ) );
+		return false !== $unpacked ? (int) $unpacked[1] : 0;
+	}
+
+	/**
+	 * Read a big-endian unsigned 32-bit integer from a byte string.
+	 *
+	 * @param string $data   Byte string to read from.
+	 * @param int    $offset Byte offset to read at.
+	 * @return int 0 when the offset is out of range or unpack() fails.
+	 */
+	private function read_uint32( string $data, int $offset ): int {
+		if ( $offset < 0 || $offset + 4 > strlen( $data ) ) {
+			return 0;
+		}
+		$unpacked = unpack( 'N', substr( $data, $offset, 4 ) );
+		return false !== $unpacked ? (int) $unpacked[1] : 0;
+	}
+
+	/**
+	 * Read a big-endian signed 16-bit integer from a byte string.
+	 *
+	 * Used for cmap format 4's idDelta field, which the TrueType spec
+	 * defines as signed even though it's stored as a plain uint16 on
+	 * disk — the two's-complement conversion happens here.
+	 *
+	 * @param string $data   Byte string to read from.
+	 * @param int    $offset Byte offset to read at.
+	 * @return int
+	 */
+	private function read_int16( string $data, int $offset ): int {
+		$value = $this->read_uint16( $data, $offset );
+		return $value > 0x7FFF ? $value - 0x10000 : $value;
+	}
+
+	/**
+	 * Whether a font file has a real (non-`.notdef`) glyph for a codepoint.
+	 *
+	 * Reads the font's own `cmap` table rather than checking the codepoint
+	 * against any hardcoded character list, so coverage is detected for
+	 * whatever the font actually supports — which varies per display font
+	 * and isn't reliably predictable from a Unicode range alone.
+	 *
+	 * @param string $font_path Absolute path to a TTF/OTF font file.
+	 * @param int    $codepoint Unicode codepoint.
+	 * @return bool
+	 */
+	private function has_glyph_coverage( string $font_path, int $codepoint ): bool {
+		if ( ! array_key_exists( $font_path, self::$glyph_coverage_cache ) ) {
+			self::$glyph_coverage_cache[ $font_path ] = $this->parse_font_cmap( $font_path );
+		}
+
+		$table = self::$glyph_coverage_cache[ $font_path ];
+
+		// Unparseable font (unreadable, malformed, unsupported cmap
+		// format) — assume coverage rather than forcing every character
+		// in every string through fallback because introspection failed.
+		if ( null === $table ) {
+			return true;
+		}
+
+		if ( 12 === $table['format'] ) {
+			foreach ( $table['groups'] as $group ) {
+				if ( $codepoint >= $group[0] && $codepoint <= $group[1] ) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		foreach ( $table['segments'] as $segment ) {
+			[ $start, $end, $delta, $range_offset, $range_offset_pos ] = $segment;
+
+			if ( $codepoint < $start || $codepoint > $end ) {
+				continue;
+			}
+
+			if ( 0 === $range_offset ) {
+				return 0 !== ( ( $codepoint + $delta ) & 0xFFFF );
+			}
+
+			// Indirect lookup via glyphIdArray, per the TrueType format 4
+			// cmap subtable spec: glyphIndexAddress = address-of-
+			// idRangeOffset[i] + idRangeOffset[i] + 2 * (c - startCode[i]).
+			$glyph_index_address = $range_offset_pos + $range_offset + ( ( $codepoint - $start ) * 2 );
+			$raw                 = $table['raw'];
+
+			if ( $glyph_index_address < 0 || $glyph_index_address + 1 >= strlen( $raw ) ) {
+				return false;
+			}
+
+			$glyph_id = $this->read_uint16( $raw, $glyph_index_address );
+
+			if ( 0 === $glyph_id ) {
+				return false;
+			}
+
+			return 0 !== ( ( $glyph_id + $delta ) & 0xFFFF );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Locate and parse a font file's best available `cmap` subtable.
+	 *
+	 * Supports format 4 (BMP segments) and format 12 (full-Unicode
+	 * groups) — between them, effectively every TrueType/OpenType font.
+	 * Works for both TTF and OTF/CFF files since `cmap` lives in the same
+	 * sfnt wrapper regardless of outline format.
+	 *
+	 * @param string $font_path Absolute path to a font file.
+	 * @return array|null Parsed table, or null if unreadable/unsupported.
+	 */
+	private function parse_font_cmap( string $font_path ): ?array {
+		if ( ! is_readable( $font_path ) ) {
+			return null;
+		}
+
+		$data = file_get_contents( $font_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local font file already resolved by register_font(), not a remote request.
+		if ( false === $data || strlen( $data ) < 12 ) {
+			return null;
+		}
+
+		$num_tables  = $this->read_uint16( $data, 4 );
+		$cmap_offset = null;
+
+		for ( $i = 0; $i < $num_tables; $i++ ) {
+			$record_offset = 12 + ( $i * 16 );
+			if ( $record_offset + 16 > strlen( $data ) ) {
+				break;
+			}
+			if ( 'cmap' === substr( $data, $record_offset, 4 ) ) {
+				$cmap_offset = $this->read_uint32( $data, $record_offset + 8 );
+				break;
+			}
+		}
+
+		if ( null === $cmap_offset || $cmap_offset + 4 > strlen( $data ) ) {
+			return null;
+		}
+
+		$sub_table_count = $this->read_uint16( $data, $cmap_offset + 2 );
+		$best_offset     = null;
+		$best_score      = -1;
+
+		for ( $i = 0; $i < $sub_table_count; $i++ ) {
+			$record_offset = $cmap_offset + 4 + ( $i * 8 );
+			if ( $record_offset + 8 > strlen( $data ) ) {
+				break;
+			}
+
+			$platform_id = $this->read_uint16( $data, $record_offset );
+			$encoding_id = $this->read_uint16( $data, $record_offset + 2 );
+			$sub_offset  = $this->read_uint32( $data, $record_offset + 4 );
+
+			// Prefer full-Unicode subtables (format 12) over BMP-only
+			// (format 4), and Windows/Unicode platforms over others.
+			$score = match ( true ) {
+				3 === $platform_id && 10 === $encoding_id => 4,
+				0 === $platform_id && $encoding_id >= 4 => 3,
+				3 === $platform_id && 1 === $encoding_id => 2,
+				0 === $platform_id => 1,
+				default => 0,
+			};
+
+			if ( $score > $best_score ) {
+				$best_score  = $score;
+				$best_offset = $cmap_offset + $sub_offset;
+			}
+		}
+
+		if ( null === $best_offset || $best_offset + 2 > strlen( $data ) ) {
+			return null;
+		}
+
+		$format = $this->read_uint16( $data, $best_offset );
+
+		if ( 12 === $format ) {
+			return $this->parse_cmap_format_12( $data, $best_offset );
+		}
+
+		if ( 4 === $format ) {
+			return $this->parse_cmap_format_4( $data, $best_offset );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Parse a cmap format 4 (segment mapping to delta values) subtable.
+	 *
+	 * @param string $data   Full font file contents.
+	 * @param int    $offset Byte offset of the subtable within $data.
+	 * @return array|null
+	 */
+	private function parse_cmap_format_4( string $data, int $offset ): ?array {
+		if ( $offset + 14 > strlen( $data ) ) {
+			return null;
+		}
+
+		$seg_count_x2 = $this->read_uint16( $data, $offset + 6 );
+		$seg_count    = intdiv( $seg_count_x2, 2 );
+
+		$end_codes_offset       = $offset + 14;
+		$start_codes_offset     = $end_codes_offset + $seg_count_x2 + 2; // +2 skips reservedPad.
+		$id_delta_offset        = $start_codes_offset + $seg_count_x2;
+		$id_range_offset_offset = $id_delta_offset + $seg_count_x2;
+
+		if ( $id_range_offset_offset + $seg_count_x2 > strlen( $data ) ) {
+			return null;
+		}
+
+		$segments = array();
+
+		for ( $i = 0; $i < $seg_count; $i++ ) {
+			$end   = $this->read_uint16( $data, $end_codes_offset + ( $i * 2 ) );
+			$start = $this->read_uint16( $data, $start_codes_offset + ( $i * 2 ) );
+			$delta = $this->read_int16( $data, $id_delta_offset + ( $i * 2 ) );
+
+			$range_offset_pos = $id_range_offset_offset + ( $i * 2 );
+			$range_offset     = $this->read_uint16( $data, $range_offset_pos );
+
+			if ( 0xFFFF === $start && 0xFFFF === $end ) {
+				continue; // Terminal sentinel segment carries no real mapping.
+			}
+
+			// Store the range-offset field's position relative to the
+			// subtable start so has_glyph_coverage() can resolve indirect
+			// glyphIdArray lookups against the cached 'raw' bytes.
+			$segments[] = array( $start, $end, $delta, $range_offset, $range_offset_pos - $offset );
+		}
+
+		return array(
+			'format'   => 4,
+			'segments' => $segments,
+			'raw'      => substr( $data, $offset ),
+		);
+	}
+
+	/**
+	 * Parse a cmap format 12 (segmented coverage) subtable.
+	 *
+	 * @param string $data   Full font file contents.
+	 * @param int    $offset Byte offset of the subtable within $data.
+	 * @return array|null
+	 */
+	private function parse_cmap_format_12( string $data, int $offset ): ?array {
+		if ( $offset + 16 > strlen( $data ) ) {
+			return null;
+		}
+
+		$num_groups = $this->read_uint32( $data, $offset + 12 );
+		$groups     = array();
+
+		for ( $i = 0; $i < $num_groups; $i++ ) {
+			$group_offset = $offset + 16 + ( $i * 12 );
+			if ( $group_offset + 8 > strlen( $data ) ) {
+				break;
+			}
+			$groups[] = array(
+				$this->read_uint32( $data, $group_offset ),
+				$this->read_uint32( $data, $group_offset + 4 ),
+			);
+		}
+
+		return array(
+			'format' => 12,
+			'groups' => $groups,
+		);
 	}
 
 	/**
