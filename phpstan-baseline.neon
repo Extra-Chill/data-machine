@@ -121,3 +121,116 @@ parameters:
 		-
 			message: '#Cannot access property \$(user_id|role|granted_at) on array\.#'
 			path: inc/Cli/Commands/AgentsCommand.php
+
+		# Pre-existing GD int-typing gaps, unrelated to
+		# Extra-Chill/data-machine-events#853's glyph-fallback fix. PHPStan's
+		# GD function stubs (imagecreatetruecolor, imagecolorallocate*,
+		# imagettfbbox) are typed more strictly than this file's plumbing
+		# (0-255 clamped ints, non-false return guarantees) ever enforced.
+		# Confirmed pre-existing by running this exact PHPStan config against
+		# the unmodified file on main before this PR: identical 23 findings,
+		# same messages, same relative positions. Baselined per this
+		# project's own documented convention (phpstan.neon.dist) for
+		# touching a file with prior debt at level 7 — not something this PR
+		# introduced or should be scope-creeped into fixing.
+		-
+			message: '#^Cannot access offset 0 on array\|false\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 4
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Cannot access offset 4 on array\|false\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 4
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Method DataMachine\\Abilities\\Media\\GDRenderer\:\:color\(\) should return int but returns int\<0, max\>\|false\.$#'
+			identifier: return.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Negated boolean expression is always false\.$#'
+			identifier: booleanNot.alwaysFalse
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#1 \$width of function imagecreatetruecolor expects int\<1, max\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#2 \$height of function imagecreatetruecolor expects int\<1, max\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#2 \$red of function imagecolorallocate expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#2 \$red of function imagecolorallocatealpha expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#2 \$red of method DataMachine\\Abilities\\Media\\GDRenderer\:\:color\(\) expects int, float\|int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#3 \$green of function imagecolorallocate expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#3 \$green of function imagecolorallocatealpha expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#3 \$green of method DataMachine\\Abilities\\Media\\GDRenderer\:\:color\(\) expects int, float\|int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#4 \$blue of function imagecolorallocate expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#4 \$blue of function imagecolorallocatealpha expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#4 \$blue of method DataMachine\\Abilities\\Media\\GDRenderer\:\:color\(\) expects int, float\|int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#5 \$alpha of function imagecolorallocatealpha expects int\<0, 127\>, int\<1, max\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Property DataMachine\\Abilities\\Media\\GDRenderer\:\:\$colors \(array\<string, int\>\) does not accept array\<string, bool\|int\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php

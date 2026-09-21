@@ -347,11 +347,27 @@ class GDRenderer {
 
 		foreach ( $this->split_by_glyph_coverage( $text, $font_path ) as $run ) {
 			imagettftext( $this->image, $font_size, 0, $x, $y, $color, $run['font'], $run['text'] );
-			$bbox = imagettfbbox( $font_size, 0, $run['font'], $run['text'] );
-			$x   += abs( $bbox[4] - $bbox[0] );
+			$x += $this->bbox_width( imagettfbbox( $font_size, 0, $run['font'], $run['text'] ) );
 		}
 
 		return $this;
+	}
+
+	/**
+	 * Width in pixels between an `imagettfbbox()` result's left and right
+	 * extents. `imagettfbbox()` is typed to return `array|false` (it can
+	 * fail to open the requested font file), so this centralizes the
+	 * false-safe read instead of indexing the result directly at each
+	 * call site.
+	 *
+	 * @param array|false $bbox Return value of imagettfbbox().
+	 * @return int
+	 */
+	private function bbox_width( array|false $bbox ): int {
+		if ( false === $bbox ) {
+			return 0;
+		}
+		return (int) abs( $bbox[4] - $bbox[0] );
 	}
 
 	/**
@@ -381,9 +397,7 @@ class GDRenderer {
 
 		foreach ( $chars as $char ) {
 			$codepoint      = mb_ord( $char );
-			$needs_fallback = false === $codepoint
-				? false
-				: ! $this->has_glyph_coverage( $font_path, $codepoint );
+			$needs_fallback = ! $this->has_glyph_coverage( $font_path, $codepoint );
 
 			if ( null === $current_needs_fallback || $needs_fallback === $current_needs_fallback ) {
 				$current                = $current . $char;
@@ -407,6 +421,58 @@ class GDRenderer {
 		}
 
 		return $runs;
+	}
+
+	/**
+	 * Read a big-endian unsigned 16-bit integer from a byte string.
+	 *
+	 * `unpack()` is typed `array|false` (it can fail on a malformed format
+	 * string, never on the fixed literal formats used here, but PHPStan
+	 * doesn't know that) — centralizing the read here means every cmap
+	 * parsing call site gets a plain `int` back instead of repeating a
+	 * false-check at each of the ~20 unpack() call sites this parser needs.
+	 *
+	 * @param string $data   Byte string to read from.
+	 * @param int    $offset Byte offset to read at.
+	 * @return int 0 when the offset is out of range or unpack() fails.
+	 */
+	private function read_uint16( string $data, int $offset ): int {
+		if ( $offset < 0 || $offset + 2 > strlen( $data ) ) {
+			return 0;
+		}
+		$unpacked = unpack( 'n', substr( $data, $offset, 2 ) );
+		return false !== $unpacked ? (int) $unpacked[1] : 0;
+	}
+
+	/**
+	 * Read a big-endian unsigned 32-bit integer from a byte string.
+	 *
+	 * @param string $data   Byte string to read from.
+	 * @param int    $offset Byte offset to read at.
+	 * @return int 0 when the offset is out of range or unpack() fails.
+	 */
+	private function read_uint32( string $data, int $offset ): int {
+		if ( $offset < 0 || $offset + 4 > strlen( $data ) ) {
+			return 0;
+		}
+		$unpacked = unpack( 'N', substr( $data, $offset, 4 ) );
+		return false !== $unpacked ? (int) $unpacked[1] : 0;
+	}
+
+	/**
+	 * Read a big-endian signed 16-bit integer from a byte string.
+	 *
+	 * Used for cmap format 4's idDelta field, which the TrueType spec
+	 * defines as signed even though it's stored as a plain uint16 on
+	 * disk — the two's-complement conversion happens here.
+	 *
+	 * @param string $data   Byte string to read from.
+	 * @param int    $offset Byte offset to read at.
+	 * @return int
+	 */
+	private function read_int16( string $data, int $offset ): int {
+		$value = $this->read_uint16( $data, $offset );
+		return $value > 0x7FFF ? $value - 0x10000 : $value;
 	}
 
 	/**
@@ -465,7 +531,7 @@ class GDRenderer {
 				return false;
 			}
 
-			$glyph_id = unpack( 'n', substr( $raw, $glyph_index_address, 2 ) )[1];
+			$glyph_id = $this->read_uint16( $raw, $glyph_index_address );
 
 			if ( 0 === $glyph_id ) {
 				return false;
@@ -498,7 +564,7 @@ class GDRenderer {
 			return null;
 		}
 
-		$num_tables  = unpack( 'n', substr( $data, 4, 2 ) )[1];
+		$num_tables  = $this->read_uint16( $data, 4 );
 		$cmap_offset = null;
 
 		for ( $i = 0; $i < $num_tables; $i++ ) {
@@ -507,7 +573,7 @@ class GDRenderer {
 				break;
 			}
 			if ( 'cmap' === substr( $data, $record_offset, 4 ) ) {
-				$cmap_offset = unpack( 'N', substr( $data, $record_offset + 8, 4 ) )[1];
+				$cmap_offset = $this->read_uint32( $data, $record_offset + 8 );
 				break;
 			}
 		}
@@ -516,7 +582,7 @@ class GDRenderer {
 			return null;
 		}
 
-		$sub_table_count = unpack( 'n', substr( $data, $cmap_offset + 2, 2 ) )[1];
+		$sub_table_count = $this->read_uint16( $data, $cmap_offset + 2 );
 		$best_offset     = null;
 		$best_score      = -1;
 
@@ -526,9 +592,9 @@ class GDRenderer {
 				break;
 			}
 
-			$platform_id = unpack( 'n', substr( $data, $record_offset, 2 ) )[1];
-			$encoding_id = unpack( 'n', substr( $data, $record_offset + 2, 2 ) )[1];
-			$sub_offset  = unpack( 'N', substr( $data, $record_offset + 4, 4 ) )[1];
+			$platform_id = $this->read_uint16( $data, $record_offset );
+			$encoding_id = $this->read_uint16( $data, $record_offset + 2 );
+			$sub_offset  = $this->read_uint32( $data, $record_offset + 4 );
 
 			// Prefer full-Unicode subtables (format 12) over BMP-only
 			// (format 4), and Windows/Unicode platforms over others.
@@ -550,7 +616,7 @@ class GDRenderer {
 			return null;
 		}
 
-		$format = unpack( 'n', substr( $data, $best_offset, 2 ) )[1];
+		$format = $this->read_uint16( $data, $best_offset );
 
 		if ( 12 === $format ) {
 			return $this->parse_cmap_format_12( $data, $best_offset );
@@ -575,7 +641,7 @@ class GDRenderer {
 			return null;
 		}
 
-		$seg_count_x2 = unpack( 'n', substr( $data, $offset + 6, 2 ) )[1];
+		$seg_count_x2 = $this->read_uint16( $data, $offset + 6 );
 		$seg_count    = intdiv( $seg_count_x2, 2 );
 
 		$end_codes_offset       = $offset + 14;
@@ -590,16 +656,12 @@ class GDRenderer {
 		$segments = array();
 
 		for ( $i = 0; $i < $seg_count; $i++ ) {
-			$end   = unpack( 'n', substr( $data, $end_codes_offset + ( $i * 2 ), 2 ) )[1];
-			$start = unpack( 'n', substr( $data, $start_codes_offset + ( $i * 2 ), 2 ) )[1];
-			$delta = unpack( 'n', substr( $data, $id_delta_offset + ( $i * 2 ), 2 ) )[1];
-
-			if ( $delta > 0x7FFF ) {
-				$delta -= 0x10000; // idDelta is a signed int16.
-			}
+			$end   = $this->read_uint16( $data, $end_codes_offset + ( $i * 2 ) );
+			$start = $this->read_uint16( $data, $start_codes_offset + ( $i * 2 ) );
+			$delta = $this->read_int16( $data, $id_delta_offset + ( $i * 2 ) );
 
 			$range_offset_pos = $id_range_offset_offset + ( $i * 2 );
-			$range_offset     = unpack( 'n', substr( $data, $range_offset_pos, 2 ) )[1];
+			$range_offset     = $this->read_uint16( $data, $range_offset_pos );
 
 			if ( 0xFFFF === $start && 0xFFFF === $end ) {
 				continue; // Terminal sentinel segment carries no real mapping.
@@ -630,7 +692,7 @@ class GDRenderer {
 			return null;
 		}
 
-		$num_groups = unpack( 'N', substr( $data, $offset + 12, 4 ) )[1];
+		$num_groups = $this->read_uint32( $data, $offset + 12 );
 		$groups     = array();
 
 		for ( $i = 0; $i < $num_groups; $i++ ) {
@@ -639,8 +701,8 @@ class GDRenderer {
 				break;
 			}
 			$groups[] = array(
-				unpack( 'N', substr( $data, $group_offset, 4 ) )[1],
-				unpack( 'N', substr( $data, $group_offset + 4, 4 ) )[1],
+				$this->read_uint32( $data, $group_offset ),
+				$this->read_uint32( $data, $group_offset + 4 ),
 			);
 		}
 
