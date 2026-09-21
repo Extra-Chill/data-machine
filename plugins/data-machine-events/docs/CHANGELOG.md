@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.63.2] - 2026-09-21
+
+### Fixed
+- catch title-contract + venue + datetime collisions in fallback dedupe
+
 ## [0.63.1] - 2026-09-21
 
 ### Changed
