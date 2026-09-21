@@ -120,6 +120,11 @@ class EventUpsertAbilities {
 			'post_author'    => absint( $input['post_author'] ?? 0 ),
 			'include_images' => false,
 		);
+
+		// Explicit organizer is caller intent, not an AI guess (#849).
+		if ( '' !== trim( (string) ( $event['organizer'] ?? '' ) ) ) {
+			$config['promoter_explicit_organizer'] = true;
+		}
 		if ( ! in_array( $config['post_status'], array( 'draft', 'publish', 'pending', 'private' ), true ) ) {
 			return new \WP_Error( 'invalid_post_status', 'post_status must be draft, publish, pending, or private.', array( 'status' => 400 ) );
 		}
@@ -273,11 +278,18 @@ class EventUpsertAbilities {
 						),
 						'performer'         => $string,
 						'performerType'     => $string,
-						'organizer'         => $string,
-						'organizerType'     => $string,
+						'organizer'         => array(
+							'type'        => 'string',
+							'description' => 'Organizer/promoter name. An explicitly supplied value creates and assigns a promoter term.',
+						),
+						'organizerType'     => array(
+							'type'        => 'string',
+							'description' => 'Schema.org organizer type, stored as promoter term meta when organizer is supplied.',
+						),
 						'organizerUrl'      => array(
-							'type'   => 'string',
-							'format' => 'uri',
+							'type'        => 'string',
+							'format'      => 'uri',
+							'description' => 'Organizer URL, stored as promoter term meta when organizer is supplied.',
 						),
 						'eventStatus'       => $string,
 						'previousStartDate' => $string,

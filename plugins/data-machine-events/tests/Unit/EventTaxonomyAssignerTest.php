@@ -13,6 +13,7 @@ namespace DataMachineEvents\Tests\Unit;
 use WP_UnitTestCase;
 use DataMachineEvents\Steps\Upsert\Events\EventTaxonomyAssigner;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 
@@ -49,6 +50,19 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		if ( ! taxonomy_exists( 'artist' ) ) {
 			register_taxonomy( 'artist', 'data_machine_events' );
 		}
+		if ( ! taxonomy_exists( 'promoter' ) ) {
+			Promoter_Taxonomy::register();
+		}
+
+		// Promoter assignment resolves terms through datamachine/resolve-term
+		// and datamachine/merge-term-meta, both permission-gated on
+		// PermissionHelper::can_manage(). Production callers reach this path
+		// authenticated (an agent/REST context, or Action Scheduler's
+		// background-processing bypass); this direct collaborator test has
+		// neither, so it must authenticate explicitly or every ability call
+		// silently permission-denies and no-ops. Mirrors
+		// EventUpsertAbilitiesTest's setUp().
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 
 		$this->assigner = new EventTaxonomyAssigner();
 	}
@@ -57,6 +71,7 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		global $wpdb;
 		$wpdb->query( 'SET autocommit = 0' );
 		$wpdb->query( 'START TRANSACTION' );
+		wp_set_current_user( 0 );
 		parent::tearDown();
 	}
 
@@ -388,18 +403,9 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 	}
 
 	public function test_process_promoter_skips_when_selection_is_skip() {
-		$post_id = wp_insert_post(
-			array(
-				'post_title'  => 'Promoter Skip Test ' . uniqid(),
-				'post_type'   => 'data_machine_events',
-				'post_status' => 'publish',
-			)
-		);
-		$this->assertGreaterThan( 0, $post_id );
+		$post_id = $this->make_event_post();
+		$engine  = new \DataMachine\Core\EngineData( array( 'organizer' => 'Test Promoter' ), 0 );
 
-		$engine = new \DataMachine\Core\EngineData( array( 'organizer' => 'Test Promoter' ), 0 );
-
-		// 'skip' selection must short-circuit before any promoter work.
 		$this->assigner->processPromoter(
 			$post_id,
 			array( 'organizer' => 'Test Promoter' ),
@@ -408,13 +414,101 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		);
 
 		$terms = wp_get_object_terms( $post_id, 'promoter' );
-		if ( is_wp_error( $terms ) ) {
-			// Promoter taxonomy may not be registered in this test context;
-			// the important assertion is that processPromoter returned without
-			// attempting assignment (skip short-circuit).
-			$this->markTestSkipped( 'promoter taxonomy unavailable in test context' );
-		}
-		$this->assertCount( 0, (array) $terms, 'processPromoter must not assign when selection is skip.' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 0, $terms, 'processPromoter must not assign when selection is skip.' );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_promoter_empty_config_does_not_assign_organizer() {
+		$post_id = $this->make_event_post();
+
+		$this->assigner->processPromoter(
+			$post_id,
+			array(
+				'organizer'     => 'Default Skip Promoter ' . uniqid(),
+				'organizerType' => 'Organization',
+				'organizerUrl'  => 'https://promoter.example/default-skip',
+			),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array()
+		);
+
+		$terms = wp_get_object_terms( $post_id, 'promoter' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 0, $terms, 'Empty handler config must keep the default skip selection.' );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_promoter_ai_decides_creates_and_assigns_from_organizer() {
+		$post_id        = $this->make_event_post();
+		$organizer_name = 'AI Decides Promoter ' . uniqid();
+
+		$this->assigner->processPromoter(
+			$post_id,
+			array(
+				'organizer'     => $organizer_name,
+				'organizerType' => 'Person',
+				'organizerUrl'  => 'https://promoter.example/ai-decides',
+			),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array( 'taxonomy_promoter_selection' => 'ai_decides' )
+		);
+
+		$terms = wp_get_object_terms( $post_id, 'promoter' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'AI_DECIDES selection must assign a promoter term from organizer data.' );
+		$this->assertSame( $organizer_name, $terms[0]->name );
+		$this->assertSame( 'https://promoter.example/ai-decides', get_term_meta( $terms[0]->term_id, '_promoter_url', true ) );
+		$this->assertSame( 'Person', get_term_meta( $terms[0]->term_id, '_promoter_type', true ) );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_promoter_pre_selected_term_id_assigns_that_term() {
+		$post_id = $this->make_event_post();
+		$term_id = wp_insert_term( 'Configured Promoter ' . uniqid(), 'promoter' );
+		$this->assertNotWPError( $term_id );
+
+		$this->assigner->processPromoter(
+			$post_id,
+			array(),
+			new \DataMachine\Core\EngineData(
+				array( 'organizer' => 'Different Organizer ' . uniqid() ),
+				0
+			),
+			array( 'taxonomy_promoter_selection' => (string) $term_id['term_id'] )
+		);
+
+		$terms = wp_get_object_terms( $post_id, 'promoter', array( 'fields' => 'ids' ) );
+		$this->assertNotWPError( $terms );
+		$this->assertSame( array( (int) $term_id['term_id'] ), array_map( 'intval', $terms ), 'A pre-selected promoter term ID must be assigned verbatim.' );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_promoter_explicit_organizer_bypasses_skip_selection() {
+		$post_id        = $this->make_event_post();
+		$organizer_name = 'Explicit Promoter ' . uniqid();
+
+		$this->assigner->processPromoter(
+			$post_id,
+			array(
+				'organizer'     => $organizer_name,
+				'organizerType' => 'Organization',
+				'organizerUrl'  => 'https://promoter.example/explicit',
+			),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array( 'promoter_explicit_organizer' => true )
+		);
+
+		$terms = wp_get_object_terms( $post_id, 'promoter' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'An explicit caller-supplied organizer must bypass the selection gate.' );
+		$this->assertSame( $organizer_name, $terms[0]->name );
+		$this->assertSame( 'https://promoter.example/explicit', get_term_meta( $terms[0]->term_id, '_promoter_url', true ) );
+		$this->assertSame( 'Organization', get_term_meta( $terms[0]->term_id, '_promoter_type', true ) );
 
 		wp_delete_post( $post_id, true );
 	}

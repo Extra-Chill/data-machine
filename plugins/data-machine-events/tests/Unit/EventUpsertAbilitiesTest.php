@@ -11,6 +11,7 @@ use DataMachineEvents\Abilities\AbilityPermissions;
 use DataMachineEvents\Abilities\EventUpsertAbilities;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 use WP_UnitTestCase;
@@ -28,6 +29,9 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		}
 		if ( ! taxonomy_exists( 'venue' ) ) {
 			Venue_Taxonomy::register();
+		}
+		if ( ! taxonomy_exists( 'promoter' ) ) {
+			Promoter_Taxonomy::register();
 		}
 		if ( ! EventDatesTable::table_exists() ) {
 			EventDatesTable::create_table();
@@ -448,6 +452,37 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'canonical_event_booking_lock_not_acquired', $result->get_error_code() );
 		$this->assertSame( 503, $result->get_error_data()['status'] );
 		$this->assertTrue( $result->get_error_data()['retryable'] );
+	}
+
+	public function test_explicit_organizer_creates_and_assigns_promoter_term(): void {
+		$input                           = $this->validInput();
+		$input['event']['organizer']     = 'Ability Promoter ' . uniqid();
+		$input['event']['organizerType'] = 'Person';
+		$input['event']['organizerUrl']  = 'https://promoter.example/ability';
+
+		$result = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertIsArray( $result );
+		$this->assertTrue( $result['success'] );
+
+		$terms = wp_get_object_terms( $result['event_id'], 'promoter' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'An explicit caller-supplied organizer must create and assign a promoter term.' );
+		$this->assertSame( $input['event']['organizer'], $terms[0]->name );
+		$this->assertSame( 'https://promoter.example/ability', get_term_meta( $terms[0]->term_id, '_promoter_url', true ) );
+		$this->assertSame( 'Person', get_term_meta( $terms[0]->term_id, '_promoter_type', true ) );
+	}
+
+	public function test_absent_organizer_assigns_no_promoter_term(): void {
+		$input  = $this->validInput();
+		$result = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertIsArray( $result );
+		$this->assertTrue( $result['success'] );
+
+		$terms = wp_get_object_terms( $result['event_id'], 'promoter' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 0, $terms, 'An absent organizer must not assign a promoter term.' );
 	}
 
 	private function validInput(): array {

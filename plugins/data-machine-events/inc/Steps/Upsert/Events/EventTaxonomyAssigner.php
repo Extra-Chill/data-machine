@@ -142,6 +142,12 @@ class EventTaxonomyAssigner {
 	 * @param array $handler_config Handler configuration
 	 */
 	public function processPromoter( int $post_id, array $parameters, EngineData $engine, array $handler_config = array() ): void {
+		// Ability-only flag: explicit organizer bypasses the selection gate (#849).
+		if ( ! empty( $handler_config['promoter_explicit_organizer'] ) ) {
+			$this->assignPromoterFromOrganizer( $post_id, $engine, $parameters );
+			return;
+		}
+
 		$selection = $this->getPromoterSelection( $handler_config );
 
 		if ( 'skip' === $selection ) {
@@ -157,6 +163,21 @@ class EventTaxonomyAssigner {
 			return;
 		}
 
+		$this->assignPromoterFromOrganizer( $post_id, $engine, $parameters );
+	}
+
+	/**
+	 * Create or find the promoter term for organizer data and assign it.
+	 *
+	 * Maps the Schema.org "organizer" fields to the promoter taxonomy.
+	 * Shared by the explicit caller-supplied path and the AI_DECIDES
+	 * selection mode.
+	 *
+	 * @param int        $post_id    Post ID.
+	 * @param EngineData $engine     Engine data helper.
+	 * @param array      $parameters Event parameters.
+	 */
+	private function assignPromoterFromOrganizer( int $post_id, EngineData $engine, array $parameters ): void {
 		// Organizer field name maps to promoter taxonomy
 		$promoter_name = $engine->get( 'organizer' ) ?? $parameters['organizer'] ?? '';
 

@@ -57,10 +57,13 @@ class EventBlockContentBuilderTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"startDate":"2026-08-01"', $content );
 		$this->assertStringContainsString( '"startTime":"20:00"', $content );
 		$this->assertStringContainsString( '"venue":"Charleston Pour House"', $content );
-		// Display flags are always forced true.
-		$this->assertStringContainsString( '"showVenue":true', $content );
+		// Display flags consumed by the calendar (DisplayVars) are always
+		// forced true.
 		$this->assertStringContainsString( '"showPrice":true', $content );
 		$this->assertStringContainsString( '"showTicketLink":true', $content );
+		// showVenue is not registered in block.json and has no consumer; it
+		// must not be written (issue #849).
+		$this->assertStringNotContainsString( '"showVenue"', $content );
 	}
 
 	public function test_build_round_trips_canonical_offer_and_type_attributes() {

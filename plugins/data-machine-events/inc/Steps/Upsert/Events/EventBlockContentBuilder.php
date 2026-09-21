@@ -60,7 +60,6 @@ class EventBlockContentBuilder {
 			// into block markup or JSON-LD.
 			'eventType'         => Event_Type_Taxonomy::resolve_schema_type( $event_data['eventType'] ?? '' ),
 
-			'showVenue'         => true,
 			'showPrice'         => true,
 			'showTicketLink'    => true,
 		);
@@ -72,7 +71,6 @@ class EventBlockContentBuilder {
 			}
 		);
 
-		$block_attributes['showVenue']      = true;
 		$block_attributes['showPrice']      = true;
 		$block_attributes['showTicketLink'] = true;
 
