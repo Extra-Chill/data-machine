@@ -223,26 +223,29 @@ class EventOgCardTemplate implements TemplateInterface {
 
 		$venue_font_size = 34;
 		$city_font_size  = 26;
-		$venue_y         = $footer_band_y + 40;
 
-		if ( '' !== $venue ) {
+		$has_venue = '' !== $venue;
+		$has_city  = '' !== $city;
+
+		[ $venue_baseline, $city_baseline ] = $this->compute_footer_baselines( $has_venue, $has_city, $brand_strip_y );
+
+		if ( $has_venue ) {
 			$renderer->draw_text(
 				$venue,
 				$venue_font_size,
 				$padding,
-				$venue_y + $venue_font_size,
+				$venue_baseline,
 				$text_pri,
 				'header'
 			);
 		}
 
-		if ( '' !== $city ) {
-			$city_y = '' !== $venue ? $venue_y + $venue_font_size + 18 : $venue_y;
+		if ( $has_city ) {
 			$renderer->draw_text(
 				$city,
 				$city_font_size,
 				$padding,
-				$city_y + $city_font_size,
+				$city_baseline,
 				$text_mute,
 				'body'
 			);
@@ -287,6 +290,55 @@ class EventOgCardTemplate implements TemplateInterface {
 		$renderer->destroy();
 
 		return $path ? array( $path ) : array();
+	}
+
+	/**
+	 * Compute the venue and city text baselines within the footer band.
+	 *
+	 * Anchored bottom-up from `$brand_strip_y` instead of top-down from
+	 * `$footer_band_y`: the last line's baseline is placed a fixed
+	 * clearance above the strip, so the block can never collide with it
+	 * regardless of how many lines are present. A top-down offset (the
+	 * previous, buggy approach — see issue #853) stays correct only for
+	 * as long as nobody changes a font size; anchoring to the strip is
+	 * self-correcting.
+	 *
+	 * Pulled out as its own method (rather than inlined in render()) so
+	 * the geometry can be verified directly — this is the exact
+	 * computation regression tests assert against, independent of
+	 * whether the host environment can rasterise text with GD/FreeType.
+	 *
+	 * @param bool $has_venue     Whether a venue line will be drawn.
+	 * @param bool $has_city      Whether a city line will be drawn.
+	 * @param int  $brand_strip_y Y position of the top of the bottom brand strip.
+	 * @return array{0:int,1:int} [venue_baseline, city_baseline]. Both are
+	 *         always populated (even when the corresponding line isn't
+	 *         drawn) so callers never index into an unset value.
+	 */
+	private function compute_footer_baselines( bool $has_venue, bool $has_city, int $brand_strip_y ): array {
+		// Vertical gap between the last text baseline and the top of the
+		// brand strip. Sized to clear descenders (~20% of font size, so
+		// ~7px for the 34px venue line) with comfortable margin to spare.
+		$bottom_clearance = 16;
+		// Baseline-to-baseline distance between the venue and city lines
+		// when both are present. Matches the original design's spacing.
+		$baseline_gap = 44;
+
+		// Default: whichever line is drawn alone sits at the single-line
+		// anchor (bottom_clearance above the strip). When both lines are
+		// present, city stays at that anchor as the last line and venue
+		// is recomputed to stack above it. Defining both up front — rather
+		// than only inside a has_venue-only branch — means the
+		// venue-absent and city-absent cases each still resolve to a
+		// real, correctly positioned baseline instead of an unset value.
+		$venue_baseline = $brand_strip_y - $bottom_clearance;
+		$city_baseline  = $brand_strip_y - $bottom_clearance;
+
+		if ( $has_venue && $has_city ) {
+			$venue_baseline = $city_baseline - $baseline_gap;
+		}
+
+		return array( $venue_baseline, $city_baseline );
 	}
 
 	/**
