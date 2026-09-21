@@ -16,6 +16,7 @@ namespace DataMachine\Tests\Unit\Abilities\Media;
 
 use DataMachine\Abilities\Media\GDRenderer;
 use ReflectionClass;
+use WP_UnitTestCase;
 
 class GDRendererGlyphFallbackTest extends WP_UnitTestCase {
 
