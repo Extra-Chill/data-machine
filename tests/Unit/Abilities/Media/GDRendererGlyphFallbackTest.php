@@ -28,7 +28,34 @@ class GDRendererGlyphFallbackTest extends TestCase {
 	 * glyphs. Tests skip gracefully if the theme isn't checked out
 	 * alongside this repo (e.g. a bare CI checkout of data-machine only).
 	 */
-	private const DISPLAY_FONT = '/var/www/extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.ttf';
+	private const DISPLAY_FONT_RELATIVE = 'themes/extrachill/assets/fonts/WilcoLoftSans-Treble.ttf';
+
+	/**
+	 * Resolve the display font without hardcoding a single machine's absolute
+	 * path. Checks an explicit override first, then wp-content locations
+	 * relative to this checkout. Returns null when no candidate is readable,
+	 * so the caller skips rather than asserting against a missing file.
+	 */
+	private function display_font_path(): ?string {
+		$candidates = array();
+
+		$override = getenv( 'DM_TEST_DISPLAY_FONT' );
+		if ( is_string( $override ) && '' !== $override ) {
+			$candidates[] = $override;
+		}
+
+		$repo = dirname( __DIR__, 4 );
+		$candidates[] = dirname( $repo, 2 ) . '/' . self::DISPLAY_FONT_RELATIVE;
+		$candidates[] = dirname( $repo ) . '/' . self::DISPLAY_FONT_RELATIVE;
+
+		foreach ( $candidates as $candidate ) {
+			if ( is_readable( $candidate ) ) {
+				return $candidate;
+			}
+		}
+
+		return null;
+	}
 
 	private function has_glyph_coverage( GDRenderer $renderer, string $font_path, int $codepoint ): bool {
 		$method = ( new ReflectionClass( $renderer ) )->getMethod( 'has_glyph_coverage' );
@@ -80,18 +107,18 @@ class GDRendererGlyphFallbackTest extends TestCase {
 	}
 
 	public function test_display_font_lacks_accented_latin_but_not_ascii(): void {
-		if ( ! is_readable( self::DISPLAY_FONT ) ) {
+		if ( null === $this->display_font_path() ) {
 			$this->markTestSkipped( 'Extra Chill display font not present in this environment.' );
 		}
 
 		$renderer = new GDRenderer();
 
 		$this->assertTrue(
-			$this->has_glyph_coverage( $renderer, self::DISPLAY_FONT, mb_ord( 'A' ) ),
+			$this->has_glyph_coverage( $renderer, $this->display_font_path(), mb_ord( 'A' ) ),
 			'Display font should cover plain ASCII'
 		);
 		$this->assertFalse(
-			$this->has_glyph_coverage( $renderer, self::DISPLAY_FONT, mb_ord( 'å' ) ),
+			$this->has_glyph_coverage( $renderer, $this->display_font_path(), mb_ord( 'å' ) ),
 			'This is the exact defect from issue #853 — the display font renders NO GLYPH for å'
 		);
 	}
@@ -105,7 +132,7 @@ class GDRendererGlyphFallbackTest extends TestCase {
 	}
 
 	public function test_run_splitting_isolates_uncovered_characters(): void {
-		if ( ! is_readable( self::DISPLAY_FONT ) ) {
+		if ( null === $this->display_font_path() ) {
 			$this->markTestSkipped( 'Extra Chill display font not present in this environment.' );
 		}
 
@@ -116,7 +143,7 @@ class GDRendererGlyphFallbackTest extends TestCase {
 		// 'Å' but not lowercase 'å', which is exactly why per-character
 		// cmap detection is the correct fix instead of any case-based or
 		// character-list heuristic.
-		$runs = $this->split_by_glyph_coverage( $renderer, 'Baggelycke Gård', self::DISPLAY_FONT );
+		$runs = $this->split_by_glyph_coverage( $renderer, 'Baggelycke Gård', $this->display_font_path() );
 
 		// Reassembling the runs must reproduce the original text exactly.
 		$this->assertSame( 'Baggelycke Gård', implode( '', array_column( $runs, 'text' ) ) );
@@ -129,7 +156,7 @@ class GDRendererGlyphFallbackTest extends TestCase {
 		// And no run should be tagged with the display font while
 		// containing the uncovered character.
 		foreach ( $runs as $run ) {
-			if ( self::DISPLAY_FONT === $run['font'] ) {
+			if ( $this->display_font_path() === $run['font'] ) {
 				$this->assertStringNotContainsString( 'å', $run['text'] );
 			}
 		}
