@@ -1,0 +1,39 @@
+# Continuous release pipeline.
+#
+# Triggers on every push to main. Homeboy derives the version from the
+# conventional commits since the last tag (fix: -> patch, feat: -> minor,
+# BREAKING CHANGE -> major; chore:/ci:/docs:/test: -> no release), runs the
+# repository quality gates, then tags, generates the changelog, creates the
+# GitHub Release and attaches the built artifact.
+#
+# The whole pipeline lives in the reusable workflow — releasable-commit
+# detection, dry-run version prediction, failed-SHA retry protection, and
+# GitHub App token handling are inherited, not re-implemented here.
+
+name: Release
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Preview the release without making changes'
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    uses: Extra-Chill/homeboy-action/.github/workflows/release.yml@v2
+    with:
+      dry-run: ${{ inputs.dry-run || false }}
+    secrets: inherit
