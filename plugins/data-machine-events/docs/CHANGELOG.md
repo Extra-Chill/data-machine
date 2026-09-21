@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.63.5] - 2026-09-21
+
+### Fixed
+- stop destroying array-typed schema fields with a blanket string cast
+
 ## [0.63.4] - 2026-09-21
 
 ### Fixed
