@@ -2,7 +2,7 @@
 /**
  * GDRenderer glyph-coverage fallback tests (issue Extra-Chill/data-machine-events#853).
  *
- * Pure unit tests — no WordPress bootstrap required. GDRenderer's glyph
+ * GDRenderer's glyph
  * detection reads a font file's `cmap` table directly, so these tests run
  * it against real system/theme font files rather than fixtures, proving
  * the detection matches reality: DejaVu Sans (the system fallback) covers
@@ -15,10 +15,9 @@
 namespace DataMachine\Tests\Unit\Abilities\Media;
 
 use DataMachine\Abilities\Media\GDRenderer;
-use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
-class GDRendererGlyphFallbackTest extends TestCase {
+class GDRendererGlyphFallbackTest extends WP_UnitTestCase {
 
 	private const SYSTEM_FALLBACK_FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
 
