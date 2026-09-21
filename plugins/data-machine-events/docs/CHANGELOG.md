@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.63.3] - 2026-09-21
+
+### Fixed
+- honour organizer fields on upsert-event promoter assignment
+
 ## [0.63.2] - 2026-09-21
 
 ### Fixed
