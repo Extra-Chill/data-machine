@@ -180,6 +180,11 @@ class SendEmailAbility {
 							'default'     => array(),
 							'description' => __( 'Array of server file paths to attach', 'data-machine' ),
 						),
+						'system'       => array(
+							'type'        => 'boolean',
+							'default'     => false,
+							'description' => __( 'Server-side only. When true and the call has no acting user or agent principal, the send resolves the site system mailbox (datamachine_email_system_mailbox option, default "default") through the same trusted principal-less authorization the queue worker uses. The flag is stripped for REST, MCP, and agent contexts, and for any caller with an acting user or agent; a logged-in non-manager is denied by the standard mailbox gates.', 'data-machine' ),
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -221,6 +226,15 @@ class SendEmailAbility {
 		if ( is_wp_error( $queued_context ) ) {
 			return $queued_context;
 		}
+
+		// `system` is a server-side-only control field: it is always removed
+		// from the input before normalization and never reaches the payload.
+		$system_send = ! empty( $input['system'] ) && ! is_array( $input['system'] );
+		unset( $input['system'] );
+		if ( $system_send && ! $this->canSendAsSystem() ) {
+			$system_send = false;
+		}
+
 		$config = $this->normalizeConfig( $input );
 
 		// 1. Parse and validate recipients.
@@ -254,6 +268,27 @@ class SendEmailAbility {
 			$config['from_email'] = $resolved['credentials']['imap_user'];
 			$config['reply_to']   = $resolved['credentials']['imap_user'];
 			$config['from_name']  = (string) ( $resolved['credentials']['display_name'] ?? '' );
+		} elseif ( $system_send ) {
+			// Principal-less system send: reuse the exact trusted authorization
+			// the queued worker's system path reaches — can_use_default()'s
+			// principal_less_system + _trusted_execution branch. No new policy.
+			$providers = apply_filters( 'datamachine_auth_providers', array() );
+			$auth      = is_array( $providers ) ? ( $providers['email_imap'] ?? null ) : null;
+			if ( ! $auth || ! is_object( $auth ) || ! method_exists( $auth, 'resolve_mailbox_for_principal' ) ) {
+				return new \WP_Error( 'email_imap_not_configured', 'Email IMAP provider is not registered.', array( 'status' => 400 ) );
+			}
+			$account  = $this->systemMailboxAccount();
+			$resolved = $auth->resolve_mailbox_for_principal( $account, 'send', array( 'principal_less_system' => true ) );
+			if ( is_wp_error( $resolved ) ) {
+				return $resolved;
+			}
+			$config['from_email'] = $resolved['credentials']['imap_user'];
+			$config['reply_to']   = $resolved['credentials']['imap_user'];
+			$config['from_name']  = (string) ( $resolved['credentials']['display_name'] ?? '' );
+			$logs[]               = array(
+				'level'   => 'info',
+				'message' => 'Email: Principal-less system send authorized via ' . (string) ( $resolved['ref'] ?? ( 'email_imap:' . $account ) ),
+			);
 		} else {
 			$legacy_sender_allowed = is_array( $queued_context )
 				? ! empty( $queued_context['legacy_sender'] ) && ( 'system' === ( $queued_context['issuer_type'] ?? '' ) || $this->userCanManageLegacySender( absint( $queued_context['user_id'] ?? 0 ) ) )
@@ -568,6 +603,46 @@ class SendEmailAbility {
 			return PermissionHelper::can_manage();
 		}
 		return PermissionHelper::acting_user_id() > 0 && PermissionHelper::can_manage();
+	}
+
+	/**
+	 * Whether the server-side principal-less system flag may be honored.
+	 *
+	 * The flag is reserved for trusted server-side transactional code paths.
+	 * Callers with any acting principal (user session, pre-authenticated user,
+	 * or agent bearer token) never qualify — a logged-in non-manager passing
+	 * `system: true` falls through to the standard gates and is denied with
+	 * the existing `email_auth_ref_required` error. REST-originated
+	 * executions are stripped unless running inside the trusted
+	 * run_as_authenticated() seam: external REST/MCP tool callers always carry
+	 * a principal (otherwise the permission callback denies them before
+	 * execute()), so no externally-triggered request can reach the honored
+	 * branch — the same protection model that keeps _mailbox_grant
+	 * unreachable from tool callers.
+	 */
+	private function canSendAsSystem(): bool {
+		if ( PermissionHelper::acting_user_id() > 0 ) {
+			return false;
+		}
+		if ( null !== PermissionHelper::get_acting_agent_id() ) {
+			return false;
+		}
+		if ( ( defined( 'REST_REQUEST' ) && REST_REQUEST ) && ! PermissionHelper::is_authenticated_context() ) {
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Account name of the site's transactional system mailbox.
+	 *
+	 * Defaults to the shared install-local default mailbox; operators can name
+	 * any other configured account via the datamachine_email_system_mailbox
+	 * site option without a code change.
+	 */
+	private function systemMailboxAccount(): string {
+		$account = strtolower( trim( (string) get_site_option( 'datamachine_email_system_mailbox', 'default' ) ) );
+		return preg_match( '/^[a-z0-9][a-z0-9._-]*$/', $account ) ? $account : 'default';
 	}
 
 	private function userCanManageLegacySender( int $user_id ): bool {

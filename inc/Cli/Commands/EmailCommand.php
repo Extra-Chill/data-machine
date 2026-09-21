@@ -1155,6 +1155,60 @@ class EmailCommand extends BaseCommand {
 		}
 	}
 
+	/**
+	 * List configured email mailboxes (redacted).
+	 *
+	 * Shows every configured mailbox — the site default plus named accounts —
+	 * with account name, scope, owner id, IMAP host, and IMAP user. Passwords
+	 * and tokens are never displayed. The `system` column marks the account
+	 * used for principal-less system sends (datamachine_email_system_mailbox
+	 * option, default "default").
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - ids
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine email mailboxes
+	 *     wp datamachine email mailboxes --format=json
+	 *
+	 * @subcommand mailboxes
+	 */
+	public function mailboxes( array $args, array $assoc_args ): void {
+		$providers = apply_filters( 'datamachine_auth_providers', array() );
+		$auth      = is_array( $providers ) ? ( $providers['email_imap'] ?? null ) : null;
+		if ( ! is_object( $auth ) || ! method_exists( $auth, 'get_mailbox_index' ) ) {
+			WP_CLI::error( 'Email IMAP provider is not registered.' );
+		}
+
+		$system_mailbox = strtolower( trim( (string) get_site_option( 'datamachine_email_system_mailbox', 'default' ) ) );
+
+		$rows = array();
+		foreach ( $auth->get_mailbox_index() as $mailbox ) {
+			$account = (string) ( $mailbox['account'] ?? '' );
+			$rows[]  = array(
+				'account'   => $account,
+				'scope'     => (string) ( $mailbox['owner_type'] ?? '' ),
+				'owner_id'  => (int) ( $mailbox['owner_id'] ?? 0 ),
+				'imap_host' => (string) ( $mailbox['imap_host'] ?? '' ),
+				'imap_user' => (string) ( $mailbox['imap_user'] ?? '' ),
+				'system'    => $account === $system_mailbox ? 'yes' : '',
+			);
+		}
+
+		$this->format_items( $rows, array( 'account', 'scope', 'owner_id', 'imap_host', 'imap_user', 'system' ), $assoc_args, 'account' );
+	}
+
 	private function mailboxRef( array $assoc_args, bool $use_default = true ): string {
 		$ref = trim( (string) ( $assoc_args['auth-ref'] ?? '' ) );
 		if ( '' === $ref && ! empty( $assoc_args['mailbox'] ) ) {
