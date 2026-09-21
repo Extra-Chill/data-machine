@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.63.1] - 2026-09-21
+
+### Changed
+- add continuous release pipeline
+
+### Fixed
+- decode HTML entities in event ingestion text before storage
+
 ## [0.63.0] - 2026-09-19
 
 ### Added
