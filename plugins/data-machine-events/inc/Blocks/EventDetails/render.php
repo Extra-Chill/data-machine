@@ -32,7 +32,16 @@ $venue            = $decode_unicode( $attributes['venue'] ?? '' );
 $address          = $decode_unicode( $attributes['address'] ?? '' );
 $price            = $decode_unicode( $attributes['price'] ?? '' );
 $ticket_url       = $attributes['ticketUrl'] ?? '';
+// block.json declares occurrenceDates as an array of strings, but 132 stored
+// posts hold a bare string there. `??` only substitutes the default for null,
+// so that string reached count() below and fatalled the whole request, making
+// those event pages return HTTP 500. The guard further down already treats a
+// non-array as "no occurrences"; normalising here makes every later use agree
+// with that instead of only some of them.
 $occurrence_dates = $attributes['occurrenceDates'] ?? array();
+if ( ! is_array( $occurrence_dates ) ) {
+	$occurrence_dates = array();
+}
 $post_id = (int) get_the_ID();
 
 /*
@@ -78,7 +87,7 @@ if ( $end_date ) {
 
 // Filter and limit occurrence dates for display.
 $upcoming_occurrences = array();
-if ( ! empty( $occurrence_dates ) && is_array( $occurrence_dates ) ) {
+if ( ! empty( $occurrence_dates ) ) {
 	$current_date = current_time( 'Y-m-d' );
 	$max_display  = apply_filters( 'data_machine_events_max_occurrence_display', 5 );
 
