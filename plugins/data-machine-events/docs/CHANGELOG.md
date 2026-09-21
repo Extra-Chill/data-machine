@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.63.6] - 2026-09-21
+
+### Fixed
+- stop venue/city text clipping the OG card brand strip
+
 ## [0.63.5] - 2026-09-21
 
 ### Fixed
