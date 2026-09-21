@@ -38,7 +38,12 @@ class EventBlockContentBuilder {
 			'startTime'         => $event_data['startTime'] ?? '',
 			'endDate'           => $event_data['endDate'] ?? '',
 			'endTime'           => $event_data['endTime'] ?? '',
-			'occurrenceDates'   => $event_data['occurrenceDates'] ?? array(),
+			// `??` only substitutes for null, so a non-array here would be
+			// serialised into block markup as-is and fatal the renderer. The
+			// writer upstream now preserves arrays, but this is the last point
+			// before the value becomes stored markup, so it refuses to emit a
+			// shape block.json does not declare.
+			'occurrenceDates'   => is_array( $event_data['occurrenceDates'] ?? null ) ? $event_data['occurrenceDates'] : array(),
 			'venue'             => $event_data['venue'] ?? $parameters['venue'] ?? '',
 			'address'           => $event_data['venueAddress'] ?? $parameters['venueAddress'] ?? '',
 			'price'             => $event_data['price'] ?? '',

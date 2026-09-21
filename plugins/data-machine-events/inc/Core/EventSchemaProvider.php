@@ -327,6 +327,27 @@ class EventSchemaProvider {
 		};
 	}
 
+	/**
+	 * Field keys the schema declares as arrays.
+	 *
+	 * Consumers that coerce values must ask the schema which fields are not
+	 * scalars rather than hardcoding a list. `occurrenceDates` is the only one
+	 * today, and a blanket `(string)` cast over every schema field silently
+	 * destroyed it — PHP renders an array as the literal "Array", so the dates
+	 * were gone before they reached block markup.
+	 *
+	 * @return array<int, string> Field keys whose declared type is `array`.
+	 */
+	public static function getArrayFieldKeys(): array {
+		$keys = array();
+		foreach ( self::getAllFields() as $key => $field ) {
+			if ( 'array' === ( $field['type'] ?? '' ) ) {
+				$keys[] = $key;
+			}
+		}
+		return $keys;
+	}
+
 	public static function getDefaults(): array {
 		$defaults = array();
 		foreach ( self::getAllFields() as $key => $field ) {

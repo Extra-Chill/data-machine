@@ -1257,10 +1257,28 @@ class EventUpsert extends UpsertHandler {
 		}
 
 		// AI parameters fill in remaining fields
+		$array_fields = EventSchemaProvider::getArrayFieldKeys();
 		foreach ( $schema_fields as $field ) {
 			if ( ! isset( $event_data[ $field ] ) && ! empty( $parameters[ $field ] ) ) {
 				if ( 'ticketUrl' === $field ) {
 					$event_data[ $field ] = trim( $parameters[ $field ] );
+				} elseif ( in_array( $field, $array_fields, true ) ) {
+					// Array-typed schema fields must never reach the scalar
+					// path below: `(string) array( '2026-01-01' )` yields the
+					// literal "Array", so the value was destroyed before it
+					// was ever stored. Sanitise each member instead.
+					$value                = $parameters[ $field ];
+					$event_data[ $field ] = is_array( $value )
+						? array_values(
+							array_filter(
+								array_map(
+									static fn( $item ) => sanitize_text_field( TextNormalization::decode_entities( (string) $item ) ),
+									$value
+								),
+								static fn( $item ) => '' !== $item
+							)
+						)
+						: array();
 				} else {
 					// Decode before sanitizing so entity-hidden markup is
 					// stripped rather than stored (issue #844).
