@@ -508,7 +508,7 @@ class EventDuplicateStrategy {
 	 */
 	private static function isValidPost( int $post_id ): bool {
 		$status = get_post_status( $post_id );
-		return $status && in_array( $status, array( 'publish', 'draft', 'pending' ), true );
+		return $status && in_array( $status, array( 'publish', 'future', 'draft', 'pending', 'private' ), true );
 	}
 
 	/**
