@@ -19,6 +19,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 class UpdateEventCommand {
 
 	/**
+	 * The `data-machine-events/update-event` ability this command wraps.
+	 *
+	 * The CLI is a thin adapter: field names accepted here are derived at
+	 * runtime from this ability's registered input schema (see
+	 * `fieldMap()`), so this docblock is the only place the field list is
+	 * hand-maintained. Keep it in sync with
+	 * `EventUpdateAbilities::registerAbility()`'s `input_schema`.
+	 */
+	private const ABILITY_NAME = 'data-machine-events/update-event';
+
+	/**
 	 * Update one or more events' date, time, venue, and other fields.
 	 *
 	 * ## OPTIONS
@@ -26,21 +37,51 @@ class UpdateEventCommand {
 	 * <event_ids>
 	 * : One or more event IDs (comma-separated).
 	 *
-	 * [--startDate=<date>]
-	 * : New start date.
+	 * [--start-date=<date>]
+	 * : New start date (any parseable format, normalized to YYYY-MM-DD).
 	 *
-	 * [--startTime=<time>]
-	 * : New start time.
+	 * [--start-time=<time>]
+	 * : New start time (any parseable format like "8pm", "20:00").
+	 *
+	 * [--end-date=<date>]
+	 * : New end date (any parseable format, normalized to YYYY-MM-DD).
+	 *
+	 * [--end-time=<time>]
+	 * : New end time (any parseable format, normalized to HH:MM).
 	 *
 	 * [--venue=<venue>]
-	 * : New venue.
+	 * : Existing venue term ID to assign.
+	 *
+	 * [--description=<description>]
+	 * : Event description (HTML allowed).
+	 *
+	 * [--price=<price>]
+	 * : Ticket price (e.g., "$25" or "$20 adv / $25 door").
+	 *
+	 * [--ticket-url=<url>]
+	 * : URL to purchase tickets.
+	 *
+	 * [--performer=<name>]
+	 * : Performer name.
+	 *
+	 * [--performer-type=<type>]
+	 * : Performer type: Person, PerformingGroup, or MusicGroup.
+	 *
+	 * [--event-status=<status>]
+	 * : Event status: EventScheduled, EventPostponed, EventCancelled, or EventRescheduled.
+	 *
+	 * [--event-type=<type>]
+	 * : Event format. Must be a value from the event_type vocabulary.
+	 *
+	 * [--occurrence-dates=<json>]
+	 * : JSON array of specific dates (YYYY-MM-DD) when the event occurs.
 	 *
 	 * [--format=<format>]
 	 * : Output format (default: table).
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp data-machine-events update-event 123 --startTime=20:00
+	 *     wp data-machine-events update-event 123 --start-time=20:00
 	 *     wp data-machine-events update-event 123,456 --venue="The Pour House"
 	 *
 	 * @param array $args       Positional arguments.
@@ -56,7 +97,7 @@ class UpdateEventCommand {
 		$event_ids_raw = $args[0] ?? '';
 
 		if ( empty( $event_ids_raw ) ) {
-			\WP_CLI::error( 'Missing required event ID(s). Usage: wp data-machine-events update-event <event_ids> [--startTime=<time>]' );
+			\WP_CLI::error( 'Missing required event ID(s). Usage: wp data-machine-events update-event <event_ids> [--start-time=<time>]' );
 		}
 
 		$event_ids = $this->parseEventIds( $event_ids_raw );
@@ -68,10 +109,17 @@ class UpdateEventCommand {
 		$format = $assoc_args['format'] ?? 'table';
 		unset( $assoc_args['format'] );
 
-		$fields = $this->extractUpdateFields( $assoc_args );
+		$field_map = $this->fieldMap();
+
+		if ( empty( $field_map ) ) {
+			\WP_CLI::error( 'The ' . self::ABILITY_NAME . ' ability is not registered; cannot resolve updatable fields.' );
+		}
+
+		$fields = $this->extractUpdateFields( $assoc_args, $field_map );
 
 		if ( empty( $fields ) ) {
-			\WP_CLI::error( 'No fields to update. Provide at least one of: --startDate, --startTime, --endDate, --endTime, --occurrenceDates, --venue, --price, --ticketUrl, --performer, --performerType, --eventStatus, --eventType, --description' );
+			$flags = array_map( static fn( string $flag ): string => "--{$flag}", array_keys( $field_map ) );
+			\WP_CLI::error( 'No fields to update. Provide at least one of: ' . implode( ', ', $flags ) );
 		}
 
 		$abilities = new EventUpdateAbilities();
@@ -100,46 +148,73 @@ class UpdateEventCommand {
 		return array_map( 'intval', $ids );
 	}
 
-	private function extractUpdateFields( array $assoc_args ): array {
-		$allowed_fields = array(
-			'startDate',
-			'startTime',
-			'endDate',
-			'endTime',
-			'occurrenceDates',
-			'venue',
-			'price',
-			'priceCurrency',
-			'ticketUrl',
-			'offerAvailability',
-			'validFrom',
-			'performer',
-			'performerType',
-			'organizer',
-			'organizerType',
-			'organizerUrl',
-			'eventStatus',
-			'previousStartDate',
-			'eventType',
-			'description',
-		);
+	/**
+	 * Map CLI-legal kebab-case flag names to the ability's camelCase field
+	 * names, derived from the ability's own registered input schema.
+	 *
+	 * WP-CLI's synopsis parser only accepts lowercase option names
+	 * (`[a-z-_0-9]+`), so this is the single place that reconciles CLI
+	 * naming conventions with the ability's camelCase contract. Deriving
+	 * from the schema (rather than hand-listing field names here) is
+	 * deliberate: a hand-maintained duplicate list is exactly what drifted
+	 * out of sync in #858.
+	 *
+	 * @return array<string, string> Map of kebab-case flag => camelCase field.
+	 */
+	private function fieldMap(): array {
+		$ability = wp_get_ability( self::ABILITY_NAME );
 
+		if ( ! $ability instanceof \WP_Ability ) {
+			return array();
+		}
+
+		$properties = $ability->get_input_schema()['properties'] ?? array();
+
+		$map = array();
+		foreach ( array_keys( $properties ) as $property_name ) {
+			$field = (string) $property_name;
+
+			// 'event' and 'events' are structural (event identification),
+			// not updatable fields, and are handled separately from
+			// positional event IDs.
+			if ( in_array( $field, array( 'event', 'events' ), true ) ) {
+				continue;
+			}
+
+			$map[ $this->toKebabCase( $field ) ] = $field;
+		}
+
+		return $map;
+	}
+
+	/** Convert a camelCase ability field name to a WP-CLI-legal kebab-case flag. */
+	private function toKebabCase( string $camel ): string {
+		return strtolower( (string) preg_replace( '/(?<!^)[A-Z]/', '-$0', $camel ) );
+	}
+
+	/**
+	 * @param array                $assoc_args Named CLI arguments (kebab-case flags).
+	 * @param array<string, string> $field_map  Map of kebab-case flag => camelCase field, from fieldMap().
+	 */
+	private function extractUpdateFields( array $assoc_args, array $field_map ): array {
 		$fields = array();
 
-		foreach ( $allowed_fields as $field ) {
-			if ( isset( $assoc_args[ $field ] ) ) {
-				$value = $assoc_args[ $field ];
-
-				// Parse JSON for array fields
-				if ( 'occurrenceDates' === $field && is_string( $value ) ) {
-					$decoded = json_decode( $value, true );
-					if ( is_array( $decoded ) ) {
-						$value = $decoded;
-					}
-				}
-
-				$fields[ $field ] = $value;
+		foreach ( $field_map as $flag => $field ) {
+			if ( ! isset( $assoc_args[ $flag ] ) ) {
+				continue;
 			}
+
+			$value = $assoc_args[ $flag ];
+
+			// Parse JSON for array fields
+			if ( 'occurrenceDates' === $field && is_string( $value ) ) {
+				$decoded = json_decode( $value, true );
+				if ( is_array( $decoded ) ) {
+					$value = $decoded;
+				}
+			}
+
+			$fields[ $field ] = $value;
 		}
 
 		return $fields;
