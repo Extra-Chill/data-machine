@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.7] - 2026-09-22
+
+### Fixed
+- align sendy-list-campaigns status enum with its own unfiltered semantics
+
 ## [0.17.6] - 2026-09-21
 
 ### Changed
