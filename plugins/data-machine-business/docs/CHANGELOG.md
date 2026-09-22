@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.9] - 2026-09-22
+
+### Fixed
+- grant id-token so the shared release workflow can start
+
 ## [0.17.8] - 2026-09-22
 
 ### Fixed
