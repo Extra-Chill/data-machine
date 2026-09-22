@@ -94,8 +94,19 @@ class GoogleAnalyticsAbilities {
 	const AGGREGATE_MAX_RESPONSE_BYTES   = 4194304;
 	const AGGREGATE_BATCH_RESPONSE_KIND  = 'analyticsData#batchRunReports';
 	const AGGREGATE_REPORT_RESPONSE_KIND = 'analyticsData#runReport';
-	const AGGREGATE_DIMENSIONS           = array( 'browser', 'country', 'date', 'deviceCategory', 'eventName', 'firstUserDefaultChannelGroup', 'firstUserMedium', 'firstUserSource', 'hostName', 'landingPage', 'month', 'newVsReturning', 'operatingSystem', 'pagePath', 'pageTitle', 'region', 'sessionCampaignName', 'sessionDefaultChannelGroup', 'sessionMedium', 'sessionSource', 'week' );
+	const AGGREGATE_DIMENSIONS           = array( 'browser', 'country', 'countryId', 'date', 'deviceCategory', 'eventName', 'firstUserDefaultChannelGroup', 'firstUserMedium', 'firstUserSource', 'hostName', 'landingPage', 'month', 'newVsReturning', 'operatingSystem', 'pagePath', 'pageTitle', 'region', 'sessionCampaignName', 'sessionDefaultChannelGroup', 'sessionMedium', 'sessionSource', 'week' );
 	const AGGREGATE_METRICS              = array( 'activeUsers', 'averageSessionDuration', 'bounceRate', 'engagedSessions', 'engagementRate', 'eventCount', 'eventsPerSession', 'keyEvents', 'newUsers', 'screenPageViews', 'screenPageViewsPerSession', 'sessionKeyEventRate', 'sessions', 'sessionsPerUser', 'totalUsers', 'userKeyEventRate' );
+
+	/**
+	 * ISO-3166-1 alpha-2 country code pattern used to validate --country cohorts.
+	 *
+	 * GA4's `country` dimension returns full English names ("United States"),
+	 * not codes — `countryId` is the ISO-alpha-2-coded dimension and the only
+	 * one that supports an exact-match --country=<code> filter.
+	 *
+	 * @var string
+	 */
+	const COUNTRY_CODE_PATTERN = '/^[A-Z]{2}$/';
 
 	/**
 	 * Share at which unknown landing-page coverage is material to analysis.
@@ -333,6 +344,10 @@ class GoogleAnalyticsAbilities {
 					'minimum' => 1,
 					'maximum' => self::AGGREGATE_MAX_ROWS,
 				),
+				'country'               => array(
+					'type'      => 'string',
+					'maxLength' => 200,
+				),
 			),
 		);
 	}
@@ -356,6 +371,10 @@ class GoogleAnalyticsAbilities {
 			),
 			'page_filter' => array( 'type' => 'string' ),
 			'hostname'    => array( 'type' => 'string' ),
+			'country'     => array(
+				'type'      => 'string',
+				'maxLength' => 200,
+			),
 			'sort_by'     => array( 'type' => 'string' ),
 			'order'       => array(
 				'type' => 'string',
@@ -505,6 +524,91 @@ class GoogleAnalyticsAbilities {
 		);
 	}
 
+	/**
+	 * Apply the configured default country cohort when the caller did not pass
+	 * --country at all.
+	 *
+	 * An explicit --country (including "all", the opt-out) always wins over the
+	 * configured default; see sanitizeCountryCodes(). Both preset actions
+	 * (buildReportRequestBody) and aggregate_report (buildAggregateReportRequestBody)
+	 * consume the resulting $input['country'] downstream, so resolving it once
+	 * here — before fetchStats() routes to either — covers every GA4 query
+	 * surface with one default. Public for unit testing.
+	 *
+	 * @param array $input  Ability input, as received by fetchStats().
+	 * @param array $config Resolved GA config (see get_config()); reads
+	 *                      default_country_cohort.
+	 * @return array $input with 'country' set to the default when it was unset
+	 *               or blank and a default is configured; otherwise unchanged.
+	 */
+	public static function applyDefaultCountryCohort( array $input, array $config ): array {
+		if ( isset( $input['country'] ) && '' !== trim( (string) $input['country'] ) ) {
+			return $input;
+		}
+		$default_cohort = is_string( $config['default_country_cohort'] ?? null ) ? trim( $config['default_country_cohort'] ) : '';
+		if ( '' !== $default_cohort ) {
+			$input['country'] = $default_cohort;
+		}
+		return $input;
+	}
+
+	/**
+	 * Parse and sanitize a --country cohort string into validated ISO codes.
+	 *
+	 * Accepts a comma-separated list of ISO-3166-1 alpha-2 codes (case-insensitive,
+	 * whitespace-tolerant) or the literal "all". Invalid entries are dropped
+	 * silently rather than rejecting the whole request — a typo'd extra code in
+	 * an otherwise valid cohort shouldn't fail the entire query. Returns an empty
+	 * array both when every code was invalid and when the input is "all"; both
+	 * mean "apply no country filter."
+	 *
+	 * @param string $raw Raw --country value.
+	 * @return array<int,string> Validated, deduped, uppercased ISO alpha-2 codes.
+	 */
+	private static function sanitizeCountryCodes( string $raw ): array {
+		if ( 'all' === strtolower( trim( $raw ) ) ) {
+			return array();
+		}
+		$codes = array();
+		foreach ( explode( ',', $raw ) as $code ) {
+			$code = strtoupper( trim( $code ) );
+			if ( 1 === preg_match( self::COUNTRY_CODE_PATTERN, $code ) && ! in_array( $code, $codes, true ) ) {
+				$codes[] = $code;
+			}
+		}
+		return $codes;
+	}
+
+	/**
+	 * Build a countryId dimensionFilter expression for a cohort of ISO codes.
+	 *
+	 * countryId — not GA4's `country` dimension, which returns full English
+	 * names ("United States") and cannot exact-match a code — verified live
+	 * against this install's GA4 property. A single code becomes one EXACT
+	 * filter; multiple codes become an orGroup, mirroring the network_density
+	 * in-network-host orGroup pattern below.
+	 *
+	 * @param array<int,string> $codes Non-empty list of validated ISO alpha-2 codes.
+	 * @return array Filter or orGroup expression.
+	 */
+	private static function buildCountryFilterExpression( array $codes ): array {
+		$expressions = array_map(
+			static fn( string $code ): array => array(
+				'filter' => array(
+					'fieldName'    => 'countryId',
+					'stringFilter' => array(
+						'matchType' => 'EXACT',
+						'value'     => $code,
+					),
+				),
+			),
+			$codes
+		);
+		return 1 === count( $expressions )
+			? $expressions[0]
+			: array( 'orGroup' => array( 'expressions' => $expressions ) );
+	}
+
 	/** Build one bounded batchRunReports request body or return an error message. */
 	public static function buildAggregateReportRequestBody( array $input ) {
 		$error = self::validateAggregateInput( $input );
@@ -539,8 +643,21 @@ class GoogleAnalyticsAbilities {
 			'metricAggregations'  => array( 'TOTAL' ),
 			'returnPropertyQuota' => true,
 		);
-		if ( ! empty( $input['filters'] ) ) {
-			$body['dimensionFilter'] = array( 'andGroup' => array( 'expressions' => array_map( $build_expression, $input['filters'] ) ) );
+		// Explicit filters (up to 4, validated) AND the resolved country cohort
+		// (explicit --country or the configured default; see fetchStats())
+		// combine into the same andGroup shape aggregate_report has always used
+		// — unlike buildReportRequestBody's legacy-action filters, a single
+		// aggregate_report filter is not unwrapped; see
+		// test_aggregate_request_is_bounded_and_uses_total_quota_batch_shape.
+		$expressions = array_map( $build_expression, $input['filters'] ?? array() );
+		if ( ! empty( $input['country'] ) ) {
+			$country_codes = self::sanitizeCountryCodes( (string) $input['country'] );
+			if ( ! empty( $country_codes ) ) {
+				$expressions[] = self::buildCountryFilterExpression( $country_codes );
+			}
+		}
+		if ( ! empty( $expressions ) ) {
+			$body['dimensionFilter'] = array( 'andGroup' => array( 'expressions' => $expressions ) );
 		}
 		if ( ! empty( $input['order_by'] ) ) {
 			$body['orderBys'] = array_map(
@@ -552,7 +669,7 @@ class GoogleAnalyticsAbilities {
 	}
 
 	private static function validateAggregateInput( array $input ): ?string {
-		$allowed = array( 'action', 'property_id', 'date_range', 'comparison_date_range', 'dimensions', 'metrics', 'filters', 'order_by', 'limit' );
+		$allowed = array( 'action', 'property_id', 'date_range', 'comparison_date_range', 'dimensions', 'metrics', 'filters', 'order_by', 'limit', 'country' );
 		if ( array_diff( array_keys( $input ), $allowed ) ) {
 			return 'aggregate_report accepts only its documented fields.'; }
 		foreach ( array( 'date_range', 'metrics' ) as $required ) {
@@ -581,6 +698,8 @@ class GoogleAnalyticsAbilities {
 			return 'limit must be an integer from 1 to 100.'; }
 		if ( ! is_array( $input['filters'] ?? array() ) || count( $input['filters'] ?? array() ) > 4 ) {
 			return 'filters supports at most four entries.'; }
+		if ( isset( $input['country'] ) && ( ! is_string( $input['country'] ) || strlen( $input['country'] ) > 200 ) ) {
+			return 'country must be a comma-separated list of ISO-3166-1 alpha-2 codes, or "all".'; }
 		foreach ( $input['filters'] ?? array() as $filter ) {
 			if ( ! is_array( $filter ) || array_diff( array_keys( $filter ), array( 'field_name', 'match_type', 'value', 'case_sensitive', 'exclude' ) ) || ! in_array( $filter['field_name'] ?? '', self::AGGREGATE_DIMENSIONS, true ) || ! in_array( $filter['match_type'] ?? '', array( 'EXACT', 'CONTAINS', 'BEGINS_WITH', 'ENDS_WITH' ), true ) || ! is_string( $filter['value'] ?? null ) || '' === $filter['value'] || strlen( $filter['value'] ) > 200 || ( isset( $filter['case_sensitive'] ) && ! is_bool( $filter['case_sensitive'] ) ) || ( isset( $filter['exclude'] ) && ! is_bool( $filter['exclude'] ) ) ) {
 				return 'filters must contain approved bounded string dimension filters.'; }
@@ -735,18 +854,30 @@ class GoogleAnalyticsAbilities {
 		);
 	}
 
+	/**
+	 * GA4's fixed placeholder dimension value for a batchRunReports totals row.
+	 *
+	 * Whenever a runReport request includes one or more dimensions, GA4 always
+	 * echoes this single placeholder as the totals row's dimensionValues (its
+	 * metricValues carry the real aggregate). A zero-dimension request's totals
+	 * row omits dimensionValues entirely. See normalizeAggregateReport().
+	 *
+	 * @var string
+	 */
+	const AGGREGATE_TOTALS_RESERVED_DIMENSION_VALUE = 'RESERVED_TOTAL';
+
 	/** Normalize a single batch report without inventing coverage guarantees. */
 	public static function normalizeAggregateReport( array $report, array $date_range, array $expected_dimensions = array(), array $expected_metrics = array() ) {
-		$invalid = static fn(): \WP_Error => new \WP_Error( 'invalid_ga_aggregate_response', 'Google Analytics returned a malformed aggregate report.' );
+		$invalid = static fn( string $reason ): \WP_Error => new \WP_Error( 'invalid_ga_aggregate_response', "Google Analytics returned a malformed aggregate report ({$reason})." );
 		if ( ! isset( $report['kind'] ) || self::AGGREGATE_REPORT_RESPONSE_KIND !== $report['kind'] ) {
-			return $invalid(); }
+			return $invalid( 'kind_mismatch' ); }
 		unset( $report['kind'] );
 		$dimension_headers = $report['dimensionHeaders'] ?? array();
 		$metric_headers    = $report['metricHeaders'] ?? array();
 		$raw_rows          = $report['rows'] ?? array();
 		$raw_totals        = $report['totals'] ?? array();
 		if ( ! is_array( $dimension_headers ) || ! is_array( $metric_headers ) || ! is_array( $raw_rows ) || ! is_array( $raw_totals ) || ! array_is_list( $dimension_headers ) || ! array_is_list( $metric_headers ) || ! array_is_list( $raw_rows ) || ! array_is_list( $raw_totals ) || count( $raw_rows ) > self::AGGREGATE_MAX_ROWS ) {
-			return $invalid(); }
+			return $invalid( 'envelope_shape' ); }
 		$headers    = static function ( array $items ) { $names = array();
 			foreach ( $items as $item ) {
 				if ( ! is_array( $item ) || array_diff( array_keys( $item ), array( 'name', 'type' ) ) || ! isset( $item['name'] ) || ! is_string( $item['name'] ) || '' === $item['name'] || strlen( $item['name'] ) > 100 || ( isset( $item['type'] ) && ( ! is_string( $item['type'] ) || strlen( $item['type'] ) > 100 ) ) ) {
@@ -756,8 +887,10 @@ class GoogleAnalyticsAbilities {
 		};
 		$dimensions = $headers( $dimension_headers );
 		$metrics    = $headers( $metric_headers );
-		if ( false === $dimensions || false === $metrics || ( ! empty( $raw_rows ) && ( $dimensions !== $expected_dimensions || $metrics !== $expected_metrics ) ) || ( ! empty( $raw_totals ) && $metrics !== $expected_metrics ) || ( empty( $raw_rows ) && empty( $raw_totals ) && ( ( ! empty( $dimensions ) && $dimensions !== $expected_dimensions ) || ( ! empty( $metrics ) && $metrics !== $expected_metrics ) ) ) ) {
-			return $invalid(); }
+		if ( false === $dimensions || false === $metrics ) {
+			return $invalid( 'header_format' ); }
+		if ( ( ! empty( $raw_rows ) && ( $dimensions !== $expected_dimensions || $metrics !== $expected_metrics ) ) || ( ! empty( $raw_totals ) && $metrics !== $expected_metrics ) || ( empty( $raw_rows ) && empty( $raw_totals ) && ( ( ! empty( $dimensions ) && $dimensions !== $expected_dimensions ) || ( ! empty( $metrics ) && $metrics !== $expected_metrics ) ) ) ) {
+			return $invalid( 'dimension_metric_mismatch' ); }
 		$dimensions = empty( $dimensions ) ? $expected_dimensions : $dimensions;
 		$metrics    = empty( $metrics ) ? $expected_metrics : $metrics;
 		$record     = static function ( array $headers, array $values, int $max_length ) { if ( ! array_is_list( $values ) || count( $values ) !== count( $headers ) ) {
@@ -773,11 +906,11 @@ class GoogleAnalyticsAbilities {
 		$rows       = array();
 		foreach ( $raw_rows as $row ) {
 			if ( ! is_array( $row ) || array_diff( array_keys( $row ), array( 'dimensionValues', 'metricValues' ) ) || ! isset( $row['dimensionValues'], $row['metricValues'] ) ) {
-				return $invalid(); }
+				return $invalid( 'row_keys' ); }
 			$dimension_values = $record( $dimensions, $row['dimensionValues'], 2000 );
 			$metric_values    = $record( $metrics, $row['metricValues'], 200 );
 			if ( false === $dimension_values || false === $metric_values ) {
-				return $invalid(); }
+				return $invalid( 'row_values' ); }
 			$rows[] = array(
 				'dimensions' => $dimension_values,
 				'metrics'    => $metric_values,
@@ -786,7 +919,7 @@ class GoogleAnalyticsAbilities {
 		$limits   = array();
 		$metadata = $report['metadata'] ?? array();
 		if ( ! is_array( $metadata ) || array_diff( array_keys( $metadata ), array( 'dataLossFromOtherRow', 'subjectToThresholding', 'samplingMetadatas', 'timeZone', 'currencyCode', 'emptyReason', 'schemaRestrictionResponse' ) ) || ( isset( $metadata['dataLossFromOtherRow'] ) && ! is_bool( $metadata['dataLossFromOtherRow'] ) ) || ( isset( $metadata['subjectToThresholding'] ) && ! is_bool( $metadata['subjectToThresholding'] ) ) || ( isset( $metadata['timeZone'] ) && ( ! is_string( $metadata['timeZone'] ) || strlen( $metadata['timeZone'] ) > 100 ) ) || ( isset( $metadata['currencyCode'] ) && ( ! is_string( $metadata['currencyCode'] ) || strlen( $metadata['currencyCode'] ) > 20 ) ) || ( isset( $metadata['emptyReason'] ) && ( ! is_string( $metadata['emptyReason'] ) || '' === $metadata['emptyReason'] || strlen( $metadata['emptyReason'] ) > 100 ) ) ) {
-			return $invalid(); }
+			return $invalid( 'metadata_shape' ); }
 		if ( ! empty( $metadata['dataLossFromOtherRow'] ) ) {
 			$limits[] = 'Some dimension values were grouped into an other row, so the returned breakdown is incomplete.'; }
 		if ( ! empty( $metadata['subjectToThresholding'] ) ) {
@@ -796,36 +929,49 @@ class GoogleAnalyticsAbilities {
 		if ( isset( $metadata['schemaRestrictionResponse'] ) ) {
 			$restriction = $metadata['schemaRestrictionResponse'];
 			if ( ! is_array( $restriction ) || array_keys( $restriction ) !== array( 'activeMetricRestrictions' ) || ! is_array( $restriction['activeMetricRestrictions'] ) || ! array_is_list( $restriction['activeMetricRestrictions'] ) || count( $restriction['activeMetricRestrictions'] ) > count( $expected_metrics ) ) {
-				return $invalid(); }
+				return $invalid( 'schema_restriction_shape' ); }
 			foreach ( $restriction['activeMetricRestrictions'] as $metric_restriction ) {
 				if ( ! is_array( $metric_restriction ) || count( $metric_restriction ) !== 2 || array_diff( array_keys( $metric_restriction ), array( 'metricName', 'restrictedMetricTypes' ) ) || ! isset( $metric_restriction['metricName'], $metric_restriction['restrictedMetricTypes'] ) || ! is_string( $metric_restriction['metricName'] ) || '' === $metric_restriction['metricName'] || strlen( $metric_restriction['metricName'] ) > 100 || ! in_array( $metric_restriction['metricName'], $expected_metrics, true ) || ! is_array( $metric_restriction['restrictedMetricTypes'] ) || ! array_is_list( $metric_restriction['restrictedMetricTypes'] ) || count( $metric_restriction['restrictedMetricTypes'] ) < 1 || count( $metric_restriction['restrictedMetricTypes'] ) > 2 || count( $metric_restriction['restrictedMetricTypes'] ) !== count( array_unique( $metric_restriction['restrictedMetricTypes'] ) ) || array_diff( $metric_restriction['restrictedMetricTypes'], array( 'RESTRICTED_METRIC_TYPE_UNSPECIFIED', 'COST_DATA', 'REVENUE_DATA' ) ) ) {
-					return $invalid(); }
+					return $invalid( 'schema_restriction_entry' ); }
 			}
 			if ( ! empty( $restriction['activeMetricRestrictions'] ) ) {
 				$limits[] = 'Google Analytics restricted one or more requested metrics.'; }
 		}
 		if ( isset( $metadata['samplingMetadatas'] ) && ( ! is_array( $metadata['samplingMetadatas'] ) || ! array_is_list( $metadata['samplingMetadatas'] ) || count( $metadata['samplingMetadatas'] ) > 5 ) ) {
-			return $invalid(); }
+			return $invalid( 'sampling_metadata_shape' ); }
 		foreach ( $metadata['samplingMetadatas'] ?? array() as $sampling ) {
 			if ( ! is_array( $sampling ) || array_diff( array_keys( $sampling ), array( 'samplesReadCount', 'samplingSpaceSize' ) ) || ( isset( $sampling['samplesReadCount'] ) && ( ! is_string( $sampling['samplesReadCount'] ) || ! ctype_digit( $sampling['samplesReadCount'] ) ) ) || ( isset( $sampling['samplingSpaceSize'] ) && ( ! is_string( $sampling['samplingSpaceSize'] ) || ! ctype_digit( $sampling['samplingSpaceSize'] ) ) ) ) {
-				return $invalid();
+				return $invalid( 'sampling_metadata_entry' );
 			} $limits[] = 'Google Analytics sampled ' . ( $sampling['samplesReadCount'] ?? 'an unknown number of' ) . ' records from ' . ( $sampling['samplingSpaceSize'] ?? 'an unknown sampling space' ) . '.'; }
 		if ( isset( $report['rowCount'] ) && ( ! is_int( $report['rowCount'] ) || $report['rowCount'] < 0 ) ) {
-			return $invalid(); }
+			return $invalid( 'row_count' ); }
 		$row_count = $report['rowCount'] ?? count( $rows );
 		if ( $row_count > count( $rows ) ) {
 			$limits[] = 'The result is truncated to ' . count( $rows ) . ' of ' . $row_count . ' matching rows.'; }
 		if ( empty( $rows ) ) {
 			$limits[] = 'No rows matched the requested report.'; }
-		if ( count( $raw_totals ) > 1 || ( 1 === count( $raw_totals ) && ( ! is_array( $raw_totals[0] ) || array_keys( $raw_totals[0] ) !== array( 'metricValues' ) ) ) ) {
-			return $invalid(); }
+		// GA4 always echoes a single RESERVED_TOTAL placeholder dimension value on
+		// the totals row whenever the request has one or more dimensions — proven
+		// live against this install's GA4 property (batchRunReports, dimensions:
+		// ["country"]): the totals row was {"dimensionValues":[{"value":
+		// "RESERVED_TOTAL"}],"metricValues":[...]}, not metricValues-only. A
+		// zero-dimension request's totals row omits dimensionValues entirely. Both
+		// shapes are legitimate; anything else is a real malformation.
+		$totals_row              = $raw_totals[0] ?? null;
+		$totals_row_keys         = is_array( $totals_row ) ? array_keys( $totals_row ) : null;
+		$totals_reserved_wrapper = array( 'dimensionValues', 'metricValues' ) === $totals_row_keys
+			&& array( array( 'value' => self::AGGREGATE_TOTALS_RESERVED_DIMENSION_VALUE ) ) === ( $totals_row['dimensionValues'] ?? null );
+		if ( count( $raw_totals ) > 1 || ( 1 === count( $raw_totals ) && ( null === $totals_row_keys || ( array( 'metricValues' ) !== $totals_row_keys && ! $totals_reserved_wrapper ) ) ) ) {
+			return $invalid( 'totals_shape' ); }
 		$totals = empty( $raw_totals ) ? array_fill_keys( $metrics, '' ) : $record( $metrics, $raw_totals[0]['metricValues'], 200 );
-		if ( false === $totals || ( isset( $report['propertyQuota'] ) && ! is_array( $report['propertyQuota'] ) ) ) {
-			return $invalid(); }
+		if ( false === $totals ) {
+			return $invalid( 'totals_values' ); }
+		if ( isset( $report['propertyQuota'] ) && ! is_array( $report['propertyQuota'] ) ) {
+			return $invalid( 'property_quota_shape' ); }
 		$quota = array();
 		foreach ( $report['propertyQuota'] ?? array() as $name => $value ) {
 			if ( ! is_string( $name ) || ! is_array( $value ) || array_diff( array_keys( $value ), array( 'consumed', 'remaining' ) ) || ( isset( $value['consumed'] ) && ( ! is_int( $value['consumed'] ) || $value['consumed'] < 0 ) ) || ( isset( $value['remaining'] ) && ( ! is_int( $value['remaining'] ) || $value['remaining'] < 0 ) ) ) {
-				return $invalid();
+				return $invalid( 'property_quota_entry' );
 			} if ( isset( $value['remaining'] ) ) {
 				$quota[ $name ] = $value['remaining']; }
 		}
@@ -870,6 +1016,7 @@ class GoogleAnalyticsAbilities {
 
 		$config      = self::get_config();
 		$property_id = ! empty( $input['property_id'] ) ? sanitize_text_field( $input['property_id'] ) : ( $config['property_id'] ?? '' );
+		$input       = self::applyDefaultCountryCohort( $input, $config );
 
 		if ( empty( $property_id ) ) {
 			return array(
@@ -1003,6 +1150,20 @@ class GoogleAnalyticsAbilities {
 					),
 				),
 			);
+		}
+
+		// Country cohort filter, applied to every action regardless of its own
+		// dimensions — same unconditional pattern as the hostname filter above.
+		// Filters on countryId (ISO-3166-1 alpha-2), not GA4's `country`
+		// dimension, which returns full English names ("United States") and
+		// cannot exact-match a code. "all" or an empty/invalid cohort applies no
+		// filter. See sanitizeCountryCodes() and fetchStats()'s default-cohort
+		// resolution.
+		if ( ! empty( $input['country'] ) ) {
+			$country_codes = self::sanitizeCountryCodes( (string) $input['country'] );
+			if ( ! empty( $country_codes ) ) {
+				$filters[] = self::buildCountryFilterExpression( $country_codes );
+			}
 		}
 
 		// In-network referrer filter for network_density.
@@ -2000,9 +2161,26 @@ class GoogleAnalyticsAbilities {
 	/**
 	 * Get stored configuration.
 	 *
-	 * @return array
+	 * Same site-option-plus-filter shape as SendyAbilities::get_campaign_config()
+	 * — deployments may override any key (including default_country_cohort)
+	 * through the filter instead of persisting it in the network option.
+	 *
+	 * @return array Keys include service_account_json, property_id, and the
+	 *               optional default_country_cohort — a comma-separated
+	 *               ISO-3166-1 alpha-2 cohort (e.g. "US,CA,GB") applied to every
+	 *               GA query unless --country explicitly overrides or opts out
+	 *               with "all". See fetchStats().
 	 */
 	public static function get_config(): array {
-		return get_site_option( self::CONFIG_OPTION, array() );
+		$config = get_site_option( self::CONFIG_OPTION, array() );
+		$config = is_array( $config ) ? $config : array();
+
+		/**
+		 * Filter the canonical Google Analytics configuration.
+		 *
+		 * @param array $config Keys: service_account_json, property_id, and
+		 *                      optional default_country_cohort.
+		 */
+		return apply_filters( 'datamachine_ga_config', $config );
 	}
 }

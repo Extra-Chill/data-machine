@@ -154,6 +154,170 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A single --country code produces one countryId EXACT filter — not GA4's
+	 * `country` dimension, which returns full English names ("United States")
+	 * and cannot exact-match a code (#140). Verified against a live GA4 payload
+	 * in test_aggregate_normalizes_real_ga4_payload_with_reserved_total_row.
+	 */
+	public function test_single_country_code_produces_country_id_exact_filter(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'country'    => 'us',
+				'start_date' => '2026-01-01',
+				'end_date'   => '2026-01-31',
+			),
+			'date_stats'
+		);
+
+		$filter = $body['dimensionFilter']['filter'];
+		$this->assertSame( 'countryId', $filter['fieldName'] );
+		$this->assertSame( 'EXACT', $filter['stringFilter']['matchType'] );
+		$this->assertSame( 'US', $filter['stringFilter']['value'], 'lowercase input is uppercased' );
+	}
+
+	/**
+	 * A comma-separated --country cohort becomes an orGroup of countryId EXACT
+	 * filters, mirroring the network_density in-network-host orGroup pattern.
+	 */
+	public function test_multi_country_cohort_produces_or_group(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'country'    => 'US, ca ,GB,us',
+				'start_date' => '2026-01-01',
+				'end_date'   => '2026-01-31',
+			),
+			'page_stats'
+		);
+
+		$expressions = $body['dimensionFilter']['orGroup']['expressions'];
+		$this->assertCount( 3, $expressions, 'cohort is deduped: US appears once despite two case variants' );
+		$this->assertSame(
+			array( 'US', 'CA', 'GB' ),
+			array_map( static fn( $e ) => $e['filter']['stringFilter']['value'], $expressions )
+		);
+		foreach ( $expressions as $expression ) {
+			$this->assertSame( 'countryId', $expression['filter']['fieldName'] );
+		}
+	}
+
+	/**
+	 * --country=all is the explicit opt-out: no filter is emitted even though
+	 * the input was provided.
+	 */
+	public function test_country_all_emits_no_filter(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'country'    => 'all',
+				'start_date' => '2026-01-01',
+				'end_date'   => '2026-01-31',
+			),
+			'date_stats'
+		);
+
+		$this->assertArrayNotHasKey( 'dimensionFilter', $body );
+	}
+
+	/**
+	 * An input containing only invalid country codes is equivalent to no
+	 * cohort — invalid entries are dropped, not rejected outright.
+	 */
+	public function test_country_with_only_invalid_codes_emits_no_filter(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'country'    => 'usa, 1, toolongcode',
+				'start_date' => '2026-01-01',
+				'end_date'   => '2026-01-31',
+			),
+			'date_stats'
+		);
+
+		$this->assertArrayNotHasKey( 'dimensionFilter', $body );
+	}
+
+	/**
+	 * page_filter + country combine into an andGroup, the same way page_filter
+	 * + hostname do.
+	 */
+	public function test_page_filter_and_country_combine_into_and_group(): void {
+		$body = GoogleAnalyticsAbilities::buildReportRequestBody(
+			array(
+				'page_filter' => '/about/',
+				'country'     => 'US',
+				'start_date'  => '2026-01-01',
+				'end_date'    => '2026-01-31',
+			),
+			'date_stats'
+		);
+
+		$field_names = array_map(
+			static fn( $e ) => $e['filter']['fieldName'],
+			$body['dimensionFilter']['andGroup']['expressions']
+		);
+		$this->assertContains( 'pagePath', $field_names );
+		$this->assertContains( 'countryId', $field_names );
+	}
+
+	/**
+	 * aggregate_report's --country cohort combines with any explicit --filters
+	 * into the same andGroup shape aggregate_report has always used for
+	 * filters (see test_aggregate_request_is_bounded_and_uses_total_quota_batch_shape).
+	 */
+	public function test_aggregate_report_country_combines_with_explicit_filters(): void {
+		$body = GoogleAnalyticsAbilities::buildAggregateReportRequestBody( array(
+			'action'     => 'aggregate_report',
+			'date_range' => array( 'start_date' => '2026-01-01', 'end_date' => '2026-01-31' ),
+			'metrics'    => array( 'sessions' ),
+			'filters'    => array( array( 'field_name' => 'hostName', 'match_type' => 'EXACT', 'value' => 'example.com' ) ),
+			'country'    => 'US,CA',
+		) );
+		$this->assertNotWPError( $body );
+		$expressions = $body['dimensionFilter']['andGroup']['expressions'];
+		$this->assertCount( 2, $expressions );
+		$this->assertSame( 'hostName', $expressions[0]['filter']['fieldName'] );
+		$this->assertSame( 'orGroup', array_key_first( $expressions[1] ) );
+	}
+
+	/**
+	 * aggregate_report's --country alone (no explicit filters) still wraps in
+	 * andGroup, matching the existing single-filter convention for this action.
+	 */
+	public function test_aggregate_report_country_alone_still_uses_and_group(): void {
+		$body = GoogleAnalyticsAbilities::buildAggregateReportRequestBody( array(
+			'action'     => 'aggregate_report',
+			'date_range' => array( 'start_date' => '2026-01-01', 'end_date' => '2026-01-31' ),
+			'metrics'    => array( 'sessions' ),
+			'country'    => 'US',
+		) );
+		$this->assertNotWPError( $body );
+		$this->assertSame(
+			'US',
+			$body['dimensionFilter']['andGroup']['expressions'][0]['filter']['stringFilter']['value']
+		);
+	}
+
+	/**
+	 * Default-cohort resolution (#140 Part 3): an explicit --country always
+	 * wins, "all" opts out even with a default configured, and an unset input
+	 * falls back to the configured datamachine_ga_config default_country_cohort.
+	 *
+	 * @dataProvider default_country_cohort_cases
+	 */
+	public function test_apply_default_country_cohort( array $input, array $config, ?string $expected ): void {
+		$resolved = GoogleAnalyticsAbilities::applyDefaultCountryCohort( $input, $config );
+		$this->assertSame( $expected, $resolved['country'] ?? null );
+	}
+
+	public static function default_country_cohort_cases(): array {
+		return array(
+			'no default configured, no input'      => array( array(), array(), null ),
+			'default applies when input unset'     => array( array(), array( 'default_country_cohort' => 'US,CA' ), 'US,CA' ),
+			'explicit input overrides default'     => array( array( 'country' => 'GB' ), array( 'default_country_cohort' => 'US,CA' ), 'GB' ),
+			'explicit "all" opt-out wins over default' => array( array( 'country' => 'all' ), array( 'default_country_cohort' => 'US,CA' ), 'all' ),
+			'blank input string falls back to default' => array( array( 'country' => '' ), array( 'default_country_cohort' => 'US,CA' ), 'US,CA' ),
+		);
+	}
+
+	/**
 	 * Empty page_filter string should not produce a dimensionFilter (empty()
 	 * check semantics).
 	 */
@@ -852,6 +1016,117 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 	public function test_aggregate_normalization_rejects_malformed_rows_and_preserves_old_action_builder(): void {
 		$this->assertWPError( GoogleAnalyticsAbilities::normalizeAggregateReport( array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND, 'dimensionHeaders' => array(), 'metricHeaders' => array(), 'rows' => array( array() ), 'totals' => array() ), array() ) );
 		$this->assertSame( array( 'date' ), wp_list_pluck( GoogleAnalyticsAbilities::buildReportRequestBody( array(), 'date_stats' )['dimensions'], 'name' ) );
+	}
+
+	/**
+	 * Regression fixture for #140: aggregate_report failed on every real GA4
+	 * response with one or more dimensions, because GA4 always echoes a
+	 * RESERVED_TOTAL placeholder dimension value on the totals row, but the
+	 * validator required totals rows to contain metricValues only. This fixture
+	 * is a real batchRunReports response captured live against this install's
+	 * GA4 property (dimensions=["country"], metrics=["sessions"]).
+	 */
+	public function test_aggregate_normalizes_real_ga4_payload_with_reserved_total_row(): void {
+		$batch  = json_decode(
+			file_get_contents( dirname( __DIR__, 3 ) . '/fixtures/ga4-aggregate-batch-response-country-totals.json' ),
+			true
+		);
+		$report = $batch['reports'][0];
+
+		$normalized = GoogleAnalyticsAbilities::normalizeAggregateReport(
+			$report,
+			array( 'start_date' => '2026-09-15', 'end_date' => '2026-09-22' ),
+			array( 'country' ),
+			array( 'sessions' )
+		);
+
+		$this->assertNotWPError( $normalized );
+		$this->assertSame( '30683', $normalized['totals']['sessions'] );
+		$this->assertSame( '13170', $normalized['rows'][0]['metrics']['sessions'] );
+		$this->assertSame( 'United States', $normalized['rows'][0]['dimensions']['country'] );
+		$this->assertSame( 199966, $normalized['quota_remaining']['tokensPerDay'] );
+	}
+
+	/**
+	 * A totals row whose dimensionValues carries anything other than the
+	 * RESERVED_TOTAL placeholder is still rejected — the fix permits exactly
+	 * the shape GA4 actually sends, not an arbitrary dimensionValues on totals.
+	 * The rejection names the failing condition (#140).
+	 */
+	public function test_aggregate_rejects_totals_row_with_non_reserved_dimension_value(): void {
+		$batch                                                     = json_decode(
+			file_get_contents( dirname( __DIR__, 3 ) . '/fixtures/ga4-aggregate-batch-response-country-totals.json' ),
+			true
+		);
+		$report                                                    = $batch['reports'][0];
+		$report['totals'][0]['dimensionValues'][0]['value']        = 'United States';
+
+		$result = GoogleAnalyticsAbilities::normalizeAggregateReport(
+			$report,
+			array( 'start_date' => '2026-09-15', 'end_date' => '2026-09-22' ),
+			array( 'country' ),
+			array( 'sessions' )
+		);
+
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( '(totals_shape)', $result->get_error_message() );
+	}
+
+	/**
+	 * Every normalizeAggregateReport() rejection names the specific failing
+	 * condition instead of one indistinguishable "malformed" message (#140),
+	 * so a future response-shape drift doesn't require re-diagnosing from
+	 * scratch. Spot-checks a representative sample of the distinct reasons.
+	 *
+	 * @dataProvider malformed_report_reasons
+	 */
+	public function test_aggregate_normalization_names_the_failing_condition( array $report, array $date_range, array $expected_dimensions, array $expected_metrics, string $expected_reason ): void {
+		$result = GoogleAnalyticsAbilities::normalizeAggregateReport( $report, $date_range, $expected_dimensions, $expected_metrics );
+		$this->assertWPError( $result );
+		$this->assertSame(
+			"Google Analytics returned a malformed aggregate report ({$expected_reason}).",
+			$result->get_error_message()
+		);
+	}
+
+	public static function malformed_report_reasons(): array {
+		return array(
+			'kind_mismatch'      => array(
+				array( 'kind' => 'wrong#kind' ),
+				array(),
+				array(),
+				array(),
+				'kind_mismatch',
+			),
+			'envelope_shape'     => array(
+				array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND, 'rows' => 'not-an-array' ),
+				array(),
+				array(),
+				array(),
+				'envelope_shape',
+			),
+			'header_format'      => array(
+				array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND, 'dimensionHeaders' => array( array( 'name' => '' ) ) ),
+				array(),
+				array(),
+				array(),
+				'header_format',
+			),
+			'row_keys'           => array(
+				array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND, 'metricHeaders' => array( array( 'name' => 'sessions' ) ), 'rows' => array( array( 'metricValues' => array( array( 'value' => '1' ) ) ) ) ),
+				array(),
+				array(),
+				array( 'sessions' ),
+				'row_keys',
+			),
+			'totals_shape'       => array(
+				array( 'kind' => GoogleAnalyticsAbilities::AGGREGATE_REPORT_RESPONSE_KIND, 'metricHeaders' => array( array( 'name' => 'sessions' ) ), 'totals' => array( array( 'metricValues' => array( array( 'value' => '1' ) ) ), array( 'metricValues' => array( array( 'value' => '2' ) ) ) ) ),
+				array(),
+				array(),
+				array( 'sessions' ),
+				'totals_shape',
+			),
+		);
 	}
 
 	public function test_aggregate_batch_request_uses_one_http_envelope_for_primary_and_comparison(): void {

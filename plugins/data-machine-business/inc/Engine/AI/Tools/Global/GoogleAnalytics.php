@@ -83,6 +83,7 @@ class GoogleAnalytics extends BaseTool {
 			'action'      => true,
 			'property_id' => true,
 			'limit'       => true,
+			'country'     => true,
 		) );
 		$legacy_properties = array(
 			'action'      => array(
@@ -115,6 +116,11 @@ class GoogleAnalytics extends BaseTool {
 			'hostname'    => array(
 				'type'        => 'string',
 				'description' => 'Filter to pages on this hostname (for multisite GA4 properties).',
+			),
+			'country'     => array(
+				'type'        => 'string',
+				'maxLength'   => 200,
+				'description' => 'Scope to a country cohort by ISO-3166-1 alpha-2 code(s), comma-separated for multiple (e.g. "US" or "US,CA,GB"). Works on every action, including aggregate_report. Pass "all" to explicitly opt out of any configured default cohort.',
 			),
 			'sort_by'     => array(
 				'type'        => 'string',

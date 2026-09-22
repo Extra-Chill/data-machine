@@ -77,6 +77,12 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 * [--hostname=<string>]
 	 * : Filter to pages on this hostname (for multisite GA4 properties).
 	 *
+	 * [--country=<codes>]
+	 * : Scope to a country cohort by ISO-3166-1 alpha-2 code(s), comma-separated
+	 * for multiple (e.g. US or US,CA,GB). Works on every action, including
+	 * aggregate_report. Pass "all" to explicitly opt out of the configured
+	 * default cohort (see datamachine_ga_config's default_country_cohort).
+	 *
 	 * [--sort-by=<field>]
 	 * : Sort results by this metric or dimension field name.
 	 *
@@ -158,6 +164,15 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 *     # Filter by hostname for multisite
 	 *     wp datamachine analytics ga page_stats --hostname=events.example.com
 	 *
+	 *     # Scope to a single country
+	 *     wp datamachine analytics ga date_stats --country=US
+	 *
+	 *     # Scope to a country cohort
+	 *     wp datamachine analytics ga page_stats --country=US,CA,GB
+	 *
+	 *     # Opt out of a configured default cohort for one query
+	 *     wp datamachine analytics ga date_stats --country=all
+	 *
 	 *     # Compare last 28 days vs previous 28 days
 	 *     wp datamachine analytics ga page_stats --compare
 	 *
@@ -179,6 +194,7 @@ class GoogleAnalyticsCommand extends BaseCommand {
 				'limit'       => 'limit',
 				'page-filter' => 'page_filter',
 				'hostname'    => 'hostname',
+				'country'     => 'country',
 				'sort-by'     => 'sort_by',
 				'order'       => 'order',
 			)

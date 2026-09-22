@@ -97,6 +97,11 @@ namespace {
 			return true;
 		}
 	}
+	if ( ! function_exists( 'apply_filters' ) ) {
+		function apply_filters( $tag, $value, ...$args ) {
+			return $value;
+		}
+	}
 	if ( ! defined( 'ABSPATH' ) ) {
 		define( 'ABSPATH', __DIR__ );
 	}

@@ -77,7 +77,7 @@ namespace {
 	$mismatched_fixture['reports'][0]['totals'] = array();
 	HttpClient::$response['data'] = json_encode( $mismatched_fixture );
 	$mismatch = $method->invoke( null, $input, 'secret-token', '123456789' );
-	$assert( empty( $mismatch['success'] ) && 'Google Analytics returned a malformed aggregate report.' === $mismatch['error'], 'rejects response headers that do not match selected fields' );
+	$assert( empty( $mismatch['success'] ) && 'Google Analytics returned a malformed aggregate report (dimension_metric_mismatch).' === $mismatch['error'], 'rejects response headers that do not match selected fields, naming the failing condition' );
 	$invalid_batch_kind = $fixture;
 	$invalid_batch_kind['kind'] = 'analyticsData#runReport';
 	HttpClient::$response['data'] = json_encode( $invalid_batch_kind );
@@ -87,7 +87,7 @@ namespace {
 	$invalid_report_kind['reports'][0]['kind'] = 'analyticsData#batchRunReports';
 	HttpClient::$response['data'] = json_encode( $invalid_report_kind );
 	$invalid_report = $method->invoke( null, $input, 'secret-token', '123456789' );
-	$assert( empty( $invalid_report['success'] ) && 'Google Analytics returned a malformed aggregate report.' === $invalid_report['error'], 'rejects an incorrect report response kind' );
+	$assert( empty( $invalid_report['success'] ) && 'Google Analytics returned a malformed aggregate report (kind_mismatch).' === $invalid_report['error'], 'rejects an incorrect report response kind, naming the failing condition' );
 	HttpClient::$response = array(
 		'success' => false,
 		'status_code' => 403,
