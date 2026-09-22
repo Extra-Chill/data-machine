@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.10] - 2026-09-22
+
+### Fixed
+- aggregate_report totals-row bug, named validator failures, GA country cohort scoping
+- require BaseTool explicitly in the GA tool-schema WordPress smoke test
+
 ## [0.17.9] - 2026-09-22
 
 ### Fixed
