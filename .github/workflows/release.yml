@@ -1,14 +1,14 @@
-# Continuous release pipeline for Data Machine.
+# Continuous release pipeline.
 #
-# Triggers on push to main (immediate release) and manual dispatch. The whole
-# pipeline — releasable-commit detection, dry-run version prediction,
-# failed-SHA retry protection, GitHub App token, version bump, changelog,
-# tag, GitHub Release, and the WordPress release.package / release.publish
-# steps — is owned by the reusable Homeboy Action release workflow.
+# Triggers on every push to main. Homeboy derives the version from the
+# conventional commits since the last tag (fix: -> patch, feat: -> minor,
+# BREAKING CHANGE -> major; chore:/ci:/docs:/test: -> no release), runs the
+# repository quality gates, then tags, generates the changelog, creates the
+# GitHub Release and attaches the built artifact.
 #
-# No human input needed — version is computed from commit types:
-#   fix: → patch, feat: → minor, BREAKING CHANGE → major
-#   chore:/ci:/docs:/test: → no release
+# The whole pipeline lives in the reusable workflow — releasable-commit
+# detection, dry-run version prediction, failed-SHA retry protection, and
+# GitHub App token handling are inherited, not re-implemented here.
 
 name: Release
 
@@ -16,6 +16,12 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  # A reusable workflow cannot request more than its caller grants. The shared
+  # release workflow declares id-token: write from homeboy-action v2.20.0 so
+  # release.publish can use npm trusted publishing (OIDC) instead of a token.
+  # Without this line the run is rejected before any job starts, with a bare
+  # startup_failure and no log to explain it.
+  id-token: write
 
 on:
   push:
@@ -36,5 +42,4 @@ jobs:
     uses: Extra-Chill/homeboy-action/.github/workflows/release.yml@v2
     with:
       dry-run: ${{ inputs.dry-run || false }}
-      args: '--setting database_type=mysql --setting wp_codebox_phpunit_config=/wordpress/wp-content/plugins/data-machine/phpunit.xml.dist'
     secrets: inherit
