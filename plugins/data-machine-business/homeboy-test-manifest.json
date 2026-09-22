@@ -22,6 +22,7 @@
     "tests/mediavine-dimensional-smoke.php": { "environment": "standalone-php" },
     "tests/pagespeed-ownership-smoke.php": { "environment": "standalone-php" },
     "tests/provider-bootstrap-smoke.php": { "environment": "standalone-php" },
-    "tests/sendy-campaign-abilities-smoke.php": { "environment": "standalone-php" }
+    "tests/sendy-campaign-abilities-smoke.php": { "environment": "standalone-php" },
+    "tests/sendy-list-campaigns-schema-smoke.php": { "environment": "wordpress" }
   }
 }

@@ -97,6 +97,42 @@ class SendyAbilities {
 	}
 
 	/**
+	 * Input schema for datamachine/sendy-list-campaigns.
+	 *
+	 * The `status` filter is optional; omitting it or passing an empty string
+	 * both mean "no status filter" and must validate the same way, because
+	 * {@see self::execute_list_campaigns()} already treats '' as unfiltered.
+	 * The enum includes '' so the schema agrees with that implementation
+	 * instead of rejecting the exact value callers send when the filter is
+	 * not in use.
+	 *
+	 * @return array
+	 */
+	public static function list_campaigns_input_schema(): array {
+		return array(
+			'type'                 => 'object',
+			'properties'           => array(
+				'per_page' => array(
+					'type'    => 'integer',
+					'minimum' => 1,
+					'maximum' => 100,
+				),
+				'offset'   => array(
+					'type'    => 'integer',
+					'minimum' => 0,
+				),
+				'status'   => array(
+					'type'        => 'string',
+					'description' => __( 'Filter by status. Omit or pass an empty string for no filter.', 'data-machine-business' ),
+					'enum'        => array( '', 'sent', 'draft', 'scheduled' ),
+					'default'     => '',
+				),
+			),
+			'additionalProperties' => false,
+		);
+	}
+
+	/**
 	 * Stable campaign summary schema.
 	 *
 	 * @return array
@@ -234,25 +270,7 @@ class SendyAbilities {
 				'label'               => __( 'Sendy: List Campaigns', 'data-machine-business' ),
 				'description'         => __( 'List Sendy campaigns from the configured database.', 'data-machine-business' ),
 				'category'            => 'datamachine-publishing',
-				'input_schema'        => array(
-					'type'                 => 'object',
-					'properties'           => array(
-						'per_page' => array(
-							'type'    => 'integer',
-							'minimum' => 1,
-							'maximum' => 100,
-						),
-						'offset'   => array(
-							'type'    => 'integer',
-							'minimum' => 0,
-						),
-						'status'   => array(
-							'type' => 'string',
-							'enum' => array( 'sent', 'draft', 'scheduled' ),
-						),
-					),
-					'additionalProperties' => false,
-				),
+				'input_schema'        => self::list_campaigns_input_schema(),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'required'   => array( 'total', 'per_page', 'offset', 'campaigns' ),
