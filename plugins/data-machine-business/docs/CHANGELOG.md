@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.17.8] - 2026-09-22
+
+### Fixed
+- aggregate Sendy campaign clicks and opens from real subscriber logs
+
 ## [0.17.7] - 2026-09-22
 
 ### Fixed
