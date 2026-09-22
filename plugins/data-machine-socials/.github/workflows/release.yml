@@ -16,6 +16,12 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  # A reusable workflow cannot request more than its caller grants. The shared
+  # release workflow declares id-token: write from homeboy-action v2.20.0 so
+  # release.publish can use npm trusted publishing (OIDC) instead of a token.
+  # Without this line the run is rejected before any job starts, with a bare
+  # startup_failure and no log to explain it.
+  id-token: write
 
 on:
   push:
