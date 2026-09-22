@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.0] - 2026-09-22
+
+### Added
+- simplify event OG card and make branding a pluggable logo token
+
 ## [0.63.6] - 2026-09-21
 
 ### Fixed
