@@ -236,6 +236,112 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 
 	/*
 	 * -------------------------------------------------------------------------
+	 * Freshness disclosure (issue #272)
+	 *
+	 * Root cause: Meta's Graph API media edge can silently omit blocks of
+	 * recent media with no error and valid-looking pagination cursors (a
+	 * documented, currently unresolved upstream gap — see class docblock on
+	 * buildFreshnessInfo()). This reader cannot distinguish that from genuine
+	 * account inactivity, so it always discloses the age of the newest
+	 * visible item instead of silently returning what may be a truncated
+	 * view as if it were current.
+	 * -------------------------------------------------------------------------
+	 */
+
+	public function test_list_flags_stale_when_newest_post_exceeds_threshold(): void {
+		$this->authenticate();
+
+		$old_timestamp = gmdate( 'Y-m-d\TH:i:sO', time() - ( 45 * DAY_IN_SECONDS ) );
+
+		$this->mock_api_response( 200, array(
+			'data'   => array(
+				array( 'id' => '111', 'timestamp' => $old_timestamp ),
+			),
+			'paging' => array( 'next' => 'https://graph.facebook.com/12345/media?after=x' ),
+		) );
+
+		$result = $this->ability->execute( array( 'action' => 'list' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertTrue( $result['data']['stale'] );
+		$this->assertSame( 45, $result['data']['newest_post_age_days'] );
+		$this->assertNotEmpty( $result['data']['note'] );
+		$this->assertStringContainsString( '45', $result['data']['note'] );
+	}
+
+	public function test_list_does_not_flag_stale_when_newest_post_is_recent(): void {
+		$this->authenticate();
+
+		$recent_timestamp = gmdate( 'Y-m-d\TH:i:sO', time() - DAY_IN_SECONDS );
+
+		$this->mock_api_response( 200, array(
+			'data'   => array(
+				array( 'id' => '111', 'timestamp' => $recent_timestamp ),
+			),
+			'paging' => array(),
+		) );
+
+		$result = $this->ability->execute( array( 'action' => 'list' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertFalse( $result['data']['stale'] );
+		$this->assertSame( 1, $result['data']['newest_post_age_days'] );
+		$this->assertNull( $result['data']['note'] );
+	}
+
+	public function test_list_freshness_is_null_when_media_empty(): void {
+		$this->authenticate();
+
+		$this->mock_api_response( 200, array( 'data' => array(), 'paging' => array() ) );
+
+		$result = $this->ability->execute( array( 'action' => 'list' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertFalse( $result['data']['stale'] );
+		$this->assertNull( $result['data']['newest_post_age_days'] );
+		$this->assertNull( $result['data']['note'] );
+	}
+
+	public function test_list_freshness_is_null_when_newest_item_has_no_timestamp(): void {
+		$this->authenticate();
+
+		$this->mock_api_response( 200, array(
+			'data'   => array( array( 'id' => '111' ) ),
+			'paging' => array( 'cursors' => array( 'after' => 'end' ) ),
+		) );
+
+		$result = $this->ability->execute( array( 'action' => 'list' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertFalse( $result['data']['stale'] );
+		$this->assertNull( $result['data']['newest_post_age_days'] );
+	}
+
+	public function test_list_stale_threshold_is_filterable(): void {
+		$this->authenticate();
+
+		add_filter( 'datamachine_socials_instagram_stale_threshold_days', function () {
+			return 3;
+		} );
+
+		$timestamp = gmdate( 'Y-m-d\TH:i:sO', time() - ( 5 * DAY_IN_SECONDS ) );
+
+		$this->mock_api_response( 200, array(
+			'data'   => array( array( 'id' => '111', 'timestamp' => $timestamp ) ),
+			'paging' => array(),
+		) );
+
+		$result = $this->ability->execute( array( 'action' => 'list' ) );
+
+		remove_all_filters( 'datamachine_socials_instagram_stale_threshold_days' );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertTrue( $result['data']['stale'] );
+		$this->assertStringContainsString( 'threshold: 3', $result['data']['note'] );
+	}
+
+	/*
+	 * -------------------------------------------------------------------------
 	 * Action: get
 	 * -------------------------------------------------------------------------
 	 */

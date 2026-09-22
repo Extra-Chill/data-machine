@@ -87,6 +87,10 @@ class InstagramCommand {
 			return;
 		}
 
+		if ( ! empty( $data['stale'] ) && ! empty( $data['note'] ) ) {
+			WP_CLI::warning( $data['note'] );
+		}
+
 		if ( 'json' === $format ) {
 			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;

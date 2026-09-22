@@ -43,6 +43,16 @@ class InstagramReadAbility extends AbstractSocialAbility {
 	const LIST_FIELDS = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count';
 
 	/**
+	 * Default number of days after which the newest visible post in a
+	 * `list` result is flagged as stale.
+	 *
+	 * Filterable via 'datamachine_socials_instagram_stale_threshold_days'.
+	 *
+	 * @see buildFreshnessInfo() for why this exists (issue #272).
+	 */
+	const DEFAULT_STALE_THRESHOLD_DAYS = 30;
+
+	/**
 	 * Fields to request for single media detail.
 	 */
 	const DETAIL_FIELDS = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,media_product_type,is_shared_to_feed';
@@ -247,12 +257,79 @@ class InstagramReadAbility extends AbstractSocialAbility {
 
 		return array(
 			'success' => true,
-			'data'    => array(
-				'media'    => $media,
-				'count'    => count( $media ),
-				'cursors'  => $paging['cursors'] ?? null,
-				'has_next' => ! empty( $paging['next'] ),
+			'data'    => array_merge(
+				array(
+					'media'    => $media,
+					'count'    => count( $media ),
+					'cursors'  => $paging['cursors'] ?? null,
+					'has_next' => ! empty( $paging['next'] ),
+				),
+				$this->buildFreshnessInfo( $media )
 			),
+		);
+	}
+
+	/**
+	 * Build a freshness disclosure for the `list` action's newest item.
+	 *
+	 * Root cause investigation (issue #272): a raw, uncached, unpaginated
+	 * request to this same Graph API edge — bypassing this class entirely —
+	 * reproduced the exact same cutoff the CLI reported. Walking the `before`
+	 * cursor (which points toward newer content) from the first page returned
+	 * an empty result, confirming Meta's own servers, not this reader, report
+	 * nothing newer. Both media types on either side of the cutoff (FEED and
+	 * REELS) were represented, ruling out media-type filtering. There is no
+	 * caching layer between this class and the Graph API (HttpClient sends
+	 * Cache-Control: no-cache). This matches a currently open, unresolved gap
+	 * reported on Meta's own Developer Community forum ("Instagram Graph API
+	 * v25.0 /media endpoint randomly missing valid media objects"): the
+	 * `/media` edge can silently omit blocks of recent media with no error,
+	 * valid-looking pagination cursors, and no permission/media-type
+	 * correlation.
+	 *
+	 * This reader cannot distinguish that upstream condition from genuine
+	 * account inactivity, so instead of ever silently returning what may be
+	 * a truncated view as if it were current, it always discloses how old
+	 * the newest visible item actually is and flags it past a threshold.
+	 *
+	 * @param array $media Media items as returned by the list endpoint (newest first).
+	 * @return array{newest_post_age_days: int|null, stale: bool, note: string|null}
+	 */
+	private function buildFreshnessInfo( array $media ): array {
+		$empty_result = array(
+			'newest_post_age_days' => null,
+			'stale'                => false,
+			'note'                 => null,
+		);
+
+		$timestamp = $media[0]['timestamp'] ?? '';
+		if ( empty( $timestamp ) || ! is_string( $timestamp ) ) {
+			return $empty_result;
+		}
+
+		$posted_at = strtotime( $timestamp );
+		if ( false === $posted_at ) {
+			return $empty_result;
+		}
+
+		$age_days  = (int) floor( ( time() - $posted_at ) / DAY_IN_SECONDS );
+		$threshold = (int) apply_filters( 'datamachine_socials_instagram_stale_threshold_days', self::DEFAULT_STALE_THRESHOLD_DAYS );
+		$stale     = $age_days > $threshold;
+
+		$note = null;
+		if ( $stale ) {
+			$note = sprintf(
+				/* translators: 1: days since the most recent visible post, 2: staleness threshold in days. */
+				__( "The most recent visible post is %1\$d day(s) old (threshold: %2\$d). This may be genuine account inactivity, or it may be Meta's Graph API media edge silently omitting recent media \u2014 a documented, currently unresolved upstream gap that returns no error and valid-looking pagination cursors. Verify directly against the Instagram app or Meta's Graph API Explorer before treating this list as current.", 'data-machine-socials' ),
+				$age_days,
+				$threshold
+			);
+		}
+
+		return array(
+			'newest_post_age_days' => $age_days,
+			'stale'                => $stale,
+			'note'                 => $note,
 		);
 	}
 
