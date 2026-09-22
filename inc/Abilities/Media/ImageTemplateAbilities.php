@@ -14,6 +14,7 @@ namespace DataMachine\Abilities\Media;
 
 use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\FilesRepository\FilesystemHelper;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -307,6 +308,23 @@ class ImageTemplateAbilities {
 	 * media browser, do not get resized, and do not interact with Imagify or
 	 * other media-pipeline plugins.
 	 *
+	 * After each copy, the destination is normalized to
+	 * `FilesystemHelper::SHARED_FILE_PERMISSIONS` (0664) via
+	 * `FilesystemHelper::make_group_writable()` — the same shared-group
+	 * permission helper `JobArtifacts` and `FileCleanup` already use for
+	 * files written by one runtime user (the web process, www-data) and
+	 * later read or overwritten by another (a CLI user in the www-data
+	 * group). Without this, mode is whatever the writing process's umask
+	 * produces, which is deterministic-but-inconsistent across processes:
+	 * a restrictive umask yields `0644` (owner-only), and no other process —
+	 * including the CLI whose entire purpose is bulk regeneration — can ever
+	 * overwrite that file again. This only fixes files written going
+	 * forward; a file that already landed at `0644` under the old code
+	 * still needs deleting (or a separate, explicit repair pass) before any
+	 * process can regenerate it, because the failing `copy()` is what would
+	 * need to succeed for a chmod-on-write fix to even run. See
+	 * https://github.com/Extra-Chill/data-machine/issues/3541.
+	 *
 	 * Source temp files are removed after the copy to avoid leaking PHP tmp.
 	 *
 	 * @param string[] $file_paths   Rendered file paths from the template.
@@ -360,7 +378,7 @@ class ImageTemplateAbilities {
 
 		foreach ( $file_paths as $index => $source_path ) {
 			if ( ! file_exists( $source_path ) ) {
-				$failures[] = basename( $source_path );
+				$failures[] = sprintf( '%s: source file missing', basename( $source_path ) );
 				continue;
 			}
 
@@ -371,8 +389,9 @@ class ImageTemplateAbilities {
 			$dest_path = trailingslashit( $bucket_dir ) . $filename;
 			$dest_url  = trailingslashit( $bucket_url ) . $filename;
 
-			if ( ! copy( $source_path, $dest_path ) ) {
-				$failures[] = basename( $source_path );
+			$copy_error = self::copyToCache( $source_path, $dest_path );
+			if ( null !== $copy_error ) {
+				$failures[] = $copy_error;
 				continue;
 			}
 
@@ -400,6 +419,46 @@ class ImageTemplateAbilities {
 			'cached_urls'  => $cached_urls,
 			'message'      => $message,
 		);
+	}
+
+	/**
+	 * Copy a rendered file into the cache bucket and normalize its mode.
+	 *
+	 * @param string $source_path Rendered temp file to copy from.
+	 * @param string $dest_path   Cache destination to copy to.
+	 * @return string|null Null on success, a human-readable failure
+	 *                      description (naming the destination, not the
+	 *                      source) on failure.
+	 */
+	private static function copyToCache( string $source_path, string $dest_path ): ?string {
+		if ( ! copy( $source_path, $dest_path ) ) {
+			return self::describeCopyFailure( $dest_path );
+		}
+
+		FilesystemHelper::make_group_writable( $dest_path, FilesystemHelper::SHARED_FILE_PERMISSIONS );
+
+		return null;
+	}
+
+	/**
+	 * Describe why a copy into the cache bucket failed, naming the
+	 * destination path so a denied write does not send investigation
+	 * toward the (already-deleted-by-the-time-anyone-reads-the-log) source
+	 * temp file.
+	 *
+	 * @param string $dest_path Cache destination that could not be written.
+	 * @return string Human-readable failure description.
+	 */
+	private static function describeCopyFailure( string $dest_path ): string {
+		if ( file_exists( $dest_path ) && ! wp_is_writable( $dest_path ) ) {
+			return sprintf( '%s: destination exists and is not writable (permission denied)', $dest_path );
+		}
+
+		if ( ! wp_is_writable( dirname( $dest_path ) ) ) {
+			return sprintf( '%s: destination directory is not writable', $dest_path );
+		}
+
+		return sprintf( '%s: copy failed', $dest_path );
 	}
 
 	/**
