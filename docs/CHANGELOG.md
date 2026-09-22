@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.0] - 2026-09-22
+
+### Added
+- resolve a logo brand token in BrandTokens, including the site icon fallback
+
+### Fixed
+- fall back to system font when a font lacks a glyph for a character
+
 ## [0.176.22] - 2026-09-20
 
 ### Changed
