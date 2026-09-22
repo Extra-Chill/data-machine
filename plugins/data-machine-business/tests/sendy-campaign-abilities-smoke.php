@@ -59,12 +59,16 @@ namespace {
 
 	class wpdb {
 		private array $campaigns;
+		private array $links;
 
 		public function __construct() {
+			// `campaigns` has no `clicks` column on the real Sendy schema (#137)
+			// and `opens` is a raw open-event log, not an integer — these
+			// fixtures mirror that shape rather than a convenient integer.
 			$this->campaigns = array(
 				101 => array(
 					'id' => 101, 'title' => 'Draft campaign', 'sent' => '', 'to_send' => 0,
-					'recipients' => 0, 'opens' => 0, 'clicks' => 0, 'send_date' => '',
+					'recipients' => 0, 'opens' => '', 'send_date' => '',
 					'lists' => '1', 'opens_tracking' => 1, 'links_tracking' => 1,
 					'campaign_stopped' => 0, 'from_name' => 'Extra Chill',
 					'from_email' => 'newsletter@example.com', 'reply_to' => 'reply@example.com',
@@ -72,16 +76,27 @@ namespace {
 				),
 				102 => array(
 					'id' => 102, 'title' => 'Sent campaign', 'sent' => 1700000000, 'to_send' => 50,
-					'recipients' => 50, 'opens' => 25, 'clicks' => 5, 'send_date' => '',
+					'recipients' => 50, 'opens' => '10:US,11:US,10:US,12:CA', 'send_date' => '',
 					'lists' => '1', 'opens_tracking' => 1, 'links_tracking' => 1,
 					'campaign_stopped' => 0, 'from_name' => 'Extra Chill',
 					'from_email' => 'newsletter@example.com', 'reply_to' => 'reply@example.com',
 					'errors' => '',
 				),
 			);
+
+			// `links.clicks` is a comma-separated subscriber-ID log, not a
+			// summable integer (#137). Campaign 102 has two tracked links;
+			// subscriber 10 clicked both, so 3 unique clickers total.
+			$this->links = array(
+				array( 'campaign_id' => 102, 'clicks' => '10,11' ),
+				array( 'campaign_id' => 102, 'clicks' => '10,20' ),
+			);
 		}
 
 		public function prepare( string $query, ...$args ): string {
+			if ( 1 === count( $args ) && is_array( $args[0] ) ) {
+				$args = $args[0];
+			}
 			return vsprintf( $query, $args );
 		}
 
@@ -90,6 +105,18 @@ namespace {
 		}
 
 		public function get_results( string $query, string $output ): array {
+			if ( false !== strpos( $query, 'FROM links' ) ) {
+				preg_match( '/IN \(([\d,]+)\)/', $query, $matches );
+				$ids = isset( $matches[1] ) ? array_map( 'intval', explode( ',', $matches[1] ) ) : array();
+				return array_values(
+					array_filter(
+						$this->links,
+						static function ( array $link ) use ( $ids ): bool {
+							return in_array( $link['campaign_id'], $ids, true );
+						}
+					)
+				);
+			}
 			return array_values( $this->filtered( $query ) );
 		}
 
@@ -156,6 +183,15 @@ namespace {
 
 	function wp_parse_args( array $args, array $defaults ): array {
 		return array_merge( $defaults, $args );
+	}
+
+	function wp_list_pluck( array $list, string $field ): array {
+		return array_map(
+			static function ( $item ) use ( $field ) {
+				return is_object( $item ) ? $item->$field : $item[ $field ];
+			},
+			$list
+		);
 	}
 
 	function untrailingslashit( string $value ): string {
@@ -263,8 +299,28 @@ namespace {
 
 	$list = $abilities->execute_list_campaigns( array( 'per_page' => 20, 'offset' => 0 ) );
 	assert_sendy( ! is_wp_error( $list ) && 2 === $list['total'] && 2 === count( $list['campaigns'] ), 'Newsletter campaign list path succeeds' );
+
+	// Regression coverage for #137: `opens` and `clicks` must be derived from
+	// the real subscriber-ID logs (campaigns.opens, links.clicks), never a
+	// cast of the raw blob or a SUM() over it. Campaign 102's opens blob
+	// ("10:US,11:US,10:US,12:CA") has 3 unique subscribers; its two links
+	// ("10,11" and "10,20") have 3 unique clicking subscribers (10, 11, 20).
+	$sent_summary = null;
+	foreach ( $list['campaigns'] as $campaign ) {
+		if ( 102 === $campaign['id'] ) {
+			$sent_summary = $campaign;
+		}
+	}
+	assert_sendy( null !== $sent_summary, 'sent campaign summary is present in the list' );
+	assert_sendy( 3 === ( $sent_summary['opens'] ?? null ), 'opens is the unique-subscriber open count, not a cast of the raw blob' );
+	assert_sendy( 3 === ( $sent_summary['clicks'] ?? null ), 'clicks is aggregated from the links table, not a nonexistent campaigns column' );
+
 	$get = $abilities->execute_get_campaign( array( 'campaign_id' => 101 ) );
 	assert_sendy( ! is_wp_error( $get ) && 'Draft campaign' === $get['title'], 'Newsletter campaign get path succeeds' );
+	assert_sendy( 0 === ( $get['opens'] ?? null ) && 0 === ( $get['clicks'] ?? null ), 'draft campaign with no tracking data has zero opens and clicks' );
+
+	$get_sent = $abilities->execute_get_campaign( array( 'campaign_id' => 102 ) );
+	assert_sendy( ! is_wp_error( $get_sent ) && 3 === ( $get_sent['opens'] ?? null ) && 3 === ( $get_sent['clicks'] ?? null ), 'single-campaign get path aggregates opens/clicks identically to the list path' );
 	$sent_delete = $abilities->execute_delete_campaign( array( 'campaign_id' => 102 ) );
 	assert_sendy( is_wp_error( $sent_delete ) && 'cannot_delete_sent' === $sent_delete->get_error_code(), 'sent campaigns remain protected' );
 	$deleted = $abilities->execute_delete_campaign( array( 'campaign_id' => 101 ) );

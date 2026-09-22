@@ -446,7 +446,7 @@ class SendyClient {
 
 		$rows = $db->get_results(
 			$db->prepare(
-				"SELECT id, title, sent, to_send, recipients, opens, clicks, send_date, lists, opens_tracking, links_tracking, campaign_stopped FROM campaigns {$where} ORDER BY id DESC LIMIT %d OFFSET %d",
+				"SELECT id, title, sent, to_send, recipients, opens, send_date, lists, opens_tracking, links_tracking, campaign_stopped FROM campaigns {$where} ORDER BY id DESC LIMIT %d OFFSET %d",
 				$per_page,
 				$offset
 			),
@@ -454,9 +454,12 @@ class SendyClient {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
+		$clicks_by_campaign = $this->clicks_by_campaign( $db, wp_list_pluck( (array) $rows, 'id' ) );
+
 		$campaigns = array();
 		foreach ( (array) $rows as $c ) {
-			$campaigns[] = $this->shape_campaign_summary( $c );
+			$campaign_id = isset( $c['id'] ) ? (int) $c['id'] : 0;
+			$campaigns[] = $this->shape_campaign_summary( $c, $clicks_by_campaign[ $campaign_id ] ?? 0 );
 		}
 
 		return array(
@@ -492,7 +495,9 @@ class SendyClient {
 			return new \WP_Error( 'campaign_not_found', 'Campaign not found.' );
 		}
 
-		$summary               = $this->shape_campaign_summary( $campaign );
+		$clicks_by_campaign = $this->clicks_by_campaign( $db, array( $campaign_id ) );
+
+		$summary               = $this->shape_campaign_summary( $campaign, $clicks_by_campaign[ $campaign_id ] ?? 0 );
 		$summary['from_name']  = isset( $campaign['from_name'] ) ? $campaign['from_name'] : '';
 		$summary['from_email'] = isset( $campaign['from_email'] ) ? $campaign['from_email'] : '';
 		$summary['reply_to']   = isset( $campaign['reply_to'] ) ? $campaign['reply_to'] : '';
@@ -805,7 +810,7 @@ class SendyClient {
 		// ── Per-campaign engagement (recent sent campaigns) ──
 		$campaign_rows = $db->get_results(
 			$db->prepare(
-				'SELECT id, title, sent, recipients, opens, clicks
+				'SELECT id, title, sent, recipients, opens
 				 FROM campaigns
 				 WHERE sent != "" AND sent IS NOT NULL AND sent != 0
 				 ORDER BY sent DESC
@@ -815,14 +820,17 @@ class SendyClient {
 			ARRAY_A
 		);
 
+		$clicks_by_campaign = $this->clicks_by_campaign( $db, wp_list_pluck( (array) $campaign_rows, 'id' ) );
+
 		$campaigns      = array();
 		$sum_open_rate  = 0.0;
 		$sum_click_rate = 0.0;
 		$analysed       = 0;
 		foreach ( (array) $campaign_rows as $c ) {
-			$recipients = (int) $c['recipients'];
-			$opens      = (int) $c['opens'];
-			$clicks     = (int) $c['clicks'];
+			$campaign_id = (int) $c['id'];
+			$recipients  = (int) $c['recipients'];
+			$opens       = $this->count_unique_open_subscribers( isset( $c['opens'] ) ? (string) $c['opens'] : '' );
+			$clicks      = $clicks_by_campaign[ $campaign_id ] ?? 0;
 
 			$open_rate  = $recipients > 0 ? round( $opens / $recipients, 4 ) : 0.0;
 			$click_rate = $recipients > 0 ? round( $clicks / $recipients, 4 ) : 0.0;
@@ -832,7 +840,7 @@ class SendyClient {
 			++$analysed;
 
 			$campaigns[] = array(
-				'id'         => (int) $c['id'],
+				'id'         => $campaign_id,
 				'title'      => (string) $c['title'],
 				'sent_date'  => $c['sent'] ? gmdate( 'Y-m-d H:i:s', (int) $c['sent'] ) : null,
 				'recipients' => $recipients,
@@ -895,13 +903,23 @@ class SendyClient {
 	/**
 	 * Shape a raw campaign DB row into a normalised summary.
 	 *
-	 * @param array $c Raw campaign row.
+	 * `campaigns.opens` is not an integer — it is a raw per-open tracking log
+	 * (`subscriberID:COUNTRY,subscriberID:COUNTRY,...`). The unique subscriber
+	 * count is derived here rather than cast, mirroring Sendy's own report.php
+	 * (`$opens_unique = count(array_unique($opens_array2))`).
+	 *
+	 * `campaigns` has no `clicks` column at all; click totals live in the
+	 * `links` table and must be pre-aggregated by the caller (see
+	 * clicks_by_campaign()) and passed in.
+	 *
+	 * @param array $c      Raw campaign row.
+	 * @param int   $clicks Unique-clicker count for this campaign, pre-aggregated
+	 *                      from the `links` table.
 	 * @return array
 	 */
-	private function shape_campaign_summary( array $c ): array {
+	private function shape_campaign_summary( array $c, int $clicks = 0 ): array {
 		$recipients = isset( $c['recipients'] ) ? (int) $c['recipients'] : 0;
-		$opens      = isset( $c['opens'] ) ? (int) $c['opens'] : 0;
-		$clicks     = isset( $c['clicks'] ) ? (int) $c['clicks'] : 0;
+		$opens      = $this->count_unique_open_subscribers( isset( $c['opens'] ) ? (string) $c['opens'] : '' );
 
 		return array(
 			'id'             => isset( $c['id'] ) ? (int) $c['id'] : 0,
@@ -920,6 +938,111 @@ class SendyClient {
 			'links_tracking' => isset( $c['links_tracking'] ) ? (bool) $c['links_tracking'] : false,
 			'stopped'        => isset( $c['campaign_stopped'] ) ? (bool) $c['campaign_stopped'] : false,
 		);
+	}
+
+	/**
+	 * Count unique subscribers recorded in a Sendy `campaigns.opens` tracking blob.
+	 *
+	 * The column is not numeric — it is a comma-separated open-event log in
+	 * the form `subscriberID:COUNTRY,subscriberID:COUNTRY,...`, and the same
+	 * subscriber can appear more than once (repeat opens). This mirrors
+	 * Sendy's own `report.php`, which strips the `:COUNTRY` suffix from each
+	 * entry before de-duplicating to compute its "unique opens" percentage.
+	 *
+	 * @param string $opens_blob Raw `campaigns.opens` value.
+	 * @return int Unique subscriber count.
+	 */
+	private function count_unique_open_subscribers( string $opens_blob ): int {
+		$opens_blob = trim( $opens_blob );
+		if ( '' === $opens_blob ) {
+			return 0;
+		}
+
+		$subscriber_ids = array();
+		foreach ( explode( ',', $opens_blob ) as $entry ) {
+			$entry = trim( $entry );
+			if ( '' === $entry ) {
+				continue;
+			}
+			$colon_pos        = strpos( $entry, ':' );
+			$subscriber_ids[] = false !== $colon_pos ? substr( $entry, 0, $colon_pos ) : $entry;
+		}
+
+		return count( array_unique( $subscriber_ids ) );
+	}
+
+	/**
+	 * Count unique subscribers who clicked any link across a set of
+	 * `links.clicks` tracking blobs for a single campaign.
+	 *
+	 * Each `links.clicks` value is a comma-separated subscriber-ID log (e.g.
+	 * `2195,2415,2650,...`), not a numeric count — summing it in SQL silently
+	 * coerces the string to its leading numeric prefix per row and produces a
+	 * meaningless total. This mirrors Sendy's own `get_click_percentage()`
+	 * (includes/reports/main.php), which pools every link's subscriber-ID log
+	 * for the campaign and de-duplicates.
+	 *
+	 * @param string[] $click_blobs Raw `links.clicks` values for one campaign.
+	 * @return int Unique clicking-subscriber count.
+	 */
+	private function count_unique_click_subscribers( array $click_blobs ): int {
+		$subscriber_ids = array();
+		foreach ( $click_blobs as $blob ) {
+			$blob = trim( (string) $blob );
+			if ( '' === $blob ) {
+				continue;
+			}
+			foreach ( explode( ',', $blob ) as $entry ) {
+				$entry = trim( $entry );
+				if ( '' !== $entry ) {
+					$subscriber_ids[] = $entry;
+				}
+			}
+		}
+
+		return count( array_unique( $subscriber_ids ) );
+	}
+
+	/**
+	 * Batch-aggregate unique click counts per campaign from the `links` table.
+	 *
+	 * One query for any number of campaign IDs rather than one query per
+	 * campaign.
+	 *
+	 * @param \wpdb $db           Sendy database connection.
+	 * @param int[] $campaign_ids Campaign primary keys to aggregate clicks for.
+	 * @return array<int,int> Map of campaign_id => unique clicking-subscriber count.
+	 */
+	private function clicks_by_campaign( \wpdb $db, array $campaign_ids ): array {
+		$campaign_ids = array_values( array_unique( array_filter( array_map( 'absint', $campaign_ids ) ) ) );
+		if ( empty( $campaign_ids ) ) {
+			return array();
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $campaign_ids ), '%d' ) );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $placeholders is a fixed-width %d list sized to count($campaign_ids); values are bound via prepare() below.
+		$rows = $db->get_results(
+			$db->prepare(
+				"SELECT campaign_id, clicks FROM links WHERE campaign_id IN ({$placeholders})",
+				$campaign_ids
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		$blobs_by_campaign = array();
+		foreach ( (array) $rows as $row ) {
+			$campaign_id                         = (int) $row['campaign_id'];
+			$blobs_by_campaign[ $campaign_id ][] = isset( $row['clicks'] ) ? (string) $row['clicks'] : '';
+		}
+
+		$clicks_by_campaign = array();
+		foreach ( $blobs_by_campaign as $campaign_id => $blobs ) {
+			$clicks_by_campaign[ $campaign_id ] = $this->count_unique_click_subscribers( $blobs );
+		}
+
+		return $clicks_by_campaign;
 	}
 
 	/**

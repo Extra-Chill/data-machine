@@ -169,8 +169,14 @@ class SendyAbilities {
 				'scheduled_date' => array( 'type' => array( 'string', 'null' ) ),
 				'to_send'        => array( 'type' => 'integer' ),
 				'recipients'     => array( 'type' => 'integer' ),
-				'opens'          => array( 'type' => 'integer' ),
-				'clicks'         => array( 'type' => 'integer' ),
+				'opens'          => array(
+					'type'        => 'integer',
+					'description' => __( 'Unique subscribers who opened this campaign at least once.', 'data-machine-business' ),
+				),
+				'clicks'         => array(
+					'type'        => 'integer',
+					'description' => __( 'Unique subscribers who clicked any tracked link in this campaign.', 'data-machine-business' ),
+				),
 				'open_rate'      => array( 'type' => 'number' ),
 				'click_rate'     => array( 'type' => 'number' ),
 				'opens_tracking' => array( 'type' => 'boolean' ),

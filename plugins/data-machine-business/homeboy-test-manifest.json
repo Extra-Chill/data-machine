@@ -23,6 +23,7 @@
     "tests/pagespeed-ownership-smoke.php": { "environment": "standalone-php" },
     "tests/provider-bootstrap-smoke.php": { "environment": "standalone-php" },
     "tests/sendy-campaign-abilities-smoke.php": { "environment": "standalone-php" },
-    "tests/sendy-list-campaigns-schema-smoke.php": { "environment": "wordpress" }
+    "tests/sendy-list-campaigns-schema-smoke.php": { "environment": "wordpress" },
+    "tests/sendy-real-schema-columns-smoke.php": { "environment": "standalone-php" }
   }
 }
