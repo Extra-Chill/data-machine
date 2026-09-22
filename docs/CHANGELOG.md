@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.2] - 2026-09-22
+
+### Fixed
+- normalize image-template cache file mode to group-writable after copy
+
 ## [0.177.1] - 2026-09-22
 
 ### Fixed
