@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.1] - 2026-09-22
+
+### Fixed
+- derive update-event CLI flags from the ability's input schema
+
 ## [0.64.0] - 2026-09-22
 
 ### Added
