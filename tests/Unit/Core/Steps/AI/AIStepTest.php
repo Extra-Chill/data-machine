@@ -483,6 +483,85 @@ class AIStepTest extends TestCase {
 		$this->assertSame( 'b', $result[1]['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ]['item_identifier'] );
 	}
 
+	public function test_process_loop_results_binds_garbled_model_identity_to_sole_claim(): void {
+		$method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
+		$method->setAccessible( true );
+		$claim     = array(
+			'identity_scope'  => 'fetch-step',
+			'source_type'     => 'fixture',
+			'item_identifier' => 'solo',
+			'ownership_token' => 'owner-solo',
+		);
+		$claim['disposition_id'] = ProcessedItems::disposition_identity( 'fetch-step', 'fixture', 'solo' );
+
+		$tool_results = array(
+			array(
+				'tool_name'       => 'fixture_upsert',
+				// Successful handler output with only the model's garbled
+				// disposition_id — no canonical identity on the result.
+				'result'          => array( 'success' => true ),
+				'parameters'      => array( 'disposition_id' => substr( $claim['disposition_id'], 0, 63 ) ),
+				'is_handler_tool' => true,
+			),
+		);
+
+		$result = $method->invoke(
+			null,
+			array( 'messages' => array(), 'tool_execution_results' => $tool_results ),
+			array( array( 'metadata' => array( 'source_type' => 'fixture' ) ) ),
+			array(
+				'flow_step_id' => 'ai-step',
+				'engine_data'  => array( ProcessedItems::CLAIM_METADATA_KEY => $claim ),
+			),
+			array( 'fixture_upsert' => array( 'handler' => 'fixture_upsert', 'handler_config' => array() ) )
+		);
+
+		$this->assertSame( 'ai_handler_complete', $result[0]['type'] );
+		$this->assertSame( $claim['disposition_id'], $result[0]['metadata']['disposition_id'] );
+		$this->assertSame( 'solo', $result[0]['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ]['item_identifier'] );
+		$this->assertTrue( $result[0]['metadata']['step_execution_success'] );
+	}
+
+	public function test_process_loop_results_fails_closed_on_unknown_multi_claim_identity(): void {
+		$method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
+		$method->setAccessible( true );
+		$claims = array();
+		foreach ( array( 'a', 'b' ) as $item ) {
+			$claims[ $item ] = array(
+				'identity_scope'  => 'fetch-step',
+				'source_type'     => 'fixture',
+				'item_identifier' => $item,
+				'ownership_token' => 'owner-' . $item,
+				'disposition_id'  => ProcessedItems::disposition_identity( 'fetch-step', 'fixture', $item ),
+			);
+		}
+
+		$tool_results = array(
+			array(
+				'tool_name'       => 'fixture_upsert',
+				'result'          => array( 'success' => true ),
+				'parameters'      => array( 'disposition_id' => substr( $claims['a']['disposition_id'], 0, 63 ) ),
+				'is_handler_tool' => true,
+			),
+		);
+
+		$result = $method->invoke(
+			null,
+			array( 'messages' => array(), 'tool_execution_results' => $tool_results ),
+			array( array( 'metadata' => array( 'source_type' => 'fixture' ) ) ),
+			array(
+				'flow_step_id' => 'ai-step',
+				'engine_data'  => array( ProcessedItems::CLAIMS_METADATA_KEY => array_values( $claims ) ),
+			),
+			array( 'fixture_upsert' => array( 'handler' => 'fixture_upsert', 'handler_config' => array() ) )
+		);
+
+		$envelope = $result[0]['metadata']['tool_result_envelope'];
+		$this->assertFalse( $envelope['success'] );
+		$this->assertSame( 'invalid_packet_disposition', $envelope['code'] );
+		$this->assertStringContainsString( 'Valid packet handles:', $envelope['error'] );
+	}
+
 	public function test_successful_handler_tool_result_is_findable_by_downstream_handler_slug(): void {
 		$method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
 		$method->setAccessible( true );

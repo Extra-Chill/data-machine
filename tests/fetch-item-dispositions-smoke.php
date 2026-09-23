@@ -124,12 +124,22 @@ namespace DataMachine\Core\Database\Jobs {
 	}
 }
 
+namespace DataMachine\Core\Steps {
+	class StepTypeMetadata {
+		public static function supportsItemDisposition( string $step_type ): bool {
+			return in_array( $step_type, array( 'fetch', 'rss', 'reddit' ), true );
+		}
+	}
+}
+
 namespace DataMachine\Core\Database\ProcessedItems {
 	class ProcessedItems {
 		public const CLAIM_METADATA_KEY          = '_datamachine_item_claim';
 		public const CLAIMS_METADATA_KEY         = '_datamachine_item_claims';
 		public const DISPOSITION_ID_METADATA_KEY = '_datamachine_packet_disposition_id';
 		public const MAX_DEFERRAL_ATTEMPTS       = 3;
+		private const DISPOSITION_HANDLE_PREFIX     = 'p';
+		private const DISPOSITION_HANDLE_MIN_CHARS  = 6;
 
 		public static function disposition_identity( string $scope, string $source, string $item ): string {
 			return hash( 'sha256', implode( "\0", array( $scope, $source, $item ) ) );
@@ -150,12 +160,53 @@ namespace DataMachine\Core\Database\ProcessedItems {
 			return $claims;
 		}
 
+		public static function disposition_handles( array $container ): array {
+			$handles = array();
+			foreach ( array_keys( self::disposition_claims( $container ) ) as $disposition_id ) {
+				$length = self::DISPOSITION_HANDLE_MIN_CHARS;
+				$handle = self::DISPOSITION_HANDLE_PREFIX . substr( $disposition_id, 0, $length );
+				while ( isset( $handles[ $handle ] ) && ! hash_equals( $handles[ $handle ], $disposition_id ) ) {
+					++$length;
+					$handle = self::DISPOSITION_HANDLE_PREFIX . substr( $disposition_id, 0, $length );
+				}
+				$handles[ $handle ] = $disposition_id;
+			}
+			return $handles;
+		}
+
+		public static function describe_disposition_handles( array $container ): string {
+			$handles = array_keys( self::disposition_handles( $container ) );
+			return empty( $handles ) ? '' : 'Valid packet handles: ' . implode( ', ', $handles ) . '.';
+		}
+
+		public static function unresolved_disposition_error( array $container, string $provided_id = '' ): string {
+			$base = '' === $provided_id
+				? 'disposition_id is required when more than one packet claim is active'
+				: 'disposition_id does not identify an active packet claim';
+			$handles = self::describe_disposition_handles( $container );
+			return '' === $handles ? $base : $base . ' ' . $handles;
+		}
+
 		public static function resolve_disposition_claim( array $container, string $id = '', bool $infer_single = true ): ?array {
 			$claims = self::disposition_claims( $container );
-			if ( '' !== $id ) {
-				return $claims[ $id ] ?? null;
+			if ( 1 === count( $claims ) && $infer_single ) {
+				return reset( $claims );
 			}
-			return $infer_single && 1 === count( $claims ) ? reset( $claims ) : null;
+			if ( '' === $id ) {
+				return null;
+			}
+			foreach ( $claims as $claim_id => $claim ) {
+				if ( hash_equals( $claim_id, $id ) ) {
+					return $claim;
+				}
+			}
+			$handle = strtolower( $id );
+			foreach ( self::disposition_handles( $container ) as $handle_id => $claim_id ) {
+				if ( hash_equals( $handle_id, $handle ) ) {
+					return $claims[ $claim_id ];
+				}
+			}
+			return null;
 		}
 
 		public function release_claim( string $flow_step_id, string $source_type, string $item_identifier ): int|false {

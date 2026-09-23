@@ -31,6 +31,9 @@ class ProcessedItems extends BaseRepository {
 	const CLAIM_METADATA_KEY          = '_datamachine_item_claim';
 	const CLAIMS_METADATA_KEY         = '_datamachine_item_claims';
 	const DISPOSITION_ID_METADATA_KEY = '_datamachine_packet_disposition_id';
+	const DISPOSITION_HANDLE_METADATA_KEY = '_datamachine_packet_disposition_handle';
+	const DISPOSITION_HANDLE_PREFIX       = 'p';
+	private const DISPOSITION_HANDLE_MIN_CHARS = 6;
 	private const READ_CHUNK_SIZE     = 500;
 
 	/** Return a stable, non-secret packet disposition identity. */
@@ -75,19 +78,90 @@ class ProcessedItems extends BaseRepository {
 		return $claims;
 	}
 
-	/** Resolve an explicit ID, or infer it only when exactly one claim exists. */
+	/**
+	 * Return short model-facing packet handles keyed to canonical disposition IDs.
+	 *
+	 * A handle is a deterministic short prefix of the canonical identity, extended
+	 * only when two claims in the same container would collide. Handles are
+	 * presentation labels: resolution compares them exactly and never prefix-matches
+	 * a partial or truncated value.
+	 *
+	 * @param array $container Engine data or packet metadata.
+	 * @return array<string,string> Handle => canonical disposition ID.
+	 */
+	public static function disposition_handles( array $container ): array {
+		$handles = array();
+		foreach ( array_keys( self::disposition_claims( $container ) ) as $disposition_id ) {
+			$length = self::DISPOSITION_HANDLE_MIN_CHARS;
+			$handle = self::DISPOSITION_HANDLE_PREFIX . substr( $disposition_id, 0, $length );
+			while ( isset( $handles[ $handle ] ) && ! hash_equals( $handles[ $handle ], $disposition_id ) ) {
+				++$length;
+				$handle = self::DISPOSITION_HANDLE_PREFIX . substr( $disposition_id, 0, $length );
+			}
+			$handles[ $handle ] = $disposition_id;
+		}
+
+		return $handles;
+	}
+
+	/** Describe the valid model-facing handles for unresolved-ID error text. */
+	public static function describe_disposition_handles( array $container ): string {
+		$handles = array_keys( self::disposition_handles( $container ) );
+		if ( empty( $handles ) ) {
+			return '';
+		}
+
+		return 'Valid packet handles: ' . implode( ', ', $handles ) . '.';
+	}
+
+	/** Build the fail-closed error text for a model-supplied identity with no active claim. */
+	public static function unresolved_disposition_error( array $container, string $provided_id = '' ): string {
+		$base = '' === $provided_id
+			? 'disposition_id is required when more than one packet claim is active'
+			: 'disposition_id does not identify an active packet claim';
+		$handles = self::describe_disposition_handles( $container );
+
+		return '' === $handles ? $base : $base . ' ' . $handles;
+	}
+
+	/**
+	 * Resolve a model-supplied packet identity to an active claim.
+	 *
+	 * With exactly one active claim and inference enabled, any supplied value
+	 * (missing, mismatched, or garbled) binds to the sole claim because it can
+	 * only mean that packet. With multiple claims, resolution accepts the full
+	 * canonical ID or a short model-facing handle from disposition_handles() and
+	 * fails closed on anything else.
+	 *
+	 * @param array  $container    Engine data or packet metadata.
+	 * @param string $disposition_id Model-supplied identity, handle, or empty string.
+	 * @param bool   $infer_single  Bind unconditionally to a sole active claim.
+	 */
 	public static function resolve_disposition_claim( array $container, string $disposition_id = '', bool $infer_single = true ): ?array {
 		$claims = self::disposition_claims( $container );
-		if ( '' !== $disposition_id ) {
-			foreach ( $claims as $claim_id => $claim ) {
-				if ( hash_equals( $claim_id, $disposition_id ) ) {
-					return $claim;
-				}
-			}
+
+		if ( 1 === count( $claims ) && $infer_single ) {
+			return reset( $claims );
+		}
+
+		if ( '' === $disposition_id ) {
 			return null;
 		}
 
-		return $infer_single && 1 === count( $claims ) ? reset( $claims ) : null;
+		foreach ( $claims as $claim_id => $claim ) {
+			if ( hash_equals( $claim_id, $disposition_id ) ) {
+				return $claim;
+			}
+		}
+
+		$handle = strtolower( $disposition_id );
+		foreach ( self::disposition_handles( $container ) as $handle_id => $claim_id ) {
+			if ( hash_equals( $handle_id, $handle ) ) {
+				return $claims[ $claim_id ];
+			}
+		}
+
+		return null;
 	}
 
 	/** Replace packet claim metadata with an exact, canonical claim set. */

@@ -287,6 +287,95 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		);
 		$this->assertFalse( $invalid['success'] );
 		$this->assertSame( 'invalid_packet_disposition', $invalid['code'] );
+		$this->assertStringContainsString( 'Valid packet handles:', $invalid['error'] );
+	}
+
+	/** @return array<string,array<string,mixed>> Packet-bound tool fixture. */
+	private function claimedHandlerTools(): array {
+		return array(
+			'claimed_handler' => array(
+				'class'                      => TestToolHandler::class,
+				'method'                     => 'handle_tool_call',
+				'packet_disposition_bound'   => true,
+				'parameters'                 => array(
+					'type'       => 'object',
+					'properties' => array( 'disposition_id' => array( 'type' => 'string' ) ),
+					'required'   => array( 'disposition_id' ),
+				),
+			),
+		);
+	}
+
+	public function test_disposition_contract_binds_garbled_or_missing_identity_to_sole_claim(): void {
+		$first  = $this->dispositionClaim( 'first' );
+		$tools  = $this->claimedHandlerTools();
+		$job_id = ( new Jobs() )->create_job( array( 'source' => 'pipeline', 'label' => 'Packet garbled identity binding' ) );
+		$this->assertGreaterThan( 0, $job_id );
+
+		$garbled = ToolExecutor::executeTool(
+			'claimed_handler',
+			array( 'disposition_id' => substr( $first['disposition_id'], 0, 63 ) ),
+			$tools,
+			array( 'job_id' => $job_id, 'engine_data' => array( ProcessedItems::CLAIM_METADATA_KEY => $first ) )
+		);
+		$this->assertTrue( $garbled['success'], 'Truncated identity binds to the sole active claim.' );
+		$this->assertSame( $first['disposition_id'], $garbled['disposition_id'] );
+
+		$missing = ToolExecutor::executeTool(
+			'claimed_handler',
+			array(),
+			$tools,
+			array( 'job_id' => $job_id, 'engine_data' => array( ProcessedItems::CLAIM_METADATA_KEY => $first ) )
+		);
+		$this->assertTrue( $missing['success'], 'Missing identity binds to the sole active claim.' );
+		$this->assertSame( $first['disposition_id'], $missing['disposition_id'] );
+	}
+
+	public function test_disposition_contract_resolves_handles_in_multi_claim_jobs(): void {
+		$first  = $this->dispositionClaim( 'first' );
+		$second = $this->dispositionClaim( 'second' );
+		$tools  = $this->claimedHandlerTools();
+		$job_id = ( new Jobs() )->create_job( array( 'source' => 'pipeline', 'label' => 'Packet handle resolution' ) );
+		$this->assertGreaterThan( 0, $job_id );
+		$engine = array( ProcessedItems::CLAIMS_METADATA_KEY => array( $first, $second ) );
+
+		$by_handle = ToolExecutor::executeTool(
+			'claimed_handler',
+			array( 'disposition_id' => 'p' . substr( $second['disposition_id'], 0, 6 ) ),
+			$tools,
+			array( 'job_id' => $job_id, 'engine_data' => $engine )
+		);
+		$this->assertTrue( $by_handle['success'] );
+		$this->assertSame( $second['disposition_id'], $by_handle['disposition_id'] );
+
+		$by_full_id = ToolExecutor::executeTool(
+			'claimed_handler',
+			array( 'disposition_id' => $first['disposition_id'] ),
+			$tools,
+			array( 'job_id' => $job_id, 'engine_data' => $engine )
+		);
+		$this->assertTrue( $by_full_id['success'] );
+		$this->assertSame( $first['disposition_id'], $by_full_id['disposition_id'] );
+	}
+
+	public function test_disposition_contract_fails_closed_on_unknown_multi_claim_identity(): void {
+		$first  = $this->dispositionClaim( 'first' );
+		$second = $this->dispositionClaim( 'second' );
+		$tools  = $this->claimedHandlerTools();
+		$engine = array( ProcessedItems::CLAIMS_METADATA_KEY => array( $first, $second ) );
+
+		$result = ToolExecutor::executeTool(
+			'claimed_handler',
+			array( 'disposition_id' => substr( $first['disposition_id'], 0, 63 ) ),
+			$tools,
+			array( 'engine_data' => $engine )
+		);
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'invalid_packet_disposition', $result['code'] );
+		$this->assertStringContainsString(
+			'Valid packet handles: p' . substr( $first['disposition_id'], 0, 6 ) . ', p' . substr( $second['disposition_id'], 0, 6 ),
+			$result['error']
+		);
 	}
 
 	public function test_execute_tool_applies_authoritative_caller_context_bindings(): void {
@@ -755,6 +844,42 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			$pending_action['apply_input'] ?? null
 		);
 		PendingActionStore::delete( $write['action_id'] );
+	}
+
+	public function test_handler_tool_schema_requires_identity_only_for_multi_claim_jobs(): void {
+		$method  = new \ReflectionMethod( ToolManager::class, 'withHandlerToolContext' );
+		$method->setAccessible( true );
+		$manager = new ToolManager();
+		$declare = static fn( array $engine_data ): array => $method->invoke(
+			$manager,
+			array(
+				'class'      => TestToolHandler::class,
+				'method'     => 'handle_tool_call',
+				'parameters' => array( 'type' => 'object', 'properties' => array(), 'required' => array() ),
+			),
+			array(),
+			'upsert_event',
+			array(),
+			$engine_data
+		);
+
+		$first  = $this->dispositionClaim( 'first' );
+		$second = $this->dispositionClaim( 'second' );
+
+		$single = $declare( array( ProcessedItems::CLAIM_METADATA_KEY => $first ) );
+		$this->assertArrayHasKey( 'disposition_id', $single['parameters']['properties'] ?? array() );
+		$this->assertNotContains( 'disposition_id', $single['parameters']['required'] ?? array() );
+
+		$multi = $declare( array( ProcessedItems::CLAIMS_METADATA_KEY => array( $first, $second ) ) );
+		$this->assertContains( 'disposition_id', $multi['parameters']['required'] ?? array() );
+		$this->assertStringContainsString(
+			'p' . substr( $first['disposition_id'], 0, 6 ),
+			(string) $multi['parameters']['properties']['disposition_id']['description']
+		);
+		$this->assertStringContainsString(
+			'p' . substr( $second['disposition_id'], 0, 6 ),
+			(string) $multi['parameters']['properties']['disposition_id']['description']
+		);
 	}
 
 	public function test_resolve_tools_invokes_callables(): void {

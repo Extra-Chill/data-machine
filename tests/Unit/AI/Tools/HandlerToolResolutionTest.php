@@ -184,6 +184,14 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 			'disposition_id'  => ProcessedItems::disposition_identity( 'fetch-step', 'fixture', 'item-2' ),
 		);
 
+		$second_claim = array(
+			'identity_scope'  => 'fetch-step',
+			'source_type'     => 'fixture',
+			'item_identifier' => 'item-3',
+			'ownership_token' => 'opaque-owner-token-3',
+			'disposition_id'  => ProcessedItems::disposition_identity( 'fetch-step', 'fixture', 'item-3' ),
+		);
+
 		$resolved = $this->tool_manager->resolveHandlerTools(
 			'claimed_publish',
 			array(),
@@ -193,9 +201,22 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $resolved['claimed_publish']['packet_disposition_bound'] );
 		$this->assertArrayHasKey( 'disposition_id', $resolved['claimed_publish']['parameters']['properties'] );
-		$this->assertContains( 'disposition_id', $resolved['claimed_publish']['parameters']['required'] );
+		$this->assertNotContains( 'disposition_id', $resolved['claimed_publish']['parameters']['required'] );
 		$this->assertContains( 'title', $resolved['claimed_publish']['parameters']['required'] );
 		$this->assertStringNotContainsString( 'opaque-owner-token', wp_json_encode( $resolved ) );
+
+		$multi_resolved = $this->tool_manager->resolveHandlerTools(
+			'claimed_publish',
+			array(),
+			array( ProcessedItems::CLAIMS_METADATA_KEY => array( $claim, $second_claim ) ),
+			'claimed-publish-scope-multi'
+		);
+		$this->assertTrue( $multi_resolved['claimed_publish']['packet_disposition_bound'] );
+		$this->assertContains( 'disposition_id', $multi_resolved['claimed_publish']['parameters']['required'] );
+		$this->assertStringContainsString(
+			'p' . substr( $second_claim['disposition_id'], 0, 6 ),
+			(string) $multi_resolved['claimed_publish']['parameters']['properties']['disposition_id']['description']
+		);
 	}
 
 	public function test_resolves_three_param_filter_style_handler_callable_before_static_tool(): void {

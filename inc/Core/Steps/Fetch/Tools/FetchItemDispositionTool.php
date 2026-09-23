@@ -91,7 +91,11 @@ class FetchItemDispositionTool {
 		$source_type     = $target['source_type'] ?? null;
 		$disposition_id  = $target['disposition_id'] ?? null;
 		if ( ! $target ) {
-			return array( 'success' => false, 'error' => 'packet disposition identity is required', 'tool_name' => $tool_name );
+			$container = array(
+				ProcessedItems::CLAIM_METADATA_KEY  => $engine->get( ProcessedItems::CLAIM_METADATA_KEY ),
+				ProcessedItems::CLAIMS_METADATA_KEY => $engine->get( ProcessedItems::CLAIMS_METADATA_KEY ),
+			);
+			return array( 'success' => false, 'error' => ProcessedItems::unresolved_disposition_error( $container, (string) ( $parameters['disposition_id'] ?? '' ) ), 'tool_name' => $tool_name );
 		}
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
 		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_REJECT_SOURCE, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
@@ -195,7 +199,11 @@ class FetchItemDispositionTool {
 		$source_type     = $target['source_type'] ?? null;
 		$disposition_id  = $target['disposition_id'] ?? null;
 		if ( ! $target ) {
-			return array( 'success' => false, 'error' => 'packet disposition identity is required', 'tool_name' => $tool_name );
+			$container = array(
+				ProcessedItems::CLAIM_METADATA_KEY  => $engine->get( ProcessedItems::CLAIM_METADATA_KEY ),
+				ProcessedItems::CLAIMS_METADATA_KEY => $engine->get( ProcessedItems::CLAIMS_METADATA_KEY ),
+			);
+			return array( 'success' => false, 'error' => ProcessedItems::unresolved_disposition_error( $container, (string) ( $parameters['disposition_id'] ?? '' ) ), 'tool_name' => $tool_name );
 		}
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
 		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_DEFER_ITEM, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );

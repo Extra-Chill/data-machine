@@ -445,16 +445,22 @@ class ToolManager {
 		}
 
 		if ( class_exists( ProcessedItems::class ) && ! empty( ProcessedItems::disposition_claims( $engine_data ) ) ) {
-			$parameters                         = ToolSchemaNormalizer::normalize( $tool_def['parameters'] ?? array() );
-			$properties                         = is_array( $parameters['properties'] ?? null ) ? $parameters['properties'] : array();
+			$parameters  = ToolSchemaNormalizer::normalize( $tool_def['parameters'] ?? array() );
+			$properties  = is_array( $parameters['properties'] ?? null ) ? $parameters['properties'] : array();
+			$claim_count = count( ProcessedItems::disposition_claims( $engine_data ) );
+			$description = 1 === $claim_count
+				? 'Optional packet disposition identity from the input packet. Only one packet claim is active, so this call binds to it automatically even when the value is missing or imperfect.'
+				: 'Packet handle from the input packet metadata (for example p86eca4). Return the handle, or the full canonical disposition identity, for the exact packet this tool call handles. Valid handles: ' . implode( ', ', array_keys( ProcessedItems::disposition_handles( $engine_data ) ) ) . '.';
 			$properties['disposition_id']        = array(
 				'type'        => 'string',
-				'description' => 'Stable packet disposition identity from the input packet. Return the identity for the exact packet this tool call handles.',
+				'description' => $description,
 			);
 			$parameters['properties']            = $properties;
-			$required                            = is_array( $parameters['required'] ?? null ) ? $parameters['required'] : array();
-			$required[]                          = 'disposition_id';
-			$parameters['required']              = array_values( array_unique( $required ) );
+			if ( 1 !== $claim_count ) {
+				$required                         = is_array( $parameters['required'] ?? null ) ? $parameters['required'] : array();
+				$required[]                       = 'disposition_id';
+				$parameters['required']           = array_values( array_unique( $required ) );
+			}
 			$tool_def['parameters']               = $parameters;
 			$tool_def['packet_disposition_bound'] = true;
 		}
@@ -506,7 +512,8 @@ class ToolManager {
 		$job_id       = (int) ( $engine_data['job_id'] ?? $job_snapshot['job_id'] ?? 0 );
 		$config_json  = wp_json_encode( $handler_config );
 		$config_hash  = md5( false === $config_json ? '' : $config_json );
-		$claim_bound  = class_exists( ProcessedItems::class ) && ! empty( ProcessedItems::disposition_claims( $engine_data ) );
+		$claim_count  = class_exists( ProcessedItems::class ) ? count( ProcessedItems::disposition_claims( $engine_data ) ) : 0;
+		$claim_bucket = 0 === $claim_count ? 'unbound' : ( 1 === $claim_count ? 'bound-single' : 'bound-multi' );
 
 		return implode(
 			'|',
@@ -516,7 +523,7 @@ class ToolManager {
 				$handler_slug,
 				'job:' . $job_id,
 				'config:' . $config_hash,
-				'claims:' . ( $claim_bound ? 'bound' : 'unbound' ),
+				'claims:' . $claim_bucket,
 			)
 		);
 	}
