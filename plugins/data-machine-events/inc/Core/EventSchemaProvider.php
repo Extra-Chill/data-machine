@@ -501,7 +501,7 @@ class EventSchemaProvider {
 		}
 
 		if ( ! empty( $event_data['ticketUrl'] ) || ! empty( $event_data['price'] ) || ! empty( $event_data['validFrom'] ) ) {
-			$schema['offers'] = self::buildOffersSchema( $event_data );
+			$schema['offers'] = self::buildOffersSchema( $event_data, $post_id );
 		}
 
 		$status                = $event_data['eventStatus'] ?? 'EventScheduled';
@@ -686,11 +686,11 @@ class EventSchemaProvider {
 		return $organizer;
 	}
 
-	private static function buildOffersSchema( array $event_data ): array {
+	private static function buildOffersSchema( array $event_data, int $post_id ): array {
 		$offers = array( '@type' => 'Offer' );
 
 		if ( ! empty( $event_data['ticketUrl'] ) ) {
-			$offers['url'] = $event_data['ticketUrl'];
+			$offers['url'] = self::resolveOfferUrl( (string) $event_data['ticketUrl'], $post_id );
 		}
 
 		$availability           = $event_data['offerAvailability'] ?? 'InStock';
@@ -709,6 +709,46 @@ class EventSchemaProvider {
 		}
 
 		return $offers;
+	}
+
+	/**
+	 * Resolve the URL to emit as the Event offers.url.
+	 *
+	 * Ticket URLs stored on events may be affiliate/redirect wrappers.
+	 * Ticketmaster's affiliate agreement prohibits publishing those wrapper
+	 * URLs in raw, machine-readable structured data, so this never emits an
+	 * affiliate URL. Mirrors the resolver in extrachill-seo (issue #58) —
+	 * both must agree on the emitted URL for the same event.
+	 *
+	 * Resolution order:
+	 * 1. Not an affiliate URL — the (normalized) ticket URL unchanged.
+	 * 2. Affiliate URL that unwraps to a different, absolute URL — the
+	 *    de-affiliated vendor destination.
+	 * 3. Affiliate URL that cannot be unwrapped — the event permalink. The
+	 *    raw affiliate wrapper is never emitted.
+	 *
+	 * @since 0.65.0
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/862
+	 *
+	 * @param string $ticket_url Raw ticket URL from the event-details block.
+	 * @param int    $post_id    Event post ID, used for the permalink fallback.
+	 * @return string URL safe to emit as offers.url.
+	 */
+	private static function resolveOfferUrl( string $ticket_url, int $post_id ): string {
+		$ticket_url = datamachine_decode_stored_url_artifacts( $ticket_url );
+
+		if ( ! data_machine_events_is_affiliate_ticket_url( $ticket_url ) ) {
+			return $ticket_url;
+		}
+
+		$unwrapped = datamachine_unwrap_affiliate_url( $ticket_url );
+
+		if ( $unwrapped !== $ticket_url && false !== filter_var( $unwrapped, FILTER_VALIDATE_URL ) ) {
+			return $unwrapped;
+		}
+
+		return (string) get_permalink( $post_id );
 	}
 
 	private static function buildImageArray( int $post_id ): array {
