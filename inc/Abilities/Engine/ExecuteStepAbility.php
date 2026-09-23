@@ -766,11 +766,23 @@ class ExecuteStepAbility {
 			$payload['data'] = $dataPackets;
 		}
 
-		$explicitly_dispositioned = $step_success
+		$claims_settled = $step_success
 			&& $reconciled['handled']
 			&& 0 === $reconciled['retained']
-			&& empty( $dataPackets )
 			&& ( 0 < $reconciled['explicit'] || 0 < $reconciled['exhausted'] );
+
+		// For AI steps only: once every claim the step owned has been explicitly
+		// resolved, anything still left in $dataPackets after settled-claim
+		// filtering is claimless conversational residue — a failed or successful
+		// non-handler tool_result (search, fetch, lookup) that never carried a
+		// disposition claim to begin with (#3447). It cannot be routed as
+		// handler output and there is nothing left to re-run it against, so it
+		// must not block the disposition short-circuit the way a live claim
+		// would. Source-ingestion steps deliberately keep the opposite
+		// behavior: a claimless fetch packet is real upstream output and stays
+		// routable (see test_execute_step_routes_claimless_packet_after_every_claim_exhausts).
+		$explicitly_dispositioned = $claims_settled
+			&& ( empty( $dataPackets ) || ( 'ai' === $step_type && self::allPacketsClaimless( $dataPackets ) ) );
 
 		// Only terminal overrides may short-circuit normal continuation routing.
 		// A stale processing/pending marker must not consume the current action
@@ -1413,6 +1425,29 @@ class ExecuteStepAbility {
 			$routable[]         = $packet;
 		}
 		return $routable;
+	}
+
+	/**
+	 * Whether every packet in the list carries no disposition claim metadata.
+	 *
+	 * Used exclusively to decide whether AI-step residue left after
+	 * settled-claim filtering is genuinely claimless (safe to ignore for the
+	 * disposition short-circuit) rather than a still-live claim that must
+	 * remain routable.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine/issues/3447
+	 *
+	 * @param array $packets Data packets.
+	 * @return bool
+	 */
+	private static function allPacketsClaimless( array $packets ): bool {
+		foreach ( $packets as $packet ) {
+			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+			if ( ! empty( ProcessedItems::disposition_claims( $metadata ) ) ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private function claimReconciliationFailure( int $job_id, string $flow_step_id, string $step_type ): array {
