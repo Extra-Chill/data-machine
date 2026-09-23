@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.3] - 2026-09-23
+
+### Fixed
+- never emit affiliate ticket URL in event JSON-LD offers.url
+
 ## [0.64.2] - 2026-09-22
 
 ### Fixed
