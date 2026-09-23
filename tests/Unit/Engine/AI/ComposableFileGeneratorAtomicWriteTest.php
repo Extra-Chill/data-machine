@@ -57,7 +57,7 @@ class ComposableFileGeneratorAtomicWriteTest extends TestCase {
 		parent::tearDown();
 	}
 
-	private function target(): string {
+	private function composed_file_path(): string {
 		return $this->directory . '/AGENTS.md';
 	}
 
@@ -76,10 +76,10 @@ class ComposableFileGeneratorAtomicWriteTest extends TestCase {
 	}
 
 	public function test_writable_directory_write_succeeds_and_leaves_no_stray_temp_file(): void {
-		$result = $this->write_file( $this->target(), $this->directory, 'composed content' );
+		$result = $this->write_file( $this->composed_file_path(), $this->directory, 'composed content' );
 
 		$this->assertTrue( $result['success'] );
-		$this->assertSame( "composed content\n", file_get_contents( $this->target() ) );
+		$this->assertSame( "composed content\n", file_get_contents( $this->composed_file_path() ) );
 
 		$leftovers = array_filter(
 			(array) glob( $this->directory . '/.*' ),
@@ -95,14 +95,14 @@ class ComposableFileGeneratorAtomicWriteTest extends TestCase {
 	public function test_writable_directory_write_is_group_writable(): void {
 		$old_umask = umask( 0077 ); // Would otherwise strip the group-write bit off a freshly created file.
 		try {
-			$result = $this->write_file( $this->target(), $this->directory, 'v1' );
+			$result = $this->write_file( $this->composed_file_path(), $this->directory, 'v1' );
 		} finally {
 			umask( $old_umask );
 		}
 
 		$this->assertTrue( $result['success'] );
 
-		$mode = fileperms( $this->target() ) & 0777;
+		$mode = fileperms( $this->composed_file_path() ) & 0777;
 		$this->assertSame(
 			0060,
 			$mode & 0060,
@@ -111,17 +111,17 @@ class ComposableFileGeneratorAtomicWriteTest extends TestCase {
 	}
 
 	public function test_writable_directory_second_write_replaces_content_and_leaves_no_stray_temp_file(): void {
-		$first = $this->write_file( $this->target(), $this->directory, 'v1' );
+		$first = $this->write_file( $this->composed_file_path(), $this->directory, 'v1' );
 		$this->assertTrue( $first['success'] );
 
 		// Longer than 'v1', so an in-place truncate+write bug (instead of the
 		// intended write-temp-then-rename) would still be caught by content
 		// correctness even where inode reuse makes an inode-identity check
 		// unreliable (tmpfs-backed sandboxes recycle freed inodes readily).
-		$second = $this->write_file( $this->target(), $this->directory, 'v2-longer-payload' );
+		$second = $this->write_file( $this->composed_file_path(), $this->directory, 'v2-longer-payload' );
 		$this->assertTrue( $second['success'] );
 
-		$this->assertSame( "v2-longer-payload\n", file_get_contents( $this->target() ) );
+		$this->assertSame( "v2-longer-payload\n", file_get_contents( $this->composed_file_path() ) );
 
 		$leftovers = array_filter(
 			(array) glob( $this->directory . '/.*' ),
@@ -147,7 +147,7 @@ class ComposableFileGeneratorAtomicWriteTest extends TestCase {
 			}
 		);
 		try {
-			$result = $this->write_file( $this->target(), $this->directory, 'composed content' );
+			$result = $this->write_file( $this->composed_file_path(), $this->directory, 'composed content' );
 		} finally {
 			restore_error_handler();
 		}
@@ -167,7 +167,7 @@ class ComposableFileGeneratorAtomicWriteTest extends TestCase {
 		);
 
 		$this->assertFileDoesNotExist(
-			$this->target(),
+			$this->composed_file_path(),
 			'A refused write must not produce a non-atomic in-place copy of the target (#3545).'
 		);
 	}
