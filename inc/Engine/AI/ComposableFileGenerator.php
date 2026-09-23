@@ -144,14 +144,11 @@ class ComposableFileGenerator {
 			$write_result = self::write_file( $filepath, $directory, $content );
 
 			if ( ! $write_result['success'] ) {
-				$failure = array(
-					'success' => false,
-					'message' => $write_result['message'] ?? sprintf( 'Failed to write %s to disk.', $filename ),
+				return array(
+					'success'    => false,
+					'message'    => $write_result['message'],
+					'error_code' => $write_result['error_code'],
 				);
-				if ( isset( $write_result['error_code'] ) ) {
-					$failure['error_code'] = $write_result['error_code'];
-				}
-				return $failure;
 			}
 
 			// Best-effort cleanup only targets the dead layer-directory copy.
@@ -291,7 +288,7 @@ class ComposableFileGenerator {
 		}
 
 		// Refuse to let tempnam() silently fall back to a different filesystem.
-		if ( ! is_writable( $directory ) ) {
+		if ( ! is_writable( $directory ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable
 			return array(
 				'success'    => false,
 				'error_code' => 'directory_not_writable',
