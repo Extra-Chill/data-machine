@@ -141,12 +141,13 @@ class ComposableFileGenerator {
 				}
 			}
 
-			$written = self::write_file( $filepath, $directory, $content );
+			$write_result = self::write_file( $filepath, $directory, $content );
 
-			if ( ! $written ) {
+			if ( ! $write_result['success'] ) {
 				return array(
-					'success' => false,
-					'message' => sprintf( 'Failed to write %s to disk.', $filename ),
+					'success'    => false,
+					'message'    => $write_result['message'],
+					'error_code' => $write_result['error_code'],
 				);
 			}
 
@@ -248,20 +249,80 @@ class ComposableFileGenerator {
 	/**
 	 * Write content to a file, ensuring directory exists and permissions are set.
 	 *
+	 * The write-to-temp-then-rename pattern below is only atomic when the temp
+	 * file lands in the same directory (same filesystem) as the target. PHP's
+	 * tempnam() does not fail when `$directory` is not writable by the running
+	 * process — it silently falls back to `sys_get_temp_dir()` and emits an
+	 * E_NOTICE. That fallback both (a) prints a notice on every CLI compose and
+	 * (b) puts the temp file on a different filesystem, degrading the following
+	 * rename() into a non-atomic copy+unlink that overwrites the target in
+	 * place while this method reports success — exactly the failure a
+	 * concurrent reader (every agent session start reads a composed file) can
+	 * observe as a half-written file.
+	 *
+	 * We do not trust tempnam()'s non-false return alone. `is_writable()` is
+	 * checked up front so the fallback path is never entered for the directory
+	 * this bug was filed against (#3545), and the temp file's actual directory
+	 * is re-verified after creation as a defense-in-depth check against any
+	 * other route to the same fallback (e.g. a permission model `is_writable()`
+	 * does not understand). Either check failing aborts the write with an
+	 * explicit, named error instead of silently completing a non-atomic
+	 * cross-filesystem rename.
+	 *
+	 * @since next Returns an array with an explicit error_code/message on
+	 *             failure instead of trusting tempnam()'s fallback (#3545).
+	 *
 	 * @param string $filepath  Full file path.
 	 * @param string $directory Parent directory.
 	 * @param string $content   File content.
-	 * @return bool True on success.
+	 * @return array{success:true}|array{success:false,message:string,error_code:string}
 	 */
-	private static function write_file( string $filepath, string $directory, string $content ): bool {
+	private static function write_file( string $filepath, string $directory, string $content ): array {
 		$dm = new DirectoryManager();
 		if ( ! $dm->ensure_directory_exists( $directory ) ) {
-			return false;
+			return array(
+				'success'    => false,
+				'error_code' => 'directory_uncreatable',
+				'message'    => sprintf( 'Could not create directory "%s".', $directory ),
+			);
+		}
+
+		// Refuse to let tempnam() silently fall back to a different filesystem.
+		if ( ! is_writable( $directory ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable
+			return array(
+				'success'    => false,
+				'error_code' => 'directory_not_writable',
+				'message'    => sprintf(
+					'Directory "%s" is not writable by this process. Refusing to fall back to a non-atomic cross-filesystem write; fix the directory ownership/permissions and retry.',
+					$directory
+				),
+			);
 		}
 
 		$temp_path = tempnam( $directory, '.' . basename( $filepath ) . '.tmp-' );
 		if ( false === $temp_path ) {
-			return false;
+			return array(
+				'success'    => false,
+				'error_code' => 'tempnam_failed',
+				'message'    => sprintf( 'Could not create a temporary file in "%s".', $directory ),
+			);
+		}
+
+		// Defense in depth: is_writable() does not model every permission
+		// scheme (ACLs, mount options, quotas). If tempnam() still fell back
+		// to sys_get_temp_dir() despite the check above, the temp file is not
+		// actually in $directory and the rename() below would silently
+		// degrade to a non-atomic copy+unlink. Fail instead of completing it.
+		if ( realpath( dirname( $temp_path ) ) !== realpath( $directory ) ) {
+			@unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink,WordPress.PHP.NoSilencedErrors.Discouraged
+			return array(
+				'success'    => false,
+				'error_code' => 'tempnam_fallback',
+				'message'    => sprintf(
+					'tempnam() fell back to a different filesystem for "%s". Refusing to complete a non-atomic cross-filesystem write.',
+					$directory
+				),
+			);
 		}
 
 		$payload   = $content . "\n";
@@ -278,11 +339,15 @@ class ComposableFileGenerator {
 
 		if ( strlen( $payload ) !== $written || ! @rename( $temp_path, $filepath ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename,WordPress.PHP.NoSilencedErrors.Discouraged
 			@unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink,WordPress.PHP.NoSilencedErrors.Discouraged
-			return false;
+			return array(
+				'success'    => false,
+				'error_code' => 'write_or_rename_failed',
+				'message'    => sprintf( 'Failed to write or atomically rename into place for "%s".', $filepath ),
+			);
 		}
 
 		FilesystemHelper::make_group_writable( $filepath );
-		return true;
+		return array( 'success' => true );
 	}
 
 	/**
