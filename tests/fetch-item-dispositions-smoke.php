@@ -174,17 +174,9 @@ namespace DataMachine\Core\Database\ProcessedItems {
 			return $handles;
 		}
 
-		public static function describe_disposition_handles( array $container ): string {
-			$handles = array_keys( self::disposition_handles( $container ) );
-			return empty( $handles ) ? '' : 'Valid packet handles: ' . implode( ', ', $handles ) . '.';
-		}
-
+		// Error wording is covered by ProcessedItemsTest; the smoke only needs a failure string.
 		public static function unresolved_disposition_error( array $container, string $provided_id = '' ): string {
-			$base = '' === $provided_id
-				? 'disposition_id is required when more than one packet claim is active'
-				: 'disposition_id does not identify an active packet claim';
-			$handles = self::describe_disposition_handles( $container );
-			return '' === $handles ? $base : $base . ' ' . $handles;
+			return 'unresolved packet disposition';
 		}
 
 		public static function resolve_disposition_claim( array $container, string $id = '', bool $infer_single = true ): ?array {
