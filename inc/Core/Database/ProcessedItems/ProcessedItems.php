@@ -22,19 +22,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 class ProcessedItems extends BaseRepository {
 	use ProcessedItemDeferrals;
 
-	const TABLE_NAME                  = 'datamachine_processed_items';
-	const STATUS_CLAIMED              = 'claimed';
-	const STATUS_DEFERRED             = 'deferred';
-	const STATUS_PROCESSED            = 'processed';
-	const DEFAULT_CLAIM_TTL_SECONDS   = 3600;
-	const MAX_DEFERRAL_ATTEMPTS       = 3;
-	const CLAIM_METADATA_KEY          = '_datamachine_item_claim';
-	const CLAIMS_METADATA_KEY         = '_datamachine_item_claims';
-	const DISPOSITION_ID_METADATA_KEY = '_datamachine_packet_disposition_id';
-	const DISPOSITION_HANDLE_METADATA_KEY = '_datamachine_packet_disposition_handle';
-	const DISPOSITION_HANDLE_PREFIX       = 'p';
+	const TABLE_NAME                           = 'datamachine_processed_items';
+	const STATUS_CLAIMED                       = 'claimed';
+	const STATUS_DEFERRED                      = 'deferred';
+	const STATUS_PROCESSED                     = 'processed';
+	const DEFAULT_CLAIM_TTL_SECONDS            = 3600;
+	const MAX_DEFERRAL_ATTEMPTS                = 3;
+	const CLAIM_METADATA_KEY                   = '_datamachine_item_claim';
+	const CLAIMS_METADATA_KEY                  = '_datamachine_item_claims';
+	const DISPOSITION_ID_METADATA_KEY          = '_datamachine_packet_disposition_id';
+	const DISPOSITION_HANDLE_METADATA_KEY      = '_datamachine_packet_disposition_handle';
+	const DISPOSITION_HANDLE_PREFIX            = 'p';
 	private const DISPOSITION_HANDLE_MIN_CHARS = 6;
-	private const READ_CHUNK_SIZE     = 500;
+	private const READ_CHUNK_SIZE              = 500;
 
 	/** Return a stable, non-secret packet disposition identity. */
 	public static function disposition_identity( string $identity_scope, string $source_type, string $item_identifier ): string {
@@ -116,7 +116,7 @@ class ProcessedItems extends BaseRepository {
 
 	/** Build the fail-closed error text for a model-supplied identity with no active claim. */
 	public static function unresolved_disposition_error( array $container, string $provided_id = '' ): string {
-		$base = '' === $provided_id
+		$base    = '' === $provided_id
 			? 'disposition_id is required when more than one packet claim is active'
 			: 'disposition_id does not identify an active packet claim';
 		$handles = self::describe_disposition_handles( $container );
