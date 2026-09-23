@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.5] - 2026-09-23
+
+### Fixed
+- don't let AI-step claimless residue block the disposition short-circuit
+
 ## [0.177.4] - 2026-09-23
 
 ### Fixed
