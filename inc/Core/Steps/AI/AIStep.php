@@ -666,9 +666,7 @@ class AIStep extends Step {
 	 * @param array  $lease_result  Limiter result.
 	 */
 	private function deferForAIConcurrency( string $provider_name, array $lease_result ): void {
-		$existing_throttle = $this->engine instanceof \DataMachine\Core\EngineData
-			? $this->engine->get( 'ai_concurrency_throttle' )
-			: null;
+		$existing_throttle = $this->engine->get( 'ai_concurrency_throttle' );
 		$existing_throttle = is_array( $existing_throttle ) ? $existing_throttle : array();
 
 		$prior_attempts = 0;
