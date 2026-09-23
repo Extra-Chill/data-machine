@@ -47,6 +47,30 @@ $forged = $claim;
 $forged['disposition_id'] = 'opaque-owner-token';
 $assert( null === ProcessedItems::resolve_disposition_claim( array( ProcessedItems::CLAIM_METADATA_KEY => $forged ) ), 'mismatched supplied identity is rejected' );
 
+// #3543: single active claim binds any model-supplied identity, including garbled.
+$single_container = array( ProcessedItems::CLAIM_METADATA_KEY => array(
+	'identity_scope'  => 'scope',
+	'source_type'     => 'source',
+	'item_identifier' => 'item',
+	'ownership_token' => 'opaque-owner-token',
+) );
+$assert( $derived === ( ProcessedItems::resolve_disposition_claim( $single_container, substr( $derived, 0, 63 ) )['disposition_id'] ?? '' ), 'single claim binds a truncated model identity' );
+$assert( $derived === ( ProcessedItems::resolve_disposition_claim( $single_container, '' )['disposition_id'] ?? '' ), 'single claim binds a missing model identity' );
+$assert( null === ProcessedItems::resolve_disposition_claim( $single_container, substr( $derived, 0, 63 ), false ), 'strict mode still rejects a mismatched identity' );
+
+// #3543: multi-claim resolution via short handles, full IDs, and fail-closed unknowns.
+$second_identity = ProcessedItems::disposition_identity( 'scope', 'source', 'item-two' );
+$multi_container = array( ProcessedItems::CLAIMS_METADATA_KEY => array(
+	array( 'identity_scope' => 'scope', 'source_type' => 'source', 'item_identifier' => 'item', 'ownership_token' => 'owner-1' ),
+	array( 'identity_scope' => 'scope', 'source_type' => 'source', 'item_identifier' => 'item-two', 'ownership_token' => 'owner-2' ),
+) );
+$handles = ProcessedItems::disposition_handles( $multi_container );
+$assert( array( 'p' . substr( $derived, 0, 6 ) => $derived, 'p' . substr( $second_identity, 0, 6 ) => $second_identity ) === $handles, 'handles derive as short prefixed identities' );
+$assert( $second_identity === ( ProcessedItems::resolve_disposition_claim( $multi_container, 'p' . substr( $second_identity, 0, 6 ) )['disposition_id'] ?? '' ), 'multi-claim resolves by short handle' );
+$assert( $derived === ( ProcessedItems::resolve_disposition_claim( $multi_container, $derived )['disposition_id'] ?? '' ), 'multi-claim still resolves by full canonical identity' );
+$assert( null === ProcessedItems::resolve_disposition_claim( $multi_container, substr( $derived, 0, 63 ) ), 'multi-claim truncated identity fails closed' );
+$assert( str_contains( ProcessedItems::unresolved_disposition_error( $multi_container, substr( $derived, 0, 63 ) ), 'Valid packet handles: ' . implode( ', ', array_keys( $handles ) ) ), 'unresolved identity error lists valid handles' );
+
 $claim['disposition_id'] = $derived;
 $canonical = array( array( 'metadata' => array( ProcessedItems::CLAIM_METADATA_KEY => $claim ) ) );
 $projection_filter = static function ( array $projected, array $packet ): array {
@@ -58,6 +82,7 @@ $projected = DataPacketPromptProjector::project( $canonical );
 $encoded   = (string) wp_json_encode( $projected );
 $assert( ! str_contains( $encoded, 'opaque-owner-token' ) && ! str_contains( $encoded, 'filter-secret' ), 'recursive ownership tokens are redacted after filters' );
 $assert( $derived === ( $projected[0]['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] ?? '' ), 'safe derived identity is restored after filtering' );
+$assert( 'p' . substr( $derived, 0, 6 ) === ( $projected[0]['metadata'][ ProcessedItems::DISPOSITION_HANDLE_METADATA_KEY ] ?? '' ), 'projected packets expose the model-facing handle' );
 
 $prior = array(
 	array(

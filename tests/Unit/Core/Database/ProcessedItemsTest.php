@@ -396,6 +396,102 @@ class ProcessedItemsTest extends WP_UnitTestCase {
 	}
 
 	// -----------------------------------------------------------------
+	// Disposition identity resolution (#3543)
+	// -----------------------------------------------------------------
+
+	private function disposition_claim( string $item_identifier ): array {
+		return array(
+			'identity_scope'  => $this->flow_step_id,
+			'source_type'     => $this->source_type,
+			'item_identifier' => $item_identifier,
+			'ownership_token' => 'owner-' . $item_identifier,
+		);
+	}
+
+	private function disposition_container( string ...$item_identifiers ): array {
+		$claims = array_map( fn( string $item ): array => $this->disposition_claim( $item ), $item_identifiers );
+
+		return 1 === count( $claims )
+			? array( ProcessedItems::CLAIM_METADATA_KEY => $claims[0] )
+			: array( ProcessedItems::CLAIMS_METADATA_KEY => $claims );
+	}
+
+	public function test_single_claim_binds_truncated_model_identity(): void {
+		$container = $this->disposition_container( 'solo' );
+		$expected  = ProcessedItems::disposition_identity( $this->flow_step_id, $this->source_type, 'solo' );
+
+		$this->assertSame(
+			$expected,
+			ProcessedItems::resolve_disposition_claim( $container, substr( $expected, 0, 63 ) )['disposition_id']
+		);
+		$this->assertSame(
+			$expected,
+			ProcessedItems::resolve_disposition_claim( $container, strrev( substr( $expected, 0, 40 ) ) )['disposition_id']
+		);
+	}
+
+	public function test_single_claim_binds_missing_model_identity(): void {
+		$expected = ProcessedItems::disposition_identity( $this->flow_step_id, $this->source_type, 'solo' );
+
+		$this->assertSame(
+			$expected,
+			ProcessedItems::resolve_disposition_claim( $this->disposition_container( 'solo' ), '' )['disposition_id']
+		);
+	}
+
+	public function test_single_claim_strict_mode_still_rejects_mismatched_identity(): void {
+		$container = $this->disposition_container( 'solo' );
+		$expected  = ProcessedItems::disposition_identity( $this->flow_step_id, $this->source_type, 'solo' );
+
+		$this->assertNull( ProcessedItems::resolve_disposition_claim( $container, substr( $expected, 0, 63 ), false ) );
+		$this->assertSame(
+			$expected,
+			ProcessedItems::resolve_disposition_claim( $container, $expected, false )['disposition_id']
+		);
+	}
+
+	public function test_multi_claim_resolves_by_short_handle_and_full_identity(): void {
+		$container     = $this->disposition_container( 'alpha', 'beta' );
+		$first_id      = ProcessedItems::disposition_identity( $this->flow_step_id, $this->source_type, 'alpha' );
+		$second_id     = ProcessedItems::disposition_identity( $this->flow_step_id, $this->source_type, 'beta' );
+		$first_handle  = 'p' . substr( $first_id, 0, 6 );
+		$second_handle = 'p' . substr( $second_id, 0, 6 );
+
+		$this->assertSame( $first_id, ProcessedItems::resolve_disposition_claim( $container, $first_handle )['disposition_id'] );
+		$this->assertSame( $second_id, ProcessedItems::resolve_disposition_claim( $container, $second_handle )['disposition_id'] );
+		$this->assertSame( $first_id, ProcessedItems::resolve_disposition_claim( $container, $first_id )['disposition_id'] );
+		$this->assertSame( $second_id, ProcessedItems::resolve_disposition_claim( $container, strtoupper( $second_handle ) )['disposition_id'] );
+	}
+
+	public function test_multi_claim_unknown_identity_fails_closed_and_lists_handles(): void {
+		$container = $this->disposition_container( 'alpha', 'beta' );
+		$first_id  = ProcessedItems::disposition_identity( $this->flow_step_id, $this->source_type, 'alpha' );
+		$second_id = ProcessedItems::disposition_identity( $this->flow_step_id, $this->source_type, 'beta' );
+
+		$this->assertNull( ProcessedItems::resolve_disposition_claim( $container, substr( $first_id, 0, 63 ) ) );
+		$this->assertNull( ProcessedItems::resolve_disposition_claim( $container, 'zz-not-a-handle' ) );
+		$this->assertNull( ProcessedItems::resolve_disposition_claim( $container, '' ) );
+
+		$error = ProcessedItems::unresolved_disposition_error( $container, substr( $first_id, 0, 63 ) );
+		$this->assertStringContainsString( 'disposition_id does not identify an active packet claim', $error );
+		$this->assertStringContainsString( 'Valid packet handles: p' . substr( $first_id, 0, 6 ) . ', p' . substr( $second_id, 0, 6 ), $error );
+	}
+
+	public function test_handles_are_short_prefixed_and_distinct(): void {
+		$container = $this->disposition_container( 'alpha', 'beta' );
+		$first_id  = ProcessedItems::disposition_identity( $this->flow_step_id, $this->source_type, 'alpha' );
+		$second_id = ProcessedItems::disposition_identity( $this->flow_step_id, $this->source_type, 'beta' );
+
+		$handles = ProcessedItems::disposition_handles( $container );
+
+		$this->assertSame(
+			array( 'p' . substr( $first_id, 0, 6 ) => $first_id, 'p' . substr( $second_id, 0, 6 ) => $second_id ),
+			$handles
+		);
+		$this->assertCount( 2, array_unique( array_keys( $handles ) ), 'Distinct identities must yield distinct handles.' );
+	}
+
+	// -----------------------------------------------------------------
 	// Index / schema
 	// -----------------------------------------------------------------
 

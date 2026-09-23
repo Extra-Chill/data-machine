@@ -67,8 +67,9 @@ class DataPacketPromptProjector {
 		}
 		$projected = self::redactOwnershipTokens( $projected );
 		if ( '' !== $disposition_id ) {
-			$projected['metadata']                                       = is_array( $projected['metadata'] ?? null ) ? $projected['metadata'] : array();
-			$projected['metadata']['_datamachine_packet_disposition_id'] = $disposition_id;
+			$projected['metadata'] = is_array( $projected['metadata'] ?? null ) ? $projected['metadata'] : array();
+			$projected['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ]     = $disposition_id;
+			$projected['metadata'][ ProcessedItems::DISPOSITION_HANDLE_METADATA_KEY ] = (string) array_key_first( ProcessedItems::disposition_handles( $metadata ) );
 		}
 
 		return $projected;

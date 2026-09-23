@@ -63,6 +63,9 @@ namespace DataMachine\Core\Steps {
 	class FlowStepConfig {
 		public static function usesHandler( array $config ): bool { return ! empty( $config['uses_handler'] ); }
 	}
+	class StepTypeMetadata {
+		public static function isSourceIngestion( string $step_type ): bool { return 'fetch' === $step_type; }
+	}
 }
 
 namespace DataMachine\Engine {

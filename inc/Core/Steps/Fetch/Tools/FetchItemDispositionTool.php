@@ -91,7 +91,7 @@ class FetchItemDispositionTool {
 		$source_type     = $target['source_type'] ?? null;
 		$disposition_id  = $target['disposition_id'] ?? null;
 		if ( ! $target ) {
-			return array( 'success' => false, 'error' => 'packet disposition identity is required', 'tool_name' => $tool_name );
+			return array( 'success' => false, 'error' => ProcessedItems::unresolved_disposition_error( $this->claimContainer( $engine ), (string) ( $parameters['disposition_id'] ?? '' ) ), 'tool_name' => $tool_name );
 		}
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
 		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_REJECT_SOURCE, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
@@ -195,7 +195,7 @@ class FetchItemDispositionTool {
 		$source_type     = $target['source_type'] ?? null;
 		$disposition_id  = $target['disposition_id'] ?? null;
 		if ( ! $target ) {
-			return array( 'success' => false, 'error' => 'packet disposition identity is required', 'tool_name' => $tool_name );
+			return array( 'success' => false, 'error' => ProcessedItems::unresolved_disposition_error( $this->claimContainer( $engine ), (string) ( $parameters['disposition_id'] ?? '' ) ), 'tool_name' => $tool_name );
 		}
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
 		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_DEFER_ITEM, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
@@ -388,11 +388,19 @@ class FetchItemDispositionTool {
 
 	/** Resolve a stable packet identity against engine-owned claim descriptors. */
 	private function resolveTargetClaim( object $engine, array $parameters ): array {
-		$container = array(
+		return ProcessedItems::resolve_disposition_claim( $this->claimContainer( $engine ), (string) ( $parameters['disposition_id'] ?? '' ), true ) ?? array();
+	}
+
+	/** Project engine-owned claim descriptors into a ProcessedItems claim container. */
+	private function claimContainer( object $engine ): array {
+		if ( ! method_exists( $engine, 'get' ) ) {
+			return array();
+		}
+
+		return array(
 			ProcessedItems::CLAIM_METADATA_KEY  => $engine->get( ProcessedItems::CLAIM_METADATA_KEY ),
 			ProcessedItems::CLAIMS_METADATA_KEY => $engine->get( ProcessedItems::CLAIMS_METADATA_KEY ),
 		);
-		return ProcessedItems::resolve_disposition_claim( $container, (string) ( $parameters['disposition_id'] ?? '' ), true ) ?? array();
 	}
 
 	/**

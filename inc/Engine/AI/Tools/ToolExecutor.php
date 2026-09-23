@@ -74,9 +74,7 @@ class ToolExecutor {
 			if ( null === $disposition_claim ) {
 				return array(
 					'success'   => false,
-					'error'     => '' === $provided_id
-						? 'disposition_id is required when more than one packet claim is active'
-						: 'disposition_id does not identify an active packet claim',
+					'error'     => ProcessedItems::unresolved_disposition_error( $engine_data, $provided_id ),
 					'tool_name' => $tool_name,
 					'code'      => 'invalid_packet_disposition',
 				);

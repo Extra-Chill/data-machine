@@ -666,9 +666,7 @@ class AIStep extends Step {
 	 * @param array  $lease_result  Limiter result.
 	 */
 	private function deferForAIConcurrency( string $provider_name, array $lease_result ): void {
-		$existing_throttle = $this->engine instanceof \DataMachine\Core\EngineData
-			? $this->engine->get( 'ai_concurrency_throttle' )
-			: null;
+		$existing_throttle = $this->engine->get( 'ai_concurrency_throttle' );
 		$existing_throttle = is_array( $existing_throttle ) ? $existing_throttle : array();
 
 		$prior_attempts = 0;
@@ -1249,11 +1247,13 @@ class AIStep extends Step {
 
 			$execution_parameters = is_array( $tool_result['metadata']['datamachine']['parameters'] ?? null ) ? $tool_result['metadata']['datamachine']['parameters'] : array();
 			$disposition_id       = (string) ( $tool_result['disposition_id'] ?? $execution_parameters['disposition_id'] ?? $tool_parameters['disposition_id'] ?? '' );
-			$matched_claim        = '' !== $disposition_id && class_exists( ProcessedItems::class ) ? ProcessedItems::resolve_disposition_claim( $engine_data, $disposition_id, false ) : null;
+			$matched_claim        = $is_handler_tool && ! empty( $active_claims ) && class_exists( ProcessedItems::class )
+				? ProcessedItems::resolve_disposition_claim( $engine_data, $disposition_id, true )
+				: null;
 			if ( $is_handler_tool && ! empty( $active_claims ) && null === $matched_claim ) {
 				$tool_result = array(
 					'success'   => false,
-					'error'     => 'Successful handler output did not identify an active packet claim.',
+					'error'     => class_exists( ProcessedItems::class ) ? ProcessedItems::unresolved_disposition_error( $engine_data, $disposition_id ) : 'Successful handler output did not identify an active packet claim.',
 					'code'      => 'invalid_packet_disposition',
 					'tool_name' => $tool_name,
 				);

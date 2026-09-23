@@ -672,9 +672,7 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 				if ( null === $claim ) {
 					return array(
 						'success'   => false,
-						'error'     => '' === $provided_id
-							? 'disposition_id is required when more than one packet claim is active'
-							: 'disposition_id does not identify an active packet claim',
+						'error'     => \DataMachine\Core\Database\ProcessedItems\ProcessedItems::unresolved_disposition_error( $engine_data, $provided_id ),
 						'tool_name' => $tool_name,
 						'code'      => 'invalid_packet_disposition',
 					);
@@ -793,7 +791,7 @@ function datamachine_build_pre_tool_mediator( array $tools, array $loop_payload,
 							'success'   => false,
 							'tool_name' => $tool_name,
 							'code'      => 'invalid_packet_disposition',
-							'error'     => 'disposition_id does not identify an active packet claim',
+							'error'     => \DataMachine\Core\Database\ProcessedItems\ProcessedItems::unresolved_disposition_error( $engine_data, $provided_id ),
 						),
 					);
 				}
