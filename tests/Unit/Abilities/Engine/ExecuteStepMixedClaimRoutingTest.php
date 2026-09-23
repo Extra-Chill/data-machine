@@ -609,7 +609,10 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertFalse( $result['step_success'] );
 		$this->assertSame( 'failed', $result['outcome'] );
-		$this->assertSame( 'handler_requiring_step_missing_handler_packets', $result['reason'] );
+		// With no explicit disposition the #3447 short-circuit never engages, so
+		// the step keeps main's behavior: every tool call failed, so it fails as
+		// tool_result_failed rather than resolving as packets_dispositioned.
+		$this->assertSame( 'tool_result_failed', $result['reason'] );
 		$this->assertSame( JobStatus::FAILED, $this->jobs->get_job( $job_id )['status'] );
 		$this->assertSame( array(), $this->scheduled );
 	}
