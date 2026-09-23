@@ -509,6 +509,111 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 		$this->assertSame( array(), $this->scheduled );
 	}
 
+	/**
+	 * Issue #3447 repro shape: a successful, claimless non-handler tool_result
+	 * (e.g. a search call) followed by an explicit reject_source disposition
+	 * must still short-circuit as dispositioned. The claimless residue is
+	 * conversational leftover, not routable handler output.
+	 */
+	public function test_claimless_successful_non_handler_tool_then_reject_terminalizes_before_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-claimless-search-then-reject', false );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array(
+			$this->successful_non_handler_tool_result_packet(),
+			$this->disposition_result_packet( $claim, 'reject_source' ),
+		);
+
+		$result = $this->execute( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'packets_dispositioned', $result['outcome'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $result['status'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+		$this->assertTrue( $this->processed->has_item_been_processed( 'mixed-scope', 'mixed-source', 'ai-claimless-search-then-reject' ) );
+		$this->assertNotSame( 'handler_requiring_step_missing_handler_packets', datamachine_get_engine_data( $job_id )['job_status_reason'] ?? '' );
+	}
+
+	/**
+	 * Issue #3447 production shape (events.extrachill.com, 2026-09-23): a
+	 * failed web_fetch (claimless, HTTP 403), an unconfigured google_search
+	 * (also claimless), then a successful reject_source disposition. Multiple
+	 * claimless packets must not accumulate into a routable "handler packet".
+	 */
+	public function test_multiple_failed_claimless_tool_results_then_reject_terminalizes_before_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-multi-claimless-then-reject', false );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array(
+			$this->failed_non_handler_tool_result_packet( 'web_fetch', 'HTTP 403 Forbidden' ),
+			$this->failed_non_handler_tool_result_packet( 'google_search', 'Search provider is not configured.' ),
+			$this->disposition_result_packet( $claim, 'reject_source' ),
+		);
+
+		$result = $this->execute( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'packets_dispositioned', $result['outcome'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $result['status'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+		$this->assertTrue( $this->processed->has_item_been_processed( 'mixed-scope', 'mixed-source', 'ai-multi-claimless-then-reject' ) );
+		$this->assertNotSame( 'handler_requiring_step_missing_handler_packets', datamachine_get_engine_data( $job_id )['job_status_reason'] ?? '' );
+	}
+
+	/**
+	 * Issue #3447 shape 1: a handler tool called without a disposition_id
+	 * fails parameter validation and is rewritten claimless (no matched
+	 * claim), then the agent explicitly rejects the item. Must still
+	 * short-circuit as dispositioned.
+	 */
+	public function test_handler_tool_without_disposition_id_then_reject_terminalizes_before_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-no-disposition-id-then-reject', false );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array(
+			$this->invalid_disposition_handler_tool_result_packet(),
+			$this->disposition_result_packet( $claim, 'reject_source' ),
+		);
+
+		$result = $this->execute( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'packets_dispositioned', $result['outcome'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $result['status'] );
+		$this->assertSame( JobStatus::COMPLETED_NO_ITEMS, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+		$this->assertTrue( $this->processed->has_item_been_processed( 'mixed-scope', 'mixed-source', 'ai-no-disposition-id-then-reject' ) );
+		$this->assertNotSame( 'handler_requiring_step_missing_handler_packets', datamachine_get_engine_data( $job_id )['job_status_reason'] ?? '' );
+	}
+
+	/**
+	 * Issue #3447 negative guard: claimless-only output with NO disposition
+	 * result at all must still fail as handler_requiring_step_missing_handler_packets.
+	 * The short-circuit only fires once every owned claim was explicitly
+	 * resolved; without a disposition, this is still a genuine
+	 * "handler never called" failure and must not be masked.
+	 */
+	public function test_claimless_only_output_without_disposition_still_fails_handler_requiring_step(): void {
+		$job_id = $this->create_job( 'ai', 'handler_sink' );
+		$claim  = $this->claim( $job_id, 'ai-claimless-only-no-disposition', false );
+		$this->set_engine_claims( $job_id, array( $claim ) );
+		MixedClaimAIStep::$packets[ $job_id ] = array(
+			$this->failed_non_handler_tool_result_packet( 'web_fetch', 'HTTP 403 Forbidden' ),
+			$this->failed_non_handler_tool_result_packet( 'google_search', 'Search provider is not configured.' ),
+		);
+
+		$result = $this->execute( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertFalse( $result['step_success'] );
+		$this->assertSame( 'failed', $result['outcome'] );
+		$this->assertSame( 'handler_requiring_step_missing_handler_packets', $result['reason'] );
+		$this->assertSame( JobStatus::FAILED, $this->jobs->get_job( $job_id )['status'] );
+		$this->assertSame( array(), $this->scheduled );
+	}
+
 	private function create_job( string $step_type = 'fetch', string $sink_step_type = 'passthrough' ): int {
 		$job_id = $this->jobs->create_job(
 			array(
@@ -673,6 +778,65 @@ class ExecuteStepMixedClaimRoutingTest extends WP_UnitTestCase {
 				),
 				'source_type'            => 'mixed-source',
 				'packet_disposition'     => 'succeeded',
+			),
+		);
+	}
+
+	/** Mirror a failed, claimless `tool_result` from a non-handler tool (e.g. web_fetch/google_search). */
+	private function failed_non_handler_tool_result_packet( string $tool_name, string $error ): array {
+		return array(
+			'type'      => 'tool_result',
+			'timestamp' => time(),
+			'data'      => array(
+				'title' => ucwords( str_replace( '_', ' ', $tool_name ) ) . ' Result',
+				'body'  => $error,
+			),
+			'metadata'  => array(
+				'tool_name'              => $tool_name,
+				'handler_tool'           => null,
+				'tool_parameters'        => array(),
+				'tool_success'           => false,
+				'tool_failure_non_fatal' => false,
+				'tool_result_envelope'   => array(
+					'success' => false,
+					'error'   => $error,
+				),
+				'source_type'            => 'mixed-source',
+				'packet_disposition'     => 'failed',
+			),
+		);
+	}
+
+	/**
+	 * Mirror AIStep::processLoopResults() output for a handler tool called
+	 * without a disposition_id: parameter validation fails before any claim
+	 * lookup runs, so the resulting `tool_result` packet carries no claim
+	 * metadata at all (distinct from failed_handler_tool_result_packet(),
+	 * which carries the claim but fails after resolving it).
+	 */
+	private function invalid_disposition_handler_tool_result_packet(): array {
+		$error = 'Tool "upsert_event" requires the following parameters: title, description, disposition_id.';
+		return array(
+			'type'      => 'tool_result',
+			'timestamp' => time(),
+			'data'      => array(
+				'title' => 'Upsert Event Result',
+				'body'  => $error,
+			),
+			'metadata'  => array(
+				'tool_name'              => 'upsert_event',
+				'handler_tool'           => 'upsert_event',
+				'tool_parameters'        => array(),
+				'tool_success'           => false,
+				'tool_failure_non_fatal' => false,
+				'tool_result_envelope'   => array(
+					'success'   => false,
+					'error'     => $error,
+					'code'      => 'invalid_packet_disposition',
+					'tool_name' => 'upsert_event',
+				),
+				'source_type'            => 'mixed-source',
+				'packet_disposition'     => 'failed',
 			),
 		);
 	}
