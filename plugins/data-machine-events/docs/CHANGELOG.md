@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.7] - 2026-09-24
+
+### Fixed
+- render an event's end time and multi-day end date on the single-event page
+
 ## [0.64.6] - 2026-09-24
 
 ### Fixed
