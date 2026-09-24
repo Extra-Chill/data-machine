@@ -127,7 +127,8 @@ class EventBlockContentBuilder {
 	}
 
 	/**
-	 * Write-path guard: heal corrupted affiliate redirect URLs before storage.
+	 * Write-path guard: heal or discard corrupted affiliate redirect URLs
+	 * before storage.
 	 *
 	 * The import pipeline's AI step constructs the affiliate wrappers, and
 	 * occasionally transcribes the redirect parameter with its URL punctuation
@@ -135,17 +136,27 @@ class EventBlockContentBuilder {
 	 * wrapper redirects real visitors to a garbage destination. Production
 	 * evidence (post 405414, imported 2026-09-09) showed this class of
 	 * corruption was still being produced by live import flows — see issue
-	 * #823.
+	 * #823, and #829 for confirmation the write path (not just historical
+	 * rows) was still active and could land on `ticketUrl`, not only
+	 * `organizerUrl`.
 	 *
 	 * When the corrupted destination reconstructs with confidence it is
 	 * replaced here, so no import path can persist the corruption. When it
-	 * does NOT reconstruct confidently the value is stored as-is (blanking an
-	 * URL would be silent data loss) and the quality-audit detector
+	 * does NOT reconstruct confidently, this attribute is discarded (not
+	 * stored) rather than persisted corrupted: a value that is missing is a
+	 * visible, honest gap, while a broken or wrong redirect looks legitimate
+	 * and can be clicked by a real visitor — on `ticketUrl` that is the
+	 * purchase funnel itself. (Issue #823/#826 originally chose to store
+	 * unreconstructable corruption as-is to avoid "silent data loss"; #829
+	 * supersedes that ruling — silent corruption is worse than a visible
+	 * gap.) The quality-audit detector
 	 * (`AffiliateRedirectShape::find_corrupted_redirect()`, surfaced via
-	 * `wp data-machine-events check quality`) remains the safety net. Healthy
-	 * URLs pass through untouched.
+	 * `wp data-machine-events check quality`) remains the safety net for rows
+	 * already in storage from before this guard existed. Healthy URLs and
+	 * non-affiliate URLs pass through untouched.
 	 *
-	 * @param array $event_data Event data (by reference; URL attrs may be healed).
+	 * @param array $event_data Event data (by reference; URL attrs may be
+	 *                          healed or removed).
 	 */
 	private function guard_affiliate_redirect_urls( array &$event_data ): void {
 		foreach ( array( 'ticketUrl', 'organizerUrl' ) as $attr ) {
@@ -155,21 +166,41 @@ class EventBlockContentBuilder {
 			}
 
 			$repair = AffiliateRedirectShape::repair_stored_url( $candidate );
-			if ( null === $repair ) {
+			if ( null !== $repair ) {
+				$event_data[ $attr ] = $repair['after'];
+
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Import URL carried a corrupted affiliate redirect parameter; destination reconstructed at write time',
+					array(
+						'attribute'   => $attr,
+						'before'      => $repair['before'],
+						'after'       => $repair['after'],
+						'destination' => $repair['destination'],
+					)
+				);
 				continue;
 			}
 
-			$event_data[ $attr ] = $repair['after'];
+			if ( null === AffiliateRedirectShape::find_corrupted_redirect( $candidate ) ) {
+				// Healthy, not an affiliate wrapper, or no redirect parameter
+				// present to evaluate — nothing to do.
+				continue;
+			}
+
+			// Corrupted AND not confidently reconstructable: the true
+			// destination is unknowable. Discard rather than persist a value
+			// that could send a real visitor to a broken or wrong page.
+			unset( $event_data[ $attr ] );
 
 			do_action(
 				'datamachine_log',
 				'warning',
-				'Import URL carried a corrupted affiliate redirect parameter; destination reconstructed at write time',
+				'Import URL carried a corrupted affiliate redirect parameter with no confident reconstruction; discarded before storage',
 				array(
-					'attribute'   => $attr,
-					'before'      => $repair['before'],
-					'after'       => $repair['after'],
-					'destination' => $repair['destination'],
+					'attribute' => $attr,
+					'discarded' => $candidate,
 				)
 			);
 		}

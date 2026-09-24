@@ -140,7 +140,7 @@ class EventSchemaProvider {
 		'ticketUrl'         => array(
 			'type'            => 'string',
 			'required'        => false,
-			'description'     => 'URL to purchase tickets',
+			'description'     => 'URL to purchase tickets. Copy the destination URL exactly as given in the source data, character for character — never retype, paraphrase, re-encode, or reconstruct it, and never invent an affiliate/redirect wrapper URL yourself. Leave empty when no ticket URL is available.',
 			'schema_property' => 'offers.url',
 		),
 		'offerAvailability' => array(
@@ -194,7 +194,7 @@ class EventSchemaProvider {
 		'organizerUrl'  => array(
 			'type'            => 'string',
 			'required'        => false,
-			'description'     => 'Website URL of the event organizer',
+			'description'     => 'Website URL of the event organizer, only when a genuinely distinct organizer/promoter website is known from the source data. Never reuse, copy, or paraphrase ticketUrl or any other URL field for this — most Ticketmaster/box-office promoters have no separate website. Leave this empty rather than guess. If a distinct organizer URL is known, copy it exactly as given, character for character; never retype or reconstruct it.',
 			'schema_property' => 'organizer.url',
 		),
 	);

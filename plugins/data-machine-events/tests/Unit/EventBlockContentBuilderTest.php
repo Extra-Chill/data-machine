@@ -157,7 +157,7 @@ class EventBlockContentBuilderTest extends WP_UnitTestCase {
 	}
 
 	// ---------------------------------------------------------------
-	// Corrupted affiliate redirect write-path guard (issue #823)
+	// Corrupted affiliate redirect write-path guard (issue #823, #829)
 	// ---------------------------------------------------------------
 
 	public function test_guard_heals_corrupted_redirect_before_storage() {
@@ -177,10 +177,12 @@ class EventBlockContentBuilderTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'httpswww.', $content );
 	}
 
-	public function test_guard_keeps_unreconstructable_corruption_visible() {
-		// Ticketweb destination: detected but deliberately not reconstructed
-		// yet. The guard must NOT blank the URL (silent data loss) — it
-		// stores as-is and the quality-audit detector remains the safety net.
+	public function test_guard_discards_unreconstructable_corruption_on_organizer_url() {
+		// Ticketweb destination: detected but not confidently reconstructed.
+		// Issue #829 supersedes the original #823/#826 "store as-is" ruling:
+		// a corrupted, unresolvable redirect must not be persisted at all —
+		// it is discarded (not blanked-and-kept) so it never lands in
+		// post_content as a plausible-looking but broken/wrong link.
 		$content = $this->builder->generate_event_block_content(
 			array(
 				'startDate'    => '2026-08-01',
@@ -188,7 +190,51 @@ class EventBlockContentBuilderTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertStringContainsString( 'httpswww.ticketweb.comeventold-school', $content );
+		$this->assertStringNotContainsString( 'httpswww.ticketweb.comeventold-school', $content );
+		$this->assertStringNotContainsString( 'organizerUrl', $content );
+	}
+
+	public function test_guard_discards_unreconstructable_corruption_on_ticket_url() {
+		// Same corruption class landing on ticketUrl instead of organizerUrl
+		// — the purchase-funnel attribute, per issue #829's concern that
+		// nothing in the pipeline guaranteed it would stay on organizerUrl.
+		$content = $this->builder->generate_event_block_content(
+			array(
+				'startDate' => '2026-08-01',
+				'ticketUrl' => 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=httpswww.ticketweb.comeventold-school-rb-crescent-ballroom-tickets14280894&utm_medium=affiliate',
+			)
+		);
+
+		$this->assertStringNotContainsString( 'httpswww.ticketweb.comeventold-school', $content );
+		$this->assertStringNotContainsString( '"ticketUrl"', $content );
+	}
+
+	public function test_guard_logs_discarded_corruption_for_triage() {
+		$logs   = array();
+		$logger = static function ( string $level, string $message, array $context ) use ( &$logs ): void {
+			if ( 'Import URL carried a corrupted affiliate redirect parameter with no confident reconstruction; discarded before storage' === $message ) {
+				$logs[] = array(
+					'level'   => $level,
+					'context' => $context,
+				);
+			}
+		};
+		add_action( 'datamachine_log', $logger, 10, 3 );
+
+		$corrupted = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=httpswww.ticketweb.comeventold-school-rb-crescent-ballroom-tickets14280894&utm_medium=affiliate';
+		$this->builder->generate_event_block_content(
+			array(
+				'startDate'    => '2026-08-01',
+				'organizerUrl' => $corrupted,
+			)
+		);
+
+		remove_action( 'datamachine_log', $logger, 10 );
+
+		$this->assertCount( 1, $logs );
+		$this->assertSame( 'warning', $logs[0]['level'] );
+		$this->assertSame( 'organizerUrl', $logs[0]['context']['attribute'] );
+		$this->assertSame( $corrupted, $logs[0]['context']['discarded'] );
 	}
 
 	public function test_guard_leaves_healthy_wrappers_untouched() {
@@ -210,10 +256,9 @@ class EventBlockContentBuilderTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'httpswww.', $content );
 	}
 
-	public function test_guard_keeps_ambiguous_corruption_visible() {
-		// Query-stripped variant: reconstruction not confident. The guard
-		// must NOT blank the URL (silent data loss) — it stores as-is and
-		// the quality-audit detector remains the safety net.
+	public function test_guard_discards_ambiguous_corruption() {
+		// Query-stripped variant: reconstruction not confident. Per #829,
+		// ambiguous corruption is discarded rather than stored-and-visible.
 		$ambiguous = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=httpswww.ticketweb.comeventvalgur-andy-loebs-zom6ii-nikki-lopez-philly-tickets14178484REFERRAL_IDtmfeed&utm_medium=affiliate';
 
 		$content = $this->builder->generate_event_block_content(
@@ -223,6 +268,7 @@ class EventBlockContentBuilderTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertStringContainsString( 'REFERRAL_IDtmfeed', $content );
+		$this->assertStringNotContainsString( 'REFERRAL_IDtmfeed', $content );
+		$this->assertStringNotContainsString( 'organizerUrl', $content );
 	}
 }
