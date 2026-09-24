@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.6] - 2026-09-24
+
+### Fixed
+- sniff real image format before attaching to provider requests
+
 ## [0.177.5] - 2026-09-23
 
 ### Fixed
