@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.6] - 2026-09-24
+
+### Fixed
+- discard unreconstructable corrupted affiliate redirects at write time
+
 ## [0.64.5] - 2026-09-24
 
 ### Fixed
