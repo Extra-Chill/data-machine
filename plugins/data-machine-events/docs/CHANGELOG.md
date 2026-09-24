@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.4] - 2026-09-24
+
+### Fixed
+- make wrong-disposition-id assertion meaningful under single-claim inference
+
 ## [0.64.3] - 2026-09-23
 
 ### Fixed
