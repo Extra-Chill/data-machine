@@ -151,6 +151,68 @@ class EmailAuth extends BaseAuthProvider {
 	}
 
 	/**
+	 * Redacted index of every configured mailbox (default plus named accounts).
+	 *
+	 * Display metadata for operator surfaces such as
+	 * `wp datamachine email mailboxes`: account name, scope, owner id, and the
+	 * IMAP host/user pair. Secrets (app passwords, tokens) are never included.
+	 *
+	 * @return array<int,array{account:string,owner_type:string,owner_id:int,imap_host:string,imap_user:string}>
+	 */
+	public function get_mailbox_index(): array {
+		$rows = array();
+
+		$config = $this->get_config();
+		if ( $this->is_authenticated() ) {
+			$rows[] = array(
+				'account'    => 'default',
+				'owner_type' => self::AUTH_SCOPE_SITE,
+				'owner_id'   => 0,
+				'imap_host'  => (string) ( $config['imap_host'] ?? '' ),
+				'imap_user'  => (string) ( $config['imap_user'] ?? '' ),
+			);
+		}
+
+		$data          = get_site_option( 'datamachine_auth_data', array() );
+		$provider_data = $data[ $this->get_provider_slug() ] ?? array();
+		if ( ! is_array( $provider_data ) ) {
+			return $rows;
+		}
+
+		$named = array();
+		foreach ( array_keys( (array) ( $provider_data['accounts'] ?? array() ) ) as $account_name ) {
+			$named[] = array( (string) $account_name, self::AUTH_SCOPE_SITE, 0 );
+		}
+		foreach ( (array) ( $provider_data['principals'] ?? array() ) as $scope => $principal_data ) {
+			if ( ! preg_match( '/^(user|agent):(\d+)$/', (string) $scope, $parts ) || ! is_array( $principal_data ) ) {
+				continue;
+			}
+			foreach ( array_keys( (array) ( $principal_data['accounts'] ?? array() ) ) as $account_name ) {
+				$named[] = array( (string) $account_name, $parts[1], (int) $parts[2] );
+			}
+		}
+
+		foreach ( $named as $entry ) {
+			list( $account_name, $owner_type, $owner_id ) = $entry;
+			foreach ( $this->find_named_accounts( $account_name ) as $match ) {
+				if ( $match['owner_type'] !== $owner_type || (int) $match['owner_id'] !== $owner_id ) {
+					continue;
+				}
+				$rows[] = array(
+					'account'    => $account_name,
+					'owner_type' => $owner_type,
+					'owner_id'   => $owner_id,
+					'imap_host'  => (string) ( $match['account']['imap_host'] ?? '' ),
+					'imap_user'  => (string) ( $match['account']['imap_user'] ?? '' ),
+				);
+				break;
+			}
+		}
+
+		return $rows;
+	}
+
+	/**
 	 * Resolve and authorize a mailbox without exposing credentials externally.
 	 *
 	 * @param string       $account    Account segment or full auth ref.
