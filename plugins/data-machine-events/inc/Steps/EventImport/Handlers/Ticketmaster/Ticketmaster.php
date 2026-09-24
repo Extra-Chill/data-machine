@@ -14,7 +14,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 use function DataMachineEvents\Core\data_machine_events_is_affiliate_ticket_url;
-use function DataMachineEvents\Core\datamachine_unwrap_affiliate_url;
+use function DataMachineEvents\Core\datamachine_unwrap_affiliate_url_faithful;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -906,11 +906,14 @@ class Ticketmaster extends EventImportHandler {
 		// vendor URL — the affiliate ID, campaign ID, and ad ID must not be
 		// frozen into post_content. The wrapper is re-assembled from config
 		// at resolve time (see inc/Core/ticket-destination.php and
-		// ResolveTicketDestinationAbilities). The existing unwrapper is
-		// reused (no second extractor); it is a no-op on an already-canonical
+		// ResolveTicketDestinationAbilities). The existing FAITHFUL unwrapper
+		// is reused (no second extractor); it is a no-op on an already-canonical
 		// `url`, so this stays correct if the API key ever stops being
-		// affiliate-linked.
-		$ticket_url = datamachine_unwrap_affiliate_url( (string) ( $tm_event['url'] ?? '' ) );
+		// affiliate-linked. Faithful, not comparison-oriented: the stored
+		// canonical URL is what a real visitor is eventually redirected to
+		// (via resolve-time wrapper re-assembly), so its nested percent-
+		// encoding must survive intact — see issue #824.
+		$ticket_url = datamachine_unwrap_affiliate_url_faithful( (string) ( $tm_event['url'] ?? '' ) );
 
 		if ( '' !== $ticket_url && data_machine_events_is_affiliate_ticket_url( $ticket_url ) ) {
 			// Unwrapping failed (e.g. the v0.8.39-era mangled `u=httpswww...`

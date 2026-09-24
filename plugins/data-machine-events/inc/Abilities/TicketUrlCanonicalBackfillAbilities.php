@@ -20,11 +20,20 @@
  * - Dry-run by default; nothing writes without `execute => true`.
  * - Only rows whose unwrap → re-assemble round-trip is byte-identical to
  *   the normalized stored wrapper are converted. Attribution drift is
- *   structurally impossible, not merely unlikely: any wrapper whose inner
- *   URL carries nested percent-encoding (the Impact Radius-wrapped
- *   SeatGeek shape, for example) would not round-trip exactly through the
- *   shared unwrapper, and is reported as `skipped_roundtrip_mismatch`
- *   instead of being rewritten. A partial, provably-safe migration beats a
+ *   structurally impossible, not merely unlikely: unwrapping uses the
+ *   byte-FAITHFUL single-decode extractor (`datamachine_unwrap_affiliate_url_faithful()`,
+ *   issue #824 — this is a redirect-purpose consumer, not a comparison
+ *   one, and must not use the aggressive dedup-oriented decode), so a
+ *   wrapper whose inner URL carries nested percent-encoding (the Impact
+ *   Radius-wrapped SeatGeek shape, for example) round-trips correctly when
+ *   its destination host is one this migration re-wraps
+ *   (`apply_to_hosts` in `inc/Core/ticket-destination.php`). Rows whose
+ *   destination host is NOT in `apply_to_hosts` (SeatGeek and other
+ *   non-monetized third-party box-office hosts) still fail the round-trip
+ *   check and are reported as `skipped_roundtrip_mismatch` — correctly:
+ *   this migration only ever converts hosts configured for resolve-time
+ *   re-wrapping, and the guard remains as defense-in-depth against any
+ *   other cause of mismatch. A partial, provably-safe migration beats a
  *   complete, possibly-lossy one.
  * - Mangled rows (the v0.8.39-era `u=httpswww.ticketmaster.com...`
  *   punctuation-stripped shape, 17 known published events) cannot be
@@ -52,7 +61,7 @@ use DataMachineEvents\Core\Event_Post_Type;
 use function DataMachineEvents\Core\data_machine_events_assemble_affiliate_wrapper;
 use function DataMachineEvents\Core\data_machine_events_is_affiliate_ticket_url;
 use function DataMachineEvents\Core\datamachine_decode_stored_url_artifacts;
-use function DataMachineEvents\Core\datamachine_unwrap_affiliate_url;
+use function DataMachineEvents\Core\datamachine_unwrap_affiliate_url_faithful;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -236,7 +245,10 @@ class TicketUrlCanonicalBackfillAbilities {
 				continue;
 			}
 
-			$canonical = datamachine_unwrap_affiliate_url( $normalized );
+			// Faithful (single-decode) extraction — this migration writes
+			// the real canonical URL a visitor is eventually redirected to,
+			// not a comparison key (issue #824).
+			$canonical = datamachine_unwrap_affiliate_url_faithful( $normalized );
 
 			if ( $canonical === $normalized ) {
 				// Unwrapper could not extract an inner URL — the mangled

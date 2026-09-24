@@ -129,8 +129,15 @@ class TicketUrlCanonicalBackfillAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Nested-encoding class (real production SeatGeek example): the
-	 * round-trip guard must refuse conversion — reporting, not writing.
+	 * Real production SeatGeek example: the destination host (seatgeek.com)
+	 * is outside `apply_to_hosts` (only `ticketmaster.com`/`ticketweb.com`
+	 * are re-wrapped), so `data_machine_events_assemble_affiliate_wrapper()`
+	 * returns the canonical destination unwrapped rather than re-wrapping
+	 * it — the round trip fails and the row correctly stays wrapper-stored.
+	 * This is no longer about decode fidelity (issue #824 fixed that; see
+	 * `test_ticketmaster_host_with_nested_encoding_round_trips_after_824_fix()`
+	 * below for a host that IS re-wrapped) — it's about which hosts this
+	 * migration is configured to convert at all.
 	 */
 	public function test_roundtrip_mismatch_row_is_reported_and_never_written(): void {
 		$stored   = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=https%3A%2F%2Fseatgeek.com%2Fchris-brown-tickets%2Fsunrise-florida-amerant-bank-arena-2026-04-04-7-pm%2Fconcert%2F18082005%3Fdd_referrer%3Dhttps%253A%252F%252Famplify.seatgeek.com%252F&utm_medium=affiliate';
@@ -142,6 +149,32 @@ class TicketUrlCanonicalBackfillAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $result['skipped_roundtrip_mismatch'] );
 		$this->assertSame( 'roundtrip_mismatch', $result['report'][0]['reason'] );
 		$this->assertStringContainsString( 'evyy.net', (string) get_post( $event_id )->post_content, 'Non-round-tripping rows must stay wrapper-stored.' );
+	}
+
+	/**
+	 * Issue #824 regression coverage: a wrapper whose destination host IS
+	 * re-wrapped (`ticketmaster.com`, in `apply_to_hosts`) but whose inner
+	 * URL carries its own nested percent-encoded query param must now
+	 * convert successfully. Before #824's faithful-unwrap fix, this would
+	 * have failed the round-trip check the same way the SeatGeek case
+	 * above does — for a completely different, avoidable reason
+	 * (over-decoding, not a host outside `apply_to_hosts`).
+	 */
+	public function test_ticketmaster_host_with_nested_encoding_round_trips_after_824_fix(): void {
+		$canonical_with_nested_encoding = 'https://www.ticketmaster.com/event/Z7r9jZ1A7Q4qb?ref=' . rawurlencode( 'https://x.example.com/' );
+		$stored                         = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=' . rawurlencode( $canonical_with_nested_encoding ) . '&utm_medium=affiliate';
+		$event_id                       = $this->makeEventWithRawTicketUrl( $stored, '2099-08-15' );
+
+		$result = $this->ability->executeBackfill( array( 'dry_run' => false ) );
+
+		$this->assertSame( 1, $result['updated'] );
+		$this->assertSame( 0, $result['skipped_roundtrip_mismatch'] );
+		$this->assertSame(
+			$canonical_with_nested_encoding,
+			$this->blockTicketUrl( $event_id ),
+			'The nested ref= encoding must survive the conversion exactly.'
+		);
+		$this->assertStringNotContainsString( 'evyy.net', (string) get_post( $event_id )->post_content );
 	}
 
 	public function test_future_only_scope_leaves_past_events_untouched(): void {

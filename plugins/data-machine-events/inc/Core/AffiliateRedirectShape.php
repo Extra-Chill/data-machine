@@ -10,12 +10,15 @@
  *
  * Detection is deliberately SHAPE-based, not string-based: after extracting
  * the redirect parameter through the shared extractor
- * (`datamachine_find_affiliate_redirect_param()`), the value must parse as an
- * absolute URL with a scheme AND a host. Matching the literal `httpswww`
- * would catch exactly one corruption variant and nothing else; the
- * scheme/host assertion catches the whole class — colon-only stripping,
- * slash-only stripping, partial encodes — on every affiliate host the
- * filterable list knows about. See
+ * (`datamachine_find_affiliate_redirect_param()`, byte-faithful single-decode
+ * — this detector's output feeds `repair_stored_url()`, which rewrites the
+ * real stored ticket URL a visitor is redirected to, so it is a
+ * redirect-purpose consumer and must not use the aggressive dedup-comparison
+ * decode; see issue #824), the value must parse as an absolute URL with a
+ * scheme AND a host. Matching the literal `httpswww` would catch exactly one
+ * corruption variant and nothing else; the scheme/host assertion catches the
+ * whole class — colon-only stripping, slash-only stripping, partial encodes
+ * — on every affiliate host the filterable list knows about. See
  * https://github.com/Extra-Chill/data-machine-events/issues/823.
  *
  * Repair is confidence-gated: a corrupted destination is reconstructed only
@@ -65,7 +68,9 @@ class AffiliateRedirectShape {
 			return null;
 		}
 
-		$redirect = datamachine_find_affiliate_redirect_param( $url );
+		// Faithful (single-decode) extraction — this value flows into a
+		// repaired REDIRECT destination, not a comparison key.
+		$redirect = datamachine_find_affiliate_redirect_param( $url, true );
 		if ( null === $redirect ) {
 			return null;
 		}

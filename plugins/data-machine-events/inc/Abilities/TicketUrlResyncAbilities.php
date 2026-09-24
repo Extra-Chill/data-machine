@@ -5,6 +5,12 @@
  * Re-normalizes ticket URL meta from block content to recover from
  * the v0.8.39 bug that stripped identity parameters from affiliate URLs.
  *
+ * `EVENT_TICKET_URL_META_KEY` (`_datamachine_ticket_url`) is a DEDUP
+ * COMPARISON KEY, not a redirect-safe URL — see the docblock on
+ * `datamachine_normalize_ticket_url()` (event-dates-sync.php) and issue
+ * #821. This class only ever recomputes/compares that meta; it must never
+ * be read expecting the complete, as-authored ticket URL.
+ *
  * Abilities API integration pattern:
  * - Registers ability via wp_register_ability() on wp_abilities_api_init hook
  * - Static $registered flag prevents duplicate registration when instantiated multiple times
@@ -20,6 +26,7 @@ namespace DataMachineEvents\Abilities;
 use DataMachineEvents\Abilities\EventDateQueryAbilities;
 use DataMachineEvents\Core\Event_Post_Type;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
+use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -131,11 +138,11 @@ class TicketUrlResyncAbilities {
 			}
 
 			$new_normalized = datamachine_normalize_ticket_url( $ticket_url );
-			$old_normalized = get_post_meta( $event->ID, '_datamachine_ticket_url', true );
+			$old_normalized = get_post_meta( $event->ID, EVENT_TICKET_URL_META_KEY, true );
 
 			if ( $new_normalized !== $old_normalized ) {
 				if ( ! $dry_run ) {
-					update_post_meta( $event->ID, '_datamachine_ticket_url', $new_normalized );
+					update_post_meta( $event->ID, EVENT_TICKET_URL_META_KEY, $new_normalized );
 				}
 				$changes[] = array(
 					'post_id' => $event->ID,

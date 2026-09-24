@@ -1,6 +1,6 @@
 <?php
 /**
- * Public API affiliate-helper export tests (issue #816).
+ * Public API affiliate-helper export tests (issue #816, #824).
  *
  * `inc/public-api.php` exposes two GLOBAL-namespace wrapper functions so
  * downstream plugins (e.g. extrachill-seo#57) can consume the affiliate
@@ -11,6 +11,16 @@
  * covers both so neither one silently regresses to "not exported" while
  * the other stays exported, which is exactly the bug this test guards
  * against (see PR #820 review).
+ *
+ * The global `datamachine_unwrap_affiliate_url()` is a DISPLAY-purpose
+ * export (extrachill-seo's JSON-LD `offers.url`), so since issue #824 it
+ * delegates to the internal FAITHFUL unwrapper
+ * (`datamachine_unwrap_affiliate_url_faithful()`), NOT the
+ * comparison-oriented internal function of the same name. Do not
+ * reintroduce an assertion that the two same-named functions
+ * (global vs. `Core\datamachine_unwrap_affiliate_url()`) always agree —
+ * they are intentionally different decode-depth variants and diverge for
+ * nested-encoded inner URLs.
  *
  * @package DataMachineEvents\Tests\Unit
  */
@@ -49,16 +59,38 @@ class PublicApiAffiliateTest extends WP_UnitTestCase {
 		);
 	}
 
-	public function test_global_unwrap_delegates_to_internal_implementation(): void {
+	public function test_global_unwrap_delegates_to_internal_faithful_implementation(): void {
 		$inner   = 'https://www.ticketmaster.com/event/Z7r9jZ1A7JFo-';
 		$wrapped = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=' . rawurlencode( $inner ) . '&utm_medium=affiliate';
 
 		$this->assertSame( $inner, \datamachine_unwrap_affiliate_url( $wrapped ) );
 
-		// Delegation, not reimplementation: both surfaces must agree.
+		// Delegation, not reimplementation: the global export must agree
+		// with the internal FAITHFUL variant specifically (issue #824) —
+		// it is a display-purpose export (extrachill-seo's offers.url), not
+		// a comparison one.
 		$this->assertSame(
-			\DataMachineEvents\Core\datamachine_unwrap_affiliate_url( $wrapped ),
+			\DataMachineEvents\Core\datamachine_unwrap_affiliate_url_faithful( $wrapped ),
 			\datamachine_unwrap_affiliate_url( $wrapped )
+		);
+	}
+
+	/**
+	 * The global export must diverge from the internal COMPARISON-oriented
+	 * function of the same name for a nested-encoded inner URL — if it ever
+	 * agrees again, the public API silently regressed to leaking a
+	 * dedup-comparison decode into a display-purpose consumer (issue #824).
+	 */
+	public function test_global_unwrap_diverges_from_comparison_oriented_internal_function_for_nested_encoding(): void {
+		$wrapped = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=https%3A%2F%2Fseatgeek.com%2Fconcert%2F18082005%3Fdd_referrer%3Dhttps%253A%252F%252Famplify.seatgeek.com%252F&utm_medium=affiliate';
+
+		$global     = \datamachine_unwrap_affiliate_url( $wrapped );
+		$comparison = \DataMachineEvents\Core\datamachine_unwrap_affiliate_url( $wrapped );
+
+		$this->assertNotSame(
+			$comparison,
+			$global,
+			'The global (display-purpose) export must not silently reconverge with the internal comparison-oriented function for a nested-encoded inner URL.'
 		);
 	}
 

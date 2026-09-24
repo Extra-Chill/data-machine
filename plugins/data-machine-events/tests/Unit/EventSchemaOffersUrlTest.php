@@ -128,6 +128,36 @@ class EventSchemaOffersUrlTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Nested percent-encoding class (issue #824, real production SeatGeek
+	 * example): the emitted offers.url must preserve the inner
+	 * destination's own nested-encoded query param exactly, matching
+	 * `rawurlencode()` of the resolved URL back to the stored wrapper's
+	 * `u=` bytes. Before #824, this over-decoded through the
+	 * comparison-oriented unwrapper and would have emitted a URL that
+	 * doesn't reproduce the originally stored destination.
+	 */
+	public function test_nested_encoded_destination_is_preserved_byte_faithfully(): void {
+		$post_id = $this->make_event();
+		$wrapped = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=https%3A%2F%2Fseatgeek.com%2Fconcert%2F18082005%3Fdd_referrer%3Dhttps%253A%252F%252Famplify.seatgeek.com%252F&utm_medium=affiliate';
+
+		$schema = EventSchemaProvider::generateSchemaOrg(
+			array( 'ticketUrl' => $wrapped ),
+			array(),
+			array(),
+			$post_id
+		);
+
+		$this->assertStringStartsWith( 'https://seatgeek.com/concert/18082005', $schema['offers']['url'] );
+		$this->assertSame(
+			'https%3A%2F%2Fseatgeek.com%2Fconcert%2F18082005%3Fdd_referrer%3Dhttps%253A%252F%252Famplify.seatgeek.com%252F',
+			rawurlencode( $schema['offers']['url'] ),
+			'The emitted offers.url must round-trip to the exact stored u= bytes, including the nested dd_referrer= encoding.'
+		);
+
+		wp_delete_post( $post_id, true );
+	}
+
+	/**
 	 * The rest of the offers node (type, availability, price fields) must
 	 * survive untouched around the affiliate-safe url resolution.
 	 */

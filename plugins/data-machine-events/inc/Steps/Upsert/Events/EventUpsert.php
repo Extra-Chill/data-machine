@@ -30,7 +30,6 @@ use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\EventSchemaProvider;
-use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
 use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
 use DataMachine\Core\Steps\Upsert\Handlers\UpsertHandler;

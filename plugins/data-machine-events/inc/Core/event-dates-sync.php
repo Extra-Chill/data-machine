@@ -148,22 +148,45 @@ function datamachine_extract_ticket_identity( string $url ): string {
  *
  * Shared extraction primitive for everything that needs to look inside an
  * affiliate wrapper's redirect parameter: `datamachine_unwrap_affiliate_url()`
- * consumes it for unwrapping, and the corrupted-redirect detector
- * (`AffiliateRedirectShape`, see issue #823) consumes it to inspect the value
- * when unwrapping refuses. There is one redirect-parameter scanner and this
- * is it — do not grow a second param-name list elsewhere.
+ * and `datamachine_unwrap_affiliate_url_faithful()` both consume it for
+ * unwrapping, and the corrupted-redirect detector (`AffiliateRedirectShape`,
+ * see issue #823) consumes it to inspect the value when unwrapping refuses.
+ * There is one redirect-parameter scanner and this is it — do not grow a
+ * second param-name list elsewhere.
+ *
+ * Decode depth is the ONE axis that legitimately differs between callers
+ * (issue #824): `wp_parse_url()` + `parse_str()` already percent-decodes the
+ * query string once, so `$single_decode` controls whether a caller wants
+ * that single decode pass (byte-faithful — safe for redirect/display
+ * destinations, including nested-encoded inner URLs) or the additional
+ * `urldecode()` pass this function has always applied on top (aggressive —
+ * intentionally over-decodes for dedup comparison, collapsing
+ * differently-encoded forms of the same identity onto one string). The
+ * param-name list itself never changes with `$single_decode`; only the
+ * decode count does.
  *
  * @since 0.63.0 Extracted from `datamachine_unwrap_affiliate_url()` so the
  *              detector can reuse the same param scan (issue #823).
+ * @since 0.65.1 Added `$single_decode` so a faithful (redirect/display)
+ *              extraction and the aggressive (dedup comparison) extraction
+ *              can share this one scanner instead of forking it (issue #824).
  *
- * @param string $url URL whose query string is scanned.
+ * @param string $url           URL whose query string is scanned.
+ * @param bool   $single_decode When true, return the value exactly as
+ *                              `parse_str()` decoded it (one decode pass —
+ *                              byte-faithful, preserves nested percent-
+ *                              encoding). When false (default, unchanged
+ *                              from prior versions), apply an additional
+ *                              `urldecode()` pass on top (two decodes total —
+ *                              the aggressive form every existing dedup
+ *                              caller depends on; do not change this default).
  * @return array{param:string, value:string}|null Array of parameter name and
- *                                                urldecoded value for the
- *                                                first present known redirect
+ *                                                decoded value for the first
+ *                                                present known redirect
  *                                                parameter, or null when none
  *                                                is present.
  */
-function datamachine_find_affiliate_redirect_param( string $url ): ?array {
+function datamachine_find_affiliate_redirect_param( string $url, bool $single_decode = false ): ?array {
 	$parsed = wp_parse_url( $url );
 	if ( ! $parsed || empty( $parsed['query'] ) ) {
 		return null;
@@ -174,9 +197,14 @@ function datamachine_find_affiliate_redirect_param( string $url ): ?array {
 	// Try common redirect parameter names
 	foreach ( array( 'u', 'url', 'murl', 'destination' ) as $param ) {
 		if ( ! empty( $query_params[ $param ] ) && is_string( $query_params[ $param ] ) ) {
+			$value = $query_params[ $param ];
+			if ( ! $single_decode ) {
+				$value = urldecode( $value );
+			}
+
 			return array(
 				'param' => $param,
-				'value' => urldecode( $query_params[ $param ] ),
+				'value' => $value,
 			);
 		}
 	}
@@ -185,7 +213,27 @@ function datamachine_find_affiliate_redirect_param( string $url ): ?array {
 }
 
 /**
- * Unwrap affiliate/redirect URLs to extract the canonical ticket URL.
+ * Unwrap affiliate/redirect URLs to extract the canonical ticket URL for
+ * DUPLICATE-DETECTION COMPARISON.
+ *
+ * COMPARISON-ORIENTED — do not use this for a redirect/display destination.
+ * This double-decodes the redirect parameter (`parse_str()`'s implicit
+ * decode, plus an explicit `urldecode()` on top via
+ * `datamachine_find_affiliate_redirect_param()`'s default), which is
+ * harmless-to-helpful for comparison — it aggressively normalizes so
+ * differently-encoded forms of the same inner URL collapse to one identity
+ * — but is LOSSY for a wrapper whose inner URL itself carries nested
+ * percent-encoding (e.g. an Impact Radius-wrapped SeatGeek destination
+ * carrying its own `dd_referrer=https%253A%252F%252F...` query param): the
+ * nested encoding is decoded away and cannot be reproduced byte-for-byte.
+ * See issue #824.
+ *
+ * This function's output feeds `datamachine_extract_ticket_identity()`,
+ * which is duplicate-detection identity across the WHOLE event corpus.
+ * Do not change this function's decode behavior — that would silently
+ * change which events are considered duplicates. A redirect/display
+ * consumer that needs the complete, byte-faithful inner URL must call
+ * `datamachine_unwrap_affiliate_url_faithful()` instead.
  *
  * Delegates the "is this an affiliate wrapper?" question to
  * `data_machine_events_is_affiliate_ticket_url()` (see affiliate-links.php) —
@@ -201,9 +249,14 @@ function datamachine_find_affiliate_redirect_param( string $url ): ?array {
  *              returns the original URL instead of silently unwrapping to the
  *              later param — masking a corrupt first param was the wrong
  *              default (issue #823).
+ * @since 0.65.1 Docblock hardened to name this COMPARISON-ORIENTED and point
+ *              redirect/display callers at the new faithful sibling (issue
+ *              #824). No behavior change.
  *
  * @param string $url Possibly wrapped URL
- * @return string Unwrapped URL, or original if not an affiliate wrapper
+ * @return string Unwrapped URL, or original if not an affiliate wrapper.
+ *                A comparison key, not necessarily byte-identical to the
+ *                originally stored inner URL.
  */
 function datamachine_unwrap_affiliate_url( string $url ): string {
 	if ( ! data_machine_events_is_affiliate_ticket_url( $url ) ) {
@@ -216,6 +269,51 @@ function datamachine_unwrap_affiliate_url( string $url ): string {
 	}
 
 	// Validate it looks like a URL
+	if ( filter_var( $redirect['value'], FILTER_VALIDATE_URL ) ) {
+		return $redirect['value'];
+	}
+
+	return $url;
+}
+
+/**
+ * Unwrap affiliate/redirect URLs to extract the canonical ticket URL for a
+ * REDIRECT/DISPLAY destination.
+ *
+ * FAITHFUL sibling of `datamachine_unwrap_affiliate_url()` (issue #824):
+ * decodes the redirect parameter exactly ONCE (`parse_str()`'s implicit
+ * decode only — no additional `urldecode()` pass), so nested percent-
+ * encoding inside the inner URL (e.g. an Impact Radius-wrapped SeatGeek
+ * destination's own `dd_referrer=https%253A%252F%252F...` query param)
+ * survives intact. `rawurlencode()`-ing this function's return value
+ * reproduces the originally stored redirect-parameter bytes exactly for
+ * every wrapper shape observed in production, including nested-encoded
+ * ones — the property `datamachine_unwrap_affiliate_url()` cannot offer.
+ *
+ * Use this for anything that sends a real visitor to the returned URL, or
+ * displays/emits it verbatim (a redirect endpoint, a JSON-LD `offers.url`,
+ * a canonical-URL migration/backfill). Use the comparison sibling instead
+ * for duplicate-detection identity — the two must never be swapped; see
+ * `datamachine_unwrap_affiliate_url()`'s docblock.
+ *
+ * @since 0.65.1
+ *
+ * @param string $url Possibly wrapped URL.
+ * @return string Byte-faithful unwrapped destination URL, or the original
+ *                `$url` unchanged when it isn't an affiliate wrapper, its
+ *                redirect parameter can't be recovered, or the extracted
+ *                value doesn't validate as a URL.
+ */
+function datamachine_unwrap_affiliate_url_faithful( string $url ): string {
+	if ( ! data_machine_events_is_affiliate_ticket_url( $url ) ) {
+		return $url;
+	}
+
+	$redirect = datamachine_find_affiliate_redirect_param( $url, true );
+	if ( null === $redirect ) {
+		return $url;
+	}
+
 	if ( filter_var( $redirect['value'], FILTER_VALIDATE_URL ) ) {
 		return $redirect['value'];
 	}

@@ -401,18 +401,42 @@ if ( ! function_exists( 'data_machine_events_is_affiliate_ticket_url' ) ) {
 
 if ( ! function_exists( 'datamachine_unwrap_affiliate_url' ) ) {
 	/**
-	 * Unwrap an affiliate/redirect ticket URL to its canonical destination.
+	 * Unwrap an affiliate/redirect ticket URL to its canonical destination,
+	 * for a REDIRECT/DISPLAY consumer.
 	 *
 	 * Companion to `data_machine_events_is_affiliate_ticket_url()` above —
 	 * the two are meant to be used together (check, then unwrap) and are
-	 * kept adjacent here for that reason. See the internal
-	 * `datamachine_unwrap_affiliate_url()` in `inc/Core/event-dates-sync.php`,
-	 * which shares the same affiliate host list via
+	 * kept adjacent here for that reason.
+	 *
+	 * This global export is a DISPLAY-purpose helper: its documented
+	 * downstream consumer is extrachill-seo's JSON-LD `offers.url` (issue
+	 * #58), which must agree byte-for-byte with this plugin's own
+	 * `EventSchemaProvider::buildOffersSchema()` (issue #862) for the same
+	 * event. Both therefore delegate to the internal, byte-FAITHFUL
+	 * `datamachine_unwrap_affiliate_url_faithful()` in
+	 * `inc/Core/event-dates-sync.php` (single-decode; preserves nested
+	 * percent-encoding inside the inner URL), NOT the internal
+	 * `datamachine_unwrap_affiliate_url()` of the same name, which is a
+	 * separate, deliberately over-decoding COMPARISON helper feeding
+	 * duplicate-detection identity — the two internal functions are
+	 * intentionally NOT interchangeable (issue #824). This global export's
+	 * own name is unchanged for backward compatibility with existing
+	 * downstream callers; only its internal delegate target changed.
+	 *
+	 * Shares the same affiliate host list via
 	 * `data_machine_events_affiliate_ticket_hosts()` (filterable). Downstream
-	 * plugins (e.g. extrachill-seo's JSON-LD `offers.url`) should call this
-	 * instead of maintaining their own `?u=`-style redirect-param unwrapping.
+	 * plugins (e.g. extrachill-seo) should call this instead of maintaining
+	 * their own `?u=`-style redirect-param unwrapping.
 	 *
 	 * @since 0.62.0
+	 * @since 0.65.1 Delegate target switched from the comparison-oriented
+	 *              internal unwrapper to the faithful one, so a nested-
+	 *              encoded inner destination (e.g. a SeatGeek `dd_referrer=`
+	 *              param) is no longer decoded away for this display
+	 *              consumer. This is a bug fix, not a contract change: the
+	 *              function name, signature, and "unchanged input on
+	 *              failure" guarantee below are unchanged; only the decode
+	 *              fidelity of a successful unwrap improved (issue #824).
 	 *
 	 * @param string $url Possibly affiliate-wrapped ticket URL.
 	 * @return string Unwrapped destination URL, or the original `$url`
@@ -424,10 +448,10 @@ if ( ! function_exists( 'datamachine_unwrap_affiliate_url' ) ) {
 	 *                input.
 	 */
 	function datamachine_unwrap_affiliate_url( string $url ): string {
-		if ( ! function_exists( '\DataMachineEvents\Core\datamachine_unwrap_affiliate_url' ) ) {
+		if ( ! function_exists( '\DataMachineEvents\Core\datamachine_unwrap_affiliate_url_faithful' ) ) {
 			return $url;
 		}
 
-		return \DataMachineEvents\Core\datamachine_unwrap_affiliate_url( $url );
+		return \DataMachineEvents\Core\datamachine_unwrap_affiliate_url_faithful( $url );
 	}
 }
