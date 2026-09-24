@@ -44,6 +44,9 @@ class RequestBuilderMultimodalTest extends TestCase {
 
 	private string $temp_image_path = '';
 
+	/** @var string[] Extra fixture/converted files created by a test, removed in tearDown(). */
+	private array $extra_files = array();
+
 	protected function setUp(): void {
 		parent::setUp();
 		WpAiClientTestDouble::reset();
@@ -54,6 +57,12 @@ class RequestBuilderMultimodalTest extends TestCase {
 		if ( '' !== $this->temp_image_path && file_exists( $this->temp_image_path ) ) {
 			@unlink( $this->temp_image_path );
 		}
+		foreach ( $this->extra_files as $path ) {
+			if ( file_exists( $path ) ) {
+				@unlink( $path );
+			}
+		}
+		$this->extra_files = array();
 		WpAiClientTestDouble::reset();
 		parent::tearDown();
 	}
@@ -175,6 +184,130 @@ class RequestBuilderMultimodalTest extends TestCase {
 		$this->assertCount( 1, $parts, 'Only the text part should survive when the file path is missing' );
 		$this->assertSame( 'Fallback text.', $parts[0]->getText() );
 		$this->assertNull( $parts[0]->getFile() );
+	}
+
+	/**
+	 * Regression for #3548: a scraped image is real AVIF bytes saved under a
+	 * lying ".jpg" name (the exact repro — extension says jpeg, content says
+	 * otherwise). The declared mime_type reaching this choke point is what
+	 * every current caller derives from the extension (`image/jpeg`), matching
+	 * production. The real format must be sniffed from content and converted
+	 * to a provider-supported format — the file part must survive, and the
+	 * job must not fail.
+	 */
+	public function test_message_parts_converts_avif_saved_as_jpg_and_keeps_job_alive(): void {
+		if ( ! function_exists( 'wp_get_image_mime' ) || ! function_exists( 'wp_get_image_editor' ) ) {
+			$this->markTestSkipped( 'Requires a bootstrapped WordPress runtime.' );
+		}
+		if ( ! class_exists( '\\Imagick' ) || ! in_array( 'AVIF', \Imagick::queryFormats( 'AVIF' ), true ) ) {
+			$this->markTestSkipped( 'Requires an Imagick build with AVIF support.' );
+		}
+
+		$imagick = new \Imagick();
+		$imagick->newImage( 64, 64, new \ImagickPixel( 'blue' ) );
+		$imagick->setImageFormat( 'avif' );
+		$avif_bytes = $imagick->getImageBlob();
+		$imagick->destroy();
+
+		$avif_as_jpg = rtrim( sys_get_temp_dir(), '/\\' ) . '/dm-3548-avif-' . uniqid() . '.jpg';
+		file_put_contents( $avif_as_jpg, $avif_bytes );
+		$this->extra_files[] = $avif_as_jpg;
+
+		$this->assertSame(
+			'image/avif',
+			wp_get_image_mime( $avif_as_jpg ),
+			'Precondition: fixture must actually be AVIF bytes under a .jpg name'
+		);
+
+		$content = array(
+			array(
+				'type'      => 'file',
+				'file_path' => $avif_as_jpg,
+				// Extension-derived declared mime — what every current caller passes
+				// (AIStep, RequestInspector, AltTextTask all derive from wp_check_filetype()).
+				'mime_type' => 'image/jpeg',
+			),
+			array(
+				'type' => 'text',
+				'text' => 'Describe this image.',
+			),
+		);
+
+		$parts = $this->invokePrivate( 'wpAiClientMessageParts', array( $content ) );
+
+		$this->assertCount( 2, $parts, 'The converted image and text must both survive — the job is not failed' );
+
+		$file_parts = array_values(
+			array_filter(
+				$parts,
+				static fn( MessagePart $part ): bool => null !== $part->getFile()
+			)
+		);
+		$this->assertCount( 1, $file_parts, 'Exactly one file MessagePart expected' );
+
+		$file = $file_parts[0]->getFile();
+		$this->assertInstanceOf( File::class, $file );
+		$this->assertSame(
+			'image/jpeg',
+			(string) $file->getMimeType(),
+			'AVIF must be converted to a provider-supported format, not sent as the mislabeled original'
+		);
+
+		$converted_path = $file->getLocalPath();
+		if ( null !== $converted_path && $converted_path !== $avif_as_jpg ) {
+			$this->extra_files[] = $converted_path;
+		}
+	}
+
+	/**
+	 * Regression for #3548: an image that's declared as an image but whose
+	 * content can't actually be decoded (corrupt / not a real image) must be
+	 * dropped with a diagnostic instead of being sent to the provider or
+	 * crashing the request. Text parts in the same message still flow through.
+	 */
+	public function test_message_parts_drops_undecodable_image_with_diagnostic(): void {
+		if ( ! function_exists( 'wp_get_image_mime' ) || ! function_exists( 'wp_get_image_editor' ) ) {
+			$this->markTestSkipped( 'Requires a bootstrapped WordPress runtime.' );
+		}
+
+		$garbage_path = rtrim( sys_get_temp_dir(), '/\\' ) . '/dm-3548-garbage-' . uniqid() . '.jpg';
+		file_put_contents( $garbage_path, str_repeat( 'not an image', 20 ) );
+		$this->extra_files[] = $garbage_path;
+
+		// Undecodable content under a .jpg name — wp_get_image_mime() sniffs no
+		// recognizable image format, so this only exercises the drop path when
+		// the caller's declared mime already claims 'image/*' (the current
+		// contract for every existing 'file' content-block producer).
+		$this->assertFalse( wp_get_image_mime( $garbage_path ), 'Precondition: fixture must not decode as any known image format' );
+
+		$logged = array();
+		add_action(
+			'datamachine_log',
+			static function ( $level, $message, $context = array() ) use ( &$logged ) {
+				$logged[] = array( $level, $message );
+			},
+			10,
+			3
+		);
+
+		$content = array(
+			array(
+				'type'      => 'file',
+				'file_path' => $garbage_path,
+				'mime_type' => 'image/jpeg',
+			),
+			array(
+				'type' => 'text',
+				'text' => 'Fallback text.',
+			),
+		);
+
+		$parts = $this->invokePrivate( 'wpAiClientMessageParts', array( $content ) );
+
+		remove_all_actions( 'datamachine_log' );
+
+		$this->assertCount( 1, $parts, 'Only the text part survives when the image cannot be built into a file MessagePart' );
+		$this->assertSame( 'Fallback text.', $parts[0]->getText() );
 	}
 
 	/**

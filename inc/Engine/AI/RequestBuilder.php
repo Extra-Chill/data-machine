@@ -525,6 +525,19 @@ class RequestBuilder {
 	/**
 	 * Build a file MessagePart from a canonical ['type' => 'file', ...] block.
 	 *
+	 * File extensions lie — a scraped image named "*.jpg" can be AVIF, HEIC, or
+	 * anything else. When the caller declares an image/* MIME type (every
+	 * current 'file' content-block producer does — AIStep, RequestInspector,
+	 * AltTextTask, DirectiveRenderer's system_file all wrap images), the real
+	 * format is sniffed from file content via wp_get_image_mime() and run
+	 * through ImageAttachmentPreparer: supported formats pass through
+	 * unchanged, unsupported-but-decodable formats (AVIF, HEIC, ...) are
+	 * converted to JPEG, oversized images are downscaled or dropped, and
+	 * content that doesn't decode as any image at all is dropped as corrupt.
+	 * A caller that declares no MIME type at all is treated as ambiguous
+	 * (could be any file type) and falls through to the original best-effort
+	 * path unchanged, so non-image 'file' attachments are never touched.
+	 *
 	 * @param array $part Canonical content block.
 	 * @return \WordPress\AiClient\Messages\DTO\MessagePart|null
 	 */
@@ -543,6 +556,40 @@ class RequestBuilder {
 				)
 			);
 			return null;
+		}
+
+		$declared_as_image = 0 === strpos( $mime_type, 'image/' );
+
+		if ( ( $declared_as_image || '' === $mime_type ) && function_exists( 'wp_get_image_mime' ) ) {
+			$sniffed_mime = wp_get_image_mime( $file_path );
+
+			if ( false !== $sniffed_mime ) {
+				$prepared = ImageAttachmentPreparer::prepare( $file_path, $sniffed_mime );
+				if ( null === $prepared ) {
+					// Already logged by ImageAttachmentPreparer with the drop reason.
+					return null;
+				}
+				$file_path = $prepared['file_path'];
+				$mime_type = $prepared['mime_type'];
+			} elseif ( $declared_as_image ) {
+				// Caller explicitly declared this as an image, but the content
+				// doesn't decode as any known image format (corrupt/garbage).
+				// Drop it — an optional image must never fail the whole job.
+				do_action(
+					'datamachine_log',
+					'warning',
+					'AI request: dropped image attachment, continuing text-only',
+					array(
+						'file_path' => $file_path,
+						'mime_type' => $mime_type,
+						'reason'    => 'declared image content is not a decodable image format',
+					)
+				);
+				return null;
+			}
+			// else: mime_type was empty and content doesn't decode as any known
+			// image format — ambiguous, not confirmed to be an image. Preserve
+			// the original best-effort pass-through below.
 		}
 
 		try {
