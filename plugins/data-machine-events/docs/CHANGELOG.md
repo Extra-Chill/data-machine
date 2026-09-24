@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.5] - 2026-09-24
+
+### Fixed
+- split comparison vs. redirect affiliate-URL decode; harden dedup meta key
+
 ## [0.64.4] - 2026-09-24
 
 ### Fixed
