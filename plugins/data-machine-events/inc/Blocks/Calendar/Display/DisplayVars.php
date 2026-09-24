@@ -117,8 +117,9 @@ class DisplayVars {
 	/**
 	 * Format time range for display.
 	 *
-	 * Formats start and end times into a readable range. When both times share
-	 * the same AM/PM period, only shows the period once (e.g., "7:30 - 10:00 PM").
+	 * Formats start and end times into a readable range. When both formatted
+	 * times share a common trailing token (e.g. the "AM"/"PM" meridiem),
+	 * only shows it once (e.g., "7:30 - 10:00 PM").
 	 *
 	 * A range is printed for same-day events and, when
 	 * $allow_same_night_range is set, for same-night events whose end lands
@@ -133,10 +134,15 @@ class DisplayVars {
 	 * @param string       $end_time               End time (H:i:s format).
 	 * @param DateTimeZone $event_tz               Event timezone.
 	 * @param bool         $allow_same_night_range Whether a same-night next-day end may render as a range.
+	 * @param string       $time_format            PHP date() format for each side of the range.
+	 *                                              Defaults to the calendar card's fixed
+	 *                                              12-hour display (unchanged for existing
+	 *                                              callers); other surfaces pass the site's
+	 *                                              configured `time_format` option (#860).
 	 * @return string Formatted time display.
 	 */
-	public static function format_time_range( DateTime $start_datetime_obj, string $end_date, string $end_time, DateTimeZone $event_tz, bool $allow_same_night_range = true ): string {
-		$start_formatted_full = $start_datetime_obj->format( 'g:i A' );
+	public static function format_time_range( DateTime $start_datetime_obj, string $end_date, string $end_time, DateTimeZone $event_tz, bool $allow_same_night_range = true, string $time_format = 'g:i A' ): string {
+		$start_formatted_full = $start_datetime_obj->format( $time_format );
 
 		if ( empty( $end_date ) || empty( $end_time ) || self::is_sentinel_end_time( $end_time ) ) {
 			return $start_formatted_full;
@@ -153,23 +159,46 @@ class DisplayVars {
 		if ( $start_datetime_obj->format( 'Y-m-d H:i' ) === $end_datetime_obj->format( 'Y-m-d H:i' ) ) {
 			return $start_formatted_full;
 		}
-
 		$is_same_day = $start_datetime_obj->format( 'Y-m-d' ) === $end_datetime_obj->format( 'Y-m-d' );
 		if ( ! $is_same_day && ( ! $allow_same_night_range || ! MultiDayResolver::is_same_night_end( $start_datetime_obj->format( 'Y-m-d' ), $end_date, $end_time ) ) ) {
 			return $start_formatted_full;
 		}
 
-		$start_period = $start_datetime_obj->format( 'A' );
-		$end_period   = $end_datetime_obj->format( 'A' );
+		$end_formatted_full = $end_datetime_obj->format( $time_format );
 
-		if ( $start_period === $end_period ) {
-			$start_time_only    = $start_datetime_obj->format( 'g:i' );
-			$end_formatted_full = $end_datetime_obj->format( 'g:i A' );
-			return $start_time_only . ' - ' . $end_formatted_full;
+		return self::combine_time_range( $start_formatted_full, $end_formatted_full );
+	}
+
+	/**
+	 * Join two already-formatted time strings into a range, collapsing a
+	 * shared trailing token so a same-period range reads "6:30 - 9:00 PM"
+	 * instead of "6:30 PM - 9:00 PM".
+	 *
+	 * Works for any `$time_format` (not just the fixed 'g:i A' the calendar
+	 * card uses) because it compares the *formatted output*, not the format
+	 * string: it looks at the last whitespace-delimited token of each side
+	 * and only collapses it when both sides produced the identical token and
+	 * that token is not itself part of the clock digits (e.g. a 24-hour
+	 * format like "18:30" has no separate trailing token, so nothing is
+	 * collapsed and both sides print in full).
+	 *
+	 * @param string $start_formatted Fully formatted start time.
+	 * @param string $end_formatted   Fully formatted end time.
+	 * @return string Combined range.
+	 */
+	private static function combine_time_range( string $start_formatted, string $end_formatted ): string {
+		$start_parts = explode( ' ', $start_formatted );
+		$end_parts   = explode( ' ', $end_formatted );
+
+		$start_last_token = end( $start_parts );
+		$end_last_token   = end( $end_parts );
+
+		if ( count( $start_parts ) > 1 && $start_last_token === $end_last_token && ! preg_match( '/\d/', $start_last_token ) ) {
+			array_pop( $start_parts );
+			return implode( ' ', $start_parts ) . ' - ' . $end_formatted;
 		}
 
-		$end_formatted_full = $end_datetime_obj->format( 'g:i A' );
-		return $start_formatted_full . ' - ' . $end_formatted_full;
+		return $start_formatted . ' - ' . $end_formatted;
 	}
 
 	/**

@@ -18,6 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\EventSchemaProvider;
+use DataMachineEvents\Blocks\Calendar\Display\DisplayVars;
+use DataMachineEvents\Blocks\Calendar\Grouping\MultiDayResolver;
 use function DataMachineEvents\Core\data_machine_events_is_gated_ticket_url;
 
 $decode_unicode = function ( $str ) {
@@ -83,6 +85,41 @@ if ( $start_date ) {
 }
 if ( $end_date ) {
 	$end_datetime = $end_time ? $end_date . ' ' . $end_time : $end_date;
+}
+
+/*
+ * Issue #860: endDate/endTime are real block attributes — already fed into
+ * EventSchemaProvider for the JSON-LD `endDate` — but nothing here ever
+ * rendered them to a visitor. $time_display reuses
+ * DisplayVars::format_time_range(), the tested source of truth the
+ * calendar card already uses for its own range rendering (same-night
+ * cutoff, sentinel-end-time, and "identical start/end means no real end"
+ * handling all live there once; see RULES.md "check what already exists").
+ * $multi_day_ends covers the one case that helper deliberately doesn't
+ * surface: a genuinely multi-day span (a continuous festival/run, not a
+ * same-night bar show) keeps that helper's start-time-only return, so its
+ * end date would otherwise stay just as invisible as before this fix.
+ * MultiDayResolver::is_multi_day() is the same classification the calendar
+ * already relies on, so the two surfaces can't disagree on what counts as
+ * "multi-day".
+ */
+$time_display   = '';
+$multi_day_ends = '';
+if ( $start_datetime && $start_time ) {
+	$start_datetime_obj = date_create( $start_datetime, wp_timezone() );
+	if ( $start_datetime_obj ) {
+		$time_display = DisplayVars::format_time_range( $start_datetime_obj, $end_date, $end_time, wp_timezone(), true, get_option( 'time_format' ) );
+	} else {
+		// date_create() couldn't parse it; fall back to the pre-#860
+		// strtotime()-based rendering exactly, so a string shape that
+		// strtotime() historically tolerated never regresses.
+		$time_display = date_i18n( get_option( 'time_format' ), strtotime( $start_datetime ) );
+	}
+}
+if ( $end_date && MultiDayResolver::is_multi_day( $attributes ) ) {
+	$multi_day_ends = $end_time
+		? date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $end_datetime ) )
+		: date_i18n( get_option( 'date_format' ), strtotime( $end_datetime ) );
 }
 
 // Filter and limit occurrence dates for display.
@@ -153,8 +190,11 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 				<span class="icon">📅</span>
 				<span class="text">
 					<?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( $start_datetime ) ) ); ?>
-					<?php if ( $start_time ) : ?>
-						<br><small><?php echo esc_html( date_i18n( get_option( 'time_format' ), strtotime( $start_datetime ) ) ); ?></small>
+					<?php if ( $time_display ) : ?>
+						<br><small><?php echo esc_html( $time_display ); ?></small>
+					<?php endif; ?>
+					<?php if ( $multi_day_ends ) : ?>
+						<br><small><?php printf( __( 'through %s', 'data-machine-events' ), esc_html( $multi_day_ends ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.WP.I18n.MissingTranslatorsComment -- The value is escaped and the placeholder meaning is evident from the label. ?></small>
 					<?php endif; ?>
 				</span>
 				<?php if ( ! empty( $upcoming_occurrences ) ) : ?>
