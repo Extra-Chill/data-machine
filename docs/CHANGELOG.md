@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.7] - 2026-09-25
+
+### Fixed
+- bump agents-api to v0.12.0 (bounded workflow stores)
+
 ## [0.177.6] - 2026-09-24
 
 ### Fixed
