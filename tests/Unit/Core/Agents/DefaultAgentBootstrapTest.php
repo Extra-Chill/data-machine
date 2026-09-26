@@ -10,6 +10,7 @@ namespace DataMachine\Tests\Unit\Core\Agents;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Database\Agents\Agents as AgentsRepository;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Core\PluginSettings;
 use WP_UnitTestCase;
 
 class DefaultAgentBootstrapTest extends WP_UnitTestCase {
@@ -30,6 +31,8 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 		wp_set_current_user( $this->default_user_id );
 		$this->clear_agents();
 		delete_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY );
+		delete_option( 'datamachine_settings' );
+		PluginSettings::clearCache();
 		$directory_manager = new DirectoryManager();
 		wp_delete_file( trailingslashit( $directory_manager->get_user_directory( $this->default_user_id ) ) . 'USER.md' );
 		wp_delete_file( trailingslashit( $directory_manager->get_shared_directory() ) . 'RULES.md' );
@@ -38,6 +41,8 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 	public function tear_down(): void {
 		$this->clear_agents();
 		delete_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY );
+		delete_option( 'datamachine_settings' );
+		PluginSettings::clearCache();
 		$directory_manager = new DirectoryManager();
 		wp_delete_file( trailingslashit( $directory_manager->get_user_directory( $this->default_user_id ) ) . 'USER.md' );
 		wp_delete_file( trailingslashit( $directory_manager->get_shared_directory() ) . 'RULES.md' );
@@ -89,6 +94,54 @@ class DefaultAgentBootstrapTest extends WP_UnitTestCase {
 		update_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY, 'shared-slug' );
 
 		$this->assertSame( $expected_id, datamachine_resolve_existing_agent_id( $this->default_user_id ) );
+	}
+
+	public function test_explicit_system_agent_setting_resolves_that_agent_regardless_of_owner(): void {
+		$other_owner_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		$pinned_id      = $this->agents_repo->create_if_missing( 'pinned-system-agent', 'Pinned System Agent', $other_owner_id, array() );
+
+		// The default owner also has its own agent with an unrelated active-agent
+		// preference; the explicit setting must win over that chain entirely.
+		$this->agents_repo->create_if_missing( 'owner-agent', 'Owner Agent', $this->default_user_id, array() );
+		update_user_meta( $this->default_user_id, AgentBundler::ACTIVE_AGENT_META_KEY, 'owner-agent' );
+
+		PluginSettings::update( array( 'system_agent_slug' => 'pinned-system-agent' ) );
+
+		$context = datamachine_resolve_system_agent_context();
+
+		$this->assertSame( $pinned_id, $context['agent_id'] );
+		$this->assertSame( $other_owner_id, $context['user_id'], 'user_id must be the pinned agent\'s owner, not the install default owner' );
+	}
+
+	public function test_explicit_system_agent_setting_falls_back_when_slug_does_not_resolve(): void {
+		$fallback_id = $this->agents_repo->create_if_missing( 'legacy-agent', 'Legacy Agent', $this->default_user_id, array() );
+
+		PluginSettings::update( array( 'system_agent_slug' => 'no-such-agent' ) );
+
+		$context = datamachine_resolve_system_agent_context();
+
+		$this->assertSame( $fallback_id, $context['agent_id'] );
+		$this->assertSame( $this->default_user_id, $context['user_id'] );
+	}
+
+	public function test_unset_setting_with_multiple_owned_agents_fails_closed_through_full_context(): void {
+		$this->agents_repo->create_if_missing( 'first-agent', 'First Agent', $this->default_user_id, array() );
+		$this->agents_repo->create_if_missing( 'second-agent', 'Second Agent', $this->default_user_id, array() );
+		// No active-agent meta and no system_agent_slug setting: ambiguous.
+
+		$context = datamachine_resolve_system_agent_context();
+
+		$this->assertSame( 0, $context['agent_id'] );
+		$this->assertSame( $this->default_user_id, $context['user_id'] );
+	}
+
+	public function test_unset_setting_with_single_owned_agent_resolves_through_full_context(): void {
+		$agent_id = $this->agents_repo->create_if_missing( 'only-agent', 'Only Agent', $this->default_user_id, array() );
+
+		$context = datamachine_resolve_system_agent_context();
+
+		$this->assertSame( $agent_id, $context['agent_id'] );
+		$this->assertSame( $this->default_user_id, $context['user_id'] );
 	}
 
 	private function clear_agents(): void {
