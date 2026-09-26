@@ -70,7 +70,7 @@ class CloudflareTurnstileAbilities {
 			array(
 				'label'               => __( 'Cloudflare Turnstile: List Widgets', 'data-machine-business' ),
 				'description'         => __( 'List all Cloudflare Turnstile widgets on the configured account.', 'data-machine-business' ),
-				'category'            => 'datamachine-cloudflare',
+				'category'            => 'datamachine-system',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(),
@@ -97,7 +97,7 @@ class CloudflareTurnstileAbilities {
 			array(
 				'label'               => __( 'Cloudflare Turnstile: Get Widget', 'data-machine-business' ),
 				'description'         => __( 'Get one Cloudflare Turnstile widget by sitekey.', 'data-machine-business' ),
-				'category'            => 'datamachine-cloudflare',
+				'category'            => 'datamachine-system',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'sitekey' ),
@@ -129,7 +129,7 @@ class CloudflareTurnstileAbilities {
 			array(
 				'label'               => __( 'Cloudflare Turnstile: Update Widget Domains', 'data-machine-business' ),
 				'description'         => __( 'Add and/or remove hostnames from a Turnstile widget\'s allowed domains. Read-modify-write: preserves the widget\'s name, mode, and every existing domain. Dry-run by default; pass apply=true to write the change.', 'data-machine-business' ),
-				'category'            => 'datamachine-cloudflare',
+				'category'            => 'datamachine-system',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'sitekey' ),
