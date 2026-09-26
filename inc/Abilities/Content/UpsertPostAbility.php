@@ -669,8 +669,8 @@ class UpsertPostAbility {
 		// attribute becomes a bare " and the block's attrs parse as null).
 		$post_data = array(
 			'post_type'    => $post_type,
-			'post_title'   => wp_slash( $title ),
-			'post_content' => wp_slash( $stored_content ),
+			'post_title'   => (string) wp_slash( (string) $title ),
+			'post_content' => (string) wp_slash( (string) $stored_content ),
 			'post_status'  => $post_status,
 		);
 
@@ -679,7 +679,7 @@ class UpsertPostAbility {
 		}
 
 		if ( '' !== $post_excerpt ) {
-			$post_data['post_excerpt'] = wp_slash( $post_excerpt );
+			$post_data['post_excerpt'] = (string) wp_slash( (string) $post_excerpt );
 		}
 
 		if ( $parent_id > 0 ) {
