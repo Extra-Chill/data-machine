@@ -35,6 +35,7 @@ Data Machine Business connects WordPress automation, agents, and pipelines to an
 | Mediavine | Fetch page, aggregate, device, country, normalized-source, and ad-unit publisher revenue reports | Ability, WP-CLI |
 | Content analytics | Category-level engagement audits, editorial triage flags, and GSC opportunity ranking | Abilities |
 | Media hygiene | Detect and safely remove orphan files and unreferenced attachments | Ability, WP-CLI |
+| Cloudflare Turnstile | List and inspect Turnstile widgets; add/remove allowed hostnames with a dry-run-by-default, read-modify-write update | Abilities, WP-CLI |
 | Agent context | Generate concise intent-based `AGENTS.md` routing for business integrations | Data Machine memory composition |
 
 ## Abilities
@@ -85,6 +86,14 @@ The plugin registers the following WordPress abilities. Management-oriented abil
 | Ability | Purpose |
 |---|---|
 | `datamachine/media-hygiene` | Diagnose, list, preview deletion, or delete orphan files and unused attachments |
+
+### Cloudflare
+
+| Ability | Purpose |
+|---|---|
+| `datamachine/cloudflare-turnstile-list-widgets` | List every Turnstile widget on the configured account |
+| `datamachine/cloudflare-turnstile-get-widget` | Get one Turnstile widget by sitekey |
+| `datamachine/cloudflare-turnstile-update-widget-domains` | Add/remove hostnames from a widget's allowed domains via read-modify-write; dry-run by default |
 
 ## AI Tools
 
@@ -239,6 +248,20 @@ wp datamachine media delete-unused --limit=50
 wp datamachine media delete-unused --limit=50 --apply
 ```
 
+### Cloudflare Turnstile
+
+```bash
+wp datamachine cloudflare turnstile list-widgets
+wp datamachine cloudflare turnstile get-widget <sitekey>
+wp datamachine cloudflare turnstile update-domains <sitekey> --add=<hostnames> --remove=<hostnames> --apply
+```
+
+`update-domains` is a dry run unless `--apply` is provided. `--add` and `--remove` accept comma-separated hostnames. See [Cloudflare Turnstile](docs/cloudflare-turnstile.md).
+
+```bash
+wp datamachine cloudflare turnstile update-domains 0x4AAAAAAAExampleSiteKey --add=example.net --apply
+```
+
 ## REST
 
 The plugin owns two compatibility REST controllers in addition to ability routes exposed by the WordPress Abilities API:
@@ -328,6 +351,10 @@ Store the publisher account email and password in the `datamachine_mediavine_con
 Mediavine page reports expose paths but not hostnames. Results therefore include explicit provenance and report `host_attribution.available=false`; multisite consumers must resolve path ownership without guessing a host.
 
 Dimensional reports are source-native Mediavine aggregates. In particular, `sources.source` is Mediavine's normalized acquisition bucket rather than a raw referrer or GA4 source/medium, countries stop at country grain, and ad-unit output explicitly distinguishes parent rows from child rows broken down by `deviceType`. See [Mediavine Reports](docs/mediavine.md).
+
+### Cloudflare Turnstile
+
+Create an API token scoped to **Account -> Turnstile -> Edit** and store it, plus the account ID, in the `datamachine_cloudflare_config` network option (or the `datamachine_cloudflare_config` filter). Reads work immediately; the domain-update ability writes only when called with `apply=true` (CLI: `--apply`) and is scoped no wider than Turnstile widget configuration. See [Cloudflare Turnstile](docs/cloudflare-turnstile.md).
 
 ## Content Analytics Notes
 

@@ -111,6 +111,7 @@ $expected_ids   = array(
 	'media-hygiene',
 	'image-diagnostics',
 	'sendy',
+	'cloudflare',
 );
 assert_provider_bootstrap( $expected_ids === $actual_ids, 'production provider order is explicit and deterministic' );
 

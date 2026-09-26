@@ -5,6 +5,7 @@
     "tests/amazon-affiliate-tool-smoke.php": { "environment": "standalone-php" },
     "tests/analytics-config-resolution-smoke.php": { "environment": "standalone-php" },
     "tests/bing-webmaster-ability-smoke.php": { "environment": "standalone-php" },
+    "tests/cloudflare-turnstile-ability-smoke.php": { "environment": "standalone-php" },
     "tests/data-machine-http-client-contract-smoke.php": { "environment": "wordpress" },
     "tests/google-analytics-aggregate-http-smoke.php": { "environment": "standalone-php" },
     "tests/google-analytics-aggregate-schema-smoke.php": { "environment": "wordpress" },

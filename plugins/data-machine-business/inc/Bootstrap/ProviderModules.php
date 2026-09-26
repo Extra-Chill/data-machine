@@ -175,6 +175,12 @@ final class ProviderModules {
 				array( 'datamachine/sendy-subscribe', 'datamachine/sendy-push-campaign', 'datamachine/sendy-list-campaigns', 'datamachine/sendy-get-campaign', 'datamachine/sendy-delete-campaign', 'datamachine/sendy-metrics' ),
 				static fn() => new \DataMachineBusiness\Abilities\Sendy\SendyAbilities()
 			),
+			new ProviderModule(
+				'cloudflare',
+				$abilities,
+				array( 'datamachine/cloudflare-turnstile-list-widgets', 'datamachine/cloudflare-turnstile-get-widget', 'datamachine/cloudflare-turnstile-update-widget-domains' ),
+				static fn() => new \DataMachineBusiness\Abilities\Cloudflare\CloudflareTurnstileAbilities()
+			),
 		);
 	}
 }
