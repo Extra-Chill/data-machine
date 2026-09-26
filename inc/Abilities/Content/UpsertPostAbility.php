@@ -663,11 +663,14 @@ class UpsertPostAbility {
 			}
 		}
 
-		// Build post data.
+		// Build post data. wp_insert_post() runs wp_unslash() over its input,
+		// so text fields are slashed first; otherwise backslashes in content
+		// are lost, which breaks block comment JSON (an escaped quote \" in an
+		// attribute becomes a bare " and the block's attrs parse as null).
 		$post_data = array(
 			'post_type'    => $post_type,
-			'post_title'   => $title,
-			'post_content' => $stored_content,
+			'post_title'   => (string) wp_slash( (string) $title ),
+			'post_content' => (string) wp_slash( (string) $stored_content ),
 			'post_status'  => $post_status,
 		);
 
@@ -676,7 +679,7 @@ class UpsertPostAbility {
 		}
 
 		if ( '' !== $post_excerpt ) {
-			$post_data['post_excerpt'] = $post_excerpt;
+			$post_data['post_excerpt'] = (string) wp_slash( (string) $post_excerpt );
 		}
 
 		if ( $parent_id > 0 ) {
