@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.8] - 2026-09-26
+
+### Fixed
+- guard null Event Details attrs; repair 132 events with corrupted block JSON
+
 ## [0.64.7] - 2026-09-24
 
 ### Fixed
