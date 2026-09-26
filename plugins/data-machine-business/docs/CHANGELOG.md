@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.18.1] - 2026-09-26
+
+### Fixed
+- register Cloudflare Turnstile abilities under core datamachine-system category
+
 ## [0.18.0] - 2026-09-26
 
 ### Added
