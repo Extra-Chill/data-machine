@@ -38,6 +38,27 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 'publish', get_post_status( $result['post_id'] ) );
 	}
 
+	public function test_escaped_quotes_in_block_attributes_survive_the_save(): void {
+		// Regression (data-machine-events#870): wp_insert_post() unslashes its
+		// input, so an escaped quote in block comment JSON became a bare quote
+		// and the block's attrs parsed as null.
+		$json   = wp_json_encode( array( 'performer' => 'Christone "Kingfish" Ingram' ) );
+		$result = UpsertPostAbility::execute(
+			array(
+				'post_type' => 'post',
+				'title'     => 'AC\\DC "Live"',
+				'content'   => '<!-- wp:paragraph ' . $json . ' --><p>Body</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$post  = get_post( $result['post_id'] );
+		$attrs = parse_blocks( $post->post_content )[0]['attrs'];
+		$this->assertIsArray( $attrs );
+		$this->assertSame( 'Christone "Kingfish" Ingram', $attrs['performer'] );
+		$this->assertSame( 'AC\\DC "Live"', $post->post_title );
+	}
+
 	public function test_first_identity_upsert_populates_shell_and_completes_reservation(): void {
 		$result = UpsertPostAbility::execute( $this->input( 'complete-one', 'First title' ) );
 
