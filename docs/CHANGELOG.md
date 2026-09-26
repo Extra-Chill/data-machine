@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.8] - 2026-09-26
+
+### Fixed
+- slash post text before wp_insert_post in upsert-post (block JSON with quotes was corrupted)
+
 ## [0.177.7] - 2026-09-25
 
 ### Fixed
