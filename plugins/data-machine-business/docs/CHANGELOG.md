@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.18.0] - 2026-09-26
+
+### Added
+- Cloudflare Turnstile provider — list/get widgets, read-modify-write domain updates
+
 ## [0.17.10] - 2026-09-22
 
 ### Fixed
