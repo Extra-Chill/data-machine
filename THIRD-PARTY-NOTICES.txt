@@ -1,0 +1,39 @@
+# Third-Party Notices
+
+Data Machine bundles production PHP dependencies and compiled browser assets so the WordPress plugin can run without Composer or npm on the destination site. Exact resolved versions, sources, integrity hashes, and transitive dependency metadata are recorded in `composer.lock` and `package-lock.json` in the source repository.
+
+## PHP Runtime Dependencies
+
+| Dependency | License | Source |
+| --- | --- | --- |
+| Automattic Blocks Engine PHP Transformer | GPL-3.0 | https://github.com/Automattic/blocks-engine |
+| WordPress Agents API | GPL-2.0-or-later | https://github.com/Automattic/agents-api |
+| WooCommerce Action Scheduler | GPL-3.0-or-later | https://actionscheduler.org/ |
+| league/commonmark | BSD-3-Clause | https://github.com/thephpleague/commonmark |
+| league/config | BSD-3-Clause | https://github.com/thephpleague/config |
+| league/html-to-markdown | MIT | https://github.com/thephpleague/html-to-markdown |
+| dflydev/dot-access-data | MIT | https://github.com/dflydev/dflydev-dot-access-data |
+| nette/schema | BSD-3-Clause, GPL-2.0-only, or GPL-3.0-only | https://github.com/nette/schema |
+| nette/utils | BSD-3-Clause, GPL-2.0-only, or GPL-3.0-only | https://github.com/nette/utils |
+| psr/event-dispatcher | MIT | https://github.com/php-fig/event-dispatcher |
+| symfony/deprecation-contracts | MIT | https://github.com/symfony/deprecation-contracts |
+| symfony/polyfill-php80 | MIT | https://github.com/symfony/polyfill |
+
+Applicable dependency license files are retained in the package. Blocks Engine is pinned to commit `d8842683cb7928a0ae1f56878de93cf0bc8b7343`; its GPL-3.0 license is retained at `vendor/automattic/blocks-engine-php-transformer/LICENSE`.
+
+## Browser Build Inputs
+
+The compiled JavaScript includes these direct production packages or consumes them from WordPress at runtime:
+
+| Dependency | License | Packaging |
+| --- | --- | --- |
+| `@extrachill/chat` | GPL-2.0-or-later | Compiled into Data Machine browser assets; source at https://github.com/Extra-Chill/chat |
+| `@tanstack/react-query` | MIT | Compiled into Data Machine browser assets; source at https://github.com/TanStack/query |
+| `react-markdown` and its unified/remark/unist dependencies | MIT | Compiled into Data Machine browser assets; source at https://github.com/remarkjs/react-markdown |
+| `zustand` | MIT | Compiled into Data Machine browser assets; source at https://github.com/pmndrs/zustand |
+| `@wordpress/api-fetch`, `components`, `data`, `dom-ready`, `element`, `hooks`, `i18n`, and `notices` | GPL-2.0-or-later | Build/runtime dependencies externalized to WordPress-provided script handles; source at https://github.com/WordPress/gutenberg |
+| React and React DOM peer dependencies | MIT | Externalized to the WordPress element runtime; source at https://github.com/facebook/react |
+
+Transitive permissive browser dependencies use MIT, ISC, BSD, Apache-2.0, or Unicode licenses as recorded per package in `package-lock.json`. GPL dependencies are listed explicitly above and are compatible with Data Machine's GPL-2.0-or-later license.
+
+Data Machine source: https://github.com/Extra-Chill/data-machine
