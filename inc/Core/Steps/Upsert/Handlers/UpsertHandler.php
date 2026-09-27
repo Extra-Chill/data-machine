@@ -77,6 +77,11 @@ abstract class UpsertHandler {
 		$engine_data = $this->getEngineData( $job_id );
 		$engine      = new EngineData( $engine_data, $job_id );
 
+		// Dry-run mode: return preview without executing the upsert.
+		if ( ! empty( $engine_data['dry_run_mode'] ) ) {
+			return $this->buildDryRunPreview( $parameters, $tool_def['handler_config'] ?? array(), $engine );
+		}
+
 		// Enhance parameters for subclasses
 		$parameters['job_id'] = $job_id;
 		$parameters['engine'] = $engine;
@@ -108,6 +113,41 @@ abstract class UpsertHandler {
 		// PostTracking::store() themselves.
 
 		return $result;
+	}
+
+	/**
+	 * Build dry-run preview response.
+	 *
+	 * Mirrors PublishHandler::buildDryRunPreview() so upsert tool calls made
+	 * during a dry-run workflow (engine_data['dry_run_mode'] === true) never
+	 * reach executeUpsert() and never write real content.
+	 *
+	 * @param array      $parameters Tool parameters.
+	 * @param array      $handler_config Handler configuration.
+	 * @param EngineData $engine Engine data instance.
+	 * @return array Dry-run preview response.
+	 */
+	protected function buildDryRunPreview( array $parameters, array $handler_config, EngineData $engine ): array {
+		do_action(
+			'datamachine_log',
+			'info',
+			'Dry-run mode - returning preview without upserting',
+			array(
+				'handler' => static::class,
+			)
+		);
+
+		return array(
+			'success'   => true,
+			'dry_run'   => true,
+			'preview'   => array(
+				'handler'        => static::class,
+				'parameters'     => array_keys( $parameters ),
+				'handler_config' => array_keys( $handler_config ),
+				'source_url'     => $engine->getSourceUrl(),
+			),
+			'tool_name' => static::class,
+		);
 	}
 
 	/**
