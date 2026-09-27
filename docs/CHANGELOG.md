@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.10] - 2026-09-27
+
+### Changed
+- run Data Machine behind the canonical agents/run-workflow ability
+
 ## [0.177.9] - 2026-09-26
 
 ### Fixed
