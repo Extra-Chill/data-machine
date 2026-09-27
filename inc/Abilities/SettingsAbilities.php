@@ -528,7 +528,7 @@ class SettingsAbilities {
 
 		if ( isset( $input['system_agent_slug'] ) ) {
 			$all_settings['system_agent_slug'] = sanitize_title( (string) $input['system_agent_slug'] );
-			$handled_keys[]                     = 'system_agent_slug';
+			$handled_keys[]                    = 'system_agent_slug';
 		}
 
 		if ( isset( $input['mode_models'] ) && is_array( $input['mode_models'] ) ) {
