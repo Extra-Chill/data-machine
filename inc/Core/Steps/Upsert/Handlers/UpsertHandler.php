@@ -141,8 +141,10 @@ abstract class UpsertHandler {
 			'success'   => true,
 			'dry_run'   => true,
 			'preview'   => array(
-				'handler'    => static::class,
-				'parameters' => array_keys( $parameters ),
+				'handler'        => static::class,
+				'parameters'     => array_keys( $parameters ),
+				'handler_config' => array_keys( $handler_config ),
+				'source_url'     => $engine->getSourceUrl(),
 			),
 			'tool_name' => static::class,
 		);
