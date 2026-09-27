@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.11] - 2026-09-27
+
+### Fixed
+- resolve system-task agent from an explicit system agent setting
+
 ## [0.177.10] - 2026-09-27
 
 ### Changed
