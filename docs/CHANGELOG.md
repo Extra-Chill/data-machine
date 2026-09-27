@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.13] - 2026-09-27
+
+### Fixed
+- resolve the PHPStan findings hidden by smoke-harness shadowing and drop its baseline entries
+
 ## [0.177.12] - 2026-09-27
 
 ### Changed
