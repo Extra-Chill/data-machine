@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.178.1] - 2026-09-27
+
+### Changed
+- UpsertHandler returns a no-write preview in dry-run mode
+
 ## [0.178.0] - 2026-09-27
 
 ### Added
