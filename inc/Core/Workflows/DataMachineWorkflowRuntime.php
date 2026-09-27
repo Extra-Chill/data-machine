@@ -51,7 +51,7 @@ class DataMachineWorkflowRuntime {
 	}
 
 	private function registerHooks(): void {
-		// @phpstan-ignore-next-line agents-api function files are require_once'd by agents-api.php, not composer-autoloaded, so PHPStan cannot see them (#3452).
+		// @phpstan-ignore-next-line agents-api ships these functions in require_once'd files, which no Composer autoload map covers, so PHPStan never discovers them (#3452).
 		\AgentsAPI\AI\Workflows\register_workflow_runtime_handler( self::RUNTIME_KEY, array( $this, 'run' ) );
 		add_filter( 'wp_agent_workflow_run_recorder', array( $this, 'resolveRecorder' ), 10, 3 );
 		add_filter( 'wp_agent_workflow_run_status_handler', array( $this, 'resolveRunStatusHandler' ), 10, 2 );
@@ -119,7 +119,6 @@ class DataMachineWorkflowRuntime {
 			$run_options['run_id'] = $options_in['run_id'];
 		}
 
-		// @phpstan-ignore-next-line A bare test stub of WP_Agent_Workflow_Runner (tests/parallel-map-fanout-adapter-smoke.php) shadows the vendored class under PHPStan (#3474).
 		$result = ( new WP_Agent_Workflow_Runner( $recorder ) )->run(
 			$spec,
 			is_array( $input['inputs'] ?? null ) ? $input['inputs'] : array(),
@@ -295,7 +294,7 @@ class DataMachineWorkflowRuntime {
 			return true;
 		}
 
-		// @phpstan-ignore-next-line agents-api function files are require_once'd by agents-api.php, not composer-autoloaded, so PHPStan cannot see them (#3452).
+		// @phpstan-ignore-next-line agents-api ships these functions in require_once'd files, which no Composer autoload map covers, so PHPStan never discovers them (#3452).
 		if ( self::RUNTIME_KEY !== \AgentsAPI\AI\Workflows\agents_workflow_resolve_dispatch_runtime( $input ) ) {
 			return $allowed;
 		}

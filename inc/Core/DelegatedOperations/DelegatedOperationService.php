@@ -224,7 +224,7 @@ final class DelegatedOperationService {
 	/** Reconcile one operation through its owner-controlled projection. */
 	public function reconcile( array $request ): array {
 		$resolved = $this->resolve( $request, 'reconcile' );
-		return is_array( $resolved ) && isset( $resolved['error_result'] ) ? $resolved['error_result'] : $this->response( $resolved['job'], $resolved['action'], $resolved['context'], true );
+		return isset( $resolved['error_result'] ) ? $resolved['error_result'] : $this->response( $resolved['job'], $resolved['action'], $resolved['context'], true );
 	}
 
 	/** Retry a failed operation without creating another job. */

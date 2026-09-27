@@ -114,6 +114,10 @@ class LegacyAIConcurrencyReconciler {
 		return $this->result( true, true, $current_status, self::TARGET_STATUS, $audit );
 	}
 
+	/**
+	 * @param array<string,mixed> $audit Reconciliation audit record.
+	 * @return array{success:bool,changed:bool,current_status:?string,status:string,reconciliation:array<string,mixed>}
+	 */
 	private function result( bool $success, bool $changed, ?string $current_status, string $status, array $audit ): array {
 		return array(
 			'success'        => $success,

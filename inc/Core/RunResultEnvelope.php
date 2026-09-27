@@ -65,7 +65,7 @@ class RunResultEnvelope {
 	 * @return array<string,mixed>
 	 */
 	public static function fromSteps( array $step_results, array $context = array() ): array {
-		$steps         = array_values( array_filter( $step_results, fn( $step_result ) => is_array( $step_result ) ) );
+		$steps         = array_values( $step_results );
 		$raw_status    = is_scalar( $context['status'] ?? null ) ? trim( (string) $context['status'] ) : '';
 		$status        = self::deriveStatus( $steps, $raw_status );
 		$outputs       = is_array( $context['outputs'] ?? null ) ? $context['outputs'] : array();
@@ -294,7 +294,7 @@ class RunResultEnvelope {
 		}
 
 		global $wpdb;
-		if ( ! is_object( $wpdb ) ) {
+		if ( ! $wpdb instanceof \wpdb ) {
 			return array();
 		}
 

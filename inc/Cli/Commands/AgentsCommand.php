@@ -717,6 +717,7 @@ class AgentsCommand extends AgentBundleCommand {
 				}
 
 				$items = array();
+				/** @var list<\WP_Agent_Access_Grant> $grants */
 				foreach ( $grants as $grant ) {
 					$user    = get_user_by( 'id', $grant->user_id );
 					$items[] = array(
