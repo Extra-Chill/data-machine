@@ -541,13 +541,25 @@ namespace {
 	flow_await_assert( 1, count( $GLOBALS['__scheduled_as'] ), 'reconcile lock contention schedules exactly one retry', $failures, $passes );
 	$scheduled = $GLOBALS['__scheduled_as'][0];
 	flow_await_assert( 'datamachine_flow_await_step_retry_completion', $scheduled['hook'], 'retry is scheduled under the flow-await retry hook', $failures, $passes );
-	flow_await_assert( array( $contended_job_id, 'completed' ), $scheduled['args'], 'retry payload carries the job id and terminal status', $failures, $passes );
+	flow_await_assert( array( $contended_job_id, 'completed', 1 ), $scheduled['args'], 'retry payload carries the job id, terminal status and attempt number', $failures, $passes );
 	flow_await_assert( 'data-machine', $scheduled['group'], 'retry is scheduled under the data-machine Action Scheduler group', $failures, $passes );
 
 	// A second terminal-commit style attempt with the SAME (job_id, status)
 	// while a retry is still pending does not stack a duplicate.
 	do_action( 'datamachine_job_terminal_committed', $contended_job_id, 'completed' );
 	flow_await_assert( 1, count( $GLOBALS['__scheduled_as'] ), 'a duplicate contention outcome for the same job does not stack a second retry', $failures, $passes );
+
+	// A retry that is still contended schedules the NEXT attempt number.
+	$GLOBALS['__scheduled_as']       = array();
+	$GLOBALS['__complete_wait_next'] = static fn() => new \WP_Error( 'agents_reconcile_lock_unavailable', 'contended' );
+	do_action( 'datamachine_flow_await_step_retry_completion', $contended_job_id, 'completed', 3 );
+	flow_await_assert( array( $contended_job_id, 'completed', 4 ), $GLOBALS['__scheduled_as'][0]['args'] ?? null, 'a contended retry schedules the next attempt number', $failures, $passes );
+
+	// At the ceiling, no further retry is scheduled (no unbounded background loop).
+	$GLOBALS['__scheduled_as']       = array();
+	$GLOBALS['__complete_wait_next'] = static fn() => new \WP_Error( 'agents_reconcile_lock_unavailable', 'contended' );
+	do_action( 'datamachine_flow_await_step_retry_completion', $contended_job_id, 'completed', 20 );
+	flow_await_assert( 0, count( $GLOBALS['__scheduled_as'] ), 'the retry ceiling stops scheduling further attempts', $failures, $passes );
 
 	// ═══════════════════════════════════════════════════════════════════
 	// 10. Retry: the fast-job race (owning run not yet suspended) also

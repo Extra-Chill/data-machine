@@ -86,6 +86,13 @@ class DataMachineFlowAwaitStep {
 	private const RETRY_DELAY_SECONDS = 30;
 
 	/**
+	 * Hard ceiling on retried completion attempts per job (~10 minutes at the
+	 * base delay). Past it the wait is left to its own `timeout_at` backstop
+	 * and the attempt is logged — never an unbounded background loop.
+	 */
+	private const MAX_RETRY_ATTEMPTS = 20;
+
+	/**
 	 * Error codes from {@see \AgentsAPI\AI\Workflows\agents_workflow_complete_wait()}
 	 * that indicate a transient condition worth retrying rather than a
 	 * permanent mismatch.
@@ -125,7 +132,7 @@ class DataMachineFlowAwaitStep {
 
 	private function registerHooks(): void {
 		add_action( 'datamachine_job_terminal_committed', array( $this, 'onJobTerminalCommitted' ), 10, 2 );
-		add_action( self::RETRY_HOOK, array( $this, 'retryCompletion' ), 10, 2 );
+		add_action( self::RETRY_HOOK, array( $this, 'retryCompletion' ), 10, 3 );
 	}
 
 	/**
@@ -302,9 +309,17 @@ class DataMachineFlowAwaitStep {
 	 * @param int    $job_id Terminalized Data Machine job id.
 	 * @param string $status Terminal job status captured at schedule time.
 	 */
-	public function retryCompletion( int $job_id, string $status ): void {
-		$this->onJobTerminalCommitted( $job_id, $status );
+	public function retryCompletion( int $job_id, string $status, int $attempt = 1 ): void {
+		$this->retry_attempt = max( 1, $attempt );
+		try {
+			$this->onJobTerminalCommitted( $job_id, $status );
+		} finally {
+			$this->retry_attempt = 0;
+		}
 	}
+
+	/** Attempt number of the retry currently executing (0 = the original hook). */
+	private int $retry_attempt = 0;
 
 	/**
 	 * Read the `{ run_id, runtime, wait_id }` await linkage off a job's
@@ -458,7 +473,22 @@ class DataMachineFlowAwaitStep {
 			return;
 		}
 
-		$args = array( $job_id, $status );
+		$attempt = $this->retry_attempt + 1;
+		if ( $attempt > self::MAX_RETRY_ATTEMPTS ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'datamachine_flow await completion gave up after the retry ceiling; the wait falls back to its timeout',
+				array(
+					'job_id'   => $job_id,
+					'status'   => $status,
+					'attempts' => self::MAX_RETRY_ATTEMPTS,
+				)
+			);
+			return;
+		}
+
+		$args = array( $job_id, $status, $attempt );
 		if ( function_exists( 'as_has_scheduled_action' ) && as_has_scheduled_action( self::RETRY_HOOK, $args, GroupRegistrar::GROUP ) ) {
 			return;
 		}
