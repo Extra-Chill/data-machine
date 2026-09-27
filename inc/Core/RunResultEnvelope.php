@@ -298,7 +298,7 @@ class RunResultEnvelope {
 			return array();
 		}
 
-		$table = $wpdb->prefix . 'datamachine_jobs';
+		$table = $wpdb->prefix . Jobs::TABLE_NAME;
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Data Machine owns the jobs table and needs fresh child state for terminal envelopes.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
