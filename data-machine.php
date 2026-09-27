@@ -311,6 +311,48 @@ function datamachine_resolve_existing_agent_id( int $user_id ): int {
 }
 
 /**
+ * Resolve an explicit system-agent identity from the `system_agent_slug` setting.
+ *
+ * Lets an operator pin system-task attribution to a specific, durable agent
+ * identity instead of depending on which human happens to own the install's
+ * default agent user, whether that human has an active-agent preference set,
+ * or whether that owner happens to have exactly one agent. Unset or invalid
+ * (nonexistent agent) values are not errors — callers fall back to the
+ * existing owner/active-agent/single-agent chain unchanged.
+ *
+ * @since next
+ *
+ * @return array{user_id:int,agent_id:int}|null Resolved owner and agent id, or
+ *         null when the setting is unset or does not resolve to an existing agent.
+ */
+function datamachine_resolve_explicit_system_agent(): ?array {
+	if ( ! class_exists( \DataMachine\Core\PluginSettings::class )
+		|| ! class_exists( \DataMachine\Core\Database\Agents\Agents::class )
+	) {
+		return null;
+	}
+
+	$agent_slug = sanitize_title( (string) \DataMachine\Core\PluginSettings::get( 'system_agent_slug', '' ) );
+	if ( '' === $agent_slug ) {
+		return null;
+	}
+
+	$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+	$agent       = $agents_repo->get_by_slug( $agent_slug );
+
+	$agent_id = (int) ( $agent['agent_id'] ?? 0 );
+	$owner_id = (int) ( $agent['owner_id'] ?? 0 );
+	if ( $agent_id <= 0 || $owner_id <= 0 ) {
+		return null;
+	}
+
+	return array(
+		'user_id'  => $owner_id,
+		'agent_id' => $agent_id,
+	);
+}
+
+/**
  * Resolve the acting agent identity for a system/ability-triggered operation.
  *
  * Media, SEO, and linking abilities enqueue agent-owned queued tasks (alt text,
@@ -330,6 +372,10 @@ function datamachine_resolve_existing_agent_id( int $user_id ): int {
  *               a per-human agent row for system tasks. ChatOrchestrator remains
  *               the legitimate caller of datamachine_resolve_or_create_agent_id().
  * @since 0.173.0 Fails closed when no explicit or unambiguous existing agent resolves.
+ * @since next     Checks the explicit `system_agent_slug` setting first. That setting
+ *                names a fixed agent identity rather than depending on a human's
+ *                active-agent chat preference; an unset or invalid setting falls
+ *                back to the existing owner/active-agent/single-agent chain unchanged.
  *
  * @return array{user_id:int,agent_id:int,triggering_user_id:int} Acting user id
  *         (the default agent owner), its agent id, and the original triggering
@@ -338,7 +384,19 @@ function datamachine_resolve_existing_agent_id( int $user_id ): int {
  */
 function datamachine_resolve_system_agent_context(): array {
 	$triggering_user_id = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
-	$user_id            = 0;
+
+	if ( function_exists( 'datamachine_resolve_explicit_system_agent' ) ) {
+		$explicit = datamachine_resolve_explicit_system_agent();
+		if ( null !== $explicit ) {
+			return array(
+				'user_id'            => $explicit['user_id'],
+				'agent_id'           => $explicit['agent_id'],
+				'triggering_user_id' => $triggering_user_id,
+			);
+		}
+	}
+
+	$user_id = 0;
 
 	// Always attribute system-task work to the install's default agent owner.
 	// This prevents every authenticated user who triggers a media/SEO/linking

@@ -151,6 +151,10 @@ class SettingsAbilities {
 						'wake_briefing_scope'            => array( 'type' => 'string' ),
 						'default_provider'               => array( 'type' => 'string' ),
 						'default_model'                  => array( 'type' => 'string' ),
+						'system_agent_slug'              => array(
+							'type'        => 'string',
+							'description' => 'Explicit agent slug that owns attribution for system/ability-triggered tasks (alt text, meta descriptions, internal linking). Overrides the owner active-agent/single-agent fallback chain. Empty string clears the override.',
+						),
 						'mode_models'                    => array(
 							'type'        => 'object',
 							'description' => 'Per-mode provider/model overrides keyed by mode id',
@@ -420,6 +424,7 @@ class SettingsAbilities {
 				'wake_briefing_scope'                     => $settings['wake_briefing_scope'] ?? 'site',
 				'default_provider'                        => $settings['default_provider'] ?? '',
 				'default_model'                           => $settings['default_model'] ?? '',
+				'system_agent_slug'                       => $settings['system_agent_slug'] ?? '',
 				'mode_models'                             => $settings['mode_models'] ?? array(),
 				'max_turns'                               => $settings['max_turns'] ?? $defaults['max_turns'],
 				'wp_ai_client_connect_timeout'            => $settings['wp_ai_client_connect_timeout'] ?? $defaults['wp_ai_client_connect_timeout'],
@@ -519,6 +524,11 @@ class SettingsAbilities {
 		if ( isset( $input['default_model'] ) ) {
 			$all_settings['default_model'] = sanitize_text_field( $input['default_model'] );
 			$handled_keys[]                = 'default_model';
+		}
+
+		if ( isset( $input['system_agent_slug'] ) ) {
+			$all_settings['system_agent_slug'] = sanitize_title( (string) $input['system_agent_slug'] );
+			$handled_keys[]                    = 'system_agent_slug';
 		}
 
 		if ( isset( $input['mode_models'] ) && is_array( $input['mode_models'] ) ) {
