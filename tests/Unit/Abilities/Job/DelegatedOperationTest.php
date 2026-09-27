@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Abilities\Job;
 
+use AgentsAPI\AI\WP_Agent_Run_Result_Envelope;
 use DataMachine\Abilities\DelegatedOperationAbilities;
 use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -252,8 +253,9 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 		$this->assertTrue( $replayed['replayed'] );
 		$this->assertSame( $submitted['operation_ref'], $replayed['operation_ref'] );
 		$this->assertSame( 'executing', $replayed['status'] );
-		$this->assertSame( 'datamachine.run_result.v1', $this->projected_run_result['schema_version'] );
-		$this->assertSame( 'executing', $this->projected_run_result['status'] );
+		$this->assertSame( WP_Agent_Run_Result_Envelope::SCHEMA, $this->projected_run_result['schema'] );
+		$this->assertSame( WP_Agent_Run_Result_Envelope::STATUS_RUNNING, $this->projected_run_result['status'] );
+		$this->assertSame( 'executing', $this->projected_run_result['status_detail'] );
 	}
 
 	public function test_later_step_retry_and_ai_continuation_block_initial_reenqueue(): void {
@@ -301,10 +303,15 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 		$engine                 = $job['engine_data'];
 		$envelope               = $job['operation_envelope'];
 		$envelope['run_result'] = array(
-			'schema_version' => 'datamachine.run_result.v1',
-			'status'         => JobStatus::COMPLETED_NO_ITEMS,
-			'outputs'        => array(),
-			'diagnostics'    => array( 'private_value' => 'must-not-cross-boundary' ),
+			'schema'        => WP_Agent_Run_Result_Envelope::SCHEMA,
+			'status'        => WP_Agent_Run_Result_Envelope::STATUS_COMPLETED,
+			'status_detail' => JobStatus::COMPLETED_NO_ITEMS,
+			'outputs'       => array(),
+			'metadata'      => array(
+				'datamachine' => array(
+					'diagnostics' => array( 'private_value' => 'must-not-cross-boundary' ),
+				),
+			),
 		);
 		$this->assertTrue( ( new Jobs() )->store_operation_envelope( (int) $job['job_id'], $envelope ) );
 		$this->projection = array(
@@ -340,9 +347,10 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 		$engine                 = $job['engine_data'];
 		$envelope               = $job['operation_envelope'];
 		$envelope['run_result'] = array(
-			'schema_version' => 'datamachine.run_result.v1',
-			'status'         => 'succeeded',
-			'outputs'        => array( 'effect_count' => 0 ),
+			'schema'        => WP_Agent_Run_Result_Envelope::SCHEMA,
+			'status'        => WP_Agent_Run_Result_Envelope::STATUS_SUCCEEDED,
+			'status_detail' => 'succeeded',
+			'outputs'       => array( 'effect_count' => 0 ),
 		);
 		$this->assertTrue( ( new Jobs() )->store_operation_envelope( (int) $job['job_id'], $envelope ) );
 		$this->projection = array( 'record_ref' => 'rec_zero' );
@@ -356,9 +364,10 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 		$engine                 = $job['engine_data'];
 		$envelope               = $job['operation_envelope'];
 		$envelope['run_result'] = array(
-			'schema_version' => 'datamachine.run_result.v1',
-			'status'         => 'skipped',
-			'outputs'        => array(),
+			'schema'        => WP_Agent_Run_Result_Envelope::SCHEMA,
+			'status'        => WP_Agent_Run_Result_Envelope::STATUS_SKIPPED,
+			'status_detail' => 'skipped',
+			'outputs'       => array(),
 		);
 		$this->assertTrue( ( new Jobs() )->store_operation_envelope( (int) $job['job_id'], $envelope ) );
 		$skipped = $this->reconcile( $service, $submitted );
@@ -371,9 +380,9 @@ final class DelegatedOperationTest extends WP_UnitTestCase {
 		$submitted = $service->submit( $this->submission( 'malformed-envelope' ) );
 		$job       = $this->job( 'malformed-envelope' );
 		$this->assertTrue( ( new Jobs() )->complete_job( (int) $job['job_id'], 'completed' ) );
-		$job                                      = $this->job( 'malformed-envelope' );
-		$envelope                                 = $job['operation_envelope'];
-		$envelope['run_result']['schema_version'] = 'legacy.result';
+		$job                               = $this->job( 'malformed-envelope' );
+		$envelope                         = $job['operation_envelope'];
+		$envelope['run_result']['schema'] = 'legacy.result';
 		$this->assertTrue( ( new Jobs() )->store_operation_envelope( (int) $job['job_id'], $envelope ) );
 		$result = $service->reconcile(
 			array(

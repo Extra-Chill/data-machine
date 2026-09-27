@@ -15,7 +15,7 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\JobRetryPolicy;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
-use DataMachine\Core\RunResult;
+use DataMachine\Core\RunResultEnvelope;
 use DataMachine\Core\Steps\WorkflowConfigFactory;
 use DataMachine\Core\Steps\WorkflowSpecValidator;
 use DataMachine\Engine\ExecutionPlan;
@@ -419,7 +419,7 @@ final class DelegatedOperationService {
 				return $this->failure( 'delegated_run_result_invalid', __( 'The operation has no valid canonical run result.', 'data-machine' ) );
 			}
 		} else {
-			$run_result = RunResult::active( $status );
+			$run_result = RunResultEnvelope::active( $status, (int) ( $job['job_id'] ?? 0 ) );
 		}
 		$projection = $this->invoke(
 			$action['project'],
@@ -477,7 +477,11 @@ final class DelegatedOperationService {
 		if ( str_starts_with( $status, JobStatus::CANCELLED ) ) {
 			return 'cancelled';
 		}
-		$canonical_status = strtolower( (string) ( $run_result['status'] ?? '' ) );
+		// Domain-specific no-op classification (agent_skipped, completed_no_items,
+		// and similar) reads status_detail: the canonical `status` is normalized
+		// down to a small enum (e.g. completed_no_items -> completed) and loses
+		// that distinction. status_detail preserves the raw Data Machine status.
+		$canonical_status = strtolower( (string) ( $run_result['status_detail'] ?? ( $run_result['status'] ?? '' ) ) );
 		$canonical_no_op  = in_array( $canonical_status, array( 'agent_skipped', 'skipped', JobStatus::COMPLETED_NO_ITEMS, 'no_items', 'no-op' ), true );
 		$projected_zero   = isset( $projection['effect_count'] ) && is_int( $projection['effect_count'] ) && 0 === $projection['effect_count'];
 		$canonical_count  = $run_result['outputs']['effect_count'] ?? null;
@@ -610,7 +614,7 @@ final class DelegatedOperationService {
 	private function terminalRunResult( array $job ) {
 		$envelope   = is_array( $job['operation_envelope'] ?? null ) ? $job['operation_envelope'] : array();
 		$run_result = $envelope['run_result'] ?? null;
-		return RunResult::validate( $run_result ) ? $run_result : new \WP_Error( 'delegated_run_result_invalid' );
+		return RunResultEnvelope::validate( $run_result ) ? $run_result : new \WP_Error( 'delegated_run_result_invalid' );
 	}
 
 	/** Register durable terminal capture in the replayable core accounting stage. */
@@ -629,8 +633,8 @@ final class DelegatedOperationService {
 		}
 		$envelope = is_array( $job['operation_envelope'] ?? null ) ? $job['operation_envelope'] : array();
 		$summary  = RunMetrics::fromJob( $job );
-		$result   = RunResult::fromJobSummary( $job, $summary );
-		if ( ! RunResult::validate( $result ) ) {
+		$result   = RunResultEnvelope::fromJobSummary( $job, $summary );
+		if ( ! RunResultEnvelope::validate( $result ) ) {
 			return false;
 		}
 		$envelope['run_result'] = $result;

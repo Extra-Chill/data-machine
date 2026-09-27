@@ -8,6 +8,7 @@
 
 namespace DataMachine\Core\Database\Jobs;
 
+use AgentsAPI\AI\WP_Agent_Run_Result_Envelope;
 use DataMachine\Core\Database\TransactionScope;
 use DataMachine\Core\RunLifecycleStore;
 
@@ -66,12 +67,14 @@ class LegacyAIConcurrencyReconciler {
 			$engine_data['run_metrics']['terminal_status']  = self::TARGET_STATUS;
 			$engine_data['run_metrics']['counts']['failed'] = 0;
 		}
-		if ( is_array( $engine_data['run_result'] ?? null ) ) {
-			$engine_data['run_result']['status'] = self::TARGET_STATUS;
+		$stored_run_result = $engine_data['run_result'] ?? null;
+		if ( is_array( $stored_run_result ) && WP_Agent_Run_Result_Envelope::SCHEMA === ( $stored_run_result['schema'] ?? null ) ) {
+			$engine_data['run_result']['status']        = self::TARGET_STATUS;
+			$engine_data['run_result']['status_detail'] = self::TARGET_STATUS;
 
 			$engine_data['run_result']['outputs']['counts']['failed'] = 0;
 
-			$engine_data['run_result']['diagnostics']['reconciliation'] = $audit;
+			$engine_data['run_result']['metadata']['datamachine']['diagnostics']['reconciliation'] = $audit;
 		}
 
 		$updated = $wpdb->update(

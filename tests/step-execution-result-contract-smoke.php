@@ -34,13 +34,16 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	}
 }
 
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-run-result-envelope.php';
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
+require_once __DIR__ . '/../inc/Core/JobArtifactSurfaces.php';
 require_once __DIR__ . '/../inc/Core/StepResult.php';
-require_once __DIR__ . '/../inc/Core/RunResult.php';
+require_once __DIR__ . '/../inc/Core/RunResultEnvelope.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 
+use AgentsAPI\AI\WP_Agent_Run_Result_Envelope;
 use DataMachine\Core\JobStatus;
-use DataMachine\Core\RunResult;
+use DataMachine\Core\RunResultEnvelope;
 use DataMachine\Core\StepExecutionResult;
 use DataMachine\Core\StepResult;
 
@@ -209,11 +212,12 @@ $assert( 'step envelope references packets by content hash', str_starts_with( (s
 $assert( 'step envelope records replay content hashes', str_starts_with( (string) ( $step_result['replay']['content_hashes']['packet_refs'] ?? '' ), 'sha256:' ) );
 
 echo "\n[8] run result envelope aggregates step envelopes\n";
-$run_result = RunResult::fromStepResults( array( $step_result ) );
+$run_result = RunResultEnvelope::fromSteps( array( $step_result ) );
 
-$assert( 'run envelope schema version is canonical', RunResult::SCHEMA_VERSION === ( $run_result['schema_version'] ?? '' ) );
+$assert( 'run envelope schema is canonical', WP_Agent_Run_Result_Envelope::SCHEMA === ( $run_result['schema'] ?? '' ) );
 $assert( 'run envelope derives success from step envelopes', 'succeeded' === ( $run_result['status'] ?? '' ) );
-$assert( 'run envelope aggregates packet refs', str_starts_with( (string) ( $run_result['packet_refs'][0]['content_hash'] ?? '' ), 'sha256:' ) );
+$assert( 'run envelope preserves raw status in status_detail', 'succeeded' === ( $run_result['status_detail'] ?? '' ) );
+$assert( 'run envelope aggregates packet refs', str_starts_with( (string) ( $run_result['metadata']['datamachine']['packet_refs'][0]['content_hash'] ?? '' ), 'sha256:' ) );
 $assert( 'run envelope records step replay hash', str_starts_with( (string) ( $run_result['replay']['content_hashes']['steps'] ?? '' ), 'sha256:' ) );
 
 if ( $failures > 0 ) {

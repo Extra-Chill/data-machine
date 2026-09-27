@@ -17,10 +17,11 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-run-result-envelope.php';
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/JobArtifactSurfaces.php';
 require_once __DIR__ . '/../inc/Core/StepResult.php';
-require_once __DIR__ . '/../inc/Core/RunResult.php';
+require_once __DIR__ . '/../inc/Core/RunResultEnvelope.php';
 require_once __DIR__ . '/../inc/Core/RunMetrics.php';
 
 use DataMachine\Core\RunMetrics;

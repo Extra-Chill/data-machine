@@ -103,16 +103,18 @@ namespace {
 		}
 	}
 
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-run-result-envelope.php';
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Core/JobArtifactSurfaces.php';
 	require_once __DIR__ . '/../inc/Core/StepResult.php';
-	require_once __DIR__ . '/../inc/Core/RunResult.php';
+	require_once __DIR__ . '/../inc/Core/RunResultEnvelope.php';
 	require_once __DIR__ . '/../inc/Core/EngineData.php';
 	require_once __DIR__ . '/../inc/Core/RunMetrics.php';
 
+	use AgentsAPI\AI\WP_Agent_Run_Result_Envelope;
 	use DataMachine\Core\Database\Jobs\Jobs;
 	use DataMachine\Core\RunMetrics;
-	use DataMachine\Core\RunResult;
+	use DataMachine\Core\RunResultEnvelope;
 
 	function datamachine_step_result_persistence_assert( bool $condition, string $message ): void {
 		if ( $condition ) {
@@ -207,8 +209,8 @@ namespace {
 		)
 	);
 
-	datamachine_step_result_persistence_assert( RunResult::SCHEMA_VERSION === ( $metrics['run_result']['schema_version'] ?? null ), 'RunMetrics exposes canonical RunResult summary' );
-	datamachine_step_result_persistence_assert( 'datamachine.step_result.v1' === ( $metrics['run_result']['step_results'][0]['schema_version'] ?? null ), 'RunResult summary includes persisted StepResult envelope' );
+	datamachine_step_result_persistence_assert( WP_Agent_Run_Result_Envelope::SCHEMA === ( $metrics['run_result']['schema'] ?? null ), 'RunMetrics exposes the canonical run result envelope' );
+	datamachine_step_result_persistence_assert( 'datamachine.step_result.v1' === ( $metrics['run_result']['steps'][0]['schema_version'] ?? null ), 'run result envelope includes persisted StepResult envelope' );
 
 	echo "\n=== step-result-persistence-cas-smoke: ALL PASS ===\n";
 }

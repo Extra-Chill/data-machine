@@ -7,7 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Core;
 
-use DataMachine\Core\RunResult;
+use DataMachine\Core\RunResultEnvelope;
 use DataMachine\Core\StepResult;
 use WP_UnitTestCase;
 
@@ -23,7 +23,7 @@ class RunResultStepProjectionCompatibilityTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( $nested, $result['step_results'][0] );
+		$this->assertSame( $nested, $result['steps'][0] );
 	}
 
 	public function test_top_level_step_envelope_remains_a_historical_fallback(): void {
@@ -39,7 +39,7 @@ class RunResultStepProjectionCompatibilityTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( $fallback, $result['step_results'][0] );
+		$this->assertSame( $fallback, $result['steps'][0] );
 	}
 
 	public function test_identical_dual_projection_preserves_output(): void {
@@ -62,8 +62,8 @@ class RunResultStepProjectionCompatibilityTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( $nested['step_results'], $dual['step_results'] );
-		$this->assertSame( $nested['packet_refs'], $dual['packet_refs'] );
+		$this->assertSame( $nested['steps'], $dual['steps'] );
+		$this->assertSame( $nested['metadata']['datamachine']['packet_refs'] ?? array(), $dual['metadata']['datamachine']['packet_refs'] ?? array() );
 		$this->assertSame( $nested['replay'], $dual['replay'] );
 	}
 
@@ -81,8 +81,8 @@ class RunResultStepProjectionCompatibilityTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( $nested, $result['step_results'][0] );
-		$this->assertSame( 'nested-wins', $result['step_results'][0]['diagnostics']['source'] );
+		$this->assertSame( $nested, $result['steps'][0] );
+		$this->assertSame( 'nested-wins', $result['steps'][0]['diagnostics']['source'] );
 	}
 
 	public function test_legacy_metrics_row_without_envelope_is_synthesized(): void {
@@ -99,14 +99,14 @@ class RunResultStepProjectionCompatibilityTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertSame( StepResult::SCHEMA_VERSION, $result['step_results'][0]['schema_version'] );
-		$this->assertSame( 2, $result['step_results'][0]['outputs']['packet_count'] );
+		$this->assertSame( StepResult::SCHEMA_VERSION, $result['steps'][0]['schema_version'] );
+		$this->assertSame( 2, $result['steps'][0]['outputs']['packet_count'] );
 	}
 
 	private function project( array $engine ): array {
 		$step_results = array_values( is_array( $engine['step_results'] ?? null ) ? $engine['step_results'] : array() );
 
-		return RunResult::fromJobSummary(
+		return RunResultEnvelope::fromJobSummary(
 			array(
 				'job_id'      => 0,
 				'status'      => 'completed',
