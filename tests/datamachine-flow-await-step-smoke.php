@@ -279,20 +279,20 @@ namespace {
 
 	flow_await_assert(
 		array(),
-		DataMachineFlowAwaitStep::validate( array( 'id' => 's', 'type' => 'datamachine_flow', 'flow_id' => 42 ), 'steps.0' ),
+		DataMachineFlowAwaitStep::validate( array( 'id' => 's', 'type' => \DataMachine\Core\Workflows\DataMachineFlowAwaitStep::STEP_TYPE, 'flow_id' => 42 ), 'steps.0' ),
 		'a valid literal int flow_id passes',
 		$failures,
 		$passes
 	);
 	flow_await_assert(
 		array(),
-		DataMachineFlowAwaitStep::validate( array( 'id' => 's', 'type' => 'datamachine_flow', 'flow_id' => '42' ), 'steps.0' ),
+		DataMachineFlowAwaitStep::validate( array( 'id' => 's', 'type' => \DataMachine\Core\Workflows\DataMachineFlowAwaitStep::STEP_TYPE, 'flow_id' => '42' ), 'steps.0' ),
 		'a valid numeric-string flow_id passes',
 		$failures,
 		$passes
 	);
 
-	$missing = DataMachineFlowAwaitStep::validate( array( 'id' => 's', 'type' => 'datamachine_flow' ), 'steps.0' );
+	$missing = DataMachineFlowAwaitStep::validate( array( 'id' => 's', 'type' => \DataMachine\Core\Workflows\DataMachineFlowAwaitStep::STEP_TYPE ), 'steps.0' );
 	flow_await_assert( 1, count( $missing ), 'missing flow_id produces exactly one error', $failures, $passes );
 	flow_await_assert( 'missing_required', $missing[0]['code'] ?? null, 'missing flow_id error code', $failures, $passes );
 	flow_await_assert( 'steps.0.flow_id', $missing[0]['path'] ?? null, 'missing flow_id error path', $failures, $passes );
@@ -330,7 +330,7 @@ namespace {
 	flow_await_assert_true( is_callable( $registered['handler'] ?? null ), 'registered handler is callable', $failures, $passes );
 	flow_await_assert_true( is_callable( $registered['validate'] ?? null ), 'registered validate callback is callable', $failures, $passes );
 
-	$registry_errors = WP_Agent_Workflow_Step_Type_Registry::validate_step( array( 'id' => 's', 'type' => 'datamachine_flow' ), 'steps.0' );
+	$registry_errors = WP_Agent_Workflow_Step_Type_Registry::validate_step( array( 'id' => 's', 'type' => \DataMachine\Core\Workflows\DataMachineFlowAwaitStep::STEP_TYPE ), 'steps.0' );
 	flow_await_assert( 1, count( $registry_errors ), 'the registry dispatches our validate callback for a missing flow_id', $failures, $passes );
 
 	// ═══════════════════════════════════════════════════════════════════

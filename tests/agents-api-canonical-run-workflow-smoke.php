@@ -501,7 +501,7 @@ namespace {
 	// handler, which is exercised end to end by
 	// tests/datamachine-flow-await-step-smoke.php.
 	\AgentsAPI\AI\Workflows\register_workflow_step_type(
-		'datamachine_flow',
+		\DataMachine\Core\Workflows\DataMachineFlowAwaitStep::STEP_TYPE,
 		array(
 			'handler' => static fn( array $step, array $context ): array => array( 'value' => $step['flow_id'] ?? null ),
 		)
@@ -512,7 +512,7 @@ namespace {
 			'runtime' => 'datamachine',
 			'spec'    => array(
 				'id'    => 'demo/flow-await-workflow',
-				'steps' => array( array( 'id' => 'run_it', 'type' => 'datamachine_flow', 'flow_id' => 42 ) ),
+				'steps' => array( array( 'id' => 'run_it', 'type' => \DataMachine\Core\Workflows\DataMachineFlowAwaitStep::STEP_TYPE, 'flow_id' => 42 ) ),
 			),
 		)
 	);
