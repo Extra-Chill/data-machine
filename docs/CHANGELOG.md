@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.178.0] - 2026-09-27
+
+### Added
+- datamachine_flow workflow step type that awaits its flow's terminal run-result
+
 ## [0.177.13] - 2026-09-27
 
 ### Fixed
