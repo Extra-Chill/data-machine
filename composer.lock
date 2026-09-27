@@ -794,12 +794,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "1465e8d7d967395193b2cc8cc9d1c542d4f61b63"
+                "reference": "acc8cefcdce7cacd47cfe6bb3befc17efe9dc5a6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/1465e8d7d967395193b2cc8cc9d1c542d4f61b63",
-                "reference": "1465e8d7d967395193b2cc8cc9d1c542d4f61b63",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/acc8cefcdce7cacd47cfe6bb3befc17efe9dc5a6",
+                "reference": "acc8cefcdce7cacd47cfe6bb3befc17efe9dc5a6",
                 "shasum": ""
             },
             "require": {
@@ -942,6 +942,7 @@
                     "php tests/context-authority-smoke.php",
                     "php tests/guidelines-substrate-smoke.php",
                     "php tests/workflow-bindings-smoke.php",
+                    "php tests/workflow-step-type-registry-smoke.php",
                     "php tests/workflow-spec-validator-smoke.php",
                     "php tests/workflow-runner-smoke.php",
                     "php tests/workflow-parallel-smoke.php",
@@ -957,6 +958,7 @@
                     "php tests/workflow-async-loopback-target-smoke.php",
                     "php tests/workflow-async-runner-dispatch-result-smoke.php",
                     "php tests/workflow-reconcile-race-smoke.php",
+                    "php tests/workflow-await-smoke.php",
                     "php tests/workflow-reconcile-branch-authorization-smoke.php",
                     "php tests/workflow-scoped-seams-smoke.php",
                     "php tests/workflow-lifecycle-smoke.php",
@@ -983,7 +985,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-09-27T03:10:58+00:00"
+            "time": "2026-09-27T13:52:12+00:00"
         }
     ],
     "packages-dev": [],

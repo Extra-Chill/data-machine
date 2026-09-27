@@ -174,6 +174,8 @@ namespace {
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Abilities/class-wp-agent-ability-dispatcher.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-bindings.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-step-type-registry.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/register-workflow-step-types.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-spec-validator.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-spec.php';
 	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-registry.php';
@@ -193,6 +195,11 @@ namespace {
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
 	require_once __DIR__ . '/../inc/Core/AgentsApiWorkflowJobRecorder.php';
+	// Referenced only for its STEP_TYPE constant (DataMachineWorkflowRuntime's
+	// SUPPORTED_STEP_TYPES allow-list now also accepts `datamachine_flow`,
+	// #3562) — not instantiated here, so none of its own dependencies
+	// (EngineData, RunMetrics, RunResultEnvelope, GroupRegistrar) are needed.
+	require_once __DIR__ . '/../inc/Core/Workflows/DataMachineFlowAwaitStep.php';
 	require_once __DIR__ . '/../inc/Core/Workflows/DataMachineWorkflowRuntime.php';
 
 	use AgentsAPI\AI\Workflows\WP_Agent_Workflow_Registry;
@@ -484,6 +491,34 @@ namespace {
 		$failures,
 		$passes
 	);
+
+	// --- 12. `datamachine_flow` (#3562) is in the SUPPORTED_STEP_TYPES allow-list ---
+	// Placed last so it does not shift the job-id/recorder assertions above,
+	// which hardcode ids and an exact recent() run-id list. Registers a
+	// trivial handler directly on the real step-type registry — proving
+	// SUPPORTED_STEP_TYPES accepts the type at DM's OWN structural gate,
+	// distinct from Extra-Chill/data-machine#3562's real DataMachineFlowAwaitStep
+	// handler, which is exercised end to end by
+	// tests/datamachine-flow-await-step-smoke.php.
+	\AgentsAPI\AI\Workflows\register_workflow_step_type(
+		\DataMachine\Core\Workflows\DataMachineFlowAwaitStep::STEP_TYPE,
+		array(
+			'handler' => static fn( array $step, array $context ): array => array( 'value' => $step['flow_id'] ?? null ),
+		)
+	);
+
+	$datamachine_flow_step = agents_run_workflow_dispatch(
+		array(
+			'runtime' => 'datamachine',
+			'spec'    => array(
+				'id'    => 'demo/flow-await-workflow',
+				'steps' => array( array( 'id' => 'run_it', 'type' => \DataMachine\Core\Workflows\DataMachineFlowAwaitStep::STEP_TYPE, 'flow_id' => 42 ) ),
+			),
+		)
+	);
+	assert_canonical_workflow_equals( false, is_wp_error( $datamachine_flow_step ), 'a datamachine_flow step is no longer rejected by the bridgeable-subset gate', $failures, $passes );
+	assert_canonical_workflow_equals( 'succeeded', $datamachine_flow_step['status'] ?? null, 'once registered, a datamachine_flow step runs to completion through the datamachine runtime', $failures, $passes );
+	assert_canonical_workflow_equals( 42, $datamachine_flow_step['steps'][0]['output']['value'] ?? null, 'the datamachine_flow step output flows through normally', $failures, $passes );
 
 	if ( $failures ) {
 		echo "\nFAILED: " . count( $failures ) . " canonical run-workflow assertions failed.\n";

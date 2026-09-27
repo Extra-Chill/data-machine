@@ -15,8 +15,12 @@
  * - `wp_agent_workflow_run_status_handler` — `agents/get-workflow-run`
  *   support, answering only for run ids this recorder actually owns.
  *
- * `foreach`/`parallel` steps stay out of scope; those are phases 3-4 of
- * Extra-Chill/data-machine#3428.
+ * `foreach`/`parallel` steps stay out of scope; those are phase 4 of
+ * Extra-Chill/data-machine#3428. Phase 3 — a step that runs a persisted flow
+ * and awaits its terminal run-result — is the `datamachine_flow` step type
+ * {@see DataMachineFlowAwaitStep} registers (#3562); its `_suspend`/resume
+ * lifecycle runs entirely through the generic `await` primitive
+ * (Automattic/agents-api#577), not through this class.
  *
  * @package DataMachine\Core\Workflows
  */
@@ -41,7 +45,7 @@ class DataMachineWorkflowRuntime {
 	 */
 	public const RUNTIME_KEY = 'datamachine';
 
-	private const SUPPORTED_STEP_TYPES = array( 'ability', 'agent' );
+	private const SUPPORTED_STEP_TYPES = array( 'ability', 'agent', DataMachineFlowAwaitStep::STEP_TYPE );
 
 	private Jobs $db_jobs;
 

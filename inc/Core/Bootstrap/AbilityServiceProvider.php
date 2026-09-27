@@ -70,6 +70,7 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\Job\ExecuteWorkflowAbility();
 		new \DataMachine\Abilities\DelegatedOperationAbilities();
 		new \DataMachine\Core\Workflows\DataMachineWorkflowRuntime();
+		new \DataMachine\Core\Workflows\DataMachineFlowAwaitStep();
 		new \DataMachine\Abilities\Job\FlowHealthAbility();
 		new \DataMachine\Abilities\Job\ProblemFlowsAbility();
 		new \DataMachine\Abilities\Job\RecoverStuckJobsAbility();
