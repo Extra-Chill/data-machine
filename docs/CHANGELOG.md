@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.177.12] - 2026-09-27
+
+### Changed
+- emit the canonical agents-api run result envelope
+
 ## [0.177.11] - 2026-09-27
 
 ### Fixed
