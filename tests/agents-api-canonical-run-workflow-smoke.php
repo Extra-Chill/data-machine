@@ -3,9 +3,9 @@
  * Pure-PHP smoke test for Data Machine running behind the canonical Agents
  * API `agents/run-workflow` ability (Extra-Chill/data-machine#3552).
  *
- * Replaces tests/agents-api-workflow-bridge-smoke.php, which exercised the
- * deleted `datamachine/execute-agent-workflow` ability directly. This test
- * exercises the real dispatch path instead:
+ * Replaces the deleted per-ability workflow bridge smoke test, which
+ * exercised the old ability directly. This test exercises the real dispatch
+ * path instead:
  *
  *   - `\AgentsAPI\AI\Workflows\agents_run_workflow_dispatch()` routes to
  *     `DataMachineWorkflowRuntime::run()` only when the dispatch resolves to

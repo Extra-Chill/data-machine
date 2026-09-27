@@ -3,8 +3,8 @@
  * Data Machine's runtime registration behind the canonical Agents API
  * `agents/run-workflow` ability.
  *
- * Replaces the deleted `datamachine/execute-agent-workflow` ability. Data
- * Machine now runs simple `ability`/`agent` workflow specs through the
+ * Replaces the deleted per-ability workflow bridge (Extra-Chill/data-machine#3552).
+ * Data Machine now runs simple `ability`/`agent` workflow specs through the
  * runtime-scoped seams introduced by Automattic/agents-api#567:
  *
  * - `wp_agent_workflow_runtime_handlers` — dispatch, scoped to the
@@ -62,9 +62,8 @@ class DataMachineWorkflowRuntime {
 	/**
 	 * `agents/run-workflow` handler for the `datamachine` runtime key.
 	 *
-	 * Ports the execution and authority logic from the deleted
-	 * `datamachine/execute-agent-workflow` ability onto the canonical
-	 * input/output contract.
+	 * Ports the execution and authority logic from the deleted per-ability
+	 * workflow bridge onto the canonical input/output contract.
 	 *
 	 * @param array $input Canonical agents/run-workflow input.
 	 * @return array|WP_Error Canonical output, or a native error for
