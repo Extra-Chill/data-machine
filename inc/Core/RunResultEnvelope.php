@@ -1,43 +1,57 @@
 <?php
 /**
- * Portable run result envelope.
+ * Canonical run result envelope builder.
+ *
+ * Projects Data Machine job/run state into the substrate's canonical
+ * `agents-api/run-result/v1` envelope ({@see WP_Agent_Run_Result_Envelope})
+ * instead of a Data-Machine-private schema. Domain-specific state that has
+ * no canonical home (packet refs, the raw job reference, diagnostics, child
+ * job envelopes) is carried in `metadata.datamachine`.
  *
  * @package DataMachine\Core
  */
 
 namespace DataMachine\Core;
 
+use AgentsAPI\AI\WP_Agent_Run_Result_Envelope;
 use DataMachine\Core\Database\Jobs\Jobs;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Builds the canonical result envelope for a job/run.
+ * Builds the canonical WP_Agent_Run_Result_Envelope for a Data Machine job/run.
  */
-class RunResult {
+class RunResultEnvelope {
 
-	public const SCHEMA_VERSION      = 'datamachine.run_result.v1';
 	private const MAX_ENVELOPE_BYTES = 163840;
 
-	/** Build a canonical nonterminal projection envelope. */
-	public static function active( string $status ): array {
-		return self::fromStepResults( array(), array( 'status' => $status ) );
+	/**
+	 * Build a canonical nonterminal projection envelope.
+	 *
+	 * The run id is the job id (as a string) when available; no better
+	 * stable run identifier exists for a Data Machine job at this layer.
+	 */
+	public static function active( string $status, int $job_id = 0 ): array {
+		return WP_Agent_Run_Result_Envelope::from_array(
+			array(
+				'run_id'        => $job_id > 0 ? (string) $job_id : '',
+				'status'        => WP_Agent_Run_Result_Envelope::STATUS_RUNNING,
+				'status_detail' => $status,
+				'provenance'    => array( 'source' => 'datamachine' ),
+			)
+		)->to_array();
 	}
 
-	/** Validate the portable envelope before it crosses a public boundary. */
+	/**
+	 * Validate the canonical envelope before it crosses a public boundary.
+	 *
+	 * A stored value that predates the canonical schema (or any other
+	 * malformed value) fails validation; callers treat that as a missing
+	 * envelope and rebuild it rather than migrating the row.
+	 */
 	public static function validate( $value ): bool {
-		if ( ! is_array( $value ) || self::SCHEMA_VERSION !== ( $value['schema_version'] ?? null ) || ! is_string( $value['status'] ?? null ) || '' === trim( $value['status'] ) ) {
+		if ( ! is_array( $value ) || WP_Agent_Run_Result_Envelope::SCHEMA !== ( $value['schema'] ?? null ) || ! is_string( $value['status'] ?? null ) || '' === trim( $value['status'] ) ) {
 			return false;
-		}
-		foreach ( array( 'outputs', 'diagnostics', 'replay' ) as $object_key ) {
-			if ( isset( $value[ $object_key ] ) && ( ! is_array( $value[ $object_key ] ) || ( array() !== $value[ $object_key ] && array_is_list( $value[ $object_key ] ) ) ) ) {
-				return false;
-			}
-		}
-		foreach ( array( 'artifact_refs', 'packet_refs', 'step_results', 'steps', 'child_job_refs', 'child_job_envelopes' ) as $list_key ) {
-			if ( isset( $value[ $list_key ] ) && ( ! is_array( $value[ $list_key ] ) || ! array_is_list( $value[ $list_key ] ) ) ) {
-				return false;
-			}
 		}
 		$encoded = wp_json_encode( $value );
 		return is_string( $encoded ) && strlen( $encoded ) <= self::MAX_ENVELOPE_BYTES;
@@ -47,61 +61,88 @@ class RunResult {
 	 * Build a run envelope from step result envelopes.
 	 *
 	 * @param array<int,array<string,mixed>> $step_results StepResult envelopes.
-	 * @param array<string,mixed>            $context      Optional outputs/artifact refs/replay context.
+	 * @param array<string,mixed>            $context      Optional status/outputs/artifact refs/replay context.
 	 * @return array<string,mixed>
 	 */
-	public static function fromStepResults( array $step_results, array $context = array() ): array {
+	public static function fromSteps( array $step_results, array $context = array() ): array {
 		$steps         = array_values( array_filter( $step_results, fn( $step_result ) => is_array( $step_result ) ) );
-		$status        = self::deriveStatus( $steps, $context['status'] ?? null );
+		$raw_status    = is_scalar( $context['status'] ?? null ) ? trim( (string) $context['status'] ) : '';
+		$status        = self::deriveStatus( $steps, $raw_status );
 		$outputs       = is_array( $context['outputs'] ?? null ) ? $context['outputs'] : array();
 		$artifact_refs = self::mergeRefs( $steps, 'artifact_refs', $context['artifact_refs'] ?? ( $context['artifacts'] ?? array() ) );
 		$packet_refs   = self::mergeRefs( $steps, 'packet_refs', $context['packet_refs'] ?? array() );
 		$diagnostics   = is_array( $context['diagnostics'] ?? null ) ? $context['diagnostics'] : array();
+		$run_id        = is_scalar( $context['run_id'] ?? null ) ? trim( (string) $context['run_id'] ) : '';
 
-		return array(
-			'schema_version' => self::SCHEMA_VERSION,
-			'status'         => $status,
-			'outputs'        => $outputs,
-			'artifact_refs'  => $artifact_refs,
-			'packet_refs'    => $packet_refs,
-			'diagnostics'    => $diagnostics,
-			'replay'         => self::buildReplayMetadata( $steps, $outputs, $artifact_refs, $packet_refs, is_array( $context['replay'] ?? null ) ? $context['replay'] : array() ),
-			'steps'          => $steps,
-		);
+		return WP_Agent_Run_Result_Envelope::from_array(
+			array(
+				'run_id'        => $run_id,
+				'status'        => $status,
+				'status_detail' => $status,
+				'outputs'       => $outputs,
+				'artifact_refs' => $artifact_refs,
+				'steps'         => $steps,
+				'replay'        => self::buildReplayMetadata( $steps, $outputs, $artifact_refs, $packet_refs, is_array( $context['replay'] ?? null ) ? $context['replay'] : array() ),
+				'metadata'      => array(
+					'datamachine' => self::filterNull(
+						array(
+							'packet_refs' => $packet_refs,
+							'diagnostics' => $diagnostics,
+						)
+					),
+				),
+				'provenance'    => array( 'source' => 'datamachine' ),
+			)
+		)->to_array();
 	}
 
 	/**
-	 * Build a portable run result envelope from a job row and its metrics summary.
+	 * Build the canonical run result envelope from a job row and its metrics summary.
 	 *
 	 * @param array<string,mixed> $job     Job row.
 	 * @param array<string,mixed> $summary RunMetrics::fromJob() summary.
 	 * @return array<string,mixed>
 	 */
 	public static function fromJobSummary( array $job, array $summary ): array {
-		$engine       = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
-		$step_results = self::stepResultEnvelopes( $summary['step_results'] ?? array(), $engine );
+		$engine        = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$step_results  = self::stepResultEnvelopes( $summary['step_results'] ?? array(), $engine );
+		$job_id        = (int) ( $summary['job_id'] ?? ( $job['job_id'] ?? 0 ) );
+		$parent_job_id = (int) ( $summary['parent_job_id'] ?? ( $job['parent_job_id'] ?? 0 ) );
+		$raw_status    = (string) ( $summary['status'] ?? ( $job['status'] ?? '' ) );
+		$outputs       = self::outputs( $summary );
+		$artifact_refs = array_values( JobArtifactSurfaces::artifactRefs( $engine ) );
+		$packet_refs   = self::packetRefs( $step_results );
 
-		return self::filterNull(
+		return WP_Agent_Run_Result_Envelope::from_array(
 			array(
-				'schema_version'      => self::SCHEMA_VERSION,
-				'job'                 => self::jobRef( $job, $summary ),
-				'status'              => (string) ( $summary['status'] ?? ( $job['status'] ?? '' ) ),
-				'outputs'             => self::outputs( $summary ),
-				'artifact_refs'       => array_values( JobArtifactSurfaces::artifactRefs( $engine ) ),
-				'packet_refs'         => self::packetRefs( $step_results ),
-				'step_results'        => $step_results,
-				'child_job_refs'      => self::childJobRefs( (int) ( $job['job_id'] ?? 0 ) ),
-				'child_job_envelopes' => self::childJobEnvelopes( (int) ( $job['job_id'] ?? 0 ) ),
-				'diagnostics'         => self::diagnostics( $summary ),
-				'replay'              => array(
+				'run_id'         => $job_id > 0 ? (string) $job_id : '',
+				'status'         => $raw_status,
+				'status_detail'  => $raw_status,
+				'outputs'        => $outputs,
+				'artifact_refs'  => $artifact_refs,
+				'steps'          => $step_results,
+				'parent_run_id'  => $parent_job_id > 0 ? (string) $parent_job_id : '',
+				'child_run_refs' => self::childRunRefs( $job_id ),
+				'replay'         => array(
 					'content_hashes' => array(
-						'outputs'       => self::contentHash( self::outputs( $summary ) ),
-						'artifact_refs' => self::contentHash( array_values( JobArtifactSurfaces::artifactRefs( $engine ) ) ),
-						'packet_refs'   => self::contentHash( self::packetRefs( $step_results ) ),
+						'outputs'       => self::contentHash( $outputs ),
+						'artifact_refs' => self::contentHash( $artifact_refs ),
+						'packet_refs'   => self::contentHash( $packet_refs ),
 					),
 				),
+				'metadata'       => array(
+					'datamachine' => self::filterNull(
+						array(
+							'job'                 => self::jobRef( $job, $summary ),
+							'packet_refs'         => $packet_refs,
+							'diagnostics'         => self::diagnostics( $summary ),
+							'child_job_envelopes' => self::childJobEnvelopes( $job_id ),
+						)
+					),
+				),
+				'provenance'     => array( 'source' => 'datamachine' ),
 			)
-		);
+		)->to_array();
 	}
 
 	/**
@@ -210,14 +251,15 @@ class RunResult {
 	 * @param int $job_id Parent job ID.
 	 * @return array<int,array<string,mixed>>
 	 */
-	private static function childJobRefs( int $job_id ): array {
+	private static function childRunRefs( int $job_id ): array {
 		$refs = array();
 		foreach ( self::childJobs( $job_id ) as $child ) {
 			$refs[] = self::filterNull(
 				array(
-					'job_id' => (int) ( $child['job_id'] ?? 0 ),
-					'status' => $child['status'] ?? null,
+					'id'     => (string) ( $child['job_id'] ?? 0 ),
+					'type'   => 'datamachine_job',
 					'label'  => $child['label'] ?? null,
+					'status' => $child['status'] ?? null,
 				)
 			);
 		}
@@ -233,8 +275,9 @@ class RunResult {
 		$envelopes = array();
 		foreach ( self::childJobs( $job_id ) as $child ) {
 			$engine = is_array( $child['engine_data'] ?? null ) ? $child['engine_data'] : array();
-			if ( is_array( $engine['run_result'] ?? null ) ) {
-				$envelopes[] = $engine['run_result'];
+			$stored = $engine['run_result'] ?? null;
+			if ( self::validate( $stored ) ) {
+				$envelopes[] = $stored;
 			}
 		}
 
@@ -295,12 +338,12 @@ class RunResult {
 	 * Derive an aggregate run status from step envelopes.
 	 *
 	 * @param array<int,array<string,mixed>> $steps           Step envelopes.
-	 * @param mixed                          $explicit_status Caller-provided status.
-	 * @return string Run status.
+	 * @param string                         $explicit_status Caller-provided raw status.
+	 * @return string Raw run status (not yet canonicalized).
 	 */
-	private static function deriveStatus( array $steps, $explicit_status ): string {
-		if ( is_scalar( $explicit_status ) && '' !== trim( (string) $explicit_status ) ) {
-			return trim( (string) $explicit_status );
+	private static function deriveStatus( array $steps, string $explicit_status ): string {
+		if ( '' !== $explicit_status ) {
+			return $explicit_status;
 		}
 
 		foreach ( $steps as $step ) {

@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Abilities\Engine;
 
+use AgentsAPI\AI\WP_Agent_Run_Result_Envelope;
 use DataMachine\Abilities\Engine\ExecuteStepAbility;
 use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Abilities\HandlerAbilities;
@@ -263,8 +264,8 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
 			$engine_after_fetch['step_results']['flow_fetch']['step_result']['schema_version'] ?? ''
 		);
 		$this->assertSame(
-			'datamachine.run_result.v1',
-			$engine_after_fetch['run_result']['schema_version'] ?? ''
+			WP_Agent_Run_Result_Envelope::SCHEMA,
+			$engine_after_fetch['run_result']['schema'] ?? ''
 		);
 
         $ai_result = $executor->execute(
@@ -336,12 +337,12 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
 
 		$completed_engine = datamachine_get_engine_data($job_id);
 		$this->assertSame(
-			'datamachine.run_result.v1',
-			$completed_engine['run_result']['schema_version'] ?? ''
+			WP_Agent_Run_Result_Envelope::SCHEMA,
+			$completed_engine['run_result']['schema'] ?? ''
 		);
 		$this->assertSame(JobStatus::COMPLETED, $completed_engine['run_result']['status'] ?? '');
-		$this->assertCount(3, $completed_engine['run_result']['step_results'] ?? array());
-		$this->assertNotEmpty($completed_engine['run_result']['packet_refs'] ?? array());
+		$this->assertCount(3, $completed_engine['run_result']['steps'] ?? array());
+		$this->assertNotEmpty($completed_engine['run_result']['metadata']['datamachine']['packet_refs'] ?? array());
     }
 
     /**

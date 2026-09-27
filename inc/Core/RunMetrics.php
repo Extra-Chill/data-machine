@@ -14,8 +14,8 @@ namespace DataMachine\Core;
 
 defined( 'ABSPATH' ) || exit;
 
-if ( ! class_exists( RunResult::class ) ) {
-	require_once __DIR__ . '/RunResult.php';
+if ( ! class_exists( RunResultEnvelope::class ) ) {
+	require_once __DIR__ . '/RunResultEnvelope.php';
 }
 
 class RunMetrics {
@@ -256,7 +256,6 @@ class RunMetrics {
 			'duration_seconds'     => self::durationSeconds( $started_at, $duration_end ),
 			'outcome'              => self::outcomeDetails( $job, $engine, $counts, $outcome_classes ),
 			'step_results'         => self::stepResults( $engine ),
-			'run_result'           => self::runResult( $engine, $status ),
 			'context'              => $metrics['context'],
 			'token_usage'          => self::tokenUsage( $engine ),
 			'cost'                 => self::cost( $engine ),
@@ -264,7 +263,11 @@ class RunMetrics {
 			'backpressure_history' => self::backpressureHistory( $engine ),
 		);
 
-		$summary['run_result'] = is_array( $engine[ self::RUN_RESULT_KEY ] ?? null ) ? $engine[ self::RUN_RESULT_KEY ] : RunResult::fromJobSummary( $job, $summary );
+		// A stored run_result that predates the canonical agents-api/run-result/v1
+		// schema is treated as missing and rebuilt from this summary rather than
+		// migrated in place. See data-machine#3558.
+		$stored_run_result     = $engine[ self::RUN_RESULT_KEY ] ?? null;
+		$summary['run_result'] = RunResultEnvelope::validate( $stored_run_result ) ? $stored_run_result : RunResultEnvelope::fromJobSummary( $job, $summary );
 
 		return $summary;
 	}
@@ -580,22 +583,6 @@ class RunMetrics {
 		return array_values( array_filter( $step_results, 'is_array' ) );
 	}
 
-	private static function runResult( array $engine, string $status ): array {
-		$step_results = array();
-		foreach ( self::stepResults( $engine ) as $result ) {
-			if ( is_array( $result['step_result'] ?? null ) ) {
-				$step_results[] = $result['step_result'];
-			}
-		}
-
-		return RunResult::fromStepResults(
-			$step_results,
-			array(
-				'status' => $status,
-			)
-		);
-	}
-
 	private static function firstStepField( array $engine, string $field ) {
 		foreach ( self::stepResults( $engine ) as $result ) {
 			if ( isset( $result[ $field ] ) && '' !== $result[ $field ] ) {
@@ -655,7 +642,7 @@ class RunMetrics {
 		unset( $engine[ self::RUN_RESULT_KEY ] );
 		$job['engine_data']             = $engine;
 		$summary                        = self::fromJob( $job );
-		$engine[ self::RUN_RESULT_KEY ] = RunResult::fromJobSummary( $job, $summary );
+		$engine[ self::RUN_RESULT_KEY ] = RunResultEnvelope::fromJobSummary( $job, $summary );
 
 		return $engine;
 	}

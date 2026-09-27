@@ -85,18 +85,25 @@ plus optional `initial_data` and `label`. When an agent is supplied, its
 registered owner is the authoritative execution user. Callers cannot provide or
 override any execution descriptor field.
 
-`project` receives the canonical `datamachine.run_result.v1` envelope and must
-return a redacted JSON-safe object no larger than 32 KiB. Raw jobs, diagnostics,
-workflow state, task classes, and scheduler records are never public inputs or
-outputs. Set `effect_count` to `0` when successful execution produced no
-consequential effect; Data Machine then reports `no-op`.
+`project` receives the canonical `agents-api/run-result/v1` envelope
+(`WP_Agent_Run_Result_Envelope::to_array()`) and must return a redacted
+JSON-safe object no larger than 32 KiB. Raw jobs, diagnostics, workflow state,
+task classes, and scheduler records are never public inputs or outputs. Set
+`effect_count` to `0` when successful execution produced no consequential
+effect; Data Machine then reports `no-op`.
 
-Data Machine validates exact `datamachine.run_result.v1` envelopes before owner
+The envelope's `status` is the substrate's small canonical enum
+(`completed`, `failed`, `skipped`, and so on); the raw Data Machine job status
+(`completed_no_items`, `agent_skipped`, `failed - reason`, and so on) is always
+preserved verbatim in `status_detail`. Owner callbacks that need
+Data-Machine-specific status detail must read `status_detail`, not `status`.
+
+Data Machine validates exact `agents-api/run-result/v1` envelopes before owner
 projection, retry, or terminal status mapping. Active operations receive a
 canonical active envelope rather than an empty array. Data Machine reports
-`no-op` for canonical skipped/no-items statuses and for a canonical integer
-`outputs.effect_count` of `0`; malformed or legacy terminal envelopes fail
-closed.
+`no-op` for canonical skipped/no-items statuses (read from `status_detail`) and
+for a canonical integer `outputs.effect_count` of `0`; malformed or legacy
+terminal envelopes fail closed.
 
 `retry` is optional. Without it, explicit retry fails closed. When registered,
 it receives the failed canonical run result and frozen operation context. It

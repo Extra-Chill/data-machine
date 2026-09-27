@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Abilities\Engine;
 
+use AgentsAPI\AI\WP_Agent_Run_Result_Envelope;
 use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -355,9 +356,15 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 			array(
 				'job'        => array( 'job_id' => $child_job_id ),
 				'run_result' => array(
-					'schema_version' => 'datamachine.run_result.v1',
-					'job'            => array( 'job_id' => $child_job_id ),
-					'status'         => JobStatus::COMPLETED,
+					'schema'        => WP_Agent_Run_Result_Envelope::SCHEMA,
+					'run_id'        => (string) $child_job_id,
+					'status'        => JobStatus::COMPLETED,
+					'status_detail' => JobStatus::COMPLETED,
+					'metadata'      => array(
+						'datamachine' => array(
+							'job' => array( 'job_id' => $child_job_id ),
+						),
+					),
 				),
 			)
 		);
@@ -378,7 +385,10 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 		$this->assertTrue( $jobs->complete_job( $parent_job_id, JobStatus::COMPLETED ) );
 
 		$parent_engine = datamachine_get_engine_data( $parent_job_id );
-		$this->assertSame( 'datamachine.run_result.v1', $parent_engine['run_result']['schema_version'] ?? '' );
-		$this->assertSame( $child_job_id, $parent_engine['run_result']['child_job_envelopes'][0]['job']['job_id'] ?? 0 );
+		$this->assertSame( WP_Agent_Run_Result_Envelope::SCHEMA, $parent_engine['run_result']['schema'] ?? '' );
+		$this->assertSame(
+			$child_job_id,
+			$parent_engine['run_result']['metadata']['datamachine']['child_job_envelopes'][0]['metadata']['datamachine']['job']['job_id'] ?? 0
+		);
 	}
 }
