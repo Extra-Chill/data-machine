@@ -542,7 +542,7 @@ namespace {
 	$scheduled = $GLOBALS['__scheduled_as'][0];
 	flow_await_assert( 'datamachine_flow_await_step_retry_completion', $scheduled['hook'], 'retry is scheduled under the flow-await retry hook', $failures, $passes );
 	flow_await_assert( array( $contended_job_id, 'completed', 1 ), $scheduled['args'], 'retry payload carries the job id, terminal status and attempt number', $failures, $passes );
-	flow_await_assert( 'data-machine', $scheduled['group'], 'retry is scheduled under the data-machine Action Scheduler group', $failures, $passes );
+	flow_await_assert( \DataMachine\Core\ActionScheduler\GroupRegistrar::GROUP, $scheduled['group'], 'retry is scheduled under the data-machine Action Scheduler group', $failures, $passes );
 
 	// A second terminal-commit style attempt with the SAME (job_id, status)
 	// while a retry is still pending does not stack a duplicate.
