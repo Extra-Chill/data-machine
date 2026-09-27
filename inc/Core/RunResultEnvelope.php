@@ -352,7 +352,7 @@ class RunResultEnvelope {
 			}
 		}
 
-		return array() === $steps ? 'completed_no_items' : 'succeeded';
+		return array() === $steps ? JobStatus::COMPLETED_NO_ITEMS : 'succeeded';
 	}
 
 	/**
