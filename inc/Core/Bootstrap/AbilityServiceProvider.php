@@ -69,7 +69,7 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\Job\DeleteJobsAbility();
 		new \DataMachine\Abilities\Job\ExecuteWorkflowAbility();
 		new \DataMachine\Abilities\DelegatedOperationAbilities();
-		new \DataMachine\Abilities\Job\ExecuteAgentWorkflowAbility();
+		new \DataMachine\Core\Workflows\DataMachineWorkflowRuntime();
 		new \DataMachine\Abilities\Job\FlowHealthAbility();
 		new \DataMachine\Abilities\Job\ProblemFlowsAbility();
 		new \DataMachine\Abilities\Job\RecoverStuckJobsAbility();

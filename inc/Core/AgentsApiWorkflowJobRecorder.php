@@ -35,6 +35,57 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 	}
 
 	/**
+	 * Build a recorder pre-bound to the Data Machine job that already
+	 * recorded `$run_id`, for reconcile/resume paths that receive a run id
+	 * without ever having called {@see self::start()} on this instance.
+	 *
+	 * Used by {@see \DataMachine\Core\Workflows\DataMachineWorkflowRuntime::resolveRecorder()}
+	 * on the scoped `wp_agent_workflow_run_recorder` filter (#567).
+	 *
+	 * @param Jobs   $jobs   Jobs repository.
+	 * @param string $run_id Agents API run ID to resolve ownership for.
+	 * @return self|null Null when no Data Machine job recorded this run id.
+	 */
+	public static function for_run( Jobs $jobs, string $run_id ): ?self {
+		if ( '' === $run_id ) {
+			return null;
+		}
+
+		$rows = $jobs->get_jobs_for_list_table(
+			array(
+				'source'               => 'agents_api_workflow',
+				'engine_data_contains' => array( '"run_id":' . wp_json_encode( $run_id ) ),
+				'fields'               => array( 'job_id', 'engine_data', 'user_id', 'agent_id', 'label' ),
+				'orderby'              => 'j.job_id',
+				'order'                => 'DESC',
+				'per_page'             => 1,
+				'offset'               => 0,
+			)
+		);
+
+		$job = $rows[0] ?? null;
+		if ( ! is_array( $job ) || ! isset( $job['job_id'] ) ) {
+			return null;
+		}
+
+		$engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$spec        = is_array( $engine_data['agents_api_workflow']['spec'] ?? null ) ? $engine_data['agents_api_workflow']['spec'] : array();
+
+		$recorder         = new self(
+			$jobs,
+			$spec,
+			array(
+				'label'    => is_string( $job['label'] ?? null ) ? $job['label'] : null,
+				'user_id'  => (int) ( $job['user_id'] ?? 0 ),
+				'agent_id' => isset( $job['agent_id'] ) ? (int) $job['agent_id'] : null,
+			)
+		);
+		$recorder->job_id = (int) $job['job_id'];
+
+		return $recorder;
+	}
+
+	/**
 	 * Persist the start of the Agents API workflow run.
 	 *
 	 * @param WP_Agent_Workflow_Run_Result $result Initial run result.
@@ -143,10 +194,6 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function query_jobs( array $engine_data_markers, int $limit, int $offset ): array {
-		if ( ! method_exists( $this->jobs, 'get_jobs_for_list_table' ) ) {
-			return array();
-		}
-
 		return $this->jobs->get_jobs_for_list_table(
 			array(
 				'source'               => 'agents_api_workflow',
@@ -183,6 +230,14 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 			return;
 		}
 
+		$metadata = $result->get_metadata();
+		// Canonical `agents/run-workflow` `options.artifacts` / `options.logs`
+		// land on the Result's own first-class fields; a caller that instead
+		// nests them under `options.metadata` (the only place the pre-canonical
+		// bridge accepted them) is still honored as a fallback.
+		$artifacts = ! empty( $result->get_artifacts() ) ? $result->get_artifacts() : ( is_array( $metadata['artifacts'] ?? null ) ? $metadata['artifacts'] : array() );
+		$logs      = ! empty( $result->get_logs() ) ? $result->get_logs() : ( is_array( $metadata['logs'] ?? null ) ? $metadata['logs'] : array() );
+
 		$this->jobs->store_engine_data(
 			$this->job_id,
 			array(
@@ -196,17 +251,17 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 					'run_id'      => $result->get_run_id(),
 					'spec'        => $this->spec,
 					'inputs'      => $result->get_inputs(),
-					'metadata'    => $result->get_metadata(),
+					'metadata'    => $metadata,
 				),
 				'workflow_run_result' => $result->to_array(),
 				'step_outcomes'       => $result->get_steps(),
 				'output'              => $result->get_output(),
-				'artifacts'           => is_array( $result->get_metadata()['artifacts'] ?? null ) ? $result->get_metadata()['artifacts'] : array(),
-				'logs'                => is_array( $result->get_metadata()['logs'] ?? null ) ? $result->get_metadata()['logs'] : array(),
+				'artifacts'           => $artifacts,
+				'logs'                => $logs,
 				'error'               => $result->get_error(),
 				'provenance'          => array(
 					'source'      => 'agents-api',
-					'bridge'      => 'datamachine/execute-agent-workflow',
+					'bridge'      => 'agents/run-workflow',
 					'execution'   => 'WP_Agent_Workflow_Runner',
 					'recorded_as' => 'datamachine_job',
 					'pipeline_id' => 'direct',
