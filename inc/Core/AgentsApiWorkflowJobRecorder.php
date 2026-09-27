@@ -47,7 +47,7 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 	 * @return self|null Null when no Data Machine job recorded this run id.
 	 */
 	public static function for_run( Jobs $jobs, string $run_id ): ?self {
-		if ( '' === $run_id || ! method_exists( $jobs, 'get_jobs_for_list_table' ) ) {
+		if ( '' === $run_id ) {
 			return null;
 		}
 
@@ -71,7 +71,7 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 		$engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		$spec        = is_array( $engine_data['agents_api_workflow']['spec'] ?? null ) ? $engine_data['agents_api_workflow']['spec'] : array();
 
-		$recorder = new self(
+		$recorder         = new self(
 			$jobs,
 			$spec,
 			array(
@@ -194,10 +194,6 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function query_jobs( array $engine_data_markers, int $limit, int $offset ): array {
-		if ( ! method_exists( $this->jobs, 'get_jobs_for_list_table' ) ) {
-			return array();
-		}
-
 		return $this->jobs->get_jobs_for_list_table(
 			array(
 				'source'               => 'agents_api_workflow',
@@ -234,7 +230,7 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 			return;
 		}
 
-		$metadata  = $result->get_metadata();
+		$metadata = $result->get_metadata();
 		// Canonical `agents/run-workflow` `options.artifacts` / `options.logs`
 		// land on the Result's own first-class fields; a caller that instead
 		// nests them under `options.metadata` (the only place the pre-canonical
