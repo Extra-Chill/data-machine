@@ -111,6 +111,25 @@ class RecurringScheduleRegistry {
 	}
 
 	/**
+	 * Whether the current site owns a recurring schedule.
+	 *
+	 * A `network_only` schedule is owned by the network's main site only, so
+	 * network-table maintenance runs once per network. Reconciliation treats
+	 * an unowned schedule as inactive (subsite chains are unscheduled) and
+	 * dispatch rejects stale subsite ticks. Single source for both
+	 * (Extra-Chill/data-machine#3569).
+	 *
+	 * @param array<string, mixed> $schedule Normalized schedule definition.
+	 */
+	public static function isOwnedByCurrentSite( array $schedule ): bool {
+		if ( empty( $schedule['network_only'] ) || ! function_exists( 'is_multisite' ) || ! is_multisite() ) {
+			return true;
+		}
+
+		return function_exists( 'is_main_site' ) && is_main_site();
+	}
+
+	/**
 	 * Resolve the current enabled state for a schedule.
 	 *
 	 * @param array $schedule Normalized schedule definition.

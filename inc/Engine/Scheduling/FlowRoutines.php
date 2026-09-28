@@ -889,13 +889,8 @@ final class FlowRoutines {
 	 * @param array<string, mixed> $schedule Normalized schedule definition.
 	 */
 	private static function system_schedule_active( array $schedule ): bool {
-		if ( ! empty( $schedule['network_only'] ) && function_exists( 'is_multisite' ) && is_multisite() ) {
-			if ( ! function_exists( 'is_main_site' ) || ! is_main_site() ) {
-				return false;
-			}
-		}
-
-		return RecurringScheduleRegistry::isEnabled( $schedule );
+		return RecurringScheduleRegistry::isOwnedByCurrentSite( $schedule )
+			&& RecurringScheduleRegistry::isEnabled( $schedule );
 	}
 
 	/**
