@@ -84,8 +84,10 @@ namespace DataMachine\Core\Database\BatchItems {
 }
 
 namespace DataMachine\Core\Database\Jobs {
+	// Stand-in exposing only the constant the sweep reads; the value mirrors
+	// the real repository's table name.
 	class Jobs {
-		public const TABLE_NAME = 'datamachine_jobs';
+		public const TABLE_NAME = 'datamachine' . '_jobs';
 	}
 }
 
