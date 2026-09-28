@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.178.3] - 2026-09-28
+
+### Changed
+- one site-ownership rule for recurring schedules; behavioural transcript-retention test
+
 ## [0.178.2] - 2026-09-28
 
 ### Fixed
