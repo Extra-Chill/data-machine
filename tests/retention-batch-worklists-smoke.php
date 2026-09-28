@@ -44,6 +44,10 @@ namespace {
 		}
 
 		public function prepare( string $sql, ...$args ): string {
+			// Like wpdb::prepare(), accept a single array of replacements.
+			if ( 1 === count( $args ) && is_array( $args[0] ) ) {
+				$args = $args[0];
+			}
 			$i = 0;
 			return (string) preg_replace_callback(
 				'/%[ids]/',

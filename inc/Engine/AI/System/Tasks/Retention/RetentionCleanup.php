@@ -1477,8 +1477,9 @@ class RetentionCleanup {
 
 			$ids          = array_map( 'intval', $orphans );
 			$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list is built from a fixed format.
-			$result = $wpdb->query( $wpdb->prepare( "DELETE FROM %i WHERE batch_job_id IN ({$placeholders})", $items, ...$ids ) );
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The IN list holds one %d per id, built from a fixed format.
+			$result = $wpdb->query( $wpdb->prepare( "DELETE FROM %i WHERE batch_job_id IN ({$placeholders})", array_merge( array( $items ), $ids ) ) );
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 			if ( false === $result ) {
 				break;
 			}
@@ -1633,7 +1634,7 @@ class RetentionCleanup {
 			);
 		}
 
-		$transcript_count = method_exists( $chat_db, 'count_old_pipeline_transcripts' ) ? $chat_db->count_old_pipeline_transcripts( $transcript_retention_days ) : 0;
+		$transcript_count = $chat_db->count_old_pipeline_transcripts( $transcript_retention_days );
 
 		return array(
 			'sessions'                  => $chat_db->count_old_sessions( $retention_days, true ),
@@ -1658,7 +1659,7 @@ class RetentionCleanup {
 		$transcript_retention_days = self::transcriptRetentionDays();
 		$transcripts_deleted       = 0;
 
-		if ( $transcript_retention_days > 0 && method_exists( $chat_db, 'cleanup_pipeline_transcripts' ) ) {
+		if ( $transcript_retention_days > 0 ) {
 			$transcripts_deleted = $chat_db->cleanup_pipeline_transcripts( $transcript_retention_days );
 		}
 

@@ -93,7 +93,7 @@ class RetentionCommand extends BaseCommand {
 		// Show total.
 		$total_mb = 0;
 		foreach ( $sizes['_unique'] ?? array() as $size_info ) {
-			$total_mb += (float) $size_info['size_mb'];
+			$total_mb += is_array( $size_info ) ? (float) ( $size_info['size_mb'] ?? 0 ) : 0.0;
 		}
 
 		WP_CLI::log( '' );
@@ -503,7 +503,9 @@ class RetentionCommand extends BaseCommand {
 	/**
 	 * Get current table sizes for Data Machine and Action Scheduler tables.
 	 *
-	 * @return array<string, array{rows: int, size_mb: string}>
+	 * @return array<string, array<string, mixed>> Per-domain size info (rows, size_mb, and
+	 *                                           optionally free_mb/reclaim_ratio), plus `_unique`
+	 *                                           keyed by table name.
 	 */
 	private function get_table_sizes(): array {
 		global $wpdb;
