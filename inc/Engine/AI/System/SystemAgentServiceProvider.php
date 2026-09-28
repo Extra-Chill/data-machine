@@ -381,7 +381,7 @@ class SystemAgentServiceProvider {
 		}
 
 		$def = RecurringScheduleRegistry::get( $schedule_id );
-		if ( null === $def || ! self::isScheduleOwnedByCurrentSite( $def ) ) {
+		if ( null === $def || ! RecurringScheduleRegistry::isOwnedByCurrentSite( $def ) ) {
 			return array(
 				'success'     => false,
 				'schedule_id' => $schedule_id,
@@ -521,22 +521,6 @@ class SystemAgentServiceProvider {
 		}
 
 		RecurringRejectionTracker::record_rejection( $schedule_id, $task_type, 'task_scheduler_rejected' );
-	}
-
-	/**
-	 * Determine whether the current site owns a recurring schedule.
-	 *
-	 * Network-table maintenance is scheduled only from the network's main site.
-	 * Reconciliation on subsites receives disabled state so legacy duplicate
-	 * chains are unscheduled, while the dispatch guard makes fetched stale
-	 * actions harmless before that reconciliation occurs.
-	 */
-	private static function isScheduleOwnedByCurrentSite( array $schedule ): bool {
-		if ( empty( $schedule['network_only'] ) || ! function_exists( 'is_multisite' ) || ! is_multisite() ) {
-			return true;
-		}
-
-		return function_exists( 'is_main_site' ) && is_main_site();
 	}
 
 	/**
