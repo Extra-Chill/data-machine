@@ -32,6 +32,13 @@ class RetentionCleanup {
 	public const TASK_FILES           = 'retention_files';
 	public const TASK_CHAT_SESSIONS   = 'retention_chat_sessions';
 	public const TASK_JOB_ARTIFACTS   = 'retention_job_artifacts';
+	public const TASK_BATCH_WORKLISTS = 'retention_batch_worklists';
+
+	/** Rows deleted per sweep query; bounded so one pass never locks the table for long. */
+	private const BATCH_WORKLIST_SWEEP_CHUNK = 1000;
+
+	/** Maximum sweep queries per run; leftover orphans are picked up by the next run. */
+	private const BATCH_WORKLIST_SWEEP_MAX_CHUNKS = 20;
 
 	public static function completedJobsMaxAgeDays(): int {
 		return self::positiveDays( apply_filters( 'datamachine_completed_jobs_max_age_days', 30 ), 30 );
@@ -1425,6 +1432,94 @@ class RetentionCleanup {
 				'SELECT COUNT(*) FROM %i WHERE date_created_gmt < %s',
 				$table,
 				$cutoff
+			)
+		);
+	}
+
+	/**
+	 * Delete batch worklist rows whose parent job no longer exists.
+	 *
+	 * Worklists are removed inline by BatchScheduler::finalize() on the
+	 * parent's terminal transition, but job rows are also deleted by bulk
+	 * retention and operator paths (Jobs::delete_old_jobs(), delete_jobs())
+	 * that never touch the worklist table. Their rows were stranded forever
+	 * (Extra-Chill/data-machine#3565). This sweep catches every deletion path
+	 * at once instead of patching each one.
+	 *
+	 * Only rows whose parent job row is gone are deleted: a worklist that
+	 * still has a parent is live or awaiting finalize() and is never touched.
+	 * Bounded: at most BATCH_WORKLIST_SWEEP_MAX_CHUNKS queries of
+	 * BATCH_WORKLIST_SWEEP_CHUNK rows per run.
+	 *
+	 * @return array{deleted:int,capped:bool}
+	 */
+	public static function cleanupBatchWorklists(): array {
+		global $wpdb;
+
+		$items = $wpdb->prefix . \DataMachine\Core\Database\BatchItems\BatchItems::TABLE_NAME;
+		$jobs  = $wpdb->prefix . \DataMachine\Core\Database\Jobs\Jobs::TABLE_NAME;
+
+		$deleted = 0;
+		$capped  = false;
+		for ( $chunk = 0; $chunk < self::BATCH_WORKLIST_SWEEP_MAX_CHUNKS; $chunk++ ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$orphans = $wpdb->get_col(
+				$wpdb->prepare(
+					'SELECT DISTINCT bi.batch_job_id FROM %i bi LEFT JOIN %i j ON j.job_id = bi.batch_job_id WHERE j.job_id IS NULL LIMIT %d',
+					$items,
+					$jobs,
+					self::BATCH_WORKLIST_SWEEP_CHUNK
+				)
+			);
+			if ( empty( $orphans ) ) {
+				break;
+			}
+
+			$ids          = array_map( 'intval', $orphans );
+			$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list is built from a fixed format.
+			$result = $wpdb->query( $wpdb->prepare( "DELETE FROM %i WHERE batch_job_id IN ({$placeholders})", $items, ...$ids ) );
+			if ( false === $result ) {
+				break;
+			}
+			$deleted += (int) $result;
+
+			if ( self::BATCH_WORKLIST_SWEEP_MAX_CHUNKS - 1 === $chunk ) {
+				$capped = true;
+			}
+		}
+
+		if ( $deleted > 0 ) {
+			self::log(
+				'Scheduled cleanup: deleted orphaned batch worklist rows',
+				array(
+					'rows_deleted' => $deleted,
+					'capped'       => $capped,
+				)
+			);
+		}
+
+		return array(
+			'deleted' => $deleted,
+			'capped'  => $capped,
+		);
+	}
+
+	/**
+	 * Count batch worklist rows whose parent job no longer exists.
+	 */
+	public static function countBatchWorklists(): int {
+		global $wpdb;
+
+		$items = $wpdb->prefix . \DataMachine\Core\Database\BatchItems\BatchItems::TABLE_NAME;
+		$jobs  = $wpdb->prefix . \DataMachine\Core\Database\Jobs\Jobs::TABLE_NAME;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM %i bi LEFT JOIN %i j ON j.job_id = bi.batch_job_id WHERE j.job_id IS NULL',
+				$items,
+				$jobs
 			)
 		);
 	}

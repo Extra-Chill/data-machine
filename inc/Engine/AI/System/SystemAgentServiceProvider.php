@@ -40,6 +40,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionJobArtifactsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionLogsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionBatchWorklistsTask;
 use DataMachine\Engine\AI\System\Tasks\SourceInventoryTask;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\AI\System\Tasks\WakeBriefingTask;
@@ -112,6 +113,7 @@ class SystemAgentServiceProvider {
 		$tasks[ RetentionCleanup::TASK_FILES ]           = RetentionFilesTask::class;
 		$tasks[ RetentionCleanup::TASK_CHAT_SESSIONS ]   = RetentionChatSessionsTask::class;
 		$tasks[ RetentionCleanup::TASK_JOB_ARTIFACTS ]   = RetentionJobArtifactsTask::class;
+		$tasks[ RetentionCleanup::TASK_BATCH_WORKLISTS ] = RetentionBatchWorklistsTask::class;
 
 		return $tasks;
 	}
@@ -275,6 +277,16 @@ class SystemAgentServiceProvider {
 					'enabled_setting' => 'retention_job_artifacts_enabled',
 					'default_enabled' => true,
 					'label'           => 'Daily scoped job-artifact cleanup',
+				)
+			),
+			RetentionCleanup::TASK_BATCH_WORKLISTS => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_BATCH_WORKLISTS,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_batch_worklists_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily orphaned batch-worklist cleanup',
 				)
 			),
 		);

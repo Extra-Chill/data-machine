@@ -436,6 +436,12 @@ class RetentionCommand extends BaseCommand {
 				'threshold' => RetentionCleanup::jobArtifactsMaxAgeDays() . ' days',
 				'count'     => array( RetentionCleanup::class, 'countJobArtifacts' ),
 			),
+			array(
+				'label'     => 'Orphaned batch worklists',
+				'task_type' => RetentionCleanup::TASK_BATCH_WORKLISTS,
+				'threshold' => 'parent job deleted',
+				'count'     => array( RetentionCleanup::class, 'countBatchWorklists' ),
+			),
 		);
 	}
 
