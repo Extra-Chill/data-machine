@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.178.2] - 2026-09-28
+
+### Fixed
+- sweep batch worklists orphaned by deleted parent jobs
+
 ## [0.178.1] - 2026-09-27
 
 ### Changed
