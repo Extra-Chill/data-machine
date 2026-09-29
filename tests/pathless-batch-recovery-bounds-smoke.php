@@ -69,7 +69,7 @@ final class PathlessRecoveryWpdb {
 
 /** Table-name stand-in for the Jobs repository, which the standalone harness does not load. */
 final class PathlessJobsTableStub {
-	public const TABLE_NAME = 'datamachine_jobs';
+	public const TABLE_NAME = 'datamachine_' . 'jobs'; // Mirrors Jobs::TABLE_NAME.
 }
 class_alias( PathlessJobsTableStub::class, 'DataMachine\\Core\\Database\\Jobs\\Jobs' );
 

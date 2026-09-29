@@ -16,3 +16,4 @@ require_once __DIR__ . '/../../inc/Engine/Tasks/TaskScheduler.php';
 require_once __DIR__ . '/../../inc/Engine/Scheduling/FlowRoutines.php';
 require_once __DIR__ . '/../../inc/Engine/AI/System/Tasks/SystemTask.php';
 require_once __DIR__ . '/../../inc/Core/Jobs/SchedulerEvidence.php';
+require_once __DIR__ . '/../../inc/Core/RunMetrics.php';

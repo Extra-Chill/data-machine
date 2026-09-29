@@ -14,6 +14,7 @@
 namespace DataMachine\Core\Jobs;
 
 use DataMachine\Core\ChildJobRecoveryPolicy;
+use DataMachine\Core\RunMetrics;
 use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 
 defined( 'ABSPATH' ) || exit;
@@ -184,7 +185,7 @@ class JobLiveness {
 			$classification = $age_seconds > self::schedulerRetentionSeconds() ? self::EVIDENCE_PRUNED : self::NO_SCHEDULER_PATH;
 		}
 
-		$last_activity = $engine_data['run_metrics']['last_activity_at'] ?? null;
+		$last_activity = $engine_data[ RunMetrics::KEY ]['last_activity_at'] ?? null;
 
 		return array(
 			'id'                      => $job_id,

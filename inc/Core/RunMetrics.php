@@ -20,7 +20,7 @@ if ( ! class_exists( RunResultEnvelope::class ) ) {
 
 class RunMetrics {
 
-	private const KEY = 'run_metrics';
+	public const KEY = 'run_metrics';
 
 	private const COUNT_KEYS = array(
 		'selected',
