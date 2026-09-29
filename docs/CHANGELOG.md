@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.179.1] - 2026-09-29
+
+### Fixed
+- bump agents-api to v0.16.1 (retry transient InnoDB deadlocks in the run-control lock)
+
 ## [0.179.0] - 2026-09-29
 
 ### Added
