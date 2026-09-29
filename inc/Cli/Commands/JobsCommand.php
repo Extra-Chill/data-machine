@@ -155,6 +155,15 @@ class JobsCommand extends BaseCommand {
 	 * [--recover-pathless-children]
 	 * : Explicitly authorize applying historical pathless-child recovery. Dry-runs diagnose them without this flag.
 	 *
+	 * [--recover-pending-orphans]
+	 * : Explicitly authorize terminalizing pending jobs that no live Action Scheduler action can advance. Dry-runs diagnose them without this flag.
+	 *
+	 * [--pending-grace=<minutes>]
+	 * : Minimum age in minutes before a pending job with no live scheduler action is recoverable (default 60).
+	 *
+	 * [--pending-limit=<limit>]
+	 * : Per-run bound on pending orphans previewed or terminalized (maximum 500, default 500).
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Preview stuck jobs recovery
@@ -162,6 +171,12 @@ class JobsCommand extends BaseCommand {
 	 *
 	 *     # Recover within the default logical-touch limit (pathless children remain guarded)
 	 *     wp datamachine jobs recover-stuck
+	 *
+	 *     # Preview pending orphans (per-verdict counts)
+	 *     wp datamachine jobs recover-stuck --dry-run --limit=1 --pending-limit=500
+	 *
+	 *     # Terminalize pending orphans (bounded per run)
+	 *     wp datamachine jobs recover-stuck --recover-pending-orphans --pending-limit=200
 	 *
 	 *     # Recover one reviewed pathless child
 	 *     wp datamachine jobs recover-stuck --job-id=123 --recover-pathless-children --limit=1
@@ -190,19 +205,27 @@ class JobsCommand extends BaseCommand {
 		$job_id  = is_int( $requested_job_id ) ? $requested_job_id : null;
 		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 100, (int) $assoc_args['limit'] ) ) : 3;
 		$recover_pathless_children = isset( $assoc_args['recover-pathless-children'] );
+		$recover_pending_orphans   = isset( $assoc_args['recover-pending-orphans'] );
+		$pending_grace             = isset( $assoc_args['pending-grace'] ) ? max( 1, (int) $assoc_args['pending-grace'] ) : null;
+		$pending_limit             = isset( $assoc_args['pending-limit'] ) ? max( 1, min( 500, (int) $assoc_args['pending-limit'] ) ) : 500;
+
+		$ability_input = array(
+			'dry_run'       => $dry_run,
+			'flow_id'       => $flow_id,
+			'timeout_hours' => $timeout,
+			'job_id'        => $job_id,
+			'limit'         => $limit,
+			'recover_pathless_children' => $recover_pathless_children,
+			'recover_pending_orphans'   => $recover_pending_orphans,
+			'pending_limit'             => $pending_limit,
+			'recovery_trigger' => 'operator_cli',
+		);
+		if ( null !== $pending_grace ) {
+			$ability_input['pending_grace_minutes'] = $pending_grace;
+		}
 
 		$ability = wp_get_ability( 'datamachine/recover-stuck-jobs' );
-		$result  = $ability->execute(
-			array(
-				'dry_run'       => $dry_run,
-				'flow_id'       => $flow_id,
-				'timeout_hours' => $timeout,
-				'job_id'        => $job_id,
-				'limit'         => $limit,
-				'recover_pathless_children' => $recover_pathless_children,
-				'recovery_trigger' => 'operator_cli',
-			)
-		);
+		$result  = $ability->execute( $ability_input );
 
 		if ( is_wp_error( $result ) ) {
 			WP_CLI::error( $result->get_error_message() );
@@ -219,6 +242,7 @@ class JobsCommand extends BaseCommand {
 					'success'        => true,
 					'dry_run'        => $dry_run,
 					'summary'        => $summary,
+					'pending_orphans' => $result['pending_orphans'] ?? array(),
 					'jobs'           => $jobs,
 					'jobs_omitted'   => (int) ( $result['jobs_omitted'] ?? 0 ),
 					'jobs_truncated' => ! empty( $result['jobs_truncated'] ),
@@ -254,7 +278,8 @@ class JobsCommand extends BaseCommand {
 		);
 		WP_CLI::log(
 			sprintf(
-				'Recovery scope: processing jobs plus expired pending AI deferrals with absent exact action receipts; job=%s flow=%s limit-mode=%s input-limit=%d requested-limit=%d %s apply-limit=%d logical_touch pathless-apply=%s.',
+				'Recovery scope: processing jobs, expired pending AI deferrals with absent exact action receipts, and pending orphans with no live scheduler action (apply=%s); job=%s flow=%s limit-mode=%s input-limit=%d requested-limit=%d %s apply-limit=%d logical_touch pathless-apply=%s.',
+				$recover_pending_orphans ? 'enabled' : 'disabled',
 				$job_id ? (string) $job_id : 'all',
 				$flow_id ? (string) $flow_id : 'all',
 				$summary['limit_mode'],
@@ -273,6 +298,35 @@ class JobsCommand extends BaseCommand {
 				$summary['logical_mutations']
 			)
 		);
+
+		$pending_orphans = is_array( $result['pending_orphans'] ?? null ) ? $result['pending_orphans'] : array();
+		if ( ! empty( $pending_orphans['enabled'] ) ) {
+			$verdict_counts = array();
+			foreach ( (array) ( $pending_orphans['verdicts'] ?? array() ) as $verdict => $count ) {
+				$verdict_counts[] = sprintf( '%s=%d', $verdict, (int) $count );
+			}
+			$excluded = array();
+			foreach ( (array) ( $pending_orphans['skipped_reasons'] ?? array() ) as $reason => $count ) {
+				$excluded[] = sprintf( '%s=%d', $reason, (int) $count );
+			}
+			WP_CLI::log(
+				sprintf(
+					'Pending orphans (%s; grace=%ds, bound=%d, scanned=%d%s): %s; excluded: %s.',
+					$dry_run ? 'would terminalize' : 'terminalized',
+					(int) ( $pending_orphans['grace_seconds'] ?? 0 ),
+					(int) ( $pending_orphans['limit'] ?? 0 ),
+					(int) ( $pending_orphans['scanned'] ?? 0 ),
+					empty( $pending_orphans['limit_reached'] ) ? '' : ', bound reached',
+					implode( ' ', $verdict_counts ),
+					empty( $excluded ) ? 'none' : implode( ' ', $excluded )
+				)
+			);
+			if ( empty( $pending_orphans['evidence_complete'] ) ) {
+				WP_CLI::warning( 'Scheduler evidence incomplete; pending orphans were not evaluated.' );
+			}
+		} else {
+			WP_CLI::log( 'Pending orphans not evaluated; preview with --dry-run or authorize apply with --recover-pending-orphans.' );
+		}
 
 		if ( empty( $jobs ) ) {
 			WP_CLI::success( 'No stuck jobs found.' );
@@ -331,6 +385,10 @@ class JobsCommand extends BaseCommand {
 				WP_CLI::log( sprintf( 'Would timeout job %d (flow %d)', $job['job_id'], $job['flow_id'] ) );
 			} elseif ( 'timed_out' === $job['status'] ) {
 				WP_CLI::log( sprintf( 'Timed out job %d (flow %d)', $job['job_id'], $job['flow_id'] ) );
+			} elseif ( 'would_terminalize_pending_orphan' === $job['status'] ) {
+				WP_CLI::log( sprintf( 'Would terminalize pending orphan %d (flow %s, operation %s, verdict %s)', $job['job_id'], $job['flow_id'], '' === (string) $job['operation_state'] ? 'none' : $job['operation_state'], $job['verdict'] ) );
+			} elseif ( 'terminalized_pending_orphan' === $job['status'] ) {
+				WP_CLI::log( sprintf( 'Terminalized pending orphan %d (flow %s, verdict %s)', $job['job_id'], $job['flow_id'], $job['verdict'] ) );
 			} elseif ( 'would_terminalize_expired_ai_deferral' === $job['status'] ) {
 				WP_CLI::log( sprintf( 'Would terminalize expired pending AI deferral %d (flow %d, missing action %d)', $job['job_id'], $job['flow_id'], $job['action_id'] ) );
 			} elseif ( 'terminalized_expired_ai_deferral' === $job['status'] ) {
@@ -384,6 +442,8 @@ class JobsCommand extends BaseCommand {
 		$pathless_policy_skipped = (int) ( $result['pathless_policy_skipped'] ?? 0 );
 		$pending_ai_terminalized = (int) ( $result['pending_ai_terminalized'] ?? 0 );
 		$pending_ai_guarded = (int) ( $result['pending_ai_guarded'] ?? 0 );
+		$pending_orphans_terminalized = (int) ( $result['pending_orphans_terminalized'] ?? 0 );
+		$pending_orphans_planned      = (int) ( $result['pending_orphans']['would_terminalize'] ?? 0 );
 		$batch_parents_completed = (int) ( $result['batch_parents_completed'] ?? 0 );
 		$mutations         = (int) ( $result['mutations'] ?? 0 );
 		$attempted         = (int) ( $result['attempted'] ?? 0 );
@@ -404,6 +464,7 @@ class JobsCommand extends BaseCommand {
 			'pathless_policy_skipped' => $pathless_policy_skipped,
 			'pending_ai_terminalized' => $pending_ai_terminalized,
 			'pending_ai_guarded' => $pending_ai_guarded,
+			'pending_orphans_terminalized' => $pending_orphans_terminalized,
 			'batch_parents_completed' => $batch_parents_completed,
 			'mutations'     => $mutations,
 			'attempted'     => $attempted,
@@ -420,21 +481,23 @@ class JobsCommand extends BaseCommand {
 			'limit_unit'    => (string) ( $result['limit_unit'] ?? 'logical_touch' ),
 			'logical_touch_limit' => (int) ( $result['logical_touch_limit'] ?? $result['apply_limit'] ?? 0 ),
 			'limit_reached' => ! empty( $result['limit_reached'] ) ? 1 : 0,
-			'actionable'    => $pending_ai_terminalized + $recovered + $batch_parents_completed + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
-			'total'         => $pending_ai_terminalized + $recovered + $batch_parents_completed + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal + $skipped,
+			'actionable'    => $pending_orphans_planned + $pending_orphans_terminalized + $pending_ai_terminalized + $recovered + $batch_parents_completed + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal,
+			'total'         => $pending_orphans_planned + $pending_orphans_terminalized + $pending_ai_terminalized + $recovered + $batch_parents_completed + $timed_out + $stale_actions + $pathless_requeued + $pathless_terminal + $skipped,
 			'requeued'      => (int) ( $result['requeued'] ?? 0 ),
 			'jobs_omitted'  => (int) ( $result['jobs_omitted'] ?? 0 ),
 		);
 	}
 
 	/**
-	 * Diagnose liveness for processing jobs and pending backpressure deferrals.
+	 * Diagnose liveness for processing and pending jobs.
 	 *
 	 * Processing is a broad lifecycle state. This command reports whether each
 	 * processing job is actively executing, waiting on a scheduler action,
 	 * scheduler-starved by overdue pending Action Scheduler work, or older
 	 * than the scheduler evidence window (evidence_pruned — its Action
 	 * Scheduler rows have been pruned, so liveness can no longer be observed).
+	 * Pending rows are classified the same way, so a pending job with no
+	 * scheduler path shows up as no_scheduler_path or evidence_pruned.
 	 *
 	 * ## OPTIONS
 	 *
@@ -487,7 +550,7 @@ class JobsCommand extends BaseCommand {
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, pipeline_id, agent_id, status, created_at, completed_at, engine_data
 				FROM %i
-				WHERE (status = 'processing' OR (status = 'pending' AND JSON_EXTRACT(engine_data, '$.ai_concurrency_throttle') IS NOT NULL))
+				WHERE status IN ('processing', 'pending')
 				AND ( %d = 0 OR flow_id = %d )
 				ORDER BY created_at ASC
 				LIMIT %d",
@@ -529,8 +592,8 @@ class JobsCommand extends BaseCommand {
 					'overdue_minutes' => $overdue_minutes,
 					'scope'           => array(
 						'statuses'            => array( 'processing', 'pending' ),
-						'pending_requirement' => 'ai_concurrency_throttle',
-						'note'                => 'Recovery includes only expired pending AI deferrals whose exact recorded action is absent.',
+						'pending_requirement' => 'none',
+						'note'                => 'Pending rows are classified like processing rows; recover-stuck terminalizes pending orphans older than the grace window with no live scheduler action.',
 					),
 					'summary'         => $summary,
 					'jobs'            => $items,
@@ -548,7 +611,7 @@ class JobsCommand extends BaseCommand {
 		$this->format_items( $items, $this->liveness_fields, $assoc_args, 'id' );
 
 		if ( 'table' === $format ) {
-			WP_CLI::log( 'Liveness scope includes processing jobs plus pending AI concurrency deferrals; recover-stuck also handles expired deferrals with absent exact action receipts.' );
+			WP_CLI::log( 'Liveness scope includes processing and pending jobs; recover-stuck terminalizes pending orphans (no live scheduler action past the grace window) and expired AI deferrals with absent exact action receipts.' );
 			WP_CLI::log(
 				sprintf(
 					'Inspected %d active jobs: %d active, %d queued, %d AI concurrency-deferred, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path, %d beyond the %d-hour scheduler evidence window.',
