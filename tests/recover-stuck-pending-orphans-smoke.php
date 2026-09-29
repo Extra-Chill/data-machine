@@ -222,7 +222,7 @@ namespace {
 		$job( 16, array( 'engine' => json_encode( array( 'batch' => true ) ) ) );
 		// Actions that are NOT live evidence: stale in-progress and complete rows.
 		$job( 13, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) );
-		$action( 903, RSP_EXECUTE_STEP_HOOK, 'in-progress', '{"job_id":13,"flow_step_id":"step_1"}', null, $ago( 10 * HOUR_IN_SECONDS ) );
+		$action( 903, RSP_EXECUTE_STEP_HOOK, \DataMachine\Core\Jobs\SchedulerEvidence::STATUS_IN_PROGRESS, '{"job_id":13,"flow_step_id":"step_1"}', null, $ago( 10 * HOUR_IN_SECONDS ) );
 		$job( 15, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) );
 		$action( 904, RSP_EXECUTE_STEP_HOOK, 'complete', '{"job_id":15,"flow_step_id":"step_1"}' );
 		// Other flow.

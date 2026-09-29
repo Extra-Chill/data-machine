@@ -94,8 +94,11 @@ require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Abilities/Job/JobHelpers.php';
 require_once __DIR__ . '/../inc/Abilities/Job/RecoverStuckJobsAbility.php';
 
+use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\Jobs\JobLiveness;
 use DataMachine\Core\Jobs\SchedulerEvidence;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
+use DataMachine\Engine\AI\System\Tasks\SystemTask;
 
 $wpdb = new Evidence_Wpdb();
 $GLOBALS['wpdb'] = $wpdb;
@@ -108,18 +111,18 @@ $insert = static function ( int $id, string $hook, string $status, string $args,
 	$stmt->execute( array( $id, $hook, $status, $ago( 60 ), $attempt ?? '0000-00-00 00:00:00', $args, $extended ) );
 };
 
-$insert( 1, 'datamachine_execute_step', 'pending', '{"job_id":100,"flow_step_id":"s1"}' );
-$insert( 2, 'datamachine_resume_ai_step', 'pending', '{"job_id":101,"flow_step_id":"s1"}' );
-$insert( 3, 'datamachine_pipeline_batch_chunk', 'pending', '{"parent_job_id":102,"offset":0}' );
-$insert( 4, 'datamachine_run_flow_now', 'pending', '[7,103]' );
-$insert( 5, 'datamachine_task_process_batch', 'pending', '{"parent_job_id":104,"offset":0}' );
-$insert( 6, 'datamachine_task_retry', 'pending', '[105]' );
-$insert( 7, 'datamachine_execute_step', 'pending', md5( 'long' ), '{"job_id":106,"flow_step_id":"' . str_repeat( 'x', 200 ) . '"}' );
-$insert( 8, 'datamachine_execute_step', 'in-progress', '{"job_id":107,"flow_step_id":"s1"}', null, $ago( 10 * HOUR_IN_SECONDS ) );
-$insert( 9, 'datamachine_execute_step', 'complete', '{"job_id":108,"flow_step_id":"s1"}' );
-$insert( 10, 'some_other_plugin_hook', 'pending', '{"job_id":109}' );
-$insert( 11, 'datamachine_execute_step', 'pending', '{"job_id":12,"flow_step_id":"s1"}' );
-$insert( 12, 'datamachine_execute_step', 'pending', '{"job_id":123,"flow_step_id":"s1"}' );
+$insert( 1, DirectJobEnqueuer::HOOK, SchedulerEvidence::STATUS_PENDING, '{"job_id":100,"flow_step_id":"s1"}' );
+$insert( 2, AIConcurrencyBackpressure::RESUME_HOOK, SchedulerEvidence::STATUS_PENDING, '{"job_id":101,"flow_step_id":"s1"}' );
+$insert( 3, 'datamachine_pipeline_batch_chunk', SchedulerEvidence::STATUS_PENDING, '{"parent_job_id":102,"offset":0}' );
+$insert( 4, 'datamachine_run_flow_now', SchedulerEvidence::STATUS_PENDING, '[7,103]' );
+$insert( 5, 'datamachine_task_process_batch', SchedulerEvidence::STATUS_PENDING, '{"parent_job_id":104,"offset":0}' );
+$insert( 6, SystemTask::RETRY_HOOK, SchedulerEvidence::STATUS_PENDING, '[105]' );
+$insert( 7, DirectJobEnqueuer::HOOK, SchedulerEvidence::STATUS_PENDING, md5( 'long' ), '{"job_id":106,"flow_step_id":"' . str_repeat( 'x', 200 ) . '"}' );
+$insert( 8, DirectJobEnqueuer::HOOK, SchedulerEvidence::STATUS_IN_PROGRESS, '{"job_id":107,"flow_step_id":"s1"}', null, $ago( 10 * HOUR_IN_SECONDS ) );
+$insert( 9, DirectJobEnqueuer::HOOK, 'complete', '{"job_id":108,"flow_step_id":"s1"}' );
+$insert( 10, 'some_other_plugin_hook', SchedulerEvidence::STATUS_PENDING, '{"job_id":109}' );
+$insert( 11, DirectJobEnqueuer::HOOK, SchedulerEvidence::STATUS_PENDING, '{"job_id":12,"flow_step_id":"s1"}' );
+$insert( 12, DirectJobEnqueuer::HOOK, SchedulerEvidence::STATUS_PENDING, '{"job_id":123,"flow_step_id":"s1"}' );
 
 echo "[1] ONE batch query serves every DM hook\n";
 $evidence = SchedulerEvidence::load();
@@ -147,11 +150,11 @@ assert_evidence( 'complete actions are never loaded', ! isset( $map[108] ) && ar
 assert_evidence( 'non-Data-Machine hooks are never loaded', ! isset( $map[109] ) && array() === $evidence->actionsFor( 109 ) );
 assert_evidence( 'no numeric-prefix collision between job 12 and 123', array( 11 ) === $map[12] && array( 12 ) === $map[123] );
 assert_evidence( 'stale in-progress rows stay available for classification', 1 === count( $evidence->actionsFor( 107 ) ) );
-assert_evidence( 'hook allow-list filters a job actions', array() === $evidence->actionsFor( 100, array( 'datamachine_resume_ai_step' ) ) && 1 === count( $evidence->actionsFor( 100, SchedulerEvidence::stepHooks() ) ) );
+assert_evidence( 'hook allow-list filters a job actions', array() === $evidence->actionsFor( 100, array( AIConcurrencyBackpressure::RESUME_HOOK ) ) && 1 === count( $evidence->actionsFor( 100, SchedulerEvidence::stepHooks() ) ) );
 assert_evidence( 'decoded args are exposed for generation checks', 100 === $evidence->actionsFor( 100 )[0]['decoded_args']['job_id'] );
 
 echo "[3] fail closed\n";
-$over = array_fill( 0, SchedulerEvidence::SCAN_LIMIT + 1, array( 'action_id' => 1, 'hook' => 'datamachine_execute_step', 'status' => 'pending', 'scheduled_date_gmt' => $ago( 60 ), 'last_attempt_gmt' => '', 'action_args' => '{"job_id":1}' ) );
+$over = array_fill( 0, SchedulerEvidence::SCAN_LIMIT + 1, array( 'action_id' => 1, 'hook' => DirectJobEnqueuer::HOOK, 'status' => SchedulerEvidence::STATUS_PENDING, 'scheduled_date_gmt' => $ago( 60 ), 'last_attempt_gmt' => '', 'action_args' => '{"job_id":1}' ) );
 assert_evidence( 'over-limit result is incomplete', false === SchedulerEvidence::fromRows( $over, count( $over ) <= SchedulerEvidence::SCAN_LIMIT )->isComplete() );
 $wpdb->pdo->exec( 'DROP TABLE wp_actionscheduler_actions' );
 $broken = SchedulerEvidence::load();
@@ -166,8 +169,8 @@ $job = static fn( array $engine = array(), int $id = 100 ): array => array(
 );
 $fixture = SchedulerEvidence::fromRows(
 	array(
-		array( 'action_id' => 1, 'hook' => 'datamachine_execute_step', 'status' => 'pending', 'scheduled_date_gmt' => $ago( 60 ), 'last_attempt_gmt' => '0000-00-00 00:00:00', 'action_args' => '{"job_id":100,"flow_step_id":"s1"}' ),
-		array( 'action_id' => 2, 'hook' => 'datamachine_execute_step', 'status' => 'in-progress', 'scheduled_date_gmt' => $ago( 5 * HOUR_IN_SECONDS ), 'last_attempt_gmt' => $ago( 5 * HOUR_IN_SECONDS ), 'action_args' => '{"job_id":200,"flow_step_id":"s1"}' ),
+		array( 'action_id' => 1, 'hook' => DirectJobEnqueuer::HOOK, 'status' => SchedulerEvidence::STATUS_PENDING, 'scheduled_date_gmt' => $ago( 60 ), 'last_attempt_gmt' => '0000-00-00 00:00:00', 'action_args' => '{"job_id":100,"flow_step_id":"s1"}' ),
+		array( 'action_id' => 2, 'hook' => DirectJobEnqueuer::HOOK, 'status' => SchedulerEvidence::STATUS_IN_PROGRESS, 'scheduled_date_gmt' => $ago( 5 * HOUR_IN_SECONDS ), 'last_attempt_gmt' => $ago( 5 * HOUR_IN_SECONDS ), 'action_args' => '{"job_id":200,"flow_step_id":"s1"}' ),
 	)
 );
 assert_evidence( 'a job with a pending step action is alive', true === JobLiveness::alive( $job(), $fixture, array(), 120, $now ) );
@@ -180,10 +183,10 @@ assert_evidence( 'dead classifications are not alive', ! JobLiveness::isAliveCla
 
 echo "[5] recover-stuck processing path reads the same single snapshot\n";
 $wpdb->pdo->exec( 'CREATE TABLE wp_actionscheduler_actions (action_id INTEGER PRIMARY KEY, hook TEXT, status TEXT, scheduled_date_gmt TEXT, last_attempt_gmt TEXT, args TEXT, extended_args TEXT NULL)' );
-$insert( 1, 'datamachine_execute_step', 'pending', '{"job_id":100,"flow_step_id":"s1"}' );
-$insert( 2, 'datamachine_resume_ai_step', 'in-progress', '{"job_id":101,"flow_step_id":"s1"}', null, $ago( 60 ) );
-$insert( 3, 'datamachine_execute_step', 'in-progress', '{"job_id":107,"flow_step_id":"s1"}', null, $ago( 10 * HOUR_IN_SECONDS ) );
-$insert( 4, 'datamachine_run_flow_now', 'pending', '[7,103]' );
+$insert( 1, DirectJobEnqueuer::HOOK, SchedulerEvidence::STATUS_PENDING, '{"job_id":100,"flow_step_id":"s1"}' );
+$insert( 2, AIConcurrencyBackpressure::RESUME_HOOK, SchedulerEvidence::STATUS_IN_PROGRESS, '{"job_id":101,"flow_step_id":"s1"}', null, $ago( 60 ) );
+$insert( 3, DirectJobEnqueuer::HOOK, SchedulerEvidence::STATUS_IN_PROGRESS, '{"job_id":107,"flow_step_id":"s1"}', null, $ago( 10 * HOUR_IN_SECONDS ) );
+$insert( 4, 'datamachine_run_flow_now', SchedulerEvidence::STATUS_PENDING, '[7,103]' );
 $reflection = new ReflectionClass( \DataMachine\Abilities\Job\RecoverStuckJobsAbility::class );
 $ability    = $reflection->newInstanceWithoutConstructor();
 $owned      = $reflection->getMethod( 'getActiveSchedulerWork' );

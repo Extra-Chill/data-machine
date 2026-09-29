@@ -159,7 +159,7 @@ class PathlessBatchRecovery {
 				continue;
 			}
 			$status = (string) ( $action['status'] ?? '' );
-			if ( 'pending' !== $status && 'in-progress' !== $status ) {
+			if ( SchedulerEvidence::STATUS_PENDING !== $status && SchedulerEvidence::STATUS_IN_PROGRESS !== $status ) {
 				continue;
 			}
 			$last_attempt = (string) ( $action['last_attempt_gmt'] ?? '' );

@@ -130,8 +130,8 @@ class JobLiveness {
 				}
 			)
 		);
-		$pending        = array_values( array_filter( $actions, fn( $action ) => 'pending' === ( $action['status'] ?? '' ) ) );
-		$in_progress    = array_values( array_filter( $actions, fn( $action ) => 'in-progress' === ( $action['status'] ?? '' ) ) );
+		$pending        = array_values( array_filter( $actions, fn( $action ) => SchedulerEvidence::STATUS_PENDING === ( $action['status'] ?? '' ) ) );
+		$in_progress    = array_values( array_filter( $actions, fn( $action ) => SchedulerEvidence::STATUS_IN_PROGRESS === ( $action['status'] ?? '' ) ) );
 		$complete       = array_values( array_filter( $actions, fn( $action ) => 'complete' === ( $action['status'] ?? '' ) ) );
 		$failed         = array_values( array_filter( $actions, fn( $action ) => 'failed' === ( $action['status'] ?? '' ) ) );
 		$fresh_progress = array_values(

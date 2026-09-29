@@ -1,6 +1,11 @@
 <?php
 /** Behavioral smoke test for bounded pathless batch action lookup. */
 
+use DataMachine\Abilities\Engine\PipelineBatchScheduler;
+use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
+use DataMachine\Core\DirectJobEnqueuer;
+use DataMachine\Core\Jobs\SchedulerEvidence;
+
 define( 'ABSPATH', __DIR__ );
 define( 'HOUR_IN_SECONDS', 3600 );
 define( 'ARRAY_A', 'ARRAY_A' );
@@ -68,7 +73,7 @@ final class PathlessJobsTableStub {
 }
 class_alias( PathlessJobsTableStub::class, 'DataMachine\\Core\\Database\\Jobs\\Jobs' );
 
-function pathless_action( string $args, string $status = 'pending', string $hook = 'datamachine_pipeline_batch_chunk', int $action_id = 1 ): array {
+function pathless_action( string $args, string $status = 'pending', string $hook = PipelineBatchScheduler::BATCH_HOOK, int $action_id = 1 ): array {
 	$recent = gmdate( 'Y-m-d H:i:s', time() - 60 );
 	return array(
 		'action_id'          => $action_id,
@@ -76,7 +81,7 @@ function pathless_action( string $args, string $status = 'pending', string $hook
 		'action_args'        => $args,
 		'status'             => $status,
 		'scheduled_date_gmt' => $recent,
-		'last_attempt_gmt'   => 'in-progress' === $status ? $recent : '0000-00-00 00:00:00',
+		'last_attempt_gmt'   => SchedulerEvidence::STATUS_IN_PROGRESS === $status ? $recent : '0000-00-00 00:00:00',
 	);
 }
 
@@ -92,9 +97,6 @@ function pathless_assert( bool $condition, string $message ): void {
 
 require_once __DIR__ . '/fixtures/scheduler-evidence-bootstrap.php';
 require_once __DIR__ . '/../inc/Core/ActionScheduler/PathlessBatchRecovery.php';
-
-use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
-use DataMachine\Core\Jobs\SchedulerEvidence;
 
 $failures = 0;
 $passes   = 0;
@@ -118,11 +120,11 @@ pathless_assert( true === $active( $evidence )['chunk_action'], 'nested JSON chu
 $evidence = SchedulerEvidence::fromRows( array( pathless_action( serialize( array( array( 'parent_job_id' => 7, 'offset' => 40 ) ) ) ) ) );
 pathless_assert( true === $active( $evidence )['chunk_action'], 'serialized chunk action is active' );
 
-$evidence = SchedulerEvidence::fromRows( array( pathless_action( '{"parent_job_id":7,"offset":40}', 'in-progress' ) ) );
+$evidence = SchedulerEvidence::fromRows( array( pathless_action( '{"parent_job_id":7,"offset":40}', SchedulerEvidence::STATUS_IN_PROGRESS ) ) );
 pathless_assert( true === $active( $evidence )['chunk_action'], 'fresh in-progress chunk action is active' );
 
 $old      = gmdate( 'Y-m-d H:i:s', time() - 5 * HOUR_IN_SECONDS );
-$stale    = pathless_action( '{"parent_job_id":7,"offset":40}', 'in-progress' );
+$stale    = pathless_action( '{"parent_job_id":7,"offset":40}', SchedulerEvidence::STATUS_IN_PROGRESS );
 $stale['scheduled_date_gmt'] = $old;
 $stale['last_attempt_gmt']   = $old;
 $wpdb                        = new PathlessRecoveryWpdb();
@@ -151,7 +153,7 @@ $old_child_created   = gmdate( 'Y-m-d H:i:s', time() - 5 * HOUR_IN_SECONDS );
 $wpdb                = new PathlessRecoveryWpdb();
 $wpdb->var_responses = array( 1 );
 $wpdb->responses     = array( array( array( 'job_id' => 71, 'status' => 'pending', 'created_at' => $old_child_created ) ) );
-$evidence            = SchedulerEvidence::fromRows( array( pathless_action( '{"job_id":71,"flow_step_id":"step"}', 'pending', 'datamachine_execute_step', 901 ) ) );
+$evidence            = SchedulerEvidence::fromRows( array( pathless_action( '{"job_id":71,"flow_step_id":"step"}', 'pending', DirectJobEnqueuer::HOOK, 901 ) ) );
 $result              = $active( $evidence );
 pathless_assert( true === $result['owned'] && array( 71 ) === $result['active_child_job_ids'] && array( 901 ) === $result['child_action_ids'], 'stale child with a live step action owns the parent through the shared snapshot' );
 pathless_assert( 2 === count( $wpdb->queries ), 'child work costs no scheduler query beyond the shared snapshot' );
@@ -183,7 +185,7 @@ pathless_assert( array( 71 ) === $owned['active_job_ids'], 'old child with curre
 pathless_assert( array( 901 ) === $owned['active_action_ids'], 'current child action ID is exposed' );
 
 $stale_action = $current_action;
-$stale_action[0]['status'] = 'in-progress';
+$stale_action[0]['status'] = SchedulerEvidence::STATUS_IN_PROGRESS;
 $stale_action[0]['last_attempt_gmt'] = '2026-08-09 09:00:00';
 $historical = PathlessBatchRecovery::diagnoseChildRows( $old_child, HOUR_IN_SECONDS, strtotime( '2026-08-09 12:00:00 UTC' ), $stale_action );
 pathless_assert( array( 71 ) === $historical['stale_job_ids'], 'old child with only stale action ages out' );
