@@ -160,6 +160,17 @@ $wpdb->pdo->exec( 'DROP TABLE wp_actionscheduler_actions' );
 $broken = SchedulerEvidence::load();
 assert_evidence( 'query error is incomplete', false === $broken->isComplete() );
 assert_evidence( 'incomplete evidence exposes no actions', array() === $broken->actionsFor( 100 ) && array() === $broken->liveActionMap( $now, HOUR_IN_SECONDS ) );
+// wpdb with ARRAY_A returns an empty array (not null) on failure; last_error is the only signal.
+$wpdb_real = $wpdb;
+$wpdb      = new class( $wpdb_real ) {
+	public string $prefix;
+	public string $last_error = '';
+	public function __construct( private object $inner ) { $this->prefix = $inner->prefix; }
+	public function prepare( ...$a ) { return $this->inner->prepare( ...$a ); }
+	public function get_results( $sql, $output = ARRAY_A ) { $this->last_error = 'simulated failure'; return array(); }
+};
+assert_evidence( 'error with an empty-array result still fails closed', false === SchedulerEvidence::load()->isComplete() );
+$wpdb = $wpdb_real;
 
 echo "[4] alive() is the single liveness predicate\n";
 $job = static fn( array $engine = array(), int $id = 100 ): array => array(

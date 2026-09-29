@@ -97,6 +97,16 @@ final class SchedulerEvidence {
 	}
 
 	/**
+	 * Whether the most recent wpdb query recorded an error.
+	 *
+	 * Read through a call so static analysis does not treat last_error as the
+	 * literal it was reset to before the query ran.
+	 */
+	private static function queryFailed( object $db ): bool {
+		return '' !== (string) ( $db->last_error ?? '' );
+	}
+
+	/**
 	 * Load the current live-action evidence with ONE bounded query.
 	 */
 	public static function load(): self {
@@ -121,7 +131,10 @@ final class SchedulerEvidence {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
-		if ( '' !== (string) $wpdb->last_error || ! is_array( $rows ) ) {
+		// With ARRAY_A, wpdb::get_results() returns an empty array (not null)
+		// when the query fails; the failure is visible only in last_error, which
+		// query() sets. Fail closed so absence is never inferred from an error.
+		if ( ! is_array( $rows ) || self::queryFailed( $wpdb ) ) {
 			return new self( array(), false, time() );
 		}
 
@@ -131,7 +144,7 @@ final class SchedulerEvidence {
 	/**
 	 * Build evidence from already-loaded rows (also the seam for pure tests).
 	 *
-	 * @param array<int,array<string,mixed>> $rows     Rows with `action_args` (or `args`).
+	 * @param array<int,array<string,mixed>|object> $rows     Rows with `action_args` (or `args`); arrays from wpdb, objects from callers passing stdClass rows.
 	 * @param bool                           $complete Whether the rows are the whole live set.
 	 */
 	public static function fromRows( array $rows, bool $complete = true ): self {

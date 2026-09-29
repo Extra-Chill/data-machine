@@ -1300,7 +1300,7 @@ class JobsCommand extends BaseCommand {
 	 * Count child jobs for a batch parent.
 	 *
 	 * @param int $parent_job_id Parent job ID.
-	 * @return array<string,int>
+	 * @return array{}|array{total:int,active:int,active_ids:list<int>,stale_ids:list<int>,action_ids:list<int>,evidence_complete:bool}
 	 */
 	private function get_child_status_counts( int $parent_job_id, int $overdue_minutes, SchedulerEvidence $evidence ): array {
 		if ( $parent_job_id <= 0 ) {

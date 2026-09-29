@@ -60,7 +60,7 @@ class JobLiveness {
 	 *
 	 * @param array<string,mixed> $job             Job row with decoded engine_data.
 	 * @param SchedulerEvidence   $evidence        Batch scheduler evidence for the pass.
-	 * @param array<string,mixed> $child_counts    Batch child counts.
+	 * @param array{active?:int,total?:int,evidence_complete?:bool,action_ids?:list<int>,active_ids?:list<int>,stale_ids?:list<int>} $child_counts    Batch child counts.
 	 * @param int                 $overdue_minutes In-progress heartbeat threshold in minutes.
 	 * @param int                 $now             Current unix time.
 	 */
@@ -82,7 +82,7 @@ class JobLiveness {
 	 * `evidence_incomplete` (alive) instead of guessed dead.
 	 *
 	 * @param array<string,mixed> $job          Job row with decoded engine_data.
-	 * @param array<string,mixed> $child_counts Batch child counts.
+	 * @param array{active?:int,total?:int,evidence_complete?:bool,action_ids?:list<int>,active_ids?:list<int>,stale_ids?:list<int>} $child_counts Batch child counts.
 	 * @return array<string,mixed>
 	 */
 	public static function diagnoseWithEvidence( array $job, SchedulerEvidence $evidence, array $child_counts, int $overdue_minutes, int $now ): array {
@@ -99,7 +99,7 @@ class JobLiveness {
 	 *
 	 * @param array<string,mixed>              $job Job row with decoded engine_data.
 	 * @param array<int,array<string,mixed>>   $actions Matching scheduler actions.
-	 * @param array<string,int>                $child_counts Batch child counts.
+	 * @param array{active?:int,total?:int,evidence_complete?:bool,action_ids?:list<int>,active_ids?:list<int>,stale_ids?:list<int>} $child_counts Batch child counts.
 	 * @return array<string,mixed>
 	 */
 	public static function diagnose( array $job, array $actions, array $child_counts, int $overdue_minutes, int $now ): array {
@@ -205,8 +205,8 @@ class JobLiveness {
 			'complete_actions'        => count( $complete ),
 			'failed_actions'          => count( $failed ),
 			'owner_action_ids'        => array_values( array_unique( array_merge( array_map( 'intval', array_column( $owner_actions, 'action_id' ) ), array_map( 'intval', $child_counts['action_ids'] ?? array() ) ) ) ),
-			'owner_job_ids'           => array_values( array_map( 'intval', $child_counts['active_ids'] ?? array() ) ),
-			'stale_child_job_ids'     => array_values( array_map( 'intval', $child_counts['stale_ids'] ?? array() ) ),
+			'owner_job_ids'           => $child_counts['active_ids'] ?? array(),
+			'stale_child_job_ids'     => $child_counts['stale_ids'] ?? array(),
 			'child_evidence_complete' => ! array_key_exists( 'evidence_complete', $child_counts ) || true === $child_counts['evidence_complete'],
 			'child_jobs'              => $total_children,
 			'active_children'         => $active_children,
