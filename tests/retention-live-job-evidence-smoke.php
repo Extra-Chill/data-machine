@@ -20,7 +20,7 @@ declare( strict_types=1 );
 namespace DataMachine\Core\Database\Jobs {
 	if ( ! class_exists( __NAMESPACE__ . '\\Jobs' ) ) {
 		class Jobs {
-			public const TABLE_NAME = 'datamachine_jobs';
+			public const TABLE_NAME = 'datamachine' . '_jobs'; // Mirrors the real repository constant.
 		}
 	}
 }
