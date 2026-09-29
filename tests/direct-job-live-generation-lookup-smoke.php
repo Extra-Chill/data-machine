@@ -17,6 +17,7 @@ require_once __DIR__ . '/bootstrap-unit.php';
 
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\DirectJobEnqueuer;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 
 final class LiveGenerationLookupFakeJobs extends Jobs {
 	public function __construct() {}
@@ -113,21 +114,21 @@ $enqueuer = new DirectJobEnqueuer( new LiveGenerationLookupFakeJobs(), static fn
 $token    = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
 
 // Short payload (<= 191 chars): stored plain in `args`.
-LiveGenerationLookupStore::insert( 'datamachine_execute_step', array( 'job_id' => 42, 'flow_step_id' => 'ephemeral_step_0', 'operation_generation' => 3, 'operation_claim_token' => $token ), 'pending' );
+LiveGenerationLookupStore::insert( DirectJobEnqueuer::HOOK, array( 'job_id' => 42, 'flow_step_id' => 'ephemeral_step_0', 'operation_generation' => 3, 'operation_claim_token' => $token ), 'pending' );
 live_generation_assert( 'step' === $enqueuer->liveGenerationExecution( 42, 3, $token ), 'short (plain args) step action is found' );
 
 // Long payload (> 191 chars): args column holds md5, JSON lives in extended_args.
 $long_step = str_repeat( 'long_flow_step_id_', 14 ) . '_9';
 $long_args = array( 'job_id' => 77, 'flow_step_id' => $long_step, 'operation_generation' => 5, 'operation_claim_token' => $token );
 live_generation_assert( strlen( json_encode( $long_args ) ) > 191, 'fixture payload exceeds the 191-char index limit' );
-LiveGenerationLookupStore::insert( 'datamachine_execute_step', $long_args, 'in-progress' );
+LiveGenerationLookupStore::insert( DirectJobEnqueuer::HOOK, $long_args, 'in-progress' );
 $stored = end( LiveGenerationLookupStore::$rows );
 live_generation_assert( 32 === strlen( $stored['args'] ) && null !== $stored['extended_args'], 'fixture is stored as md5 + extended_args like Action Scheduler' );
 
 // Regression proof: the old query shape returns nothing for the long payload.
 $old_shape = LiveGenerationLookupStore::query(
 	array(
-		'hook'                  => 'datamachine_execute_step',
+		'hook'                  => DirectJobEnqueuer::HOOK,
 		'args'                  => array( 'job_id' => 77, 'operation_generation' => 5, 'operation_claim_token' => $token ),
 		'partial_args_matching' => 'like',
 		'status'                => array( 'pending', 'in-progress' ),
@@ -138,7 +139,7 @@ live_generation_assert( array() === $old_shape, 'partial_args_matching=like miss
 live_generation_assert( 'step' === $enqueuer->liveGenerationExecution( 77, 5, $token ), 'long (extended_args) step action is found' );
 
 // AI continuation with long args.
-LiveGenerationLookupStore::insert( 'datamachine_resume_ai_step', array_merge( $long_args, array( 'job_id' => 88, 'ai_resume_generation' => 2 ) ), 'pending' );
+LiveGenerationLookupStore::insert( AIConcurrencyBackpressure::RESUME_HOOK, array_merge( $long_args, array( 'job_id' => 88, 'ai_resume_generation' => 2 ) ), 'pending' );
 live_generation_assert( 'ai_continuation' === $enqueuer->liveGenerationExecution( 88, 5, $token ), 'long AI continuation action is found' );
 
 // Ownership is verified from hydrated args, not substring evidence.
@@ -147,12 +148,12 @@ live_generation_assert( 'none' === $enqueuer->liveGenerationExecution( 7, 5, $to
 live_generation_assert( 'none' === $enqueuer->liveGenerationExecution( 77, 5, 'ffffffffffffffffffffffffffffffff' ), 'different token does not match' );
 
 // Finished actions are not live.
-LiveGenerationLookupStore::insert( 'datamachine_execute_step', array( 'job_id' => 99, 'flow_step_id' => $long_step, 'operation_generation' => 1, 'operation_claim_token' => 'deadbeef' . $token ), 'complete' );
+LiveGenerationLookupStore::insert( DirectJobEnqueuer::HOOK, array( 'job_id' => 99, 'flow_step_id' => $long_step, 'operation_generation' => 1, 'operation_claim_token' => 'deadbeef' . $token ), 'complete' );
 live_generation_assert( 'none' === $enqueuer->liveGenerationExecution( 99, 1, 'deadbeef' . $token ), 'complete action is not live' );
 
 // A shared token across many jobs is paged rather than truncated.
 for ( $i = 1000; $i < 1040; ++$i ) {
-	LiveGenerationLookupStore::insert( 'datamachine_execute_step', array( 'job_id' => $i, 'flow_step_id' => $long_step, 'operation_generation' => 9, 'operation_claim_token' => 'shared' . $token ), 'pending' );
+	LiveGenerationLookupStore::insert( DirectJobEnqueuer::HOOK, array( 'job_id' => $i, 'flow_step_id' => $long_step, 'operation_generation' => 9, 'operation_claim_token' => 'shared' . $token ), 'pending' );
 }
 live_generation_assert( 'step' === $enqueuer->liveGenerationExecution( 1039, 9, 'shared' . $token ), 'match beyond the first page is found' );
 
