@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.179.3] - 2026-09-29
+
+### Fixed
+- cover pending rows with no live Action Scheduler action
+
 ## [0.179.2] - 2026-09-29
 
 ### Fixed
