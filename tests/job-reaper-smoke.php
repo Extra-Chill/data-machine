@@ -244,15 +244,15 @@ namespace {
 		PluginSettings::clearCache();
 	};
 	$set_mode( null );
-	assert_reaper( 'default mode is dry_run', 'dry_run' === JobReaper::resolveMode() );
+	assert_reaper( 'default mode is dry_run', JobReaper::MODE_DRY_RUN === JobReaper::resolveMode() );
 	$set_mode( 'apply' );
 	assert_reaper( 'apply is honored', 'apply' === JobReaper::resolveMode() );
 	$set_mode( 'off' );
 	assert_reaper( 'off is honored', 'off' === JobReaper::resolveMode() );
 	$set_mode( 'aply' );
-	assert_reaper( 'a typo falls back to dry_run, never apply', 'dry_run' === JobReaper::resolveMode() );
+	assert_reaper( 'a typo falls back to dry_run, never apply', JobReaper::MODE_DRY_RUN === JobReaper::resolveMode() );
 	$set_mode( 1 );
-	assert_reaper( 'a non-string value falls back to dry_run', 'dry_run' === JobReaper::resolveMode() );
+	assert_reaper( 'a non-string value falls back to dry_run', JobReaper::MODE_DRY_RUN === JobReaper::resolveMode() );
 	$set_mode( null );
 
 	// -- Fixture: the pending-orphan verdict rows, shared with the recover-stuck smoke ----------------
@@ -470,7 +470,7 @@ namespace {
 	$runs = JobReaperHistory::load()['runs'];
 	assert_reaper( 'the consumed flagged list is dropped from the older run', empty( $runs[0]['flagged'] ) && ! empty( $runs[1]['flagged'] ) );
 	$report = JobReaper::statusReport( 10 );
-	assert_reaper( 'status report exposes mode, totals, rate, and shaped rows', 'dry_run' === $report['mode'] && 2 === count( $report['runs'] ) && abs( 2 / 3 - $report['false_positive_rate'] ) < 1e-9 );
+	assert_reaper( 'status report exposes mode, totals, rate, and shaped rows', JobReaper::MODE_DRY_RUN === $report['mode'] && 2 === count( $report['runs'] ) && abs( 2 / 3 - $report['false_positive_rate'] ) < 1e-9 );
 	assert_reaper( 'status rows are newest first with the re-check columns', 2 === $report['runs'][0]['false_positives'] && 3 === $report['runs'][0]['rechecked'] && 1 === $report['runs'][0]['still_flagged'] );
 	assert_reaper( 'status rows render non-zero verdict counts', str_contains( $report['runs'][0]['verdicts'], 'orphaned_pending=3' ) && ! str_contains( $report['runs'][0]['verdicts'], 'requeued=' ) );
 

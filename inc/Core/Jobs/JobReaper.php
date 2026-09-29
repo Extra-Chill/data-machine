@@ -57,6 +57,15 @@ final class JobReaper {
 	/** Per-run bound on pending orphans previewed or terminalized. */
 	public const RUN_PENDING_LIMIT = 100;
 
+	/** Counter keys in the recover-stuck ability result that map onto reaper verdicts. */
+	private const COUNTER_AI_DEFERRAL   = 'pending_ai_terminalized';
+	private const COUNTER_STATUS_FINAL  = 'recovered';
+	private const COUNTER_BATCH_PARENTS = 'batch_parents_completed';
+	private const COUNTER_TIMED_OUT     = 'timed_out';
+	private const COUNTER_REQUEUED      = 'requeued';
+	private const COUNTER_PATHLESS      = 'pathless_terminal';
+	private const COUNTER_STALE_ACTIONS = 'stale_actions';
+
 	/** Heartbeat threshold used when re-checking flagged jobs for liveness. */
 	private const LIVENESS_OVERDUE_MINUTES = 120;
 
@@ -222,13 +231,13 @@ final class JobReaper {
 		}
 
 		// `requeued` already includes pathless requeues; do not add them again.
-		$verdicts['expired_ai_deferral']   = (int) ( $result['pending_ai_terminalized'] ?? 0 );
-		$verdicts['job_status_override']   = (int) ( $result['recovered'] ?? 0 );
-		$verdicts['batch_parent_complete'] = (int) ( $result['batch_parents_completed'] ?? 0 );
-		$verdicts['processing_timeout']    = (int) ( $result['timed_out'] ?? 0 );
-		$verdicts['requeued']              = (int) ( $result['requeued'] ?? 0 );
-		$verdicts['pathless_child']        = (int) ( $result['pathless_terminal'] ?? 0 );
-		$verdicts['stale_action']          = (int) ( $result['stale_actions'] ?? 0 );
+		$verdicts['expired_ai_deferral']   = (int) ( $result[ self::COUNTER_AI_DEFERRAL ] ?? 0 );
+		$verdicts['job_status_override']   = (int) ( $result[ self::COUNTER_STATUS_FINAL ] ?? 0 );
+		$verdicts['batch_parent_complete'] = (int) ( $result[ self::COUNTER_BATCH_PARENTS ] ?? 0 );
+		$verdicts['processing_timeout']    = (int) ( $result[ self::COUNTER_TIMED_OUT ] ?? 0 );
+		$verdicts['requeued']              = (int) ( $result[ self::COUNTER_REQUEUED ] ?? 0 );
+		$verdicts['pathless_child']        = (int) ( $result[ self::COUNTER_PATHLESS ] ?? 0 );
+		$verdicts['stale_action']          = (int) ( $result[ self::COUNTER_STALE_ACTIONS ] ?? 0 );
 
 		// Only non-zero verdicts are stored: the record is written every 15 minutes.
 		$verdicts = array_filter( $verdicts );
