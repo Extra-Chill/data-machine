@@ -17,7 +17,6 @@ use WP_CLI;
 use DataMachine\Cli\AbilityRunner;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\AgentResolver;
-use DataMachine\Cli\JobLivenessClassifier;
 use DataMachine\Cli\UserResolver;
 use DataMachine\Abilities\Job\DeleteJobsAbility;
 use DataMachine\Abilities\Job\FailJobAbility;
@@ -31,6 +30,8 @@ use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
+use DataMachine\Core\Jobs\JobLiveness;
+use DataMachine\Core\Jobs\SchedulerEvidence;
 use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -564,19 +565,22 @@ class JobsCommand extends BaseCommand {
 
 		$items   = array();
 		$summary = array(
-			'total'                   => 0,
-			'active_processing'       => 0,
-			'queued_next_step'        => 0,
-			'waiting_children'        => 0,
-			'scheduler_starved'       => 0,
-			'stale_in_progress'       => 0,
-			'no_scheduler_path'       => 0,
-			'evidence_pruned'         => 0,
-			'ai_concurrency_deferred' => 0,
+			'total'                            => 0,
+			JobLiveness::ACTIVE_PROCESSING       => 0,
+			JobLiveness::QUEUED_NEXT_STEP        => 0,
+			JobLiveness::WAITING_CHILDREN        => 0,
+			JobLiveness::SCHEDULER_STARVED       => 0,
+			JobLiveness::STALE_IN_PROGRESS       => 0,
+			JobLiveness::NO_SCHEDULER_PATH       => 0,
+			JobLiveness::EVIDENCE_PRUNED         => 0,
+			JobLiveness::AI_CONCURRENCY_DEFERRED => 0,
+			JobLiveness::EVIDENCE_INCOMPLETE     => 0,
 		);
 
+		// One batch scheduler query serves every job in this pass.
+		$evidence = SchedulerEvidence::load();
 		foreach ( $jobs as $job ) {
-			$diagnostic = $this->diagnose_job_liveness( $job, $overdue_minutes );
+			$diagnostic = $this->diagnose_job_liveness( $job, $overdue_minutes, $evidence );
 			++$summary['total'];
 			if ( isset( $summary[ $diagnostic['classification'] ] ) ) {
 				++$summary[ $diagnostic['classification'] ];
@@ -585,7 +589,7 @@ class JobsCommand extends BaseCommand {
 		}
 
 		if ( 'json' === $format || 'yaml' === $format ) {
-			$summary['scheduler_retention_hours'] = (int) round( JobLivenessClassifier::schedulerRetentionSeconds() / HOUR_IN_SECONDS );
+			$summary['scheduler_retention_hours'] = (int) round( JobLiveness::schedulerRetentionSeconds() / HOUR_IN_SECONDS );
 			WP_CLI::print_value(
 				array(
 					'success'         => true,
@@ -616,15 +620,15 @@ class JobsCommand extends BaseCommand {
 				sprintf(
 					'Inspected %d active jobs: %d active, %d queued, %d AI concurrency-deferred, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path, %d beyond the %d-hour scheduler evidence window.',
 					$summary['total'],
-					$summary['active_processing'],
-					$summary['queued_next_step'],
-					$summary['ai_concurrency_deferred'],
-					$summary['waiting_children'],
-					$summary['scheduler_starved'],
-					$summary['stale_in_progress'],
-					$summary['no_scheduler_path'],
-					$summary['evidence_pruned'],
-					(int) round( JobLivenessClassifier::schedulerRetentionSeconds() / HOUR_IN_SECONDS )
+					$summary[ JobLiveness::ACTIVE_PROCESSING ],
+					$summary[ JobLiveness::QUEUED_NEXT_STEP ],
+					$summary[ JobLiveness::AI_CONCURRENCY_DEFERRED ],
+					$summary[ JobLiveness::WAITING_CHILDREN ],
+					$summary[ JobLiveness::SCHEDULER_STARVED ],
+					$summary[ JobLiveness::STALE_IN_PROGRESS ],
+					$summary[ JobLiveness::NO_SCHEDULER_PATH ],
+					$summary[ JobLiveness::EVIDENCE_PRUNED ],
+					(int) round( JobLiveness::schedulerRetentionSeconds() / HOUR_IN_SECONDS )
 				)
 			);
 		}
@@ -1275,11 +1279,11 @@ class JobsCommand extends BaseCommand {
 	 *
 	 * @param array<string,mixed> $job Job row.
 	 * @param int                 $overdue_minutes Overdue threshold in minutes.
+	 * @param SchedulerEvidence   $evidence Batch scheduler evidence for the pass.
 	 * @return array<string,mixed>
 	 */
-	private function diagnose_job_liveness( array $job, int $overdue_minutes ): array {
-		$job_id  = (int) ( $job['job_id'] ?? 0 );
-		$actions = $this->get_job_scheduler_actions( $job_id );
+	private function diagnose_job_liveness( array $job, int $overdue_minutes, SchedulerEvidence $evidence ): array {
+		$job_id = (int) ( $job['job_id'] ?? 0 );
 
 		$engine_data = json_decode( (string) ( $job['engine_data'] ?? '' ), true );
 		if ( ! is_array( $engine_data ) ) {
@@ -1287,75 +1291,23 @@ class JobsCommand extends BaseCommand {
 		}
 
 		$job['engine_data'] = $engine_data;
-		$child_counts       = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id, $overdue_minutes ) : array();
+		$child_counts       = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id, $overdue_minutes, $evidence ) : array();
 
-		return JobLivenessClassifier::diagnose( $job, $actions, $child_counts, $overdue_minutes, time() );
-	}
-
-	/**
-	 * Get Action Scheduler actions that can advance a job.
-	 *
-	 * @param int $job_id Job ID.
-	 * @return array<int,array<string,mixed>>
-	 */
-	private function get_job_scheduler_actions( int $job_id ): array {
-		global $wpdb;
-
-		if ( $job_id <= 0 ) {
-			return array();
-		}
-
-		$actions_table      = $wpdb->prefix . 'actionscheduler_actions';
-		$like_job_id        = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
-		$like_parent_job_id = '%"parent_job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
-
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, attempts, args
-				 FROM %i
-				 WHERE hook IN (%s, %s, %s)
-				 AND (args LIKE %s OR args LIKE %s)
-				 ORDER BY action_id ASC',
-				$actions_table,
-				'datamachine_execute_step',
-				'datamachine_resume_ai_step',
-				PipelineBatchScheduler::BATCH_HOOK,
-				$like_job_id,
-				$like_parent_job_id
-			),
-			ARRAY_A
-		);
-
-		foreach ( $rows as &$row ) {
-			$args = json_decode( (string) ( $row['args'] ?? '' ), true );
-			if ( is_array( $args ) ) {
-				$row['decoded_args'] = $args;
-			}
-		}
-		unset( $row );
-
-		return array_values(
-			array_filter(
-				$rows,
-				function ( array $row ) use ( $job_id ): bool {
-					return $job_id === $this->extract_action_job_id( (string) ( $row['args'] ?? '' ) );
-				}
-			)
-		);
+		return JobLiveness::diagnoseWithEvidence( $job, $evidence, $child_counts, $overdue_minutes, time() );
 	}
 
 	/**
 	 * Count child jobs for a batch parent.
 	 *
 	 * @param int $parent_job_id Parent job ID.
-	 * @return array<string,int>
+	 * @return array{}|array{total:int,active:int,active_ids:list<int>,stale_ids:list<int>,action_ids:list<int>,evidence_complete:bool}
 	 */
-	private function get_child_status_counts( int $parent_job_id, int $overdue_minutes ): array {
+	private function get_child_status_counts( int $parent_job_id, int $overdue_minutes, SchedulerEvidence $evidence ): array {
 		if ( $parent_job_id <= 0 ) {
 			return array();
 		}
 
-		$diagnosis = PathlessBatchRecovery::diagnoseChildWork( $parent_job_id, max( 1, $overdue_minutes ) * MINUTE_IN_SECONDS, time() );
+		$diagnosis = PathlessBatchRecovery::diagnoseChildWork( $parent_job_id, max( 1, $overdue_minutes ) * MINUTE_IN_SECONDS, time(), $evidence );
 
 		return array(
 			'total'         => (int) $diagnosis['total_children'],
@@ -1365,58 +1317,6 @@ class JobsCommand extends BaseCommand {
 			'action_ids'    => $diagnosis['active_action_ids'],
 			'evidence_complete' => $diagnosis['evidence_complete'],
 		);
-	}
-
-	/**
-	 * Extract job ID from an Action Scheduler args payload.
-	 *
-	 * @param string $args Action args.
-	 * @return int Job ID.
-	 */
-	private function extract_action_job_id( string $args ): int {
-		$decoded = json_decode( $args, true );
-		if ( is_array( $decoded ) ) {
-			if ( isset( $decoded['job_id'] ) && is_numeric( $decoded['job_id'] ) ) {
-				return (int) $decoded['job_id'];
-			}
-
-			if ( isset( $decoded['parent_job_id'] ) && is_numeric( $decoded['parent_job_id'] ) ) {
-				return (int) $decoded['parent_job_id'];
-			}
-
-			foreach ( $decoded as $value ) {
-				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
-					return (int) $value['job_id'];
-				}
-
-				if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
-					return (int) $value['parent_job_id'];
-				}
-			}
-		}
-
-		$unserialized = maybe_unserialize( $args );
-		if ( is_array( $unserialized ) ) {
-			if ( isset( $unserialized['job_id'] ) && is_numeric( $unserialized['job_id'] ) ) {
-				return (int) $unserialized['job_id'];
-			}
-
-			if ( isset( $unserialized['parent_job_id'] ) && is_numeric( $unserialized['parent_job_id'] ) ) {
-				return (int) $unserialized['parent_job_id'];
-			}
-
-			foreach ( $unserialized as $value ) {
-				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
-					return (int) $value['job_id'];
-				}
-
-				if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
-					return (int) $value['parent_job_id'];
-				}
-			}
-		}
-
-		return 0;
 	}
 
 	/**

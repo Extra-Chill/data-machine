@@ -18,6 +18,7 @@ use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
 use DataMachine\Core\EngineData;
+use DataMachine\Core\Jobs\SchedulerEvidence;
 use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
@@ -45,20 +46,8 @@ class RecoverStuckJobsAbility {
 	/** Hard cap on pending rows examined per run, including excluded rows. */
 	private const PENDING_ORPHAN_SCAN_LIMIT = 5000;
 
-	/** Live-action rows loaded per run; exceeding it fails the pass closed. */
-	private const LIVE_ACTION_SCAN_LIMIT = 5000;
-
-	/**
-	 * Data Machine-owned Action Scheduler hooks that may be reconciled.
-	 *
-	 * @var array<string,string>
-	 */
-	private const RECOVERABLE_ACTION_HOOK_ARGS = array(
-		'datamachine_execute_step'         => 'job_id',
-		'datamachine_resume_ai_step'       => 'job_id',
-		'datamachine_pipeline_batch_chunk' => 'parent_job_id',
-		'datamachine_run_flow_now'         => 'job_id',
-	);
+	/** Scheduler evidence for the current pass (one batch query, reloaded only when stale). */
+	private ?SchedulerEvidence $scheduler_evidence = null;
 
 	public function __construct() {
 		$this->initDatabases();
@@ -219,6 +208,7 @@ class RecoverStuckJobsAbility {
 	 */
 	public function execute( array $input ): array|\WP_Error {
 		global $wpdb;
+		$this->scheduler_evidence = null;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 		$requested_job_id = array_key_exists( 'job_id', $input ) && null !== $input['job_id'] ? filter_var( $input['job_id'], FILTER_VALIDATE_INT ) : null;
 		if ( array_key_exists( 'job_id', $input ) && null !== $input['job_id'] && ( false === $requested_job_id || $requested_job_id <= 0 ) ) {
@@ -1192,14 +1182,15 @@ class RecoverStuckJobsAbility {
 		$summary = $this->emptyPendingOrphanSummary( true, $grace_seconds, $limit );
 		$limit   = max( 1, min( self::MAX_PENDING_ORPHANS_PER_RUN, $limit ) );
 
-		$live_actions = $this->getLiveJobActionMap( $timeout_hours, $now );
-		if ( ! $live_actions['complete'] ) {
+		$evidence = $this->schedulerEvidence();
+		if ( ! $evidence->isComplete() ) {
 			// Absence of a live action cannot be proven; refuse to infer orphans.
 			$summary['evidence_complete'] = false;
 			return $summary;
 		}
 
-		$cutoff      = gmdate( 'Y-m-d H:i:s', $now - $grace_seconds );
+		$live_actions = $evidence->liveActionMap( $now, max( 1, $timeout_hours ) * HOUR_IN_SECONDS );
+		$cutoff       = gmdate( 'Y-m-d H:i:s', $now - $grace_seconds );
 		$last_job_id = 0;
 		$actionable  = 0;
 
@@ -1232,7 +1223,7 @@ class RecoverStuckJobsAbility {
 				$diagnosis = PendingJobRecoveryPolicy::diagnose(
 					$row,
 					$this->getJobEngineData( $job_id ),
-					$live_actions['by_job'][ $job_id ] ?? array(),
+					$live_actions[ $job_id ] ?? array(),
 					$now,
 					$grace_seconds
 				);
@@ -1297,68 +1288,13 @@ class RecoverStuckJobsAbility {
 	}
 
 	/**
-	 * Map job IDs to live Action Scheduler actions across Data Machine hooks.
-	 *
-	 * One bounded query on the hook/status index; the join key is parsed from
-	 * `COALESCE(extended_args, args)` because Action Scheduler stores an md5 in
-	 * `args` when the JSON exceeds 191 characters. In-progress actions older than
-	 * the timeout window are not treated as live, matching timeout recovery.
-	 *
-	 * @return array{complete:bool,by_job:array<int,array<int,int>>}
+	 * Scheduler evidence for this pass: ONE batch query, reloaded only when stale.
 	 */
-	private function getLiveJobActionMap( int $timeout_hours, int $now ): array {
-		global $wpdb;
-		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		$hooks         = array_keys( self::RECOVERABLE_ACTION_HOOK_ARGS );
-		$placeholders  = implode( ', ', array_fill( 0, count( $hooks ), '%s' ) );
-		$args          = array_merge( array( $actions_table ), $hooks, array( 'pending', 'in-progress', self::LIVE_ACTION_SCAN_LIMIT + 1 ) );
-
-		$wpdb->last_error = '';
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Generated placeholders only; every value is bound via the spread.
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, COALESCE(extended_args, args) AS action_args
-				 FROM %i
-				 WHERE hook IN ( {$placeholders} )
-				 AND status IN ( %s, %s )
-				 LIMIT %d",
-				...$args
-			),
-			ARRAY_A
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
-
-		if ( '' !== (string) $wpdb->last_error || ! is_array( $rows ) || count( $rows ) > self::LIVE_ACTION_SCAN_LIMIT ) {
-			return array(
-				'complete' => false,
-				'by_job'   => array(),
-			);
+	private function schedulerEvidence(): SchedulerEvidence {
+		if ( null === $this->scheduler_evidence || $this->scheduler_evidence->isStale( time() ) ) {
+			$this->scheduler_evidence = SchedulerEvidence::load();
 		}
-
-		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
-		$by_job          = array();
-		foreach ( $rows as $row ) {
-			$job_id = $this->extractActionJobIdForHook( (string) ( $row['action_args'] ?? '' ), (string) ( $row['hook'] ?? '' ) );
-			if ( $job_id <= 0 ) {
-				continue;
-			}
-
-			if ( 'in-progress' === (string) $row['status'] ) {
-				$last_attempt = (string) ( $row['last_attempt_gmt'] ?? '' );
-				$reference    = '' !== $last_attempt && '0000-00-00 00:00:00' !== $last_attempt ? $last_attempt : (string) ( $row['scheduled_date_gmt'] ?? '' );
-				$started_at   = '' !== $reference ? strtotime( $reference . ' UTC' ) : false;
-				if ( false !== $started_at && ( $now - $started_at ) >= $timeout_seconds ) {
-					continue;
-				}
-			}
-
-			$by_job[ $job_id ][] = (int) $row['action_id'];
-		}
-
-		return array(
-			'complete' => true,
-			'by_job'   => $by_job,
-		);
+		return $this->scheduler_evidence;
 	}
 
 	/** Read an exact Action Scheduler receipt and fail closed on query errors. */
@@ -1700,8 +1636,11 @@ class RecoverStuckJobsAbility {
 		$jobs_table    = $wpdb->prefix . 'datamachine_jobs';
 
 		$action_jobs = array();
-		foreach ( self::RECOVERABLE_ACTION_HOOK_ARGS as $hook => $arg_name ) {
-			$arg_like = '%"' . $wpdb->esc_like( $arg_name ) . '"%';
+		foreach ( SchedulerEvidence::hookJobArgs() as $hook => $spec ) {
+			if ( ! empty( $spec['positional_only'] ) ) {
+				continue;
+			}
+			$arg_like = '%"' . $wpdb->esc_like( $spec['arg'] ) . '"%';
 
 			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated from the WP prefix.
 			$actions = $wpdb->get_results(
@@ -1723,7 +1662,7 @@ class RecoverStuckJobsAbility {
 			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 			foreach ( $actions as $action ) {
-				$job_id = $this->extractActionJobIdForHook( (string) ( $action->args ?? '' ), (string) ( $action->hook ?? $hook ) );
+				$job_id = SchedulerEvidence::extractJobId( (string) ( $action->args ?? '' ), (string) ( $action->hook ?? $hook ) );
 				if ( $job_id > 0 ) {
 					$action_jobs[ (int) $action->action_id ] = array(
 						'hook'   => (string) ( $action->hook ?? $hook ),
@@ -1797,6 +1736,18 @@ class RecoverStuckJobsAbility {
 	 * @return array<string,mixed> Scheduler ownership evidence.
 	 */
 	private function getActiveSchedulerWork( int $job_id, array $engine_data, int $timeout_hours ): array {
+		$evidence = $this->schedulerEvidence();
+		if ( ! $evidence->isComplete() ) {
+			// Absence of a live action cannot be proven; refuse to infer it.
+			return array(
+				'owned'             => true,
+				'type'              => 'scheduler_evidence_incomplete',
+				'action_ids'        => array(),
+				'job_ids'           => array(),
+				'evidence_complete' => false,
+			);
+		}
+
 		$action_ids = $this->getActiveStepActionIds( $job_id, $timeout_hours );
 		if ( ! empty( $action_ids ) ) {
 			return array(
@@ -1807,7 +1758,7 @@ class RecoverStuckJobsAbility {
 			);
 		}
 
-		$batch = PathlessBatchRecovery::diagnoseActiveWork( $job_id, $engine_data, $timeout_hours );
+		$batch = PathlessBatchRecovery::diagnoseActiveWork( $job_id, $engine_data, $timeout_hours, $evidence );
 		if ( ! empty( $batch['owned'] ) ) {
 			$type = 'fresh_child_rows';
 			if ( empty( $batch['evidence_complete'] ) ) {
@@ -1846,148 +1797,11 @@ class RecoverStuckJobsAbility {
 	 * @return array<int,int> Pending or fresh in-progress action IDs.
 	 */
 	private function getActiveStepActionIds( int $job_id, int $timeout_hours ): array {
-		global $wpdb;
-
 		if ( $job_id <= 0 ) {
 			return array();
 		}
 
-		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		$like_job_id   = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
-
-		$actions = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
-				 FROM %i
-				 WHERE hook IN ( %s, %s )
-				 AND status IN ( %s, %s )
-				 AND args LIKE %s',
-				$actions_table,
-				'datamachine_execute_step',
-				'datamachine_resume_ai_step',
-				'pending',
-				'in-progress',
-				$like_job_id
-			)
-		);
-
-		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
-		$now_gmt         = strtotime( current_time( 'mysql', true ) );
-
-		$active_action_ids = array();
-		foreach ( $actions as $action ) {
-			if ( $job_id === $this->extractActionJobId( (string) ( $action->args ?? '' ) ) ) {
-				if ( 'pending' === (string) $action->status ) {
-					$active_action_ids[] = (int) $action->action_id;
-					continue;
-				}
-
-				$last_attempt = (string) ( $action->last_attempt_gmt ?? '' );
-				$scheduled    = (string) ( $action->scheduled_date_gmt ?? '' );
-				$reference    = $last_attempt && '0000-00-00 00:00:00' !== $last_attempt ? $last_attempt : $scheduled;
-				$started_at   = $reference ? strtotime( $reference ) : false;
-
-				if ( false === $started_at || false === $now_gmt ) {
-					$active_action_ids[] = (int) $action->action_id;
-					continue;
-				}
-
-				if ( ( $now_gmt - $started_at ) < $timeout_seconds ) {
-					$active_action_ids[] = (int) $action->action_id;
-				}
-			}
-		}
-
-		return $active_action_ids;
-	}
-
-	/**
-	 * Extract the Data Machine job ID from Action Scheduler args.
-	 *
-	 * @param string $args Action Scheduler args payload.
-	 * @return int Job ID, or 0 when unavailable.
-	 */
-	private function extractActionJobId( string $args ): int {
-		return $this->extractActionArgInt( $args, 'job_id' );
-	}
-
-	/**
-	 * Extract the paired Data Machine job ID for a recoverable Action Scheduler hook.
-	 *
-	 * @param string $args Action Scheduler args payload.
-	 * @param string $hook Action Scheduler hook.
-	 * @return int Job ID, or 0 when the action has no paired job.
-	 */
-	private function extractActionJobIdForHook( string $args, string $hook ): int {
-		$arg_name = self::RECOVERABLE_ACTION_HOOK_ARGS[ $hook ] ?? 'job_id';
-		$job_id   = $this->extractActionArgInt( $args, $arg_name );
-		if ( $job_id > 0 ) {
-			return $job_id;
-		}
-
-		if ( 'datamachine_run_flow_now' !== $hook ) {
-			return 0;
-		}
-
-		return $this->extractActionPositionalInt( $args, 1 );
-	}
-
-	/**
-	 * Extract a numeric argument from an Action Scheduler args payload.
-	 *
-	 * @param string $args Action Scheduler args payload.
-	 * @param string $arg_name Argument name to extract.
-	 * @return int Argument value, or 0 when unavailable.
-	 */
-	private function extractActionArgInt( string $args, string $arg_name ): int {
-		$decoded = json_decode( $args, true );
-		if ( is_array( $decoded ) ) {
-			if ( isset( $decoded[ $arg_name ] ) && is_numeric( $decoded[ $arg_name ] ) ) {
-				return (int) $decoded[ $arg_name ];
-			}
-
-			foreach ( $decoded as $value ) {
-				if ( is_array( $value ) && isset( $value[ $arg_name ] ) && is_numeric( $value[ $arg_name ] ) ) {
-					return (int) $value[ $arg_name ];
-				}
-			}
-		}
-
-		$unserialized = maybe_unserialize( $args );
-		if ( is_array( $unserialized ) ) {
-			if ( isset( $unserialized[ $arg_name ] ) && is_numeric( $unserialized[ $arg_name ] ) ) {
-				return (int) $unserialized[ $arg_name ];
-			}
-
-			foreach ( $unserialized as $value ) {
-				if ( is_array( $value ) && isset( $value[ $arg_name ] ) && is_numeric( $value[ $arg_name ] ) ) {
-					return (int) $value[ $arg_name ];
-				}
-			}
-		}
-
-		return 0;
-	}
-
-	/**
-	 * Extract a numeric positional argument from an Action Scheduler args payload.
-	 *
-	 * @param string $args Action Scheduler args payload.
-	 * @param int    $position Zero-based argument position.
-	 * @return int Argument value, or 0 when unavailable.
-	 */
-	private function extractActionPositionalInt( string $args, int $position ): int {
-		$decoded = json_decode( $args, true );
-		if ( is_array( $decoded ) && isset( $decoded[ $position ] ) && is_numeric( $decoded[ $position ] ) ) {
-			return (int) $decoded[ $position ];
-		}
-
-		$unserialized = maybe_unserialize( $args );
-		if ( is_array( $unserialized ) && isset( $unserialized[ $position ] ) && is_numeric( $unserialized[ $position ] ) ) {
-			return (int) $unserialized[ $position ];
-		}
-
-		return 0;
+		return $this->schedulerEvidence()->liveActionIds( $job_id, time(), max( 1, $timeout_hours ) * HOUR_IN_SECONDS, SchedulerEvidence::stepHooks() );
 	}
 
 	/**

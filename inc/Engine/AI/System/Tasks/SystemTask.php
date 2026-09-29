@@ -51,6 +51,11 @@ use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
 abstract class SystemTask {
 
 	/**
+	 * Action Scheduler hook for polling-task retries; args are `[ $job_id ]`.
+	 */
+	public const RETRY_HOOK = 'datamachine_task_retry';
+
+	/**
 	 * Declare the task as a workflow step list.
 	 *
 	 * Returns an array with a "steps" key, where each step is an object
@@ -454,7 +459,7 @@ abstract class SystemTask {
 
 		as_schedule_single_action(
 			time() + $delaySeconds,
-			'datamachine_task_retry',
+			self::RETRY_HOOK,
 			array( $jobId ),
 			'data-machine'
 		);

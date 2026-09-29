@@ -12,7 +12,7 @@ $loader->addPsr4( 'DataMachine\\', dirname( __DIR__ ) . '/inc/' );
 $loader->register();
 
 use DataMachine\Cli\Commands\JobsCommand;
-use DataMachine\Cli\JobLivenessClassifier;
+use DataMachine\Core\Jobs\JobLiveness;
 
 $failures = 0;
 
@@ -26,7 +26,7 @@ $assert = static function ( string $label, bool $condition ) use ( &$failures ):
 	echo "FAIL: {$label}\n";
 };
 
-$assert( 'classifier autoloads from its declared namespace', class_exists( JobLivenessClassifier::class ) );
+$assert( 'classifier autoloads from its Core namespace', class_exists( JobLiveness::class ) );
 $assert( 'jobs command autoloads with the classifier import', class_exists( JobsCommand::class ) );
 $assert( 'real jobs command can be instantiated', new JobsCommand() instanceof JobsCommand );
 
