@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.180.0] - 2026-09-29
+
+### Added
+- recurring job reaper system task, dry-run by default
+
 ## [0.179.5] - 2026-09-29
 
 ### Fixed
