@@ -564,6 +564,11 @@ class SendEmailAbility {
 	}
 
 	private function canUseLegacySender(): bool {
+		// Trusted server code sending as the system (PermissionHelper::run_as_system())
+		// carries the same trust as WP-CLI for the site default sender.
+		if ( PermissionHelper::is_system_context() ) {
+			return true;
+		}
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			return PermissionHelper::can_manage();
 		}

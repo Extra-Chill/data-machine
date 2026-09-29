@@ -34,6 +34,9 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		$property   = $reflection->getProperty( 'authenticated_context' );
 		$property->setAccessible( true );
 		$property->setValue( null, false );
+		$system = $reflection->getProperty( 'system_context' );
+		$system->setAccessible( true );
+		$system->setValue( null, false );
 
 		parent::tear_down();
 	}
@@ -464,5 +467,60 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		);
 
 		$this->assertNull( PermissionHelper::get_acting_agent_id() );
+	}
+
+	public function test_run_as_system_ignores_the_logged_in_user(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+		$inside = PermissionHelper::run_as_system(
+			static function () {
+				return array(
+					'acting'        => PermissionHelper::acting_user_id(),
+					'system'        => PermissionHelper::is_system_context(),
+					'authenticated' => PermissionHelper::is_authenticated_context(),
+				);
+			}
+		);
+
+		$this->assertSame( 0, $inside['acting'] );
+		$this->assertTrue( $inside['system'] );
+		$this->assertTrue( $inside['authenticated'] );
+		$this->assertSame( $user_id, PermissionHelper::acting_user_id() );
+		$this->assertFalse( PermissionHelper::is_system_context() );
+		$this->assertFalse( PermissionHelper::is_authenticated_context() );
+	}
+
+	public function test_run_as_system_restores_an_outer_authenticated_context(): void {
+		$outer_user = self::factory()->user->create( array( 'role' => 'administrator' ) );
+
+		$after_inner = PermissionHelper::run_as_authenticated(
+			static function () {
+				PermissionHelper::run_as_system(
+					static function () {
+						return null;
+					}
+				);
+				return array( PermissionHelper::is_authenticated_context(), PermissionHelper::acting_user_id(), PermissionHelper::is_system_context() );
+			},
+			$outer_user
+		);
+
+		$this->assertSame( array( true, $outer_user, false ), $after_inner );
+	}
+
+	public function test_run_as_system_restores_context_after_an_exception(): void {
+		try {
+			PermissionHelper::run_as_system(
+				static function () {
+					throw new \RuntimeException( 'boom' );
+				}
+			);
+		} catch ( \RuntimeException $e ) {
+			unset( $e );
+		}
+
+		$this->assertFalse( PermissionHelper::is_system_context() );
+		$this->assertFalse( PermissionHelper::is_authenticated_context() );
 	}
 }

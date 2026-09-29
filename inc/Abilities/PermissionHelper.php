@@ -65,6 +65,13 @@ class PermissionHelper {
 	private static int $authenticated_user_id = 0;
 
 	/**
+	 * Whether the current callback runs as the system (no acting user).
+	 *
+	 * @var bool
+	 */
+	private static bool $system_context = false;
+
+	/**
 	 * Acting agent ID when authenticated via agent bearer token.
 	 *
 	 * @since 0.47.0
@@ -216,6 +223,12 @@ class PermissionHelper {
 			return self::$authenticated_user_id;
 		}
 
+		// System context: trusted server code acting on its own behalf, never
+		// as whichever user happens to own the request.
+		if ( self::$system_context ) {
+			return 0;
+		}
+
 		return get_current_user_id();
 	}
 
@@ -252,6 +265,46 @@ class PermissionHelper {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Execute a callback as the system: pre-authenticated with no acting user.
+	 *
+	 * Use for work that trusted server code performs on its own behalf, such as
+	 * transactional mail, regardless of who owns the current request. Unlike
+	 * run_as_authenticated(), the request's logged-in user is never attributed
+	 * as the actor, so issuer-bound work (queued email grants) records a system
+	 * issuer instead of a user who lacks the capability to issue it.
+	 *
+	 * Re-entrant: the previous context is restored afterward, even if an
+	 * exception is thrown.
+	 *
+	 * @param callable $callback The callback to execute as the system.
+	 * @return mixed The return value of the callback.
+	 *
+	 * @throws \Throwable Re-throws any exception from the callback after restoring context.
+	 */
+	public static function run_as_system( callable $callback ) {
+		$previous = array( self::$authenticated_context, self::$authenticated_user_id, self::$system_context );
+
+		self::$authenticated_context = true;
+		self::$authenticated_user_id = 0;
+		self::$system_context        = true;
+
+		try {
+			return $callback();
+		} finally {
+			list( self::$authenticated_context, self::$authenticated_user_id, self::$system_context ) = $previous;
+		}
+	}
+
+	/**
+	 * Whether the current callback runs as the system (see run_as_system()).
+	 *
+	 * @return bool
+	 */
+	public static function is_system_context(): bool {
+		return self::$system_context && null === self::$acting_agent_id;
 	}
 
 	/**
