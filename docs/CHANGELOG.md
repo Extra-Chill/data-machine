@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.179.0] - 2026-09-29
+
+### Added
+- add PermissionHelper::run_as_system for trusted server-side work
+
 ## [0.178.4] - 2026-09-28
 
 ### Fixed
