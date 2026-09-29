@@ -222,20 +222,20 @@ namespace {
 	$provider  = ( new \ReflectionClass( SystemAgentServiceProvider::class ) )->newInstanceWithoutConstructor();
 	$tasks     = $provider->getBuiltInTasks( array() );
 	$schedules = $provider->getBuiltInSchedules( array() );
-	assert_reaper( 'job_reaper task type is registered to JobReaperTask', JobReaperTask::class === ( $tasks['job_reaper'] ?? null ) );
-	assert_reaper( 'task type constant matches the registry key', 'job_reaper' === ( new JobReaperTask() )->getTaskType() );
+	assert_reaper( 'job_reaper task type is registered to JobReaperTask', JobReaperTask::class === ( $tasks[ JobReaperTask::TASK_TYPE ] ?? null ) );
+	assert_reaper( 'task type constant matches the registry key', JobReaperTask::TASK_TYPE === ( new JobReaperTask() )->getTaskType() );
 	assert_reaper( 'task opts out of the agent-context gate (pure maintenance)', false === ( new JobReaperTask() )->requiresAgentContext() );
 	$meta = JobReaperTask::getTaskMeta();
 	assert_reaper( 'task supports manual runs and declares that it mutates', true === $meta['supports_run'] && true === $meta['mutates'] );
-	$schedule = $schedules['job_reaper'] ?? array();
-	assert_reaper( 'a recurring schedule is registered for the task', 'job_reaper' === ( $schedule['task_type'] ?? null ) );
+	$schedule = $schedules[ JobReaperTask::TASK_TYPE ] ?? array();
+	assert_reaper( 'a recurring schedule is registered for the task', JobReaperTask::TASK_TYPE === ( $schedule['task_type'] ?? null ) );
 	assert_reaper( 'the schedule runs every 15 minutes', 'every_15_minutes' === ( $schedule['interval'] ?? null ) );
 	assert_reaper( 'every_15_minutes resolves to 900 seconds in the interval table', 900 === ( datamachine_get_default_scheduler_intervals()['every_15_minutes']['seconds'] ?? 0 ) );
 	assert_reaper( 'the schedule is per-site (not network_only) and not per_agent', empty( $schedule['network_only'] ) && empty( $schedule['per_agent'] ) );
 	assert_reaper( 'the schedule is on by default (mode, not a boolean, gates mutation)', true === ( $schedule['default_enabled'] ?? null ) && ! isset( $schedule['enabled_setting'] ) );
 	RecurringScheduleRegistry::reset();
 	assert_reaper( 'every site owns the schedule (per-site, not main-site-only)', RecurringScheduleRegistry::isOwnedByCurrentSite( array_merge( array( 'network_only' => false ), $schedule ) ) );
-	assert_reaper( 'the recurring hook is a worker bootstrap hook', str_contains( file_get_contents( __DIR__ . '/../inc/Cli/Commands/WorkerCommand.php' ) ?: '', "'" . RecurringScheduleRegistry::hookFor( array( 'schedule_id' => 'job_reaper' ) ) . "'" ) );
+	assert_reaper( 'the recurring hook is a worker bootstrap hook', str_contains( file_get_contents( __DIR__ . '/../inc/Cli/Commands/WorkerCommand.php' ) ?: '', "'" . RecurringScheduleRegistry::hookFor( array( 'schedule_id' => JobReaperTask::TASK_TYPE ) ) . "'" ) );
 
 	// -- 2. Mode resolution ---------------------------------------------------------------------------
 	echo "[2] mode resolution\n";
@@ -348,7 +348,7 @@ namespace {
 	assert_reaper( 'ability input is a dry run without pending-orphan apply authorization', true === $executor_inputs[0][ JobReaper::INPUT_DRY_RUN ] && false === $executor_inputs[0]['recover_pending_orphans'] );
 	assert_reaper( 'pathless-child recovery is never authorized', false === $executor_inputs[0]['recover_pathless_children'] );
 	assert_reaper( 'the run is bounded by touch and pending limits', JobReaper::RUN_TOUCH_LIMIT === $executor_inputs[0]['limit'] && JobReaper::RUN_PENDING_LIMIT === $executor_inputs[0]['pending_limit'] );
-	assert_reaper( 'ability input carries the job_reaper recovery trigger', 'job_reaper' === $executor_inputs[0]['recovery_trigger'] );
+	assert_reaper( 'ability input carries the job_reaper recovery trigger', JobReaperTask::TASK_TYPE === $executor_inputs[0]['recovery_trigger'] );
 	assert_reaper( 'per-verdict counts are recorded', 1 === $run['verdicts'][ PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED ] && 1 === $run['verdicts'][ PendingJobRecoveryPolicy::VERDICT_EVIDENCE_PRUNED ] && 2 === $run['verdicts'][ PendingJobRecoveryPolicy::VERDICT_ENQUEUE_INTERRUPTED ] && 1 === $run['verdicts'][ PendingJobRecoveryPolicy::VERDICT_ORPHANED_PENDING ] );
 	assert_reaper( 'would_act totals the verdicts and acted is zero', 5 === $run['would_act'] && 0 === $run['acted'] );
 	assert_reaper( 'the run is recorded in history', 1 === count( JobReaperHistory::load()['runs'] ) );
@@ -364,7 +364,7 @@ namespace {
 	$after           = $snapshot();
 	assert_reaper( 'ability input authorizes pending-orphan apply and is not a dry run', false === $executor_inputs[0][ JobReaper::INPUT_DRY_RUN ] && true === $executor_inputs[0]['recover_pending_orphans'] );
 	assert_reaper( 'one CAS call per orphan, none for healthy rows', 5 === count( Jobs::$calls ) );
-	assert_reaper( 'CAS calls carry the job_reaper trigger', array( 'job_reaper' ) === array_values( array_unique( array_column( Jobs::$calls, 'trigger' ) ) ) );
+	assert_reaper( 'CAS calls carry the job_reaper trigger', array( JobReaperTask::TASK_TYPE ) === array_values( array_unique( array_column( Jobs::$calls, 'trigger' ) ) ) );
 	assert_reaper( 'orphans are terminalized with their verdict as the reason', 'failed - enqueue_failed' === $after[1]['status'] && 'failed - evidence_pruned' === $after[2]['status'] && 'failed - enqueue_interrupted' === $after[3]['status'] && 'failed - orphaned_pending' === $after[5]['status'] );
 	assert_reaper( 'healthy in-flight rows are untouched', 'pending' === $after[6]['status'] && 'pending' === $after[8]['status'] && 'pending' === $after[9]['status'] && 'pending' === $after[11]['status'] && 'processing' === $after[12]['status'] );
 	assert_reaper( 'acted counts the mutations', 5 === $run['acted'] && 5 === $run['would_act'] );
