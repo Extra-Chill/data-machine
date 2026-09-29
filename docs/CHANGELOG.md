@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.179.5] - 2026-09-29
+
+### Fixed
+- keep failed step actions for live jobs until the job terminalizes
+
 ## [0.179.4] - 2026-09-29
 
 ### Changed
