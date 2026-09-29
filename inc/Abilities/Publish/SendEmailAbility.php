@@ -242,7 +242,7 @@ class SendEmailAbility {
 		if ( ! empty( $config['auth_ref'] ) ) {
 			$providers = apply_filters( 'datamachine_auth_providers', array() );
 			$auth      = $providers['email_imap'] ?? null;
-			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) ) {
+			if ( ! is_object( $auth ) || ! method_exists( $auth, 'resolve_mailbox' ) || ! method_exists( $auth, 'resolve_mailbox_for_principal' ) ) {
 				return new \WP_Error( 'email_imap_not_configured', 'Email IMAP provider is not registered.', array( 'status' => 400 ) );
 			}
 			$resolved = null === $queued_context
@@ -564,6 +564,11 @@ class SendEmailAbility {
 	}
 
 	private function canUseLegacySender(): bool {
+		// Trusted server code sending as the system (PermissionHelper::run_as_system())
+		// carries the same trust as WP-CLI for the site default sender.
+		if ( PermissionHelper::is_system_context() ) {
+			return true;
+		}
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			return PermissionHelper::can_manage();
 		}
