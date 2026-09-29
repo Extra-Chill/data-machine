@@ -18,6 +18,14 @@ These intervals are available by default in the Data Machine core plugin.
 - **Seconds**: 300
 - **Use Case**: Real-time monitoring, high-frequency data ingestion.
 
+### Every 15 Minutes
+```php
+'interval' => 'every_15_minutes'
+```
+- **Frequency**: Every 15 minutes
+- **Seconds**: 900
+- **Use Case**: Frequent maintenance passes, such as the job reaper.
+
 ### Hourly
 ```php
 'interval' => 'hourly'

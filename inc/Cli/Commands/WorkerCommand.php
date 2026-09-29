@@ -16,6 +16,7 @@ use DataMachine\Cli\WorkerLock;
 use DataMachine\Cli\WorkerProcessDeadline;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\Jobs\SchedulerEvidence;
 use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
@@ -610,6 +611,7 @@ class WorkerCommand extends BaseCommand {
 			'datamachine_recurring_wiki_graph_maintain',
 			'datamachine_recurring_wiki_timeline_materialize',
 			'datamachine_recurring_wiki_timeline_materialize_wordpress_com',
+			'datamachine_recurring_job_reaper',
 			'datamachine_recurring_retention_as_actions',
 			'datamachine_recurring_retention_chat_sessions',
 			'datamachine_recurring_retention_completed_jobs',
@@ -855,7 +857,7 @@ class WorkerCommand extends BaseCommand {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Worker job selection must inspect fresh scheduler rows.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT a.action_id, a.args
+				'SELECT a.action_id, a.hook, a.args
 				FROM %i a
 				INNER JOIN %i g ON g.group_id = a.group_id
 				WHERE a.hook IN (%s, %s)
@@ -880,43 +882,13 @@ class WorkerCommand extends BaseCommand {
 
 		$job_ids = array();
 		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
-			$job_id = self::extractActionJobId( (string) ( $row['args'] ?? '' ) );
+			$job_id = SchedulerEvidence::extractJobId( (string) ( $row['args'] ?? '' ), (string) ( $row['hook'] ?? '' ) );
 			if ( $job_id > 0 ) {
 				$job_ids[] = $job_id;
 			}
 		}
 
 		return array_values( array_unique( $job_ids ) );
-	}
-
-	/**
-	 * Extract a job identifier from Action Scheduler args.
-	 */
-	private static function extractActionJobId( string $args_json ): int {
-		$args = json_decode( $args_json, true );
-		if ( ! is_array( $args ) ) {
-			return 0;
-		}
-
-		if ( isset( $args['job_id'] ) ) {
-			return absint( $args['job_id'] );
-		}
-
-		if ( isset( $args['parent_job_id'] ) ) {
-			return absint( $args['parent_job_id'] );
-		}
-
-		foreach ( $args as $value ) {
-			if ( is_array( $value ) && isset( $value['job_id'] ) ) {
-				return absint( $value['job_id'] );
-			}
-
-			if ( is_array( $value ) && isset( $value['parent_job_id'] ) ) {
-				return absint( $value['parent_job_id'] );
-			}
-		}
-
-		return 0;
 	}
 
 	/**

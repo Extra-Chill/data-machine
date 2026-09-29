@@ -28,6 +28,7 @@ use DataMachine\Engine\AI\System\Tasks\DispatchMessageTask;
 use DataMachine\Engine\AI\System\Tasks\EmitDataPacketsTask;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
+use DataMachine\Engine\AI\System\Tasks\JobReaperTask;
 use DataMachine\Engine\AI\System\Tasks\MetaDescriptionTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionActionSchedulerTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionChatSessionsTask;
@@ -103,6 +104,7 @@ class SystemAgentServiceProvider {
 		$tasks['daily_memory_generation']                = DailyMemoryTask::class;
 		$tasks['wake_briefing']                          = WakeBriefingTask::class;
 		$tasks['meta_description_generation']            = MetaDescriptionTask::class;
+		$tasks[ JobReaperTask::TASK_TYPE ]               = JobReaperTask::class;
 		$tasks[ RetentionCleanup::TASK_COMPLETED_JOBS ]  = RetentionCompletedJobsTask::class;
 		$tasks[ RetentionCleanup::TASK_FAILED_JOBS ]     = RetentionFailedJobsTask::class;
 		$tasks[ RetentionCleanup::TASK_ENGINE_DATA ]     = RetentionEngineDataTask::class;
@@ -158,6 +160,20 @@ class SystemAgentServiceProvider {
 			'task_params_callback' => static function () {
 				return array();
 			},
+		);
+
+		// Per-site: every site runs its own jobs table, so every site reaps
+		// its own rows. The mode (dry_run | apply | off) is the
+		// `job_reaper_mode` setting, read by the task at run time; there is
+		// deliberately no boolean enabled_setting so the default is dry-run,
+		// not disabled.
+		$schedules[ JobReaperTask::TASK_TYPE ] = array(
+			'task_type'          => JobReaperTask::TASK_TYPE,
+			'interval'           => 'every_15_minutes',
+			'default_enabled'    => true,
+			'label'              => 'Every 15 minutes — recovers jobs no live scheduler path can advance (dry-run by default)',
+			'first_run_callback' => 'strtotime',
+			'first_run_arg'      => '+15 minutes',
 		);
 
 		foreach ( self::getRetentionScheduleDefinitions() as $schedule_id => $schedule ) {
