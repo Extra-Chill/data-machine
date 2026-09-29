@@ -33,7 +33,7 @@ class PendingJobRecoveryPolicy {
 	public const VERDICT_ENQUEUE_FAILED      = 'enqueue_failed';
 	public const VERDICT_EVIDENCE_PRUNED     = 'evidence_pruned';
 	public const VERDICT_ENQUEUE_INTERRUPTED = 'enqueue_interrupted';
-	public const VERDICT_NO_SCHEDULER_PATH   = 'no_scheduler_path';
+	public const VERDICT_ORPHANED_PENDING    = 'orphaned_pending';
 
 	public const SKIP_NOT_PENDING        = 'not_pending';
 	public const SKIP_WITHIN_GRACE       = 'within_grace';
@@ -54,7 +54,7 @@ class PendingJobRecoveryPolicy {
 			self::VERDICT_ENQUEUE_FAILED,
 			self::VERDICT_EVIDENCE_PRUNED,
 			self::VERDICT_ENQUEUE_INTERRUPTED,
-			self::VERDICT_NO_SCHEDULER_PATH,
+			self::VERDICT_ORPHANED_PENDING,
 		);
 	}
 
@@ -120,7 +120,7 @@ class PendingJobRecoveryPolicy {
 			case self::OPERATION_STATE_ENQUEUING:
 				return $result( self::VERDICT_ENQUEUE_INTERRUPTED, '' );
 			case '':
-				return $result( self::VERDICT_NO_SCHEDULER_PATH, '' );
+				return $result( self::VERDICT_ORPHANED_PENDING, '' );
 		}
 
 		return $result( '', self::SKIP_UNKNOWN_STATE );

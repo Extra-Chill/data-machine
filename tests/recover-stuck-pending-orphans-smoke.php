@@ -158,9 +158,9 @@ namespace {
 	assert_pending_orphans( 'enqueued + no action -> evidence_pruned', 'evidence_pruned' === $policy( array( 'operation_state' => 'enqueued' ) )['verdict'] );
 	assert_pending_orphans( 'preparing past lease -> enqueue_interrupted', 'enqueue_interrupted' === $policy( array( 'operation_state' => 'preparing' ) )['verdict'] );
 	assert_pending_orphans( 'enqueuing past lease -> enqueue_interrupted', 'enqueue_interrupted' === $policy( array( 'operation_state' => 'enqueuing', 'operation_claimed_at' => $ago( 7200 ) ) )['verdict'] );
-	assert_pending_orphans( 'NULL operation_state -> no_scheduler_path', 'no_scheduler_path' === $policy( array() )['verdict'] );
+	assert_pending_orphans( 'NULL operation_state -> orphaned_pending', 'orphaned_pending' === $policy( array() )['verdict'] );
 	assert_pending_orphans( 'future engine_data.retry.next_retry_at is excluded', 'retry_scheduled' === $policy( array(), array( 'retry' => array( 'next_retry_at' => gmdate( 'c', $now + 600 ) ) ) )['skip'] );
-	assert_pending_orphans( 'past retry.next_retry_at does not exclude', 'no_scheduler_path' === $policy( array(), array( 'retry' => array( 'next_retry_at' => gmdate( 'c', $now - 600 ) ) ) )['verdict'] );
+	assert_pending_orphans( 'past retry.next_retry_at does not exclude', 'orphaned_pending' === $policy( array(), array( 'retry' => array( 'next_retry_at' => gmdate( 'c', $now - 600 ) ) ) )['verdict'] );
 	assert_pending_orphans( 'future ai_concurrency_throttle is excluded', 'ai_throttle_scheduled' === $policy( array(), array( 'ai_concurrency_throttle' => array( 'next_retry_at' => gmdate( 'c', $now + 600 ) ) ) )['skip'] );
 	assert_pending_orphans( 'unexpired enqueuing lease is excluded', 'enqueue_lease_active' === $policy( array( 'operation_state' => 'enqueuing', 'operation_claimed_at' => $ago( 30 ) ) )['skip'] );
 	assert_pending_orphans( 'live scheduler action is excluded', 'live_scheduler_action' === $policy( array( 'operation_state' => 'enqueued' ), array(), array( 5 ) )['skip'] );
@@ -275,7 +275,7 @@ namespace {
 	assert_pending_orphans( 'dry-run reports enqueue_failed x2 (flows 10 and 99)', 2 === $summary['verdicts']['enqueue_failed'] );
 	assert_pending_orphans( 'dry-run reports evidence_pruned x3 (enqueued+pruned, stale in-progress, complete-only)', 3 === $summary['verdicts']['evidence_pruned'] );
 	assert_pending_orphans( 'dry-run reports enqueue_interrupted x2 (preparing, expired enqueuing)', 2 === $summary['verdicts']['enqueue_interrupted'] );
-	assert_pending_orphans( 'dry-run reports no_scheduler_path x1 (NULL operation_state)', 1 === $summary['verdicts']['no_scheduler_path'] );
+	assert_pending_orphans( 'dry-run reports orphaned_pending x1 (NULL operation_state)', 1 === $summary['verdicts']['orphaned_pending'] );
 	assert_pending_orphans( 'dry-run would_terminalize totals the verdicts', 8 === $summary['would_terminalize'] && 0 === $summary['terminalized'] );
 	$reasons = $summary['skipped_reasons'];
 	assert_pending_orphans( 'excludes future retry', 1 === ( $reasons['retry_scheduled'] ?? 0 ) );
@@ -297,7 +297,7 @@ namespace {
 	assert_pending_orphans( 'enqueued+no action failed as evidence_pruned', 'failed - evidence_pruned' === $after[2]['status'] );
 	assert_pending_orphans( 'preparing failed as enqueue_interrupted', 'failed - enqueue_interrupted' === $after[3]['status'] );
 	assert_pending_orphans( 'expired enqueuing failed as enqueue_interrupted', 'failed - enqueue_interrupted' === $after[4]['status'] );
-	assert_pending_orphans( 'NULL operation_state failed as no_scheduler_path', 'failed - no_scheduler_path' === $after[5]['status'] );
+	assert_pending_orphans( 'NULL operation_state failed as orphaned_pending', 'failed - orphaned_pending' === $after[5]['status'] );
 	assert_pending_orphans( 'future-retry row untouched', 'pending' === $after[6]['status'] );
 	assert_pending_orphans( 'future-throttle row untouched', 'pending' === $after[7]['status'] );
 	assert_pending_orphans( 'live-lease row untouched', 'pending' === $after[8]['status'] );
