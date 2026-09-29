@@ -349,11 +349,11 @@ namespace {
 	assert_reaper( 'pathless-child recovery is never authorized', false === $executor_inputs[0]['recover_pathless_children'] );
 	assert_reaper( 'the run is bounded by touch and pending limits', JobReaper::RUN_TOUCH_LIMIT === $executor_inputs[0]['limit'] && JobReaper::RUN_PENDING_LIMIT === $executor_inputs[0]['pending_limit'] );
 	assert_reaper( 'ability input carries the job_reaper recovery trigger', 'job_reaper' === $executor_inputs[0]['recovery_trigger'] );
-	assert_reaper( 'per-verdict counts are recorded', 1 === $run['verdicts']['enqueue_failed'] && 1 === $run['verdicts']['evidence_pruned'] && 2 === $run['verdicts']['enqueue_interrupted'] && 1 === $run['verdicts']['orphaned_pending'] );
+	assert_reaper( 'per-verdict counts are recorded', 1 === $run['verdicts'][ PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED ] && 1 === $run['verdicts'][ PendingJobRecoveryPolicy::VERDICT_EVIDENCE_PRUNED ] && 2 === $run['verdicts'][ PendingJobRecoveryPolicy::VERDICT_ENQUEUE_INTERRUPTED ] && 1 === $run['verdicts'][ PendingJobRecoveryPolicy::VERDICT_ORPHANED_PENDING ] );
 	assert_reaper( 'would_act totals the verdicts and acted is zero', 5 === $run['would_act'] && 0 === $run['acted'] );
 	assert_reaper( 'the run is recorded in history', 1 === count( JobReaperHistory::load()['runs'] ) );
 	assert_reaper( 'flagged jobs are remembered for the next run', 5 === $run['flagged_count'] && 5 === count( JobReaperHistory::previousFlagged() ) );
-	assert_reaper( 'flagged pending orphans record their flagged status and verdict', array( 'job_id' => 1, 'status' => 'pending', 'verdict' => 'enqueue_failed' ) === JobReaperHistory::previousFlagged()[0] );
+	assert_reaper( 'flagged pending orphans record their flagged status and verdict', array( 'job_id' => 1, 'status' => 'pending', 'verdict' => PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED ) === JobReaperHistory::previousFlagged()[0] );
 	assert_reaper( 'a dry run with findings is logged', 1 === count( $GLOBALS['dm_logs'] ) && 'Job reaper dry run' === $GLOBALS['dm_logs'][0][1] );
 
 	// -- 4. apply mutates through the same CAS path --------------------------------------------------------
@@ -399,11 +399,11 @@ namespace {
 	$GLOBALS['dm_options'] = array();
 	$flag_rows             = array();
 	for ( $i = 1; $i <= 120; $i++ ) {
-		$flag_rows[] = array( 'job_id' => $i, 'scope' => 'pending_orphan', 'verdict' => 'enqueue_failed', 'status' => 'would_terminalize_pending_orphan' );
+		$flag_rows[] = array( 'job_id' => $i, 'scope' => 'pending_orphan', 'verdict' => PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED, 'status' => 'would_terminalize_pending_orphan' );
 	}
 	$stub = static fn( array $input ): array => array(
 		'success'         => true,
-		'pending_orphans' => array( 'verdicts' => array( 'enqueue_failed' => 120 ), 'evidence_complete' => true ),
+		'pending_orphans' => array( 'verdicts' => array( PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED => 120 ), 'evidence_complete' => true ),
 		'jobs'            => $flag_rows,
 		'skipped'         => 0,
 	);
@@ -426,19 +426,19 @@ namespace {
 	echo "[7] false-positive signal (injected probe)\n";
 	$GLOBALS['dm_options'] = array();
 	$details               = array(
-		array( 'job_id' => 1, 'scope' => 'pending_orphan', 'verdict' => 'enqueue_failed', 'status' => 'would_terminalize_pending_orphan' ),
-		array( 'job_id' => 2, 'scope' => 'pending_orphan', 'verdict' => 'evidence_pruned', 'status' => 'would_terminalize_pending_orphan' ),
+		array( 'job_id' => 1, 'scope' => 'pending_orphan', 'verdict' => PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED, 'status' => 'would_terminalize_pending_orphan' ),
+		array( 'job_id' => 2, 'scope' => 'pending_orphan', 'verdict' => PendingJobRecoveryPolicy::VERDICT_EVIDENCE_PRUNED, 'status' => 'would_terminalize_pending_orphan' ),
 		array( 'job_id' => 3, 'status' => 'would_timeout' ),
-		array( 'job_id' => 4, 'scope' => 'pending_orphan', 'verdict' => 'orphaned_pending', 'status' => 'would_terminalize_pending_orphan' ),
-		array( 'job_id' => 5, 'scope' => 'pending_orphan', 'verdict' => 'orphaned_pending', 'status' => 'would_terminalize_pending_orphan' ),
-		array( 'job_id' => 6, 'scope' => 'pending_orphan', 'verdict' => 'orphaned_pending', 'status' => 'would_terminalize_pending_orphan' ),
+		array( 'job_id' => 4, 'scope' => 'pending_orphan', 'verdict' => PendingJobRecoveryPolicy::VERDICT_ORPHANED_PENDING, 'status' => 'would_terminalize_pending_orphan' ),
+		array( 'job_id' => 5, 'scope' => 'pending_orphan', 'verdict' => PendingJobRecoveryPolicy::VERDICT_ORPHANED_PENDING, 'status' => 'would_terminalize_pending_orphan' ),
+		array( 'job_id' => 6, 'scope' => 'pending_orphan', 'verdict' => PendingJobRecoveryPolicy::VERDICT_ORPHANED_PENDING, 'status' => 'would_terminalize_pending_orphan' ),
 		array( 'job_id' => 7, 'action_id' => 55, 'hook' => 'x', 'status' => 'would_reconcile_action' ),
 		array( 'job_id' => 8, 'status' => 'skipped', 'reason' => 'x' ),
 	);
 	$stub = static fn( array $input ): array => array(
 		'success'         => true,
 		'timed_out'       => 1,
-		'pending_orphans' => array( 'verdicts' => array( 'enqueue_failed' => 1, 'evidence_pruned' => 1, 'orphaned_pending' => 3 ), 'evidence_complete' => true ),
+		'pending_orphans' => array( 'verdicts' => array( PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED => 1, PendingJobRecoveryPolicy::VERDICT_EVIDENCE_PRUNED => 1, PendingJobRecoveryPolicy::VERDICT_ORPHANED_PENDING => 3 ), 'evidence_complete' => true ),
 		'jobs'            => $details,
 		'skipped'         => 1,
 	);
