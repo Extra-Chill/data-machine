@@ -1314,7 +1314,7 @@ class RecoverStuckJobsAbility {
 		$args          = array_merge( array( $actions_table ), $hooks, array( 'pending', 'in-progress', self::LIVE_ACTION_SCAN_LIMIT + 1 ) );
 
 		$wpdb->last_error = '';
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Generated placeholders only; every value is bound.
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Generated placeholders only; every value is bound via the spread.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, COALESCE(extended_args, args) AS action_args
@@ -1326,7 +1326,7 @@ class RecoverStuckJobsAbility {
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		if ( '' !== (string) $wpdb->last_error || ! is_array( $rows ) || count( $rows ) > self::LIVE_ACTION_SCAN_LIMIT ) {
 			return array(
