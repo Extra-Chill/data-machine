@@ -29,8 +29,8 @@ use DataMachine\Core\AbilityResult;
 use DataMachine\Core\ExecutionQuery;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\RunMetrics;
-use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
 use DataMachine\Core\Jobs\JobLiveness;
+use DataMachine\Core\Jobs\JobReaper;
 use DataMachine\Core\Jobs\SchedulerEvidence;
 use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
@@ -108,6 +108,8 @@ class JobsCommand extends BaseCommand {
 	 *
 	 * @var array
 	 */
+	private array $reaper_status_fields = array( 'ran_at', 'mode', 'would_act', 'acted', 'guarded', 'verdicts', 'rechecked', 'false_positives', 'still_flagged', 'limit_reached', 'evidence', 'error' );
+
 	private array $liveness_fields = array( 'id', 'flow_id', 'classification', 'age_hours', 'defer_count', 'defer_age_seconds', 'pending_actions', 'in_progress_actions', 'owner_action_ids', 'owner_job_ids', 'oldest_pending', 'latest_attempt' );
 
 	/**
@@ -632,6 +634,85 @@ class JobsCommand extends BaseCommand {
 				)
 			);
 		}
+	}
+
+	/**
+	 * Show recent job reaper runs and the false-positive signal.
+	 *
+	 * The reaper is a recurring system task that runs recover-stuck over pending
+	 * and processing jobs. It is controlled by the `job_reaper_mode` setting:
+	 * dry_run (default: records verdict counts, never mutates), apply
+	 * (terminalizes / resumes like recover-stuck --recover-pending-orphans,
+	 * bounded per run), or off.
+	 *
+	 * Columns: would_act is what the pass found; acted is what it mutated (0 in
+	 * dry_run). rechecked / false_positives / still_flagged describe the re-check
+	 * of the PREVIOUS run's flagged jobs at the start of this run: a false positive
+	 * is a flagged job that was alive or had progressed on its own since.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--limit=<limit>]
+	 * : Number of most recent runs to show (1-96).
+	 * ---
+	 * default: 10
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 *   - csv
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Last 10 reaper runs plus lifetime totals
+	 *     wp datamachine jobs reaper-status
+	 *
+	 *     # Full report as JSON (mode, totals, false_positive_rate, runs)
+	 *     wp datamachine jobs reaper-status --limit=96 --format=json
+	 *
+	 * @subcommand reaper-status
+	 */
+	public function reaper_status( array $args, array $assoc_args ): void {
+		$limit  = isset( $assoc_args['limit'] ) ? max( 1, min( 96, (int) $assoc_args['limit'] ) ) : 10;
+		$format = $assoc_args['format'] ?? 'table';
+		$report = JobReaper::statusReport( $limit );
+
+		if ( 'json' === $format || 'yaml' === $format ) {
+			WP_CLI::print_value( $report, array( 'format' => $format ) );
+			return;
+		}
+
+		$totals = $report['totals'];
+		$rate   = $report['false_positive_rate'];
+		WP_CLI::log(
+			sprintf(
+				'Job reaper mode: %s. Lifetime: %d runs (%d dry-run, %d apply) since %s; would-act %d, acted %d; false positives %d of %d re-checked (%s).',
+				$report['mode'],
+				(int) $totals['runs'],
+				(int) $totals['dry_run_runs'],
+				(int) $totals['apply_runs'],
+				'' === (string) $totals['first_run_at'] ? 'never' : (string) $totals['first_run_at'],
+				(int) $totals['would_act'],
+				(int) $totals['acted'],
+				(int) $totals['fp_hits'],
+				(int) $totals['fp_checked'],
+				null === $rate ? 'no re-checks yet' : sprintf( '%.1f%%', $rate * 100 )
+			)
+		);
+
+		if ( empty( $report['runs'] ) ) {
+			WP_CLI::log( 'No reaper runs recorded yet.' );
+			return;
+		}
+
+		$this->format_items( $report['runs'], $this->reaper_status_fields, $assoc_args, 'ran_at' );
 	}
 
 	/**
@@ -1291,32 +1372,9 @@ class JobsCommand extends BaseCommand {
 		}
 
 		$job['engine_data'] = $engine_data;
-		$child_counts       = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id, $overdue_minutes, $evidence ) : array();
+		$child_counts       = ! empty( $engine_data['batch'] ) ? JobLiveness::childCounts( $job_id, $overdue_minutes, $evidence ) : array();
 
 		return JobLiveness::diagnoseWithEvidence( $job, $evidence, $child_counts, $overdue_minutes, time() );
-	}
-
-	/**
-	 * Count child jobs for a batch parent.
-	 *
-	 * @param int $parent_job_id Parent job ID.
-	 * @return array{}|array{total:int,active:int,active_ids:list<int>,stale_ids:list<int>,action_ids:list<int>,evidence_complete:bool}
-	 */
-	private function get_child_status_counts( int $parent_job_id, int $overdue_minutes, SchedulerEvidence $evidence ): array {
-		if ( $parent_job_id <= 0 ) {
-			return array();
-		}
-
-		$diagnosis = PathlessBatchRecovery::diagnoseChildWork( $parent_job_id, max( 1, $overdue_minutes ) * MINUTE_IN_SECONDS, time(), $evidence );
-
-		return array(
-			'total'         => (int) $diagnosis['total_children'],
-			'active'        => count( $diagnosis['active_job_ids'] ),
-			'active_ids'    => $diagnosis['active_job_ids'],
-			'stale_ids'     => $diagnosis['stale_job_ids'],
-			'action_ids'    => $diagnosis['active_action_ids'],
-			'evidence_complete' => $diagnosis['evidence_complete'],
-		);
 	}
 
 	/**

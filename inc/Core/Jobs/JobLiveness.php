@@ -13,6 +13,7 @@
 
 namespace DataMachine\Core\Jobs;
 
+use DataMachine\Core\ActionScheduler\PathlessBatchRecovery;
 use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Engine\AI\AIConcurrencyBackpressure;
@@ -66,6 +67,31 @@ class JobLiveness {
 	 */
 	public static function alive( array $job, SchedulerEvidence $evidence, array $child_counts, int $overdue_minutes, int $now ): bool {
 		return self::isAliveClassification( (string) self::diagnoseWithEvidence( $job, $evidence, $child_counts, $overdue_minutes, $now )['classification'] );
+	}
+
+	/**
+	 * Batch-parent child counts in the shape `alive()` and `diagnoseWithEvidence()` consume.
+	 *
+	 * @param int               $parent_job_id   Batch parent job ID.
+	 * @param int               $overdue_minutes In-progress heartbeat threshold in minutes.
+	 * @param SchedulerEvidence $evidence        Batch scheduler evidence for the pass.
+	 * @return array{}|array{total:int,active:int,active_ids:list<int>,stale_ids:list<int>,action_ids:list<int>,evidence_complete:bool}
+	 */
+	public static function childCounts( int $parent_job_id, int $overdue_minutes, SchedulerEvidence $evidence ): array {
+		if ( $parent_job_id <= 0 ) {
+			return array();
+		}
+
+		$diagnosis = PathlessBatchRecovery::diagnoseChildWork( $parent_job_id, max( 1, $overdue_minutes ) * MINUTE_IN_SECONDS, time(), $evidence );
+
+		return array(
+			'total'             => (int) $diagnosis['total_children'],
+			'active'            => count( $diagnosis['active_job_ids'] ),
+			'active_ids'        => $diagnosis['active_job_ids'],
+			'stale_ids'         => $diagnosis['stale_job_ids'],
+			'action_ids'        => $diagnosis['active_action_ids'],
+			'evidence_complete' => $diagnosis['evidence_complete'],
+		);
 	}
 
 	/**

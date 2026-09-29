@@ -18,43 +18,47 @@ defined( 'ABSPATH' ) || exit;
  */
 function datamachine_get_default_scheduler_intervals(): array {
 	return array(
-		'every_5_minutes' => array(
+		'every_5_minutes'  => array(
 			'label'   => 'Every 5 Minutes',
 			'seconds' => 300,
 		),
-		'hourly'          => array(
+		'every_15_minutes' => array(
+			'label'   => 'Every 15 Minutes',
+			'seconds' => 15 * MINUTE_IN_SECONDS,
+		),
+		'hourly'           => array(
 			'label'   => 'Hourly',
 			'seconds' => HOUR_IN_SECONDS,
 		),
-		'every_2_hours'   => array(
+		'every_2_hours'    => array(
 			'label'   => 'Every 2 Hours',
 			'seconds' => HOUR_IN_SECONDS * 2,
 		),
-		'every_4_hours'   => array(
+		'every_4_hours'    => array(
 			'label'   => 'Every 4 Hours',
 			'seconds' => HOUR_IN_SECONDS * 4,
 		),
-		'qtrdaily'        => array(
+		'qtrdaily'         => array(
 			'label'   => 'Every 6 Hours',
 			'seconds' => HOUR_IN_SECONDS * 6,
 		),
-		'twicedaily'      => array(
+		'twicedaily'       => array(
 			'label'   => 'Twice Daily',
 			'seconds' => HOUR_IN_SECONDS * 12,
 		),
-		'daily'           => array(
+		'daily'            => array(
 			'label'   => 'Daily',
 			'seconds' => DAY_IN_SECONDS,
 		),
-		'every_3_days'    => array(
+		'every_3_days'     => array(
 			'label'   => 'Every 3 Days',
 			'seconds' => DAY_IN_SECONDS * 3,
 		),
-		'weekly'          => array(
+		'weekly'           => array(
 			'label'   => 'Weekly',
 			'seconds' => WEEK_IN_SECONDS,
 		),
-		'monthly'         => array(
+		'monthly'          => array(
 			'label'   => 'Monthly',
 			'seconds' => DAY_IN_SECONDS * 30,
 		),

@@ -71,7 +71,9 @@ assert_worker_contains( "'batch_size'   => 1", $worker_src, 'job mode bootstrap 
 assert_worker_contains( "'datamachine_recurring_wiki_brain_refill'", $worker_src, 'job mode bootstrap drain includes wiki refill scheduling' );
 assert_worker_contains( "'job-' . \$job_id", $worker_src, 'job mode uses per-job lock lanes' );
 assert_worker_contains( 'dueJobIds', $worker_src, 'job mode selects due jobs from scheduler work' );
-assert_worker_contains( 'extractActionJobId', $worker_src, 'job mode extracts job ids from scheduler args' );
+assert_worker_contains( 'SchedulerEvidence::extractJobId(', $worker_src, 'job mode extracts job ids through the shared scheduler-args parser' );
+assert_worker_not_contains( 'extractActionJobId', $worker_src, 'job mode keeps no private scheduler-args parser' );
+assert_worker_not_contains( 'json_decode( $args_json', $worker_src, 'worker does not hand-parse scheduler args' );
 assert_worker_contains( "'mode'                     => 'job'", $worker_src, 'job mode reports its execution mode' );
 assert_worker_contains( '[--lane=<lane>]', $worker_src, 'worker exposes lane option' );
 assert_worker_contains( "'lane'                    => isset( \$assoc_args['lane'] )", $worker_src, 'worker passes lane option into run loop' );
