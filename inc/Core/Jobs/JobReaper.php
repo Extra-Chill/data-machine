@@ -26,6 +26,7 @@
 
 namespace DataMachine\Core\Jobs;
 
+use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -49,6 +50,9 @@ final class JobReaper {
 	public const ABILITY = 'datamachine/recover-stuck-jobs';
 
 	/** Recovery initiator recorded in machine-readable evidence on recovered jobs. */
+	/** Ability input key that switches recover-stuck between preview and apply. */
+	public const INPUT_DRY_RUN = 'dry_run';
+
 	public const RECOVERY_TRIGGER = JobReaperTask::TASK_TYPE;
 
 	/** Per-run logical-touch cap passed to the ability (apply mode). */
@@ -61,7 +65,7 @@ final class JobReaper {
 	private const COUNTER_AI_DEFERRAL   = 'pending_ai_terminalized';
 	private const COUNTER_STATUS_FINAL  = 'recovered';
 	private const COUNTER_BATCH_PARENTS = 'batch_parents_completed';
-	private const COUNTER_TIMED_OUT     = 'timed_out';
+	private const COUNTER_TIMED_OUT     = RecoverStuckJobsAbility::RESULT_TIMED_OUT;
 	private const COUNTER_REQUEUED      = 'requeued';
 	private const COUNTER_PATHLESS      = 'pathless_terminal';
 	private const COUNTER_STALE_ACTIONS = 'stale_actions';
@@ -121,7 +125,7 @@ final class JobReaper {
 		$previous_check = array() === $flagged ? null : self::checkFlagged( $flagged, $probe ?? self::defaultProbe() );
 
 		$input  = array(
-			'dry_run'                   => $dry_run,
+			self::INPUT_DRY_RUN         => $dry_run,
 			'recover_pending_orphans'   => ! $dry_run,
 			'recover_pathless_children' => false,
 			'limit'                     => self::RUN_TOUCH_LIMIT,

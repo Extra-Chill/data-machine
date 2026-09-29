@@ -323,7 +323,7 @@ namespace {
 			$omitted = 0;
 			$summary = $method->invokeArgs(
 				$ability,
-				array( (bool) $input['dry_run'], null, null, HOUR_IN_SECONDS, (int) $input['pending_limit'], 2, (string) $input['recovery_trigger'], &$details, &$omitted )
+				array( (bool) $input[ JobReaper::INPUT_DRY_RUN ], null, null, HOUR_IN_SECONDS, (int) $input['pending_limit'], 2, (string) $input['recovery_trigger'], &$details, &$omitted )
 			);
 
 			return array(
@@ -345,7 +345,7 @@ namespace {
 	$run             = JobReaper::run( JobReaper::MODE_DRY_RUN, $make_executor( $executor_inputs ) );
 	assert_reaper( 'dry run leaves every row byte-identical', $before === $snapshot() );
 	assert_reaper( 'dry run makes no repository (CAS) calls', array() === Jobs::$calls );
-	assert_reaper( 'ability input is a dry run without pending-orphan apply authorization', true === $executor_inputs[0]['dry_run'] && false === $executor_inputs[0]['recover_pending_orphans'] );
+	assert_reaper( 'ability input is a dry run without pending-orphan apply authorization', true === $executor_inputs[0][ JobReaper::INPUT_DRY_RUN ] && false === $executor_inputs[0]['recover_pending_orphans'] );
 	assert_reaper( 'pathless-child recovery is never authorized', false === $executor_inputs[0]['recover_pathless_children'] );
 	assert_reaper( 'the run is bounded by touch and pending limits', JobReaper::RUN_TOUCH_LIMIT === $executor_inputs[0]['limit'] && JobReaper::RUN_PENDING_LIMIT === $executor_inputs[0]['pending_limit'] );
 	assert_reaper( 'ability input carries the job_reaper recovery trigger', 'job_reaper' === $executor_inputs[0]['recovery_trigger'] );
@@ -362,7 +362,7 @@ namespace {
 	$executor_inputs = array();
 	$run             = JobReaper::run( JobReaper::MODE_APPLY, $make_executor( $executor_inputs ) );
 	$after           = $snapshot();
-	assert_reaper( 'ability input authorizes pending-orphan apply and is not a dry run', false === $executor_inputs[0]['dry_run'] && true === $executor_inputs[0]['recover_pending_orphans'] );
+	assert_reaper( 'ability input authorizes pending-orphan apply and is not a dry run', false === $executor_inputs[0][ JobReaper::INPUT_DRY_RUN ] && true === $executor_inputs[0]['recover_pending_orphans'] );
 	assert_reaper( 'one CAS call per orphan, none for healthy rows', 5 === count( Jobs::$calls ) );
 	assert_reaper( 'CAS calls carry the job_reaper trigger', array( 'job_reaper' ) === array_values( array_unique( array_column( Jobs::$calls, 'trigger' ) ) ) );
 	assert_reaper( 'orphans are terminalized with their verdict as the reason', 'failed - enqueue_failed' === $after[1]['status'] && 'failed - evidence_pruned' === $after[2]['status'] && 'failed - enqueue_interrupted' === $after[3]['status'] && 'failed - orphaned_pending' === $after[5]['status'] );

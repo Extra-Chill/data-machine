@@ -29,6 +29,9 @@ class RecoverStuckJobsAbility {
 
 	use JobHelpers;
 
+	/** Result key counting processing jobs failed as timed out; read by the job reaper. */
+	public const RESULT_TIMED_OUT = 'timed_out';
+
 	private const CANDIDATE_BATCH_SIZE = 50;
 	private const JOB_DETAIL_LIMIT     = 100;
 	private const ACTION_HISTORY_LIMIT = 20;
@@ -989,7 +992,7 @@ class RecoverStuckJobsAbility {
 			'success'        => true,
 			'recovered'      => $recovered,
 			'skipped'        => $skipped,
-			'timed_out'      => $timed_out,
+			self::RESULT_TIMED_OUT => $timed_out,
 			'stale_actions'  => $stale_actions,
 			'requeued'       => $requeued,
 			'pathless_terminal' => $pathless_terminal,
