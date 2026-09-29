@@ -158,7 +158,7 @@ class JobLifecycleTransitionTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, $retried['action_id'] );
 		$this->assertSame( JobStatus::PENDING, $this->db_jobs->get_job( $child_id )['status'] );
 		$this->assertSame( $retried['action_id'], datamachine_get_engine_data( $child_id )['scheduler_recovery']['receipt']['action_id'] );
-		$this->assertSame( JobStatus::PENDING, datamachine_get_engine_data( $child_id )['run_lifecycle']['status'] );
+		$this->assertArrayNotHasKey( 'status', datamachine_get_engine_data( $child_id )['run_lifecycle'] );
 	}
 
 	public function test_recovery_apply_limit_bounds_multiple_candidate_batches(): void {

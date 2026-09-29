@@ -35,7 +35,7 @@ $assert( 'terminal recovery validates locked owner', str_contains( $jobs, 'trans
 $assert( 'locked owner is renewed before side effects', str_contains( $jobs, 'renew_recovery_owner_on_locked_job' ) && str_contains( $jobs, 'RECOVERY_LEASE_TTL' ) );
 $assert( 'execution generation renews immediately before Step execute', str_contains( $execute, 'renew_recovery_execution_owner' ) && strpos( $execute, 'renew_recovery_execution_owner' ) < strpos( $execute, '$flow_step->execute' ) );
 $assert( 'post-execution and route fences remain active', str_contains( $execute, 'was superseded during execution' ) && str_contains( $execute, 'was superseded before next-step scheduling' ) && str_contains( $execute, 'transitionTerminalWithRecoveryFence' ) );
-$assert( 'atomic requeue mirrors run lifecycle', str_contains( $jobs, '$engine[\'run_lifecycle\']' ) && str_contains( $jobs, '$run_lifecycle[\'status\']' ) );
+$assert( 'atomic requeue touches run lifecycle metadata but does not mirror status', str_contains( $jobs, '$engine[\'run_lifecycle\']' ) && ! str_contains( $jobs, '$run_lifecycle[\'status\']' ) );
 $assert( 'action scan keysets exact numeric boundaries before decode', str_contains( $ability, 'action_id < %d' ) && str_contains( $ability, '$like_job_comma' ) && str_contains( $ability, '$like_job_end' ) && str_contains( $ability, 'actionBelongsToJob' ) );
 $assert( 'claim policy includes exact receipt action beyond history cap', str_contains( $ability, '$required_action_id' ) && str_contains( $ability, "['receipt']" ) && str_contains( $ability, 'canClaimNextGeneration' ) );
 $assert( 'CLI prints scope and ownership evidence', str_contains( $cli, 'Recovery scope:' ) && str_contains( $cli, 'recovery_lease_age_seconds' ) && str_contains( $cli, 'receipt_state' ) );

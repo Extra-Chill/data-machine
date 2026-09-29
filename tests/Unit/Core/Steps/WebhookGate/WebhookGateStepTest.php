@@ -501,7 +501,7 @@ class WebhookGateStepTest extends WP_UnitTestCase {
 				)
 			)
 		);
-		$this->assertSame( JobStatus::PROCESSING, $job['engine_data']['run_lifecycle']['status'] );
+		$this->assertArrayNotHasKey( 'status', $job['engine_data']['run_lifecycle'] );
 	}
 
 	public function test_scheduled_execution_reads_committed_packets(): void {

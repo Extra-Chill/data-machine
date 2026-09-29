@@ -62,7 +62,6 @@ class RunLifecycleStore {
 
 		$seed = array(
 			'run_type'      => $run_type,
-			'status'        => JobStatus::PENDING,
 			'attempt'       => max( 1, (int) ( $args['attempt'] ?? 1 ) ),
 			'replay_events' => is_array( $args['replay_events'] ?? null ) ? array_values( $args['replay_events'] ) : array(),
 			'artifact_refs' => is_array( $args['artifact_refs'] ?? null ) ? array_values( $args['artifact_refs'] ) : array(),
@@ -89,14 +88,17 @@ class RunLifecycleStore {
 
 		$engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		$meta        = is_array( $engine_data[ self::META_KEY ] ?? null ) ? $engine_data[ self::META_KEY ] : array();
-		$run_id      = (string) ( $meta['run_id'] ?? $this->run_id_for_job( $job_id ) );
+		// Status lives on the job row only. Rows written before the mirror was
+		// removed may still carry a stale copy; never let it override the row.
+		unset( $meta['status'] );
+		$run_id = (string) ( $meta['run_id'] ?? $this->run_id_for_job( $job_id ) );
 
 		return array_merge(
 			array(
 				'run_id'        => $run_id,
 				'job_id'        => $job_id,
 				'run_type'      => $this->normalize_run_type( $meta['run_type'] ?? ( $job['source'] ?? 'job' ) ),
-				'status'        => (string) ( $job['status'] ?? ( $meta['status'] ?? JobStatus::PENDING ) ),
+				'status'        => (string) ( $job['status'] ?? JobStatus::PENDING ),
 				'attempt'       => max( 1, (int) ( $meta['attempt'] ?? 1 ) ),
 				'replay_events' => is_array( $meta['replay_events'] ?? null ) ? array_values( $meta['replay_events'] ) : array(),
 				'artifact_refs' => is_array( $meta['artifact_refs'] ?? null ) ? array_values( $meta['artifact_refs'] ) : array(),
@@ -196,7 +198,6 @@ class RunLifecycleStore {
 						'run_id'        => $this->run_id_for_job( $job_id ),
 						'job_id'        => $job_id,
 						'run_type'      => $this->normalize_run_type( $metadata['run_type'] ?? 'job' ),
-						'status'        => JobStatus::PENDING,
 						'attempt'       => 1,
 						'replay_events' => array(),
 						'artifact_refs' => array(),
@@ -220,7 +221,10 @@ class RunLifecycleStore {
 	}
 
 	/**
-	 * Mirror an existing job status transition into generic run metadata.
+	 * Record status-transition metadata (reason, timestamps) in run metadata.
+	 *
+	 * The status itself is never mirrored here; the job row is the single
+	 * source of truth and `get_run()` reads it from there.
 	 */
 	public function mark_job_status( int $job_id, string $status, ?string $completed_at = null ): bool {
 		if ( $job_id <= 0 || '' === $status ) {
@@ -232,11 +236,10 @@ class RunLifecycleStore {
 		$result     = $this->mutate_run(
 			$job_id,
 			function ( array $meta ) use ( $status, $completed_at, $job_status ): array {
-				if ( ( $meta['status'] ?? null ) === $status && ( ! JobStatus::isStatusFinal( $status ) || ! empty( $meta['completed_at'] ) ) ) {
+				if ( JobStatus::isStatusFinal( $status ) && ! empty( $meta['completed_at'] ) ) {
 					return $meta;
 				}
-				$terminal_time  = JobStatus::isStatusFinal( $status ) && ! empty( $completed_at ) ? $completed_at : $this->now();
-				$meta['status'] = $status;
+				$terminal_time = JobStatus::isStatusFinal( $status ) && ! empty( $completed_at ) ? $completed_at : $this->now();
 				if ( $job_status->hasReason() ) {
 					$meta['status_reason'] = $job_status->getReason();
 				} else {
@@ -268,7 +271,6 @@ class RunLifecycleStore {
 		return $this->mutate_run(
 			$job_id,
 			function ( array $meta ) use ( $job_status, $timestamp_key, $context ): array {
-				$meta['status'] = $job_status->getBaseStatus();
 				if ( $job_status->hasReason() ) {
 					$meta['status_reason'] = $job_status->getReason();
 				} else {
@@ -296,12 +298,14 @@ class RunLifecycleStore {
 			$job_id,
 			function ( array $snapshot ) use ( $job_id, $callback ): array {
 				$meta                       = is_array( $snapshot[ self::META_KEY ] ?? null ) ? $snapshot[ self::META_KEY ] : array();
+				unset( $meta['status'] ); // Legacy mirror: status lives on the job row only.
 				$meta['run_id']             = (string) ( $meta['run_id'] ?? $this->run_id_for_job( $job_id ) );
 				$meta['job_id']             = $job_id;
 				$meta['attempt']            = max( 1, (int) ( $meta['attempt'] ?? 1 ) );
 				$meta['replay_events']      = is_array( $meta['replay_events'] ?? null ) ? array_values( $meta['replay_events'] ) : array();
 				$meta['artifact_refs']      = is_array( $meta['artifact_refs'] ?? null ) ? array_values( $meta['artifact_refs'] ) : array();
 				$next                       = $callback( $meta );
+				unset( $next['status'] );
 				$next['run_id']             = $this->run_id_for_job( $job_id );
 				$next['job_id']             = $job_id;
 				$snapshot[ self::META_KEY ] = $next;

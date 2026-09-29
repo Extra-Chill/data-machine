@@ -52,7 +52,7 @@ $assert( 'post-effects evidence prohibits replay and accounts for child cleanup'
 
 $jobs_source = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php' ) ?: '';
 $assert( 'requeue schedules and receipts while holding the jobs-row transaction', str_contains( $jobs_source, 'commit_missing_direct_operation_requeue' ) && str_contains( $jobs_source, 'TransactionScope::begin( $this->wpdb )' ) && str_contains( $jobs_source, '$schedule( $new_generation, $new_token )' ) );
-$assert( 'requeue advances generation and restores pending lifecycle', str_contains( $jobs_source, '$new_generation = $generation + 1' ) && str_contains( $jobs_source, "\$run_lifecycle['status']" ) && str_contains( $jobs_source, 'JobStatus::PENDING' ) );
+$assert( 'requeue advances generation and restores pending job status without mirroring it into run_lifecycle', str_contains( $jobs_source, '$new_generation = $generation + 1' ) && ! str_contains( $jobs_source, "\$run_lifecycle['status']" ) && str_contains( $jobs_source, 'JobStatus::PENDING' ) );
 $assert( 'terminal recovery fences the exact recorded action owner', str_contains( $jobs_source, 'missing_direct_operation_owner_matches' ) && str_contains( $jobs_source, "'operation' === \$mode" ) );
 
 echo sprintf( "\nMissing direct-operation recovery smoke complete: %d failures.\n", $failures );

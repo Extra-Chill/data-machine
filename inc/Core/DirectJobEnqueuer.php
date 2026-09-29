@@ -147,26 +147,55 @@ class DirectJobEnqueuer {
 			self::HOOK                   => 'step',
 			'datamachine_resume_ai_step' => 'ai_continuation',
 		) as $hook => $type ) {
-			$action_ids = as_get_scheduled_actions(
-				array(
-					'hook'                  => $hook,
-					'args'                  => array(
-						'job_id'                => $job_id,
-						'operation_generation'  => $generation,
-						'operation_claim_token' => $token,
-					),
-					'partial_args_matching' => 'like',
-					'status'                => array( 'pending', 'in-progress' ),
-					'per_page'              => 1,
-				),
-				'ids'
-			);
-			if ( ! empty( $action_ids ) ) {
+			if ( $this->hasLiveGenerationActionForHook( $hook, $job_id, $generation, $token ) ) {
 				return $type;
 			}
 		}
 
 		return 'none';
+	}
+
+	/**
+	 * Check a hook for a pending/in-progress action owned by this generation.
+	 *
+	 * Action Scheduler stores `md5( json )` in the indexed `args` column (and the
+	 * real JSON in `extended_args`) once the encoded args exceed 191 characters,
+	 * so `partial_args_matching=like` cannot see long payloads. The `search`
+	 * query covers both columns; ownership is then verified against the
+	 * hydrated action args so a substring match never counts as evidence.
+	 */
+	private function hasLiveGenerationActionForHook( string $hook, int $job_id, int $generation, string $token ): bool {
+		$per_page = 25;
+		for ( $page = 0; $page < 4; ++$page ) {
+			$actions = as_get_scheduled_actions(
+				array(
+					'hook'     => $hook,
+					'search'   => $token,
+					'status'   => array( 'pending', 'in-progress' ),
+					'per_page' => $per_page,
+					'offset'   => $page * $per_page,
+				)
+			);
+			if ( ! is_array( $actions ) || empty( $actions ) ) {
+				return false;
+			}
+
+			foreach ( $actions as $action ) {
+				$args = is_object( $action ) && method_exists( $action, 'get_args' ) ? $action->get_args() : array();
+				if ( is_array( $args )
+					&& (int) ( $args['job_id'] ?? 0 ) === $job_id
+					&& (int) ( $args['operation_generation'] ?? 0 ) === $generation
+					&& hash_equals( $token, (string) ( $args['operation_claim_token'] ?? '' ) ) ) {
+					return true;
+				}
+			}
+
+			if ( count( $actions ) < $per_page ) {
+				return false;
+			}
+		}
+
+		return false;
 	}
 
 	private function actionArgs( int $job_id, string $flow_step_id, int $generation, string $token ): array {
