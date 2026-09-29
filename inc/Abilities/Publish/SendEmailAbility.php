@@ -242,7 +242,7 @@ class SendEmailAbility {
 		if ( ! empty( $config['auth_ref'] ) ) {
 			$providers = apply_filters( 'datamachine_auth_providers', array() );
 			$auth      = $providers['email_imap'] ?? null;
-			if ( ! $auth || ! method_exists( $auth, 'resolve_mailbox' ) ) {
+			if ( ! is_object( $auth ) || ! method_exists( $auth, 'resolve_mailbox' ) || ! method_exists( $auth, 'resolve_mailbox_for_principal' ) ) {
 				return new \WP_Error( 'email_imap_not_configured', 'Email IMAP provider is not registered.', array( 'status' => 400 ) );
 			}
 			$resolved = null === $queued_context

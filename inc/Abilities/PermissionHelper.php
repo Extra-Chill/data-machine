@@ -105,7 +105,7 @@ class PermissionHelper {
 	 * Array means only these DM capabilities are allowed for this token.
 	 *
 	 * @since 0.47.0
-	 * @var array|null
+	 * @var \WP_Agent_Capability_Ceiling|null
 	 */
 	private static ?\WP_Agent_Capability_Ceiling $capability_ceiling = null;
 
@@ -442,7 +442,7 @@ class PermissionHelper {
 	 */
 	public static function set_execution_principal( WP_Agent_Execution_Principal $principal ): void {
 		self::$execution_principal = $principal;
-		if ( property_exists( $principal, 'capability_ceiling' ) && $principal->capability_ceiling instanceof \WP_Agent_Capability_Ceiling ) {
+		if ( $principal->capability_ceiling instanceof \WP_Agent_Capability_Ceiling ) {
 			self::$capability_ceiling = $principal->capability_ceiling;
 		}
 	}
@@ -579,7 +579,7 @@ class PermissionHelper {
 			$registry = \WP_Abilities_Registry::get_instance();
 			if ( method_exists( $registry, 'is_registered' ) && $registry->is_registered( $ability_slug ) ) {
 				$ability = $registry->get_registered( $ability_slug );
-				if ( is_object( $ability ) && method_exists( $ability, 'get_category' ) ) {
+				if ( $ability instanceof \WP_Ability ) {
 					$category = (string) $ability->get_category();
 				}
 			}
