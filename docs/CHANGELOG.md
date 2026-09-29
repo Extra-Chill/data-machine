@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.179.4] - 2026-09-29
+
+### Changed
+- move liveness classifier to Core with one batch scheduler evidence query
+
 ## [0.179.3] - 2026-09-29
 
 ### Fixed
