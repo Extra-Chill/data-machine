@@ -177,6 +177,10 @@ namespace {
 			return 1;
 		}
 
+		public function get_var( $query = null ) {
+			return is_string( $query ) && str_contains( $query, 'max_allowed_packet' ) ? 67108864 : null;
+		}
+
 		public function get_row( $query = null, $output = OBJECT, $y = 0 ) {
 			$args   = is_array( $query ) ? ( $query[1] ?? array() ) : array();
 			$job_id = (int) end( $args );
@@ -190,6 +194,7 @@ namespace {
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 	require_once __DIR__ . '/../inc/Core/Database/LifecycleStateTransition.php';
+	require_once __DIR__ . '/../inc/Core/Database/TransactionScope.php';
 	require_once __DIR__ . '/../inc/Core/EngineData.php';
 	require_once __DIR__ . '/../inc/Core/RunLifecycleStore.php';
 	require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
@@ -216,8 +221,14 @@ namespace {
 	$assert( 'pending' === ( $run['status'] ?? '' ), 'create_run records pending status' );
 	$assert( 1 === ( $run['attempt'] ?? 0 ), 'create_run initializes attempt' );
 
+	$stored_lifecycle = json_decode( (string) $wpdb->rows[1]['engine_data'], true )[ RunLifecycleStore::META_KEY ] ?? array();
+	$assert( ! array_key_exists( 'status', $stored_lifecycle ), 'create_run does not mirror status into engine_data.run_lifecycle' );
+
 	$started = $store->start_run( 'job:1' );
 	$assert( 'processing' === ( $started['status'] ?? '' ), 'start_run transitions to processing' );
+
+	$stored_lifecycle = json_decode( (string) $wpdb->rows[1]['engine_data'], true )[ RunLifecycleStore::META_KEY ] ?? array();
+	$assert( ! array_key_exists( 'status', $stored_lifecycle ) && 'processing' === $wpdb->rows[1]['status'], 'transitions write status to the job row only' );
 
 	$waiting = $store->wait_run( 'job:1', array( 'gate' => 'manual' ) );
 	$assert( 'waiting' === ( $waiting['status'] ?? '' ), 'wait_run transitions to waiting' );
@@ -236,6 +247,17 @@ namespace {
 
 	$failed_after_final = $store->fail_run( 'job:1', 'too late' );
 	$assert( false === $failed_after_final, 'terminal runs are immutable through fail_run' );
+
+	$stored_lifecycle = json_decode( (string) $wpdb->rows[1]['engine_data'], true )[ RunLifecycleStore::META_KEY ] ?? array();
+	$assert( ! array_key_exists( 'status', $stored_lifecycle ) && ! empty( $stored_lifecycle['completed_at'] ), 'terminal transition keeps timestamps but not a status mirror' );
+
+	// Legacy rows carrying a stale mirror never override the job row and are cleaned on next write.
+	$wpdb->rows[1]['engine_data'] = json_encode( array( RunLifecycleStore::META_KEY => array_merge( $stored_lifecycle, array( 'status' => 'pending' ) ) ) );
+	$legacy                       = $store->get_run( 'job:1' );
+	$assert( 'completed' === ( $legacy['status'] ?? '' ), 'get_run ignores a stale legacy run_lifecycle.status and reads the job row' );
+	$store->append_replay_event( 'job:1', 'legacy_cleanup' );
+	$cleaned = json_decode( (string) $wpdb->rows[1]['engine_data'], true )[ RunLifecycleStore::META_KEY ] ?? array();
+	$assert( ! array_key_exists( 'status', $cleaned ), 'next lifecycle write drops the legacy status mirror' );
 
 	$cancel_candidate = $store->create_run( 'deterministic_loop' );
 	$cancelled        = $store->cancel_run( $cancel_candidate['run_id'] ?? '' );

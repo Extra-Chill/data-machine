@@ -819,7 +819,7 @@ class DirectJobOwnershipTest extends WP_UnitTestCase {
 		$this->assertNotSame( (int) $before['operation_action_id'], (int) $after['operation_action_id'] );
 		$this->assertSame( 'requeued', $after['engine_data']['direct_operation_recovery']['state'] );
 		$this->assertSame( (int) $before['operation_action_id'], (int) $after['engine_data']['direct_operation_recovery']['missing_action_id'] );
-		$this->assertSame( JobStatus::PENDING, $after['engine_data']['run_lifecycle']['status'] );
+		$this->assertArrayNotHasKey( 'status', $after['engine_data']['run_lifecycle'] );
 		$this->assertSame( 'requeued_missing_direct_action', $result['jobs'][0]['status'] );
 
 		$stale = ( new ExecuteStepAbility() )->execute( $old_args );

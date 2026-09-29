@@ -123,7 +123,6 @@ class Jobs extends BaseRepository {
 			$job_id,
 			array(
 				'run_type' => $prepared['data']['source'] ?? 'job',
-				'status'   => $prepared['data']['status'] ?? JobStatus::PENDING,
 			)
 		);
 
@@ -203,7 +202,6 @@ class Jobs extends BaseRepository {
 			$job_id,
 			array(
 				'run_type' => $prepared['data']['source'] ?? 'job',
-				'status'   => $prepared['data']['status'] ?? JobStatus::PENDING,
 			)
 		);
 
@@ -548,7 +546,6 @@ class Jobs extends BaseRepository {
 			'recovered_at'                  => gmdate( 'c' ),
 		);
 		$run_lifecycle                         = is_array( $engine[ RunLifecycleStore::META_KEY ] ?? null ) ? $engine[ RunLifecycleStore::META_KEY ] : array();
-		$run_lifecycle['status']               = JobStatus::PENDING;
 		$run_lifecycle['updated_at']           = current_time( 'mysql', true );
 		$engine[ RunLifecycleStore::META_KEY ] = $run_lifecycle;
 
@@ -2574,7 +2571,6 @@ class Jobs extends BaseRepository {
 		$run_lifecycle['attempt']            = max( 1, (int) ( $run_lifecycle['attempt'] ?? 1 ) );
 		$run_lifecycle['replay_events']      = is_array( $run_lifecycle['replay_events'] ?? null ) ? array_values( $run_lifecycle['replay_events'] ) : array();
 		$run_lifecycle['artifact_refs']      = is_array( $run_lifecycle['artifact_refs'] ?? null ) ? array_values( $run_lifecycle['artifact_refs'] ) : array();
-		$run_lifecycle['status']             = JobStatus::PROCESSING;
 		$run_lifecycle['updated_at']         = current_time( 'mysql', true );
 		$engine['run_lifecycle']             = $run_lifecycle;
 		$engine['webhook_gate']['action_id'] = $action_id;
@@ -2844,7 +2840,6 @@ class Jobs extends BaseRepository {
 		$run_lifecycle['attempt']       = max( 1, (int) ( $run_lifecycle['attempt'] ?? 1 ) );
 		$run_lifecycle['replay_events'] = is_array( $run_lifecycle['replay_events'] ?? null ) ? array_values( $run_lifecycle['replay_events'] ) : array();
 		$run_lifecycle['artifact_refs'] = is_array( $run_lifecycle['artifact_refs'] ?? null ) ? array_values( $run_lifecycle['artifact_refs'] ) : array();
-		$run_lifecycle['status']        = JobStatus::PENDING;
 		$run_lifecycle['updated_at']    = current_time( 'mysql', true );
 		$engine['run_lifecycle']        = $run_lifecycle;
 
