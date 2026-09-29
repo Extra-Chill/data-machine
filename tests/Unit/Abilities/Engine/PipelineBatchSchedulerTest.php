@@ -316,12 +316,12 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 	}
 
 	public function test_pathless_batch_recovery_preserves_nested_and_serialized_action_args(): void {
-		$extract = new \ReflectionMethod( PathlessBatchRecovery::class, 'extractParentJobId' );
-
-		$this->assertSame( 100, $extract->invoke( null, wp_json_encode( array( 'parent_job_id' => 100, 'offset' => 0 ) ) ) );
-		$this->assertSame( 123, $extract->invoke( null, wp_json_encode( array( array( 'parent_job_id' => 123 ) ) ) ) );
-		$this->assertSame( 321, $extract->invoke( null, serialize( array( 'parent_job_id' => 321, 'offset' => 0 ) ) ) );
-		$this->assertSame( 456, $extract->invoke( null, serialize( array( array( 'parent_job_id' => 456 ) ) ) ) );
+		// Parent-id extraction moved to the shared scheduler evidence parser (#3575).
+		$hook = \DataMachine\Abilities\Engine\PipelineBatchScheduler::BATCH_HOOK;
+		$this->assertSame( 100, \DataMachine\Core\Jobs\SchedulerEvidence::extractJobId( wp_json_encode( array( 'parent_job_id' => 100, 'offset' => 0 ) ), $hook ) );
+		$this->assertSame( 123, \DataMachine\Core\Jobs\SchedulerEvidence::extractJobId( wp_json_encode( array( array( 'parent_job_id' => 123 ) ) ), $hook ) );
+		$this->assertSame( 321, \DataMachine\Core\Jobs\SchedulerEvidence::extractJobId( serialize( array( 'parent_job_id' => 321, 'offset' => 0 ) ), $hook ) );
+		$this->assertSame( 456, \DataMachine\Core\Jobs\SchedulerEvidence::extractJobId( serialize( array( array( 'parent_job_id' => 456 ) ) ), $hook ) );
 	}
 
 	/**
