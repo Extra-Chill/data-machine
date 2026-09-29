@@ -110,13 +110,14 @@ final class JobReaperHistory {
 		$run['flagged'] = array_slice( is_array( $run['flagged'] ?? null ) ? array_values( $run['flagged'] ) : array(), 0, self::MAX_FLAGGED );
 
 		$history['runs'][] = $run;
-		$history['runs']   = array_slice( array_values( $history['runs'] ), -self::MAX_RUNS );
+		$history['runs']   = array_slice( $history['runs'], -self::MAX_RUNS );
 
 		$totals                 = $history['totals'];
 		$check                  = is_array( $run['previous_check'] ?? null ) ? $run['previous_check'] : array();
 		$totals['runs']         = (int) $totals['runs'] + 1;
-		$totals['dry_run_runs'] = (int) $totals['dry_run_runs'] + ( ! empty( $run['dry_run'] ) ? 1 : 0 );
-		$totals['apply_runs']   = (int) $totals['apply_runs'] + ( empty( $run['dry_run'] ) ? 1 : 0 );
+		$applied                = JobReaper::MODE_APPLY === ( $run['mode'] ?? '' );
+		$totals['dry_run_runs'] = (int) $totals['dry_run_runs'] + ( $applied ? 0 : 1 );
+		$totals['apply_runs']   = (int) $totals['apply_runs'] + ( $applied ? 1 : 0 );
 		$totals['would_act']    = (int) $totals['would_act'] + (int) ( $run['would_act'] ?? 0 );
 		$totals['acted']        = (int) $totals['acted'] + (int) ( $run['acted'] ?? 0 );
 		$totals['fp_checked']   = (int) $totals['fp_checked'] + (int) ( $check['checked'] ?? 0 );

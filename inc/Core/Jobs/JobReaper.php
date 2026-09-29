@@ -32,6 +32,7 @@ use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\PendingJobRecoveryPolicy;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\System\Tasks\JobReaperTask;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -48,7 +49,7 @@ final class JobReaper {
 	public const ABILITY = 'datamachine/recover-stuck-jobs';
 
 	/** Recovery initiator recorded in machine-readable evidence on recovered jobs. */
-	public const RECOVERY_TRIGGER = 'job_reaper';
+	public const RECOVERY_TRIGGER = JobReaperTask::TASK_TYPE;
 
 	/** Per-run logical-touch cap passed to the ability (apply mode). */
 	public const RUN_TOUCH_LIMIT = 25;
@@ -123,7 +124,6 @@ final class JobReaper {
 		$run = array(
 			'ran_at'  => gmdate( 'c' ),
 			'mode'    => $mode,
-			'dry_run' => $dry_run,
 			'success' => ! empty( $result['success'] ),
 		) + self::summarize( $result, $dry_run );
 		if ( ! $run['success'] ) {
@@ -390,7 +390,7 @@ final class JobReaper {
 			}
 
 			$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
-			$counts =  ! empty( $engine['batch'] ) ? JobLiveness::childCounts( $job_id, self::LIVENESS_OVERDUE_MINUTES, $evidence ) : array();
+			$counts = ! empty( $engine['batch'] ) ? JobLiveness::childCounts( $job_id, self::LIVENESS_OVERDUE_MINUTES, $evidence ) : array();
 
 			return array(
 				'status' => $status,

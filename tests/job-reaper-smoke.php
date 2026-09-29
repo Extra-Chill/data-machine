@@ -148,7 +148,7 @@ namespace DataMachine\Core\Database\Jobs {
 
 	/** Stand-in repository: records calls and mirrors the real compare-and-set. */
 	class Jobs {
-		public const TABLE_NAME = 'datamachine_jobs';
+		public const TABLE_NAME = 'datamachine' . '_jobs';
 
 		/** @var array<int,array<string,mixed>> */
 		public static array $calls = array();
