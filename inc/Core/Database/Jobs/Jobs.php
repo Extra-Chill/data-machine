@@ -25,6 +25,7 @@ use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\PendingJobRecoveryPolicy;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\RunLifecycleStore;
 
@@ -2670,6 +2671,40 @@ class Jobs extends BaseRepository {
 		);
 	}
 
+	/**
+	 * Terminalize an orphaned pending job, compare-and-set on the observed row state.
+	 *
+	 * The locked row must still be `pending`, carry the observed operation state and
+	 * generation, and still yield the observed verdict from the pending-orphan policy
+	 * (no future retry/throttle, no live enqueue lease). Any drift rolls back.
+	 *
+	 * @param int    $job_id                    Job ID.
+	 * @param string $verdict                   PendingJobRecoveryPolicy verdict observed by the caller.
+	 * @param string $observed_operation_state  Observed operation_state ('' for NULL).
+	 * @param int    $observed_generation       Observed operation_generation.
+	 * @param string $trigger                   Recovery initiator recorded in engine_data.
+	 * @param int    $grace_seconds             Grace window the caller applied.
+	 * @return array{success: bool, changed: bool, current_status: ?string, status: string}
+	 */
+	public function transition_orphaned_pending_job( int $job_id, string $verdict, string $observed_operation_state, int $observed_generation, string $trigger, int $grace_seconds ): array {
+		if ( $job_id <= 0 || ! in_array( $verdict, PendingJobRecoveryPolicy::verdicts(), true ) ) {
+			return $this->status_transition_result( false, false, null, JobStatus::FAILED );
+		}
+
+		return $this->transition_terminal_job_status_result(
+			$job_id,
+			PendingJobRecoveryPolicy::terminalStatus( $verdict ),
+			array(
+				'mode'            => 'pending_orphan',
+				'verdict'         => $verdict,
+				'operation_state' => $observed_operation_state,
+				'generation'      => $observed_generation,
+				'grace_seconds'   => max( 0, $grace_seconds ),
+				'trigger'         => sanitize_key( $trigger ),
+			)
+		);
+	}
+
 	/** Commit a terminal direct-operation recovery only while the recorded action generation owns the row. */
 	public function transition_missing_direct_operation( int $job_id, string $status, int $action_id, int $generation, string $token, string $trigger ): array {
 		if ( ! JobStatus::isStatusFinal( $status ) || $action_id <= 0 || $generation <= 0 || '' === $token ) {
@@ -3133,7 +3168,8 @@ class Jobs extends BaseRepository {
 		$operation_recovery    = 'operation' === $owner_mode;
 		$ai_deferral_recovery  = 'ai_deferral' === $owner_mode;
 		$webhook_gate_timeout  = 'webhook_gate_timeout' === $owner_mode;
-		if ( $pending_direct_cancel || $operation_recovery ) {
+		$pending_orphan        = 'pending_orphan' === $owner_mode;
+		if ( $pending_direct_cancel || $operation_recovery || ( $pending_orphan && '' !== (string) ( $job['operation_state'] ?? '' ) ) ) {
 			$update_data['operation_state']       = 'cancelled';
 			$update_data['operation_claimed_at']  = null;
 			$update_data['operation_claim_token'] = null;
@@ -3180,7 +3216,19 @@ class Jobs extends BaseRepository {
 			$engine['webhook_gate']['timed_out_at'] = gmdate( 'c' );
 			$update_data['engine_data']              = wp_json_encode( $engine );
 		}
-		if ( is_array( $recovery_owner ) && ! $operation_recovery && ! $ai_deferral_recovery && ! $webhook_gate_timeout ) {
+		if ( $pending_orphan ) {
+			$engine['pending_orphan_recovery'] = array(
+				'schema'                     => 'datamachine.pending-orphan-recovery.v1',
+				'verdict'                    => (string) ( $recovery_owner['verdict'] ?? '' ),
+				'trigger'                    => (string) ( $recovery_owner['trigger'] ?? '' ),
+				'previous_operation_state'   => (string) ( $recovery_owner['operation_state'] ?? '' ),
+				'previous_operation_generation' => (int) ( $recovery_owner['generation'] ?? 0 ),
+				'grace_seconds'              => (int) ( $recovery_owner['grace_seconds'] ?? 0 ),
+				'recovered_at'               => gmdate( 'c' ),
+			);
+			$update_data['engine_data'] = wp_json_encode( $engine );
+		}
+		if ( is_array( $recovery_owner ) && ! $operation_recovery && ! $ai_deferral_recovery && ! $webhook_gate_timeout && ! $pending_orphan ) {
 			$engine['scheduler_recovery']['state']        = 'terminalized';
 			$engine['scheduler_recovery']['completed_at'] = gmdate( 'c' );
 			$engine['scheduler_recovery']['receipt']      = array(
@@ -3522,6 +3570,9 @@ class Jobs extends BaseRepository {
 		if ( 'ai_deferral' === $mode ) {
 			return $this->expired_ai_deferral_owner_matches( $job, $owner );
 		}
+		if ( 'pending_orphan' === $mode ) {
+			return $this->pending_orphan_owner_matches( $job, $owner );
+		}
 		if ( 'webhook_gate_timeout' === $mode ) {
 			$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 			$gate   = is_array( $engine['webhook_gate'] ?? null ) ? $engine['webhook_gate'] : array();
@@ -3536,6 +3587,21 @@ class Jobs extends BaseRepository {
 
 		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		return ChildJobRecoveryPolicy::recoveryExecutionMatches( $engine, $generation, $token );
+	}
+
+	/** Re-verify, on the locked row, the pending-orphan verdict the caller observed. */
+	private function pending_orphan_owner_matches( ?array $job, array $owner ): bool {
+		if ( ! is_array( $job ) || JobStatus::PENDING !== (string) ( $job['status'] ?? '' ) ) {
+			return false;
+		}
+
+		$engine = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		// Live scheduler evidence is checked by the caller; every row-local guard is re-run here.
+		$diagnosis = PendingJobRecoveryPolicy::diagnose( $job, $engine, array(), time(), (int) ( $owner['grace_seconds'] ?? 0 ) );
+
+		return (string) ( $owner['verdict'] ?? '' ) === $diagnosis['verdict']
+			&& (string) ( $owner['operation_state'] ?? '' ) === (string) ( $job['operation_state'] ?? '' )
+			&& (int) ( $owner['generation'] ?? 0 ) === (int) ( $job['operation_generation'] ?? 0 );
 	}
 
 	/** Validate an expired AI receipt and prove its exact scheduler action is absent. */

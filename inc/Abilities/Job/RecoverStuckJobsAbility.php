@@ -3,7 +3,8 @@
 /**
  * Recover Stuck Jobs Ability
  *
- * Recovers stuck processing jobs and expired pending AI deferrals whose exact scheduler action is absent.
+ * Recovers stuck processing jobs, expired pending AI deferrals whose exact scheduler action is absent,
+ * and pending jobs that no live Action Scheduler action can advance.
  *
  * @package DataMachine\Abilities\Job
  * @since 0.17.0
@@ -12,6 +13,7 @@
 namespace DataMachine\Abilities\Job;
 
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\PendingJobRecoveryPolicy;
 use DataMachine\Core\ChildJobRecoveryPolicy;
 use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\DirectOperationRecoveryPolicy;
@@ -33,6 +35,18 @@ class RecoverStuckJobsAbility {
 	private const RECOVERY_CLAIM_TTL   = 300;
 	private const DEFAULT_APPLY_LIMIT   = 3;
 	private const MAX_APPLY_LIMIT       = 100;
+
+	/** Per-run bound on pending orphans terminalized (or previewed). */
+	private const MAX_PENDING_ORPHANS_PER_RUN = 500;
+
+	/** Candidate rows read per page while scanning pending orphans. */
+	private const PENDING_ORPHAN_PAGE_SIZE = 100;
+
+	/** Hard cap on pending rows examined per run, including excluded rows. */
+	private const PENDING_ORPHAN_SCAN_LIMIT = 5000;
+
+	/** Live-action rows loaded per run; exceeding it fails the pass closed. */
+	private const LIVE_ACTION_SCAN_LIMIT = 5000;
 
 	/**
 	 * Data Machine-owned Action Scheduler hooks that may be reconciled.
@@ -58,7 +72,7 @@ class RecoverStuckJobsAbility {
 				'datamachine/recover-stuck-jobs',
 				array(
 					'label'               => __( 'Recover Stuck Jobs', 'data-machine' ),
-					'description'         => __( 'Recover stuck processing jobs and expired pending AI deferrals whose exact scheduler action is absent.', 'data-machine' ),
+					'description'         => __( 'Recover stuck processing jobs, expired pending AI deferrals, and pending jobs with no live scheduler action.', 'data-machine' ),
 					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -89,6 +103,23 @@ class RecoverStuckJobsAbility {
 								'default'     => false,
 								'description' => __( 'Explicitly authorize applying pathless child recovery', 'data-machine' ),
 							),
+							'recover_pending_orphans' => array(
+								'type'        => 'boolean',
+								'default'     => false,
+								'description' => __( 'Explicitly authorize applying pending-orphan recovery. Dry-runs always diagnose pending orphans without this flag.', 'data-machine' ),
+							),
+							'pending_grace_minutes' => array(
+								'type'        => 'integer',
+								'minimum'     => 1,
+								'description' => __( 'Minimum age in minutes before a pending job with no live scheduler action is recoverable. Defaults to 60 (filterable).', 'data-machine' ),
+							),
+							'pending_limit' => array(
+								'type'        => 'integer',
+								'minimum'     => 1,
+								'maximum'     => self::MAX_PENDING_ORPHANS_PER_RUN,
+								'default'     => self::MAX_PENDING_ORPHANS_PER_RUN,
+								'description' => __( 'Per-run bound on pending orphans previewed or terminalized. Independent of the logical-touch limit.', 'data-machine' ),
+							),
 							'timeout_hours' => array(
 								'type'        => 'integer',
 								'default'     => 2,
@@ -116,6 +147,11 @@ class RecoverStuckJobsAbility {
 							'pathless_policy_skipped' => array( 'type' => 'integer' ),
 							'pending_ai_terminalized' => array( 'type' => 'integer' ),
 							'pending_ai_guarded' => array( 'type' => 'integer' ),
+							'pending_orphans_terminalized' => array( 'type' => 'integer' ),
+							'pending_orphans' => array(
+								'type'        => 'object',
+								'description' => __( 'Pending-orphan scope: per-verdict counts, skip reasons, grace window, and per-run bound.', 'data-machine' ),
+							),
 							'batch_parents_completed' => array( 'type' => 'integer' ),
 							'mutations'     => array( 'type' => 'integer' ),
 							'attempted'     => array(
@@ -197,6 +233,9 @@ class RecoverStuckJobsAbility {
 		$requested_limit = null === $job_id_scope ? $input_limit : 1;
 		$apply_limit     = null === $job_id_scope ? $requested_limit : self::MAX_APPLY_LIMIT;
 		$recover_pathless_children = ! empty( $input['recover_pathless_children'] );
+		$recover_pending_orphans   = ! empty( $input['recover_pending_orphans'] );
+		$pending_grace_seconds     = $this->resolvePendingGraceSeconds( $input, $flow_id );
+		$pending_limit             = isset( $input['pending_limit'] ) && is_numeric( $input['pending_limit'] ) ? max( 1, min( self::MAX_PENDING_ORPHANS_PER_RUN, (int) $input['pending_limit'] ) ) : self::MAX_PENDING_ORPHANS_PER_RUN;
 
 		$recovered      = 0;
 		$skipped        = 0;
@@ -321,6 +360,19 @@ class RecoverStuckJobsAbility {
 					'reason'  => 'pending_ai_ownership_changed',
 				) );
 			}
+		}
+
+		// Pending orphans: pending rows older than the grace window with no live scheduler
+		// action. Dry-runs always diagnose; apply requires explicit authorization so the
+		// automatic worker pass never terminalizes them.
+		$pending_orphans_enabled = $dry_run || $recover_pending_orphans;
+		$pending_orphans         = $this->emptyPendingOrphanSummary( $pending_orphans_enabled, $pending_grace_seconds, $pending_limit );
+		if ( $pending_orphans_enabled ) {
+			$pending_orphans = $this->recoverPendingOrphans( $dry_run, $flow_id, $job_id_scope, $pending_grace_seconds, $pending_limit, $timeout_hours, $recovery_trigger, $jobs, $jobs_omitted );
+			$skipped        += $pending_orphans['guarded'];
+			$mutations      += $pending_orphans['terminalized'];
+			$mutated        += $pending_orphans['terminalized'];
+			$limit_reached   = $limit_reached || $pending_orphans['limit_reached'];
 		}
 
 		$last_job_id = 0;
@@ -900,8 +952,8 @@ class RecoverStuckJobsAbility {
 		$limit_unit          = null === $job_id_scope ? 'logical_touch' : 'target';
 		$logical_touch_limit = $apply_limit;
 		$message = $dry_run
-			? sprintf( 'Dry run complete. Would terminalize %d expired pending AI deferrals, recover %d jobs, complete %d batch parents, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, reconcile %d terminal-backed actions, guard %d pending AI deferrals, and guard %d pathless children requiring explicit authorization.', $pending_ai_terminalized, $recovered, $batch_parents_completed, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped )
-			: sprintf( 'Recovery complete. Target attempts/logical touches/logical mutations: %d/%d/%d (%s input limit %d; requested limit %d %s; logical-touch safety cap %d), outcomes: %d, pending AI terminalized: %d, recovered: %d, batch parents completed: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, pending AI guarded: %d, policy-skipped: %d', $target_attempts, $touched, $mutated, $limit_mode, $input_limit, $limit_value, $limit_unit, $logical_touch_limit, $mutations, $pending_ai_terminalized, $recovered, $batch_parents_completed, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped );
+			? sprintf( 'Dry run complete. Would terminalize %d pending orphans, %d expired pending AI deferrals, recover %d jobs, complete %d batch parents, timeout %d jobs, requeue %d pathless children, terminalize %d pathless children, reconcile %d terminal-backed actions, guard %d pending AI deferrals, and guard %d pathless children requiring explicit authorization.', $pending_orphans['would_terminalize'], $pending_ai_terminalized, $recovered, $batch_parents_completed, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped )
+			: sprintf( 'Recovery complete. Target attempts/logical touches/logical mutations: %d/%d/%d (%s input limit %d; requested limit %d %s; logical-touch safety cap %d), outcomes: %d, pending orphans terminalized: %d, pending AI terminalized: %d, recovered: %d, batch parents completed: %d, timed out: %d, pathless requeued: %d, pathless terminal: %d, reconciled actions: %d, pending AI guarded: %d, policy-skipped: %d', $target_attempts, $touched, $mutated, $limit_mode, $input_limit, $limit_value, $limit_unit, $logical_touch_limit, $mutations, $pending_orphans['terminalized'], $pending_ai_terminalized, $recovered, $batch_parents_completed, $timed_out, $pathless_requeued, $pathless_terminal, $stale_actions, $pending_ai_guarded, $pathless_policy_skipped );
 
 		if ( ! $dry_run && ( $mutations > 0 || $claimed_elsewhere > 0 || $pathless_policy_skipped > 0 ) ) {
 			do_action(
@@ -919,6 +971,8 @@ class RecoverStuckJobsAbility {
 					'pathless_policy_skipped' => $pathless_policy_skipped,
 					'pending_ai_terminalized' => $pending_ai_terminalized,
 					'pending_ai_guarded' => $pending_ai_guarded,
+					'pending_orphans_terminalized' => $pending_orphans['terminalized'],
+					'pending_orphan_verdicts' => $pending_orphans['verdicts'],
 					'batch_parents_completed' => $batch_parents_completed,
 					'mutations'     => $mutations,
 					'attempted'     => $attempted,
@@ -954,6 +1008,8 @@ class RecoverStuckJobsAbility {
 			'pathless_policy_skipped' => $pathless_policy_skipped,
 			'pending_ai_terminalized' => $pending_ai_terminalized,
 			'pending_ai_guarded' => $pending_ai_guarded,
+			'pending_orphans_terminalized' => $pending_orphans['terminalized'],
+			'pending_orphans' => $pending_orphans,
 			'batch_parents_completed' => $batch_parents_completed,
 			'mutations'      => $mutations,
 			'attempted'      => $attempted,
@@ -976,6 +1032,10 @@ class RecoverStuckJobsAbility {
 				'statuses'                  => array( 'processing', 'pending' ),
 				'includes_pending_ai'       => true,
 				'pending_ai_requirement'    => 'expired deferred throttle with exact absent action receipt',
+				'includes_pending_orphans'  => true,
+				'pending_orphan_requirement' => 'pending row older than the grace window with no live scheduler action, no future retry/throttle, and no unexpired enqueue lease',
+				'pending_orphan_apply_authorized' => $recover_pending_orphans,
+				'pending_grace_seconds'     => $pending_grace_seconds,
 				'recover_pathless_children' => $recover_pathless_children,
 			),
 			'dry_run'        => $dry_run,
@@ -1062,6 +1122,243 @@ class RecoverStuckJobsAbility {
 		}
 		unset( $row );
 		return $rows;
+	}
+
+	/**
+	 * Resolve the pending-orphan grace window in seconds.
+	 *
+	 * @param array<string,mixed> $input   Ability input.
+	 * @param int|null            $flow_id Optional flow scope.
+	 */
+	private function resolvePendingGraceSeconds( array $input, ?int $flow_id ): int {
+		$default = PendingJobRecoveryPolicy::DEFAULT_GRACE_SECONDS;
+		if ( isset( $input['pending_grace_minutes'] ) && is_numeric( $input['pending_grace_minutes'] ) ) {
+			$default = max( 1, (int) $input['pending_grace_minutes'] ) * MINUTE_IN_SECONDS;
+		}
+
+		/**
+		 * Filter the age before a pending job with no live scheduler action is recoverable.
+		 *
+		 * @param int      $seconds Grace window in seconds.
+		 * @param int|null $flow_id Optional flow scope.
+		 */
+		return max( MINUTE_IN_SECONDS, (int) apply_filters( 'datamachine_recover_stuck_pending_grace_seconds', $default, $flow_id ) );
+	}
+
+	/**
+	 * Zeroed pending-orphan summary.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function emptyPendingOrphanSummary( bool $enabled, int $grace_seconds, int $limit ): array {
+		return array(
+			'enabled'           => $enabled,
+			'grace_seconds'     => $grace_seconds,
+			'limit'             => $limit,
+			'limit_reached'     => false,
+			'evidence_complete' => true,
+			'scanned'           => 0,
+			'would_terminalize' => 0,
+			'terminalized'      => 0,
+			'guarded'           => 0,
+			'verdicts'          => array_fill_keys( PendingJobRecoveryPolicy::verdicts(), 0 ),
+			'skipped_reasons'   => array(),
+		);
+	}
+
+	/**
+	 * Diagnose and (unless dry-run) terminalize pending jobs no live scheduler action can advance.
+	 *
+	 * Candidates are `pending` rows older than the grace window. Rows with a future
+	 * retry/AI throttle, an unexpired enqueue lease, batch state, or a live Action
+	 * Scheduler action are excluded. Terminalization goes through the Jobs
+	 * compare-and-set transition, never a raw UPDATE.
+	 *
+	 * @param bool                            $dry_run       Preview only.
+	 * @param int|null                        $flow_id       Optional flow scope.
+	 * @param int|null                        $job_id_scope  Optional exact job scope.
+	 * @param int                             $grace_seconds Minimum row age.
+	 * @param int                             $limit         Per-run bound on actionable rows.
+	 * @param int                             $timeout_hours In-progress action freshness window.
+	 * @param string                          $trigger       Recovery initiator.
+	 * @param array<int,array<string,mixed>>  $jobs          Job detail rows (by reference).
+	 * @param int                             $jobs_omitted  Omitted detail count (by reference).
+	 * @return array<string,mixed> Pending-orphan summary.
+	 */
+	private function recoverPendingOrphans( bool $dry_run, ?int $flow_id, ?int $job_id_scope, int $grace_seconds, int $limit, int $timeout_hours, string $trigger, array &$jobs, int &$jobs_omitted ): array {
+		global $wpdb;
+		$table   = $wpdb->prefix . 'datamachine_jobs';
+		$now     = time();
+		$summary = $this->emptyPendingOrphanSummary( true, $grace_seconds, $limit );
+		$limit   = max( 1, min( self::MAX_PENDING_ORPHANS_PER_RUN, $limit ) );
+
+		$live_actions = $this->getLiveJobActionMap( $timeout_hours, $now );
+		if ( ! $live_actions['complete'] ) {
+			// Absence of a live action cannot be proven; refuse to infer orphans.
+			$summary['evidence_complete'] = false;
+			return $summary;
+		}
+
+		$cutoff      = gmdate( 'Y-m-d H:i:s', $now - $grace_seconds );
+		$last_job_id = 0;
+		$actionable  = 0;
+
+		while ( $summary['scanned'] < self::PENDING_ORPHAN_SCAN_LIMIT ) {
+			$sql  = 'SELECT job_id, flow_id, status, created_at, operation_state, operation_claimed_at, operation_generation FROM %i WHERE status = %s AND job_id > %d AND created_at < %s';
+			$args = array( $table, JobStatus::PENDING, $last_job_id, $cutoff );
+			if ( $flow_id ) {
+				$sql   .= ' AND flow_id = %s';
+				$args[] = (string) $flow_id;
+			}
+			if ( $job_id_scope ) {
+				$sql   .= ' AND job_id = %d';
+				$args[] = $job_id_scope;
+			}
+			$sql   .= ' ORDER BY job_id ASC LIMIT %d';
+			$args[] = self::PENDING_ORPHAN_PAGE_SIZE;
+
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Fixed clauses with typed placeholders for every identifier and value.
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$args ), ARRAY_A );
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+			if ( empty( $rows ) ) {
+				break;
+			}
+
+			foreach ( $rows as $row ) {
+				$job_id       = (int) $row['job_id'];
+				$last_job_id  = max( $last_job_id, $job_id );
+				++$summary['scanned'];
+
+				$diagnosis = PendingJobRecoveryPolicy::diagnose(
+					$row,
+					$this->getJobEngineData( $job_id ),
+					$live_actions['by_job'][ $job_id ] ?? array(),
+					$now,
+					$grace_seconds
+				);
+				if ( '' === $diagnosis['verdict'] ) {
+					$summary['skipped_reasons'][ $diagnosis['skip'] ] = ( $summary['skipped_reasons'][ $diagnosis['skip'] ] ?? 0 ) + 1;
+					continue;
+				}
+
+				if ( $actionable >= $limit ) {
+					$summary['limit_reached'] = true;
+					break 2;
+				}
+				++$actionable;
+
+				$verdict    = $diagnosis['verdict'];
+				$target     = PendingJobRecoveryPolicy::terminalStatus( $verdict );
+				$created_at = strtotime( (string) $row['created_at'] . ' UTC' );
+				$detail     = array(
+					'job_id'          => $job_id,
+					'flow_id'         => (string) $row['flow_id'],
+					'scope'           => 'pending_orphan',
+					'verdict'         => $verdict,
+					'target_status'   => $target,
+					'operation_state' => $diagnosis['operation_state'],
+					'job_age_seconds' => false === $created_at ? 0 : max( 0, $now - $created_at ),
+				);
+
+				if ( $dry_run ) {
+					++$summary['would_terminalize'];
+					++$summary['verdicts'][ $verdict ];
+					$this->appendJobDetail( $jobs, $jobs_omitted, $detail + array( 'status' => 'would_terminalize_pending_orphan' ) );
+					continue;
+				}
+
+				$result = $this->db_jobs->transition_orphaned_pending_job(
+					$job_id,
+					$verdict,
+					$diagnosis['operation_state'],
+					(int) ( $row['operation_generation'] ?? 0 ),
+					$trigger,
+					$grace_seconds
+				);
+				if ( ! empty( $result['success'] ) && ! empty( $result['changed'] ) ) {
+					++$summary['terminalized'];
+					++$summary['verdicts'][ $verdict ];
+					$this->appendJobDetail( $jobs, $jobs_omitted, $detail + array( 'status' => 'terminalized_pending_orphan' ) );
+				} else {
+					++$summary['guarded'];
+					$this->appendJobDetail( $jobs, $jobs_omitted, $detail + array(
+						'status'         => 'skipped',
+						'reason'         => 'pending_orphan_state_changed',
+						'current_status' => (string) ( $result['current_status'] ?? '' ),
+					) );
+				}
+			}
+			if ( $job_id_scope ) {
+				break;
+			}
+		}
+
+		return $summary;
+	}
+
+	/**
+	 * Map job IDs to live Action Scheduler actions across Data Machine hooks.
+	 *
+	 * One bounded query on the hook/status index; the join key is parsed from
+	 * `COALESCE(extended_args, args)` because Action Scheduler stores an md5 in
+	 * `args` when the JSON exceeds 191 characters. In-progress actions older than
+	 * the timeout window are not treated as live, matching timeout recovery.
+	 *
+	 * @return array{complete:bool,by_job:array<int,array<int,int>>}
+	 */
+	private function getLiveJobActionMap( int $timeout_hours, int $now ): array {
+		global $wpdb;
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$hooks         = array_keys( self::RECOVERABLE_ACTION_HOOK_ARGS );
+		$placeholders  = implode( ', ', array_fill( 0, count( $hooks ), '%s' ) );
+		$args          = array_merge( array( $actions_table ), $hooks, array( 'pending', 'in-progress', self::LIVE_ACTION_SCAN_LIMIT + 1 ) );
+
+		$wpdb->last_error = '';
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Generated placeholders only; every value is bound.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, COALESCE(extended_args, args) AS action_args
+				 FROM %i
+				 WHERE hook IN ( {$placeholders} )
+				 AND status IN ( %s, %s )
+				 LIMIT %d",
+				...$args
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( '' !== (string) $wpdb->last_error || ! is_array( $rows ) || count( $rows ) > self::LIVE_ACTION_SCAN_LIMIT ) {
+			return array(
+				'complete' => false,
+				'by_job'   => array(),
+			);
+		}
+
+		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
+		$by_job          = array();
+		foreach ( $rows as $row ) {
+			$job_id = $this->extractActionJobIdForHook( (string) ( $row['action_args'] ?? '' ), (string) ( $row['hook'] ?? '' ) );
+			if ( $job_id <= 0 ) {
+				continue;
+			}
+
+			if ( 'in-progress' === (string) $row['status'] ) {
+				$last_attempt = (string) ( $row['last_attempt_gmt'] ?? '' );
+				$reference    = '' !== $last_attempt && '0000-00-00 00:00:00' !== $last_attempt ? $last_attempt : (string) ( $row['scheduled_date_gmt'] ?? '' );
+				$started_at   = '' !== $reference ? strtotime( $reference . ' UTC' ) : false;
+				if ( false !== $started_at && ( $now - $started_at ) >= $timeout_seconds ) {
+					continue;
+				}
+			}
+
+			$by_job[ $job_id ][] = (int) $row['action_id'];
+		}
+
+		return array(
+			'complete' => true,
+			'by_job'   => $by_job,
+		);
 	}
 
 	/** Read an exact Action Scheduler receipt and fail closed on query errors. */
