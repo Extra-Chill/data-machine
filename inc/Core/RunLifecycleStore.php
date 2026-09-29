@@ -297,14 +297,14 @@ class RunLifecycleStore {
 		$result = EngineData::mutate(
 			$job_id,
 			function ( array $snapshot ) use ( $job_id, $callback ): array {
-				$meta                       = is_array( $snapshot[ self::META_KEY ] ?? null ) ? $snapshot[ self::META_KEY ] : array();
+				$meta = is_array( $snapshot[ self::META_KEY ] ?? null ) ? $snapshot[ self::META_KEY ] : array();
 				unset( $meta['status'] ); // Legacy mirror: status lives on the job row only.
-				$meta['run_id']             = (string) ( $meta['run_id'] ?? $this->run_id_for_job( $job_id ) );
-				$meta['job_id']             = $job_id;
-				$meta['attempt']            = max( 1, (int) ( $meta['attempt'] ?? 1 ) );
-				$meta['replay_events']      = is_array( $meta['replay_events'] ?? null ) ? array_values( $meta['replay_events'] ) : array();
-				$meta['artifact_refs']      = is_array( $meta['artifact_refs'] ?? null ) ? array_values( $meta['artifact_refs'] ) : array();
-				$next                       = $callback( $meta );
+				$meta['run_id']        = (string) ( $meta['run_id'] ?? $this->run_id_for_job( $job_id ) );
+				$meta['job_id']        = $job_id;
+				$meta['attempt']       = max( 1, (int) ( $meta['attempt'] ?? 1 ) );
+				$meta['replay_events'] = is_array( $meta['replay_events'] ?? null ) ? array_values( $meta['replay_events'] ) : array();
+				$meta['artifact_refs'] = is_array( $meta['artifact_refs'] ?? null ) ? array_values( $meta['artifact_refs'] ) : array();
+				$next                  = $callback( $meta );
 				unset( $next['status'] );
 				$next['run_id']             = $this->run_id_for_job( $job_id );
 				$next['job_id']             = $job_id;

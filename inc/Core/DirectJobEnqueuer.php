@@ -176,7 +176,7 @@ class DirectJobEnqueuer {
 					'offset'   => $page * $per_page,
 				)
 			);
-			if ( ! is_array( $actions ) || empty( $actions ) ) {
+			if ( empty( $actions ) ) {
 				return false;
 			}
 
