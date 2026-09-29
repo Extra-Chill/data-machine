@@ -154,7 +154,7 @@ namespace {
 	);
 	$policy = static fn( array $job, array $engine = array(), array $actions = array() ): array => PendingJobRecoveryPolicy::diagnose( array_merge( $base, $job ), $engine, $actions, $now );
 
-	assert_pending_orphans( 'enqueue_failed -> enqueue_failed', 'enqueue_failed' === $policy( array( 'operation_state' => 'enqueue_failed' ) )['verdict'] );
+	assert_pending_orphans( 'enqueue_failed -> enqueue_failed', PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED === $policy( array( 'operation_state' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUE_FAILED ) )['verdict'] );
 	assert_pending_orphans( 'enqueued + no action -> evidence_pruned', 'evidence_pruned' === $policy( array( 'operation_state' => 'enqueued' ) )['verdict'] );
 	assert_pending_orphans( 'preparing past lease -> enqueue_interrupted', 'enqueue_interrupted' === $policy( array( 'operation_state' => 'preparing' ) )['verdict'] );
 	assert_pending_orphans( 'enqueuing past lease -> enqueue_interrupted', 'enqueue_interrupted' === $policy( array( 'operation_state' => 'enqueuing', 'operation_claimed_at' => $ago( 7200 ) ) )['verdict'] );
