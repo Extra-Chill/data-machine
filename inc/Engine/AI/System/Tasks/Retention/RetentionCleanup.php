@@ -1392,7 +1392,7 @@ class RetentionCleanup {
 			}
 
 			if ( 'failed' === $status && null !== $hook && in_array( $hook, self::liveJobEvidenceHooks(), true ) ) {
-				$rows = self::selectFailedStepActionRows( $actions_table, $cutoff, $hook, $remaining, $require_last_attempt, $retained_ids );
+				$rows      = self::selectFailedStepActionRows( $actions_table, $cutoff, $hook, $remaining, $require_last_attempt, $retained_ids );
 				$examined += count( $rows );
 				$live_ids  = self::liveJobActionIds( $rows, $hook );
 				foreach ( $rows as $row ) {
