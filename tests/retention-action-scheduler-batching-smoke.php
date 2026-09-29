@@ -25,6 +25,9 @@ namespace {
 	if ( ! defined( 'ABSPATH' ) ) {
 		define( 'ABSPATH', __DIR__ . '/../' );
 	}
+	if ( ! defined( 'ARRAY_A' ) ) {
+		define( 'ARRAY_A', 'ARRAY_A' );
+	}
 	if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 		define( 'DAY_IN_SECONDS', 86400 );
 	}
@@ -174,6 +177,8 @@ namespace {
 	// -----------------------------------------------------------------------
 
 	require_once __DIR__ . '/fixtures/retention-batching-stubs.php';
+	require_once __DIR__ . '/fixtures/scheduler-evidence-bootstrap.php';
+	require_once $root . '/inc/Core/JobStatus.php';
 	require_once $root . '/inc/Engine/AI/System/Tasks/Retention/RetentionCleanup.php';
 
 	$fake_wpdb = new class() {
@@ -238,6 +243,16 @@ namespace {
 			}
 
 			return count( $this->matching_actions( $cutoff, $hook ) );
+		}
+
+		/**
+		 * Failed step-action rows carry job args; this fixture seeds none, so the
+		 * live-job protection path sees an empty result. Live-job behavior is
+		 * covered by retention-live-job-evidence-smoke.php.
+		 */
+		public function get_results( $prepared, $output = null ): array {
+			unset( $prepared, $output );
+			return array();
 		}
 
 		public function get_col( $prepared ): array {

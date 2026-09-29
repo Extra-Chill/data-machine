@@ -10,14 +10,19 @@ namespace DataMachine\Engine\AI\System\Tasks\Retention;
 
 defined( 'ABSPATH' ) || exit;
 
+use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Logs\LogRepository;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+use DataMachine\Core\DirectJobEnqueuer;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\JobArtifactSurfaces;
+use DataMachine\Core\JobStatus;
+use DataMachine\Core\Jobs\SchedulerEvidence;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 use DataMachine\Core\PluginSettings;
 
 class RetentionCleanup {
@@ -33,6 +38,14 @@ class RetentionCleanup {
 	public const TASK_CHAT_SESSIONS   = 'retention_chat_sessions';
 	public const TASK_JOB_ARTIFACTS   = 'retention_job_artifacts';
 	public const TASK_BATCH_WORKLISTS = 'retention_batch_worklists';
+
+	/**
+	 * Most action IDs a single retention window will exclude from re-selection.
+	 *
+	 * Failed step actions kept for live jobs are excluded from later batches so
+	 * the window can page past them; the cap keeps the NOT IN list bounded.
+	 */
+	private const LIVE_JOB_EXCLUSION_LIMIT = 1000;
 
 	/** Rows deleted per sweep query; bounded so one pass never locks the table for long. */
 	private const BATCH_WORKLIST_SWEEP_CHUNK = 1000;
@@ -85,6 +98,30 @@ class RetentionCleanup {
 
 	public static function actionSchedulerMaxAgeDays(): int {
 		return self::positiveDays( apply_filters( 'datamachine_as_actions_max_age_days', 7 ), 7 );
+	}
+
+	/**
+	 * Absolute ceiling, in days, on keeping failed step actions for live jobs.
+	 *
+	 * A failed `execute_step`-family action is the crash signal the recovery
+	 * reaper reads, so retention keeps it while its job is still non-terminal
+	 * (pending/processing/waiting). A job that never terminalizes must not pin
+	 * rows forever: once the failed action is older than this ceiling it is
+	 * pruned regardless of the job's status.
+	 */
+	public static function liveJobEvidenceMaxAgeDays(): float {
+		$days = (float) apply_filters( 'datamachine_as_live_job_evidence_max_age_days', 7 );
+
+		return $days > 0 ? $days : 7.0;
+	}
+
+	/**
+	 * Hooks whose failed rows are crash evidence for a still-live job.
+	 *
+	 * @return array<int,string>
+	 */
+	private static function liveJobEvidenceHooks(): array {
+		return array( DirectJobEnqueuer::HOOK, AIConcurrencyBackpressure::RESUME_HOOK, PipelineBatchScheduler::BATCH_HOOK );
 	}
 
 	/**
@@ -1006,6 +1043,7 @@ class RetentionCleanup {
 		$hit_limit       = false;
 		$logs_deleted    = 0;
 		$actions_deleted = 0;
+		$retained        = 0;
 
 		foreach ( self::actionSchedulerCleanupWindows() as $window ) {
 			$cutoff = $window['cutoff'];
@@ -1024,6 +1062,7 @@ class RetentionCleanup {
 			);
 			$actions_deleted += $deleted['actions_deleted'];
 			$logs_deleted    += $deleted['logs_deleted'];
+			$retained        += $deleted['retained_for_live_jobs'];
 		}
 
 		// Hard row-count ceiling per high-churn hook. Age windows above can
@@ -1043,6 +1082,7 @@ class RetentionCleanup {
 		);
 		$actions_deleted += $ceiling['actions_deleted'];
 		$logs_deleted    += $ceiling['logs_deleted'];
+		$retained        += $ceiling['retained_for_live_jobs'];
 
 		$total_deleted = $logs_deleted + $actions_deleted;
 
@@ -1056,7 +1096,7 @@ class RetentionCleanup {
 			)
 		);
 
-		if ( $total_deleted > 0 || $hit_limit ) {
+		if ( $total_deleted > 0 || $hit_limit || $retained > 0 ) {
 			self::log(
 				'Scheduled cleanup: deleted old Action Scheduler actions and logs',
 				array(
@@ -1064,6 +1104,7 @@ class RetentionCleanup {
 					'logs_deleted'            => $logs_deleted,
 					'ceiling_actions_deleted' => $ceiling['actions_deleted'],
 					'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
+					'retained_for_live_jobs'  => $retained,
 					'max_age_days'            => $max_age_days,
 					'batch_size'              => $batch_size,
 					'iterations'              => $iterations_used,
@@ -1085,6 +1126,7 @@ class RetentionCleanup {
 			'logs_deleted'            => $logs_deleted,
 			'ceiling_actions_deleted' => $ceiling['actions_deleted'],
 			'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
+			'retained_for_live_jobs'  => $retained,
 			'max_age_days'            => $max_age_days,
 			'batch_size'              => $batch_size,
 			'iterations'              => $iterations_used,
@@ -1110,7 +1152,7 @@ class RetentionCleanup {
 	 * @param float  $deadline        Wall-clock deadline (microtime float).
 	 * @param int    $iterations_used Shared iteration counter (by reference).
 	 * @param bool   $hit_limit       Set true when a budget cap trips (by reference).
-	 * @return array{actions_deleted:int,logs_deleted:int}
+	 * @return array{actions_deleted:int,logs_deleted:int,retained_for_live_jobs:int}
 	 */
 	private static function enforceActionSchedulerRowCeilings(
 		string $actions_table,
@@ -1125,6 +1167,7 @@ class RetentionCleanup {
 
 		$actions_deleted = 0;
 		$logs_deleted    = 0;
+		$retained        = 0;
 
 		foreach ( self::actionSchedulerHookMaxRows() as $hook => $max_rows ) {
 			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
@@ -1177,11 +1220,13 @@ class RetentionCleanup {
 			);
 			$actions_deleted += $deleted['actions_deleted'];
 			$logs_deleted    += $deleted['logs_deleted'];
+			$retained        += $deleted['retained_for_live_jobs'];
 		}
 
 		return array(
-			'actions_deleted' => $actions_deleted,
-			'logs_deleted'    => $logs_deleted,
+			'actions_deleted'        => $actions_deleted,
+			'logs_deleted'           => $logs_deleted,
+			'retained_for_live_jobs' => $retained,
 		);
 	}
 
@@ -1234,7 +1279,7 @@ class RetentionCleanup {
 	 * @param bool    $hit_limit       Set true when a budget cap trips (by reference).
 	 * @param ?string $status               Optional single terminal status.
 	 * @param bool    $require_last_attempt Whether the cutoff also applies to last_attempt_gmt.
-	 * @return array{actions_deleted:int,logs_deleted:int}
+	 * @return array{actions_deleted:int,logs_deleted:int,retained_for_live_jobs:int}
 	 */
 	private static function deleteActionSchedulerWindowBatched(
 		string $actions_table,
@@ -1253,16 +1298,23 @@ class RetentionCleanup {
 
 		$actions_deleted = 0;
 		$logs_deleted    = 0;
+		$retained_ids    = array();
 
-		do {
-			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline ) {
+		while ( true ) {
+			if ( $iterations_used >= $max_iterations || microtime( true ) >= $deadline || count( $retained_ids ) >= self::LIVE_JOB_EXCLUSION_LIMIT ) {
 				$hit_limit = true;
 				break;
 			}
 
-			$action_ids = self::selectActionSchedulerActionIds( $actions_table, $cutoff, $hook, $batch_size, $status, $require_last_attempt );
-			if ( empty( $action_ids ) ) {
+			$batch      = self::selectActionSchedulerActionIds( $actions_table, $cutoff, $hook, $batch_size, $status, $require_last_attempt, $retained_ids );
+			$action_ids = $batch['ids'];
+			if ( 0 === $batch['examined'] ) {
 				break;
+			}
+			if ( empty( $action_ids ) ) {
+				// Every selected row was kept for a live job; they are now
+				// excluded, so the next select pages past them.
+				continue;
 			}
 
 			$placeholders = implode( ', ', array_fill( 0, count( $action_ids ), '%d' ) );
@@ -1294,18 +1346,30 @@ class RetentionCleanup {
 			);
 			$affected         = false !== $affected ? (int) $affected : 0;
 			$actions_deleted += $affected;
-		} while ( $affected > 0 );
+
+			if ( $affected <= 0 ) {
+				break;
+			}
+		}
 
 		return array(
-			'actions_deleted' => $actions_deleted,
-			'logs_deleted'    => $logs_deleted,
+			'actions_deleted'        => $actions_deleted,
+			'logs_deleted'           => $logs_deleted,
+			'retained_for_live_jobs' => count( $retained_ids ),
 		);
 	}
 
 	/**
 	 * Select a bounded action batch using indexes shipped by Action Scheduler.
 	 *
-	 * @return array<int, int> Action IDs.
+	 * Failed rows for the step-execution hooks are crash evidence for the
+	 * recovery reaper, so they are only returned for deletion once their job is
+	 * terminal (or the row is older than the live-job evidence ceiling). Rows
+	 * kept for live jobs are appended to `$retained_ids` so later batches skip
+	 * them. `complete` and `canceled` rows are never held back.
+	 *
+	 * @param array<int,int> $retained_ids Action IDs kept for live jobs (by reference).
+	 * @return array{ids:array<int,int>,examined:int} Deletable action IDs and rows examined.
 	 */
 	private static function selectActionSchedulerActionIds(
 		string $actions_table,
@@ -1313,16 +1377,32 @@ class RetentionCleanup {
 		?string $hook,
 		int $batch_size,
 		?string $only_status,
-		bool $require_last_attempt
+		bool $require_last_attempt,
+		array &$retained_ids
 	): array {
 		global $wpdb;
 
 		$action_ids = array();
+		$examined   = 0;
 		$statuses   = null === $only_status ? array( 'complete', 'failed', 'canceled' ) : array( $only_status );
 		foreach ( $statuses as $status ) {
-			$remaining = $batch_size - count( $action_ids );
+			$remaining = $batch_size - $examined;
 			if ( $remaining <= 0 ) {
 				break;
+			}
+
+			if ( 'failed' === $status && null !== $hook && in_array( $hook, self::liveJobEvidenceHooks(), true ) ) {
+				$rows      = self::selectFailedStepActionRows( $actions_table, $cutoff, $hook, $remaining, $require_last_attempt, $retained_ids );
+				$examined += count( $rows );
+				$live_ids  = self::liveJobActionIds( $rows, $hook );
+				foreach ( $rows as $row ) {
+					if ( isset( $live_ids[ $row['action_id'] ] ) ) {
+						$retained_ids[] = $row['action_id'];
+					} else {
+						$action_ids[] = $row['action_id'];
+					}
+				}
+				continue;
 			}
 
 			if ( null === $hook ) {
@@ -1363,10 +1443,122 @@ class RetentionCleanup {
 				);
 			}
 
-			$action_ids = array_merge( $action_ids, array_map( 'intval', is_array( $ids ) ? $ids : array() ) );
+			$ids        = array_map( 'intval', is_array( $ids ) ? $ids : array() );
+			$examined  += count( $ids );
+			$action_ids = array_merge( $action_ids, $ids );
 		}
 
-		return $action_ids;
+		return array(
+			'ids'      => $action_ids,
+			'examined' => $examined,
+		);
+	}
+
+	/**
+	 * Select a bounded batch of failed step-action rows with their job args.
+	 *
+	 * Same index and ordering as the id-only query, plus the args needed to
+	 * resolve the owning job. Rows already kept for live jobs are excluded so
+	 * the window can page past them.
+	 *
+	 * @param array<int,int> $retained_ids Action IDs to skip.
+	 * @return array<int,array{action_id:int,last_attempt_gmt:string,scheduled_date_gmt:string,args:string}>
+	 */
+	private static function selectFailedStepActionRows(
+		string $actions_table,
+		string $cutoff,
+		string $hook,
+		int $limit,
+		bool $require_last_attempt,
+		array $retained_ids
+	): array {
+		global $wpdb;
+
+		$exclusion = '';
+		$params    = array( $actions_table, $hook, 'failed', $cutoff );
+		if ( $require_last_attempt ) {
+			$params[] = $cutoff;
+		}
+		if ( ! empty( $retained_ids ) ) {
+			$exclusion = ' AND action_id NOT IN (' . implode( ', ', array_fill( 0, count( $retained_ids ), '%d' ) ) . ')';
+			$params    = array_merge( $params, array_map( 'intval', $retained_ids ) );
+		}
+		$params[] = $limit;
+
+		$last_attempt = $require_last_attempt ? ' AND last_attempt_gmt < %s' : '';
+		$sql          = 'SELECT action_id, last_attempt_gmt, scheduled_date_gmt, COALESCE(extended_args, args) AS args FROM %i FORCE INDEX (hook_status_scheduled_date_gmt) WHERE hook = %s AND status = %s AND scheduled_date_gmt < %s' . $last_attempt . $exclusion . ' ORDER BY scheduled_date_gmt ASC LIMIT %d';
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Generated placeholders only; every value is bound.
+		$results = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A );
+		// phpcs:enable
+
+		$rows = array();
+		foreach ( is_array( $results ) ? $results : array() as $result ) {
+			$rows[] = array(
+				'action_id'          => (int) $result['action_id'],
+				'last_attempt_gmt'   => (string) ( $result['last_attempt_gmt'] ?? '' ),
+				'scheduled_date_gmt' => (string) ( $result['scheduled_date_gmt'] ?? '' ),
+				'args'               => (string) ( $result['args'] ?? '' ),
+			);
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Resolve which failed step-action rows belong to a still-live job.
+	 *
+	 * ONE jobs query per batch (`job_id IN (...)`), never per row. Rows older
+	 * than the live-job evidence ceiling are not looked up: a stuck job cannot
+	 * pin its crash evidence forever.
+	 *
+	 * @param array<int,array{action_id:int,last_attempt_gmt:string,scheduled_date_gmt:string,args:string}> $rows Failed action rows.
+	 * @return array<int,true> Action IDs to retain, keyed by action ID.
+	 */
+	private static function liveJobActionIds( array $rows, string $hook ): array {
+		global $wpdb;
+
+		$ceiling_cutoff = gmdate( 'Y-m-d H:i:s', time() - (int) round( self::liveJobEvidenceMaxAgeDays() * DAY_IN_SECONDS ) );
+		$job_by_action  = array();
+		foreach ( $rows as $row ) {
+			$attempted = '' !== $row['last_attempt_gmt'] && '0000-00-00 00:00:00' !== $row['last_attempt_gmt'] ? $row['last_attempt_gmt'] : $row['scheduled_date_gmt'];
+			if ( $attempted < $ceiling_cutoff ) {
+				continue;
+			}
+
+			$job_id = SchedulerEvidence::extractJobId( $row['args'], $hook );
+			if ( $job_id > 0 ) {
+				$job_by_action[ $row['action_id'] ] = $job_id;
+			}
+		}
+
+		if ( empty( $job_by_action ) ) {
+			return array();
+		}
+
+		$job_ids      = array_values( array_unique( $job_by_action ) );
+		$placeholders = implode( ', ', array_fill( 0, count( $job_ids ), '%d' ) );
+		$params       = array_merge( array( $wpdb->prefix . Jobs::TABLE_NAME ), $job_ids );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Generated placeholders only; every value is bound.
+		$job_rows = $wpdb->get_results( $wpdb->prepare( "SELECT job_id, status FROM %i WHERE job_id IN ({$placeholders})", $params ), ARRAY_A );
+		// phpcs:enable
+
+		$live_jobs = array();
+		foreach ( is_array( $job_rows ) ? $job_rows : array() as $job_row ) {
+			if ( ! JobStatus::isStatusFinal( (string) $job_row['status'] ) ) {
+				$live_jobs[ (int) $job_row['job_id'] ] = true;
+			}
+		}
+
+		$retained = array();
+		foreach ( $job_by_action as $action_id => $job_id ) {
+			if ( isset( $live_jobs[ $job_id ] ) ) {
+				$retained[ $action_id ] = true;
+			}
+		}
+
+		return $retained;
 	}
 
 	/**
