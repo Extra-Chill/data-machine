@@ -24,9 +24,9 @@ class PendingJobRecoveryPolicy {
 	/** Margin over the enqueue claim lease before a preparing/enqueuing claim is treated as abandoned. */
 	public const ENQUEUE_LEASE_SECONDS = 300;
 
-	public const OPERATION_STATE_PREPARING     = 'preparing';
-	public const OPERATION_STATE_ENQUEUING     = 'enqueuing';
-	public const OPERATION_STATE_ENQUEUED      = 'enqueued';
+	public const OPERATION_STATE_PREPARING      = 'preparing';
+	public const OPERATION_STATE_ENQUEUING      = 'enqueuing';
+	public const OPERATION_STATE_ENQUEUED       = 'enqueued';
 	public const OPERATION_STATE_ENQUEUE_FAILED = 'enqueue_failed';
 
 	/** Verdicts double as the terminal failure reason recorded on the job. */

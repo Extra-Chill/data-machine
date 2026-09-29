@@ -12,6 +12,8 @@
  */
 
 namespace {
+	// Mirrors DirectJobEnqueuer::HOOK; the class is not loaded in this standalone harness.
+	const RSP_EXECUTE_STEP_HOOK = 'datamachine_' . 'execute_step';
 	define( 'ABSPATH', __DIR__ . '/' );
 	define( 'HOUR_IN_SECONDS', 3600 );
 	define( 'MINUTE_IN_SECONDS', 60 );
@@ -155,20 +157,20 @@ namespace {
 	$policy = static fn( array $job, array $engine = array(), array $actions = array() ): array => PendingJobRecoveryPolicy::diagnose( array_merge( $base, $job ), $engine, $actions, $now );
 
 	assert_pending_orphans( 'enqueue_failed -> enqueue_failed', PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED === $policy( array( 'operation_state' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUE_FAILED ) )['verdict'] );
-	assert_pending_orphans( 'enqueued + no action -> evidence_pruned', 'evidence_pruned' === $policy( array( 'operation_state' => 'enqueued' ) )['verdict'] );
-	assert_pending_orphans( 'preparing past lease -> enqueue_interrupted', 'enqueue_interrupted' === $policy( array( 'operation_state' => 'preparing' ) )['verdict'] );
-	assert_pending_orphans( 'enqueuing past lease -> enqueue_interrupted', 'enqueue_interrupted' === $policy( array( 'operation_state' => 'enqueuing', 'operation_claimed_at' => $ago( 7200 ) ) )['verdict'] );
-	assert_pending_orphans( 'NULL operation_state -> orphaned_pending', 'orphaned_pending' === $policy( array() )['verdict'] );
+	assert_pending_orphans( 'enqueued + no action -> evidence_pruned', PendingJobRecoveryPolicy::VERDICT_EVIDENCE_PRUNED === $policy( array( 'operation_state' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) )['verdict'] );
+	assert_pending_orphans( 'preparing past lease -> enqueue_interrupted', PendingJobRecoveryPolicy::VERDICT_ENQUEUE_INTERRUPTED === $policy( array( 'operation_state' => PendingJobRecoveryPolicy::OPERATION_STATE_PREPARING ) )['verdict'] );
+	assert_pending_orphans( 'enqueuing past lease -> enqueue_interrupted', PendingJobRecoveryPolicy::VERDICT_ENQUEUE_INTERRUPTED === $policy( array( 'operation_state' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUING, 'operation_claimed_at' => $ago( 7200 ) ) )['verdict'] );
+	assert_pending_orphans( 'NULL operation_state -> orphaned_pending', PendingJobRecoveryPolicy::VERDICT_ORPHANED_PENDING === $policy( array() )['verdict'] );
 	assert_pending_orphans( 'future engine_data.retry.next_retry_at is excluded', 'retry_scheduled' === $policy( array(), array( 'retry' => array( 'next_retry_at' => gmdate( 'c', $now + 600 ) ) ) )['skip'] );
-	assert_pending_orphans( 'past retry.next_retry_at does not exclude', 'orphaned_pending' === $policy( array(), array( 'retry' => array( 'next_retry_at' => gmdate( 'c', $now - 600 ) ) ) )['verdict'] );
+	assert_pending_orphans( 'past retry.next_retry_at does not exclude', PendingJobRecoveryPolicy::VERDICT_ORPHANED_PENDING === $policy( array(), array( 'retry' => array( 'next_retry_at' => gmdate( 'c', $now - 600 ) ) ) )['verdict'] );
 	assert_pending_orphans( 'future ai_concurrency_throttle is excluded', 'ai_throttle_scheduled' === $policy( array(), array( 'ai_concurrency_throttle' => array( 'next_retry_at' => gmdate( 'c', $now + 600 ) ) ) )['skip'] );
-	assert_pending_orphans( 'unexpired enqueuing lease is excluded', 'enqueue_lease_active' === $policy( array( 'operation_state' => 'enqueuing', 'operation_claimed_at' => $ago( 30 ) ) )['skip'] );
-	assert_pending_orphans( 'live scheduler action is excluded', 'live_scheduler_action' === $policy( array( 'operation_state' => 'enqueued' ), array(), array( 5 ) )['skip'] );
+	assert_pending_orphans( 'unexpired enqueuing lease is excluded', PendingJobRecoveryPolicy::SKIP_LEASE_ACTIVE === $policy( array( 'operation_state' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUING, 'operation_claimed_at' => $ago( 30 ) ) )['skip'] );
+	assert_pending_orphans( 'live scheduler action is excluded', PendingJobRecoveryPolicy::SKIP_LIVE_ACTION === $policy( array( 'operation_state' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ), array(), array( 5 ) )['skip'] );
 	assert_pending_orphans( 'row inside the grace window is excluded', 'within_grace' === $policy( array( 'created_at' => $ago( 600 ) ) )['skip'] );
 	assert_pending_orphans( 'non-pending rows are never diagnosed', 'not_pending' === $policy( array( 'status' => 'processing' ) )['skip'] );
 	assert_pending_orphans( 'batch parents are excluded', 'batch_parent' === $policy( array(), array( 'batch' => true ) )['skip'] );
 	assert_pending_orphans( 'unknown operation states are not guessed', 'unrecognized_operation_state' === $policy( array( 'operation_state' => 'cancelled' ) )['skip'] );
-	assert_pending_orphans( 'terminal status carries the verdict as reason', 'failed - evidence_pruned' === PendingJobRecoveryPolicy::terminalStatus( 'evidence_pruned' ) );
+	assert_pending_orphans( 'terminal status carries the verdict as reason', 'failed - evidence_pruned' === PendingJobRecoveryPolicy::terminalStatus( PendingJobRecoveryPolicy::VERDICT_EVIDENCE_PRUNED ) );
 
 	// -- 2. Ability pass against SQLite -----------------------------------------------------------
 	global $wpdb;
@@ -199,31 +201,31 @@ namespace {
 		};
 
 		// Verdict rows.
-		$job( 1, array( 'op' => 'enqueue_failed' ) );
-		$job( 2, array( 'op' => 'enqueued' ) );
-		$job( 3, array( 'op' => 'preparing' ) );
-		$job( 4, array( 'op' => 'enqueuing', 'claimed' => $ago( 7200 ) ) );
+		$job( 1, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUE_FAILED ) );
+		$job( 2, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) );
+		$job( 3, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_PREPARING ) );
+		$job( 4, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUING, 'claimed' => $ago( 7200 ) ) );
 		$job( 5, array() );
 		// Exclusions.
 		$job( 6, array( 'engine' => json_encode( array( 'retry' => array( 'next_retry_at' => gmdate( 'c', $now + 900 ) ) ) ) ) );
 		$job( 7, array( 'engine' => json_encode( array( 'ai_concurrency_throttle' => array( 'state' => 'deferred', 'next_retry_at' => gmdate( 'c', $now + 900 ) ) ) ) ) );
-		$job( 8, array( 'op' => 'enqueuing', 'claimed' => $ago( 20 ) ) );
-		$job( 9, array( 'op' => 'enqueued' ) );
-		$action( 900, 'datamachine_execute_step', 'pending', '{"job_id":9,"flow_step_id":"step_1"}' );
-		$job( 10, array( 'op' => 'enqueued' ) );
-		$action( 901, 'datamachine_execute_step', 'pending', md5( 'long-args' ), '{"job_id":10,"flow_step_id":"' . str_repeat( 'x', 200 ) . '"}' );
+		$job( 8, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUING, 'claimed' => $ago( 20 ) ) );
+		$job( 9, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) );
+		$action( 900, RSP_EXECUTE_STEP_HOOK, 'pending', '{"job_id":9,"flow_step_id":"step_1"}' );
+		$job( 10, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) );
+		$action( 901, RSP_EXECUTE_STEP_HOOK, 'pending', md5( 'long-args' ), '{"job_id":10,"flow_step_id":"' . str_repeat( 'x', 200 ) . '"}' );
 		$job( 11, array( 'created' => $ago( 600 ) ) );
-		$job( 12, array( 'status' => 'processing', 'op' => 'enqueued' ) );
-		$job( 14, array( 'op' => 'enqueued' ) );
+		$job( 12, array( 'status' => 'processing', 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) );
+		$job( 14, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) );
 		$action( 902, 'datamachine_pipeline_batch_chunk', 'pending', '{"parent_job_id":14,"offset":0}' );
 		$job( 16, array( 'engine' => json_encode( array( 'batch' => true ) ) ) );
 		// Actions that are NOT live evidence: stale in-progress and complete rows.
-		$job( 13, array( 'op' => 'enqueued' ) );
-		$action( 903, 'datamachine_execute_step', 'in-progress', '{"job_id":13,"flow_step_id":"step_1"}', null, $ago( 10 * HOUR_IN_SECONDS ) );
-		$job( 15, array( 'op' => 'enqueued' ) );
-		$action( 904, 'datamachine_execute_step', 'complete', '{"job_id":15,"flow_step_id":"step_1"}' );
+		$job( 13, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) );
+		$action( 903, RSP_EXECUTE_STEP_HOOK, 'in-progress', '{"job_id":13,"flow_step_id":"step_1"}', null, $ago( 10 * HOUR_IN_SECONDS ) );
+		$job( 15, array( 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUED ) );
+		$action( 904, RSP_EXECUTE_STEP_HOOK, 'complete', '{"job_id":15,"flow_step_id":"step_1"}' );
 		// Other flow.
-		$job( 17, array( 'flow_id' => '99', 'op' => 'enqueue_failed' ) );
+		$job( 17, array( 'flow_id' => '99', 'op' => PendingJobRecoveryPolicy::OPERATION_STATE_ENQUEUE_FAILED ) );
 	};
 
 	$statuses = static function () use ( $wpdb ): array {
@@ -272,16 +274,16 @@ namespace {
 	list( $summary, $details, $repo ) = $run( true );
 	assert_pending_orphans( 'dry-run makes no repository calls', array() === $repo->calls );
 	assert_pending_orphans( 'dry-run leaves every row byte-identical', $before === $statuses() );
-	assert_pending_orphans( 'dry-run reports enqueue_failed x2 (flows 10 and 99)', 2 === $summary['verdicts']['enqueue_failed'] );
-	assert_pending_orphans( 'dry-run reports evidence_pruned x3 (enqueued+pruned, stale in-progress, complete-only)', 3 === $summary['verdicts']['evidence_pruned'] );
-	assert_pending_orphans( 'dry-run reports enqueue_interrupted x2 (preparing, expired enqueuing)', 2 === $summary['verdicts']['enqueue_interrupted'] );
-	assert_pending_orphans( 'dry-run reports orphaned_pending x1 (NULL operation_state)', 1 === $summary['verdicts']['orphaned_pending'] );
+	assert_pending_orphans( 'dry-run reports enqueue_failed x2 (flows 10 and 99)', 2 === $summary['verdicts'][PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED] );
+	assert_pending_orphans( 'dry-run reports evidence_pruned x3 (enqueued+pruned, stale in-progress, complete-only)', 3 === $summary['verdicts'][PendingJobRecoveryPolicy::VERDICT_EVIDENCE_PRUNED] );
+	assert_pending_orphans( 'dry-run reports enqueue_interrupted x2 (preparing, expired enqueuing)', 2 === $summary['verdicts'][PendingJobRecoveryPolicy::VERDICT_ENQUEUE_INTERRUPTED] );
+	assert_pending_orphans( 'dry-run reports orphaned_pending x1 (NULL operation_state)', 1 === $summary['verdicts'][PendingJobRecoveryPolicy::VERDICT_ORPHANED_PENDING] );
 	assert_pending_orphans( 'dry-run would_terminalize totals the verdicts', 8 === $summary['would_terminalize'] && 0 === $summary['terminalized'] );
 	$reasons = $summary['skipped_reasons'];
 	assert_pending_orphans( 'excludes future retry', 1 === ( $reasons['retry_scheduled'] ?? 0 ) );
 	assert_pending_orphans( 'excludes future AI throttle', 1 === ( $reasons['ai_throttle_scheduled'] ?? 0 ) );
-	assert_pending_orphans( 'excludes unexpired enqueue lease', 1 === ( $reasons['enqueue_lease_active'] ?? 0 ) );
-	assert_pending_orphans( 'excludes live AS actions (plain args, md5+extended_args, batch chunk parent)', 3 === ( $reasons['live_scheduler_action'] ?? 0 ) );
+	assert_pending_orphans( 'excludes unexpired enqueue lease', 1 === ( $reasons[PendingJobRecoveryPolicy::SKIP_LEASE_ACTIVE] ?? 0 ) );
+	assert_pending_orphans( 'excludes live AS actions (plain args, md5+extended_args, batch chunk parent)', 3 === ( $reasons[PendingJobRecoveryPolicy::SKIP_LIVE_ACTION] ?? 0 ) );
 	assert_pending_orphans( 'excludes batch parents', 1 === ( $reasons['batch_parent'] ?? 0 ) );
 	assert_pending_orphans( 'rows inside the grace window and non-pending rows are never scanned', 15 === $summary['scanned'] );
 	$detail_statuses = array_unique( array_column( $details, 'status' ) );
@@ -305,7 +307,7 @@ namespace {
 	assert_pending_orphans( 'young and processing rows untouched', 'pending' === $after[11]['status'] && 'processing' === $after[12]['status'] );
 	assert_pending_orphans( 'batch parent untouched', 'pending' === $after[16]['status'] );
 	assert_pending_orphans( 'stale in-progress and complete-only actions do not shield', 'failed - evidence_pruned' === $after[13]['status'] && 'failed - evidence_pruned' === $after[15]['status'] );
-	assert_pending_orphans( 'repository receives the observed operation state and generation', 'enqueue_failed' === $repo->calls[0]['observed_operation_state'] && 1 === $repo->calls[0]['observed_generation'] && 'test' === $repo->calls[0]['trigger'] );
+	assert_pending_orphans( 'repository receives the observed operation state and generation', PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED === $repo->calls[0]['observed_operation_state'] && 1 === $repo->calls[0]['observed_generation'] && 'test' === $repo->calls[0]['trigger'] );
 
 	echo "[4] apply is idempotent\n";
 	list( $again ) = $run( false );
@@ -326,9 +328,9 @@ namespace {
 	echo "[6] scope filters\n";
 	$reset();
 	list( $flow_scope ) = $run( true, array( 'flow_id' => 99 ) );
-	assert_pending_orphans( 'flow scope only sees that flow', 1 === $flow_scope['would_terminalize'] && 1 === $flow_scope['verdicts']['enqueue_failed'] );
+	assert_pending_orphans( 'flow scope only sees that flow', 1 === $flow_scope['would_terminalize'] && 1 === $flow_scope['verdicts'][PendingJobRecoveryPolicy::VERDICT_ENQUEUE_FAILED] );
 	list( $job_scope ) = $run( true, array( 'job_id' => 2 ) );
-	assert_pending_orphans( 'job scope only sees that job', 1 === $job_scope['would_terminalize'] && 1 === $job_scope['verdicts']['evidence_pruned'] );
+	assert_pending_orphans( 'job scope only sees that job', 1 === $job_scope['would_terminalize'] && 1 === $job_scope['verdicts'][PendingJobRecoveryPolicy::VERDICT_EVIDENCE_PRUNED] );
 	list( $custom_grace ) = $run( true, array( 'grace' => 5 * MINUTE_IN_SECONDS, 'job_id' => 11 ) );
 	assert_pending_orphans( 'a shorter grace admits younger rows', 1 === $custom_grace['would_terminalize'] );
 

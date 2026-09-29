@@ -210,15 +210,15 @@ class JobsCommand extends BaseCommand {
 		$pending_limit             = isset( $assoc_args['pending-limit'] ) ? max( 1, min( 500, (int) $assoc_args['pending-limit'] ) ) : 500;
 
 		$ability_input = array(
-				'dry_run'       => $dry_run,
-				'flow_id'       => $flow_id,
-				'timeout_hours' => $timeout,
-				'job_id'        => $job_id,
-				'limit'         => $limit,
-				'recover_pathless_children' => $recover_pathless_children,
-				'recover_pending_orphans'   => $recover_pending_orphans,
-				'pending_limit'             => $pending_limit,
-				'recovery_trigger' => 'operator_cli',
+			'dry_run'       => $dry_run,
+			'flow_id'       => $flow_id,
+			'timeout_hours' => $timeout,
+			'job_id'        => $job_id,
+			'limit'         => $limit,
+			'recover_pathless_children' => $recover_pathless_children,
+			'recover_pending_orphans'   => $recover_pending_orphans,
+			'pending_limit'             => $pending_limit,
+			'recovery_trigger' => 'operator_cli',
 		);
 		if ( null !== $pending_grace ) {
 			$ability_input['pending_grace_minutes'] = $pending_grace;
