@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.179.2] - 2026-09-29
+
+### Fixed
+- drop run_lifecycle.status mirror and fix >191-char live-action lookup
+
 ## [0.179.1] - 2026-09-29
 
 ### Fixed
