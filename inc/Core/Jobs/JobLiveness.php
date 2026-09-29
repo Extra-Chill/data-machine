@@ -1,23 +1,97 @@
 <?php
 /**
- * Pure scheduler-liveness classification for active jobs.
+ * Core job liveness classifier.
  *
- * @package DataMachine\Cli
+ * `jobs.status` is lifecycle, not liveness. `JobLiveness` is the single
+ * predicate that answers "is this job alive": scheduler evidence (one batch
+ * query, see `SchedulerEvidence`) plus persisted engine state in, a
+ * classification out. `alive()` collapses the classification to a boolean.
+ *
+ * @package DataMachine\Core\Jobs
+ * @since 0.180.0
  */
 
-namespace DataMachine\Cli;
+namespace DataMachine\Core\Jobs;
 
 use DataMachine\Core\ChildJobRecoveryPolicy;
+use DataMachine\Engine\AI\AIConcurrencyBackpressure;
 
 defined( 'ABSPATH' ) || exit;
 
-class JobLivenessClassifier {
+class JobLiveness {
+
+	public const ACTIVE_PROCESSING       = 'active_processing';
+	public const STALE_IN_PROGRESS       = 'stale_in_progress';
+	public const SCHEDULER_STARVED       = 'scheduler_starved';
+	public const AI_CONCURRENCY_DEFERRED = 'ai_concurrency_deferred';
+	public const QUEUED_NEXT_STEP        = 'queued_next_step';
+	public const WAITING_CHILDREN        = 'waiting_children';
+	public const EVIDENCE_PRUNED         = 'evidence_pruned';
+	public const NO_SCHEDULER_PATH       = 'no_scheduler_path';
+	public const EVIDENCE_INCOMPLETE     = 'evidence_incomplete';
+
+	/**
+	 * Classifications with a live path that can still advance the job.
+	 *
+	 * `evidence_incomplete` is alive by construction: absence cannot be proven,
+	 * so nothing may be inferred dead.
+	 *
+	 * @var array<int,string>
+	 */
+	private const ALIVE_CLASSIFICATIONS = array(
+		self::ACTIVE_PROCESSING,
+		self::SCHEDULER_STARVED,
+		self::AI_CONCURRENCY_DEFERRED,
+		self::QUEUED_NEXT_STEP,
+		self::WAITING_CHILDREN,
+		self::EVIDENCE_INCOMPLETE,
+	);
+
 	/**
 	 * Action Scheduler's default retention window: 31 days in seconds.
 	 *
 	 * Mirrors ActionScheduler_QueueCleaner::$month_in_seconds.
 	 */
 	private const ACTION_SCHEDULER_DEFAULT_RETENTION_SECONDS = 2678400;
+
+	/**
+	 * The single liveness predicate: can any path still advance this job?
+	 *
+	 * @param array<string,mixed> $job             Job row with decoded engine_data.
+	 * @param SchedulerEvidence   $evidence        Batch scheduler evidence for the pass.
+	 * @param array<string,mixed> $child_counts    Batch child counts.
+	 * @param int                 $overdue_minutes In-progress heartbeat threshold in minutes.
+	 * @param int                 $now             Current unix time.
+	 */
+	public static function alive( array $job, SchedulerEvidence $evidence, array $child_counts, int $overdue_minutes, int $now ): bool {
+		return self::isAliveClassification( (string) self::diagnoseWithEvidence( $job, $evidence, $child_counts, $overdue_minutes, $now )['classification'] );
+	}
+
+	/**
+	 * Whether a classification represents a live path.
+	 */
+	public static function isAliveClassification( string $classification ): bool {
+		return in_array( $classification, self::ALIVE_CLASSIFICATIONS, true );
+	}
+
+	/**
+	 * Classify one job against a scheduler evidence snapshot.
+	 *
+	 * An incomplete snapshot cannot prove absence, so the job is reported as
+	 * `evidence_incomplete` (alive) instead of guessed dead.
+	 *
+	 * @param array<string,mixed> $job          Job row with decoded engine_data.
+	 * @param array<string,mixed> $child_counts Batch child counts.
+	 * @return array<string,mixed>
+	 */
+	public static function diagnoseWithEvidence( array $job, SchedulerEvidence $evidence, array $child_counts, int $overdue_minutes, int $now ): array {
+		$actions   = $evidence->isComplete() ? $evidence->actionsFor( (int) ( $job['job_id'] ?? 0 ) ) : array();
+		$diagnosis = self::diagnose( $job, $actions, $child_counts, $overdue_minutes, $now );
+		if ( ! $evidence->isComplete() ) {
+			$diagnosis['classification'] = self::EVIDENCE_INCOMPLETE;
+		}
+		return $diagnosis;
+	}
 
 	/**
 	 * Classify one job from persisted engine state and scheduler evidence.
@@ -34,13 +108,13 @@ class JobLivenessClassifier {
 				$actions,
 				static function ( array $action ) use ( $job, $engine_data ): bool {
 					$hook = (string) ( $action['hook'] ?? '' );
-					if ( ! in_array( $hook, array( 'datamachine_execute_step', 'datamachine_resume_ai_step' ), true ) ) {
+					if ( ! in_array( $hook, SchedulerEvidence::stepHooks(), true ) ) {
 						return true;
 					}
 					if ( ChildJobRecoveryPolicy::actionGenerationMatches( $job, $engine_data, $action ) ) {
 						return true;
 					}
-					if ( 'datamachine_resume_ai_step' !== $hook ) {
+					if ( AIConcurrencyBackpressure::RESUME_HOOK !== $hook ) {
 						return false;
 					}
 
@@ -82,7 +156,7 @@ class JobLivenessClassifier {
 		$contention_actions = array_values(
 			array_filter(
 				$owner_actions,
-				static fn( array $action ): bool => 'datamachine_resume_ai_step' === (string) ( $action['hook'] ?? '' )
+				static fn( array $action ): bool => AIConcurrencyBackpressure::RESUME_HOOK === (string) ( $action['hook'] ?? '' )
 			)
 		);
 		$contention_owned   = ! empty( $throttle )
@@ -92,22 +166,22 @@ class JobLivenessClassifier {
 		$defer_age          = false === $first_deferred ? (int) ( $throttle['defer_age_seconds'] ?? 0 ) : max( 0, $now - $first_deferred );
 
 		if ( ! empty( $fresh_progress ) ) {
-			$classification = 'active_processing';
+			$classification = self::ACTIVE_PROCESSING;
 		} elseif ( ! empty( $in_progress ) ) {
-			$classification = 'stale_in_progress';
+			$classification = self::STALE_IN_PROGRESS;
 		} elseif ( ! empty( $pending ) && $oldest_pending_age > $overdue_minutes ) {
-			$classification = 'scheduler_starved';
+			$classification = self::SCHEDULER_STARVED;
 		} elseif ( ! empty( $throttle ) && 'deferred' === ( $throttle['state'] ?? 'deferred' ) && ! empty( $pending ) ) {
-			$classification = 'ai_concurrency_deferred';
+			$classification = self::AI_CONCURRENCY_DEFERRED;
 		} elseif ( ! empty( $pending ) ) {
-			$classification = 'queued_next_step';
+			$classification = self::QUEUED_NEXT_STEP;
 		} elseif ( array_key_exists( 'evidence_complete', $child_counts ) && false === $child_counts['evidence_complete'] ) {
-			$classification = 'waiting_children';
+			$classification = self::WAITING_CHILDREN;
 		} elseif ( $active_children > 0 || ( $batch_total > 0 && $total_children < $batch_total ) ) {
-			$classification = 'waiting_children';
+			$classification = self::WAITING_CHILDREN;
 		} else {
 			$age_seconds    = self::ageSeconds( (string) ( $job['created_at'] ?? '' ), $now );
-			$classification = $age_seconds > self::schedulerRetentionSeconds() ? 'evidence_pruned' : 'no_scheduler_path';
+			$classification = $age_seconds > self::schedulerRetentionSeconds() ? self::EVIDENCE_PRUNED : self::NO_SCHEDULER_PATH;
 		}
 
 		$last_activity = $engine_data['run_metrics']['last_activity_at'] ?? null;

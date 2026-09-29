@@ -7,9 +7,10 @@ define( 'HOUR_IN_SECONDS', 3600 );
 define( 'YEAR_IN_SECONDS', 31536000 );
 
 require_once __DIR__ . '/../inc/Core/ChildJobRecoveryPolicy.php';
-require_once __DIR__ . '/../inc/Cli/JobLivenessClassifier.php';
+require_once __DIR__ . '/fixtures/scheduler-evidence-bootstrap.php';
+require_once __DIR__ . '/../inc/Core/Jobs/JobLiveness.php';
 
-use DataMachine\Cli\JobLivenessClassifier;
+use DataMachine\Core\Jobs\JobLiveness;
 
 $failed = 0;
 $total  = 0;
@@ -48,7 +49,7 @@ $action = static fn( string $status, string $scheduled, array $args = array(), s
 	'decoded_args'       => array_merge( array( 'job_id' => 42, 'flow_step_id' => 'step' ), $args ),
 );
 $classify = static function ( array $job_row, array $actions = array(), array $children = array() ) use ( $now ): array {
-	return JobLivenessClassifier::diagnose( $job_row, $actions, $children, 120, $now );
+	return JobLiveness::diagnose( $job_row, $actions, $children, 120, $now );
 };
 
 echo "=== job-liveness-cli-smoke ===\n";
@@ -146,7 +147,7 @@ $assert( 'old historical action is not scheduler ownership', 'no_scheduler_path'
 $old_job               = $job();
 $old_job['created_at'] = '2026-06-01 08:00:00';
 $young_no_path         = $classify( $job() );
-$default_window        = JobLivenessClassifier::schedulerRetentionSeconds();
+$default_window        = JobLiveness::schedulerRetentionSeconds();
 $assert( 'default retention window matches Action Scheduler 31-day default', 2678400 === $default_window );
 $assert( 'young job without actions still has no scheduler path', 'no_scheduler_path' === $young_no_path['classification'] );
 
@@ -162,7 +163,7 @@ $config_narrow = $classify( $job() );
 $assert( 'narrow filter window classifies young job as evidence pruned', 'evidence_pruned' === $config_narrow['classification'] );
 
 $GLOBALS['test_as_retention_periods']['action_scheduler_retention_period'] = 0;
-$assert( 'zero filter value falls back to the 31-day default', 2678400 === JobLivenessClassifier::schedulerRetentionSeconds() );
+$assert( 'zero filter value falls back to the 31-day default', 2678400 === JobLiveness::schedulerRetentionSeconds() );
 $assert( 'zero filter window still prunes the old job', 'evidence_pruned' === $classify( $old_job )['classification'] );
 $assert( 'zero filter window keeps young job actionable as no scheduler path', 'no_scheduler_path' === $classify( $job() )['classification'] );
 $GLOBALS['test_as_retention_periods'] = array();

@@ -141,6 +141,7 @@ namespace {
 
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Core/PendingJobRecoveryPolicy.php';
+	require_once __DIR__ . '/fixtures/scheduler-evidence-bootstrap.php';
 	require_once __DIR__ . '/../inc/Abilities/Job/JobHelpers.php';
 	require_once __DIR__ . '/../inc/Abilities/Job/RecoverStuckJobsAbility.php';
 

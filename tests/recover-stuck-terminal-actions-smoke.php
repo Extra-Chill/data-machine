@@ -27,8 +27,11 @@ if ( ! function_exists( 'maybe_unserialize' ) ) {
 }
 
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
+require_once __DIR__ . '/fixtures/scheduler-evidence-bootstrap.php';
 require_once __DIR__ . '/../inc/Abilities/Job/JobHelpers.php';
 require_once __DIR__ . '/../inc/Abilities/Job/RecoverStuckJobsAbility.php';
+
+use DataMachine\Core\Jobs\SchedulerEvidence;
 
 $failures = array();
 
@@ -44,33 +47,32 @@ $assert = static function ( string $label, bool $condition ) use ( &$failures ):
 
 $reflection = new ReflectionClass( DataMachine\Abilities\Job\RecoverStuckJobsAbility::class );
 $ability    = $reflection->newInstanceWithoutConstructor();
-$extract    = $reflection->getMethod( 'extractActionJobId' );
-$extract_for_hook = $reflection->getMethod( 'extractActionJobIdForHook' );
 $detect     = $reflection->getMethod( 'getTerminalBackedInProgressActions' );
+$extract    = static fn( string $args, string $hook = '' ): int => SchedulerEvidence::extractJobId( $args, $hook );
 
 $assert(
 	'extracts job_id from JSON object args',
-	123 === $extract->invoke( $ability, '{"job_id":123,"flow_step_id":"step-a"}' )
+	123 === $extract( '{"job_id":123,"flow_step_id":"step-a"}' )
 );
 
 $assert(
 	'extracts job_id from JSON array args',
-	456 === $extract->invoke( $ability, '[{"job_id":456,"flow_step_id":"step-b"}]' )
+	456 === $extract( '[{"job_id":456,"flow_step_id":"step-b"}]' )
 );
 
 $assert(
 	'extracts job_id from serialized args',
-	789 === $extract->invoke( $ability, serialize( array( 'job_id' => 789 ) ) )
+	789 === $extract( serialize( array( 'job_id' => 789 ) ) )
 );
 
 $assert(
 	'extracts parent_job_id from pipeline batch args',
-	321 === $extract_for_hook->invoke( $ability, '{"parent_job_id":321}', 'datamachine_pipeline_batch_chunk' )
+	321 === $extract( '{"parent_job_id":321}', 'datamachine_pipeline_batch_chunk' )
 );
 
 $assert(
 	'extracts optional run-flow job_id from positional args',
-	654 === $extract_for_hook->invoke( $ability, '[98,654]', 'datamachine_run_flow_now' )
+	654 === $extract( '[98,654]', 'datamachine_run_flow_now' )
 );
 
 $GLOBALS['wpdb'] = new class() {
@@ -184,10 +186,9 @@ $cli_src     = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.ph
 
 $assert(
 	'detects orphaned in-progress Data Machine actions with paired job args',
-	str_contains( $ability_src, 'AND args LIKE %s' )
-		&& str_contains( $ability_src, "'datamachine_execute_step'" )
-		&& str_contains( $ability_src, "'datamachine_pipeline_batch_chunk'" )
-		&& str_contains( $ability_src, "'datamachine_run_flow_now'" )
+	str_contains( $ability_src, 'AND a.args LIKE %s' )
+		&& array( 'datamachine_execute_step', 'datamachine_pipeline_batch_chunk', 'datamachine_run_flow_now' ) === array_values( array_intersect( array( 'datamachine_execute_step', 'datamachine_pipeline_batch_chunk', 'datamachine_run_flow_now' ), array_keys( SchedulerEvidence::hookJobArgs() ) ) )
+		&& str_contains( $ability_src, 'SchedulerEvidence::hookJobArgs()' )
 		&& str_contains( $ability_src, 'a.claim_id = 0 OR c.claim_id IS NULL' )
 		&& str_contains( $ability_src, "'in-progress'" )
 );
