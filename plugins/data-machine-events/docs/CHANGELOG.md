@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.9] - 2026-09-30
+
+### Fixed
+- send plain-text titles and venues to calendar apps
+
 ## [0.64.8] - 2026-09-26
 
 ### Fixed
