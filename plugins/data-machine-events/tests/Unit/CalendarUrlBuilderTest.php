@@ -51,13 +51,13 @@ class CalendarUrlBuilderTest extends WP_UnitTestCase {
 
 	private function base_event_fields(): array {
 		return array(
-			'startDate'  => '2026-09-23',
-			'startTime'  => '20:00:00',
-			'endTime'    => '',
-			'venue'      => 'The Royal American',
-			'address'    => '970 Morrison Dr, Charleston, SC',
-			'ticketUrl'  => self::AFFILIATE_TICKET_URL,
-			'performer'  => 'Jimmy Fortune',
+			'startDate' => '2026-09-23',
+			'startTime' => '20:00:00',
+			'endTime'   => '',
+			'venue'     => 'The Royal American',
+			'address'   => '970 Morrison Dr, Charleston, SC',
+			'ticketUrl' => self::AFFILIATE_TICKET_URL,
+			'performer' => 'Jimmy Fortune',
 		);
 	}
 
@@ -108,7 +108,10 @@ class CalendarUrlBuilderTest extends WP_UnitTestCase {
 		// post_id is 0 (unknown post) -> get_permalink() has nothing to resolve,
 		// so no permalink line must be emitted at all, rather than falling
 		// back to the raw (possibly affiliate-wrapped) ticket URL.
-		$event = array_merge( $this->base_event_fields(), array( 'post_id' => 0, 'title' => 'Untracked Event' ) );
+		$event = array_merge( $this->base_event_fields(), array(
+			'post_id' => 0,
+			'title'   => 'Untracked Event',
+		) );
 
 		$details = $this->extract_query_param( CalendarUrlBuilder::google( $event ), 'details' );
 
@@ -131,6 +134,39 @@ class CalendarUrlBuilderTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'Tickets:', $details );
 		$this->assertStringContainsString( 'More info: ' . $permalink, $details );
 		$this->assertSame( 1, substr_count( $details, $permalink ), 'Permalink must appear exactly once in the description.' );
+	}
+
+	public function test_titles_and_venues_reach_calendars_as_plain_text() {
+		$post_id = $this->factory()->post->create(
+			array(
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_title'  => 'Extra Chill & WordPress Meetup: Rock \'n\' Roll',
+				'post_name'   => 'entity-title-test-event',
+				'post_status' => 'publish',
+			)
+		);
+		$event   = array_merge(
+			$this->base_event_fields(),
+			array(
+				'post_id' => $post_id,
+				'venue'   => 'Burns &amp; Sons Hall',
+			)
+		);
+
+		$google_text  = $this->extract_query_param( CalendarUrlBuilder::google( $event ), 'text' );
+		$outlook_subj = $this->extract_query_param( CalendarUrlBuilder::outlook( $event ), 'subject' );
+		$location     = $this->extract_query_param( CalendarUrlBuilder::google( $event ), 'location' );
+
+		foreach ( array( $google_text, $outlook_subj ) as $title ) {
+			$this->assertStringStartsWith( 'Extra Chill & WordPress Meetup', $title );
+			$this->assertStringNotContainsString( '&amp;', $title );
+			$this->assertStringNotContainsString( '&#', $title );
+		}
+		$this->assertStringStartsWith( 'Burns & Sons Hall,', $location );
+	}
+
+	public function test_plain_text_decodes_entities_and_strips_tags() {
+		$this->assertSame( 'A & B "C" D’s', CalendarUrlBuilder::plain_text( 'A &amp; <em>B</em> &quot;C&quot; D&#8217;s' ) );
 	}
 
 	/**

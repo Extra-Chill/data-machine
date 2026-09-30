@@ -184,6 +184,21 @@ class CalendarUrlBuilder {
 	}
 
 	/**
+	 * Reduce a stored field to plain text for a calendar payload.
+	 *
+	 * Titles and venue names are stored HTML-encoded (`&amp;`), and
+	 * get_the_title() adds texturized entities (`&#038;`, `&#8217;`). Calendar
+	 * apps show the raw text, so strip tags and decode entities once here.
+	 * Every calendar field (Google, Outlook, .ics) goes through this.
+	 *
+	 * @param string $value Stored or rendered value.
+	 * @return string Plain text.
+	 */
+	public static function plain_text( string $value ): string {
+		return html_entity_decode( wp_strip_all_tags( $value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+	}
+
+	/**
 	 * Get the event title, preferring `get_the_title()` when a post ID is available.
 	 *
 	 * @param array $event   Event data.
@@ -194,10 +209,10 @@ class CalendarUrlBuilder {
 		if ( $post_id > 0 ) {
 			$title = get_the_title( $post_id );
 			if ( $title ) {
-				return wp_strip_all_tags( $title );
+				return self::plain_text( $title );
 			}
 		}
-		return isset( $event['title'] ) ? wp_strip_all_tags( (string) $event['title'] ) : '';
+		return isset( $event['title'] ) ? self::plain_text( (string) $event['title'] ) : '';
 	}
 
 	/**
@@ -239,7 +254,7 @@ class CalendarUrlBuilder {
 			$performer = (string) $event['performerName'];
 		}
 		if ( $performer ) {
-			$parts[] = sprintf( __( 'Performer: %s', 'data-machine-events' ), wp_strip_all_tags( $performer ) );
+			$parts[] = sprintf( __( 'Performer: %s', 'data-machine-events' ), self::plain_text( $performer ) );
 		}
 
 		$permalink = $post_id > 0 ? get_permalink( $post_id ) : '';
@@ -271,8 +286,8 @@ class CalendarUrlBuilder {
 	 * @return string
 	 */
 	private static function build_location( array $event ): string {
-		$venue   = isset( $event['venue'] ) ? wp_strip_all_tags( (string) $event['venue'] ) : '';
-		$address = isset( $event['address'] ) ? wp_strip_all_tags( (string) $event['address'] ) : '';
+		$venue   = isset( $event['venue'] ) ? self::plain_text( (string) $event['venue'] ) : '';
+		$address = isset( $event['address'] ) ? self::plain_text( (string) $event['address'] ) : '';
 
 		if ( $venue && $address ) {
 			return $venue . ', ' . $address;

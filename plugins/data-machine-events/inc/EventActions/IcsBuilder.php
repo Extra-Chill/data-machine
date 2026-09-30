@@ -90,7 +90,7 @@ class IcsBuilder {
 			$end = $start->add( new \DateInterval( 'PT3H' ) );
 		}
 
-		$title       = wp_strip_all_tags( (string) get_the_title( $post_id ) );
+		$title       = CalendarUrlBuilder::plain_text( (string) get_the_title( $post_id ) );
 		$permalink   = (string) get_permalink( $post_id );
 		$description = self::build_description( $event, $post_id );
 		$location    = self::build_location( $event );
@@ -386,7 +386,7 @@ class IcsBuilder {
 			$performer = (string) $event['performerName'];
 		}
 		if ( $performer ) {
-			$parts[] = sprintf( __( 'Performer: %s', 'data-machine-events' ), wp_strip_all_tags( $performer ) );
+			$parts[] = sprintf( __( 'Performer: %s', 'data-machine-events' ), CalendarUrlBuilder::plain_text( $performer ) );
 		}
 
 		$permalink = $post_id > 0 ? get_permalink( $post_id ) : '';
@@ -412,8 +412,8 @@ class IcsBuilder {
 	 * @return string
 	 */
 	private static function build_location( array $event ): string {
-		$venue   = isset( $event['venue'] ) ? wp_strip_all_tags( (string) $event['venue'] ) : '';
-		$address = isset( $event['address'] ) ? wp_strip_all_tags( (string) $event['address'] ) : '';
+		$venue   = isset( $event['venue'] ) ? CalendarUrlBuilder::plain_text( (string) $event['venue'] ) : '';
+		$address = isset( $event['address'] ) ? CalendarUrlBuilder::plain_text( (string) $event['address'] ) : '';
 
 		if ( $venue && $address ) {
 			return $venue . ', ' . $address;

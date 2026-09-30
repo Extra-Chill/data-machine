@@ -51,6 +51,29 @@ class IcsBuilderTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_ics_summary_is_plain_text() {
+		$post_id = $this->create_event_post(
+			array(
+				'startDate' => '2026-10-21',
+				'startTime' => '18:30',
+				'venue'     => 'Lo-Fi Brewing',
+			),
+			'ics-entity-title-test-event'
+		);
+		wp_update_post(
+			array(
+				'ID'         => $post_id,
+				'post_title' => 'Extra Chill & WordPress Meetup',
+			)
+		);
+
+		$ics = IcsBuilder::build( $post_id );
+		$this->assertNotEmpty( $ics );
+		$this->assertStringContainsString( 'SUMMARY:Extra Chill & WordPress Meetup', $this->unfold( (string) $ics ) );
+		$this->assertStringNotContainsString( '&amp;', (string) $ics );
+		$this->assertStringNotContainsString( '&#038;', (string) $ics );
+	}
+
 	/**
 	 * Unfold RFC 5545 folded lines (CRLF + leading space continuation) back
 	 * into a single logical line per property so substring assertions work
