@@ -42,6 +42,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionLogsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionBatchWorklistsTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionReclaimSpaceTask;
 use DataMachine\Engine\AI\System\Tasks\SourceInventoryTask;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\AI\System\Tasks\WakeBriefingTask;
@@ -116,6 +117,7 @@ class SystemAgentServiceProvider {
 		$tasks[ RetentionCleanup::TASK_CHAT_SESSIONS ]   = RetentionChatSessionsTask::class;
 		$tasks[ RetentionCleanup::TASK_JOB_ARTIFACTS ]   = RetentionJobArtifactsTask::class;
 		$tasks[ RetentionCleanup::TASK_BATCH_WORKLISTS ] = RetentionBatchWorklistsTask::class;
+		$tasks[ RetentionCleanup::TASK_RECLAIM_SPACE ]   = RetentionReclaimSpaceTask::class;
 
 		return $tasks;
 	}
@@ -303,6 +305,18 @@ class SystemAgentServiceProvider {
 					'enabled_setting' => 'retention_batch_worklists_enabled',
 					'default_enabled' => true,
 					'label'           => 'Daily orphaned batch-worklist cleanup',
+				)
+			),
+			// Runs after the daily delete passes have freed pages. It only
+			// rebuilds tables crossing BOTH free-space thresholds (#3587).
+			RetentionCleanup::TASK_RECLAIM_SPACE   => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_RECLAIM_SPACE,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_reclaim_space_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily table space reclaim',
 				)
 			),
 		);
