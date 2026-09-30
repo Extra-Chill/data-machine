@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.181.0] - 2026-09-30
+
+### Added
+- reclaim InnoDB table space after retention deletes
+
 ## [0.180.0] - 2026-09-29
 
 ### Added
