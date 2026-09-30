@@ -18,12 +18,14 @@
 
 namespace DataMachine\Abilities\Fetch;
 
-use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Email\EmailMailboxPermission;
 use DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth;
 
 defined( 'ABSPATH' ) || exit;
 
 class FetchEmailAbility {
+
+	use EmailMailboxPermission;
 
 	private static bool $registered = false;
 
@@ -126,10 +128,20 @@ class FetchEmailAbility {
 	/**
 	 * Permission callback.
 	 *
+	 * @param mixed $input Normalized ability input.
 	 * @return bool True if user has permission.
 	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+	public function checkPermission( $input = null ): bool {
+		$normalized = is_array( $input ) ? $input : array();
+		$operations = array( 'read' );
+		if ( empty( $normalized['uid'] ) && ! empty( $normalized['search_criteria'] ) ) {
+			$operations[] = 'search';
+		}
+		if ( ! empty( $normalized['mark_as_read'] ) ) {
+			$operations[] = 'organize';
+		}
+
+		return $this->authorizeMailboxRef( $input, $operations );
 	}
 
 	/**

@@ -103,6 +103,7 @@ if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
 }
 
 require_once $plugin_root . '/inc/Abilities/AbilityRegistration.php';
+require_once $plugin_root . '/inc/Abilities/Email/EmailMailboxPermission.php';
 require_once $plugin_root . '/inc/Abilities/Publish/SendEmailAbility.php';
 require_once $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
 

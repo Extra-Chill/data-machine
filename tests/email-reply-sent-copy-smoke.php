@@ -71,6 +71,8 @@ class WP_Error {
 	}
 }
 
+require_once dirname( __DIR__ ) . '/inc/Abilities/Email/EmailMailboxPermission.php';
+require_once dirname( __DIR__ ) . '/inc/Abilities/Email/EmailAbilitiesPermissions.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/Email/EmailAbilities.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/Publish/SendEmailAbility.php';
 

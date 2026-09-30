@@ -135,6 +135,7 @@ namespace {
 	require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityCategories.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/AgentAbilities.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Media/ImageTemplateAbilities.php';
+	require_once dirname( __DIR__ ) . '/inc/Abilities/Email/EmailMailboxPermission.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Publish/SendEmailAbility.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
 	require_once dirname( __DIR__ ) . '/inc/Core/Bootstrap/AbilityServiceProvider.php';

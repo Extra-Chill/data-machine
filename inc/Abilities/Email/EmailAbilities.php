@@ -13,11 +13,11 @@
 
 namespace DataMachine\Abilities\Email;
 
-use DataMachine\Abilities\PermissionHelper;
-
 defined( 'ABSPATH' ) || exit;
 
 class EmailAbilities {
+
+	use EmailAbilitiesPermissions;
 
 	private static bool $registered = false;
 	private ?array $activeMailbox   = null;
@@ -86,7 +86,7 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeReply' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkReplyPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -122,7 +122,7 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeDelete' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkDeletePermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -162,7 +162,7 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeMove' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkMovePermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -207,7 +207,7 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeFlag' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkFlagPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -254,7 +254,7 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeBatchMove' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkBatchMovePermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -305,7 +305,7 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeBatchFlag' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkBatchFlagPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -348,7 +348,7 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeBatchDelete' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkBatchDeletePermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -385,7 +385,7 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeUnsubscribe' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkUnsubscribePermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -429,7 +429,7 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeBatchUnsubscribe' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkBatchUnsubscribePermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -455,17 +455,13 @@ class EmailAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeTestConnection' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
+					'permission_callback' => array( $this, 'checkTestConnectionPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
-	}
-
-	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
 	}
 
 	private static function authRefProperty(): array {

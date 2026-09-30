@@ -46,6 +46,7 @@ function wp_register_ability( $name, $args ) {
 }
 
 require_once __DIR__ . '/../inc/Abilities/AbilityRegistration.php';
+require_once __DIR__ . '/../inc/Abilities/Email/EmailMailboxPermission.php';
 require_once __DIR__ . '/../inc/Abilities/Publish/SendEmailAbility.php';
 require_once __DIR__ . '/../inc/Abilities/Publish/SendEmailQueuedAbility.php';
 
