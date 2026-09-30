@@ -619,6 +619,7 @@ class WorkerCommand extends BaseCommand {
 			'datamachine_recurring_retention_files',
 			'datamachine_recurring_retention_logs',
 			'datamachine_recurring_retention_processed_items',
+			'datamachine_recurring_retention_reclaim_space',
 			'datamachine_recurring_retention_stale_claims',
 			'datamachine_recurring_workspace_disk_emergency_cleanup',
 			'datamachine_recurring_workspace_retention_cleanup',

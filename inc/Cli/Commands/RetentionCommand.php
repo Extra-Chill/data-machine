@@ -442,6 +442,12 @@ class RetentionCommand extends BaseCommand {
 				'threshold' => 'parent job deleted',
 				'count'     => array( RetentionCleanup::class, 'countBatchWorklists' ),
 			),
+			array(
+				'label'     => 'Reclaimable table space',
+				'task_type' => RetentionCleanup::TASK_RECLAIM_SPACE,
+				'threshold' => 'free >= ' . size_format( RetentionCleanup::tableFreeBytesThreshold() ) . ' and >= ' . round( RetentionCleanup::tableFreeRatioThreshold() * 100 ) . '%',
+				'count'     => array( RetentionCleanup::class, 'countAutoReclaimCandidates' ),
+			),
 		);
 	}
 

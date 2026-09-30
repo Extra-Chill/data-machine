@@ -38,6 +38,7 @@ class RetentionCleanup {
 	public const TASK_CHAT_SESSIONS   = 'retention_chat_sessions';
 	public const TASK_JOB_ARTIFACTS   = 'retention_job_artifacts';
 	public const TASK_BATCH_WORKLISTS = 'retention_batch_worklists';
+	public const TASK_RECLAIM_SPACE   = 'retention_reclaim_space';
 
 	/**
 	 * Most action IDs a single retention window will exclude from re-selection.
@@ -459,6 +460,123 @@ class RetentionCleanup {
 			'optimized' => $optimized,
 			'rejected'  => $rejected,
 		);
+	}
+
+	/**
+	 * Largest live table (data + index bytes) automatic reclaim will rebuild.
+	 *
+	 * OPTIMIZE on InnoDB is an online rebuild, but its I/O and temporary disk
+	 * scale with live size. Larger tables stay on the explicit operator path
+	 * (`wp datamachine retention optimize`). `0` disables the cap.
+	 */
+	public static function autoReclaimMaxLiveBytes(): int {
+		return max( 0, (int) apply_filters( 'datamachine_table_auto_reclaim_max_live_bytes', 4 * 1024 * 1024 * 1024 ) );
+	}
+
+	/**
+	 * Owned InnoDB tables whose freed space warrants an unattended rebuild.
+	 *
+	 * Stricter than {@see tableBloatHealth()}, which warns when EITHER
+	 * threshold is crossed: an automatic rebuild requires BOTH the absolute
+	 * free-bytes threshold AND the free ratio, so a large table carrying a
+	 * modest fraction of free space is never rebuilt without an operator.
+	 *
+	 * @return array<string, array<string, mixed>> Table name => allocation row.
+	 */
+	public static function autoReclaimCandidates(): array {
+		$absolute   = self::tableFreeBytesThreshold();
+		$ratio      = self::tableFreeRatioThreshold();
+		$max_live   = self::autoReclaimMaxLiveBytes();
+		$candidates = array();
+
+		foreach ( self::ownedTableAllocations() as $table => $data ) {
+			if ( empty( $data['available'] ) || 'innodb' !== strtolower( (string) $data['engine'] ) ) {
+				continue;
+			}
+			$free  = $data['allocated_free_bytes'];
+			$share = $data['reclaim_ratio'];
+			$live  = $data['live_bytes'];
+			if ( null === $free || null === $share || null === $live ) {
+				continue;
+			}
+			if ( $free < $absolute || $share < $ratio ) {
+				continue;
+			}
+			if ( $max_live > 0 && $live > $max_live ) {
+				continue;
+			}
+			$candidates[ $table ] = $data;
+		}
+
+		return $candidates;
+	}
+
+	/**
+	 * Number of owned tables automatic reclaim would rebuild right now.
+	 */
+	public static function countAutoReclaimCandidates(): int {
+		return count( self::autoReclaimCandidates() );
+	}
+
+	/**
+	 * Reclaim filesystem space left behind by retention deletes.
+	 *
+	 * Row retention deletes and sheds data correctly, but InnoDB keeps freed
+	 * pages inside the tablespace (`DATA_FREE`); on busy installs job tables
+	 * grew to many times their live size (#3587). This rebuilds only the
+	 * owned tables that cross both thresholds, through the same allowlisted
+	 * {@see optimizeOwnedTables()} path the operator command uses.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function reclaimTableSpace(): array {
+		$candidates = self::autoReclaimCandidates();
+		$result     = array(
+			'optimized'       => array(),
+			'rejected'        => array(),
+			'reclaimed_bytes' => 0,
+			'tables'          => array(),
+			'thresholds'      => array(
+				'free_bytes'     => self::tableFreeBytesThreshold(),
+				'free_ratio'     => self::tableFreeRatioThreshold(),
+				'max_live_bytes' => self::autoReclaimMaxLiveBytes(),
+			),
+		);
+		if ( empty( $candidates ) ) {
+			return $result;
+		}
+
+		$optimize            = self::optimizeOwnedTables( array_keys( $candidates ) );
+		$result['optimized'] = $optimize['optimized'];
+		$result['rejected']  = $optimize['rejected'];
+
+		$after = self::ownedTableAllocations();
+		foreach ( $optimize['optimized'] as $table ) {
+			$before_free = (int) ( $candidates[ $table ]['allocated_free_bytes'] ?? 0 );
+			$after_free  = $after[ $table ]['allocated_free_bytes'] ?? null;
+			$reclaimed   = null === $after_free ? 0 : max( 0, $before_free - (int) $after_free );
+
+			$result['tables'][ $table ] = array(
+				'free_bytes_before' => $before_free,
+				'free_bytes_after'  => $after_free,
+				'reclaimed_bytes'   => $reclaimed,
+			);
+			$result['reclaimed_bytes'] += $reclaimed;
+		}
+
+		if ( ! empty( $optimize['optimized'] ) ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Retention reclaimed table space',
+				array(
+					'tables'          => $optimize['optimized'],
+					'reclaimed_bytes' => $result['reclaimed_bytes'],
+				)
+			);
+		}
+
+		return $result;
 	}
 
 	/**

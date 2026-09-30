@@ -1,6 +1,7 @@
 <?php
 /**
- * Focused regression coverage for retention table allocation reporting (#3282, #3283).
+ * Focused regression coverage for retention table allocation reporting (#3282, #3283)
+ * and unattended table-space reclaim (#3587).
  *
  * Run with: php tests/retention-reporting-smoke.php
  */
@@ -58,6 +59,8 @@ namespace {
 		public string $prefix = 'wp_';
 		public bool $restricted = false;
 		public int $optimize_calls = 0;
+		public int $free = 900;
+		public string $engine = 'InnoDB';
 
 		public function prepare( string $sql, ...$args ): array {
 			return array( 'sql' => $sql, 'args' => $args );
@@ -70,11 +73,11 @@ namespace {
 			return array(
 				(object) array(
 					'TABLE_NAME'    => 'wp_datamachine_jobs',
-					'ENGINE'        => 'InnoDB',
+					'ENGINE'        => $this->engine,
 					'TABLE_ROWS'    => 2,
 					'DATA_LENGTH'   => 100,
 					'INDEX_LENGTH'  => 100,
-					'DATA_FREE'     => 900,
+					'DATA_FREE'     => $this->free,
 				),
 			);
 		}
@@ -85,6 +88,8 @@ namespace {
 
 		public function query( $prepared ): int {
 			++$this->optimize_calls;
+			// A rebuild returns freed pages to the filesystem.
+			$this->free = 0;
 			return 0;
 		}
 	}
@@ -109,7 +114,33 @@ namespace {
 	assert_retention_reporting( 'selected owned table is optimized', in_array( 'wp_datamachine_jobs', $optimized['optimized'], true ) && 1 === $wpdb->optimize_calls );
 	assert_retention_reporting( 'selected table allowlist rejects foreign table', isset( $optimized['rejected']['wp_not_owned'] ) );
 
+	// #3587: unattended reclaim requires BOTH thresholds and a bounded live size.
+	$wpdb->free           = 900;
+	$wpdb->optimize_calls = 0;
+	$GLOBALS['retention_reporting_filters']['datamachine_table_free_ratio_threshold'] = 0.9;
+	assert_retention_reporting( 'health still warns when only the byte threshold is crossed', 'warning' === RetentionCleanup::tableBloatHealth()['status'] );
+	$none = RetentionCleanup::reclaimTableSpace();
+	assert_retention_reporting( 'auto reclaim requires both thresholds, not either', array() === $none['optimized'] && 0 === $wpdb->optimize_calls );
+
+	$GLOBALS['retention_reporting_filters']['datamachine_table_free_ratio_threshold'] = 0.8;
+	$GLOBALS['retention_reporting_filters']['datamachine_table_auto_reclaim_max_live_bytes'] = 100;
+	$capped = RetentionCleanup::reclaimTableSpace();
+	assert_retention_reporting( 'auto reclaim skips tables above the live-size cap', array() === $capped['optimized'] && 0 === $wpdb->optimize_calls );
+
+	$GLOBALS['retention_reporting_filters']['datamachine_table_auto_reclaim_max_live_bytes'] = 0;
+	$wpdb->engine = 'MyISAM';
+	assert_retention_reporting( 'auto reclaim ignores non-InnoDB tables', 0 === RetentionCleanup::countAutoReclaimCandidates() );
+	$wpdb->engine = 'InnoDB';
+
+	assert_retention_reporting( 'crossing both thresholds makes the table a candidate', 1 === RetentionCleanup::countAutoReclaimCandidates() );
+	$reclaimed = RetentionCleanup::reclaimTableSpace();
+	assert_retention_reporting( 'auto reclaim rebuilds the candidate once', array( 'wp_datamachine_jobs' ) === $reclaimed['optimized'] && 1 === $wpdb->optimize_calls );
+	assert_retention_reporting( 'auto reclaim reports reclaimed bytes per table and in total', 900 === $reclaimed['reclaimed_bytes'] && 900 === $reclaimed['tables']['wp_datamachine_jobs']['reclaimed_bytes'] && 0 === $reclaimed['tables']['wp_datamachine_jobs']['free_bytes_after'] );
+	$again = RetentionCleanup::reclaimTableSpace();
+	assert_retention_reporting( 'a reclaimed table is not rebuilt again', array() === $again['optimized'] && 1 === $wpdb->optimize_calls );
+
 	$wpdb->restricted = true;
+	assert_retention_reporting( 'auto reclaim is a no-op when allocation metadata is unavailable', array() === RetentionCleanup::reclaimTableSpace()['optimized'] );
 	$unavailable = RetentionCleanup::ownedTableAllocations();
 	assert_retention_reporting( 'information_schema failure degrades without byte claims', false === $unavailable['wp_datamachine_jobs']['available'] && null === $unavailable['wp_datamachine_jobs']['allocated_free_bytes'] );
 
