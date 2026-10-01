@@ -315,7 +315,7 @@ if ( ! function_exists( '__' ) ) {
  * -------------------------------------------------------------------------*/
 
 if ( ! class_exists( '\\DataMachine\\Abilities\\PermissionHelper' ) ) {
-	eval( 'namespace DataMachine\\Abilities; class PermissionHelper { public static bool $manage = true; public static int $user_id = 1; public static int $agent_id = 0; public static int $token_id = 0; public static function can_manage(): bool { return self::$manage; } public static function can( string $action ): bool { return self::$manage; } public static function acting_user_id(): int { return self::$user_id; } public static function get_acting_agent_id(): ?int { return self::$agent_id ?: null; } public static function get_acting_token_id(): ?int { return self::$token_id ?: null; } public static function is_authenticated_context(): bool { return false; } }' );
+	eval( 'namespace DataMachine\\Abilities; class PermissionHelper { public static bool $manage = true; public static int $user_id = 1; public static int $agent_id = 0; public static int $token_id = 0; public static function can_manage(): bool { return self::$manage; } public static function can( string $action ): bool { return self::$manage; } public static function acting_user_id(): int { return self::$user_id; } public static function get_acting_agent_id(): ?int { return self::$agent_id ?: null; } public static function get_acting_token_id(): ?int { return self::$token_id ?: null; } public static function is_authenticated_context(): bool { return false; } public static function is_system_context(): bool { return false; } }' );
 }
 
 if ( ! class_exists( 'WP_Agent_Token' ) ) {

@@ -133,6 +133,8 @@ final class AbilityServiceProvider {
 
 		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
 		new \DataMachine\Abilities\Email\EmailAbilities();
+		new \DataMachine\Abilities\Email\MailboxAbilities();
+		new \DataMachine\Abilities\Email\ForwardEmailAbility();
 		new \DataMachine\Abilities\Fetch\FetchEmailAbility();
 		new \DataMachine\Abilities\Fetch\FetchRssAbility();
 		new \DataMachine\Abilities\Fetch\FetchWordPressApiAbility();

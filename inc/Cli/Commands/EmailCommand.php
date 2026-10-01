@@ -16,6 +16,103 @@ use WP_CLI;
 defined( 'ABSPATH' ) || exit;
 
 class EmailCommand extends BaseCommand {
+	/**
+	 * List accessible named inboxes for the current user or agent.
+	 *
+	 * @subcommand mailboxes
+	 */
+	public function mailboxes( array $args, array $flags ): void {
+		$this->mailboxAbility( 'email-mailboxes', array() );
+	}
+
+	/**
+	 * Connect or update a user-owned IMAP/SMTP inbox using a private JSON file.
+	 *
+	 * ## OPTIONS
+	 * <name>
+	 * : Stable mailbox name, e.g. work or personal.
+	 * --input-file=<path>
+	 * : JSON credentials file. Passwords are encrypted; the output contains no credentials.
+	 * @subcommand mailbox-connect
+	 */
+	public function mailbox_connect( array $args, array $flags ): void {
+		$file = $flags['input-file'];
+		if ( ! is_file( $file ) || ! is_readable( $file ) || filesize( $file ) > 16384 ) {
+			WP_CLI::error( 'Provide a readable credentials JSON file of at most 16 KiB.' );
+		}
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Operator-supplied local credential file, never an HTTP URL.
+		$raw = file_get_contents( $file );
+		if ( false === $raw ) {
+			WP_CLI::error( 'Could not read mailbox credentials file.' );
+			return;
+		}
+		$credentials = json_decode( $raw, true );
+		if ( ! is_array( $credentials ) ) {
+			WP_CLI::error( 'Credentials file must contain a JSON object.' );
+		}
+		$this->mailboxAbility( 'email-mailbox-connect', array(
+			'name'        => $args[0],
+			'credentials' => $credentials,
+		) );
+	}
+
+	/**
+	 * Delegate explicit operations on one owned inbox to an agent.
+	 *
+	 * ## OPTIONS
+	 * <name>
+	 * : Mailbox name.
+	 * <agent-id>
+	 * : Existing target agent ID.
+	 * --operations=<operations>
+	 * : Comma-separated read,search,send,reply,organize,delete,draft,unsubscribe permissions.
+	 * @subcommand mailbox-grant
+	 */
+	public function mailbox_grant( array $args, array $flags ): void {
+		$this->mailboxAbility( 'email-mailbox-grant', array(
+			'name'       => $args[0],
+			'agent_id'   => (int) $args[1],
+			'operations' => explode( ',', $flags['operations'] ),
+		) );
+	}
+
+	/**
+	 * Forward one original email with its attachments from a connected inbox.
+	 *
+	 * ## OPTIONS
+	 * <uid>
+	 * : Source message UID.
+	 * --mailbox=<name>
+	 * : Authorized source mailbox name.
+	 * --to=<emails>
+	 * : Comma-separated recipients.
+	 * [--folder=<folder>]
+	 * : Source folder, defaults to INBOX.
+	 * [--body=<text>]
+	 * : Optional note above the original message.
+	 * @subcommand forward
+	 */
+	public function forward( array $args, array $flags ): void {
+		$this->mailboxAbility( 'email-forward', array(
+			'auth_ref' => $this->mailboxRef( $flags, false ),
+			'uid'      => (int) $args[0],
+			'to'       => $flags['to'],
+			'folder'   => $flags['folder'] ?? 'INBOX',
+			'body'     => $flags['body'] ?? '',
+		) );
+	}
+
+	private function mailboxAbility( string $name, array $input ): void {
+		$ability = wp_get_ability( 'datamachine/' . $name );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Email ability is unavailable.' );
+		}
+		$result = $ability->execute( $input );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+		WP_CLI::log( (string) wp_json_encode( $result, JSON_UNESCAPED_SLASHES ) );
+	}
 
 	/**
 	 * Send an email.

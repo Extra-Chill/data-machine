@@ -87,11 +87,11 @@ class EmailAuth extends BaseAuthProvider {
 	}
 
 	protected function get_encrypted_fields(): array {
-		return array_values( array_unique( array_merge( parent::get_encrypted_fields(), array( 'imap_password' ) ) ) );
+		return array_values( array_unique( array_merge( parent::get_encrypted_fields(), array( 'imap_password', 'smtp_password' ) ) ) );
 	}
 
 	public function strip_auth_config_secrets( array $handler_config ): array {
-		foreach ( array( 'imap_host', 'imap_port', 'imap_encryption', 'imap_user', 'imap_password' ) as $field ) {
+		foreach ( array( 'imap_host', 'imap_port', 'imap_encryption', 'imap_user', 'imap_password', 'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_user', 'smtp_password' ) as $field ) {
 			unset( $handler_config[ $field ] );
 		}
 		return parent::strip_auth_config_secrets( $handler_config );

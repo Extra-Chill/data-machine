@@ -14,6 +14,8 @@
 namespace DataMachine\Abilities\Email;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\AbilityRegistration;
+use DataMachine\Core\Email\MailboxTransport;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,434 +36,324 @@ class EmailAbilities {
 	private function registerAbilities(): void {
 		$register_callback = function () {
 			// Reply to an email.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-reply',
 				array(
-					'label'               => __( 'Reply to Email', 'data-machine' ),
-					'description'         => __( 'Send a reply to an email, maintaining thread headers', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'to', 'subject', 'body', 'in_reply_to' ),
-						'properties' => array(
-							'auth_ref'     => self::authRefProperty(),
-							'to'           => array(
-								'type'        => 'string',
-								'description' => __( 'Recipient email address', 'data-machine' ),
-							),
-							'subject'      => array(
-								'type'        => 'string',
-								'description' => __( 'Reply subject (typically Re: original subject)', 'data-machine' ),
-							),
-							'body'         => array(
-								'type'        => 'string',
-								'description' => __( 'Reply body content', 'data-machine' ),
-							),
-							'in_reply_to'  => array(
-								'type'        => 'string',
-								'description' => __( 'Message-ID of the email being replied to', 'data-machine' ),
-							),
-							'references'   => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'References header chain for threading', 'data-machine' ),
-							),
-							'cc'           => array(
-								'type'    => 'string',
-								'default' => '',
-							),
-							'content_type' => array(
-								'type'    => 'string',
-								'default' => 'text/html',
-							),
+					'label'            => __( 'Reply to Email', 'data-machine' ),
+					'description'      => __( 'Send a reply to an email, maintaining thread headers', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => self::inputSchema( array( 'to', 'subject', 'body', 'in_reply_to' ), array(
+						'auth_ref'     => self::authRefProperty(),
+						'to'           => array(
+							'type'        => 'string',
+							'description' => __( 'Recipient email address', 'data-machine' ),
 						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
-							'logs'    => array( 'type' => 'array' ),
+						'subject'      => array(
+							'type'        => 'string',
+							'description' => __( 'Reply subject (typically Re: original subject)', 'data-machine' ),
 						),
-					),
-					'execute_callback'    => array( $this, 'executeReply' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+						'body'         => array(
+							'type'        => 'string',
+							'description' => __( 'Reply body content', 'data-machine' ),
+						),
+						'in_reply_to'  => array(
+							'type'        => 'string',
+							'description' => __( 'Message-ID of the email being replied to', 'data-machine' ),
+						),
+						'references'   => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'References header chain for threading', 'data-machine' ),
+						),
+						'cc'           => array(
+							'type'    => 'string',
+							'default' => '',
+						),
+						'content_type' => array(
+							'type'    => 'string',
+							'default' => 'text/html',
+						),
+					) ),
+					'output_schema'    => self::resultSchema( array( 'logs' => array( 'type' => 'array' ) ) ),
+					'execute_callback' => array( $this, 'executeReply' ),
 				)
 			);
 
 			// Delete an email via IMAP.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-delete',
 				array(
-					'label'               => __( 'Delete Email', 'data-machine' ),
-					'description'         => __( 'Delete (expunge) an email by UID from the IMAP server', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'uid' ),
-						'properties' => array(
-							'auth_ref' => self::authRefProperty(),
-							'uid'      => array(
-								'type'        => 'integer',
-								'description' => __( 'Message UID to delete', 'data-machine' ),
-							),
-							'folder'   => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
+					'label'            => __( 'Delete Email', 'data-machine' ),
+					'description'      => __( 'Delete (expunge) an email by UID from the IMAP server', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => self::inboxSchema( array( 'uid' ), array(
+						'uid' => array(
+							'type'        => 'integer',
+							'description' => __( 'Message UID to delete', 'data-machine' ),
 						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeDelete' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+					) ),
+					'output_schema'    => self::resultSchema(),
+					'execute_callback' => array( $this, 'executeDelete' ),
 				)
 			);
 
 			// Move an email to a different folder.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-move',
 				array(
-					'label'               => __( 'Move Email', 'data-machine' ),
-					'description'         => __( 'Move an email to a different IMAP folder', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'uid', 'destination' ),
-						'properties' => array(
-							'auth_ref'    => self::authRefProperty(),
-							'uid'         => array(
-								'type'        => 'integer',
-								'description' => __( 'Message UID to move', 'data-machine' ),
-							),
-							'destination' => array(
-								'type'        => 'string',
-								'description' => __( 'Target folder (e.g., Archive, Trash, [Gmail]/All Mail)', 'data-machine' ),
-							),
-							'folder'      => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
+					'label'            => __( 'Move Email', 'data-machine' ),
+					'description'      => __( 'Move an email to a different IMAP folder', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => self::inboxSchema( array( 'uid', 'destination' ), array(
+						'uid'         => array(
+							'type'        => 'integer',
+							'description' => __( 'Message UID to move', 'data-machine' ),
 						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
+						'destination' => array(
+							'type'        => 'string',
+							'description' => __( 'Target folder (e.g., Archive, Trash, [Gmail]/All Mail)', 'data-machine' ),
 						),
-					),
-					'execute_callback'    => array( $this, 'executeMove' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+					) ),
+					'output_schema'    => self::resultSchema(),
+					'execute_callback' => array( $this, 'executeMove' ),
 				)
 			);
 
 			// Flag/unflag an email.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-flag',
 				array(
-					'label'               => __( 'Flag Email', 'data-machine' ),
-					'description'         => __( 'Set or clear IMAP flags on an email (Seen, Flagged, etc.)', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'uid', 'flag' ),
-						'properties' => array(
-							'auth_ref' => self::authRefProperty(),
-							'uid'      => array(
-								'type'        => 'integer',
-								'description' => __( 'Message UID', 'data-machine' ),
-							),
-							'flag'     => array(
-								'type'        => 'string',
-								'description' => __( 'IMAP flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
-							),
-							'action'   => array(
-								'type'        => 'string',
-								'default'     => 'set',
-								'description' => __( 'set or clear the flag', 'data-machine' ),
-							),
-							'folder'   => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
+					'label'            => __( 'Flag Email', 'data-machine' ),
+					'description'      => __( 'Set or clear IMAP flags on an email (Seen, Flagged, etc.)', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => self::inboxSchema( array( 'uid', 'flag' ), array(
+						'uid'    => array(
+							'type'        => 'integer',
+							'description' => __( 'Message UID', 'data-machine' ),
 						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
+						'flag'   => array(
+							'type'        => 'string',
+							'description' => __( 'IMAP flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
 						),
-					),
-					'execute_callback'    => array( $this, 'executeFlag' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+						'action' => array(
+							'type'        => 'string',
+							'default'     => 'set',
+							'description' => __( 'set or clear the flag', 'data-machine' ),
+						),
+					) ),
+					'output_schema'    => self::resultSchema(),
+					'execute_callback' => array( $this, 'executeFlag' ),
 				)
 			);
 
 			// Batch move: search → move all matches.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-batch-move',
 				array(
-					'label'               => __( 'Batch Move Emails', 'data-machine' ),
-					'description'         => __( 'Move all emails matching a search to a destination folder', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'search', 'destination' ),
-						'properties' => array(
-							'auth_ref'    => self::authRefProperty(),
-							'search'      => array(
-								'type'        => 'string',
-								'description' => __( 'IMAP search criteria (e.g., FROM "github.com")', 'data-machine' ),
-							),
-							'destination' => array(
-								'type'        => 'string',
-								'description' => __( 'Target folder (e.g., [Gmail]/GitHub, Archive)', 'data-machine' ),
-							),
-							'folder'      => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
-							'max'         => array(
-								'type'        => 'integer',
-								'default'     => 500,
-								'description' => __( 'Maximum messages to move (safety limit)', 'data-machine' ),
-							),
+					'label'            => __( 'Batch Move Emails', 'data-machine' ),
+					'description'      => __( 'Move all emails matching a search to a destination folder', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => self::inboxSchema( array( 'search', 'destination' ), array(
+						'search'      => array(
+							'type'        => 'string',
+							'description' => __( 'IMAP search criteria (e.g., FROM "github.com")', 'data-machine' ),
 						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'message'       => array( 'type' => 'string' ),
-							'moved_count'   => array( 'type' => 'integer' ),
-							'total_matches' => array( 'type' => 'integer' ),
-							'error'         => array( 'type' => 'string' ),
+						'destination' => array(
+							'type'        => 'string',
+							'description' => __( 'Target folder (e.g., [Gmail]/GitHub, Archive)', 'data-machine' ),
 						),
-					),
-					'execute_callback'    => array( $this, 'executeBatchMove' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+						'max'         => self::maximumProperty( 500, __( 'Maximum messages to move (safety limit)', 'data-machine' ) ),
+					) ),
+					'output_schema'    => self::resultSchema( array(
+						'moved_count'   => array( 'type' => 'integer' ),
+						'total_matches' => array( 'type' => 'integer' ),
+					) ),
+					'execute_callback' => array( $this, 'executeBatchMove' ),
 				)
 			);
 
 			// Batch flag: search → flag/unflag all matches.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-batch-flag',
 				array(
-					'label'               => __( 'Batch Flag Emails', 'data-machine' ),
-					'description'         => __( 'Set or clear a flag on all emails matching a search', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'search', 'flag' ),
-						'properties' => array(
-							'auth_ref' => self::authRefProperty(),
-							'search'   => array(
-								'type'        => 'string',
-								'description' => __( 'IMAP search criteria', 'data-machine' ),
-							),
-							'flag'     => array(
-								'type'        => 'string',
-								'description' => __( 'Flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
-							),
-							'action'   => array(
-								'type'        => 'string',
-								'default'     => 'set',
-								'description' => __( 'set or clear', 'data-machine' ),
-							),
-							'folder'   => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
-							'max'      => array(
-								'type'    => 'integer',
-								'default' => 500,
-							),
+					'label'            => __( 'Batch Flag Emails', 'data-machine' ),
+					'description'      => __( 'Set or clear a flag on all emails matching a search', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => self::inboxSchema( array( 'search', 'flag' ), array(
+						'search' => self::searchProperty(),
+						'flag'   => array(
+							'type'        => 'string',
+							'description' => __( 'Flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
 						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'message'       => array( 'type' => 'string' ),
-							'flagged_count' => array( 'type' => 'integer' ),
-							'total_matches' => array( 'type' => 'integer' ),
-							'error'         => array( 'type' => 'string' ),
+						'action' => array(
+							'type'        => 'string',
+							'default'     => 'set',
+							'description' => __( 'set or clear', 'data-machine' ),
 						),
-					),
-					'execute_callback'    => array( $this, 'executeBatchFlag' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+						'max'    => self::maximumProperty( 500 ),
+					) ),
+					'output_schema'    => self::resultSchema( array(
+						'flagged_count' => array( 'type' => 'integer' ),
+						'total_matches' => array( 'type' => 'integer' ),
+					) ),
+					'execute_callback' => array( $this, 'executeBatchFlag' ),
 				)
 			);
 
 			// Batch delete: search → delete all matches.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-batch-delete',
 				array(
-					'label'               => __( 'Batch Delete Emails', 'data-machine' ),
-					'description'         => __( 'Delete all emails matching a search', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'search' ),
-						'properties' => array(
-							'auth_ref' => self::authRefProperty(),
-							'search'   => array(
-								'type'        => 'string',
-								'description' => __( 'IMAP search criteria', 'data-machine' ),
-							),
-							'folder'   => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
-							'max'      => array(
-								'type'        => 'integer',
-								'default'     => 100,
-								'description' => __( 'Maximum messages to delete (safety limit, lower default)', 'data-machine' ),
-							),
-						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'message'       => array( 'type' => 'string' ),
-							'deleted_count' => array( 'type' => 'integer' ),
-							'total_matches' => array( 'type' => 'integer' ),
-							'error'         => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeBatchDelete' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+					'label'            => __( 'Batch Delete Emails', 'data-machine' ),
+					'description'      => __( 'Delete all emails matching a search', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => self::inboxSchema( array( 'search' ), array(
+						'search' => self::searchProperty(),
+						'max'    => self::maximumProperty( 100, __( 'Maximum messages to delete (safety limit, lower default)', 'data-machine' ) ),
+					) ),
+					'output_schema'    => self::resultSchema( array(
+						'deleted_count' => array( 'type' => 'integer' ),
+						'total_matches' => array( 'type' => 'integer' ),
+					) ),
+					'execute_callback' => array( $this, 'executeBatchDelete' ),
 				)
 			);
 
 			// Unsubscribe from a mailing list.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-unsubscribe',
 				array(
-					'label'               => __( 'Unsubscribe from Email', 'data-machine' ),
-					'description'         => __( 'Unsubscribe from a mailing list using List-Unsubscribe headers', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'uid' ),
-						'properties' => array(
-							'auth_ref' => self::authRefProperty(),
-							'uid'      => array(
-								'type'        => 'integer',
-								'description' => __( 'Message UID to unsubscribe from', 'data-machine' ),
-							),
-							'folder'   => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
+					'label'            => __( 'Unsubscribe from Email', 'data-machine' ),
+					'description'      => __( 'Unsubscribe from a mailing list using List-Unsubscribe headers', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => self::inboxSchema( array( 'uid' ), array(
+						'uid' => array(
+							'type'        => 'integer',
+							'description' => __( 'Message UID to unsubscribe from', 'data-machine' ),
 						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'method'  => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeUnsubscribe' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+					) ),
+					'output_schema'    => self::resultSchema( array( 'method' => array( 'type' => 'string' ) ) ),
+					'execute_callback' => array( $this, 'executeUnsubscribe' ),
 				)
 			);
 
 			// Batch unsubscribe from all matching senders.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-batch-unsubscribe',
 				array(
-					'label'               => __( 'Batch Unsubscribe', 'data-machine' ),
-					'description'         => __( 'Unsubscribe from all mailing lists matching a search', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'search' ),
-						'properties' => array(
-							'auth_ref' => self::authRefProperty(),
-							'search'   => array(
-								'type'        => 'string',
-								'description' => __( 'IMAP search criteria', 'data-machine' ),
-							),
-							'folder'   => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
-							'max'      => array(
-								'type'        => 'integer',
-								'default'     => 20,
-								'description' => __( 'Max unique senders to unsubscribe from (deduped by sender)', 'data-machine' ),
-							),
-						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'message'      => array( 'type' => 'string' ),
-							'results'      => array( 'type' => 'array' ),
-							'unsubscribed' => array( 'type' => 'integer' ),
-							'failed'       => array( 'type' => 'integer' ),
-							'no_header'    => array( 'type' => 'integer' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeBatchUnsubscribe' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+					'label'            => __( 'Batch Unsubscribe', 'data-machine' ),
+					'description'      => __( 'Unsubscribe from all mailing lists matching a search', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => self::inboxSchema( array( 'search' ), array(
+						'search' => self::searchProperty(),
+						'max'    => self::maximumProperty( 20, __( 'Max unique senders to unsubscribe from (deduped by sender)', 'data-machine' ) ),
+					) ),
+					'output_schema'    => self::resultSchema( array(
+						'results'      => array( 'type' => 'array' ),
+						'unsubscribed' => array( 'type' => 'integer' ),
+						'failed'       => array( 'type' => 'integer' ),
+						'no_header'    => array( 'type' => 'integer' ),
+					), false ),
+					'execute_callback' => array( $this, 'executeBatchUnsubscribe' ),
 				)
 			);
 
 			// Test IMAP connection.
-			wp_register_ability(
+			$this->registerAbility(
 				'datamachine/email-test-connection',
 				array(
-					'label'               => __( 'Test Email Connection', 'data-machine' ),
-					'description'         => __( 'Test IMAP connection with stored credentials', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
+					'label'            => __( 'Test Email Connection', 'data-machine' ),
+					'description'      => __( 'Test IMAP connection with stored credentials', 'data-machine' ),
+					'category'         => 'datamachine-email',
+					'input_schema'     => array(
 						'type'       => 'object',
 						'properties' => array( 'auth_ref' => self::authRefProperty() ),
 					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'message'      => array( 'type' => 'string' ),
-							'mailbox_info' => array( 'type' => 'object' ),
-							'error'        => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeTestConnection' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
+					'output_schema'    => self::resultSchema( array( 'mailbox_info' => array( 'type' => 'object' ) ) ),
+					'execute_callback' => array( $this, 'executeTestConnection' ),
 				)
 			);
 		};
 
-		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+		AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/** Shared integer limit property, retaining operation-specific defaults and descriptions. */
+	private static function maximumProperty( int $default_value, ?string $description = null ): array {
+		$property = array(
+			'type'    => 'integer',
+			'default' => $default_value,
+		);
+		if ( null !== $description ) {
+			$property['description'] = $description;
+		}
+		return $property;
+	}
+
+	/** Shared authenticated inbox input contract. */
+	private static function inboxSchema( array $required, array $properties ): array {
+		return self::inputSchema( $required, array_merge(
+			array(
+				'auth_ref' => self::authRefProperty(),
+				'folder'   => self::folderProperty(),
+			),
+			$properties
+		) );
+	}
+
+	/** Shared source folder property. */
+	private static function folderProperty(): array {
+		return array(
+			'type'    => 'string',
+			'default' => 'INBOX',
+		);
+	}
+
+	/** Shared IMAP search property. */
+	private static function searchProperty(): array {
+		return array(
+			'type'        => 'string',
+			'description' => __( 'IMAP search criteria', 'data-machine' ),
+		);
+	}
+
+	/** Build the common object input contract without repeating registration scaffolding. */
+	private static function inputSchema( array $required, array $properties ): array {
+		return array(
+			'type'       => 'object',
+			'required'   => $required,
+			'properties' => $properties,
+		);
+	}
+
+	/** Attach the shared permission and REST visibility contract to every email ability. */
+	private function registerAbility( string $name, array $definition ): void {
+		wp_register_ability( $name, array_merge(
+			$definition,
+			array(
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		) );
+	}
+
+	/** Shared mutation result contract, extended by operation-specific properties. */
+	private static function resultSchema( array $properties = array(), bool $include_error = true ): array {
+		$schema = array(
+			'type'       => 'object',
+			'properties' => array_merge(
+				array(
+					'success' => array( 'type' => 'boolean' ),
+					'message' => array( 'type' => 'string' ),
+					'error'   => array( 'type' => 'string' ),
+				),
+				$properties
+			),
+		);
+		if ( ! $include_error ) {
+			unset( $schema['properties']['error'] );
+		}
+		return $schema;
 	}
 
 	public function checkPermission(): bool {
@@ -522,7 +414,20 @@ class EmailAbilities {
 		}
 		$headers[] = 'From: ' . $mailbox['credentials']['imap_user'];
 
-		$sent = wp_mail( $to, $input['subject'], $input['body'], $headers );
+		if ( ! empty( $mailbox['credentials']['smtp_host'] ) ) {
+			$delivery = MailboxTransport::send( $mailbox['credentials'], $to, $input['subject'], $input['body'], array(), array(
+				'content_type' => $content_type,
+				'cc'           => $input['cc'] ?? '',
+				'In-Reply-To'  => $input['in_reply_to'] ?? '',
+				'References'   => $references,
+			) );
+			if ( is_wp_error( $delivery ) ) {
+				return $delivery;
+			}
+			$sent = true;
+		} else {
+			$sent = wp_mail( $to, $input['subject'], $input['body'], $headers );
+		}
 
 		if ( $sent ) {
 			if ( ! $this->isConfiguredMailboxRecipient( $to, $cc_list ) ) {
