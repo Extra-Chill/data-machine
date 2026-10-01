@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.182.1] - 2026-10-01
+
+### Fixed
+- fill empty image alt in post content after generation
+
 ## [0.182.0] - 2026-10-01
 
 ### Added
