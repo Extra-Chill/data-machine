@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.65.1] - 2026-10-01
+
+### Fixed
+- let a site-level owner suppress block Event JSON-LD; emit offset-qualified dates
+
 ## [0.65.0] - 2026-10-01
 
 ### Added
