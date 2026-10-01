@@ -21,6 +21,7 @@ use DataMachineEvents\Core\EventSchemaProvider;
 use DataMachineEvents\Blocks\Calendar\Display\DisplayVars;
 use DataMachineEvents\Blocks\Calendar\Grouping\MultiDayResolver;
 use function DataMachineEvents\Core\data_machine_events_is_gated_ticket_url;
+use DataMachineEvents\Blocks\EventDetails\ProseSections;
 
 $decode_unicode = function ( $str ) {
 	return html_entity_decode( preg_replace( '/\\\\u([0-9a-fA-F]{4})/', '&#x$1;', $str ), ENT_NOQUOTES, 'UTF-8' );
@@ -399,6 +400,18 @@ $event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_
 			}
 		}
 	}
+	?>
+	<?php
+	// Issue #830: derivable in-content prose sections (ad-insertion <p> slots).
+	// Each section degrades to zero bytes when its data is missing, and the
+	// whole render is served from a generation-keyed transient on cache hits.
+	echo ProseSections::render(
+		(int) $post_id,
+		array(
+			'venue_term_id' => ( ! is_wp_error( $venue_terms ) && ! empty( $venue_terms[0]->term_id ) ) ? (int) $venue_terms[0]->term_id : 0,
+			'venue_data'    => is_array( $venue_data ) ? $venue_data : array(),
+		)
+	); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Every dynamic piece is escaped inside ProseSections before assembly.
 	?>
 
 </div>
