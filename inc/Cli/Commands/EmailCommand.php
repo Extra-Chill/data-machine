@@ -44,6 +44,7 @@ class EmailCommand extends BaseCommand {
 		$raw = file_get_contents( $file );
 		if ( false === $raw ) {
 			WP_CLI::error( 'Could not read mailbox credentials file.' );
+			return;
 		}
 		$credentials = json_decode( $raw, true );
 		if ( ! is_array( $credentials ) ) {
