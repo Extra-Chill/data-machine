@@ -23,7 +23,7 @@ The ability runner returns the ability's output directly (no `{success, data}` w
 
 ## Email Abilities
 
-Every ability takes `auth_ref` (non-secret mailbox auth ref, for example `email_imap:default`; default `email_imap:default`).
+Message operations take `auth_ref`, a non-secret mailbox handle such as `email_imap:work` or `email_imap:personal`. Legacy operations default to `email_imap:default`; forwarding requires an explicit authorized inbox. Mailbox management operates on the current user/agent rather than accepting an arbitrary owner ID.
 
 | Ability slug | Purpose |
 | --- | --- |
@@ -40,6 +40,59 @@ Every ability takes `auth_ref` (non-secret mailbox auth ref, for example `email_
 | `datamachine/email-unsubscribe` | Unsubscribe from a list using one message's headers (`uid`). |
 | `datamachine/email-batch-unsubscribe` | Unsubscribe from lists matching an IMAP `search` (`max`). |
 | `datamachine/email-test-connection` | Test stored IMAP credentials for the mailbox. |
+| `datamachine/email-mailboxes` | List accessible named inboxes and non-secret connection metadata. |
+| `datamachine/email-mailbox-connect` | Connect or update one inbox (`name`, `credentials`) owned by the current principal. |
+| `datamachine/email-mailbox-grant` | Delegate explicit `operations` on an owned inbox to `agent_id`. |
+| `datamachine/email-forward` | Forward an original message by `uid` from `auth_ref` to `to`, with optional `folder` and introductory `body`. Includes every attachment and an `original.eml` copy. |
+
+## Multiple inboxes per user
+
+Data Machine core owns IMAP/SMTP connections. Each inbox is a separate encrypted named account under its user or agent principal. Connecting a second inbox preserves the first. Names are installation-unique; use a distinct name if another principal already owns the desired handle. User credentials do not automatically become available to the user's agent: grant each inbox separately.
+
+For each inbox, create a private JSON file outside Git:
+
+```json
+{
+  "imap_host": "imap.gmail.com",
+  "imap_port": 993,
+  "imap_encryption": "ssl",
+  "imap_user": "your-address@example.com",
+  "imap_password": "YOUR_IMAP_APP_PASSWORD",
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_encryption": "tls",
+  "smtp_user": "your-address@example.com",
+  "smtp_password": "YOUR_SMTP_APP_PASSWORD",
+  "display_name": "Your Name",
+  "sent_folder": "[Gmail]/Sent Mail"
+}
+```
+
+Use your provider's server settings. SMTP is optional for read-only inboxes and required for authenticated forwarding. Both passwords are encrypted at rest. Native PHP IMAP, OpenSSL, and WordPress's PHPMailer are runtime prerequisites. Connections are explicitly TLS/SSL; no certificate validation is disabled.
+
+```sh
+wp --user=USER_ID datamachine email mailbox-connect work --input-file=/private/work.json
+wp --user=USER_ID datamachine email mailbox-connect personal --input-file=/private/personal.json
+wp --user=USER_ID datamachine email mailboxes
+wp --user=USER_ID datamachine email test-connection --mailbox=work
+wp --user=USER_ID datamachine email fetch --mailbox=personal --search='FROM "vendor.example"'
+wp --user=USER_ID datamachine email forward MESSAGE_UID --mailbox=personal --to=receipts@example.com
+```
+
+For an agent that needs to find and forward invoices:
+
+```sh
+wp --user=USER_ID datamachine email mailbox-grant work AGENT_ID --operations=read,search,send
+wp --user=USER_ID datamachine email mailbox-grant personal AGENT_ID --operations=read,search,send
+```
+
+An agent's permission to read does not imply permission to send; forwarding requires both. Deleting or replacing a sibling inbox is not part of connection setup. Existing send, queued-send, and reply abilities use the selected inbox's SMTP configuration when present, while legacy site mail behavior is preserved for existing configurations.
+
+Forwarding traverses nested MIME parts, preserves HTML and inline images, sends attachments as their original bytes, and attaches the original email. It reads with IMAP PEEK and fails before sending if any part cannot be extracted. Successful sends are deduplicated by source content, inbox owner, and recipients. An interrupted or uncertain SMTP send remains blocked for inspection rather than being retried automatically. `delivery: accepted_by_smtp` establishes SMTP acceptance, not downstream application processing. `sent_copy_saved` reports the optional IMAP Sent-folder append separately.
+
+SMTP delivery uses a fresh PHPMailer instance, avoiding cross-inbox credential leakage through WordPress's global mailer. Trusted extensions can customize it through `datamachine_email_phpmailer_init`.
+
+Verification: `WORDPRESS_PATH=/path/to/wordpress php tests/email-multi-inbox-forward-smoke.php` exercises two inboxes, actual credential encryption, principal/delegation boundaries, recursive attachments, actual PHPMailer MIME serialization, sender-specific SMTP authentication, and duplicate suppression against deterministic peers.
 
 ## Search Strings
 

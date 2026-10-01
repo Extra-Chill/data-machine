@@ -522,7 +522,15 @@ class EmailAbilities {
 		}
 		$headers[] = 'From: ' . $mailbox['credentials']['imap_user'];
 
-		$sent = wp_mail( $to, $input['subject'], $input['body'], $headers );
+		if ( ! empty( $mailbox['credentials']['smtp_host'] ) ) {
+			$delivery = MailboxTransport::send( $mailbox['credentials'], $to, $input['subject'], $input['body'], array(), array( 'content_type' => $content_type, 'cc' => $input['cc'] ?? '', 'In-Reply-To' => $input['in_reply_to'] ?? '', 'References' => $references ) );
+			if ( is_wp_error( $delivery ) ) {
+				return $delivery;
+			}
+			$sent = true;
+		} else {
+			$sent = wp_mail( $to, $input['subject'], $input['body'], $headers );
+		}
 
 		if ( $sent ) {
 			if ( ! $this->isConfiguredMailboxRecipient( $to, $cc_list ) ) {

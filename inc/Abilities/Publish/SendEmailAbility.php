@@ -443,13 +443,21 @@ class SendEmailAbility {
 			switch_to_blog( $mail_site_id );
 		}
 
-		$sent      = wp_mail( $to, $subject, $body, $headers, $attachments );
+		if ( ! empty( $resolved['credentials']['smtp_host'] ) ) {
+			$delivery = \DataMachine\Abilities\Email\MailboxTransport::send( $resolved['credentials'], $to, $subject, $body, $attachments, array( 'content_type' => $content_type, 'cc' => $config['cc'], 'bcc' => $config['bcc'] ) );
+			$sent = ! is_wp_error( $delivery );
+		} else {
+			$sent = wp_mail( $to, $subject, $body, $headers, $attachments );
+		}
 		$error_msg = '';
 
 		if ( ! $sent ) {
 			global $phpmailer;
 			$error_msg = 'wp_mail() returned false';
-			if ( isset( $phpmailer ) && $phpmailer instanceof \PHPMailer\PHPMailer\PHPMailer ) {
+			if ( isset( $delivery ) && is_wp_error( $delivery ) ) {
+				$error_msg = $delivery->get_error_message();
+			}
+			if ( ! isset( $delivery ) && isset( $phpmailer ) && $phpmailer instanceof \PHPMailer\PHPMailer\PHPMailer ) {
 				$error_msg = ! empty( $phpmailer->ErrorInfo ) ? $phpmailer->ErrorInfo : $error_msg;
 			}
 		}
