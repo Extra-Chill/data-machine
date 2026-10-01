@@ -14,6 +14,7 @@
 namespace DataMachine\Abilities\Email;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Core\Email\MailboxTransport;
 
 defined( 'ABSPATH' ) || exit;
@@ -77,15 +78,7 @@ class EmailAbilities {
 							),
 						),
 					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
-							'logs'    => array( 'type' => 'array' ),
-						),
-					),
+					'output_schema'       => self::resultSchema( array( 'logs' => array( 'type' => 'array' ) ) ),
 					'execute_callback'    => array( $this, 'executeReply' ),
 					'permission_callback' => array( $this, 'checkPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
@@ -114,14 +107,7 @@ class EmailAbilities {
 							),
 						),
 					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
-						),
-					),
+					'output_schema'       => self::resultSchema(),
 					'execute_callback'    => array( $this, 'executeDelete' ),
 					'permission_callback' => array( $this, 'checkPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
@@ -154,14 +140,7 @@ class EmailAbilities {
 							),
 						),
 					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
-						),
-					),
+					'output_schema'       => self::resultSchema(),
 					'execute_callback'    => array( $this, 'executeMove' ),
 					'permission_callback' => array( $this, 'checkPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
@@ -199,14 +178,7 @@ class EmailAbilities {
 							),
 						),
 					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
-						),
-					),
+					'output_schema'       => self::resultSchema(),
 					'execute_callback'    => array( $this, 'executeFlag' ),
 					'permission_callback' => array( $this, 'checkPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
@@ -462,7 +434,22 @@ class EmailAbilities {
 			);
 		};
 
-		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+		AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/** Shared mutation result contract, extended by operation-specific properties. */
+	private static function resultSchema( array $properties = array() ): array {
+		return array(
+			'type'       => 'object',
+			'properties' => array_merge(
+				array(
+					'success' => array( 'type' => 'boolean' ),
+					'message' => array( 'type' => 'string' ),
+					'error'   => array( 'type' => 'string' ),
+				),
+				$properties
+			),
+		);
 	}
 
 	public function checkPermission(): bool {
