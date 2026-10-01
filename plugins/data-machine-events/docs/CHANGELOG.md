@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.65.0] - 2026-10-01
+
+### Added
+- render derivable prose sections on event pages
+
 ## [0.64.10] - 2026-10-01
 
 ### Fixed
