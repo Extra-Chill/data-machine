@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.65.2] - 2026-10-01
+
+### Fixed
+- stop storing box-office lines as the venue phone
+
 ## [0.65.1] - 2026-10-01
 
 ### Fixed
