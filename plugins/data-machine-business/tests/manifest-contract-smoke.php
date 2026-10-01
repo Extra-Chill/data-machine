@@ -46,6 +46,7 @@ $wordpress_smokes = array(
 	'tests/data-machine-http-client-contract-smoke.php',
 	'tests/google-analytics-aggregate-schema-smoke.php',
 	'tests/google-analytics-tool-schema-smoke.php',
+	'tests/sendy-list-campaigns-schema-smoke.php',
 );
 foreach ( $manifest['tests'] as $path => $test ) {
 	$expected_environment = in_array( $path, $wordpress_smokes, true ) ? 'wordpress' : 'standalone-php';

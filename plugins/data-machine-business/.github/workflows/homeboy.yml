@@ -1,0 +1,75 @@
+name: Homeboy
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: homeboy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  homeboy:
+    name: Homeboy (${{ matrix.command }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [review audit, review lint, review test]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ''
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: homeboy_wptests
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.HOMEBOY_APP_ID }}
+          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
+
+      - name: Prepare Data Machine validation dependency
+        run: |
+          git clone --depth 1 https://github.com/Extra-Chill/data-machine.git /tmp/data-machine
+          composer install --working-dir=/tmp/data-machine --no-dev --no-interaction --no-progress --prefer-dist --classmap-authoritative
+
+      - name: Run Homeboy ${{ matrix.command }}
+        env:
+          HOMEBOY_SETTINGS_JSON: '{"database_type":"mysql","wp_codebox_database_service":{"provider":"external","engine":"mysql","allowed_hosts":["127.0.0.1:3306"],"secret_env":{"host":"WP_CODEBOX_DB_HOST","port":"WP_CODEBOX_DB_PORT","username":"WP_CODEBOX_DB_USER","password":"WP_CODEBOX_DB_PASSWORD"}},"wp_codebox_multisite":true,"wp_codebox_phpunit_bootstrap_mode":"managed"}'
+          HOMEBOY_WORDPRESS_DEPENDENCY_PATHS: /tmp/data-machine
+          HOMEBOY_WORDPRESS_MULTISITE: '1'
+          WP_CODEBOX_DB_HOST: 127.0.0.1
+          WP_CODEBOX_DB_PORT: '3306'
+          WP_CODEBOX_DB_USER: root
+          WP_CODEBOX_DB_PASSWORD: ''
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          commands: ${{ matrix.command }}
+          expected-commands: review audit,review lint,review test
+          scope: ${{ matrix.command == 'review test' && 'full' || 'auto' }}
+          app-token: ${{ steps.app-token.outputs.token || '' }}
+          autofix: 'false'
