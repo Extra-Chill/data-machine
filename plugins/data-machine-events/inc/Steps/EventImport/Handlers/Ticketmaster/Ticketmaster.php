@@ -862,7 +862,14 @@ class Ticketmaster extends EventImportHandler {
 			$venue_state   = $venue['state']['stateCode'] ?? '';
 			$venue_zip     = $venue['postalCode'] ?? '';
 			$venue_country = $venue['country']['countryCode'] ?? '';
-			$venue_phone   = $venue['boxOfficeInfo']['phoneNumberDetail'] ?? '';
+			// boxOfficeInfo.phoneNumberDetail is not the venue's phone. Ticketmaster
+			// fills it with a regional market or promoter line, often as prose
+			// ("To contact House of Blues, please call ..."), shared across every
+			// venue in a market: 1,397 of 2,257 stored venue phones were shared by
+			// 3+ venues, e.g. Austin's Scoot Inn number on 19 venues. Leave the
+			// field empty rather than publish a wrong number on event pages and
+			// in schema.org telephone.
+			$venue_phone   = '';
 			$venue_website = '';
 
 			if ( ! empty( $venue['location']['latitude'] ) && ! empty( $venue['location']['longitude'] ) ) {

@@ -137,6 +137,40 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertEquals( '19:30', $result['startTime'] );
 	}
 
+	public function test_map_event_does_not_store_box_office_line_as_venue_phone(): void {
+		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
+
+		$result = $method->invoke(
+			$this->handler,
+			array(
+				'name'      => 'Gavin Adcock w/ The Creekers',
+				'id'        => 'Z7r9jZ1A7-Y8O',
+				'url'       => 'https://www.ticketmaster.com/event/Z7r9jZ1A7-Y8O',
+				'dates'     => array(
+					'start' => array(
+						'localDate' => '2099-09-19',
+						'localTime' => '18:00:00',
+					),
+				),
+				'_embedded' => array(
+					'venues' => array(
+						array(
+							'name'          => 'Round Rock Amp',
+							'address'       => array( 'line1' => '3701 N IH-35' ),
+							'city'          => array( 'name' => 'Round Rock' ),
+							'state'         => array( 'stateCode' => 'TX' ),
+							'country'       => array( 'countryCode' => 'US' ),
+							'timezone'      => 'America/Chicago',
+							'boxOfficeInfo' => array( 'phoneNumberDetail' => 'To contact House of Blues, please call (312) 923-2000.' ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertSame( '', $result['venuePhone'], 'Ticketmaster box-office lines are market-wide, not the venue phone.' );
+	}
+
 	public function test_new_event_uses_stable_ticketmaster_source_identity(): void {
 		$handler = new TicketmasterHandlerTestDouble(
 			array(
