@@ -455,16 +455,16 @@ class EventSchemaProvider {
 			'name'     => get_the_title( $post_id ),
 		);
 
+		$timezone = self::resolveSchemaTimezone( $venue_data, $event_data );
+
 		[$resolved_start_date, $resolved_start_time] = self::resolveStartDate( $event_data, $post_id );
 		if ( ! empty( $resolved_start_date ) ) {
-			$start_time          = ! empty( $resolved_start_time ) ? 'T' . $resolved_start_time : '';
-			$schema['startDate'] = $resolved_start_date . $start_time;
+			$schema['startDate'] = self::formatSchemaDateTime( $resolved_start_date, $resolved_start_time, $timezone );
 		}
 
 		[$resolved_end_date, $resolved_end_time] = self::resolveEndDate( $event_data, $post_id );
 		if ( ! empty( $resolved_end_date ) ) {
-			$end_time     = ! empty( $resolved_end_time ) ? 'T' . $resolved_end_time : '';
-			$end_date_iso = $resolved_end_date . $end_time;
+			$end_date_iso = self::formatSchemaDateTime( $resolved_end_date, $resolved_end_time, $timezone );
 
 			// Only include endDate if it differs from startDate.
 			// Identical values mean no real end time was provided — omitting
@@ -541,6 +541,56 @@ class EventSchemaProvider {
 		}
 
 		return 'Event';
+	}
+
+	/**
+	 * Resolve the timezone event times are expressed in.
+	 *
+	 * Prefers the venue's stored IANA timezone and falls back to the site
+	 * timezone, so a naive local time can be published with its UTC offset.
+	 *
+	 * @param array $venue_data Venue data (may carry `timezone`).
+	 * @param array $event_data Event data (may carry `venueTimezone`).
+	 * @return \DateTimeZone
+	 */
+	private static function resolveSchemaTimezone( array $venue_data, array $event_data ): \DateTimeZone {
+		$candidate = (string) ( $venue_data['timezone'] ?? $event_data['venueTimezone'] ?? '' );
+		if ( '' !== $candidate ) {
+			try {
+				return new \DateTimeZone( $candidate );
+			} catch ( \Exception $e ) {
+				unset( $e ); // Invalid stored timezone: fall back to the site timezone.
+			}
+		}
+
+		return wp_timezone();
+	}
+
+	/**
+	 * Format a schema.org date/time value.
+	 *
+	 * Date-only values stay date-only (`2026-10-21`). A value with a time is
+	 * emitted as full ISO-8601 with its UTC offset
+	 * (`2026-10-21T18:30:00-04:00`) so consumers never have to guess the
+	 * timezone of a naive local time (#880).
+	 *
+	 * @param string        $date     `Y-m-d` date.
+	 * @param string        $time     `H:i` or `H:i:s` time, or empty.
+	 * @param \DateTimeZone $timezone Timezone the local time is expressed in.
+	 * @return string
+	 */
+	public static function formatSchemaDateTime( string $date, string $time, \DateTimeZone $timezone ): string {
+		if ( '' === $time ) {
+			return $date;
+		}
+
+		try {
+			$datetime = new \DateTimeImmutable( $date . ' ' . $time, $timezone );
+		} catch ( \Exception $e ) {
+			return $date . 'T' . $time;
+		}
+
+		return $datetime->format( 'Y-m-d\TH:i:sP' );
 	}
 
 	private static function resolveStartDate( array $event_data, int $post_id ): array {

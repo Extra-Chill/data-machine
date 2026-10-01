@@ -163,15 +163,28 @@ $ticket_button_text  = $is_non_ticket_price
 	: __( 'Get Tickets', 'data-machine-events' );
 
 
-$event_schema     = null;
-$description_text = ! empty( $content ) ? wp_strip_all_tags( $content ) : '';
-$event_data       = array_merge(
-	$attributes,
-	array(
-		'description' => $description_text,
-	)
-);
-$event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_data ?? array(), $organizer_data ?? array(), $post_id );
+$event_schema = null;
+
+/**
+ * Filters whether the Event Details block prints its own Event JSON-LD.
+ *
+ * The block emits a standalone schema.org Event so the plugin works on its
+ * own. A site that builds a consolidated structured-data graph can return
+ * false here so each page carries exactly one Event entity (#880).
+ *
+ * @param bool $output  Whether to print the block's Event JSON-LD. Default true.
+ * @param int  $post_id Event post ID.
+ */
+if ( apply_filters( 'data_machine_events_output_event_schema', true, (int) $post_id ) ) {
+	$description_text = ! empty( $content ) ? wp_strip_all_tags( $content ) : '';
+	$event_data       = array_merge(
+		$attributes,
+		array(
+			'description' => $description_text,
+		)
+	);
+	$event_schema     = EventSchemaProvider::generateSchemaOrg( $event_data, $venue_data ?? array(), $organizer_data ?? array(), $post_id );
+}
 ?>
 
 <?php if ( $event_schema ) : ?>
