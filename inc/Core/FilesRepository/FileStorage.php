@@ -44,10 +44,7 @@ class FileStorage {
 	 * @return string|false Repository file path on success, false on failure
 	 */
 	public function store_file( string $source_path, string $filename, array $context ): string|false {
-		$directory = $this->directory_manager->get_flow_files_directory(
-			$context['pipeline_id'],
-			$context['flow_id']
-		);
+		$directory = $this->directory_manager->get_files_directory_for_context( $context );
 
 		if ( ! $this->directory_manager->ensure_directory_exists( $directory ) ) {
 			return false;
@@ -92,10 +89,7 @@ class FileStorage {
 	 * @return array Array of file information
 	 */
 	public function get_all_files( array $context ): array {
-		$directory = $this->directory_manager->get_flow_files_directory(
-			$context['pipeline_id'],
-			$context['flow_id']
-		);
+		$directory = $this->directory_manager->get_files_directory_for_context( $context );
 
 		if ( ! is_dir( $directory ) ) {
 			return array();
@@ -132,10 +126,7 @@ class FileStorage {
 	 * @return bool True on success, false on failure
 	 */
 	public function delete_file( string $filename, array $context ): bool {
-		$directory = $this->directory_manager->get_flow_files_directory(
-			$context['pipeline_id'],
-			$context['flow_id']
-		);
+		$directory = $this->directory_manager->get_files_directory_for_context( $context );
 
 		$safe_filename = sanitize_file_name( $filename );
 		$file_path     = "{$directory}/{$safe_filename}";

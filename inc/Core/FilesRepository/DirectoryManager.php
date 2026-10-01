@@ -137,6 +137,47 @@ class DirectoryManager {
 	}
 
 	/**
+	 * Get the files directory for standalone execution.
+	 *
+	 * Standalone contexts run outside any pipeline or flow, so their files
+	 * live in an isolated bucket, scoped to the job when one is known.
+	 *
+	 * @param int|string|null $job_id Optional job ID.
+	 * @return string Full path to standalone files directory
+	 */
+	public function get_standalone_files_directory( int|string|null $job_id = null ): string {
+		$upload_dir = wp_upload_dir();
+		$base       = trailingslashit( $upload_dir['basedir'] ) . self::REPOSITORY_DIR . '/standalone';
+
+		if ( null !== $job_id && '' !== (string) $job_id ) {
+			$base .= '/job-' . sanitize_file_name( (string) $job_id );
+		}
+
+		return "{$base}/files";
+	}
+
+	/**
+	 * Resolve the files directory for a file context.
+	 *
+	 * Flow and direct contexts carry pipeline/flow identifiers and map to the
+	 * flow files directory. Standalone contexts carry null identifiers and map
+	 * to the standalone files bucket.
+	 *
+	 * @param array $context File context (pipeline_id, flow_id, optional job_id).
+	 * @return string Full path to the files directory
+	 */
+	public function get_files_directory_for_context( array $context ): string {
+		$pipeline_id = $context['pipeline_id'] ?? null;
+		$flow_id     = $context['flow_id'] ?? null;
+
+		if ( null === $pipeline_id || '' === $pipeline_id || null === $flow_id || '' === $flow_id ) {
+			return $this->get_standalone_files_directory( $context['job_id'] ?? null );
+		}
+
+		return $this->get_flow_files_directory( $pipeline_id, $flow_id );
+	}
+
+	/**
 	 * Get pipeline context directory path
 	 *
 	 * @param int|string $pipeline_id Pipeline ID or 'direct' for direct execution
