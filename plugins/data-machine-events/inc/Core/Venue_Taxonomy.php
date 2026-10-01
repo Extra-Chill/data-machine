@@ -580,7 +580,10 @@ class Venue_Taxonomy {
 		if ( $identity['term'] ) {
 			$term_id = $identity['term_id'];
 
-			if ( ! empty( $venue_data ) ) {
+			// A source alias means this source's venue data is known to be
+			// wrong for the canonical term (#878); fill-empty merging would
+			// put the source's bad values back into fields an editor cleared.
+			if ( ! empty( $venue_data ) && 'source_alias' !== $identity['matched_via'] ) {
 				self::smart_merge_venue_meta( $term_id, $venue_data );
 			}
 
@@ -588,6 +591,7 @@ class Venue_Taxonomy {
 				'term_id'      => $term_id,
 				'was_created'  => false,
 				'match_status' => 'matched',
+				'matched_via'  => $identity['matched_via'],
 			);
 		}
 
@@ -815,7 +819,13 @@ class Venue_Taxonomy {
 	 *
 	 * @param string $venue_name Venue name.
 	 * @param array  $venue_data Venue metadata.
-	 * @return array{term: \WP_Term|null, term_id: int|null, match_status: string, conflicting_term_ids: int[], venue_name: string}
+	 * Curated source aliases (#878) are checked first: an editor has declared
+	 * that this source's venue is a specific term, so neither the source's
+	 * address nor its name gets a vote. `matched_via` reports which rule
+	 * produced a match (`source_alias`, `address`, or `name`; '' otherwise)
+	 * while `match_status` keeps its existing values for callers.
+	 *
+	 * @return array{term: \WP_Term|null, term_id: int|null, match_status: string, matched_via: string, conflicting_term_ids: int[], venue_name: string}
 	 */
 	public static function resolve_venue_identity( string $venue_name, array $venue_data = array() ): array {
 		$extracted_address = self::extract_address_from_name( $venue_name );
@@ -826,6 +836,18 @@ class Venue_Taxonomy {
 					$venue_data[ $field ] = $extracted_address[ $field ];
 				}
 			}
+		}
+
+		$alias_match = VenueSourceAliases::resolve( $venue_name, $venue_data );
+		if ( $alias_match ) {
+			return array(
+				'term'                 => $alias_match,
+				'term_id'              => (int) $alias_match->term_id,
+				'match_status'         => 'matched',
+				'matched_via'          => 'source_alias',
+				'conflicting_term_ids' => array(),
+				'venue_name'           => $alias_match->name,
+			);
 		}
 
 		$address_match = self::find_venue_by_address(
@@ -842,6 +864,7 @@ class Venue_Taxonomy {
 					'term'                 => $term,
 					'term_id'              => (int) $term->term_id,
 					'match_status'         => 'matched',
+					'matched_via'          => 'address',
 					'conflicting_term_ids' => array(),
 					'venue_name'           => $venue_name,
 				);
@@ -865,6 +888,7 @@ class Venue_Taxonomy {
 			'term'                 => $term,
 			'term_id'              => $term ? (int) $term->term_id : null,
 			'match_status'         => $match_status,
+			'matched_via'          => $term ? 'name' : '',
 			'conflicting_term_ids' => $name_match['conflicting_term_ids'],
 			'venue_name'           => $venue_name,
 		);
@@ -1113,7 +1137,7 @@ class Venue_Taxonomy {
 	 * @param string $address Raw address string.
 	 * @return string Space-separated identity key.
 	 */
-	private static function street_identity_key( string $address ): string {
+	public static function street_identity_key( string $address ): string {
 		$normalized = self::normalize_address_for_matching( $address );
 
 		if ( '' === $normalized ) {

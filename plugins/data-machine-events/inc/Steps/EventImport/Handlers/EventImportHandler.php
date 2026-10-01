@@ -13,6 +13,7 @@ use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\PriceFormatter;
 use DataMachineEvents\Core\VenueParameterProvider;
+use DataMachineEvents\Core\VenueSourceAliases;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -142,6 +143,20 @@ abstract class EventImportHandler extends FetchHandler {
 	 */
 	public function extractVenueMetadata( array $event ): array {
 		return VenueParameterProvider::extractFromEventData( $event );
+	}
+
+	/**
+	 * Rewrite a standardized event to its aliased canonical venue.
+	 *
+	 * Call right after mapping, before building event identity, the AI
+	 * packet, or engine data, so a source's known-wrong venue never reaches
+	 * the model or the stored event (#878).
+	 *
+	 * @param array $event Standardized event data.
+	 * @return array Event data, rewritten when a venue source alias resolves.
+	 */
+	public function applyVenueSourceAliases( array $event ): array {
+		return VenueSourceAliases::canonicalize_event( $event );
 	}
 
 	public function stripVenueMetadataFromEvent( array &$event ): void {

@@ -12,6 +12,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Core\VenueSourceAliases;
 use DataMachineEvents\Core\VenueService;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -44,6 +45,7 @@ class VenueAbilities {
 		$register_callback = function () {
 			$this->registerHealthCheckAbility();
 			$this->registerUpdateVenueAbility();
+			$this->registerUpdateVenueSourceAliasesAbility();
 			$this->registerGetVenueAbility();
 			$this->registerCheckDuplicateAbility();
 		};
@@ -210,6 +212,50 @@ class VenueAbilities {
 		);
 	}
 
+	private function registerUpdateVenueSourceAliasesAbility(): void {
+		wp_register_ability(
+			'data-machine-events/update-venue-source-aliases',
+			array(
+				'label'               => __( 'Update Venue Source Aliases', 'data-machine-events' ),
+				'description'         => __( 'Add or remove source aliases that pin a source\'s venue to this canonical venue. Imports resolve aliases before address and name matching and never merge the aliased source\'s venue data. Aliases look like "ticketmaster:<venue id>" or "fingerprint:<source venue name>|<source street address>".', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'venue' ),
+					'properties' => array(
+						'venue'  => array(
+							'type'        => 'string',
+							'description' => 'Canonical venue identifier (term ID, name, or slug)',
+						),
+						'add'    => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Aliases to add. Adding an alias owned by another venue fails.',
+						),
+						'remove' => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Aliases to remove.',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'term_id'        => array( 'type' => 'integer' ),
+						'name'           => array( 'type' => 'string' ),
+						'added'          => array( 'type' => 'array' ),
+						'removed'        => array( 'type' => 'array' ),
+						'source_aliases' => array( 'type' => 'array' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeUpdateVenueSourceAliases' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
 	private function registerGetVenueAbility(): void {
 		wp_register_ability(
 			'data-machine-events/get-venue',
@@ -230,22 +276,23 @@ class VenueAbilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'name'          => array( 'type' => 'string' ),
-						'term_id'       => array( 'type' => 'integer' ),
-						'slug'          => array( 'type' => 'string' ),
-						'description'   => array( 'type' => 'string' ),
-						'address'       => array( 'type' => 'string' ),
-						'city'          => array( 'type' => 'string' ),
-						'state'         => array( 'type' => 'string' ),
-						'zip'           => array( 'type' => 'string' ),
-						'country'       => array( 'type' => 'string' ),
-						'phone'         => array( 'type' => 'string' ),
-						'website'       => array( 'type' => 'string' ),
-						'ticketing_url' => array( 'type' => 'string' ),
-						'capacity'      => array( 'type' => 'string' ),
-						'coordinates'   => array( 'type' => 'string' ),
-						'timezone'      => array( 'type' => 'string' ),
-						'error'         => array( 'type' => 'string' ),
+						'name'           => array( 'type' => 'string' ),
+						'term_id'        => array( 'type' => 'integer' ),
+						'slug'           => array( 'type' => 'string' ),
+						'description'    => array( 'type' => 'string' ),
+						'address'        => array( 'type' => 'string' ),
+						'city'           => array( 'type' => 'string' ),
+						'state'          => array( 'type' => 'string' ),
+						'zip'            => array( 'type' => 'string' ),
+						'country'        => array( 'type' => 'string' ),
+						'phone'          => array( 'type' => 'string' ),
+						'website'        => array( 'type' => 'string' ),
+						'ticketing_url'  => array( 'type' => 'string' ),
+						'capacity'       => array( 'type' => 'string' ),
+						'coordinates'    => array( 'type' => 'string' ),
+						'timezone'       => array( 'type' => 'string' ),
+						'source_aliases' => array( 'type' => 'array' ),
+						'error'          => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeGetVenue' ),
@@ -502,7 +549,93 @@ class VenueAbilities {
 			return new \WP_Error( 'venue_not_found', 'Venue not found', array( 'status' => 404 ) );
 		}
 
+		$venue_data['source_aliases'] = VenueSourceAliases::get( (int) $term_id );
+
 		return $venue_data;
+	}
+
+	/**
+	 * Execute update venue source aliases.
+	 *
+	 * Validates every alias before writing any, so a bad or conflicting alias
+	 * leaves the venue unchanged.
+	 *
+	 * @param array $input Input with 'venue' and optional 'add' / 'remove' lists.
+	 * @return array|\WP_Error
+	 */
+	public function executeUpdateVenueSourceAliases( array $input ): array|\WP_Error {
+		$venue_identifier = (string) ( $input['venue'] ?? '' );
+		if ( '' === $venue_identifier ) {
+			return new \WP_Error( 'missing_venue', 'venue parameter is required', array( 'status' => 400 ) );
+		}
+
+		$term = $this->resolveVenue( $venue_identifier );
+		if ( ! $term ) {
+			return new \WP_Error( 'venue_not_found', "Venue '{$venue_identifier}' not found", array( 'status' => 404 ) );
+		}
+		$term_id = (int) $term->term_id;
+
+		$to_add    = array_map( 'strval', (array) ( $input['add'] ?? array() ) );
+		$to_remove = array_map( 'strval', (array) ( $input['remove'] ?? array() ) );
+		if ( empty( $to_add ) && empty( $to_remove ) ) {
+			return new \WP_Error( 'no_fields', 'Provide aliases to add or remove', array( 'status' => 400 ) );
+		}
+
+		foreach ( $to_add as $alias ) {
+			$normalized = VenueSourceAliases::normalize( $alias );
+			if ( is_wp_error( $normalized ) ) {
+				return $normalized;
+			}
+			$owner = VenueSourceAliases::find_term( array( $normalized ) );
+			if ( $owner && (int) $owner->term_id !== $term_id ) {
+				return new \WP_Error(
+					'venue_alias_conflict',
+					sprintf( 'Alias "%s" already belongs to venue %d (%s).', $normalized, (int) $owner->term_id, $owner->name ),
+					array(
+						'status'  => 409,
+						'term_id' => (int) $owner->term_id,
+					)
+				);
+			}
+		}
+		foreach ( $to_remove as $alias ) {
+			$normalized = VenueSourceAliases::normalize( $alias );
+			if ( is_wp_error( $normalized ) ) {
+				return $normalized;
+			}
+		}
+
+		$added = array();
+		foreach ( $to_add as $alias ) {
+			$result = VenueSourceAliases::add( $term_id, $alias );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+			$added[] = $result;
+		}
+
+		$removed = array();
+		foreach ( $to_remove as $alias ) {
+			$normalized = VenueSourceAliases::normalize( $alias );
+			if ( is_wp_error( $normalized ) ) {
+				return $normalized;
+			}
+			$result = VenueSourceAliases::remove( $term_id, $normalized );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+			if ( $result ) {
+				$removed[] = $normalized;
+			}
+		}
+
+		return array(
+			'term_id'        => $term_id,
+			'name'           => $term->name,
+			'added'          => array_values( array_unique( $added ) ),
+			'removed'        => $removed,
+			'source_aliases' => VenueSourceAliases::get( $term_id ),
+		);
 	}
 
 	/**

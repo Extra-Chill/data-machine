@@ -31,17 +31,17 @@ class EventEngineData {
 	public static function buildConfiguredVenueEngineData( array $config ): array {
 		$venue_name = sanitize_text_field( $config['venue_name'] ?? '' );
 		$venue_meta = array(
-			'address'     => sanitize_text_field( $config['venue_address'] ?? '' ),
-			'city'        => sanitize_text_field( $config['venue_city'] ?? '' ),
-			'state'       => sanitize_text_field( $config['venue_state'] ?? '' ),
-			'zip'         => sanitize_text_field( $config['venue_zip'] ?? '' ),
-			'country'     => sanitize_text_field( $config['venue_country'] ?? '' ),
-			'phone'       => sanitize_text_field( $config['venue_phone'] ?? '' ),
-			'website'     => esc_url_raw( $config['venue_website'] ?? '' ),
+			'address'       => sanitize_text_field( $config['venue_address'] ?? '' ),
+			'city'          => sanitize_text_field( $config['venue_city'] ?? '' ),
+			'state'         => sanitize_text_field( $config['venue_state'] ?? '' ),
+			'zip'           => sanitize_text_field( $config['venue_zip'] ?? '' ),
+			'country'       => sanitize_text_field( $config['venue_country'] ?? '' ),
+			'phone'         => sanitize_text_field( $config['venue_phone'] ?? '' ),
+			'website'       => esc_url_raw( $config['venue_website'] ?? '' ),
 			'ticketing_url' => esc_url_raw( $config['venue_ticketing_url'] ?? '' ),
-			'capacity'    => ! empty( $config['venue_capacity'] ) ? (string) absint( $config['venue_capacity'] ) : '',
-			'coordinates' => '',
-			'timezone'    => '',
+			'capacity'      => ! empty( $config['venue_capacity'] ) ? (string) absint( $config['venue_capacity'] ) : '',
+			'coordinates'   => '',
+			'timezone'      => '',
 		);
 
 		if ( '' === $venue_name && ! empty( $config['venue'] ) && is_numeric( $config['venue'] ) ) {
@@ -63,17 +63,17 @@ class EventEngineData {
 		);
 
 		$camel_meta = array(
-			'venueAddress'     => $venue_meta['address'] ?? '',
-			'venueCity'        => $venue_meta['city'] ?? '',
-			'venueState'       => $venue_meta['state'] ?? '',
-			'venueZip'         => $venue_meta['zip'] ?? '',
-			'venueCountry'     => $venue_meta['country'] ?? '',
-			'venuePhone'       => $venue_meta['phone'] ?? '',
-			'venueWebsite'     => $venue_meta['website'] ?? '',
+			'venueAddress'      => $venue_meta['address'] ?? '',
+			'venueCity'         => $venue_meta['city'] ?? '',
+			'venueState'        => $venue_meta['state'] ?? '',
+			'venueZip'          => $venue_meta['zip'] ?? '',
+			'venueCountry'      => $venue_meta['country'] ?? '',
+			'venuePhone'        => $venue_meta['phone'] ?? '',
+			'venueWebsite'      => $venue_meta['website'] ?? '',
 			'venueTicketingUrl' => $venue_meta['ticketing_url'] ?? '',
-			'venueCoordinates' => $venue_meta['coordinates'] ?? '',
-			'venueCapacity'    => $venue_meta['capacity'] ?? '',
-			'venueTimezone'    => $venue_meta['timezone'] ?? '',
+			'venueCoordinates'  => $venue_meta['coordinates'] ?? '',
+			'venueCapacity'     => $venue_meta['capacity'] ?? '',
+			'venueTimezone'     => $venue_meta['timezone'] ?? '',
 		);
 
 		return self::buildEngineData( $event_data, $camel_meta );
@@ -94,33 +94,33 @@ class EventEngineData {
 		}
 
 		$flattened = array(
-			'venue'            => $event_data['venue'] ?? '',
-			'venueAddress'     => $venue_metadata['venueAddress'] ?? '',
-			'venueCity'        => $venue_metadata['venueCity'] ?? '',
-			'venueState'       => $venue_metadata['venueState'] ?? '',
-			'venueZip'         => $venue_metadata['venueZip'] ?? '',
-			'venueCountry'     => $venue_metadata['venueCountry'] ?? '',
-			'venuePhone'       => $venue_metadata['venuePhone'] ?? '',
-			'venueWebsite'     => $venue_metadata['venueWebsite'] ?? '',
+			'venue'             => $event_data['venue'] ?? '',
+			'venueAddress'      => $venue_metadata['venueAddress'] ?? '',
+			'venueCity'         => $venue_metadata['venueCity'] ?? '',
+			'venueState'        => $venue_metadata['venueState'] ?? '',
+			'venueZip'          => $venue_metadata['venueZip'] ?? '',
+			'venueCountry'      => $venue_metadata['venueCountry'] ?? '',
+			'venuePhone'        => $venue_metadata['venuePhone'] ?? '',
+			'venueWebsite'      => $venue_metadata['venueWebsite'] ?? '',
 			'venueTicketingUrl' => $venue_metadata['venueTicketingUrl'] ?? '',
-			'venueCoordinates' => $venue_metadata['venueCoordinates'] ?? '',
-			'venueCapacity'    => $venue_metadata['venueCapacity'] ?? '',
-			'venueTimezone'    => $venue_metadata['venueTimezone'] ?? '',
+			'venueCoordinates'  => $venue_metadata['venueCoordinates'] ?? '',
+			'venueCapacity'     => $venue_metadata['venueCapacity'] ?? '',
+			'venueTimezone'     => $venue_metadata['venueTimezone'] ?? '',
 		);
 
 		$metadata = array(
-			'name'        => $flattened['venue'],
-			'address'     => $flattened['venueAddress'],
-			'city'        => $flattened['venueCity'],
-			'state'       => $flattened['venueState'],
-			'zip'         => $flattened['venueZip'],
-			'country'     => $flattened['venueCountry'],
-			'phone'       => $flattened['venuePhone'],
-			'website'     => $flattened['venueWebsite'],
+			'name'          => $flattened['venue'],
+			'address'       => $flattened['venueAddress'],
+			'city'          => $flattened['venueCity'],
+			'state'         => $flattened['venueState'],
+			'zip'           => $flattened['venueZip'],
+			'country'       => $flattened['venueCountry'],
+			'phone'         => $flattened['venuePhone'],
+			'website'       => $flattened['venueWebsite'],
 			'ticketing_url' => $flattened['venueTicketingUrl'],
-			'coordinates' => $flattened['venueCoordinates'],
-			'capacity'    => $flattened['venueCapacity'],
-			'timezone'    => $flattened['venueTimezone'],
+			'coordinates'   => $flattened['venueCoordinates'],
+			'capacity'      => $flattened['venueCapacity'],
+			'timezone'      => $flattened['venueTimezone'],
 		);
 
 		$payload = array_filter(
@@ -204,18 +204,18 @@ class EventEngineData {
 
 		// Venue fields (flattened).
 		$venue_fields = array(
-			'venue'            => $event_data['venue'] ?? '',
-			'venueAddress'     => $venue_metadata['venueAddress'] ?? '',
-			'venueCity'        => $venue_metadata['venueCity'] ?? '',
-			'venueState'       => $venue_metadata['venueState'] ?? '',
-			'venueZip'         => $venue_metadata['venueZip'] ?? '',
-			'venueCountry'     => $venue_metadata['venueCountry'] ?? '',
-			'venuePhone'       => $venue_metadata['venuePhone'] ?? '',
-			'venueWebsite'     => $venue_metadata['venueWebsite'] ?? '',
+			'venue'             => $event_data['venue'] ?? '',
+			'venueAddress'      => $venue_metadata['venueAddress'] ?? '',
+			'venueCity'         => $venue_metadata['venueCity'] ?? '',
+			'venueState'        => $venue_metadata['venueState'] ?? '',
+			'venueZip'          => $venue_metadata['venueZip'] ?? '',
+			'venueCountry'      => $venue_metadata['venueCountry'] ?? '',
+			'venuePhone'        => $venue_metadata['venuePhone'] ?? '',
+			'venueWebsite'      => $venue_metadata['venueWebsite'] ?? '',
 			'venueTicketingUrl' => $venue_metadata['venueTicketingUrl'] ?? '',
-			'venueCoordinates' => $venue_metadata['venueCoordinates'] ?? '',
-			'venueCapacity'    => $venue_metadata['venueCapacity'] ?? '',
-			'venueTimezone'    => $venue_metadata['venueTimezone'] ?? '',
+			'venueCoordinates'  => $venue_metadata['venueCoordinates'] ?? '',
+			'venueCapacity'     => $venue_metadata['venueCapacity'] ?? '',
+			'venueTimezone'     => $venue_metadata['venueTimezone'] ?? '',
 		);
 
 		$venue_fields_clean = array_filter(
@@ -230,18 +230,18 @@ class EventEngineData {
 
 			// Build venue_context sub-array.
 			$context_map = array(
-				'name'        => $venue_fields['venue'],
-				'address'     => $venue_fields['venueAddress'],
-				'city'        => $venue_fields['venueCity'],
-				'state'       => $venue_fields['venueState'],
-				'zip'         => $venue_fields['venueZip'],
-				'country'     => $venue_fields['venueCountry'],
-				'phone'       => $venue_fields['venuePhone'],
-				'website'     => $venue_fields['venueWebsite'],
+				'name'          => $venue_fields['venue'],
+				'address'       => $venue_fields['venueAddress'],
+				'city'          => $venue_fields['venueCity'],
+				'state'         => $venue_fields['venueState'],
+				'zip'           => $venue_fields['venueZip'],
+				'country'       => $venue_fields['venueCountry'],
+				'phone'         => $venue_fields['venuePhone'],
+				'website'       => $venue_fields['venueWebsite'],
 				'ticketing_url' => $venue_fields['venueTicketingUrl'],
-				'coordinates' => $venue_fields['venueCoordinates'],
-				'capacity'    => $venue_fields['venueCapacity'],
-				'timezone'    => $venue_fields['venueTimezone'],
+				'coordinates'   => $venue_fields['venueCoordinates'],
+				'capacity'      => $venue_fields['venueCapacity'],
+				'timezone'      => $venue_fields['venueTimezone'],
 			);
 
 			$context_clean = array_filter(
@@ -254,6 +254,13 @@ class EventEngineData {
 			if ( ! empty( $context_clean ) ) {
 				$payload['venue_context'] = $context_clean;
 			}
+		}
+
+		// Source venue identity — routing metadata so upsert-time venue
+		// resolution can honor venue source aliases (#878).
+		$venue_source_identity = (string) ( $event_data[ \DataMachineEvents\Core\VenueSourceAliases::EVENT_FIELD ] ?? '' );
+		if ( '' !== $venue_source_identity ) {
+			$payload[ \DataMachineEvents\Core\VenueSourceAliases::EVENT_FIELD ] = $venue_source_identity;
 		}
 
 		// Event title — stored in engine_data so pre-AI dedup gate can

@@ -337,6 +337,17 @@ class EventUpsert extends UpsertHandler {
 		$event_data             = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
 		$venue_resolution       = $this->taxonomy_assigner->resolveVenue( $parameters, $engine, $handler_config );
 		$authoritative_venue_id = (int) $venue_resolution['term_id'];
+		if ( 'source_alias' === ( $venue_resolution['matched_via'] ?? '' ) && $authoritative_venue_id > 0 ) {
+			// Import handlers canonicalize aliased venues before the AI step;
+			// this covers items queued before the alias existed (#878).
+			$canonical_venue = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( $authoritative_venue_id );
+			if ( ! empty( $canonical_venue['name'] ) ) {
+				$event_data['venue']        = (string) $canonical_venue['name'];
+				$event_data['venueAddress'] = (string) ( $canonical_venue['address'] ?? '' );
+				$parameters['venue']        = $event_data['venue'];
+				$parameters['venueAddress'] = $event_data['venueAddress'];
+			}
+		}
 		if ( 'skip' === $venue_resolution['action'] && $existing_post_id > 0 ) {
 			$existing_venues = wp_get_object_terms( $existing_post_id, 'venue', array( 'fields' => 'ids' ) );
 			if ( is_wp_error( $existing_venues ) ) {

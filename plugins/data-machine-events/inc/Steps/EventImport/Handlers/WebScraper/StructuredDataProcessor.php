@@ -70,6 +70,7 @@ class StructuredDataProcessor {
 			}
 
 			$this->applyVenueConfigOverride( $event, $config );
+			$event = $this->handler->applyVenueSourceAliases( $event );
 
 			$source_identity  = EventSourceIdentity::resolve( $event, $context );
 			$event_identifier = $source_identity['event_identifier'];

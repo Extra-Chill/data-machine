@@ -296,5 +296,8 @@ class VenueParameterProvider {
 			}
 			unset( $event[ $key ] );
 		}
+
+		// Routing metadata for venue resolution; engine data carries it.
+		unset( $event[ VenueSourceAliases::EVENT_FIELD ] );
 	}
 }

@@ -102,7 +102,7 @@ class DiceFm extends EventImportHandler {
 		$country_skipped = 0;
 
 		foreach ( $raw_events as $raw_event ) {
-			$standardized_event = $this->convert_dice_fm_event( $raw_event );
+			$standardized_event = $this->applyVenueSourceAliases( $this->convert_dice_fm_event( $raw_event ) );
 
 			// Filter by country — Dice.fm returns events from all countries matching the city name.
 			// e.g. "Manchester" returns Manchester UK + Manchester NH.

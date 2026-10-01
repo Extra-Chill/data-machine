@@ -9,6 +9,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 
 use DataMachine\Core\Database\TrackedItems\TrackedItems;
 use DataMachine\Core\ExecutionContext;
+use DataMachineEvents\Core\VenueSourceAliases;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -30,10 +31,18 @@ class TicketmasterSourceIdentity {
 	/**
 	 * Build a revision from the mapped fields that EventUpsert can persist.
 	 *
+	 * The source venue identity is routing metadata, not persisted content,
+	 * so it stays out of the hash; adding it must not invalidate every
+	 * tracked revision (#878). A venue rewritten through a source alias does
+	 * change the hash, which reprocesses that event once with the canonical
+	 * venue.
+	 *
 	 * @param array $event Standardized event data.
 	 * @return string Source revision hash.
 	 */
 	public static function revision( array $event ): string {
+		unset( $event[ VenueSourceAliases::EVENT_FIELD ] );
+
 		return hash( 'sha256', (string) wp_json_encode( $event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
 	}
 
