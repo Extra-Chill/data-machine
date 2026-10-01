@@ -13,6 +13,7 @@ namespace DataMachine\Engine\AI\System\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
+use DataMachine\Abilities\Media\AltTextContentSync;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\RequestBuilder;
@@ -131,9 +132,23 @@ class AltTextTask extends SystemTask {
 			),
 		);
 
+		// Images inserted before generation finished were saved with alt="".
+		$synced_posts = AltTextContentSync::syncPostsForAttachment( $attachment_id, $alt_text );
+		foreach ( $synced_posts as $synced ) {
+			if ( null === $synced['revision_id'] ) {
+				continue;
+			}
+			$effects[] = array(
+				'type'        => 'post_content_modified',
+				'target'      => array( 'post_id' => $synced['post_id'] ),
+				'revision_id' => $synced['revision_id'],
+			);
+		}
+
 		$this->completeJob( $jobId, array(
 			'alt_text'      => $alt_text,
 			'attachment_id' => $attachment_id,
+			'synced_posts'  => array_column( $synced_posts, 'post_id' ),
 			'effects'       => $effects,
 			'completed_at'  => current_time( 'mysql' ),
 		) );

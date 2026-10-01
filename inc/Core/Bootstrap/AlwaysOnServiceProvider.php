@@ -44,6 +44,8 @@ final class AlwaysOnServiceProvider {
 	public static function register_wordpress_hooks(): void {
 		add_filter( 'upload_mimes', array( self::class, 'allow_json_upload' ) );
 		add_action( 'update_option_datamachine_settings', array( \DataMachine\Core\PluginSettings::class, 'clearCache' ) );
+		// Front-end requests skip the full runtime; fill empty image alt from attachment meta at render.
+		add_filter( 'render_block_core/image', array( \DataMachine\Abilities\Media\AltTextContentSync::class, 'filterImageBlock' ), 10, 2 );
 	}
 
 	/**

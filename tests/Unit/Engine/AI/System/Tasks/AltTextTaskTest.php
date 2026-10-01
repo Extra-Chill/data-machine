@@ -150,6 +150,44 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Generated alt text reaches image blocks saved with an empty alt.
+	 */
+	public function test_execute_backfills_empty_alt_in_post_content(): void {
+		$settings_filter = function( $pre_option ) {
+			return [
+				'default_provider' => 'openai',
+				'default_model' => 'gpt-4'
+			];
+		};
+		add_filter( 'pre_option_datamachine_settings', $settings_filter, 10, 1 );
+		PluginSettings::clearCache();
+
+		WpAiClientTestDouble::set_response_callback( function(): array {
+			return [
+				'success' => true,
+				'data' => [ 'content' => 'A guitarist under red stage lights.' ],
+			];
+		} );
+
+		$post_id = self::factory()->post->create( [
+			'post_status'  => 'pending',
+			'post_content' => '<!-- wp:image {"id":' . $this->attachment_id . '} -->' . "\n"
+				. '<figure class="wp-block-image"><img src="x.jpg" alt="" class="wp-image-' . $this->attachment_id . '"/></figure>' . "\n"
+				. '<!-- /wp:image -->',
+		] );
+
+		$this->expectOutputString( '' );
+		$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
+
+		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
+
+		$this->assertStringContainsString(
+			'alt="A guitarist under red stage lights."',
+			get_post( $post_id )->post_content
+		);
+	}
+
+	/**
 	 * Test execute fails when image file missing.
 	 */
 	public function test_execute_missing_file(): void {
