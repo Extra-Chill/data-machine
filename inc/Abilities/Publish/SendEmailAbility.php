@@ -444,8 +444,12 @@ class SendEmailAbility {
 		}
 
 		if ( ! empty( $resolved['credentials']['smtp_host'] ) ) {
-			$delivery = \DataMachine\Abilities\Email\MailboxTransport::send( $resolved['credentials'], $to, $subject, $body, $attachments, array( 'content_type' => $content_type, 'cc' => $config['cc'], 'bcc' => $config['bcc'] ) );
-			$sent = ! is_wp_error( $delivery );
+			$delivery = \DataMachine\Core\Email\MailboxTransport::send( $resolved['credentials'], $to, $subject, $body, $attachments, array(
+				'content_type' => $content_type,
+				'cc'           => $config['cc'],
+				'bcc'          => $config['bcc'],
+			) );
+			$sent     = ! is_wp_error( $delivery );
 		} else {
 			$sent = wp_mail( $to, $subject, $body, $headers, $attachments );
 		}

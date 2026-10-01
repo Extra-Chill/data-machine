@@ -103,7 +103,7 @@ namespace {
 	require_once dirname( __DIR__ ) . '/inc/Core/OAuth/BaseAuthProvider.php';
 	require_once dirname( __DIR__ ) . '/inc/Core/Steps/Fetch/Handlers/Email/EmailAuth.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Email/MailboxAbilities.php';
-	require_once dirname( __DIR__ ) . '/inc/Abilities/Email/MailboxTransport.php';
+	require_once dirname( __DIR__ ) . '/inc/Core/Email/MailboxTransport.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Email/ForwardEmailAbility.php';
 	$abilities = new \DataMachine\Abilities\Email\MailboxAbilities();
 	$forward = new \DataMachine\Abilities\Email\ForwardEmailAbility();

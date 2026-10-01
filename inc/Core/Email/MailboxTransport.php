@@ -1,7 +1,7 @@
 <?php
 /** SMTP delivery using one authorized inbox, independent of site-wide mail hooks. */
 
-namespace DataMachine\Abilities\Email;
+namespace DataMachine\Core\Email;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -16,33 +16,37 @@ final class MailboxTransport {
 		}
 		if ( ! class_exists( '\PHPMailer\PHPMailer\PHPMailer' ) ) {
 			foreach ( array( 'Exception', 'PHPMailer', 'SMTP' ) as $class ) {
+				// @phpstan-ignore constant.notFound (WordPress defines WPINC during bootstrap.)
 				require_once ABSPATH . WPINC . '/PHPMailer/' . $class . '.php';
 			}
 		}
 		$mailer = new \PHPMailer\PHPMailer\PHPMailer( true );
 		try {
 			$mailer->isSMTP();
-			$mailer->Host = $credentials['smtp_host'];
-			$mailer->Port = (int) ( $credentials['smtp_port'] ?? 587 );
+			$mailer->Host       = $credentials['smtp_host'];
+			$mailer->Port       = (int) ( $credentials['smtp_port'] ?? 587 );
 			$mailer->SMTPSecure = $credentials['smtp_encryption'] ?? 'tls';
-			$mailer->SMTPAuth = true;
-			$mailer->Username = $credentials['smtp_user'];
-			$mailer->Password = $credentials['smtp_password'];
-			$mailer->Timeout = 30;
-			$mailer->CharSet = 'UTF-8';
+			$mailer->SMTPAuth   = true;
+			$mailer->Username   = $credentials['smtp_user'];
+			$mailer->Password   = $credentials['smtp_password'];
+			$mailer->Timeout    = 30;
+			$mailer->CharSet    = 'UTF-8';
 			$mailer->setFrom( $credentials['imap_user'], $credentials['display_name'] ?? '' );
 			$mailer->addReplyTo( $credentials['imap_user'] );
 			foreach ( $to as $address ) {
 				$mailer->addAddress( $address );
 			}
-			foreach ( array( 'cc' => 'addCC', 'bcc' => 'addBCC' ) as $key => $method ) {
+			foreach ( array(
+				'cc'  => 'addCC',
+				'bcc' => 'addBCC',
+			) as $key => $method ) {
 				foreach ( array_filter( array_map( 'trim', explode( ',', $options[ $key ] ?? '' ) ) ) as $address ) {
 					$mailer->$method( $address );
 				}
 			}
 			$mailer->Subject = $subject;
 			$mailer->isHTML( 'text/html' === ( $options['content_type'] ?? 'text/plain' ) );
-			$mailer->Body = $body;
+			$mailer->Body    = $body;
 			$mailer->AltBody = $options['alt_body'] ?? '';
 			foreach ( $attachments as $attachment ) {
 				if ( is_string( $attachment ) ) {
@@ -62,7 +66,11 @@ final class MailboxTransport {
 			if ( ! $mailer->send() ) {
 				return new \WP_Error( 'email_smtp_failed', 'SMTP delivery failed. Check the destination before retrying.' );
 			}
-			return array( 'success' => true, 'message_id' => $mailer->getLastMessageID(), 'raw_message' => $mailer->getSentMIMEMessage() );
+			return array(
+				'success'     => true,
+				'message_id'  => $mailer->getLastMessageID(),
+				'raw_message' => $mailer->getSentMIMEMessage(),
+			);
 		} catch ( \Throwable $error ) {
 			return new \WP_Error( 'email_smtp_failed', 'SMTP delivery failed. Check the mailbox credentials and destination before retrying.' );
 		} finally {

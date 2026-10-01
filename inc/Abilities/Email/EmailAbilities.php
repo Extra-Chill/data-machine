@@ -14,6 +14,7 @@
 namespace DataMachine\Abilities\Email;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Email\MailboxTransport;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -523,7 +524,12 @@ class EmailAbilities {
 		$headers[] = 'From: ' . $mailbox['credentials']['imap_user'];
 
 		if ( ! empty( $mailbox['credentials']['smtp_host'] ) ) {
-			$delivery = MailboxTransport::send( $mailbox['credentials'], $to, $input['subject'], $input['body'], array(), array( 'content_type' => $content_type, 'cc' => $input['cc'] ?? '', 'In-Reply-To' => $input['in_reply_to'] ?? '', 'References' => $references ) );
+			$delivery = MailboxTransport::send( $mailbox['credentials'], $to, $input['subject'], $input['body'], array(), array(
+				'content_type' => $content_type,
+				'cc'           => $input['cc'] ?? '',
+				'In-Reply-To'  => $input['in_reply_to'] ?? '',
+				'References'   => $references,
+			) );
 			if ( is_wp_error( $delivery ) ) {
 				return $delivery;
 			}
