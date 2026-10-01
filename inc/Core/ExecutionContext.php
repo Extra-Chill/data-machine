@@ -594,6 +594,7 @@ class ExecutionContext {
 				'pipeline_name' => 'standalone',
 				'flow_id'       => null,
 				'flow_name'     => 'standalone',
+				'job_id'        => $this->job_id,
 			);
 		}
 		return array(

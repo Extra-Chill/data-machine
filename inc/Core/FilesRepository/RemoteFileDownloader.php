@@ -62,10 +62,7 @@ class RemoteFileDownloader {
 		$timeout = $options['timeout'] ?? 30;
 
 		// Ensure directory exists
-		$directory = $this->directory_manager->get_flow_files_directory(
-			$context['pipeline_id'],
-			$context['flow_id']
-		);
+		$directory = $this->directory_manager->get_files_directory_for_context( $context );
 
 		if ( ! $this->directory_manager->ensure_directory_exists( $directory ) ) {
 			return null;
