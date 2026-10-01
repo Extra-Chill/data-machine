@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.182.2] - 2026-10-01
+
+### Fixed
+- store standalone execution files in an isolated bucket
+
 ## [0.182.1] - 2026-10-01
 
 ### Fixed
