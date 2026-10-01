@@ -866,6 +866,9 @@ class GoogleAnalyticsAbilities {
 	 */
 	const AGGREGATE_TOTALS_RESERVED_DIMENSION_VALUE = 'RESERVED_TOTAL';
 
+	/** Input keys only aggregate_report honors; fixed actions reject them (#148). */
+	const AGGREGATE_ONLY_INPUT_KEYS = array( 'date_range', 'comparison_date_range', 'dimensions', 'metrics', 'filters', 'order_by' );
+
 	/** Normalize a single batch report without inventing coverage guarantees. */
 	public static function normalizeAggregateReport( array $report, array $date_range, array $expected_dimensions = array(), array $expected_metrics = array() ) {
 		$invalid = static fn( string $reason ): \WP_Error => new \WP_Error( 'invalid_ga_aggregate_response', "Google Analytics returned a malformed aggregate report ({$reason})." );
@@ -950,17 +953,18 @@ class GoogleAnalyticsAbilities {
 			$limits[] = 'The result is truncated to ' . count( $rows ) . ' of ' . $row_count . ' matching rows.'; }
 		if ( empty( $rows ) ) {
 			$limits[] = 'No rows matched the requested report.'; }
-		// GA4 always echoes a single RESERVED_TOTAL placeholder dimension value on
-		// the totals row whenever the request has one or more dimensions — proven
-		// live against this install's GA4 property (batchRunReports, dimensions:
-		// ["country"]): the totals row was {"dimensionValues":[{"value":
-		// "RESERVED_TOTAL"}],"metricValues":[...]}, not metricValues-only. A
+		// GA4 echoes one RESERVED_TOTAL placeholder dimension value per requested
+		// dimension on the totals row — proven live against this install's GA4
+		// property (batchRunReports): dimensions ["country"] gave
+		// {"dimensionValues":[{"value":"RESERVED_TOTAL"}],...} and dimensions
+		// ["hostName","landingPage"] gave two RESERVED_TOTAL entries (#147). A
 		// zero-dimension request's totals row omits dimensionValues entirely. Both
 		// shapes are legitimate; anything else is a real malformation.
 		$totals_row              = $raw_totals[0] ?? null;
 		$totals_row_keys         = is_array( $totals_row ) ? array_keys( $totals_row ) : null;
+		$reserved_dimension_vals = array_fill( 0, max( 1, count( $dimension_headers ) ), array( 'value' => self::AGGREGATE_TOTALS_RESERVED_DIMENSION_VALUE ) );
 		$totals_reserved_wrapper = array( 'dimensionValues', 'metricValues' ) === $totals_row_keys
-			&& array( array( 'value' => self::AGGREGATE_TOTALS_RESERVED_DIMENSION_VALUE ) ) === ( $totals_row['dimensionValues'] ?? null );
+			&& ( $totals_row['dimensionValues'] ?? null ) === $reserved_dimension_vals;
 		if ( count( $raw_totals ) > 1 || ( 1 === count( $raw_totals ) && ( null === $totals_row_keys || ( array( 'metricValues' ) !== $totals_row_keys && ! $totals_reserved_wrapper ) ) ) ) {
 			return $invalid( 'totals_shape' ); }
 		$totals = empty( $raw_totals ) ? array_fill_keys( $metrics, '' ) : $record( $metrics, $raw_totals[0]['metricValues'], 200 );
@@ -996,6 +1000,29 @@ class GoogleAnalyticsAbilities {
 	 */
 	public static function fetchStats( array $input ): array {
 		$action = sanitize_text_field( $input['action'] ?? '' );
+
+		// Fixed actions use preset dimensions and support no filtering. The
+		// legacy schema stays open for consumer context keys, so aggregate-only
+		// keys would otherwise be dropped silently and the caller would read
+		// unfiltered data as filtered (#148).
+		$present_keys   = array_keys( array_filter( $input, static fn( $value ) => ! in_array( $value, array( null, '', array() ), true ) ) );
+		$aggregate_only = array();
+		if ( 'aggregate_report' !== $action ) {
+			$aggregate_only = array_values( array_intersect( self::AGGREGATE_ONLY_INPUT_KEYS, $present_keys ) );
+		}
+		if ( ! empty( $aggregate_only ) ) {
+			$single = 1 === count( $aggregate_only );
+			return array(
+				'success' => false,
+				'error'   => sprintf(
+					'%s only %s to action aggregate_report; "%s" uses fixed dimensions and would ignore %s. Use action aggregate_report with date_range, dimensions, metrics, and filters.',
+					implode( ', ', $aggregate_only ),
+					$single ? 'applies' : 'apply',
+					$action,
+					$single ? 'it' : 'them'
+				),
+			);
+		}
 
 		$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence', 'aggregate_report' ) );
 		if ( empty( $action ) || ! in_array( $action, $valid_actions, true ) ) {

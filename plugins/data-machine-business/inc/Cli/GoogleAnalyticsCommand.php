@@ -105,7 +105,9 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 * : aggregate_report metrics JSON array (1-8 approved names).
 	 *
 	 * [--filters=<json>]
-	 * : aggregate_report filters JSON array (up to 4 AND string filters).
+	 * : aggregate_report only. JSON array of up to 4 AND string filters, e.g.
+	 * [{"field_name":"sessionSource","match_type":"CONTAINS","value":"chatgpt"}].
+	 * match_type: EXACT, CONTAINS, BEGINS_WITH, ENDS_WITH. Optional: exclude, case_sensitive.
 	 *
 	 * [--order-by=<json>]
 	 * : aggregate_report ordering JSON array (up to 2 selected fields).
@@ -127,6 +129,9 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 *
 	 *     # Traffic sources
 	 *     wp datamachine analytics ga traffic_sources --limit=50
+	 *
+	 *     # Landing pages for one traffic source (filters require aggregate_report)
+	 *     wp datamachine analytics ga aggregate_report --date-range='{"start_date":"2026-09-01","end_date":"2026-09-30"}' --dimensions='["hostName","landingPage"]' --metrics='["sessions"]' --filters='[{"field_name":"sessionSource","match_type":"CONTAINS","value":"chatgpt"}]'
 	 *
 	 *     # Real-time active users
 	 *     wp datamachine analytics ga realtime
