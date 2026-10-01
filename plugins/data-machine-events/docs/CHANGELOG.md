@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.64.10] - 2026-10-01
+
+### Fixed
+- honor curated venue source aliases so corrections survive re-imports
+
 ## [0.64.9] - 2026-09-30
 
 ### Fixed
