@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.182.0] - 2026-10-01
+
+### Added
+- expose named inbox setup and authenticated forwarding
+
 ## [0.181.0] - 2026-09-30
 
 ### Added
