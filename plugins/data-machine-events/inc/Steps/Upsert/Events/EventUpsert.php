@@ -316,6 +316,12 @@ class EventUpsert extends UpsertHandler {
 		if ( is_wp_error( $existing_post_id ) ) {
 			return $this->lifecycleErrorResponse( $existing_post_id, $title );
 		}
+		// Resolve the venue once, before duplicate detection, so dedup sees the
+		// same term persistence will assign. Name-only re-resolution inside the
+		// duplicate strategy is ambiguous whenever two venue terms share a name,
+		// which returned "clear" and created duplicate events on re-import (#883).
+		$venue_resolution       = $this->taxonomy_assigner->resolveVenue( $parameters, $engine, $handler_config );
+		$authoritative_venue_id = (int) $venue_resolution['term_id'];
 		if ( $existing_post_id <= 0 ) {
 			$duplicate_result = $this->findExistingEventViaAbility(
 				$title,
@@ -325,7 +331,8 @@ class EventUpsert extends UpsertHandler {
 				$venueAddress,
 				$venueCity,
 				$venueState,
-				$venueCountry
+				$venueCountry,
+				'assign' === $venue_resolution['action'] ? $authoritative_venue_id : 0
 			);
 			if ( is_wp_error( $duplicate_result ) ) {
 				return $this->lifecycleErrorResponse( $duplicate_result, $title );
@@ -334,9 +341,7 @@ class EventUpsert extends UpsertHandler {
 		}
 
 		// 2. Build event data.
-		$event_data             = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
-		$venue_resolution       = $this->taxonomy_assigner->resolveVenue( $parameters, $engine, $handler_config );
-		$authoritative_venue_id = (int) $venue_resolution['term_id'];
+		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
 		if ( 'source_alias' === ( $venue_resolution['matched_via'] ?? '' ) && $authoritative_venue_id > 0 ) {
 			// Import handlers canonicalize aliased venues before the AI step;
 			// this covers items queued before the alias existed (#878).
@@ -769,6 +774,10 @@ class EventUpsert extends UpsertHandler {
 	 * @param string $city      Venue city (required alongside address).
 	 * @param string $state     Venue state or region.
 	 * @param string $country   Venue country.
+	 * @param int    $venue_term_id Venue term already resolved by the upsert
+	 *                              path (0 when unresolved). When set, dedup
+	 *                              matches by this term instead of re-resolving
+	 *                              the venue by name (#883).
 	 * @return int|\WP_Error Post ID, zero when clear, or a contract error.
 	 */
 	private function findExistingEventViaAbility(
@@ -779,7 +788,8 @@ class EventUpsert extends UpsertHandler {
 		string $address = '',
 		string $city = '',
 		string $state = '',
-		string $country = ''
+		string $country = '',
+		int $venue_term_id = 0
 	): int|\WP_Error {
 		$duplicate_check = wp_has_ability( 'datamachine/check-duplicate' )
 			? wp_get_ability( 'datamachine/check-duplicate' )
@@ -802,13 +812,14 @@ class EventUpsert extends UpsertHandler {
 				'post_type' => Event_Post_Type::POST_TYPE,
 				'scope'     => 'published',
 				'context'   => array(
-					'venue'     => $venue,
-					'startDate' => $startDate,
-					'ticketUrl' => $ticketUrl,
-					'address'   => $address,
-					'city'      => $city,
-					'state'     => $state,
-					'country'   => $country,
+					'venue'         => $venue,
+					'startDate'     => $startDate,
+					'ticketUrl'     => $ticketUrl,
+					'address'       => $address,
+					'city'          => $city,
+					'state'         => $state,
+					'country'       => $country,
+					'venue_term_id' => $venue_term_id,
 				),
 			)
 		);

@@ -93,12 +93,31 @@ class EventDuplicateStrategy {
 		$date_only           = self::extractDateOnly( $startDate );
 		$identity_confidence = EventIdentifierGenerator::getIdentityConfidence( $title, $startDate, $venue );
 
-		// Resolve the incoming venue once via the same cascade used by
-		// Venue_Taxonomy::find_or_create_venue (address-first, then name).
-		// Reused across strategies so dedup matches the canonicalization
-		// that the upsert path will perform.
-		$venue_identity = self::resolveVenueIdentity( $venue, $address, $city, $state, $country );
-		$venue_term     = $venue_identity['term'];
+		// Prefer the venue term the upsert path already resolved (#883). It was
+		// resolved with full venue metadata and source identity, so it is the
+		// term persistence will assign. Re-resolving by name here is ambiguous
+		// whenever two venue terms share a name, which used to return "clear"
+		// and create duplicate events.
+		$authoritative_term = self::authoritativeVenueTerm( absint( $context['venue_term_id'] ?? 0 ) );
+
+		if ( $authoritative_term ) {
+			$venue_identity = array(
+				'term'         => $authoritative_term,
+				'match_status' => 'matched',
+			);
+		} else {
+			// Resolve the incoming venue once via the same cascade used by
+			// Venue_Taxonomy::find_or_create_venue (address-first, then name).
+			// Reused across strategies so dedup matches the canonicalization
+			// that the upsert path will perform.
+			$venue_identity = self::resolveVenueIdentity( $venue, $address, $city, $state, $country );
+		}
+		$venue_term = $venue_identity['term'];
+
+		// With an authoritative term, venue confirmation is by term ID only.
+		// A same-named but distinct venue (#806 conflict term) must never be
+		// confirmed by name, so later strategies get no venue name to compare.
+		$confirm_venue = $authoritative_term ? '' : $venue;
 
 		// Strategy 1: Ticket URL + date (most reliable).
 		if ( ! empty( $ticketUrl ) ) {
@@ -126,14 +145,14 @@ class EventDuplicateStrategy {
 		}
 
 		// Strategy 3: Exact title + date (with venue confirmation).
-		$match = self::findByExactTitle( $title, $venue, $date_only, $identity_confidence, $venue_term, $startDate );
+		$match = self::findByExactTitle( $title, $confirm_venue, $date_only, $identity_confidence, $venue_term, $startDate );
 		if ( $match ) {
 			return $match;
 		}
 
 		// Strategy 4: Date + fuzzy title fallback (venue-agnostic).
 		if ( 'low' !== $identity_confidence ) {
-			$match = self::findByDateAndFuzzyTitle( $title, $date_only, $startDate, $venue, $venue_term );
+			$match = self::findByDateAndFuzzyTitle( $title, $date_only, $startDate, $confirm_venue, $venue_term );
 			if ( $match ) {
 				return $match;
 			}
@@ -531,6 +550,22 @@ class EventDuplicateStrategy {
 		$identity = self::resolveVenueIdentity( $venue, $address, $city, $state, $country );
 
 		return $identity['term'];
+	}
+
+	/**
+	 * Load a caller-supplied, already-resolved venue term.
+	 *
+	 * @param int $term_id Venue term ID from the upsert path (0 when absent).
+	 * @return \WP_Term|null Venue term, or null when absent or invalid.
+	 */
+	private static function authoritativeVenueTerm( int $term_id ): ?\WP_Term {
+		if ( $term_id <= 0 ) {
+			return null;
+		}
+
+		$term = get_term( $term_id, 'venue' );
+
+		return $term instanceof \WP_Term ? $term : null;
 	}
 
 	/**

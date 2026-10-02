@@ -220,6 +220,110 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->cleanup( $term_id, $existing_post_id );
 	}
 
+	/**
+	 * Two venue terms share a name (e.g. "The Dinghy" 3609 / 96682 in
+	 * production). Name-only resolution is ambiguous, which used to return
+	 * "clear" and let re-imports create duplicate events. The upsert path
+	 * resolves the venue authoritatively and passes the term ID (#883).
+	 */
+	public function test_authoritative_venue_term_dedups_when_name_is_ambiguous(): void {
+		$venue_name = 'Ambiguous Twin Venue ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Someday Maybes 7-10pm',
+			'2026-10-02 19:00:00',
+			$venue_name
+		);
+		$twin_id = $this->insertSameNamedVenue( $venue_name, 'Isle of Palms' );
+
+		$identity = Venue_Taxonomy::resolve_venue_identity( $venue_name, array() );
+		$this->assertSame( 'ambiguous', $identity['match_status'], 'Fixture must reproduce the ambiguous name-only resolution.' );
+
+		$base_context = array(
+			'venue'     => $venue_name,
+			'startDate' => '2026-10-02T19:00:00',
+			'ticketUrl' => '',
+		);
+
+		$this->assertNull(
+			EventDuplicateStrategy::check(
+				array(
+					'title'   => 'Someday Maybes 7-10pm',
+					'context' => $base_context,
+				)
+			),
+			'Without an authoritative term the #806 ambiguity guard still applies.'
+		);
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Someday Maybes 7-10pm',
+				'context' => array_merge( $base_context, array( 'venue_term_id' => $term_id ) ),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'duplicate', $result['verdict'] );
+		$this->assertSame( $existing_post_id, (int) $result['match']['post_id'] );
+
+		wp_delete_term( $twin_id, 'venue' );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	/**
+	 * An authoritative term for the *other* same-named venue must never be
+	 * confirmed by venue name (#806 protection survives #883).
+	 */
+	public function test_authoritative_venue_term_never_matches_same_named_other_venue(): void {
+		$venue_name = 'Ambiguous Twin Venue ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Same Night Show',
+			'2026-10-02 20:00:00',
+			$venue_name
+		);
+		$twin_id = $this->insertSameNamedVenue( $venue_name, 'Isle of Palms' );
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Same Night Show',
+				'context' => array(
+					'venue'         => $venue_name,
+					'startDate'     => '2026-10-02T20:00:00',
+					'ticketUrl'     => '',
+					'venue_term_id' => $twin_id,
+				),
+			)
+		);
+
+		$this->assertNull( $result, 'A distinct venue term is never a duplicate by name.' );
+
+		wp_delete_term( $twin_id, 'venue' );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	/**
+	 * An invalid or missing venue_term_id falls back to name resolution.
+	 */
+	public function test_invalid_venue_term_id_falls_back_to_name_resolution(): void {
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent( 'Fallback Show', '2026-10-02 20:00:00' );
+		$venue_name                     = get_term( $term_id, 'venue' )->name;
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Fallback Show',
+				'context' => array(
+					'venue'         => $venue_name,
+					'startDate'     => '2026-10-02T20:00:00',
+					'ticketUrl'     => '',
+					'venue_term_id' => 999999999,
+				),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( $existing_post_id, (int) $result['match']['post_id'] );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
 	public function test_equivalent_geography_forms_still_allow_duplicate_match(): void {
 		$venue_name = 'Equivalent Geography Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
@@ -897,6 +1001,23 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		}
 
 		return array( $term_id, $post_id );
+	}
+
+	/**
+	 * Insert a second venue term with the same name but a distinct slug and city.
+	 *
+	 * @param string $venue_name Shared venue name.
+	 * @param string $city       City for the twin term.
+	 * @return int Twin term ID.
+	 */
+	private function insertSameNamedVenue( string $venue_name, string $city ): int {
+		$twin = wp_insert_term( $venue_name, 'venue', array( 'slug' => sanitize_title( $venue_name ) . '-twin' ) );
+		$this->assertNotWPError( $twin );
+		$twin_id = (int) $twin['term_id'];
+		update_term_meta( $twin_id, '_venue_address', '8 Other Boulevard' );
+		update_term_meta( $twin_id, '_venue_city', $city );
+
+		return $twin_id;
 	}
 
 	/**
