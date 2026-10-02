@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.65.3] - 2026-10-02
+
+### Fixed
+- match on the upsert's resolved venue term so re-imports stop creating duplicates
+
 ## [0.65.2] - 2026-10-01
 
 ### Fixed
