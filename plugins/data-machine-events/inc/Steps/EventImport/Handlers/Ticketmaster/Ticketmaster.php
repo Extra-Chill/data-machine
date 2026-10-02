@@ -265,6 +265,9 @@ class Ticketmaster extends EventImportHandler {
 					}
 
 					$standardized_event = $this->applyVenueSourceAliases( $standardized_event );
+					if ( $this->isOutsideConfiguredRadius( $standardized_event, $config, $context ) ) {
+						continue;
+					}
 
 					if ( $this->is_junk_payload( $raw_event, $standardized_event, $context ) ) {
 						continue;
@@ -530,7 +533,7 @@ class Ticketmaster extends EventImportHandler {
 		$location    = $handler_config['location'] ?? '32.7765,-79.9311'; // Charleston, SC
 		$coordinates = '' === $attraction_ids ? $this->parseCoordinates( $location ) : null;
 		if ( $coordinates ) {
-			$params['geoPoint'] = $coordinates['lat'] . ',' . $coordinates['lng'];
+			$params['geoPoint'] = self::encodeGeohash( $coordinates['lat'], $coordinates['lng'] );
 			$radius             = ! empty( $handler_config['radius'] ) ? $handler_config['radius'] : '50';
 			$params['radius']   = $radius;
 			$params['unit']     = 'miles';
@@ -550,6 +553,74 @@ class Ticketmaster extends EventImportHandler {
 		}
 
 		return $params;
+	}
+
+	/** Encode coordinates using the geohash format required by Discovery API. */
+	public static function encodeGeohash( float $latitude, float $longitude, int $precision = 6 ): string {
+		$alphabet       = '0123456789bcdefghjkmnpqrstuvwxyz';
+		$lat_range      = array( -90.0, 90.0 );
+		$lng_range      = array( -180.0, 180.0 );
+		$hash           = '';
+		$bits           = 0;
+		$bit            = 0;
+		$longitude_turn = true;
+
+		while ( strlen( $hash ) < $precision ) {
+			$range    = $longitude_turn ? $lng_range : $lat_range;
+			$value    = $longitude_turn ? $longitude : $latitude;
+			$midpoint = ( $range[0] + $range[1] ) / 2;
+			$bits   <<= 1;
+			if ( $value >= $midpoint ) {
+				$bits    |= 1;
+				$range[0] = $midpoint;
+			} else {
+				$range[1] = $midpoint;
+			}
+			if ( $longitude_turn ) {
+				$lng_range = $range;
+			} else {
+				$lat_range = $range;
+			}
+			$longitude_turn = ! $longitude_turn;
+			if ( 5 === ++$bit ) {
+				$hash .= $alphabet[ $bits ];
+				$bit   = 0;
+				$bits  = 0;
+			}
+		}
+
+		return $hash;
+	}
+
+	private function isOutsideConfiguredRadius( array $event, array $config, ExecutionContext $context ): bool {
+		$center = $this->parseCoordinates( (string) ( $config['location'] ?? '' ) );
+		$venue  = $this->parseCoordinates( (string) ( $event['venueCoordinates'] ?? '' ) );
+		if ( ! $center || ! $venue ) {
+			return false;
+		}
+
+		$radius   = is_numeric( $config['radius'] ?? null ) && (float) $config['radius'] > 0 ? (float) $config['radius'] : 50.0;
+		$distance = self::distanceMiles( $center, $venue );
+		if ( $distance <= $radius ) {
+			return false;
+		}
+
+		$context->log( 'debug', 'Ticketmaster: Skipped event outside configured radius', array(
+			'title'          => $event['title'] ?? '',
+			'distance_miles' => round( $distance, 1 ),
+			'radius_miles'   => $radius,
+		) );
+		return true;
+	}
+
+	/** Return great-circle distance between two parsed points in miles. */
+	public static function distanceMiles( array $first, array $second ): float {
+		$lat1      = deg2rad( $first['lat'] );
+		$lat2      = deg2rad( $second['lat'] );
+		$delta_lat = $lat2 - $lat1;
+		$delta_lng = deg2rad( $second['lng'] - $first['lng'] );
+		$a         = sin( $delta_lat / 2 ) ** 2 + cos( $lat1 ) * cos( $lat2 ) * sin( $delta_lng / 2 ) ** 2;
+		return 3958.7613 * 2 * atan2( sqrt( $a ), sqrt( 1 - $a ) );
 	}
 
 	/**
