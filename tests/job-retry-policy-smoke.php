@@ -9,6 +9,7 @@
 
 define( 'ABSPATH', __DIR__ );
 define( 'WPINC', 'wp-includes' );
+define( 'MINUTE_IN_SECONDS', 60 );
 
 $failed = 0;
 $total  = 0;
@@ -34,9 +35,21 @@ if ( ! function_exists( 'apply_filters' ) ) {
 
 if ( ! function_exists( 'do_action' ) ) {
     function do_action( string $hook, mixed ...$args ): void {
-    	$hook;
-    	$args;
+		$GLOBALS['retry_policy_actions'][ $hook ][] = $args;
     }
+}
+
+if ( ! function_exists( 'get_transient' ) ) {
+    function get_transient( string $key ): mixed { return $GLOBALS['retry_policy_transients'][ $key ] ?? false; }
+}
+if ( ! function_exists( 'set_transient' ) ) {
+    function set_transient( string $key, mixed $value, int $expiration = 0 ): bool {
+        $GLOBALS['retry_policy_transients'][ $key ] = $value;
+        return true;
+    }
+}
+if ( ! function_exists( 'sanitize_key' ) ) {
+    function sanitize_key( string $key ): string { return strtolower( preg_replace( '/[^a-z0-9_\\-]/', '', $key ) ); }
 }
 
 if ( ! function_exists( 'wp_rand' ) ) {
@@ -77,6 +90,13 @@ echo "Case 2: Generic transient/provider failures are retryable by default\n";
 assert_retry_policy_smoke( 'explicit retryable flag wins', true === $is_retryable->invoke( null, 'custom_failure', array( 'retryable' => true ) ) );
 assert_retry_policy_smoke( 'Retry-After implies retryable', true === $is_retryable->invoke( null, 'provider_error', array( 'retry_after' => 10 ) ) );
 assert_retry_policy_smoke( 'rate-limit text implies retryable', true === $is_retryable->invoke( null, 'ai_processing_failed', array( 'ai_error' => 'Provider returned 429 rate limit' ) ) );
+$quota_message = 'wp-ai-client request failed: Too Many Requests (429) - You have no credits remaining. Add credits to continue using the API';
+assert_retry_policy_smoke( 'quota exhaustion takes precedence over 429', 'provider_quota_exhausted' === $classify_failure->invoke( null, 'ai_processing_failed', array( 'ai_error' => $quota_message ) ) );
+assert_retry_policy_smoke( 'quota exhaustion is not retryable', false === $is_retryable->invoke( null, 'ai_processing_failed', array( 'ai_error' => $quota_message, 'ai_provider' => 'openai', 'ai_model' => 'model-x' ) ) );
+assert_retry_policy_smoke( 'structured quota code is classified', 'provider_quota_exhausted' === $classify_failure->invoke( null, 'ai_processing_failed', array( 'error_code' => 'insufficient_quota' ) ) );
+assert_retry_policy_smoke( 'repeated quota failures stay non-retryable', false === $is_retryable->invoke( null, 'ai_processing_failed', array( 'ai_error' => $quota_message, 'ai_provider' => 'openai' ) ) );
+assert_retry_policy_smoke( 'plain 429 rate limit remains retryable', true === $is_retryable->invoke( null, 'ai_processing_failed', array( 'ai_error' => 'Too Many Requests (429)' ) ) );
+assert_retry_policy_smoke( 'quota hook is debounced by provider', 1 === count( $GLOBALS['retry_policy_actions']['datamachine_provider_quota_exhausted'] ?? array() ) );
 assert_retry_policy_smoke( 'cURL 28 connect timeout text implies retryable', true === $is_retryable->invoke( null, 'ai_processing_failed', array( 'ai_error' => 'cURL error 28: Connection timed out after 15000 milliseconds' ) ) );
 assert_retry_policy_smoke( 'cURL 52 empty reply text implies retryable', true === $is_retryable->invoke( null, 'ai_processing_failed', array( 'ai_error' => 'Network error occurred while sending request: cURL error 52: Empty reply from server' ) ) );
 assert_retry_policy_smoke( 'validation-style failures are not retryable by default', false === $is_retryable->invoke( null, 'missing_flow_id_in_step_config', array() ) );

@@ -265,6 +265,11 @@ class JobRetryPolicy {
 	 * @return bool
 	 */
 	private static function isRetryableFailure( string $reason, array $context_data ): bool {
+		if ( 'provider_quota_exhausted' === self::classifyFailure( $reason, $context_data ) ) {
+			self::signalQuotaExhausted( $context_data );
+			return false;
+		}
+
 		if ( isset( $context_data['retryable'] ) ) {
 			return (bool) $context_data['retryable'];
 		}
@@ -313,6 +318,19 @@ class JobRetryPolicy {
 			return 'generic';
 		}
 
+		$quota_needles = apply_filters(
+			'datamachine_provider_quota_exhausted_needles',
+			array( 'insufficient_quota', 'no credits', 'credits remaining', 'quota exceeded', 'exceeded your current quota', 'billing' ),
+			$reason,
+			$context_data
+		);
+		foreach ( is_array( $quota_needles ) ? $quota_needles : array() as $needle ) {
+			$needle = strtolower( trim( (string) $needle ) );
+			if ( '' !== $needle && str_contains( $message, $needle ) ) {
+				return 'provider_quota_exhausted';
+			}
+		}
+
 		foreach ( array( 'rate limit', 'rate-limit', 'too many requests', '429', 'throttle', 'throttled' ) as $needle ) {
 			if ( str_contains( $message, $needle ) ) {
 				return 'provider_rate_limit';
@@ -342,6 +360,28 @@ class JobRetryPolicy {
 		}
 
 		return 'generic';
+	}
+
+	/** Emit one operator signal per provider in the debounce window. */
+	private static function signalQuotaExhausted( array $context_data ): void {
+		$provider = sanitize_key( (string) ( $context_data['ai_provider'] ?? $context_data['provider'] ?? 'unknown' ) );
+		$key      = 'datamachine_quota_exhausted_' . md5( $provider );
+		if ( get_transient( $key ) ) {
+			return;
+		}
+
+		set_transient( $key, 1, (int) apply_filters( 'datamachine_provider_quota_exhausted_debounce', 15 * MINUTE_IN_SECONDS, $provider ) );
+		$signal = array_filter(
+			array(
+				'condition' => 'provider_quota_exhausted',
+				'provider'  => $provider,
+				'model'     => $context_data['ai_model'] ?? $context_data['model'] ?? null,
+				'error_code' => $context_data['error_code'] ?? null,
+			),
+			static fn( $value ) => null !== $value && '' !== $value
+		);
+		do_action( 'datamachine_provider_quota_exhausted', $signal );
+		do_action( 'datamachine_log', 'error', 'AI provider quota exhausted; operator action required', $signal );
 	}
 
 	/**
