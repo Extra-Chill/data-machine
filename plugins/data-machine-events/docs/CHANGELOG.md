@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.65.4] - 2026-10-03
+
+### Fixed
+- Fix ISO file modification dates in flyer image selection
+
 ## [0.65.3] - 2026-10-02
 
 ### Fixed
