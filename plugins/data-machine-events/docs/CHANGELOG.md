@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.65.6] - 2026-10-03
+
+### Fixed
+- process the job's own image instead of the next file in the shared bucket
+
 ## [0.65.5] - 2026-10-03
 
 ### Fixed
