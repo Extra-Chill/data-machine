@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.182.3] - 2026-10-03
+
+### Changed
+- Stop retrying provider quota exhaustion and emit a debounced operator signal
+
 ## [0.182.2] - 2026-10-01
 
 ### Fixed
