@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.65.5] - 2026-10-03
+
+### Fixed
+- use a date-neutral calendar icon instead of the JUL 17 emoji
+
 ## [0.65.4] - 2026-10-03
 
 ### Fixed
