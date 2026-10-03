@@ -1,0 +1,164 @@
+/**
+ * Jobs API Operations
+ *
+ * Ability-backed job management operations, executed through WordPress
+ * core's ability runner (see #3456).
+ */
+
+/**
+ * External dependencies
+ */
+import { executeAbility } from '@shared/utils/api';
+import { useAgentStore } from '@shared/stores/agentStore';
+
+/**
+ * Get the agent_id ability input for the selected agent, if any.
+ * The shared client param interceptor only applies to datamachine/v1
+ * GET requests, so ability inputs carry it explicitly.
+ *
+ * @return {Object} Object with agent_id if one is selected, empty otherwise.
+ */
+const getAgentScope = () => {
+	const { selectedAgentId } = useAgentStore.getState();
+	return selectedAgentId !== null ? { agent_id: selectedAgentId } : {};
+};
+
+/**
+ * Fetch jobs list with pagination
+ *
+ * @param {Object}  params              Query parameters
+ * @param {number}  params.page         Current page (1-based)
+ * @param {number}  params.perPage      Items per page
+ * @param {string}  params.status       Optional status filter
+ * @param {boolean} params.hideChildren Hide child jobs in the main list
+ * @return {Promise<Object>} Jobs list response
+ */
+export const fetchJobs = async ( {
+	page = 1,
+	perPage = 50,
+	status,
+	hideChildren = true,
+} = {} ) => {
+	const offset = ( page - 1 ) * perPage;
+	const input = {
+		orderby: 'job_id',
+		order: 'DESC',
+		per_page: perPage,
+		offset,
+		hide_children: !! hideChildren,
+		...getAgentScope(),
+	};
+
+	if ( status && status !== 'all' ) {
+		input.status = status;
+	}
+
+	const result = await executeAbility( 'get-jobs', input );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: result.jobs ?? [],
+	};
+};
+
+/**
+ * Fetch child jobs for a batch parent
+ *
+ * @param {number} parentJobId Parent job ID
+ * @return {Promise<Object>} Child jobs list response
+ */
+export const fetchChildJobs = async ( parentJobId ) => {
+	const result = await executeAbility( 'get-jobs', {
+		parent_job_id: parentJobId,
+		orderby: 'job_id',
+		order: 'ASC',
+		per_page: 100,
+		offset: 0,
+	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: result.jobs ?? [],
+	};
+};
+
+/**
+ * Clear jobs
+ *
+ * @param {string}  type             Job type to clear: 'all' or 'failed'
+ * @param {boolean} cleanupProcessed Also clear processed items
+ * @return {Promise<Object>}  Clear operation result
+ */
+export const clearJobs = ( type, cleanupProcessed = false ) =>
+	executeAbility( 'delete-jobs', {
+		type,
+		cleanup_processed: !! cleanupProcessed,
+	} );
+
+/**
+ * Clear processed items
+ *
+ * @param {string} clearType Clear type: 'pipeline' or 'flow'
+ * @param {number} targetId  Pipeline ID or Flow ID
+ * @return {Promise<Object>}  Clear operation result
+ */
+export const clearProcessedItems = ( clearType, targetId ) =>
+	executeAbility( 'clear-processed-items', {
+		clear_type: clearType,
+		target_id: targetId,
+	} );
+
+/**
+ * Fetch pipelines list for dropdown
+ *
+ * @return {Promise<Object>} Pipelines list response
+ */
+export const fetchPipelines = async () => {
+	const result = await executeAbility( 'get-pipelines', {
+		output_mode: 'list',
+		include_flows: false,
+		per_page: 100,
+	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: { pipelines: result.pipelines ?? [] },
+	};
+};
+
+/**
+ * Fetch flows for a specific pipeline
+ *
+ * @param {number} pipelineId Pipeline ID
+ * @return {Promise<Object>} Flows list response
+ */
+export const fetchFlowsForPipeline = async ( pipelineId ) => {
+	const { selectedAgentId } = useAgentStore.getState();
+	const result = await executeAbility( 'get-flows', {
+		pipeline_id: pipelineId,
+		output_mode: 'list',
+		per_page: 100,
+		...( selectedAgentId ? { agent_id: selectedAgentId } : {} ),
+	} );
+
+	if ( ! result.success ) {
+		return result;
+	}
+
+	return {
+		...result,
+		data: { flows: result.flows ?? [] },
+	};
+};
