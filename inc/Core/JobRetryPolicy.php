@@ -373,9 +373,9 @@ class JobRetryPolicy {
 		set_transient( $key, 1, (int) apply_filters( 'datamachine_provider_quota_exhausted_debounce', 15 * MINUTE_IN_SECONDS, $provider ) );
 		$signal = array_filter(
 			array(
-				'condition' => 'provider_quota_exhausted',
-				'provider'  => $provider,
-				'model'     => $context_data['ai_model'] ?? $context_data['model'] ?? null,
+				'condition'  => 'provider_quota_exhausted',
+				'provider'   => $provider,
+				'model'      => $context_data['ai_model'] ?? $context_data['model'] ?? null,
 				'error_code' => $context_data['error_code'] ?? null,
 			),
 			static fn( $value ) => null !== $value && '' !== $value
