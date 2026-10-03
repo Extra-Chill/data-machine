@@ -201,7 +201,8 @@ if ( apply_filters( 'data_machine_events_output_event_schema', true, (int) $post
 	<div class="event-info-grid">
 		<?php if ( $start_datetime ) : ?>
 			<div class="event-date-time">
-				<span class="icon">📅</span>
+				<?php // Date-neutral dashicon (dashicons is a dependency of data-machine-events-root). The 📅 emoji renders as a page reading "JUL 17" (#890). ?>
+				<span class="icon dashicons dashicons-calendar-alt" aria-hidden="true"></span>
 				<span class="text">
 					<?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( $start_datetime ) ) ); ?>
 					<?php if ( $time_display ) : ?>

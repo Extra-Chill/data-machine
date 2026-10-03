@@ -37,6 +37,13 @@
     margin-top: 0.1rem;
 }
 
+.event-info-grid .icon.dashicons {
+    width: 1.2rem;
+    height: 1.2rem;
+    font-size: 1.2rem;
+    color: var(--data-machine-text-secondary);
+}
+
 .event-info-grid .text {
     line-height: 1.4;
 }

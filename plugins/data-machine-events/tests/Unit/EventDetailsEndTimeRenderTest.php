@@ -74,6 +74,27 @@ class EventDetailsEndTimeRenderTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The date row's icon must be date-neutral. The 📅 emoji is drawn by
+	 * every major emoji font as a page reading "JUL 17", which sits beside the
+	 * real date and reads as a second, conflicting date (#890).
+	 */
+	public function test_date_row_icon_is_date_neutral(): void {
+		$output = $this->render_event_details(
+			array(
+				'startDate' => '2026-10-21',
+				'startTime' => '18:30',
+			)
+		);
+
+		$this->assertStringNotContainsString( '📅', $output, 'The calendar emoji renders a misleading date.' );
+		$this->assertMatchesRegularExpression(
+			'/<div class="event-date-time">\s*<span class="icon dashicons dashicons-calendar-alt" aria-hidden="true"><\/span>/',
+			$output,
+			'The date row uses the date-neutral calendar dashicon.'
+		);
+	}
+
+	/**
 	 * The overwhelmingly common case for scraped events: no end stored at
 	 * all. Must render byte-for-byte like the pre-#860 behavior — no dash,
 	 * no invented end, no "through" line.
