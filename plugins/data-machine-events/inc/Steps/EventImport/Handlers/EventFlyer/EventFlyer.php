@@ -171,7 +171,7 @@ class EventFlyer extends EventImportHandler {
 				'persistent_path' => $file['path'],
 				'size'            => $file['size'],
 				'mime_type'       => $this->getMimeType( $file['path'] ),
-				'uploaded_at'     => gmdate( 'Y-m-d H:i:s', $file['modified'] ),
+				'uploaded_at'     => $this->formatUploadedAt( $file['modified'] ),
 			);
 
 			$collector->offer( $file_identifier, $image );
@@ -191,6 +191,21 @@ class EventFlyer extends EventImportHandler {
 		$file_info = wp_check_filetype( $file_path );
 		$mime      = $file_info['type'];
 		return $mime ? $mime : 'application/octet-stream';
+	}
+
+	/**
+	 * Format FileStorage's ISO-8601 'modified' value as a GMT MySQL datetime.
+	 *
+	 * @param string $modified ISO-8601 modification time from FileStorage::get_all_files().
+	 * @return string GMT datetime, or the current time when the value cannot be parsed.
+	 */
+	private function formatUploadedAt( string $modified ): string {
+		$timestamp = strtotime( $modified );
+		if ( false === $timestamp ) {
+			$timestamp = time();
+		}
+
+		return gmdate( 'Y-m-d H:i:s', $timestamp );
 	}
 
 	/**
