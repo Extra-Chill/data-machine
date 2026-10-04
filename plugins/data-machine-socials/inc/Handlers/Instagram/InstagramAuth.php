@@ -25,7 +25,7 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	const TOKEN_URL     = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION . '/oauth/access_token';
 	const GRAPH_API_URL = 'https://graph.instagram.com';
 	const FB_API_URL    = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
-	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_messages,instagram_manage_comments,pages_read_engagement,pages_manage_metadata,pages_messaging';
+	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_insights,instagram_manage_messages,instagram_manage_comments,pages_read_engagement,pages_manage_metadata,pages_messaging';
 
 	/**
 	 * Page fields subscribed to during OAuth so the Conversations API can

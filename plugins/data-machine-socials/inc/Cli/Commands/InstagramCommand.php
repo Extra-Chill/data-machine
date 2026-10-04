@@ -188,6 +188,41 @@ class InstagramCommand {
 	}
 
 	/**
+	 * Read insights for a media item.
+	 *
+	 * ## OPTIONS
+	 * <media_id> : The Instagram media ID.
+	 * [--format=<format>] : Output format (table or json).
+	 *
+	 * ## EXAMPLES
+	 *     wp datamachine-socials instagram insights 17891234567890
+	 */
+	public function insights( $args, $assoc_args ) {
+		$media_id = $args[0] ?? '';
+		if ( '' === $media_id ) {
+			WP_CLI::error( 'Media ID is required.' );
+		}
+		$ability = wp_get_ability( 'datamachine/instagram-insights' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/instagram-insights ability not registered.' );
+		}
+		$result = $ability->execute( array( 'media_id' => $media_id ) );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
+		}
+		$data = $result['data'];
+		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+		WP_CLI::success( 'Insights for ' . $media_id );
+		foreach ( $data['metrics'] as $metric ) {
+			$value = $metric['values'][0]['value'] ?? $metric['total_value']['value'] ?? '';
+			WP_CLI::log( sprintf( '%s: %s', $metric['name'] ?? '', is_scalar( $value ) ? (string) $value : wp_json_encode( $value ) ) );
+		}
+	}
+
+	/**
 	 * Get comments on an Instagram post.
 	 *
 	 * ## OPTIONS
