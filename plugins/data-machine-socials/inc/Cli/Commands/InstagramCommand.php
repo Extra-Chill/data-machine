@@ -507,6 +507,9 @@ class InstagramCommand {
 	 * [--source-url=<url>]
 	 * : Source URL to attribute.
 	 *
+	 * [--collaborators=<usernames>]
+	 * : Comma-separated Instagram usernames to invite as collaborators (up to 3).
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Post with caption only
@@ -556,6 +559,9 @@ class InstagramCommand {
 		if ( ! empty( $assoc_args['source-url'] ) ) {
 			$input['source_url'] = $assoc_args['source-url'];
 		}
+		if ( ! empty( $assoc_args['collaborators'] ) ) {
+			$input['collaborators'] = array_values( array_filter( array_map( 'trim', explode( ',', (string) $assoc_args['collaborators'] ) ) ) );
+		}
 
 		$result = $publish_ability->execute( $input );
 
@@ -590,6 +596,9 @@ class InstagramCommand {
 	 *
 	 * [--source-url=<url>]
 	 * : Source URL to attribute.
+	 *
+	 * [--collaborators=<usernames>]
+	 * : Comma-separated Instagram usernames to invite as collaborators (up to 3).
 	 *
 	 * ## EXAMPLES
 	 *
@@ -631,6 +640,9 @@ class InstagramCommand {
 
 		if ( ! empty( $assoc_args['source-url'] ) ) {
 			$input['source_url'] = $assoc_args['source-url'];
+		}
+		if ( ! empty( $assoc_args['collaborators'] ) ) {
+			$input['collaborators'] = array_values( array_filter( array_map( 'trim', explode( ',', (string) $assoc_args['collaborators'] ) ) ) );
 		}
 
 		WP_CLI::log( 'Publishing Reel to Instagram...' );

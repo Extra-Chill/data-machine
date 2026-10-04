@@ -54,6 +54,8 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 	 */
 	const MAX_CAROUSEL_IMAGES = 10;
 
+	const MAX_COLLABORATORS = 3;
+
 	/**
 	 * Maximum characters for caption
 	 */
@@ -140,6 +142,25 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 								'description' => 'Source URL to include in caption',
 								'format'      => 'uri',
 							),
+							'collaborators'  => array(
+								'type'        => 'array',
+								'description' => 'Instagram usernames to invite as collaborators (up to 3)',
+								'maxItems'    => 3,
+								'items'       => array( 'type' => 'string' ),
+							),
+							'user_tags'      => array(
+								'type'        => 'array',
+								'description' => 'People to tag in an image, each with username, x, and y coordinates',
+								'items'       => array(
+									'type'       => 'object',
+									'required'   => array( 'username', 'x', 'y' ),
+									'properties' => array(
+										'username' => array( 'type' => 'string' ),
+										'x'        => array( 'type' => 'number', 'minimum' => 0, 'maximum' => 1 ),
+										'y'        => array( 'type' => 'number', 'minimum' => 0, 'maximum' => 1 ),
+									),
+								),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -206,6 +227,24 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		$content    = $input['content'] ?? '';
 		$media_kind = $input['media_kind'] ?? 'image';
 		$source_url = $input['source_url'] ?? '';
+		$collaborators = $input['collaborators'] ?? array();
+		if ( ! is_array( $collaborators ) || count( $collaborators ) > self::MAX_COLLABORATORS ) {
+			return new \WP_Error( 'invalid_collaborators', 'A maximum of 3 collaborators is allowed', array( 'status' => 400 ) );
+		}
+		foreach ( $collaborators as &$collaborator ) {
+			$collaborator = ltrim( trim( (string) $collaborator ), '@' );
+			if ( ! preg_match( '/^[A-Za-z0-9._]{1,30}$/', $collaborator ) ) {
+				return new \WP_Error( 'invalid_collaborators', 'Collaborators must be valid Instagram usernames', array( 'status' => 400 ) );
+			}
+		}
+		unset( $collaborator );
+		$input['collaborators'] = $collaborators;
+		if ( 'story' === $media_kind && ! empty( $collaborators ) ) {
+			return new \WP_Error( 'unsupported_collaborators', 'Instagram Stories do not support collaborators', array( 'status' => 400 ) );
+		}
+		if ( ! empty( $input['user_tags'] ) && ( 'image' !== $media_kind || count( $input['image_urls'] ?? array() ) !== 1 ) ) {
+			return new \WP_Error( 'unsupported_user_tags', 'User tags are only supported for single-image posts', array( 'status' => 400 ) );
+		}
 
 		if ( empty( $content ) ) {
 			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
@@ -292,6 +331,12 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 				$container_body['is_carousel_item'] = 'true';
 			} else {
 				$container_body['caption'] = $caption;
+				if ( ! empty( $input['collaborators'] ) ) {
+					$container_body['collaborators'] = implode( ',', $input['collaborators'] );
+				}
+				if ( ! empty( $input['user_tags'] ) ) {
+					$container_body['user_tags'] = wp_json_encode( $input['user_tags'] );
+				}
 			}
 
 			$result = HttpClient::post(
@@ -360,12 +405,12 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 				self::GRAPH_API_URL . "/{$user_id}/media",
 				array(
 					'context' => 'Instagram Carousel Container',
-					'body'    => array(
+					'body'    => array_merge( array(
 						'media_type'   => 'CAROUSEL',
 						'children'     => $children,
 						'caption'      => $caption,
 						'access_token' => $access_token,
-					),
+					), ! empty( $input['collaborators'] ) ? array( 'collaborators' => implode( ',', $input['collaborators'] ) ) : array() ),
 					'timeout' => 40,
 				)
 			);
@@ -441,6 +486,9 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 			'share_to_feed' => $share_to_feed ? 'true' : 'false',
 			'access_token'  => $access_token,
 		);
+		if ( ! empty( $input['collaborators'] ) ) {
+			$container_body['collaborators'] = implode( ',', $input['collaborators'] );
+		}
 
 		if ( ! empty( $cover_url ) ) {
 			if ( ! filter_var( $cover_url, FILTER_VALIDATE_URL ) ) {

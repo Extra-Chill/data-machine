@@ -64,6 +64,7 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 				$this->assertSame( 'https://example.com/video.mp4', $args['body']['video_url'] );
 				$this->assertSame( 'Check this reel!', $args['body']['caption'] );
 				$this->assertSame( 'true', $args['body']['share_to_feed'] );
+				$this->assertSame( 'venue.account', $args['body']['collaborators'] );
 
 				return array(
 					'response' => array( 'code' => 200 ),
@@ -106,6 +107,7 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 			'content'    => 'Check this reel!',
 			'media_kind' => 'reel',
 			'video_url'  => 'https://example.com/video.mp4',
+			'collaborators' => array( '@venue.account' ),
 		) );
 
 		$this->assertTrue( $result['success'] );
@@ -312,6 +314,7 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 		add_filter( 'pre_http_request', function ( $preempt, $args, $url ) {
 			// Container creation.
 			if ( str_ends_with( $url, '/12345/media' ) && 'POST' === $args['method'] && ! isset( $args['body']['media_type'] ) ) {
+				$this->assertSame( 'venue.account', $args['body']['collaborators'] );
 				return array(
 					'response' => array( 'code' => 200 ),
 					'body'     => wp_json_encode( array( 'id' => 'container_img' ) ),
@@ -349,9 +352,43 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 		$result = InstagramPublishAbility::execute_publish( array(
 			'content'    => 'Image post',
 			'image_urls' => array( 'https://example.com/photo.jpg' ),
+			'collaborators' => array( '@venue.account' ),
 		) );
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'image', $result['media_kind'] );
+	}
+
+	public function test_collaborators_are_limited_to_three_and_normalized(): void {
+		$this->authenticate();
+		$result = InstagramPublishAbility::execute_publish( array(
+			'content'       => 'Too many collaborators',
+			'media_kind'    => 'reel',
+			'video_url'      => 'https://example.com/video.mp4',
+			'collaborators' => array( 'one', 'two', 'three', 'four' ),
+		) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'maximum of 3', $result->get_error_message() );
+
+		$result = InstagramPublishAbility::execute_publish( array(
+			'content'       => 'Invalid collaborator',
+			'media_kind'    => 'reel',
+			'video_url'      => 'https://example.com/video.mp4',
+			'collaborators' => array( 'invalid name' ),
+		) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'valid Instagram usernames', $result->get_error_message() );
+	}
+
+	public function test_story_rejects_collaborators(): void {
+		$this->authenticate();
+		$result = InstagramPublishAbility::execute_publish( array(
+			'content'         => 'Story',
+			'media_kind'      => 'story',
+			'story_image_url' => 'https://example.com/story.jpg',
+			'collaborators'   => array( 'venue' ),
+		) );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Stories do not support collaborators', $result->get_error_message() );
 	}
 }
