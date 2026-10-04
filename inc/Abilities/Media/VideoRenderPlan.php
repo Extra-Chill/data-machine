@@ -23,8 +23,8 @@ final class VideoRenderPlan {
 		if ( $width < 2 || $height < 2 || $fps < 1 ) {
 			throw new \InvalidArgumentException( 'Output dimensions and fps must be positive.' );
 		}
-		$args   = array( '-y' );
-		$filters = array();
+		$args     = array( '-y' );
+		$filters  = array();
 		$total_ms = 0;
 		foreach ( $segments as $index => $segment ) {
 			$path = $sources[ $index ] ?? '';
@@ -49,7 +49,7 @@ final class VideoRenderPlan {
 				$args = array_merge( $args, array( '-ss', sprintf( '%.3f', (int) ( $segment['in_ms'] ?? 0 ) / 1000 ), '-t', sprintf( '%.3f', $duration_ms / 1000 ), '-i', $path ) );
 			}
 			$motion = $segment['motion'] ?? 'none';
-			$zoom = 'zoom_in' === $motion ? 'min(zoom+0.0015,1.5)' : ( 'zoom_out' === $motion ? 'if(eq(on,1),1.5,max(zoom-0.0015,1))' : '1' );
+			$zoom   = 'zoom_in' === $motion ? 'min(zoom+0.0015,1.5)' : ( 'zoom_out' === $motion ? 'if(eq(on,1),1.5,max(zoom-0.0015,1))' : '1' );
 			$filter = sprintf( '[%d:v]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,setsar=1,fps=%d', $index, $width, $height, $width, $height, $fps );
 			if ( 'none' !== $motion ) {
 				$filter .= sprintf( ',zoompan=z=\'%s\':d=1:s=%dx%d:fps=%d', $zoom, $width, $height, $fps );
@@ -66,8 +66,8 @@ final class VideoRenderPlan {
 			if ( '' === $audio ) {
 				throw new \InvalidArgumentException( 'Audio requires a resolved source path.' );
 			}
-			$args[] = '-i';
-			$args[] = $audio;
+			$args[]  = '-i';
+			$args[]  = $audio;
 			$filter .= ';[' . count( $segments ) . ':a]atrim=duration=' . sprintf( '%.3f', $total_ms / 1000 ) . ',afade=t=out:st=' . sprintf( '%.3f', max( 0, ( $total_ms - 1000 ) / 1000 ) ) . ':d=' . sprintf( '%.3f', min( 1, $total_ms / 1000 ) ) . '[outa]';
 		}
 		$args = array_merge( $args, array( '-filter_complex', $filter, '-map', '[outv]' ) );
@@ -75,17 +75,27 @@ final class VideoRenderPlan {
 			$args = array_merge( $args, array( '-map', '[outa]', '-c:a', 'aac' ) );
 		}
 		$args = array_merge( $args, array( '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-r', (string) $fps ) );
-		return array( 'arguments' => $args, 'duration_ms' => $total_ms, 'width' => $width, 'height' => $height, 'captions_ass' => self::captions_ass( $spec['captions'] ?? array(), $width, $height ) );
+		return array(
+			'arguments'    => $args,
+			'duration_ms'  => $total_ms,
+			'width'        => $width,
+			'height'       => $height,
+			'captions_ass' => self::captions_ass( $spec['captions'] ?? array(), $width, $height ),
+		);
 	}
 
 	private static function captions_ass( array $captions, int $width, int $height ): string {
 		$ass = "[Script Info]\nScriptType: v4.00+\nPlayResX: {$width}\nPlayResY: {$height}\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,48,&H00FFFFFF,&H80000000,0,0,3,1,0,2,60,60,60,1\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
 		foreach ( $captions as $caption ) {
-			$position = array( 'bottom' => 2, 'top' => 8, 'center' => 5 )[ $caption['position'] ?? 'bottom' ] ?? 2;
-			$start = max( 0, (int) ( $caption['start_ms'] ?? 0 ) );
-			$end = max( $start, (int) ( $caption['end_ms'] ?? $start ) );
-			$text = str_replace( array( "\\", '{', '}' ), array( '\\\\', '\\{', '\\}' ), (string) ( $caption['text'] ?? '' ) );
-			$ass .= sprintf( "Dialogue: 0,%s,%s,Default,,0,0,0,,{\\an%d}%s\n", self::ass_time( $start ), self::ass_time( $end ), $position, $text );
+			$position = array(
+				'bottom' => 2,
+				'top'    => 8,
+				'center' => 5,
+			)[ $caption['position'] ?? 'bottom' ] ?? 2;
+			$start    = max( 0, (int) ( $caption['start_ms'] ?? 0 ) );
+			$end      = max( $start, (int) ( $caption['end_ms'] ?? $start ) );
+			$text     = str_replace( array( '\\', '{', '}' ), array( '\\\\', '\\{', '\\}' ), (string) ( $caption['text'] ?? '' ) );
+			$ass     .= sprintf( "Dialogue: 0,%s,%s,Default,,0,0,0,,{\\an%d}%s\n", self::ass_time( $start ), self::ass_time( $end ), $position, $text );
 		}
 		return $ass;
 	}
