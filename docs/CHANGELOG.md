@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.183.0] - 2026-10-04
+
+### Added
+- add pure video render planning
+
 ## [0.182.3] - 2026-10-03
 
 ### Changed
