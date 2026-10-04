@@ -64,8 +64,8 @@ if ( 0 !== $exit_code ) {
 $probe = array();
 exec( 'ffprobe -v error -show_entries format=duration:stream=width,height -of json ' . escapeshellarg( $paths[3] ), $probe, $exit_code );
 $metadata = json_decode( implode( "\n", $probe ), true );
-foreach ( $paths as $path ) {
-	@unlink( $path );
+foreach ( $paths as $fixture_path ) {
+	@unlink( $fixture_path );
 }
 @rmdir( $dir );
 $stream   = $metadata['streams'][0] ?? array();
