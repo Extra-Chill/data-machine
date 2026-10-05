@@ -3,6 +3,8 @@
  * SITE.md "Active Plugins" / NETWORK.md "Network Plugins" regression coverage
  * for issue #3521 (ghost entries) and its paired scope reduction (names only,
  * no descriptions).
+ * Unchanged snapshot callbacks must also retain identical prompt bytes when
+ * recomposed at a later wall-clock second, while real plugin changes remain live.
  *
  * A plugin recorded in the `active_plugins` / `active_sitewide_plugins`
  * options but deleted from disk without being deactivated must not appear
@@ -103,6 +105,32 @@ function assert_true( bool $condition, string $message ): void {
 }
 
 require_once dirname( __DIR__ ) . '/inc/setup/site-md.php';
+
+// A new session can recompose shared instructions while another session is
+// between tool calls. Unchanged runtime facts must keep the same prompt bytes
+// even when the wall clock advances.
+$compose_site_snapshot = static function (): string {
+	return datamachine_site_section_header() . "\n\n" . datamachine_site_section_plugins();
+};
+$first_snapshot        = $compose_site_snapshot();
+usleep( 1100000 );
+$second_snapshot = $compose_site_snapshot();
+assert_true(
+	$first_snapshot === $second_snapshot,
+	'unchanged site snapshot bytes remain identical across different wall-clock seconds'
+);
+
+$original_active_plugins                                     = $GLOBALS['dm_smoke_options']['active_plugins'];
+$original_network_plugins                                    = $GLOBALS['dm_smoke_site_options']['active_sitewide_plugins'];
+$GLOBALS['dm_smoke_options']['active_plugins']               = array();
+$GLOBALS['dm_smoke_site_options']['active_sitewide_plugins'] = array();
+$changed_snapshot = $compose_site_snapshot();
+assert_true(
+	$first_snapshot !== $changed_snapshot && ! str_contains( $changed_snapshot, '**Present Plugin**' ),
+	'a real active-plugin change still updates the composed snapshot'
+);
+$GLOBALS['dm_smoke_options']['active_plugins']               = $original_active_plugins;
+$GLOBALS['dm_smoke_site_options']['active_sitewide_plugins'] = $original_network_plugins;
 
 // --- SITE.md "## Active Plugins" -------------------------------------------
 
