@@ -113,10 +113,9 @@ function datamachine_site_section_header(): string {
 	$lines   = array();
 	$lines[] = '# SITE';
 	$lines[] = '';
-	$lines[] = sprintf(
-		'Generated: %s. Active plugin data comes from WordPress runtime state; refresh with `wp datamachine memory compose SITE.md` and compare with `wp plugin list --status=active` when auditing freshness.',
-		gmdate( 'Y-m-d H:i:s \U\T\C' )
-	);
+	// Shared instructions are reread between model steps. Keep generation-time
+	// metadata out of the prompt so unchanged site facts retain identical bytes.
+	$lines[] = 'Active plugin data comes from WordPress runtime state; refresh with `wp datamachine memory compose SITE.md` and compare with `wp plugin list --status=active` when auditing freshness.';
 
 	return implode( "\n", $lines );
 }
