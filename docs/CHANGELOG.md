@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.183.1] - 2026-10-05
+
+### Fixed
+- keep SITE.md snapshot bytes stable
+
 ## [0.183.0] - 2026-10-04
 
 ### Added
