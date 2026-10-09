@@ -103,6 +103,10 @@ class CommandRegistry {
 				'file'  => $cli . 'Check/CheckOrphanVenuesCommand.php',
 				'class' => Check\CheckOrphanVenuesCommand::class,
 			),
+			'data-machine-events check venue-timezones'   => array(
+				'file'  => $cli . 'Check/CheckVenueTimezonesCommand.php',
+				'class' => Check\CheckVenueTimezonesCommand::class,
+			),
 			'data-machine-events check orphan-pipelines'  => array(
 				'file'  => $cli . 'Check/CheckOrphanPipelinesCommand.php',
 				'class' => Check\CheckOrphanPipelinesCommand::class,

@@ -211,6 +211,64 @@ class VenueTimezoneResolver {
 	 * @return array{timezone: string, source: string}|null
 	 */
 	public static function resolve( string $coordinates, string $country = '', string $state = '' ): ?array {
+		return self::resolveWith( $coordinates, $country, $state, true );
+	}
+
+	/**
+	 * Resolve with offline rules only; never calls GeoNames.
+	 *
+	 * For bulk audits, where one network request per venue is impractical.
+	 *
+	 * @param string $coordinates "lat,lng" or empty.
+	 * @param string $country     ISO 3166-1 alpha-2 or a common country name, or empty.
+	 * @param string $state       Region/state code or name, or empty.
+	 * @return array{timezone: string, source: string}|null
+	 */
+	public static function resolveOffline( string $coordinates, string $country = '', string $state = '' ): ?array {
+		return self::resolveWith( $coordinates, $country, $state, false );
+	}
+
+	/**
+	 * Resolve an exact zone from country/state alone, ignoring coordinates.
+	 *
+	 * Returns a result only for a single-zone country or a single-zone US
+	 * state, so a bad geocode cannot influence it.
+	 *
+	 * @param string $country Country code or name, or empty.
+	 * @param string $state   Region/state code or name, or empty.
+	 * @return array{timezone: string, source: string}|null
+	 */
+	public static function resolveFromRegion( string $country, string $state = '' ): ?array {
+		$country_code = self::normalizeCountry( $country );
+		$state_code   = self::normalizeUsState( $state );
+
+		if ( '' === $country_code && '' !== $state_code ) {
+			$country_code = 'US';
+		}
+		if ( '' === $country_code ) {
+			return null;
+		}
+
+		$zones = self::zonesForCountry( $country_code );
+		if ( 1 === count( $zones ) ) {
+			return self::result( $zones[0], self::SOURCE_COUNTRY );
+		}
+
+		if ( 'US' === $country_code && isset( self::US_STATE_ZONES[ $state_code ] ) ) {
+			return self::result( self::US_STATE_ZONES[ $state_code ], self::SOURCE_US_STATE );
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param string $coordinates   "lat,lng" or empty.
+	 * @param string $country       Country code or name, or empty.
+	 * @param string $state         Region/state code or name, or empty.
+	 * @param bool   $allow_network Whether GeoNames may be consulted.
+	 * @return array{timezone: string, source: string}|null
+	 */
+	private static function resolveWith( string $coordinates, string $country, string $state, bool $allow_network ): ?array {
 		$coordinates  = trim( $coordinates );
 		$country_code = self::normalizeCountry( $country );
 		$state_code   = self::normalizeUsState( $state );
@@ -220,7 +278,7 @@ class VenueTimezoneResolver {
 			$country_code = 'US';
 		}
 
-		if ( '' !== $coordinates && GeoNamesService::isConfigured() ) {
+		if ( $allow_network && '' !== $coordinates && GeoNamesService::isConfigured() ) {
 			$timezone = GeoNamesService::getTimezoneFromCoordinates( $coordinates );
 			if ( $timezone && self::isValid( $timezone ) ) {
 				return self::result( $timezone, self::SOURCE_GEONAMES );
@@ -306,6 +364,36 @@ class VenueTimezoneResolver {
 	/**
 	 * Rough continental-US bounding box (excludes AK/HI, which need a country).
 	 */
+	/**
+	 * Whether coordinates plainly contradict a venue's US state.
+	 *
+	 * True only for a venue in a contiguous US state whose coordinates fall
+	 * outside the continental US bounding box (e.g. a Denver venue geocoded
+	 * to Paris). Conservative by design; borders are not checked.
+	 *
+	 * @param string $coordinates "lat,lng".
+	 * @param string $country     Country code or name, or empty.
+	 * @param string $state       Region/state code or name, or empty.
+	 * @return bool
+	 */
+	public static function coordinatesContradictRegion( string $coordinates, string $country, string $state ): bool {
+		$point = self::parseCoordinates( trim( $coordinates ) );
+		if ( ! $point ) {
+			return false;
+		}
+
+		$country_code = self::normalizeCountry( $country );
+		$state_code   = self::normalizeUsState( $state );
+		if ( '' === $state_code || ( '' !== $country_code && 'US' !== $country_code ) ) {
+			return false;
+		}
+		if ( in_array( $state_code, array( 'AK', 'HI' ), true ) ) {
+			return false;
+		}
+
+		return ! self::isContinentalUs( $point[0], $point[1] );
+	}
+
 	private static function isContinentalUs( float $lat, float $lng ): bool {
 		return $lat >= 24.5 && $lat <= 49.5 && $lng >= -125.0 && $lng <= -66.9;
 	}

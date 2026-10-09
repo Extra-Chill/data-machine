@@ -334,7 +334,17 @@ class DateTimeParser {
 			return false;
 		}
 
-		return in_array( $timezone, timezone_identifiers_list( DateTimeZone::ALL_WITH_BC ), true );
+		if ( ! in_array( $timezone, timezone_identifiers_list( DateTimeZone::ALL_WITH_BC ), true ) ) {
+			return false;
+		}
+
+		try {
+			new DateTimeZone( $timezone );
+		} catch ( Exception $e ) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
