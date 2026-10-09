@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.65.7] - 2026-10-09
+
+### Fixed
+- never store raw UTC offsets as venue timezones
+
 ## [0.65.6] - 2026-10-03
 
 ### Fixed
