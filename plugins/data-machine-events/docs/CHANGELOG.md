@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.0] - 2026-10-09
+
+### Added
+- audit and repair venue timezones that contradict location
+
+### Fixed
+- derive venue timezone from location, not import data
+
 ## [0.65.7] - 2026-10-09
 
 ### Fixed
