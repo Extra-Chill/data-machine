@@ -15,6 +15,7 @@
 
 namespace DataMachineEvents\Abilities;
 
+use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\NominatimClient;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
@@ -421,8 +422,8 @@ class GeocodingAbilities {
 			}
 
 			$term_id  = (int) $venue->term_id;
-			$existing = get_term_meta( $term_id, '_venue_timezone', true );
-			if ( ! empty( $existing ) && ! $force ) {
+			$existing = (string) get_term_meta( $term_id, '_venue_timezone', true );
+			if ( DateTimeParser::isValidTimezone( $existing ) && ! $force ) {
 				++$skipped;
 				continue;
 			}

@@ -1573,8 +1573,8 @@ class Venue_Taxonomy {
 			return false;
 		}
 
-		$existing_timezone = get_term_meta( $term_id, '_venue_timezone', true );
-		if ( ! empty( $existing_timezone ) ) {
+		$existing_timezone = (string) get_term_meta( $term_id, '_venue_timezone', true );
+		if ( DateTimeParser::isValidTimezone( $existing_timezone ) ) {
 			return false;
 		}
 

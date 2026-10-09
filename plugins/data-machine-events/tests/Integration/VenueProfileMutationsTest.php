@@ -307,6 +307,71 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		$this->assertSame( 'America/New_York', get_term_meta( $term_id, '_venue_timezone', true ) );
 	}
 
+	public function test_system_write_drops_raw_utc_offset_timezone(): void {
+		$term_id = $this->venue( 'Offset Import' );
+
+		$result = VenueProfileMutations::updateSystem(
+			$term_id,
+			array(
+				'phone'    => '843-555-0164',
+				'timezone' => '-08:00',
+			),
+			VenueProfileMutations::STRATEGY_FILL_EMPTY
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertNotContains( 'timezone', $result['updated_fields'] );
+		$this->assertSame( '843-555-0164', get_term_meta( $term_id, '_venue_phone', true ) );
+		$this->assertSame( '', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_system_overwrite_with_offset_preserves_existing_iana_timezone(): void {
+		$term_id = $this->venue( 'Offset Overwrite' );
+		update_term_meta( $term_id, '_venue_timezone', 'America/New_York' );
+
+		$result = VenueProfileMutations::updateSystem( $term_id, array( 'timezone' => '-04:00' ) );
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'America/New_York', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_system_write_accepts_iana_timezone(): void {
+		$term_id = $this->venue( 'IANA Import' );
+
+		$result = VenueProfileMutations::updateSystem( $term_id, array( 'timezone' => 'America/Chicago' ) );
+
+		$this->assertNotWPError( $result );
+		$this->assertContains( 'timezone', $result['updated_fields'] );
+		$this->assertSame( 'America/Chicago', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_derive_timezone_replaces_legacy_offset_value(): void {
+		$term_id = $this->venue( 'Legacy Offset' );
+		update_term_meta( $term_id, '_venue_state', 'SC' );
+		update_term_meta( $term_id, '_venue_country', 'US' );
+		update_term_meta( $term_id, '_venue_coordinates', '32.8697033,-79.9727527' );
+		update_term_meta( $term_id, '_venue_timezone', '-08:00' );
+		delete_option( Settings_Page::OPTION_KEY );
+
+		$block_http = static fn() => new \WP_Error( 'http_blocked', 'No network in tests.' );
+		add_filter( 'pre_http_request', $block_http );
+		$derived = Venue_Taxonomy::maybe_derive_timezone( $term_id );
+		remove_filter( 'pre_http_request', $block_http );
+
+		$this->assertTrue( $derived );
+		$this->assertSame( 'America/New_York', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_derive_timezone_keeps_existing_iana_value(): void {
+		$term_id = $this->venue( 'Existing IANA' );
+		update_term_meta( $term_id, '_venue_state', 'SC' );
+		update_term_meta( $term_id, '_venue_country', 'US' );
+		update_term_meta( $term_id, '_venue_timezone', 'America/Chicago' );
+
+		$this->assertFalse( Venue_Taxonomy::maybe_derive_timezone( $term_id ) );
+		$this->assertSame( 'America/Chicago', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
 	public function test_duplicate_meta_is_canonicalized_and_owner_hook_fires_once(): void {
 		$term_id = $this->venue( 'Duplicate Meta' );
 		$this->assertIsInt( add_term_meta( $term_id, '_venue_phone', 'canonical' ) );

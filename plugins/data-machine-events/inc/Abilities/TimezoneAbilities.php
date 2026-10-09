@@ -11,6 +11,7 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
@@ -322,6 +323,14 @@ class TimezoneAbilities {
 				'event'  => $event_id,
 				'status' => 'failed',
 				'error'  => 'Invalid event ID',
+			);
+		}
+
+		if ( ! empty( $timezone ) && ! DateTimeParser::isValidTimezone( (string) $timezone ) ) {
+			return array(
+				'event'  => $event_id,
+				'status' => 'failed',
+				'error'  => 'Timezone must be an IANA identifier (e.g. America/New_York)',
 			);
 		}
 
