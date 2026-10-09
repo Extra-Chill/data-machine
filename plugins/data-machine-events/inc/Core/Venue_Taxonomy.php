@@ -559,6 +559,13 @@ class Venue_Taxonomy {
 		// writes go through the admin term screen or update_venue_meta().
 		unset( $venue_data['tier'] );
 
+		// Venue timezone is a function of venue location (#897). An import's
+		// timezone describes the event datetime, not the venue, so it is never
+		// merged as venue data. It survives only as a last-resort hint for a
+		// venue whose location cannot resolve a zone.
+		$timezone_hint = trim( (string) ( $venue_data['timezone'] ?? '' ) );
+		unset( $venue_data['timezone'] );
+
 		// Strip a trailing address blob baked into the venue name (AI
 		// extraction sometimes returns "Venue Name, street, city, ST zip"
 		// as a single string). Must run first: it both cleans the name used
@@ -583,8 +590,11 @@ class Venue_Taxonomy {
 			// A source alias means this source's venue data is known to be
 			// wrong for the canonical term (#878); fill-empty merging would
 			// put the source's bad values back into fields an editor cleared.
-			if ( ! empty( $venue_data ) && 'source_alias' !== $identity['matched_via'] ) {
-				self::smart_merge_venue_meta( $term_id, $venue_data );
+			if ( 'source_alias' !== $identity['matched_via'] ) {
+				if ( ! empty( $venue_data ) ) {
+					self::smart_merge_venue_meta( $term_id, $venue_data );
+				}
+				self::settle_import_timezone( (int) $term_id, $timezone_hint );
 			}
 
 			return array(
@@ -620,7 +630,11 @@ class Venue_Taxonomy {
 		}
 
 		if ( 'conflict' === $identity['match_status'] ) {
-			return self::create_venue_on_geographic_conflict( $venue_name, $venue_data, $identity, $log_context );
+			$created = self::create_venue_on_geographic_conflict( $venue_name, $venue_data, $identity, $log_context );
+			if ( ! empty( $created['term_id'] ) ) {
+				self::settle_import_timezone( (int) $created['term_id'], $timezone_hint );
+			}
+			return $created;
 		}
 
 		// Create new venue
@@ -647,6 +661,7 @@ class Venue_Taxonomy {
 
 		// Update all metadata for new venue
 		self::update_venue_meta( $term_id, $venue_data );
+		self::settle_import_timezone( (int) $term_id, $timezone_hint );
 
 		return array(
 			'term_id'      => $term_id,
@@ -1555,6 +1570,43 @@ class Venue_Taxonomy {
 		self::maybe_derive_timezone( $term_id );
 
 		return false;
+	}
+
+	/**
+	 * Give an imported venue a timezone derived from its location.
+	 *
+	 * Location wins. The import's timezone is used only when the venue still
+	 * has no valid zone after derivation, i.e. its location cannot resolve one.
+	 *
+	 * @param int    $term_id       Venue term ID.
+	 * @param string $timezone_hint Timezone carried by the import, if any.
+	 */
+	private static function settle_import_timezone( int $term_id, string $timezone_hint ): void {
+		if ( $term_id <= 0 ) {
+			return;
+		}
+
+		self::maybe_derive_timezone( $term_id );
+
+		if ( ! DateTimeParser::isValidTimezone( $timezone_hint ) ) {
+			return;
+		}
+		if ( DateTimeParser::isValidTimezone( (string) get_term_meta( $term_id, '_venue_timezone', true ) ) ) {
+			return;
+		}
+
+		$result = VenueProfileMutations::updateSystem( $term_id, array( 'timezone' => $timezone_hint ) );
+		if ( ! is_wp_error( $result ) && ! empty( $result['success'] ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Venue timezone taken from import because location could not resolve one',
+				array(
+					'term_id'  => $term_id,
+					'timezone' => $timezone_hint,
+				)
+			);
+		}
 	}
 
 	/**
