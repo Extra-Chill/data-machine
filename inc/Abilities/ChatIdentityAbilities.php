@@ -144,7 +144,7 @@ class ChatIdentityAbilities {
 						'actor_id'   => array( 'type' => 'string' ),
 						'event'      => array(
 							'type'        => 'string',
-							'description' => __( 'Event name. The turn event returns personal memory for the speaker; any other event returns agent memory.', 'data-machine' ),
+							'description' => 'Event name. The turn event returns personal memory for the speaker; any other event returns agent memory.',
 						),
 					),
 				),
