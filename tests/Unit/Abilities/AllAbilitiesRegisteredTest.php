@@ -117,6 +117,11 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/update-taxonomy-term',
 			'datamachine/delete-taxonomy-term',
 			'datamachine/resolve-term',
+			// ChatIdentityAbilities (4)
+			'datamachine/link-chat-identity',
+			'datamachine/unlink-chat-identity',
+			'datamachine/list-chat-identities',
+			'datamachine/resolve-chat-person',
 		);
 
 		$missing = array();
