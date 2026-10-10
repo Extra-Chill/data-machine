@@ -77,18 +77,21 @@ class CheckVenueTimezonesCommand {
 		$limit  = max( 1, (int) ( $assoc_args['limit'] ?? 500 ) );
 		$format = (string) ( $assoc_args['format'] ?? 'table' );
 
-		$term_ids = isset( $assoc_args['venue-id'] )
-			? array( (int) $assoc_args['venue-id'] )
-			: get_terms(
+		if ( isset( $assoc_args['venue-id'] ) ) {
+			$term_ids = array( (int) $assoc_args['venue-id'] );
+		} else {
+			$terms = get_terms(
 				array(
 					'taxonomy'   => 'venue',
 					'hide_empty' => false,
 					'fields'     => 'ids',
 				)
 			);
-
-		if ( is_wp_error( $term_ids ) ) {
-			\WP_CLI::error( $term_ids->get_error_message() );
+			if ( is_wp_error( $terms ) ) {
+				\WP_CLI::error( $terms->get_error_message() );
+				return;
+			}
+			$term_ids = array_map( 'intval', $terms );
 		}
 
 		$counts   = array();

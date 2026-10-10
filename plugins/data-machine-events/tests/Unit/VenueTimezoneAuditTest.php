@@ -59,7 +59,7 @@ class VenueTimezoneAuditTest extends WP_UnitTestCase {
 	}
 
 	public function test_invalid_value_without_exact_region_is_reported_not_repaired(): void {
-		$audit = VenueTimezoneAudit::classify( 'US/Eastern', '38.2554,-85.7487', 'Unites States', 'Ky. 40202' );
+		$audit = VenueTimezoneAudit::classify( '-05:00', '38.2554,-85.7487', 'Unites States', 'Ky. 40202' );
 
 		$this->assertSame( VenueTimezoneAudit::INVALID, $audit['status'] );
 		$this->assertFalse( $audit['repairable'] );

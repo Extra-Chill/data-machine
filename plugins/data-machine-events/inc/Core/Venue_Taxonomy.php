@@ -1680,8 +1680,10 @@ class Venue_Taxonomy {
 			return null;
 		}
 
+		$region = self::geocode_expected_region( $venue_data );
+
 		foreach ( $queries as $strategy => $query ) {
-			$coordinates = self::query_nominatim( $query );
+			$coordinates = self::query_nominatim( $query, $region['country'], $region['state'] );
 
 			if ( $coordinates ) {
 				do_action(
@@ -1857,12 +1859,12 @@ class Venue_Taxonomy {
 	 * @param string $query Search query string.
 	 * @return string|null Coordinates as "lat,lng" or null on failure.
 	 */
-	public static function query_nominatim( string $query ): ?string {
+	public static function query_nominatim( string $query, string $country_code = '', string $state_code = '' ): ?string {
 		if ( empty( $query ) ) {
 			return null;
 		}
 
-		$result = NominatimClient::geocodeOne( $query );
+		$result = NominatimClient::geocodeOne( $query, strtolower( $country_code ) );
 
 		if ( is_wp_error( $result ) ) {
 			$error_code = $result->get_error_code();
@@ -1889,7 +1891,75 @@ class Venue_Taxonomy {
 			return null;
 		}
 
+		if ( ! self::geocode_result_matches_region( $result, $country_code, $state_code ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Geocoding result rejected: outside the venue country/state',
+				array(
+					'query'            => $query,
+					'expected_country' => $country_code,
+					'expected_state'   => $state_code,
+					'result_country'   => $result['country_code'],
+					'result_region'    => $result['region_code'],
+					'display_name'     => $result['display_name'],
+				)
+			);
+			return null;
+		}
+
 		return $result['lat'] . ',' . $result['lng'];
+	}
+
+	/**
+	 * Country and US state a geocode result must fall in, from venue data.
+	 *
+	 * Either value is empty when the venue does not state it unambiguously,
+	 * in which case that dimension is not enforced. See #899.
+	 *
+	 * @param array $venue_data Venue data.
+	 * @return array{country: string, state: string} Uppercase ISO alpha-2 country and US postal state.
+	 */
+	public static function geocode_expected_region( array $venue_data ): array {
+		$country = VenueTimezoneResolver::normalizeCountry( (string) ( $venue_data['country'] ?? '' ) );
+		$state   = VenueTimezoneResolver::normalizeUsState( (string) ( $venue_data['state'] ?? '' ) );
+
+		if ( '' === $country && '' !== $state ) {
+			$country = 'US';
+		}
+		if ( 'US' !== $country ) {
+			$state = '';
+		}
+
+		return array(
+			'country' => $country,
+			'state'   => $state,
+		);
+	}
+
+	/**
+	 * Whether a geocode result lies in the expected country/state.
+	 *
+	 * Missing data on either side is not a contradiction.
+	 *
+	 * @param array  $result       geocodeOne() result.
+	 * @param string $country_code Expected ISO alpha-2, or ''.
+	 * @param string $state_code   Expected US postal state, or ''.
+	 * @return bool
+	 */
+	public static function geocode_result_matches_region( array $result, string $country_code, string $state_code ): bool {
+		$result_country = strtoupper( (string) ( $result['country_code'] ?? '' ) );
+		$result_region  = strtoupper( (string) ( $result['region_code'] ?? '' ) );
+
+		if ( '' !== $country_code && '' !== $result_country && strtoupper( $country_code ) !== $result_country ) {
+			return false;
+		}
+
+		if ( '' !== $state_code && '' !== $result_region && 'US-' . strtoupper( $state_code ) !== $result_region ) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

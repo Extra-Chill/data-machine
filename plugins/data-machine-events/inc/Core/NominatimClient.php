@@ -152,11 +152,15 @@ class NominatimClient {
 	 *                            query when Nominatim omits it).
 	 *   - cached       (bool)   true when the result was served from the
 	 *                            transient cache, false on a fresh lookup.
+	 *   - country_code (string) Lowercase ISO alpha-2 of the result, or ''.
+	 *   - region_code  (string) ISO 3166-2 subdivision (e.g. "US-CO"), or ''.
 	 *
-	 * @param string $query Address string (3-500 chars after sanitization).
-	 * @return array{lat:string,lng:string,display_name:string,cached:bool}|\WP_Error
+	 * @param string $query        Address string (3-500 chars after sanitization).
+	 * @param string $countrycodes Optional comma-separated ISO alpha-2 codes
+	 *                             restricting results (e.g. "us").
+	 * @return array{lat:string,lng:string,display_name:string,cached:bool,country_code:string,region_code:string}|\WP_Error
 	 */
-	public static function geocodeOne( string $query ): array|\WP_Error {
+	public static function geocodeOne( string $query, string $countrycodes = '' ): array|\WP_Error {
 		$query = trim( $query );
 		if ( '' === $query || strlen( $query ) < 3 ) {
 			return new \WP_Error( 'invalid_query', 'Query must be at least 3 characters.', array( 'status' => 400 ) );
@@ -164,7 +168,9 @@ class NominatimClient {
 
 		$query = substr( $query, 0, 500 );
 
-		$cache_key = self::CACHE_PREFIX . md5( strtolower( $query ) );
+		$countrycodes = strtolower( preg_replace( '/[^A-Za-z,]/', '', $countrycodes ) ?? '' );
+
+		$cache_key = self::CACHE_PREFIX . md5( strtolower( $query ) . ( '' !== $countrycodes ? '|cc:' . $countrycodes : '' ) );
 		$cached    = get_transient( $cache_key );
 
 		if ( false !== $cached && is_array( $cached ) && isset( $cached['lat'], $cached['lng'], $cached['display_name'] ) ) {
@@ -173,17 +179,22 @@ class NominatimClient {
 				'lng'          => (string) $cached['lng'],
 				'display_name' => (string) $cached['display_name'],
 				'cached'       => true,
+				'country_code' => (string) ( $cached['country_code'] ?? '' ),
+				'region_code'  => (string) ( $cached['region_code'] ?? '' ),
 			);
 		}
 
-		$url = add_query_arg(
-			array(
-				'format' => 'json',
-				'limit'  => '1',
-				'q'      => $query,
-			),
-			self::ENDPOINT_SEARCH
+		$args = array(
+			'format'         => 'json',
+			'limit'          => '1',
+			'addressdetails' => '1',
+			'q'              => $query,
 		);
+		if ( '' !== $countrycodes ) {
+			$args['countrycodes'] = $countrycodes;
+		}
+
+		$url = add_query_arg( $args, self::ENDPOINT_SEARCH );
 
 		$data = self::request( $url, 'Nominatim Geocode' );
 
@@ -202,6 +213,8 @@ class NominatimClient {
 			'lng'          => (string) $top['lon'],
 			'display_name' => isset( $top['display_name'] ) ? (string) $top['display_name'] : $query,
 			'cached'       => false,
+			'country_code' => strtolower( (string) ( $top['address']['country_code'] ?? '' ) ),
+			'region_code'  => strtoupper( (string) ( $top['address']['ISO3166-2-lvl4'] ?? '' ) ),
 		);
 
 		set_transient( $cache_key, $result, self::CACHE_TTL );
