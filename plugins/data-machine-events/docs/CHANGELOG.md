@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.1] - 2026-10-10
+
+### Fixed
+- reject geocode results outside the venue's country/state
+
 ## [0.66.0] - 2026-10-09
 
 ### Added
