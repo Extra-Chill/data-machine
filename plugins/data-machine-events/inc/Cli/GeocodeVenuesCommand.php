@@ -114,13 +114,11 @@ class GeocodeVenuesCommand {
 				'Action'  => $item['action'],
 			);
 
-			if ( isset( $item['coordinates'] ) ) {
-				$row['Coordinates'] = $item['coordinates'];
-			}
-
-			if ( isset( $item['timezone'] ) ) {
-				$row['Timezone'] = $item['timezone'];
+			if ( $input['timezones_only'] ) {
+				$row['Timezone'] = $item['timezone'] ?? '';
 				$row['Source']   = $item['source'] ?? '';
+			} elseif ( ! $input['dry_run'] ) {
+				$row['Coordinates'] = $item['coordinates'] ?? '';
 			}
 
 			$table_data[] = $row;

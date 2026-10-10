@@ -76,6 +76,17 @@ class GeocodeRegionCheckTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'countrycodes', $this->requested_urls[0] );
 	}
 
+	public function test_query_is_url_encoded_so_ampersand_does_not_truncate_it(): void {
+		$this->respond_with( '39.7626227', '-104.9748913', 'us', 'US-CO' );
+		$suffix = uniqid();
+
+		Venue_Taxonomy::query_nominatim( "14th & Curtis Streets #2, Denver, CO {$suffix}", 'US', 'CO' );
+
+		$query = array();
+		wp_parse_str( (string) wp_parse_url( $this->requested_urls[0], PHP_URL_QUERY ), $query );
+		$this->assertSame( "14th & Curtis Streets #2, Denver, CO {$suffix}", $query['q'] );
+	}
+
 	private function respond_with( string $lat, string $lon, string $country_code, string $region ): void {
 		$filter = function ( $preempt, $args, $url ) use ( $lat, $lon, $country_code, $region ) {
 			if ( ! str_contains( (string) $url, 'nominatim.openstreetmap.org' ) ) {

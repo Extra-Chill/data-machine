@@ -127,7 +127,7 @@ class NominatimClient {
 			$args['countrycodes'] = $countrycodes;
 		}
 
-		$url = add_query_arg( $args, self::ENDPOINT_SEARCH );
+		$url = add_query_arg( array_map( 'rawurlencode', $args ), self::ENDPOINT_SEARCH );
 
 		$data = self::request( $url, 'Nominatim Search' );
 
@@ -194,7 +194,7 @@ class NominatimClient {
 			$args['countrycodes'] = $countrycodes;
 		}
 
-		$url = add_query_arg( $args, self::ENDPOINT_SEARCH );
+		$url = add_query_arg( array_map( 'rawurlencode', $args ), self::ENDPOINT_SEARCH );
 
 		$data = self::request( $url, 'Nominatim Geocode' );
 

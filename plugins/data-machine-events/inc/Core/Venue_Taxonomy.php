@@ -1532,18 +1532,20 @@ class Venue_Taxonomy {
 	}
 
 	/**
-	 * Geocode venue address if coordinates are missing
+	 * Geocode venue address if coordinates are missing, or always when forced.
 	 *
-	 * @param int $term_id Venue term ID
+	 * @param int  $term_id Venue term ID
+	 * @param bool $force   Re-geocode even when coordinates exist. Existing
+	 *                      coordinates are kept when no new result is found.
 	 * @return bool True if geocoding was performed, false otherwise
 	 */
-	public static function maybe_geocode_venue( $term_id ) {
+	public static function maybe_geocode_venue( $term_id, bool $force = false ) {
 		if ( ! $term_id ) {
 			return false;
 		}
 
 		$existing_coords = get_term_meta( $term_id, '_venue_coordinates', true );
-		if ( ! empty( $existing_coords ) ) {
+		if ( ! empty( $existing_coords ) && ! $force ) {
 			self::maybe_derive_timezone( $term_id, $existing_coords );
 			return false;
 		}
@@ -1551,8 +1553,17 @@ class Venue_Taxonomy {
 		$venue_data  = self::get_venue_data( $term_id );
 		$coordinates = self::geocode_address( $venue_data );
 
+		// A forced re-geocode that finds nothing leaves the venue as it was (#903).
+		if ( ! $coordinates && ! empty( $existing_coords ) ) {
+			return false;
+		}
+
 		if ( $coordinates ) {
-			$result   = VenueProfileMutations::updateSystem( (int) $term_id, array( 'coordinates' => $coordinates ) );
+			$changes = array( 'coordinates' => $coordinates );
+			if ( ! empty( $existing_coords ) ) {
+				$changes['timezone'] = '';
+			}
+			$result   = VenueProfileMutations::updateSystem( (int) $term_id, $changes );
 			$geocoded = ! is_wp_error( $result ) && ! empty( $result['success'] );
 
 			// Derive the timezone in the same pass. Previously this only ran on

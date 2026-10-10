@@ -339,18 +339,7 @@ class GeocodingAbilities {
 				continue;
 			}
 
-			// Clear existing coordinates if force mode.
-			if ( $force && ! empty( $coords ) ) {
-				\DataMachineEvents\Core\VenueProfileMutations::updateSystem(
-					(int) $venue->term_id,
-					array(
-						'coordinates' => '',
-						'timezone'    => '',
-					)
-				);
-			}
-
-			$geocoded = Venue_Taxonomy::maybe_geocode_venue( $venue->term_id );
+			$geocoded = Venue_Taxonomy::maybe_geocode_venue( $venue->term_id, $force );
 
 			if ( $geocoded ) {
 				$new_coords                  = get_term_meta( $venue->term_id, '_venue_coordinates', true );
