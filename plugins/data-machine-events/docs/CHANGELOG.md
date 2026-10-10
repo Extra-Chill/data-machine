@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.2] - 2026-10-10
+
+### Fixed
+- URL-encode Nominatim queries; keep location on failed forced re-geocode
+
 ## [0.66.1] - 2026-10-10
 
 ### Fixed
