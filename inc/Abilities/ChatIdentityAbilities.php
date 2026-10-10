@@ -48,24 +48,15 @@ class ChatIdentityAbilities {
 			array(
 				'label'               => __( 'Link Chat Identity', 'data-machine' ),
 				'description'         => __( 'Link a platform-scoped external chat actor ID to a WordPress user.', 'data-machine' ),
-				'category'            => 'datamachine-agent',
+				'category'            => AbilityCategories::AGENT,
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'user_id', 'platform', 'actor_id' ),
-					'properties' => array(
-						'user_id'  => array( 'type' => 'integer' ),
-						'platform' => array( 'type' => 'string' ),
-						'actor_id' => array( 'type' => 'string' ),
-					),
+					'properties' => self::linkProperties(),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
-					'properties' => array(
-						'success'  => array( 'type' => 'boolean' ),
-						'user_id'  => array( 'type' => 'integer' ),
-						'platform' => array( 'type' => 'string' ),
-						'actor_id' => array( 'type' => 'string' ),
-					),
+					'properties' => array( 'success' => array( 'type' => 'boolean' ) ) + self::linkProperties(),
 				),
 				'execute_callback'    => array( self::class, 'link' ),
 				'permission_callback' => array( self::class, 'checkPermission' ),
@@ -80,7 +71,7 @@ class ChatIdentityAbilities {
 			array(
 				'label'               => __( 'Unlink Chat Identity', 'data-machine' ),
 				'description'         => __( 'Remove a WordPress user\'s chat identity link for a platform.', 'data-machine' ),
-				'category'            => 'datamachine-agent',
+				'category'            => AbilityCategories::AGENT,
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'user_id', 'platform' ),
@@ -109,7 +100,7 @@ class ChatIdentityAbilities {
 			array(
 				'label'               => __( 'List Chat Identities', 'data-machine' ),
 				'description'         => __( 'List linked chat identities, optionally filtered by user or platform.', 'data-machine' ),
-				'category'            => 'datamachine-agent',
+				'category'            => AbilityCategories::AGENT,
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -125,11 +116,7 @@ class ChatIdentityAbilities {
 							'type'  => 'array',
 							'items' => array(
 								'type'       => 'object',
-								'properties' => array(
-									'user_id'  => array( 'type' => 'integer' ),
-									'platform' => array( 'type' => 'string' ),
-									'actor_id' => array( 'type' => 'string' ),
-								),
+								'properties' => self::linkProperties(),
 							),
 						),
 					),
@@ -147,7 +134,7 @@ class ChatIdentityAbilities {
 			array(
 				'label'               => __( 'Resolve Chat Person', 'data-machine' ),
 				'description'         => __( 'Resolve a chat actor to a WordPress user for an agent: access decision, role (admin|operator|viewer) and memory sections. Fails closed for unlinked or unauthorized actors.', 'data-machine' ),
-				'category'            => 'datamachine-agent',
+				'category'            => AbilityCategories::AGENT,
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'agent_slug', 'platform', 'actor_id' ),
@@ -157,7 +144,7 @@ class ChatIdentityAbilities {
 						'actor_id'   => array( 'type' => 'string' ),
 						'event'      => array(
 							'type'        => 'string',
-							'description' => __( 'Event name. "turn" returns the speaker\'s personal memory; any other event returns agent memory.', 'data-machine' ),
+							'description' => __( 'Event name. A "turn" event returns personal memory for the speaker; any other event returns agent memory.', 'data-machine' ),
 						),
 					),
 				),
@@ -197,6 +184,19 @@ class ChatIdentityAbilities {
 	 *
 	 * WP-CLI is treated as the host operator, matching PermissionHelper.
 	 */
+	/**
+	 * Schema properties shared by every chat identity link record.
+	 *
+	 * @return array<string, array<string, string>>
+	 */
+	private static function linkProperties(): array {
+		return array(
+			'user_id'  => array( 'type' => 'integer' ),
+			'platform' => array( 'type' => 'string' ),
+			'actor_id' => array( 'type' => 'string' ),
+		);
+	}
+
 	public static function checkPermission(): bool {
 		if ( current_user_can( 'manage_options' ) ) {
 			return true;
