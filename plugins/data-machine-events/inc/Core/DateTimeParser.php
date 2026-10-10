@@ -7,6 +7,13 @@
  * Single source of truth for parsing various datetime formats and converting
  * between timezones.
  *
+ * Every parser returns {date, time, timezone, offset}:
+ *  - date/time  Wall clock in the zone the input was expressed in.
+ *  - timezone   An IANA identifier, or '' when the input carried only an
+ *               offset or no zone. Never a raw offset or "Z".
+ *  - offset     "+HH:MM" when the input pinned an instant (offset, Z, or an
+ *               IANA zone), else ''. Lets callers convert to venue time.
+ *
  * @package DataMachineEvents\Core
  */
 
@@ -35,7 +42,7 @@ class DateTimeParser {
 	 *
 	 * @param string $datetime UTC datetime string (e.g., "2026-01-04T02:30:00Z")
 	 * @param string $timezone Target IANA timezone (e.g., "America/Chicago")
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	public static function parseUtc( string $datetime, string $timezone ): array {
 		$result = self::emptyResult();
@@ -63,9 +70,7 @@ class DateTimeParser {
 			$dt = new DateTime( $datetime, new DateTimeZone( 'UTC' ) );
 			$dt->setTimezone( new DateTimeZone( $timezone ) );
 
-			$result['date']     = $dt->format( 'Y-m-d' );
-			$result['time']     = $dt->format( 'H:i' );
-			$result['timezone'] = $timezone;
+			$result = self::fromDateTime( $dt, true );
 		} catch ( Exception $e ) {
 			// Invalid datetime format, return empty result
 		}
@@ -106,7 +111,7 @@ class DateTimeParser {
 	 * @param string $date Date string (e.g., "2026-01-15")
 	 * @param string $time Time string (e.g., "19:30" or "19:30:00")
 	 * @param string $timezone IANA timezone identifier
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	public static function parseLocal( string $date, string $time, string $timezone ): array {
 		$result = self::emptyResult();
@@ -128,8 +133,8 @@ class DateTimeParser {
 			$tz = ! empty( $timezone ) ? new DateTimeZone( $timezone ) : null;
 			$dt = new DateTime( $datetime_string, $tz );
 
-			$result['date']     = $dt->format( 'Y-m-d' );
-			$result['time']     = ! empty( $time ) ? $dt->format( 'H:i' ) : '';
+			$result             = self::fromDateTime( $dt, null !== $tz && ! empty( $time ) );
+			$result['time']     = ! empty( $time ) ? $result['time'] : '';
 			$result['timezone'] = $timezone;
 		} catch ( Exception $e ) {
 			// Invalid datetime format, return empty result
@@ -145,7 +150,7 @@ class DateTimeParser {
 	 * Example: Eventbrite returns "2026-01-15T19:30:00-06:00"
 	 *
 	 * @param string $datetime ISO 8601 string (e.g., "2026-01-15T19:30:00-06:00")
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	public static function parseIso( string $datetime ): array {
 		$result = self::emptyResult();
@@ -155,12 +160,7 @@ class DateTimeParser {
 		}
 
 		try {
-			$dt = new DateTime( $datetime );
-			$tz = $dt->getTimezone();
-
-			$result['date']     = $dt->format( 'Y-m-d' );
-			$result['time']     = $dt->format( 'H:i' );
-			$result['timezone'] = $tz->getName();
+			$result = self::fromDateTime( new DateTime( $datetime ), self::hasEmbeddedTimezone( $datetime ) || (bool) preg_match( '/Z$/i', $datetime ) );
 		} catch ( Exception $e ) {
 			// Invalid datetime format, return empty result
 		}
@@ -178,7 +178,7 @@ class DateTimeParser {
 	 *
 	 * @param string $datetime ICS datetime string (e.g., "20230809T000000Z")
 	 * @param string $calendar_timezone Calendar timezone from VTIMEZONE section (e.g., "America/Chicago")
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	public static function parseIcs( string $datetime, string $calendar_timezone = 'UTC' ): array {
 		$result = self::emptyResult();
@@ -205,12 +205,7 @@ class DateTimeParser {
 				$dt = new DateTime( $datetime, $tz );
 			}
 
-			$tz      = $dt->getTimezone();
-			$tz_name = $tz->getName();
-
-			$result['date']     = $dt->format( 'Y-m-d' );
-			$result['time']     = $dt->format( 'H:i' );
-			$result['timezone'] = $tz_name;
+			$result = self::fromDateTime( $dt, true );
 		} catch ( Exception $e ) {
 			return $result;
 		}
@@ -226,7 +221,7 @@ class DateTimeParser {
 	 *
 	 * @param string $datetime Datetime string in any parseable format
 	 * @param string $fallback_timezone Timezone to use if not embedded in datetime
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	public static function parse( string $datetime, string $fallback_timezone = '' ): array {
 		$result = self::emptyResult();
@@ -245,16 +240,11 @@ class DateTimeParser {
 				? new DateTimeZone( $fallback_timezone )
 				: null;
 			$dt              = new DateTime( $datetime, $constructor_tz );
-			$tz              = $dt->getTimezone();
-			$tz_name         = $tz->getName();
 
+			$result = self::fromDateTime( $dt, $has_embedded_tz || null !== $constructor_tz );
 			if ( null !== $constructor_tz ) {
-				$tz_name = $fallback_timezone;
+				$result['timezone'] = $fallback_timezone;
 			}
-
-			$result['date']     = $dt->format( 'Y-m-d' );
-			$result['time']     = $dt->format( 'H:i' );
-			$result['timezone'] = $tz_name;
 		} catch ( Exception $e ) {
 			// Invalid datetime format, return empty result
 		}
@@ -388,13 +378,32 @@ class DateTimeParser {
 	/**
 	 * Get empty result array.
 	 *
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	private static function emptyResult(): array {
 		return array(
 			'date'     => '',
 			'time'     => '',
 			'timezone' => '',
+			'offset'   => '',
+		);
+	}
+
+	/**
+	 * Build a result from a parsed DateTime.
+	 *
+	 * @param DateTime $dt       Parsed datetime.
+	 * @param bool     $anchored Whether the input pinned an instant.
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	private static function fromDateTime( DateTime $dt, bool $anchored ): array {
+		$name = $dt->getTimezone()->getName();
+
+		return array(
+			'date'     => $dt->format( 'Y-m-d' ),
+			'time'     => $dt->format( 'H:i' ),
+			'timezone' => $anchored && self::isValidTimezone( $name ) ? $name : '',
+			'offset'   => $anchored ? $dt->format( 'P' ) : '',
 		);
 	}
 }

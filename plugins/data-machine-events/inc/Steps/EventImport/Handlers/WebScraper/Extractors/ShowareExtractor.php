@@ -228,8 +228,10 @@ class ShowareExtractor extends BaseExtractor {
 			'title'         => $this->sanitizeText( $name ),
 			'startDate'     => $start_parsed['date'],
 			'startTime'     => $start_parsed['time'],
+			'startOffset'   => $start_parsed['offset'],
 			'endDate'       => $end_parsed['date'],
 			'endTime'       => $end_parsed['time'],
+			'endOffset'     => $end_parsed['offset'],
 			'ticketUrl'     => $ticket_url,
 			'imageUrl'      => $image_url,
 			'price'         => $price,
@@ -250,26 +252,12 @@ class ShowareExtractor extends BaseExtractor {
 	 * The fractional seconds (7 digits) are non-standard and need stripping.
 	 *
 	 * @param string $datetime Showare datetime string.
-	 * @return array{date: string, time: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	private function parseShowareDatetime( string $datetime ): array {
-		if ( empty( $datetime ) ) {
-			return array(
-				'date' => '',
-				'time' => '',
-			);
-		}
-
 		// Strip the non-standard 7-digit fractional seconds.
 		// "2026-07-10T20:00:00.0000000-05:00" → "2026-07-10T20:00:00-05:00"
-		$cleaned = preg_replace( '/\.\d{1,7}/', '', $datetime );
-
-		$parsed = $this->parseIsoDatetime( $cleaned );
-
-		return array(
-			'date' => $parsed['date'],
-			'time' => $parsed['time'],
-		);
+		return $this->parseIsoDatetime( (string) preg_replace( '/\.\d{1,7}/', '', $datetime ) );
 	}
 
 	/**

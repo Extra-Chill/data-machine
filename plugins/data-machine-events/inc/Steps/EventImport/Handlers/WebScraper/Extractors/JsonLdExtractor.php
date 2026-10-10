@@ -278,15 +278,17 @@ class JsonLdExtractor extends BaseExtractor {
 	 */
 	private function parseDates( array &$event, array $event_data ): void {
 		if ( ! empty( $event_data['startDate'] ) && is_string( $event_data['startDate'] ) ) {
-			$parsed             = $this->parseIsoDatetime( $event_data['startDate'] );
-			$event['startDate'] = $parsed['date'];
-			$event['startTime'] = '00:00' !== $parsed['time'] ? $parsed['time'] : '';
+			$parsed               = $this->parseIsoDatetime( $event_data['startDate'] );
+			$event['startDate']   = $parsed['date'];
+			$event['startTime']   = '00:00' !== $parsed['time'] ? $parsed['time'] : '';
+			$event['startOffset'] = '' !== $event['startTime'] ? $parsed['offset'] : '';
 		}
 
 		if ( ! empty( $event_data['endDate'] ) && is_string( $event_data['endDate'] ) ) {
-			$parsed           = $this->parseIsoDatetime( $event_data['endDate'] );
-			$event['endDate'] = $parsed['date'];
-			$event['endTime'] = $parsed['time'];
+			$parsed             = $this->parseIsoDatetime( $event_data['endDate'] );
+			$event['endDate']   = $parsed['date'];
+			$event['endTime']   = $parsed['time'];
+			$event['endOffset'] = $parsed['offset'];
 		}
 	}
 

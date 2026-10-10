@@ -103,6 +103,56 @@ class JsonLdExtractorTest extends WP_UnitTestCase {
 		$this->assertEquals( '2026-05-16', $event['endDate'] );
 	}
 
+	public function test_utc_start_carries_offset_for_venue_localization(): void {
+		$html = '<script type="application/ld+json">' . wp_json_encode(
+			array(
+				'@context'  => 'https://schema.org',
+				'@type'     => 'Event',
+				'name'      => 'Spotlight Dance',
+				'startDate' => '2026-10-12T03:00:00Z',
+				'location'  => array(
+					'@type'   => 'Place',
+					'name'    => "Harvelle's Long Beach",
+					'address' => array(
+						'@type'           => 'PostalAddress',
+						'streetAddress'   => '201 East Broadway',
+						'addressLocality' => 'Long Beach',
+						'addressRegion'   => 'CA',
+						'addressCountry'  => 'US',
+					),
+				),
+			)
+		) . '</script>';
+
+		$events = $this->extractor->extract( $html, 'https://longbeach.harvelles.com/events/125330' );
+
+		$this->assertCount( 1, $events );
+		$this->assertSame( '2026-10-12', $events[0]['startDate'] );
+		$this->assertSame( '03:00', $events[0]['startTime'] );
+		$this->assertSame( '+00:00', $events[0]['startOffset'] );
+	}
+
+	public function test_midnight_start_is_date_only_without_offset(): void {
+		$html = '<script type="application/ld+json">' . wp_json_encode(
+			array(
+				'@context'  => 'https://schema.org',
+				'@type'     => 'Event',
+				'name'      => 'All Day Fest',
+				'startDate' => '2026-10-12T00:00:00Z',
+				'location'  => array(
+					'@type' => 'Place',
+					'name'  => 'Somewhere',
+				),
+			)
+		) . '</script>';
+
+		$events = $this->extractor->extract( $html, 'https://venue.example.test/events' );
+
+		$this->assertCount( 1, $events );
+		$this->assertSame( '', $events[0]['startTime'] );
+		$this->assertSame( '', $events[0]['startOffset'] );
+	}
+
 	// ────────────────────────────────────────────────────────────────────────────
 	// Shape 1: Single Event object — implicitly covered by Royal American fixture.
 	// Shape 2: Top-level array of Events (synthetic + Pour House)

@@ -705,12 +705,10 @@ class BandzoogleExtractor extends BaseExtractor {
 
 		// time[datetime] -> ISO 8601.
 		if ( preg_match( '/<time[^>]+datetime="([^"]+)"/i', $html, $m ) ) {
-			$parsed             = $this->parseIsoDatetime( $m[1] );
-			$event['startDate'] = $parsed['date'];
-			$event['startTime'] = $parsed['time'];
-			if ( ! empty( $parsed['timezone'] ) ) {
-				$event['venueTimezone'] = $parsed['timezone'];
-			}
+			$parsed               = $this->parseIsoDatetime( $m[1] );
+			$event['startDate']   = $parsed['date'];
+			$event['startTime']   = $parsed['time'];
+			$event['startOffset'] = $parsed['offset'];
 		} elseif ( preg_match( '/<time[^>]*>(.*?)<\/time>/is', $html, $m ) ) {
 			// Fall back to time element text.
 			$text   = trim( wp_strip_all_tags( $m[1] ) );

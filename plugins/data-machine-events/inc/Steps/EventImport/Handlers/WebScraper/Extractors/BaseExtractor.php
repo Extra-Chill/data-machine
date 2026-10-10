@@ -41,7 +41,7 @@ abstract class BaseExtractor implements ExtractorInterface {
 	 *
 	 * @param int|string $timestamp Unix timestamp (seconds or milliseconds)
 	 * @param string $timezone IANA timezone identifier (e.g., "America/Chicago")
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	protected function parseUtcTimestamp( $timestamp, string $timezone ): array {
 		if ( empty( $timestamp ) || ! is_numeric( $timestamp ) ) {
@@ -49,6 +49,7 @@ abstract class BaseExtractor implements ExtractorInterface {
 				'date'     => '',
 				'time'     => '',
 				'timezone' => '',
+				'offset'   => '',
 			);
 		}
 
@@ -68,7 +69,7 @@ abstract class BaseExtractor implements ExtractorInterface {
 	 * Use when data source provides datetime strings like "2026-01-15T19:30:00-06:00".
 	 *
 	 * @param string $datetime ISO 8601 datetime string
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	protected function parseIsoDatetime( string $datetime ): array {
 		return DateTimeParser::parseIso( $datetime );
@@ -82,7 +83,7 @@ abstract class BaseExtractor implements ExtractorInterface {
 	 *
 	 * @param string $datetime UTC datetime string
 	 * @param string $timezone IANA timezone identifier
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	protected function parseUtcDatetime( string $datetime, string $timezone ): array {
 		return DateTimeParser::parseUtc( $datetime, $timezone );
@@ -97,7 +98,7 @@ abstract class BaseExtractor implements ExtractorInterface {
 	 * @param string $date Date string (Y-m-d)
 	 * @param string $time Time string (H:i or H:i:s)
 	 * @param string $timezone IANA timezone identifier
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	protected function parseLocalDatetime( string $date, string $time, string $timezone ): array {
 		return DateTimeParser::parseLocal( $date, $time, $timezone );
@@ -112,7 +113,7 @@ abstract class BaseExtractor implements ExtractorInterface {
 	 *
 	 * @param string $datetime Datetime string in any format
 	 * @param string $fallback_timezone Timezone to use if not embedded
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	protected function parseDatetime( string $datetime, string $fallback_timezone = '' ): array {
 		return DateTimeParser::parse( $datetime, $fallback_timezone );

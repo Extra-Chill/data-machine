@@ -11,6 +11,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
 use DataMachine\Core\ExecutionContext;
+use DataMachineEvents\Core\EventTimeLocalizer;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Utilities\EventSourceIdentity;
@@ -71,6 +72,7 @@ class StructuredDataProcessor {
 
 			$this->applyVenueConfigOverride( $event, $config );
 			$event = $this->handler->applyVenueSourceAliases( $event );
+			$event = EventTimeLocalizer::localize( $event, EventTimeLocalizer::venueTimezone( $event, $config ) );
 
 			$source_identity  = EventSourceIdentity::resolve( $event, $context );
 			$event_identifier = $source_identity['event_identifier'];

@@ -360,34 +360,33 @@ class EventbriteExtractor extends BaseExtractor {
 	 */
 	private function parseDates( array &$event, array $event_data, array $series_meta = array() ): void {
 		if ( ! empty( $event_data['startDate'] ) ) {
-			$parsed             = $this->parseIsoDatetime( $event_data['startDate'] );
-			$event['startDate'] = $parsed['date'];
-			$event['startTime'] = '00:00' !== $parsed['time'] ? $parsed['time'] : '';
-
-			if ( ! empty( $parsed['timezone'] ) ) {
-				$event['venueTimezone'] = $parsed['timezone'];
-			}
+			$this->applyStart( $event, $this->parseIsoDatetime( $event_data['startDate'] ) );
 		}
 
 		if ( ! empty( $event_data['endDate'] ) ) {
-			$parsed           = $this->parseIsoDatetime( $event_data['endDate'] );
-			$event['endDate'] = $parsed['date'];
-			$event['endTime'] = $parsed['time'];
+			$parsed             = $this->parseIsoDatetime( $event_data['endDate'] );
+			$event['endDate']   = $parsed['date'];
+			$event['endTime']   = $parsed['time'];
+			$event['endOffset'] = $parsed['offset'];
 		}
 
 		if ( ! empty( $series_meta['nextAvailableSession'] ) ) {
-			$next_session = $series_meta['nextAvailableSession'];
-			$parsed       = $this->parseIsoDatetime( $next_session );
-
-			$event['startDate'] = $parsed['date'];
-			$event['startTime'] = '00:00' !== $parsed['time'] ? $parsed['time'] : '';
-
-			if ( ! empty( $parsed['timezone'] ) ) {
-				$event['venueTimezone'] = $parsed['timezone'];
-			}
+			$this->applyStart( $event, $this->parseIsoDatetime( $series_meta['nextAvailableSession'] ) );
 		}
 
 		$this->normalizeEnd( $event );
+	}
+
+	/**
+	 * Set start date/time from a parsed ISO datetime. Midnight means no time.
+	 *
+	 * @param array $event  Event array (by reference).
+	 * @param array $parsed DateTimeParser result.
+	 */
+	private function applyStart( array &$event, array $parsed ): void {
+		$event['startDate']   = $parsed['date'];
+		$event['startTime']   = '00:00' !== $parsed['time'] ? $parsed['time'] : '';
+		$event['startOffset'] = '' !== $event['startTime'] ? $parsed['offset'] : '';
 	}
 
 	/**

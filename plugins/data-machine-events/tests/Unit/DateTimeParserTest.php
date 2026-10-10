@@ -101,12 +101,13 @@ class DateTimeParserTest extends WP_UnitTestCase {
 		$this->assertEquals( '', $result['timezone'] );
 	}
 
-	public function test_parse_iso_extracts_timezone_offset() {
+	public function test_parse_iso_reports_offset_not_timezone() {
 		$result = DateTimeParser::parseIso( '2026-01-15T19:30:00-06:00' );
 
 		$this->assertEquals( '2026-01-15', $result['date'] );
 		$this->assertEquals( '19:30', $result['time'] );
-		$this->assertNotEmpty( $result['timezone'] );
+		$this->assertSame( '-06:00', $result['offset'] );
+		$this->assertSame( '', $result['timezone'], 'A raw offset is not a timezone (#905).' );
 	}
 
 	public function test_parse_iso_handles_utc_suffix() {
@@ -114,6 +115,22 @@ class DateTimeParserTest extends WP_UnitTestCase {
 
 		$this->assertEquals( '2026-01-15', $result['date'] );
 		$this->assertEquals( '19:30', $result['time'] );
+		$this->assertSame( '+00:00', $result['offset'] );
+		$this->assertSame( '', $result['timezone'] );
+	}
+
+	public function test_parse_iso_floating_time_has_no_offset() {
+		$result = DateTimeParser::parseIso( '2026-01-15T19:30:00' );
+
+		$this->assertEquals( '19:30', $result['time'] );
+		$this->assertSame( '', $result['offset'] );
+		$this->assertSame( '', $result['timezone'] );
+	}
+
+	public function test_parse_utc_and_local_report_offset_of_target_zone() {
+		$this->assertSame( '-06:00', DateTimeParser::parseUtc( '2026-01-15T18:00:00Z', 'America/Chicago' )['offset'] );
+		$this->assertSame( '-07:00', DateTimeParser::parseLocal( '2026-01-15', '19:30', 'America/Denver' )['offset'] );
+		$this->assertSame( '', DateTimeParser::parseLocal( '2026-01-15', '', 'America/Denver' )['offset'] );
 	}
 
 	public function test_parse_ics_floating_time_uses_calendar_timezone() {
@@ -170,7 +187,8 @@ class DateTimeParserTest extends WP_UnitTestCase {
 
 		$this->assertEquals( '2026-03-08', $result['date'] );
 		$this->assertEquals( '04:30', $result['time'] );
-		$this->assertEquals( 'Z', $result['timezone'] );
+		$this->assertSame( '', $result['timezone'] );
+		$this->assertSame( '+00:00', $result['offset'] );
 	}
 
 	public function test_parse_preserves_literal_utc_identifier() {
@@ -186,7 +204,8 @@ class DateTimeParserTest extends WP_UnitTestCase {
 
 		$this->assertEquals( '2026-03-08', $result['date'] );
 		$this->assertEquals( '01:30', $result['time'] );
-		$this->assertEquals( '-08:00', $result['timezone'] );
+		$this->assertSame( '', $result['timezone'] );
+		$this->assertSame( '-08:00', $result['offset'] );
 	}
 
 	public function test_parse_preserves_embedded_iana_timezone() {

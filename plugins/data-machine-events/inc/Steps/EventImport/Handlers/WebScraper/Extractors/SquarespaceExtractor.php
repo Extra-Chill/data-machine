@@ -1114,7 +1114,7 @@ class SquarespaceExtractor extends BaseExtractor {
 	 *
 	 * @param mixed $value Timestamp in milliseconds, seconds, or ISO string
 	 * @param string $timezone IANA timezone identifier
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	private function parseSquarespaceTimestamp( $value, string $timezone ): array {
 		if ( is_numeric( $value ) ) {

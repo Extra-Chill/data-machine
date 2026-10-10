@@ -203,7 +203,7 @@ abstract class EventImportHandler extends FetchHandler {
 	 *
 	 * @param string $datetime UTC datetime string
 	 * @param string $timezone Target IANA timezone
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	protected function parseDateTimeUtc( string $datetime, string $timezone ): array {
 		return DateTimeParser::parseUtc( $datetime, $timezone );
@@ -215,7 +215,7 @@ abstract class EventImportHandler extends FetchHandler {
 	 * @param string $date Date string
 	 * @param string $time Time string
 	 * @param string $timezone IANA timezone identifier
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	protected function parseDateTimeLocal( string $date, string $time, string $timezone ): array {
 		return DateTimeParser::parseLocal( $date, $time, $timezone );
@@ -225,7 +225,7 @@ abstract class EventImportHandler extends FetchHandler {
 	 * Parse ISO 8601 datetime with embedded timezone.
 	 *
 	 * @param string $datetime ISO 8601 string
-	 * @return array{date: string, time: string, timezone: string}
+	 * @return array{date: string, time: string, timezone: string, offset: string}
 	 */
 	protected function parseDateTimeIso( string $datetime ): array {
 		return DateTimeParser::parseIso( $datetime );
