@@ -27,8 +27,10 @@ class EventTimeLocalizer {
 	 * Convert offset-anchored start/end times to venue-local time.
 	 *
 	 * Offsets are always removed from the returned event. Times without an
-	 * offset, or events whose venue timezone is unknown, keep the source's
-	 * wall clock.
+	 * offset keep the source's wall clock. When the venue timezone is
+	 * unknown, a UTC-anchored time falls back to the site timezone (as
+	 * DateTimeParser::parseUtc() does, #254); other offsets keep the
+	 * source's wall clock.
 	 *
 	 * @param array  $event          Extracted event.
 	 * @param string $venue_timezone IANA timezone of the venue, or ''.
@@ -44,7 +46,12 @@ class EventTimeLocalizer {
 			$date = (string) ( $event[ $prefix . 'Date' ] ?? '' );
 			$time = (string) ( $event[ $prefix . 'Time' ] ?? '' );
 
-			if ( null === $zone || '' === $offset || '' === $time || ! DateTimeParser::isValidYmd( $date ) ) {
+			if ( '' === $offset || '' === $time || ! DateTimeParser::isValidYmd( $date ) ) {
+				continue;
+			}
+
+			$target = $zone ?? ( '+00:00' === $offset ? wp_timezone() : null );
+			if ( null === $target ) {
 				continue;
 			}
 
@@ -54,7 +61,7 @@ class EventTimeLocalizer {
 				continue;
 			}
 
-			$instant->setTimezone( $zone );
+			$instant->setTimezone( $target );
 			$event[ $prefix . 'Date' ] = $instant->format( 'Y-m-d' );
 			$event[ $prefix . 'Time' ] = $instant->format( 'H:i' );
 		}
@@ -66,8 +73,8 @@ class EventTimeLocalizer {
 	 * Venue timezone for an extracted event.
 	 *
 	 * Order: the configured venue term's stored zone; an exact single-zone
-	 * country/state rule from the event's venue fields; the offline location
-	 * resolver; a valid IANA zone the source supplied.
+	 * country/state rule from the event's venue fields; a valid IANA zone the
+	 * source declared; the offline location estimate.
 	 *
 	 * @param array $event  Extracted event (venue fields already merged).
 	 * @param array $config Handler config.
@@ -85,13 +92,17 @@ class EventTimeLocalizer {
 		$state       = (string) ( $event['venueState'] ?? '' );
 		$coordinates = (string) ( $event['venueCoordinates'] ?? '' );
 
-		$resolved = VenueTimezoneResolver::resolveFromRegion( $country, $state )
-			?? VenueTimezoneResolver::resolveOffline( $coordinates, $country, $state );
-		if ( $resolved ) {
-			return $resolved['timezone'];
+		$exact = VenueTimezoneResolver::resolveFromRegion( $country, $state );
+		if ( $exact ) {
+			return $exact['timezone'];
 		}
 
 		$hint = (string) ( $event['venueTimezone'] ?? '' );
-		return DateTimeParser::isValidTimezone( $hint ) ? $hint : '';
+		if ( DateTimeParser::isValidTimezone( $hint ) ) {
+			return $hint;
+		}
+
+		$estimate = VenueTimezoneResolver::resolveOffline( $coordinates, $country, $state );
+		return $estimate ? $estimate['timezone'] : '';
 	}
 }

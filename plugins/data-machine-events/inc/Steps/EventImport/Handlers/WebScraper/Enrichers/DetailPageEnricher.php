@@ -297,7 +297,13 @@ class DetailPageEnricher implements EnricherInterface {
 					continue;
 				}
 
-				$event[ $field ]               = (string) $value;
+				$event[ $field ] = (string) $value;
+				$offset_field    = preg_replace( '/Time$/', 'Offset', $field );
+				if ( $offset_field !== $field ) {
+					// A filled time carries its own source offset, or none (#907).
+					$event[ $offset_field ] = (string) ( $found[ $offset_field ] ?? '' );
+				}
+
 				$event['enrichment'][ $field ] = array(
 					'value'  => (string) $value,
 					'source' => $source->getMethod(),

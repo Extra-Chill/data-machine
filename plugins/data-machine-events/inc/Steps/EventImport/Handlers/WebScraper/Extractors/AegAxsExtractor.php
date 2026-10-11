@@ -132,9 +132,10 @@ class AegAxsExtractor extends BaseExtractor {
 		$timezone = $raw['eventDateTimeZone'] ?? '';
 
 		if ( ! empty( $raw['eventDateTimeISO'] ) ) {
-			$parsed             = $this->parseUtcDatetime( $raw['eventDateTimeISO'], $timezone );
-			$event['startDate'] = $parsed['date'];
-			$event['startTime'] = $parsed['time'];
+			$parsed               = $this->parseUtcDatetime( $raw['eventDateTimeISO'], $timezone );
+			$event['startDate']   = $parsed['date'];
+			$event['startTime']   = $parsed['time'];
+			$event['startOffset'] = $parsed['offset'];
 		}
 
 		if ( ! empty( $raw['doorDateTime'] ) && ! empty( $timezone ) ) {

@@ -129,14 +129,16 @@ class GigwellExtractor extends BaseExtractor {
 		$description = $event['description'] ?? '';
 
 		// Parse datetime - Gigwell returns UTC ISO 8601 with timezone info
-		$start_date = '';
-		$start_time = '';
-		$timezone   = $event['eventTimeZone'] ?? 'America/New_York';
+		$start_date   = '';
+		$start_time   = '';
+		$start_offset = '';
+		$timezone     = $this->isValidTimezone( (string) ( $event['eventTimeZone'] ?? '' ) ) ? (string) $event['eventTimeZone'] : '';
 
 		if ( ! empty( $event['startDateTime'] ) ) {
-			$parsed     = $this->parseUtcDatetime( $event['startDateTime'], $timezone );
-			$start_date = $parsed['date'];
-			$start_time = $parsed['time'];
+			$parsed       = $this->parseUtcDatetime( $event['startDateTime'], '' !== $timezone ? $timezone : 'UTC' );
+			$start_date   = $parsed['date'];
+			$start_time   = $parsed['time'];
+			$start_offset = $parsed['offset'];
 		} elseif ( ! empty( $event['localDate'] ) ) {
 			// Fallback to localDate if startDateTime not available
 			$start_date = $event['localDate'];
@@ -164,6 +166,7 @@ class GigwellExtractor extends BaseExtractor {
 			'startDate'     => $start_date,
 			'endDate'       => '',
 			'startTime'     => $start_time,
+			'startOffset'   => $start_offset,
 			'endTime'       => '',
 			'venue'         => $this->sanitizeText( $venue_name ),
 			'venueAddress'  => $this->sanitizeText( $venue_address ),

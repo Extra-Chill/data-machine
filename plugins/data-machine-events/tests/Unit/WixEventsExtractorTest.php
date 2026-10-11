@@ -55,6 +55,11 @@ class WixEventsExtractorTest extends WP_UnitTestCase {
 		);
 		$this->assertSame( 'sanitized-instance-token', $this->requests[1]['headers']['Authorization'] );
 		$this->assertSame( 'sanitized-instance-token', $this->requests[2]['headers']['Authorization'] );
+
+		// 2099-08-01T00:00:00Z in America/New_York, with the offset used (#907).
+		$this->assertSame( '2099-07-31', $events[0]['startDate'] );
+		$this->assertSame( '20:00', $events[0]['startTime'] );
+		$this->assertSame( '-04:00', $events[0]['startOffset'] );
 	}
 
 	public function test_extract_returns_empty_without_wix_events_app_evidence(): void {

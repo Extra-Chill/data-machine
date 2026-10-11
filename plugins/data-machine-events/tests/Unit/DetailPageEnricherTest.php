@@ -14,6 +14,7 @@ namespace DataMachineEvents\Tests\Unit;
 use WP_UnitTestCase;
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Enrichers\DetailPageEnricher;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Enrichers\Sources\JsonLdEventSource;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Enrichers\Sources\TimeTextSource;
 
 class DetailPageEnricherTest extends WP_UnitTestCase {
@@ -207,6 +208,54 @@ class DetailPageEnricherTest extends WP_UnitTestCase {
 
 		$this->assertSame( array( 'startTime' ), $enricher->provides() );
 		$this->assertSame( 'detail_page', $enricher->getMethod() );
+	}
+
+	/**
+	 * A time filled from detail-page JSON-LD carries the source offset, so the
+	 * localizer can convert it to venue time (#907). A text time carries none.
+	 */
+	public function test_filled_time_carries_its_source_offset(): void {
+		$jsonld = '<script type="application/ld+json">' . wp_json_encode(
+			array(
+				'@context'  => 'https://schema.org',
+				'@type'     => 'Event',
+				'name'      => 'Detail Show',
+				'startDate' => '2026-10-12T03:00:00Z',
+				'location'  => array(
+					'@type' => 'Place',
+					'name'  => 'Venue',
+				),
+			)
+		) . '</script>';
+		$pages  = array(
+			'https://venue.example/show/7' => $jsonld,
+			'https://venue.example/show/8' => '<html><body><p>Startar 20:00</p></body></html>',
+		);
+
+		$enricher = new DetailPageEnricher(
+			static fn( string $url ): ?string => $pages[ $url ] ?? null,
+			array( new JsonLdEventSource(), new TimeTextSource() )
+		);
+		$events   = array(
+			array(
+				'title'      => 'From JSON-LD',
+				'startTime'  => '',
+				'source_url' => 'https://venue.example/show/7',
+			),
+			array(
+				'title'       => 'From text',
+				'startTime'   => '',
+				'startOffset' => '+00:00',
+				'source_url'  => 'https://venue.example/show/8',
+			),
+		);
+
+		$enriched = $enricher->run( $events, array( 'startTime' ), 'https://venue.example/calendar', $this->context );
+
+		$this->assertSame( '03:00', $enriched[0]['startTime'] );
+		$this->assertSame( '+00:00', $enriched[0]['startOffset'] );
+		$this->assertSame( '20:00', $enriched[1]['startTime'] );
+		$this->assertSame( '', $enriched[1]['startOffset'] );
 	}
 
 	/**

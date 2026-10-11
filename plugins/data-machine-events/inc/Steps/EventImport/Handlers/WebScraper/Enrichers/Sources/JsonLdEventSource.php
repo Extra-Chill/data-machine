@@ -50,7 +50,7 @@ class JsonLdEventSource implements SourceInterface {
 	 *
 	 * @param string $html       Raw page HTML.
 	 * @param string $source_url URL the HTML was fetched from.
-	 * @return array{startTime?: string} Found fields; empty array when none found.
+	 * @return array{startTime?: string, startOffset?: string} Found fields; empty array when none found.
 	 */
 	public function extract( string $html, string $source_url = '' ): array {
 		if ( null === $this->json_ld_extractor ) {
@@ -61,7 +61,10 @@ class JsonLdEventSource implements SourceInterface {
 
 		foreach ( $events as $event ) {
 			if ( ! empty( $event['startTime'] ) ) {
-				return array( 'startTime' => (string) $event['startTime'] );
+				return array(
+					'startTime'   => (string) $event['startTime'],
+					'startOffset' => (string) ( $event['startOffset'] ?? '' ),
+				);
 			}
 		}
 

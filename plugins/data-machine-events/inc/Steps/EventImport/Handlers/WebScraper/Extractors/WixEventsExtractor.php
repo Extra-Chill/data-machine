@@ -311,15 +311,17 @@ class WixEventsExtractor extends BaseExtractor {
 		$timezone_id = $scheduling['timeZoneId'] ?? '';
 
 		if ( ! empty( $scheduling['startDate'] ) ) {
-			$start_parsed       = $this->parseUtcDatetime( $scheduling['startDate'], $timezone_id );
-			$event['startDate'] = $start_parsed['date'];
-			$event['startTime'] = $start_parsed['time'];
+			$start_parsed         = $this->parseUtcDatetime( $scheduling['startDate'], $timezone_id );
+			$event['startDate']   = $start_parsed['date'];
+			$event['startTime']   = $start_parsed['time'];
+			$event['startOffset'] = $start_parsed['offset'];
 		}
 
 		if ( ! empty( $scheduling['endDate'] ) ) {
-			$end_parsed       = $this->parseUtcDatetime( $scheduling['endDate'], $timezone_id );
-			$event['endDate'] = $end_parsed['date'];
-			$event['endTime'] = $end_parsed['time'];
+			$end_parsed         = $this->parseUtcDatetime( $scheduling['endDate'], $timezone_id );
+			$event['endDate']   = $end_parsed['date'];
+			$event['endTime']   = $end_parsed['time'];
+			$event['endOffset'] = $end_parsed['offset'];
 		}
 
 		if ( ! empty( $timezone_id ) && $this->isValidTimezone( $timezone_id ) ) {

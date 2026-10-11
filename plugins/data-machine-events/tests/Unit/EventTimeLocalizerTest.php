@@ -60,7 +60,7 @@ class EventTimeLocalizerTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'endOffset', $event );
 	}
 
-	public function test_floating_time_and_unknown_venue_zone_keep_source_wall_clock(): void {
+	public function test_floating_time_keeps_source_wall_clock(): void {
 		$floating = EventTimeLocalizer::localize(
 			array(
 				'startDate'   => '2026-10-12',
@@ -69,7 +69,30 @@ class EventTimeLocalizerTest extends WP_UnitTestCase {
 			),
 			'America/Los_Angeles'
 		);
-		$unknown  = EventTimeLocalizer::localize(
+
+		$this->assertSame( '03:00', $floating['startTime'] );
+	}
+
+	public function test_unknown_venue_zone_keeps_non_utc_offset_wall_clock(): void {
+		$event = EventTimeLocalizer::localize(
+			array(
+				'startDate'   => '2026-10-12',
+				'startTime'   => '20:00',
+				'startOffset' => '-05:00',
+			),
+			''
+		);
+
+		$this->assertSame( '2026-10-12', $event['startDate'] );
+		$this->assertSame( '20:00', $event['startTime'] );
+		$this->assertArrayNotHasKey( 'startOffset', $event );
+	}
+
+	public function test_unknown_venue_zone_puts_utc_time_in_site_timezone(): void {
+		$before = get_option( 'timezone_string' );
+		update_option( 'timezone_string', 'America/New_York' );
+
+		$event = EventTimeLocalizer::localize(
 			array(
 				'startDate'   => '2026-10-12',
 				'startTime'   => '03:00',
@@ -77,11 +100,10 @@ class EventTimeLocalizerTest extends WP_UnitTestCase {
 			),
 			''
 		);
+		update_option( 'timezone_string', $before );
 
-		$this->assertSame( '03:00', $floating['startTime'] );
-		$this->assertSame( '2026-10-12', $unknown['startDate'] );
-		$this->assertSame( '03:00', $unknown['startTime'] );
-		$this->assertArrayNotHasKey( 'startOffset', $unknown );
+		$this->assertSame( '2026-10-11', $event['startDate'] );
+		$this->assertSame( '23:00', $event['startTime'] );
 	}
 
 	public function test_date_only_event_is_not_converted(): void {
@@ -110,6 +132,34 @@ class EventTimeLocalizerTest extends WP_UnitTestCase {
 		wp_delete_term( $term['term_id'], 'venue' );
 
 		$this->assertSame( 'America/Denver', $zone );
+	}
+
+	public function test_source_zone_beats_split_state_estimate(): void {
+		// El Paso, TX is Mountain; the offline estimate for TX without a
+		// matching boundary rule would be Central. A source-declared zone wins.
+		$zone = EventTimeLocalizer::venueTimezone(
+			array(
+				'venueState'    => 'TX',
+				'venueCountry'  => 'US',
+				'venueTimezone' => 'America/Denver',
+			),
+			array()
+		);
+
+		$this->assertSame( 'America/Denver', $zone );
+	}
+
+	public function test_exact_region_beats_source_zone(): void {
+		$zone = EventTimeLocalizer::venueTimezone(
+			array(
+				'venueState'    => 'GA',
+				'venueCountry'  => 'US',
+				'venueTimezone' => 'America/Chicago',
+			),
+			array()
+		);
+
+		$this->assertSame( 'America/New_York', $zone );
 	}
 
 	public function test_venue_timezone_from_location_then_hint(): void {

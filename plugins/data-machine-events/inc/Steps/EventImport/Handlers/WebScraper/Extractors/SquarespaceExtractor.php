@@ -1081,30 +1081,35 @@ class SquarespaceExtractor extends BaseExtractor {
 
 		if ( ! empty( $item['startDate'] ) ) {
 			if ( is_numeric( $item['startDate'] ) || preg_match( '/^\d{4}-\d{2}-\d{2}/', $item['startDate'] ) ) {
-				$parsed             = $this->parseSquarespaceTimestamp( $item['startDate'], $timezone );
-				$event['startDate'] = $parsed['date'];
-				$event['startTime'] = $parsed['time'];
+				$parsed               = $this->parseSquarespaceTimestamp( $item['startDate'], $timezone );
+				$event['startDate']   = $parsed['date'];
+				$event['startTime']   = $parsed['time'];
+				$event['startOffset'] = $parsed['offset'];
 			} else {
 				$this->parseTextDate( $event, $item['startDate'] );
 			}
 		} elseif ( ! empty( $item['publishOn'] ) ) {
-			$parsed             = $this->parseSquarespaceTimestamp( $item['publishOn'], $timezone );
-			$event['startDate'] = $parsed['date'];
-			$event['startTime'] = $parsed['time'];
+			$parsed               = $this->parseSquarespaceTimestamp( $item['publishOn'], $timezone );
+			$event['startDate']   = $parsed['date'];
+			$event['startTime']   = $parsed['time'];
+			$event['startOffset'] = $parsed['offset'];
 		}
 
 		if ( $pre_extracted_time && ( empty( $event['startTime'] ) || '00:00' === $event['startTime'] ) ) {
-			$event['startTime'] = $pre_extracted_time;
+			$event['startTime']   = $pre_extracted_time;
+			$event['startOffset'] = '';
 		}
 
 		if ( ! empty( $item['endDate'] ) ) {
-			$parsed           = $this->parseSquarespaceTimestamp( $item['endDate'], $timezone );
-			$event['endDate'] = $parsed['date'];
-			$event['endTime'] = $parsed['time'];
+			$parsed             = $this->parseSquarespaceTimestamp( $item['endDate'], $timezone );
+			$event['endDate']   = $parsed['date'];
+			$event['endTime']   = $parsed['time'];
+			$event['endOffset'] = $parsed['offset'];
 		}
 
 		// Fallback: search description for dates if not found
 		if ( empty( $event['startDate'] ) ) {
+			$event['startOffset'] = '';
 			$this->extractDateFromText( $event, $event['description'] );
 		}
 	}

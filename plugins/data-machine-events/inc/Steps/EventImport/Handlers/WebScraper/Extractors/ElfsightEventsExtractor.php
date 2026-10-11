@@ -47,7 +47,7 @@ class ElfsightEventsExtractor extends BaseExtractor {
 		}
 
 		$page_venue = PageVenueExtractor::extract( $html, $source_url );
-		$timezone   = $page_venue['venueTimezone'] ? $page_venue['venueTimezone'] : 'America/Chicago';
+		$timezone   = $this->isValidTimezone( (string) $page_venue['venueTimezone'] ) ? (string) $page_venue['venueTimezone'] : '';
 
 		$normalized_events = array();
 		foreach ( $events as $event ) {
@@ -142,8 +142,9 @@ class ElfsightEventsExtractor extends BaseExtractor {
 	 * Normalize Elfsight event to standard format.
 	 */
 	private function normalizeEvent( array $event, array $locations, array $page_venue, string $timezone ): array {
-		$start_parsed = $this->parseUtcTimestamp( $event['start'] ?? 0, $timezone );
-		$end_parsed   = $this->parseUtcTimestamp( $event['end'] ?? 0, $timezone );
+		$convert_in   = '' !== $timezone ? $timezone : 'UTC';
+		$start_parsed = $this->parseUtcTimestamp( $event['start'] ?? 0, $convert_in );
+		$end_parsed   = $this->parseUtcTimestamp( $event['end'] ?? 0, $convert_in );
 
 		$location_data = $this->resolveLocation( $event['location'] ?? '', $locations );
 
@@ -154,6 +155,8 @@ class ElfsightEventsExtractor extends BaseExtractor {
 			'endDate'       => $end_parsed['date'],
 			'startTime'     => $start_parsed['time'],
 			'endTime'       => $end_parsed['time'],
+			'startOffset'   => $start_parsed['offset'],
+			'endOffset'     => $end_parsed['offset'],
 			'venue'         => '',
 			'venueAddress'  => '',
 			'venueCity'     => '',

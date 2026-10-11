@@ -338,19 +338,8 @@ GRAPHQL;
 		$utc_starts = $event['startsAt'] ?? '';
 		$utc_ends   = $event['endsAt'] ?? '';
 
-		$start_parsed = ! empty( $utc_starts )
-			? $this->parseUtcDatetime( $utc_starts, $timezone )
-			: array(
-				'date' => '',
-				'time' => '',
-			);
-
-		$end_parsed = ! empty( $utc_ends )
-			? $this->parseUtcDatetime( $utc_ends, $timezone )
-			: array(
-				'date' => '',
-				'time' => '',
-			);
+		$start_parsed = $this->parseUtcDatetime( (string) $utc_starts, $timezone );
+		$end_parsed   = $this->parseUtcDatetime( (string) $utc_ends, $timezone );
 
 		// Venue — often secret/unlisted for Sofar shows.
 		$venue_name    = $this->sanitizeText( $event['venue']['venueName'] ?? '' );
@@ -389,6 +378,8 @@ GRAPHQL;
 			'endDate'          => $end_parsed['date'],
 			'startTime'        => $start_parsed['time'],
 			'endTime'          => $end_parsed['time'],
+			'startOffset'      => $start_parsed['offset'],
+			'endOffset'        => $end_parsed['offset'],
 			'venue'            => $venue_name,
 			'venueAddress'     => $venue_address,
 			'venueCity'        => $city_title,
