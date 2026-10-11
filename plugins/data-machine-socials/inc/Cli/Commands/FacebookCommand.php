@@ -542,4 +542,234 @@ class FacebookCommand {
 		WP_CLI::success( 'Post deleted successfully!' );
 		WP_CLI::log( 'Post ID: ' . $result['data']['post_id'] );
 	}
+
+	/**
+	 * Print the opt-in authorization URL that adds paid-promotion permissions.
+	 *
+	 * Open it in a browser while logged in as a site admin. The default Page
+	 * connection never requests ads access; this is the only way to grant it.
+	 *
+	 * @subcommand ads-connect
+	 */
+	public function ads_connect( $args, $assoc_args ) {
+		$auth = ( new AuthAbilities() )->getProvider( 'facebook' );
+		if ( ! $auth instanceof \DataMachineSocials\Handlers\Facebook\FacebookAuth ) {
+			WP_CLI::error( 'Facebook auth provider not available.' );
+		}
+		WP_CLI::log( 'Approve ads access (expires in 15 minutes):' );
+		WP_CLI::log( $auth->get_ads_authorization_url() );
+	}
+
+	/**
+	 * Show or set the ad account and hard spend limits.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--account=<act_id>]
+	 * : Ad account to promote from (act_<id> or numeric id).
+	 *
+	 * [--max-budget=<amount>]
+	 * : Hard cap on one promotion's lifetime budget, in account currency.
+	 *
+	 * [--max-days=<days>]
+	 * : Hard cap on one promotion's duration.
+	 *
+	 * @subcommand ads-config
+	 */
+	public function ads_config( $args, $assoc_args ) {
+		$auth = \DataMachineSocials\Handlers\Facebook\FacebookGraphClient::auth();
+		if ( ! $auth ) {
+			WP_CLI::error( 'Facebook auth provider not available.' );
+		}
+
+		if ( isset( $assoc_args['account'] ) && ! $auth->set_ad_account_id( (string) $assoc_args['account'] ) ) {
+			WP_CLI::error( 'Invalid ad account ID. Use act_<digits> or the numeric ID.' );
+		}
+
+		$changes = array();
+		if ( isset( $assoc_args['max-budget'] ) ) {
+			$changes['max_lifetime_budget'] = $assoc_args['max-budget'];
+		}
+		if ( isset( $assoc_args['max-days'] ) ) {
+			$changes['max_duration_days'] = $assoc_args['max-days'];
+		}
+		$limits = $changes ? \DataMachineSocials\Abilities\Facebook\FacebookAdsPolicy::save_limits( $changes ) : \DataMachineSocials\Abilities\Facebook\FacebookAdsPolicy::limits();
+		if ( is_wp_error( $limits ) ) {
+			WP_CLI::error( $limits->get_error_message() );
+		}
+
+		$account = $auth->get_ad_account_id();
+		WP_CLI::log( 'Ad account:      ' . ( '' !== $account ? $account : '(none)' ) );
+		WP_CLI::log( 'Max budget:      ' . $limits['max_lifetime_budget'] . ' per promotion' );
+		WP_CLI::log( 'Max duration:    ' . $limits['max_duration_days'] . ' days' );
+		WP_CLI::log( 'Ads permission:  ' . ( $auth->has_ads_permission() ? 'granted' : 'not granted (run ads-connect)' ) );
+	}
+
+	/**
+	 * List ad accounts available to the connected Facebook user.
+	 *
+	 * @subcommand ad-accounts
+	 */
+	public function ad_accounts( $args, $assoc_args ) {
+		$result = $this->run_ads_ability( 'datamachine/facebook-ad-accounts', array() );
+		foreach ( $result['accounts'] as $account ) {
+			WP_CLI::log( sprintf( '  %s  %s  %s  status=%s%s', $account['id'] ?? '', $account['currency'] ?? '', $account['name'] ?? '', $account['account_status'] ?? '', ( $account['id'] ?? '' ) === $result['selected'] ? '  (selected)' : '' ) );
+		}
+	}
+
+	/**
+	 * Search Meta ad targeting interests.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <query>
+	 * : Interest keyword.
+	 *
+	 * @subcommand ads-interests
+	 */
+	public function ads_interests( $args, $assoc_args ) {
+		$result = $this->run_ads_ability( 'datamachine/facebook-ads-interests', array( 'query' => $args[0] ) );
+		foreach ( $result['interests'] as $interest ) {
+			WP_CLI::log( sprintf( '  %s  %s  (~%s people)', $interest['id'], $interest['name'], $interest['audience_size'] ?? '?' ) );
+		}
+	}
+
+	/**
+	 * Stage a paused, budget-capped promotion for human approval.
+	 *
+	 * Creates the campaign, ad set and ad PAUSED and files a pending action.
+	 * Nothing spends until an administrator runs
+	 * `wp datamachine pending-actions accept <action_id>`.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --budget=<amount>
+	 * : Lifetime budget in account currency (hard-capped).
+	 *
+	 * --end=<datetime>
+	 * : When the promotion stops.
+	 *
+	 * [--start=<datetime>]
+	 * : When it starts (default: 15 minutes from now).
+	 *
+	 * --lat=<latitude>
+	 * : Center of the audience radius.
+	 *
+	 * --lng=<longitude>
+	 * : Center of the audience radius.
+	 *
+	 * --radius=<miles>
+	 * : Audience radius in miles (1-50).
+	 *
+	 * --link=<url>
+	 * : Destination URL (https).
+	 *
+	 * [--name=<name>]
+	 * : Campaign name.
+	 *
+	 * [--age-min=<age>]
+	 * : Minimum age (default 21).
+	 *
+	 * [--age-max=<age>]
+	 * : Maximum age (default 65).
+	 *
+	 * [--interests=<list>]
+	 * : Comma-separated interest keywords.
+	 *
+	 * [--post=<post_id>]
+	 * : Promote an existing Page post instead of building a link ad.
+	 *
+	 * [--ig-post=<media_id>]
+	 * : Boost an existing Instagram post (numeric media ID from
+	 *   `wp datamachine-socials instagram posts`). Defaults to Instagram placements only.
+	 *
+	 * [--platforms=<list>]
+	 * : Comma-separated placements: facebook, instagram (default both).
+	 *
+	 * [--message=<text>]
+	 * : Ad text (link ad).
+	 *
+	 * [--headline=<text>]
+	 * : Ad headline (link ad).
+	 *
+	 * [--image=<path>]
+	 * : Local image for the link ad.
+	 *
+	 * [--image-url=<url>]
+	 * : Public image URL for the link ad.
+	 */
+	public function promote( $args, $assoc_args ) {
+		$input = array(
+			'name'               => $assoc_args['name'] ?? '',
+			'budget'             => (float) $assoc_args['budget'],
+			'start_time'         => $assoc_args['start'] ?? '',
+			'end_time'           => $assoc_args['end'],
+			'latitude'           => (float) $assoc_args['lat'],
+			'longitude'          => (float) $assoc_args['lng'],
+			'radius_miles'       => (int) $assoc_args['radius'],
+			'age_min'            => (int) ( $assoc_args['age-min'] ?? 21 ),
+			'age_max'            => (int) ( $assoc_args['age-max'] ?? 65 ),
+			'interests'          => isset( $assoc_args['interests'] ) ? array_map( 'trim', explode( ',', $assoc_args['interests'] ) ) : array(),
+			'link'               => $assoc_args['link'],
+			'post_id'            => $assoc_args['post'] ?? '',
+			'instagram_media_id' => $assoc_args['ig-post'] ?? '',
+			'platforms'          => isset( $assoc_args['platforms'] ) ? explode( ',', $assoc_args['platforms'] ) : array(),
+			'message'            => $assoc_args['message'] ?? '',
+			'headline'           => $assoc_args['headline'] ?? '',
+			'image_path'         => $assoc_args['image'] ?? '',
+			'image_url'          => $assoc_args['image-url'] ?? '',
+		);
+
+		$result    = $this->run_ads_ability( 'datamachine/facebook-ads-promote', $input );
+		$action_id = (string) ( $result['action_id'] ?? '' );
+
+		WP_CLI::success( 'Promotion created PAUSED. Nothing will spend until it is approved.' );
+		WP_CLI::log( wp_json_encode( $result['preview'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		WP_CLI::log( '' );
+		if ( ! empty( $result['links']['approve_url'] ) ) {
+			WP_CLI::log( 'Approve link: ' . $result['links']['approve_url'] );
+			WP_CLI::log( 'Reject link:  ' . $result['links']['reject_url'] );
+			WP_CLI::log( 'Links expire: ' . $result['links']['expires_at'] );
+			WP_CLI::log( '' );
+		}
+		WP_CLI::log( 'Approve: wp datamachine pending-actions accept ' . $action_id );
+		WP_CLI::log( 'Reject:  wp datamachine pending-actions reject ' . $action_id . '   (deletes the paused promotion)' );
+	}
+
+	/**
+	 * Spend, reach and link clicks for promotions.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [<campaign_id>]
+	 * : One campaign (default: all in the configured ad account).
+	 *
+	 * @subcommand ads-report
+	 */
+	public function ads_report( $args, $assoc_args ) {
+		$result = $this->run_ads_ability( 'datamachine/facebook-ads-report', array( 'campaign_id' => $args[0] ?? '' ) );
+		foreach ( $result['campaigns'] as $campaign ) {
+			$i = $campaign['insights']['data'][0] ?? array();
+			WP_CLI::log( sprintf( '  %s  %-8s  spend=%s reach=%s clicks=%s  %s', $campaign['id'] ?? '', $campaign['effective_status'] ?? '', $i['spend'] ?? '0', $i['reach'] ?? '0', $i['inline_link_clicks'] ?? '0', $campaign['name'] ?? '' ) );
+		}
+	}
+
+	/**
+	 * Execute an ads ability or exit with its error.
+	 *
+	 * @param string $slug  Ability slug.
+	 * @param array  $input Ability input.
+	 * @return array
+	 */
+	private function run_ads_ability( string $slug, array $input ): array {
+		$ability = wp_get_ability( $slug );
+		if ( ! $ability ) {
+			WP_CLI::error( $slug . ' ability not registered.' );
+		}
+		$result = $ability->execute( $input );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+		return (array) $result;
+	}
 }
