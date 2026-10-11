@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.184.0] - 2026-10-11
+
+### Added
+- resolve a chat actor to a WordPress person for an agent
+
+### Changed
+- drop Homeboy review audit and refactor lint
+
 ## [0.183.1] - 2026-10-05
 
 ### Fixed
