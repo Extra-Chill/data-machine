@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.18.4] - 2026-10-11
+
+### Changed
+- drop Homeboy review audit
+
 ## [0.18.3] - 2026-10-01
 
 ### Fixed
