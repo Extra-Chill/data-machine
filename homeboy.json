@@ -1250,45 +1250,6 @@
       ]
     }
   },
-  "transforms": {
-    "drop_wp_ability_dead_guards": {
-      "description": "Drop dead class_exists('WP_Ability') and class_exists('WP_Abilities_Registry') guards. Plugin header requires WP 7.0 where both classes ship in core, so every guard on these symbols is unreachable. Ref: https://github.com/Extra-Chill/data-machine/issues/XXXX",
-      "rules": [
-        {
-          "context": "file",
-          "description": "Remove standalone if ( ! class_exists( 'WP_Ability' ) ) { return; } blocks.",
-          "files": "inc/Abilities/**/*.php",
-          "find": "(?s)\n\t\tif \\( ! class_exists\\( ?'WP_Ability' ?\\) \\) \\{\n\t\t\treturn;\n\t\t\\}\n",
-          "id": "simple_guard",
-          "replace": ""
-        },
-        {
-          "context": "file",
-          "description": "Drop the WP_Ability half of 'if ( ! class_exists( WP_Ability ) || self::$registered ) { return; }' guards.",
-          "files": "inc/Abilities/**/*.php",
-          "find": "(?s)if \\( ! class_exists\\( 'WP_Ability' \\) \\|\\| self::\\$registered \\) \\{\n\t+return;\n\t+\\}",
-          "id": "combined_guard_registered",
-          "replace": "if ( self::$$registered ) {\n\t\t\treturn;\n\t\t}"
-        },
-        {
-          "context": "line",
-          "description": "Replace '(class_exists(WP_Abilities_Registry) ? WP_Abilities_Registry::get_instance() : null)' with a direct call — the ternary is unreachable.",
-          "files": "inc/**/*.php",
-          "find": "class_exists\\( 'WP_Abilities_Registry' \\) \\? \\\\WP_Abilities_Registry::get_instance\\(\\) : null",
-          "id": "ternary_registry_guard",
-          "replace": "\\\\WP_Abilities_Registry::get_instance()"
-        },
-        {
-          "context": "file",
-          "description": "Same as combined_guard_registered but catches the one hit in inc/Engine/ (ResolvePendingActionAbility).",
-          "files": "inc/Engine/**/*.php",
-          "find": "(?s)if \\( ! class_exists\\( 'WP_Ability' \\) \\|\\| self::\\$registered \\) \\{\n\t+return;\n\t+\\}",
-          "id": "combined_guard_registered_engine",
-          "replace": "if ( self::$$registered ) {\n\t\t\treturn;\n\t\t}"
-        }
-      ]
-    }
-  },
   "version_targets": [
     {
       "file": "data-machine.php",
