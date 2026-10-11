@@ -148,9 +148,10 @@ class RedditAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				return $this->get_reddit_user_identity( $token_data, $developer_username );
 			},
 			null,
-			function ( $account_data ) {
-				$this->save_account( $account_data );
+			function ( $account_data ): bool {
+				$saved = $this->save_account( $account_data );
 				$this->schedule_proactive_refresh();
+				return $saved;
 			}
 		);
 	}

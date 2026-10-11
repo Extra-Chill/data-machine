@@ -150,9 +150,10 @@ class YouTubeAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				);
 			},
 			null,
-			function ( array $account_data ) {
-				$this->save_account( $account_data );
+			function ( array $account_data ): bool {
+				$saved = $this->save_account( $account_data );
 				$this->schedule_proactive_refresh();
+				return $saved;
 			}
 		);
 	}

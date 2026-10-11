@@ -176,9 +176,10 @@ class PinterestAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				return $this->build_account_data( $token_data );
 			},
 			null,
-			function ( $account_data ) {
-				$this->save_account( $account_data );
+			function ( $account_data ): bool {
+				$saved = $this->save_account( $account_data );
 				$this->schedule_proactive_refresh();
+				return $saved;
 			}
 		);
 	}

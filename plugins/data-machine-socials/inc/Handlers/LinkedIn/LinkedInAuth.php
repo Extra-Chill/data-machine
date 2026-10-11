@@ -202,9 +202,10 @@ class LinkedInAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				return $account_data;
 			},
 			null, // No two-stage token exchange needed for LinkedIn.
-			function ( $account_data ) {
-				$this->save_account( $account_data );
+			function ( $account_data ): bool {
+				$saved = $this->save_account( $account_data );
 				$this->schedule_proactive_refresh();
+				return $saved;
 			}
 		);
 	}
