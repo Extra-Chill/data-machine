@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.5] - 2026-10-11
+
+### Changed
+- drop Homeboy review audit and its baseline
+
 ## [0.66.4] - 2026-10-11
 
 ### Fixed
