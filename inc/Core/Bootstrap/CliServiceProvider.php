@@ -67,6 +67,7 @@ final class CliServiceProvider {
 			'datamachine blocks'           => \DataMachine\Cli\Commands\BlocksCommand::class,
 			'datamachine meta-description' => \DataMachine\Cli\Commands\MetaDescriptionCommand::class,
 			'datamachine chat'             => \DataMachine\Cli\Commands\ChatCommand::class,
+			'datamachine chat-identity'    => \DataMachine\Cli\Commands\ChatIdentityCommand::class,
 		);
 
 		foreach ( $commands as $command => $class ) {

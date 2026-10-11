@@ -115,6 +115,7 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\Taxonomy\DeleteTaxonomyTermAbility();
 		new \DataMachine\Abilities\AgentAbilities();
 		new \DataMachine\Abilities\AgentTokenAbilities();
+		new \DataMachine\Abilities\ChatIdentityAbilities();
 		new \DataMachine\Abilities\AgentMemoryAbilities();
 		new \DataMachine\Abilities\InjectableMemoryFilesAbility();
 		new \DataMachine\Abilities\DailyMemoryAbilities();
