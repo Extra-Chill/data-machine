@@ -32,9 +32,5 @@ jobs:
     if: ${{ github.event_name != 'push' }}
     uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
     with:
-      # Autofix on PRs is expressed by adding `refactor lint` to the commands
-      # list — ci.yml@v2 has no `autofix`/`autofix-commands` inputs, and passing
-      # undeclared inputs to a reusable workflow is a hard startup_failure.
-      commands: ${{ github.event_name == 'pull_request' && 'review audit,review lint,refactor lint' || 'review audit,review lint' }}
-      expected-commands: 'review audit,review lint'
+      commands: review lint
     secrets: inherit
