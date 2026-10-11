@@ -242,7 +242,7 @@ class UpcomingCountAbilities {
 		$upcoming_where = $upcoming_sql['where'];
 
 		$parent_clause = $exclude_roots ? 'AND tt.parent != 0' : '';
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names and optional clauses are internally constructed; request values remain prepared.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Table names and optional clauses are internally constructed; request values remain prepared. The interpolated UpcomingFilter clause carries two %s placeholders.
 
 		if ( $has_filter ) {
 			// Co-occurrence join: require each counted post to ALSO be tagged
@@ -309,7 +309,7 @@ class UpcomingCountAbilities {
 			);
 		}
 
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		$terms = array();
 		foreach ( $rows as $row ) {
 			$url = get_term_link( (int) $row->term_id, $taxonomy );
@@ -368,7 +368,7 @@ class UpcomingCountAbilities {
 
 		// Pull every (term_id, object_id) pair for upcoming published events
 		// in this taxonomy. One pass; deduped per-ancestor in PHP below.
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- The event dates table name is internally generated; request values remain prepared.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The event dates table name is internally generated; request values remain prepared. The interpolated UpcomingFilter clause carries two %s placeholders.
 		if ( $has_filter ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$pairs = $wpdb->get_results(
@@ -408,7 +408,7 @@ class UpcomingCountAbilities {
 		}
 
 		// Parent map for every term in the taxonomy (term_id => parent_id).
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		// hide_empty=false so ancestors with zero direct tags are present.
 		$all_terms = get_terms(
 			array(

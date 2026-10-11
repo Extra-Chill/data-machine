@@ -164,7 +164,7 @@ class VenueProfileMutations {
 	 */
 	public static function lockName( int $term_id ): string {
 		global $wpdb;
-		$scope = DB_NAME . '|' . $wpdb->prefix . '|' . get_current_blog_id() . '|' . $term_id;
+		$scope = (string) constant( 'DB_NAME' ) . '|' . $wpdb->prefix . '|' . get_current_blog_id() . '|' . $term_id;
 		return 'dme:venue:' . md5( $scope );
 	}
 
