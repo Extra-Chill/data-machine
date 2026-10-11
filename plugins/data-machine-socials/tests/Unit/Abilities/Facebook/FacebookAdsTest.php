@@ -13,6 +13,7 @@
 
 namespace DataMachineSocials\Tests\Unit\Abilities\Facebook;
 
+use DataMachineSocials\Abilities\Facebook\FacebookAdsReadAbility;
 use DataMachineSocials\Abilities\Facebook\FacebookPromotionApproval;
 use DataMachineSocials\Abilities\Facebook\FacebookAdsPolicy;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
@@ -192,5 +193,92 @@ class FacebookAdsTest extends WP_UnitTestCase {
 		$this->assertWPError( FacebookPromotionApproval::can_resolve( array(), 'accepted', $editor ) );
 		$this->assertWPError( FacebookPromotionApproval::can_resolve( array(), 'accepted', 0 ) );
 		$this->assertTrue( FacebookPromotionApproval::can_resolve( array(), 'accepted', 0, array( 'resolution_transport' => 'signed_url' ) ) );
+	}
+
+	private function live_adset(): array {
+		return array(
+			'lifetime_budget' => 5000,
+			'start_time'      => gmdate( 'c', self::NOW ),
+			'end_time'        => gmdate( 'c', self::NOW + 9 * DAY_IN_SECONDS ),
+			'targeting'       => array(
+				'geo_locations'        => array(
+					'custom_locations' => array(
+						array(
+							'latitude'      => 32.8335,
+							'longitude'     => -79.9567,
+							'radius'        => 15,
+							'distance_unit' => 'mile',
+						),
+					),
+				),
+				'age_min'              => 21,
+				'age_max'              => 65,
+				'publisher_platforms'  => array( 'instagram' ),
+				'targeting_automation' => array( 'advantage_audience' => 0 ),
+				'flexible_spec'        => array( array( 'interests' => array( array( 'id' => '1', 'name' => 'Beer' ) ) ) ),
+			),
+		);
+	}
+
+	public function test_plan_update_edits_only_what_was_asked(): void {
+		$plan = FacebookAdsPolicy::plan_update( $this->live_adset(), array( 'budget' => 70 ), null, $this->limits(), 100, 10.0, self::NOW );
+
+		$this->assertSame( array( 'lifetime_budget' => 7000 ), $plan['fields'] );
+		$this->assertSame( '50.00 lifetime', $plan['before']['budget'] );
+		$this->assertSame( '70.00 lifetime', $plan['after']['budget'] );
+	}
+
+	public function test_plan_update_replaces_interests_and_keeps_audience_locked(): void {
+		$adset = $this->live_adset();
+		unset( $adset['targeting']['targeting_automation'] );
+
+		$plan = FacebookAdsPolicy::plan_update( $adset, array( 'radius_miles' => 20 ), array( array( 'id' => '2', 'name' => 'GitHub' ) ), $this->limits(), 100, 0.0, self::NOW );
+
+		$t = $plan['fields']['targeting'];
+		$this->assertSame( 20, $t['geo_locations']['custom_locations'][0]['radius'] );
+		$this->assertSame( 'GitHub', $t['flexible_spec'][0]['interests'][0]['name'] );
+		$this->assertSame( array( 'instagram' ), $t['publisher_platforms'] );
+		$this->assertSame( 0, $t['targeting_automation']['advantage_audience'] );
+	}
+
+	/**
+	 * @dataProvider update_refusals
+	 */
+	public function test_plan_update_refuses( array $changes, ?array $interests, float $spent, string $code ): void {
+		$result = FacebookAdsPolicy::plan_update( $this->live_adset(), $changes, $interests, $this->limits(), 100, $spent, self::NOW );
+
+		$this->assertWPError( $result );
+		$this->assertSame( $code, $result->get_error_code() );
+	}
+
+	public static function update_refusals(): array {
+		return array(
+			'over budget cap'   => array( array( 'budget' => 76 ), null, 0.0, 'budget_over_limit' ),
+			'below spend'       => array( array( 'budget' => 20 ), null, 25.0, 'budget_below_spend' ),
+			'over duration cap' => array( array( 'end_time' => self::NOW + 11 * DAY_IN_SECONDS ), null, 0.0, 'duration_over_limit' ),
+			'end in past'       => array( array( 'end_time' => self::NOW - DAY_IN_SECONDS ), null, 0.0, 'invalid_schedule' ),
+			'radius too big'    => array( array( 'radius_miles' => 80 ), null, 0.0, 'invalid_location' ),
+			'too young'         => array( array( 'age_min' => 13 ), null, 0.0, 'invalid_age' ),
+			'too many'          => array( array(), array_fill( 0, 11, array( 'id' => '9', 'name' => 'x' ) ), 0.0, 'too_many_interests' ),
+			'no changes'        => array( array(), null, 0.0, 'nothing_to_update' ),
+		);
+	}
+
+	public function test_exact_interest_match_never_guesses(): void {
+		$candidates = array(
+			array( 'id' => '1', 'name' => 'App Store (iOS)' ),
+			array( 'id' => '2', 'name' => 'Open-source software' ),
+		);
+
+		$this->assertNull( FacebookAdsReadAbility::exact_match( 'open source', $candidates ) );
+		$this->assertSame( '2', FacebookAdsReadAbility::exact_match( 'open-source SOFTWARE', $candidates )['id'] );
+	}
+
+	public function test_operator_grant_covers_create_and_update_only(): void {
+		$grant = FacebookPromotionApproval::resolver_grants()[0];
+
+		$this->assertSame( 'operator', $grant['type'] );
+		$this->assertSame( array( FacebookPromotionApproval::KIND, FacebookPromotionApproval::UPDATE_KIND ), $grant['kinds'] );
+		$this->assertGreaterThanOrEqual( 3, ( new \ReflectionMethod( FacebookPromotionApproval::class, 'apply_update' ) )->getNumberOfParameters() );
 	}
 }

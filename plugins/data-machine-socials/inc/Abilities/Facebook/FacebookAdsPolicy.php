@@ -281,6 +281,152 @@ final class FacebookAdsPolicy {
 	}
 
 	/**
+	 * Plan an edit to a live promotion's ad set.
+	 *
+	 * Starts from the ad set as Meta returns it and applies only the
+	 * requested changes; everything else in targeting is preserved, except
+	 * that Advantage+ audience expansion is always forced off. The result
+	 * must still satisfy every hard limit.
+	 *
+	 * @param array      $adset     Ad set: lifetime_budget (minor), start_time, end_time, targeting.
+	 * @param array      $changes   Any of: budget, end_time, radius_miles, latitude, longitude, age_min, age_max.
+	 * @param array|null $interests Resolved interests replacing the current set; null = unchanged.
+	 * @param array      $limits    Output of limits().
+	 * @param int        $offset    Currency offset.
+	 * @param float      $spent     Amount already spent (major units).
+	 * @param int        $now       Current Unix time.
+	 * @return array{fields: array, before: array, after: array}|\WP_Error
+	 */
+	public static function plan_update( array $adset, array $changes, ?array $interests, array $limits, int $offset, float $spent, int $now ) {
+		$targeting = is_array( $adset['targeting'] ?? null ) ? $adset['targeting'] : array();
+		$start     = (int) strtotime( (string) ( $adset['start_time'] ?? '' ) );
+		$end       = (int) strtotime( (string) ( $adset['end_time'] ?? '' ) );
+		$budget    = (int) ( $adset['lifetime_budget'] ?? 0 ) / max( 1, $offset );
+		$before    = self::summarize( $budget, $end, $targeting );
+		$fields    = array();
+
+		if ( array_key_exists( 'budget', $changes ) && '' !== (string) $changes['budget'] ) {
+			$new = (float) $changes['budget'];
+			if ( $new > (float) $limits['max_lifetime_budget'] ) {
+				return new \WP_Error( 'budget_over_limit', sprintf( 'budget %s exceeds the hard limit of %s per promotion.', self::money( $new ), self::money( (float) $limits['max_lifetime_budget'] ) ) );
+			}
+			if ( $new <= $spent ) {
+				return new \WP_Error( 'budget_below_spend', sprintf( 'budget %s must be more than the %s already spent.', self::money( $new ), self::money( $spent ) ) );
+			}
+			$budget                    = $new;
+			$fields['lifetime_budget'] = (int) round( $new * $offset );
+		}
+
+		if ( array_key_exists( 'end_time', $changes ) && '' !== (string) $changes['end_time'] ) {
+			$new = self::to_time( $changes['end_time'], 0 );
+			if ( null === $new || 0 === $new || $new <= $now ) {
+				return new \WP_Error( 'invalid_schedule', 'end_time must be a valid future date.' );
+			}
+			if ( $new - $start > (int) $limits['max_duration_days'] * DAY_IN_SECONDS ) {
+				return new \WP_Error( 'duration_over_limit', sprintf( 'Promotion would run longer than the hard limit of %d days.', (int) $limits['max_duration_days'] ) );
+			}
+			$end                = $new;
+			$fields['end_time'] = gmdate( 'c', $new );
+		}
+
+		$targeting_changed = false;
+		$location          = $targeting['geo_locations']['custom_locations'][0] ?? null;
+		foreach ( array(
+			'radius_miles' => 'radius',
+			'latitude'     => 'latitude',
+			'longitude'    => 'longitude',
+		) as $in => $key ) {
+			if ( ! array_key_exists( $in, $changes ) || '' === (string) $changes[ $in ] ) {
+				continue;
+			}
+			if ( ! is_array( $location ) ) {
+				return new \WP_Error( 'unsupported_targeting', 'This ad set does not use a radius location, so it cannot be edited here.' );
+			}
+			$location[ $key ]  = 'radius' === $key ? (int) $changes[ $in ] : (float) $changes[ $in ];
+			$targeting_changed = true;
+		}
+		if ( is_array( $location ) ) {
+			$radius = (int) ( $location['radius'] ?? 0 );
+			if ( 'mile' === ( $location['distance_unit'] ?? 'mile' ) && ( $radius < self::MIN_RADIUS_MILES || $radius > self::MAX_RADIUS_MILES ) ) {
+				return new \WP_Error( 'invalid_location', sprintf( 'radius_miles must be between %d and %d.', self::MIN_RADIUS_MILES, self::MAX_RADIUS_MILES ) );
+			}
+			if ( abs( (float) ( $location['latitude'] ?? 0 ) ) > 90 || abs( (float) ( $location['longitude'] ?? 0 ) ) > 180 ) {
+				return new \WP_Error( 'invalid_location', 'latitude/longitude out of range.' );
+			}
+			$targeting['geo_locations']['custom_locations'][0] = $location;
+		}
+
+		foreach ( array( 'age_min', 'age_max' ) as $key ) {
+			if ( array_key_exists( $key, $changes ) && '' !== (string) $changes[ $key ] ) {
+				$targeting[ $key ] = (int) $changes[ $key ];
+				$targeting_changed = true;
+			}
+		}
+		$age_min = (int) ( $targeting['age_min'] ?? self::MIN_AGE );
+		$age_max = (int) ( $targeting['age_max'] ?? self::MAX_AGE );
+		if ( $age_min < self::MIN_AGE || $age_max > self::MAX_AGE || $age_min > $age_max ) {
+			return new \WP_Error( 'invalid_age', sprintf( 'Ages must be within %d-%d with age_min <= age_max.', self::MIN_AGE, self::MAX_AGE ) );
+		}
+
+		if ( null !== $interests ) {
+			if ( count( $interests ) > self::MAX_INTERESTS ) {
+				return new \WP_Error( 'too_many_interests', sprintf( 'At most %d interests.', self::MAX_INTERESTS ) );
+			}
+			unset( $targeting['flexible_spec'] );
+			if ( $interests ) {
+				$targeting['flexible_spec'] = array( array( 'interests' => array_values( $interests ) ) );
+			}
+			$targeting_changed = true;
+		}
+
+		if ( $targeting_changed ) {
+			$targeting['targeting_automation'] = array( 'advantage_audience' => 0 );
+			$fields['targeting']               = $targeting;
+		}
+
+		if ( empty( $fields ) ) {
+			return new \WP_Error( 'nothing_to_update', 'No changes requested.' );
+		}
+
+		return array(
+			'fields' => $fields,
+			'before' => $before,
+			'after'  => self::summarize( $budget, $end, $targeting ),
+		);
+	}
+
+	/**
+	 * Interests currently targeted by an ad set (first flexible_spec group).
+	 *
+	 * @param array $targeting Graph targeting spec.
+	 * @return array<int, array{id: string, name: string}>
+	 */
+	public static function current_interests( array $targeting ): array {
+		return array_values(
+			array_map(
+				static fn( $i ) => array(
+					'id'   => (string) ( $i['id'] ?? '' ),
+					'name' => (string) ( $i['name'] ?? '' ),
+				),
+				(array) ( $targeting['flexible_spec'][0]['interests'] ?? array() )
+			)
+		);
+	}
+
+	/**
+	 * Human-readable snapshot of an ad set for before/after previews.
+	 */
+	private static function summarize( float $budget, int $end, array $targeting ): array {
+		$loc = $targeting['geo_locations']['custom_locations'][0] ?? array();
+		return array(
+			'budget'    => self::money( $budget ) . ' lifetime',
+			'ends'      => $end ? gmdate( 'Y-m-d H:i', $end ) . ' UTC' : '?',
+			'audience'  => $loc ? sprintf( 'Ages %d-%d within %s %ss of %.4f,%.4f', (int) ( $targeting['age_min'] ?? 0 ), (int) ( $targeting['age_max'] ?? 0 ), (string) ( $loc['radius'] ?? '?' ), (string) ( $loc['distance_unit'] ?? 'mile' ), (float) ( $loc['latitude'] ?? 0 ), (float) ( $loc['longitude'] ?? 0 ) ) : 'non-radius location',
+			'interests' => array_map( static fn( $i ) => $i['name'], self::current_interests( $targeting ) ),
+		);
+	}
+
+	/**
 	 * Plain-language preview a human approves.
 	 *
 	 * @param array  $promotion Output of validate().

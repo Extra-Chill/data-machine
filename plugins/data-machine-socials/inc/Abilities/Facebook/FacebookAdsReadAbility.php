@@ -161,6 +161,100 @@ class FacebookAdsReadAbility extends AbstractSocialAbility {
 		);
 	}
 
+	/**
+	 * Resolve interest keywords to Meta interests, exactly (#285).
+	 *
+	 * Each entry is either a numeric Meta interest ID or a name. Names must
+	 * match a search result exactly (case-insensitive); otherwise this
+	 * refuses and lists the candidates instead of guessing.
+	 *
+	 * @param FacebookGraphClient $graph    Authorized client.
+	 * @param string[]            $keywords Interest names or IDs.
+	 * @return array<int, array{id: string, name: string}>|\WP_Error
+	 */
+	public static function resolve_interests( FacebookGraphClient $graph, array $keywords ) {
+		$resolved = array();
+		$ids      = array();
+
+		foreach ( $keywords as $keyword ) {
+			$keyword = trim( (string) $keyword );
+			if ( '' === $keyword ) {
+				continue;
+			}
+			if ( ctype_digit( $keyword ) ) {
+				$ids[] = $keyword;
+				continue;
+			}
+
+			$found = self::interests( $graph, $keyword, 10 );
+			if ( is_wp_error( $found ) ) {
+				return $found;
+			}
+			$match = self::exact_match( $keyword, $found['interests'] );
+			if ( null === $match ) {
+				$names = array_map( static fn( $i ) => $i['name'] . ' (' . $i['id'] . ')', array_slice( $found['interests'], 0, 5 ) );
+				return new \WP_Error(
+					'interest_not_exact',
+					sprintf( 'No interest named exactly "%s". Candidates: %s. Pass the exact name or its numeric ID.', $keyword, $names ? implode( ', ', $names ) : 'none' )
+				);
+			}
+			$resolved[ $match['id'] ] = array(
+				'id'   => $match['id'],
+				'name' => $match['name'],
+			);
+		}
+
+		if ( $ids ) {
+			$valid = $graph->get(
+				'/search',
+				array(
+					'type'               => 'adinterestvalid',
+					'interest_fbid_list' => $ids,
+				)
+			);
+			if ( is_wp_error( $valid ) ) {
+				return $valid;
+			}
+			$known = array();
+			foreach ( (array) ( $valid['data'] ?? array() ) as $row ) {
+				if ( ! empty( $row['valid'] ) && isset( $row['id'] ) ) {
+					$known[ (string) $row['id'] ] = (string) ( $row['name'] ?? '' );
+				}
+			}
+			foreach ( $ids as $id ) {
+				if ( ! isset( $known[ $id ] ) ) {
+					return new \WP_Error( 'interest_invalid', sprintf( 'Interest ID %s is not a valid Meta targeting interest.', $id ) );
+				}
+				$resolved[ $id ] = array(
+					'id'   => $id,
+					'name' => $known[ $id ],
+				);
+			}
+		}
+
+		return array_values( $resolved );
+	}
+
+	/**
+	 * Exact (case-insensitive) name match among search results.
+	 *
+	 * @param string $name       Requested name.
+	 * @param array  $candidates Search results ({id,name}).
+	 * @return array{id: string, name: string}|null
+	 */
+	public static function exact_match( string $name, array $candidates ): ?array {
+		$needle = mb_strtolower( trim( $name ) );
+		foreach ( $candidates as $candidate ) {
+			if ( mb_strtolower( trim( (string) ( $candidate['name'] ?? '' ) ) ) === $needle && '' !== (string) ( $candidate['id'] ?? '' ) ) {
+				return array(
+					'id'   => (string) $candidate['id'],
+					'name' => (string) $candidate['name'],
+				);
+			}
+		}
+		return null;
+	}
+
 	/** @return array|\WP_Error */
 	public function report( array $input = array() ) {
 		$graph = FacebookGraphClient::for_ads();

@@ -146,7 +146,7 @@ class FacebookAdsPromoteAbility extends AbstractSocialAbility {
 		$currency = (string) ( $account['currency'] ?? 'USD' );
 		$offset   = FacebookAdsPolicy::currency_offset( $currency );
 
-		$interests = $this->resolveInterests( $graph, $promotion['interests'] );
+		$interests = FacebookAdsReadAbility::resolve_interests( $graph, $promotion['interests'] );
 		if ( is_wp_error( $interests ) ) {
 			return $interests;
 		}
@@ -249,36 +249,11 @@ class FacebookAdsPromoteAbility extends AbstractSocialAbility {
 	}
 
 	/**
-	 * Resolve interest keywords to Meta interests (first match per keyword;
-	 * the resolved names are shown in the approval preview).
-	 *
-	 * @param FacebookGraphClient $graph    Authorized client.
-	 * @param string[]            $keywords Interest keywords.
-	 * @return array|\WP_Error
-	 */
-	private function resolveInterests( FacebookGraphClient $graph, array $keywords ) {
-		$interests = array();
-		foreach ( $keywords as $keyword ) {
-			$found = FacebookAdsReadAbility::interests( $graph, $keyword, 1 );
-			if ( is_wp_error( $found ) ) {
-				return $found;
-			}
-			if ( ! empty( $found['interests'][0]['id'] ) ) {
-				$interests[] = array(
-					'id'   => $found['interests'][0]['id'],
-					'name' => $found['interests'][0]['name'],
-				);
-			}
-		}
-		return $interests;
-	}
-
-	/**
 	 * Signed approve/reject links for delivery to a human.
 	 *
 	 * @param string $action_id Pending action ID.
 	 */
-	private static function approvalLinks( string $action_id ): array {
+	public static function approvalLinks( string $action_id ): array {
 		if ( '' === $action_id || ! class_exists( SignPendingActionResolutionAbility::class ) ) {
 			return array();
 		}

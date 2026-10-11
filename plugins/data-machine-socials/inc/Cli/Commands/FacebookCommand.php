@@ -674,7 +674,7 @@ class FacebookCommand {
 	 * : Maximum age (default 65).
 	 *
 	 * [--interests=<list>]
-	 * : Comma-separated interest keywords.
+	 * : Comma-separated exact interest names or numeric IDs (see ads-interests).
 	 *
 	 * [--post=<post_id>]
 	 * : Promote an existing Page post instead of building a link ad.
@@ -734,6 +734,85 @@ class FacebookCommand {
 		}
 		WP_CLI::log( 'Approve: wp datamachine pending-actions accept ' . $action_id );
 		WP_CLI::log( 'Reject:  wp datamachine pending-actions reject ' . $action_id . '   (deletes the paused promotion)' );
+	}
+
+	/**
+	 * Stage an edit to a live promotion for human approval.
+	 *
+	 * Nothing changes until the edit is approved (signed link or
+	 * `wp datamachine pending-actions accept <id>`). Edited values must
+	 * still satisfy the hard limits.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <campaign_id>
+	 * : Campaign to edit (from ads-report).
+	 *
+	 * [--budget=<amount>]
+	 * : New lifetime budget (must exceed what is already spent).
+	 *
+	 * [--end=<datetime>]
+	 * : New end date.
+	 *
+	 * [--radius=<miles>]
+	 * : New audience radius.
+	 *
+	 * [--lat=<latitude>]
+	 * : New center latitude.
+	 *
+	 * [--lng=<longitude>]
+	 * : New center longitude.
+	 *
+	 * [--age-min=<age>]
+	 * : New minimum age.
+	 *
+	 * [--age-max=<age>]
+	 * : New maximum age.
+	 *
+	 * [--interests=<list>]
+	 * : Replace all interests (comma-separated exact names or numeric IDs).
+	 *
+	 * [--add-interests=<list>]
+	 * : Add interests (exact names or numeric IDs).
+	 *
+	 * [--remove-interests=<list>]
+	 * : Remove interests by exact name or ID.
+	 *
+	 * @subcommand ads-update
+	 */
+	public function ads_update( $args, $assoc_args ) {
+		$split = static fn( $key ) => isset( $assoc_args[ $key ] ) ? array_map( 'trim', explode( ',', (string) $assoc_args[ $key ] ) ) : array();
+		$input = array_filter(
+			array(
+				'campaign_id'  => $args[0],
+				'budget'       => $assoc_args['budget'] ?? null,
+				'end_time'     => $assoc_args['end'] ?? null,
+				'radius_miles' => $assoc_args['radius'] ?? null,
+				'latitude'     => $assoc_args['lat'] ?? null,
+				'longitude'    => $assoc_args['lng'] ?? null,
+				'age_min'      => $assoc_args['age-min'] ?? null,
+				'age_max'      => $assoc_args['age-max'] ?? null,
+			),
+			static fn( $v ) => null !== $v
+		) + array(
+			'interests'        => $split( 'interests' ),
+			'add_interests'    => $split( 'add-interests' ),
+			'remove_interests' => $split( 'remove-interests' ),
+		);
+
+			$result    = $this->run_ads_ability( 'datamachine/facebook-ads-update', $input );
+			$action_id = (string) ( $result['action_id'] ?? '' );
+
+			WP_CLI::success( 'Edit staged. Nothing changes until it is approved.' );
+			WP_CLI::log( wp_json_encode( $result['preview'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( '' );
+			if ( ! empty( $result['links']['approve_url'] ) ) {
+				WP_CLI::log( 'Approve link: ' . $result['links']['approve_url'] );
+				WP_CLI::log( 'Reject link:  ' . $result['links']['reject_url'] );
+				WP_CLI::log( '' );
+			}
+			WP_CLI::log( 'Approve: wp datamachine pending-actions accept ' . $action_id );
+			WP_CLI::log( 'Reject:  wp datamachine pending-actions reject ' . $action_id . '   (the promotion keeps running unchanged)' );
 	}
 
 	/**

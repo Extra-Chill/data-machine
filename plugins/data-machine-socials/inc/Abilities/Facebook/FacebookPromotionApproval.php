@@ -26,8 +26,11 @@ defined( 'ABSPATH' ) || exit;
 
 final class FacebookPromotionApproval {
 
-	/** Pending-action kind. */
+	/** Pending-action kind: activate a newly staged promotion. */
 	public const KIND = 'socials_facebook_promotion';
+
+	/** Pending-action kind: apply an edit to a live promotion. */
+	public const UPDATE_KIND = 'socials_facebook_promotion_update';
 
 	private static bool $registered = false;
 
@@ -49,8 +52,8 @@ final class FacebookPromotionApproval {
 	public static function resolver_grants(): array {
 		return array(
 			array(
-				'type' => 'operator',
-				'kind' => self::KIND,
+				'type'  => 'operator',
+				'kinds' => array( self::KIND, self::UPDATE_KIND ),
 			),
 		);
 	}
@@ -60,9 +63,13 @@ final class FacebookPromotionApproval {
 	 * @return array
 	 */
 	public static function handlers( $handlers ): array {
-		$handlers               = is_array( $handlers ) ? $handlers : array();
-		$handlers[ self::KIND ] = array(
+		$handlers                      = is_array( $handlers ) ? $handlers : array();
+		$handlers[ self::KIND ]        = array(
 			'apply'       => array( self::class, 'apply' ),
+			'can_resolve' => array( self::class, 'can_resolve' ),
+		);
+		$handlers[ self::UPDATE_KIND ] = array(
+			'apply'       => array( self::class, 'apply_update' ),
 			'can_resolve' => array( self::class, 'can_resolve' ),
 		);
 		return $handlers;
@@ -141,6 +148,66 @@ final class FacebookPromotionApproval {
 			'success'     => true,
 			'status'      => 'active',
 			'campaign_id' => (string) ( $input['campaign_id'] ?? '' ),
+		);
+	}
+
+	/**
+	 * Apply an approved edit to a live promotion's ad set.
+	 *
+	 * Re-reads the ad set and re-checks the resulting budget and schedule
+	 * against the current hard limits before writing. A rejected or
+	 * expired edit changes nothing; the promotion keeps running as it was.
+	 *
+	 * @param array $input   Stored apply_input: adset_id, fields, currency_offset.
+	 * @param array $payload Stored pending action payload.
+	 * @param array $receipt One-time authorization receipt.
+	 * @return array|\WP_Error
+	 */
+	public static function apply_update( array $input, array $payload, array $receipt ) {
+		$subject    = (string) ( $payload['agent'] ?? $payload['creator'] ?? '' );
+		$workspace  = isset( $payload['workspace'] ) && is_array( $payload['workspace'] ) ? $payload['workspace'] : array();
+		$authorized = PendingActionAuthorizationReceipt::consume( $receipt, self::UPDATE_KIND, self::UPDATE_KIND, $input, $input, $subject, $workspace );
+		if ( is_wp_error( $authorized ) ) {
+			return $authorized;
+		}
+
+		$graph = FacebookGraphClient::for_ads();
+		if ( is_wp_error( $graph ) ) {
+			return $graph;
+		}
+
+		$adset_id = (string) ( $input['adset_id'] ?? '' );
+		$fields   = is_array( $input['fields'] ?? null ) ? $input['fields'] : array();
+		$adset    = $graph->get( '/' . rawurlencode( $adset_id ), array( 'fields' => 'lifetime_budget,start_time,end_time' ) );
+		if ( is_wp_error( $adset ) ) {
+			return $adset;
+		}
+
+		$ok = FacebookAdsPolicy::recheck(
+			(int) ( $fields['lifetime_budget'] ?? $adset['lifetime_budget'] ?? PHP_INT_MAX ),
+			(int) ( $input['currency_offset'] ?? 100 ),
+			(int) strtotime( (string) ( $adset['start_time'] ?? '' ) ),
+			(int) strtotime( (string) ( $fields['end_time'] ?? $adset['end_time'] ?? '' ) ),
+			FacebookAdsPolicy::limits()
+		);
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
+		}
+
+		if ( isset( $fields['targeting'] ) && is_array( $fields['targeting'] ) ) {
+			$fields['targeting']['targeting_automation'] = array( 'advantage_audience' => 0 );
+		}
+
+		$res = $graph->post( '/' . rawurlencode( $adset_id ), $fields );
+		if ( is_wp_error( $res ) ) {
+			return $res;
+		}
+
+		return array(
+			'success'  => true,
+			'status'   => 'updated',
+			'adset_id' => $adset_id,
+			'changed'  => array_keys( $fields ),
 		);
 	}
 
