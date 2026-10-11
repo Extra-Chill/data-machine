@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.4] - 2026-10-11
+
+### Fixed
+- route UTC-converting extractors through EventTimeLocalizer
+
 ## [0.66.3] - 2026-10-10
 
 ### Fixed
