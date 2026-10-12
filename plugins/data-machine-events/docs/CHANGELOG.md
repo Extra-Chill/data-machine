@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.6] - 2026-10-12
+
+### Fixed
+- render event info and action buttons before the description
+
 ## [0.66.5] - 2026-10-11
 
 ### Changed
