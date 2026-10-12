@@ -380,6 +380,25 @@ datamachine_signed_assert( ! empty( $GLOBALS['__signed_options']['datamachine_pe
 $query = array();
 parse_str( (string) parse_url( (string) $signed['approve_url'], PHP_URL_QUERY ), $query );
 
+// #3604: a GET (link unfurlers, mail scanners) must only preview.
+$applies_before = $GLOBALS['__signed_applies'];
+$previewed      = \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::preview_token( (string) ( $query['t'] ?? '' ) );
+datamachine_signed_assert( true === ( $previewed['requires_confirmation'] ?? false ) && 'accepted' === ( $previewed['decision'] ?? null ), 'previewing a signed link asks for confirmation instead of resolving', $failures, $passes );
+datamachine_signed_assert( $applies_before === $GLOBALS['__signed_applies'] && 'pending' === ( \DataMachine\Engine\AI\Actions\PendingActionStore::inspect( $action_id )['status'] ?? null ), 'previewing a signed link changes nothing', $failures, $passes );
+datamachine_signed_assert( \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::confirm_signature( (string) $query['t'] ) === ( $previewed['confirm']['confirm'] ?? null ), 'confirmation page carries the token-bound confirm signature', $failures, $passes );
+datamachine_signed_assert( \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::confirm_signature( (string) $query['t'] ) !== \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::confirm_signature( (string) $query['t'] . 'x' ), 'confirm signature is bound to the exact token', $failures, $passes );
+$repeat_preview = \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::preview_token( (string) ( $query['t'] ?? '' ) );
+datamachine_signed_assert( true === ( $repeat_preview['requires_confirmation'] ?? false ) && $applies_before === $GLOBALS['__signed_applies'], 'repeated previews (unfurler retries) stay side-effect free', $failures, $passes );
+
+// #3604: the inspection route must not shadow literal sibling routes.
+$inspection_pattern = '#^/actions/(?P<action_id>act_[a-zA-Z0-9_\-]+)$#';
+datamachine_signed_assert( 1 === preg_match( $inspection_pattern, '/actions/act_11111111-2222-4333-8444-555555555555' ), 'inspection route still matches real action IDs', $failures, $passes );
+foreach ( array( 'resolve-by-token', 'resolve', 'summary' ) as $sibling ) {
+	datamachine_signed_assert( 0 === preg_match( $inspection_pattern, '/actions/' . $sibling ), "inspection route does not shadow /actions/{$sibling}", $failures, $passes );
+}
+$inspection_source = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionInspectionAbility.php' );
+datamachine_signed_assert( str_contains( $inspection_source, "'/actions/(?P<action_id>act_[a-zA-Z0-9_\\-]+)'" ), 'registered inspection route uses the act_-prefixed pattern', $failures, $passes );
+
 $resolved = \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::resolve_token( (string) ( $query['t'] ?? '' ) );
 
 datamachine_signed_assert( true === ( $resolved['success'] ?? false ), 'valid approve token resolves action', $failures, $passes );
@@ -394,6 +413,10 @@ datamachine_signed_assert( true === ( $resolved['result']['wrong_workspace_rejec
 datamachine_signed_assert( 1 === $GLOBALS['__signed_applies'], 'accepted action applies exactly once', $failures, $passes );
 
 $second = \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::execute( array( 'action_id' => $action_id, 'decision' => 'accepted', 'resolver' => 'email_approval' ) );
+datamachine_signed_assert( is_wp_error( $second ), 'refused resolution surfaces as WP_Error from execute()', $failures, $passes );
+$second = \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::error_result( $second );
+$second_token = \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::resolve_token( (string) ( $query['t'] ?? '' ) );
+datamachine_signed_assert( is_array( $second_token ), 'resolve_token never returns a WP_Error to HTTP callers (#3602)', $failures, $passes );
 datamachine_signed_assert( false === ( $second['success'] ?? true ), 'a second acceptance cannot claim the action', $failures, $passes );
 datamachine_signed_assert( null === \DataMachine\Engine\AI\Actions\PendingActionStore::get( $action_id ) && 'accepted' === ( \DataMachine\Engine\AI\Actions\PendingActionStore::inspect( $action_id )['status'] ?? null ), 'resolved action is retained as an accepted audit row', $failures, $passes );
 datamachine_signed_assert( is_wp_error( \DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt::validate( $GLOBALS['__signed_receipt'], 'signed_smoke', 'signed_smoke', array( 'action' => 'signed' ), array( 'value' => 42 ), '', $GLOBALS['__signed_receipt']['claims']['workspace'] ) ), 'consumed receipt cannot be reused', $failures, $passes );

@@ -119,7 +119,10 @@ final class PendingActionInspectionAbility {
 
 				register_rest_route(
 					'datamachine/v1',
-					'/actions/(?P<action_id>[a-zA-Z0-9_\-]+)',
+					// Match only real action IDs (PendingActionStore::generate_id()), so
+					// literal siblings such as /actions/resolve-by-token, /actions/resolve
+					// and /actions/summary are never shadowed by this route (#3604).
+					'/actions/(?P<action_id>act_[a-zA-Z0-9_\-]+)',
 					array(
 						'methods'             => 'GET',
 						'callback'            => array( self::class, 'handle_get_rest' ),

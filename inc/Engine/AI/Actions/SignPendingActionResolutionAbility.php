@@ -22,6 +22,7 @@ final class SignPendingActionResolutionAbility {
 	private const TOKEN_VERSION        = 1;
 	private const RESOLVE_ROUTE        = '/actions/resolve-by-token';
 	private const TOKEN_QUERY_ARG      = 't';
+	private const CONFIRM_FIELD        = 'confirm';
 	private const HTML_RESPONSE_FILTER = 'datamachine_pending_action_resolution_token_html';
 
 	/** @var bool */
@@ -80,7 +81,9 @@ final class SignPendingActionResolutionAbility {
 					'datamachine/v1',
 					self::RESOLVE_ROUTE,
 					array(
-						'methods'             => 'GET',
+						// GET only previews (link unfurlers and mail scanners fetch it);
+						// the decision is a POST from the rendered confirmation page.
+						'methods'             => array( 'GET', 'POST' ),
 						'callback'            => array( self::class, 'handle_rest' ),
 						'permission_callback' => '__return_true',
 						'args'                => array(
@@ -171,22 +174,106 @@ final class SignPendingActionResolutionAbility {
 	 * Public REST callback for signed URL resolution.
 	 */
 	public static function handle_rest( \WP_REST_Request $request ): \WP_REST_Response {
-		$result = self::resolve_token( (string) $request->get_param( self::TOKEN_QUERY_ARG ) );
-		$status = (int) ( $result['status_code'] ?? ( ! empty( $result['success'] ) ? 200 : 400 ) );
+		$token = (string) $request->get_param( self::TOKEN_QUERY_ARG );
 
+		if ( 'POST' === strtoupper( $request->get_method() ) ) {
+			$result = hash_equals( self::confirm_signature( $token ), (string) $request->get_param( self::CONFIRM_FIELD ) )
+				? self::resolve_token( $token )
+				: array(
+					'success'     => false,
+					'error'       => 'Confirmation is missing or invalid. Open the link again and use the button on that page.',
+					'status_code' => 400,
+				);
+		} else {
+			$result = self::preview_token( $token );
+		}
+
+		$status = (int) ( $result['status_code'] ?? ( ! empty( $result['success'] ) ? 200 : 400 ) );
 		unset( $result['status_code'] );
 
 		if ( self::request_wants_json( $request ) ) {
 			return new \WP_REST_Response( $result, $status );
 		}
 
-		$response = new \WP_REST_Response( self::html_response( $result, $status ), $status );
+		$html     = ! empty( $result['requires_confirmation'] )
+			? self::confirmation_page( $result, $token )
+			: self::html_response( $result, $status );
+		$response = new \WP_REST_Response( $html, $status );
 		$response->header( 'Content-Type', 'text/html; charset=' . get_option( 'blog_charset', 'UTF-8' ) );
 		return $response;
 	}
 
 	/**
+	 * Verify a signed token and describe the action WITHOUT resolving it.
+	 *
+	 * Safe for GET: link previewers (Discord, Slack, iMessage), mail
+	 * security scanners and prefetchers fetch URLs automatically, so a GET
+	 * must never change state (#3604).
+	 */
+	public static function preview_token( string $token ): array {
+		$payload = self::verify_token( $token );
+		if ( is_wp_error( $payload ) ) {
+			return array(
+				'success'     => false,
+				'error'       => $payload->get_error_message(),
+				'status_code' => 'expired_token' === $payload->get_error_code() ? 410 : 400,
+			);
+		}
+
+		$action_id = sanitize_text_field( (string) ( $payload['action_id'] ?? '' ) );
+		$existing  = PendingActionStore::inspect( $action_id );
+		if ( null === $existing ) {
+			return array(
+				'success'     => false,
+				'error'       => 'Pending action not found or expired.',
+				'action_id'   => $action_id,
+				'status_code' => 410,
+			);
+		}
+
+		$status = (string) ( $existing['status'] ?? WP_Agent_Pending_Action_Status::PENDING );
+		if ( WP_Agent_Pending_Action_Status::PENDING !== $status ) {
+			return array(
+				'success'          => in_array( $status, array( WP_Agent_Approval_Decision::ACCEPTED, WP_Agent_Approval_Decision::REJECTED ), true ),
+				'already_resolved' => true,
+				'decision'         => $status,
+				'action_id'        => $action_id,
+				'kind'             => (string) ( $existing['kind'] ?? '' ),
+				'status_code'      => 200,
+			);
+		}
+
+		return array(
+			'success'               => true,
+			'requires_confirmation' => true,
+			'decision'              => (string) $payload['decision'],
+			'action_id'             => $action_id,
+			'kind'                  => (string) ( $existing['kind'] ?? '' ),
+			'summary'               => (string) ( $existing['summary'] ?? '' ),
+			'preview'               => $existing['preview_data'] ?? ( $existing['preview'] ?? array() ),
+			'confirm'               => array(
+				'method'              => 'POST',
+				self::TOKEN_QUERY_ARG => $token,
+				self::CONFIRM_FIELD   => self::confirm_signature( $token ),
+			),
+			'status_code'           => 200,
+		);
+	}
+
+	/**
+	 * Confirmation signature carried only by the rendered confirmation page.
+	 *
+	 * Derived from the token with the resolution secret, so a POST must have
+	 * come from a page this site rendered for that exact link.
+	 */
+	public static function confirm_signature( string $token ): string {
+		return self::base64url_encode( hash_hmac( 'sha256', 'confirm|' . trim( $token ), self::secret(), true ) );
+	}
+
+	/**
 	 * Resolve a signed token and return a structured result.
+	 *
+	 * Callers on the HTTP surface must reach this only from a confirmed POST.
 	 */
 	public static function resolve_token( string $token ): array {
 		$payload = self::verify_token( $token );
@@ -234,7 +321,7 @@ final class SignPendingActionResolutionAbility {
 			);
 		}
 
-		$result                = ResolvePendingActionAbility::execute(
+		$result = ResolvePendingActionAbility::execute(
 			array(
 				'action_id' => $action_id,
 				'decision'  => $decision,
@@ -242,6 +329,9 @@ final class SignPendingActionResolutionAbility {
 				'context'   => array( 'resolution_transport' => 'signed_url' ),
 			)
 		);
+		if ( is_wp_error( $result ) ) {
+			return ResolvePendingActionAbility::error_result( $result );
+		}
 		$result['status_code'] = ! empty( $result['success'] ) ? 200 : 400;
 
 		return $result;
@@ -346,6 +436,31 @@ final class SignPendingActionResolutionAbility {
 	private static function request_wants_json( \WP_REST_Request $request ): bool {
 		$accept = (string) $request->get_header( 'accept' );
 		return str_contains( strtolower( $accept ), 'application/json' );
+	}
+
+	/**
+	 * Confirmation page: describes the action and posts the decision.
+	 */
+	private static function confirmation_page( array $result, string $token ): string {
+		$accept  = WP_Agent_Approval_Decision::ACCEPTED === ( $result['decision'] ?? '' );
+		$title   = $accept ? __( 'Approve this action?', 'data-machine' ) : __( 'Reject this action?', 'data-machine' );
+		$button  = $accept ? __( 'Approve', 'data-machine' ) : __( 'Reject', 'data-machine' );
+		$preview = $result['preview'] ?? array();
+		$details = is_array( $preview ) && $preview ? '<pre style="white-space:pre-wrap">' . esc_html( (string) wp_json_encode( $preview, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ) . '</pre>' : '';
+		$action  = rest_url( 'datamachine/v1' . self::RESOLVE_ROUTE );
+
+		$html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>' . esc_html( $title ) . '</title></head><body><main>'
+			. '<h1>' . esc_html( $title ) . '</h1>'
+			. '<p>' . esc_html( (string) ( $result['summary'] ?? '' ) ) . '</p>'
+			. $details
+			. '<form method="post" action="' . esc_url( $action ) . '">'
+			. '<input type="hidden" name="' . esc_attr( self::TOKEN_QUERY_ARG ) . '" value="' . esc_attr( $token ) . '">'
+			. '<input type="hidden" name="' . esc_attr( self::CONFIRM_FIELD ) . '" value="' . esc_attr( self::confirm_signature( $token ) ) . '">'
+			. '<button type="submit">' . esc_html( $button ) . '</button>'
+			. '</form></main></body></html>';
+
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- The constant is the canonical Data Machine HTML response hook.
+		return (string) apply_filters( self::HTML_RESPONSE_FILTER, $html, $result, 200 );
 	}
 
 	private static function html_response( array $result, int $status ): string {

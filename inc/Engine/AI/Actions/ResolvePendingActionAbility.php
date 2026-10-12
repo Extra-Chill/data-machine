@@ -168,6 +168,33 @@ class ResolvePendingActionAbility {
 	}
 
 	/**
+	 * Normalize a resolver WP_Error into the array result shape (#3602).
+	 *
+	 * execute() returns WP_Error for refused or failed resolutions; HTTP and
+	 * CLI callers that report results as arrays use this instead of indexing
+	 * the WP_Error.
+	 *
+	 * @param \WP_Error $error Resolver error.
+	 * @return array{success: false, error: string, code: string, action_id?: string, kind?: string, status_code: int}
+	 */
+	public static function error_result( \WP_Error $error ): array {
+		$data = method_exists( $error, 'get_error_data' ) ? $error->get_error_data() : array();
+		$data = is_array( $data ) ? $data : array();
+
+		return array_filter(
+			array(
+				'success'     => false,
+				'error'       => $error->get_error_message(),
+				'code'        => (string) $error->get_error_code(),
+				'action_id'   => isset( $data['action_id'] ) ? (string) $data['action_id'] : null,
+				'kind'        => isset( $data['kind'] ) ? (string) $data['kind'] : null,
+				'status_code' => (int) ( $data['status'] ?? 400 ),
+			),
+			static fn( $value ): bool => null !== $value
+		);
+	}
+
+	/**
 	 * Resolve through Data Machine's concrete handler map.
 	 *
 	 * This is the internal adapter target used by the canonical Agents API

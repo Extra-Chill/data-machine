@@ -40,6 +40,9 @@ class PendingActionsCommand extends BaseCommand {
 			'resolver'  => 'cli:' . get_current_user_id(),
 			'context'   => array( 'resolution_transport' => 'cli' ),
 		) );
+		if ( is_wp_error( $result ) ) {
+			$result = \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::error_result( $result );
+		}
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( (string) ( $result['error'] ?? 'Pending action could not be resolved.' ) );
 		}
