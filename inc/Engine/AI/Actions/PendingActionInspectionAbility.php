@@ -286,7 +286,7 @@ final class PendingActionInspectionAbility {
 
 		return array(
 			'success' => true,
-			'summary' => is_array( $result ) ? $result : array(),
+			'summary' => $result,
 		);
 	}
 
@@ -336,14 +336,14 @@ final class PendingActionInspectionAbility {
 			}
 		}
 
-		if ( isset( $input['context'] ) && is_array( $input['context'] ) ) {
-			$filters['context'] = array_map( 'sanitize_text_field', $input['context'] );
-		}
-
+		$context = ( isset( $input['context'] ) && is_array( $input['context'] ) ) ? array_map( 'sanitize_text_field', $input['context'] ) : array();
 		foreach ( array( 'session_id', 'transcript_session_id' ) as $key ) {
 			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] ) {
-				$filters['context'][ $key ] = sanitize_text_field( (string) $input[ $key ] );
+				$context[ $key ] = sanitize_text_field( (string) $input[ $key ] );
 			}
+		}
+		if ( $context || ( isset( $input['context'] ) && is_array( $input['context'] ) ) ) {
+			$filters['context'] = $context;
 		}
 
 		return $filters;

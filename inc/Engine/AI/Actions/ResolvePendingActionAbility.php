@@ -168,6 +168,16 @@ class ResolvePendingActionAbility {
 	}
 
 	/**
+	 * A filtered value as an array; anything else (a misbehaving filter) is empty.
+	 *
+	 * @param mixed $value Filtered value.
+	 * @return array<string, mixed>
+	 */
+	private static function array_or_empty( mixed $value ): array {
+		return is_array( $value ) ? $value : array();
+	}
+
+	/**
 	 * Normalize a resolver WP_Error into the array result shape (#3602).
 	 *
 	 * execute() returns WP_Error for refused or failed resolutions; HTTP and
@@ -178,7 +188,7 @@ class ResolvePendingActionAbility {
 	 * @return array{success: false, error: string, code: string, action_id?: string, kind?: string, status_code: int}
 	 */
 	public static function error_result( \WP_Error $error ): array {
-		$data = method_exists( $error, 'get_error_data' ) ? $error->get_error_data() : array();
+		$data = $error->get_error_data();
 		$data = is_array( $data ) ? $data : array();
 
 		return array_filter(
@@ -450,13 +460,7 @@ class ResolvePendingActionAbility {
 			);
 		}
 
-		if ( ! switch_to_blog( $origin_blog_id ) ) {
-			return array(
-				'success'   => false,
-				'error'     => 'Pending action origin could not be verified.',
-				'action_id' => $action_id,
-			);
-		}
+		switch_to_blog( $origin_blog_id );
 
 		try {
 			$input['_origin_routed'] = true;
@@ -510,7 +514,7 @@ class ResolvePendingActionAbility {
 		 * @param array<string, array{apply: callable, can_resolve?: callable}> $handlers Current map.
 		 */
 		$handlers = apply_filters( 'datamachine_pending_action_handlers', array() );
-		return is_array( $handlers ) ? $handlers : array();
+		return self::array_or_empty( $handlers );
 	}
 
 	/**

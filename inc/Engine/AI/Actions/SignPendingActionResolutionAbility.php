@@ -364,7 +364,7 @@ final class SignPendingActionResolutionAbility {
 	}
 
 	private static function sign_payload( array $payload ): string {
-		$encoded_payload = self::base64url_encode( wp_json_encode( $payload ) );
+		$encoded_payload = self::base64url_encode( (string) wp_json_encode( $payload ) );
 		$signature       = hash_hmac( 'sha256', $encoded_payload, self::secret(), true );
 
 		return $encoded_payload . '.' . self::base64url_encode( $signature );

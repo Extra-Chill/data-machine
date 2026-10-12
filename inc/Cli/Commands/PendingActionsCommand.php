@@ -48,7 +48,7 @@ class PendingActionsCommand extends BaseCommand {
 		}
 		WP_CLI::success( sprintf( 'Pending action %s.', $decision ) );
 		if ( 'json' === ( $assoc_args['format'] ?? '' ) ) {
-			WP_CLI::line( wp_json_encode( $result ) );
+			WP_CLI::line( (string) wp_json_encode( $result ) );
 		}
 	}
 
@@ -109,6 +109,7 @@ class PendingActionsCommand extends BaseCommand {
 		$result = \AgentsAPI\AI\Approvals\agents_list_pending_actions( array( 'filters' => $filters ) );
 		if ( is_wp_error( $result ) ) {
 			WP_CLI::error( $result->get_error_message() );
+			return;
 		}
 
 		$rows = PendingActionInspectionAbility::normalize_action_rows( is_array( $result['actions'] ?? null ) ? $result['actions'] : array() );
@@ -150,6 +151,7 @@ class PendingActionsCommand extends BaseCommand {
 		);
 		if ( is_wp_error( $result ) ) {
 			WP_CLI::error( $result->get_error_message() );
+			return;
 		}
 
 		$action = is_array( $result['action'] ?? null ) ? $result['action'] : null;
@@ -203,6 +205,7 @@ class PendingActionsCommand extends BaseCommand {
 		$summary = \AgentsAPI\AI\Approvals\agents_summary_pending_actions( array( 'filters' => $filters ) );
 		if ( is_wp_error( $summary ) ) {
 			WP_CLI::error( $summary->get_error_message() );
+			return;
 		}
 		$format = $assoc_args['format'] ?? 'json';
 
