@@ -95,6 +95,50 @@ class EventDetailsEndTimeRenderTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Event essentials and action buttons precede the description by default;
+	 * the compatibility filter restores the prior description-first order.
+	 */
+	public function test_info_and_actions_precede_description_by_default_and_filter_restores_legacy_order(): void {
+		$action_hook_fired = false;
+		$action_callback   = function ( $post_id, $ticket_url, $timing ) use ( &$action_hook_fired ) {
+			$action_hook_fired = true;
+			echo '<span class="test-action-hook">Action hook output</span>';
+		};
+		add_action( 'data_machine_events_action_buttons', $action_callback, 10, 3 );
+
+		try {
+			$output = $this->render_event_details(
+				array( 'startDate' => '2026-10-21' ),
+				'<p class="event-description">Description marker</p>'
+			);
+
+			$this->assertTrue( $action_hook_fired, 'The action-buttons hook continues to fire.' );
+			$this->assertLessThan( strpos( $output, 'event-description' ), strpos( $output, 'event-info-grid' ) );
+			$this->assertLessThan( strpos( $output, 'event-description' ), strpos( $output, 'event-action-buttons' ) );
+
+			$action_hook_fired = false;
+			$filter_callback = static function ( $description_first, $post_id ) {
+				return true;
+			};
+			add_filter( 'data_machine_events_details_description_first', $filter_callback, 10, 2 );
+			try {
+				$legacy_output = $this->render_event_details(
+					array( 'startDate' => '2026-10-21' ),
+					'<p class="event-description">Description marker</p>'
+				);
+			} finally {
+				remove_filter( 'data_machine_events_details_description_first', $filter_callback, 10 );
+			}
+
+			$this->assertLessThan( strpos( $legacy_output, 'event-info-grid' ), strpos( $legacy_output, 'event-description' ) );
+			$this->assertLessThan( strpos( $legacy_output, 'event-action-buttons' ), strpos( $legacy_output, 'event-description' ) );
+			$this->assertTrue( $action_hook_fired, 'The action-buttons hook also fires in legacy order.' );
+		} finally {
+			remove_action( 'data_machine_events_action_buttons', $action_callback, 10 );
+		}
+	}
+
+	/**
 	 * The overwhelmingly common case for scraped events: no end stored at
 	 * all. Must render byte-for-byte like the pre-#860 behavior — no dash,
 	 * no invented end, no "through" line.
@@ -197,7 +241,7 @@ class EventDetailsEndTimeRenderTest extends WP_UnitTestCase {
 	 * @param array $attributes Block attributes (startDate/startTime/endDate/endTime, etc.).
 	 * @return string Rendered HTML.
 	 */
-	private function render_event_details( array $attributes ): string {
+	private function render_event_details( array $attributes, string $content = '' ): string {
 		$post_id = self::factory()->post->create(
 			array(
 				'post_type'   => Event_Post_Type::POST_TYPE,
@@ -216,7 +260,6 @@ class EventDetailsEndTimeRenderTest extends WP_UnitTestCase {
 		// docblock `@var` tags) rather than receiving them as function
 		// arguments, since it's a server-side-render template, not a
 		// callable.
-		$content = '';
 		$block   = null;
 
 		ob_start();
