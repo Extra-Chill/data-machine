@@ -119,7 +119,10 @@ final class PendingActionInspectionAbility {
 
 				register_rest_route(
 					'datamachine/v1',
-					'/actions/(?P<action_id>[a-zA-Z0-9_\-]+)',
+					// Match only real action IDs (PendingActionStore::generate_id()), so
+					// literal siblings such as /actions/resolve-by-token, /actions/resolve
+					// and /actions/summary are never shadowed by this route (#3604).
+					'/actions/(?P<action_id>act_[a-zA-Z0-9_\-]+)',
 					array(
 						'methods'             => 'GET',
 						'callback'            => array( self::class, 'handle_get_rest' ),
@@ -283,7 +286,7 @@ final class PendingActionInspectionAbility {
 
 		return array(
 			'success' => true,
-			'summary' => is_array( $result ) ? $result : array(),
+			'summary' => $result,
 		);
 	}
 
@@ -333,14 +336,14 @@ final class PendingActionInspectionAbility {
 			}
 		}
 
-		if ( isset( $input['context'] ) && is_array( $input['context'] ) ) {
-			$filters['context'] = array_map( 'sanitize_text_field', $input['context'] );
-		}
-
+		$context = ( isset( $input['context'] ) && is_array( $input['context'] ) ) ? array_map( 'sanitize_text_field', $input['context'] ) : array();
 		foreach ( array( 'session_id', 'transcript_session_id' ) as $key ) {
 			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] ) {
-				$filters['context'][ $key ] = sanitize_text_field( (string) $input[ $key ] );
+				$context[ $key ] = sanitize_text_field( (string) $input[ $key ] );
 			}
+		}
+		if ( $context || ( isset( $input['context'] ) && is_array( $input['context'] ) ) ) {
+			$filters['context'] = $context;
 		}
 
 		return $filters;
