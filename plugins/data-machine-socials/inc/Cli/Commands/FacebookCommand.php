@@ -830,6 +830,18 @@ class FacebookCommand {
 		foreach ( $result['campaigns'] as $campaign ) {
 			$i = $campaign['insights']['data'][0] ?? array();
 			WP_CLI::log( sprintf( '  %s  %-8s  spend=%s reach=%s clicks=%s  %s', $campaign['id'] ?? '', $campaign['effective_status'] ?? '', $i['spend'] ?? '0', $i['reach'] ?? '0', $i['inline_link_clicks'] ?? '0', $campaign['name'] ?? '' ) );
+			if ( empty( $args[0] ) ) {
+				continue;
+			}
+			WP_CLI::log( sprintf( '    objective=%s  start=%s  stop=%s  cpc=%s', $campaign['objective'] ?? '', $campaign['start_time'] ?? '', $campaign['stop_time'] ?? '', $i['cpc'] ?? '' ) );
+			foreach ( (array) ( $campaign['adsets']['data'] ?? array() ) as $adset ) {
+				$t = (array) ( $adset['targeting_summary'] ?? array() );
+				WP_CLI::log( sprintf( '    budget=%s (%s) remaining=%s  goal=%s  destination=%s  ages=%s-%s', $adset['budget'] ?? '', $adset['budget_type'] ?? '', $adset['remaining_budget'] ?? 'n/a', $adset['optimization_goal'] ?? '', $adset['destination_type'] ?? '', $t['age_min'] ?? '', $t['age_max'] ?? '' ) );
+				WP_CLI::log( '    interests=' . implode( ', ', (array) ( $t['interests'] ?? array() ) ) );
+			}
+			foreach ( (array) ( $campaign['ads']['data'] ?? array() ) as $ad ) {
+				WP_CLI::log( sprintf( '    ad %s -> %s  (source %s)', $ad['id'] ?? '', $ad['destination_url'] ?? 'n/a', $ad['source_post']['instagram_permalink_url'] ?? 'n/a' ) );
+			}
 		}
 	}
 

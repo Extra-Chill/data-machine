@@ -66,6 +66,10 @@ class FacebookAdsPromoteAbility extends AbstractSocialAbility {
 								'type'        => 'string',
 								'description' => 'Destination URL (e.g. the event RSVP page).',
 							),
+							'url_tags'           => array(
+								'type'        => 'string',
+								'description' => 'Override the default campaign UTM tags.',
+							),
 							'post_id'            => array(
 								'type'        => 'string',
 								'description' => 'Existing Page post to promote. Omit to build a link ad from message + image.',
@@ -155,7 +159,8 @@ class FacebookAdsPromoteAbility extends AbstractSocialAbility {
 		if ( '' === $instagram_id && ( in_array( 'instagram', $promotion['platforms'], true ) || '' !== $promotion['ig_media_id'] ) ) {
 			return new \WP_Error( 'instagram_not_connected', 'Instagram placements need a connected Instagram business account.' );
 		}
-		$ids = array();
+		$ids      = array();
+		$url_tags = array_key_exists( 'url_tags', $input ) ? (string) $input['url_tags'] : self::defaultUrlTags( $promotion['name'] );
 
 		$campaign = $graph->post(
 			$act . '/campaigns',
@@ -190,9 +195,13 @@ class FacebookAdsPromoteAbility extends AbstractSocialAbility {
 					'status'            => 'PAUSED',
 				)
 			),
-			'creative_id' => function () use ( $graph, $act, $promotion, $page_id, $instagram_id ) {
+			'creative_id' => function () use ( $graph, $act, $promotion, $page_id, $instagram_id, $url_tags ) {
 				$spec = $this->creativeSpec( $graph, $promotion, $page_id, $instagram_id );
-				return is_wp_error( $spec ) ? $spec : $graph->post( $act . '/adcreatives', $spec );
+				if ( is_wp_error( $spec ) ) {
+					return $spec;
+				}
+				$spec['url_tags'] = $url_tags;
+				return $graph->post( $act . '/adcreatives', $spec );
 			},
 			// By reference: adset_id / creative_id are filled in by earlier steps.
 			'ad_id'       => function () use ( $graph, $act, $promotion, &$ids ) {
@@ -216,8 +225,9 @@ class FacebookAdsPromoteAbility extends AbstractSocialAbility {
 			$ids[ $key ] = (string) $res['id'];
 		}
 
-		$preview = FacebookAdsPolicy::preview( $promotion, $interests, $currency );
-		$staged  = PendingActionHelper::stage(
+		$preview             = FacebookAdsPolicy::preview( $promotion, $interests, $currency );
+		$preview['url_tags'] = $url_tags;
+		$staged              = PendingActionHelper::stage(
 			array(
 				'kind'            => FacebookPromotionApproval::KIND,
 				'summary'         => sprintf( 'Spend up to %s %s promoting "%s" to %s', number_format( $promotion['budget'], 2 ), strtoupper( $currency ), $promotion['name'], $preview['audience'] ),
@@ -268,6 +278,10 @@ class FacebookAdsPromoteAbility extends AbstractSocialAbility {
 			'reject_url'  => (string) $signed['reject_url'],
 			'expires_at'  => (string) $signed['expires_at'],
 		);
+	}
+
+	public static function defaultUrlTags( string $campaign_name ): string {
+		return 'utm_source=meta&utm_medium=paid_social&utm_campaign=' . sanitize_title( $campaign_name );
 	}
 
 	/**

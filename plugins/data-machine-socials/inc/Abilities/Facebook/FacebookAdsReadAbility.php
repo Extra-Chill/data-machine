@@ -24,7 +24,7 @@ class FacebookAdsReadAbility extends AbstractSocialAbility {
 
 	protected static bool $registered = false;
 
-	private const INSIGHT_FIELDS = 'spend,reach,impressions,inline_link_clicks,cpc';
+	private const INSIGHT_FIELDS = 'spend,reach,impressions,inline_link_clicks,cpc,actions';
 
 	public function __construct() {
 		$this->registerAbility( $this->registerCallback(), true );
@@ -255,6 +255,68 @@ class FacebookAdsReadAbility extends AbstractSocialAbility {
 		return null;
 	}
 
+	/**
+	 * Add derived detail to a campaign read: remaining budget, a targeting
+	 * summary per ad set, and each ad's destination URL and source post.
+	 *
+	 * Meta returns ad set budgets in the account currency's minor units
+	 * (cents for USD) and insight spend in major units, so budgets are
+	 * converted before comparing. Interests are collected from every
+	 * flexible_spec group.
+	 *
+	 * @param array $campaign Campaign node as returned by the Graph API.
+	 * @return array
+	 */
+	public static function summarize_campaign( array $campaign ): array {
+		$spend = (float) ( $campaign['insights']['data'][0]['spend'] ?? 0 );
+
+		$adsets = (array) ( $campaign['adsets']['data'] ?? array() );
+		foreach ( $adsets as $i => $adset ) {
+			$lifetime = (float) ( $adset['lifetime_budget'] ?? 0 );
+			$daily    = (float) ( $adset['daily_budget'] ?? 0 );
+			$budget   = ( $lifetime > 0 ? $lifetime : $daily ) / 100;
+
+			$targeting = (array) ( $adset['targeting'] ?? array() );
+			$interests = array();
+			foreach ( (array) ( $targeting['flexible_spec'] ?? array() ) as $group ) {
+				foreach ( (array) ( $group['interests'] ?? array() ) as $interest ) {
+					$name = (string) ( $interest['name'] ?? '' );
+					if ( '' !== $name ) {
+						$interests[] = $name;
+					}
+				}
+			}
+
+			$adsets[ $i ]['budget']            = $budget;
+			$adsets[ $i ]['budget_type']       = $lifetime > 0 ? 'lifetime' : 'daily';
+			$adsets[ $i ]['remaining_budget']  = $lifetime > 0 ? max( 0.0, round( $budget - $spend, 2 ) ) : null;
+			$adsets[ $i ]['targeting_summary'] = array(
+				'geo_locations' => $targeting['geo_locations'] ?? array(),
+				'age_min'       => $targeting['age_min'] ?? null,
+				'age_max'       => $targeting['age_max'] ?? null,
+				'interests'     => array_values( array_unique( $interests ) ),
+			);
+		}
+		if ( isset( $campaign['adsets'] ) ) {
+			$campaign['adsets']['data'] = $adsets;
+		}
+
+		$ads = (array) ( $campaign['ads']['data'] ?? array() );
+		foreach ( $ads as $i => $ad ) {
+			$creative                     = (array) ( $ad['creative'] ?? array() );
+			$ads[ $i ]['destination_url'] = $creative['call_to_action']['value']['link'] ?? null;
+			$ads[ $i ]['source_post']     = array(
+				'instagram_media_id'      => $creative['source_instagram_media_id'] ?? null,
+				'instagram_permalink_url' => $creative['instagram_permalink_url'] ?? null,
+			);
+		}
+		if ( isset( $campaign['ads'] ) ) {
+			$campaign['ads']['data'] = $ads;
+		}
+
+		return $campaign;
+	}
+
 	/** @return array|\WP_Error */
 	public function report( array $input = array() ) {
 		$graph = FacebookGraphClient::for_ads();
@@ -265,7 +327,11 @@ class FacebookAdsReadAbility extends AbstractSocialAbility {
 		$campaign = trim( (string) ( $input['campaign_id'] ?? '' ) );
 
 		if ( '' !== $campaign ) {
-			$res = $graph->get( '/' . rawurlencode( $campaign ), array( 'fields' => $fields ) );
+			$detail_fields = 'id,name,status,effective_status,objective,start_time,stop_time,insights.date_preset(maximum){' . self::INSIGHT_FIELDS . '},adsets{optimization_goal,lifetime_budget,daily_budget,end_time,destination_type,targeting{geo_locations,age_min,age_max,flexible_spec}},ads{creative{call_to_action,source_instagram_media_id,instagram_permalink_url}}';
+			$res           = $graph->get( '/' . rawurlencode( $campaign ), array( 'fields' => $detail_fields ) );
+			if ( ! is_wp_error( $res ) ) {
+				$res = self::summarize_campaign( $res );
+			}
 			return is_wp_error( $res ) ? $res : array(
 				'success'   => true,
 				'campaigns' => array( $res ),

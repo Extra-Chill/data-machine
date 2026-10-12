@@ -14,6 +14,7 @@
 namespace DataMachineSocials\Tests\Unit\Abilities\Facebook;
 
 use DataMachineSocials\Abilities\Facebook\FacebookAdsReadAbility;
+use DataMachineSocials\Abilities\Facebook\FacebookAdsPromoteAbility;
 use DataMachineSocials\Abilities\Facebook\FacebookPromotionApproval;
 use DataMachineSocials\Abilities\Facebook\FacebookAdsPolicy;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
@@ -272,6 +273,77 @@ class FacebookAdsTest extends WP_UnitTestCase {
 
 		$this->assertNull( FacebookAdsReadAbility::exact_match( 'open source', $candidates ) );
 		$this->assertSame( '2', FacebookAdsReadAbility::exact_match( 'open-source SOFTWARE', $candidates )['id'] );
+	}
+
+	/**
+	 * Shape taken from the real Graph read of campaign 52568045328948
+	 * (Lo-Fi meetup boost): lifetime_budget is in cents, spend in dollars.
+	 */
+	public function test_summarize_campaign_exposes_budget_targeting_and_destination(): void {
+		$campaign = FacebookAdsReadAbility::summarize_campaign(
+			array(
+				'id'        => '52568045328948',
+				'objective' => 'OUTCOME_TRAFFIC',
+				'insights'  => array( 'data' => array( array( 'spend' => '0.85' ) ) ),
+				'adsets'    => array(
+					'data' => array(
+						array(
+							'optimization_goal' => 'LINK_CLICKS',
+							'lifetime_budget'   => '5000',
+							'daily_budget'      => '0',
+							'destination_type'  => 'WEBSITE',
+							'targeting'         => array(
+								'age_min'       => 21,
+								'age_max'       => 65,
+								'flexible_spec' => array(
+									array( 'interests' => array( array( 'name' => 'WordPress' ), array( 'name' => 'Beer' ) ) ),
+									array( 'interests' => array( array( 'name' => 'Photography' ) ) ),
+								),
+							),
+						),
+					),
+				),
+				'ads'       => array(
+					'data' => array(
+						array(
+							'id'       => '52568045352948',
+							'creative' => array(
+								'call_to_action'            => array( 'value' => array( 'link' => 'https://events.extrachill.com/events/x' ) ),
+								'source_instagram_media_id' => '18335726839277941',
+								'instagram_permalink_url'   => 'https://www.instagram.com/p/DeXyHQUA-VQ/',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$adset = $campaign['adsets']['data'][0];
+		$this->assertSame( 50.0, $adset['budget'] );
+		$this->assertSame( 'lifetime', $adset['budget_type'] );
+		$this->assertSame( 49.15, $adset['remaining_budget'] );
+		$this->assertSame( array( 'WordPress', 'Beer', 'Photography' ), $adset['targeting_summary']['interests'] );
+		$this->assertSame( 21, $adset['targeting_summary']['age_min'] );
+
+		$ad = $campaign['ads']['data'][0];
+		$this->assertSame( 'https://events.extrachill.com/events/x', $ad['destination_url'] );
+		$this->assertSame( '18335726839277941', $ad['source_post']['instagram_media_id'] );
+	}
+
+	public function test_summarize_campaign_daily_budget_has_no_remaining(): void {
+		$campaign = FacebookAdsReadAbility::summarize_campaign(
+			array(
+				'adsets' => array( 'data' => array( array( 'daily_budget' => '1000' ) ) ),
+			)
+		);
+
+		$this->assertSame( 10.0, $campaign['adsets']['data'][0]['budget'] );
+		$this->assertSame( 'daily', $campaign['adsets']['data'][0]['budget_type'] );
+		$this->assertNull( $campaign['adsets']['data'][0]['remaining_budget'] );
+	}
+
+	public function test_default_campaign_url_tags_use_a_slug(): void {
+		$this->assertSame( 'utm_source=meta&utm_medium=paid_social&utm_campaign=october-meetup-boost', FacebookAdsPromoteAbility::defaultUrlTags( 'October Meetup Boost!' ) );
 	}
 
 	public function test_operator_grant_covers_create_and_update_only(): void {
