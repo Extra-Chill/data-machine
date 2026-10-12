@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.184.1] - 2026-10-12
+
+### Fixed
+- signed approval links preview on GET and resolve on confirmed POST; stop route shadowing
+
 ## [0.184.0] - 2026-10-11
 
 ### Added
