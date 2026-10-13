@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.184.2] - 2026-10-13
+
+### Fixed
+- forward messages whose MIME parts lack parameters
+
 ## [0.184.1] - 2026-10-12
 
 ### Fixed
