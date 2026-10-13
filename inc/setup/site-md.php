@@ -535,8 +535,8 @@ function datamachine_network_section_sites(): string {
 
 	$lines   = array();
 	$lines[] = '## Sites';
-	$lines[] = '| Site | Blog ID | URL | Theme | Last Updated |';
-	$lines[] = '|------|---------|-----|-------|--------------|';
+	$lines[] = '| Site | Blog ID | URL | Theme |';
+	$lines[] = '|------|---------|-----|-------|';
 
 	foreach ( $sites as $site ) {
 		$blog_id = (int) $site->blog_id;
@@ -547,10 +547,8 @@ function datamachine_network_section_sites(): string {
 		$theme = wp_get_theme()->get( 'Name' ) ? wp_get_theme()->get( 'Name' ) : 'Unknown';
 		restore_current_blog();
 
-		$last_updated = $site->last_updated ? mysql2date( 'Y-m-d H:i', $site->last_updated ) : '';
-
 		$is_main = ( $blog_id === $main_site_id ) ? ' (main)' : '';
-		$lines[] = sprintf( '| %s%s | %d | %s | %s | %s |', $name, $is_main, $blog_id, $url, $theme, $last_updated );
+		$lines[] = sprintf( '| %s%s | %d | %s | %s |', $name, $is_main, $blog_id, $url, $theme );
 	}
 
 	return implode( "\n", $lines );

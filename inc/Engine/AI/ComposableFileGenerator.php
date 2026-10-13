@@ -299,6 +299,11 @@ class ComposableFileGenerator {
 			);
 		}
 
+		$payload = $content . "\n";
+		if ( is_file( $filepath ) && file_get_contents( $filepath ) === $payload ) {
+			return array( 'success' => true );
+		}
+
 		$temp_path = tempnam( $directory, '.' . basename( $filepath ) . '.tmp-' );
 		if ( false === $temp_path ) {
 			return array(
@@ -325,7 +330,6 @@ class ComposableFileGenerator {
 			);
 		}
 
-		$payload   = $content . "\n";
 		$written   = file_put_contents( $temp_path, $payload, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 		$file_mode = defined( 'FS_CHMOD_FILE' ) ? FS_CHMOD_FILE : 0644;
 		@chmod( $temp_path, $file_mode ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod,WordPress.PHP.NoSilencedErrors.Discouraged

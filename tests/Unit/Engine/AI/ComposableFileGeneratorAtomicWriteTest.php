@@ -134,6 +134,18 @@ class ComposableFileGeneratorAtomicWriteTest extends TestCase {
 		);
 	}
 
+	public function test_identical_write_preserves_file_mtime(): void {
+		$result = $this->write_file( $this->composed_file_path(), $this->directory, 'stable content' );
+		$this->assertTrue( $result['success'] );
+		$mtime = filemtime( $this->composed_file_path() );
+
+		$result = $this->write_file( $this->composed_file_path(), $this->directory, 'stable content' );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $mtime, filemtime( $this->composed_file_path() ) );
+		$this->assertSame( array(), glob( $this->directory . '/.*' ) );
+	}
+
 	public function test_unwritable_directory_fails_explicitly_without_a_tempnam_notice(): void {
 		$this->skip_when_root();
 
