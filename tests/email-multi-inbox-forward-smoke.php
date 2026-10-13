@@ -45,7 +45,7 @@ namespace DataMachine\Abilities\Email {
 	function imap_utf8( string $value ): string { return $value; }
 	function imap_fetchstructure( mixed $connection, int $uid, int $flags ): object {
 		return (object) array( 'type' => 1, 'parts' => array(
-			(object) array( 'type' => 1, 'parts' => array( (object) array( 'type' => 0, 'subtype' => 'PLAIN', 'encoding' => 0 ), (object) array( 'type' => 0, 'subtype' => 'HTML', 'encoding' => 4 ) ) ),
+			(object) array( 'type' => 1, 'parts' => array( (object) array( 'type' => 0, 'subtype' => 'PLAIN', 'encoding' => 0, 'ifdparameters' => 0, 'dparameters' => new \stdClass(), 'ifparameters' => 1, 'parameters' => array( (object) array( 'attribute' => 'charset', 'value' => 'utf-8' ) ) ), (object) array( 'type' => 0, 'subtype' => 'HTML', 'encoding' => 4, 'ifdparameters' => 0, 'dparameters' => new \stdClass(), 'ifparameters' => 0, 'parameters' => new \stdClass() ) ) ),
 			(object) array( 'type' => 1, 'parts' => array( (object) array( 'type' => 3, 'subtype' => 'PDF', 'encoding' => 3, 'disposition' => 'attachment', 'dparameters' => array( (object) array( 'attribute' => 'filename', 'value' => 'invoice.pdf' ) ) ) ) ),
 			(object) array( 'type' => 3, 'subtype' => 'PDF', 'encoding' => 3, 'disposition' => 'attachment', 'dparameters' => array( (object) array( 'attribute' => 'filename', 'value' => 'details.pdf' ) ) ),
 		) );
