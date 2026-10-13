@@ -516,10 +516,8 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		$second_lock = VenueProfileMutations::lockName( $second_id );
 		$this->assertNotSame( $first_lock, $second_lock );
 
-		$owner  = mysqli_init();
-		$waiter = mysqli_init();
-		$owner->real_connect( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
-		$waiter->real_connect( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$owner  = $this->independentConnection();
+		$waiter = $this->independentConnection();
 		$this->assertSame( 1, $this->namedLock( $owner, 'GET_LOCK', $first_lock ) );
 		$this->assertSame( 1, $this->namedLock( $waiter, 'GET_LOCK', $second_lock ) );
 		$this->assertSame( 0, $this->namedLock( $waiter, 'GET_LOCK', $first_lock ) );
@@ -535,14 +533,13 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_waiting_fill_empty_writer_rechecks_after_operator_edit(): void {
-		if ( ! extension_loaded( 'mysqli' ) || ! function_exists( 'pcntl_fork' ) ) {
-			$this->markTestSkipped( 'Real MySQL venue concurrency coverage requires mysqli and pcntl.' );
+		if ( ! function_exists( 'pcntl_fork' ) ) {
+			$this->markTestSkipped( 'Cross-process venue concurrency coverage requires pcntl.' );
 		}
 		global $wpdb, $table_prefix;
 		$term_id  = $this->venue( 'Fill Empty Race' );
 		$lock_key = VenueProfileMutations::lockName( $term_id );
-		$owner    = mysqli_init();
-		$owner->real_connect( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$owner    = $this->independentConnection();
 		$this->assertSame( 1, $this->namedLock( $owner, 'GET_LOCK', $lock_key ) );
 
 		$result_file = tempnam( sys_get_temp_dir(), 'dme-venue-race-' );
@@ -550,7 +547,7 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		$this->assertNotSame( -1, $pid );
 		if ( 0 === $pid ) {
 			global $wpdb;
-			$wpdb = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+			$wpdb = $this->independentConnection();
 			$wpdb->set_prefix( $table_prefix );
 			$result = VenueProfileMutations::updateSystem(
 				$term_id,
@@ -577,14 +574,10 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_native_wordpress_edit_fails_when_serialization_is_unavailable(): void {
-		if ( ! extension_loaded( 'mysqli' ) ) {
-			$this->markTestSkipped( 'Native venue lock coverage requires mysqli.' );
-		}
 		$term_id  = $this->venue( 'Native Lock Failure' );
 		$original = get_term( $term_id, 'venue' )->name;
 		$lock_key = VenueProfileMutations::lockName( $term_id );
-		$owner    = mysqli_init();
-		$owner->real_connect( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$owner    = $this->independentConnection();
 		$this->assertSame( 1, $this->namedLock( $owner, 'GET_LOCK', $lock_key ) );
 		add_filter( 'data_machine_events_venue_lock_timeout', '__return_zero' );
 		$rejected = false;
@@ -602,13 +595,9 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_native_wordpress_edit_releases_serialization_after_saved_hooks(): void {
-		if ( ! extension_loaded( 'mysqli' ) ) {
-			$this->markTestSkipped( 'Native venue lock coverage requires mysqli.' );
-		}
 		$term_id  = $this->venue( 'Native Lock Success' );
 		$lock_key = VenueProfileMutations::lockName( $term_id );
-		$observer = mysqli_init();
-		$observer->real_connect( DB_HOST, DB_USER, DB_PASSWORD, DB_NAME );
+		$observer = $this->independentConnection();
 
 		try {
 			$result = wp_update_term( $term_id, 'venue', array( 'name' => 'Native Lock Persisted' ) );
@@ -705,12 +694,23 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		return $attachment_id;
 	}
 
-	private function namedLock( \mysqli $connection, string $operation, string $key ): int {
-		$sql       = 'GET_LOCK' === $operation ? 'SELECT GET_LOCK(?, 0)' : 'SELECT RELEASE_LOCK(?)';
-		$statement = $connection->prepare( $sql );
-		$statement->bind_param( 's', $key );
-		$statement->execute();
-		return (int) $statement->get_result()->fetch_row()[0];
+	/**
+	 * Open a second, independent database connection with its own lock ownership.
+	 *
+	 * Stock MySQL wpdb: a new connection. A driver that is not a mysqli client
+	 * (e.g. a pure-PHP SQL engine) exposes open_connection() for the same purpose.
+	 */
+	private function independentConnection(): \wpdb {
+		global $wpdb;
+		if ( method_exists( $wpdb, 'open_connection' ) ) {
+			return $wpdb->open_connection();
+		}
+		return new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+	}
+
+	private function namedLock( \wpdb $connection, string $operation, string $key ): int {
+		$sql = 'GET_LOCK' === $operation ? 'SELECT GET_LOCK(%s, 0)' : 'SELECT RELEASE_LOCK(%s)';
+		return (int) $connection->get_var( $connection->prepare( $sql, $key ) );
 	}
 
 	private static function httpResponse( array $body ): array {

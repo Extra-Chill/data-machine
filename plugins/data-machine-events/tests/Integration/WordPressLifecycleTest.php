@@ -71,7 +71,6 @@ class WordPressLifecycleTest extends WP_UnitTestCase {
 	public function test_runtime_uses_mysql_json_semantics(): void {
 		global $wpdb;
 
-		$this->assertInstanceOf( \mysqli::class, $wpdb->dbh );
 		$this->assertSame( '1', (string) $wpdb->get_var( "SELECT JSON_VALID('{\"valid\":true}')" ) );
 		$this->assertSame( '0', (string) $wpdb->get_var( "SELECT JSON_VALID('{invalid}')" ) );
 	}

@@ -25,20 +25,6 @@ jobs:
       fail-fast: false
       matrix:
         command: [review lint, review test]
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: ''
-          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
-          MYSQL_DATABASE: homeboy_wptests
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,13 +45,9 @@ jobs:
 
       - name: Run Homeboy ${{ matrix.command }}
         env:
-          HOMEBOY_SETTINGS_JSON: '{"database_type":"mysql","wp_codebox_database_service":{"provider":"external","engine":"mysql","allowed_hosts":["127.0.0.1:3306"],"secret_env":{"host":"WP_CODEBOX_DB_HOST","port":"WP_CODEBOX_DB_PORT","username":"WP_CODEBOX_DB_USER","password":"WP_CODEBOX_DB_PASSWORD"}},"wp_codebox_multisite":true,"wp_codebox_phpunit_bootstrap_mode":"managed","wp_codebox_prepare_steps":[{"command":"npm","args":["ci"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventsMap"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventsMap"}]}'
+          HOMEBOY_SETTINGS_JSON: '{"database_type":"mdi-native","wp_codebox_multisite":true,"wp_codebox_phpunit_bootstrap_mode":"managed","wp_codebox_prepare_steps":[{"command":"npm","args":["ci"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventsMap"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventsMap"}]}'
           HOMEBOY_WORDPRESS_DEPENDENCY_PATHS: /tmp/data-machine
           HOMEBOY_WORDPRESS_MULTISITE: '1'
-          WP_CODEBOX_DB_HOST: 127.0.0.1
-          WP_CODEBOX_DB_PORT: '3306'
-          WP_CODEBOX_DB_USER: root
-          WP_CODEBOX_DB_PASSWORD: ''
         uses: Extra-Chill/homeboy-action@v2
         with:
           commands: ${{ matrix.command }}
