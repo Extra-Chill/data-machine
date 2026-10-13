@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.7] - 2026-10-13
+
+### Changed
+- run PHPUnit on wp-codebox mdi-native instead of external MySQL
+
 ## [0.66.6] - 2026-10-12
 
 ### Fixed
