@@ -61,6 +61,8 @@ class Email extends FetchHandler {
 			'folder'               => $config['folder'] ?? 'INBOX',
 			'search_criteria'      => $search_criteria,
 			'max_messages'         => (int) ( $config['max_messages'] ?? 10 ),
+			'search'               => (string) ( $config['search'] ?? '' ),
+			'exclude_keywords'     => (string) ( $config['exclude_keywords'] ?? '' ),
 			'mark_as_read'         => ! empty( $config['mark_as_read'] ),
 			'download_attachments' => ! empty( $config['download_attachments'] ),
 		);
@@ -111,34 +113,62 @@ class Email extends FetchHandler {
 	/**
 	 * Build IMAP search criteria from handler config.
 	 *
-	 * Starts with the base search criteria and augments with
-	 * from_filter and timeframe_limit settings.
+	 * Starts with the base search criteria and augments it with the sender,
+	 * subject and timeframe filters. PHP's c-client imap_search() rejects the
+	 * IMAP OR keyword, so comma-separated sender/subject values produce one
+	 * criteria string per combination; the ability merges and dedupes the UIDs.
 	 *
 	 * @param array $config Handler configuration.
-	 * @return string IMAP search criteria string.
+	 * @return string|string[] One criteria string, or a list of OR'd alternatives.
 	 */
-	private function buildSearchCriteria( array $config ): string {
-		$criteria = $config['search_criteria'] ?? 'UNSEEN';
+	private function buildSearchCriteria( array $config ): string|array {
+		$base     = (string) ( $config['search_criteria'] ?? 'UNSEEN' );
+		$senders  = $this->splitFilterValues( (string) ( $config['from_filter'] ?? '' ) );
+		$subjects = $this->splitFilterValues( (string) ( $config['subject_filter'] ?? '' ) );
 
-		// Augment with sender filter.
-		if ( ! empty( $config['from_filter'] ) ) {
-			$criteria .= ' FROM "' . $config['from_filter'] . '"';
-		}
-
-		// Augment with subject filter.
-		if ( ! empty( $config['subject_filter'] ) ) {
-			$criteria .= ' SUBJECT "' . $config['subject_filter'] . '"';
-		}
-
-		// Augment with timeframe filter.
+		$since = '';
 		if ( ! empty( $config['timeframe_limit'] ) && 'all_time' !== $config['timeframe_limit'] ) {
-			$since_date = $this->timeframeToDate( $config['timeframe_limit'] );
-			if ( $since_date ) {
-				$criteria .= ' SINCE "' . $since_date . '"';
+			$since_date = $this->timeframeToDate( (string) $config['timeframe_limit'] );
+			if ( null !== $since_date ) {
+				$since = ' SINCE "' . $since_date . '"';
 			}
 		}
 
-		return $criteria;
+		$searches = array();
+		foreach ( ( empty( $senders ) ? array( '' ) : $senders ) as $sender ) {
+			foreach ( ( empty( $subjects ) ? array( '' ) : $subjects ) as $subject ) {
+				$search = $base;
+				if ( '' !== $sender ) {
+					$search .= ' FROM "' . $this->quoteImapString( $sender ) . '"';
+				}
+				if ( '' !== $subject ) {
+					$search .= ' SUBJECT "' . $this->quoteImapString( $subject ) . '"';
+				}
+				$searches[] = $search . $since;
+			}
+		}
+
+		return 1 === count( $searches ) ? $searches[0] : $searches;
+	}
+
+	/**
+	 * Split a comma-separated filter value into trimmed, non-empty parts.
+	 *
+	 * @param string $value Raw filter value.
+	 * @return string[]
+	 */
+	private function splitFilterValues( string $value ): array {
+		return array_values( array_filter( array_map( 'trim', explode( ',', $value ) ), 'strlen' ) );
+	}
+
+	/**
+	 * Escape a value for use inside an IMAP quoted string.
+	 *
+	 * @param string $value Raw value.
+	 * @return string
+	 */
+	private function quoteImapString( string $value ): string {
+		return str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), $value );
 	}
 
 	/**
@@ -148,20 +178,11 @@ class Email extends FetchHandler {
 	 * @return string|null IMAP-formatted date or null.
 	 */
 	private function timeframeToDate( string $timeframe ): ?string {
-		$days_map = array(
-			'24_hours' => 1,
-			'7_days'   => 7,
-			'30_days'  => 30,
-			'90_days'  => 90,
-			'6_months' => 180,
-			'1_year'   => 365,
-		);
-
-		$days = $days_map[ $timeframe ] ?? null;
-		if ( null === $days ) {
+		$timestamp = apply_filters( 'datamachine_timeframe_limit', null, $timeframe );
+		if ( ! is_numeric( $timestamp ) ) {
+			do_action( 'datamachine_log', 'warning', 'Unknown email timeframe_limit: ' . $timeframe );
 			return null;
 		}
-
-		return gmdate( 'j-M-Y', strtotime( "-{$days} days" ) );
+		return gmdate( 'j-M-Y', (int) $timestamp );
 	}
 }
