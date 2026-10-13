@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.8] - 2026-10-13
+
+### Fixed
+- never silently drop the submission publish email
+
 ## [0.66.7] - 2026-10-13
 
 ### Changed
