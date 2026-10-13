@@ -179,12 +179,55 @@ class SubmissionNotification {
 			'context'  => $context,
 		);
 
-		$result = $ability->execute( $input );
+		$result = self::execute_as_system( $ability, $input );
 
-		if ( is_array( $result ) && empty( $result['success'] ) ) {
-			$error = isset( $result['error'] ) ? (string) $result['error'] : 'unknown error';
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- intentional failure log; ability returned structured error.
+		$error = self::failure_message( $result );
+		if ( null !== $error ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- intentional failure log; the submitter email was not sent.
 			error_log( '[data-machine-events] SubmissionNotification: send-email ability failed for event ' . $post->ID . ': ' . $error );
 		}
+	}
+
+	/**
+	 * Run the send as the system rather than as whoever changed the status.
+	 *
+	 * The notification is trusted, server-built transactional mail: the
+	 * recipient is the stored submitter address and the body is rendered here.
+	 * Whether it sends must not depend on the publishing user's Data Machine
+	 * capabilities, nor on there being a user at all (auto-published
+	 * submissions are created inside a background job).
+	 *
+	 * @param \WP_Ability           $ability Resolved datamachine/send-email ability.
+	 * @param array<string, mixed> $input   Ability input.
+	 * @return mixed Ability result.
+	 */
+	private static function execute_as_system( \WP_Ability $ability, array $input ) {
+		return \DataMachine\Abilities\PermissionHelper::run_as_system( static fn() => $ability->execute( $input ) );
+	}
+
+	/**
+	 * Describe a failed send, or null when the send succeeded.
+	 *
+	 * WP_Ability::execute() returns a WP_Error when the permission callback
+	 * denies the call or input validation fails, and the send-email ability
+	 * itself returns array|WP_Error. Both shapes must be reported (#918).
+	 *
+	 * @param mixed $result Ability result.
+	 * @return string|null
+	 */
+	public static function failure_message( $result ): ?string {
+		if ( is_wp_error( $result ) ) {
+			return $result->get_error_code() . ': ' . $result->get_error_message();
+		}
+
+		if ( is_array( $result ) ) {
+			if ( ! empty( $result['success'] ) ) {
+				return null;
+			}
+
+			return isset( $result['error'] ) ? (string) $result['error'] : 'unknown error';
+		}
+
+		return 'unexpected result type ' . gettype( $result );
 	}
 }
