@@ -300,7 +300,7 @@ class ComposableFileGenerator {
 		}
 
 		$payload = $content . "\n";
-		if ( is_file( $filepath ) && file_get_contents( $filepath ) === $payload ) {
+		if ( is_file( $filepath ) && file_get_contents( $filepath ) === $payload ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local file comparison.
 			return array( 'success' => true );
 		}
 

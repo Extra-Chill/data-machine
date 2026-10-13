@@ -402,9 +402,9 @@ class WakeBriefingTask extends SystemTask {
 	 * @return string Markdown content.
 	 */
 	private function render( array $signals, int $window_hours, string $scope = 'site' ): string {
-		$reach        = 'network' === $scope ? 'across the network' : 'on this site';
-		$header       = "# Wake Briefing\n\n";
-		$header      .= sprintf( "_What changed in the last %dh %s (recomposed hourly; a rolling %dh window; not personal to one session)._\n\n", $window_hours, $reach, $window_hours );
+		$reach   = 'network' === $scope ? 'across the network' : 'on this site';
+		$header  = "# Wake Briefing\n\n";
+		$header .= sprintf( "_What changed in the last %dh %s (recomposed hourly; a rolling %dh window; not personal to one session)._\n\n", $window_hours, $reach, $window_hours );
 
 		if ( empty( $signals ) ) {
 			$where = 'network' === $scope ? 'across the network' : 'here';
