@@ -204,7 +204,7 @@ final class ForwardEmailAbility {
 			return new \WP_Error( 'email_part_invalid', 'A message part is invalid or exceeds the size limit.' );
 		}
 		$filename = '';
-		foreach ( array_merge( $part->dparameters ?? array(), $part->parameters ?? array() ) as $parameter ) {
+		foreach ( array_merge( self::parameters( $part, 'dparameters' ), self::parameters( $part, 'parameters' ) ) as $parameter ) {
 			if ( in_array( strtolower( $parameter->attribute ), array( 'filename', 'name' ), true ) ) {
 				$filename = sanitize_file_name( imap_utf8( $parameter->value ) );
 			}
@@ -213,7 +213,7 @@ final class ForwardEmailAbility {
 		$subtype       = strtolower( $part->subtype ?? 'octet-stream' );
 		$is_attachment = '' !== $filename || 'attachment' === strtolower( $part->disposition ?? '' );
 		if ( 0 === $type && ! $is_attachment && in_array( $subtype, array( 'plain', 'html' ), true ) ) {
-			foreach ( $part->parameters ?? array() as $parameter ) {
+			foreach ( self::parameters( $part, 'parameters' ) as $parameter ) {
 				if ( 'charset' === strtolower( $parameter->attribute ) && ! in_array( strtolower( $parameter->value ), array( 'utf-8', 'us-ascii' ), true ) ) {
 					// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- Invalid encoding returns a structured error without exposing the invoice.
 					$converted = @iconv( $parameter->value, 'UTF-8', $data );
@@ -234,5 +234,12 @@ final class ForwardEmailAbility {
 			);
 		}
 		return null;
+	}
+
+	/**
+	 * MIME parameters for a part. ext-imap reports absent parameters as an empty object.
+	 */
+	private static function parameters( object $part, string $property ): array {
+		return is_array( $part->$property ?? null ) ? $part->$property : array();
 	}
 }
