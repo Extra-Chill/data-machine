@@ -394,22 +394,17 @@ class WakeBriefingTask extends SystemTask {
 	 * Render the digest. Ruthless terseness: one grouped line per signal,
 	 * a single quiet line when nothing crosses the bar.
 	 *
-	 * The rendered header includes a machine+human-readable `generated_at`
-	 * (UTC) stamp so any reader can see the digest age. The injection-time
-	 * staleness guard (see {@see self::applyStalenessGuard()}) layers a
-	 * visible warning on top when the on-disk file is older than the
-	 * rolling window.
+	 * Age is surfaced by the injection-time staleness guard using the file's
+	 * mtime; the rendered content stays stable when its signals do not change.
 	 *
 	 * @param string[] $signals      Threshold-crossing signal lines.
 	 * @param int      $window_hours Window size in hours.
 	 * @return string Markdown content.
 	 */
 	private function render( array $signals, int $window_hours, string $scope = 'site' ): string {
-		$reach        = 'network' === $scope ? 'across the network' : 'on this site';
-		$generated_at = gmdate( 'Y-m-d H:i T' );
-		$header       = "# Wake Briefing\n\n";
-		$header      .= sprintf( "_What changed in the last %dh %s (recomposed hourly; a rolling %dh window; not personal to one session)._\n\n", $window_hours, $reach, $window_hours );
-		$header      .= sprintf( "_Generated at %s._\n\n", $generated_at );
+		$reach   = 'network' === $scope ? 'across the network' : 'on this site';
+		$header  = "# Wake Briefing\n\n";
+		$header .= sprintf( "_What changed in the last %dh %s (recomposed hourly; a rolling %dh window; not personal to one session)._\n\n", $window_hours, $reach, $window_hours );
 
 		if ( empty( $signals ) ) {
 			$where = 'network' === $scope ? 'across the network' : 'here';
@@ -1039,9 +1034,8 @@ class WakeBriefingTask extends SystemTask {
 	 *
 	 * If WAKE.md hasn't been refreshed within the rolling window, prepend
 	 * a visible warning so consumers don't silently trust stale data. The
-	 * generated_at stamp baked into the file by render() already shows the
-	 * composition time; this guard adds a machine-computed age warning at
-	 * injection time based on the file's actual mtime.
+	 * warning is machine-computed at injection time from the file's actual
+	 * mtime.
 	 *
 	 * @param string     $content    File content.
 	 * @param string     $filename   Filename.
