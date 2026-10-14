@@ -138,6 +138,25 @@ class EventDetailsEndTimeRenderTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_explicit_false_description_first_filter_keeps_info_and_actions_before_description(): void {
+		$filter_callback = static function ( $description_first, $post_id ) {
+			return false;
+		};
+		add_filter( 'data_machine_events_details_description_first', $filter_callback, 10, 2 );
+
+		try {
+			$output = $this->render_event_details(
+				array( 'startDate' => '2026-10-21' ),
+				'<p class="event-description">Description marker</p>'
+			);
+
+			$this->assertLessThan( strpos( $output, 'event-description' ), strpos( $output, 'event-info-grid' ) );
+			$this->assertLessThan( strpos( $output, 'event-description' ), strpos( $output, 'event-action-buttons' ) );
+		} finally {
+			remove_filter( 'data_machine_events_details_description_first', $filter_callback, 10 );
+		}
+	}
+
 	/**
 	 * The overwhelmingly common case for scraped events: no end stored at
 	 * all. Must render byte-for-byte like the pre-#860 behavior — no dash,
