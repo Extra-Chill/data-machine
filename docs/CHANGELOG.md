@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.185.0] - 2026-10-14
+
+### Added
+- return agent-layer memory for actorless non-turn events and expose convention_path
+
 ## [0.184.3] - 2026-10-14
 
 ### Fixed
