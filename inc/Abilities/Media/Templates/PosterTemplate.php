@@ -21,6 +21,15 @@
  *     in a left column; logo top-right and QR + label above the banner
  *     in a right column; footer row under the banner.
  *
+ * Knobs beyond copy:
+ *   - scheme: `dark` (default), `accent` (canvas flooded with the brand
+ *     accent, dark banner) or `light` (brand background, dark type).
+ *   - list_heading + list_items: a ruled list of rows, each with a
+ *     primary line, an optional secondary line and an optional
+ *     right-aligned meta value (e.g. a time or a price). Portrait draws
+ *     it under the tagline; landscape gives it its own column. Rows that
+ *     do not fit are dropped from the end, never squeezed.
+ *
  * Spare vertical space on tall canvases is distributed instead of
  * pooling at the bottom, and the title shrinks until the content clears
  * the banner.
@@ -78,6 +87,17 @@ class PosterTemplate implements TemplateInterface {
 	/** GD alpha (0 opaque .. 127 transparent) for the background stripes. */
 	private const STRIPE_ALPHA = 122;
 
+	/** Supported color schemes; the first is the default. */
+	public const SCHEMES = array( 'dark', 'accent', 'light' );
+
+	/** List block sizes, in each layout's design unit. */
+	private const LIST_HEADING_SIZE = 26;
+	private const LIST_PRIMARY_SIZE = 38;
+	private const LIST_SECOND_SIZE  = 24;
+	private const LIST_META_SIZE    = 34;
+	private const LIST_ROW_PAD      = 14;
+	private const LIST_MIN_ROWS     = 3;
+
 	/** Share of spare vertical space placed above the content block. */
 	private const SLACK_ABOVE = 0.4;
 
@@ -90,7 +110,7 @@ class PosterTemplate implements TemplateInterface {
 	}
 
 	public function get_description(): string {
-		return 'Branded promotional poster from free-form copy: kicker, title, tagline, detail lines, banner, call to action and an optional QR code. Portrait, print and 16:9 landscape layouts.';
+		return 'Branded promotional poster from free-form copy: kicker, title, tagline, an optional ruled list of rows, detail lines, banner, call to action and an optional QR code. Dark, accent or light color scheme. Portrait, print and 16:9 landscape layouts.';
 	}
 
 	public function get_fields(): array {
@@ -119,6 +139,9 @@ class PosterTemplate implements TemplateInterface {
 			'cta_text'      => $string( 'Call-to-action line' ),
 			'footer_note'   => $string( 'Footer note' ),
 			'cobrand_logos' => $list( 'Co-brand logo paths' ),
+			'scheme'        => $string( 'Color scheme: dark (default), accent or light' ),
+			'list_heading'  => $string( 'List heading (small caps line above the list)' ),
+			'list_items'    => $list( 'List rows: strings, or objects with primary, secondary and meta' ),
 		);
 	}
 
@@ -172,7 +195,7 @@ class PosterTemplate implements TemplateInterface {
 	 * Normalize raw template input into the strings and lists drawn.
 	 *
 	 * @param array $data Raw template input.
-	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: string[], accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, cta_text: string, footer_note: string, cobrand_logos: string[]}
+	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: string[], accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, cta_text: string, footer_note: string, cobrand_logos: string[], scheme: string, list_heading: string, list_items: array<int, array{primary: string, secondary: string, meta: string}>}
 	 */
 	public static function normalize_fields( array $data ): array {
 		$str = static fn( string $key ): string => is_scalar( $data[ $key ] ?? null ) ? trim( (string) $data[ $key ] ) : '';
@@ -191,6 +214,23 @@ class PosterTemplate implements TemplateInterface {
 			}
 		}
 
+		$list_items = array();
+		foreach ( (array) ( $data['list_items'] ?? array() ) as $item ) {
+			$item = is_scalar( $item ) ? array( 'primary' => $item ) : $item;
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			$row = array();
+			foreach ( array( 'primary', 'secondary', 'meta' ) as $key ) {
+				$row[ $key ] = is_scalar( $item[ $key ] ?? null ) ? trim( (string) $item[ $key ] ) : '';
+			}
+			if ( '' !== $row['primary'] ) {
+				$list_items[] = $row;
+			}
+		}
+
+		$scheme = strtolower( $str( 'scheme' ) );
+
 		return array(
 			'title'         => $str( 'title' ),
 			'kicker'        => $str( 'kicker' ),
@@ -205,6 +245,9 @@ class PosterTemplate implements TemplateInterface {
 			'cta_text'      => $str( 'cta_text' ),
 			'footer_note'   => $str( 'footer_note' ),
 			'cobrand_logos' => $cobrand,
+			'scheme'        => in_array( $scheme, self::SCHEMES, true ) ? $scheme : self::SCHEMES[0],
+			'list_heading'  => $str( 'list_heading' ),
+			'list_items'    => $list_items,
 		);
 	}
 
@@ -234,18 +277,22 @@ class PosterTemplate implements TemplateInterface {
 		$r->register_font( 'heading', (string) ( $tokens['fonts']['heading'] ?? '' ) );
 		$r->register_font( 'body', (string) ( $tokens['fonts']['body'] ?? '' ) );
 
-		// Dark-mode palette when the brand supplies one, falling back to
-		// the light-mode-derived tokens.
-		$c      = (array) ( $tokens['colors'] ?? array() );
-		$bg_hex = (string) ( $c['dark_background'] ?? $c['background_dark'] ?? '#1a1a1a' );
-		$colors = array(
-			'text'   => $r->color_hex( 'text', (string) ( $c['dark_text'] ?? $c['text_inverse'] ?? '#e5e5e5' ) ),
-			'muted'  => $r->color_hex( 'muted', (string) ( $c['dark_muted'] ?? $c['text_muted'] ?? '#b0b0b0' ) ),
-			'accent' => $r->color_hex( 'accent', (string) ( $c['dark_accent'] ?? $c['accent'] ?? '#53940b' ) ),
-			'ink'    => $r->color_hex( 'ink', $bg_hex ),
+		$palette = self::palette( (array) ( $tokens['colors'] ?? array() ), $fields['scheme'] );
+		$colors  = array(
+			'text'   => $r->color_hex( 'text', $palette['text'] ),
+			'muted'  => $r->color_hex( 'muted', $palette['muted'] ),
+			'accent' => $r->color_hex( 'accent', $palette['accent'] ),
+			'ink'    => $r->color_hex( 'ink', $palette['banner_text'] ),
+			'banner' => $r->color_hex( 'banner', $palette['banner'] ),
+			'rule'   => $r->color_hex( 'rule', $palette['rule'] ),
 		);
-		$r->fill( $r->color_hex( 'bg', $bg_hex ) );
-		self::draw_stripes( $r, $width, $height, $u );
+		$r->fill( $r->color_hex( 'bg', $palette['background'] ) );
+		self::draw_stripes( $r, $width, $height, $u, 'light' === $palette['stripe'] ? 255 : 0 );
+
+		// Light canvases take the standard logo; dark ones the inverse.
+		$tokens['logo_path_inverse'] = 'dark' === $fields['scheme']
+			? (string) ( $tokens['logo_path_inverse'] ?? '' )
+			: (string) ( $tokens['logo_path'] ?? $tokens['logo_path_inverse'] ?? '' );
 
 		if ( '' === $fields['kicker'] ) {
 			$fields['kicker'] = self::default_kicker( (string) ( $tokens['brand_text'] ?? '' ) );
@@ -297,10 +344,23 @@ class PosterTemplate implements TemplateInterface {
 		do {
 			$content_h = $this->content_height( $r, $fields, $lines, $title_size, $title_w, $max_w, $px );
 			$plan      = self::plan_layout( $height, $margin, $content_h, $banner_h, $footer_h, $px( self::MIN_BANNER_GAP ) );
-			if ( $plan['fits'] || $title_size <= $px( self::TITLE_MIN_SIZE ) ) {
+			if ( $plan['fits'] ) {
 				break;
 			}
-			$title_size -= $px( 4 );
+			// Trim the list to a few rows before shrinking the headline,
+			// then shrink the headline, then trim the list further.
+			if ( count( $fields['list_items'] ) > self::LIST_MIN_ROWS ) {
+				array_pop( $fields['list_items'] );
+				continue;
+			}
+			if ( $title_size > $px( self::TITLE_MIN_SIZE ) ) {
+				$title_size -= $px( 4 );
+				continue;
+			}
+			if ( ! $fields['list_items'] ) {
+				break;
+			}
+			array_pop( $fields['list_items'] );
 		} while ( true );
 
 		$y = $plan['content_top'];
@@ -317,11 +377,14 @@ class PosterTemplate implements TemplateInterface {
 			$y = $r->draw_text_wrapped( $line, $px( self::BODY_SIZE ), $margin, $y, 0 === $i ? $text : $muted, 'body', $max_w, 1.35 ) + $px( 10 );
 		}
 		$y += $px( 40 );
+		if ( $fields['list_items'] ) {
+			$y = self::draw_list( $r, $fields, $margin, $y, $max_w, $colors, $px ) + $px( 40 );
+		}
 		foreach ( $fields['detail_lines'] as $line ) {
-			$y = $r->draw_text_wrapped( $line, $px( self::DETAIL_SIZE ), $margin, $y, $text, 'heading', $max_w, 1.15 );
+			$y = $r->draw_text_wrapped( $line, self::fit_word_size( $r, $line, $px( self::DETAIL_SIZE ), 'heading', $max_w ), $margin, $y, $text, 'heading', $max_w, 1.15 );
 		}
 		if ( '' !== $fields['accent_line'] ) {
-			$y = $r->draw_text_wrapped( $fields['accent_line'], $px( self::DETAIL_SIZE ), $margin, $y, $accent, 'heading', $max_w, 1.15 );
+			$y = $r->draw_text_wrapped( $fields['accent_line'], self::fit_word_size( $r, $fields['accent_line'], $px( self::DETAIL_SIZE ), 'heading', $max_w ), $margin, $y, $accent, 'heading', $max_w, 1.15 );
 		}
 		if ( '' !== $fields['detail_note'] ) {
 			$r->draw_text_wrapped( $fields['detail_note'], $px( self::NOTE_LINE_SIZE ), $margin, $y + $px( 6 ), $muted, 'body', $max_w, 1.4 );
@@ -330,7 +393,7 @@ class PosterTemplate implements TemplateInterface {
 		// Banner.
 		$banner_top = $plan['banner_top'];
 		if ( $has_banner ) {
-			$r->filled_rect( $margin, $banner_top, $width - $margin, $banner_top + $banner_h, $accent );
+			$r->filled_rect( $margin, $banner_top, $width - $margin, $banner_top + $banner_h, $colors['banner'] );
 			$size = $px( self::BANNER_TEXT_SIZE );
 			while ( $size > 12 && $r->measure_text_width( $fields['banner_text'], $size, 'heading' ) > $max_w - $px( 60 ) ) {
 				--$size;
@@ -394,6 +457,14 @@ class PosterTemplate implements TemplateInterface {
 		$left_w     = self::landscape_left_width( $width, $margin, $right_w, $px( 80 ) );
 		$detail     = $px( self::LANDSCAPE_DETAIL_SIZE );
 
+		// With a list, the left area splits: copy on the left, list beside it.
+		$list_w = 0;
+		if ( $fields['list_items'] ) {
+			$area   = $left_w;
+			$left_w = (int) round( $area * 0.42 );
+			$list_w = $area - $left_w - $px( 70 );
+		}
+
 		$title_size = $px( self::LANDSCAPE_TITLE_MAX );
 		do {
 			$content_h = $r->measure_text_height( $fields['kicker'], $px( 30 ), 'body', $left_w, 1.3 ) + $px( 20 )
@@ -401,9 +472,9 @@ class PosterTemplate implements TemplateInterface {
 				+ ( '' !== $fields['tagline'] ? $r->measure_text_height( $fields['tagline'], $px( 36 ), 'body', $left_w, 1.35 ) + $px( 30 ) : 0 )
 				+ ( '' !== $fields['subline'] ? $r->measure_text_height( $fields['subline'], $px( 30 ), 'body', $left_w, 1.35 ) + $px( 24 ) : 0 );
 			foreach ( $fields['detail_lines'] as $line ) {
-				$content_h += $r->measure_text_height( $line, $detail, 'heading', $left_w, 1.15 );
+				$content_h += $r->measure_text_height( $line, self::fit_word_size( $r, $line, $detail, 'heading', $left_w ), 'heading', $left_w, 1.15 );
 			}
-			$content_h += ( '' !== $fields['accent_line'] ? $r->measure_text_height( $fields['accent_line'], $detail, 'heading', $left_w, 1.15 ) : 0 )
+			$content_h += ( '' !== $fields['accent_line'] ? $r->measure_text_height( $fields['accent_line'], self::fit_word_size( $r, $fields['accent_line'], $detail, 'heading', $left_w ), 'heading', $left_w, 1.15 ) : 0 )
 				+ ( '' !== $fields['detail_note'] ? $px( 6 ) + $r->measure_text_height( $fields['detail_note'], $px( 30 ), 'body', $left_w, 1.4 ) : 0 );
 
 			$plan = self::plan_layout( $height, $margin, $content_h, $banner_h, $footer_h, $px( 40 ) );
@@ -414,6 +485,16 @@ class PosterTemplate implements TemplateInterface {
 		} while ( true );
 
 		$banner_top = $plan['banner_top'];
+
+		if ( $list_w ) {
+			$list_x = $margin + $left_w + $px( 70 );
+			$room   = $banner_top - $px( 40 ) - $margin;
+			while ( $fields['list_items'] && self::list_height( $fields, $px ) > $room ) {
+				array_pop( $fields['list_items'] );
+			}
+			$r->filled_rect( $list_x - $px( 36 ), $margin, $list_x - $px( 32 ), $banner_top - $px( 40 ), $colors['rule'] );
+			self::draw_list( $r, $fields, $list_x, $margin, $list_w, $colors, $px );
+		}
 
 		if ( $logo_w ) {
 			$r->overlay_image( $logo, $width - $margin - $logo_w, max( 0, $margin - $px( 20 ) ), $logo_w, $logo_h );
@@ -445,17 +526,17 @@ class PosterTemplate implements TemplateInterface {
 			$y = $r->draw_text_wrapped( $fields['subline'], $px( 30 ), $margin, $y, $colors['muted'], 'body', $left_w, 1.35 ) + $px( 24 );
 		}
 		foreach ( $fields['detail_lines'] as $line ) {
-			$y = $r->draw_text_wrapped( $line, $detail, $margin, $y, $colors['text'], 'heading', $left_w, 1.15 );
+			$y = $r->draw_text_wrapped( $line, self::fit_word_size( $r, $line, $detail, 'heading', $left_w ), $margin, $y, $colors['text'], 'heading', $left_w, 1.15 );
 		}
 		if ( '' !== $fields['accent_line'] ) {
-			$y = $r->draw_text_wrapped( $fields['accent_line'], $detail, $margin, $y, $colors['accent'], 'heading', $left_w, 1.15 );
+			$y = $r->draw_text_wrapped( $fields['accent_line'], self::fit_word_size( $r, $fields['accent_line'], $detail, 'heading', $left_w ), $margin, $y, $colors['accent'], 'heading', $left_w, 1.15 );
 		}
 		if ( '' !== $fields['detail_note'] ) {
 			$r->draw_text_wrapped( $fields['detail_note'], $px( 30 ), $margin, $y + $px( 6 ), $colors['muted'], 'body', $left_w, 1.4 );
 		}
 
 		if ( $has_banner ) {
-			$r->filled_rect( $margin, $banner_top, $width - $margin, $banner_top + $banner_h, $colors['accent'] );
+			$r->filled_rect( $margin, $banner_top, $width - $margin, $banner_top + $banner_h, $colors['banner'] );
 			$size = $px( 46 );
 			while ( $size > 12 && $r->measure_text_width( $fields['banner_text'], $size, 'heading' ) > $width - 2 * $margin - $px( 80 ) ) {
 				--$size;
@@ -498,6 +579,207 @@ class PosterTemplate implements TemplateInterface {
 	}
 
 	/**
+	 * Resolve a scheme to hex colors from brand tokens.
+	 *
+	 * dark: the brand's dark palette (falls back to light-derived tokens).
+	 * accent: canvas flooded with the brand accent, dark type, dark
+	 * banner carrying accent-colored text. light: brand background, dark
+	 * type, accent highlights and banner.
+	 *
+	 * @param array  $c      BrandTokens colors.
+	 * @param string $scheme One of self::SCHEMES.
+	 * @return array{background: string, text: string, muted: string, accent: string, banner: string, banner_text: string, rule: string, stripe: string}
+	 */
+	public static function palette( array $c, string $scheme ): array {
+		$get       = static fn( array $keys, string $fallback ): string => (string) ( array_values( array_filter( array_map( static fn( $k ) => $c[ $k ] ?? null, $keys ) ) )[0] ?? $fallback );
+		$dark_bg   = $get( array( 'dark_background', 'background_dark' ), '#1a1a1a' );
+		$dark_text = $get( array( 'dark_text', 'text_inverse' ), '#e5e5e5' );
+		$accent    = $get( array( 'dark_accent', 'accent' ), '#53940b' );
+
+		if ( 'accent' === $scheme ) {
+			return array(
+				'background'  => $accent,
+				'text'        => $dark_bg,
+				'muted'       => self::mix( $dark_bg, $accent, 0.7 ),
+				'accent'      => '#ffffff',
+				'banner'      => $dark_bg,
+				'banner_text' => $accent,
+				'rule'        => self::mix( $dark_bg, $accent, 0.35 ),
+				'stripe'      => 'dark',
+			);
+		}
+		if ( 'light' === $scheme ) {
+			$ink   = $get( array( 'text_primary' ), '#000000' );
+			$green = $get( array( 'accent' ), '#53940b' );
+			return array(
+				'background'  => $get( array( 'background' ), '#ffffff' ),
+				'text'        => $ink,
+				'muted'       => $get( array( 'text_muted' ), '#6b7280' ),
+				'accent'      => $green,
+				'banner'      => $green,
+				'banner_text' => '#ffffff',
+				'rule'        => $get( array( 'border' ), '#dddddd' ),
+				'stripe'      => 'dark',
+			);
+		}
+		return array(
+			'background'  => $dark_bg,
+			'text'        => $dark_text,
+			'muted'       => $get( array( 'dark_muted', 'text_muted' ), '#b0b0b0' ),
+			'accent'      => $accent,
+			'banner'      => $accent,
+			'banner_text' => $dark_bg,
+			'rule'        => self::mix( $dark_text, $dark_bg, 0.25 ),
+			'stripe'      => 'light',
+		);
+	}
+
+	/**
+	 * Blend two hex colors: $weight of $a, the rest $b.
+	 *
+	 * @param string $a      Hex color.
+	 * @param string $b      Hex color.
+	 * @param float  $weight Share of $a (0..1).
+	 */
+	private static function mix( string $a, string $b, float $weight ): string {
+		$a   = array_map( 'hexdec', str_split( substr( ltrim( $a, '#' ) . '000000', 0, 6 ), 2 ) );
+		$b   = array_map( 'hexdec', str_split( substr( ltrim( $b, '#' ) . '000000', 0, 6 ), 2 ) );
+		$out = '#';
+		foreach ( array( 0, 1, 2 ) as $i ) {
+			$out .= sprintf( '%02x', (int) round( $a[ $i ] * $weight + $b[ $i ] * ( 1 - $weight ) ) );
+		}
+		return $out;
+	}
+
+	/**
+	 * Height of one list row.
+	 *
+	 * @param array    $row Normalized list row.
+	 * @param callable $px  Design-unit scaler.
+	 */
+	private static function list_row_height( array $row, callable $px ): int {
+		$h = $px( self::LIST_ROW_PAD ) * 2 + (int) ( $px( self::LIST_PRIMARY_SIZE ) * 1.2 );
+		if ( '' !== $row['secondary'] ) {
+			$h += $px( 6 ) + (int) ( $px( self::LIST_SECOND_SIZE ) * 1.3 );
+		}
+		return $h;
+	}
+
+	/**
+	 * Height of the list block (heading plus rows).
+	 *
+	 * @param array    $fields Normalized fields.
+	 * @param callable $px     Design-unit scaler.
+	 */
+	public static function list_height( array $fields, callable $px ): int {
+		if ( ! $fields['list_items'] ) {
+			return 0;
+		}
+		$h = '' !== $fields['list_heading'] ? (int) ( $px( self::LIST_HEADING_SIZE ) * 1.3 ) + $px( 10 ) : 0;
+		foreach ( $fields['list_items'] as $row ) {
+			$h += self::list_row_height( $row, $px );
+		}
+		return $h;
+	}
+
+	/**
+	 * Draw the ruled list block; returns the y after the last row.
+	 *
+	 * Each row: primary line (heading font) with the meta value
+	 * right-aligned beside it, secondary line (body, muted) under it, and
+	 * a hairline rule below. Lines are truncated, never wrapped, so every
+	 * row has the same rhythm.
+	 *
+	 * @param GDRenderer $r      Renderer.
+	 * @param array      $fields Normalized fields.
+	 * @param int        $x      Left edge.
+	 * @param int        $y      Top.
+	 * @param int        $w      Block width.
+	 * @param array      $colors Allocated colors.
+	 * @param callable   $px     Design-unit scaler.
+	 */
+	private static function draw_list( GDRenderer $r, array $fields, int $x, int $y, int $w, array $colors, callable $px ): int {
+		if ( '' !== $fields['list_heading'] ) {
+			$y = $r->draw_text_wrapped( self::truncate( $r, $fields['list_heading'], $px( self::LIST_HEADING_SIZE ), 'body', $w ), $px( self::LIST_HEADING_SIZE ), $x, $y, $colors['accent'], 'body', $w + 1, 1.3 ) + $px( 10 );
+		}
+		$rule_h = max( 1, $px( 2 ) );
+		$r->filled_rect( $x, $y - $rule_h, $x + $w, $y, $colors['rule'] );
+
+		$primary = $px( self::LIST_PRIMARY_SIZE );
+		$second  = $px( self::LIST_SECOND_SIZE );
+		$meta_sz = $px( self::LIST_META_SIZE );
+		foreach ( $fields['list_items'] as $row ) {
+			$top    = $y;
+			$y     += $px( self::LIST_ROW_PAD );
+			$meta_w = '' !== $row['meta'] ? $r->measure_text_width( $row['meta'], $meta_sz, 'heading' ) + $px( 24 ) : 0;
+			if ( $meta_w ) {
+				$r->draw_text( $row['meta'], $meta_sz, $x + $w - $meta_w + $px( 24 ), $y + $primary, $colors['accent'], 'heading' );
+			}
+			// Shrink long names up to 20% before resorting to an ellipsis.
+			$size = $primary;
+			while ( $size > (int) ( $primary * 0.8 ) && $r->measure_text_width( $row['primary'], $size, 'heading' ) > $w - $meta_w ) {
+				--$size;
+			}
+			$r->draw_text( self::truncate( $r, $row['primary'], $size, 'heading', $w - $meta_w ), $size, $x, $y + $primary, $colors['text'], 'heading' );
+			$y += (int) ( $primary * 1.2 );
+			if ( '' !== $row['secondary'] ) {
+				$y += $px( 6 );
+				$r->draw_text( self::truncate( $r, $row['secondary'], $second, 'body', $w ), $second, $x, $y + $second, $colors['muted'], 'body' );
+				$y += (int) ( $second * 1.3 );
+			}
+			$y = $top + self::list_row_height( $row, $px );
+			$r->filled_rect( $x, $y - $rule_h, $x + $w, $y, $colors['rule'] );
+		}
+		return $y;
+	}
+
+	/**
+	 * Largest size (up to $size) at which no single word overflows $w.
+	 *
+	 * Wrapping cannot break a word, so long unbroken tokens (URLs,
+	 * hostnames) would otherwise spill past their column.
+	 *
+	 * @param GDRenderer $r    Renderer.
+	 * @param string     $text Text.
+	 * @param int        $size Preferred font size.
+	 * @param string     $font Registered font name.
+	 * @param int        $w    Column width.
+	 */
+	private static function fit_word_size( GDRenderer $r, string $text, int $size, string $font, int $w ): int {
+		$words = preg_split( '/\s+/', trim( $text ) );
+		while ( $size > 12 ) {
+			$widest = 0;
+			foreach ( (array) $words as $word ) {
+				$widest = max( $widest, $r->measure_text_width( (string) $word, $size, $font ) );
+			}
+			if ( $widest <= $w ) {
+				break;
+			}
+			--$size;
+		}
+		return $size;
+	}
+
+	/**
+	 * Truncate a single line to a width with an ellipsis.
+	 *
+	 * @param GDRenderer $r    Renderer.
+	 * @param string     $text Text.
+	 * @param int        $size Font size.
+	 * @param string     $font Registered font name.
+	 * @param int        $w    Max width.
+	 */
+	private static function truncate( GDRenderer $r, string $text, int $size, string $font, int $w ): string {
+		if ( $r->measure_text_width( $text, $size, $font ) <= $w ) {
+			return $text;
+		}
+		while ( mb_strlen( $text ) > 1 && $r->measure_text_width( $text . "\u{2026}", $size, $font ) > $w ) {
+			$text = rtrim( mb_substr( $text, 0, -1 ) );
+		}
+		return $text . "\u{2026}";
+	}
+
+	/**
 	 * Width of the landscape layout's left text column.
 	 *
 	 * @param int $width   Canvas width.
@@ -519,9 +801,10 @@ class PosterTemplate implements TemplateInterface {
 	 * @param int        $width  Canvas width.
 	 * @param int        $height Canvas height.
 	 * @param float      $u      Scale unit (width / 1080).
+	 * @param int        $shade  Stripe gray level: 255 on dark canvases, 0 on light.
 	 */
-	private static function draw_stripes( GDRenderer $r, int $width, int $height, float $u ): void {
-		$stripe = $r->color( 'stripe', 255, 255, 255, self::STRIPE_ALPHA );
+	private static function draw_stripes( GDRenderer $r, int $width, int $height, float $u, int $shade = 255 ): void {
+		$stripe = $r->color( 'stripe', $shade, $shade, $shade, self::STRIPE_ALPHA );
 		$step   = max( 1, (int) ( $width / 18 ) );
 		$weight = max( 2, (int) round( 4 * $u ) );
 		for ( $x = -$height; $x < $width; $x += $step ) {
@@ -541,11 +824,14 @@ class PosterTemplate implements TemplateInterface {
 			$h += $r->measure_text_height( $line, $px( self::BODY_SIZE ), 'body', $max_w, 1.35 ) + $px( 10 );
 		}
 		$h += $px( 40 );
+		if ( $fields['list_items'] ) {
+			$h += self::list_height( $fields, $px ) + $px( 40 );
+		}
 		foreach ( $fields['detail_lines'] as $line ) {
-			$h += $r->measure_text_height( $line, $px( self::DETAIL_SIZE ), 'heading', $max_w, 1.15 );
+			$h += $r->measure_text_height( $line, self::fit_word_size( $r, $line, $px( self::DETAIL_SIZE ), 'heading', $max_w ), 'heading', $max_w, 1.15 );
 		}
 		if ( '' !== $fields['accent_line'] ) {
-			$h += $r->measure_text_height( $fields['accent_line'], $px( self::DETAIL_SIZE ), 'heading', $max_w, 1.15 );
+			$h += $r->measure_text_height( $fields['accent_line'], self::fit_word_size( $r, $fields['accent_line'], $px( self::DETAIL_SIZE ), 'heading', $max_w ), 'heading', $max_w, 1.15 );
 		}
 		if ( '' !== $fields['detail_note'] ) {
 			$h += $px( 6 ) + $r->measure_text_height( $fields['detail_note'], $px( self::NOTE_LINE_SIZE ), 'body', $max_w, 1.4 );

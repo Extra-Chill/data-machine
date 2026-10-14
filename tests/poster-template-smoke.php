@@ -148,7 +148,40 @@ $assert( 'normalize trims strings', 'Never Miss The Show' === $norm['title'] );
 $assert( 'normalize keeps only non-empty scalar detail lines', array( 'Find a show tonight', '42' ) === $norm['detail_lines'] );
 $assert( 'normalize rejects non-scalar strings', '' === $norm['banner_text'] );
 $assert( 'normalize keeps only string logo paths', array( '/tmp/a.png' ) === $norm['cobrand_logos'] );
-$assert( 'normalize fills every field', 13 === count( $norm ) && '' === $norm['qr_url'] );
+$assert( 'normalize fills every field', 16 === count( $norm ) && '' === $norm['qr_url'] );
+$assert( 'scheme defaults to dark', 'dark' === $norm['scheme'] );
+$assert( 'unknown scheme falls back to dark', 'dark' === PosterTemplate::normalize_fields( array( 'scheme' => 'neon' ) )['scheme'] );
+$assert( 'scheme is case-insensitive', 'accent' === PosterTemplate::normalize_fields( array( 'scheme' => 'Accent' ) )['scheme'] );
+
+$list = PosterTemplate::normalize_fields(
+	array(
+		'list_items' => array(
+			'Plain string row',
+			array( 'primary' => 'Band', 'secondary' => 'Venue', 'meta' => 'FRI 8PM' ),
+			array( 'secondary' => 'no primary' ),
+			array( 'primary' => array( 'bad' ) ),
+			null,
+		),
+	)
+)['list_items'];
+$assert( 'list rows normalize strings and objects, drop rows without a primary', 2 === count( $list ) );
+$assert( 'string row becomes a primary-only row', array( 'primary' => 'Plain string row', 'secondary' => '', 'meta' => '' ) === $list[0] );
+$assert( 'object row keeps primary, secondary and meta', array( 'primary' => 'Band', 'secondary' => 'Venue', 'meta' => 'FRI 8PM' ) === $list[1] );
+
+$tok = array( 'dark_background' => '#1a1a1a', 'dark_text' => '#e5e5e5', 'dark_accent' => '#6ab312', 'background' => '#ffffff', 'text_primary' => '#000000', 'accent' => '#53940b' );
+$dark_p   = PosterTemplate::palette( $tok, 'dark' );
+$accent_p = PosterTemplate::palette( $tok, 'accent' );
+$light_p  = PosterTemplate::palette( $tok, 'light' );
+$assert( 'dark palette: brand dark background, accent banner', '#1a1a1a' === $dark_p['background'] && '#6ab312' === $dark_p['banner'] );
+$assert( 'accent palette: accent canvas, dark banner with accent text', '#6ab312' === $accent_p['background'] && '#1a1a1a' === $accent_p['banner'] && '#6ab312' === $accent_p['banner_text'] );
+$assert( 'light palette: brand background and type', '#ffffff' === $light_p['background'] && '#000000' === $light_p['text'] );
+$assert( 'each palette contrasts text with background', $dark_p['text'] !== $dark_p['background'] && $accent_p['text'] !== $accent_p['background'] && $light_p['text'] !== $light_p['background'] );
+
+$unit = static fn( float $n ): int => (int) round( $n );
+$assert( 'list height is zero without rows', 0 === PosterTemplate::list_height( PosterTemplate::normalize_fields( array() ), $unit ) );
+$two  = PosterTemplate::list_height( PosterTemplate::normalize_fields( array( 'list_items' => array( 'a', 'b' ) ) ), $unit );
+$four = PosterTemplate::list_height( PosterTemplate::normalize_fields( array( 'list_items' => array( 'a', 'b', 'c', 'd' ) ) ), $unit );
+$assert( 'list height grows per row', $four === 2 * $two );
 
 $assert( 'default kicker uses brand text', 'ACME PRESENTS' === PosterTemplate::default_kicker( 'Acme' ) );
 $assert( 'default kicker is empty without a brand', '' === PosterTemplate::default_kicker( '  ' ) );
@@ -238,6 +271,18 @@ $assert( 'QR temp files are deleted after drawing', ! file_exists( $qr_files[0][
 $GLOBALS['poster_smoke_qr'] = null;
 foreach ( array( 'instagram_feed_portrait', 'landscape_16_9' ) as $preset ) {
 	$assert( "{$preset}: title-only poster renders", null !== $render( array( 'title' => 'HELLO' ), $preset ) );
+}
+
+// Schemes and list rows render at every orientation.
+$rows = array();
+for ( $i = 1; $i <= 12; $i++ ) {
+	$rows[] = array( 'primary' => "A Very Long Band Name Number {$i} That Overflows", 'secondary' => 'Some Venue', 'meta' => 'SAT 9PM' );
+}
+foreach ( PosterTemplate::SCHEMES as $scheme ) {
+	foreach ( array( 'instagram_feed_portrait', 'instagram_story', 'landscape_16_9' ) as $preset ) {
+		$info = $render( $ad + array( 'scheme' => $scheme, 'list_heading' => 'THIS WEEKEND', 'list_items' => $rows ), $preset );
+		$assert( "{$scheme} / {$preset}: renders with an overlong list", null !== $info );
+	}
 }
 
 $assert( 'missing title returns empty without fatal', array() === $template->render( array( 'tagline' => 'x' ), new GDRenderer() ) );
