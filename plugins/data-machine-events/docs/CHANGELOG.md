@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.67.1] - 2026-10-14
+
+### Fixed
+- resolve typo'd venue names to an existing venue in the same city
+
 ## [0.67.0] - 2026-10-14
 
 ### Added
