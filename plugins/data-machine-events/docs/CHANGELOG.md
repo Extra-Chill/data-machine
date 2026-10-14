@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.10] - 2026-10-14
+
+### Fixed
+- skip the taxonomy-archive 404 rewrite on singular requests
+
 ## [0.66.9] - 2026-10-14
 
 ### Changed
