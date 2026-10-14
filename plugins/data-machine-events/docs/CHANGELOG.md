@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.67.0] - 2026-10-14
+
+### Added
+- honor an explicit venue_term_id in upsert and expose venue city/state on wp/v2/venue
+
+### Fixed
+- read flyer show time as start, not doors-to-show as start/end
+
 ## [0.66.10] - 2026-10-14
 
 ### Fixed
