@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.184.3] - 2026-10-14
+
+### Fixed
+- stabilize composed file output
+
 ## [0.184.2] - 2026-10-13
 
 ### Fixed
