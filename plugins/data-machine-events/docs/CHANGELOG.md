@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.66.9] - 2026-10-14
+
+### Changed
+- cover the description_first filter default via an explicit false return
+
 ## [0.66.8] - 2026-10-13
 
 ### Fixed
