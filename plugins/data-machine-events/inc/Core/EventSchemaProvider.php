@@ -105,7 +105,7 @@ class EventSchemaProvider {
 		'endTime'         => array(
 			'type'            => 'string',
 			'required'        => false,
-			'description'     => 'Event end time (HH:MM 24-hour format). If not provided in structured data but a time range is mentioned (e.g., "6-9pm"), extract the end time ("21:00"). If only a start time is found, leave this empty.',
+			'description'     => 'Event end time (HH:MM 24-hour format). If not provided in structured data but a time range is mentioned (e.g., "6-9pm"), extract the end time ("21:00"). If only a start time is found, leave this empty. A doors/show time pair is two start times, not a start/end range — the show time is the start and endTime stays empty unless the source gives an explicit end time.',
 			'schema_property' => null,
 		),
 		'occurrenceDates' => array(

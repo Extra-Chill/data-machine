@@ -71,6 +71,12 @@ Look for and extract:
 - Ticket purchase URLs if visible
 - Any age restrictions (21+, All Ages, etc.)
 
+Time rules:
+- If the flyer lists separate DOORS and SHOW times, the SHOW time is the event start time. The doors time is never the start time and never the end time.
+- When a doors time is shown, include it in the description (e.g. "Doors: 8 PM") — there is no dedicated doors field.
+- If the flyer shows only a doors time, use that doors time as the start time.
+- Set an end time only when the flyer states an explicit end or time range (e.g. "8PM–11PM", "until 2AM"). A doors/show pair is not a start/end range.
+
 Format guidelines:
 - Dates should be in YYYY-MM-DD format
 - Times should be in HH:MM 24-hour format
@@ -89,12 +95,12 @@ Fields available for AI extraction include detailed descriptions:
 | city | City name |
 | state | State or province abbreviation (e.g., SC, NY, CA) |
 | startDate | Event date in YYYY-MM-DD format |
-| startTime | Event start time in HH:MM 24-hour format |
-| endTime | Event end time in HH:MM 24-hour format (if visible) |
+| startTime | Event start time in HH:MM 24-hour format. On flyers listing DOORS and SHOW times, this is the SHOW time — never the doors time. |
+| endTime | Event end time in HH:MM 24-hour format. Set only when the flyer states an explicit end or time range (e.g. "8PM-11PM", "until 2AM"); a doors/show pair is not a start/end range. |
 | price | Ticket price (e.g., "$20" or "$15 adv / $20 dos") |
 | ticketUrl | Ticket purchase URL if visible on the flyer |
 | performer | Supporting acts, opening bands, or additional performers |
-| description | Any additional event details visible on the flyer |
+| description | Any additional event details visible on the flyer (doors times, age restrictions, special notes, etc.) |
 
 ## Integration
 

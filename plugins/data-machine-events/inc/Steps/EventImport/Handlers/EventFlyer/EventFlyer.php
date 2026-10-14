@@ -117,13 +117,7 @@ class EventFlyer extends EventImportHandler {
 		return array(
 			'title'    => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
 			'content'  => wp_json_encode(
-				array(
-					'event'                => $event_data,
-					'venue_metadata'       => $venue_metadata,
-					'import_source'        => 'event_flyer',
-					'source_file'          => $image_file['original_name'],
-					'ai_extraction_fields' => $ai_fields,
-				),
+				$this->buildPacketContent( $event_data, $venue_metadata, $image_file['original_name'], $ai_fields ),
 				JSON_PRETTY_PRINT
 			),
 			'metadata' => array(
@@ -281,6 +275,31 @@ class EventFlyer extends EventImportHandler {
 	}
 
 	/**
+	 * Build the data packet body the AI step reads next to the flyer image.
+	 *
+	 * The AI step gets the flyer as a file message and this packet as JSON.
+	 * The packet is the only place the handler can tell the model how to
+	 * read the flyer, so the extraction rules (doors vs. show time, explicit
+	 * end times) travel with it. See #922.
+	 *
+	 * @param array  $event_data     Event fields already known from config.
+	 * @param array  $venue_metadata Venue metadata from config.
+	 * @param string $source_file    Original flyer file name.
+	 * @param array  $ai_fields      Fields the AI still has to extract.
+	 * @return array Packet body.
+	 */
+	private function buildPacketContent( array $event_data, array $venue_metadata, string $source_file, array $ai_fields ): array {
+		return array(
+			'event'                => $event_data,
+			'venue_metadata'       => $venue_metadata,
+			'import_source'        => 'event_flyer',
+			'source_file'          => $source_file,
+			'extraction_rules'     => self::get_vision_prompt(),
+			'ai_extraction_fields' => $ai_fields,
+		);
+	}
+
+	/**
 	 * Merge config with defaults and convert venue fields to camelCase event data format.
 	 *
 	 * Handler config uses snake_case (venue_address), but event data uses camelCase (venueAddress).
@@ -310,6 +329,12 @@ Look for and extract:
 - Supporting acts, opening bands, or additional performers
 - Ticket purchase URLs if visible
 - Any age restrictions (21+, All Ages, etc.)
+
+Time rules:
+- If the flyer lists separate DOORS and SHOW times, the SHOW time is the event start time. The doors time is never the start time and never the end time.
+- When a doors time is shown, include it in the description (e.g. "Doors: 8 PM") — there is no dedicated doors field.
+- If the flyer shows only a doors time, use that doors time as the start time.
+- Set an end time only when the flyer states an explicit end or time range (e.g. "8PM–11PM", "until 2AM"). A doors/show pair is not a start/end range.
 
 Format guidelines:
 - Dates should be in YYYY-MM-DD format
