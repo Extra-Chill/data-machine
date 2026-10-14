@@ -133,15 +133,18 @@ class ChatIdentityAbilities {
 			'datamachine/resolve-chat-person',
 			array(
 				'label'               => __( 'Resolve Chat Person', 'data-machine' ),
-				'description'         => __( 'Resolve a chat actor to a WordPress user for an agent: access decision, role (admin|operator|viewer) and memory sections. Fails closed for unlinked or unauthorized actors.', 'data-machine' ),
+				'description'         => __( 'Resolve a chat actor to a WordPress user for an agent: access decision, role (admin|operator|viewer) and memory sections. Fails closed for unlinked or unauthorized actors. A non-turn event with no actor returns agent-layer memory only, without admitting anyone.', 'data-machine' ),
 				'category'            => AbilityCategories::AGENT,
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'agent_slug', 'platform', 'actor_id' ),
+					'required'   => array( 'agent_slug', 'platform' ),
 					'properties' => array(
 						'agent_slug' => array( 'type' => 'string' ),
 						'platform'   => array( 'type' => 'string' ),
-						'actor_id'   => array( 'type' => 'string' ),
+						'actor_id'   => array(
+							'type'        => 'string',
+							'description' => 'External actor ID on the platform. Omit or leave empty when the event has no speaker: a non-turn event then returns agent-layer memory with allowed false and reason no_actor; a turn event is denied.',
+						),
 						'event'      => array(
 							'type'        => 'string',
 							'description' => 'Event name. The turn event returns personal memory for the speaker; any other event returns agent memory.',
@@ -162,10 +165,14 @@ class ChatIdentityAbilities {
 							'items' => array(
 								'type'       => 'object',
 								'properties' => array(
-									'name'     => array( 'type' => 'string' ),
-									'layer'    => array( 'type' => 'string' ),
-									'priority' => array( 'type' => 'integer' ),
-									'content'  => array( 'type' => 'string' ),
+									'name'            => array( 'type' => 'string' ),
+									'layer'           => array( 'type' => 'string' ),
+									'priority'        => array( 'type' => 'integer' ),
+									'content'         => array( 'type' => 'string' ),
+									'convention_path' => array(
+										'type'        => 'string',
+										'description' => 'Path relative to the WordPress root where a convention copy of this file is materialized (e.g. AGENTS.md). Present only when the memory file registry declares one.',
+									),
 								),
 							),
 						),
