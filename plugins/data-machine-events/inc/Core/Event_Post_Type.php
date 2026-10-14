@@ -228,6 +228,17 @@ class Event_Post_Type {
 			return;
 		}
 
+		// Never touch singular requests. A page or post URL can carry a
+		// taxonomy query var (e.g. /submit/?venue=Foo, #927); core still
+		// resolves it as the page (parse_query has already run, so
+		// is_singular() is reliable here). Rewriting it into a fields=ids
+		// events archive renders the calendar instead of the page and leaves
+		// $wp_query->post as an int, which floods core templates with
+		// "Attempt to read property on int" warnings.
+		if ( $query->is_singular() ) {
+			return;
+		}
+
 		// Check query vars directly — conditional tags like is_tax() aren't
 		// reliable inside pre_get_posts because the query hasn't executed yet.
 		$event_taxonomies = get_object_taxonomies( self::POST_TYPE );
