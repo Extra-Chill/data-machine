@@ -276,6 +276,94 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		wp_delete_term( $venue['term_id'], 'venue' );
 	}
 
+	/**
+	 * An explicitly chosen venue term is assigned as-is (extrachill-events#965).
+	 *
+	 * The submitter picked "Recovery Room Tavern" but the venue string that
+	 * reached upsert was the typo "Recoery Room Tavern". The chosen term wins,
+	 * no new venue term is created, and the chosen term's data is untouched.
+	 */
+	public function test_process_venue_assigns_explicit_venue_term_over_typo_name(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Explicit Venue Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'pending',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+
+		$suffix = uniqid();
+		$chosen = wp_insert_term( 'Recovery Room Tavern ' . $suffix, 'venue' );
+		$this->assertNotWPError( $chosen );
+		$chosen_id = (int) $chosen['term_id'];
+		update_term_meta( $chosen_id, '_venue_address', '685 King Street' );
+
+		$typo_name = 'Recoery Room Tavern ' . $suffix;
+		$engine    = new \DataMachine\Core\EngineData(
+			array(
+				'venue'         => $typo_name,
+				'venueAddress'  => '1 Wrong Street',
+				'venue_term_id' => $chosen_id,
+			),
+			0
+		);
+
+		$resolution = $this->assigner->resolveVenue( array( 'venue' => $typo_name ), $engine );
+		$this->assertSame( $chosen_id, $resolution['term_id'] );
+		$this->assertSame( 'assign', $resolution['action'] );
+		$this->assertSame( 'explicit_term', $resolution['matched_via'] );
+
+		$result = $this->assigner->processVenue( $post_id, array( 'venue' => $typo_name ), $engine );
+		$this->assertTrue( $result['success'] );
+
+		$terms = wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+		$this->assertSame( array( $chosen_id ), array_map( 'intval', $terms ) );
+		$this->assertEmpty( term_exists( $typo_name, 'venue' ), 'A typo must not create a venue term when one was chosen.' );
+		$this->assertSame( '685 King Street', get_term_meta( $chosen_id, '_venue_address', true ), 'Extracted venue fields must not overwrite the chosen venue.' );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $chosen_id, 'venue' );
+	}
+
+	public function test_invalid_explicit_venue_term_falls_back_to_name_resolution(): void {
+		$not_a_venue = wp_insert_term( 'Not A Venue ' . uniqid(), 'promoter' );
+		$this->assertNotWPError( $not_a_venue );
+
+		$venue_name = 'Fallback Venue ' . uniqid();
+		$engine     = new \DataMachine\Core\EngineData(
+			array(
+				'venue'         => $venue_name,
+				'venue_term_id' => (int) $not_a_venue['term_id'],
+			),
+			0
+		);
+
+		$resolution = $this->assigner->resolveVenue( array(), $engine );
+
+		$this->assertNotSame( 'explicit_term', $resolution['matched_via'] ?? '' );
+		$this->assertNotSame( (int) $not_a_venue['term_id'], $resolution['term_id'] );
+		$created = get_term( $resolution['term_id'], 'venue' );
+		$this->assertInstanceOf( \WP_Term::class, $created );
+		$this->assertSame( $venue_name, $created->name );
+
+		wp_delete_term( $resolution['term_id'], 'venue' );
+		wp_delete_term( (int) $not_a_venue['term_id'], 'promoter' );
+	}
+
+	public function test_venue_city_and_state_are_read_only_rest_meta(): void {
+		// WP_UnitTestCase resets registered meta between tests; register again.
+		Venue_Taxonomy::register();
+		$registered = get_registered_meta_keys( 'term', 'venue' );
+
+		foreach ( array( '_venue_city', '_venue_state' ) as $key ) {
+			$this->assertArrayHasKey( $key, $registered );
+			$this->assertNotEmpty( $registered[ $key ]['show_in_rest'], "$key must be readable on wp/v2/venue." );
+			$this->assertTrue( is_protected_meta( $key, 'term' ), "$key must stay protected so REST cannot write it." );
+		}
+		$this->assertArrayNotHasKey( '_venue_address', $registered, 'Only city and state are exposed.' );
+	}
+
 	public function test_process_venue_skips_when_no_venue() {
 		$post_id = wp_insert_post(
 			array(

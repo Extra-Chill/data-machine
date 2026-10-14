@@ -338,6 +338,33 @@ class Venue_Taxonomy {
 				'show_in_rest'      => false,
 			)
 		);
+
+		self::register_public_location_meta();
+	}
+
+	/**
+	 * Expose venue city and state on the core `wp/v2/venue` REST route.
+	 *
+	 * Both are public on every venue page. Exposing them read-only lets a
+	 * client that searches venues by name (`wp/v2/venue?search=`) tell
+	 * same-named venues in different cities apart. The keys stay protected
+	 * (leading underscore), so the core meta REST handler refuses writes
+	 * through this route; venue data is still written only through
+	 * find_or_create_venue() and the venue admin screens.
+	 */
+	private static function register_public_location_meta(): void {
+		foreach ( array( 'city', 'state' ) as $field ) {
+			register_term_meta(
+				'venue',
+				self::$meta_fields[ $field ],
+				array(
+					'type'         => 'string',
+					'single'       => true,
+					'description'  => 'Venue ' . $field . ' (read-only in REST).',
+					'show_in_rest' => true,
+				)
+			);
+		}
 	}
 
 	/* ---------------------------------------------------------------------

@@ -86,6 +86,15 @@ class EventTaxonomyAssigner {
 	 * @return array{term_id:int, action:string, matched_via?:string} Venue resolution.
 	 */
 	public function resolveVenue( array $parameters, EngineData $engine, array $handler_config = array(), int $post_id = 0 ): array {
+		$explicit_term_id = $this->resolveExplicitVenueTermId( $engine, $post_id );
+		if ( $explicit_term_id > 0 ) {
+			return array(
+				'term_id'     => $explicit_term_id,
+				'action'      => 'assign',
+				'matched_via' => 'explicit_term',
+			);
+		}
+
 		$venue_name = VenueParameterProvider::resolveField( 'venue', $parameters, $engine->all() );
 
 		if ( empty( $venue_name ) ) {
@@ -132,6 +141,50 @@ class EventTaxonomyAssigner {
 			'action'      => ! empty( $venue_result['term_id'] ) ? 'assign' : 'skip',
 			'matched_via' => (string) ( $venue_result['matched_via'] ?? '' ),
 		);
+	}
+
+	/**
+	 * Venue term a human explicitly chose for this event, if any.
+	 *
+	 * A caller that already knows the exact venue (for example a submission
+	 * form where the submitter picked an existing venue) seeds
+	 * `venue_term_id` into engine data. That choice is authoritative: the
+	 * term is assigned as-is and name/address resolution, which can be
+	 * thrown off by a typo or an AI rewrite, never runs. The chosen term's
+	 * stored data is not merged with extracted venue fields, so a pick
+	 * cannot alter the existing venue.
+	 *
+	 * Engine data is set by the workflow's caller, never by AI tool
+	 * parameters, so the model cannot redirect an event to another venue
+	 * through this key. An ID that is not an existing venue term is ignored
+	 * and resolution falls back to the venue name.
+	 *
+	 * @param EngineData $engine  Engine data helper.
+	 * @param int        $post_id Event post ID for log context.
+	 * @return int Venue term ID, or 0 when none was chosen or it is invalid.
+	 */
+	private function resolveExplicitVenueTermId( EngineData $engine, int $post_id ): int {
+		$term_id = absint( $engine->get( 'venue_term_id' ) ?? 0 );
+		if ( $term_id <= 0 ) {
+			return 0;
+		}
+
+		$term = get_term( $term_id, 'venue' );
+		if ( $term instanceof \WP_Term ) {
+			return (int) $term->term_id;
+		}
+
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Explicit venue_term_id is not an existing venue term; falling back to venue name resolution',
+			array(
+				'post_id'       => $post_id,
+				'venue_term_id' => $term_id,
+			)
+		);
+
+		return 0;
 	}
 
 	/**
