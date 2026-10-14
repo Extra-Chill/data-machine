@@ -9,6 +9,13 @@
  * Fails closed: unlinked actors, unknown agents and unauthorized users all
  * resolve to `allowed: false` with no sections.
  *
+ * Agent context without a speaker: a non-turn event with no actor (for
+ * example a session started by a scheduler or the system rather than a
+ * person) resolves to `allowed: false`, `reason: no_actor` and the
+ * agent-layer sections (shared, agent, network). No speaker is admitted and
+ * personal layers are never read. A turn event always needs a linked,
+ * authorized actor.
+ *
  * @package DataMachine\Core\Agents
  */
 
@@ -31,6 +38,11 @@ class ChatPersonResolver {
 	 * Event that carries the speaker's personal (user/principal) layers.
 	 */
 	const EVENT_TURN = 'turn';
+
+	/**
+	 * Denial reason when the request carries no actor.
+	 */
+	const REASON_NO_ACTOR = 'no_actor';
 
 	/**
 	 * Name of the synthetic section stating the current speaker.
@@ -74,11 +86,18 @@ class ChatPersonResolver {
 	 *
 	 * @param string $agent_slug Agent slug.
 	 * @param string $platform   Chat platform name (data, not interpreted).
-	 * @param string $actor_id   External actor ID on that platform.
+	 * @param string $actor_id   External actor ID on that platform. Empty when the
+	 *                           event has no speaker.
 	 * @param string $event      Event name; 'turn' selects the speaker's personal layers.
 	 * @return array{allowed: bool, user_id: int, role: string, sections: array, reason: string}
 	 */
 	public function resolve( string $agent_slug, string $platform, string $actor_id, string $event = '' ): array {
+		$is_turn = self::EVENT_TURN === $event;
+
+		if ( '' === trim( $actor_id ) ) {
+			return $is_turn ? self::denied( 0, self::REASON_NO_ACTOR ) : $this->resolve_agent_context( $agent_slug );
+		}
+
 		$user_id = ChatIdentityLinks::resolve_user_id( $platform, $actor_id );
 		if ( $user_id <= 0 ) {
 			return self::denied( 0, 'actor_not_linked' );
@@ -95,7 +114,6 @@ class ChatPersonResolver {
 			return self::denied( $user_id, 'access_denied' );
 		}
 
-		$is_turn  = self::EVENT_TURN === $event;
 		$sections = $this->build_sections( $identity, $user_id, $is_turn );
 
 		if ( $is_turn ) {
@@ -117,6 +135,29 @@ class ChatPersonResolver {
 			'sections' => $sections,
 			'reason'   => '',
 		);
+	}
+
+	/**
+	 * Resolve agent-layer context for a non-turn event that has no speaker.
+	 *
+	 * Nobody is admitted (`allowed` stays false and `role` empty); only the
+	 * agent-layer sections are returned, read as the agent owner. Personal
+	 * layers are never read on this path.
+	 *
+	 * @param string $agent_slug Agent slug.
+	 * @return array{allowed: bool, user_id: int, role: string, sections: array, reason: string}
+	 */
+	private function resolve_agent_context( string $agent_slug ): array {
+		try {
+			$identity = ( new AgentIdentityResolver() )->resolve_agent_identity( $agent_slug );
+		} catch ( \InvalidArgumentException $e ) {
+			return self::denied( 0, 'agent_not_found' );
+		}
+
+		$result             = self::denied( 0, self::REASON_NO_ACTOR );
+		$result['sections'] = $this->build_sections( $identity, 0, false );
+
+		return $result;
 	}
 
 	/**
@@ -154,12 +195,14 @@ class ChatPersonResolver {
 	 * Build capped memory sections.
 	 *
 	 * Uses explicit layers on every AgentMemory so a missing user never falls
-	 * back to the default (owner) user.
+	 * back to the default (owner) user. Sections whose registry entry declares
+	 * a `convention_path` (e.g. AGENTS.md) carry it, so a runtime that already
+	 * loads that file from disk can skip the duplicate.
 	 *
 	 * @param AgentIdentity $identity Agent identity.
 	 * @param int           $user_id  Speaker user ID.
 	 * @param bool          $is_turn  Whether to build the speaker's personal layers.
-	 * @return array<int, array{name: string, layer: string, priority: int, content: string}>
+	 * @return array<int, array{name: string, layer: string, priority: int, content: string, convention_path?: string}>
 	 */
 	private function build_sections( AgentIdentity $identity, int $user_id, bool $is_turn ): array {
 		$layers = $is_turn ? self::PERSON_LAYERS : self::AGENT_LAYERS;
@@ -178,8 +221,9 @@ class ChatPersonResolver {
 			$layer = (string) ( $meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT );
 			if ( in_array( $layer, $layers, true ) ) {
 				$candidates[ (string) $filename ] = array(
-					'layer'    => $layer,
-					'priority' => (int) ( $meta['priority'] ?? 50 ),
+					'layer'           => $layer,
+					'priority'        => (int) ( $meta['priority'] ?? 50 ),
+					'convention_path' => is_string( $meta['convention_path'] ?? null ) ? $meta['convention_path'] : '',
 				);
 			}
 		}
@@ -212,13 +256,18 @@ class ChatPersonResolver {
 				$content = function_exists( 'mb_strcut' ) ? mb_strcut( $content, 0, $limit, 'UTF-8' ) : substr( $content, 0, $limit );
 			}
 
-			$total     += strlen( $content );
-			$sections[] = array(
+			$section = array(
 				'name'     => $filename,
 				'layer'    => $info['layer'],
 				'priority' => $info['priority'],
 				'content'  => $content,
 			);
+			if ( '' !== $info['convention_path'] ) {
+				$section['convention_path'] = $info['convention_path'];
+			}
+
+			$total     += strlen( $content );
+			$sections[] = $section;
 		}
 
 		return $sections;
