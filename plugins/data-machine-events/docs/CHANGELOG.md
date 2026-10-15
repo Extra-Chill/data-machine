@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.67.4] - 2026-10-15
+
+### Fixed
+- keep merged duplicate events trashed on re-import
+
 ## [0.67.3] - 2026-10-15
 
 ### Fixed
