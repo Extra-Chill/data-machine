@@ -25,6 +25,7 @@ use DataMachine\Core\AbilityResult;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\PluginSettings;
 use DataMachineEvents\Core\TextNormalization;
+use DataMachineEvents\Core\EventTitleCleaner;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\Event_Post_Type;
@@ -139,6 +140,7 @@ class EventUpsert extends UpsertHandler {
 		// every downstream consumer (validation gate, advisory-lock keys,
 		// duplicate detection, buildEventData) keys on the same canonical form.
 		$title               = sanitize_text_field( TextNormalization::decode_entities( (string) ( $parameters['title'] ?? $engine->get( 'title' ) ?? '' ) ) );
+		$title               = $this->cleanTitleNoise( $title, $parameters, $engine );
 		$parameters['title'] = $title;
 		$venue               = VenueParameterProvider::resolveField( 'venue', $parameters, $engine->all() );
 		$startDate           = $engine->get( 'startDate' ) ?? $parameters['startDate'] ?? '';
@@ -1244,6 +1246,59 @@ class EventUpsert extends UpsertHandler {
 	}
 
 	/**
+	 * Strip schedule/price noise from a title and keep what it carried.
+	 *
+	 * "Sean Smith 6-9pm" becomes "Sean Smith" with endTime 21:00. "David
+	 * Peterson $20" becomes "David Peterson" with price $20. Recovered values
+	 * only fill fields the source left empty. An end time is only used when
+	 * it falls later on the same day as a known start time, because a
+	 * "10pm-1am" range has no endDate to carry the rollover. Runs before
+	 * identity, locking, and duplicate detection so every consumer keys on
+	 * the clean title. See issue #932.
+	 *
+	 * @param string     $title      Decoded, sanitized title.
+	 * @param array      $parameters AI parameters (filled by reference).
+	 * @param EngineData $engine     Engine data.
+	 * @return string Clean title.
+	 */
+	private function cleanTitleNoise( string $title, array &$parameters, EngineData $engine ): string {
+		$cleaned = EventTitleCleaner::clean( $title );
+		if ( ! $cleaned['changed'] ) {
+			return $title;
+		}
+
+		$has_value = static function ( string $field ) use ( $parameters, $engine ): bool {
+			$value = $engine->get( $field ) ?? $parameters[ $field ] ?? '';
+			return '' !== trim( (string) $value );
+		};
+
+		if ( '' !== $cleaned['price'] && ! $has_value( 'price' ) ) {
+			$parameters['price'] = $cleaned['price'];
+		}
+
+		$start_time = trim( (string) ( $engine->get( 'startTime' ) ?? $parameters['startTime'] ?? '' ) );
+		$end_date   = trim( (string) ( $engine->get( 'endDate' ) ?? $parameters['endDate'] ?? '' ) );
+		if ( '' !== $cleaned['end_time'] && '' !== $start_time && '' === $end_date && ! $has_value( 'endTime' )
+			&& strtotime( '1970-01-01 ' . $cleaned['end_time'] ) > strtotime( '1970-01-01 ' . $start_time ) ) {
+			$parameters['endTime'] = $cleaned['end_time'];
+		}
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			'Event title schedule/price noise removed',
+			array(
+				'original' => $title,
+				'cleaned'  => $cleaned['title'],
+				'end_time' => $parameters['endTime'] ?? '',
+				'price'    => $parameters['price'] ?? '',
+			)
+		);
+
+		return $cleaned['title'];
+	}
+
+	/**
 	 * Build event data by merging engine data with AI parameters.
 	 *
 	 * Engine data takes precedence since AI only received parameters
@@ -1306,6 +1361,14 @@ class EventUpsert extends UpsertHandler {
 					$event_data[ $field ] = sanitize_text_field( TextNormalization::decode_entities( (string) $parameters[ $field ] ) );
 				}
 			}
+		}
+
+		// The engine loop above can overwrite the title with the raw source
+		// value. Re-apply the same sanitize + noise cleaning executeUpsert()
+		// used for identity, so the stored title matches the deduped one
+		// (issue #932).
+		if ( isset( $event_data['title'] ) ) {
+			$event_data['title'] = EventTitleCleaner::clean( sanitize_text_field( TextNormalization::decode_entities( (string) $event_data['title'] ) ) )['title'];
 		}
 
 		// Handler config venue override (highest priority)

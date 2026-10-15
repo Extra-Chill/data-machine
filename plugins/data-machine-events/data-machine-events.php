@@ -449,6 +449,11 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\AffiliateRedirectRepairAbilities();
 		}
 
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TitleNoiseRepairAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TitleNoiseRepairAbilities.php';
+			new \DataMachineEvents\Abilities\TitleNoiseRepairAbilities();
+		}
+
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BlockAttributeJsonRepairAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BlockAttributeJsonRepairAbilities.php';
 			new \DataMachineEvents\Abilities\BlockAttributeJsonRepairAbilities();

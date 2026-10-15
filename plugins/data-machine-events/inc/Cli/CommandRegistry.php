@@ -165,6 +165,10 @@ class CommandRegistry {
 				'file'  => $cli . 'EntityTitleRepairCommand.php',
 				'class' => EntityTitleRepairCommand::class,
 			),
+			'data-machine-events repair-title-noise'      => array(
+				'file'  => $cli . 'TitleNoiseRepairCommand.php',
+				'class' => TitleNoiseRepairCommand::class,
+			),
 			'data-machine-events backfill-canonical-ticket-urls' => array(
 				'file'  => $cli . 'TicketUrlCanonicalBackfillCommand.php',
 				'class' => TicketUrlCanonicalBackfillCommand::class,
