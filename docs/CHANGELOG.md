@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.185.1] - 2026-10-15
+
+### Fixed
+- honor first_run anchors for recurring system schedules
+
 ## [0.185.0] - 2026-10-14
 
 ### Added
