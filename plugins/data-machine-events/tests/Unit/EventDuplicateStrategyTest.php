@@ -936,6 +936,128 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->cleanup( $term_id, $existing_post_id );
 	}
 
+	/**
+	 * Data provider: short headliner titles a ticketing source lists two ways.
+	 *
+	 * Shapes taken from live duplicates created after #884 (issue #931).
+	 *
+	 * @return array<string, array{0:string,1:string,2:string,3:string}>
+	 */
+	public function short_title_same_show_provider(): array {
+		return array(
+			'support act appended'  => array( 'The Aces w/ Gatlin', 'The Aces', '2026-10-20 20:00:00', '2026-10-20T20:00:00' ),
+			'co-bill listed'        => array( 'Riff Raff, Jordypurp', 'Riff Raff', '2026-10-21 21:00:00', '2026-10-21T21:00:00' ),
+			'tour name, doors/show' => array( 'The Army, The Navy', 'THE ARMY, THE NAVY - THE FAKE BRAVE TOUR', '2026-10-22 19:00:00', '2026-10-22T20:00:00' ),
+			'full bill vs headliner' => array( 'LIONEER, White Hot Velvet, Alandria , Town of Trees', 'Lioneer', '2026-10-23 19:30:00', '2026-10-23T20:00:00' ),
+		);
+	}
+
+	/**
+	 * Short (low-confidence) titles at the same resolved venue, date, and a
+	 * start time within an hour are the same show (#931).
+	 *
+	 * @dataProvider short_title_same_show_provider
+	 */
+	public function test_short_title_same_venue_and_time_is_duplicate( string $stored_title, string $incoming_title, string $stored_start, string $incoming_start ): void {
+		$venue_name = 'Short Title Venue ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent( $stored_title, $stored_start, $venue_name );
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => $incoming_title,
+				'context' => array(
+					'venue'         => $venue_name,
+					'startDate'     => $incoming_start,
+					'ticketUrl'     => '',
+					'venue_term_id' => $term_id,
+				),
+			)
+		);
+
+		$this->assertIsArray( $result, "{$incoming_title} should match stored {$stored_title}." );
+		$this->assertSame( 'duplicate', $result['verdict'] );
+		$this->assertSame( $existing_post_id, (int) $result['match']['post_id'] );
+
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	/**
+	 * Early and late sets of a short-titled act stay distinct: the
+	 * low-confidence path needs start times within an hour.
+	 */
+	public function test_short_title_early_and_late_sets_are_distinct(): void {
+		$venue_name = 'Two Set Venue ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent( 'Cyrille Aimee', '2026-11-04 19:00:00', $venue_name );
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Cyrille Aimee - Late Show',
+				'context' => array(
+					'venue'         => $venue_name,
+					'startDate'     => '2026-11-04T21:30:00',
+					'ticketUrl'     => '',
+					'venue_term_id' => $term_id,
+				),
+			)
+		);
+
+		$this->assertNull( $result );
+
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	/**
+	 * Without an incoming start time a short title is not enough evidence.
+	 */
+	public function test_short_title_without_start_time_is_not_fuzzy_matched(): void {
+		$venue_name = 'No Time Venue ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent( 'The Aces w/ Gatlin', '2026-10-20 20:00:00', $venue_name );
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'The Aces',
+				'context' => array(
+					'venue'         => $venue_name,
+					'startDate'     => '2026-10-20',
+					'ticketUrl'     => '',
+					'venue_term_id' => $term_id,
+				),
+			)
+		);
+
+		$this->assertNull( $result );
+
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	/**
+	 * A short title at a different venue on the same night stays distinct.
+	 */
+	public function test_short_title_at_other_venue_is_distinct(): void {
+		$venue_name = 'Short Title Home ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent( 'The Aces w/ Gatlin', '2026-10-20 20:00:00', $venue_name );
+
+		$other = wp_insert_term( 'Short Title Elsewhere ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $other );
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'The Aces',
+				'context' => array(
+					'venue'         => get_term( $other['term_id'], 'venue' )->name,
+					'startDate'     => '2026-10-20T20:00:00',
+					'ticketUrl'     => '',
+					'venue_term_id' => (int) $other['term_id'],
+				),
+			)
+		);
+
+		$this->assertNull( $result );
+
+		wp_delete_term( (int) $other['term_id'], 'venue' );
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
 	// ---------------------------------------------------------------------
 	// Helpers
 	// ---------------------------------------------------------------------

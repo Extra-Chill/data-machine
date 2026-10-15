@@ -41,6 +41,14 @@ class EventDuplicateStrategy {
 	private const CANDIDATE_PAGE_SIZE = 100;
 
 	/**
+	 * Maximum start-time gap (seconds) for matching a low-confidence title.
+	 *
+	 * Covers doors-vs-show listings of one show. Early and late sets are
+	 * normally further apart and stay distinct.
+	 */
+	private const LOW_CONFIDENCE_TIME_WINDOW = 3600;
+
+	/**
 	 * Register this strategy with DM core's duplicate detection system.
 	 */
 	public static function register(): void {
@@ -217,12 +225,22 @@ class EventDuplicateStrategy {
 	 * @param string        $venue      Venue name.
 	 * @param string        $date_only  Date in YYYY-MM-DD.
 	 * @param string        $startDate  Full datetime for time window comparison.
+	 * Short headliner titles ("The Aces", "Riff Raff") are low-confidence on
+	 * their own, so a bare fuzzy match is not trusted. They are still the same
+	 * show when a resolved venue term, the same date, and a start time within
+	 * LOW_CONFIDENCE_TIME_WINDOW all agree. Ticketing sources routinely list
+	 * one show as "The Aces" and "The Aces w/ Gatlin", or with doors and show
+	 * times 30-60 minutes apart, and skipping those created duplicates (#931).
+	 * Early and late sets at the same venue are usually 2+ hours apart, so
+	 * they stay distinct.
+	 *
 	 * @param \WP_Term|null $venue_term Optional pre-resolved venue term (address-aware).
 	 *                                  When null, falls back to a name-only cascade.
 	 * @return array|null Duplicate result or null.
 	 */
 	private static function findByVenueDateAndFuzzyTitle( string $title, string $venue, string $date_only, string $startDate, ?\WP_Term $venue_term = null ): ?array {
-		if ( EventIdentifierGenerator::isLowConfidenceTitle( $title ) ) {
+		$low_confidence = EventIdentifierGenerator::isLowConfidenceTitle( $title );
+		if ( $low_confidence && ! self::hasTimeComponent( $startDate ) ) {
 			return null;
 		}
 
@@ -248,6 +266,13 @@ class EventDuplicateStrategy {
 				// Check time window.
 				$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
 				$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
+				if ( $low_confidence ) {
+					if ( ! self::isWithinStrictTimeWindow( $startDate, $existing_datetime, self::LOW_CONFIDENCE_TIME_WINDOW ) ) {
+						continue;
+					}
+
+					return self::duplicateResult( $post_id, 'venue_date_time_fuzzy_short_title' );
+				}
 				if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
 					continue;
 				}
@@ -492,6 +517,41 @@ class EventDuplicateStrategy {
 			}
 			++$page;
 		} while ( (int) ( $result['post_count'] ?? 0 ) === self::CANDIDATE_PAGE_SIZE );
+	}
+
+	/**
+	 * Whether a datetime string carries an HH:MM time component.
+	 *
+	 * @param string $datetime Datetime string.
+	 * @return bool True when a time is present.
+	 */
+	private static function hasTimeComponent( string $datetime ): bool {
+		return 1 === preg_match( '/\d{2}:\d{2}/', $datetime );
+	}
+
+	/**
+	 * Check that both datetimes carry a time and fall within $window seconds.
+	 *
+	 * Unlike isWithinTimeWindow(), a missing time on either side is NOT a
+	 * match. Low-confidence titles need the start time as positive evidence.
+	 *
+	 * @param string $datetime1 First datetime.
+	 * @param string $datetime2 Second datetime.
+	 * @param int    $window    Maximum gap in seconds.
+	 * @return bool True when both have times within the window.
+	 */
+	private static function isWithinStrictTimeWindow( string $datetime1, string $datetime2, int $window ): bool {
+		if ( ! self::hasTimeComponent( $datetime1 ) || ! self::hasTimeComponent( $datetime2 ) ) {
+			return false;
+		}
+
+		$time1 = strtotime( $datetime1 );
+		$time2 = strtotime( $datetime2 );
+		if ( false === $time1 || false === $time2 ) {
+			return false;
+		}
+
+		return abs( $time1 - $time2 ) <= $window;
 	}
 
 	/**
