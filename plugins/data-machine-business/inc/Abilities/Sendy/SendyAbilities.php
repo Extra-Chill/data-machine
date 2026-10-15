@@ -2,12 +2,13 @@
 /**
  * Sendy Abilities
  *
- * Generic, config-driven abilities for the Sendy email-marketing service —
- * a sibling to the Slack, Discord, and Google integrations in this plugin.
+ * Generic abilities for the Sendy email-marketing service — a sibling to the
+ * Slack, Discord, and Google integrations in this plugin.
  *
- * Campaign abilities resolve connection configuration inside this plugin so
- * credentials never cross the public ability boundary. Consumers continue to
- * own campaign content and sender identity. The mechanics live in
+ * Every Sendy ability resolves its connection from one place: the
+ * `datamachine_sendy_config` network option (filterable via
+ * `datamachine_sendy_config`). Credentials never cross the public ability
+ * boundary; consumers own only content, sender identity, and list IDs. The mechanics live in
  * {@see \DataMachineBusiness\Sendy\SendyClient}.
  *
  * Abilities:
@@ -31,7 +32,7 @@ use DataMachineBusiness\Sendy\SendyClient;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers the generic, config-driven Sendy abilities.
+ * Registers the generic Sendy abilities.
  */
 class SendyAbilities {
 
@@ -60,40 +61,6 @@ class SendyAbilities {
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( array( $this, 'register_abilities' ) );
 
 		self::$registered = true;
-	}
-
-	/**
-	 * The reusable config input-schema fragment shared by every Sendy ability.
-	 *
-	 * @return array
-	 */
-	private function config_schema(): array {
-		return array(
-			'type'        => 'object',
-			'description' => __( 'Sendy connection configuration. Supplied by the caller — this plugin stores no Sendy credentials of its own.', 'data-machine-business' ),
-			'properties'  => array(
-				'api_key'   => array(
-					'type'        => 'string',
-					'description' => __( 'Sendy API key.', 'data-machine-business' ),
-				),
-				'sendy_url' => array(
-					'type'        => 'string',
-					'description' => __( 'Sendy installation URL.', 'data-machine-business' ),
-				),
-				'db'        => array(
-					'type'        => 'object',
-					'description' => __( 'Optional read-only Sendy database connection (host, user, pass, name, port). Required only for the DB-backed metric reads.', 'data-machine-business' ),
-					'properties'  => array(
-						'host' => array( 'type' => 'string' ),
-						'user' => array( 'type' => 'string' ),
-						'pass' => array( 'type' => 'string' ),
-						'name' => array( 'type' => 'string' ),
-						'port' => array( 'type' => 'string' ),
-					),
-				),
-			),
-			'required'    => array( 'api_key', 'sendy_url' ),
-		);
 	}
 
 	/**
@@ -200,9 +167,8 @@ class SendyAbilities {
 				'category'            => 'datamachine-publishing',
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'config', 'list_id', 'email' ),
+					'required'   => array( 'list_id', 'email' ),
 					'properties' => array(
-						'config'  => $this->config_schema(),
 						'list_id' => array(
 							'type'        => 'string',
 							'description' => __( 'Sendy list ID (encrypted hash).', 'data-machine-business' ),
@@ -389,9 +355,7 @@ class SendyAbilities {
 				'category'            => 'datamachine-analytics',
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'config' ),
 					'properties' => array(
-						'config'         => $this->config_schema(),
 						'metric'         => array(
 							'type'        => 'string',
 							'enum'        => array( 'funnel', 'subscribers', 'campaigns' ),
@@ -451,26 +415,7 @@ class SendyAbilities {
 	}
 
 	/**
-	 * Build a client from the ability's config input.
-	 *
-	 * @param array $input Ability input.
-	 * @return SendyClient|\WP_Error
-	 */
-	private function client_from_input( array $input ) {
-		$config = isset( $input['config'] ) && is_array( $input['config'] ) ? $input['config'] : array();
-
-		if ( empty( $config['api_key'] ) || empty( $config['sendy_url'] ) ) {
-			return new \WP_Error(
-				'sendy_config_incomplete',
-				__( 'A Sendy config with api_key and sendy_url is required.', 'data-machine-business' )
-			);
-		}
-
-		return new SendyClient( $config );
-	}
-
-	/**
-	 * Resolve the DMB-owned Sendy configuration for campaign operations.
+	 * Resolve the canonical Sendy configuration used by every Sendy ability.
 	 *
 	 * Deployments may provide secrets through the filter instead of persisting
 	 * them in the network option. The filter remains owned by this integration;
@@ -501,7 +446,7 @@ class SendyAbilities {
 		if ( empty( $config ) ) {
 			return new \WP_Error(
 				'sendy_provider_unavailable',
-				__( 'The Sendy provider is not configured.', 'data-machine-business' )
+				__( 'The Sendy provider is not configured. Set the datamachine_sendy_config network option.', 'data-machine-business' )
 			);
 		}
 
@@ -509,7 +454,7 @@ class SendyAbilities {
 			if ( empty( $config['api_key'] ) || empty( $config['sendy_url'] ) ) {
 				return new \WP_Error(
 					'sendy_config_incomplete',
-					__( 'The Sendy API configuration requires api_key and sendy_url.', 'data-machine-business' )
+					__( 'The Sendy API configuration requires api_key and sendy_url in the datamachine_sendy_config network option.', 'data-machine-business' )
 				);
 			}
 
@@ -541,7 +486,7 @@ class SendyAbilities {
 	 * @return array|\WP_Error
 	 */
 	public function execute_subscribe( array $input ) {
-		$client = $this->client_from_input( $input );
+		$client = $this->campaign_client( 'api' );
 		if ( is_wp_error( $client ) ) {
 			return $client;
 		}
@@ -689,13 +634,20 @@ class SendyAbilities {
 	 * @return array|\WP_Error
 	 */
 	public function execute_metrics( array $input ) {
-		$client = $this->client_from_input( $input );
+		$metric = isset( $input['metric'] ) ? (string) $input['metric'] : 'funnel';
+		$source = isset( $input['source'] ) ? (string) $input['source'] : 'auto';
+
+		$requirement = 'any';
+		if ( 'subscribers' === $metric && in_array( $source, array( 'api', 'db' ), true ) ) {
+			$requirement = $source;
+		} elseif ( 'campaigns' === $metric ) {
+			$requirement = 'db';
+		}
+
+		$client = $this->campaign_client( $requirement );
 		if ( is_wp_error( $client ) ) {
 			return $client;
 		}
-
-		$metric = isset( $input['metric'] ) ? (string) $input['metric'] : 'funnel';
-		$source = isset( $input['source'] ) ? (string) $input['source'] : 'auto';
 
 		if ( 'subscribers' === $metric ) {
 			return $client->subscriber_stats( $source );
