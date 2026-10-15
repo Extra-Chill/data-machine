@@ -249,8 +249,11 @@ class SendyClient {
 	/**
 	 * Create or update a Sendy campaign.
 	 *
-	 * When $campaign_id is supplied and the campaign exists, it is updated;
-	 * otherwise a new campaign is created. The caller owns the content (subject,
+	 * Works against stock Sendy, whose only campaign API is create.php (it
+	 * replies "Campaign created" without an ID). New campaigns are created via
+	 * the API and their ID is read back from the Sendy DB. When $campaign_id
+	 * names an existing unsent draft it is updated in the Sendy DB; sent or
+	 * scheduled campaigns are refused; a missing campaign is recreated. The caller owns the content (subject,
 	 * html, plain text) and sender identity — this method just transports it.
 	 *
 	 * Campaign keys: from_name, from_email, reply_to, subject, html_text,
@@ -278,51 +281,38 @@ class SendyClient {
 			? (string) $campaign['campaign_id']
 			: null;
 
-		// Determine whether an existing campaign should be updated.
-		$endpoint = '/api/campaigns/create.php';
+		$fields = array(
+			'from_name'  => isset( $campaign['from_name'] ) ? (string) $campaign['from_name'] : '',
+			'from_email' => isset( $campaign['from_email'] ) ? (string) $campaign['from_email'] : '',
+			'reply_to'   => isset( $campaign['reply_to'] ) ? (string) $campaign['reply_to'] : '',
+			'subject'    => isset( $campaign['subject'] ) ? (string) $campaign['subject'] : '',
+			'plain_text' => isset( $campaign['plain_text'] ) ? (string) $campaign['plain_text'] : '',
+			'html_text'  => isset( $campaign['html_text'] ) ? (string) $campaign['html_text'] : '',
+			'brand_id'   => isset( $campaign['brand_id'] ) ? (string) $campaign['brand_id'] : '',
+		);
+
+		// Stock Sendy has no campaign update/status API. An existing draft is
+		// updated in the Sendy DB (like delete_campaign()); a campaign that no
+		// longer exists is recreated.
 		if ( $campaign_id ) {
-			$check = wp_remote_post(
-				$this->sendy_url . '/api/campaigns/status.php',
-				array(
-					'headers' => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
-					'body'    => array(
-						'api_key'     => $this->api_key,
-						'campaign_id' => $campaign_id,
-					),
-					'timeout' => 30,
-				)
-			);
-
-			if ( is_wp_error( $check ) ) {
-				return $this->normalize_transport_error( $check );
+			$updated = $this->update_draft_campaign( (int) $campaign_id, $fields );
+			if ( is_wp_error( $updated ) ) {
+				return $updated;
 			}
-
-			$status_code = wp_remote_retrieve_response_code( $check );
-			if ( $status_code < 200 || $status_code >= 300 ) {
-				return new \WP_Error(
-					'sendy_remote_error',
-					'Sendy returned an unsuccessful response while checking campaign status.',
-					array( 'status' => $status_code )
+			if ( true === $updated ) {
+				return array(
+					'success'     => true,
+					'campaign_id' => $campaign_id,
+					'message'     => 'Campaign updated in Sendy.',
+					'created'     => false,
+					'raw'         => '',
 				);
 			}
-
-			if ( 'Campaign exists' === trim( wp_remote_retrieve_body( $check ) ) ) {
-				$endpoint = '/api/campaigns/update.php';
-			} else {
-				$campaign_id = null;
-			}
+			$campaign_id = null;
 		}
 
-		$body = array(
-			'api_key'    => $this->api_key,
-			'from_name'  => isset( $campaign['from_name'] ) ? $campaign['from_name'] : '',
-			'from_email' => isset( $campaign['from_email'] ) ? $campaign['from_email'] : '',
-			'reply_to'   => isset( $campaign['reply_to'] ) ? $campaign['reply_to'] : '',
-			'subject'    => isset( $campaign['subject'] ) ? $campaign['subject'] : '',
-			'plain_text' => isset( $campaign['plain_text'] ) ? $campaign['plain_text'] : '',
-			'html_text'  => isset( $campaign['html_text'] ) ? $campaign['html_text'] : '',
-			'brand_id'   => isset( $campaign['brand_id'] ) ? $campaign['brand_id'] : '',
-		);
+		$body            = $fields;
+		$body['api_key'] = $this->api_key;
 
 		if ( isset( $campaign['extra'] ) && is_array( $campaign['extra'] ) ) {
 			foreach ( $campaign['extra'] as $key => $value ) {
@@ -332,12 +322,8 @@ class SendyClient {
 			}
 		}
 
-		if ( $campaign_id ) {
-			$body['campaign_id'] = $campaign_id;
-		}
-
 		$response = wp_remote_post(
-			$this->sendy_url . $endpoint,
+			$this->sendy_url . '/api/campaigns/create.php',
 			array(
 				'headers' => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
 				'body'    => $body,
@@ -358,31 +344,113 @@ class SendyClient {
 			);
 		}
 
-		$raw     = wp_remote_retrieve_body( $response );
-		$created = false;
+		$raw = trim( (string) wp_remote_retrieve_body( $response ) );
 
-		// A newly-created campaign returns its numeric ID.
-		if ( ! $campaign_id && is_numeric( trim( $raw ) ) ) {
-			$campaign_id = (string) trim( $raw );
-			$created     = true;
-		}
-
-		// Sendy returns the campaign ID (numeric) on success, or an error string.
-		$success = $created || ( '/api/campaigns/update.php' === $endpoint && false === stripos( $raw, 'error' ) );
-		if ( ! $success ) {
-			return new \WP_Error( 'sendy_remote_error', 'Sendy rejected the campaign request.' );
+		// Stock Sendy replies "Campaign created"; patched installs may reply
+		// with the numeric ID. Anything else is Sendy's error string.
+		if ( is_numeric( $raw ) ) {
+			$campaign_id = $raw;
+		} elseif ( 0 === stripos( $raw, 'Campaign created' ) ) {
+			$campaign_id = $this->find_created_campaign_id( $fields );
+		} else {
+			return new \WP_Error(
+				'sendy_remote_error',
+				sprintf( 'Sendy rejected the campaign request: %s', '' !== $raw ? substr( wp_strip_all_tags( $raw ), 0, 200 ) : 'empty response' )
+			);
 		}
 
 		return array(
-			'success'     => $success,
+			'success'     => true,
 			'campaign_id' => $campaign_id,
-			'message'     => 'Campaign pushed to Sendy successfully.',
-			'created'     => $created,
+			'message'     => null === $campaign_id
+				? 'Campaign created in Sendy; its ID could not be read without Sendy DB access.'
+				: 'Campaign pushed to Sendy successfully.',
+			'created'     => true,
 			'raw'         => $raw,
 		);
 	}
 
-	// ─── DB mechanics (read-only) ───────────────────────────────────────────
+	/**
+	 * Update an unsent Sendy campaign draft in the Sendy DB.
+	 *
+	 * @param int   $campaign_id Campaign primary key.
+	 * @param array $fields      Campaign fields from push_campaign().
+	 * @return bool|\WP_Error True when updated, false when the campaign no
+	 *                        longer exists, or an error.
+	 */
+	private function update_draft_campaign( int $campaign_id, array $fields ) {
+		$db = $this->get_db();
+		if ( is_wp_error( $db ) ) {
+			return new \WP_Error(
+				'sendy_db_not_configured',
+				'Updating an existing Sendy campaign requires Sendy database credentials in datamachine_sendy_config.'
+			);
+		}
+
+		$existing = $db->get_row(
+			$db->prepare( 'SELECT id, sent, send_date, to_send, recipients FROM campaigns WHERE id = %d', $campaign_id ),
+			ARRAY_A
+		);
+		if ( ! $existing ) {
+			return false;
+		}
+
+		$status = $this->campaign_status( $existing );
+		if ( 'draft' !== $status ) {
+			return new \WP_Error(
+				'cannot_update_sent',
+				sprintf( 'Sendy campaign %d is %s and can no longer be edited.', $campaign_id, $status )
+			);
+		}
+
+		$result = $db->update(
+			'campaigns',
+			array(
+				'from_name'  => $fields['from_name'],
+				'from_email' => $fields['from_email'],
+				'reply_to'   => $fields['reply_to'],
+				'title'      => $fields['subject'],
+				'plain_text' => $fields['plain_text'],
+				'html_text'  => $fields['html_text'],
+			),
+			array( 'id' => $campaign_id ),
+			array( '%s', '%s', '%s', '%s', '%s', '%s' ),
+			array( '%d' )
+		);
+		if ( false === $result ) {
+			return new \WP_Error( 'sendy_db_update_failed', 'Failed to update the Sendy campaign draft.' );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Find the ID of the draft stock Sendy just created.
+	 *
+	 * Sendy's create API does not return the ID, so read the newest unsent
+	 * campaign in the brand with the pushed subject.
+	 *
+	 * @param array $fields Campaign fields from push_campaign().
+	 * @return string|null
+	 */
+	private function find_created_campaign_id( array $fields ) {
+		$db = $this->get_db();
+		if ( is_wp_error( $db ) ) {
+			return null;
+		}
+
+		$id = $db->get_var(
+			$db->prepare(
+				'SELECT id FROM campaigns WHERE app = %d AND title = %s AND (sent = "" OR sent IS NULL) ORDER BY id DESC LIMIT 1',
+				(int) $fields['brand_id'],
+				$fields['subject']
+			)
+		);
+
+		return $id ? (string) $id : null;
+	}
+
+	// ─── DB mechanics ───────────────────────────────────────────
 
 	/**
 	 * Get a wpdb instance bound to the read-only Sendy database.

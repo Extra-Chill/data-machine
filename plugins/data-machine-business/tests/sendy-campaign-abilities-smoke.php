@@ -101,6 +101,10 @@ namespace {
 		}
 
 		public function get_var( string $query ) {
+			if ( 0 === strpos( $query, 'SELECT id FROM campaigns WHERE app' ) ) {
+				$GLOBALS['sendy_lookup_query'] = $query;
+				return $GLOBALS['sendy_created_id'] ?? null;
+			}
 			return count( $this->filtered( $query ) );
 		}
 
@@ -124,6 +128,16 @@ namespace {
 			preg_match( '/id = (\d+)/', $query, $matches );
 			$id = isset( $matches[1] ) ? (int) $matches[1] : 0;
 			return $this->campaigns[ $id ] ?? null;
+		}
+
+		public function update( string $table, array $data, array $where, array $formats, array $where_formats ) {
+			$id = (int) $where['id'];
+			if ( 'campaigns' !== $table || ! isset( $this->campaigns[ $id ] ) ) {
+				return false;
+			}
+			$this->campaigns[ $id ]     = array_merge( $this->campaigns[ $id ], $data );
+			$GLOBALS['sendy_updated'][] = array( $id, $data );
+			return 1;
 		}
 
 		public function delete( string $table, array $where, array $formats ) {
@@ -214,22 +228,25 @@ namespace {
 		return trim( (string) $value );
 	}
 
+	function wp_strip_all_tags( string $text ): string {
+		return trim( strip_tags( $text ) );
+	}
+
 	function is_wp_error( $value ): bool {
 		return $value instanceof WP_Error;
 	}
 
 	function wp_remote_post( string $url, array $args ) {
 		global $http_mode, $http_fixtures;
+		$GLOBALS['sendy_http_urls'][] = $url;
 		if ( 'timeout' === $http_mode ) {
 			return new WP_Error( 'http_request_failed', 'cURL error 28: api-secret timed out' );
 		}
-		if ( false !== strpos( $url, '/status.php' ) ) {
-			return $http_fixtures['exists'];
+		if ( false === strpos( $url, '/api/campaigns/create.php' ) ) {
+			// Stock Sendy has no other campaign endpoints.
+			return array( 'code' => 404, 'body' => 'Not Found' );
 		}
-		if ( 'remote_error' === $http_mode ) {
-			return $http_fixtures['remote_error'];
-		}
-		return $http_fixtures[ false !== strpos( $url, '/update.php' ) ? 'update' : 'create' ];
+		return $http_fixtures[ $http_mode ];
 	}
 
 	function wp_remote_retrieve_body( array $response ): string {
@@ -289,13 +306,38 @@ namespace {
 	$bad_list = $abilities->execute_list_campaigns( array( 'status' => 'unknown' ) );
 	assert_sendy( is_wp_error( $bad_list ) && 'sendy_validation_error' === $bad_list->get_error_code(), 'campaign list validation is explicit' );
 
-	$http_mode = 'create';
-	$created   = $abilities->execute_push_campaign( $campaign_input );
-	assert_sendy( ! is_wp_error( $created ) && '321' === $created['campaign_id'] && true === $created['created'], 'Newsletter campaign create path succeeds' );
+	// Stock Sendy: create.php replies "Campaign created" with no ID; the ID is
+	// read back from the Sendy DB.
+	$http_mode                   = 'create';
+	$GLOBALS['sendy_created_id'] = '321';
+	$created                     = $abilities->execute_push_campaign( $campaign_input );
+	assert_sendy( ! is_wp_error( $created ) && true === $created['success'] && '321' === $created['campaign_id'] && true === $created['created'], 'stock "Campaign created" reply is a success with the DB-resolved ID' );
+	assert_sendy( false !== strpos( $GLOBALS['sendy_lookup_query'] ?? '', 'title = ' . $campaign_input['subject'] ) && false !== strpos( $GLOBALS['sendy_lookup_query'], 'app = 1' ), 'the created ID is looked up by brand and subject' );
 	assert_sendy( ! isset( $created['raw'] ), 'campaign create response omits raw provider data' );
 
-	$updated = $abilities->execute_push_campaign( array_merge( $campaign_input, array( 'campaign_id' => '321' ) ) );
-	assert_sendy( ! is_wp_error( $updated ) && false === $updated['created'], 'Newsletter campaign update path succeeds' );
+	$http_mode = 'create_numeric';
+	$numeric   = $abilities->execute_push_campaign( $campaign_input );
+	assert_sendy( ! is_wp_error( $numeric ) && '654' === $numeric['campaign_id'] && true === $numeric['created'], 'a numeric create reply is used directly' );
+
+	$http_mode = 'rejected';
+	$rejected  = $abilities->execute_push_campaign( $campaign_input );
+	assert_sendy( is_wp_error( $rejected ) && 'sendy_remote_error' === $rejected->get_error_code() && false !== strpos( $rejected->get_error_message(), 'From email not passed' ), "Sendy's rejection reason is surfaced" );
+
+	// Update: stock Sendy has no update API, so drafts are edited in the DB.
+	$http_mode                  = 'create';
+	$GLOBALS['sendy_http_urls'] = array();
+	$GLOBALS['sendy_updated']   = array();
+	$updated                    = $abilities->execute_push_campaign( array_merge( $campaign_input, array( 'campaign_id' => '101', 'subject' => 'Edited subject' ) ) );
+	assert_sendy( ! is_wp_error( $updated ) && true === $updated['success'] && false === $updated['created'] && '101' === $updated['campaign_id'], 'an existing draft is updated, not duplicated' );
+	assert_sendy( array() === $GLOBALS['sendy_http_urls'], 'updating a draft makes no API call' );
+	assert_sendy( 101 === ( $GLOBALS['sendy_updated'][0][0] ?? null ) && 'Edited subject' === $GLOBALS['sendy_updated'][0][1]['title'], 'the draft row gets the new subject and content' );
+
+	$sent_update = $abilities->execute_push_campaign( array_merge( $campaign_input, array( 'campaign_id' => '102' ) ) );
+	assert_sendy( is_wp_error( $sent_update ) && 'cannot_update_sent' === $sent_update->get_error_code(), 'sent campaigns are never edited' );
+
+	$GLOBALS['sendy_created_id'] = '777';
+	$recreated                   = $abilities->execute_push_campaign( array_merge( $campaign_input, array( 'campaign_id' => '999' ) ) );
+	assert_sendy( ! is_wp_error( $recreated ) && true === $recreated['created'] && '777' === $recreated['campaign_id'], 'a campaign deleted in Sendy is recreated' );
 
 	$list = $abilities->execute_list_campaigns( array( 'per_page' => 20, 'offset' => 0 ) );
 	assert_sendy( ! is_wp_error( $list ) && 2 === $list['total'] && 2 === count( $list['campaigns'] ), 'Newsletter campaign list path succeeds' );
@@ -333,7 +375,7 @@ namespace {
 	$timeout   = $abilities->execute_push_campaign( $campaign_input );
 	assert_sendy( is_wp_error( $timeout ) && 'sendy_timeout' === $timeout->get_error_code(), 'provider timeouts are explicit' );
 
-	$public_results = array( $absent, $invalid, $db_missing, $created, $updated, $list, $get, $deleted, $remote_error, $timeout );
+	$public_results = array( $absent, $invalid, $db_missing, $created, $numeric, $rejected, $updated, $sent_update, $recreated, $list, $get, $deleted, $remote_error, $timeout );
 	foreach ( $public_results as $result ) {
 		if ( is_wp_error( $result ) ) {
 			$result = array( $result->get_error_code(), $result->get_error_message(), $result->get_error_data() );

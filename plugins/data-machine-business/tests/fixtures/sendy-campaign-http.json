@@ -1,15 +1,15 @@
 {
   "create": {
     "code": 200,
-    "body": "321"
+    "body": "Campaign created"
   },
-  "exists": {
+  "create_numeric": {
     "code": 200,
-    "body": "Campaign exists"
+    "body": "654"
   },
-  "update": {
+  "rejected": {
     "code": 200,
-    "body": "Campaign updated"
+    "body": "From email not passed"
   },
   "remote_error": {
     "code": 500,
