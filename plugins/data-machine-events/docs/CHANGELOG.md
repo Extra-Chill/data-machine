@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.67.3] - 2026-10-15
+
+### Fixed
+- stop splitting non-US venues on region granularity
+- let duplicate cleanup pair punctuation-only title variants
+
 ## [0.67.2] - 2026-10-15
 
 ### Fixed
