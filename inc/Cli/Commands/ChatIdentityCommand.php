@@ -25,13 +25,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * ## EXAMPLES
  *
  *     # Link a chat actor on a platform to a user
- *     wp datamachine chat-identity link <platform> <actor_id> --user=<user>
+ *     wp datamachine chat-identity link <platform> <actor_id> --target-user=<user>
  *
  *     # Remove a user's link for a platform
- *     wp datamachine chat-identity unlink <platform> --user=<user>
+ *     wp datamachine chat-identity unlink <platform> --target-user=<user>
  *
  *     # List links
- *     wp datamachine chat-identity list [--user=<user>] [--platform=<platform>]
+ *     wp datamachine chat-identity list [--target-user=<user>] [--platform=<platform>]
  */
 class ChatIdentityCommand extends BaseCommand {
 
@@ -46,16 +46,16 @@ class ChatIdentityCommand extends BaseCommand {
 	 * <actor_id>
 	 * : External actor ID on that platform.
 	 *
-	 * --user=<user>
+	 * --target-user=<user>
 	 * : WordPress user ID, login or email.
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function link( array $args, array $assoc_args ): void {
-		$user_id = UserResolver::resolve( $assoc_args );
+		$user_id = self::target_user( $assoc_args );
 		if ( $user_id <= 0 || empty( $args[0] ) || ! isset( $args[1] ) ) {
-			WP_CLI::error( 'Usage: wp datamachine chat-identity link <platform> <actor_id> --user=<user>' );
+			WP_CLI::error( 'Usage: wp datamachine chat-identity link <platform> <actor_id> --target-user=<user>' );
 			return;
 		}
 
@@ -84,16 +84,16 @@ class ChatIdentityCommand extends BaseCommand {
 	 * <platform>
 	 * : Platform name.
 	 *
-	 * --user=<user>
+	 * --target-user=<user>
 	 * : WordPress user ID, login or email.
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function unlink( array $args, array $assoc_args ): void {
-		$user_id = UserResolver::resolve( $assoc_args );
+		$user_id = self::target_user( $assoc_args );
 		if ( $user_id <= 0 || empty( $args[0] ) ) {
-			WP_CLI::error( 'Usage: wp datamachine chat-identity unlink <platform> --user=<user>' );
+			WP_CLI::error( 'Usage: wp datamachine chat-identity unlink <platform> --target-user=<user>' );
 			return;
 		}
 
@@ -123,7 +123,7 @@ class ChatIdentityCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
-	 * [--user=<user>]
+	 * [--target-user=<user>]
 	 * : Only links for this WordPress user (ID, login or email).
 	 *
 	 * [--platform=<platform>]
@@ -149,7 +149,7 @@ class ChatIdentityCommand extends BaseCommand {
 		$result = AbilityRunner::execute(
 			'datamachine/list-chat-identities',
 			array(
-				'user_id'  => UserResolver::resolve( $assoc_args ),
+				'user_id'  => self::target_user( $assoc_args ),
 				'platform' => (string) ( $assoc_args['platform'] ?? '' ),
 			)
 		);
@@ -165,5 +165,18 @@ class ChatIdentityCommand extends BaseCommand {
 		}
 
 		$this->format_items( $result['identities'], array( 'user_id', 'platform', 'actor_id' ), $assoc_args );
+	}
+
+	/**
+	 * Resolve --target-user to a WordPress user ID (0 when omitted).
+	 *
+	 * Not --user: WP-CLI consumes that as its global "run as" parameter and
+	 * never passes it to the command, so a required --user can never arrive.
+	 *
+	 * @param array $assoc_args Associative arguments.
+	 * @return int
+	 */
+	private static function target_user( array $assoc_args ): int {
+		return UserResolver::resolve( array( 'user' => $assoc_args['target-user'] ?? null ) );
 	}
 }

@@ -123,8 +123,11 @@ preg_match_all( '/^  --(?:\[no-\])?([a-z0-9-]+)/m', $wp_help, $global_matches );
 $global_options = $global_matches[1];
 
 foreach ( $sources as $command => $source ) {
+	// Optional `[--opt=<v>]` and required `--opt=<v>` declarations alike:
+	// WP-CLI consumes a global name before the command sees it.
 	preg_match_all( '/\[--([a-z0-9-]+)(?:=<[^>]+>)?\]/', $source, $matches );
-	$declared_globals = array_intersect( $global_options, $matches[1] );
+	preg_match_all( '/^\s*\*\s+--([a-z0-9-]+)=<[^>]+>\s*$/m', $source, $required );
+	$declared_globals = array_intersect( $global_options, array_merge( $matches[1], $required[1] ) );
 	$assert( array() === $declared_globals, "registered {$command} command declares no WP-CLI global options" );
 }
 
@@ -132,9 +135,11 @@ $auth   = $sources['Commands\\AuthCommand'];
 $chat   = $sources['Commands\\ChatCommand'];
 $email  = $sources['Commands\\EmailCommand'];
 $memory = $sources['Commands\\MemoryCommand'];
+$identity = $sources['Commands\\ChatIdentityCommand'];
 
 $assert( str_contains( $auth, "\$assoc_args['target-user']" ), 'auth revoke receives --target-user' );
 $assert( str_contains( $chat, "\$assoc_args['owner-user']" ), 'chat commands receive --owner-user' );
+$assert( str_contains( $identity, "\$assoc_args['target-user']" ), 'chat-identity commands receive --target-user' );
 $assert( str_contains( $chat, "\$assoc_args['session-context']" ), 'chat commands receive --session-context' );
 $assert( str_contains( $email, "\$assoc_args['template-context']" ) && str_contains( $email, "\$input['context'] = \$decoded" ), 'queued email maps --template-context to the internal context payload' );
 $assert( ! str_contains( $memory, "get_flag_value( \$assoc_args, 'quiet'" ), 'memory compose relies on WP-CLI global quiet handling' );
@@ -145,6 +150,9 @@ $help_commands = array(
 	'chat list'      => array( '--owner-user=<id>', '--session-context=<type>' ),
 	'chat get'       => array( '--owner-user=<id>' ),
 	'chat create'    => array( '--owner-user=<id>', '--session-context=<type>' ),
+	'chat-identity link'   => array( '--target-user=<user>' ),
+	'chat-identity unlink' => array( '--target-user=<user>' ),
+	'chat-identity list'   => array( '--target-user=<user>' ),
 	'email send-queued' => array( '--template-context=<json>' ),
 	'memory compose' => array( '--agent=<slug>' ),
 );
