@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.67.2] - 2026-10-15
+
+### Fixed
+- dedup short headliner titles at the same venue and start time
+- strip schedule and price noise from imported event titles
+
 ## [0.67.1] - 2026-10-14
 
 ### Fixed
