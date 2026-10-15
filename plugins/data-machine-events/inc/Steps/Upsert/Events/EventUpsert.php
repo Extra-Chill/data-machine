@@ -318,6 +318,22 @@ class EventUpsert extends UpsertHandler {
 		if ( is_wp_error( $existing_post_id ) ) {
 			return $this->lifecycleErrorResponse( $existing_post_id, $title );
 		}
+		// A source whose event was merged into another canonical event must
+		// not republish the trashed duplicate. Ordinary trash still restores
+		// on re-import (#591); only merge losers carry a winner pointer.
+		if ( $existing_post_id > 0 && 'trash' === get_post_status( $existing_post_id ) ) {
+			$merged_winner_id = \DataMachineEvents\Core\DuplicateDetection\EventMergeHelper::resolveMergedWinner( $existing_post_id );
+			if ( $merged_winner_id > 0 ) {
+				return $this->successResponse(
+					array(
+						'post_id'     => $merged_winner_id,
+						'post_url'    => get_permalink( $merged_winner_id ),
+						'action'      => 'no_change',
+						'merged_from' => $existing_post_id,
+					)
+				);
+			}
+		}
 		// Resolve the venue once, before duplicate detection, so dedup sees the
 		// same term persistence will assign. Name-only re-resolution inside the
 		// duplicate strategy is ambiguous whenever two venue terms share a name,

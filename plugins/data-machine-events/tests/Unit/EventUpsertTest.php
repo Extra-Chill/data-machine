@@ -49,6 +49,73 @@ class EventUpsertTest extends EventUpsertTestCase {
 
 	}
 
+	public function test_reimport_of_merged_duplicate_resolves_to_winner_and_stays_trashed(): void {
+		$suffix = uniqid();
+		$winner = $this->invoke_upsert(
+			array(
+				'title'           => 'Merge Winner ' . $suffix,
+				'venue'           => 'Merge Venue A ' . $suffix,
+				'startDate'       => '2026-11-21',
+				'startTime'       => '20:00',
+				'source_identity' => 'source:winner-' . $suffix,
+			)
+		);
+		$loser_parameters = array(
+			'title'           => 'Merge Loser ' . $suffix,
+			'venue'           => 'Merge Venue B ' . $suffix,
+			'startDate'       => '2026-11-22',
+			'startTime'       => '21:00',
+			'source_identity' => 'source:loser-' . $suffix,
+		);
+		$loser = $this->invoke_upsert( $loser_parameters );
+
+		$winner_id = (int) $winner['data']['post_id'];
+		$loser_id  = (int) $loser['data']['post_id'];
+		$merge     = \DataMachineEvents\Core\DuplicateDetection\EventMergeHelper::merge( $winner_id, $loser_id );
+		$this->assertTrue( $merge['success'], (string) $merge['error'] );
+
+		$reimported = $this->invoke_upsert( $loser_parameters );
+
+		$this->assertTrue( $reimported['success'] ?? false, wp_json_encode( $reimported ) );
+		$this->assertSame( 'no_change', $reimported['data']['action'] );
+		$this->assertSame( $winner_id, (int) $reimported['data']['post_id'] );
+		$this->assertSame( $loser_id, (int) $reimported['data']['merged_from'] );
+		$this->assertSame( 'trash', get_post_status( $loser_id ) );
+		$this->assertSame( 'Merge Winner ' . $suffix, get_the_title( $winner_id ) );
+	}
+
+	public function test_merged_duplicate_whose_winner_is_gone_restores_on_reimport(): void {
+		$suffix = uniqid();
+		$winner = $this->invoke_upsert(
+			array(
+				'title'           => 'Gone Winner ' . $suffix,
+				'venue'           => 'Gone Venue A ' . $suffix,
+				'startDate'       => '2026-11-23',
+				'startTime'       => '20:00',
+				'source_identity' => 'source:gone-winner-' . $suffix,
+			)
+		);
+		$loser_parameters = array(
+			'title'           => 'Surviving Loser ' . $suffix,
+			'venue'           => 'Gone Venue B ' . $suffix,
+			'startDate'       => '2026-11-24',
+			'startTime'       => '21:00',
+			'source_identity' => 'source:gone-loser-' . $suffix,
+		);
+		$loser = $this->invoke_upsert( $loser_parameters );
+
+		$winner_id = (int) $winner['data']['post_id'];
+		$loser_id  = (int) $loser['data']['post_id'];
+		$this->assertTrue( \DataMachineEvents\Core\DuplicateDetection\EventMergeHelper::merge( $winner_id, $loser_id )['success'] );
+		wp_trash_post( $winner_id );
+
+		$reimported = $this->invoke_upsert( $loser_parameters );
+
+		$this->assertTrue( $reimported['success'] ?? false, wp_json_encode( $reimported ) );
+		$this->assertSame( $loser_id, (int) $reimported['data']['post_id'] );
+		$this->assertSame( 'publish', get_post_status( $loser_id ) );
+	}
+
 	public function test_unchanged_trash_reimport_republishes_the_exact_source_post(): void {
 		$parameters = array(
 			'title'           => 'Exact Source Trash Replay ' . uniqid(),

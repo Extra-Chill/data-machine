@@ -27,6 +27,14 @@ defined( 'ABSPATH' ) || exit;
 class EventMergeHelper {
 
 	/**
+	 * Post meta on a merged-away loser naming the canonical winner.
+	 *
+	 * Re-imports of the loser's source resolve to the winner instead of
+	 * republishing the trashed duplicate (see EventUpsert).
+	 */
+	public const MERGED_INTO_META_KEY = '_datamachine_event_merged_into';
+
+	/**
 	 * Merge a duplicate event pair.
 	 *
 	 * Trashes the loser after transferring its URL history to the winner.
@@ -119,8 +127,11 @@ class EventMergeHelper {
 			}
 		}
 
+		update_post_meta( $loser_id, self::MERGED_INTO_META_KEY, $winner_id );
+
 		$trashed = wp_trash_post( $loser_id );
 		if ( ! $trashed ) {
+			delete_post_meta( $loser_id, self::MERGED_INTO_META_KEY );
 			self::removeTransferredSlugs( $winner_id, $transferred_slugs );
 			self::restoreMetaValues( $loser_id, '_wp_old_slug', $loser_old_slug_values );
 			if ( $ticket_url_was_modified ) {
@@ -135,6 +146,25 @@ class EventMergeHelper {
 		$result['success']           = true;
 
 		return $result;
+	}
+
+	/**
+	 * Resolve the live canonical winner for a merged-away event.
+	 *
+	 * Follows merge chains (A merged into B, later B into C) and returns 0
+	 * when the post was not merged, or its winner is no longer published.
+	 *
+	 * @param int $post_id Possibly merged-away event post ID.
+	 * @return int Published winner post ID, or 0.
+	 */
+	public static function resolveMergedWinner( int $post_id ): int {
+		$seen = array();
+		while ( $post_id > 0 && ! isset( $seen[ $post_id ] ) && 'trash' === get_post_status( $post_id ) ) {
+			$seen[ $post_id ] = true;
+			$post_id          = (int) get_post_meta( $post_id, self::MERGED_INTO_META_KEY, true );
+		}
+
+		return ( $post_id > 0 && ! isset( $seen[ $post_id ] ) && 'publish' === get_post_status( $post_id ) ) ? $post_id : 0;
 	}
 
 	/**

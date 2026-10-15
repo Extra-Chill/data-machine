@@ -217,4 +217,53 @@ class EventMergeHelperTest extends WP_UnitTestCase {
 		$this->assertFalse( $result['ticket_url_merged'] );
 		$this->assertSame( '', get_post_meta( $winner, EVENT_TICKET_URL_META_KEY, true ) );
 	}
+
+	public function test_merge_records_winner_and_resolves_merge_chains(): void {
+		$a = $this->create_merge_event( 'chain-a' );
+		$b = $this->create_merge_event( 'chain-b' );
+		$c = $this->create_merge_event( 'chain-c' );
+
+		$this->assertTrue( EventMergeHelper::merge( $b, $a )['success'] );
+		$this->assertSame( $b, (int) get_post_meta( $a, EventMergeHelper::MERGED_INTO_META_KEY, true ) );
+		$this->assertSame( $b, EventMergeHelper::resolveMergedWinner( $a ) );
+
+		$this->assertTrue( EventMergeHelper::merge( $c, $b )['success'] );
+		$this->assertSame( $c, EventMergeHelper::resolveMergedWinner( $a ) );
+
+		wp_trash_post( $c );
+		$this->assertSame( 0, EventMergeHelper::resolveMergedWinner( $a ) );
+	}
+
+	public function test_ordinary_trash_has_no_merged_winner(): void {
+		$event = $this->create_merge_event( 'plain-trash' );
+		wp_trash_post( $event );
+
+		$this->assertSame( 0, EventMergeHelper::resolveMergedWinner( $event ) );
+		$this->assertSame( '', get_post_meta( $event, EventMergeHelper::MERGED_INTO_META_KEY, true ) );
+	}
+
+	public function test_failed_trash_leaves_no_merged_winner(): void {
+		$winner = $this->create_merge_event( 'fail-winner' );
+		$loser  = $this->create_merge_event( 'fail-loser' );
+		$block  = static fn( $trash, $post ) => $loser === $post->ID ? false : $trash;
+		add_filter( 'pre_trash_post', $block, 10, 2 );
+		try {
+			$this->assertFalse( EventMergeHelper::merge( $winner, $loser )['success'] );
+		} finally {
+			remove_filter( 'pre_trash_post', $block, 10 );
+		}
+
+		$this->assertSame( '', get_post_meta( $loser, EventMergeHelper::MERGED_INTO_META_KEY, true ) );
+	}
+
+	private function create_merge_event( string $slug ): int {
+		return (int) self::factory()->post->create(
+			array(
+				'post_type'   => \DataMachineEvents\Core\Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+				'post_title'  => 'Merge ' . $slug,
+				'post_name'   => $slug . '-' . uniqid(),
+			)
+		);
+	}
 }
