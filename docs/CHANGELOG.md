@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.185.2] - 2026-10-15
+
+### Fixed
+- chat-identity takes --target-user, since WP-CLI consumes --user
+
 ## [0.185.1] - 2026-10-15
 
 ### Fixed
