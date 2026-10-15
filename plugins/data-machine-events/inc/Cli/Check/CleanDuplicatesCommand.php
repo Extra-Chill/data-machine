@@ -31,8 +31,8 @@ class CleanDuplicatesCommand {
 	/**
 	 * Clean duplicate events by trashing the newer copy.
 	 *
-	 * Scans for duplicate events using exact normalized title, start time, and venue
-	 * identity, keeps the older post (more link equity), and trashes the newer one. If the
+	 * Scans for duplicate events using exact normalized title (punctuation and
+	 * quotes ignored), start time, and venue identity, keeps the older post (more link equity), and trashes the newer one. If the
 	 * trashed post has a ticket URL that the kept post lacks, it is copied over.
 	 *
 	 * ## OPTIONS
@@ -223,7 +223,31 @@ class CleanDuplicatesCommand {
 			return '';
 		}
 
-		return EventIdentifierGenerator::normalizeBasic( $title ) . "\0" . $start . "\0" . EventIdentifierGenerator::normalizeBasic( $venue );
+		return self::punctuation_insensitive( $title ) . "\0" . $start . "\0" . EventIdentifierGenerator::normalizeBasic( $venue );
+	}
+
+	/**
+	 * Normalize a title for exact identity, ignoring punctuation only.
+	 *
+	 * Sources re-list one show with only quoting or punctuation changed:
+	 * `Burgundy: Karaoke Nite` vs `Burgundy: "Karaoke Nite"`, or
+	 * `Alborosie — Live in Austin!` vs `Alborosie – Live in Austin`
+	 * (issue #931). Words, digits, and their order must still match exactly,
+	 * so expanded bills (`Meltt` vs `Meltt, Los Eclipses`) and different
+	 * products (`Night 1` vs `2 Day Pass`) stay distinct, as #712 requires.
+	 *
+	 * @param string $title Event title.
+	 * @return string Lowercased words separated by single spaces.
+	 */
+	private static function punctuation_insensitive( string $title ): string {
+		$text = EventIdentifierGenerator::normalizeBasic( $title );
+		// Apostrophes and quote marks join words ("Gary's" == "Garys").
+		$text = (string) preg_replace( "/['\"`\x{2018}\x{2019}\x{201A}\x{201B}\x{201C}\x{201D}\x{201E}\x{00B4}]/u", '', $text );
+		// Any other punctuation or symbol is a word boundary.
+		$text = (string) preg_replace( '/[^\p{L}\p{N}]+/u', ' ', $text );
+		$text = trim( $text );
+
+		return (string) preg_replace( '/^(the|a|an)\s+/', '', $text );
 	}
 
 	private function build_actions( array $duplicate_groups ): array {

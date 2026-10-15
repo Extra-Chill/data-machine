@@ -80,6 +80,52 @@ class CleanDuplicatesCommandTest extends WP_UnitTestCase {
 		$this->assertEqualsCanonicalizing( array( $first, $dupe ), array( $groups[0]['event_a']['id'], $groups[0]['event_b']['id'] ) );
 	}
 
+	/**
+	 * Punctuation-only re-listings are the same show (issue #931).
+	 */
+	public function test_repair_accepts_punctuation_only_variants(): void {
+		$venue = wp_insert_term( 'Punctuation venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		$venue_id = (int) $venue['term_id'];
+		$pairs    = array(
+			array( 'Burgundy: Karaoke Nite ft. Karaoke Possum', 'Burgundy: "Karaoke Nite" ft. Karaoke Possum', '2026-11-26 20:00:00' ),
+			array( 'Alborosie — Live in Austin!', 'Alborosie – Live in Austin', '2026-11-27 20:00:00' ),
+			array( "Uncle Gary's Band", 'Uncle Garys Band', '2026-11-28 20:00:00' ),
+		);
+
+		foreach ( $pairs as [ $old_title, $new_title, $start ] ) {
+			$first  = $this->seedEvent( $old_title, $start, $venue_id );
+			$second = $this->seedEvent( $new_title, $start, $venue_id );
+
+			$groups = $this->invokePrivate( 'find_duplicates', array_map( 'get_post', array( $first, $second ) ) );
+
+			$this->assertCount( 1, $groups, "{$new_title} should pair with {$old_title}." );
+			$this->assertSame( $first, $groups[0]['event_a']['id'] );
+			$this->assertSame( $second, $groups[0]['event_b']['id'] );
+		}
+	}
+
+	/**
+	 * Ignoring punctuation must not merge different words, digits, or products.
+	 */
+	public function test_repair_keeps_word_and_number_differences_distinct(): void {
+		$venue = wp_insert_term( 'Distinct words venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		$venue_id = (int) $venue['term_id'];
+		$events   = array(
+			$this->seedEvent( 'In The End - Linkin Park Experience: Night 1', '2026-11-29 17:00:00', $venue_id ),
+			$this->seedEvent( 'In The End - Linkin Park Experience: 2 Day Pass', '2026-11-29 17:00:00', $venue_id ),
+			$this->seedEvent( 'Meltt', '2026-11-30 20:00:00', $venue_id ),
+			$this->seedEvent( 'Meltt, Los Eclipses', '2026-11-30 20:00:00', $venue_id ),
+			$this->seedEvent( 'Sum 41', '2026-12-01 20:00:00', $venue_id ),
+			$this->seedEvent( 'Sum 42', '2026-12-01 20:00:00', $venue_id ),
+		);
+
+		$groups = $this->invokePrivate( 'find_duplicates', array_map( 'get_post', $events ) );
+
+		$this->assertSame( array(), $groups );
+	}
+
 	public function test_location_scope_uses_existing_taxonomy_query_filter(): void {
 		$venue    = wp_insert_term( 'Scoped cleaner venue ' . uniqid(), 'venue' );
 		$chicago  = wp_insert_term( 'Chicago cleaner ' . uniqid(), 'location' );
