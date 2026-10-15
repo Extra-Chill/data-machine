@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.18.6] - 2026-10-15
+
+### Fixed
+- push campaigns against stock Sendy
+
 ## [0.18.5] - 2026-10-15
 
 ### Changed
