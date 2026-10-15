@@ -663,7 +663,7 @@ final class FlowRoutines {
 		}
 
 		try {
-			return \ActionScheduler_Store::instance()->fetch_action( $action_id )->get_schedule()->is_recurring();
+			return \ActionScheduler_Store::instance()->fetch_action( (string) $action_id )->get_schedule()->is_recurring();
 		} catch ( \Throwable $error ) {
 			unset( $error );
 			return false;
