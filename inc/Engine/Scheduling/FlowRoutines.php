@@ -22,6 +22,14 @@
  * expression) is missing or has actually changed; an unchanged routine is a
  * read-only no-op.
  *
+ * First-run anchors: a system schedule may declare `first_run_callback` /
+ * `first_run_arg` (e.g. `strtotime` / `'next thursday 15:00 UTC'`). The
+ * Agents API routine contract has no first-run timestamp arg, so the anchor
+ * is applied here, and only when the bridge has just minted a fresh chain
+ * (first registration, re-enable, or recurrence change). An unchanged
+ * routine is never re-anchored, so a relative anchor that drifts with the
+ * clock never counts as a schedule change. See {@see anchor_first_run()}.
+ *
  * @package DataMachine\Engine\Scheduling
  * @since   1.0.0
  */
@@ -29,6 +37,7 @@
 namespace DataMachine\Engine\Scheduling;
 
 use AgentsAPI\AI\Routines\WP_Agent_Routine;
+use AgentsAPI\AI\Routines\WP_Agent_Routine_Action_Scheduler_Bridge;
 use AgentsAPI\AI\Routines\WP_Agent_Routine_Registry;
 use DataMachine\Api\Flows\FlowScheduleReconciliationLock;
 use DataMachine\Core\ActionScheduler\GroupRegistrar;
@@ -500,11 +509,164 @@ final class FlowRoutines {
 				continue;
 			}
 
-			self::register_routine_logged(
-				self::system_routine_id( $schedule_id ),
+			$routine_id = self::system_routine_id( $schedule_id );
+			$anchor     = isset( $args['interval'] ) ? self::system_first_run_anchor( $schedule ) : null;
+			$before     = null === $anchor ? null : self::current_generation( $routine_id );
+
+			$registered = self::register_routine_logged(
+				$routine_id,
 				$args,
 				array( 'schedule_id' => $schedule_id )
 			);
+
+			if ( $registered && null !== $anchor ) {
+				self::anchor_first_run( $routine_id, (int) $args['interval'], $anchor, $before, $schedule_id );
+			}
+		}
+	}
+
+	/**
+	 * Resolve a system schedule's declared first-run anchor to a timestamp.
+	 *
+	 * Honors the `first_run_callback` / `first_run_arg` contract documented
+	 * on {@see RecurringScheduleRegistry}. A string `first_run_arg` without a
+	 * callback is parsed with `strtotime()`. Returns null when no anchor is
+	 * declared, the callback is not callable, or the result is not a future
+	 * timestamp.
+	 *
+	 * @param array<string, mixed> $schedule Normalized schedule definition.
+	 * @param int|null             $now      Reference "now" (tests); defaults to time().
+	 * @return int|null Unix timestamp of the first run, or null.
+	 */
+	public static function system_first_run_anchor( array $schedule, ?int $now = null ): ?int {
+		$callback = $schedule['first_run_callback'] ?? null;
+		$arg      = $schedule['first_run_arg'] ?? null;
+
+		if ( null === $callback && ( ! is_string( $arg ) || '' === trim( $arg ) ) ) {
+			return null;
+		}
+
+		if ( null === $callback ) {
+			$callback = 'strtotime';
+		}
+
+		if ( ! is_callable( $callback ) ) {
+			return null;
+		}
+
+		try {
+			$timestamp = null === $arg ? call_user_func( $callback ) : call_user_func( $callback, $arg );
+		} catch ( \Throwable $error ) {
+			unset( $error );
+			return null;
+		}
+
+		$now = $now ?? time();
+		if ( ! is_numeric( $timestamp ) || (int) $timestamp <= $now ) {
+			return null;
+		}
+
+		return (int) $timestamp;
+	}
+
+	/**
+	 * The routine's current schedule generation, or null when unknown.
+	 *
+	 * @param string $routine_id Routine id.
+	 */
+	private static function current_generation( string $routine_id ): ?string {
+		$backend = WP_Agent_Routine_Registry::backend();
+		return null === $backend ? null : $backend->current_generation( $routine_id );
+	}
+
+	/**
+	 * Move a freshly minted routine chain's first run to its declared anchor.
+	 *
+	 * Runs only when registration just minted a new chain, i.e. the backend's
+	 * generation changed across the `register()` call. An unchanged routine
+	 * keeps its generation, so this is a read-only no-op on every ordinary
+	 * boot. That keeps a drifting relative anchor such as
+	 * `'next thursday 15:00 UTC'` from rescheduling the routine per request.
+	 *
+	 * The anchored recurring action is stored first, then the bridge's
+	 * provisional recurring action is cancelled. Action Scheduler ids only
+	 * increase, so the anchored action sits above the routine's generation
+	 * watermark and passes the bridge's fence. The bridge's pending-action
+	 * cache is refreshed afterwards so a later `register()` in the same
+	 * request sees the anchored chain as matching.
+	 *
+	 * @param string      $routine_id  Routine id.
+	 * @param int         $interval    Recurrence interval in seconds.
+	 * @param int         $anchor      First-run timestamp.
+	 * @param string|null $before      Generation observed before registration.
+	 * @param string      $schedule_id System schedule id (logging).
+	 */
+	private static function anchor_first_run( string $routine_id, int $interval, int $anchor, ?string $before, string $schedule_id ): void {
+		$backend = WP_Agent_Routine_Registry::backend();
+		if ( ! $backend instanceof WP_Agent_Routine_Action_Scheduler_Bridge || ! function_exists( 'as_schedule_recurring_action' ) ) {
+			return;
+		}
+
+		$after = $backend->current_generation( $routine_id );
+		if ( null === $after || $after === $before ) {
+			return; // Unchanged chain: never re-anchor.
+		}
+
+		$provisional = array();
+		foreach ( $backend->pending_by_routine()[ $routine_id ] ?? array() as $action_id ) {
+			if ( self::is_recurring_action( (int) $action_id ) ) {
+				$provisional[] = (int) $action_id;
+			}
+		}
+
+		$anchored_id = (int) as_schedule_recurring_action(
+			$anchor,
+			$interval,
+			WP_Agent_Routine_Action_Scheduler_Bridge::SCHEDULED_HOOK,
+			array( 'routine_id' => $routine_id ),
+			WP_Agent_Routine_Action_Scheduler_Bridge::GROUP
+		);
+		if ( $anchored_id <= 0 ) {
+			return; // Keep the provisional chain rather than leave none.
+		}
+
+		foreach ( $provisional as $action_id ) {
+			if ( $action_id !== $anchored_id ) {
+				$backend->cancel( $action_id );
+			}
+		}
+
+		// Refresh the bridge's request-scoped pending cache.
+		$backend->pending_by_routine();
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Anchored system routine first run',
+			array(
+				'schedule_id' => $schedule_id,
+				'routine_id'  => $routine_id,
+				'first_run'   => gmdate( 'c', $anchor ),
+				'interval'    => $interval,
+			)
+		);
+	}
+
+	/**
+	 * Whether a stored Action Scheduler action has a recurring schedule.
+	 *
+	 * @param int $action_id Action id.
+	 */
+	private static function is_recurring_action( int $action_id ): bool {
+		if ( $action_id <= 0 || ! class_exists( '\ActionScheduler_Store' ) ) {
+			return false;
+		}
+
+		try {
+			return \ActionScheduler_Store::instance()->fetch_action( $action_id )->get_schedule()->is_recurring();
+		} catch ( \Throwable $error ) {
+			unset( $error );
+			return false;
 		}
 	}
 
@@ -517,8 +679,9 @@ final class FlowRoutines {
 	 * @param string               $routine_id  Routine id.
 	 * @param array<string, mixed> $args        Registry args.
 	 * @param array<string, mixed> $log_context Extra identifiers for the error log.
+	 * @return bool True when the routine registered.
 	 */
-	private static function register_routine_logged( string $routine_id, array $args, array $log_context ): void {
+	private static function register_routine_logged( string $routine_id, array $args, array $log_context ): bool {
 		try {
 			$registered = WP_Agent_Routine_Registry::register( $routine_id, $args );
 		} catch ( \Throwable $error ) {
@@ -534,11 +697,11 @@ final class FlowRoutines {
 					)
 				)
 			);
-			return;
+			return false;
 		}
 
 		if ( ! is_wp_error( $registered ) ) {
-			return;
+			return true;
 		}
 
 		do_action(
@@ -553,6 +716,8 @@ final class FlowRoutines {
 				)
 			)
 		);
+
+		return false;
 	}
 
 	/**
