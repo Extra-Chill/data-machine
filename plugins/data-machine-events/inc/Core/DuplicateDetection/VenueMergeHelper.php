@@ -194,7 +194,16 @@ class VenueMergeHelper {
 	 * Reject conflicting stored geography while allowing either side to omit it.
 	 */
 	private static function geography_is_compatible( array $geo_a, array $geo_b ): bool {
-		foreach ( array( 'city', 'state', 'country' ) as $field ) {
+		if ( Venue_Taxonomy::states_conflict(
+			(string) ( $geo_a['state'] ?? '' ),
+			(string) ( $geo_b['state'] ?? '' ),
+			(string) ( $geo_a['country'] ?? '' ),
+			(string) ( $geo_b['country'] ?? '' )
+		) ) {
+			return false;
+		}
+
+		foreach ( array( 'city', 'country' ) as $field ) {
 			$value_a = self::normalize_geography_value( $field, (string) ( $geo_a[ $field ] ?? '' ) );
 			$value_b = self::normalize_geography_value( $field, (string) ( $geo_b[ $field ] ?? '' ) );
 

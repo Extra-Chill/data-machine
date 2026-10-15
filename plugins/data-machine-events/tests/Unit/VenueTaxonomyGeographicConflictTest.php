@@ -217,6 +217,105 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		$this->assertNotEmpty( $result['conflicting_term_ids'] );
 	}
 
+	/**
+	 * Same building, same non-US country, region filled at different levels (#931).
+	 *
+	 * Production: The Roxy, 3-5 Rathbone Place, London. Ticketmaster stored
+	 * state "England"; DICE sent "London" and a second term was created.
+	 */
+	public function test_non_us_region_granularity_is_not_conflict(): void {
+		$name    = 'Region Granularity Venue ' . uniqid();
+		$term_id = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '3-5 Rathbone Place',
+				'city'    => 'London',
+				'state'   => 'England',
+				'country' => 'United Kingdom',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '3-5 Rathbone Place',
+				'city'    => 'London',
+				'state'   => 'London',
+				'country' => 'GB',
+			)
+		);
+
+		$this->assertSame( 'matched', $result['match_status'] );
+		$this->assertSame( $term_id, $result['term_id'] );
+	}
+
+	public function test_us_state_difference_is_still_conflict(): void {
+		$name = 'US State Conflict Venue ' . uniqid();
+		$this->create_venue_with_meta(
+			$name,
+			array(
+				'city'    => 'Portland',
+				'state'   => 'ME',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'city'    => 'Portland',
+				'state'   => 'Oregon',
+				'country' => 'United States',
+			)
+		);
+
+		$this->assertSame( 'conflict', $result['match_status'] );
+	}
+
+	public function test_region_difference_without_shared_country_is_conflict(): void {
+		$name = 'Unknown Country Region Venue ' . uniqid();
+		$this->create_venue_with_meta(
+			$name,
+			array(
+				'city'    => 'London',
+				'state'   => 'England',
+				'country' => 'United Kingdom',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'city'  => 'London',
+				'state' => 'Ontario',
+			)
+		);
+
+		$this->assertSame( 'conflict', $result['match_status'] );
+	}
+
+	public function test_states_conflict_rules(): void {
+		$this->assertFalse( Venue_Taxonomy::states_conflict( 'England', 'London', 'United Kingdom', 'GB' ) );
+		$this->assertFalse( Venue_Taxonomy::states_conflict( 'Ile-de-France', 'Seine-Saint-Denis', 'France', 'FR' ) );
+		$this->assertFalse( Venue_Taxonomy::states_conflict( 'North Holland', 'Noord-Holland', 'NL', 'Netherlands' ) );
+		$this->assertFalse( Venue_Taxonomy::states_conflict( 'South Carolina', 'SC', 'US', 'US' ) );
+		$this->assertTrue( Venue_Taxonomy::states_conflict( 'SC', 'GA', 'US', 'United States' ) );
+		$this->assertTrue( Venue_Taxonomy::states_conflict( 'SC', 'GA', '', '' ) );
+		$this->assertTrue( Venue_Taxonomy::states_conflict( 'England', 'Ontario', 'GB', 'CA' ) );
+		$this->assertTrue( Venue_Taxonomy::states_conflict( 'England', 'Ontario', 'GB', '' ) );
+	}
+
+	public function test_country_aliases_normalize_to_iso(): void {
+		foreach ( array( 'GB', 'gb', 'United Kingdom', 'UK', 'Royaume-Uni' ) as $alias ) {
+			$this->assertSame( 'gb', Venue_Taxonomy::normalize_geographic_value( $alias, 'country' ), $alias );
+		}
+		foreach ( array( 'US', 'USA', 'United States', 'U.S.A.' ) as $alias ) {
+			$this->assertSame( 'us', Venue_Taxonomy::normalize_geographic_value( $alias, 'country' ), $alias );
+		}
+		$this->assertSame( 'nl', Venue_Taxonomy::normalize_geographic_value( 'The Netherlands', 'country' ) );
+		$this->assertSame( 'de', Venue_Taxonomy::normalize_geographic_value( 'Deutschland', 'country' ) );
+	}
+
 	// ---------------------------------------------------------------------
 	// Part A2: #803 directional/unit/ordinal variants are not conflicts
 	// ---------------------------------------------------------------------

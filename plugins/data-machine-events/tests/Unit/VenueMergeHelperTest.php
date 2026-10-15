@@ -576,6 +576,64 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 		}
 	}
 
+	/**
+	 * Non-US terms at one address split by region granularity and country
+	 * spelling cluster together (#931); US terms in different states do not.
+	 */
+	public function test_address_cluster_ignores_non_us_region_granularity(): void {
+		$tm   = $this->make_venue(
+			'Roxy Granularity',
+			array(
+				'_venue_address' => '3-5 Rathbone Place',
+				'_venue_city'    => 'London',
+				'_venue_state'   => 'England',
+				'_venue_country' => 'United Kingdom',
+			)
+		);
+		$dice = $this->make_venue(
+			'Roxy Granularity',
+			array(
+				'_venue_address' => '3-5 Rathbone Place',
+				'_venue_city'    => 'London',
+				'_venue_state'   => 'London',
+				'_venue_country' => 'GB',
+			)
+		);
+		$this->make_venue(
+			'Twin Town Granularity',
+			array(
+				'_venue_address' => '100 Main St',
+				'_venue_city'    => 'Springfield',
+				'_venue_state'   => 'IL',
+				'_venue_country' => 'US',
+			)
+		);
+		$this->make_venue(
+			'Twin Town Granularity',
+			array(
+				'_venue_address' => '100 Main St',
+				'_venue_city'    => 'Springfield',
+				'_venue_state'   => 'MO',
+				'_venue_country' => 'US',
+			)
+		);
+
+		$cmd        = new CheckMergeDuplicateVenuesCommand();
+		$reflection = new \ReflectionClass( $cmd );
+		$method     = $reflection->getMethod( 'find_clusters' );
+		$method->setAccessible( true );
+		$clusters = $method->invoke( $cmd );
+
+		$roxy = array_values( array_filter( $clusters, static fn( $c ) => in_array( $tm, $c['term_ids'], true ) ) );
+		$this->assertCount( 1, $roxy );
+		$this->assertEqualsCanonicalizing( array( $tm, $dice ), $roxy[0]['term_ids'] );
+
+		foreach ( $clusters as $cluster ) {
+			$names = array_map( static fn( $t ) => $t->name, $cluster['terms'] );
+			$this->assertNotContains( 'Twin Town Granularity', $names, 'Different US states must not cluster.' );
+		}
+	}
+
 	public function test_address_cluster_includes_similar_names(): void {
 		// Two terms at the same address+city with case-only name variants.
 		// Both pass Rule 1 → address-cluster must contain them.

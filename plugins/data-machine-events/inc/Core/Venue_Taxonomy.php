@@ -1289,6 +1289,18 @@ class Venue_Taxonomy {
 				continue;
 			}
 
+			if ( 'state' === $field ) {
+				if ( self::states_conflict(
+					(string) $incoming,
+					(string) $stored,
+					(string) ( $venue_data['country'] ?? '' ),
+					(string) get_term_meta( $term_id, self::$meta_fields['country'], true )
+				) ) {
+					return true;
+				}
+				continue;
+			}
+
 			if ( 'address' === $field ) {
 				if ( ! self::address_has_street_component( (string) $incoming ) ) {
 					continue;
@@ -1448,6 +1460,15 @@ class Venue_Taxonomy {
 			return 'us';
 		}
 
+		// Collapse recognised country names and codes to ISO alpha-2 so
+		// "GB" and "United Kingdom" are the same place (#931).
+		if ( 'country' === $field ) {
+			$iso = VenueTimezoneResolver::normalizeCountry( $value );
+			if ( '' !== $iso ) {
+				return strtolower( $iso );
+			}
+		}
+
 		if ( 'state' === $field ) {
 			foreach ( self::$us_state_names as $abbreviation => $state_name ) {
 				$normalized_state_name = self::normalize_geographic_value( $state_name, '' );
@@ -1458,6 +1479,39 @@ class Venue_Taxonomy {
 		}
 
 		return $value;
+	}
+
+	/**
+	 * Whether two non-empty state/region values place a venue in different places.
+	 *
+	 * Inside the US a state is a reliable, fixed-granularity identifier, so any
+	 * difference is a conflict. Elsewhere sources fill "state" at whatever
+	 * level they like for the same building: Ticketmaster sends "England",
+	 * DICE sends "London"; "Ile-de-France" vs "Seine-Saint-Denis"; "North
+	 * Holland" vs "Noord-Holland". When both sides name the same non-US
+	 * country the region is therefore not evidence of a different place, and
+	 * city, street, and country carry the identity instead (#931). Without a
+	 * shared known country the region is still compared, so "London, Ontario"
+	 * and "London, England" stay apart.
+	 *
+	 * @param string $state_a   First state/region value.
+	 * @param string $state_b   Second state/region value.
+	 * @param string $country_a Country paired with $state_a.
+	 * @param string $country_b Country paired with $state_b.
+	 * @return bool True when the regions contradict each other.
+	 */
+	public static function states_conflict( string $state_a, string $state_b, string $country_a, string $country_b ): bool {
+		$state_a = self::normalize_geographic_value( $state_a, 'state' );
+		$state_b = self::normalize_geographic_value( $state_b, 'state' );
+
+		if ( '' === $state_a || '' === $state_b || $state_a === $state_b ) {
+			return false;
+		}
+
+		$country_a = self::normalize_geographic_value( $country_a, 'country' );
+		$country_b = self::normalize_geographic_value( $country_b, 'country' );
+
+		return ! ( '' !== $country_a && $country_a === $country_b && 'us' !== $country_a );
 	}
 
 	/**

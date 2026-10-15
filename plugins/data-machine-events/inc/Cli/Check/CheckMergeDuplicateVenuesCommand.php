@@ -167,12 +167,21 @@ class CheckMergeDuplicateVenuesCommand {
 				continue;
 			}
 
+			// Outside the US, sources disagree on the region granularity for
+			// the same building ("England" vs "London"), so a known non-US
+			// country buckets by address + city + country only. The name
+			// sub-clustering below re-checks geography (#931).
+			$country_key = Venue_Taxonomy::normalize_geographic_value( $country, 'country' );
+			$state_key   = ( '' !== $country_key && 'us' !== $country_key )
+				? ''
+				: Venue_Taxonomy::normalize_geographic_value( $state, 'state' );
+
 			$addr_key = sprintf(
 				'%s|%s|%s|%s',
 				VenueMergeHelper::normalize_address_for_alias_matching( $address, $city, $state ),
 				Venue_Taxonomy::normalize_geographic_value( $city, 'city' ),
-				Venue_Taxonomy::normalize_geographic_value( $state, 'state' ),
-				Venue_Taxonomy::normalize_geographic_value( $country, 'country' )
+				$state_key,
+				$country_key
 			);
 
 			if ( str_starts_with( $addr_key, '|' ) ) {

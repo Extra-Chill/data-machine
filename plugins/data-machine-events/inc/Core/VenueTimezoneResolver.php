@@ -515,10 +515,6 @@ class VenueTimezoneResolver {
 			return '';
 		}
 
-		if ( 2 === strlen( $country ) && ctype_alpha( $country ) ) {
-			return strtoupper( $country );
-		}
-
 		$aliases = array(
 			'united states'            => 'US',
 			'united states of america' => 'US',
@@ -527,6 +523,8 @@ class VenueTimezoneResolver {
 			'u.s.a.'                   => 'US',
 			'united kingdom'           => 'GB',
 			'uk'                       => 'GB',
+			'royaume-uni'              => 'GB',
+			'royaume uni'              => 'GB',
 			'great britain'            => 'GB',
 			'england'                  => 'GB',
 			'scotland'                 => 'GB',
@@ -535,6 +533,7 @@ class VenueTimezoneResolver {
 			'mexico'                   => 'MX',
 			'australia'                => 'AU',
 			'germany'                  => 'DE',
+			'deutschland'              => 'DE',
 			'france'                   => 'FR',
 			'netherlands'              => 'NL',
 			'the netherlands'          => 'NL',
@@ -554,7 +553,17 @@ class VenueTimezoneResolver {
 
 		$key = strtolower( $country );
 
-		return $aliases[ $key ] ?? '';
+		if ( isset( $aliases[ $key ] ) ) {
+			return $aliases[ $key ];
+		}
+
+		// Any other two-letter value is taken as an ISO alpha-2 code. Aliases
+		// are checked first so "UK" resolves to "GB" (#931).
+		if ( 2 === strlen( $country ) && ctype_alpha( $country ) ) {
+			return strtoupper( $country );
+		}
+
+		return '';
 	}
 
 	/**
