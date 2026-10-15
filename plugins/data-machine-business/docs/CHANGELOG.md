@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.18.5] - 2026-10-15
+
+### Changed
+- one config contract for every Sendy ability
+
 ## [0.18.4] - 2026-10-11
 
 ### Changed
