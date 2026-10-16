@@ -60,6 +60,8 @@ $assert(
 );
 $assert( 'core ships the landscape_16_9 preset', str_contains( $presets_src, "'landscape_16_9'" ) );
 $assert( 'core ships the print_tabloid preset', str_contains( $presets_src, "'print_tabloid'" ) );
+$assert( 'core ships the print_tabloid_300 preset', str_contains( $presets_src, "'print_tabloid_300'" ) );
+$assert( 'core ships the print_pocket_flyer preset', str_contains( $presets_src, "'print_pocket_flyer'" ) );
 $assert( 'QR codes resolve through a filter', str_contains( $tmpl_source, "'datamachine/image_generation/qr_image_path'" ) );
 $assert(
 	'template names no domain concept or vendor',
@@ -135,6 +137,8 @@ $assert( 'only title is required', array( 'title' ) === $required );
 $assert( 'default preset exists', null !== PlatformPresets::get( $template->get_default_preset() ) );
 $assert( 'landscape_16_9 is 1920x1080', array( 'width' => 1920, 'height' => 1080 ) === PlatformPresets::dimensions( 'landscape_16_9' ) );
 $assert( 'print_tabloid is 1650x2550', array( 'width' => 1650, 'height' => 2550 ) === PlatformPresets::dimensions( 'print_tabloid' ) );
+$assert( 'print_tabloid_300 is 3300x5100', array( 'width' => 3300, 'height' => 5100 ) === PlatformPresets::dimensions( 'print_tabloid_300' ) );
+$assert( 'print_pocket_flyer is 1275x1650', array( 'width' => 1275, 'height' => 1650 ) === PlatformPresets::dimensions( 'print_pocket_flyer' ) );
 
 $norm = PosterTemplate::normalize_fields(
 	array(
@@ -148,10 +152,13 @@ $assert( 'normalize trims strings', 'Never Miss The Show' === $norm['title'] );
 $assert( 'normalize keeps only non-empty scalar detail lines', array( 'Find a show tonight', '42' ) === $norm['detail_lines'] );
 $assert( 'normalize rejects non-scalar strings', '' === $norm['banner_text'] );
 $assert( 'normalize keeps only string logo paths', array( '/tmp/a.png' ) === $norm['cobrand_logos'] );
-$assert( 'normalize fills every field', 16 === count( $norm ) && '' === $norm['qr_url'] );
+$assert( 'normalize fills every field', 17 === count( $norm ) && '' === $norm['qr_url'] );
 $assert( 'scheme defaults to dark', 'dark' === $norm['scheme'] );
 $assert( 'unknown scheme falls back to dark', 'dark' === PosterTemplate::normalize_fields( array( 'scheme' => 'neon' ) )['scheme'] );
 $assert( 'scheme is case-insensitive', 'accent' === PosterTemplate::normalize_fields( array( 'scheme' => 'Accent' ) )['scheme'] );
+$assert( 'qr_emphasis defaults to footer', 'footer' === $norm['qr_emphasis'] );
+$assert( 'qr_emphasis accepts hero (case-insensitive)', 'hero' === PosterTemplate::normalize_fields( array( 'qr_emphasis' => 'Hero' ) )['qr_emphasis'] );
+$assert( 'unknown qr_emphasis falls back to footer', 'footer' === PosterTemplate::normalize_fields( array( 'qr_emphasis' => 'giant' ) )['qr_emphasis'] );
 
 $list = PosterTemplate::normalize_fields(
 	array(
@@ -286,5 +293,63 @@ foreach ( PosterTemplate::SCHEMES as $scheme ) {
 }
 
 $assert( 'missing title returns empty without fatal', array() === $template->render( array( 'tagline' => 'x' ), new GDRenderer() ) );
+
+// -------------------------------------------------------------------------
+// QR-hero layout (#3621).
+// -------------------------------------------------------------------------
+
+$hero_card = PosterTemplate::hero_card( 1485, 150 );
+$assert( 'hero card quiet zone is at least 4 modules', $hero_card['pad'] >= (int) ceil( 1485 * 4 / 33 ) );
+$assert( 'hero card wraps QR plus quiet zone', $hero_card['width'] === 1485 + 2 * $hero_card['pad'] );
+
+$hero_plan = PosterTemplate::plan_hero_layout( 5100, 244, 1200, 367, 2400, 122 );
+$assert( 'hero plan pins the card to the bottom margin', 5100 - 244 - 2400 === $hero_plan['card_top'] );
+$assert( 'hero plan stacks content, banner and card without overlap', $hero_plan['fits'] && $hero_plan['content_bottom'] + 122 <= $hero_plan['banner_top'] && $hero_plan['banner_top'] + 367 + 122 <= $hero_plan['card_top'] );
+$assert( 'oversized hero content reports it does not fit', ! PosterTemplate::plan_hero_layout( 1650, 94, 2000, 142, 900, 47 )['fits'] );
+
+// The issue #3621 example: a QR-first print sign with no banner.
+$hero_data = array(
+	'kicker'       => 'ACME PRESENTS',
+	'title'        => 'EXAMPLE CONTEST',
+	'tagline'      => 'Enter your thing. Get your friends to vote.',
+	'detail_lines' => array( 'Top 10 take the stage' ),
+	'accent_line'  => 'SAT JAN 1 · SOMEWHERE',
+	'qr_url'       => 'https://example.com/contest/?qr=1',
+	'qr_label'     => 'SCAN TO ENTER & VOTE',
+	'qr_emphasis'  => 'hero',
+);
+
+// Hero without a QR provider falls back to the standard layout cleanly.
+$GLOBALS['poster_smoke_qr'] = null;
+foreach ( array( 'print_tabloid_300', 'print_pocket_flyer', 'landscape_16_9' ) as $preset ) {
+	$dims = PlatformPresets::dimensions( $preset );
+	$info = $render( $hero_data, $preset );
+	$assert( "{$preset}: hero renders at preset size without a QR provider", null !== $info && $dims['width'] === $info[0] && $dims['height'] === $info[1] );
+}
+
+// Hero with a QR provider: the final request matches the drawn hero size.
+$qr_sizes                   = array();
+$GLOBALS['poster_smoke_qr'] = static function ( $value, $url, $size ) use ( &$qr_sizes ) {
+	$qr_sizes[] = (int) $size;
+	$img        = imagecreatetruecolor( max( 1, (int) $size ), max( 1, (int) $size ) );
+	imagefill( $img, 0, 0, imagecolorallocate( $img, 0, 0, 0 ) );
+	$path = tempnam( sys_get_temp_dir(), 'poster-qr' );
+	imagepng( $img, $path );
+	return $path;
+};
+
+foreach ( array( 'print_tabloid_300' => 3300, 'print_pocket_flyer' => 1275 ) as $preset => $w ) {
+	$qr_sizes = array();
+	$info     = $render( $hero_data, $preset );
+	$final    = $qr_sizes ? (int) end( $qr_sizes ) : 0;
+	$assert( "{$preset}: hero renders with a QR provider", null !== $info );
+	$assert( "{$preset}: hero QR is at least 45% of the canvas width", $final >= (int) round( $w * PosterTemplate::HERO_QR_MIN_RATIO ) );
+}
+
+$qr_sizes = array();
+$info     = $render( $hero_data, 'landscape_16_9' );
+$final    = $qr_sizes ? (int) end( $qr_sizes ) : 0;
+$assert( 'landscape_16_9: hero QR is at least 40% of the canvas height', null !== $info && $final >= (int) round( 1080 * PosterTemplate::HERO_QR_MIN_RATIO_LANDSCAPE ) );
+$GLOBALS['poster_smoke_qr'] = null;
 
 $finish();

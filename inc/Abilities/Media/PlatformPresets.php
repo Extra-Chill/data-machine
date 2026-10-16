@@ -68,6 +68,16 @@ class PlatformPresets {
 			'height' => 2550,
 			'label'  => 'Print Tabloid (11x17 @ 150dpi)',
 		),
+		'print_tabloid_300'       => array(
+			'width'  => 3300,
+			'height' => 5100,
+			'label'  => 'Print Tabloid (11x17 @ 300dpi)',
+		),
+		'print_pocket_flyer'      => array(
+			'width'  => 1275,
+			'height' => 1650,
+			'label'  => 'Print Pocket Flyer (4.25x5.5 @ 300dpi, 8-up on 11x17)',
+		),
 	);
 
 	/**

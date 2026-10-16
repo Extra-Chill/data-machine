@@ -850,9 +850,13 @@ class GDRenderer {
 	 * @param int    $width      Destination width (0 = source width).
 	 * @param int    $height     Destination height (0 = source height).
 	 * @param int    $opacity    Opacity percentage (0-100, default 100).
+	 * @param bool   $smooth     Resample smoothly when scaling (default). Pass
+	 *                           false for nearest-neighbor scaling so hard-edged
+	 *                           bitmaps (QR codes) stay crisp instead of being
+	 *                           blurred by bilinear interpolation.
 	 * @return self
 	 */
-	public function overlay_image( string $image_path, int $x, int $y, int $width = 0, int $height = 0, int $opacity = 100 ): self {
+	public function overlay_image( string $image_path, int $x, int $y, int $width = 0, int $height = 0, int $opacity = 100, bool $smooth = true ): self {
 		if ( ! $this->image || ! file_exists( $image_path ) ) {
 			return $this;
 		}
@@ -881,8 +885,10 @@ class GDRenderer {
 
 		if ( $opacity < 100 ) {
 			imagecopymerge( $this->image, $source, $x, $y, 0, 0, $dst_width, $dst_height, $opacity );
-		} else {
+		} elseif ( $smooth ) {
 			imagecopyresampled( $this->image, $source, $x, $y, 0, 0, $dst_width, $dst_height, $src_width, $src_height );
+		} else {
+			imagecopyresized( $this->image, $source, $x, $y, 0, 0, $dst_width, $dst_height, $src_width, $src_height );
 		}
 
 		unset( $source );
