@@ -744,7 +744,8 @@ class PosterTemplate implements TemplateInterface {
 			$card_top = $margin + (int) floor( ( $height - 2 * $margin - $card['height'] ) / 2 );
 		} else {
 			$card_x   = (int) round( ( $width - $card['width'] ) / 2 );
-			$card_top = $plan['card_top'];
+			// Portrait always plans with plan_hero_layout(), which sets card_top.
+			$card_top = $plan['card_top'] ?? ( $height - $margin - $card['height'] );
 		}
 		$card_bg  = $r->color_hex( 'qr_card', '#ffffff' );
 		$card_ink = $r->color_hex( 'qr_card_ink', '#111111' );
