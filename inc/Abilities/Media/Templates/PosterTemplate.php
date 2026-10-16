@@ -195,7 +195,7 @@ class PosterTemplate implements TemplateInterface {
 	 * Normalize raw template input into the strings and lists drawn.
 	 *
 	 * @param array $data Raw template input.
-	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: string[], accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, cta_text: string, footer_note: string, cobrand_logos: string[], scheme: string, list_heading: string, list_items: array<int, array{primary: string, secondary: string, meta: string}>}
+	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: list<string>, accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, cta_text: string, footer_note: string, cobrand_logos: list<string>, scheme: string, list_heading: string, list_items: list<array{primary: non-empty-string, secondary: string, meta: string}>}
 	 */
 	public static function normalize_fields( array $data ): array {
 		$str = static fn( string $key ): string => is_scalar( $data[ $key ] ?? null ) ? trim( (string) $data[ $key ] ) : '';
@@ -220,7 +220,11 @@ class PosterTemplate implements TemplateInterface {
 			if ( ! is_array( $item ) ) {
 				continue;
 			}
-			$row = array();
+			$row = array(
+				'primary'   => '',
+				'secondary' => '',
+				'meta'      => '',
+			);
 			foreach ( array( 'primary', 'secondary', 'meta' ) as $key ) {
 				$row[ $key ] = is_scalar( $item[ $key ] ?? null ) ? trim( (string) $item[ $key ] ) : '';
 			}
@@ -311,7 +315,7 @@ class PosterTemplate implements TemplateInterface {
 		$max_w  = $width - 2 * $margin;
 
 		// Brand mark, top-right.
-		$logo   = (string) ( $tokens['logo_path_inverse'] ?? '' );
+		$logo   = (string) $tokens['logo_path_inverse'];
 		$logo_h = $px( self::LOGO_HEIGHT );
 		$logo_w = 0;
 		$dims   = ( '' !== $logo && is_readable( $logo ) ) ? getimagesize( $logo ) : false;
@@ -696,7 +700,7 @@ class PosterTemplate implements TemplateInterface {
 	 * @param int        $y      Top.
 	 * @param int        $w      Block width.
 	 * @param array      $colors Allocated colors.
-	 * @param callable   $px     Design-unit scaler.
+	 * @param callable(float): int $px Design-unit scaler.
 	 */
 	private static function draw_list( GDRenderer $r, array $fields, int $x, int $y, int $w, array $colors, callable $px ): int {
 		if ( '' !== $fields['list_heading'] ) {
