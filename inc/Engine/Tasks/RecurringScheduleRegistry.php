@@ -26,6 +26,14 @@
  *         return $schedules;
  *     } );
  *
+ * `first_run_callback` / `first_run_arg` (optional): anchor the first run of
+ * an interval schedule. The callback is called with the arg and must return
+ * a future Unix timestamp; a string arg without a callback is parsed with
+ * `strtotime()`. Later runs repeat at `interval` from that anchor. The
+ * anchor applies whenever the routine's chain is freshly scheduled (first
+ * registration, re-enable, interval change); an unchanged schedule is never
+ * re-anchored. Cron-expression schedules ignore it.
+ *
  * `per_agent` (default false): When true, the recurring hook iterates
  * every registered agent and fires one TaskScheduler::schedule() call per
  * agent with that agent's identity in $context. Site-scoped schedules leave

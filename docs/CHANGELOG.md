@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.185.2] - 2026-10-15
+
+### Fixed
+- chat-identity takes --target-user, since WP-CLI consumes --user
+
+## [0.185.1] - 2026-10-15
+
+### Fixed
+- honor first_run anchors for recurring system schedules
+
+## [0.185.0] - 2026-10-14
+
+### Added
+- return agent-layer memory for actorless non-turn events and expose convention_path
+
 ## [0.184.3] - 2026-10-14
 
 ### Fixed

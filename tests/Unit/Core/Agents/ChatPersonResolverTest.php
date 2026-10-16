@@ -19,6 +19,9 @@ class ChatPersonResolverTest extends WP_UnitTestCase {
 
 	private const PLATFORM = 'test-platform';
 
+	private const CONVENTION_FILE = 'CONVENTION-TEST.md';
+	private const CONVENTION_PATH = 'wp-content/uploads/datamachine-test/CONVENTION-TEST.md';
+
 	private int $owner_id;
 	private int $viewer_id;
 	private int $other_id;
@@ -53,6 +56,12 @@ class ChatPersonResolverTest extends WP_UnitTestCase {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query( "DELETE FROM {$wpdb->base_prefix}datamachine_agents" );
 		remove_all_filters( 'datamachine_can_access_agent' );
+
+		MemoryFileRegistry::deregister( self::CONVENTION_FILE );
+		$convention_file = ABSPATH . self::CONVENTION_PATH;
+		if ( file_exists( $convention_file ) ) {
+			wp_delete_file( $convention_file );
+		}
 
 		parent::tear_down();
 	}
@@ -266,6 +275,104 @@ class ChatPersonResolverTest extends WP_UnitTestCase {
 		$this->assertLessThanOrEqual( ChatPersonResolver::MAX_TOTAL_BYTES, strlen( $this->joined( array( 'sections' => $sections ) ) ) );
 	}
 
+	// -- No actor ------------------------------------------------------------
+
+	public function test_non_turn_event_without_actor_returns_agent_layers_only(): void {
+		foreach ( array( 'session_start', '' ) as $event ) {
+			$result = $this->resolve( '', $event );
+			$text   = $this->joined( $result );
+
+			$this->assertFalse( $result['allowed'], $event );
+			$this->assertSame( 0, $result['user_id'], $event );
+			$this->assertSame( '', $result['role'], $event );
+			$this->assertSame( ChatPersonResolver::REASON_NO_ACTOR, $result['reason'], $event );
+			$this->assertStringContainsString( 'agent-soul-sentinel', $text, $event );
+
+			foreach ( $result['sections'] as $section ) {
+				$this->assertContains( $section['layer'], ChatPersonResolver::AGENT_LAYERS, $event );
+			}
+			$this->assertStringNotContainsString( 'profile-sentinel', $text, $event );
+			$this->assertStringNotContainsString( 'principal-sentinel', $text, $event );
+			$this->assertNotContains( ChatPersonResolver::CURRENT_USER_SECTION, array_column( $result['sections'], 'name' ), $event );
+		}
+	}
+
+	public function test_whitespace_actor_counts_as_no_actor(): void {
+		$result = $this->resolve( '   ', 'session_start' );
+
+		$this->assertSame( ChatPersonResolver::REASON_NO_ACTOR, $result['reason'] );
+		$this->assertStringContainsString( 'agent-soul-sentinel', $this->joined( $result ) );
+	}
+
+	public function test_non_turn_event_without_actor_does_not_read_owner_personal_layers(): void {
+		( new AgentMemory( $this->owner_id, $this->agent_id, 'USER.md', MemoryFileRegistry::LAYER_USER ) )->replace_all( "owner-profile-sentinel\n" );
+
+		$text = $this->joined( $this->resolve( '', 'session_start' ) );
+		$this->assertStringNotContainsString( 'owner-profile-sentinel', $text );
+	}
+
+	public function test_turn_event_without_actor_is_denied(): void {
+		$result = $this->resolve( '', 'turn' );
+
+		$this->assertFalse( $result['allowed'] );
+		$this->assertSame( 0, $result['user_id'] );
+		$this->assertSame( '', $result['role'] );
+		$this->assertSame( array(), $result['sections'] );
+		$this->assertSame( ChatPersonResolver::REASON_NO_ACTOR, $result['reason'] );
+	}
+
+	public function test_turn_and_non_turn_with_unlinked_actor_stay_denied(): void {
+		foreach ( array( 'turn', 'session_start' ) as $event ) {
+			$result = $this->resolve( 'nobody', $event );
+
+			$this->assertFalse( $result['allowed'], $event );
+			$this->assertSame( array(), $result['sections'], $event );
+			$this->assertSame( 'actor_not_linked', $result['reason'], $event );
+		}
+	}
+
+	public function test_no_actor_for_unknown_agent_is_denied(): void {
+		$result = ( new ChatPersonResolver() )->resolve( 'no-such-agent', self::PLATFORM, '', 'session_start' );
+
+		$this->assertFalse( $result['allowed'] );
+		$this->assertSame( array(), $result['sections'] );
+		$this->assertSame( 'agent_not_found', $result['reason'] );
+	}
+
+	// -- Convention path -----------------------------------------------------
+
+	public function test_section_carries_convention_path_when_registry_declares_one(): void {
+		MemoryFileRegistry::register(
+			self::CONVENTION_FILE,
+			15,
+			array(
+				'layer'           => MemoryFileRegistry::LAYER_SHARED,
+				'convention_path' => self::CONVENTION_PATH,
+				'modes'           => array( MemoryFileRegistry::MODE_ALL ),
+			)
+		);
+		( new AgentMemory( $this->owner_id, $this->agent_id, self::CONVENTION_FILE, MemoryFileRegistry::LAYER_SHARED ) )->replace_all( "convention-sentinel\n" );
+
+		$sections = $this->resolve( '', 'session_start' )['sections'];
+		$by_name  = array_column( $sections, null, 'name' );
+
+		$this->assertArrayHasKey( self::CONVENTION_FILE, $by_name );
+		$this->assertStringContainsString( 'convention-sentinel', $by_name[ self::CONVENTION_FILE ]['content'] );
+		$this->assertSame( self::CONVENTION_PATH, $by_name[ self::CONVENTION_FILE ]['convention_path'] );
+
+		$this->assertArrayHasKey( 'SOUL.md', $by_name );
+		$this->assertArrayNotHasKey( 'convention_path', $by_name['SOUL.md'] );
+	}
+
+	public function test_turn_sections_omit_convention_path_when_not_declared(): void {
+		$this->grant( $this->viewer_id, 'viewer' );
+		ChatIdentityLinks::link( $this->viewer_id, self::PLATFORM, 'v' );
+
+		foreach ( $this->resolve( 'v', 'turn' )['sections'] as $section ) {
+			$this->assertArrayNotHasKey( 'convention_path', $section, $section['name'] );
+		}
+	}
+
 	// -- Abilities -----------------------------------------------------------
 
 	public function test_abilities_are_admin_only_and_not_in_rest(): void {
@@ -280,6 +387,32 @@ class ChatPersonResolverTest extends WP_UnitTestCase {
 			array( 'agent_slug' => $this->slug, 'platform' => self::PLATFORM, 'actor_id' => 'x' )
 		);
 		$this->assertWPError( $denied );
+	}
+
+	public function test_ability_accepts_missing_actor_for_agent_context(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$result = wp_get_ability( 'datamachine/resolve-chat-person' )->execute(
+			array(
+				'agent_slug' => $this->slug,
+				'platform'   => self::PLATFORM,
+				'event'      => 'session_start',
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertFalse( $result['allowed'] );
+		$this->assertSame( ChatPersonResolver::REASON_NO_ACTOR, $result['reason'] );
+		$this->assertStringContainsString( 'agent-soul-sentinel', $this->joined( $result ) );
+
+		$turn = wp_get_ability( 'datamachine/resolve-chat-person' )->execute(
+			array(
+				'agent_slug' => $this->slug,
+				'platform'   => self::PLATFORM,
+				'event'      => 'turn',
+			)
+		);
+		$this->assertSame( array(), $turn['sections'] );
 	}
 
 	public function test_ability_link_resolve_unlink_round_trip(): void {
