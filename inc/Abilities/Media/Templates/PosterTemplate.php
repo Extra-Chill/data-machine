@@ -20,10 +20,22 @@
  *   - Landscape (any canvas wider than tall, e.g. landscape_16_9): text
  *     in a left column; logo top-right and QR + label above the banner
  *     in a right column; footer row under the banner.
+ *   - QR hero (qr_emphasis: hero): the QR code is the dominant element,
+ *     drawn on a white quiet-zone card with the label set large beneath
+ *     it. Portrait pins the card to the bottom (at least 45% of the
+ *     canvas width, horizontally centered); landscape puts the card on
+ *     the right (at least 40% of the canvas height) with the text column
+ *     on the left. Copy and banner reflow above/beside the card, and
+ *     optional text shrinks or drops before the QR gives up size. The QR
+ *     bitmap is requested at its final pixel size and scaled
+ *     nearest-neighbor, never resampled, so it stays crisp in print.
  *
  * Knobs beyond copy:
  *   - scheme: `dark` (default), `accent` (canvas flooded with the brand
  *     accent, dark banner) or `light` (brand background, dark type).
+ *   - qr_emphasis: `footer` (default, small QR in the footer block) or
+ *     `hero` (see above). Hero falls back to the footer layout when no
+ *     QR provider answers the QR filter.
  *   - list_heading + list_items: a ruled list of rows, each with a
  *     primary line, an optional secondary line and an optional
  *     right-aligned meta value (e.g. a time or a price). Portrait draws
@@ -90,6 +102,30 @@ class PosterTemplate implements TemplateInterface {
 	/** Supported color schemes; the first is the default. */
 	public const SCHEMES = array( 'dark', 'accent', 'light' );
 
+	/** QR emphasis modes; the first is the default. */
+	public const QR_EMPHASES = array( 'footer', 'hero' );
+
+	/** Hero QR: preferred share of the canvas width (portrait) or height (landscape). */
+	private const HERO_QR_RATIO = 0.52;
+
+	/** Hero QR: minimum share of the canvas width on portrait canvases. */
+	public const HERO_QR_MIN_RATIO = 0.45;
+
+	/** Hero QR: minimum share of the canvas height on landscape canvases. */
+	public const HERO_QR_MIN_RATIO_LANDSCAPE = 0.40;
+
+	/**
+	 * Hero quiet-zone card: the white card pads the QR by at least
+	 * HERO_QUIET_MODULES modules on every side, sized for a QR of up to
+	 * HERO_QR_MODULES modules per side (version 4, which comfortably holds
+	 * a campaign URL). Larger-version codes still get proportional padding.
+	 */
+	public const HERO_QUIET_MODULES = 4;
+	private const HERO_QR_MODULES   = 33;
+
+	/** Hero QR label size, in design units. */
+	private const HERO_LABEL_SIZE = 42;
+
 	/** List block sizes, in each layout's design unit. */
 	private const LIST_HEADING_SIZE = 26;
 	private const LIST_PRIMARY_SIZE = 38;
@@ -136,6 +172,7 @@ class PosterTemplate implements TemplateInterface {
 			'banner_text'   => $string( 'Banner text (banner omitted when empty)' ),
 			'qr_url'        => $string( 'QR code URL' ),
 			'qr_label'      => $string( 'QR label' ),
+			'qr_emphasis'   => $string( 'QR emphasis: footer (default) or hero (large QR on a white card)' ),
 			'cta_text'      => $string( 'Call-to-action line' ),
 			'footer_note'   => $string( 'Footer note' ),
 			'cobrand_logos' => $list( 'Co-brand logo paths' ),
@@ -195,7 +232,7 @@ class PosterTemplate implements TemplateInterface {
 	 * Normalize raw template input into the strings and lists drawn.
 	 *
 	 * @param array $data Raw template input.
-	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: list<string>, accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, cta_text: string, footer_note: string, cobrand_logos: list<string>, scheme: string, list_heading: string, list_items: list<array{primary: non-empty-string, secondary: string, meta: string}>}
+	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: list<string>, accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, qr_emphasis: string, cta_text: string, footer_note: string, cobrand_logos: list<string>, scheme: string, list_heading: string, list_items: list<array{primary: non-empty-string, secondary: string, meta: string}>}
 	 */
 	public static function normalize_fields( array $data ): array {
 		$str = static fn( string $key ): string => is_scalar( $data[ $key ] ?? null ) ? trim( (string) $data[ $key ] ) : '';
@@ -233,7 +270,8 @@ class PosterTemplate implements TemplateInterface {
 			}
 		}
 
-		$scheme = strtolower( $str( 'scheme' ) );
+		$scheme   = strtolower( $str( 'scheme' ) );
+		$emphasis = strtolower( $str( 'qr_emphasis' ) );
 
 		return array(
 			'title'         => $str( 'title' ),
@@ -246,6 +284,7 @@ class PosterTemplate implements TemplateInterface {
 			'banner_text'   => $str( 'banner_text' ),
 			'qr_url'        => $str( 'qr_url' ),
 			'qr_label'      => $str( 'qr_label' ),
+			'qr_emphasis'   => in_array( $emphasis, self::QR_EMPHASES, true ) ? $emphasis : self::QR_EMPHASES[0],
 			'cta_text'      => $str( 'cta_text' ),
 			'footer_note'   => $str( 'footer_note' ),
 			'cobrand_logos' => $cobrand,
@@ -302,6 +341,12 @@ class PosterTemplate implements TemplateInterface {
 			$fields['kicker'] = self::default_kicker( (string) ( $tokens['brand_text'] ?? '' ) );
 		}
 		$fields['cobrand_logos'] = array_values( array_filter( $fields['cobrand_logos'], 'is_readable' ) );
+
+		// QR-hero layout; falls through to the standard layouts when no
+		// QR provider answers the filter.
+		if ( 'hero' === $fields['qr_emphasis'] && $this->draw_hero( $r, $fields, $tokens, $colors ) ) {
+			return;
+		}
 
 		if ( $width > $height ) {
 			$this->draw_landscape( $r, $fields, $tokens, $colors );
@@ -557,6 +602,284 @@ class PosterTemplate implements TemplateInterface {
 		if ( '' !== $note ) {
 			$r->draw_text( $note, $px( 24 ), $nx, $fy + $px( 27 ), $colors['muted'], 'body' );
 		}
+	}
+
+	/**
+	 * QR-hero layout: the QR code is the dominant element.
+	 *
+	 * Portrait: the QR sits on a white quiet-zone card pinned to the bottom
+	 * margin, horizontally centered, at least HERO_QR_MIN_RATIO of the
+	 * canvas width. The label is set large under the QR on the card. Kicker,
+	 * title, tagline, detail lines, accent line and banner reflow above the
+	 * card; the footer copy (CTA, note, co-brand logos) joins the content
+	 * block since the QR owns the bottom of the canvas.
+	 *
+	 * Landscape: the card goes on the right, vertically centered, at least
+	 * HERO_QR_MIN_RATIO_LANDSCAPE of the canvas height; the text column and
+	 * the banner take the left.
+	 *
+	 * Fitting order: trim overlong lists, shrink the title, shrink the QR
+	 * toward its minimum, then drop optional copy (footer note, CTA, detail
+	 * note, subline, tagline, remaining list rows, detail lines) — only
+	 * after all of that may the QR shrink below its minimum rather than
+	 * overlap.
+	 *
+	 * The QR bitmap is re-requested from the provider at its final pixel
+	 * size and drawn with nearest-neighbor scaling so module edges stay
+	 * crisp at print resolutions.
+	 *
+	 * @param GDRenderer $r      Renderer with a filled canvas.
+	 * @param array      $fields Output of normalize_fields(), kicker resolved.
+	 * @param array      $tokens Brand tokens.
+	 * @param array      $colors Allocated colors: text, muted, accent, ink, banner, rule.
+	 * @return bool False when no QR provider answered (caller falls back).
+	 */
+	private function draw_hero( GDRenderer $r, array $fields, array $tokens, array $colors ): bool {
+		$width     = $r->get_width();
+		$height    = $r->get_height();
+		$landscape = $width > $height;
+		$u         = $landscape ? $height / self::LANDSCAPE_BASE_HEIGHT : $width / self::BASE_WIDTH;
+		$px        = static fn( float $n ): int => (int) round( $n * $u );
+		$margin    = $px( $landscape ? self::LANDSCAPE_MARGIN : self::MARGIN );
+
+		$qr_pref = (int) round( $landscape ? $height * self::HERO_QR_RATIO : $width * self::HERO_QR_RATIO );
+		$qr_min  = (int) round( $landscape ? $height * self::HERO_QR_MIN_RATIO_LANDSCAPE : $width * self::HERO_QR_MIN_RATIO );
+		$qr_path = self::qr_image_path( $fields['qr_url'], $qr_pref );
+		if ( ! $qr_path ) {
+			return false;
+		}
+
+		$label        = $fields['qr_label'];
+		$label_base   = $px( self::HERO_LABEL_SIZE );
+		$measure_card = static function ( int $qr_size ) use ( $r, $label, $label_base ): array {
+			$size = '' !== $label ? self::fit_word_size( $r, $label, $label_base, 'heading', $qr_size ) : 0;
+			$h    = '' !== $label ? $r->measure_text_height( $label, $size, 'heading', $qr_size, 1.2 ) : 0;
+			return array( self::hero_card( $qr_size, $h ), $size );
+		};
+
+		$qr_size = $qr_pref;
+		if ( $landscape ) {
+			// The card must clear the vertical margins before anything else.
+			while ( $qr_size > $px( 120 ) ) {
+				list( $card ) = $measure_card( $qr_size );
+				if ( $card['height'] <= $height - 2 * $margin ) {
+					break;
+				}
+				$qr_size -= $px( 16 );
+			}
+		}
+
+		$logo   = (string) $tokens['logo_path_inverse'];
+		$logo_h = $px( self::LOGO_HEIGHT );
+		$dims   = ( '' !== $logo && is_readable( $logo ) ) ? getimagesize( $logo ) : false;
+		$logo_w = $dims ? (int) round( $dims[0] * $logo_h / max( 1, $dims[1] ) ) : 0;
+
+		$has_banner = '' !== $fields['banner_text'];
+		$banner_h   = $has_banner ? $px( self::BANNER_HEIGHT ) : 0;
+		$min_gap    = $px( self::MIN_BANNER_GAP );
+
+		$title_size = $px( self::TITLE_MAX_SIZE );
+		$drops      = array( 'footer_note', 'cta_text', 'detail_note', 'subline', 'tagline' );
+		do {
+			list( $card, $label_sz ) = $measure_card( $qr_size );
+
+			$max_w   = $landscape
+				? self::landscape_left_width( $width, $margin, $card['width'], $px( 80 ) )
+				: $width - 2 * $margin;
+			$title_w = $max_w - ( $logo_w ? $logo_w + $px( 30 ) : 0 );
+
+			$lines     = array_values( array_filter( array( $fields['tagline'], $fields['subline'] ) ) );
+			$content_h = $this->hero_content_height( $r, $fields, $lines, $title_size, $title_w, $max_w, $px );
+			$plan      = $landscape
+				? self::plan_layout( $height, $margin, $content_h, $banner_h, 0, $min_gap )
+				: self::plan_hero_layout( $height, $margin, $content_h, $banner_h, $card['height'], $min_gap );
+			if ( $plan['fits'] ) {
+				break;
+			}
+			if ( count( $fields['list_items'] ) > self::LIST_MIN_ROWS ) {
+				array_pop( $fields['list_items'] );
+				continue;
+			}
+			if ( $title_size > $px( self::TITLE_MIN_SIZE ) ) {
+				$title_size -= $px( 4 );
+				continue;
+			}
+			if ( ! $landscape && $qr_size > $qr_min ) {
+				$qr_size = max( $qr_min, $qr_size - $px( 16 ) );
+				continue;
+			}
+			if ( $drops ) {
+				$fields[ array_shift( $drops ) ] = '';
+				continue;
+			}
+			if ( $fields['list_items'] ) {
+				array_pop( $fields['list_items'] );
+				continue;
+			}
+			if ( $fields['detail_lines'] ) {
+				array_pop( $fields['detail_lines'] );
+				continue;
+			}
+			// Last resort: shrink the QR below its minimum rather than overlap.
+			if ( $qr_size > (int) round( ( $landscape ? $height : $width ) / 4 ) ) {
+				$qr_size -= $px( 16 );
+				continue;
+			}
+			break;
+		} while ( true );
+
+		// Re-request the QR at its final size so the provider renders the
+		// exact bitmap drawn — no lossy downscale of module edges.
+		if ( $qr_size !== $qr_pref ) {
+			$crisp = self::qr_image_path( $fields['qr_url'], $qr_size );
+			if ( $crisp ) {
+				wp_delete_file( $qr_path );
+				$qr_path = $crisp;
+			}
+		}
+
+		// White quiet-zone card with the QR and its label.
+		if ( $landscape ) {
+			$card_x   = $width - $margin - $card['width'];
+			$card_top = $margin + (int) floor( ( $height - 2 * $margin - $card['height'] ) / 2 );
+		} else {
+			// Portrait always plans with plan_hero_layout(), which sets card_top.
+			$card_x   = (int) round( ( $width - $card['width'] ) / 2 );
+			$card_top = $plan['card_top'] ?? ( $height - $margin - $card['height'] );
+		}
+		$card_bg  = $r->color_hex( 'qr_card', '#ffffff' );
+		$card_ink = $r->color_hex( 'qr_card_ink', '#111111' );
+		$r->filled_rect( $card_x, $card_top, $card_x + $card['width'], $card_top + $card['height'], $card_bg );
+		$qr_x = $card_x + $card['pad'];
+		$qr_y = $card_top + $card['pad'];
+		$r->overlay_image( $qr_path, $qr_x, $qr_y, $qr_size, $qr_size, 100, false );
+		if ( '' !== $label ) {
+			$r->draw_text_wrapped( $label, $label_sz, $qr_x, $qr_y + $qr_size + $card['pad'], $card_ink, 'heading', $qr_size, 1.2, 'center' );
+		}
+		wp_delete_file( $qr_path );
+
+		$text   = $colors['text'];
+		$muted  = $colors['muted'];
+		$accent = $colors['accent'];
+
+		$y = $plan['content_top'];
+		if ( $logo_w ) {
+			$r->overlay_image( $logo, $margin + $max_w - $logo_w, max( $px( 20 ), $y - $px( 20 ) ), $logo_w, $logo_h );
+		}
+
+		$y = $r->draw_text_wrapped( $fields['kicker'], $px( self::KICKER_SIZE ), $margin, $y, $accent, 'body', $max_w, 1.3 ) + $px( 24 );
+		$y = $r->draw_text_wrapped( $fields['title'], $title_size, $margin, $y, $text, 'heading', $title_w, 1.08 ) + $px( 30 );
+		$r->filled_rect( $margin, $y, $margin + $px( 140 ), $y + $px( 10 ), $accent );
+		$y += $px( 40 );
+		foreach ( $lines as $i => $line ) {
+			$y = $r->draw_text_wrapped( $line, $px( self::BODY_SIZE ), $margin, $y, 0 === $i ? $text : $muted, 'body', $max_w, 1.35 ) + $px( 10 );
+		}
+		$y += $px( 40 );
+		if ( $fields['list_items'] ) {
+			$y = self::draw_list( $r, $fields, $margin, $y, $max_w, $colors, $px ) + $px( 40 );
+		}
+		foreach ( $fields['detail_lines'] as $line ) {
+			$y = $r->draw_text_wrapped( $line, self::fit_word_size( $r, $line, $px( self::DETAIL_SIZE ), 'heading', $max_w ), $margin, $y, $text, 'heading', $max_w, 1.15 );
+		}
+		if ( '' !== $fields['accent_line'] ) {
+			$y = $r->draw_text_wrapped( $fields['accent_line'], self::fit_word_size( $r, $fields['accent_line'], $px( self::DETAIL_SIZE ), 'heading', $max_w ), $margin, $y, $accent, 'heading', $max_w, 1.15 );
+		}
+		if ( '' !== $fields['detail_note'] ) {
+			$y = $r->draw_text_wrapped( $fields['detail_note'], $px( self::NOTE_LINE_SIZE ), $margin, $y + $px( 6 ), $muted, 'body', $max_w, 1.4 );
+		}
+		if ( '' !== $fields['cta_text'] ) {
+			$y = $r->draw_text_wrapped( $fields['cta_text'], $px( self::CTA_SIZE ), $margin, $y + $px( 20 ), $text, 'body', $max_w, 1.5 );
+		}
+		if ( '' !== $fields['footer_note'] ) {
+			$y = $r->draw_text_wrapped( $fields['footer_note'], $px( self::FOOTNOTE_SIZE ), $margin, $y + $px( 10 ), $muted, 'body', $max_w, 1.3 );
+		}
+		if ( $fields['cobrand_logos'] ) {
+			self::draw_cobrand( $r, $fields['cobrand_logos'], $margin, $y + $px( 20 ), $px( self::COBRAND_HEIGHT ), $px( 16 ) );
+		}
+
+		// Banner: full content width (the left column on landscape).
+		if ( $has_banner ) {
+			$banner_top = $plan['banner_top'];
+			$r->filled_rect( $margin, $banner_top, $margin + $max_w, $banner_top + $banner_h, $colors['banner'] );
+			$size = $px( self::BANNER_TEXT_SIZE );
+			while ( $size > 12 && $r->measure_text_width( $fields['banner_text'], $size, 'heading' ) > $max_w - $px( 60 ) ) {
+				--$size;
+			}
+			$r->draw_text( $fields['banner_text'], $size, $margin + $px( 30 ), $banner_top + (int) ( ( $banner_h + $size ) / 2 ), $colors['ink'], 'heading' );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Height of the hero content block: the portrait content block plus the
+	 * footer copy (CTA, footer note, co-brand logos), which moves into the
+	 * content column because the hero QR card owns the bottom of the canvas.
+	 *
+	 * Mirrors the vertical advances in draw_hero(); keep the two in sync.
+	 */
+	private function hero_content_height( GDRenderer $r, array $fields, array $lines, int $title_size, int $title_w, int $max_w, callable $px ): int {
+		$h = $this->content_height( $r, $fields, $lines, $title_size, $title_w, $max_w, $px );
+		if ( '' !== $fields['cta_text'] ) {
+			$h += $px( 20 ) + $r->measure_text_height( $fields['cta_text'], $px( self::CTA_SIZE ), 'body', $max_w, 1.5 );
+		}
+		if ( '' !== $fields['footer_note'] ) {
+			$h += $px( 10 ) + $r->measure_text_height( $fields['footer_note'], $px( self::FOOTNOTE_SIZE ), 'body', $max_w, 1.3 );
+		}
+		if ( $fields['cobrand_logos'] ) {
+			$h += $px( 20 ) + $px( self::COBRAND_HEIGHT );
+		}
+		return $h;
+	}
+
+	/**
+	 * Metrics of the hero quiet-zone card for a QR of the given pixel size.
+	 *
+	 * The card pads the QR by HERO_QUIET_MODULES modules on every side
+	 * (module size estimated from HERO_QR_MODULES), and reserves the label
+	 * height plus another quiet zone below the QR when a label is present.
+	 *
+	 * @param int $qr_size      QR side length in pixels.
+	 * @param int $label_height Measured label height (0 without a label).
+	 * @return array{pad: int, width: int, height: int}
+	 */
+	public static function hero_card( int $qr_size, int $label_height ): array {
+		$pad = (int) ceil( $qr_size * self::HERO_QUIET_MODULES / self::HERO_QR_MODULES );
+		return array(
+			'pad'    => $pad,
+			'width'  => $qr_size + 2 * $pad,
+			'height' => $qr_size + 2 * $pad + ( $label_height > 0 ? $label_height + $pad : 0 ),
+		);
+	}
+
+	/**
+	 * Place the content block, banner and hero QR card on a portrait canvas.
+	 *
+	 * The card is pinned to the bottom margin; the banner sits min_gap above
+	 * it, and the content block above that, with spare space distributed the
+	 * same way plan_layout() does.
+	 *
+	 * @param int $height         Canvas height.
+	 * @param int $margin         Outer margin.
+	 * @param int $content_height Height of the content block.
+	 * @param int $banner_height  Banner height (0 without a banner).
+	 * @param int $card_height    Hero QR card height.
+	 * @param int $min_gap        Minimum gap between stacked blocks.
+	 * @return array{fits: bool, content_top: int, content_bottom: int, banner_top: int, card_top: int}
+	 */
+	public static function plan_hero_layout( int $height, int $margin, int $content_height, int $banner_height, int $card_height, int $min_gap ): array {
+		$card_top   = $height - $margin - $card_height;
+		$banner_top = $card_top - ( $banner_height > 0 ? $min_gap + $banner_height : 0 );
+		$slack      = $banner_top - $min_gap - ( $margin + $content_height );
+		$top        = $margin + ( $slack > 0 ? (int) floor( $slack * self::SLACK_ABOVE ) : 0 );
+
+		return array(
+			'fits'           => $slack >= 0,
+			'content_top'    => $top,
+			'content_bottom' => $top + $content_height,
+			'banner_top'     => $banner_top,
+			'card_top'       => $card_top,
+		);
 	}
 
 	/**
