@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.187.0] - 2026-10-16
+
+### Added
+- poster QR-hero layout and 300dpi print presets
+
 ## [0.186.0] - 2026-10-16
 
 ### Added
