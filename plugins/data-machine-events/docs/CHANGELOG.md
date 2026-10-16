@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.68.0] - 2026-10-16
+
+### Added
+- venue_tier query filter accepts a list of tiers
+
 ## [0.67.4] - 2026-10-15
 
 ### Fixed
