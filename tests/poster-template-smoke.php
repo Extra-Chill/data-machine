@@ -7,6 +7,10 @@
  *  - registered on the core datamachine/image_generation/templates filter
  *  - landscape_16_9 and print_tabloid presets ship in core
  *  - field normalization (trim, list filtering, non-scalar rejection)
+ *  - background treatments (#3623): default stripes unchanged, every
+ *    value renders at preset size on print_tabloid_300 and
+ *    landscape_16_9 (footer and hero modes), cover-fit math, and a bad
+ *    background image path falls back to stripes without error
  *  - layout planning: content clears the banner, slack is distributed,
  *    banner-less layouts, landscape columns never overlap
  *  - renders portrait and landscape PNGs at preset size, with and without
@@ -152,13 +156,53 @@ $assert( 'normalize trims strings', 'Never Miss The Show' === $norm['title'] );
 $assert( 'normalize keeps only non-empty scalar detail lines', array( 'Find a show tonight', '42' ) === $norm['detail_lines'] );
 $assert( 'normalize rejects non-scalar strings', '' === $norm['banner_text'] );
 $assert( 'normalize keeps only string logo paths', array( '/tmp/a.png' ) === $norm['cobrand_logos'] );
-$assert( 'normalize fills every field', 17 === count( $norm ) && '' === $norm['qr_url'] );
+$assert( 'normalize fills every field', 21 === count( $norm ) && '' === $norm['qr_url'] );
 $assert( 'scheme defaults to dark', 'dark' === $norm['scheme'] );
 $assert( 'unknown scheme falls back to dark', 'dark' === PosterTemplate::normalize_fields( array( 'scheme' => 'neon' ) )['scheme'] );
 $assert( 'scheme is case-insensitive', 'accent' === PosterTemplate::normalize_fields( array( 'scheme' => 'Accent' ) )['scheme'] );
 $assert( 'qr_emphasis defaults to footer', 'footer' === $norm['qr_emphasis'] );
 $assert( 'qr_emphasis accepts hero (case-insensitive)', 'hero' === PosterTemplate::normalize_fields( array( 'qr_emphasis' => 'Hero' ) )['qr_emphasis'] );
 $assert( 'unknown qr_emphasis falls back to footer', 'footer' === PosterTemplate::normalize_fields( array( 'qr_emphasis' => 'giant' ) )['qr_emphasis'] );
+$assert( 'background defaults to stripes', 'stripes' === $norm['background'] && 'stripes' === PosterTemplate::BACKGROUNDS[0] );
+$assert( 'unknown background falls back to stripes', 'stripes' === PosterTemplate::normalize_fields( array( 'background' => 'plaid' ) )['background'] );
+$assert( 'background is case-insensitive', 'halftone' === PosterTemplate::normalize_fields( array( 'background' => 'Halftone' ) )['background'] );
+$assert(
+	'background constant lists every treatment',
+	array( 'stripes', 'none', 'grid', 'dots', 'halftone', 'crosshatch', 'waves', 'gradient', 'glow', 'image' ) === PosterTemplate::BACKGROUNDS
+);
+$bg_listed = true;
+foreach ( PosterTemplate::BACKGROUNDS as $bg_value ) {
+	$bg_listed = $bg_listed && str_contains( (string) $fields['background']['label'], $bg_value );
+}
+$assert( 'get_fields lists every background value', $bg_listed );
+$assert( 'get_fields declares background_image and background_overlay', isset( $fields['background_image'], $fields['background_tint'], $fields['background_overlay'] ) );
+$assert( 'background_overlay defaults to 0.55', 0.55 === $norm['background_overlay'] );
+$assert(
+	'background_overlay is clamped to 0..1',
+	1.0 === PosterTemplate::normalize_fields( array( 'background_overlay' => 7 ) )['background_overlay']
+		&& 0.0 === PosterTemplate::normalize_fields( array( 'background_overlay' => -3 ) )['background_overlay']
+);
+$assert( 'non-numeric background_overlay falls back to the default', 0.55 === PosterTemplate::normalize_fields( array( 'background_overlay' => 'lots' ) )['background_overlay'] );
+$assert( 'background_tint normalizes a hex color', '#aabbcc' === PosterTemplate::normalize_fields( array( 'background_tint' => 'AABBCC' ) )['background_tint'] );
+$assert( 'invalid background_tint is dropped', '' === PosterTemplate::normalize_fields( array( 'background_tint' => 'red' ) )['background_tint'] );
+
+// Pure cover-fit math: scale to fill, center-crop the overflow.
+$assert(
+	'cover-fit crops a wide source horizontally',
+	array( 'src_x' => 150, 'src_y' => 0, 'src_w' => 100, 'src_h' => 100 ) === GDRenderer::cover_crop( 400, 100, 100, 100 )
+);
+$assert(
+	'cover-fit crops a tall source vertically',
+	array( 'src_x' => 0, 'src_y' => 150, 'src_w' => 100, 'src_h' => 100 ) === GDRenderer::cover_crop( 100, 400, 100, 100 )
+);
+$assert(
+	'cover-fit leaves a matching aspect uncropped',
+	array( 'src_x' => 0, 'src_y' => 0, 'src_w' => 800, 'src_h' => 600 ) === GDRenderer::cover_crop( 800, 600, 400, 300 )
+);
+$assert(
+	'cover-fit crops a wide source for a portrait destination',
+	array( 'src_x' => 333, 'src_y' => 0, 'src_w' => 333, 'src_h' => 500 ) === GDRenderer::cover_crop( 1000, 500, 200, 300 )
+);
 
 $list = PosterTemplate::normalize_fields(
 	array(
@@ -293,6 +337,77 @@ foreach ( PosterTemplate::SCHEMES as $scheme ) {
 }
 
 $assert( 'missing title returns empty without fatal', array() === $template->render( array( 'tagline' => 'x' ), new GDRenderer() ) );
+
+// -------------------------------------------------------------------------
+// Background treatments (#3623).
+// -------------------------------------------------------------------------
+
+// Small GD fixture for background: image (cover-fit source).
+$bg_fixture = tempnam( sys_get_temp_dir(), 'poster-bg' ) . '.png';
+$bg_img     = imagecreatetruecolor( 64, 48 );
+imagefill( $bg_img, 0, 0, imagecolorallocate( $bg_img, 40, 80, 160 ) );
+imagepng( $bg_img, $bg_fixture );
+unset( $bg_img );
+
+// Every background value renders at preset size, footer mode.
+foreach ( PosterTemplate::BACKGROUNDS as $bg_value ) {
+	foreach ( array( 'print_tabloid_300', 'landscape_16_9' ) as $preset ) {
+		$dims = PlatformPresets::dimensions( $preset );
+		$info = $render( $ad + array( 'background' => $bg_value, 'background_image' => $bg_fixture ), $preset );
+		$assert( "background {$bg_value} / {$preset}: renders at preset size", null !== $info && $dims['width'] === $info[0] && $dims['height'] === $info[1] );
+	}
+}
+
+// Hero mode honors the background too.
+$GLOBALS['poster_smoke_qr'] = static function ( $value, $url, $size ) {
+	$img = imagecreatetruecolor( max( 1, (int) $size ), max( 1, (int) $size ) );
+	imagefill( $img, 0, 0, imagecolorallocate( $img, 0, 0, 0 ) );
+	$path = tempnam( sys_get_temp_dir(), 'poster-qr' );
+	imagepng( $img, $path );
+	return $path;
+};
+foreach ( array( 'grid', 'gradient', 'image' ) as $bg_value ) {
+	foreach ( array( 'print_tabloid_300', 'landscape_16_9' ) as $preset ) {
+		$dims = PlatformPresets::dimensions( $preset );
+		$info = $render( $ad + array( 'background' => $bg_value, 'background_image' => $bg_fixture, 'qr_emphasis' => 'hero' ), $preset );
+		$assert( "background {$bg_value} / {$preset}: hero renders at preset size", null !== $info && $dims['width'] === $info[0] && $dims['height'] === $info[1] );
+	}
+}
+$GLOBALS['poster_smoke_qr'] = null;
+
+// Byte-level checks on the small portrait preset.
+$hash = static function ( array $data ) use ( $template ): string {
+	$paths = $template->render( $data, new GDRenderer(), array( 'preset' => 'instagram_feed_portrait' ) );
+	$path  = $paths[0] ?? '';
+	$sha   = ( '' !== $path && file_exists( $path ) ) ? (string) sha1_file( $path ) : '';
+	if ( '' !== $path ) {
+		wp_delete_file( $path );
+	}
+	return $sha;
+};
+
+$default_hash = $hash( $ad );
+$assert( 'default output is byte-identical to explicit stripes', '' !== $default_hash && $hash( $ad + array( 'background' => 'stripes' ) ) === $default_hash );
+$assert( 'background none renders a different (flat) canvas', '' !== $hash( $ad + array( 'background' => 'none' ) ) && $hash( $ad + array( 'background' => 'none' ) ) !== $default_hash );
+$assert( 'background_tint recolors the pattern ink', '' !== $hash( $ad + array( 'background_tint' => '#ff8800' ) ) && $hash( $ad + array( 'background_tint' => '#ff8800' ) ) !== $default_hash );
+$assert(
+	'a bad background image path falls back to stripes without error',
+	$hash( $ad + array( 'background' => 'image', 'background_image' => '/nope/missing.png' ) ) === $default_hash
+);
+$assert(
+	'an unsupported background image type falls back to stripes',
+	$hash( $ad + array( 'background' => 'image', 'background_image' => __FILE__ ) ) === $default_hash
+);
+$assert(
+	'a readable background image renders a different canvas',
+	'' !== $hash( $ad + array( 'background' => 'image', 'background_image' => $bg_fixture ) )
+		&& $hash( $ad + array( 'background' => 'image', 'background_image' => $bg_fixture ) ) !== $default_hash
+);
+$assert(
+	'a fully opaque overlay still renders',
+	'' !== $hash( $ad + array( 'background' => 'image', 'background_image' => $bg_fixture, 'background_overlay' => 1 ) )
+);
+wp_delete_file( $bg_fixture );
 
 // -------------------------------------------------------------------------
 // QR-hero layout (#3621).

@@ -36,6 +36,14 @@
  *   - qr_emphasis: `footer` (default, small QR in the footer block) or
  *     `hero` (see above). Hero falls back to the footer layout when no
  *     QR provider answers the QR filter.
+ *   - background: texture behind everything — `stripes` (default),
+ *     `none`, `grid`, `dots`, `halftone`, `crosshatch`, `waves`,
+ *     `gradient`, `glow` or `image`. Patterns are drawn procedurally in
+ *     the same low-alpha ink as the stripes (optionally recolored with
+ *     background_tint); `image` cover-fits background_image behind the
+ *     content and floods the scheme background over it at
+ *     background_overlay opacity so the copy stays legible. Unreadable
+ *     or unsupported images fall back to stripes.
  *   - list_heading + list_items: a ruled list of rows, each with a
  *     primary line, an optional secondary line and an optional
  *     right-aligned meta value (e.g. a time or a price). Portrait draws
@@ -99,8 +107,17 @@ class PosterTemplate implements TemplateInterface {
 	/** GD alpha (0 opaque .. 127 transparent) for the background stripes. */
 	private const STRIPE_ALPHA = 122;
 
+	/** GD alpha for the finer background patterns (grid, dots, waves), which need a touch more ink than the broad stripes. */
+	private const PATTERN_ALPHA = 114;
+
 	/** Supported color schemes; the first is the default. */
 	public const SCHEMES = array( 'dark', 'accent', 'light' );
+
+	/** Background treatments; the first is the default. */
+	public const BACKGROUNDS = array( 'stripes', 'none', 'grid', 'dots', 'halftone', 'crosshatch', 'waves', 'gradient', 'glow', 'image' );
+
+	/** Default opacity of the scheme-color overlay flooded over a background image. */
+	private const BACKGROUND_OVERLAY_DEFAULT = 0.55;
 
 	/** QR emphasis modes; the first is the default. */
 	public const QR_EMPHASES = array( 'footer', 'hero' );
@@ -162,23 +179,31 @@ class PosterTemplate implements TemplateInterface {
 		);
 
 		return array(
-			'title'         => $string( 'Title', true ),
-			'kicker'        => $string( 'Kicker (defaults to "<BRAND> PRESENTS")' ),
-			'tagline'       => $string( 'Tagline' ),
-			'subline'       => $string( 'Subline' ),
-			'detail_lines'  => $list( 'Detail lines (large type)' ),
-			'accent_line'   => $string( 'Accent line (large type, accent color)' ),
-			'detail_note'   => $string( 'Detail note (small, under the accent line)' ),
-			'banner_text'   => $string( 'Banner text (banner omitted when empty)' ),
-			'qr_url'        => $string( 'QR code URL' ),
-			'qr_label'      => $string( 'QR label' ),
-			'qr_emphasis'   => $string( 'QR emphasis: footer (default) or hero (large QR on a white card)' ),
-			'cta_text'      => $string( 'Call-to-action line' ),
-			'footer_note'   => $string( 'Footer note' ),
-			'cobrand_logos' => $list( 'Co-brand logo paths' ),
-			'scheme'        => $string( 'Color scheme: dark (default), accent or light' ),
-			'list_heading'  => $string( 'List heading (small caps line above the list)' ),
-			'list_items'    => $list( 'List rows: strings, or objects with primary, secondary and meta' ),
+			'title'              => $string( 'Title', true ),
+			'kicker'             => $string( 'Kicker (defaults to "<BRAND> PRESENTS")' ),
+			'tagline'            => $string( 'Tagline' ),
+			'subline'            => $string( 'Subline' ),
+			'detail_lines'       => $list( 'Detail lines (large type)' ),
+			'accent_line'        => $string( 'Accent line (large type, accent color)' ),
+			'detail_note'        => $string( 'Detail note (small, under the accent line)' ),
+			'banner_text'        => $string( 'Banner text (banner omitted when empty)' ),
+			'qr_url'             => $string( 'QR code URL' ),
+			'qr_label'           => $string( 'QR label' ),
+			'qr_emphasis'        => $string( 'QR emphasis: footer (default) or hero (large QR on a white card)' ),
+			'cta_text'           => $string( 'Call-to-action line' ),
+			'footer_note'        => $string( 'Footer note' ),
+			'cobrand_logos'      => $list( 'Co-brand logo paths' ),
+			'scheme'             => $string( 'Color scheme: dark (default), accent or light' ),
+			'background'         => $string( 'Background: stripes (default), none, grid, dots, halftone, crosshatch, waves, gradient, glow or image' ),
+			'background_image'   => $string( 'Background image: absolute path to a PNG, JPEG or WebP, cover-fit behind everything (used when background is image)' ),
+			'background_tint'    => $string( 'Background pattern tint: hex color overriding the pattern ink' ),
+			'background_overlay' => array(
+				'label'    => 'Background image overlay: opacity (0-1, default 0.55) of the scheme background flooded over the image',
+				'type'     => 'number',
+				'required' => false,
+			),
+			'list_heading'       => $string( 'List heading (small caps line above the list)' ),
+			'list_items'         => $list( 'List rows: strings, or objects with primary, secondary and meta' ),
 		);
 	}
 
@@ -232,7 +257,7 @@ class PosterTemplate implements TemplateInterface {
 	 * Normalize raw template input into the strings and lists drawn.
 	 *
 	 * @param array $data Raw template input.
-	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: list<string>, accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, qr_emphasis: string, cta_text: string, footer_note: string, cobrand_logos: list<string>, scheme: string, list_heading: string, list_items: list<array{primary: non-empty-string, secondary: string, meta: string}>}
+	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: list<string>, accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, qr_emphasis: string, cta_text: string, footer_note: string, cobrand_logos: list<string>, scheme: string, background: string, background_image: string, background_tint: string, background_overlay: float, list_heading: string, list_items: list<array{primary: non-empty-string, secondary: string, meta: string}>}
 	 */
 	public static function normalize_fields( array $data ): array {
 		$str = static fn( string $key ): string => is_scalar( $data[ $key ] ?? null ) ? trim( (string) $data[ $key ] ) : '';
@@ -270,27 +295,38 @@ class PosterTemplate implements TemplateInterface {
 			}
 		}
 
-		$scheme   = strtolower( $str( 'scheme' ) );
-		$emphasis = strtolower( $str( 'qr_emphasis' ) );
+		$scheme     = strtolower( $str( 'scheme' ) );
+		$emphasis   = strtolower( $str( 'qr_emphasis' ) );
+		$background = strtolower( $str( 'background' ) );
+
+		$tint = strtolower( $str( 'background_tint' ) );
+		$tint = 1 === preg_match( '/^#?[0-9a-f]{6}$/', $tint ) ? '#' . ltrim( $tint, '#' ) : '';
+
+		$overlay = $data['background_overlay'] ?? null;
+		$overlay = is_numeric( $overlay ) ? min( 1.0, max( 0.0, (float) $overlay ) ) : self::BACKGROUND_OVERLAY_DEFAULT;
 
 		return array(
-			'title'         => $str( 'title' ),
-			'kicker'        => $str( 'kicker' ),
-			'tagline'       => $str( 'tagline' ),
-			'subline'       => $str( 'subline' ),
-			'detail_lines'  => $detail_lines,
-			'accent_line'   => $str( 'accent_line' ),
-			'detail_note'   => $str( 'detail_note' ),
-			'banner_text'   => $str( 'banner_text' ),
-			'qr_url'        => $str( 'qr_url' ),
-			'qr_label'      => $str( 'qr_label' ),
-			'qr_emphasis'   => in_array( $emphasis, self::QR_EMPHASES, true ) ? $emphasis : self::QR_EMPHASES[0],
-			'cta_text'      => $str( 'cta_text' ),
-			'footer_note'   => $str( 'footer_note' ),
-			'cobrand_logos' => $cobrand,
-			'scheme'        => in_array( $scheme, self::SCHEMES, true ) ? $scheme : self::SCHEMES[0],
-			'list_heading'  => $str( 'list_heading' ),
-			'list_items'    => $list_items,
+			'title'              => $str( 'title' ),
+			'kicker'             => $str( 'kicker' ),
+			'tagline'            => $str( 'tagline' ),
+			'subline'            => $str( 'subline' ),
+			'detail_lines'       => $detail_lines,
+			'accent_line'        => $str( 'accent_line' ),
+			'detail_note'        => $str( 'detail_note' ),
+			'banner_text'        => $str( 'banner_text' ),
+			'qr_url'             => $str( 'qr_url' ),
+			'qr_label'           => $str( 'qr_label' ),
+			'qr_emphasis'        => in_array( $emphasis, self::QR_EMPHASES, true ) ? $emphasis : self::QR_EMPHASES[0],
+			'cta_text'           => $str( 'cta_text' ),
+			'footer_note'        => $str( 'footer_note' ),
+			'cobrand_logos'      => $cobrand,
+			'scheme'             => in_array( $scheme, self::SCHEMES, true ) ? $scheme : self::SCHEMES[0],
+			'background'         => in_array( $background, self::BACKGROUNDS, true ) ? $background : self::BACKGROUNDS[0],
+			'background_image'   => $str( 'background_image' ),
+			'background_tint'    => $tint,
+			'background_overlay' => $overlay,
+			'list_heading'       => $str( 'list_heading' ),
+			'list_items'         => $list_items,
 		);
 	}
 
@@ -330,7 +366,7 @@ class PosterTemplate implements TemplateInterface {
 			'rule'   => $r->color_hex( 'rule', $palette['rule'] ),
 		);
 		$r->fill( $r->color_hex( 'bg', $palette['background'] ) );
-		self::draw_stripes( $r, $width, $height, $u, 'light' === $palette['stripe'] ? 255 : 0 );
+		self::draw_background( $r, $fields, $palette, $width, $height, $u );
 
 		// Light canvases take the standard logo; dark ones the inverse.
 		$tokens['logo_path_inverse'] = 'dark' === $fields['scheme']
@@ -1119,24 +1155,249 @@ class PosterTemplate implements TemplateInterface {
 	}
 
 	/**
+	 * Draw the background treatment behind all content.
+	 *
+	 * Every pattern is drawn procedurally in the same low-alpha ink as the
+	 * default stripes — light ink on dark schemes, dark ink on light ones,
+	 * or the background_tint override — with spacing and weight scaled by
+	 * the canvas unit so print presets keep the same texture density.
+	 * `image` cover-fits background_image behind the content and floods the
+	 * scheme background color over it at background_overlay opacity; an
+	 * unreadable, unsupported or unloadable image falls back to stripes.
+	 *
+	 * @param GDRenderer $r       Renderer with a filled canvas.
+	 * @param array      $fields  Output of normalize_fields().
+	 * @param array      $palette Output of palette().
+	 * @param int        $width   Canvas width.
+	 * @param int        $height  Canvas height.
+	 * @param float      $u       Scale unit (width / 1080).
+	 */
+	private static function draw_background( GDRenderer $r, array $fields, array $palette, int $width, int $height, float $u ): void {
+		$background = (string) $fields['background'];
+		if ( 'image' === $background ) {
+			if ( self::draw_background_image( $r, (string) $fields['background_image'], (string) $palette['background'], (float) $fields['background_overlay'], $width, $height ) ) {
+				return;
+			}
+			$background = self::BACKGROUNDS[0];
+		}
+		if ( 'none' === $background ) {
+			return;
+		}
+
+		$tint = (string) $fields['background_tint'];
+		$rgb  = self::hex_rgb( '' !== $tint ? $tint : ( 'light' === $palette['stripe'] ? '#ffffff' : '#000000' ) );
+		$ink  = static fn( string $name, int $alpha ): int => $r->color( $name, $rgb[0], $rgb[1], $rgb[2], $alpha );
+
+		switch ( $background ) {
+			case 'grid':
+				self::draw_grid( $r, $width, $height, $u, $ink( 'pattern', self::PATTERN_ALPHA ) );
+				break;
+			case 'dots':
+				self::draw_dots( $r, $width, $height, $u, $ink( 'pattern', self::PATTERN_ALPHA ), false );
+				break;
+			case 'halftone':
+				self::draw_dots( $r, $width, $height, $u, $ink( 'pattern', self::PATTERN_ALPHA ), true );
+				break;
+			case 'crosshatch':
+				self::draw_stripes( $r, $width, $height, $u, $ink( 'stripe', self::STRIPE_ALPHA ) );
+				self::draw_stripes( $r, $width, $height, $u, $ink( 'stripe', self::STRIPE_ALPHA ), -1 );
+				break;
+			case 'waves':
+				self::draw_waves( $r, $width, $height, $u, $ink( 'pattern', self::PATTERN_ALPHA ) );
+				break;
+			case 'gradient':
+				self::draw_gradient( $r, $width, $height, $ink );
+				break;
+			case 'glow':
+				self::draw_glow( $r, $width, $height, $ink );
+				break;
+			default:
+				self::draw_stripes( $r, $width, $height, $u, $ink( 'stripe', self::STRIPE_ALPHA ) );
+		}
+	}
+
+	/**
+	 * Cover-fit a background image behind everything, then flood the scheme
+	 * background color over the full canvas at the overlay opacity so the
+	 * copy drawn on top stays legible.
+	 *
+	 * @param GDRenderer $r       Renderer with a filled canvas.
+	 * @param string     $path    Absolute path to a PNG, JPEG or WebP.
+	 * @param string     $bg_hex  Scheme background color.
+	 * @param float      $overlay Overlay opacity (0..1, already clamped).
+	 * @param int        $width   Canvas width.
+	 * @param int        $height  Canvas height.
+	 * @return bool False when the file is missing, unsupported or fails to load.
+	 */
+	private static function draw_background_image( GDRenderer $r, string $path, string $bg_hex, float $overlay, int $width, int $height ): bool {
+		if ( '' === $path || ! $r->overlay_image_cover( $path, 0, 0, $width, $height ) ) {
+			return false;
+		}
+		$alpha = min( 127, max( 0, (int) round( 127 * ( 1 - $overlay ) ) ) );
+		if ( $alpha < 127 ) {
+			$rgb = self::hex_rgb( $bg_hex );
+			$r->filled_rect( 0, 0, $width, $height, $r->color( 'bg_overlay', $rgb[0], $rgb[1], $rgb[2], $alpha ) );
+		}
+		return true;
+	}
+
+	/**
 	 * Subtle diagonal stripes for texture.
 	 *
-	 * Near-transparent white lines at a 45-degree angle, spaced 1/18 of
-	 * the canvas width, so the background reads as textured, not flat.
+	 * Near-transparent lines at a 45-degree angle, spaced 1/18 of the
+	 * canvas width, so the background reads as textured, not flat.
+	 *
+	 * @param GDRenderer $r         Renderer with a filled canvas.
+	 * @param int        $width     Canvas width.
+	 * @param int        $height    Canvas height.
+	 * @param float      $u         Scale unit (width / 1080).
+	 * @param int        $ink       Allocated low-alpha GD color.
+	 * @param int        $direction Diagonal direction: 1 rising, -1 falling.
+	 */
+	private static function draw_stripes( GDRenderer $r, int $width, int $height, float $u, int $ink, int $direction = 1 ): void {
+		$step   = max( 1, (int) ( $width / 18 ) );
+		$weight = max( 2, (int) round( 4 * $u ) );
+		for ( $x = -$height; $x < $width; $x += $step ) {
+			if ( $direction >= 0 ) {
+				$r->draw_line( $x, $height, $x + $height, 0, $ink, $weight );
+			} else {
+				$r->draw_line( $x, 0, $x + $height, $height, $ink, $weight );
+			}
+		}
+	}
+
+	/**
+	 * Thin square grid.
 	 *
 	 * @param GDRenderer $r      Renderer with a filled canvas.
 	 * @param int        $width  Canvas width.
 	 * @param int        $height Canvas height.
 	 * @param float      $u      Scale unit (width / 1080).
-	 * @param int        $shade  Stripe gray level: 255 on dark canvases, 0 on light.
+	 * @param int        $ink    Allocated low-alpha GD color.
 	 */
-	private static function draw_stripes( GDRenderer $r, int $width, int $height, float $u, int $shade = 255 ): void {
-		$stripe = $r->color( 'stripe', $shade, $shade, $shade, self::STRIPE_ALPHA );
-		$step   = max( 1, (int) ( $width / 18 ) );
-		$weight = max( 2, (int) round( 4 * $u ) );
-		for ( $x = -$height; $x < $width; $x += $step ) {
-			$r->draw_line( $x, $height, $x + $height, 0, $stripe, $weight );
+	private static function draw_grid( GDRenderer $r, int $width, int $height, float $u, int $ink ): void {
+		$step   = max( 4, (int) round( 64 * $u ) );
+		$weight = max( 1, (int) round( 2 * $u ) );
+		for ( $x = 0; $x <= $width; $x += $step ) {
+			$r->draw_line( $x, 0, $x, $height, $ink, $weight );
 		}
+		for ( $y = 0; $y <= $height; $y += $step ) {
+			$r->draw_line( 0, $y, $width, $y, $ink, $weight );
+		}
+	}
+
+	/**
+	 * Dot matrix (staggered rows); halftone grows the dot radius toward
+	 * the bottom-right corner.
+	 *
+	 * @param GDRenderer $r        Renderer with a filled canvas.
+	 * @param int        $width    Canvas width.
+	 * @param int        $height   Canvas height.
+	 * @param float      $u        Scale unit (width / 1080).
+	 * @param int        $ink      Allocated low-alpha GD color.
+	 * @param bool       $halftone Vary the radius with corner distance.
+	 */
+	private static function draw_dots( GDRenderer $r, int $width, int $height, float $u, int $ink, bool $halftone ): void {
+		$step  = max( 6, (int) round( 56 * $u ) );
+		$base  = max( 2, (int) round( 5 * $u ) );
+		$reach = hypot( $width, $height );
+		$row   = 0;
+		for ( $y = intdiv( $step, 2 ); $y < $height + $step; $y += $step ) {
+			$offset = ( $row % 2 ) ? intdiv( $step, 2 ) : 0;
+			++$row;
+			for ( $x = $offset; $x < $width + $step; $x += $step ) {
+				$d = 2 * $base;
+				if ( $halftone ) {
+					$t = 1.0 - min( 1.0, hypot( $width - $x, $height - $y ) / $reach );
+					$d = max( 2, (int) round( 2 * $base * ( 0.4 + 2.4 * $t ) ) );
+				}
+				$r->draw_ellipse( $x, $y, $d, $d, $ink );
+			}
+		}
+	}
+
+	/**
+	 * Horizontal sine lines, phase-shifted per row.
+	 *
+	 * @param GDRenderer $r      Renderer with a filled canvas.
+	 * @param int        $width  Canvas width.
+	 * @param int        $height Canvas height.
+	 * @param float      $u      Scale unit (width / 1080).
+	 * @param int        $ink    Allocated low-alpha GD color.
+	 */
+	private static function draw_waves( GDRenderer $r, int $width, int $height, float $u, int $ink ): void {
+		$gap    = max( 8, (int) round( 72 * $u ) );
+		$amp    = max( 2, (int) round( 16 * $u ) );
+		$length = max( 16, (int) round( 260 * $u ) );
+		$seg    = max( 4, (int) round( 10 * $u ) );
+		$weight = max( 1, (int) round( 3 * $u ) );
+		$row    = 0;
+		for ( $y = 0; $y <= $height + $amp; $y += $gap ) {
+			$phase = $row * M_PI / 3;
+			++$row;
+			$prev_y = $y + (int) round( $amp * sin( $phase ) );
+			for ( $x = $seg; $x <= $width + $seg; $x += $seg ) {
+				$next_y = $y + (int) round( $amp * sin( $x * 2 * M_PI / $length + $phase ) );
+				$r->draw_line( $x - $seg, $prev_y, $x, $next_y, $ink, $weight );
+				$prev_y = $next_y;
+			}
+		}
+	}
+
+	/**
+	 * Vertical linear gradient: the scheme background at the top ramping
+	 * toward a darker (light schemes) or lighter (dark schemes) shade at
+	 * the bottom, built from ink bands of increasing opacity.
+	 *
+	 * @param GDRenderer $r      Renderer with a filled canvas.
+	 * @param int        $width  Canvas width.
+	 * @param int        $height Canvas height.
+	 * @param callable(string, int): int $ink Ink allocator (name, GD alpha).
+	 */
+	private static function draw_gradient( GDRenderer $r, int $width, int $height, callable $ink ): void {
+		$bands  = 48;
+		$band_h = (int) ceil( $height / $bands );
+		for ( $i = 1; $i < $bands; $i++ ) {
+			// Fully transparent at the top, ~30% ink at the bottom.
+			$alpha = 127 - (int) round( 38 * $i / ( $bands - 1 ) );
+			$r->filled_rect( 0, $i * $band_h, $width, min( $height, ( $i + 1 ) * $band_h ), $ink( "gradient_{$i}", $alpha ) );
+		}
+	}
+
+	/**
+	 * Radial vignette: concentric near-transparent ink layers that stack
+	 * toward the center, so the middle of the canvas reads lighter (dark
+	 * schemes) or softly inked (light schemes) than the corners.
+	 *
+	 * @param GDRenderer $r      Renderer with a filled canvas.
+	 * @param int        $width  Canvas width.
+	 * @param int        $height Canvas height.
+	 * @param callable(string, int): int $ink Ink allocator (name, GD alpha).
+	 */
+	private static function draw_glow( GDRenderer $r, int $width, int $height, callable $ink ): void {
+		$steps = 36;
+		$layer = $ink( 'glow', 126 ); // One ~1% ink layer per ellipse; they accumulate at the center.
+		$cx    = intdiv( $width, 2 );
+		$cy    = intdiv( $height, 2 );
+		for ( $i = 0; $i < $steps; $i++ ) {
+			$t = 1 - $i / $steps;
+			$r->draw_ellipse( $cx, $cy, (int) round( 2 * $width * ( 0.25 + 0.75 * $t ) ), (int) round( 2 * $height * ( 0.25 + 0.75 * $t ) ), $layer );
+		}
+	}
+
+	/**
+	 * Parse a hex color into its RGB channels.
+	 *
+	 * @param string $hex Hex color (e.g. '#ff6b6b').
+	 * @return array{int, int, int}
+	 */
+	private static function hex_rgb( string $hex ): array {
+		$hex = substr( ltrim( $hex, '#' ) . '000000', 0, 6 );
+		return array(
+			(int) hexdec( substr( $hex, 0, 2 ) ),
+			(int) hexdec( substr( $hex, 2, 2 ) ),
+			(int) hexdec( substr( $hex, 4, 2 ) ),
+		);
 	}
 
 	/**

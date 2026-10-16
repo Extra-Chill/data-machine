@@ -896,6 +896,84 @@ class GDRenderer {
 		return $this;
 	}
 
+	/**
+	 * Source crop rectangle for cover-fitting an image into a destination.
+	 *
+	 * The source is scaled so it fills the destination completely while
+	 * preserving its aspect ratio; the dimension that overflows is
+	 * center-cropped. The returned rectangle is in source coordinates and
+	 * can be fed straight into imagecopyresampled().
+	 *
+	 * @param int $src_width  Source width in pixels.
+	 * @param int $src_height Source height in pixels.
+	 * @param int $dst_width  Destination width in pixels.
+	 * @param int $dst_height Destination height in pixels.
+	 * @return array{src_x: int, src_y: int, src_w: int, src_h: int}
+	 */
+	public static function cover_crop( int $src_width, int $src_height, int $dst_width, int $dst_height ): array {
+		if ( $src_width < 1 || $src_height < 1 || $dst_width < 1 || $dst_height < 1 ) {
+			return array(
+				'src_x' => 0,
+				'src_y' => 0,
+				'src_w' => max( 1, $src_width ),
+				'src_h' => max( 1, $src_height ),
+			);
+		}
+
+		$scale  = max( $dst_width / $src_width, $dst_height / $src_height );
+		$crop_w = min( $src_width, max( 1, (int) round( $dst_width / $scale ) ) );
+		$crop_h = min( $src_height, max( 1, (int) round( $dst_height / $scale ) ) );
+
+		return array(
+			'src_x' => intdiv( $src_width - $crop_w, 2 ),
+			'src_y' => intdiv( $src_height - $crop_h, 2 ),
+			'src_w' => $crop_w,
+			'src_h' => $crop_h,
+		);
+	}
+
+	/**
+	 * Cover-fit an image file onto a region of the canvas.
+	 *
+	 * The source is scaled to fill the region, its overflow center-cropped
+	 * (see cover_crop()), and resampled at high quality. Supports PNG, JPEG
+	 * and WebP sources; anything else is refused so callers can fall back.
+	 *
+	 * @param string $image_path Path to the source image.
+	 * @param int    $x          Destination X.
+	 * @param int    $y          Destination Y.
+	 * @param int    $width      Destination width.
+	 * @param int    $height     Destination height.
+	 * @return bool Whether the image was drawn.
+	 */
+	public function overlay_image_cover( string $image_path, int $x, int $y, int $width, int $height ): bool {
+		if ( ! $this->image || $width < 1 || $height < 1 || ! is_readable( $image_path ) ) {
+			return false;
+		}
+
+		$info = getimagesize( $image_path );
+		if ( ! $info ) {
+			return false;
+		}
+
+		$source = match ( $info[2] ) {
+			IMAGETYPE_PNG  => imagecreatefrompng( $image_path ),
+			IMAGETYPE_JPEG => imagecreatefromjpeg( $image_path ),
+			IMAGETYPE_WEBP => imagecreatefromwebp( $image_path ),
+			default        => false,
+		};
+
+		if ( ! $source ) {
+			return false;
+		}
+
+		$crop = self::cover_crop( imagesx( $source ), imagesy( $source ), $width, $height );
+		imagecopyresampled( $this->image, $source, $x, $y, $crop['src_x'], $crop['src_y'], $width, $height, $crop['src_w'], $crop['src_h'] );
+		unset( $source );
+
+		return true;
+	}
+
 	// -------------------------------------------------------------------------
 	// Chart Drawing
 	// -------------------------------------------------------------------------
