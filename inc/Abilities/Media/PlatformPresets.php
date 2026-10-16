@@ -58,6 +58,16 @@ class PlatformPresets {
 			'height' => 630,
 			'label'  => 'Open Graph',
 		),
+		'landscape_16_9'          => array(
+			'width'  => 1920,
+			'height' => 1080,
+			'label'  => 'Landscape 16:9 (featured / Open Graph)',
+		),
+		'print_tabloid'           => array(
+			'width'  => 1650,
+			'height' => 2550,
+			'label'  => 'Print Tabloid (11x17 @ 150dpi)',
+		),
 	);
 
 	/**
