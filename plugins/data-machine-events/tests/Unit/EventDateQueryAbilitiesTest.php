@@ -589,4 +589,64 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( ' LIMIT ', strtoupper( $sql ) );
 		$this->assertStringNotContainsString( ' ORDER BY ', strtoupper( $sql ) );
 	}
+
+	public function test_venue_tier_list_matches_any_listed_tier(): void {
+		$venues = array();
+		foreach ( array( 'club', 'listening_room', 'bar_gig', '' ) as $tier ) {
+			$term = wp_insert_term( 'Tier list venue ' . ( $tier ? $tier : 'untiered' ) . ' ' . uniqid(), 'venue' );
+			$this->assertNotWPError( $term );
+			if ( '' !== $tier ) {
+				update_term_meta( (int) $term['term_id'], Venue_Taxonomy::TIER_META_KEY, $tier );
+			}
+			$venues[ $tier ] = (int) $term['term_id'];
+		}
+
+		$start  = current_datetime()->modify( '+1 day' )->format( 'Y-m-d H:i:s' );
+		$events = array();
+		foreach ( $venues as $tier => $venue_id ) {
+			$events[ $tier ] = $this->seed_event( 'Tier list event ' . $tier, 'publish', $start, null, $venue_id );
+		}
+
+		foreach ( array( array( 'club', 'listening_room' ), 'club, listening_room', array( 'club', 'listening_room', 'club' ) ) as $venue_tier ) {
+			$result = ( new EventDateQueryAbilities() )->executeQueryEvents(
+				array(
+					'scope'      => 'upcoming',
+					'venue_tier' => $venue_tier,
+					'per_page'   => -1,
+					'fields'     => 'ids',
+				)
+			);
+			$ids    = array_map( 'intval', $result['posts'] );
+
+			$this->assertContains( $events['club'], $ids );
+			$this->assertContains( $events['listening_room'], $ids );
+			$this->assertNotContains( $events['bar_gig'], $ids );
+			$this->assertNotContains( $events[''], $ids );
+		}
+	}
+
+	public function test_venue_tier_list_with_an_unknown_tier_fails_closed(): void {
+		$term = wp_insert_term( 'Tier list fail-closed venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $term );
+		update_term_meta( (int) $term['term_id'], Venue_Taxonomy::TIER_META_KEY, 'club' );
+		$this->seed_event( 'Tier fail-closed event', 'publish', current_datetime()->modify( '+1 day' )->format( 'Y-m-d H:i:s' ), null, (int) $term['term_id'] );
+
+		$result = ( new EventDateQueryAbilities() )->executeQueryEvents(
+			array(
+				'scope'      => 'upcoming',
+				'venue_tier' => 'club,invented-tier',
+				'per_page'   => -1,
+				'fields'     => 'ids',
+			)
+		);
+
+		$this->assertSame( 0, $result['total'] );
+	}
+
+	public function test_normalize_venue_tiers(): void {
+		$this->assertSame( array(), EventDateQueryAbilities::normalizeVenueTiers( '' ) );
+		$this->assertSame( array( 'club' ), EventDateQueryAbilities::normalizeVenueTiers( 'club' ) );
+		$this->assertSame( array( 'club', 'concert_hall' ), EventDateQueryAbilities::normalizeVenueTiers( ' club , concert_hall,club,' ) );
+		$this->assertSame( array( 'club' ), EventDateQueryAbilities::normalizeVenueTiers( array( 'club', array( 'x' ), '' ) ) );
+	}
 }

@@ -95,8 +95,9 @@ class EventDateQueryAbilities {
 								'description' => 'Taxonomy filters as { taxonomy_slug: [term_ids] }.',
 							),
 							'venue_tier'  => array(
-								'type'        => 'string',
-								'description' => 'Venue tier slug. Resolves to the venue terms carrying that tier and constrains events through the venue taxonomy filter path. Unknown values fail closed.',
+								'type'        => array( 'string', 'array' ),
+								'items'       => array( 'type' => 'string' ),
+								'description' => 'Venue tier slug, or several as an array or comma-separated string (matches any of them). Resolves to the venue terms carrying those tiers and constrains events through the venue taxonomy filter path. Any unknown value fails closed.',
 							),
 							'search'      => array(
 								'type'        => 'string',
@@ -656,19 +657,32 @@ class EventDateQueryAbilities {
 	 * buckets — then treats it as an ordinary venue term constraint. See
 	 * #786.
 	 *
-	 * An unknown tier, or a known tier no venue carries yet, fails closed to
-	 * an impossible term list (mirroring the empty-geo handling).
+	 * Several tiers (array or comma-separated string) match venues carrying
+	 * any of them, e.g. every music-first room without bar/restaurant gigs.
+	 *
+	 * An unknown tier anywhere in the list, or tiers no venue carries yet,
+	 * fail closed to an impossible term list (mirroring the empty-geo
+	 * handling) rather than silently dropping the constraint.
 	 *
 	 * @param array $input Query-events ability input.
 	 * @return array Input with the venue tier merged into tax_filters.
 	 */
 	private function applyVenueTierConstraint( array $input ): array {
-		$tier = sanitize_key( (string) ( $input['venue_tier'] ?? '' ) );
-		if ( '' === $tier ) {
+		$tiers = self::normalizeVenueTiers( $input['venue_tier'] ?? '' );
+		if ( empty( $tiers ) ) {
 			return $input;
 		}
 
-		$venue_ids = Venue_Taxonomy::get_venue_term_ids_by_tier( $tier );
+		$vocabulary = Venue_Taxonomy::get_venue_tier_vocabulary();
+		$venue_ids  = array();
+		foreach ( $tiers as $tier ) {
+			if ( ! isset( $vocabulary[ $tier ] ) ) {
+				$venue_ids = array();
+				break;
+			}
+			$venue_ids = array_merge( $venue_ids, Venue_Taxonomy::get_venue_term_ids_by_tier( $tier ) );
+		}
+		$venue_ids = array_values( array_unique( $venue_ids ) );
 		if ( empty( $venue_ids ) ) {
 			$venue_ids = array( 0 );
 		}
@@ -684,6 +698,29 @@ class EventDateQueryAbilities {
 		$input['tax_filters'] = array_merge( $existing, array( 'venue' => $venue_ids ) );
 
 		return $input;
+	}
+
+	/**
+	 * Normalize a venue_tier input (slug, comma-separated slugs, or array)
+	 * into unique sanitized slugs.
+	 *
+	 * @param mixed $value Raw venue_tier input.
+	 * @return string[]
+	 */
+	public static function normalizeVenueTiers( $value ): array {
+		$parts = is_array( $value ) ? $value : explode( ',', (string) $value );
+		$tiers = array();
+		foreach ( $parts as $part ) {
+			if ( ! is_scalar( $part ) ) {
+				continue;
+			}
+			$tier = sanitize_key( trim( (string) $part ) );
+			if ( '' !== $tier ) {
+				$tiers[ $tier ] = true;
+			}
+		}
+
+		return array_keys( $tiers );
 	}
 
 	/**
