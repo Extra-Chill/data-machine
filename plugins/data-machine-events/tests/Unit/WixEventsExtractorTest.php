@@ -62,6 +62,38 @@ class WixEventsExtractorTest extends WP_UnitTestCase {
 		$this->assertSame( '-04:00', $events[0]['startOffset'] );
 	}
 
+	/**
+	 * Regression: data-machine-events#941 (The Rickhouse / Cannon Distillery,
+	 * flow 6). The old events-page URL 404s; the Wix homepage embeds the
+	 * upcoming events in wix-warmup-data and must extract without any API
+	 * calls. Fixture trimmed from https://www.cannondistillerychs.com/ (2026-10-16).
+	 */
+	public function test_extract_reads_warmup_data_from_wix_homepage(): void {
+		$html = file_get_contents( $this->fixtures_dir . '/cannon-distillery-home.html' );
+
+		// No routes: any HTTP call would be recorded and fail the request-count assertion.
+		$this->mockHttpRoutes( array() );
+
+		$this->assertTrue( $this->extractor->canExtract( $html ) );
+
+		$events = $this->extractor->extract( $html, 'https://www.cannondistillerychs.com/' );
+
+		$this->assertCount( 4, $events );
+		$this->assertSame( array(), $this->requests, 'Warmup data must not trigger API calls.' );
+
+		$titles = array_column( $events, 'title' );
+		$this->assertContains( 'Pet Helpers: Rescue Rocks', $titles );
+		$this->assertContains( 'Tuesday Trivia w/ Dave! RSVP to save a table!', $titles );
+
+		// 2026-10-20T23:00:00Z in America/New_York → 7:00 PM on Oct 20.
+		$trivia = $events[1];
+		$this->assertSame( '2026-10-20', $trivia['startDate'] );
+		$this->assertSame( '19:00', $trivia['startTime'] );
+		$this->assertSame( 'America/New_York', $trivia['venueTimezone'] );
+		$this->assertSame( 'Charleston', $trivia['venueCity'] );
+		$this->assertSame( 'SC', $trivia['venueState'] );
+	}
+
 	public function test_extract_returns_empty_without_wix_events_app_evidence(): void {
 		$this->mockHttpRoutes(
 			array(

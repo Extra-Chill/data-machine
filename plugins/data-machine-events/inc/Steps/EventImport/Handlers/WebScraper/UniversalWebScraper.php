@@ -18,6 +18,8 @@
  * 10. Dusk.fm/BeatGig venue calendar (data-beatgig-embed → __NEXT_DATA__)
  * 11. SpotHopper API (spothopperapp.com)
  * 12. VenuePilot GraphQL API (venuepilot.co widget → GraphQL)
+ * 12b. Turntable Tickets (window.__pinia SSR state → /api/performance JSON)
+ * 12c. Charles Towne Fermentory SPA (/api/events/upcoming JSON)
  * 13. Sofar Sounds GraphQL API (sofarsounds.com SPA → GetEventsForFan)
  * 14. Gigwell booking platform (gigwell-gigstream)
  * 13. DoStuff Media API (Waterloo Records, Do512)
@@ -70,6 +72,8 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EmbeddedC
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquarespaceExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SpotHopperExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VenuePilotExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\TurntableTicketsExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ChsFermentoryExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\PrekindleExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GoDaddyExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandzoogleExtractor;
@@ -178,6 +182,8 @@ class UniversalWebScraper extends EventImportHandler {
 			new DuskFmExtractor(),
 			new SpotHopperExtractor(),
 			new VenuePilotExtractor(),
+			new TurntableTicketsExtractor(),
+			new ChsFermentoryExtractor(),
 			new SofarSoundsExtractor(),
 			new GigwellExtractor(),
 			new DoStuffExtractor(),

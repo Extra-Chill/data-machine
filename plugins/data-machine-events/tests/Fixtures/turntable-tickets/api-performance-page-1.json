@@ -1,0 +1,54 @@
+{
+ "count": 4,
+ "pageSize": 2,
+ "results": [
+  {
+   "id": 35066,
+   "datetime": "2026-10-16T23:00:00Z",
+   "show_id": 12360,
+   "show": {
+    "id": 12360,
+    "name": "Sinatra: Nothing But The Best | Joe Clarke & The Forte Show Band",
+    "image": "https://assets-prod.turntabletickets.com/media/forte-jazz-lounge/show-12360/NBTB_-_Show_band.jpg",
+    "price_per_person": [
+     "25.00",
+     "90.00"
+    ],
+    "description": "<p>The Forte Show band backs up Joe Clarke as he performs from the vast collection of Sinatra Hits!  This is one of Forte Jazz Lounge's most popular shows. You'll hear iconic songs made famous by Frank Sinatra like; Fly me to the Moon, I've Got you Under My Skin and Lady is a Tramp.  Great Composers"
+   },
+   "sold": false,
+   "availability_state": "available",
+   "residencies": [
+    {
+     "id": 606,
+     "name": "Vocal Jazz Series - 2026",
+     "slug": "vocal-jazz-series-2026"
+    }
+   ]
+  },
+  {
+   "id": 35067,
+   "datetime": "2026-10-17T01:30:00Z",
+   "show_id": 12360,
+   "show": {
+    "id": 12360,
+    "name": "Sinatra: Nothing But The Best | Joe Clarke & The Forte Show Band",
+    "image": "https://assets-prod.turntabletickets.com/media/forte-jazz-lounge/show-12360/NBTB_-_Show_band.jpg",
+    "price_per_person": [
+     "25.00",
+     "90.00"
+    ],
+    "description": "<p>The Forte Show band backs up Joe Clarke as he performs from the vast collection of Sinatra Hits!  This is one of Forte Jazz Lounge's most popular shows. You'll hear iconic songs made famous by Frank Sinatra like; Fly me to the Moon, I've Got you Under My Skin and Lady is a Tramp.  Great Composers"
+   },
+   "sold": false,
+   "availability_state": "available",
+   "residencies": [
+    {
+     "id": 606,
+     "name": "Vocal Jazz Series - 2026",
+     "slug": "vocal-jazz-series-2026"
+    }
+   ]
+  }
+ ]
+}
