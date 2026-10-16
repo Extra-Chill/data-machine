@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.186.0] - 2026-10-16
+
+### Added
+- generic composable poster image template in core
+
 ## [0.185.2] - 2026-10-15
 
 ### Fixed
