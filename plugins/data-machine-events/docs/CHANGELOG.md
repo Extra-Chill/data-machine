@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.68.1] - 2026-10-16
+
+### Fixed
+- restore Forte, Fermentory and Cannon Distillery imports
+
 ## [0.68.0] - 2026-10-16
 
 ### Added
