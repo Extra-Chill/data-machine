@@ -309,10 +309,17 @@ namespace DataMachine\Tests\Unit\Abilities\Media {
 			$this->assertLessThanOrEqual( $dims['height'] - self::SAFE_MARGIN, $card['max_y'], "{$preset}: card clears the bottom trim zone" );
 		}
 
+		/**
+		 * Rendered-pixel cases use the pocket flyer only. The layout is
+		 * resolution-independent (every size goes through the px scaler), and
+		 * the 11x17 preset is covered by test_plan_hero_layout_stacks_without_overlap
+		 * and the preset-size assertions. A full 3300x5100 truecolor render
+		 * costs ~67MB of GD memory per canvas, which starves the in-memory
+		 * test filesystem for suites sharing the shard.
+		 */
 		public function portrait_print_presets(): array {
 			return array(
-				'11x17 poster @300dpi'    => array( 'print_tabloid_300' ),
-				'pocket flyer @300dpi'    => array( 'print_pocket_flyer' ),
+				'pocket flyer @300dpi' => array( 'print_pocket_flyer' ),
 			);
 		}
 
@@ -342,8 +349,8 @@ namespace DataMachine\Tests\Unit\Abilities\Media {
 			$this->require_render_font();
 			$GLOBALS['dm_poster_hero_qr_provider'] = null;
 
-			$dims = PlatformPresets::dimensions( 'print_tabloid_300' );
-			$path = $this->render( self::SIGN_DATA + array( 'qr_emphasis' => 'hero' ), 'print_tabloid_300' );
+			$dims = PlatformPresets::dimensions( 'print_pocket_flyer' );
+			$path = $this->render( self::SIGN_DATA + array( 'qr_emphasis' => 'hero' ), 'print_pocket_flyer' );
 			$this->assertNotSame( '', $path, 'hero poster still renders with no QR provider' );
 
 			$info = getimagesize( $path );
