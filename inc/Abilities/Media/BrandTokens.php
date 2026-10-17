@@ -48,6 +48,7 @@ class BrandTokens {
 			// Absolute paths to .ttf files. GD cannot use .woff2 — themes
 			// must ship TTF/OTF for any font they want in rendered images.
 			'heading' => null,
+			'display' => null, // Poster/card titles only; falls back to heading.
 			'body'    => null,
 			'brand'   => null,
 			'mono'    => null,
