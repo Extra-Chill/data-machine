@@ -1,0 +1,365 @@
+<?php
+/**
+ * Base class for all publish handlers.
+ *
+ * Provides common functionality for publish handlers including:
+ * - Engine data retrieval
+ * - Image validation
+ * - Standardized response formatting
+ * - Centralized logging
+ *
+ * @package DataMachine\Core\Steps\Publish\Handlers
+ * @since 0.2.1
+ */
+
+namespace DataMachine\Core\Steps\Publish\Handlers;
+
+use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Core\EngineData;
+use DataMachine\Core\Steps\Handlers\HandlerConfigValidator;
+use DataMachine\Core\Steps\Handlers\HttpRequestHelpers;
+use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
+
+defined( 'ABSPATH' ) || exit;
+
+abstract class PublishHandler {
+
+	use HttpRequestHelpers;
+
+	/** @var string Handler type for logging and responses */
+	protected string $handler_type;
+
+	public function __construct( string $handler_type ) {
+		$this->handler_type = $handler_type;
+	}
+
+	/**
+	 * Implemented by each handler to execute publishing.
+	 *
+	 * @param array $parameters Tool parameters including content
+	 * @param array $handler_config Handler-specific configuration
+	 * @return array Result with success, data/error, and tool_name
+	 */
+	abstract protected function executePublish( array $parameters, array $handler_config ): array;
+
+	/**
+	 * Public entry point called by AI tool executor.
+	 *
+	 * @param array $parameters Tool parameters
+	 * @param array $tool_def Tool definition with handler config
+	 * @return array Result array
+	 */
+	final public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		// Centralize job_id handling and engine_data retrieval
+		$job_id = (int) ( $parameters['job_id'] ?? null );
+		if ( ! $job_id ) {
+			return $this->errorResponse( 'job_id parameter is required for publish operations' );
+		}
+
+		$engine_data = $this->getEngineData( $job_id );
+		$engine      = new EngineData( $engine_data, $job_id );
+
+		// Dry-run mode: return preview without executing publish
+		if ( ! empty( $engine_data['dry_run_mode'] ) ) {
+			$handler_config = $tool_def['handler_config'] ?? array();
+			return $this->buildDryRunPreview( $parameters, $handler_config, $engine );
+		}
+
+		// Enhance parameters for subclasses
+		$parameters['job_id'] = $job_id;
+		$parameters['engine'] = $engine;
+
+		$handler_slug   = (string) ( $tool_def['handler'] ?? $this->handler_type );
+		$handler_config = $tool_def['handler_config'] ?? array();
+		$handler_config = AuthRefHandlerConfig::resolve_runtime_config(
+			$handler_config,
+			$handler_slug,
+			array( 'job_id' => $job_id )
+		);
+		if ( is_wp_error( $handler_config ) ) {
+			return $this->errorResponse( 'Auth ref resolution failed: ' . $handler_config->get_error_message() );
+		}
+
+		$validation = HandlerConfigValidator::validate( $handler_slug, 'publish', $handler_config, array( 'job_id' => $job_id ) );
+		if ( is_wp_error( $validation ) ) {
+			return $this->errorResponse(
+				$validation->get_error_message(),
+				HandlerConfigValidator::diagnostics( $validation )
+			);
+		}
+
+		$result = $this->executePublish( $parameters, $handler_config );
+
+		// Post origin tracking is applied centrally in ToolExecutor::executeTool()
+		// after every tool call — handler tools and ability tools share the same
+		// path now, so individual base classes no longer need to call
+		// PostTracking::store() themselves.
+
+		return $result;
+	}
+
+	/**
+	 * Build dry-run preview response.
+	 *
+	 * Subclasses can override to provide handler-specific preview data.
+	 *
+	 * @param array      $parameters Tool parameters
+	 * @param array      $handler_config Handler configuration
+	 * @param EngineData $engine Engine data instance
+	 * @return array Dry-run preview response
+	 */
+	protected function buildDryRunPreview( array $parameters, array $handler_config, EngineData $engine ): array {
+		$this->log(
+			'info',
+			'Dry-run mode - returning preview without publishing',
+			array(
+				'handler' => $this->handler_type,
+			)
+		);
+
+		return $this->successResponse(
+			array(
+				'dry_run'    => true,
+				'preview'    => array(
+					'handler'    => $this->handler_type,
+					'parameters' => array_keys( $parameters ),
+				),
+				'source_url' => $engine->getSourceUrl(),
+				'image_path' => $engine->getImagePath(),
+				'video_path' => $engine->getVideoPath(),
+			)
+		);
+	}
+
+	/**
+	 * Get all engine data for the current job.
+	 *
+	 * @param int $job_id Job identifier
+	 * @return array Engine data with source_url, image_file_path, etc.
+	 */
+	protected function getEngineData( int $job_id ): array {
+		if ( ! $job_id ) {
+			return array(
+				'source_url'      => null,
+				'image_file_path' => null,
+				'image_url'       => null,
+				'video_file_path' => null,
+			);
+		}
+		return datamachine_get_engine_data( $job_id );
+	}
+
+	/**
+	 * Get source URL from engine data.
+	 *
+	 * @param int $job_id Job identifier
+	 * @return string|null Source URL
+	 */
+	protected function getSourceUrl( int $job_id ): ?string {
+		$engine_data = $this->getEngineData( $job_id );
+		return $engine_data['source_url'] ?? null;
+	}
+
+	/**
+	 * Get image file path from engine data.
+	 *
+	 * @param int $job_id Job identifier
+	 * @return string|null Image file path
+	 */
+	protected function getImageFilePath( int $job_id ): ?string {
+		$engine_data = $this->getEngineData( $job_id );
+		return $engine_data['image_file_path'] ?? null;
+	}
+
+	/**
+	 * Validate a repository media file using the given validator.
+	 *
+	 * @since 0.42.0
+	 * @param string                                           $file_path Path to media file.
+	 * @param \DataMachine\Core\FilesRepository\MediaValidator $validator  Validator instance.
+	 * @return array Validation result with valid, errors, mime_type, size.
+	 */
+	protected function validateMedia( string $file_path, \DataMachine\Core\FilesRepository\MediaValidator $validator ): array {
+		$validation = $validator->validate_repository_file( $file_path );
+
+		return array(
+			'valid'     => $validation['valid'] ?? false,
+			'errors'    => $validation['errors'] ?? array(),
+			'mime_type' => $validation['mime_type'] ?? null,
+			'size'      => $validation['size'] ?? 0,
+		);
+	}
+
+	/**
+	 * Validate repository image file.
+	 *
+	 * @param string $image_file_path Path to image file
+	 * @return array Validation result with valid, errors, mime_type, size
+	 */
+	protected function validateImage( string $image_file_path ): array {
+		return $this->validateMedia( $image_file_path, new \DataMachine\Core\FilesRepository\ImageValidator() );
+	}
+
+	/**
+	 * Get video file path from engine data.
+	 *
+	 * @since 0.42.0
+	 * @param int $job_id Job identifier
+	 * @return string|null Video file path
+	 */
+	protected function getVideoFilePath( int $job_id ): ?string {
+		$engine_data = $this->getEngineData( $job_id );
+		return $engine_data['video_file_path'] ?? null;
+	}
+
+	/**
+	 * Validate repository video file.
+	 *
+	 * @since 0.42.0
+	 * @param string $video_file_path Path to video file
+	 * @return array Validation result with valid, errors, mime_type, size
+	 */
+	protected function validateVideo( string $video_file_path ): array {
+		return $this->validateMedia( $video_file_path, new \DataMachine\Core\FilesRepository\VideoValidator() );
+	}
+
+	/**
+	 * Resolve media URLs from engine data.
+	 *
+	 * Validates file paths via core MediaValidator and returns public URLs.
+	 * Includes fallbacks to URLs already in engine data and WordPress featured images.
+	 *
+	 * Resolution order for images:
+	 * 1. image_file_path → validate → public URL (pipeline flow)
+	 * 2. image_url in engine data (already a URL)
+	 * 3. WordPress featured image from source_url
+	 * 4. attachment_url in engine data
+	 *
+	 * Resolution order for video:
+	 * 1. video_file_path → validate → public URL (pipeline flow)
+	 *
+	 * @since 0.42.0
+	 * @param \DataMachine\Core\EngineData $engine Engine data instance.
+	 * @return array{image_url: string, video_url: string, image_file_path: string, video_file_path: string}
+	 */
+	protected function resolveMediaUrls( \DataMachine\Core\EngineData $engine ): array {
+		$file_storage = new \DataMachine\Core\FilesRepository\FileStorage();
+		$result       = array(
+			'image_url'       => '',
+			'video_url'       => '',
+			'image_file_path' => '',
+			'video_file_path' => '',
+		);
+
+		// Video: file path → validate → public URL.
+		$video_file_path = $engine->getVideoPath();
+		if ( ! empty( $video_file_path ) ) {
+			$validation = $this->validateVideo( $video_file_path );
+			if ( $validation['valid'] ) {
+				$result['video_url']       = $file_storage->get_public_url( $video_file_path );
+				$result['video_file_path'] = $video_file_path;
+			}
+		}
+
+		// Image: file path → public URL.
+		$image_file_path = $engine->getImagePath();
+		if ( ! empty( $image_file_path ) ) {
+			$result['image_url']       = $file_storage->get_public_url( $image_file_path );
+			$result['image_file_path'] = $image_file_path;
+			return $result;
+		}
+
+		// Image fallback: URL already in engine data.
+		$image_url = $engine->get( 'image_url' );
+		if ( ! empty( $image_url ) && filter_var( $image_url, FILTER_VALIDATE_URL ) ) {
+			$result['image_url'] = $image_url;
+			return $result;
+		}
+
+		// Image fallback: WordPress featured image from source URL.
+		$source_url = $engine->getSourceUrl();
+		if ( ! empty( $source_url ) ) {
+			$post_id = url_to_postid( $source_url );
+			if ( $post_id > 0 ) {
+				$thumbnail_url = get_the_post_thumbnail_url( $post_id, 'full' );
+				if ( ! empty( $thumbnail_url ) ) {
+					$result['image_url'] = $thumbnail_url;
+					return $result;
+				}
+			}
+		}
+
+		// Image fallback: attachment_url in engine data.
+		$attachment_url = $engine->get( 'attachment_url' );
+		if ( ! empty( $attachment_url ) && filter_var( $attachment_url, FILTER_VALIDATE_URL ) ) {
+			$result['image_url'] = $attachment_url;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Create standardized success response.
+	 *
+	 * @param array $data Result data (post_id, post_url, etc.)
+	 * @return array Success response
+	 */
+	protected function successResponse( array $data ): array {
+		return array(
+			'success'   => true,
+			'data'      => $data,
+			'tool_name' => "{$this->handler_type}_publish",
+		);
+	}
+
+	/**
+	 * Create standardized error response.
+	 *
+	 * @param string     $error_message Error message
+	 * @param array|null $context Optional context for logging
+	 * @param string     $severity Error severity: 'critical', 'warning', 'info' (default: 'warning')
+	 * @return array Error response
+	 */
+	protected function errorResponse( string $error_message, ?array $context = null, string $severity = 'warning' ): array {
+		$this->log( 'error', $error_message, $context ?? array() );
+
+		return array(
+			'success'   => false,
+			'error'     => $error_message,
+			'severity'  => $severity,
+			'tool_name' => "{$this->handler_type}_publish",
+		);
+	}
+
+	/**
+	 * Centralized logging with handler context.
+	 *
+	 * @param string $level Log level (debug, info, warning, error)
+	 * @param string $message Log message
+	 * @param array  $context Additional context data
+	 */
+	protected function log( string $level, string $message, array $context = array() ): void {
+		do_action(
+			'datamachine_log',
+			$level,
+			$message,
+			array_merge(
+				array(
+					'handler' => $this->handler_type,
+				),
+				$context
+			)
+		);
+	}
+
+	/**
+	 * Get OAuth provider instance.
+	 *
+	 * @param string $provider_key Provider key (e.g., 'reddit', 'googlesheets')
+	 * @return object|null Provider instance or null
+	 */
+	protected function getAuthProvider( string $provider_key ): ?object {
+		$auth_abilities = new AuthAbilities();
+		return $auth_abilities->getProvider( $provider_key );
+	}
+}
