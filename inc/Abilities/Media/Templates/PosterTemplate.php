@@ -1302,10 +1302,11 @@ class PosterTemplate implements TemplateInterface {
 		$base  = max( 2, (int) round( 5 * $u ) );
 		$reach = hypot( $width, $height );
 		$row   = 0;
+		$col_w = $step;
 		for ( $y = intdiv( $step, 2 ); $y < $height + $step; $y += $step ) {
-			$offset = ( $row % 2 ) ? intdiv( $step, 2 ) : 0;
+			$offset = ( $row % 2 ) ? intdiv( $col_w, 2 ) : 0;
 			++$row;
-			for ( $x = $offset; $x < $width + $step; $x += $step ) {
+			for ( $x = $offset; $x < $width + $col_w; $x += $col_w ) {
 				$d = 2 * $base;
 				if ( $halftone ) {
 					$t = 1.0 - min( 1.0, hypot( $width - $x, $height - $y ) / $reach );
