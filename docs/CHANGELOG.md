@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.192.1] - 2026-10-17
+
+### Fixed
+- complete alt-text job as skipped when attachment was deleted before it ran
+
 ## [0.192.0] - 2026-10-17
 
 ### Added
