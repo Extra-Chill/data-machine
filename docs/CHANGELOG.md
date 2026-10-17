@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.192.0] - 2026-10-17
+
+### Added
+- display font role for titles
+
 ## [0.191.0] - 2026-10-17
 
 ### Added
