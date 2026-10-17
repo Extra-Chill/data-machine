@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.193.0] - 2026-10-17
+
+### Added
+- add dedicated render_images action for image-template abilities
+
 ## [0.192.2] - 2026-10-17
 
 ### Fixed
