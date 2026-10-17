@@ -44,6 +44,11 @@
  *     content and floods the scheme background over it at
  *     background_overlay opacity so the copy stays legible. Unreadable
  *     or unsupported images fall back to stripes.
+ *   - background_strength: `normal` (default), `subtle` or `bold`.
+ *     Scales the pattern ink opacity and line/dot weight for every
+ *     procedural pattern (stripes included) — `bold` roughly doubles the
+ *     subtle ink and thickens strokes 1.5x so the texture survives
+ *     office printing.
  *   - list_heading + list_items: a ruled list of rows, each with a
  *     primary line, an optional secondary line and an optional
  *     right-aligned meta value (e.g. a time or a price). Portrait draws
@@ -104,10 +109,10 @@ class PosterTemplate implements TemplateInterface {
 	private const LANDSCAPE_TITLE_MIN     = 60;
 	private const LANDSCAPE_DETAIL_SIZE   = 62;
 
-	/** GD alpha (0 opaque .. 127 transparent) for the background stripes. */
+	/** GD alpha (0 opaque .. 127 transparent) for the background stripes at subtle strength. */
 	private const STRIPE_ALPHA = 122;
 
-	/** GD alpha for the finer background patterns (grid, dots, waves), which need a touch more ink than the broad stripes. */
+	/** GD alpha for the finer background patterns (grid, dots, waves) at subtle strength, which need a touch more ink than the broad stripes. */
 	private const PATTERN_ALPHA = 114;
 
 	/** Supported color schemes; the first is the default. */
@@ -118,6 +123,23 @@ class PosterTemplate implements TemplateInterface {
 
 	/** Default opacity of the scheme-color overlay flooded over a background image. */
 	private const BACKGROUND_OVERLAY_DEFAULT = 0.55;
+
+	/** Background strengths; the first is the default. */
+	public const BACKGROUND_STRENGTHS = array( 'normal', 'subtle', 'bold' );
+
+	/**
+	 * Ink-opacity and stroke-weight multipliers per background strength.
+	 * `subtle` is the untouched base ink; `normal` is modestly stronger so
+	 * the texture reads on screen; `bold` roughly doubles the ink and
+	 * thickens strokes 1.5x so the pattern survives office printing.
+	 *
+	 * @var array<string, array{float, float}> strength => [ink factor, weight factor].
+	 */
+	private const STRENGTH_FACTORS = array(
+		'subtle' => array( 1.0, 1.0 ),
+		'normal' => array( 1.35, 1.15 ),
+		'bold'   => array( 2.2, 1.5 ),
+	);
 
 	/** QR emphasis modes; the first is the default. */
 	public const QR_EMPHASES = array( 'footer', 'hero' );
@@ -143,6 +165,12 @@ class PosterTemplate implements TemplateInterface {
 	/** Hero QR label size, in design units. */
 	private const HERO_LABEL_SIZE = 42;
 
+	/** Hero portrait title: target share of the available text width the widest wrapped line should fill. */
+	private const HERO_TITLE_FILL = 0.9;
+
+	/** Hero portrait title: growth cap as a multiple of the base title size. */
+	private const HERO_TITLE_GROWTH_CAP = 2.2;
+
 	/** List block sizes, in each layout's design unit. */
 	private const LIST_HEADING_SIZE = 26;
 	private const LIST_PRIMARY_SIZE = 38;
@@ -153,6 +181,13 @@ class PosterTemplate implements TemplateInterface {
 
 	/** Share of spare vertical space placed above the content block. */
 	private const SLACK_ABOVE = 0.4;
+
+	/**
+	 * Share of spare vertical space placed above the hero portrait content
+	 * block: half, so the content is vertically centered between the top
+	 * margin and the QR card instead of leaving one large dead band.
+	 */
+	private const HERO_SLACK_ABOVE = 0.5;
 
 	public function get_id(): string {
 		return 'poster';
@@ -179,31 +214,32 @@ class PosterTemplate implements TemplateInterface {
 		);
 
 		return array(
-			'title'              => $string( 'Title', true ),
-			'kicker'             => $string( 'Kicker (defaults to "<BRAND> PRESENTS")' ),
-			'tagline'            => $string( 'Tagline' ),
-			'subline'            => $string( 'Subline' ),
-			'detail_lines'       => $list( 'Detail lines (large type)' ),
-			'accent_line'        => $string( 'Accent line (large type, accent color)' ),
-			'detail_note'        => $string( 'Detail note (small, under the accent line)' ),
-			'banner_text'        => $string( 'Banner text (banner omitted when empty)' ),
-			'qr_url'             => $string( 'QR code URL' ),
-			'qr_label'           => $string( 'QR label' ),
-			'qr_emphasis'        => $string( 'QR emphasis: footer (default) or hero (large QR on a white card)' ),
-			'cta_text'           => $string( 'Call-to-action line' ),
-			'footer_note'        => $string( 'Footer note' ),
-			'cobrand_logos'      => $list( 'Co-brand logo paths' ),
-			'scheme'             => $string( 'Color scheme: dark (default), accent or light' ),
-			'background'         => $string( 'Background: stripes (default), none, grid, dots, halftone, crosshatch, waves, gradient, glow or image' ),
-			'background_image'   => $string( 'Background image: absolute path to a PNG, JPEG or WebP, cover-fit behind everything (used when background is image)' ),
-			'background_tint'    => $string( 'Background pattern tint: hex color overriding the pattern ink' ),
-			'background_overlay' => array(
+			'title'               => $string( 'Title', true ),
+			'kicker'              => $string( 'Kicker (defaults to "<BRAND> PRESENTS")' ),
+			'tagline'             => $string( 'Tagline' ),
+			'subline'             => $string( 'Subline' ),
+			'detail_lines'        => $list( 'Detail lines (large type)' ),
+			'accent_line'         => $string( 'Accent line (large type, accent color)' ),
+			'detail_note'         => $string( 'Detail note (small, under the accent line)' ),
+			'banner_text'         => $string( 'Banner text (banner omitted when empty)' ),
+			'qr_url'              => $string( 'QR code URL' ),
+			'qr_label'            => $string( 'QR label' ),
+			'qr_emphasis'         => $string( 'QR emphasis: footer (default) or hero (large QR on a white card)' ),
+			'cta_text'            => $string( 'Call-to-action line' ),
+			'footer_note'         => $string( 'Footer note' ),
+			'cobrand_logos'       => $list( 'Co-brand logo paths' ),
+			'scheme'              => $string( 'Color scheme: dark (default), accent or light' ),
+			'background'          => $string( 'Background: stripes (default), none, grid, dots, halftone, crosshatch, waves, gradient, glow or image' ),
+			'background_strength' => $string( 'Background strength: normal (default), subtle or bold — scales the pattern ink opacity and line weight' ),
+			'background_image'    => $string( 'Background image: absolute path to a PNG, JPEG or WebP, cover-fit behind everything (used when background is image)' ),
+			'background_tint'     => $string( 'Background pattern tint: hex color overriding the pattern ink' ),
+			'background_overlay'  => array(
 				'label'    => 'Background image overlay: opacity (0-1, default 0.55) of the scheme background flooded over the image',
 				'type'     => 'number',
 				'required' => false,
 			),
-			'list_heading'       => $string( 'List heading (small caps line above the list)' ),
-			'list_items'         => $list( 'List rows: strings, or objects with primary, secondary and meta' ),
+			'list_heading'        => $string( 'List heading (small caps line above the list)' ),
+			'list_items'          => $list( 'List rows: strings, or objects with primary, secondary and meta' ),
 		);
 	}
 
@@ -257,7 +293,7 @@ class PosterTemplate implements TemplateInterface {
 	 * Normalize raw template input into the strings and lists drawn.
 	 *
 	 * @param array $data Raw template input.
-	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: list<string>, accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, qr_emphasis: string, cta_text: string, footer_note: string, cobrand_logos: list<string>, scheme: string, background: string, background_image: string, background_tint: string, background_overlay: float, list_heading: string, list_items: list<array{primary: non-empty-string, secondary: string, meta: string}>}
+	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: list<string>, accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, qr_emphasis: string, cta_text: string, footer_note: string, cobrand_logos: list<string>, scheme: string, background: string, background_strength: string, background_image: string, background_tint: string, background_overlay: float, list_heading: string, list_items: list<array{primary: non-empty-string, secondary: string, meta: string}>}
 	 */
 	public static function normalize_fields( array $data ): array {
 		$str = static fn( string $key ): string => is_scalar( $data[ $key ] ?? null ) ? trim( (string) $data[ $key ] ) : '';
@@ -298,6 +334,7 @@ class PosterTemplate implements TemplateInterface {
 		$scheme     = strtolower( $str( 'scheme' ) );
 		$emphasis   = strtolower( $str( 'qr_emphasis' ) );
 		$background = strtolower( $str( 'background' ) );
+		$strength   = strtolower( $str( 'background_strength' ) );
 
 		$tint = strtolower( $str( 'background_tint' ) );
 		$tint = 1 === preg_match( '/^#?[0-9a-f]{6}$/', $tint ) ? '#' . ltrim( $tint, '#' ) : '';
@@ -306,27 +343,28 @@ class PosterTemplate implements TemplateInterface {
 		$overlay = is_numeric( $overlay ) ? min( 1.0, max( 0.0, (float) $overlay ) ) : self::BACKGROUND_OVERLAY_DEFAULT;
 
 		return array(
-			'title'              => $str( 'title' ),
-			'kicker'             => $str( 'kicker' ),
-			'tagline'            => $str( 'tagline' ),
-			'subline'            => $str( 'subline' ),
-			'detail_lines'       => $detail_lines,
-			'accent_line'        => $str( 'accent_line' ),
-			'detail_note'        => $str( 'detail_note' ),
-			'banner_text'        => $str( 'banner_text' ),
-			'qr_url'             => $str( 'qr_url' ),
-			'qr_label'           => $str( 'qr_label' ),
-			'qr_emphasis'        => in_array( $emphasis, self::QR_EMPHASES, true ) ? $emphasis : self::QR_EMPHASES[0],
-			'cta_text'           => $str( 'cta_text' ),
-			'footer_note'        => $str( 'footer_note' ),
-			'cobrand_logos'      => $cobrand,
-			'scheme'             => in_array( $scheme, self::SCHEMES, true ) ? $scheme : self::SCHEMES[0],
-			'background'         => in_array( $background, self::BACKGROUNDS, true ) ? $background : self::BACKGROUNDS[0],
-			'background_image'   => $str( 'background_image' ),
-			'background_tint'    => $tint,
-			'background_overlay' => $overlay,
-			'list_heading'       => $str( 'list_heading' ),
-			'list_items'         => $list_items,
+			'title'               => $str( 'title' ),
+			'kicker'              => $str( 'kicker' ),
+			'tagline'             => $str( 'tagline' ),
+			'subline'             => $str( 'subline' ),
+			'detail_lines'        => $detail_lines,
+			'accent_line'         => $str( 'accent_line' ),
+			'detail_note'         => $str( 'detail_note' ),
+			'banner_text'         => $str( 'banner_text' ),
+			'qr_url'              => $str( 'qr_url' ),
+			'qr_label'            => $str( 'qr_label' ),
+			'qr_emphasis'         => in_array( $emphasis, self::QR_EMPHASES, true ) ? $emphasis : self::QR_EMPHASES[0],
+			'cta_text'            => $str( 'cta_text' ),
+			'footer_note'         => $str( 'footer_note' ),
+			'cobrand_logos'       => $cobrand,
+			'scheme'              => in_array( $scheme, self::SCHEMES, true ) ? $scheme : self::SCHEMES[0],
+			'background'          => in_array( $background, self::BACKGROUNDS, true ) ? $background : self::BACKGROUNDS[0],
+			'background_strength' => in_array( $strength, self::BACKGROUND_STRENGTHS, true ) ? $strength : self::BACKGROUND_STRENGTHS[0],
+			'background_image'    => $str( 'background_image' ),
+			'background_tint'     => $tint,
+			'background_overlay'  => $overlay,
+			'list_heading'        => $str( 'list_heading' ),
+			'list_items'          => $list_items,
 		);
 	}
 
@@ -654,6 +692,13 @@ class PosterTemplate implements TemplateInterface {
 	 * HERO_QR_MIN_RATIO_LANDSCAPE of the canvas height; the text column and
 	 * the banner take the left.
 	 *
+	 * Portrait titles auto-size upward first: the base title size grows (up
+	 * to HERO_TITLE_GROWTH_CAP times) until the widest wrapped line fills
+	 * about HERO_TITLE_FILL of the width left of the logo, so short titles
+	 * do not strand a wide empty column. The fit loop below still shrinks
+	 * the grown title back toward (and past) the base size before the QR
+	 * card gives up any size, so content never overlaps the card.
+	 *
 	 * Fitting order: trim overlong lists, shrink the title, shrink the QR
 	 * toward its minimum, then drop optional copy (footer note, CTA, detail
 	 * note, subline, tagline, remaining list rows, detail lines) — only
@@ -715,7 +760,11 @@ class PosterTemplate implements TemplateInterface {
 		$min_gap    = $px( self::MIN_BANNER_GAP );
 
 		$title_size = $px( self::TITLE_MAX_SIZE );
-		$drops      = array( 'footer_note', 'cta_text', 'detail_note', 'subline', 'tagline' );
+		if ( ! $landscape ) {
+			$grow_w     = $width - 2 * $margin - ( $logo_w ? $logo_w + $px( 30 ) : 0 );
+			$title_size = self::hero_title_size( $r, $fields['title'], $title_size, $grow_w );
+		}
+		$drops = array( 'footer_note', 'cta_text', 'detail_note', 'subline', 'tagline' );
 		do {
 			list( $card, $label_sz ) = $measure_card( $qr_size );
 
@@ -892,8 +941,9 @@ class PosterTemplate implements TemplateInterface {
 	 * Place the content block, banner and hero QR card on a portrait canvas.
 	 *
 	 * The card is pinned to the bottom margin; the banner sits min_gap above
-	 * it, and the content block above that, with spare space distributed the
-	 * same way plan_layout() does.
+	 * it, and the content block above that, vertically centered in the spare
+	 * space between the top margin and the banner (or card) so no single
+	 * large dead band pools above the QR card.
 	 *
 	 * @param int $height         Canvas height.
 	 * @param int $margin         Outer margin.
@@ -907,7 +957,7 @@ class PosterTemplate implements TemplateInterface {
 		$card_top   = $height - $margin - $card_height;
 		$banner_top = $card_top - ( $banner_height > 0 ? $min_gap + $banner_height : 0 );
 		$slack      = $banner_top - $min_gap - ( $margin + $content_height );
-		$top        = $margin + ( $slack > 0 ? (int) floor( $slack * self::SLACK_ABOVE ) : 0 );
+		$top        = $margin + ( $slack > 0 ? (int) floor( $slack * self::HERO_SLACK_ABOVE ) : 0 );
 
 		return array(
 			'fits'           => $slack >= 0,
@@ -1097,6 +1147,64 @@ class PosterTemplate implements TemplateInterface {
 	}
 
 	/**
+	 * Hero portrait title size: grow the base size until the widest wrapped
+	 * line fills about HERO_TITLE_FILL of the available width.
+	 *
+	 * Growth is capped at HERO_TITLE_GROWTH_CAP times the base and the
+	 * result is never below the base, so a title that already fills its
+	 * column keeps its current size. The caller's fit loop still shrinks
+	 * the returned size when vertical space runs out.
+	 *
+	 * @param GDRenderer $r     Renderer with registered fonts.
+	 * @param string     $title Title text.
+	 * @param int        $base  Base (current) title size in pixels.
+	 * @param int        $width Available text width in pixels.
+	 */
+	public static function hero_title_size( GDRenderer $r, string $title, int $base, int $width ): int {
+		if ( '' === $title || $base < 1 || $width < 1 ) {
+			return max( 1, $base );
+		}
+		$cap    = (int) round( $base * self::HERO_TITLE_GROWTH_CAP );
+		$target = (int) round( $width * self::HERO_TITLE_FILL );
+		$size   = $base;
+
+		// The widest wrapped line scales roughly linearly with the font size
+		// between re-wraps, so a few proportional passes converge on the
+		// target fill without walking every candidate size.
+		for ( $pass = 0; $pass < 5; $pass++ ) {
+			$widest = self::widest_line_width( $r, $title, $size, 'heading', $width );
+			if ( $widest < 1 || $widest >= $target || $size >= $cap ) {
+				break;
+			}
+			$size = min( $cap, max( $size + 1, (int) floor( $size * $target / $widest ) ) );
+		}
+
+		// Wrapping never breaks words, so back off until no single word
+		// spills past the column (but never below the base size).
+		while ( $size > $base && self::widest_line_width( $r, $title, $size, 'heading', $width ) > $width ) {
+			--$size;
+		}
+		return $size;
+	}
+
+	/**
+	 * Width of the widest wrapped line of a text at a size.
+	 *
+	 * @param GDRenderer $r     Renderer with registered fonts.
+	 * @param string     $text  Text to wrap.
+	 * @param int        $size  Font size.
+	 * @param string     $font  Registered font name.
+	 * @param int        $width Wrap width in pixels.
+	 */
+	private static function widest_line_width( GDRenderer $r, string $text, int $size, string $font, int $width ): int {
+		$widest = 0;
+		foreach ( $r->wrap_text( $text, $size, $font, $width ) as $line ) {
+			$widest = max( $widest, $r->measure_text_width( $line, $size, $font ) );
+		}
+		return $widest;
+	}
+
+	/**
 	 * Largest size (up to $size) at which no single word overflows $w.
 	 *
 	 * Wrapping cannot break a word, so long unbroken tokens (URLs,
@@ -1161,6 +1269,8 @@ class PosterTemplate implements TemplateInterface {
 	 * default stripes — light ink on dark schemes, dark ink on light ones,
 	 * or the background_tint override — with spacing and weight scaled by
 	 * the canvas unit so print presets keep the same texture density.
+	 * background_strength scales the ink opacity and the stroke weight (see
+	 * background_ink()) so `bold` stays clearly visible in print.
 	 * `image` cover-fits background_image behind the content and floods the
 	 * scheme background color over it at background_overlay opacity; an
 	 * unreadable, unsupported or unloadable image falls back to stripes.
@@ -1188,32 +1298,69 @@ class PosterTemplate implements TemplateInterface {
 		$rgb  = self::hex_rgb( '' !== $tint ? $tint : ( 'light' === $palette['stripe'] ? '#ffffff' : '#000000' ) );
 		$ink  = static fn( string $name, int $alpha ): int => $r->color( $name, $rgb[0], $rgb[1], $rgb[2], $alpha );
 
+		$spec   = self::background_ink( (string) $fields['background_strength'] );
+		$weight = (float) $spec['weight'];
+
 		switch ( $background ) {
 			case 'grid':
-				self::draw_grid( $r, $width, $height, $u, $ink( 'pattern', self::PATTERN_ALPHA ) );
+				self::draw_grid( $r, $width, $height, $u, $ink( 'pattern', $spec['pattern_alpha'] ), $weight );
 				break;
 			case 'dots':
-				self::draw_dots( $r, $width, $height, $u, $ink( 'pattern', self::PATTERN_ALPHA ), false );
+				self::draw_dots( $r, $width, $height, $u, $ink( 'pattern', $spec['pattern_alpha'] ), false, $weight );
 				break;
 			case 'halftone':
-				self::draw_dots( $r, $width, $height, $u, $ink( 'pattern', self::PATTERN_ALPHA ), true );
+				self::draw_dots( $r, $width, $height, $u, $ink( 'pattern', $spec['pattern_alpha'] ), true, $weight );
 				break;
 			case 'crosshatch':
-				self::draw_stripes( $r, $width, $height, $u, $ink( 'stripe', self::STRIPE_ALPHA ) );
-				self::draw_stripes( $r, $width, $height, $u, $ink( 'stripe', self::STRIPE_ALPHA ), -1 );
+				self::draw_stripes( $r, $width, $height, $u, $ink( 'stripe', $spec['stripe_alpha'] ), $weight );
+				self::draw_stripes( $r, $width, $height, $u, $ink( 'stripe', $spec['stripe_alpha'] ), $weight, -1 );
 				break;
 			case 'waves':
-				self::draw_waves( $r, $width, $height, $u, $ink( 'pattern', self::PATTERN_ALPHA ) );
+				self::draw_waves( $r, $width, $height, $u, $ink( 'pattern', $spec['pattern_alpha'] ), $weight );
 				break;
 			case 'gradient':
-				self::draw_gradient( $r, $width, $height, $ink );
+				self::draw_gradient( $r, $width, $height, $ink, (float) $spec['opacity'] );
 				break;
 			case 'glow':
-				self::draw_glow( $r, $width, $height, $ink );
+				self::draw_glow( $r, $width, $height, $ink, (float) $spec['opacity'] );
 				break;
 			default:
-				self::draw_stripes( $r, $width, $height, $u, $ink( 'stripe', self::STRIPE_ALPHA ) );
+				self::draw_stripes( $r, $width, $height, $u, $ink( 'stripe', $spec['stripe_alpha'] ), $weight );
 		}
+	}
+
+	/**
+	 * Resolve a background strength to concrete ink values.
+	 *
+	 * Returns the GD alphas (0 opaque .. 127 transparent) for the stripe
+	 * and pattern inks with the strength's opacity factor applied, the raw
+	 * opacity factor (for the gradient and glow ramps) and the stroke
+	 * weight multiplier. Unknown strengths normalize to the default.
+	 *
+	 * @param string $strength One of self::BACKGROUND_STRENGTHS.
+	 * @return array{stripe_alpha: int, pattern_alpha: int, opacity: float, weight: float}
+	 */
+	public static function background_ink( string $strength ): array {
+		$factors = self::STRENGTH_FACTORS[ $strength ] ?? self::STRENGTH_FACTORS[ self::BACKGROUND_STRENGTHS[0] ];
+		return array(
+			'stripe_alpha'  => self::scaled_alpha( self::STRIPE_ALPHA, $factors[0] ),
+			'pattern_alpha' => self::scaled_alpha( self::PATTERN_ALPHA, $factors[0] ),
+			'opacity'       => $factors[0],
+			'weight'        => $factors[1],
+		);
+	}
+
+	/**
+	 * Scale a GD alpha's ink (opacity) by a factor, clamped to 0..127.
+	 *
+	 * GD alphas are inverted (0 opaque, 127 transparent), so the factor is
+	 * applied to the ink share (127 - alpha) and converted back.
+	 *
+	 * @param int   $alpha  Base GD alpha.
+	 * @param float $factor Ink multiplier.
+	 */
+	private static function scaled_alpha( int $alpha, float $factor ): int {
+		return max( 0, min( 127, 127 - (int) round( ( 127 - $alpha ) * $factor ) ) );
 	}
 
 	/**
@@ -1252,11 +1399,12 @@ class PosterTemplate implements TemplateInterface {
 	 * @param int        $height    Canvas height.
 	 * @param float      $u         Scale unit (width / 1080).
 	 * @param int        $ink       Allocated low-alpha GD color.
+	 * @param float      $boldness  Stroke weight multiplier (background strength).
 	 * @param int        $direction Diagonal direction: 1 rising, -1 falling.
 	 */
-	private static function draw_stripes( GDRenderer $r, int $width, int $height, float $u, int $ink, int $direction = 1 ): void {
+	private static function draw_stripes( GDRenderer $r, int $width, int $height, float $u, int $ink, float $boldness = 1.0, int $direction = 1 ): void {
 		$step   = max( 1, (int) ( $width / 18 ) );
-		$weight = max( 2, (int) round( 4 * $u ) );
+		$weight = max( 2, (int) round( 4 * $u * $boldness ) );
 		for ( $x = -$height; $x < $width; $x += $step ) {
 			if ( $direction >= 0 ) {
 				$r->draw_line( $x, $height, $x + $height, 0, $ink, $weight );
@@ -1269,15 +1417,16 @@ class PosterTemplate implements TemplateInterface {
 	/**
 	 * Thin square grid.
 	 *
-	 * @param GDRenderer $r      Renderer with a filled canvas.
-	 * @param int        $width  Canvas width.
-	 * @param int        $height Canvas height.
-	 * @param float      $u      Scale unit (width / 1080).
-	 * @param int        $ink    Allocated low-alpha GD color.
+	 * @param GDRenderer $r        Renderer with a filled canvas.
+	 * @param int        $width    Canvas width.
+	 * @param int        $height   Canvas height.
+	 * @param float      $u        Scale unit (width / 1080).
+	 * @param int        $ink      Allocated low-alpha GD color.
+	 * @param float      $boldness Stroke weight multiplier (background strength).
 	 */
-	private static function draw_grid( GDRenderer $r, int $width, int $height, float $u, int $ink ): void {
+	private static function draw_grid( GDRenderer $r, int $width, int $height, float $u, int $ink, float $boldness = 1.0 ): void {
 		$step   = max( 4, (int) round( 64 * $u ) );
-		$weight = max( 1, (int) round( 2 * $u ) );
+		$weight = max( 1, (int) round( 2 * $u * $boldness ) );
 		for ( $x = 0; $x <= $width; $x += $step ) {
 			$r->draw_line( $x, 0, $x, $height, $ink, $weight );
 		}
@@ -1296,10 +1445,11 @@ class PosterTemplate implements TemplateInterface {
 	 * @param float      $u        Scale unit (width / 1080).
 	 * @param int        $ink      Allocated low-alpha GD color.
 	 * @param bool       $halftone Vary the radius with corner distance.
+	 * @param float      $boldness Dot weight multiplier (background strength).
 	 */
-	private static function draw_dots( GDRenderer $r, int $width, int $height, float $u, int $ink, bool $halftone ): void {
+	private static function draw_dots( GDRenderer $r, int $width, int $height, float $u, int $ink, bool $halftone, float $boldness = 1.0 ): void {
 		$step  = max( 6, (int) round( 56 * $u ) );
-		$base  = max( 2, (int) round( 5 * $u ) );
+		$base  = max( 2, (int) round( 5 * $u * $boldness ) );
 		$reach = hypot( $width, $height );
 		$row   = 0;
 		$col_w = $step;
@@ -1320,18 +1470,19 @@ class PosterTemplate implements TemplateInterface {
 	/**
 	 * Horizontal sine lines, phase-shifted per row.
 	 *
-	 * @param GDRenderer $r      Renderer with a filled canvas.
-	 * @param int        $width  Canvas width.
-	 * @param int        $height Canvas height.
-	 * @param float      $u      Scale unit (width / 1080).
-	 * @param int        $ink    Allocated low-alpha GD color.
+	 * @param GDRenderer $r        Renderer with a filled canvas.
+	 * @param int        $width    Canvas width.
+	 * @param int        $height   Canvas height.
+	 * @param float      $u        Scale unit (width / 1080).
+	 * @param int        $ink      Allocated low-alpha GD color.
+	 * @param float      $boldness Stroke weight multiplier (background strength).
 	 */
-	private static function draw_waves( GDRenderer $r, int $width, int $height, float $u, int $ink ): void {
+	private static function draw_waves( GDRenderer $r, int $width, int $height, float $u, int $ink, float $boldness = 1.0 ): void {
 		$gap    = max( 8, (int) round( 72 * $u ) );
 		$amp    = max( 2, (int) round( 16 * $u ) );
 		$length = max( 16, (int) round( 260 * $u ) );
 		$seg    = max( 4, (int) round( 10 * $u ) );
-		$weight = max( 1, (int) round( 3 * $u ) );
+		$weight = max( 1, (int) round( 3 * $u * $boldness ) );
 		$row    = 0;
 		for ( $y = 0; $y <= $height + $amp; $y += $gap ) {
 			$phase = $row * M_PI / 3;
@@ -1350,17 +1501,18 @@ class PosterTemplate implements TemplateInterface {
 	 * toward a darker (light schemes) or lighter (dark schemes) shade at
 	 * the bottom, built from ink bands of increasing opacity.
 	 *
-	 * @param GDRenderer $r      Renderer with a filled canvas.
-	 * @param int        $width  Canvas width.
-	 * @param int        $height Canvas height.
+	 * @param GDRenderer $r       Renderer with a filled canvas.
+	 * @param int        $width   Canvas width.
+	 * @param int        $height  Canvas height.
 	 * @param callable(string, int): int $ink Ink allocator (name, GD alpha).
+	 * @param float      $opacity Ink multiplier (background strength).
 	 */
-	private static function draw_gradient( GDRenderer $r, int $width, int $height, callable $ink ): void {
+	private static function draw_gradient( GDRenderer $r, int $width, int $height, callable $ink, float $opacity = 1.0 ): void {
 		$bands  = 48;
 		$band_h = (int) ceil( $height / $bands );
 		for ( $i = 1; $i < $bands; $i++ ) {
-			// Fully transparent at the top, ~30% ink at the bottom.
-			$alpha = 127 - (int) round( 38 * $i / ( $bands - 1 ) );
+			// Fully transparent at the top, ~30% ink at the bottom (scaled by the strength).
+			$alpha = max( 0, 127 - (int) round( 38 * $opacity * $i / ( $bands - 1 ) ) );
 			$r->filled_rect( 0, $i * $band_h, $width, min( $height, ( $i + 1 ) * $band_h ), $ink( "gradient_{$i}", $alpha ) );
 		}
 	}
@@ -1370,14 +1522,15 @@ class PosterTemplate implements TemplateInterface {
 	 * toward the center, so the middle of the canvas reads lighter (dark
 	 * schemes) or softly inked (light schemes) than the corners.
 	 *
-	 * @param GDRenderer $r      Renderer with a filled canvas.
-	 * @param int        $width  Canvas width.
-	 * @param int        $height Canvas height.
+	 * @param GDRenderer $r       Renderer with a filled canvas.
+	 * @param int        $width   Canvas width.
+	 * @param int        $height  Canvas height.
 	 * @param callable(string, int): int $ink Ink allocator (name, GD alpha).
+	 * @param float      $opacity Ink multiplier (background strength).
 	 */
-	private static function draw_glow( GDRenderer $r, int $width, int $height, callable $ink ): void {
+	private static function draw_glow( GDRenderer $r, int $width, int $height, callable $ink, float $opacity = 1.0 ): void {
 		$steps = 36;
-		$layer = $ink( 'glow', 126 ); // One ~1% ink layer per ellipse; they accumulate at the center.
+		$layer = $ink( 'glow', max( 0, 127 - max( 1, (int) round( $opacity ) ) ) ); // One ~1% ink layer per ellipse (scaled by the strength); they accumulate at the center.
 		$cx    = intdiv( $width, 2 );
 		$cy    = intdiv( $height, 2 );
 		for ( $i = 0; $i < $steps; $i++ ) {

@@ -11,6 +11,13 @@
  *    value renders at preset size on print_tabloid_300 and
  *    landscape_16_9 (footer and hero modes), cover-fit math, and a bad
  *    background image path falls back to stripes without error
+ *  - background_strength (#3628): normalization, bold ink stronger than
+ *    subtle, bold roughly doubles the subtle ink and thickens strokes,
+ *    and bold/subtle render different bytes
+ *  - hero portrait title autoscale (#3628): the widest wrapped line of a
+ *    short two-word title fills at least 80% of the text width on both
+ *    print presets, never below the base size, and the fitted posters
+ *    keep the QR at its guaranteed minimum (no content/QR overlap)
  *  - layout planning: content clears the banner, slack is distributed,
  *    banner-less layouts, landscape columns never overlap
  *  - renders portrait and landscape PNGs at preset size, with and without
@@ -156,7 +163,7 @@ $assert( 'normalize trims strings', 'Never Miss The Show' === $norm['title'] );
 $assert( 'normalize keeps only non-empty scalar detail lines', array( 'Find a show tonight', '42' ) === $norm['detail_lines'] );
 $assert( 'normalize rejects non-scalar strings', '' === $norm['banner_text'] );
 $assert( 'normalize keeps only string logo paths', array( '/tmp/a.png' ) === $norm['cobrand_logos'] );
-$assert( 'normalize fills every field', 21 === count( $norm ) && '' === $norm['qr_url'] );
+$assert( 'normalize fills every field', 22 === count( $norm ) && '' === $norm['qr_url'] );
 $assert( 'scheme defaults to dark', 'dark' === $norm['scheme'] );
 $assert( 'unknown scheme falls back to dark', 'dark' === PosterTemplate::normalize_fields( array( 'scheme' => 'neon' ) )['scheme'] );
 $assert( 'scheme is case-insensitive', 'accent' === PosterTemplate::normalize_fields( array( 'scheme' => 'Accent' ) )['scheme'] );
@@ -185,6 +192,36 @@ $assert(
 $assert( 'non-numeric background_overlay falls back to the default', 0.55 === PosterTemplate::normalize_fields( array( 'background_overlay' => 'lots' ) )['background_overlay'] );
 $assert( 'background_tint normalizes a hex color', '#aabbcc' === PosterTemplate::normalize_fields( array( 'background_tint' => 'AABBCC' ) )['background_tint'] );
 $assert( 'invalid background_tint is dropped', '' === PosterTemplate::normalize_fields( array( 'background_tint' => 'red' ) )['background_tint'] );
+
+// Background strength (#3628): subtle | normal (default) | bold.
+$assert( 'background_strength defaults to normal', 'normal' === $norm['background_strength'] && 'normal' === PosterTemplate::BACKGROUND_STRENGTHS[0] );
+$assert( 'unknown background_strength falls back to normal', 'normal' === PosterTemplate::normalize_fields( array( 'background_strength' => 'shouty' ) )['background_strength'] );
+$assert( 'background_strength is case-insensitive', 'bold' === PosterTemplate::normalize_fields( array( 'background_strength' => 'Bold' ) )['background_strength'] );
+$assert( 'get_fields declares background_strength', isset( $fields['background_strength'] ) );
+$assert(
+	'background_strength constant lists every value',
+	array( 'normal', 'subtle', 'bold' ) === PosterTemplate::BACKGROUND_STRENGTHS
+);
+
+$ink_subtle = PosterTemplate::background_ink( 'subtle' );
+$ink_normal = PosterTemplate::background_ink( 'normal' );
+$ink_bold   = PosterTemplate::background_ink( 'bold' );
+$assert(
+	'bold ink alpha is stronger than subtle',
+	$ink_bold['stripe_alpha'] < $ink_subtle['stripe_alpha'] && $ink_bold['pattern_alpha'] < $ink_subtle['pattern_alpha']
+);
+$assert(
+	'bold roughly doubles the subtle ink opacity',
+	( 127 - $ink_bold['stripe_alpha'] ) >= 2 * ( 127 - $ink_subtle['stripe_alpha'] )
+		&& ( 127 - $ink_bold['pattern_alpha'] ) >= 2 * ( 127 - $ink_subtle['pattern_alpha'] )
+);
+$assert( 'bold thickens strokes by 1.5x', $ink_bold['weight'] >= 1.5 * $ink_subtle['weight'] );
+$assert(
+	'normal sits between subtle and bold',
+	$ink_normal['stripe_alpha'] <= $ink_subtle['stripe_alpha'] && $ink_normal['stripe_alpha'] >= $ink_bold['stripe_alpha']
+		&& $ink_normal['weight'] >= $ink_subtle['weight'] && $ink_normal['weight'] <= $ink_bold['weight']
+);
+$assert( 'unknown strength resolves to the normal ink', PosterTemplate::background_ink( 'shouty' ) === $ink_normal );
 
 // Pure cover-fit math: scale to fill, center-crop the overflow.
 $assert(
@@ -409,6 +446,16 @@ $assert(
 );
 wp_delete_file( $bg_fixture );
 
+// Background strength changes the rendered ink for stripes and finer patterns.
+$assert( 'default output is byte-identical to explicit normal strength', $hash( $ad + array( 'background_strength' => 'normal' ) ) === $default_hash );
+$bold_hash   = $hash( $ad + array( 'background_strength' => 'bold' ) );
+$subtle_hash = $hash( $ad + array( 'background_strength' => 'subtle' ) );
+$assert( 'bold strength renders different bytes than subtle', '' !== $bold_hash && '' !== $subtle_hash && $bold_hash !== $subtle_hash );
+$assert(
+	'strength also scales the finer patterns',
+	$hash( $ad + array( 'background' => 'grid', 'background_strength' => 'bold' ) ) !== $hash( $ad + array( 'background' => 'grid', 'background_strength' => 'subtle' ) )
+);
+
 // -------------------------------------------------------------------------
 // QR-hero layout (#3621).
 // -------------------------------------------------------------------------
@@ -465,6 +512,65 @@ $qr_sizes = array();
 $info     = $render( $hero_data, 'landscape_16_9' );
 $final    = $qr_sizes ? (int) end( $qr_sizes ) : 0;
 $assert( 'landscape_16_9: hero QR is at least 40% of the canvas height', null !== $info && $final >= (int) round( 1080 * PosterTemplate::HERO_QR_MIN_RATIO_LANDSCAPE ) );
+$GLOBALS['poster_smoke_qr'] = null;
+
+// -------------------------------------------------------------------------
+// Hero portrait title autoscale (#3628).
+// -------------------------------------------------------------------------
+
+// The issue #3628 example: a short two-word title that wraps to two lines
+// and previously filled under half the text width on the print presets.
+foreach ( array( 'print_tabloid_300', 'print_pocket_flyer' ) as $preset ) {
+	$dims   = PlatformPresets::dimensions( $preset );
+	$u      = $dims['width'] / 1080;
+	$margin = (int) round( 80 * $u );
+	$text_w = $dims['width'] - 2 * $margin;
+	$base   = (int) round( 84 * $u );
+
+	$measure = new GDRenderer();
+	$measure->create_canvas( $preset );
+	$measure->register_font( 'heading', '' );
+
+	$size   = PosterTemplate::hero_title_size( $measure, 'COSTUME CONTEST', $base, $text_w );
+	$widest = 0;
+	foreach ( $measure->wrap_text( 'COSTUME CONTEST', $size, 'heading', $text_w ) as $line ) {
+		$widest = max( $widest, $measure->measure_text_width( $line, $size, 'heading' ) );
+	}
+
+	$assert( "{$preset}: hero title never shrinks below the base size", $size >= $base );
+	$assert( "{$preset}: hero title growth is capped", $size <= (int) round( $base * 2.2 ) );
+	$assert(
+		"{$preset}: hero title fills at least 80% of the text width",
+		$widest >= (int) round( 0.8 * $text_w ) && $widest <= $text_w
+	);
+}
+
+// A title that already fills its column keeps its current size.
+$measure = new GDRenderer();
+$measure->create_canvas( 'print_pocket_flyer' );
+$measure->register_font( 'heading', '' );
+$assert( 'hero title at a tiny width stays at the base size', 10 === PosterTemplate::hero_title_size( $measure, 'COSTUME CONTEST', 10, 1 ) );
+
+// End to end: the grown title still never overlaps the QR card — the fit
+// loop shrinks it back before the hero QR gives up its guaranteed minimum
+// across the print preset matrix.
+$costume_data               = array( 'title' => 'COSTUME CONTEST' ) + $hero_data;
+$GLOBALS['poster_smoke_qr'] = static function ( $value, $url, $size ) use ( &$qr_sizes ) {
+	$qr_sizes[] = (int) $size;
+	$img        = imagecreatetruecolor( max( 1, (int) $size ), max( 1, (int) $size ) );
+	imagefill( $img, 0, 0, imagecolorallocate( $img, 0, 0, 0 ) );
+	$path = tempnam( sys_get_temp_dir(), 'poster-qr' );
+	imagepng( $img, $path );
+	return $path;
+};
+foreach ( array( 'print_tabloid_300' => 3300, 'print_pocket_flyer' => 1275, 'print_tabloid' => 1650 ) as $preset => $w ) {
+	$dims     = PlatformPresets::dimensions( $preset );
+	$qr_sizes = array();
+	$info     = $render( $costume_data, $preset );
+	$final    = $qr_sizes ? (int) end( $qr_sizes ) : 0;
+	$assert( "{$preset}: COSTUME CONTEST hero renders at preset size", null !== $info && $dims['width'] === $info[0] && $dims['height'] === $info[1] );
+	$assert( "{$preset}: COSTUME CONTEST hero keeps the QR minimum (no overlap)", $final >= (int) round( $w * PosterTemplate::HERO_QR_MIN_RATIO ) );
+}
 $GLOBALS['poster_smoke_qr'] = null;
 
 $finish();
