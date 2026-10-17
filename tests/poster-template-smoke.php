@@ -728,4 +728,12 @@ $GLOBALS['poster_smoke_qr'] = null;
 wp_delete_file( $wide_logo );
 wp_delete_file( $square_logo );
 
+// Display font role: titles draw in fonts.display (falling back to heading);
+// every other heading-font element keeps the heading font.
+$poster_src = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Media/Templates/PosterTemplate.php' );
+$assert( 'display font registers with a heading fallback', str_contains( $poster_src, "register_font( 'display', (string) ( \$tokens['fonts']['display'] ?? \$tokens['fonts']['heading'] ?? '' ) )" ) );
+$assert( 'every title draw and measure uses the display font', 0 === preg_match( "/\\\$fields\\['title'\\], \\\$title_size[^;]*'heading'/", $poster_src ) && 4 <= preg_match_all( "/\\\$fields\\['title'\\], \\\$title_size[^;]*'display'/", $poster_src ) );
+$assert( 'list rows keep the heading font', str_contains( $poster_src, "\$colors['text'], 'heading' );" ) );
+$assert( 'brand tokens declare a display font slot', array_key_exists( 'display', ( new ReflectionClassConstant( \DataMachine\Abilities\Media\BrandTokens::class, 'DEFAULTS' ) )->getValue()['fonts'] ?? array() ) );
+
 $finish();

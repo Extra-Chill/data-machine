@@ -493,6 +493,7 @@ class PosterTemplate implements TemplateInterface {
 
 		$r->register_font( 'heading', (string) ( $tokens['fonts']['heading'] ?? '' ) );
 		$r->register_font( 'body', (string) ( $tokens['fonts']['body'] ?? '' ) );
+		$r->register_font( 'display', (string) ( $tokens['fonts']['display'] ?? $tokens['fonts']['heading'] ?? '' ) );
 
 		$palette = self::palette( (array) ( $tokens['colors'] ?? array() ), $fields['scheme'] );
 		$colors  = array(
@@ -593,7 +594,7 @@ class PosterTemplate implements TemplateInterface {
 		}
 
 		$y = $r->draw_text_wrapped( $fields['kicker'], $px( self::KICKER_SIZE ), $margin, $y, $accent, 'body', $title_w, 1.3 ) + $px( 24 );
-		$y = $r->draw_text_wrapped( $fields['title'], $title_size, $margin, $y, $text, 'heading', $title_w, 1.08 ) + $px( 30 );
+		$y = $r->draw_text_wrapped( $fields['title'], $title_size, $margin, $y, $text, 'display', $title_w, 1.08 ) + $px( 30 );
 		$r->filled_rect( $margin, $y, $margin + $px( 140 ), $y + $px( 10 ), $accent );
 		$y += $px( 40 );
 		foreach ( $lines as $i => $line ) {
@@ -694,7 +695,7 @@ class PosterTemplate implements TemplateInterface {
 		$title_size = $px( self::LANDSCAPE_TITLE_MAX );
 		do {
 			$content_h = $r->measure_text_height( $fields['kicker'], $px( 30 ), 'body', $left_w, 1.3 ) + $px( 20 )
-				+ $r->measure_text_height( $fields['title'], $title_size, 'heading', $left_w, 1.05 ) + $px( 26 ) + $px( 44 )
+				+ $r->measure_text_height( $fields['title'], $title_size, 'display', $left_w, 1.05 ) + $px( 26 ) + $px( 44 )
 				+ ( '' !== $fields['tagline'] ? $r->measure_text_height( $fields['tagline'], $px( 36 ), 'body', $left_w, 1.35 ) + $px( 30 ) : 0 )
 				+ ( '' !== $fields['subline'] ? $r->measure_text_height( $fields['subline'], $px( 30 ), 'body', $left_w, 1.35 ) + $px( 24 ) : 0 );
 			foreach ( $fields['detail_lines'] as $line ) {
@@ -742,7 +743,7 @@ class PosterTemplate implements TemplateInterface {
 
 		$y = $margin;
 		$y = $r->draw_text_wrapped( $fields['kicker'], $px( 30 ), $margin, $y, $colors['accent'], 'body', $left_w, 1.3 ) + $px( 20 );
-		$y = $r->draw_text_wrapped( $fields['title'], $title_size, $margin, $y, $colors['text'], 'heading', $left_w, 1.05 ) + $px( 26 );
+		$y = $r->draw_text_wrapped( $fields['title'], $title_size, $margin, $y, $colors['text'], 'display', $left_w, 1.05 ) + $px( 26 );
 		$r->filled_rect( $margin, $y, $margin + $px( 180 ), $y + $px( 12 ), $colors['accent'] );
 		$y += $px( 44 );
 		if ( '' !== $fields['tagline'] ) {
@@ -896,7 +897,7 @@ class PosterTemplate implements TemplateInterface {
 		}
 
 		$y = $r->draw_text_wrapped( $fields['kicker'], $px( self::KICKER_SIZE ), $margin, $y, $accent, 'body', $title_w, 1.3 ) + $px( 24 );
-		$y = $r->draw_text_wrapped( $fields['title'], $title_size, $margin, $y, $text, 'heading', $title_w, 1.08 ) + $px( 30 );
+		$y = $r->draw_text_wrapped( $fields['title'], $title_size, $margin, $y, $text, 'display', $title_w, 1.08 ) + $px( 30 );
 		$r->filled_rect( $margin, $y, $margin + $px( 140 ), $y + $px( 10 ), $accent );
 		$y += $px( 40 );
 		foreach ( $lines as $i => $line ) {
@@ -1547,7 +1548,7 @@ class PosterTemplate implements TemplateInterface {
 		// between re-wraps, so a few proportional passes converge on the
 		// target fill without walking every candidate size.
 		for ( $pass = 0; $pass < 5; $pass++ ) {
-			$widest = self::widest_line_width( $r, $title, $size, 'heading', $width );
+			$widest = self::widest_line_width( $r, $title, $size, 'display', $width );
 			if ( $widest < 1 || $widest >= $target || $size >= $cap ) {
 				break;
 			}
@@ -1556,7 +1557,7 @@ class PosterTemplate implements TemplateInterface {
 
 		// Wrapping never breaks words, so back off until no single word
 		// spills past the column (but never below the base size).
-		while ( $size > $base && self::widest_line_width( $r, $title, $size, 'heading', $width ) > $width ) {
+		while ( $size > $base && self::widest_line_width( $r, $title, $size, 'display', $width ) > $width ) {
 			--$size;
 		}
 		return $size;
@@ -1936,7 +1937,7 @@ class PosterTemplate implements TemplateInterface {
 	 */
 	private function content_height( GDRenderer $r, array $fields, array $lines, int $title_size, int $title_w, int $max_w, callable $px ): int {
 		$h  = $r->measure_text_height( $fields['kicker'], $px( self::KICKER_SIZE ), 'body', $title_w, 1.3 ) + $px( 24 );
-		$h += $r->measure_text_height( $fields['title'], $title_size, 'heading', $title_w, 1.08 ) + $px( 30 ) + $px( 40 );
+		$h += $r->measure_text_height( $fields['title'], $title_size, 'display', $title_w, 1.08 ) + $px( 30 ) + $px( 40 );
 		foreach ( $lines as $line ) {
 			$h += $r->measure_text_height( $line, $px( self::BODY_SIZE ), 'body', $max_w, 1.35 ) + $px( 10 );
 		}
