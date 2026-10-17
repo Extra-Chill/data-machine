@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.188.0] - 2026-10-17
+
+### Added
+- poster background options (stripes, grid, dots, halftone, glow, image, …)
+
 ## [0.187.1] - 2026-10-17
 
 ### Changed
