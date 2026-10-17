@@ -35,6 +35,22 @@ class AltTextTask extends SystemTask {
 			return;
 		}
 
+		// Queue time (add_attachment hook / ability call) already verified the
+		// target was an image attachment. If the post is gone, no longer an
+		// attachment, or trashed by the time the job runs, it was deleted in
+		// between — that is not a failure, so complete as skipped (#3638).
+		$attachment = get_post( $attachment_id );
+		if ( ! $attachment instanceof \WP_Post || 'attachment' !== $attachment->post_type || 'trash' === $attachment->post_status ) {
+			$this->completeJob( $jobId, array(
+				'skipped'       => true,
+				'attachment_id' => $attachment_id,
+				'reason'        => 'attachment_deleted',
+			) );
+			return;
+		}
+
+		// A real, non-trashed attachment that is not an image (e.g. explicitly
+		// targeted via force / a manual ability call) is still a clear failure.
 		if ( ! wp_attachment_is_image( $attachment_id ) ) {
 			$this->failJob( $jobId, "Attachment #{$attachment_id} is not an image" );
 			return;
