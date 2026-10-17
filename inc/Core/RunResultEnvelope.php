@@ -5,8 +5,8 @@
  * Projects Data Machine job/run state into the substrate's canonical
  * `agents-api/run-result/v1` envelope ({@see WP_Agent_Run_Result_Envelope})
  * instead of a Data-Machine-private schema. Domain-specific state that has
- * no canonical home (packet refs, the raw job reference, diagnostics, child
- * job envelopes) is carried in `metadata.datamachine`.
+ * no canonical home (packet refs, the raw job reference, diagnostics, bounded
+ * child job summaries) is carried in `metadata.datamachine`.
  *
  * @package DataMachine\Core
  */
@@ -112,6 +112,7 @@ class RunResultEnvelope {
 		$outputs       = self::outputs( $summary );
 		$artifact_refs = array_values( JobArtifactSurfaces::artifactRefs( $engine ) );
 		$packet_refs   = self::packetRefs( $step_results );
+		$children      = self::childJobs( $job_id );
 
 		return WP_Agent_Run_Result_Envelope::from_array(
 			array(
@@ -122,7 +123,7 @@ class RunResultEnvelope {
 				'artifact_refs'  => $artifact_refs,
 				'steps'          => $step_results,
 				'parent_run_id'  => $parent_job_id > 0 ? (string) $parent_job_id : '',
-				'child_run_refs' => self::childRunRefs( $job_id ),
+				'child_run_refs' => self::childRunRefs( $children ),
 				'replay'         => array(
 					'content_hashes' => array(
 						'outputs'       => self::contentHash( $outputs ),
@@ -136,7 +137,7 @@ class RunResultEnvelope {
 							'job'                 => self::jobRef( $job, $summary ),
 							'packet_refs'         => $packet_refs,
 							'diagnostics'         => self::diagnostics( $summary ),
-							'child_job_envelopes' => self::childJobEnvelopes( $job_id ),
+							'child_job_summaries' => self::childJobSummaries( $children ),
 						)
 					),
 				),
@@ -248,12 +249,12 @@ class RunResultEnvelope {
 	}
 
 	/**
-	 * @param int $job_id Parent job ID.
+	 * @param array<int,array<string,mixed>> $children Child job rows.
 	 * @return array<int,array<string,mixed>>
 	 */
-	private static function childRunRefs( int $job_id ): array {
+	private static function childRunRefs( array $children ): array {
 		$refs = array();
-		foreach ( self::childJobs( $job_id ) as $child ) {
+		foreach ( $children as $child ) {
 			$refs[] = self::filterNull(
 				array(
 					'id'     => (string) ( $child['job_id'] ?? 0 ),
@@ -268,20 +269,60 @@ class RunResultEnvelope {
 	}
 
 	/**
-	 * @param int $job_id Parent job ID.
+	 * Build bounded per-child summaries for the parent envelope.
+	 *
+	 * A parent must never inline full child run_result envelopes: fan-out
+	 * parents grow linearly with child count and blow past the engine_data
+	 * size guard (see data-machine#3637). Consumers that need full child
+	 * state hydrate each child's own run_result via `child_run_refs`.
+	 *
+	 * @param array<int,array<string,mixed>> $children Child job rows.
 	 * @return array<int,array<string,mixed>>
 	 */
-	private static function childJobEnvelopes( int $job_id ): array {
-		$envelopes = array();
-		foreach ( self::childJobs( $job_id ) as $child ) {
-			$engine = is_array( $child['engine_data'] ?? null ) ? $child['engine_data'] : array();
-			$stored = $engine['run_result'] ?? null;
-			if ( self::validate( $stored ) ) {
-				$envelopes[] = $stored;
+	private static function childJobSummaries( array $children ): array {
+		$summaries = array();
+		foreach ( $children as $child ) {
+			$engine  = is_array( $child['engine_data'] ?? null ) ? $child['engine_data'] : array();
+			$stored  = $engine['run_result'] ?? null;
+			$outputs = self::validate( $stored ) && is_array( $stored['outputs'] ?? null ) ? $stored['outputs'] : array();
+
+			$outcome = is_array( $outputs['outcome'] ?? null ) ? $outputs['outcome'] : array();
+
+			$summaries[] = self::filterNull(
+				array(
+					'job_id'               => (int) ( $child['job_id'] ?? 0 ),
+					'status'               => is_scalar( $child['status'] ?? null ) ? (string) $child['status'] : null,
+					'counts'               => self::intCounts( $outputs['counts'] ?? null ),
+					'outcome_class_counts' => self::intCounts( $outcome['class_counts'] ?? null ),
+				)
+			);
+		}
+
+		return $summaries;
+	}
+
+	/**
+	 * Project an arbitrary value into a bounded string-keyed integer map.
+	 *
+	 * Guarantees each per-child summary stays a few hundred bytes no matter
+	 * what the child envelope carries.
+	 *
+	 * @param mixed $counts Candidate counts map.
+	 * @return array<string,int>|null
+	 */
+	private static function intCounts( $counts ): ?array {
+		if ( ! is_array( $counts ) ) {
+			return null;
+		}
+
+		$out = array();
+		foreach ( $counts as $key => $value ) {
+			if ( is_string( $key ) && is_numeric( $value ) ) {
+				$out[ $key ] = (int) $value;
 			}
 		}
 
-		return $envelopes;
+		return array() === $out ? null : $out;
 	}
 
 	/**
