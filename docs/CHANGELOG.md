@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.190.0] - 2026-10-17
+
+### Added
+- report poster fields dropped to fit the QR-hero layout
+
 ## [0.189.0] - 2026-10-17
 
 ### Added
