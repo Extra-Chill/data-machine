@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.191.0] - 2026-10-17
+
+### Added
+- tight hero QR card, outside label, numbered list, header co-brand logos
+
 ## [0.190.0] - 2026-10-17
 
 ### Added
