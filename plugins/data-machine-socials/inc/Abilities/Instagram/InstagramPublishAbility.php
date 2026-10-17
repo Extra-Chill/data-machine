@@ -142,13 +142,18 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 								'description' => 'Source URL to include in caption',
 								'format'      => 'uri',
 							),
-							'collaborators'  => array(
+							'collaborators'   => array(
 								'type'        => 'array',
 								'description' => 'Instagram usernames to invite as collaborators (up to 3)',
 								'maxItems'    => 3,
 								'items'       => array( 'type' => 'string' ),
 							),
-							'user_tags'      => array(
+							'location_id'     => array(
+								'type'        => 'string',
+								'description' => 'Facebook Page ID of a place to tag as the post location (image, carousel, or reel). Stories do not support locations.',
+								'pattern'     => '^[0-9]+$',
+							),
+							'user_tags'       => array(
 								'type'        => 'array',
 								'description' => 'People to tag in an image, each with username, x, and y coordinates',
 								'items'       => array(
@@ -242,6 +247,16 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		if ( 'story' === $media_kind && ! empty( $collaborators ) ) {
 			return new \WP_Error( 'unsupported_collaborators', 'Instagram Stories do not support collaborators', array( 'status' => 400 ) );
 		}
+		$location_id = trim( (string) ( $input['location_id'] ?? '' ) );
+		if ( '' !== $location_id ) {
+			if ( ! preg_match( '/^[0-9]+$/', $location_id ) ) {
+				return new \WP_Error( 'invalid_location', 'location_id must be a numeric Facebook Page ID', array( 'status' => 400 ) );
+			}
+			if ( 'story' === $media_kind ) {
+				return new \WP_Error( 'unsupported_location', 'Instagram Stories do not support location tags', array( 'status' => 400 ) );
+			}
+		}
+		$input['location_id'] = $location_id;
 		if ( ! empty( $input['user_tags'] ) && ( 'image' !== $media_kind || count( $input['image_urls'] ?? array() ) !== 1 ) ) {
 			return new \WP_Error( 'unsupported_user_tags', 'User tags are only supported for single-image posts', array( 'status' => 400 ) );
 		}
@@ -337,6 +352,9 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 				if ( ! empty( $input['user_tags'] ) ) {
 					$container_body['user_tags'] = wp_json_encode( $input['user_tags'] );
 				}
+				if ( ! empty( $input['location_id'] ) ) {
+					$container_body['location_id'] = $input['location_id'];
+				}
 			}
 
 			$result = HttpClient::post(
@@ -405,12 +423,16 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 				self::GRAPH_API_URL . "/{$user_id}/media",
 				array(
 					'context' => 'Instagram Carousel Container',
-					'body'    => array_merge( array(
-						'media_type'   => 'CAROUSEL',
-						'children'     => $children,
-						'caption'      => $caption,
-						'access_token' => $access_token,
-					), ! empty( $input['collaborators'] ) ? array( 'collaborators' => implode( ',', $input['collaborators'] ) ) : array() ),
+					'body'    => array_merge(
+						array(
+							'media_type'   => 'CAROUSEL',
+							'children'     => $children,
+							'caption'      => $caption,
+							'access_token' => $access_token,
+						),
+						! empty( $input['collaborators'] ) ? array( 'collaborators' => implode( ',', $input['collaborators'] ) ) : array(),
+						! empty( $input['location_id'] ) ? array( 'location_id' => $input['location_id'] ) : array()
+					),
 					'timeout' => 40,
 				)
 			);
@@ -488,6 +510,9 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		);
 		if ( ! empty( $input['collaborators'] ) ) {
 			$container_body['collaborators'] = implode( ',', $input['collaborators'] );
+		}
+		if ( ! empty( $input['location_id'] ) ) {
+			$container_body['location_id'] = $input['location_id'];
 		}
 
 		if ( ! empty( $cover_url ) ) {
@@ -646,8 +671,13 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 			)
 		);
 
+		/*
+		 * Failures at this step use `publish_unconfirmed`: the request may have
+		 * reached Instagram (e.g. a timeout), so callers must not blindly retry
+		 * and risk a duplicate post.
+		 */
 		if ( empty( $publish_result['success'] ) ) {
-			return new \WP_Error( 'api_error', 'Error publishing to Instagram: ' . ( $publish_result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
+			return new \WP_Error( 'publish_unconfirmed', 'Error publishing to Instagram: ' . ( $publish_result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
 		}
 
 		$publish_body = json_decode( $publish_result['data'], true );
@@ -656,7 +686,7 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 			if ( isset( $publish_body['error']['message'] ) ) {
 				$error_msg .= ': ' . $publish_body['error']['message'];
 			}
-			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
+			return new \WP_Error( 'publish_unconfirmed', $error_msg, array( 'status' => 500 ) );
 		}
 
 		$media_id = $publish_body['id'];

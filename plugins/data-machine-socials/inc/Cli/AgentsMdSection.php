@@ -28,6 +28,7 @@ class AgentsMdSection {
 			"- Read recent platform content: `{$wp} datamachine-socials instagram posts`",
 			"- Discover public content: `{$wp} datamachine-socials reddit search \"live music\"`",
 			"- Publish through a platform command: `{$wp} datamachine-socials instagram publish --help`",
+			"- Schedule a post for later: add `--publish-at=<iso8601>` to a publish command; list or cancel with `{$wp} datamachine-socials scheduled list` and `{$wp} datamachine-socials scheduled cancel <id>`",
 			"- Read or reply to comments across supported platforms: `{$wp} datamachine-socials comments --help`",
 			"- Read or send Instagram direct messages: `{$wp} datamachine-socials messages --help`",
 			"- Inspect share tracking for a WordPress post: `{$wp} datamachine-socials shares list <post-id>`",

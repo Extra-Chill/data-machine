@@ -41,6 +41,7 @@ class CommandRegistry {
 			'datamachine-socials youtube'   => Commands\YouTubeCommand::class,
 			'datamachine-socials mastodon'  => Commands\MastodonCommand::class,
 			'datamachine-socials shares'    => Commands\SharesCommand::class,
+			'datamachine-socials scheduled' => Commands\ScheduledCommand::class,
 		);
 	}
 

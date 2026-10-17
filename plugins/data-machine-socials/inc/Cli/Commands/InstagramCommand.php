@@ -545,6 +545,12 @@ class InstagramCommand {
 	 * [--collaborators=<usernames>]
 	 * : Comma-separated Instagram usernames to invite as collaborators (up to 3).
 	 *
+	 * [--location-id=<page_id>]
+	 * : Facebook Page ID of a place to tag as the post location.
+	 *
+	 * [--publish-at=<datetime>]
+	 * : Schedule instead of publishing now. ISO 8601 with timezone (e.g. 2026-10-19T12:00:00-04:00) or a Unix timestamp. Manage with `wp datamachine-socials scheduled`.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Post with caption only
@@ -597,6 +603,13 @@ class InstagramCommand {
 		if ( ! empty( $assoc_args['collaborators'] ) ) {
 			$input['collaborators'] = array_values( array_filter( array_map( 'trim', explode( ',', (string) $assoc_args['collaborators'] ) ) ) );
 		}
+		if ( ! empty( $assoc_args['location-id'] ) ) {
+			$input['location_id'] = (string) $assoc_args['location-id'];
+		}
+		if ( ! empty( $assoc_args['publish-at'] ) ) {
+			$this->schedule_publish( $input, (string) $assoc_args['publish-at'] );
+			return;
+		}
 
 		$result = $publish_ability->execute( $input );
 
@@ -634,6 +647,12 @@ class InstagramCommand {
 	 *
 	 * [--collaborators=<usernames>]
 	 * : Comma-separated Instagram usernames to invite as collaborators (up to 3).
+	 *
+	 * [--location-id=<page_id>]
+	 * : Facebook Page ID of a place to tag as the post location.
+	 *
+	 * [--publish-at=<datetime>]
+	 * : Schedule instead of publishing now. ISO 8601 with timezone (e.g. 2026-10-19T12:00:00-04:00) or a Unix timestamp. Manage with `wp datamachine-socials scheduled`.
 	 *
 	 * ## EXAMPLES
 	 *
@@ -678,6 +697,13 @@ class InstagramCommand {
 		}
 		if ( ! empty( $assoc_args['collaborators'] ) ) {
 			$input['collaborators'] = array_values( array_filter( array_map( 'trim', explode( ',', (string) $assoc_args['collaborators'] ) ) ) );
+		}
+		if ( ! empty( $assoc_args['location-id'] ) ) {
+			$input['location_id'] = (string) $assoc_args['location-id'];
+		}
+		if ( ! empty( $assoc_args['publish-at'] ) ) {
+			$this->schedule_publish( $input, (string) $assoc_args['publish-at'] );
+			return;
 		}
 
 		WP_CLI::log( 'Publishing Reel to Instagram...' );
@@ -754,6 +780,35 @@ class InstagramCommand {
 		WP_CLI::success( 'Story published to Instagram!' );
 		WP_CLI::log( 'Media ID:  ' . ( $result['media_id'] ?? '' ) );
 		WP_CLI::log( 'Permalink: ' . ( $result['permalink'] ?? '(Stories may not have permalinks)' ) );
+	}
+
+	/**
+	 * Queue a publish for later through datamachine/social-publish-scheduled.
+	 *
+	 * @param array  $input      Instagram publish ability input.
+	 * @param string $publish_at ISO 8601 datetime or Unix timestamp.
+	 */
+	private function schedule_publish( array $input, string $publish_at ): void {
+		$ability = wp_get_ability( 'datamachine/social-publish-scheduled' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/social-publish-scheduled ability not registered.' );
+		}
+
+		$result = $ability->execute(
+			array(
+				'platform'   => 'instagram',
+				'payload'    => $input,
+				'publish_at' => $publish_at,
+			)
+		);
+
+		if ( is_wp_error( $result ) || empty( $result['success'] ) ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Scheduling failed' ) );
+		}
+
+		WP_CLI::success( 'Instagram post scheduled.' );
+		WP_CLI::log( 'Schedule ID: ' . $result['schedule_id'] );
+		WP_CLI::log( 'Publishes:   ' . $result['publish_at'] );
 	}
 
 	/**

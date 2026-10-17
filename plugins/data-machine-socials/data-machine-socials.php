@@ -77,6 +77,7 @@ function datamachine_socials_bootstrap() {
 	// Load cross-platform abilities before isolated platform providers.
 	new \DataMachineSocials\Abilities\SocialCommentsAbility();
 	new \DataMachineSocials\Abilities\SocialMessagesAbility();
+	new \DataMachineSocials\Abilities\ScheduledPublishAbility();
 
 	\DataMachineSocials\Bootstrap\PlatformBootstrap::instance()->register();
 
@@ -199,7 +200,7 @@ add_action( 'admin_enqueue_scripts', 'datamachine_socials_enqueue_assets' );
  */
 if ( defined( 'WP_CLI' ) ) {
 	// Cross-platform commands remain outside platform-local providers.
-	foreach ( array( 'datamachine-socials comments', 'datamachine-socials messages', 'datamachine-socials shares' ) as $command ) {
+	foreach ( array( 'datamachine-socials comments', 'datamachine-socials messages', 'datamachine-socials shares', 'datamachine-socials scheduled' ) as $command ) {
 		$command_map = \DataMachineSocials\Cli\CommandRegistry::map();
 		$class       = $command_map[ $command ];
 		require_once \DataMachineSocials\Cli\CommandRegistry::file_for_class( $class );
