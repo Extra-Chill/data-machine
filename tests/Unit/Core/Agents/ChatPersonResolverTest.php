@@ -31,6 +31,17 @@ class ChatPersonResolverTest extends WP_UnitTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
+		// This suite depends on the core memory file and agent mode
+		// registrations (SOUL.md, USER.md, USER_MEMORY.md, chat mode). They
+		// register once per process, so restore them if an earlier test in the
+		// same process reset the registries.
+		if ( ! MemoryFileRegistry::is_registered( 'SOUL.md' ) ) {
+			datamachine_register_default_memory_files();
+		}
+		if ( ! \DataMachine\Engine\AI\AgentModeRegistry::is_registered( 'chat' ) ) {
+			\DataMachine\Core\Bootstrap\HostIntegrationServiceProvider::register_agent_modes();
+		}
+
 		$this->owner_id  = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		$this->viewer_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		$this->other_id  = self::factory()->user->create( array( 'role' => 'subscriber' ) );

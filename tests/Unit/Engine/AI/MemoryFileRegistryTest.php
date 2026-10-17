@@ -30,6 +30,14 @@ class MemoryFileRegistryTest extends TestCase {
 
 	protected function tearDown(): void {
 		MemoryFileRegistry::reset();
+
+		// Re-register the production defaults wiped by reset(). They register
+		// once per process (plugins_loaded 0), so an empty registry would leak
+		// into every later test in the same process.
+		if ( function_exists( 'datamachine_register_default_memory_files' ) ) {
+			datamachine_register_default_memory_files();
+		}
+
 		parent::tearDown();
 	}
 
