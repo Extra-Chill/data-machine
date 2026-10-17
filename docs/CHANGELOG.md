@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.187.1] - 2026-10-17
+
+### Changed
+- restore default memory registrations after registry resets
+
 ## [0.187.0] - 2026-10-16
 
 ### Added
