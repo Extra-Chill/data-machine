@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.192.2] - 2026-10-17
+
+### Fixed
+- replace inlined child envelopes with bounded per-child summaries
+
 ## [0.192.1] - 2026-10-17
 
 ### Fixed
