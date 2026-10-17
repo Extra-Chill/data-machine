@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\Engine\AI\System\Tasks;
 
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
@@ -73,28 +74,97 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test execute with invalid attachment_id fails.
+	 * A missing attachment at execution time means it was deleted after queue
+	 * time — the job must complete as skipped, not fail (#3638).
 	 */
-	public function test_execute_invalid_attachment_id(): void {
-		$this->expectOutputString( '' );
-		$this->task->executeTask( 1, [ 'attachment_id' => 99999 ] );
-		
-		$this->assertTrue( true ); // Placeholder assertion
+	public function test_execute_deleted_attachment_completes_as_skipped(): void {
+		$job_id = $this->createTrackingJob();
+
+		$deleted_id = self::factory()->attachment->create_object( [
+			'file' => $this->test_image_path,
+			'post_mime_type' => 'image/jpeg',
+		] );
+		wp_delete_attachment( $deleted_id, true );
+
+		$this->task->executeTask( $job_id, [ 'attachment_id' => $deleted_id ] );
+
+		$jobs_db = new Jobs();
+		$job     = $jobs_db->get_job( $job_id );
+		$this->assertStringContainsString( 'completed', strtolower( $job['status'] ?? '' ) );
+
+		$engine_data = $jobs_db->retrieve_engine_data( $job_id );
+		$this->assertTrue( (bool) ( $engine_data['skipped'] ?? false ) );
+		$this->assertSame( 'attachment_deleted', $engine_data['reason'] ?? '' );
+		$this->assertSame( $deleted_id, (int) ( $engine_data['attachment_id'] ?? 0 ) );
 	}
 
 	/**
-	 * Test execute with non-image attachment fails.
+	 * A trashed attachment at execution time is treated the same as deleted.
 	 */
-	public function test_execute_non_image_attachment(): void {
-		$text_attachment = self::factory()->attachment->create_object( [
-			'file' => 'test.txt',
-			'post_mime_type' => 'text/plain'
+	public function test_execute_trashed_attachment_completes_as_skipped(): void {
+		$job_id = $this->createTrackingJob();
+
+		wp_update_post( [
+			'ID'          => $this->attachment_id,
+			'post_status' => 'trash',
 		] );
 
-		$this->expectOutputString( '' );
-		$this->task->executeTask( 1, [ 'attachment_id' => $text_attachment ] );
-		
-		$this->assertTrue( true ); // Placeholder assertion
+		$this->task->executeTask( $job_id, [ 'attachment_id' => $this->attachment_id ] );
+
+		$jobs_db = new Jobs();
+		$job     = $jobs_db->get_job( $job_id );
+		$this->assertStringContainsString( 'completed', strtolower( $job['status'] ?? '' ) );
+
+		$engine_data = $jobs_db->retrieve_engine_data( $job_id );
+		$this->assertTrue( (bool) ( $engine_data['skipped'] ?? false ) );
+		$this->assertSame( 'attachment_deleted', $engine_data['reason'] ?? '' );
+	}
+
+	/**
+	 * A genuinely non-image attachment that still exists must fail clearly.
+	 */
+	public function test_execute_non_image_attachment_fails(): void {
+		$job_id = $this->createTrackingJob();
+
+		$upload_dir = wp_upload_dir();
+		$text_path  = $upload_dir['path'] . '/test-doc.txt';
+		file_put_contents( $text_path, 'not an image' );
+
+		$text_attachment = self::factory()->attachment->create_object( [
+			'file' => $text_path,
+			'post_mime_type' => 'text/plain'
+		] );
+		update_attached_file( $text_attachment, $text_path );
+
+		$this->task->executeTask( $job_id, [ 'attachment_id' => $text_attachment, 'force' => true ] );
+
+		$jobs_db = new Jobs();
+		$job     = $jobs_db->get_job( $job_id );
+		$this->assertStringContainsString( 'failed', strtolower( $job['status'] ?? '' ) );
+
+		$engine_data = $jobs_db->retrieve_engine_data( $job_id );
+		$this->assertArrayNotHasKey( 'skipped', $engine_data );
+
+		wp_delete_file( $text_path );
+	}
+
+	/**
+	 * Create a real tracking job for executeTask() outcome assertions.
+	 */
+	private function createTrackingJob(): int {
+		$jobs_db = new Jobs();
+		$job_id  = (int) $jobs_db->create_job( [
+			'pipeline_id' => 'direct',
+			'flow_id'     => 'direct',
+			'source'      => 'system',
+			'label'       => 'Test Alt Text',
+		] );
+
+		if ( $job_id <= 0 ) {
+			$this->markTestSkipped( 'Could not create test job.' );
+		}
+
+		return $job_id;
 	}
 
 	/**
