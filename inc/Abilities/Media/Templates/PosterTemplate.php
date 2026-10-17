@@ -21,8 +21,9 @@
  *     in a left column; logo top-right and QR + label above the banner
  *     in a right column; footer row under the banner.
  *   - QR hero (qr_emphasis: hero): the QR code is the dominant element,
- *     drawn on a white quiet-zone card with the label set large beneath
- *     it. Portrait pins the card to the bottom (at least 45% of the
+ *     drawn on a light quiet-zone card with the label set large beneath
+ *     it (or above the card with qr_label_position: outside). Portrait
+ *     pins the card to the bottom (at least 45% of the
  *     canvas width, horizontally centered); landscape puts the card on
  *     the right (at least 40% of the canvas height) with the text column
  *     on the left. Copy and banner reflow above/beside the card, and
@@ -49,11 +50,27 @@
  *     procedural pattern (stripes included) — `bold` roughly doubles the
  *     subtle ink and thickens strokes 1.5x so the texture survives
  *     office printing.
+ *   - qr_quiet_modules: hero card padding around the QR in modules
+ *     (1-4, default 4). Lower values give a tighter card that still
+ *     scans on modern phones.
+ *   - qr_label_position: `card` (default, label on the card) or
+ *     `outside` (accent label in the heading font on the poster
+ *     background directly above the card, which shrinks to just the QR
+ *     plus its quiet zone).
+ *   - qr_card_color: hero card fill (hex, default #ffffff). Must stay
+ *     light so the dark QR modules keep their scan contrast.
  *   - list_heading + list_items: a ruled list of rows, each with a
  *     primary line, an optional secondary line and an optional
  *     right-aligned meta value (e.g. a time or a price). Portrait draws
  *     it under the tagline; landscape gives it its own column. Rows that
  *     do not fit are dropped from the end, never squeezed.
+ *   - list_style: `rows` (default, ruled rows) or `numbered` (large
+ *     accent-colored step numbers in a left gutter with the row text
+ *     beside them — meta values are not drawn).
+ *   - header_logos: co-brand logos drawn in the top-right slot beside
+ *     the brand logo (which stays rightmost), all at the brand logo's
+ *     height. An overwide cluster scales down together, equal heights
+ *     kept, and the title's width shrinks to clear it.
  *
  * Spare vertical space on tall canvases is distributed instead of
  * pooling at the bottom, and the title shrinks until the content clears
@@ -154,22 +171,39 @@ class PosterTemplate implements TemplateInterface {
 	public const HERO_QR_MIN_RATIO_LANDSCAPE = 0.40;
 
 	/**
-	 * Hero quiet-zone card: the white card pads the QR by at least
-	 * HERO_QUIET_MODULES modules on every side, sized for a QR of up to
-	 * HERO_QR_MODULES modules per side (version 4, which comfortably holds
-	 * a campaign URL). Larger-version codes still get proportional padding.
+	 * Hero quiet-zone card: the card pads the QR by qr_quiet_modules
+	 * modules on every side (default HERO_QUIET_MODULES), sized for a QR of
+	 * up to HERO_QR_MODULES modules per side (version 4, which comfortably
+	 * holds a campaign URL). Larger-version codes still get proportional
+	 * padding.
 	 */
 	public const HERO_QUIET_MODULES = 4;
 	private const HERO_QR_MODULES   = 33;
 
+	/** qr_quiet_modules bounds: fewer than 1 module risks misreads, more than 4 wastes card. */
+	public const QR_QUIET_MODULES_MIN = 1;
+	public const QR_QUIET_MODULES_MAX = 4;
+
+	/** Hero QR label positions; the first is the default. */
+	public const QR_LABEL_POSITIONS = array( 'card', 'outside' );
+
+	/** Default hero QR card fill; must stay light for scan contrast. */
+	public const QR_CARD_COLOR_DEFAULT = '#ffffff';
+
 	/** Hero QR label size, in design units. */
 	private const HERO_LABEL_SIZE = 42;
+
+	/** Gap between an outside hero label and the card, in design units. */
+	private const HERO_LABEL_GAP = 16;
 
 	/** Hero portrait title: target share of the available text width the widest wrapped line should fill. */
 	private const HERO_TITLE_FILL = 0.9;
 
 	/** Hero portrait title: growth cap as a multiple of the base title size. */
 	private const HERO_TITLE_GROWTH_CAP = 2.2;
+
+	/** List styles; the first is the default. */
+	public const LIST_STYLES = array( 'rows', 'numbered' );
 
 	/** List block sizes, in each layout's design unit. */
 	private const LIST_HEADING_SIZE = 26;
@@ -178,6 +212,16 @@ class PosterTemplate implements TemplateInterface {
 	private const LIST_META_SIZE    = 34;
 	private const LIST_ROW_PAD      = 14;
 	private const LIST_MIN_ROWS     = 3;
+
+	/** Numbered list: step number size and number-to-text gap, in design units. */
+	private const LIST_NUMBER_SIZE = 56;
+	private const LIST_NUMBER_GAP  = 24;
+
+	/** Gap between header logos, in design units. */
+	private const HEADER_LOGO_GAP = 24;
+
+	/** Share of the content width the header logo cluster may occupy. */
+	private const HEADER_LOGO_MAX_SHARE = 0.6;
 
 	/** Share of spare vertical space placed above the content block. */
 	private const SLACK_ABOVE = 0.4;
@@ -200,10 +244,11 @@ class PosterTemplate implements TemplateInterface {
 	/**
 	 * Field keys omitted from the last render() to make the layout fit.
 	 *
-	 * The hero fitting order drops optional copy (footer note, CTA, detail
-	 * note, subline, tagline, list rows, detail lines) before the QR gives
-	 * up size; callers surface this list so a render that silently loses
-	 * fields is distinguishable from one that drew everything.
+	 * The hero fitting order shrinks the title and the QR (down to its
+	 * guaranteed minimum) before dropping optional copy (footer note, CTA,
+	 * detail note, subline, tagline, list rows, detail lines); callers
+	 * surface this list so a render that silently loses fields is
+	 * distinguishable from one that drew everything.
 	 *
 	 * @return list<string> Dropped field keys, empty when nothing was dropped.
 	 */
@@ -246,10 +291,18 @@ class PosterTemplate implements TemplateInterface {
 			'banner_text'         => $string( 'Banner text (banner omitted when empty)' ),
 			'qr_url'              => $string( 'QR code URL' ),
 			'qr_label'            => $string( 'QR label' ),
-			'qr_emphasis'         => $string( 'QR emphasis: footer (default) or hero (large QR on a white card)' ),
+			'qr_emphasis'         => $string( 'QR emphasis: footer (default) or hero (large QR on a quiet-zone card)' ),
+			'qr_quiet_modules'    => array(
+				'label'    => 'Hero QR quiet zone: card padding around the QR in modules (1-4, default 4; 2 is tight but still scans)',
+				'type'     => 'number',
+				'required' => false,
+			),
+			'qr_label_position'   => $string( 'Hero QR label position: card (default, label on the card) or outside (accent label above the card)' ),
+			'qr_card_color'       => $string( 'Hero QR card color: hex, default #ffffff — must stay light so the dark QR modules scan' ),
 			'cta_text'            => $string( 'Call-to-action line' ),
 			'footer_note'         => $string( 'Footer note' ),
-			'cobrand_logos'       => $list( 'Co-brand logo paths' ),
+			'cobrand_logos'       => $list( 'Co-brand logo paths (footer row, small)' ),
+			'header_logos'        => $list( 'Header co-brand logo paths: drawn beside the brand logo at its height, brand logo rightmost' ),
 			'scheme'              => $string( 'Color scheme: dark (default), accent or light' ),
 			'background'          => $string( 'Background: stripes (default), none, grid, dots, halftone, crosshatch, waves, gradient, glow or image' ),
 			'background_strength' => $string( 'Background strength: normal (default), subtle or bold — scales the pattern ink opacity and line weight' ),
@@ -262,6 +315,7 @@ class PosterTemplate implements TemplateInterface {
 			),
 			'list_heading'        => $string( 'List heading (small caps line above the list)' ),
 			'list_items'          => $list( 'List rows: strings, or objects with primary, secondary and meta' ),
+			'list_style'          => $string( 'List style: rows (default, ruled rows) or numbered (large accent step numbers; meta values are not drawn)' ),
 		);
 	}
 
@@ -317,7 +371,7 @@ class PosterTemplate implements TemplateInterface {
 	 * Normalize raw template input into the strings and lists drawn.
 	 *
 	 * @param array $data Raw template input.
-	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: list<string>, accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, qr_emphasis: string, cta_text: string, footer_note: string, cobrand_logos: list<string>, scheme: string, background: string, background_strength: string, background_image: string, background_tint: string, background_overlay: float, list_heading: string, list_items: list<array{primary: non-empty-string, secondary: string, meta: string}>}
+	 * @return array{title: string, kicker: string, tagline: string, subline: string, detail_lines: list<string>, accent_line: string, detail_note: string, banner_text: string, qr_url: string, qr_label: string, qr_emphasis: string, qr_quiet_modules: int, qr_label_position: string, qr_card_color: string, cta_text: string, footer_note: string, cobrand_logos: list<string>, header_logos: list<string>, scheme: string, background: string, background_strength: string, background_image: string, background_tint: string, background_overlay: float, list_heading: string, list_items: list<array{primary: non-empty-string, secondary: string, meta: string}>, list_style: string}
 	 */
 	public static function normalize_fields( array $data ): array {
 		$str = static fn( string $key ): string => is_scalar( $data[ $key ] ?? null ) ? trim( (string) $data[ $key ] ) : '';
@@ -333,6 +387,13 @@ class PosterTemplate implements TemplateInterface {
 		foreach ( (array) ( $data['cobrand_logos'] ?? array() ) as $logo ) {
 			if ( is_string( $logo ) && '' !== $logo ) {
 				$cobrand[] = $logo;
+			}
+		}
+
+		$header_logos = array();
+		foreach ( (array) ( $data['header_logos'] ?? array() ) as $logo ) {
+			if ( is_string( $logo ) && '' !== $logo ) {
+				$header_logos[] = $logo;
 			}
 		}
 
@@ -359,6 +420,16 @@ class PosterTemplate implements TemplateInterface {
 		$emphasis   = strtolower( $str( 'qr_emphasis' ) );
 		$background = strtolower( $str( 'background' ) );
 		$strength   = strtolower( $str( 'background_strength' ) );
+		$label_pos  = strtolower( $str( 'qr_label_position' ) );
+		$list_style = strtolower( $str( 'list_style' ) );
+
+		$quiet = $data['qr_quiet_modules'] ?? null;
+		$quiet = is_numeric( $quiet )
+			? max( self::QR_QUIET_MODULES_MIN, min( self::QR_QUIET_MODULES_MAX, (int) $quiet ) )
+			: self::HERO_QUIET_MODULES;
+
+		$card_color = strtolower( $str( 'qr_card_color' ) );
+		$card_color = 1 === preg_match( '/^#?[0-9a-f]{6}$/', $card_color ) ? '#' . ltrim( $card_color, '#' ) : self::QR_CARD_COLOR_DEFAULT;
 
 		$tint = strtolower( $str( 'background_tint' ) );
 		$tint = 1 === preg_match( '/^#?[0-9a-f]{6}$/', $tint ) ? '#' . ltrim( $tint, '#' ) : '';
@@ -378,9 +449,13 @@ class PosterTemplate implements TemplateInterface {
 			'qr_url'              => $str( 'qr_url' ),
 			'qr_label'            => $str( 'qr_label' ),
 			'qr_emphasis'         => in_array( $emphasis, self::QR_EMPHASES, true ) ? $emphasis : self::QR_EMPHASES[0],
+			'qr_quiet_modules'    => $quiet,
+			'qr_label_position'   => in_array( $label_pos, self::QR_LABEL_POSITIONS, true ) ? $label_pos : self::QR_LABEL_POSITIONS[0],
+			'qr_card_color'       => $card_color,
 			'cta_text'            => $str( 'cta_text' ),
 			'footer_note'         => $str( 'footer_note' ),
 			'cobrand_logos'       => $cobrand,
+			'header_logos'        => $header_logos,
 			'scheme'              => in_array( $scheme, self::SCHEMES, true ) ? $scheme : self::SCHEMES[0],
 			'background'          => in_array( $background, self::BACKGROUNDS, true ) ? $background : self::BACKGROUNDS[0],
 			'background_strength' => in_array( $strength, self::BACKGROUND_STRENGTHS, true ) ? $strength : self::BACKGROUND_STRENGTHS[0],
@@ -389,6 +464,7 @@ class PosterTemplate implements TemplateInterface {
 			'background_overlay'  => $overlay,
 			'list_heading'        => $str( 'list_heading' ),
 			'list_items'          => $list_items,
+			'list_style'          => in_array( $list_style, self::LIST_STYLES, true ) ? $list_style : self::LIST_STYLES[0],
 		);
 	}
 
@@ -457,14 +533,14 @@ class PosterTemplate implements TemplateInterface {
 		$margin = $px( self::MARGIN );
 		$max_w  = $width - 2 * $margin;
 
-		// Brand mark, top-right.
-		$logo   = (string) $tokens['logo_path_inverse'];
-		$logo_h = $px( self::LOGO_HEIGHT );
-		$logo_w = 0;
-		$dims   = ( '' !== $logo && is_readable( $logo ) ) ? getimagesize( $logo ) : false;
-		if ( $dims ) {
-			$logo_w = (int) round( $dims[0] * $logo_h / max( 1, $dims[1] ) );
-		}
+		// Header logo cluster, top-right: co-brand logos, brand mark rightmost.
+		$cluster = self::header_logo_cluster(
+			self::header_logo_paths( $fields, $tokens ),
+			$px( self::LOGO_HEIGHT ),
+			$px( self::HEADER_LOGO_GAP ),
+			(int) round( $max_w * self::HEADER_LOGO_MAX_SHARE )
+		);
+		$logo_w  = $cluster['width'];
 
 		// Footer block: QR (+ label) on the right, CTA + note on the left.
 		$qr_path  = self::qr_image_path( $fields['qr_url'], $px( self::QR_SIZE ) );
@@ -513,10 +589,10 @@ class PosterTemplate implements TemplateInterface {
 		$y = $plan['content_top'];
 
 		if ( $logo_w ) {
-			$r->overlay_image( $logo, $width - $margin - $logo_w, max( $px( 20 ), $y - $px( 20 ) ), $logo_w, $logo_h );
+			self::draw_header_logos( $r, $cluster, $width - $margin, max( $px( 20 ), $y - $px( 20 ) ) );
 		}
 
-		$y = $r->draw_text_wrapped( $fields['kicker'], $px( self::KICKER_SIZE ), $margin, $y, $accent, 'body', $max_w, 1.3 ) + $px( 24 );
+		$y = $r->draw_text_wrapped( $fields['kicker'], $px( self::KICKER_SIZE ), $margin, $y, $accent, 'body', $title_w, 1.3 ) + $px( 24 );
 		$y = $r->draw_text_wrapped( $fields['title'], $title_size, $margin, $y, $text, 'heading', $title_w, 1.08 ) + $px( 30 );
 		$r->filled_rect( $margin, $y, $margin + $px( 140 ), $y + $px( 10 ), $accent );
 		$y += $px( 40 );
@@ -585,10 +661,13 @@ class PosterTemplate implements TemplateInterface {
 		$px     = static fn( float $n ): int => (int) round( $n * $u );
 		$margin = $px( self::LANDSCAPE_MARGIN );
 
-		$logo   = (string) ( $tokens['logo_path_inverse'] ?? '' );
-		$logo_h = $px( self::LANDSCAPE_LOGO_HEIGHT );
-		$dims   = ( '' !== $logo && is_readable( $logo ) ) ? getimagesize( $logo ) : false;
-		$logo_w = $dims ? (int) round( $dims[0] * $logo_h / max( 1, $dims[1] ) ) : 0;
+		$cluster = self::header_logo_cluster(
+			self::header_logo_paths( $fields, $tokens ),
+			$px( self::LANDSCAPE_LOGO_HEIGHT ),
+			$px( self::HEADER_LOGO_GAP ),
+			(int) round( ( $width - 2 * $margin ) * self::HEADER_LOGO_MAX_SHARE )
+		);
+		$logo_w  = $cluster['width'];
 
 		$qr_path = self::qr_image_path( $fields['qr_url'], $px( self::LANDSCAPE_QR_SIZE ) );
 		$qr_size = $qr_path ? $px( self::LANDSCAPE_QR_SIZE ) : 0;
@@ -644,7 +723,7 @@ class PosterTemplate implements TemplateInterface {
 		}
 
 		if ( $logo_w ) {
-			$r->overlay_image( $logo, $width - $margin - $logo_w, max( 0, $margin - $px( 20 ) ), $logo_w, $logo_h );
+			self::draw_header_logos( $r, $cluster, $width - $margin, max( 0, $margin - $px( 20 ) ) );
 		}
 		if ( $qr_path ) {
 			// Reserve the label's real height so multi-line labels never
@@ -723,11 +802,12 @@ class PosterTemplate implements TemplateInterface {
 	 * the grown title back toward (and past) the base size before the QR
 	 * card gives up any size, so content never overlaps the card.
 	 *
-	 * Fitting order: trim overlong lists, shrink the title, shrink the QR
-	 * toward its minimum, then drop optional copy (footer note, CTA, detail
-	 * note, subline, tagline, remaining list rows, detail lines) — only
-	 * after all of that may the QR shrink below its minimum rather than
-	 * overlap.
+	 * Fitting order: shrink a grown title back to its pre-growth base,
+	 * shrink the QR toward its minimum, shrink the title further, trim
+	 * overlong lists to their minimum rows, then drop optional copy (footer
+	 * note, CTA, detail note, subline, tagline, remaining list rows, detail
+	 * lines) — only after all of that may the QR shrink below its minimum
+	 * rather than overlap.
 	 *
 	 * The QR bitmap is re-requested from the provider at its final pixel
 	 * size and drawn with nearest-neighbor scaling so module edges stay
@@ -753,12 +833,14 @@ class PosterTemplate implements TemplateInterface {
 			return false;
 		}
 
-		$logo   = (string) $tokens['logo_path_inverse'];
-		$logo_h = $px( self::LOGO_HEIGHT );
-		$dims   = ( '' !== $logo && is_readable( $logo ) ) ? getimagesize( $logo ) : false;
-		$logo_w = $dims ? (int) round( $dims[0] * $logo_h / max( 1, $dims[1] ) ) : 0;
+		$cluster = self::header_logo_cluster(
+			self::header_logo_paths( $fields, $tokens ),
+			$px( self::LOGO_HEIGHT ),
+			$px( self::HEADER_LOGO_GAP ),
+			(int) round( ( $width - 2 * $margin ) * self::HEADER_LOGO_MAX_SHARE )
+		);
 
-		$fit = $this->plan_hero_fit( $r, $fields, $width, $height, $logo_w );
+		$fit = $this->plan_hero_fit( $r, $fields, $width, $height, $cluster['width'] );
 
 		$this->dropped_fields = $fit['dropped_fields'];
 
@@ -785,23 +867,22 @@ class PosterTemplate implements TemplateInterface {
 			}
 		}
 
-		// White quiet-zone card with the QR and its label.
-		if ( $landscape ) {
-			$card_x   = $width - $margin - $card['width'];
-			$card_top = $margin + (int) floor( ( $height - 2 * $margin - $card['height'] ) / 2 );
-		} else {
-			// Portrait always plans with plan_hero_layout(), which sets card_top.
-			$card_x   = (int) round( ( $width - $card['width'] ) / 2 );
-			$card_top = $plan['card_top'] ?? ( $height - $margin - $card['height'] );
-		}
-		$card_bg  = $r->color_hex( 'qr_card', '#ffffff' );
+		// Quiet-zone card with the QR; the label sits on the card or on the
+		// poster background directly above it (qr_label_position).
+		$card_x   = $fit['card_x'];
+		$card_top = $fit['card_top'];
+		$card_bg  = $r->color_hex( 'qr_card', (string) $fields['qr_card_color'] );
 		$card_ink = $r->color_hex( 'qr_card_ink', '#111111' );
 		$r->filled_rect( $card_x, $card_top, $card_x + $card['width'], $card_top + $card['height'], $card_bg );
 		$qr_x = $card_x + $card['pad'];
 		$qr_y = $card_top + $card['pad'];
 		$r->overlay_image( $qr_path, $qr_x, $qr_y, $qr_size, $qr_size, 100, false );
 		if ( '' !== $label ) {
-			$r->draw_text_wrapped( $label, $label_sz, $qr_x, $qr_y + $qr_size + $card['pad'], $card_ink, 'heading', $qr_size, 1.2, 'center' );
+			if ( $fit['label_height'] > 0 ) {
+				$r->draw_text_wrapped( $label, $label_sz, $card_x, $fit['label_top'], $colors['accent'], 'heading', $card['width'], 1.2, 'center' );
+			} else {
+				$r->draw_text_wrapped( $label, $label_sz, $qr_x, $qr_y + $qr_size + $card['pad'], $card_ink, 'heading', $qr_size, 1.2, 'center' );
+			}
 		}
 		wp_delete_file( $qr_path );
 
@@ -810,11 +891,11 @@ class PosterTemplate implements TemplateInterface {
 		$accent = $colors['accent'];
 
 		$y = $plan['content_top'];
-		if ( $logo_w ) {
-			$r->overlay_image( $logo, $margin + $max_w - $logo_w, max( $px( 20 ), $y - $px( 20 ) ), $logo_w, $logo_h );
+		if ( $cluster['width'] ) {
+			self::draw_header_logos( $r, $cluster, $margin + $max_w, max( $px( 20 ), $y - $px( 20 ) ) );
 		}
 
-		$y = $r->draw_text_wrapped( $fields['kicker'], $px( self::KICKER_SIZE ), $margin, $y, $accent, 'body', $max_w, 1.3 ) + $px( 24 );
+		$y = $r->draw_text_wrapped( $fields['kicker'], $px( self::KICKER_SIZE ), $margin, $y, $accent, 'body', $title_w, 1.3 ) + $px( 24 );
 		$y = $r->draw_text_wrapped( $fields['title'], $title_size, $margin, $y, $text, 'heading', $title_w, 1.08 ) + $px( 30 );
 		$r->filled_rect( $margin, $y, $margin + $px( 140 ), $y + $px( 10 ), $accent );
 		$y += $px( 40 );
@@ -862,19 +943,24 @@ class PosterTemplate implements TemplateInterface {
 	 * Fit the hero layout for a canvas without drawing anything.
 	 *
 	 * Pure planning pass shared by draw_hero() and tests: runs the hero
-	 * fitting order (trim overlong lists, shrink the title, shrink the QR
-	 * toward its minimum, then drop optional copy) against real text
-	 * measurements until the plan fits, and reports every field key whose
-	 * content was dropped along the way. The renderer is used for text
-	 * measurement only — no canvas is required.
+	 * fitting order (shrink a grown title back to its base, shrink the QR
+	 * toward its minimum, shrink the title further, trim overlong lists,
+	 * then drop optional copy) against real text measurements until the
+	 * plan fits, and reports every field key whose content was dropped
+	 * along the way. The renderer is used for text measurement only — no
+	 * canvas is required.
+	 *
+	 * The returned card placement is final: card_x/card_top locate the card,
+	 * and label_top/label_height locate an outside label above it
+	 * (label_height is 0 when the label sits on the card).
 	 *
 	 * @param GDRenderer $r      Renderer for text measurement (fonts optional;
 	 *                           unregistered names use the system fallback).
 	 * @param array      $fields Output of normalize_fields(), kicker resolved.
 	 * @param int        $width  Canvas width in pixels.
 	 * @param int        $height Canvas height in pixels.
-	 * @param int        $logo_w Brand logo width in pixels (0 without a logo).
-	 * @return array{fields: array, plan: array, card: array{pad: int, width: int, height: int}, label_size: int, qr_size: int, title_size: int, max_w: int, title_w: int, lines: list<string>, banner_h: int, dropped_fields: list<string>}
+	 * @param int        $logo_w Header logo cluster width in pixels (0 without logos).
+	 * @return array{fields: array, plan: array, card: array{pad: int, width: int, height: int}, card_x: int, card_top: int, label_size: int, label_top: int, label_height: int, qr_size: int, title_size: int, max_w: int, title_w: int, lines: list<string>, banner_h: int, dropped_fields: list<string>}
 	 */
 	public function plan_hero_fit( GDRenderer $r, array $fields, int $width, int $height, int $logo_w = 0 ): array {
 		$landscape = $width > $height;
@@ -885,20 +971,30 @@ class PosterTemplate implements TemplateInterface {
 		$qr_pref = (int) round( $landscape ? $height * self::HERO_QR_RATIO : $width * self::HERO_QR_RATIO );
 		$qr_min  = (int) round( $landscape ? $height * self::HERO_QR_MIN_RATIO_LANDSCAPE : $width * self::HERO_QR_MIN_RATIO );
 
-		$label        = $fields['qr_label'];
-		$label_base   = $px( self::HERO_LABEL_SIZE );
-		$measure_card = static function ( int $qr_size ) use ( $r, $label, $label_base ): array {
-			$size = '' !== $label ? self::fit_word_size( $r, $label, $label_base, 'heading', $qr_size ) : 0;
-			$h    = '' !== $label ? $r->measure_text_height( $label, $size, 'heading', $qr_size, 1.2 ) : 0;
-			return array( self::hero_card( $qr_size, $h ), $size );
+		$label      = $fields['qr_label'];
+		$outside    = '' !== $label && 'outside' === ( $fields['qr_label_position'] ?? self::QR_LABEL_POSITIONS[0] );
+		$quiet      = (int) ( $fields['qr_quiet_modules'] ?? self::HERO_QUIET_MODULES );
+		$label_base = $px( self::HERO_LABEL_SIZE );
+		$label_gap  = $px( self::HERO_LABEL_GAP );
+
+		// Card metrics, label size and the outside label's height for a QR
+		// size (the outside height is 0 when the label sits on the card).
+		$measure_card = static function ( int $qr_size ) use ( $r, $label, $label_base, $outside, $quiet ): array {
+			$wrap_w = $outside ? self::hero_card( $qr_size, 0, $quiet )['width'] : $qr_size;
+			$size   = '' !== $label ? self::fit_word_size( $r, $label, $label_base, 'heading', $wrap_w ) : 0;
+			$h      = '' !== $label ? $r->measure_text_height( $label, $size, 'heading', $wrap_w, 1.2 ) : 0;
+			return array( self::hero_card( $qr_size, $outside ? 0 : $h, $quiet ), $size, $outside ? $h : 0 );
 		};
+		// Vertical footprint of the card plus an outside label above it.
+		$block_h = static fn( array $card, int $out_h ): int => $card['height'] + ( $out_h > 0 ? $out_h + $label_gap : 0 );
 
 		$qr_size = $qr_pref;
 		if ( $landscape ) {
-			// The card must clear the vertical margins before anything else.
+			// The card (and any outside label) must clear the vertical margins
+			// before anything else.
 			while ( $qr_size > $px( 120 ) ) {
-				list( $card ) = $measure_card( $qr_size );
-				if ( $card['height'] <= $height - 2 * $margin ) {
+				list( $card, , $out_h ) = $measure_card( $qr_size );
+				if ( $block_h( $card, $out_h ) <= $height - 2 * $margin ) {
 					break;
 				}
 				$qr_size -= $px( 16 );
@@ -909,15 +1005,16 @@ class PosterTemplate implements TemplateInterface {
 		$banner_h   = $has_banner ? $px( self::BANNER_HEIGHT ) : 0;
 		$min_gap    = $px( self::MIN_BANNER_GAP );
 
-		$title_size = $px( self::TITLE_MAX_SIZE );
+		$title_base = $px( self::TITLE_MAX_SIZE );
+		$title_size = $title_base;
 		if ( ! $landscape ) {
 			$grow_w     = $width - 2 * $margin - ( $logo_w ? $logo_w + $px( 30 ) : 0 );
-			$title_size = self::hero_title_size( $r, $fields['title'], $title_size, $grow_w );
+			$title_size = self::hero_title_size( $r, $fields['title'], $title_base, $grow_w );
 		}
 		$drops   = array( 'footer_note', 'cta_text', 'detail_note', 'subline', 'tagline' );
 		$dropped = array();
 		do {
-			list( $card, $label_sz ) = $measure_card( $qr_size );
+			list( $card, $label_sz, $out_h ) = $measure_card( $qr_size );
 
 			$max_w   = $landscape
 				? self::landscape_left_width( $width, $margin, $card['width'], $px( 80 ) )
@@ -928,21 +1025,30 @@ class PosterTemplate implements TemplateInterface {
 			$content_h = $this->hero_content_height( $r, $fields, $lines, $title_size, $title_w, $max_w, $px );
 			$plan      = $landscape
 				? self::plan_layout( $height, $margin, $content_h, $banner_h, 0, $min_gap )
-				: self::plan_hero_layout( $height, $margin, $content_h, $banner_h, $card['height'], $min_gap );
+				: self::plan_hero_layout( $height, $margin, $content_h, $banner_h, $block_h( $card, $out_h ), $min_gap );
 			if ( $plan['fits'] ) {
 				break;
 			}
-			if ( count( $fields['list_items'] ) > self::LIST_MIN_ROWS ) {
-				array_pop( $fields['list_items'] );
-				$dropped['list_items'] = true;
+			// A grown title gives back its extra size before anything else.
+			if ( $title_size > $title_base ) {
+				$title_size = max( $title_base, $title_size - $px( 4 ) );
 				continue;
 			}
+			// Then the QR shrinks toward its guaranteed minimum.
+			if ( ! $landscape && $qr_size > $qr_min ) {
+				$qr_size = max( $qr_min, $qr_size - $px( 16 ) );
+				continue;
+			}
+			// Then the title shrinks below its base.
 			if ( $title_size > $px( self::TITLE_MIN_SIZE ) ) {
 				$title_size -= $px( 4 );
 				continue;
 			}
-			if ( ! $landscape && $qr_size > $qr_min ) {
-				$qr_size = max( $qr_min, $qr_size - $px( 16 ) );
+			// Only now do overlong lists give up rows — and never below the
+			// minimum before the optional-copy drops below.
+			if ( count( $fields['list_items'] ) > self::LIST_MIN_ROWS ) {
+				array_pop( $fields['list_items'] );
+				$dropped['list_items'] = true;
 				continue;
 			}
 			if ( $drops ) {
@@ -971,11 +1077,28 @@ class PosterTemplate implements TemplateInterface {
 			break;
 		} while ( true );
 
+		// Final card placement: landscape centers the card (plus any outside
+		// label) vertically on the right; portrait pins it to the bottom via
+		// plan_hero_layout(), whose card_top is the top of the label + card
+		// block.
+		$label_block = $out_h > 0 ? $out_h + $label_gap : 0;
+		if ( $landscape ) {
+			$card_x   = $width - $margin - $card['width'];
+			$card_top = $margin + (int) floor( ( $height - 2 * $margin - $card['height'] - $label_block ) / 2 ) + $label_block;
+		} else {
+			$card_x   = (int) round( ( $width - $card['width'] ) / 2 );
+			$card_top = ( $plan['card_top'] ?? ( $height - $margin - $card['height'] - $label_block ) ) + $label_block;
+		}
+
 		return array(
 			'fields'         => $fields,
 			'plan'           => $plan,
 			'card'           => $card,
+			'card_x'         => $card_x,
+			'card_top'       => $card_top,
 			'label_size'     => $label_sz,
+			'label_top'      => $card_top - $label_block,
+			'label_height'   => $out_h,
 			'qr_size'        => $qr_size,
 			'title_size'     => $title_size,
 			'max_w'          => $max_w,
@@ -1010,16 +1133,20 @@ class PosterTemplate implements TemplateInterface {
 	/**
 	 * Metrics of the hero quiet-zone card for a QR of the given pixel size.
 	 *
-	 * The card pads the QR by HERO_QUIET_MODULES modules on every side
-	 * (module size estimated from HERO_QR_MODULES), and reserves the label
-	 * height plus another quiet zone below the QR when a label is present.
+	 * The card pads the QR by $quiet_modules modules on every side (module
+	 * size estimated from HERO_QR_MODULES), and reserves the label height
+	 * plus another quiet zone below the QR when a label is on the card.
+	 * With an outside label (label_height 0) the card is exactly the QR
+	 * plus its quiet zone — no extra bottom padding.
 	 *
-	 * @param int $qr_size      QR side length in pixels.
-	 * @param int $label_height Measured label height (0 without a label).
+	 * @param int $qr_size       QR side length in pixels.
+	 * @param int $label_height  Measured on-card label height (0 without one).
+	 * @param int $quiet_modules Quiet zone in modules, clamped to 1-4.
 	 * @return array{pad: int, width: int, height: int}
 	 */
-	public static function hero_card( int $qr_size, int $label_height ): array {
-		$pad = (int) ceil( $qr_size * self::HERO_QUIET_MODULES / self::HERO_QR_MODULES );
+	public static function hero_card( int $qr_size, int $label_height, int $quiet_modules = self::HERO_QUIET_MODULES ): array {
+		$quiet = max( self::QR_QUIET_MODULES_MIN, min( self::QR_QUIET_MODULES_MAX, $quiet_modules ) );
+		$pad   = (int) ceil( $qr_size * $quiet / self::HERO_QR_MODULES );
 		return array(
 			'pad'    => $pad,
 			'width'  => $qr_size + 2 * $pad,
@@ -1056,6 +1183,103 @@ class PosterTemplate implements TemplateInterface {
 			'banner_top'     => $banner_top,
 			'card_top'       => $card_top,
 		);
+	}
+
+	/**
+	 * Paths drawn in the header logo slot: readable header co-brand logos
+	 * followed by the brand logo, which stays rightmost.
+	 *
+	 * @param array $fields Output of normalize_fields().
+	 * @param array $tokens Brand tokens (logo_path_inverse resolved for the scheme).
+	 * @return list<string>
+	 */
+	private static function header_logo_paths( array $fields, array $tokens ): array {
+		$paths = array_values( array_filter( (array) $fields['header_logos'], 'is_readable' ) );
+		$brand = (string) ( $tokens['logo_path_inverse'] ?? '' );
+		if ( '' !== $brand && is_readable( $brand ) ) {
+			$paths[] = $brand;
+		}
+		return $paths;
+	}
+
+	/**
+	 * Lay out the header logo cluster at a shared height.
+	 *
+	 * Every logo is scaled to the same height, aspect preserved, separated
+	 * by a gap. When the cluster would exceed $max_w, every logo (and the
+	 * gap) scales down together so the logos keep equal heights.
+	 *
+	 * @param string[] $paths  Candidate logo paths (unreadable ones are skipped).
+	 * @param int      $height Target logo height in pixels.
+	 * @param int      $gap    Gap between logos in pixels.
+	 * @param int      $max_w  Maximum cluster width in pixels.
+	 * @return array{logos: list<array{path: string, width: int, height: int}>, width: int, height: int, gap: int}
+	 */
+	public static function header_logo_cluster( array $paths, int $height, int $gap, int $max_w ): array {
+		$entries   = array();
+		$ratio_sum = 0.0;
+		foreach ( $paths as $path ) {
+			$dims = ( '' !== $path && is_readable( $path ) ) ? getimagesize( $path ) : false;
+			if ( $dims && $dims[0] > 0 && $dims[1] > 0 ) {
+				$ratio      = $dims[0] / $dims[1];
+				$entries[]  = array(
+					'path'  => $path,
+					'ratio' => $ratio,
+				);
+				$ratio_sum += $ratio;
+			}
+		}
+		if ( ! $entries ) {
+			return array(
+				'logos'  => array(),
+				'width'  => 0,
+				'height' => 0,
+				'gap'    => $gap,
+			);
+		}
+
+		$count = count( $entries );
+		$total = (int) round( $ratio_sum * $height ) + $gap * ( $count - 1 );
+		if ( $max_w > 0 && $total > $max_w ) {
+			$scale  = $max_w / $total;
+			$height = max( 1, (int) floor( $height * $scale ) );
+			$gap    = (int) floor( $gap * $scale );
+		}
+
+		$logos = array();
+		$width = $gap * ( $count - 1 );
+		foreach ( $entries as $entry ) {
+			$w       = max( 1, (int) round( $entry['ratio'] * $height ) );
+			$logos[] = array(
+				'path'   => $entry['path'],
+				'width'  => $w,
+				'height' => $height,
+			);
+			$width  += $w;
+		}
+
+		return array(
+			'logos'  => $logos,
+			'width'  => $width,
+			'height' => $height,
+			'gap'    => $gap,
+		);
+	}
+
+	/**
+	 * Draw the header logo cluster right-aligned to an edge.
+	 *
+	 * @param GDRenderer $r       Renderer.
+	 * @param array      $cluster Output of header_logo_cluster().
+	 * @param int        $right   Right edge x.
+	 * @param int        $y       Top y.
+	 */
+	private static function draw_header_logos( GDRenderer $r, array $cluster, int $right, int $y ): void {
+		$x = $right - (int) $cluster['width'];
+		foreach ( (array) $cluster['logos'] as $logo ) {
+			$r->overlay_image( (string) $logo['path'], $x, $y, (int) $logo['width'], (int) $logo['height'] );
+			$x += (int) $logo['width'] + (int) $cluster['gap'];
+		}
 	}
 
 	/**
@@ -1157,15 +1381,22 @@ class PosterTemplate implements TemplateInterface {
 	/**
 	 * Height of one list row.
 	 *
-	 * @param array    $row Normalized list row.
-	 * @param callable $px  Design-unit scaler.
+	 * Numbered rows reserve at least the step number's height, so the
+	 * accent number never collides with the next row.
+	 *
+	 * @param array    $row   Normalized list row.
+	 * @param callable $px    Design-unit scaler.
+	 * @param string   $style One of self::LIST_STYLES.
 	 */
-	private static function list_row_height( array $row, callable $px ): int {
-		$h = $px( self::LIST_ROW_PAD ) * 2 + (int) ( $px( self::LIST_PRIMARY_SIZE ) * 1.2 );
+	private static function list_row_height( array $row, callable $px, string $style = 'rows' ): int {
+		$text_h = (int) ( $px( self::LIST_PRIMARY_SIZE ) * 1.2 );
 		if ( '' !== $row['secondary'] ) {
-			$h += $px( 6 ) + (int) ( $px( self::LIST_SECOND_SIZE ) * 1.3 );
+			$text_h += $px( 6 ) + (int) ( $px( self::LIST_SECOND_SIZE ) * 1.3 );
 		}
-		return $h;
+		if ( 'numbered' === $style ) {
+			$text_h = max( $text_h, (int) ( $px( self::LIST_NUMBER_SIZE ) * 0.95 ) );
+		}
+		return $px( self::LIST_ROW_PAD ) * 2 + $text_h;
 	}
 
 	/**
@@ -1178,20 +1409,23 @@ class PosterTemplate implements TemplateInterface {
 		if ( ! $fields['list_items'] ) {
 			return 0;
 		}
-		$h = '' !== $fields['list_heading'] ? (int) ( $px( self::LIST_HEADING_SIZE ) * 1.3 ) + $px( 10 ) : 0;
+		$style = (string) ( $fields['list_style'] ?? self::LIST_STYLES[0] );
+		$h     = '' !== $fields['list_heading'] ? (int) ( $px( self::LIST_HEADING_SIZE ) * 1.3 ) + $px( 10 ) : 0;
 		foreach ( $fields['list_items'] as $row ) {
-			$h += self::list_row_height( $row, $px );
+			$h += self::list_row_height( $row, $px, $style );
 		}
 		return $h;
 	}
 
 	/**
-	 * Draw the ruled list block; returns the y after the last row.
+	 * Draw the list block; returns the y after the last row.
 	 *
-	 * Each row: primary line (heading font) with the meta value
+	 * rows style: primary line (heading font) with the meta value
 	 * right-aligned beside it, secondary line (body, muted) under it, and
-	 * a hairline rule below. Lines are truncated, never wrapped, so every
-	 * row has the same rhythm.
+	 * a hairline rule below. numbered style: a large accent step number in
+	 * a left gutter with the primary beside it and the secondary under the
+	 * primary (meta values are not drawn). Lines are truncated, never
+	 * wrapped, so every row has the same rhythm.
 	 *
 	 * @param GDRenderer $r      Renderer.
 	 * @param array      $fields Normalized fields.
@@ -1204,6 +1438,9 @@ class PosterTemplate implements TemplateInterface {
 	private static function draw_list( GDRenderer $r, array $fields, int $x, int $y, int $w, array $colors, callable $px ): int {
 		if ( '' !== $fields['list_heading'] ) {
 			$y = $r->draw_text_wrapped( self::truncate( $r, $fields['list_heading'], $px( self::LIST_HEADING_SIZE ), 'body', $w ), $px( self::LIST_HEADING_SIZE ), $x, $y, $colors['accent'], 'body', $w + 1, 1.3 ) + $px( 10 );
+		}
+		if ( 'numbered' === ( $fields['list_style'] ?? self::LIST_STYLES[0] ) ) {
+			return self::draw_numbered_rows( $r, $fields['list_items'], $x, $y, $w, $colors, $px );
 		}
 		$rule_h = max( 1, $px( 2 ) );
 		$r->filled_rect( $x, $y - $rule_h, $x + $w, $y, $colors['rule'] );
@@ -1232,6 +1469,54 @@ class PosterTemplate implements TemplateInterface {
 			}
 			$y = $top + self::list_row_height( $row, $px );
 			$r->filled_rect( $x, $y - $rule_h, $x + $w, $y, $colors['rule'] );
+		}
+		return $y;
+	}
+
+	/**
+	 * Draw numbered list rows; returns the y after the last row.
+	 *
+	 * Each row: a large accent-colored step number (1, 2, 3, …) in a left
+	 * gutter sized to the widest number, the primary line (heading font)
+	 * beside it and the secondary line (body, muted) under the primary.
+	 * Meta values are not drawn in this style.
+	 *
+	 * @param GDRenderer $r      Renderer.
+	 * @param array      $items  Normalized list rows.
+	 * @param int        $x      Left edge.
+	 * @param int        $y      Top.
+	 * @param int        $w      Block width.
+	 * @param array      $colors Allocated colors.
+	 * @param callable(float): int $px Design-unit scaler.
+	 */
+	private static function draw_numbered_rows( GDRenderer $r, array $items, int $x, int $y, int $w, array $colors, callable $px ): int {
+		$number_sz = $px( self::LIST_NUMBER_SIZE );
+		$primary   = $px( self::LIST_PRIMARY_SIZE );
+		$second    = $px( self::LIST_SECOND_SIZE );
+
+		$gutter = 0;
+		foreach ( array_keys( $items ) as $i ) {
+			$gutter = max( $gutter, $r->measure_text_width( (string) ( $i + 1 ), $number_sz, 'heading' ) );
+		}
+		$gutter += $px( self::LIST_NUMBER_GAP );
+		$text_w  = max( 1, $w - $gutter );
+		$text_x  = $x + $gutter;
+
+		foreach ( $items as $i => $row ) {
+			$top = $y;
+			$y  += $px( self::LIST_ROW_PAD );
+			$r->draw_text( (string) ( $i + 1 ), $number_sz, $x, $y + $number_sz, $colors['accent'], 'heading' );
+			// Shrink long primaries up to 20% before resorting to an ellipsis.
+			$size = $primary;
+			while ( $size > (int) ( $primary * 0.8 ) && $r->measure_text_width( $row['primary'], $size, 'heading' ) > $text_w ) {
+				--$size;
+			}
+			$r->draw_text( self::truncate( $r, $row['primary'], $size, 'heading', $text_w ), $size, $text_x, $y + $primary, $colors['text'], 'heading' );
+			if ( '' !== $row['secondary'] ) {
+				$sy = $y + (int) ( $primary * 1.2 ) + $px( 6 );
+				$r->draw_text( self::truncate( $r, $row['secondary'], $second, 'body', $text_w ), $second, $text_x, $sy + $second, $colors['muted'], 'body' );
+			}
+			$y = $top + self::list_row_height( $row, $px, 'numbered' );
 		}
 		return $y;
 	}
@@ -1650,7 +1935,7 @@ class PosterTemplate implements TemplateInterface {
 	 * Mirrors the vertical advances in draw(); keep the two in sync.
 	 */
 	private function content_height( GDRenderer $r, array $fields, array $lines, int $title_size, int $title_w, int $max_w, callable $px ): int {
-		$h  = $r->measure_text_height( $fields['kicker'], $px( self::KICKER_SIZE ), 'body', $max_w, 1.3 ) + $px( 24 );
+		$h  = $r->measure_text_height( $fields['kicker'], $px( self::KICKER_SIZE ), 'body', $title_w, 1.3 ) + $px( 24 );
 		$h += $r->measure_text_height( $fields['title'], $title_size, 'heading', $title_w, 1.08 ) + $px( 30 ) + $px( 40 );
 		foreach ( $lines as $line ) {
 			$h += $r->measure_text_height( $line, $px( self::BODY_SIZE ), 'body', $max_w, 1.35 ) + $px( 10 );
