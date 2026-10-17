@@ -35,6 +35,7 @@ class PermissionHelper {
 		'manage_flows'     => 'datamachine_manage_flows',
 		'manage_settings'  => 'datamachine_manage_settings',
 		'view_analytics'   => 'datamachine_view_analytics',
+		'render_images'    => 'datamachine_render_images',
 		'chat'             => 'datamachine_chat',
 		'use_tools'        => 'datamachine_use_tools',
 		'view_logs'        => 'datamachine_view_logs',
@@ -157,19 +158,35 @@ class PermissionHelper {
 	}
 
 	/**
+	 * Actions implied by any management capability.
+	 *
+	 * Holders of manage_flows / manage_settings / manage_agents (and
+	 * administrators via manage_options) pass these actions without a
+	 * dedicated capability grant — no regression for existing operators.
+	 *
+	 * - view_analytics: read-only analytics access.
+	 * - render_images: image-template rendering is a content-creation
+	 *   action; admins/operators keep access while the dedicated
+	 *   datamachine_render_images cap lets sites grant it to content teams.
+	 *
+	 * @since 0.37.0
+	 * @var string[]
+	 */
+	private const IMPLIED_BY_MANAGEMENT = array( 'view_analytics', 'render_images' );
+
+	/**
 	 * Check whether current context can perform an action.
 	 *
 	 * @since 0.37.0
 	 *
-	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, chat, use_tools, view_logs).
+	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, render_images, chat, use_tools, view_logs).
 	 * @return bool
 	 */
 	public static function can( string $action ): bool {
-		// Read-only analytics access is implied by any management capability.
-		// This keeps existing manage_flows / manage_settings / manage_agents
-		// holders (and administrators via manage_options) working without a
-		// dedicated datamachine_view_analytics grant — no regression.
-		if ( 'view_analytics' === $action && self::can_manage() ) {
+		// Some actions are implied by any management capability (see
+		// IMPLIED_BY_MANAGEMENT) so existing manage_* holders keep access
+		// without a dedicated grant.
+		if ( in_array( $action, self::IMPLIED_BY_MANAGEMENT, true ) && self::can_manage() ) {
 			return true;
 		}
 
