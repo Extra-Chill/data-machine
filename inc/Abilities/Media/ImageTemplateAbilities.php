@@ -174,7 +174,7 @@ class ImageTemplateAbilities {
 				),
 			),
 			'execute_callback'    => array( self::class, 'renderTemplate' ),
-			'permission_callback' => fn() => PermissionHelper::can_manage(),
+			'permission_callback' => fn() => PermissionHelper::can( 'render_images' ),
 			'meta'                => array( 'show_in_rest' => false ),
 		);
 	}
@@ -196,7 +196,7 @@ class ImageTemplateAbilities {
 				),
 			),
 			'execute_callback'    => array( self::class, 'listTemplates' ),
-			'permission_callback' => fn() => PermissionHelper::can_manage(),
+			'permission_callback' => fn() => PermissionHelper::can( 'render_images' ),
 			'meta'                => array( 'show_in_rest' => false ),
 		);
 	}
