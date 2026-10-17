@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.189.0] - 2026-10-17
+
+### Added
+- fill hero title width, balance hero spacing, add background_strength
+
 ## [0.188.0] - 2026-10-17
 
 ### Added
