@@ -20,6 +20,13 @@
  *    keep the QR at its guaranteed minimum (no content/QR overlap)
  *  - layout planning: content clears the banner, slack is distributed,
  *    banner-less layouts, landscape columns never overlap
+ *  - hero QR controls (#3631): fit order keeps a 5-step numbered list
+ *    over QR size, qr_quiet_modules tightens the card, an outside label
+ *    sits above the card bounds, qr_card_color and list_style normalize
+ *    with safe fallbacks, numbered lists measure and render
+ *  - header co-brand logos (#3631): equal heights beside the brand logo,
+ *    overwide clusters scale down together, the hero title width clears
+ *    the cluster
  *  - renders portrait and landscape PNGs at preset size, with and without
  *    a QR provider; provider-supplied QR files are consumed and deleted
  *  - missing title fails gracefully (empty result, no fatal)
@@ -163,13 +170,35 @@ $assert( 'normalize trims strings', 'Never Miss The Show' === $norm['title'] );
 $assert( 'normalize keeps only non-empty scalar detail lines', array( 'Find a show tonight', '42' ) === $norm['detail_lines'] );
 $assert( 'normalize rejects non-scalar strings', '' === $norm['banner_text'] );
 $assert( 'normalize keeps only string logo paths', array( '/tmp/a.png' ) === $norm['cobrand_logos'] );
-$assert( 'normalize fills every field', 22 === count( $norm ) && '' === $norm['qr_url'] );
+$assert( 'normalize fills every field', 27 === count( $norm ) && '' === $norm['qr_url'] );
 $assert( 'scheme defaults to dark', 'dark' === $norm['scheme'] );
 $assert( 'unknown scheme falls back to dark', 'dark' === PosterTemplate::normalize_fields( array( 'scheme' => 'neon' ) )['scheme'] );
 $assert( 'scheme is case-insensitive', 'accent' === PosterTemplate::normalize_fields( array( 'scheme' => 'Accent' ) )['scheme'] );
 $assert( 'qr_emphasis defaults to footer', 'footer' === $norm['qr_emphasis'] );
 $assert( 'qr_emphasis accepts hero (case-insensitive)', 'hero' === PosterTemplate::normalize_fields( array( 'qr_emphasis' => 'Hero' ) )['qr_emphasis'] );
 $assert( 'unknown qr_emphasis falls back to footer', 'footer' === PosterTemplate::normalize_fields( array( 'qr_emphasis' => 'giant' ) )['qr_emphasis'] );
+
+// Hero QR controls and list style (#3631): normalization fallbacks.
+$assert( 'qr_quiet_modules defaults to 4', 4 === $norm['qr_quiet_modules'] && 4 === PosterTemplate::HERO_QUIET_MODULES );
+$assert(
+	'qr_quiet_modules is clamped to 1-4',
+	1 === PosterTemplate::normalize_fields( array( 'qr_quiet_modules' => 0 ) )['qr_quiet_modules']
+		&& 4 === PosterTemplate::normalize_fields( array( 'qr_quiet_modules' => 9 ) )['qr_quiet_modules']
+		&& 2 === PosterTemplate::normalize_fields( array( 'qr_quiet_modules' => '2' ) )['qr_quiet_modules']
+);
+$assert( 'non-numeric qr_quiet_modules falls back to 4', 4 === PosterTemplate::normalize_fields( array( 'qr_quiet_modules' => 'roomy' ) )['qr_quiet_modules'] );
+$assert( 'qr_label_position defaults to card', 'card' === $norm['qr_label_position'] && 'card' === PosterTemplate::QR_LABEL_POSITIONS[0] );
+$assert( 'unknown qr_label_position falls back to card', 'card' === PosterTemplate::normalize_fields( array( 'qr_label_position' => 'under' ) )['qr_label_position'] );
+$assert( 'qr_label_position accepts outside (case-insensitive)', 'outside' === PosterTemplate::normalize_fields( array( 'qr_label_position' => 'Outside' ) )['qr_label_position'] );
+$assert( 'qr_card_color defaults to white', '#ffffff' === $norm['qr_card_color'] );
+$assert( 'qr_card_color normalizes a hex color', '#f5f0e6' === PosterTemplate::normalize_fields( array( 'qr_card_color' => 'F5F0E6' ) )['qr_card_color'] );
+$assert( 'invalid qr_card_color falls back to white', '#ffffff' === PosterTemplate::normalize_fields( array( 'qr_card_color' => 'cream' ) )['qr_card_color'] );
+$assert( 'list_style defaults to rows', 'rows' === $norm['list_style'] && 'rows' === PosterTemplate::LIST_STYLES[0] );
+$assert( 'unknown list_style falls back to rows', 'rows' === PosterTemplate::normalize_fields( array( 'list_style' => 'bullets' ) )['list_style'] );
+$assert( 'list_style accepts numbered (case-insensitive)', 'numbered' === PosterTemplate::normalize_fields( array( 'list_style' => 'Numbered' ) )['list_style'] );
+$assert( 'header_logos keeps only string paths', array( '/tmp/h.png' ) === PosterTemplate::normalize_fields( array( 'header_logos' => array( '/tmp/h.png', '', 3 ) ) )['header_logos'] );
+$assert( 'get_fields declares the new QR, list and header-logo fields', isset( $fields['qr_quiet_modules'], $fields['qr_label_position'], $fields['qr_card_color'], $fields['list_style'], $fields['header_logos'] ) );
+$assert( 'qr_card_color field documents the light requirement', str_contains( (string) $fields['qr_card_color']['label'], 'light' ) );
 $assert( 'background defaults to stripes', 'stripes' === $norm['background'] && 'stripes' === PosterTemplate::BACKGROUNDS[0] );
 $assert( 'unknown background falls back to stripes', 'stripes' === PosterTemplate::normalize_fields( array( 'background' => 'plaid' ) )['background'] );
 $assert( 'background is case-insensitive', 'halftone' === PosterTemplate::normalize_fields( array( 'background' => 'Halftone' ) )['background'] );
@@ -270,6 +299,18 @@ $assert( 'list height is zero without rows', 0 === PosterTemplate::list_height( 
 $two  = PosterTemplate::list_height( PosterTemplate::normalize_fields( array( 'list_items' => array( 'a', 'b' ) ) ), $unit );
 $four = PosterTemplate::list_height( PosterTemplate::normalize_fields( array( 'list_items' => array( 'a', 'b', 'c', 'd' ) ) ), $unit );
 $assert( 'list height grows per row', $four === 2 * $two );
+
+// Numbered rows reserve the step number height, so fit planning matches.
+$two_numbered = PosterTemplate::list_height(
+	PosterTemplate::normalize_fields(
+		array(
+			'list_items' => array( 'a', 'b' ),
+			'list_style' => 'numbered',
+		)
+	),
+	$unit
+);
+$assert( 'numbered rows reserve the step number height', $two_numbered > $two );
 
 $assert( 'default kicker uses brand text', 'ACME PRESENTS' === PosterTemplate::default_kicker( 'Acme' ) );
 $assert( 'default kicker is empty without a brand', '' === PosterTemplate::default_kicker( '  ' ) );
@@ -464,6 +505,13 @@ $hero_card = PosterTemplate::hero_card( 1485, 150 );
 $assert( 'hero card quiet zone is at least 4 modules', $hero_card['pad'] >= (int) ceil( 1485 * 4 / 33 ) );
 $assert( 'hero card wraps QR plus quiet zone', $hero_card['width'] === 1485 + 2 * $hero_card['pad'] );
 
+// qr_quiet_modules drives the card padding (#3631).
+$tight_card = PosterTemplate::hero_card( 1485, 150, 2 );
+$assert( 'quiet=2 gives a smaller card than quiet=4', $tight_card['pad'] < $hero_card['pad'] && $tight_card['width'] < $hero_card['width'] && $tight_card['height'] < $hero_card['height'] );
+$assert( 'hero_card clamps quiet modules to 1-4', PosterTemplate::hero_card( 1485, 150, 9 ) === $hero_card && PosterTemplate::hero_card( 1485, 150, 0 ) === PosterTemplate::hero_card( 1485, 150, 1 ) );
+$tight_h = 1485 + 2 * $tight_card['pad'];
+$assert( 'label-less card is exactly QR plus quiet zone (no bottom padding)', PosterTemplate::hero_card( 1485, 0, 2 )['height'] === $tight_h );
+
 $hero_plan = PosterTemplate::plan_hero_layout( 5100, 244, 1200, 367, 2400, 122 );
 $assert( 'hero plan pins the card to the bottom margin', 5100 - 244 - 2400 === $hero_plan['card_top'] );
 $assert( 'hero plan stacks content, banner and card without overlap', $hero_plan['fits'] && $hero_plan['content_bottom'] + 122 <= $hero_plan['banner_top'] && $hero_plan['banner_top'] + 367 + 122 <= $hero_plan['card_top'] );
@@ -572,5 +620,112 @@ foreach ( array( 'print_tabloid_300' => 3300, 'print_pocket_flyer' => 1275, 'pri
 	$assert( "{$preset}: COSTUME CONTEST hero keeps the QR minimum (no overlap)", $final >= (int) round( $w * PosterTemplate::HERO_QR_MIN_RATIO ) );
 }
 $GLOBALS['poster_smoke_qr'] = null;
+
+// -------------------------------------------------------------------------
+// Hero fit order, quiet zone, outside label, numbered list (#3631).
+// -------------------------------------------------------------------------
+
+$measure = new GDRenderer();
+$measure->register_font( 'heading', '' );
+$measure->register_font( 'body', '' );
+
+$steps      = array( 'Open your camera', 'Scan the code', 'Pick something nearby', 'Mark yourself going', 'Get reminded' );
+$how_raw    = array(
+	'title'             => 'HOW IT WORKS',
+	'kicker'            => 'ACME PRESENTS',
+	'qr_url'            => 'https://example.com/go/',
+	'qr_label'          => 'SCAN TO START',
+	'qr_emphasis'       => 'hero',
+	'qr_quiet_modules'  => 2,
+	'qr_label_position' => 'outside',
+	'list_heading'      => 'FIVE STEPS',
+	'list_style'        => 'numbered',
+	'list_items'        => $steps,
+);
+$how_fields = PosterTemplate::normalize_fields( $how_raw );
+
+// Fit order: the QR shrinks toward its minimum before any list row drops,
+// so a 5-step numbered list survives on the print_tabloid_300 hero.
+$fit = $template->plan_hero_fit( $measure, $how_fields, 3300, 5100, 0 );
+$assert( 'print_tabloid_300 hero keeps all 5 numbered steps', 5 === count( $fit['fields']['list_items'] ) );
+$assert( 'print_tabloid_300 hero QR stays at least its minimum ratio', $fit['qr_size'] >= (int) round( 3300 * PosterTemplate::HERO_QR_MIN_RATIO ) );
+$assert( '5-step hero plan fits without dropping any field', $fit['plan']['fits'] && array() === $fit['dropped_fields'] );
+
+// Outside label: drawn above the card, and the tight card is exactly the
+// QR plus its quiet zone — no extra bottom padding.
+$assert( 'outside label has a measured height', $fit['label_height'] > 0 );
+$assert( 'outside label sits above the card bounds', $fit['label_top'] + $fit['label_height'] <= $fit['card_top'] );
+$assert( 'tight hero card is exactly QR plus quiet zone', $fit['card']['height'] === $fit['qr_size'] + 2 * $fit['card']['pad'] );
+
+// On-card label (default position) still reserves its height inside the card.
+$card_fit = $template->plan_hero_fit( $measure, PosterTemplate::normalize_fields( array( 'qr_label_position' => 'card' ) + $how_raw ), 3300, 5100, 0 );
+$assert( 'on-card label reserves height inside the card', 0 === $card_fit['label_height'] && $card_fit['card']['height'] > $card_fit['qr_size'] + 2 * $card_fit['card']['pad'] );
+
+// End to end: the numbered 5-step hero renders at preset size with no
+// dropped fields.
+$GLOBALS['poster_smoke_qr'] = static function ( $value, $url, $size ) {
+	$img = imagecreatetruecolor( max( 1, (int) $size ), max( 1, (int) $size ) );
+	imagefill( $img, 0, 0, imagecolorallocate( $img, 0, 0, 0 ) );
+	$path = tempnam( sys_get_temp_dir(), 'poster-qr' );
+	imagepng( $img, $path );
+	return $path;
+};
+
+$paths = $template->render( $how_raw, new GDRenderer(), array( 'preset' => 'print_tabloid_300' ) );
+$info  = isset( $paths[0] ) && file_exists( $paths[0] ) ? getimagesize( $paths[0] ) : false;
+if ( isset( $paths[0] ) ) {
+	wp_delete_file( $paths[0] );
+}
+$assert( 'numbered 5-step hero renders at preset size', is_array( $info ) && 3300 === $info[0] && 5100 === $info[1] );
+$assert( 'numbered 5-step hero drops no fields', array() === $template->get_dropped_fields() );
+$GLOBALS['poster_smoke_qr'] = null;
+
+// -------------------------------------------------------------------------
+// Header co-brand logos (#3631).
+// -------------------------------------------------------------------------
+
+$wide_logo   = tempnam( sys_get_temp_dir(), 'poster-logo-a' ) . '.png';
+$square_logo = tempnam( sys_get_temp_dir(), 'poster-logo-b' ) . '.png';
+$logo_img    = imagecreatetruecolor( 200, 50 );
+imagefill( $logo_img, 0, 0, imagecolorallocate( $logo_img, 200, 40, 40 ) );
+imagepng( $logo_img, $wide_logo );
+$logo_img = imagecreatetruecolor( 80, 80 );
+imagefill( $logo_img, 0, 0, imagecolorallocate( $logo_img, 40, 40, 200 ) );
+imagepng( $logo_img, $square_logo );
+unset( $logo_img );
+
+$cluster = PosterTemplate::header_logo_cluster( array( $wide_logo, $square_logo ), 150, 24, 5000 );
+$assert(
+	'header cluster renders both logos at equal height',
+	2 === count( $cluster['logos'] ) && 150 === $cluster['logos'][0]['height'] && $cluster['logos'][0]['height'] === $cluster['logos'][1]['height']
+);
+$assert( 'header cluster preserves each aspect ratio', 600 === $cluster['logos'][0]['width'] && 150 === $cluster['logos'][1]['width'] );
+$assert( 'header cluster width sums logos and gap', 600 + 24 + 150 === $cluster['width'] );
+
+$narrow = PosterTemplate::header_logo_cluster( array( $wide_logo, $square_logo ), 150, 24, 300 );
+$assert(
+	'overwide cluster scales every logo down together at equal heights',
+	$narrow['width'] <= 300 && $narrow['logos'][0]['height'] === $narrow['logos'][1]['height'] && $narrow['logos'][0]['height'] < 150
+);
+$assert( 'unreadable logo paths are skipped', 0 === PosterTemplate::header_logo_cluster( array( '/nope/missing.png' ), 150, 24, 300 )['width'] );
+
+// The hero title's available width shrinks to clear the logo cluster.
+$fit_logos = $template->plan_hero_fit( $measure, $how_fields, 3300, 5100, $cluster['width'] );
+$assert( 'hero title width clears the logo cluster', $fit_logos['title_w'] <= $fit_logos['max_w'] - $cluster['width'] );
+
+// End to end: header logos render on standard portrait and hero layouts.
+$GLOBALS['poster_smoke_qr'] = static function ( $value, $url, $size ) {
+	$img = imagecreatetruecolor( max( 1, (int) $size ), max( 1, (int) $size ) );
+	imagefill( $img, 0, 0, imagecolorallocate( $img, 0, 0, 0 ) );
+	$path = tempnam( sys_get_temp_dir(), 'poster-qr' );
+	imagepng( $img, $path );
+	return $path;
+};
+$assert( 'portrait renders with header logos', null !== $render( $ad + array( 'header_logos' => array( $wide_logo, $square_logo ) ), 'instagram_feed_portrait' ) );
+$assert( 'hero renders with header logos', null !== $render( $hero_data + array( 'header_logos' => array( $wide_logo, $square_logo ) ), 'print_pocket_flyer' ) );
+$assert( 'landscape renders with header logos', null !== $render( $ad + array( 'header_logos' => array( $wide_logo, $square_logo ) ), 'landscape_16_9' ) );
+$GLOBALS['poster_smoke_qr'] = null;
+wp_delete_file( $wide_logo );
+wp_delete_file( $square_logo );
 
 $finish();
