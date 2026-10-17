@@ -189,6 +189,28 @@ class PosterTemplate implements TemplateInterface {
 	 */
 	private const HERO_SLACK_ABOVE = 0.5;
 
+	/**
+	 * Field keys whose content was omitted during the last render() so the
+	 * layout could fit. Empty when nothing was dropped.
+	 *
+	 * @var list<string>
+	 */
+	private array $dropped_fields = array();
+
+	/**
+	 * Field keys omitted from the last render() to make the layout fit.
+	 *
+	 * The hero fitting order drops optional copy (footer note, CTA, detail
+	 * note, subline, tagline, list rows, detail lines) before the QR gives
+	 * up size; callers surface this list so a render that silently loses
+	 * fields is distinguishable from one that drew everything.
+	 *
+	 * @return list<string> Dropped field keys, empty when nothing was dropped.
+	 */
+	public function get_dropped_fields(): array {
+		return $this->dropped_fields;
+	}
+
 	public function get_id(): string {
 		return 'poster';
 	}
@@ -259,6 +281,8 @@ class PosterTemplate implements TemplateInterface {
 	 * @return string[] Rendered file paths, empty on failure.
 	 */
 	public function render( array $data, GDRenderer $renderer, array $options = array() ): array {
+		$this->dropped_fields = array();
+
 		$fields = self::normalize_fields( $data );
 		if ( '' === $fields['title'] ) {
 			return array();
@@ -724,30 +748,9 @@ class PosterTemplate implements TemplateInterface {
 		$margin    = $px( $landscape ? self::LANDSCAPE_MARGIN : self::MARGIN );
 
 		$qr_pref = (int) round( $landscape ? $height * self::HERO_QR_RATIO : $width * self::HERO_QR_RATIO );
-		$qr_min  = (int) round( $landscape ? $height * self::HERO_QR_MIN_RATIO_LANDSCAPE : $width * self::HERO_QR_MIN_RATIO );
 		$qr_path = self::qr_image_path( $fields['qr_url'], $qr_pref );
 		if ( ! $qr_path ) {
 			return false;
-		}
-
-		$label        = $fields['qr_label'];
-		$label_base   = $px( self::HERO_LABEL_SIZE );
-		$measure_card = static function ( int $qr_size ) use ( $r, $label, $label_base ): array {
-			$size = '' !== $label ? self::fit_word_size( $r, $label, $label_base, 'heading', $qr_size ) : 0;
-			$h    = '' !== $label ? $r->measure_text_height( $label, $size, 'heading', $qr_size, 1.2 ) : 0;
-			return array( self::hero_card( $qr_size, $h ), $size );
-		};
-
-		$qr_size = $qr_pref;
-		if ( $landscape ) {
-			// The card must clear the vertical margins before anything else.
-			while ( $qr_size > $px( 120 ) ) {
-				list( $card ) = $measure_card( $qr_size );
-				if ( $card['height'] <= $height - 2 * $margin ) {
-					break;
-				}
-				$qr_size -= $px( 16 );
-			}
 		}
 
 		$logo   = (string) $tokens['logo_path_inverse'];
@@ -755,63 +758,22 @@ class PosterTemplate implements TemplateInterface {
 		$dims   = ( '' !== $logo && is_readable( $logo ) ) ? getimagesize( $logo ) : false;
 		$logo_w = $dims ? (int) round( $dims[0] * $logo_h / max( 1, $dims[1] ) ) : 0;
 
+		$fit = $this->plan_hero_fit( $r, $fields, $width, $height, $logo_w );
+
+		$this->dropped_fields = $fit['dropped_fields'];
+
+		$fields     = $fit['fields'];
+		$plan       = $fit['plan'];
+		$card       = $fit['card'];
+		$label_sz   = $fit['label_size'];
+		$qr_size    = $fit['qr_size'];
+		$title_size = $fit['title_size'];
+		$max_w      = $fit['max_w'];
+		$title_w    = $fit['title_w'];
+		$lines      = $fit['lines'];
+		$banner_h   = $fit['banner_h'];
 		$has_banner = '' !== $fields['banner_text'];
-		$banner_h   = $has_banner ? $px( self::BANNER_HEIGHT ) : 0;
-		$min_gap    = $px( self::MIN_BANNER_GAP );
-
-		$title_size = $px( self::TITLE_MAX_SIZE );
-		if ( ! $landscape ) {
-			$grow_w     = $width - 2 * $margin - ( $logo_w ? $logo_w + $px( 30 ) : 0 );
-			$title_size = self::hero_title_size( $r, $fields['title'], $title_size, $grow_w );
-		}
-		$drops = array( 'footer_note', 'cta_text', 'detail_note', 'subline', 'tagline' );
-		do {
-			list( $card, $label_sz ) = $measure_card( $qr_size );
-
-			$max_w   = $landscape
-				? self::landscape_left_width( $width, $margin, $card['width'], $px( 80 ) )
-				: $width - 2 * $margin;
-			$title_w = $max_w - ( $logo_w ? $logo_w + $px( 30 ) : 0 );
-
-			$lines     = array_values( array_filter( array( $fields['tagline'], $fields['subline'] ) ) );
-			$content_h = $this->hero_content_height( $r, $fields, $lines, $title_size, $title_w, $max_w, $px );
-			$plan      = $landscape
-				? self::plan_layout( $height, $margin, $content_h, $banner_h, 0, $min_gap )
-				: self::plan_hero_layout( $height, $margin, $content_h, $banner_h, $card['height'], $min_gap );
-			if ( $plan['fits'] ) {
-				break;
-			}
-			if ( count( $fields['list_items'] ) > self::LIST_MIN_ROWS ) {
-				array_pop( $fields['list_items'] );
-				continue;
-			}
-			if ( $title_size > $px( self::TITLE_MIN_SIZE ) ) {
-				$title_size -= $px( 4 );
-				continue;
-			}
-			if ( ! $landscape && $qr_size > $qr_min ) {
-				$qr_size = max( $qr_min, $qr_size - $px( 16 ) );
-				continue;
-			}
-			if ( $drops ) {
-				$fields[ array_shift( $drops ) ] = '';
-				continue;
-			}
-			if ( $fields['list_items'] ) {
-				array_pop( $fields['list_items'] );
-				continue;
-			}
-			if ( $fields['detail_lines'] ) {
-				array_pop( $fields['detail_lines'] );
-				continue;
-			}
-			// Last resort: shrink the QR below its minimum rather than overlap.
-			if ( $qr_size > (int) round( ( $landscape ? $height : $width ) / 4 ) ) {
-				$qr_size -= $px( 16 );
-				continue;
-			}
-			break;
-		} while ( true );
+		$label      = $fields['qr_label'];
 
 		// Re-request the QR at its final size so the provider renders the
 		// exact bitmap drawn — no lossy downscale of module edges.
@@ -894,6 +856,134 @@ class PosterTemplate implements TemplateInterface {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Fit the hero layout for a canvas without drawing anything.
+	 *
+	 * Pure planning pass shared by draw_hero() and tests: runs the hero
+	 * fitting order (trim overlong lists, shrink the title, shrink the QR
+	 * toward its minimum, then drop optional copy) against real text
+	 * measurements until the plan fits, and reports every field key whose
+	 * content was dropped along the way. The renderer is used for text
+	 * measurement only — no canvas is required.
+	 *
+	 * @param GDRenderer $r      Renderer for text measurement (fonts optional;
+	 *                           unregistered names use the system fallback).
+	 * @param array      $fields Output of normalize_fields(), kicker resolved.
+	 * @param int        $width  Canvas width in pixels.
+	 * @param int        $height Canvas height in pixels.
+	 * @param int        $logo_w Brand logo width in pixels (0 without a logo).
+	 * @return array{fields: array, plan: array, card: array{pad: int, width: int, height: int}, label_size: int, qr_size: int, title_size: int, max_w: int, title_w: int, lines: list<string>, banner_h: int, dropped_fields: list<string>}
+	 */
+	public function plan_hero_fit( GDRenderer $r, array $fields, int $width, int $height, int $logo_w = 0 ): array {
+		$landscape = $width > $height;
+		$u         = $landscape ? $height / self::LANDSCAPE_BASE_HEIGHT : $width / self::BASE_WIDTH;
+		$px        = static fn( float $n ): int => (int) round( $n * $u );
+		$margin    = $px( $landscape ? self::LANDSCAPE_MARGIN : self::MARGIN );
+
+		$qr_pref = (int) round( $landscape ? $height * self::HERO_QR_RATIO : $width * self::HERO_QR_RATIO );
+		$qr_min  = (int) round( $landscape ? $height * self::HERO_QR_MIN_RATIO_LANDSCAPE : $width * self::HERO_QR_MIN_RATIO );
+
+		$label        = $fields['qr_label'];
+		$label_base   = $px( self::HERO_LABEL_SIZE );
+		$measure_card = static function ( int $qr_size ) use ( $r, $label, $label_base ): array {
+			$size = '' !== $label ? self::fit_word_size( $r, $label, $label_base, 'heading', $qr_size ) : 0;
+			$h    = '' !== $label ? $r->measure_text_height( $label, $size, 'heading', $qr_size, 1.2 ) : 0;
+			return array( self::hero_card( $qr_size, $h ), $size );
+		};
+
+		$qr_size = $qr_pref;
+		if ( $landscape ) {
+			// The card must clear the vertical margins before anything else.
+			while ( $qr_size > $px( 120 ) ) {
+				list( $card ) = $measure_card( $qr_size );
+				if ( $card['height'] <= $height - 2 * $margin ) {
+					break;
+				}
+				$qr_size -= $px( 16 );
+			}
+		}
+
+		$has_banner = '' !== $fields['banner_text'];
+		$banner_h   = $has_banner ? $px( self::BANNER_HEIGHT ) : 0;
+		$min_gap    = $px( self::MIN_BANNER_GAP );
+
+		$title_size = $px( self::TITLE_MAX_SIZE );
+		if ( ! $landscape ) {
+			$grow_w     = $width - 2 * $margin - ( $logo_w ? $logo_w + $px( 30 ) : 0 );
+			$title_size = self::hero_title_size( $r, $fields['title'], $title_size, $grow_w );
+		}
+		$drops   = array( 'footer_note', 'cta_text', 'detail_note', 'subline', 'tagline' );
+		$dropped = array();
+		do {
+			list( $card, $label_sz ) = $measure_card( $qr_size );
+
+			$max_w   = $landscape
+				? self::landscape_left_width( $width, $margin, $card['width'], $px( 80 ) )
+				: $width - 2 * $margin;
+			$title_w = $max_w - ( $logo_w ? $logo_w + $px( 30 ) : 0 );
+
+			$lines     = array_values( array_filter( array( $fields['tagline'], $fields['subline'] ) ) );
+			$content_h = $this->hero_content_height( $r, $fields, $lines, $title_size, $title_w, $max_w, $px );
+			$plan      = $landscape
+				? self::plan_layout( $height, $margin, $content_h, $banner_h, 0, $min_gap )
+				: self::plan_hero_layout( $height, $margin, $content_h, $banner_h, $card['height'], $min_gap );
+			if ( $plan['fits'] ) {
+				break;
+			}
+			if ( count( $fields['list_items'] ) > self::LIST_MIN_ROWS ) {
+				array_pop( $fields['list_items'] );
+				$dropped['list_items'] = true;
+				continue;
+			}
+			if ( $title_size > $px( self::TITLE_MIN_SIZE ) ) {
+				$title_size -= $px( 4 );
+				continue;
+			}
+			if ( ! $landscape && $qr_size > $qr_min ) {
+				$qr_size = max( $qr_min, $qr_size - $px( 16 ) );
+				continue;
+			}
+			if ( $drops ) {
+				$key = array_shift( $drops );
+				if ( '' !== $fields[ $key ] ) {
+					$dropped[ $key ] = true;
+				}
+				$fields[ $key ] = '';
+				continue;
+			}
+			if ( $fields['list_items'] ) {
+				array_pop( $fields['list_items'] );
+				$dropped['list_items'] = true;
+				continue;
+			}
+			if ( $fields['detail_lines'] ) {
+				array_pop( $fields['detail_lines'] );
+				$dropped['detail_lines'] = true;
+				continue;
+			}
+			// Last resort: shrink the QR below its minimum rather than overlap.
+			if ( $qr_size > (int) round( ( $landscape ? $height : $width ) / 4 ) ) {
+				$qr_size -= $px( 16 );
+				continue;
+			}
+			break;
+		} while ( true );
+
+		return array(
+			'fields'         => $fields,
+			'plan'           => $plan,
+			'card'           => $card,
+			'label_size'     => $label_sz,
+			'qr_size'        => $qr_size,
+			'title_size'     => $title_size,
+			'max_w'          => $max_w,
+			'title_w'        => $title_w,
+			'lines'          => $lines,
+			'banner_h'       => $banner_h,
+			'dropped_fields' => array_keys( $dropped ),
+		);
 	}
 
 	/**
