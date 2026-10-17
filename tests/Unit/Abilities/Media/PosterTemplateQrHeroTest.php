@@ -12,6 +12,9 @@
  *    canvas, on a white quiet-zone card padded by at least 4 modules
  *  - hero layout boxes stack without overlap (plan_hero_layout) and the
  *    card stays inside a 0.25" (75px @300dpi) trim-safe margin
+ *  - the hero fitting pass (plan_hero_fit) reports every field it drops
+ *    to fit — pocket flyer drops tagline + detail_lines, tabloid drops
+ *    nothing (#3625) — measured without rendering a full canvas
  *  - the QR bitmap is requested at its final pixel size (crisp at print
  *    resolution, no blurry resample)
  *  - landscape hero puts the QR on one side at >= 40% of the height
@@ -245,6 +248,47 @@ namespace DataMachine\Tests\Unit\Abilities\Media {
 				PosterTemplate::plan_hero_layout( 1650, 94, 2000, 142, 900, 47 )['fits'],
 				'oversized content reports it does not fit'
 			);
+		}
+
+		/**
+		 * The hero fitting pass names every field it drops to fit (#3625).
+		 *
+		 * Pure planning only — plan_hero_fit() uses the renderer for text
+		 * measurement and never creates a canvas, so this covers the 300dpi
+		 * print presets without the ~67MB-per-canvas GD cost of rendering
+		 * them (see portrait_print_presets()).
+		 */
+		public function test_plan_hero_fit_reports_dropped_fields(): void {
+			$this->require_render_font();
+			$fields = PosterTemplate::normalize_fields(
+				self::SIGN_DATA + array(
+					'banner_text' => 'FREE · ALL AGES · DOORS 7PM',
+					'qr_emphasis' => 'hero',
+				)
+			);
+
+			$r        = new GDRenderer();
+			$template = new PosterTemplate();
+
+			$pocket = PlatformPresets::dimensions( 'print_pocket_flyer' );
+			$fit    = $template->plan_hero_fit( $r, $fields, $pocket['width'], $pocket['height'] );
+			$this->assertSame(
+				array( 'tagline', 'detail_lines' ),
+				$fit['dropped_fields'],
+				'pocket-flyer hero reports the tagline and detail lines it drops to fit'
+			);
+			$this->assertSame( '', $fit['fields']['tagline'], 'the fitted fields no longer carry the dropped tagline' );
+			$this->assertSame( array(), $fit['fields']['detail_lines'], 'the fitted fields no longer carry the dropped detail lines' );
+			$this->assertTrue( $fit['plan']['fits'], 'the plan fits once the optional copy is dropped' );
+
+			$tabloid = PlatformPresets::dimensions( 'print_tabloid_300' );
+			$fit     = $template->plan_hero_fit( $r, $fields, $tabloid['width'], $tabloid['height'] );
+			$this->assertSame( array(), $fit['dropped_fields'], 'tabloid fits the same copy without dropping anything' );
+			$this->assertSame( $fields['tagline'], $fit['fields']['tagline'], 'tabloid keeps the tagline' );
+			$this->assertSame( $fields['detail_lines'], $fit['fields']['detail_lines'], 'tabloid keeps the detail lines' );
+			$this->assertTrue( $fit['plan']['fits'], 'tabloid plan fits with every field drawn' );
+
+			$this->assertSame( array(), $template->get_dropped_fields(), 'planning alone does not mark the template as having dropped fields' );
 		}
 
 		// ── Rendered pixels ────────────────────────────────────────────

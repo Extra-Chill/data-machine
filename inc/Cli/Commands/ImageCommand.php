@@ -154,7 +154,9 @@ class ImageCommand extends BaseCommand {
 	 * Render an image from a registered GD template.
 	 *
 	 * Generates deterministic, brand-consistent graphics from structured data
-	 * using server-side GD rendering. No external API calls required.
+	 * using server-side GD rendering. No external API calls required. When the
+	 * template drops fields to make the layout fit (e.g. the poster QR-hero
+	 * fitting order), a warning names the dropped fields.
 	 *
 	 * ## OPTIONS
 	 *
@@ -246,6 +248,11 @@ class ImageCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] ?? 'Template rendered.' );
+
+		$dropped_fields = $result['dropped_fields'] ?? array();
+		if ( ! empty( $dropped_fields ) ) {
+			WP_CLI::warning( sprintf( 'Dropped fields to fit the layout: %s', implode( ', ', $dropped_fields ) ) );
+		}
 
 		$file_paths = $result['file_paths'] ?? array();
 		$items      = array();

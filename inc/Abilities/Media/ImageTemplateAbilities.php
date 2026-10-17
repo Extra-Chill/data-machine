@@ -151,21 +151,26 @@ class ImageTemplateAbilities {
 			'output_schema'       => array(
 				'type'       => 'object',
 				'properties' => array(
-					'success'      => array( 'type' => 'boolean' ),
-					'file_paths'   => array(
+					'success'        => array( 'type' => 'boolean' ),
+					'file_paths'     => array(
 						'type'  => 'array',
 						'items' => array( 'type' => 'string' ),
 					),
-					'cached_paths' => array(
+					'cached_paths'   => array(
 						'type'  => 'array',
 						'items' => array( 'type' => 'string' ),
 					),
-					'cached_urls'  => array(
+					'cached_urls'    => array(
 						'type'  => 'array',
 						'items' => array( 'type' => 'string' ),
 					),
-					'template_id'  => array( 'type' => 'string' ),
-					'message'      => array( 'type' => 'string' ),
+					'template_id'    => array( 'type' => 'string' ),
+					'dropped_fields' => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Field keys the template omitted to make the layout fit. Empty when every field was drawn.',
+					),
+					'message'        => array( 'type' => 'string' ),
 				),
 			),
 			'execute_callback'    => array( self::class, 'renderTemplate' ),
@@ -272,13 +277,21 @@ class ImageTemplateAbilities {
 			return new \WP_Error( 'template_render_empty', sprintf( 'Template "%s" rendered but produced no output', $template_id ), array( 'status' => 500 ) );
 		}
 
+		// Fields the template omitted to make the layout fit (e.g. the poster
+		// QR-hero fitting order) — surfaced so callers can tell a complete
+		// render from one that silently lost copy.
+		$dropped_fields = method_exists( $template, 'get_dropped_fields' )
+			? array_values( array_map( 'strval', (array) $template->get_dropped_fields() ) )
+			: array();
+
 		// Default output mode — return file paths as-is.
 		if ( 'cached_file' !== $output ) {
 			return array(
-				'success'     => true,
-				'file_paths'  => $file_paths,
-				'template_id' => $template_id,
-				'message'     => sprintf( 'Generated %d image(s) using template "%s"', count( $file_paths ), $template_id ),
+				'success'        => true,
+				'file_paths'     => $file_paths,
+				'template_id'    => $template_id,
+				'dropped_fields' => $dropped_fields,
+				'message'        => sprintf( 'Generated %d image(s) using template "%s"', count( $file_paths ), $template_id ),
 			);
 		}
 
@@ -291,8 +304,9 @@ class ImageTemplateAbilities {
 
 		return array_merge(
 			array(
-				'success'     => true,
-				'template_id' => $template_id,
+				'success'        => true,
+				'template_id'    => $template_id,
+				'dropped_fields' => $dropped_fields,
 			),
 			$cached_result
 		);
