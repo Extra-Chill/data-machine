@@ -331,7 +331,7 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 		$this->assertIsInt( $error_data['job_id'] );
 	}
 
-	public function test_completed_parent_run_result_includes_available_child_envelopes(): void {
+	public function test_completed_parent_run_result_includes_bounded_child_summaries(): void {
 		$jobs = new Jobs();
 
 		$parent_job_id = $jobs->create_job(
@@ -360,6 +360,9 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 					'run_id'        => (string) $child_job_id,
 					'status'        => JobStatus::COMPLETED,
 					'status_detail' => JobStatus::COMPLETED,
+					'outputs'       => array(
+						'counts' => array( 'items_processed' => 3 ),
+					),
 					'metadata'      => array(
 						'datamachine' => array(
 							'job' => array( 'job_id' => $child_job_id ),
@@ -386,9 +389,16 @@ class RunFlowAbilityLifecycleTest extends WP_UnitTestCase {
 
 		$parent_engine = datamachine_get_engine_data( $parent_job_id );
 		$this->assertSame( WP_Agent_Run_Result_Envelope::SCHEMA, $parent_engine['run_result']['schema'] ?? '' );
-		$this->assertSame(
-			$child_job_id,
-			$parent_engine['run_result']['metadata']['datamachine']['child_job_envelopes'][0]['metadata']['datamachine']['job']['job_id'] ?? 0
-		);
+
+		$datamachine_metadata = $parent_engine['run_result']['metadata']['datamachine'] ?? array();
+		$this->assertArrayNotHasKey( 'child_job_envelopes', $datamachine_metadata, 'Parent run_result must not inline full child envelopes.' );
+
+		$summary = $datamachine_metadata['child_job_summaries'][0] ?? array();
+		$this->assertSame( $child_job_id, $summary['job_id'] ?? 0 );
+		$this->assertSame( array( 'items_processed' => 3 ), $summary['counts'] ?? array() );
+		$this->assertArrayNotHasKey( 'metadata', $summary );
+
+		$child_run_refs = $parent_engine['run_result']['child_run_refs'] ?? array();
+		$this->assertSame( (string) $child_job_id, $child_run_refs[0]['id'] ?? '' );
 	}
 }
