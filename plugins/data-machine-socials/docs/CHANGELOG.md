@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.27.1] - 2026-10-18
+
+### Fixed
+- route account read/reply/update/delete abilities through PublishAuthorization
+
 ## [0.27.0] - 2026-10-17
 
 ### Added
