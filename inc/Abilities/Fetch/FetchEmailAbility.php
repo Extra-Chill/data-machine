@@ -129,7 +129,7 @@ class FetchEmailAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_email' );
 	}
 
 	/**

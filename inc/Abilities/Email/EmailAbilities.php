@@ -357,7 +357,7 @@ class EmailAbilities {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_email' );
 	}
 
 	private static function authRefProperty(): array {

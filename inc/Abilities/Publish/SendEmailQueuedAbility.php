@@ -285,7 +285,7 @@ class SendEmailQueuedAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_email' );
 	}
 
 	/**
@@ -982,7 +982,7 @@ class SendEmailQueuedAbility {
 	}
 
 	private function userHasQueueCapability( int $user_id, ?array $ceiling = null ): bool {
-		foreach ( array( 'datamachine_use_tools', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_manage_agents' ) as $capability ) {
+		foreach ( array( 'datamachine_use_email', 'datamachine_use_tools', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_manage_agents' ) as $capability ) {
 			if ( null !== $ceiling && ! in_array( $capability, $ceiling, true ) ) {
 				continue;
 			}

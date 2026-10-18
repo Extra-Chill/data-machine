@@ -86,7 +86,7 @@ final class MailboxAbilities {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_email' );
 	}
 
 	private function owner(): array|\WP_Error {

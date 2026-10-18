@@ -49,7 +49,7 @@ final class ForwardEmailAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+		return PermissionHelper::can( 'use_email' );
 	}
 
 	public function execute( array $input ): array|\WP_Error {
