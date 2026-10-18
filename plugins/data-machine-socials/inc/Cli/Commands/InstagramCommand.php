@@ -578,6 +578,8 @@ class InstagramCommand {
 			'content' => $caption,
 		);
 
+		$verb = empty( $assoc_args['publish-at'] ) ? 'Publishing to' : 'Scheduling for';
+
 		// Collect image URLs (--image can be repeated)
 		if ( ! empty( $assoc_args['image'] ) ) {
 			$images              = is_array( $assoc_args['image'] ) ? $assoc_args['image'] : array( $assoc_args['image'] );
@@ -588,9 +590,9 @@ class InstagramCommand {
 			}
 
 			$count_label = count( $images ) > 1 ? count( $images ) . ' images (carousel)' : '1 image';
-			WP_CLI::log( "Publishing to Instagram with {$count_label}..." );
+			WP_CLI::log( "{$verb} Instagram with {$count_label}..." );
 		} else {
-			WP_CLI::log( 'Publishing to Instagram (text only)...' );
+			WP_CLI::log( "{$verb} Instagram (text only)..." );
 		}
 
 		if ( ! empty( $assoc_args['aspect-ratio'] ) ) {
