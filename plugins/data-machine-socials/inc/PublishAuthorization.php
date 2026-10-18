@@ -11,6 +11,21 @@ use DataMachine\Abilities\ExecutionScope;
 
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * Every ability that reads or acts on a connected social account authorizes
+ * through this class, so a site's `datamachine_socials_user_can` policy
+ * covers the whole surface:
+ *
+ * - `can_edit()`  (action `edit`): reads, account/status lookups, analytics,
+ *   comment and message listings, and local board sync.
+ * - `can_publish()` (action `publish`): anything visible on the account —
+ *   publishing, updates, deletes, comment replies, engagement, message sends.
+ *
+ * Ads abilities (they spend money) and Reddit abilities (they act as the
+ * brand in a third-party community) require BOTH this policy and Data
+ * Machine's `use_tools` capability. `use_tools` alone is not a boundary:
+ * Data Machine grants it to the author and editor roles by default.
+ */
 final class PublishAuthorization {
 
 	/** Determine whether the current execution context may publish socially. */

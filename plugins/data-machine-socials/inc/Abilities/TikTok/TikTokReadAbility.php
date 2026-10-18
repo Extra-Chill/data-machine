@@ -18,10 +18,10 @@
 namespace DataMachineSocials\Abilities\TikTok;
 
 use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\Handlers\TikTok\TikTokAuth;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -95,7 +95,7 @@ class TikTokReadAbility extends AbstractSocialAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_edit' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

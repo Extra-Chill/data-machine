@@ -12,7 +12,6 @@
 namespace DataMachineSocials\Abilities\LinkedIn;
 
 use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\LinkedIn\LinkedInAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
@@ -118,7 +117,7 @@ class LinkedInPublishAbility extends AbstractSocialAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'get_account' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_edit' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

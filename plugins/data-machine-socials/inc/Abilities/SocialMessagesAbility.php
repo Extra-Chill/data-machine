@@ -7,7 +7,7 @@
 
 namespace DataMachineSocials\Abilities;
 
-use DataMachine\Abilities\PermissionHelper;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -101,8 +101,13 @@ class SocialMessagesAbility extends AbstractSocialAbility {
 		};
 	}
 
-	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+	public function checkPermission( $input = array() ): bool {
+		// Sending a message acts publicly on the connected account; listing reads it.
+		if ( is_array( $input ) && 'send' === ( $input['action'] ?? '' ) ) {
+			return PublishAuthorization::can_publish();
+		}
+
+		return PublishAuthorization::can_edit();
 	}
 
 	/**

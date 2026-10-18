@@ -12,9 +12,9 @@
 
 namespace DataMachineSocials\Abilities\Twitter;
 
-use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Twitter\TwitterAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -71,7 +71,7 @@ class TwitterUpdateAbility extends AbstractSocialAbility {
 	 * @return bool
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		return PublishAuthorization::can_publish();
 	}
 
 	/**

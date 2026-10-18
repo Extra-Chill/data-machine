@@ -13,9 +13,9 @@
 namespace DataMachineSocials\Abilities\LinkedIn;
 
 use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\LinkedIn\LinkedInAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -77,7 +77,7 @@ class LinkedInReadAbility extends AbstractSocialAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		return PublishAuthorization::can_edit();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

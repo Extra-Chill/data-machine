@@ -17,10 +17,10 @@
 namespace DataMachineSocials\Abilities\YouTube;
 
 use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\Handlers\YouTube\YouTubeAuth;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -90,7 +90,7 @@ class YouTubeSearchAbility extends AbstractSocialAbility {
 						),
 					),
 					'execute_callback'    => array( $this, 'execute_search' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_edit' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

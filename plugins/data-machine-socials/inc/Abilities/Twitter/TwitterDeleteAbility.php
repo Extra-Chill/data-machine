@@ -11,9 +11,9 @@
 
 namespace DataMachineSocials\Abilities\Twitter;
 
-use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Twitter\TwitterAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -60,7 +60,7 @@ class TwitterDeleteAbility extends AbstractSocialAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		return PublishAuthorization::can_publish();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

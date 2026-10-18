@@ -15,7 +15,6 @@
 namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
@@ -209,7 +208,7 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'get_account' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_edit' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

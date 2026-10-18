@@ -12,10 +12,10 @@
 
 namespace DataMachineSocials\Abilities\Mastodon;
 
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Mastodon\MastodonAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -67,7 +67,7 @@ class MastodonUpdateAbility extends AbstractSocialAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		return PublishAuthorization::can_publish();
 	}
 
 	public function execute( array $input ): array|\WP_Error {

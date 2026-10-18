@@ -17,6 +17,7 @@ namespace DataMachineSocials\Abilities\Facebook;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\Handlers\Facebook\FacebookGraphClient;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -93,7 +94,8 @@ class FacebookAdsReadAbility extends AbstractSocialAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		// Stricter gate: the site's socials policy AND Data Machine tool access.
+		return PublishAuthorization::can_edit() && PermissionHelper::can( 'use_tools' );
 	}
 
 	/** @return array|\WP_Error */

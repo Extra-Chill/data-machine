@@ -7,7 +7,7 @@
 
 namespace DataMachineSocials\Abilities;
 
-use DataMachine\Abilities\PermissionHelper;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -75,7 +75,7 @@ class SocialCommentsAbility extends AbstractSocialAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		return PublishAuthorization::can_edit();
 	}
 
 	/**

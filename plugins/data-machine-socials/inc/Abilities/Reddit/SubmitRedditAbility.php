@@ -15,6 +15,7 @@ namespace DataMachineSocials\Abilities\Reddit;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -116,7 +117,8 @@ class SubmitRedditAbility extends AbstractSocialAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		// Stricter gate: the site's socials policy AND Data Machine tool access.
+		return PublishAuthorization::can_publish() && PermissionHelper::can( 'use_tools' );
 	}
 
 	/**

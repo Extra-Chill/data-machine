@@ -17,6 +17,7 @@ namespace DataMachineSocials\Abilities\Reddit;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -182,7 +183,8 @@ class FetchRedditAbility extends AbstractSocialAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		// Stricter gate: the site's socials policy AND Data Machine tool access.
+		return PublishAuthorization::can_edit() && PermissionHelper::can( 'use_tools' );
 	}
 
 	/**

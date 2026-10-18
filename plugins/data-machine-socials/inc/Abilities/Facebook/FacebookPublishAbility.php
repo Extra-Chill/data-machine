@@ -11,7 +11,6 @@
 namespace DataMachineSocials\Abilities\Facebook;
 
 use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
@@ -123,7 +122,7 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'get_pages' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_edit' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

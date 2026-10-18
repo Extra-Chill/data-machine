@@ -13,6 +13,7 @@ use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\Tracking\RedditCommentDomainStore;
 use DataMachineSocials\Tracking\RedditCommentUrlMatcher;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -192,7 +193,8 @@ class RedditCommentDomainMonitorAbility extends AbstractSocialAbility {
 	}
 
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		// Stricter gate: the site's socials policy AND Data Machine tool access.
+		return PublishAuthorization::can_edit() && PermissionHelper::can( 'use_tools' );
 	}
 
 	/** Poll each explicitly configured subreddit scope. */

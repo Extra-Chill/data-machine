@@ -12,10 +12,10 @@
 
 namespace DataMachineSocials\Abilities\Facebook;
 
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -78,7 +78,7 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 	 * @return bool
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' );
+		return PublishAuthorization::can_publish();
 	}
 
 	/**
