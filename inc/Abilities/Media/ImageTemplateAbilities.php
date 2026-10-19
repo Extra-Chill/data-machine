@@ -175,7 +175,12 @@ class ImageTemplateAbilities {
 			),
 			'execute_callback'    => array( self::class, 'renderTemplate' ),
 			'permission_callback' => fn() => PermissionHelper::can( 'render_images' ),
-			'meta'                => array( 'show_in_rest' => false ),
+			// Not a REST resource, but a deliberate tool for MCP clients:
+			// the render_images permission is a real user boundary.
+			'meta'                => array(
+				'show_in_rest' => false,
+				'mcp'          => array( 'public' => true ),
+			),
 		);
 	}
 
@@ -197,7 +202,12 @@ class ImageTemplateAbilities {
 			),
 			'execute_callback'    => array( self::class, 'listTemplates' ),
 			'permission_callback' => fn() => PermissionHelper::can( 'render_images' ),
-			'meta'                => array( 'show_in_rest' => false ),
+			// Not a REST resource, but a deliberate tool for MCP clients:
+			// the render_images permission is a real user boundary.
+			'meta'                => array(
+				'show_in_rest' => false,
+				'mcp'          => array( 'public' => true ),
+			),
 		);
 	}
 

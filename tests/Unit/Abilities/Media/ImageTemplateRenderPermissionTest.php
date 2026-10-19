@@ -163,4 +163,14 @@ class ImageTemplateRenderPermissionTest extends WP_UnitTestCase {
 		$this->assertTrue( get_role( 'contributor' )->has_cap( 'datamachine_render_images' ) );
 		$contributor->remove_cap( 'datamachine_render_images' );
 	}
+
+	public function test_image_template_abilities_opt_into_mcp_exposure(): void {
+		foreach ( array( 'datamachine/render-image-template', 'datamachine/list-image-templates' ) as $name ) {
+			$ability = wp_get_ability( $name );
+			$this->assertNotNull( $ability, $name );
+			$meta = $ability->get_meta();
+			$this->assertFalse( $meta['show_in_rest'], $name );
+			$this->assertTrue( $meta['mcp']['public'] ?? false, $name );
+		}
+	}
 }
