@@ -1,6 +1,6 @@
 <?php
 /**
- * Ensure every standalone or WordPress smoke declares its execution environment.
+ * Ensure every smoke declares its execution environment in homeboy.json.
  *
  * Run with: php tests/manifest-contract-smoke.php
  *
@@ -8,10 +8,21 @@
  */
 
 $root     = dirname( __DIR__ );
-$manifest = json_decode( file_get_contents( $root . '/homeboy-test-manifest.json' ), true );
+$config   = json_decode( file_get_contents( $root . '/homeboy.json' ), true );
+$settings = $config['extensions']['wordpress']['settings'] ?? null;
 
-if ( ! is_array( $manifest ) || 'homeboy/test-manifest/v1' !== ( $manifest['schema'] ?? '' ) || ! isset( $manifest['tests'] ) || ! is_array( $manifest['tests'] ) ) {
-	fwrite( STDERR, "Invalid Homeboy test manifest.\n" );
+if ( ! is_array( $settings ) || ! is_array( $settings['standalone_php_test_paths'] ?? null ) || ! is_array( $settings['wordpress_test_paths'] ?? null ) ) {
+	fwrite( STDERR, "homeboy.json must declare standalone_php_test_paths and wordpress_test_paths.\n" );
+	exit( 1 );
+}
+
+$environments = array_merge(
+	array_fill_keys( $settings['standalone_php_test_paths'], 'standalone-php' ),
+	array_fill_keys( $settings['wordpress_test_paths'], 'wordpress' )
+);
+
+if ( count( $environments ) !== count( $settings['standalone_php_test_paths'] ) + count( $settings['wordpress_test_paths'] ) ) {
+	fwrite( STDERR, "A smoke test is declared in both standalone_php_test_paths and wordpress_test_paths.\n" );
 	exit( 1 );
 }
 
@@ -34,11 +45,11 @@ foreach ( $expected as $path ) {
 	}
 }
 
-$declared = array_keys( $manifest['tests'] );
+$declared = array_keys( $environments );
 sort( $declared );
 
 if ( $expected !== $declared ) {
-	fwrite( STDERR, "Homeboy test manifest does not classify every smoke test exactly.\n" );
+	fwrite( STDERR, "homeboy.json does not classify every smoke test exactly.\n" );
 	exit( 1 );
 }
 
@@ -48,12 +59,12 @@ $wordpress_smokes = array(
 	'tests/google-analytics-tool-schema-smoke.php',
 	'tests/sendy-list-campaigns-schema-smoke.php',
 );
-foreach ( $manifest['tests'] as $path => $test ) {
+foreach ( $environments as $path => $environment ) {
 	$expected_environment = in_array( $path, $wordpress_smokes, true ) ? 'wordpress' : 'standalone-php';
-	if ( $expected_environment !== ( $test['environment'] ?? null ) ) {
+	if ( $expected_environment !== $environment ) {
 		fwrite( STDERR, "Unexpected environment for {$path}.\n" );
 		exit( 1 );
 	}
 }
 
-echo "Homeboy test manifest contract passed for " . count( $expected ) . " smoke tests.\n";
+echo "homeboy.json test environment contract passed for " . count( $expected ) . " smoke tests.\n";

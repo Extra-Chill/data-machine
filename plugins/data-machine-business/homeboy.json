@@ -6,7 +6,37 @@
       "php": "8.2",
       "release_latest_branch": "release-latest",
       "settings": {
-        "validation_dependencies": "data-machine"
+        "validation_dependencies": "data-machine",
+        "standalone_php_test_paths": [
+          "tests/ability-registration-lifecycle-smoke.php",
+          "tests/amazon-affiliate-tool-smoke.php",
+          "tests/analytics-config-resolution-smoke.php",
+          "tests/bing-webmaster-ability-smoke.php",
+          "tests/cloudflare-turnstile-ability-smoke.php",
+          "tests/google-analytics-aggregate-http-smoke.php",
+          "tests/google-search-tool-smoke.php",
+          "tests/gsc-business-registration-smoke.php",
+          "tests/gsc-site-url-guard-smoke.php",
+          "tests/image-broken-reference-multisite-smoke.php",
+          "tests/image-diagnostics-ownership-smoke.php",
+          "tests/image-optimization-pagination-smoke.php",
+          "tests/image-optimization-scheduling-context-smoke.php",
+          "tests/indexnow-ownership-smoke.php",
+          "tests/indexnow-registration-smoke.php",
+          "tests/manifest-contract-smoke.php",
+          "tests/mediavine-dimensional-smoke.php",
+          "tests/pagespeed-ownership-smoke.php",
+          "tests/provider-bootstrap-smoke.php",
+          "tests/sendy-campaign-abilities-smoke.php",
+          "tests/sendy-canonical-config-smoke.php",
+          "tests/sendy-real-schema-columns-smoke.php"
+        ],
+        "wordpress_test_paths": [
+          "tests/data-machine-http-client-contract-smoke.php",
+          "tests/google-analytics-aggregate-schema-smoke.php",
+          "tests/google-analytics-tool-schema-smoke.php",
+          "tests/sendy-list-campaigns-schema-smoke.php"
+        ]
       }
     }
   },
