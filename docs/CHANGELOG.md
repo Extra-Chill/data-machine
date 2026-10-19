@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.194.0] - 2026-10-19
+
+### Added
+- expose image-template abilities to MCP clients via mcp.public
+
 ## [0.193.0] - 2026-10-17
 
 ### Added
