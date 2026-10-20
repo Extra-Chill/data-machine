@@ -360,8 +360,9 @@ class AgentAccess extends BaseRepository {
 	/**
 	 * Revoke a user's access to an agent.
 	 *
-	 * @param int $agent_id Agent ID.
-	 * @param int $user_id  WordPress user ID.
+	 * @param string      $agent_id     Agent ID.
+	 * @param int         $user_id      WordPress user ID.
+	 * @param string|null $workspace_id Optional workspace ID.
 	 * @return bool True on success.
 	 */
 	public function revoke_access( string $agent_id, int $user_id, ?string $workspace_id = null ): bool {
@@ -386,9 +387,10 @@ class AgentAccess extends BaseRepository {
 	/**
 	 * Get a specific user's access grant for an agent.
 	 *
-	 * @param int $agent_id Agent ID.
-	 * @param int $user_id  WordPress user ID.
-	 * @return array|null Access row or null.
+	 * @param string      $agent_id     Agent ID.
+	 * @param int         $user_id      WordPress user ID.
+	 * @param string|null $workspace_id Optional workspace ID.
+	 * @return \WP_Agent_Access_Grant|null Access grant or null.
 	 */
 	public function get_access( string $agent_id, int $user_id, ?string $workspace_id = null ): ?\WP_Agent_Access_Grant {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
@@ -411,6 +413,7 @@ class AgentAccess extends BaseRepository {
 	 *
 	 * @param int         $user_id      WordPress user ID.
 	 * @param string|null $minimum_role Minimum role to filter by (null = any role).
+	 * @param string|null $workspace_id Optional workspace ID.
 	 * @return int[] Array of agent IDs.
 	 */
 	public function get_agent_ids_for_user( int $user_id, ?string $minimum_role = null, ?string $workspace_id = null ): array {
@@ -448,8 +451,9 @@ class AgentAccess extends BaseRepository {
 	/**
 	 * Get all users with access to an agent.
 	 *
-	 * @param int $agent_id Agent ID.
-	 * @return array[] Array of access rows.
+	 * @param string      $agent_id     Agent ID.
+	 * @param string|null $workspace_id Optional workspace ID.
+	 * @return \WP_Agent_Access_Grant[] Array of access grants.
 	 */
 	public function get_users_for_agent( string $agent_id, ?string $workspace_id = null ): array {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
@@ -577,6 +581,8 @@ class AgentAccess extends BaseRepository {
 
 	/**
 	 * Transport-independent context shared by access actions.
+	 *
+	 * @return array{agent_slug: string|null} Agent slug, if available.
 	 */
 	private function action_context( int $agent_id ): array {
 		$agent = ( new Agents() )->get_agent( $agent_id );
@@ -613,6 +619,7 @@ class AgentAccess extends BaseRepository {
 	 * @return string[] Roles that meet or exceed the minimum.
 	 */
 	private function roles_at_or_above( string $role ): array {
+		/** @var list<string> $hierarchy Ordered role hierarchy. */
 		$hierarchy = \WP_Agent_Access_Grant::roles();
 		$index     = array_search( $role, $hierarchy, true );
 

@@ -105,6 +105,9 @@ class AgentAccessActionsTest extends WP_UnitTestCase {
 	}
 
 	public function test_cli_grant_uses_the_same_storage_action_once(): void {
+		if ( ! class_exists( '\WP_CLI_Command' ) ) {
+			require_once dirname( __DIR__, 4 ) . '/Doubles/AccessActionsCliCommand.php';
+		}
 		if ( ! class_exists( '\WP_CLI' ) ) {
 			require_once dirname( __DIR__, 4 ) . '/Doubles/AccessActionsCli.php';
 		}
