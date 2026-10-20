@@ -8,31 +8,33 @@
  * @package DataMachine\Tests
  */
 
-$root   = dirname( __DIR__ );
-$output = array();
-$status = 0;
-exec( 'git -C ' . escapeshellarg( $root ) . ' ls-files', $output, $status );
-if ( 0 !== $status ) {
-	fwrite( STDERR, "git ls-files failed.\n" );
+$audit_root     = dirname( __DIR__ );
+$tracked_files  = array();
+$ls_files_exit  = 0;
+$path_spellings = array();
+
+// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec -- CLI-only repository audit reads the Git index.
+exec( 'git -C ' . escapeshellarg( $audit_root ) . ' ls-files', $tracked_files, $ls_files_exit );
+if ( 0 !== $ls_files_exit ) {
+	echo "git ls-files failed.\n";
 	exit( 1 );
 }
 
-$spellings = array();
-foreach ( $output as $tracked ) {
-	$path = '';
-	foreach ( explode( '/', $tracked ) as $segment ) {
-		$path = '' === $path ? $segment : $path . '/' . $segment;
-		$spellings[ strtolower( $path ) ][ $path ] = true;
+foreach ( $tracked_files as $tracked_file ) {
+	$prefix = '';
+	foreach ( explode( '/', $tracked_file ) as $segment ) {
+		$prefix = '' === $prefix ? $segment : $prefix . '/' . $segment;
+		$path_spellings[ strtolower( $prefix ) ][ $prefix ] = true;
 	}
 }
 
-$collisions = array_filter( $spellings, static fn( array $variants ): bool => count( $variants ) > 1 );
+$collisions = array_filter( $path_spellings, static fn( array $variants ): bool => count( $variants ) > 1 );
 if ( array() !== $collisions ) {
-	fwrite( STDERR, "Tracked paths differ only by case:\n" );
+	echo "Tracked paths differ only by case:\n";
 	foreach ( $collisions as $variants ) {
-		fwrite( STDERR, '- ' . implode( ' vs ', array_keys( $variants ) ) . "\n" );
+		echo '- ' . implode( ' vs ', array_keys( $variants ) ) . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CLI output of repository paths.
 	}
 	exit( 1 );
 }
 
-echo 'Path case audit passed (' . count( $output ) . " tracked files).\n";
+echo 'Path case audit passed (' . count( $tracked_files ) . " tracked files).\n";

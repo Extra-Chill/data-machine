@@ -16,7 +16,7 @@ final class DuplicateLoserAgents extends Agents {
 	protected function insert_identity_row( array $data, array $formats ): int|false {
 		unset( $formats );
 		$this->duplicate_loser_exercised = true;
-		$config = json_decode( (string) $data['agent_config'], true );
+		$config                          = json_decode( (string) $data['agent_config'], true );
 		( new Agents() )->create_identity_if_missing(
 			(string) $data['agent_slug'],
 			(string) $data['agent_name'],
