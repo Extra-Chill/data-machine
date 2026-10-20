@@ -27,7 +27,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  *     # Link a chat actor on a platform to a user
  *     wp datamachine chat-identity link <platform> <actor_id> --target-user=<user>
  *
- *     # Remove a user's link for a platform
+ *     # Link a second actor on the same platform to the same user
+ *     wp datamachine chat-identity link <platform> <other_actor_id> --target-user=<user>
+ *
+ *     # Remove one actor link
+ *     wp datamachine chat-identity unlink <platform> --target-user=<user> --actor=<actor_id>
+ *
+ *     # Remove every link a user has on a platform
  *     wp datamachine chat-identity unlink <platform> --target-user=<user>
  *
  *     # List links
@@ -37,6 +43,8 @@ class ChatIdentityCommand extends BaseCommand {
 
 	/**
 	 * Link a platform actor ID to a WordPress user.
+	 *
+	 * A user may hold several actor IDs on the same platform; each call adds one.
 	 *
 	 * ## OPTIONS
 	 *
@@ -77,7 +85,7 @@ class ChatIdentityCommand extends BaseCommand {
 	}
 
 	/**
-	 * Remove a user's chat identity link for a platform.
+	 * Remove a user's chat identity links for a platform.
 	 *
 	 * ## OPTIONS
 	 *
@@ -87,21 +95,27 @@ class ChatIdentityCommand extends BaseCommand {
 	 * --target-user=<user>
 	 * : WordPress user ID, login or email.
 	 *
+	 * [--actor=<actor_id>]
+	 * : Only remove this actor's link. Omit to remove every link the user has on the platform.
+	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function unlink( array $args, array $assoc_args ): void {
 		$user_id = self::target_user( $assoc_args );
 		if ( $user_id <= 0 || empty( $args[0] ) ) {
-			WP_CLI::error( 'Usage: wp datamachine chat-identity unlink <platform> --target-user=<user>' );
+			WP_CLI::error( 'Usage: wp datamachine chat-identity unlink <platform> --target-user=<user> [--actor=<actor_id>]' );
 			return;
 		}
+
+		$actor_id = (string) ( $assoc_args['actor'] ?? '' );
 
 		$result = AbilityRunner::execute(
 			'datamachine/unlink-chat-identity',
 			array(
 				'user_id'  => $user_id,
 				'platform' => (string) $args[0],
+				'actor_id' => $actor_id,
 			)
 		);
 
@@ -111,11 +125,16 @@ class ChatIdentityCommand extends BaseCommand {
 		}
 
 		if ( empty( $result['removed'] ) ) {
-			WP_CLI::warning( 'No link existed for that user and platform.' );
+			WP_CLI::warning( '' !== $actor_id ? 'No link existed for that user, platform and actor.' : 'No link existed for that user and platform.' );
 			return;
 		}
 
-		WP_CLI::success( sprintf( 'Unlinked %s from user %d.', (string) $args[0], $user_id ) );
+		if ( '' !== $actor_id ) {
+			WP_CLI::success( sprintf( 'Unlinked %s actor %s from user %d.', (string) $args[0], $actor_id, $user_id ) );
+			return;
+		}
+
+		WP_CLI::success( sprintf( 'Unlinked all %s actors from user %d.', (string) $args[0], $user_id ) );
 	}
 
 	/**

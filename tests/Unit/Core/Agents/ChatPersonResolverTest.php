@@ -185,6 +185,20 @@ class ChatPersonResolverTest extends WP_UnitTestCase {
 		$this->assertSame( 'operator', $this->resolve( 'o' )['role'] );
 	}
 
+	public function test_second_actor_for_same_user_resolves_to_that_user(): void {
+		$this->grant( $this->viewer_id, 'viewer' );
+		ChatIdentityLinks::link( $this->viewer_id, self::PLATFORM, 'v' );
+		ChatIdentityLinks::link( $this->viewer_id, self::PLATFORM, 'v-alt' );
+
+		foreach ( array( 'v', 'v-alt' ) as $actor_id ) {
+			$result = $this->resolve( $actor_id, 'turn' );
+			$this->assertTrue( $result['allowed'], $actor_id );
+			$this->assertSame( $this->viewer_id, $result['user_id'], $actor_id );
+			$this->assertSame( 'viewer', $result['role'], $actor_id );
+			$this->assertStringContainsString( 'viewer-profile-sentinel', $this->joined( $result ), $actor_id );
+		}
+	}
+
 	public function test_access_filter_can_deny_and_grant(): void {
 		ChatIdentityLinks::link( $this->owner_id, self::PLATFORM, 'owner-actor' );
 		ChatIdentityLinks::link( $this->other_id, self::PLATFORM, 'stranger' );
