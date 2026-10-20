@@ -7,8 +7,10 @@
  * Links are scoped by platform only (never by server/guild/workspace) and
  * platform names are plain data: any non-empty slug is accepted.
  *
- * Storage: one user meta row per platform, `datamachine_chat_identity_{platform}`,
- * whose value is the external actor ID.
+ * Storage: one user meta row per linked actor under
+ * `datamachine_chat_identity_{platform}`, whose value is the external actor ID.
+ * A user may hold several actors on the same platform; each actor belongs to
+ * at most one user per platform.
  *
  * @package DataMachine\Core\Agents
  */
@@ -72,8 +74,9 @@ class ChatIdentityLinks {
 	/**
 	 * Link an external actor to a WordPress user on a platform.
 	 *
-	 * Replaces any existing link the user holds for that platform. Fails when the
-	 * actor is already linked to a different user.
+	 * Adds the actor alongside any other actors the user already holds on that
+	 * platform. Re-linking an actor the user already holds is a no-op success.
+	 * Fails when the actor is already linked to a different user.
 	 *
 	 * @param int    $user_id  WordPress user ID.
 	 * @param string $platform Platform name.
@@ -101,7 +104,9 @@ class ChatIdentityLinks {
 			}
 		}
 
-		update_user_meta( $user_id, self::meta_key( $platform ), $actor_id );
+		if ( ! in_array( $user_id, $holders, true ) ) {
+			add_user_meta( $user_id, self::meta_key( $platform ), $actor_id );
+		}
 
 		return array(
 			'user_id'  => $user_id,
@@ -111,20 +116,37 @@ class ChatIdentityLinks {
 	}
 
 	/**
-	 * Remove a user's link for a platform.
+	 * Remove a user's links for a platform.
+	 *
+	 * With an actor ID, removes only that actor's link. Without one, removes
+	 * every link the user holds on the platform.
 	 *
 	 * @param int    $user_id  WordPress user ID.
 	 * @param string $platform Platform name.
-	 * @return bool True when a link existed and was removed.
+	 * @param string $actor_id Optional actor ID to remove ('' = all on the platform).
+	 * @return bool True when at least one link was removed.
 	 */
-	public static function unlink( int $user_id, string $platform ): bool {
+	public static function unlink( int $user_id, string $platform, string $actor_id = '' ): bool {
 		$platform = self::normalize_platform( $platform );
 		if ( '' === $platform || $user_id <= 0 ) {
 			return false;
 		}
 
-		$key = self::meta_key( $platform );
-		if ( '' === (string) get_user_meta( $user_id, $key, true ) ) {
+		$key       = self::meta_key( $platform );
+		$requested = '' !== trim( $actor_id );
+		$actor_id  = self::normalize_actor_id( $actor_id );
+		$current   = array_map( 'strval', (array) get_user_meta( $user_id, $key, false ) );
+
+		// A requested actor that fails normalization never widens to "all".
+		if ( $requested ) {
+			if ( '' === $actor_id || ! in_array( $actor_id, $current, true ) ) {
+				return false;
+			}
+
+			return delete_user_meta( $user_id, $key, $actor_id );
+		}
+
+		if ( array() === $current ) {
 			return false;
 		}
 
@@ -193,6 +215,9 @@ class ChatIdentityLinks {
 
 	/**
 	 * Find all user IDs holding an actor on a platform.
+	 *
+	 * Matches any of the user's meta rows for the platform, so every linked
+	 * actor resolves to its user.
 	 *
 	 * @param string $platform Normalized platform slug.
 	 * @param string $actor_id Normalized actor ID.

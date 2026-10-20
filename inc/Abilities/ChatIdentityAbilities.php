@@ -70,7 +70,7 @@ class ChatIdentityAbilities {
 			'datamachine/unlink-chat-identity',
 			array(
 				'label'               => __( 'Unlink Chat Identity', 'data-machine' ),
-				'description'         => __( 'Remove a WordPress user\'s chat identity link for a platform.', 'data-machine' ),
+				'description'         => __( 'Remove a WordPress user\'s chat identity links for a platform: one actor when actor_id is given, otherwise all of them.', 'data-machine' ),
 				'category'            => AbilityCategories::AGENT,
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -78,6 +78,10 @@ class ChatIdentityAbilities {
 					'properties' => array(
 						'user_id'  => array( 'type' => 'integer' ),
 						'platform' => array( 'type' => 'string' ),
+						'actor_id' => array(
+							'type'        => 'string',
+							'description' => 'Optional actor ID to unlink. Omit to remove every link the user holds on the platform.',
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -225,7 +229,11 @@ class ChatIdentityAbilities {
 	public static function unlink( array $input ): array {
 		return array(
 			'success' => true,
-			'removed' => ChatIdentityLinks::unlink( (int) ( $input['user_id'] ?? 0 ), (string) ( $input['platform'] ?? '' ) ),
+			'removed' => ChatIdentityLinks::unlink(
+				(int) ( $input['user_id'] ?? 0 ),
+				(string) ( $input['platform'] ?? '' ),
+				(string) ( $input['actor_id'] ?? '' )
+			),
 		);
 	}
 
