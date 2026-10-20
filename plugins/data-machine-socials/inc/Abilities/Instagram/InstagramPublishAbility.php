@@ -264,6 +264,24 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
 		}
 
+		// Validate all feed images before auth/token refresh or any publishing API call.
+		if ( ! in_array( $media_kind, array( 'reel', 'story' ), true ) ) {
+			$image_urls = $input['image_urls'] ?? array();
+			if ( count( $image_urls ) > self::MAX_CAROUSEL_IMAGES ) {
+				return new \WP_Error( 'missing_param', sprintf( 'Maximum %d images allowed for Instagram carousel', self::MAX_CAROUSEL_IMAGES ), array( 'status' => 400 ) );
+			}
+
+			foreach ( $image_urls as $url ) {
+				if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+					return new \WP_Error( 'missing_param', 'Invalid image URL: ' . $url, array( 'status' => 400 ) );
+				}
+				$extension = strtolower( pathinfo( (string) parse_url( $url, PHP_URL_PATH ), PATHINFO_EXTENSION ) );
+				if ( ! in_array( $extension, array( 'jpg', 'jpeg' ), true ) ) {
+					return new \WP_Error( 'unsupported_image_format', 'Instagram feed and carousel images must be JPEG (.jpg or .jpeg). Unsupported image URL: ' . $url, array( 'status' => 400 ) );
+				}
+			}
+		}
+
 		// Auth check.
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'instagram' );
@@ -313,19 +331,6 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 	 */
 	private static function publish_image( array $input, string $user_id, string $access_token, string $caption ): array|\WP_Error {
 		$image_urls = $input['image_urls'] ?? array();
-
-		// Validate image URLs.
-		if ( ! empty( $image_urls ) ) {
-			if ( count( $image_urls ) > self::MAX_CAROUSEL_IMAGES ) {
-				return new \WP_Error( 'missing_param', sprintf( 'Maximum %d images allowed for Instagram carousel', self::MAX_CAROUSEL_IMAGES ), array( 'status' => 400 ) );
-			}
-
-			foreach ( $image_urls as $url ) {
-				if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
-					return new \WP_Error( 'missing_param', 'Invalid image URL: ' . $url, array( 'status' => 400 ) );
-				}
-			}
-		}
 
 		// Create media containers for each image.
 		$is_carousel   = count( $image_urls ) > 1;

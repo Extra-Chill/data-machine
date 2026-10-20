@@ -525,8 +525,8 @@ class InstagramCommand {
 	 * <caption>
 	 * : The caption text for the post.
 	 *
-	 * [--image=<url>]
-	 * : Image URL to include. Can be specified multiple times for carousel (up to 10).
+	 * [--image=<url>...]
+	 * : JPEG image URL (.jpg or .jpeg). Can be specified multiple times for carousel (up to 10).
 	 *
 	 * [--aspect-ratio=<ratio>]
 	 * : Aspect ratio for images.
