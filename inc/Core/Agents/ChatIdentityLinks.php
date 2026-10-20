@@ -132,12 +132,14 @@ class ChatIdentityLinks {
 			return false;
 		}
 
-		$key      = self::meta_key( $platform );
-		$actor_id = self::normalize_actor_id( $actor_id );
-		$current  = array_map( 'strval', (array) get_user_meta( $user_id, $key, false ) );
+		$key       = self::meta_key( $platform );
+		$requested = '' !== trim( $actor_id );
+		$actor_id  = self::normalize_actor_id( $actor_id );
+		$current   = array_map( 'strval', (array) get_user_meta( $user_id, $key, false ) );
 
-		if ( '' !== $actor_id ) {
-			if ( ! in_array( $actor_id, $current, true ) ) {
+		// A requested actor that fails normalization never widens to "all".
+		if ( $requested ) {
+			if ( '' === $actor_id || ! in_array( $actor_id, $current, true ) ) {
 				return false;
 			}
 

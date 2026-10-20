@@ -76,6 +76,10 @@ class ChatIdentityLinksTest extends WP_UnitTestCase {
 		// Unlinking an actor the user does not hold removes nothing.
 		$this->assertFalse( ChatIdentityLinks::unlink( $this->user_id, self::PLATFORM, 'actor-a' ) );
 		$this->assertSame( array( 'actor-b' ), $this->stored_actors( $this->user_id ) );
+
+		// An actor ID that fails normalization never widens to removing all links.
+		$this->assertFalse( ChatIdentityLinks::unlink( $this->user_id, self::PLATFORM, str_repeat( 'x', ChatIdentityLinks::MAX_ACTOR_ID_LENGTH + 1 ) ) );
+		$this->assertSame( array( 'actor-b' ), $this->stored_actors( $this->user_id ) );
 	}
 
 	public function test_unlink_without_actor_removes_all_links_on_the_platform(): void {
