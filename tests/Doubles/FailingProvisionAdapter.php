@@ -2,10 +2,10 @@
 /**
  * Identity adapter double that fails during provisioning.
  *
- * @package DataMachine\Tests\Fixtures
+ * @package DataMachine\Tests\Doubles
  */
 
-namespace DataMachine\Tests\Fixtures;
+namespace DataMachine\Tests\Doubles;
 
 use AgentsAPI\Core\Identity\WP_Agent_Identity_Scope;
 use DataMachine\Core\Identity\AgentIdentityStoreAdapter;

@@ -2,10 +2,10 @@
 /**
  * Agents repository double for duplicate-key reconciliation.
  *
- * @package DataMachine\Tests\Fixtures
+ * @package DataMachine\Tests\Doubles
  */
 
-namespace DataMachine\Tests\Fixtures;
+namespace DataMachine\Tests\Doubles;
 
 use DataMachine\Core\Database\Agents\Agents;
 

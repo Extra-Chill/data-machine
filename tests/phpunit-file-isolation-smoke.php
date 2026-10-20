@@ -52,9 +52,9 @@ $homeboy = json_decode( (string) file_get_contents( $root . '/homeboy.json' ), t
 $check( 'fail' === ( $homeboy['extensions']['wordpress']['settings']['phpunit_no_tests'] ?? null ), 'authoritative PHPUnit gate must fail closed on zero tests' );
 
 $fixtures = array(
-	'FailingProvisionAdapter'  => 'tests/Fixtures/FailingProvisionAdapter.php',
-	'CountingProvisionAdapter' => 'tests/Fixtures/CountingProvisionAdapter.php',
-	'DuplicateLoserAgents'     => 'tests/Fixtures/DuplicateLoserAgents.php',
+	'FailingProvisionAdapter'  => 'tests/Doubles/FailingProvisionAdapter.php',
+	'CountingProvisionAdapter' => 'tests/Doubles/CountingProvisionAdapter.php',
+	'DuplicateLoserAgents'     => 'tests/Doubles/DuplicateLoserAgents.php',
 );
 foreach ( $fixtures as $class => $relative_path ) {
 	$path = $root . '/' . $relative_path;
