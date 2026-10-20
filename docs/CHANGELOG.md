@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.194.2] - 2026-10-20
+
+### Fixed
+- move PSR-4 test doubles out of the case-colliding tests/Fixtures directory
+
 ## [0.194.1] - 2026-10-20
 
 ### Changed
