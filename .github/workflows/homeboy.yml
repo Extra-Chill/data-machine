@@ -27,6 +27,8 @@ jobs:
           php-version: '8.2'
       - name: Audit WordPress identifier prefixes
         run: php tests/prefix-policy-audit.php
+      - name: Audit tracked path casing
+        run: php tests/path-case-audit.php
 
   homeboy-quality:
     if: ${{ github.event_name != 'push' }}
