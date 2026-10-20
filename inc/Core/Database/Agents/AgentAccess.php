@@ -114,6 +114,10 @@ class AgentAccess extends BaseRepository {
 
 		$existing = $this->get_principal_access( (string) $agent_id, $principal_type, $principal_id );
 		if ( $existing ) {
+			if ( $existing['role'] === $role ) {
+				return $existing;
+			}
+
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result = $this->wpdb->update(
 				$this->principal_table_name(),
@@ -129,6 +133,10 @@ class AgentAccess extends BaseRepository {
 
 			if ( false === $result ) {
 				throw new \RuntimeException( 'datamachine_agent_principal_access_update_failed' );
+			}
+
+			if ( $result > 0 ) {
+				$this->announce_grant( $agent_id, $principal_type, $principal_id, $role, $existing['role'] );
 			}
 
 			return $this->get_principal_access( (string) $agent_id, $principal_type, $principal_id ) ?? $existing;
@@ -151,6 +159,10 @@ class AgentAccess extends BaseRepository {
 			throw new \RuntimeException( 'datamachine_agent_principal_access_insert_failed' );
 		}
 
+		if ( $result > 0 ) {
+			$this->announce_grant( $agent_id, $principal_type, $principal_id, $role, null );
+		}
+
 		return $this->get_principal_access( (string) $agent_id, $principal_type, $principal_id ) ?? array(
 			'agent_id'       => (string) $agent_id,
 			'principal_type' => $principal_type,
@@ -163,18 +175,26 @@ class AgentAccess extends BaseRepository {
 	 * Revoke an audience/non-user principal grant.
 	 */
 	public function revoke_principal_access( string $agent_id, string $principal_type, string $principal_id ): bool {
+		$principal_type = $this->normalize_principal_type( $principal_type );
+		$principal_id   = $this->normalize_principal_id( $principal_id );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $this->wpdb->delete(
 			$this->principal_table_name(),
 			array(
 				'agent_id'       => (int) $agent_id,
-				'principal_type' => $this->normalize_principal_type( $principal_type ),
-				'principal_id'   => $this->normalize_principal_id( $principal_id ),
+				'principal_type' => $principal_type,
+				'principal_id'   => $principal_id,
 			),
 			array( '%d', '%s', '%s' )
 		);
 
-		return false !== $result && $result > 0;
+		if ( false !== $result && $result > 0 ) {
+			$this->announce_revocation( (int) $agent_id, $principal_type, $principal_id );
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -268,10 +288,9 @@ class AgentAccess extends BaseRepository {
 	 *
 	 * If the user already has access, updates the role.
 	 *
-	 * @param int    $agent_id Agent ID.
-	 * @param int    $user_id  WordPress user ID.
-	 * @param string $role     Access role (admin, operator, viewer).
-	 * @return bool True on success.
+	 * @param \WP_Agent_Access_Grant $grant Requested access grant.
+	 * @return \WP_Agent_Access_Grant Persisted grant.
+	 * @throws \RuntimeException When the write fails.
 	 */
 	public function grant_access( \WP_Agent_Access_Grant $grant ): \WP_Agent_Access_Grant {
 		$agent_id = (int) $grant->agent_id;
@@ -285,6 +304,10 @@ class AgentAccess extends BaseRepository {
 		$existing = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
 
 		if ( $existing ) {
+			if ( $existing->role === $role ) {
+				return $existing;
+			}
+
 			// Update existing role.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result = $this->wpdb->update(
@@ -300,6 +323,10 @@ class AgentAccess extends BaseRepository {
 
 			if ( false === $result ) {
 				throw new \RuntimeException( 'datamachine_agent_access_update_failed' );
+			}
+
+			if ( $result > 0 ) {
+				$this->announce_grant( $agent_id, 'user', (string) $user_id, $role, $existing->role );
 			}
 
 			$updated = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
@@ -320,6 +347,10 @@ class AgentAccess extends BaseRepository {
 
 		if ( false === $result ) {
 			throw new \RuntimeException( 'datamachine_agent_access_insert_failed' );
+		}
+
+		if ( $result > 0 ) {
+			$this->announce_grant( $agent_id, 'user', (string) $user_id, $role, null );
 		}
 
 		$created = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
@@ -344,7 +375,12 @@ class AgentAccess extends BaseRepository {
 			array( '%d', '%d' )
 		);
 
-		return false !== $result && $result > 0;
+		if ( false !== $result && $result > 0 ) {
+			$this->announce_revocation( (int) $agent_id, 'user', (string) $user_id );
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -505,6 +541,46 @@ class AgentAccess extends BaseRepository {
 			'granted_at'     => isset( $row['granted_at'] ) ? (string) $row['granted_at'] : null,
 			'metadata'       => array( 'source' => self::PRINCIPAL_TABLE_NAME ),
 		);
+	}
+
+	/**
+	 * Announce a successfully persisted new grant or role change.
+	 */
+	private function announce_grant( int $agent_id, string $principal_type, string $principal_id, string $role, ?string $previous_role ): void {
+		/**
+		 * Fires after a new access grant or a role change, never for a no-op.
+		 *
+		 * @param int|string $agent_id       Persisted agent ID.
+		 * @param string     $principal_type User or non-user principal type.
+		 * @param string     $principal_id   Principal identifier (user ID for users).
+		 * @param string     $role           Persisted role.
+		 * @param string|null $previous_role Previous role, null for a new grant.
+		 * @param array      $context        Contains agent_slug (null if unavailable).
+		 */
+		do_action( 'datamachine_agent_access_granted', $agent_id, $principal_type, $principal_id, $role, $previous_role, $this->action_context( $agent_id ) );
+	}
+
+	/**
+	 * Announce a successfully deleted access grant.
+	 */
+	private function announce_revocation( int $agent_id, string $principal_type, string $principal_id ): void {
+		/**
+		 * Fires after an access grant is removed, never for a missing grant.
+		 *
+		 * @param int|string $agent_id       Persisted agent ID.
+		 * @param string     $principal_type User or non-user principal type.
+		 * @param string     $principal_id   Principal identifier.
+		 * @param array      $context        Contains agent_slug (null if unavailable).
+		 */
+		do_action( 'datamachine_agent_access_revoked', $agent_id, $principal_type, $principal_id, $this->action_context( $agent_id ) );
+	}
+
+	/**
+	 * Transport-independent context shared by access actions.
+	 */
+	private function action_context( int $agent_id ): array {
+		$agent = ( new Agents() )->get_agent( $agent_id );
+		return array( 'agent_slug' => $agent['agent_slug'] ?? null );
 	}
 
 	/**

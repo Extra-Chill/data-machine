@@ -105,7 +105,19 @@ class ChatIdentityLinks {
 		}
 
 		if ( ! in_array( $user_id, $holders, true ) ) {
-			add_user_meta( $user_id, self::meta_key( $platform ), $actor_id );
+			if ( ! add_user_meta( $user_id, self::meta_key( $platform ), $actor_id ) ) {
+				return new \WP_Error( 'chat_identity_link_failed', 'Could not persist chat identity link.', array( 'status' => 500 ) );
+			}
+
+			/**
+			 * Fires after a new chat identity link is persisted.
+			 *
+			 * @param int    $user_id  WordPress user ID.
+			 * @param string $platform Normalized platform slug.
+			 * @param string $actor_id Normalized external actor ID.
+			 * @param array  $context  Additional context (currently empty).
+			 */
+			do_action( 'datamachine_chat_identity_linked', $user_id, $platform, $actor_id, array() );
 		}
 
 		return array(
@@ -143,14 +155,32 @@ class ChatIdentityLinks {
 				return false;
 			}
 
-			return delete_user_meta( $user_id, $key, $actor_id );
+			$removed = delete_user_meta( $user_id, $key, $actor_id );
+			$actors  = array( $actor_id );
+		} else {
+			if ( array() === $current ) {
+				return false;
+			}
+
+			$removed = delete_user_meta( $user_id, $key );
+			$actors  = array_unique( $current );
 		}
 
-		if ( array() === $current ) {
-			return false;
+		if ( $removed ) {
+			foreach ( $actors as $removed_actor ) {
+				/**
+				 * Fires once per identity after successful removal, including bulk unlink.
+				 *
+				 * @param int    $user_id       WordPress user ID.
+				 * @param string $platform      Normalized platform slug.
+				 * @param string $removed_actor Removed external actor ID.
+				 * @param array  $context       Additional context (currently empty).
+				 */
+				do_action( 'datamachine_chat_identity_unlinked', $user_id, $platform, $removed_actor, array() );
+			}
 		}
 
-		return delete_user_meta( $user_id, $key );
+		return $removed;
 	}
 
 	/**

@@ -97,6 +97,54 @@ class ChatIdentityLinksTest extends WP_UnitTestCase {
 		$this->assertFalse( ChatIdentityLinks::unlink( $this->user_id, self::PLATFORM ) );
 	}
 
+	public function test_actions_only_fire_for_persisted_identity_changes(): void {
+		$linked = array();
+		$unlinked = array();
+		$on_link = static function ( ...$args ) use ( &$linked ) { $linked[] = $args; };
+		$on_unlink = static function ( ...$args ) use ( &$unlinked ) { $unlinked[] = $args; };
+		add_action( 'datamachine_chat_identity_linked', $on_link, 10, 4 );
+		add_action( 'datamachine_chat_identity_unlinked', $on_unlink, 10, 4 );
+		try {
+			ChatIdentityLinks::link( $this->user_id, ' Test-Chat ', ' actor-a ' );
+			ChatIdentityLinks::link( $this->user_id, 'test-chat', 'actor-a' );
+			$this->assertWPError( ChatIdentityLinks::link( $this->other_id, 'test-chat', 'actor-a' ) );
+			$this->assertWPError( ChatIdentityLinks::link( 0, 'test-chat', 'actor-b' ) );
+			$this->assertSame( array( array( $this->user_id, 'test-chat', 'actor-a', array() ) ), $linked );
+			$this->assertTrue( ChatIdentityLinks::unlink( $this->user_id, 'test-chat', 'actor-a' ) );
+			$this->assertFalse( ChatIdentityLinks::unlink( $this->user_id, 'test-chat', 'actor-a' ) );
+			ChatIdentityLinks::link( $this->user_id, 'test-chat', 'actor-b' );
+			ChatIdentityLinks::link( $this->user_id, 'test-chat', 'actor-c' );
+			$this->assertTrue( ChatIdentityLinks::unlink( $this->user_id, 'test-chat' ) );
+			$this->assertSame( array(
+				array( $this->user_id, 'test-chat', 'actor-a', array() ),
+				array( $this->user_id, 'test-chat', 'actor-b', array() ),
+				array( $this->user_id, 'test-chat', 'actor-c', array() ),
+			), $unlinked );
+		} finally {
+			remove_action( 'datamachine_chat_identity_linked', $on_link );
+			remove_action( 'datamachine_chat_identity_unlinked', $on_unlink );
+		}
+	}
+
+	public function test_failed_metadata_writes_do_not_fire_actions(): void {
+		ChatIdentityLinks::link( $this->user_id, 'test-chat', 'existing' );
+		$linked_before = did_action( 'datamachine_chat_identity_linked' );
+		$unlinked_before = did_action( 'datamachine_chat_identity_unlinked' );
+		$fail = static fn() => false;
+		add_filter( 'add_user_metadata', $fail );
+		add_filter( 'delete_user_metadata', $fail );
+		try {
+			$this->assertWPError( ChatIdentityLinks::link( $this->user_id, 'test-chat', 'new' ) );
+			$this->assertFalse( ChatIdentityLinks::unlink( $this->user_id, 'test-chat', 'existing' ) );
+			$this->assertFalse( ChatIdentityLinks::unlink( $this->user_id, 'test-chat' ) );
+			$this->assertSame( $linked_before, did_action( 'datamachine_chat_identity_linked' ) );
+			$this->assertSame( $unlinked_before, did_action( 'datamachine_chat_identity_unlinked' ) );
+		} finally {
+			remove_filter( 'add_user_metadata', $fail );
+			remove_filter( 'delete_user_metadata', $fail );
+		}
+	}
+
 	public function test_list_returns_one_row_per_actor(): void {
 		ChatIdentityLinks::link( $this->user_id, self::PLATFORM, 'actor-a' );
 		ChatIdentityLinks::link( $this->user_id, self::PLATFORM, 'actor-b' );
