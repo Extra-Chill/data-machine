@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.194.1] - 2026-10-20
+
+### Changed
+- Allow multiple chat actor IDs per user on the same platform
+
 ## [0.194.0] - 2026-10-19
 
 ### Added
