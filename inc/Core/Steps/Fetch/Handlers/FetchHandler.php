@@ -251,8 +251,12 @@ abstract class FetchHandler {
 				++$diagnostics['claims_acquired'];
 			}
 
-			$item['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ]          = $claim;
-			$item['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] = $claim['disposition_id'];
+			$item['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] = $claim;
+			// Direct/standalone contexts return a non-persisted claim with no
+			// disposition identity (#3650); only persisted claims carry one.
+			if ( isset( $claim['disposition_id'] ) ) {
+				$item['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] = $claim['disposition_id'];
+			}
 
 			$result[] = $item;
 		}
