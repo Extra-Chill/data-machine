@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.68.2] - 2026-10-21
+
+### Fixed
+- recover the local show time from Seated's UTC start instant
+
 ## [0.68.1] - 2026-10-16
 
 ### Fixed
