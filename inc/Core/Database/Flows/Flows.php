@@ -266,7 +266,18 @@ class Flows extends BaseRepository {
 			return false;
 		}
 
-		return 1 === (int) $result;
+		if ( 1 === (int) $result ) {
+			return true;
+		}
+
+		// MySQL counts changed rows, so a write that leaves the config
+		// byte-identical affects 0 rows. That is a successful no-op, not a
+		// conflict, as long as the stored config still matches the snapshot.
+		if ( hash_equals( $expected_config_json, (string) $new_config_json ) ) {
+			return hash_equals( $expected_config_json, (string) $this->get_flow_config_json( $flow_id ) );
+		}
+
+		return false;
 	}
 
 	public function get_flows_for_pipeline( int $pipeline_id ): array {
