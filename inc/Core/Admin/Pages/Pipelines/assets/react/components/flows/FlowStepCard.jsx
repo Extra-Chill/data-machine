@@ -20,6 +20,10 @@ import QueueablePromptField from './QueueablePromptField';
 import InlineStepConfig from './InlineStepConfig';
 import { updateFlowStepConfig } from '../../utils/api';
 import { useStepTypes } from '../../queries/config';
+import {
+	getFlowStepHandlerSlugs,
+	getFlowStepHandlerConfig,
+} from '../../utils/flowStepHandlers';
 
 /**
  * Flow Step Card Component.
@@ -49,19 +53,14 @@ export default function FlowStepCard( {
 	const isAiStep = pipelineStep.step_type === 'ai';
 	const usesHandler = stepTypeInfo.uses_handler !== false;
 	const isMultiHandlerStep = stepTypeInfo.multi_handler === true;
-	let handlerSlugs = [];
-	if ( isMultiHandlerStep ) {
-		handlerSlugs = flowStepConfig?.handler_slugs || [];
-	} else if ( flowStepConfig?.handler_slug ) {
-		handlerSlugs = [ flowStepConfig.handler_slug ];
-	}
+	const handlerSlugs = getFlowStepHandlerSlugs(
+		flowStepConfig,
+		isMultiHandlerStep
+	);
 	const primarySlug = handlerSlugs[ 0 ] || '';
 	const primaryConfig = useMemo(
-		() =>
-			( isMultiHandlerStep
-				? primarySlug && flowStepConfig?.handler_configs?.[ primarySlug ]
-				: flowStepConfig?.handler_config ) || {},
-		[ flowStepConfig, isMultiHandlerStep, primarySlug ]
+		() => getFlowStepHandlerConfig( flowStepConfig, primarySlug ),
+		[ flowStepConfig, primarySlug ]
 	);
 
 	const promptQueue = useMemo(
