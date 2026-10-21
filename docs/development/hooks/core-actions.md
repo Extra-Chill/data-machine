@@ -12,6 +12,38 @@ Direct ability calls are preferred over actions for system operations:
 - Job abilities such as `datamachine/fail-job` and `datamachine/retry-job`
 - `LogAbilities` -> `write_to_log()`, `read_logs()`, `clear_logs()`
 
+## Access and Chat Identity Actions
+
+These transport-independent notifications fire from shared storage methods after
+successful changes, covering abilities, admin UI, and CLI callers. Failed writes
+and unchanged grants/links do not fire actions.
+
+### `datamachine_agent_access_granted`
+
+Arguments: `(int|string $agent_id, string $principal_type, string $principal_id,
+string $role, ?string $previous_role, array $context)`.
+
+Fires for a new user or audience/principal grant and for role changes.
+`$previous_role` is null for a new grant. User grants use principal type `user`
+and the string WordPress user ID. Other principals use their stored normalized
+identifiers. Context contains `agent_slug` (null if the agent is unavailable).
+
+### `datamachine_agent_access_revoked`
+
+Arguments: `(int|string $agent_id, string $principal_type, string $principal_id,
+array $context)`. Fires only when a grant was actually deleted. Principal and
+context conventions match the granted action.
+
+### `datamachine_chat_identity_linked` / `datamachine_chat_identity_unlinked`
+
+Arguments: `(int $user_id, string $platform, string $actor_id, array $context)`.
+Platform and actor ID are normalized storage values; context is currently empty.
+Link fires only for a newly persisted identity, not a repeated link. Unlink fires
+once per removed actor, including when all identities on a platform are removed.
+
+Listeners should use the role/previous-role and principal type to decide whether
+a grant represents onboarding; these actions impose no integration policy.
+
 ## Pipeline Execution Actions
 
 ### `datamachine_run_flow_now`

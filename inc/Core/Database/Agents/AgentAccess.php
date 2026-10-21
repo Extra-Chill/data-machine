@@ -114,6 +114,10 @@ class AgentAccess extends BaseRepository {
 
 		$existing = $this->get_principal_access( (string) $agent_id, $principal_type, $principal_id );
 		if ( $existing ) {
+			if ( $existing['role'] === $role ) {
+				return $existing;
+			}
+
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result = $this->wpdb->update(
 				$this->principal_table_name(),
@@ -129,6 +133,10 @@ class AgentAccess extends BaseRepository {
 
 			if ( false === $result ) {
 				throw new \RuntimeException( 'datamachine_agent_principal_access_update_failed' );
+			}
+
+			if ( $result > 0 ) {
+				$this->announce_grant( $agent_id, $principal_type, $principal_id, $role, $existing['role'] );
 			}
 
 			return $this->get_principal_access( (string) $agent_id, $principal_type, $principal_id ) ?? $existing;
@@ -151,6 +159,10 @@ class AgentAccess extends BaseRepository {
 			throw new \RuntimeException( 'datamachine_agent_principal_access_insert_failed' );
 		}
 
+		if ( $result > 0 ) {
+			$this->announce_grant( $agent_id, $principal_type, $principal_id, $role, null );
+		}
+
 		return $this->get_principal_access( (string) $agent_id, $principal_type, $principal_id ) ?? array(
 			'agent_id'       => (string) $agent_id,
 			'principal_type' => $principal_type,
@@ -163,18 +175,26 @@ class AgentAccess extends BaseRepository {
 	 * Revoke an audience/non-user principal grant.
 	 */
 	public function revoke_principal_access( string $agent_id, string $principal_type, string $principal_id ): bool {
+		$principal_type = $this->normalize_principal_type( $principal_type );
+		$principal_id   = $this->normalize_principal_id( $principal_id );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $this->wpdb->delete(
 			$this->principal_table_name(),
 			array(
 				'agent_id'       => (int) $agent_id,
-				'principal_type' => $this->normalize_principal_type( $principal_type ),
-				'principal_id'   => $this->normalize_principal_id( $principal_id ),
+				'principal_type' => $principal_type,
+				'principal_id'   => $principal_id,
 			),
 			array( '%d', '%s', '%s' )
 		);
 
-		return false !== $result && $result > 0;
+		if ( false !== $result && $result > 0 ) {
+			$this->announce_revocation( (int) $agent_id, $principal_type, $principal_id );
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -268,10 +288,9 @@ class AgentAccess extends BaseRepository {
 	 *
 	 * If the user already has access, updates the role.
 	 *
-	 * @param int    $agent_id Agent ID.
-	 * @param int    $user_id  WordPress user ID.
-	 * @param string $role     Access role (admin, operator, viewer).
-	 * @return bool True on success.
+	 * @param \WP_Agent_Access_Grant $grant Requested access grant.
+	 * @return \WP_Agent_Access_Grant Persisted grant.
+	 * @throws \RuntimeException When the write fails.
 	 */
 	public function grant_access( \WP_Agent_Access_Grant $grant ): \WP_Agent_Access_Grant {
 		$agent_id = (int) $grant->agent_id;
@@ -285,6 +304,10 @@ class AgentAccess extends BaseRepository {
 		$existing = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
 
 		if ( $existing ) {
+			if ( $existing->role === $role ) {
+				return $existing;
+			}
+
 			// Update existing role.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result = $this->wpdb->update(
@@ -300,6 +323,10 @@ class AgentAccess extends BaseRepository {
 
 			if ( false === $result ) {
 				throw new \RuntimeException( 'datamachine_agent_access_update_failed' );
+			}
+
+			if ( $result > 0 ) {
+				$this->announce_grant( $agent_id, 'user', (string) $user_id, $role, $existing->role );
 			}
 
 			$updated = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
@@ -322,6 +349,10 @@ class AgentAccess extends BaseRepository {
 			throw new \RuntimeException( 'datamachine_agent_access_insert_failed' );
 		}
 
+		if ( $result > 0 ) {
+			$this->announce_grant( $agent_id, 'user', (string) $user_id, $role, null );
+		}
+
 		$created = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
 		return $created ?? $grant;
 	}
@@ -329,8 +360,9 @@ class AgentAccess extends BaseRepository {
 	/**
 	 * Revoke a user's access to an agent.
 	 *
-	 * @param int $agent_id Agent ID.
-	 * @param int $user_id  WordPress user ID.
+	 * @param string      $agent_id     Agent ID.
+	 * @param int         $user_id      WordPress user ID.
+	 * @param string|null $workspace_id Optional workspace ID.
 	 * @return bool True on success.
 	 */
 	public function revoke_access( string $agent_id, int $user_id, ?string $workspace_id = null ): bool {
@@ -344,15 +376,21 @@ class AgentAccess extends BaseRepository {
 			array( '%d', '%d' )
 		);
 
-		return false !== $result && $result > 0;
+		if ( false !== $result && $result > 0 ) {
+			$this->announce_revocation( (int) $agent_id, 'user', (string) $user_id );
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
 	 * Get a specific user's access grant for an agent.
 	 *
-	 * @param int $agent_id Agent ID.
-	 * @param int $user_id  WordPress user ID.
-	 * @return array|null Access row or null.
+	 * @param string      $agent_id     Agent ID.
+	 * @param int         $user_id      WordPress user ID.
+	 * @param string|null $workspace_id Optional workspace ID.
+	 * @return \WP_Agent_Access_Grant|null Access grant or null.
 	 */
 	public function get_access( string $agent_id, int $user_id, ?string $workspace_id = null ): ?\WP_Agent_Access_Grant {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
@@ -375,6 +413,7 @@ class AgentAccess extends BaseRepository {
 	 *
 	 * @param int         $user_id      WordPress user ID.
 	 * @param string|null $minimum_role Minimum role to filter by (null = any role).
+	 * @param string|null $workspace_id Optional workspace ID.
 	 * @return int[] Array of agent IDs.
 	 */
 	public function get_agent_ids_for_user( int $user_id, ?string $minimum_role = null, ?string $workspace_id = null ): array {
@@ -412,8 +451,9 @@ class AgentAccess extends BaseRepository {
 	/**
 	 * Get all users with access to an agent.
 	 *
-	 * @param int $agent_id Agent ID.
-	 * @return array[] Array of access rows.
+	 * @param string      $agent_id     Agent ID.
+	 * @param string|null $workspace_id Optional workspace ID.
+	 * @return \WP_Agent_Access_Grant[] Array of access grants.
 	 */
 	public function get_users_for_agent( string $agent_id, ?string $workspace_id = null ): array {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
@@ -508,6 +548,48 @@ class AgentAccess extends BaseRepository {
 	}
 
 	/**
+	 * Announce a successfully persisted new grant or role change.
+	 */
+	private function announce_grant( int $agent_id, string $principal_type, string $principal_id, string $role, ?string $previous_role ): void {
+		/**
+		 * Fires after a new access grant or a role change, never for a no-op.
+		 *
+		 * @param int|string $agent_id       Persisted agent ID.
+		 * @param string     $principal_type User or non-user principal type.
+		 * @param string     $principal_id   Principal identifier (user ID for users).
+		 * @param string     $role           Persisted role.
+		 * @param string|null $previous_role Previous role, null for a new grant.
+		 * @param array      $context        Contains agent_slug (null if unavailable).
+		 */
+		do_action( 'datamachine_agent_access_granted', $agent_id, $principal_type, $principal_id, $role, $previous_role, $this->action_context( $agent_id ) );
+	}
+
+	/**
+	 * Announce a successfully deleted access grant.
+	 */
+	private function announce_revocation( int $agent_id, string $principal_type, string $principal_id ): void {
+		/**
+		 * Fires after an access grant is removed, never for a missing grant.
+		 *
+		 * @param int|string $agent_id       Persisted agent ID.
+		 * @param string     $principal_type User or non-user principal type.
+		 * @param string     $principal_id   Principal identifier.
+		 * @param array      $context        Contains agent_slug (null if unavailable).
+		 */
+		do_action( 'datamachine_agent_access_revoked', $agent_id, $principal_type, $principal_id, $this->action_context( $agent_id ) );
+	}
+
+	/**
+	 * Transport-independent context shared by access actions.
+	 *
+	 * @return array{agent_slug: string|null} Agent slug, if available.
+	 */
+	private function action_context( int $agent_id ): array {
+		$agent = ( new Agents() )->get_agent( $agent_id );
+		return array( 'agent_slug' => $agent['agent_slug'] ?? null );
+	}
+
+	/**
 	 * Return the full principal grants table name.
 	 */
 	private function principal_table_name(): string {
@@ -537,6 +619,7 @@ class AgentAccess extends BaseRepository {
 	 * @return string[] Roles that meet or exceed the minimum.
 	 */
 	private function roles_at_or_above( string $role ): array {
+		/** @var list<string> $hierarchy Ordered role hierarchy. */
 		$hierarchy = \WP_Agent_Access_Grant::roles();
 		$index     = array_search( $role, $hierarchy, true );
 
