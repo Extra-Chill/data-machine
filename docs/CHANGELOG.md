@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.195.2] - 2026-10-21
+
+### Fixed
+- bound taxonomy select options and memoize handler field schemas
+
 ## [0.195.1] - 2026-10-21
 
 ### Fixed
