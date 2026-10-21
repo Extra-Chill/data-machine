@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.69.0] - 2026-10-21
+
+### Added
+- match venue, artist and location names in calendar search
+
 ## [0.68.2] - 2026-10-21
 
 ### Fixed
