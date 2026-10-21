@@ -133,16 +133,53 @@ class SettingsDisplayService {
 			return array();
 		}
 
-		$handler_abilities = new HandlerAbilities();
-		$handler_settings  = $handler_abilities->getSettingsClass( $handler_slug );
-
-		if ( ! $handler_settings || ! method_exists( $handler_settings, 'get_fields' ) ) {
+		$fields = $this->getHandlerFields( $handler_slug );
+		if ( null === $fields ) {
 			return array();
 		}
 
-		$fields = $handler_settings::get_fields();
-
 		return $this->buildDisplayArray( $fields, $current_settings );
+	}
+
+	/**
+	 * Request-scoped cache of handler field schemas keyed by handler slug.
+	 *
+	 * Handler get_fields() can be expensive (taxonomy/user/venue option
+	 * lookups) and is otherwise rebuilt for every step of every flow when
+	 * formatting flow listings.
+	 *
+	 * @var array<string, array|null>
+	 */
+	private static array $handler_fields_cache = array();
+
+	/**
+	 * Get a handler's settings field schema, memoized per request.
+	 *
+	 * @param string $handler_slug Handler slug.
+	 * @return array|null Field definitions, or null when the handler has no settings fields.
+	 */
+	private function getHandlerFields( string $handler_slug ): ?array {
+		if ( array_key_exists( $handler_slug, self::$handler_fields_cache ) ) {
+			return self::$handler_fields_cache[ $handler_slug ];
+		}
+
+		$handler_abilities = new HandlerAbilities();
+		$handler_settings  = $handler_abilities->getSettingsClass( $handler_slug );
+
+		$fields = ( $handler_settings && method_exists( $handler_settings, 'get_fields' ) )
+			? $handler_settings::get_fields()
+			: null;
+
+		self::$handler_fields_cache[ $handler_slug ] = $fields;
+
+		return $fields;
+	}
+
+	/**
+	 * Clear the memoized handler field schemas.
+	 */
+	public static function clearHandlerFieldsCache(): void {
+		self::$handler_fields_cache = array();
 	}
 
 	/**
@@ -275,16 +312,10 @@ class SettingsDisplayService {
 	 * @return array Field state array
 	 */
 	public function getFieldState( string $handler_slug, array $current_settings = array() ): array {
-		// Get handler Settings class via cached service
-		$handler_abilities = new HandlerAbilities();
-		$handler_settings  = $handler_abilities->getSettingsClass( $handler_slug );
-
-		if ( ! $handler_settings || ! method_exists( $handler_settings, 'get_fields' ) ) {
+		$fields = $this->getHandlerFields( $handler_slug );
+		if ( null === $fields ) {
 			return array();
 		}
-
-		// Get field definitions
-		$fields = $handler_settings::get_fields();
 
 		$field_state = array();
 		foreach ( $fields as $key => $field_config ) {
