@@ -29,6 +29,10 @@ import useFlowReconciliation from '../../hooks/useFlowReconciliation';
 
 import { MODAL_TYPES } from '../../utils/constants';
 import { isSameId } from '../../utils/ids';
+import {
+	getFlowStepHandlerSlugs,
+	getFlowStepHandlerConfig,
+} from '../../utils/flowStepHandlers';
 
 export default function FlowCard( props ) {
 	const { flow, pipelineConfig, onFlowDeleted, onFlowDuplicated } = props;
@@ -236,22 +240,15 @@ function FlowCardContent( props ) {
 
 			const stepType = pipelineStep?.step_type || flowStepConfig.step_type;
 			const isMultiHandlerStep = stepTypes[ stepType ]?.multi_handler === true;
-			let handlerSlugs = [];
-			if ( isMultiHandlerStep ) {
-				handlerSlugs = flowStepConfig.handler_slugs || [];
-			} else if ( flowStepConfig.handler_slug ) {
-				handlerSlugs = [ flowStepConfig.handler_slug ];
-			}
+			const handlerSlugs = getFlowStepHandlerSlugs(
+				flowStepConfig,
+				isMultiHandlerStep
+			);
 			const primarySlug = handlerSlugs[ 0 ] || '';
-			let currentSettings = flowStepConfig.handler_config || {};
-			if ( isMultiHandlerStep ) {
-				currentSettings =
-					flowStepConfig.handler_configs?.[ primarySlug ] || {};
-			}
-			if ( specificHandler ) {
-				currentSettings =
-					flowStepConfig.handler_configs?.[ specificHandler ] || {};
-			}
+			const currentSettings = getFlowStepHandlerConfig(
+				flowStepConfig,
+				specificHandler || primarySlug
+			);
 
 			// Build data for handler modals
 			const data = {
@@ -276,7 +273,7 @@ function FlowCardContent( props ) {
 				openModal( MODAL_TYPES.HANDLER_SETTINGS, {
 					...data,
 					handlerSlug: specificHandler,
-					currentSettings: isMultiHandlerStep ? ( flowStepConfig.handler_configs?.[ specificHandler ] || {} ) : ( flowStepConfig.handler_config || {} ),
+
 				} );
 			} else {
 				// Default: open settings for primary handler.
