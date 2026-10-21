@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.195.1] - 2026-10-21
+
+### Fixed
+- don't read disposition_id from non-persisted direct claims
+
 ## [0.195.0] - 2026-10-21
 
 ### Added
