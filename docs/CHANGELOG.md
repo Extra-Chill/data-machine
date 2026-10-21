@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.195.3] - 2026-10-21
+
+### Fixed
+- read canonical handler_slugs for single-handler flow steps
+
 ## [0.195.2] - 2026-10-21
 
 ### Fixed
