@@ -18,6 +18,7 @@ namespace DataMachineEvents\Abilities;
 use WP_Query;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Core\EventSearchTerms;
 use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
@@ -31,6 +32,7 @@ class EventDateQueryAbilities {
 	private const CAPTURE_IDS_QUERY_VAR       = '_data_machine_events_capture_ids_sql';
 	private const CAPTURE_COUNT_QUERY_VAR     = '_data_machine_events_capture_count_sql';
 	private const CAPTURE_AGGREGATE_QUERY_VAR = '_data_machine_events_capture_aggregate_sql';
+	private const SEARCH_TERMS_QUERY_VAR      = '_data_machine_events_search_terms';
 	private const MAX_PUBLIC_RESULTS          = 100;
 	private const DEFAULT_PUBLIC_RESULTS      = 50;
 	private const TAXONOMY_CANDIDATE_BATCH    = 100;
@@ -366,8 +368,15 @@ class EventDateQueryAbilities {
 			$query_args['post__not_in'] = $exclude;
 		}
 
+		$search_tt_ids = array();
 		if ( ! empty( $search ) ) {
 			$query_args['s'] = $search;
+
+			// Venue, artist, location (and other event term) names match too.
+			$search_tt_ids = EventSearchTerms::matchingTermTaxonomyIds( (string) $search );
+			if ( ! empty( $search_tt_ids ) ) {
+				$query_args[ self::SEARCH_TERMS_QUERY_VAR ] = $search_tt_ids;
+			}
 		}
 
 		if ( ! empty( $meta_query ) ) {
@@ -445,6 +454,20 @@ class EventDateQueryAbilities {
 		add_filter( 'posts_clauses', $clauses_filter );
 		$filters[] = $clauses_filter;
 
+		$search_filter = static function ( $search_sql, $query ) {
+			global $wpdb;
+
+			$tt_ids = $query->get( self::SEARCH_TERMS_QUERY_VAR );
+			if ( empty( $tt_ids ) || ! is_array( $tt_ids ) || ! is_string( $search_sql ) ) {
+				return $search_sql;
+			}
+
+			return EventSearchTerms::widenSearchSql( $search_sql, $tt_ids, $wpdb->posts, $wpdb->term_relationships );
+		};
+		if ( ! empty( $search_tt_ids ) ) {
+			add_filter( 'posts_search', $search_filter, 10, 2 );
+		}
+
 		/**
 		 * Filter the final WP_Query args before the events query runs.
 		 *
@@ -473,6 +496,7 @@ class EventDateQueryAbilities {
 
 		if ( $query_args === $base_query_args && $this->canUseBoundedTaxonomyCandidates( $input, $tax_filters, $scope, $status, $per_page, $page ) ) {
 			remove_filter( 'posts_clauses', $clauses_filter );
+			remove_filter( 'posts_search', $search_filter, 10 );
 
 			return $this->executeBoundedTaxonomyQuery( $tax_filters, $exclude, $per_page, $page, $fields, $order );
 		}
@@ -484,6 +508,7 @@ class EventDateQueryAbilities {
 		foreach ( $filters as $f ) {
 			remove_filter( 'posts_clauses', $f );
 		}
+		remove_filter( 'posts_search', $search_filter, 10 );
 
 		$posts = $query->posts;
 		$total = $query->post_count;

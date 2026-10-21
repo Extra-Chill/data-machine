@@ -433,6 +433,8 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 
 	public function test_matching_ids_sql_preserves_consumer_constraints_without_querying(): void {
 		wp_load_alloptions();
+		// Search term-name lookups are cached separately from the matching SQL.
+		\DataMachineEvents\Core\EventSearchTerms::matchingTermTaxonomyIds( 'needle' );
 		$filter = static function ( array $query_args, array $input ): array {
 			if ( 'sql-capture-scope' === ( $input['scope_token'] ?? '' ) ) {
 				$query_args['post__in'] = array( 123, 456 );
@@ -588,6 +590,43 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'FROM (SELECT', $sql );
 		$this->assertStringNotContainsString( ' LIMIT ', strtoupper( $sql ) );
 		$this->assertStringNotContainsString( ' ORDER BY ', strtoupper( $sql ) );
+	}
+
+	public function test_search_matches_venue_names_ignoring_spacing_and_punctuation(): void {
+		$lofi  = wp_insert_term( 'Lo-Fi Brewing ' . uniqid(), 'venue' );
+		$other = wp_insert_term( 'Pablo Fierro Hall ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $lofi );
+		$this->assertNotWPError( $other );
+
+		$start    = current_datetime()->modify( '+1 day' )->format( 'Y-m-d H:i:s' );
+		$at_lofi  = $this->seed_event( 'Late show', 'publish', $start, null, (int) $lofi['term_id'] );
+		$at_other = $this->seed_event( 'Early show', 'publish', $start, null, (int) $other['term_id'] );
+		$by_title = $this->seed_event( 'Lofi beats night', 'publish', $start );
+
+		foreach ( array( 'lofi', 'lo fi', 'LO-FI' ) as $search ) {
+			$result = ( new EventDateQueryAbilities() )->executeQueryEvents(
+				array(
+					'scope'    => 'upcoming',
+					'search'   => $search,
+					'per_page' => -1,
+					'fields'   => 'ids',
+				)
+			);
+			$ids    = array_map( 'intval', $result['posts'] );
+
+			$this->assertContains( $at_lofi, $ids, "Venue name match for \"{$search}\"." );
+			$this->assertNotContains( $at_other, $ids, "\"{$search}\" must not match letters across a word break." );
+		}
+
+		$text = ( new EventDateQueryAbilities() )->executeQueryEvents(
+			array(
+				'scope'    => 'upcoming',
+				'search'   => 'lofi',
+				'per_page' => -1,
+				'fields'   => 'ids',
+			)
+		);
+		$this->assertContains( $by_title, array_map( 'intval', $text['posts'] ), 'Title search still matches.' );
 	}
 
 	public function test_venue_tier_list_matches_any_listed_tier(): void {
