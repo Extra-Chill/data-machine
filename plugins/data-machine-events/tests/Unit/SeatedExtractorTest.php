@@ -86,9 +86,9 @@ class SeatedExtractorTest extends WP_UnitTestCase {
 		$this->assertSame( 'Philadelphia', $first['venueCity'] );
 		$this->assertSame( 'PA', $first['venueState'] );
 		$this->assertStringContainsString( 'link.seated.com', $first['ticketUrl'] );
-		// We deliberately do not assert a local start time — Seated only gives
-		// a UTC instant with no venue timezone, so startTime is left empty.
-		$this->assertSame( '', $first['startTime'] );
+		// 23:00Z in Philadelphia (EDT) is a 7pm show.
+		$this->assertSame( '19:00', $first['startTime'] );
+		$this->assertSame( 'America/New_York', $first['venueTimezone'] );
 	}
 
 	public function test_extract_uses_local_date_not_utc_drift(): void {
@@ -121,6 +121,31 @@ class SeatedExtractorTest extends WP_UnitTestCase {
 
 		$this->assertCount( 1, $events );
 		$this->assertSame( '2026-09-01', $events[0]['startDate'], 'Must use local date, not the next-day UTC date.' );
+		// 03:00Z in Nashville (CDT) is 10pm the night before.
+		$this->assertSame( '22:00', $events[0]['startTime'] );
+	}
+
+	public function test_extract_leaves_time_empty_when_seated_marks_it_unknown(): void {
+		$payload = $this->sampleTourPayload();
+		$payload['included'][0]['attributes']['is-starts-at-known'] = false;
+		$this->mockSeatedApi( $payload );
+
+		$html   = '<html><body><div id="seated-x" data-artist-id="' . self::ARTIST_ID . '"></div></body></html>';
+		$events = $this->extractor->extract( $html, 'https://easyhoneymusic.test/tour/' );
+
+		$this->assertSame( '2026-08-11', $events[0]['startDate'] );
+		$this->assertSame( '', $events[0]['startTime'] );
+	}
+
+	public function test_extract_leaves_time_empty_without_a_venue_state(): void {
+		$payload = $this->sampleTourPayload();
+		$payload['included'][0]['attributes']['formatted-address'] = 'Somewhere';
+		$this->mockSeatedApi( $payload );
+
+		$html   = '<html><body><div id="seated-x" data-artist-id="' . self::ARTIST_ID . '"></div></body></html>';
+		$events = $this->extractor->extract( $html, 'https://easyhoneymusic.test/tour/' );
+
+		$this->assertSame( '', $events[0]['startTime'] );
 	}
 
 	public function test_extract_returns_empty_on_api_failure(): void {

@@ -200,13 +200,10 @@ class SeatedExtractor extends BaseExtractor {
 		$starts_at_date = (string) ( $attr['starts-at-date-local'] ?? '' );
 
 		// Seated returns `starts-at` as a UTC instant ("...Z") and separately a
-		// pre-localized calendar date (`starts-at-date-local`). We trust the
-		// local date — it is already correct for the venue's region and avoids
-		// drifting a late-evening show onto the next UTC day. We deliberately do
-		// NOT emit a startTime or venueTimezone: the only time Seated gives is
-		// in UTC with no venue zone, so labeling "23:00" as a local show time
-		// would be wrong. The downstream AI/upsert step localizes timing from
-		// the venue/city we provide.
+		// pre-localized calendar date (`starts-at-date-local`). The local date
+		// is authoritative. The show time is recovered below once the venue's
+		// zone is known (from its "City, ST" address), and only kept when the
+		// localized instant lands on that same local date.
 		$local_date = ( '' !== $starts_at_date && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $starts_at_date ) )
 			? $starts_at_date
 			: '';
@@ -237,6 +234,15 @@ class SeatedExtractor extends BaseExtractor {
 			}
 		}
 
+		// Show time. Seated marks unknown times with is-starts-at-known=false.
+		if ( ! empty( $attr['is-starts-at-known'] ) && '' !== $starts_at && ! empty( $event['startDate'] ) ) {
+			$local = $this->localStartTime( $starts_at, $event['startDate'], (string) ( $event['venueState'] ?? '' ) );
+			if ( null !== $local ) {
+				$event['startTime']     = $local['time'];
+				$event['venueTimezone'] = $local['timezone'];
+			}
+		}
+
 		// Ticket / RSVP link is built from the event id, mirroring the widget.
 		$event_id = (string) ( $record['id'] ?? '' );
 		if ( '' !== $event_id ) {
@@ -244,6 +250,48 @@ class SeatedExtractor extends BaseExtractor {
 		}
 
 		return $event;
+	}
+
+	/**
+	 * Convert Seated's UTC start instant to the venue's wall-clock time.
+	 *
+	 * The zone comes from the venue's state (exact single-zone rule first,
+	 * then the offline estimate). The result is kept only when the converted
+	 * instant falls on Seated's own local date, so a wrong zone can never
+	 * shift a show to another day.
+	 *
+	 * @param string $starts_at  UTC instant, e.g. "2027-02-22T01:00:00Z".
+	 * @param string $local_date Seated's local calendar date (Y-m-d).
+	 * @param string $state      Venue state/region from the address.
+	 * @return array{time:string,timezone:string}|null
+	 */
+	private function localStartTime( string $starts_at, string $local_date, string $state ): ?array {
+		if ( '' === $state ) {
+			return null;
+		}
+
+		$zone     = \DataMachineEvents\Core\VenueTimezoneResolver::resolveFromRegion( '', $state )
+			?? \DataMachineEvents\Core\VenueTimezoneResolver::resolveOffline( '', '', $state );
+		$timezone = (string) ( $zone['timezone'] ?? '' );
+		if ( ! \DataMachineEvents\Core\DateTimeParser::isValidTimezone( $timezone ) ) {
+			return null;
+		}
+
+		try {
+			$instant = new \DateTimeImmutable( $starts_at, new \DateTimeZone( 'UTC' ) );
+		} catch ( \Exception $e ) {
+			return null;
+		}
+
+		$local = $instant->setTimezone( new \DateTimeZone( $timezone ) );
+		if ( $local->format( 'Y-m-d' ) !== $local_date ) {
+			return null;
+		}
+
+		return array(
+			'time'     => $local->format( 'H:i' ),
+			'timezone' => $timezone,
+		);
 	}
 
 	/**
