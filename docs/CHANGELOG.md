@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.195.4] - 2026-10-22
+
+### Fixed
+- treat an unchanged compare-and-swap as success, not a conflict
+
 ## [0.195.3] - 2026-10-21
 
 ### Fixed
