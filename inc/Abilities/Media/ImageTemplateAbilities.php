@@ -15,6 +15,7 @@ namespace DataMachine\Abilities\Media;
 use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
+use DataMachine\Core\FilesRepository\FileStorage;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -128,7 +129,7 @@ class ImageTemplateAbilities {
 					),
 					'output'      => array(
 						'type'        => 'string',
-						'description' => 'Output destination: "files" returns file paths (default, requires context for repository or returns temp paths), "cached_file" stores the rendered file under uploads/<bucket>/<key>.<ext> and returns a stable public URL — ideal for OG images and other long-lived public artifacts that should not pollute the media library.',
+						'description' => 'Output destination: "files" returns file paths and public file_urls (default; temporary renders are copied to the file repository), "cached_file" stores the rendered file under uploads/<bucket>/<key>.<ext> and returns a stable public URL — ideal for OG images and other long-lived public artifacts that should not pollute the media library.',
 						'enum'        => array( 'files', 'cached_file' ),
 						'default'     => 'files',
 					),
@@ -155,6 +156,11 @@ class ImageTemplateAbilities {
 					'file_paths'     => array(
 						'type'  => 'array',
 						'items' => array( 'type' => 'string' ),
+					),
+					'file_urls'      => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Public image URLs for files output, aligned index-for-index with file_paths. Cached output uses cached_urls.',
 					),
 					'cached_paths'   => array(
 						'type'  => 'array',
@@ -215,7 +221,7 @@ class ImageTemplateAbilities {
 	 * Render an image from a registered template.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with success flag and file paths.
+	 * @return array|\WP_Error Result with local paths and public URLs, or an error.
 	 */
 	public static function renderTemplate( array $input ): array|\WP_Error {
 		$template_id = $input['template_id'] ?? '';
@@ -294,11 +300,32 @@ class ImageTemplateAbilities {
 			? array_values( array_map( 'strval', (array) $template->get_dropped_fields() ) )
 			: array();
 
-		// Default output mode — return file paths as-is.
+		// Keep local paths intact for in-process callers; publish temp renders
+		// through the existing repository for remote callers.
 		if ( 'cached_file' !== $output ) {
+			$storage         = new FileStorage();
+			$uploads         = wp_upload_dir();
+			$repository_root = trailingslashit( wp_normalize_path( $uploads['basedir'] ) ) . 'datamachine-files/';
+			$file_urls       = array();
+
+			foreach ( $file_paths as $index => $file_path ) {
+				$public_path = $file_path;
+				if ( ! str_starts_with( wp_normalize_path( $file_path ), $repository_root ) ) {
+					$filename    = wp_generate_uuid4() . '.' . pathinfo( $file_path, PATHINFO_EXTENSION );
+					$public_path = $storage->store_file( $file_path, $filename, $context );
+				}
+
+				if ( ! $public_path || ! is_file( $public_path ) ) {
+					return new \WP_Error( 'template_storage_failed', 'Failed to publish rendered template output.', array( 'status' => 500 ) );
+				}
+
+				$file_urls[ $index ] = $storage->get_public_url( $public_path );
+			}
+
 			return array(
 				'success'        => true,
 				'file_paths'     => $file_paths,
+				'file_urls'      => $file_urls,
 				'template_id'    => $template_id,
 				'dropped_fields' => $dropped_fields,
 				'message'        => sprintf( 'Generated %d image(s) using template "%s"', count( $file_paths ), $template_id ),
