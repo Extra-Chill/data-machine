@@ -1070,6 +1070,11 @@ class Venue_Taxonomy {
 		}
 
 		if ( ! $had_candidates ) {
+			$core_match = self::resolve_core_name_tier( $venue_name, $venues, $venue_data );
+			if ( $core_match['term'] || $core_match['ambiguous'] ) {
+				return $core_match;
+			}
+
 			return self::resolve_fuzzy_name_tier( $venue_name, $normalized_name, $venues, $normalized_by_term, $venue_data );
 		}
 
@@ -1081,6 +1086,95 @@ class Venue_Taxonomy {
 			'conflict'             => true,
 			'conflicting_term_ids' => array_values( array_unique( $conflicting_term_ids ) ),
 		);
+	}
+
+	/**
+	 * Core-name tier: same venue named with or without a source qualifier.
+	 *
+	 * Ticketing sources append the state to venue names ("The Catalyst-CA",
+	 * "The Urban Lounge-UT") while artist tour pages add a generic word ("The
+	 * Catalyst Club"). Neither is a typo, so the fuzzy tier misses them and a
+	 * second venue term splits the venue's events. This tier compares names
+	 * with a trailing state code (only when it equals the venue's own state)
+	 * and a trailing "club"/"nightclub" removed.
+	 *
+	 * Like the fuzzy tier it runs only when no exact, article-toggle, or
+	 * normalized candidate exists, and a candidate needs positive location
+	 * evidence (same non-empty city or street). One compatible candidate is a
+	 * match; several are ambiguous.
+	 *
+	 * @param string               $venue_name Venue name as supplied.
+	 * @param \WP_Term[]           $venues     All venue terms.
+	 * @param array<string, mixed> $venue_data Incoming venue metadata.
+	 * @return array{term: \WP_Term|null, ambiguous: bool, conflict: bool, conflicting_term_ids: int[]}
+	 */
+	private static function resolve_core_name_tier( string $venue_name, array $venues, array $venue_data ): array {
+		$no_match = array(
+			'term'                 => null,
+			'ambiguous'            => false,
+			'conflict'             => false,
+			'conflicting_term_ids' => array(),
+		);
+
+		$incoming = self::core_venue_name( $venue_name, (string) ( $venue_data['state'] ?? '' ) );
+		if ( strlen( $incoming ) < self::FUZZY_NAME_MIN_LENGTH ) {
+			return $no_match;
+		}
+
+		$compatible = array();
+		foreach ( $venues as $venue ) {
+			$state = (string) get_term_meta( (int) $venue->term_id, self::$meta_fields['state'], true );
+			if ( self::core_venue_name( $venue->name, $state ) !== $incoming ) {
+				continue;
+			}
+			if ( self::has_geographic_conflict( (int) $venue->term_id, $venue_data ) ) {
+				continue;
+			}
+			if ( self::has_positive_location_evidence( (int) $venue->term_id, $venue_data ) ) {
+				$compatible[] = $venue;
+			}
+		}
+
+		if ( 1 === count( $compatible ) ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Venue matched via core name match',
+				array(
+					'input_name'   => $venue_name,
+					'matched_name' => $compatible[0]->name,
+					'matched_id'   => (int) $compatible[0]->term_id,
+				)
+			);
+
+			$no_match['term'] = $compatible[0];
+			return $no_match;
+		}
+
+		$no_match['ambiguous'] = count( $compatible ) > 1;
+		return $no_match;
+	}
+
+	/**
+	 * Normalized venue name without a source qualifier.
+	 *
+	 * Strips a trailing "-XX" / " - XX" state code when it equals $state,
+	 * then a trailing "club" or "nightclub".
+	 *
+	 * @param string $name  Venue name.
+	 * @param string $state Venue state (code or name); '' disables the state strip.
+	 * @return string Core name, normalized for matching.
+	 */
+	public static function core_venue_name( string $name, string $state ): string {
+		$name  = trim( $name );
+		$state = trim( $state );
+		if ( 2 === strlen( $state ) && preg_match( '/\s*-\s*([A-Za-z]{2})$/', $name, $m ) && 0 === strcasecmp( $m[1], $state ) ) {
+			$name = (string) preg_replace( '/\s*-\s*[A-Za-z]{2}$/', '', $name );
+		}
+
+		$core = self::normalize_venue_name_for_matching( $name );
+
+		return trim( (string) preg_replace( '/\s+(?:night)?club$/', '', $core ) );
 	}
 
 	/**

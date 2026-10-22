@@ -146,7 +146,7 @@ class EventDuplicateStrategy {
 
 		// Strategy 2: Venue + date + fuzzy title.
 		if ( ! empty( $venue ) || $venue_term ) {
-			$match = self::findByVenueDateAndFuzzyTitle( $title, $venue, $date_only, $startDate, $venue_term );
+			$match = self::findByVenueDateAndFuzzyTitle( $title, $venue, $date_only, $startDate, $venue_term, (string) ( $context['source'] ?? '' ) );
 			if ( $match ) {
 				return $match;
 			}
@@ -238,7 +238,7 @@ class EventDuplicateStrategy {
 	 *                                  When null, falls back to a name-only cascade.
 	 * @return array|null Duplicate result or null.
 	 */
-	private static function findByVenueDateAndFuzzyTitle( string $title, string $venue, string $date_only, string $startDate, ?\WP_Term $venue_term = null ): ?array {
+	private static function findByVenueDateAndFuzzyTitle( string $title, string $venue, string $date_only, string $startDate, ?\WP_Term $venue_term = null, string $source = '' ): ?array {
 		$low_confidence = EventIdentifierGenerator::isLowConfidenceTitle( $title );
 		if ( $low_confidence && ! self::hasTimeComponent( $startDate ) ) {
 			return null;
@@ -253,6 +253,8 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
+		$cross_source        = array();
+		$same_source_outside = false;
 		foreach ( self::candidatePagesByDate( $date_only, (int) $venue_term->term_id ) as $candidates ) {
 			foreach ( $candidates as $candidate ) {
 				$post_id = (int) $candidate->ID;
@@ -274,6 +276,11 @@ class EventDuplicateStrategy {
 					return self::duplicateResult( $post_id, 'venue_date_time_fuzzy_short_title' );
 				}
 				if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
+					if ( self::isCrossSourceCandidate( $post_id, $source ) ) {
+						$cross_source[ $post_id ] = true;
+					} else {
+						$same_source_outside = true;
+					}
 					continue;
 				}
 
@@ -281,7 +288,33 @@ class EventDuplicateStrategy {
 			}
 		}
 
+		// Different sources often disagree on the time of one show (doors vs
+		// set time, e.g. 19:00 on an artist's tour page and 21:30 on
+		// Ticketmaster). When nothing matched in-window, accept a single
+		// cross-source title match at the same confirmed venue and date. Two
+		// candidates, or a same-source one, means early/late sets: stay apart.
+		if ( 1 === count( $cross_source ) && ! $same_source_outside ) {
+			return self::duplicateResult( (int) array_key_first( $cross_source ), 'venue_date_fuzzy_title_cross_source' );
+		}
+
 		return null;
+	}
+
+	/**
+	 * Whether a stored event came from a different, known import source.
+	 *
+	 * @param int    $post_id Candidate event post ID.
+	 * @param string $source  Incoming import source slug.
+	 * @return bool
+	 */
+	private static function isCrossSourceCandidate( int $post_id, string $source ): bool {
+		if ( '' === $source ) {
+			return false;
+		}
+
+		$stored = (string) get_post_meta( $post_id, '_datamachine_event_source', true );
+
+		return '' !== $stored && $stored !== $source;
 	}
 
 	/**

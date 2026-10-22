@@ -1097,6 +1097,67 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->assertFalse( EventDuplicateStrategy::titlesMatchAtVenue( 'Goose at Soundwell — Salt Lake City', 'Stop Light Observations', 'Soundwell' ) );
 	}
 
+	private function crossSourceCheck( string $venue_name, int $term_id, string $start, string $source ): ?array {
+		return EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Little Stranger at ' . $venue_name . ' — Cleveland',
+				'context' => array(
+					'venue'         => $venue_name,
+					'startDate'     => $start,
+					'ticketUrl'     => '',
+					'venue_term_id' => $term_id,
+					'source'        => $source,
+				),
+			)
+		);
+	}
+
+	public function test_cross_source_show_dedups_outside_time_window(): void {
+		$venue_name = 'Agora ' . uniqid();
+		[ $term_id, $post_id ] = $this->seedVenueWithEvent( 'Little Stranger w/ Jarv', '2026-12-31 21:30:00', $venue_name );
+		update_post_meta( $post_id, '_datamachine_event_source', 'ticketmaster' );
+
+		$result = $this->crossSourceCheck( $venue_name, $term_id, '2026-12-31T19:00:00', 'universal_web_scraper' );
+
+		$this->assertIsArray( $result );
+		$this->assertSame( $post_id, $result['match']['post_id'] );
+		$this->assertStringContainsString( 'cross_source', $result['reason'] );
+
+		$this->cleanup( $term_id, $post_id );
+	}
+
+	public function test_same_source_outside_time_window_stays_distinct(): void {
+		$venue_name = 'Agora ' . uniqid();
+		[ $term_id, $post_id ] = $this->seedVenueWithEvent( 'Little Stranger', '2026-12-31 21:30:00', $venue_name );
+		update_post_meta( $post_id, '_datamachine_event_source', 'ticketmaster' );
+
+		$this->assertNull( $this->crossSourceCheck( $venue_name, $term_id, '2026-12-31T19:00:00', 'ticketmaster' ) );
+		$this->assertNull( $this->crossSourceCheck( $venue_name, $term_id, '2026-12-31T19:00:00', '' ) );
+
+		$this->cleanup( $term_id, $post_id );
+	}
+
+	public function test_two_cross_source_sets_outside_window_stay_distinct(): void {
+		$venue_name = 'Agora ' . uniqid();
+		[ $term_id, $early ] = $this->seedVenueWithEvent( 'Little Stranger', '2026-12-31 15:00:00', $venue_name );
+		$late                = wp_insert_post(
+			array(
+				'post_title'  => 'Little Stranger',
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		wp_set_object_terms( $late, array( $term_id ), 'venue' );
+		EventDatesTable::upsert( $late, '2026-12-31 23:00:00' );
+		update_post_meta( $early, '_datamachine_event_source', 'ticketmaster' );
+		update_post_meta( $late, '_datamachine_event_source', 'ticketmaster' );
+
+		$this->assertNull( $this->crossSourceCheck( $venue_name, $term_id, '2026-12-31T19:00:00', 'universal_web_scraper' ) );
+
+		wp_delete_post( $late, true );
+		$this->cleanup( $term_id, $early );
+	}
+
 	// ---------------------------------------------------------------------
 	// Helpers
 	// ---------------------------------------------------------------------

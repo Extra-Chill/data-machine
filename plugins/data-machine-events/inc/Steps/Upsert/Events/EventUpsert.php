@@ -350,7 +350,8 @@ class EventUpsert extends UpsertHandler {
 				$venueCity,
 				$venueState,
 				$venueCountry,
-				'assign' === $venue_resolution['action'] ? $authoritative_venue_id : 0
+				'assign' === $venue_resolution['action'] ? $authoritative_venue_id : 0,
+				(string) ( $parameters['source'] ?? '' )
 			);
 			if ( is_wp_error( $duplicate_result ) ) {
 				return $this->lifecycleErrorResponse( $duplicate_result, $title );
@@ -796,6 +797,8 @@ class EventUpsert extends UpsertHandler {
 	 *                              path (0 when unresolved). When set, dedup
 	 *                              matches by this term instead of re-resolving
 	 *                              the venue by name (#883).
+	 * @param string $source        Import source slug (e.g. ticketmaster),
+	 *                              used for the cross-source venue fallback.
 	 * @return int|\WP_Error Post ID, zero when clear, or a contract error.
 	 */
 	private function findExistingEventViaAbility(
@@ -807,7 +810,8 @@ class EventUpsert extends UpsertHandler {
 		string $city = '',
 		string $state = '',
 		string $country = '',
-		int $venue_term_id = 0
+		int $venue_term_id = 0,
+		string $source = ''
 	): int|\WP_Error {
 		$duplicate_check = wp_has_ability( 'datamachine/check-duplicate' )
 			? wp_get_ability( 'datamachine/check-duplicate' )
@@ -838,6 +842,7 @@ class EventUpsert extends UpsertHandler {
 					'state'         => $state,
 					'country'       => $country,
 					'venue_term_id' => $venue_term_id,
+					'source'        => $source,
 				),
 			)
 		);
