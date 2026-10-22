@@ -1093,6 +1093,42 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->assertSame( 'Night at the Museum', EventDuplicateStrategy::stripVenuePhrase( 'Night at the Museum', 'Museum Bar' ) );
 	}
 
+	public function test_support_act_title_dedups_against_tour_page_title_at_same_venue(): void {
+		$venue_name = 'Fremont Theater ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Little Stranger at ' . $venue_name . ' — San Luis Obispo',
+			'2027-02-04 20:00:00',
+			$venue_name
+		);
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Little Stranger w/ Shwayze',
+				'context' => array(
+					'venue'         => $venue_name,
+					'startDate'     => '2027-02-04T20:00:00',
+					'ticketUrl'     => '',
+					'venue_term_id' => $term_id,
+				),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'duplicate', $result['verdict'] );
+		$this->assertSame( $existing_post_id, $result['match']['post_id'] );
+
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	public function test_strip_support_clause_only_removes_explicit_support_markers(): void {
+		$this->assertSame( 'Little Stranger', EventDuplicateStrategy::stripSupportClause( 'Little Stranger w/ Shwayze' ) );
+		$this->assertSame( 'Robert Glasper', EventDuplicateStrategy::stripSupportClause( 'Robert Glasper feat. Derrick Hodge, Isaiah Sharkey, & Chris Dave' ) );
+		$this->assertSame( 'Band', EventDuplicateStrategy::stripSupportClause( 'Band with special guest Y' ) );
+		$this->assertSame( 'An Evening with Bob', EventDuplicateStrategy::stripSupportClause( 'An Evening with Bob' ) );
+		$this->assertSame( 'Ft. Lauderdale Jam', EventDuplicateStrategy::stripSupportClause( 'Ft. Lauderdale Jam' ) );
+		$this->assertSame( 'Featuring Nobody', EventDuplicateStrategy::stripSupportClause( 'Featuring Nobody' ) );
+	}
+
 	public function test_venue_phrase_does_not_merge_different_acts(): void {
 		$this->assertFalse( EventDuplicateStrategy::titlesMatchAtVenue( 'Goose at Soundwell — Salt Lake City', 'Stop Light Observations', 'Soundwell' ) );
 	}

@@ -1424,9 +1424,12 @@ class Venue_Taxonomy {
 					continue;
 				}
 
-				// Stored address carries no street component and the subset
-				// check did not pass — fall through to the strict equality
-				// comparison below.
+				// Stored address carries no street component ("Killington,
+				// VT", "San Luis Obispo, CA"): it is a city/region placeholder,
+				// not a street to contradict. The mirror of #798 — a partial
+				// stored address is incomplete evidence, never a conflict.
+				// City/state/country are still compared on their own fields.
+				continue;
 			} else {
 				$incoming_normalized = self::normalize_geographic_value( (string) $incoming, $field );
 				$stored_normalized   = self::normalize_geographic_value( (string) $stored, $field );
@@ -1828,7 +1831,7 @@ class Venue_Taxonomy {
 		$text = html_entity_decode( $name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		$text = remove_accents( $text );
 		$text = strtolower( $text );
-		$text = preg_replace( '/\s*&\s*/', ' and ', $text );
+		$text = preg_replace( '/\s*[&+]\s*/', ' and ', $text );
 		$text = preg_replace( '/^(the|a|an)\s+/i', '', $text );
 		$text = preg_replace( '/[^a-z0-9\s]/', '', $text );
 		$text = trim( preg_replace( '/\s+/', ' ', $text ) );

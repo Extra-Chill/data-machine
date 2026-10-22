@@ -335,8 +335,8 @@ class EventDuplicateStrategy {
 			return true;
 		}
 
-		$stripped_title     = self::stripVenuePhrase( $title, $venue_name );
-		$stripped_candidate = self::stripVenuePhrase( $candidate, $venue_name );
+		$stripped_title     = self::stripSupportClause( self::stripVenuePhrase( $title, $venue_name ) );
+		$stripped_candidate = self::stripSupportClause( self::stripVenuePhrase( $candidate, $venue_name ) );
 		if ( $stripped_title === $title && $stripped_candidate === $candidate ) {
 			return false;
 		}
@@ -361,6 +361,26 @@ class EventDuplicateStrategy {
 		$stripped = trim( (string) preg_replace( $pattern, '', $title ) );
 
 		return '' === $stripped ? $title : $stripped;
+	}
+
+	/**
+	 * Remove a trailing support-act clause from a title.
+	 *
+	 * Ticketing sources append openers ("Little Stranger w/ Shwayze",
+	 * "Kenyon Dixon feat. X", "Band with special guest Y") while artist tour
+	 * pages list the headliner alone. Only explicit support markers are
+	 * stripped: a bare "with" is left alone so "An Evening with A" and
+	 * "An Evening with B" never collapse to the same title. Callers use this
+	 * only once venue and date are already confirmed.
+	 *
+	 * @param string $title Event title.
+	 * @return string Title without the support clause, or the original title.
+	 */
+	public static function stripSupportClause( string $title ): string {
+		$pattern  = '/\s+(?:w\/|with\s+(?:very\s+)?special\s+guests?|with\s+support(?:\s+from)?|feat\.?|ft\.|featuring|\+\s*special\s+guests?)\s+.*$/iu';
+		$stripped = trim( (string) preg_replace( $pattern, '', $title ) );
+
+		return mb_strlen( $stripped ) < 3 ? $title : $stripped;
 	}
 
 	// -----------------------------------------------------------------------

@@ -789,4 +789,57 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		$this->assertNull( $result['term_id'] );
 		$this->assertSame( 'ambiguous', $result['match_status'] );
 	}
+
+	public function test_placeholder_stored_address_does_not_conflict_with_incoming_street(): void {
+		// #958: a stored "address" that is only city/state ("Killington, VT")
+		// is not a street, so a real street from another source must match.
+		$name = 'Pickle Barrel ' . uniqid();
+		$id   = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => 'Killington, VT',
+				'city'    => 'Killington',
+				'state'   => 'VT',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '1741 Killington Road',
+				'city'    => 'Killington',
+				'state'   => 'VT',
+				'country' => 'US',
+			)
+		);
+
+		$this->assertSame( 'matched', $result['match_status'] );
+		$this->assertSame( $id, $result['term_id'] );
+	}
+
+	public function test_placeholder_stored_address_still_conflicts_on_city(): void {
+		$name = 'Placeholder City Venue ' . uniqid();
+		$this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => 'Killington, VT',
+				'city'    => 'Killington',
+				'state'   => 'VT',
+				'country' => 'US',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address' => '100 Main Street',
+				'city'    => 'Burlington',
+				'state'   => 'VT',
+				'country' => 'US',
+			)
+		);
+
+		$this->assertSame( 'conflict', $result['match_status'] );
+	}
 }

@@ -86,6 +86,13 @@ class VenueNormalizationTest extends WP_UnitTestCase {
 		$this->assertSame( 'hook and ladder theater', $canonical );
 	}
 
+	public function test_normalize_venue_name_collapses_plus_sign(): void {
+		$this->assertSame(
+			Venue_Taxonomy::normalize_venue_name_for_matching( "Pappy & Harriet's" ),
+			Venue_Taxonomy::normalize_venue_name_for_matching( "Pappy + Harriet's" )
+		);
+	}
+
 	public function test_normalize_venue_name_collapses_apostrophes(): void {
 		$canonical = Venue_Taxonomy::normalize_venue_name_for_matching( 'Amos Southend' );
 
