@@ -473,8 +473,16 @@ class Ticketmaster extends EventImportHandler {
 			)
 		);
 
+		$attraction_ids = self::normalize_attraction_ids( (string) ( $handler_config['attraction_ids'] ?? '' ) );
+		if ( '' !== $attraction_ids ) {
+			// Artist mode: follow these artists wherever they play. A geo filter
+			// would silently drop every show outside one metro, so it is skipped.
+			$params['attractionId'] = $attraction_ids;
+			$context->log( 'info', 'Ticketmaster: Artist mode', array( 'attraction_ids' => $attraction_ids ) );
+		}
+
 		$location    = $handler_config['location'] ?? '32.7765,-79.9311'; // Charleston, SC
-		$coordinates = $this->parseCoordinates( $location );
+		$coordinates = '' === $attraction_ids ? $this->parseCoordinates( $location ) : null;
 		if ( $coordinates ) {
 			$params['geoPoint'] = $coordinates['lat'] . ',' . $coordinates['lng'];
 			$radius             = ! empty( $handler_config['radius'] ) ? $handler_config['radius'] : '50';
@@ -496,6 +504,29 @@ class Ticketmaster extends EventImportHandler {
 		}
 
 		return $params;
+	}
+
+	/**
+	 * Normalize a comma/whitespace-separated list of Ticketmaster attraction IDs.
+	 *
+	 * Keeps only ID-shaped tokens, de-duplicates, and joins with commas, which
+	 * is the format the Discovery API accepts for `attractionId`.
+	 *
+	 * @param string $raw Raw setting value.
+	 * @return string Comma-joined IDs, or '' when none are valid.
+	 */
+	public static function normalize_attraction_ids( string $raw ): string {
+		$ids    = array();
+		$tokens = preg_split( '/[\s,]+/', $raw );
+		if ( false === $tokens ) {
+			return '';
+		}
+		foreach ( $tokens as $token ) {
+			if ( preg_match( '/^[A-Za-z0-9_-]{6,40}$/', $token ) ) {
+				$ids[ $token ] = true;
+			}
+		}
+		return implode( ',', array_keys( $ids ) );
 	}
 
 	/**

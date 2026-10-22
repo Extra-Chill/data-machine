@@ -764,6 +764,30 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertSame( Ticketmaster::DEFAULT_MAX_ITEMS, TicketmasterSettings::get_defaults()['max_items'] );
 	}
 
+	public function test_attraction_ids_are_normalized(): void {
+		$this->assertSame( 'K8vZ9171FAV,K8vZ9174G2V', Ticketmaster::normalize_attraction_ids( " K8vZ9171FAV,  K8vZ9174G2V\nK8vZ9171FAV, <b>x</b>, " ) );
+		$this->assertSame( '', Ticketmaster::normalize_attraction_ids( '' ) );
+		$this->assertSame( 'K8vZ9171FAV', TicketmasterSettings::sanitize( array( 'attraction_ids' => 'K8vZ9171FAV' ) )['attraction_ids'] );
+		$this->assertArrayHasKey( 'attraction_ids', TicketmasterSettings::get_fields() );
+		$this->assertSame( '', TicketmasterSettings::get_defaults()['attraction_ids'] );
+	}
+
+	public function test_artist_mode_sets_attraction_filter_and_skips_geo(): void {
+		set_transient( 'data_machine_events_ticketmaster_classifications', array( 'music' => 'Music' ), HOUR_IN_SECONDS );
+		$handler = new Ticketmaster();
+		$method  = new \ReflectionMethod( $handler, 'build_search_params' );
+		$context = ExecutionContext::direct( 'ticketmaster' );
+
+		$artist = $method->invoke( $handler, array( 'classification_type' => 'music', 'location' => '32.7765,-79.9311', 'attraction_ids' => 'K8vZ9171FAV, K8vZ9174G2V' ), 'key', $context );
+		$this->assertSame( 'K8vZ9171FAV,K8vZ9174G2V', $artist['attractionId'] );
+		$this->assertArrayNotHasKey( 'geoPoint', $artist );
+		$this->assertArrayNotHasKey( 'radius', $artist );
+
+		$geo = $method->invoke( $handler, array( 'classification_type' => 'music', 'location' => '32.7765,-79.9311' ), 'key', $context );
+		$this->assertArrayNotHasKey( 'attractionId', $geo );
+		$this->assertArrayHasKey( 'geoPoint', $geo );
+	}
+
 	public function test_pre_ai_gate_allows_ticketmaster_revision_updates(): void {
 		$engine = new EngineData(
 			array(
