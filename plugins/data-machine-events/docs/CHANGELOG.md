@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.69.1] - 2026-10-22
+
+### Fixed
+- store AI title and dedupe venue-phrase titles at a confirmed venue
+
 ## [0.69.0] - 2026-10-21
 
 ### Added
