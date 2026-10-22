@@ -1337,6 +1337,11 @@ class EventUpsert extends UpsertHandler {
 		$all_engine_fields = array_unique( array_merge( $schema_fields, $venue_fields ) );
 
 		foreach ( $all_engine_fields as $field ) {
+			// The AI-written title is the one identity and dedup were keyed
+			// on; the raw source title only fills in when the AI gave none.
+			if ( 'title' === $field && '' !== $event_data['title'] ) {
+				continue;
+			}
 			$value = $engine->get( $field );
 			if ( null !== $value && '' !== $value ) {
 				// Free-text fields carry the same entity-encoding risk as the

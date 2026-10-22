@@ -259,7 +259,7 @@ class EventDuplicateStrategy {
 				if ( ! self::isValidPost( $post_id ) ) {
 					continue;
 				}
-				if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
+				if ( ! self::titlesMatchAtVenue( $title, (string) $candidate->post_title, (string) $venue_term->name ) ) {
 					continue;
 				}
 
@@ -282,6 +282,52 @@ class EventDuplicateStrategy {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Fuzzy title match for two listings already confirmed at one venue.
+	 *
+	 * Import titles often name the place ("Artist at Venue — City") while
+	 * older or venue-sourced listings do not ("Artist (21+ Event)"). Once the
+	 * venue term is confirmed, the "at Venue — City" phrase carries no identity,
+	 * so it is stripped from both sides before comparing.
+	 *
+	 * @param string $title      Incoming title.
+	 * @param string $candidate  Stored candidate title.
+	 * @param string $venue_name Confirmed venue term name.
+	 * @return bool
+	 */
+	public static function titlesMatchAtVenue( string $title, string $candidate, string $venue_name ): bool {
+		if ( EventIdentifierGenerator::titlesMatch( $title, $candidate ) ) {
+			return true;
+		}
+
+		$stripped_title     = self::stripVenuePhrase( $title, $venue_name );
+		$stripped_candidate = self::stripVenuePhrase( $candidate, $venue_name );
+		if ( $stripped_title === $title && $stripped_candidate === $candidate ) {
+			return false;
+		}
+
+		return EventIdentifierGenerator::titlesMatch( $stripped_title, $stripped_candidate );
+	}
+
+	/**
+	 * Remove a trailing "at <venue>[ — <city>]" phrase from a title.
+	 *
+	 * @param string $title      Event title.
+	 * @param string $venue_name Venue name.
+	 * @return string Title without the venue phrase, or the original title.
+	 */
+	public static function stripVenuePhrase( string $title, string $venue_name ): string {
+		$venue = trim( (string) preg_replace( '/^the\s+/iu', '', trim( $venue_name ) ) );
+		if ( '' === $venue ) {
+			return $title;
+		}
+
+		$pattern  = '/\s+(?:live\s+)?(?:at|@)\s+(?:the\s+)?' . preg_quote( $venue, '/' ) . '(?:\s*(?:[,:;\x{2013}\x{2014}|]|\s-\s|\()\s*.*)?\.?$/iu';
+		$stripped = trim( (string) preg_replace( $pattern, '', $title ) );
+
+		return '' === $stripped ? $title : $stripped;
 	}
 
 	// -----------------------------------------------------------------------

@@ -1058,6 +1058,45 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$this->cleanup( $term_id, $existing_post_id );
 	}
 
+	public function test_venue_phrase_title_dedups_against_bare_title_at_same_venue(): void {
+		$venue_name = 'Soundwell ' . uniqid();
+		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
+			'Stop Light Observations (21+ Event)',
+			'2026-10-30 20:00:00',
+			$venue_name
+		);
+
+		$result = EventDuplicateStrategy::check(
+			array(
+				'title'   => 'Stop Light Observations at ' . $venue_name . ' — Salt Lake City',
+				'context' => array(
+					'venue'         => $venue_name,
+					'startDate'     => '2026-10-30T19:00:00',
+					'ticketUrl'     => '',
+					'venue_term_id' => $term_id,
+				),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'duplicate', $result['verdict'] );
+		$this->assertSame( $existing_post_id, $result['match']['post_id'] );
+
+		$this->cleanup( $term_id, $existing_post_id );
+	}
+
+	public function test_strip_venue_phrase_only_removes_the_confirmed_venue(): void {
+		$this->assertSame( 'Little Stranger', EventDuplicateStrategy::stripVenuePhrase( 'Little Stranger at The Royal American — Charleston', 'The Royal American' ) );
+		$this->assertSame( 'Artist', EventDuplicateStrategy::stripVenuePhrase( 'Artist @ Soundwell, Salt Lake City, UT', 'Soundwell' ) );
+		$this->assertSame( 'Artist', EventDuplicateStrategy::stripVenuePhrase( 'Artist at Soundwell (21+)', 'Soundwell' ) );
+		$this->assertSame( 'Dinner at Soundwell Party', EventDuplicateStrategy::stripVenuePhrase( 'Dinner at Soundwell Party', 'Soundwell' ) );
+		$this->assertSame( 'Night at the Museum', EventDuplicateStrategy::stripVenuePhrase( 'Night at the Museum', 'Museum Bar' ) );
+	}
+
+	public function test_venue_phrase_does_not_merge_different_acts(): void {
+		$this->assertFalse( EventDuplicateStrategy::titlesMatchAtVenue( 'Goose at Soundwell — Salt Lake City', 'Stop Light Observations', 'Soundwell' ) );
+	}
+
 	// ---------------------------------------------------------------------
 	// Helpers
 	// ---------------------------------------------------------------------

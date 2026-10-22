@@ -129,4 +129,37 @@ class EventUpsertTitleNoiseTest extends EventUpsertTestCase {
 		$this->assertTrue( $result['success'] ?? false, (string) wp_json_encode( $result ) );
 		$this->assertSame( '$uicideboy$ - Grey Day Tour', get_post( (int) $result['data']['post_id'] )->post_title );
 	}
+
+	public function test_ai_title_wins_over_raw_source_title(): void {
+		$venue  = 'Title Authority Venue ' . uniqid();
+		$artist = 'Tour Artist ' . uniqid();
+		$method = new \ReflectionMethod( $this->handler, 'executeUpsert' );
+		$method->setAccessible( true );
+
+		$result = $method->invoke(
+			$this->handler,
+			array(
+				'title'     => $artist . ' at ' . $venue . ' — Phoenix',
+				'venue'     => $venue,
+				'startDate' => '2026-11-15',
+				'startTime' => '19:00',
+				'engine'    => new \DataMachine\Core\EngineData(
+					array(
+						'title'     => $artist,
+						'startDate' => '2026-11-15',
+						'startTime' => '19:00',
+					),
+					0
+				),
+				'job_id'    => 0,
+			),
+			array(
+				'post_author' => self::factory()->user->create( array( 'role' => 'administrator' ) ),
+				'post_status' => 'publish',
+			)
+		);
+
+		$this->assertTrue( $result['success'] ?? false, (string) wp_json_encode( $result ) );
+		$this->assertSame( $artist . ' at ' . $venue . ' — Phoenix', get_post( (int) $result['data']['post_id'] )->post_title );
+	}
 }
