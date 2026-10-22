@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.196.0] - 2026-10-22
+
+### Added
+- return public file_urls from render-image-template
+
 ## [0.195.5] - 2026-10-22
 
 ### Fixed
