@@ -69,6 +69,33 @@ class FlowsCompareAndSwapTest extends WP_UnitTestCase {
 		$this->assertSame( $concurrent, $this->flows->get_flow_config_json( $this->flow_id ) );
 	}
 
+	public function test_unchanged_config_is_a_successful_noop(): void {
+		$expected = $this->get_raw_config();
+
+		$updated = $this->flows->compare_and_swap_flow_config(
+			$this->flow_id,
+			$expected,
+			json_decode( $expected, true )
+		);
+
+		$this->assertTrue( $updated );
+		$this->assertSame( $expected, $this->flows->get_flow_config_json( $this->flow_id ) );
+	}
+
+	public function test_unchanged_config_against_stale_snapshot_still_conflicts(): void {
+		$expected   = $this->get_raw_config();
+		$concurrent = str_replace( 'Alpha', 'Beta', $expected );
+		$this->write_raw_config( $concurrent );
+
+		$updated = $this->flows->compare_and_swap_flow_config(
+			$this->flow_id,
+			$expected,
+			json_decode( $expected, true )
+		);
+
+		$this->assertFalse( $updated );
+	}
+
 	public function test_exact_snapshot_updates_successfully(): void {
 		$updated = $this->flows->compare_and_swap_flow_config(
 			$this->flow_id,
