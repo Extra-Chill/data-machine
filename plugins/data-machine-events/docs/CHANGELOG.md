@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.70.0] - 2026-10-22
+
+### Added
+- follow artists via attraction_ids
+
 ## [0.69.2] - 2026-10-22
 
 ### Fixed
