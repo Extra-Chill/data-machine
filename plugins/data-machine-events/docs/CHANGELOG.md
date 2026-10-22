@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.71.1] - 2026-10-22
+
+### Fixed
+- placeholder stored addresses, plus-sign names, and support-act titles no longer split shows
+
 ## [0.71.0] - 2026-10-22
 
 ### Added
