@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.195.5] - 2026-10-22
+
+### Fixed
+- release reservations when WordPress deletes the linked post
+
 ## [0.195.4] - 2026-10-22
 
 ### Fixed
