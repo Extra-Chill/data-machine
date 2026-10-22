@@ -192,3 +192,66 @@
 .data-machine-taxonomy-post_tag { background: #dcfce7; color: #166534; }
 .data-machine-taxonomy-genre { background: #f3e8ff; color: #7c3aed; }
 .data-machine-taxonomy-artist_type { background: #fed7aa; color: #c2410c; }
+/* ====================================
+ * EVENT RATINGS (Core\EventRatings)
+ * ==================================== */
+.dme-stars {
+  color: #f5b301;
+  letter-spacing: 0.05em;
+}
+
+.dme-rating-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  text-decoration: none;
+}
+
+.dme-review-rating {
+  margin: 0 0 0.25em;
+  font-size: 1.1em;
+}
+
+.dme-rating-field {
+  border: 0;
+  margin: 0 0 1em;
+  padding: 0;
+}
+
+.dme-rating-field legend {
+  font-weight: 600;
+  padding: 0;
+}
+
+/* Inputs render high-to-low so ~ selects lower stars; flex reverses them visually. */
+.dme-rating-options {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+
+.dme-rating-options input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.dme-rating-options label {
+  cursor: pointer;
+  font-size: 2rem;
+  line-height: 1;
+  padding: 0 0.1em;
+  color: #c4c4c4;
+}
+
+.dme-rating-options input:checked ~ label,
+.dme-rating-options label:hover,
+.dme-rating-options label:hover ~ label {
+  color: #f5b301;
+}
+
+.dme-rating-options input:focus-visible + label {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
