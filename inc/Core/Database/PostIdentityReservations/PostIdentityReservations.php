@@ -489,6 +489,34 @@ class PostIdentityReservations extends BaseRepository {
 		return $this->resolve_locked( $identity, $explicit_post_id, $slug_fallback_id, $shell );
 	}
 
+	/**
+	 * Release reservations linked to a post that WordPress has deleted.
+	 *
+	 * A deleted post is a definitive end to its identity link, so the
+	 * reservation returns to the unlinked `reserved` state and the next
+	 * upsert for that identity allocates a fresh post. Links whose post row
+	 * vanished any other way still fail closed in resolve_locked().
+	 *
+	 * @param int $post_id Deleted post ID.
+	 * @return int Number of reservations released.
+	 */
+	public function release_deleted_post( int $post_id ): int {
+		if ( $post_id <= 0 ) {
+			return 0;
+		}
+		$now = current_time( 'mysql', true );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE %i SET post_id = NULL, state = 'reserved', completed_at = NULL, last_error_code = NULL, last_error_message = NULL, updated_at = %s WHERE post_id = %d",
+				$this->table_name,
+				$now,
+				$post_id
+			)
+		);
+		return false === $result ? 0 : (int) $result;
+	}
+
 	/** @return true|\WP_Error */
 	public function mark_complete( array $identity, int $post_id ) {
 		$post = get_post( $post_id );

@@ -572,6 +572,42 @@ class PostIdentityReservationsTest extends WP_UnitTestCase {
 		$this->assertSame( (string) $first['post_id'], (string) $row['post_id'] );
 	}
 
+	public function test_deleted_post_releases_its_reservation_for_a_fresh_allocation(): void {
+		$identity = array( 'key' => '_source', 'value' => 'deleted-post' );
+		$first    = $this->repository->reserve_and_resolve( 'post', $identity, 0, 0, $this->shell() );
+		$this->assertSame( 1, $this->repository->release_deleted_post( (int) $first['post_id'] ) );
+		wp_delete_post( (int) $first['post_id'], true );
+
+		$row = $this->repository->get_reservation( $first['identity']['identity_hash'] );
+		$this->assertNull( $row['post_id'] );
+		$this->assertSame( 'reserved', $row['state'] );
+
+		$retry = $this->repository->reserve_and_resolve( 'post', $identity, 0, 0, $this->shell() );
+		$this->assertIsArray( $retry );
+		$this->assertTrue( $retry['allocated'] );
+		$this->assertNotSame( $first['post_id'], $retry['post_id'] );
+	}
+
+	public function test_wp_delete_post_releases_the_reservation_through_the_runtime_hook(): void {
+		$identity = array( 'key' => '_source', 'value' => 'deleted-post-hook' );
+		$first    = $this->repository->reserve_and_resolve( 'post', $identity, 0, 0, $this->shell() );
+		if ( ! has_action( 'deleted_post' ) ) {
+			$this->markTestSkipped( 'Runtime service provider hooks are not loaded in this suite.' );
+		}
+		wp_delete_post( (int) $first['post_id'], true );
+
+		$row = $this->repository->get_reservation( $first['identity']['identity_hash'] );
+		$this->assertNull( $row['post_id'] );
+		$this->assertSame( 'reserved', $row['state'] );
+	}
+
+	public function test_release_ignores_unrelated_posts(): void {
+		$first = $this->repository->reserve_and_resolve( 'post', array( 'key' => '_source', 'value' => 'kept-link' ), 0, 0, $this->shell() );
+		$this->assertSame( 0, $this->repository->release_deleted_post( (int) $first['post_id'] + 100000 ) );
+		$row = $this->repository->get_reservation( $first['identity']['identity_hash'] );
+		$this->assertSame( (string) $first['post_id'], (string) $row['post_id'] );
+	}
+
 	public function test_wrong_post_type_link_fails_without_reallocation(): void {
 		global $wpdb;
 

@@ -156,5 +156,14 @@ final class RuntimeServiceProvider {
 				$index->delete( (int) $post_id );
 			}
 		);
+
+		// Release identity reservations only once the deletion has happened.
+		add_action(
+			'deleted_post',
+			static function ( $post_id ): void {
+				$reservations = new \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations();
+				$reservations->release_deleted_post( (int) $post_id );
+			}
+		);
 	}
 }
