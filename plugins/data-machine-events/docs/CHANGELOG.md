@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.71.0] - 2026-10-22
+
+### Added
+- show ratings and reviews for past events
+
 ## [0.70.0] - 2026-10-22
 
 ### Added
