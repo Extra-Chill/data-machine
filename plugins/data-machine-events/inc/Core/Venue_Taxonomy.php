@@ -1596,6 +1596,15 @@ class Venue_Taxonomy {
 			}
 		}
 
+		// "Saint Paul" / "St. Paul" / "St Paul" and "New York City" / "New
+		// York" name one city. Different spellings must not read as a
+		// geographic conflict and split a venue.
+		if ( 'city' === $field ) {
+			$value = preg_replace( '/\b(saint|st)\b/', 'st', $value );
+			$value = preg_replace( '/\b(sainte|ste)\b/', 'ste', $value );
+			$value = preg_replace( '/^(new york city|nyc)$/', 'new york', $value );
+		}
+
 		if ( 'state' === $field ) {
 			foreach ( self::$us_state_names as $abbreviation => $state_name ) {
 				$normalized_state_name = self::normalize_geographic_value( $state_name, '' );

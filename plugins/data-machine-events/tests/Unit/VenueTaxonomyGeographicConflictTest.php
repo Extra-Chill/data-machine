@@ -938,4 +938,41 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		$this->assertSame( '', get_term_meta( (int) $result['term_id'], Venue_Taxonomy::UNVERIFIED_FIELDS_KEY, true ) );
 		$this->assertSame( '1 Test Street', get_term_meta( (int) $result['term_id'], '_venue_address', true ) );
 	}
+
+	public function test_saint_and_st_city_spellings_do_not_conflict(): void {
+		$this->assertSame(
+			Venue_Taxonomy::normalize_geographic_value( 'Saint Paul', 'city' ),
+			Venue_Taxonomy::normalize_geographic_value( 'St. Paul', 'city' )
+		);
+		$this->assertSame(
+			Venue_Taxonomy::normalize_geographic_value( 'New York City', 'city' ),
+			Venue_Taxonomy::normalize_geographic_value( 'New York', 'city' )
+		);
+		$this->assertNotSame(
+			Venue_Taxonomy::normalize_geographic_value( 'St. Paul', 'city' ),
+			Venue_Taxonomy::normalize_geographic_value( 'St. Louis', 'city' )
+		);
+		$this->assertSame( 'stockton', Venue_Taxonomy::normalize_geographic_value( 'Stockton', 'city' ) );
+
+		$name = 'Saint City Venue ' . uniqid();
+		$id   = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '400 Snelling Ave N',
+				'city'    => 'Saint Paul',
+				'state'   => 'MN',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'city'  => 'St. Paul',
+				'state' => 'MN',
+			)
+		);
+
+		$this->assertSame( 'matched', $result['match_status'] );
+		$this->assertSame( $id, $result['term_id'] );
+	}
 }
