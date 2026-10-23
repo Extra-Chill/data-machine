@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.0] - 2026-10-23
+
+### Added
+- composable stack image template
+
 ## [0.197.0] - 2026-10-23
 
 ### Added
