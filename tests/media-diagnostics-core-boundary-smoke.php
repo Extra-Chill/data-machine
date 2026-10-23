@@ -55,6 +55,7 @@ $assert = static function ( bool $condition, string $message ) use ( &$failures 
 require_once $root . '/inc/Abilities/AbilityRegistration.php';
 require_once $root . '/inc/Abilities/Media/AltTextAbilities.php';
 require_once $root . '/inc/Abilities/Media/ImageGenerationAbilities.php';
+require_once $root . '/inc/Abilities/Media/BrandTokens.php';
 require_once $root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
 require_once $root . '/inc/Abilities/Media/MediaAbilities.php';
 

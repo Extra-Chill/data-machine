@@ -81,6 +81,7 @@ foreach ( array(
 	'inc/Abilities/Media/TemplateInterface.php',
 	'inc/Abilities/Media/TemplateRegistry.php',
 	'inc/Abilities/Media/GDRenderer.php',
+	'inc/Abilities/Media/BrandTokens.php',
 	'inc/Abilities/Media/ImageTemplateAbilities.php',
 ) as $file ) {
 	require_once $plugin_root . '/' . $file;

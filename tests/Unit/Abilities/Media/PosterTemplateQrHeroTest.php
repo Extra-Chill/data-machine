@@ -85,6 +85,48 @@ namespace DataMachine\Tests\Unit\Abilities\Media {
 
 	class PosterTemplateQrHeroTest extends TestCase {
 
+		public function test_brand_overrides_win_and_invalid_values_fall_through(): void {
+			$tokens = \DataMachine\Abilities\Media\BrandTokens::get( 'poster', array(), array(
+				'colors' => array( 'accent' => '#123456', 'text_muted' => 'not-hex', 'unknown' => '#fff' ),
+				'fonts' => array( 'heading' => '/missing/font.ttf' ),
+				'logo_path' => '/missing/logo.png',
+				'brand_text' => 'Partner',
+			) );
+			$this->assertSame( '#123456', $tokens['colors']['accent'] );
+			$this->assertSame( self::TEST_COLORS['text_muted'], $tokens['colors']['text_muted'] );
+			$this->assertSame( self::TEST_COLORS['background_dark'], $tokens['colors']['background_dark'] );
+			$this->assertArrayNotHasKey( 'unknown', $tokens['colors'] );
+			$this->assertNull( $tokens['fonts']['heading'] );
+			$this->assertNull( $tokens['logo_path'] );
+			$this->assertSame( 'Partner', $tokens['brand_text'] );
+		}
+
+		public function test_override_scope_restores_after_nested_exception(): void {
+			$brand = \DataMachine\Abilities\Media\BrandTokens::class;
+			$brand::with_overrides( array( 'brand_text' => 'Outer' ), function () use ( $brand ) {
+				try {
+					$brand::with_overrides( array( 'brand_text' => 'Inner' ), function () {
+						throw new \RuntimeException( 'render failed' );
+					} );
+				} catch ( \RuntimeException $e ) {
+					$this->assertSame( 'Outer', $brand::get()['brand_text'] );
+				}
+			} );
+			$this->assertSame( '', $brand::get()['brand_text'] );
+		}
+
+		public function test_poster_renders_with_overridden_background(): void {
+			$this->require_render_font();
+			$path = \DataMachine\Abilities\Media\BrandTokens::with_overrides(
+				array( 'colors' => array( 'background_dark' => '#123456' ) ),
+				fn() => $this->render( array( 'title' => 'Example', 'background' => 'none' ), 'instagram_feed_portrait' )
+			);
+			$image = imagecreatefrompng( $path );
+			$this->assertSame( 0x123456, imagecolorat( $image, 0, 0 ) & 0xffffff );
+			imagedestroy( $image );
+			$this->assertSame( self::TEST_COLORS['background_dark'], \DataMachine\Abilities\Media\BrandTokens::get()['colors']['background_dark'] );
+		}
+
 		/** Trim-safe margin on 300dpi print presets: 0.25" = 75px. */
 		private const SAFE_MARGIN = 75;
 
