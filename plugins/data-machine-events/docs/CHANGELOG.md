@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.72.0] - 2026-10-23
+
+### Added
+- find-ticketmaster-attractions ability
+
 ## [0.71.1] - 2026-10-22
 
 ### Fixed
