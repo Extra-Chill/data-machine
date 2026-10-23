@@ -292,6 +292,7 @@ class DATAMACHINE_Events {
 			\DataMachineEvents\Abilities\TicketUrlCanonicalBackfillAbilities::class,
 			\DataMachineEvents\Abilities\BatchActionRecoveryAbilities::class,
 			\DataMachineEvents\Abilities\TicketmasterTest::class,
+			\DataMachineEvents\Abilities\TicketmasterAttractionAbilities::class,
 			\DataMachineEvents\Abilities\DiceFmTest::class,
 			\DataMachineEvents\Abilities\GeocodingAbilities::class,
 			\DataMachineEvents\Abilities\VenueStatsAbilities::class,
@@ -480,6 +481,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterTest.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterTest.php';
 			new \DataMachineEvents\Abilities\TicketmasterTest();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterAttractionAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/TicketmasterAttractionAbilities.php';
+			new \DataMachineEvents\Abilities\TicketmasterAttractionAbilities();
 		}
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DiceFmTest.php' ) ) {
