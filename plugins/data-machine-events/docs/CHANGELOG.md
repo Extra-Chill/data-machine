@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.73.6] - 2026-10-23
+
+### Fixed
+- title the follow-up form "Add a comment" after rating
+
 ## [0.73.5] - 2026-10-23
 
 ### Fixed
