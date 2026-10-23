@@ -56,7 +56,9 @@ class EventRatings {
 		add_filter( 'allow_empty_comment', array( self::class, 'allow_rating_only_review' ), 10, 2 );
 
 		add_action( 'comment_form_logged_in_after', array( self::class, 'render_rating_field' ) );
+		add_filter( 'comment_form_field_comment', array( self::class, 'filter_review_field' ), 9 );
 		add_filter( 'comment_form_field_comment', array( self::class, 'filter_form_field' ) );
+		add_filter( 'comment_form_submit_button', array( self::class, 'filter_submit_button' ), 9 );
 		add_filter( 'comment_form_submit_field', array( self::class, 'filter_form_field' ) );
 		add_filter( 'comment_form_logged_in', array( self::class, 'filter_logged_in_notice' ) );
 		add_filter( 'comment_text', array( self::class, 'filter_comment_text' ), 5, 2 );
@@ -459,6 +461,53 @@ class EventRatings {
 	 * Wrap the textarea and submit button in a hidden, unlockable container
 	 * for users who may not rate yet.
 	 */
+	/**
+	 * Whether the form will carry the star picker: a rateable event the
+	 * current user has not reviewed yet. Locked forms count too, since they
+	 * can unlock in place.
+	 */
+	private static function form_offers_rating( int $post_id ): bool {
+		$user_id = get_current_user_id();
+		if ( $post_id <= 0 || $user_id <= 0 || ! self::is_rateable_event( $post_id ) ) {
+			return false;
+		}
+		return null === self::get_user_review( $user_id, $post_id );
+	}
+
+	/**
+	 * With the star picker present the text is optional (rating-only
+	 * reviews are allowed), so drop the browser `required` flag and label
+	 * the box as an optional review.
+	 */
+	public static function filter_review_field( $field ) {
+		if ( ! self::form_offers_rating( self::current_event_id() ) ) {
+			return $field;
+		}
+
+		$field = preg_replace( '/\s(?:required|aria-required="true")(?:="required")?/', '', (string) $field );
+		return (string) preg_replace(
+			'#<label for="comment">.*?</label>#s',
+			'<label for="comment">' . esc_html__( 'Review (optional)', 'data-machine-events' ) . '</label>',
+			(string) $field,
+			1
+		);
+	}
+
+	/**
+	 * Label the submit button for what it does on a first review.
+	 */
+	public static function filter_submit_button( $button ) {
+		if ( ! self::form_offers_rating( self::current_event_id() ) ) {
+			return $button;
+		}
+		return (string) preg_replace(
+			'/value="[^"]*"/',
+			'value="' . esc_attr__( 'Post Rating', 'data-machine-events' ) . '"',
+			(string) $button,
+			1
+		);
+	}
+
 	public static function filter_form_field( $field ) {
 		$post_id = self::current_event_id();
 		if ( ! self::form_is_locked( $post_id ) ) {

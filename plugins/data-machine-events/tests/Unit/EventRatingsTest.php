@@ -384,4 +384,19 @@ class EventRatingsTest extends WP_UnitTestCase {
 		$empty = $ability->execute( array( 'event_ids' => array( $one ) ) );
 		$this->assertSame( '{}', wp_json_encode( $empty['ratings'] ) );
 	}
+
+	public function test_first_review_form_makes_text_optional_and_labels_submit(): void {
+		$event = $this->pastEvent();
+
+		$first = $this->renderFormFor( $this->user_a, $event );
+		$this->assertStringContainsString( 'Review (optional)', $first );
+		$this->assertDoesNotMatchRegularExpression( '/<textarea[^>]*\srequired/', $first );
+		$this->assertStringContainsString( 'value="Post Rating"', $first );
+
+		EventRatings::rate( $this->user_a, $event, 4 );
+		$followup = $this->renderFormFor( $this->user_a, $event );
+		$this->assertStringNotContainsString( 'Review (optional)', $followup );
+		$this->assertMatchesRegularExpression( '/<textarea[^>]*\srequired/', $followup );
+		$this->assertStringNotContainsString( 'value="Post Rating"', $followup );
+	}
 }
