@@ -166,6 +166,9 @@ class ImageCommand extends BaseCommand {
 	 * --data=<json>
 	 * : JSON string of structured data matching the template fields.
 	 *
+	 * [--brand=<json>]
+	 * : Per-render brand tokens: colors, fonts, logo_path, logo_path_inverse, brand_text. Asset values accept readable paths or attachment IDs.
+	 *
 	 * [--preset=<preset>]
 	 * : Platform preset override (e.g. instagram_feed_portrait).
 	 *
@@ -215,6 +218,15 @@ class ImageCommand extends BaseCommand {
 			'template_id' => $template_id,
 			'data'        => $data,
 		);
+
+		if ( isset( $assoc_args['brand'] ) ) {
+			$brand = json_decode( $assoc_args['brand'] );
+			if ( json_last_error() !== JSON_ERROR_NONE || ! is_object( $brand ) ) {
+				WP_CLI::error( 'Invalid --brand: expected a JSON object.' );
+				return;
+			}
+			$input['brand'] = json_decode( $assoc_args['brand'], true );
+		}
 
 		if ( ! empty( $assoc_args['preset'] ) ) {
 			$input['preset'] = $assoc_args['preset'];

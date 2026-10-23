@@ -113,6 +113,7 @@ class ImageTemplateAbilities {
 						'type'        => 'object',
 						'description' => 'Structured data matching the template fields',
 					),
+					'brand'       => BrandTokens::override_schema(),
 					'preset'      => array(
 						'type'        => 'string',
 						'description' => 'Platform preset override (e.g. instagram_feed_portrait)',
@@ -287,7 +288,14 @@ class ImageTemplateAbilities {
 			$options['context'] = $context;
 		}
 
-		$file_paths = $template->render( $data, $renderer, $options );
+		if ( isset( $input['brand'] ) && ! is_array( $input['brand'] ) ) {
+			return new \WP_Error( 'invalid_brand', 'brand must be an object.', array( 'status' => 400 ) );
+		}
+
+		$file_paths = BrandTokens::with_overrides(
+			$input['brand'] ?? array(),
+			fn() => $template->render( $data, $renderer, $options )
+		);
 
 		if ( empty( $file_paths ) ) {
 			return new \WP_Error( 'template_render_empty', sprintf( 'Template "%s" rendered but produced no output', $template_id ), array( 'status' => 500 ) );

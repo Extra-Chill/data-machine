@@ -59,6 +59,63 @@ class BrandTokens {
 		'site_label'        => '',
 	);
 
+	/** @var array Render-local overrides, restored after each render. */
+	private static array $render_overrides = array();
+
+	/**
+	 * Run a template with overrides shared by every token accessor.
+	 * Nested renders and exceptions restore the previous scope.
+	 *
+	 * @param array    $overrides Per-render tokens.
+	 * @param callable $render   Render callback.
+	 * @return mixed Callback result.
+	 */
+	public static function with_overrides( array $overrides, callable $render ) {
+		$previous               = self::$render_overrides;
+		self::$render_overrides = $overrides;
+		try {
+			return $render();
+		} finally {
+			self::$render_overrides = $previous;
+		}
+	}
+
+	/**
+	 * Schema for optional per-render brand tokens. Invalid entries are ignored.
+	 *
+	 * @return array JSON schema.
+	 */
+	public static function override_schema(): array {
+		$properties = array();
+		foreach ( array( 'colors', 'fonts' ) as $group ) {
+			$properties[ $group ] = array(
+				'type'       => 'object',
+				'properties' => array_fill_keys( array_keys( self::DEFAULTS[ $group ] ), array( 'description' => 'Optional token override; invalid values are ignored.' ) ),
+			);
+		}
+		foreach ( array( 'logo_path', 'logo_path_inverse', 'brand_text' ) as $key ) {
+			$properties[ $key ] = array( 'description' => 'Optional token override; invalid values are ignored.' );
+		}
+		return array(
+			'type'        => 'object',
+			'description' => 'Per-render brand overrides, applied after site tokens. Colors accept #RGB or #RRGGBB. Fonts and logos accept readable local file paths or media attachment IDs. Invalid entries fall through to site tokens. brand_text accepts a string.',
+			'properties'  => $properties,
+		);
+	}
+
+	/**
+	 * Resolve an override asset without fetching remote URLs.
+	 *
+	 * @param mixed $value Local path or attachment ID.
+	 * @return string|null Readable file path.
+	 */
+	private static function resolve_override_path( $value ): ?string {
+		if ( is_int( $value ) || ( is_string( $value ) && ctype_digit( $value ) ) ) {
+			$value = get_attached_file( (int) $value );
+		}
+		return is_string( $value ) && '' !== $value && ! str_contains( $value, '://' ) && is_file( $value ) && is_readable( $value ) ? $value : null;
+	}
+
 	/**
 	 * Get brand tokens for the current site/template.
 	 *
@@ -79,9 +136,10 @@ class BrandTokens {
 	 *
 	 * @param string $template_id Template identifier (e.g. 'event_og_card').
 	 * @param mixed  $context     Optional context (WP_Post, array, etc.).
+	 * @param array  $overrides   Optional tokens applied after site and render-scoped tokens.
 	 * @return array Resolved brand token array (always has colors + fonts keys).
 	 */
-	public static function get( string $template_id = '', $context = null ): array {
+	public static function get( string $template_id = '', $context = null, array $overrides = array() ): array {
 		$defaults = self::DEFAULTS;
 
 		/**
@@ -117,6 +175,30 @@ class BrandTokens {
 			$icon_path = self::resolve_site_icon_path();
 			if ( null !== $icon_path ) {
 				$tokens['logo_path'] = $icon_path;
+			}
+		}
+
+		foreach ( array( self::$render_overrides, $overrides ) as $layer ) {
+			foreach ( array_keys( $defaults['colors'] ) as $key ) {
+				$value = $layer['colors'][ $key ] ?? null;
+				if ( is_string( $value ) && preg_match( '/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i', $value ) ) {
+					$tokens['colors'][ $key ] = $value;
+				}
+			}
+			foreach ( array_keys( $defaults['fonts'] ) as $key ) {
+				$path = self::resolve_override_path( $layer['fonts'][ $key ] ?? null );
+				if ( null !== $path ) {
+					$tokens['fonts'][ $key ] = $path;
+				}
+			}
+			foreach ( array( 'logo_path', 'logo_path_inverse' ) as $key ) {
+				$path = self::resolve_override_path( $layer[ $key ] ?? null );
+				if ( null !== $path ) {
+					$tokens[ $key ] = $path;
+				}
+			}
+			if ( isset( $layer['brand_text'] ) && is_string( $layer['brand_text'] ) ) {
+				$tokens['brand_text'] = $layer['brand_text'];
 			}
 		}
 

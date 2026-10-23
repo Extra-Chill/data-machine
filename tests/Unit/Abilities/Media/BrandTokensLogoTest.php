@@ -65,6 +65,36 @@ class BrandTokensLogoTest extends WP_UnitTestCase {
 		return $attachment_id;
 	}
 
+	public function test_override_assets_accept_attachment_ids_and_readable_paths(): void {
+		$id = $this->make_temp_icon_attachment();
+		$path = get_attached_file( $id );
+		$tokens = BrandTokens::get( 'poster', null, array(
+			'fonts' => array( 'heading' => $path, 'body' => $id ),
+			'logo_path' => $id,
+			'logo_path_inverse' => (string) $id,
+		) );
+		$this->assertSame( $path, $tokens['fonts']['heading'] );
+		$this->assertSame( $path, $tokens['fonts']['body'] );
+		$this->assertSame( $path, $tokens['logo_path'] );
+		$this->assertSame( $path, $tokens['logo_path_inverse'] );
+	}
+
+	public function test_unreadable_overrides_preserve_site_assets(): void {
+		$id = $this->make_temp_icon_attachment();
+		$path = get_attached_file( $id );
+		add_filter( 'datamachine/image_template/brand_tokens', function ( $tokens ) use ( $path ) {
+			$tokens['fonts']['heading'] = $path;
+			$tokens['logo_path'] = $path;
+			return $tokens;
+		} );
+		$tokens = BrandTokens::get( 'poster', null, array(
+			'fonts' => array( 'heading' => '/missing/font.ttf' ),
+			'logo_path' => '/missing/logo.png',
+		) );
+		$this->assertSame( $path, $tokens['fonts']['heading'] );
+		$this->assertSame( $path, $tokens['logo_path'] );
+	}
+
 	public function test_get_returns_null_logo_path_when_nothing_is_available(): void {
 		$tokens = BrandTokens::get( 'some_template' );
 

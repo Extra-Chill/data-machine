@@ -190,6 +190,7 @@ $assert(
 $reset();
 require_once $plugin_root . '/inc/Abilities/AbilityCategories.php';
 require_once $plugin_root . '/inc/Abilities/AgentAbilities.php';
+require_once $plugin_root . '/inc/Abilities/Media/BrandTokens.php';
 require_once $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
 require_once $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php';
 $prior_hook_count = count( $GLOBALS['datamachine_2303_state']->hooked['wp_abilities_api_init'] ?? array() );
