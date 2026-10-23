@@ -261,6 +261,10 @@ class ImageCommand extends BaseCommand {
 
 		WP_CLI::success( $result['message'] ?? 'Template rendered.' );
 
+		foreach ( $result['warnings'] ?? array() as $warning ) {
+			WP_CLI::warning( $warning );
+		}
+
 		$dropped_fields = $result['dropped_fields'] ?? array();
 		if ( ! empty( $dropped_fields ) ) {
 			WP_CLI::warning( sprintf( 'Dropped fields to fit the layout: %s', implode( ', ', $dropped_fields ) ) );
