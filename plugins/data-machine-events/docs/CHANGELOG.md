@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.73.2] - 2026-10-23
+
+### Fixed
+- Saint/St. and New York City spellings are one city
+
 ## [0.73.1] - 2026-10-23
 
 ### Fixed
