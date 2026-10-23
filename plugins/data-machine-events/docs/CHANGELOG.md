@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.73.0] - 2026-10-23
+
+### Added
+- listing badges, in-place unlock, batch read of own ratings
+
 ## [0.72.0] - 2026-10-23
 
 ### Added
