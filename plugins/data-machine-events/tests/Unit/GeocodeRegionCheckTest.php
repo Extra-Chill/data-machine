@@ -175,4 +175,46 @@ class GeocodeRegionCheckTest extends WP_UnitTestCase {
 		$this->assertSame( '2500 East 2nd Street', Venue_Taxonomy::numeric_street_ordinals( '2500 East Second Street' ) );
 		$this->assertSame( '12 Third Man Records Way', Venue_Taxonomy::numeric_street_ordinals( '12 Third Man Records Way' ) );
 	}
+
+	public function test_periods_and_floor_suffixes_are_stripped(): void {
+		$queries = $this->queries_for(
+			array(
+				'address' => '4802 N. Broadway Ave.',
+				'city'    => 'Chicago',
+				'state'   => 'IL',
+			)
+		);
+		$this->assertSame( '4802 N Broadway Ave, Chicago, IL', $queries['cleaned_address'] );
+
+		$queries = $this->queries_for(
+			array(
+				'address' => '1808 West End Ave 2nd Floor',
+				'city'    => 'Nashville',
+				'state'   => 'TN',
+			)
+		);
+		$this->assertSame( '1808 West End Ave, Nashville, TN', $queries['cleaned_address'] );
+	}
+
+	public function test_street_type_fallback_keeps_house_number(): void {
+		$queries = $this->queries_for(
+			array(
+				'name'    => 'Green Mill Jazz Club',
+				'address' => '4802 N. Broadway Ave.',
+				'city'    => 'Chicago',
+				'state'   => 'IL',
+			)
+		);
+		$this->assertSame( '4802 N Broadway, Chicago, IL', $queries['no_street_type'] );
+		$this->assertSame(
+			array( 'cleaned_address', 'no_street_type', 'name_lookup' ),
+			array_values( array_intersect( array_keys( $queries ), array( 'cleaned_address', 'no_street_type', 'name_lookup' ) ) )
+		);
+
+		$this->assertSame( '2325 Elm', Venue_Taxonomy::strip_trailing_street_type( '2325 Elm St' ) );
+		$this->assertSame( '300 E Ocean', Venue_Taxonomy::strip_trailing_street_type( '300 E Ocean BL' ) );
+		$this->assertSame( '', Venue_Taxonomy::strip_trailing_street_type( 'Theater Alley' ) );
+		$this->assertSame( '', Venue_Taxonomy::strip_trailing_street_type( '10 Theater Alley' ) );
+		$this->assertSame( '', Venue_Taxonomy::strip_trailing_street_type( '12 Way' ) );
+	}
 }

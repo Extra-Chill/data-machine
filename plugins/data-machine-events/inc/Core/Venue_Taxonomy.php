@@ -2195,6 +2195,30 @@ class Venue_Taxonomy {
 		return is_string( $result ) ? $result : $street;
 	}
 
+	/**
+	 * Drop the trailing street-type word from a numbered street.
+	 *
+	 * Returns '' when the street has no leading house number or no trailing
+	 * street type, so the fallback is only used where it stays precise.
+	 *
+	 * @param string $street Cleaned street portion of an address.
+	 * @return string
+	 */
+	public static function strip_trailing_street_type( string $street ): string {
+		if ( ! preg_match( '/^\d+[a-z]?\s+\S/i', $street ) ) {
+			return '';
+		}
+
+		$types = 'st|street|ave|av|avenue|rd|road|blvd|bl|boulevard|dr|drive|ln|lane|pl|place|way|ct|court|pkwy|parkway|ter|terrace|cir|circle|hwy|highway';
+		$bare  = preg_replace( '/\s+(?:' . $types . ')$/i', '', $street );
+
+		if ( ! is_string( $bare ) || $bare === $street || ! preg_match( '/^\d+[a-z]?\s+\S/i', $bare ) ) {
+			return '';
+		}
+
+		return $bare;
+	}
+
 	private static function build_geocode_queries( array $venue_data ): array {
 		$address = html_entity_decode( trim( (string) ( $venue_data['address'] ?? '' ) ) );
 		$city    = html_entity_decode( trim( (string) ( $venue_data['city'] ?? '' ) ) );
@@ -2226,6 +2250,11 @@ class Venue_Taxonomy {
 		$street = preg_replace( '/,?\s*(?:\b(?:Suite|Ste|Unit|Apt|Room|Rm)\b\.?|#)\s*[\w\-#]+.*/i', '', $street );
 		// Strip "Located in: ..." annotations
 		$street = preg_replace( '/,?\s*Located in:.*$/i', '', $street );
+		// Strip floor annotations ("1808 West End Ave 2nd Floor") and
+		// abbreviation periods ("4802 N. Broadway Ave.") — Nominatim's
+		// free-text search misses both. See #971.
+		$street = preg_replace( '/,?\s*\b(?:\d+(?:st|nd|rd|th)\s+(?:floor|fl)|(?:floor|fl)\s+\d+)\b\.?.*$/i', '', (string) $street );
+		$street = str_replace( '.', '', (string) $street );
 		$street = trim( $street, ', ' );
 
 		// Nominatim indexes numbered streets as "3rd", not "Third": the
@@ -2248,6 +2277,16 @@ class Venue_Taxonomy {
 			if ( ! isset( $queries['cleaned_address'] ) || $query !== $queries['cleaned_address'] ) {
 				$queries['no_zip'] = $query;
 			}
+		}
+
+		// Strategy 2b: Street without its trailing street-type word, house
+		// number kept. Nominatim misses when the source's suffix differs from
+		// OSM ("Broadway Ave" vs "Broadway", "Elm St" vs "Elm"). Dropping the
+		// house number instead is not safe: it lands on the street centroid
+		// or a same-named street in another town. See #971.
+		$bare_street = self::strip_trailing_street_type( $street );
+		if ( '' !== $bare_street && $bare_street !== $street && ! empty( $city ) ) {
+			$queries['no_street_type'] = implode( ', ', array_filter( array( $bare_street, $city, $state ) ) );
 		}
 
 		// Strategy 3: Venue name + city + state (Nominatim indexes many POIs by name)
