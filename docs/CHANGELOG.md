@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.197.0] - 2026-10-23
+
+### Added
+- per-render brand token overrides for image templates
+
 ## [0.196.0] - 2026-10-22
 
 ### Added
