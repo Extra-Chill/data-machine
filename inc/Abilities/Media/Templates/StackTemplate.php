@@ -146,7 +146,7 @@ class StackTemplate implements TemplateInterface {
 			if ( is_numeric( $path ) ) {
 				$path = get_attached_file( (int) $path );
 			}
-			$info = is_string( $path ) && is_readable( $path ) ? @getimagesize( $path ) : false;
+			$info = is_string( $path ) && is_readable( $path ) ? getimagesize( $path ) : false;
 			if ( ! $info || ! in_array( $info[2], array( IMAGETYPE_PNG, IMAGETYPE_JPEG, IMAGETYPE_WEBP ), true ) ) {
 				$p['width'] = 0;
 				$this->warn( $key, "$key: unreadable or unsupported image skipped." );
@@ -292,7 +292,7 @@ class StackTemplate implements TemplateInterface {
 				if ( '' !== $marker ) {
 					$r->draw_text( $marker, $b['size'], $x, $y + $b['size'], $this->color( $r, $b['marker_color'] ), $b['font'] );
 				}
-				$y = $r->draw_text_wrapped( (string) $item, $b['size'], $x + $b['gutter'], $y, $this->color( $r, $b['color'] ), $b['font'], max( 1, $b['width'] - $b['gutter'] ), $b['line_height'] );
+				$y = $r->draw_text_wrapped( (string) $item, $b['size'], $x + $b['gutter'], $y, $this->color( $r, $b['color'] ), $b['font'], max( 1, (int) ( $b['width'] - $b['gutter'] ) ), $b['line_height'] );
 			}
 		} elseif ( 'divider' === $b['type'] ) {
 			$r->filled_rect( $x, $y, $x + $b['width'] - 1, $y + $b['height'] - 1, $this->color( $r, $b['color'] ) );

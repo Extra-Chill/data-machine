@@ -29,7 +29,7 @@ final class TemplateHelpers {
 		while ( $size > $minimum ) {
 			$widest = 0;
 			foreach ( (array) $parts as $part ) {
-				$widest = max( $widest, $r->measure_text_width( $part, $size, $font ) );
+				$widest = max( $widest, $r->measure_text_width( (string) $part, $size, $font ) );
 			}
 			if ( $widest <= $width ) {
 				break;
