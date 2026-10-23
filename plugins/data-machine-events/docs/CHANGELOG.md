@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.73.1] - 2026-10-23
+
+### Fixed
+- AI-guessed location fields are not venue identity evidence
+
 ## [0.73.0] - 2026-10-23
 
 ### Added
