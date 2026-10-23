@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.73.5] - 2026-10-23
+
+### Fixed
+- title first-review form Rate this show
+- strip periods/floor suffixes and add street-type fallback query
+
 ## [0.73.4] - 2026-10-23
 
 ### Fixed
