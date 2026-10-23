@@ -111,7 +111,7 @@ class ImageTemplateAbilities {
 					),
 					'data'        => array(
 						'type'        => 'object',
-						'description' => 'Structured data matching the template fields',
+						'description' => 'Structured data matching the template fields. stack accepts background (hex/token), padding (1080px base), align (center|left), blocks: ordered text (text/font/color/size/fit/max_size/wrap/line_height/align), image (path or attachment_id/width/max_height), qr (url/size/card_color/quiet_modules), row (text/image items, gap), list (items/style/marker_color/font/color/size), divider (width/thickness/color), spacer (height/flex). Every block accepts gap_before. Widths are fractions or base px; QR size is a fraction.',
 					),
 					'brand'       => BrandTokens::override_schema(),
 					'preset'      => array(
@@ -176,6 +176,11 @@ class ImageTemplateAbilities {
 						'type'        => 'array',
 						'items'       => array( 'type' => 'string' ),
 						'description' => 'Field keys the template omitted to make the layout fit. Empty when every field was drawn.',
+					),
+					'warnings'       => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Layout and asset warnings, including unresolved stack overflow. No blocks are removed to fit a stack.',
 					),
 					'message'        => array( 'type' => 'string' ),
 				),
@@ -308,6 +313,10 @@ class ImageTemplateAbilities {
 			? array_values( array_map( 'strval', (array) $template->get_dropped_fields() ) )
 			: array();
 
+		$warnings = method_exists( $template, 'get_warnings' )
+			? array_values( array_map( 'strval', (array) $template->get_warnings() ) )
+			: array();
+
 		// Keep local paths intact for in-process callers; publish temp renders
 		// through the existing repository for remote callers.
 		if ( 'cached_file' !== $output ) {
@@ -336,6 +345,7 @@ class ImageTemplateAbilities {
 				'file_urls'      => $file_urls,
 				'template_id'    => $template_id,
 				'dropped_fields' => $dropped_fields,
+				'warnings'       => $warnings,
 				'message'        => sprintf( 'Generated %d image(s) using template "%s"', count( $file_paths ), $template_id ),
 			);
 		}
@@ -352,6 +362,7 @@ class ImageTemplateAbilities {
 				'success'        => true,
 				'template_id'    => $template_id,
 				'dropped_fields' => $dropped_fields,
+				'warnings'       => $warnings,
 			),
 			$cached_result
 		);

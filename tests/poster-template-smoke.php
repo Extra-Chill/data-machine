@@ -80,7 +80,8 @@ $assert( 'core ships the landscape_16_9 preset', str_contains( $presets_src, "'l
 $assert( 'core ships the print_tabloid preset', str_contains( $presets_src, "'print_tabloid'" ) );
 $assert( 'core ships the print_tabloid_300 preset', str_contains( $presets_src, "'print_tabloid_300'" ) );
 $assert( 'core ships the print_pocket_flyer preset', str_contains( $presets_src, "'print_pocket_flyer'" ) );
-$assert( 'QR codes resolve through a filter', str_contains( $tmpl_source, "'datamachine/image_generation/qr_image_path'" ) );
+$helpers_source = (string) file_get_contents( $plugin_root . '/inc/Abilities/Media/Templates/TemplateHelpers.php' );
+$assert( 'QR codes resolve through a shared filter', str_contains( $helpers_source, "'datamachine/image_generation/qr_image_path'" ) && str_contains( $tmpl_source, 'TemplateHelpers::qr_image_path' ) );
 $assert(
 	'template names no domain concept or vendor',
 	! preg_match( '/event|venue|rsvp|extrachill|extra chill|ticket/i', $tmpl_source )
@@ -134,6 +135,7 @@ require_once $plugin_root . '/inc/Abilities/Media/PlatformPresets.php';
 require_once $plugin_root . '/inc/Abilities/Media/TemplateInterface.php';
 require_once $plugin_root . '/inc/Abilities/Media/BrandTokens.php';
 require_once $plugin_root . '/inc/Abilities/Media/GDRenderer.php';
+require_once $plugin_root . '/inc/Abilities/Media/Templates/TemplateHelpers.php';
 require_once $plugin_root . '/inc/Abilities/Media/Templates/PosterTemplate.php';
 
 use DataMachine\Abilities\Media\GDRenderer;

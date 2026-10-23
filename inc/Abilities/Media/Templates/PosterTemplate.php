@@ -1593,18 +1593,7 @@ class PosterTemplate implements TemplateInterface {
 	 * @param int        $w    Column width.
 	 */
 	private static function fit_word_size( GDRenderer $r, string $text, int $size, string $font, int $w ): int {
-		$words = preg_split( '/\s+/', trim( $text ) );
-		while ( $size > 12 ) {
-			$widest = 0;
-			foreach ( (array) $words as $word ) {
-				$widest = max( $widest, $r->measure_text_width( (string) $word, $size, $font ) );
-			}
-			if ( $widest <= $w ) {
-				break;
-			}
-			--$size;
-		}
-		return $size;
+		return TemplateHelpers::fit_text( $r, $text, $size, $font, $w, true, 12 );
 	}
 
 	/**
@@ -1994,19 +1983,6 @@ class PosterTemplate implements TemplateInterface {
 	 * @return string|null Readable temp PNG path the caller deletes, or null.
 	 */
 	private static function qr_image_path( string $url, int $size ): ?string {
-		if ( '' === $url ) {
-			return null;
-		}
-		/**
-		 * Resolve a QR code image for a poster.
-		 *
-		 * @param string|null $path Null by default (no QR provider).
-		 * @param string      $url  URL to encode.
-		 * @param int         $size Drawn size in pixels.
-		 * @return string|null Path to a temp PNG the template owns and deletes.
-		 */
-		// phpcs:ignore WordPress.NamingConventions.ValidHookName -- Intentional slash-separated hook namespace.
-		$path = apply_filters( 'datamachine/image_generation/qr_image_path', null, $url, $size );
-		return ( is_string( $path ) && '' !== $path && is_readable( $path ) ) ? $path : null;
+		return TemplateHelpers::qr_image_path( $url, $size );
 	}
 }
