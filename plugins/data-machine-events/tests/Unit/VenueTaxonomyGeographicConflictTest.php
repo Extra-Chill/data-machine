@@ -842,4 +842,100 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'conflict', $result['match_status'] );
 	}
+
+	/**
+	 * A street the AI step guessed must not split a venue the source named.
+	 */
+	public function test_unverified_incoming_street_does_not_conflict(): void {
+		$name = 'Rough Trade Guess ' . uniqid();
+		$id   = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '96-98 Pentonville Rd',
+				'city'    => 'London',
+				'country' => 'United Kingdom',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address'                             => '310 Uxbridge Rd',
+				'city'                                => 'London',
+				'country'                             => 'United Kingdom',
+				Venue_Taxonomy::UNVERIFIED_FIELDS_KEY => array( 'address' ),
+			)
+		);
+
+		$this->assertSame( 'matched', $result['match_status'] );
+		$this->assertSame( $id, $result['term_id'] );
+	}
+
+	/**
+	 * A source-supplied different street still conflicts (#806).
+	 */
+	public function test_verified_incoming_street_still_conflicts(): void {
+		$name = 'Verified Street Venue ' . uniqid();
+		$this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '96-98 Pentonville Rd',
+				'city'    => 'London',
+				'country' => 'United Kingdom',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			$name,
+			array(
+				'address'                             => '310 Uxbridge Rd',
+				'city'                                => 'London',
+				'country'                             => 'United Kingdom',
+				Venue_Taxonomy::UNVERIFIED_FIELDS_KEY => array( 'city' ),
+			)
+		);
+
+		$this->assertSame( 'conflict', $result['match_status'] );
+	}
+
+	/**
+	 * A guessed street must not attach the event to whichever venue owns it.
+	 */
+	public function test_unverified_street_does_not_match_another_venue_by_address(): void {
+		$suffix = uniqid();
+		$owner  = $this->create_venue_with_meta(
+			'Morocco Bound Guess ' . $suffix,
+			array(
+				'address' => '310 Uxbridge Rd',
+				'city'    => 'London',
+			)
+		);
+
+		$result = Venue_Taxonomy::resolve_venue_identity(
+			'Colours Guess ' . $suffix,
+			array(
+				'address'                             => '310 Uxbridge Rd',
+				'city'                                => 'London',
+				Venue_Taxonomy::UNVERIFIED_FIELDS_KEY => array( 'address' ),
+			)
+		);
+
+		$this->assertNotSame( $owner, $result['term_id'] );
+		$this->assertNotSame( 'address', $result['matched_via'] );
+	}
+
+	public function test_find_or_create_never_stores_unverified_fields_key(): void {
+		$result = Venue_Taxonomy::find_or_create_venue(
+			'Unverified Key Venue ' . uniqid(),
+			array(
+				'address'                             => '1 Test Street',
+				'city'                                => 'London',
+				Venue_Taxonomy::UNVERIFIED_FIELDS_KEY => array( 'address' ),
+			)
+		);
+
+		$this->assertNotEmpty( $result['term_id'] );
+		$this->assertSame( '', get_term_meta( (int) $result['term_id'], Venue_Taxonomy::UNVERIFIED_FIELDS_KEY, true ) );
+		$this->assertSame( '1 Test Street', get_term_meta( (int) $result['term_id'], '_venue_address', true ) );
+	}
 }

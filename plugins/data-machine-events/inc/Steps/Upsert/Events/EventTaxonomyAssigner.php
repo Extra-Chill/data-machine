@@ -133,6 +133,7 @@ class EventTaxonomyAssigner {
 		$merged_params  = VenueParameterProvider::mergeEngineOverParameters( $parameters, $engine->all() );
 		$venue_metadata = VenueParameterProvider::extractFromParameters( $merged_params );
 		$venue_metadata = $this->withVenueSourceIdentity( $venue_metadata, $engine );
+		$venue_metadata = $this->withUnverifiedLocationFields( $venue_metadata, $engine );
 
 		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata, array( 'post_id' => $post_id ) );
 
@@ -277,6 +278,48 @@ class EventTaxonomyAssigner {
 	}
 
 	/**
+	 * Flag location fields the import source did not supply.
+	 *
+	 * A structured feed that omits a venue's street (Dice.fm sends none for
+	 * many London rooms) leaves the AI step free to fill venueAddress, and it
+	 * guesses: one invented street ended up on Rough Trade East, Colours
+	 * Hoxton and Morocco Bound at once. A guessed street must not split a
+	 * venue on a "different street" conflict, nor attach an event to another
+	 * venue that happens to own that street. A value is source-verified only
+	 * when it equals what the import's engine data carried.
+	 *
+	 * @param array      $venue_metadata Venue metadata for find_or_create_venue().
+	 * @param EngineData $engine         Engine data.
+	 * @return array
+	 */
+	private function withUnverifiedLocationFields( array $venue_metadata, EngineData $engine ): array {
+		$fields = array(
+			'address' => 'venueAddress',
+			'city'    => 'venueCity',
+			'state'   => 'venueState',
+			'country' => 'venueCountry',
+		);
+
+		$unverified = array();
+		foreach ( $fields as $field => $engine_key ) {
+			$value = trim( html_entity_decode( (string) ( $venue_metadata[ $field ] ?? '' ), ENT_QUOTES ) );
+			if ( '' === $value ) {
+				continue;
+			}
+			$source_value = trim( html_entity_decode( (string) ( $engine->get( $engine_key ) ?? '' ), ENT_QUOTES ) );
+			if ( $value !== $source_value ) {
+				$unverified[] = $field;
+			}
+		}
+
+		if ( ! empty( $unverified ) ) {
+			$venue_metadata[ Venue_Taxonomy::UNVERIFIED_FIELDS_KEY ] = $unverified;
+		}
+
+		return $venue_metadata;
+	}
+
+	/**
 	 * Custom taxonomy handler for venue
 	 *
 	 * @param int $post_id Post ID
@@ -327,6 +370,7 @@ class EventTaxonomyAssigner {
 			'capacity'      => $this->getParameterValue( $parameters, 'venueCapacity' ) ?: ( $engine->get( 'venueCapacity' ) ?? '' ),
 		);
 		$venue_metadata = $this->withVenueSourceIdentity( $venue_metadata, $engine );
+		$venue_metadata = $this->withUnverifiedLocationFields( $venue_metadata, $engine );
 
 		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata, array( 'post_id' => $post_id ) );
 

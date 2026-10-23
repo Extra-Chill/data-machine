@@ -23,6 +23,15 @@ class Venue_Taxonomy {
 	public const TIER_META_KEY = '_venue_tier';
 
 	/**
+	 * Venue-data key listing location fields the import source did not supply.
+	 *
+	 * Values under these fields came from the AI step, not the source feed,
+	 * so they are not evidence for matching a venue by street or for
+	 * splitting a same-name venue on a geographic conflict. Never stored.
+	 */
+	public const UNVERIFIED_FIELDS_KEY = 'unverified_fields';
+
+	/**
 	 * Default closed vocabulary for venue tiers, slug => label.
 	 *
 	 * Generic room classifications only — site-specific tier definitions are
@@ -638,6 +647,7 @@ class Venue_Taxonomy {
 
 		$identity   = self::resolve_venue_identity( $venue_name, $venue_data );
 		$venue_name = $identity['venue_name'];
+		unset( $venue_data[ self::UNVERIFIED_FIELDS_KEY ] );
 
 		if ( $identity['term'] ) {
 			$term_id = $identity['term_id'];
@@ -921,7 +931,7 @@ class Venue_Taxonomy {
 		}
 
 		$address_match = self::find_venue_by_address(
-			$venue_data['address'] ?? '',
+			self::is_unverified_field( $venue_data, 'address' ) ? '' : ( $venue_data['address'] ?? '' ),
 			$venue_data['city'] ?? '',
 			$venue_data['state'] ?? '',
 			$venue_data['country'] ?? ''
@@ -1344,6 +1354,12 @@ class Venue_Taxonomy {
 	 * @return bool
 	 */
 	private static function has_positive_location_evidence( int $term_id, array $venue_data ): bool {
+		foreach ( array( 'address', 'city' ) as $field ) {
+			if ( self::is_unverified_field( $venue_data, $field ) ) {
+				$venue_data[ $field ] = '';
+			}
+		}
+
 		$incoming_city = trim( (string) ( $venue_data['city'] ?? '' ) );
 		$stored_city   = trim( (string) get_term_meta( $term_id, self::$meta_fields['city'], true ) );
 
@@ -1362,6 +1378,19 @@ class Venue_Taxonomy {
 	}
 
 	/**
+	 * Whether a venue-data field was supplied by the AI step, not the source.
+	 *
+	 * @param array  $venue_data Incoming venue metadata.
+	 * @param string $field      Venue field (address, city, state, country).
+	 * @return bool
+	 */
+	private static function is_unverified_field( array $venue_data, string $field ): bool {
+		$unverified = $venue_data[ self::UNVERIFIED_FIELDS_KEY ] ?? array();
+
+		return is_array( $unverified ) && in_array( $field, $unverified, true );
+	}
+
+	/**
 	 * Determine whether supplied geography contradicts stored venue evidence.
 	 *
 	 * Missing values on either side are incomplete evidence, not a conflict.
@@ -1376,7 +1405,8 @@ class Venue_Taxonomy {
 	 */
 	private static function has_geographic_conflict( int $term_id, array $venue_data ): bool {
 		foreach ( array( 'address', 'city', 'state', 'country' ) as $field ) {
-			$incoming = $venue_data[ $field ] ?? '';
+			// A value the source never supplied is a guess, not evidence.
+			$incoming = self::is_unverified_field( $venue_data, $field ) ? '' : ( $venue_data[ $field ] ?? '' );
 			$stored   = get_term_meta( $term_id, self::$meta_fields[ $field ], true );
 
 			if ( '' === trim( (string) $incoming ) || '' === trim( (string) $stored ) ) {

@@ -209,6 +209,51 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		wp_delete_term( $term_id, 'venue' );
 	}
 
+	/**
+	 * An AI-guessed street must not split a venue the feed named (Dice.fm).
+	 */
+	public function test_process_venue_ai_guessed_street_reuses_named_venue(): void {
+		$venue_name = 'Dice Guess Venue ' . uniqid();
+		$existing   = wp_insert_term( $venue_name, 'venue' );
+		$this->assertNotWPError( $existing );
+		$existing_id = (int) $existing['term_id'];
+		update_term_meta( $existing_id, '_venue_address', '96-98 Pentonville Rd' );
+		update_term_meta( $existing_id, '_venue_city', 'London' );
+		update_term_meta( $existing_id, '_venue_country', 'United Kingdom' );
+
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Dice Guess Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$engine     = new \DataMachine\Core\EngineData(
+			array(
+				'venue'        => $venue_name,
+				'venueAddress' => '',
+				'venueCity'    => 'London',
+				'venueCountry' => 'United Kingdom',
+			),
+			0
+		);
+		$parameters = array(
+			'venue'        => $venue_name,
+			'venueAddress' => '310 Uxbridge Rd',
+		);
+
+		$result = $this->assigner->processVenue( $post_id, $parameters, $engine );
+		$this->assertTrue( $result['success'] );
+
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertCount( 1, $terms );
+		$this->assertSame( $existing_id, (int) $terms[0]->term_id, 'A guessed street must not create a second venue.' );
+		$this->assertSame( '96-98 Pentonville Rd', get_term_meta( $existing_id, '_venue_address', true ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $existing_id, 'venue' );
+	}
+
 	public function test_lofi_eventbrite_url_cannot_replace_canonical_official_website(): void {
 		$source_url = 'https://www.eventbrite.com/o/lo-fi-brewing-14959647606';
 		$ticket_url = 'https://www.eventbrite.com/e/lo-fi-test-event-123';
