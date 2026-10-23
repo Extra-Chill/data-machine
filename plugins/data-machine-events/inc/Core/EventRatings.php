@@ -502,10 +502,21 @@ class EventRatings {
 	 * @return array
 	 */
 	public static function filter_form_defaults( $defaults ) {
-		if ( self::form_offers_rating( self::current_event_id() ) ) {
+		$post_id = self::current_event_id();
+		if ( self::form_offers_rating( $post_id ) ) {
 			$defaults['title_reply'] = __( 'Rate this show', 'data-machine-events' );
+		} elseif ( self::has_rated( get_current_user_id(), $post_id ) ) {
+			// The rating is posted; the form is now for follow-up comments.
+			$defaults['title_reply'] = __( 'Add a comment', 'data-machine-events' );
 		}
 		return $defaults;
+	}
+
+	/**
+	 * Whether the user has already reviewed a rateable event.
+	 */
+	private static function has_rated( int $user_id, int $post_id ): bool {
+		return $post_id > 0 && $user_id > 0 && self::is_rateable_event( $post_id ) && null !== self::get_user_review( $user_id, $post_id );
 	}
 
 	/**

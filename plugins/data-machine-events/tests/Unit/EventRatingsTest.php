@@ -405,6 +405,8 @@ class EventRatingsTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Rate this show', $this->renderFormFor( $this->user_a, $event ) );
 
 		EventRatings::rate( $this->user_a, $event, 4 );
-		$this->assertStringNotContainsString( 'Rate this show', $this->renderFormFor( $this->user_a, $event ) );
+		$after = $this->renderFormFor( $this->user_a, $event );
+		$this->assertStringNotContainsString( 'Rate this show', $after );
+		$this->assertStringContainsString( 'Add a comment', $after );
 	}
 }
