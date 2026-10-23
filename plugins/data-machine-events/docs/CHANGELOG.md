@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.73.4] - 2026-10-23
+
+### Fixed
+- optional review text and Post Rating label on first review
+
 ## [0.73.3] - 2026-10-23
 
 ### Fixed
