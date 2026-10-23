@@ -399,4 +399,12 @@ class EventRatingsTest extends WP_UnitTestCase {
 		$this->assertMatchesRegularExpression( '/<textarea[^>]*\srequired/', $followup );
 		$this->assertStringNotContainsString( 'value="Post Rating"', $followup );
 	}
+
+	public function test_first_review_form_is_titled_rate_this_show(): void {
+		$event = $this->pastEvent();
+		$this->assertStringContainsString( 'Rate this show', $this->renderFormFor( $this->user_a, $event ) );
+
+		EventRatings::rate( $this->user_a, $event, 4 );
+		$this->assertStringNotContainsString( 'Rate this show', $this->renderFormFor( $this->user_a, $event ) );
+	}
 }

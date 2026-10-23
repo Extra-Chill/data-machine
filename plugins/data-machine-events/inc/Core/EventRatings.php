@@ -59,6 +59,7 @@ class EventRatings {
 		add_filter( 'comment_form_field_comment', array( self::class, 'filter_review_field' ), 9 );
 		add_filter( 'comment_form_field_comment', array( self::class, 'filter_form_field' ) );
 		add_filter( 'comment_form_submit_button', array( self::class, 'filter_submit_button' ), 9 );
+		add_filter( 'comment_form_defaults', array( self::class, 'filter_form_defaults' ), 20 );
 		add_filter( 'comment_form_submit_field', array( self::class, 'filter_form_field' ) );
 		add_filter( 'comment_form_logged_in', array( self::class, 'filter_logged_in_notice' ) );
 		add_filter( 'comment_text', array( self::class, 'filter_comment_text' ), 5, 2 );
@@ -494,6 +495,20 @@ class EventRatings {
 	}
 
 	/**
+	 * Retitle the form on a first review. Applies when the theme supplies
+	 * the heading as a default rather than a comment_form() argument.
+	 *
+	 * @param array $defaults Comment form defaults.
+	 * @return array
+	 */
+	public static function filter_form_defaults( $defaults ) {
+		if ( self::form_offers_rating( self::current_event_id() ) ) {
+			$defaults['title_reply'] = __( 'Rate this show', 'data-machine-events' );
+		}
+		return $defaults;
+	}
+
+	/**
 	 * Label the submit button for what it does on a first review.
 	 */
 	public static function filter_submit_button( $button ) {
@@ -581,7 +596,7 @@ class EventRatings {
 			return;
 		}
 
-		$field = '<fieldset class="dme-rating-field"><legend>' . esc_html__( 'Rate this show', 'data-machine-events' ) . '</legend><div class="dme-rating-options">';
+		$field = '<fieldset class="dme-rating-field"><legend>' . esc_html__( 'Your rating', 'data-machine-events' ) . '</legend><div class="dme-rating-options">';
 		for ( $i = self::MAX_RATING; $i >= self::MIN_RATING; $i-- ) {
 			$field .= sprintf(
 				'<input type="radio" id="dme-rating-%1$d" name="%2$s" value="%1$d"><label for="dme-rating-%1$d" title="%3$s">★</label>',
