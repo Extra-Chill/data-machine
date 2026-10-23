@@ -119,4 +119,60 @@ class GeocodeRegionCheckTest extends WP_UnitTestCase {
 		$this->http_filters[] = $filter;
 		add_filter( 'pre_http_request', $filter, 10, 3 );
 	}
+
+	/**
+	 * Build geocode queries for venue data through the private builder.
+	 *
+	 * @param array $venue_data Venue data.
+	 * @return array<string, string>
+	 */
+	private function queries_for( array $venue_data ): array {
+		$method = new \ReflectionMethod( Venue_Taxonomy::class, 'build_geocode_queries' );
+		$method->setAccessible( true );
+		return $method->invoke( null, $venue_data );
+	}
+
+	public function test_street_containing_unit_word_is_not_truncated(): void {
+		$queries = $this->queries_for(
+			array(
+				'address' => '2548 North Halsted',
+				'city'    => 'Chicago',
+				'state'   => 'IL',
+			)
+		);
+		$this->assertSame( '2548 North Halsted, Chicago, IL', $queries['cleaned_address'] );
+
+		$queries = $this->queries_for(
+			array(
+				'address' => '3010 Minnehaha Ave STE 420',
+				'city'    => 'Minneapolis',
+				'state'   => 'MN',
+			)
+		);
+		$this->assertSame( '3010 Minnehaha Ave, Minneapolis, MN', $queries['cleaned_address'] );
+
+		$queries = $this->queries_for(
+			array(
+				'address' => '100 Main St #4',
+				'city'    => 'Austin',
+				'state'   => 'TX',
+			)
+		);
+		$this->assertSame( '100 Main St, Austin, TX', $queries['cleaned_address'] );
+	}
+
+	public function test_spelled_ordinals_become_numeric_in_queries(): void {
+		$queries = $this->queries_for(
+			array(
+				'address' => '1200 West Third Avenue',
+				'city'    => 'Columbus',
+				'state'   => 'OH',
+			)
+		);
+		$this->assertSame( '1200 West 3rd Avenue, Columbus, OH', $queries['cleaned_address'] );
+
+		$this->assertSame( '454 6th Ave', Venue_Taxonomy::numeric_street_ordinals( '454 Sixth Ave' ) );
+		$this->assertSame( '2500 East 2nd Street', Venue_Taxonomy::numeric_street_ordinals( '2500 East Second Street' ) );
+		$this->assertSame( '12 Third Man Records Way', Venue_Taxonomy::numeric_street_ordinals( '12 Third Man Records Way' ) );
+	}
 }

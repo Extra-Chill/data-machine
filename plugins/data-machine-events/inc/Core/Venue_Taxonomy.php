@@ -2174,6 +2174,27 @@ class Venue_Taxonomy {
 	 * @param array $venue_data Venue data with address fields
 	 * @return array Ordered queries keyed by strategy name
 	 */
+	/**
+	 * Replace spelled-out ordinals in a street with numeric ones.
+	 *
+	 * Only a word directly before a street-type word is converted, so names
+	 * such as "Third Man Records Way" keep their spelling.
+	 *
+	 * @param string $street Street portion of an address.
+	 * @return string
+	 */
+	public static function numeric_street_ordinals( string $street ): string {
+		$words = implode( '|', array_keys( self::ORDINAL_ALIASES ) );
+
+		$result = preg_replace_callback(
+			'/\b(' . $words . ')(\s+)(st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|pl|place|way|ct|court|pkwy|parkway|ter|terrace)\b/i',
+			static fn( array $m ): string => self::ORDINAL_ALIASES[ strtolower( $m[1] ) ] . $m[2] . $m[3],
+			$street
+		);
+
+		return is_string( $result ) ? $result : $street;
+	}
+
 	private static function build_geocode_queries( array $venue_data ): array {
 		$address = html_entity_decode( trim( (string) ( $venue_data['address'] ?? '' ) ) );
 		$city    = html_entity_decode( trim( (string) ( $venue_data['city'] ?? '' ) ) );
@@ -2200,10 +2221,19 @@ class Venue_Taxonomy {
 		}
 
 		// Strip suite/unit/apartment suffixes that confuse Nominatim
-		$street = preg_replace( '/,?\s*(?:Suite|Ste|Unit|Apt|#|Room|Rm)\s*[\w\-#]+.*/i', '', $street );
+		// Word-bounded so street names that contain a unit word ("North
+		// Halsted" holds "ste") are not truncated to "North Hal".
+		$street = preg_replace( '/,?\s*(?:\b(?:Suite|Ste|Unit|Apt|Room|Rm)\b\.?|#)\s*[\w\-#]+.*/i', '', $street );
 		// Strip "Located in: ..." annotations
 		$street = preg_replace( '/,?\s*Located in:.*$/i', '', $street );
 		$street = trim( $street, ', ' );
+
+		// Nominatim indexes numbered streets as "3rd", not "Third": the
+		// spelled form misses ("1200 West Third Avenue", Columbus) or lands
+		// in another town ("454 Sixth Ave" resolved to Escondido for a San
+		// Diego venue). Query with numeric ordinals; the spelled form is
+		// never tried first.
+		$street = self::numeric_street_ordinals( $street );
 
 		// Strategy 1: Cleaned street + city + state + zip
 		if ( ! empty( $street ) && ! empty( $city ) ) {
