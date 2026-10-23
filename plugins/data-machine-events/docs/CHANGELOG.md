@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.73.3] - 2026-10-23
+
+### Fixed
+- word-bound unit strip and numeric street ordinals
+
 ## [0.73.2] - 2026-10-23
 
 ### Fixed
