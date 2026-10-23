@@ -39,6 +39,8 @@ class EventRatings {
 	public const MIN_RATING   = 1;
 	public const MAX_RATING   = 5;
 	public const FORM_FIELD   = 'dme_rating';
+	public const FORM_SCRIPT  = 'data-machine-events-rating-form';
+	public const UNLOCK_EVENT = 'dme:rating-eligibility';
 
 	private static bool $registered = false;
 
@@ -60,6 +62,9 @@ class EventRatings {
 		add_filter( 'comment_text', array( self::class, 'filter_comment_text' ), 5, 2 );
 
 		add_action( 'data_machine_events_action_buttons', array( self::class, 'render_summary_action' ), 5, 3 );
+
+		add_action( 'data_machine_events_rating_updated', array( self::class, 'invalidate_listing_caches' ), 10, 0 );
+		add_action( 'wp_enqueue_scripts', array( self::class, 'register_form_script' ) );
 
 		add_action( 'wp_insert_comment', array( self::class, 'on_comment_change' ), 10, 2 );
 		add_action( 'transition_comment_status', array( self::class, 'on_comment_transition' ), 10, 3 );
@@ -440,27 +445,69 @@ class EventRatings {
 	}
 
 	/**
-	 * Hide the textarea and submit button from users who may not rate.
+	 * Whether the current form is being shown to a logged-in user who may not
+	 * rate yet. The form still renders, locked, so a front-end change in
+	 * eligibility (see UNLOCK_EVENT) can reveal it without a reload. The
+	 * server re-checks can_rate() on every submission.
 	 */
-	public static function filter_form_field( $field ) {
-		$post_id = self::current_event_id();
-		if ( $post_id && ! self::can_rate( get_current_user_id(), $post_id ) ) {
-			return '';
-		}
-		return $field;
+	private static function form_is_locked( int $post_id ): bool {
+		$user_id = get_current_user_id();
+		return $post_id > 0 && $user_id > 0 && self::is_rateable_event( $post_id ) && ! self::can_rate( $user_id, $post_id );
 	}
 
 	/**
-	 * Replace the "Logged in as" notice with the gate message for users who
-	 * may not rate.
+	 * Wrap the textarea and submit button in a hidden, unlockable container
+	 * for users who may not rate yet.
+	 */
+	public static function filter_form_field( $field ) {
+		$post_id = self::current_event_id();
+		if ( ! self::form_is_locked( $post_id ) ) {
+			return $field;
+		}
+		return self::locked_wrap( (string) $field );
+	}
+
+	/**
+	 * Add the gate message for users who may not rate. It hides again when
+	 * the form unlocks.
 	 */
 	public static function filter_logged_in_notice( $html ) {
 		$post_id = self::current_event_id();
-		$user_id = get_current_user_id();
-		if ( $post_id && ! self::can_rate( $user_id, $post_id ) ) {
-			return '<p class="dme-rating-gate">' . esc_html( self::gate_message( $user_id, $post_id ) ) . '</p>';
+		if ( ! self::form_is_locked( $post_id ) ) {
+			return $html;
 		}
-		return $html;
+
+		self::enqueue_form_script();
+		return sprintf(
+			'<p class="dme-rating-gate" data-dme-rating-gate="%d">%s</p>',
+			(int) $post_id,
+			esc_html( self::gate_message( get_current_user_id(), $post_id ) )
+		);
+	}
+
+	private static function locked_wrap( string $html ): string {
+		return sprintf(
+			'<div class="dme-rating-locked" data-dme-rating-locked="%d" hidden>%s</div>',
+			(int) self::current_event_id(),
+			$html
+		);
+	}
+
+	public static function register_form_script(): void {
+		wp_register_script(
+			self::FORM_SCRIPT,
+			DATA_MACHINE_EVENTS_PLUGIN_URL . 'assets/js/rating-form.js',
+			array(),
+			(string) filemtime( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'assets/js/rating-form.js' ),
+			true
+		);
+	}
+
+	private static function enqueue_form_script(): void {
+		if ( ! wp_script_is( self::FORM_SCRIPT, 'registered' ) ) {
+			self::register_form_script();
+		}
+		wp_enqueue_script( self::FORM_SCRIPT );
 	}
 
 	/**
@@ -469,11 +516,12 @@ class EventRatings {
 	public static function render_rating_field(): void {
 		$post_id = self::current_event_id();
 		$user_id = get_current_user_id();
-		if ( ! $post_id || ! self::can_rate( $user_id, $post_id ) ) {
+		if ( ! $post_id || ! self::is_rateable_event( $post_id ) ) {
 			return;
 		}
 
-		$existing = self::get_user_review( $user_id, $post_id );
+		$locked   = ! self::can_rate( $user_id, $post_id );
+		$existing = $locked ? null : self::get_user_review( $user_id, $post_id );
 		if ( $existing ) {
 			$rating = self::get_comment_rating( (int) $existing->comment_ID );
 			printf(
@@ -484,9 +532,9 @@ class EventRatings {
 			return;
 		}
 
-		echo '<fieldset class="dme-rating-field"><legend>' . esc_html__( 'Rate this show', 'data-machine-events' ) . '</legend><div class="dme-rating-options">';
+		$field = '<fieldset class="dme-rating-field"><legend>' . esc_html__( 'Rate this show', 'data-machine-events' ) . '</legend><div class="dme-rating-options">';
 		for ( $i = self::MAX_RATING; $i >= self::MIN_RATING; $i-- ) {
-			printf(
+			$field .= sprintf(
 				'<input type="radio" id="dme-rating-%1$d" name="%2$s" value="%1$d"><label for="dme-rating-%1$d" title="%3$s">★</label>',
 				(int) $i,
 				esc_attr( self::FORM_FIELD ),
@@ -494,7 +542,9 @@ class EventRatings {
 				esc_attr( sprintf( _n( '%d star', '%d stars', $i, 'data-machine-events' ), $i ) )
 			);
 		}
-		echo '</div></fieldset>';
+		$field .= '</div></fieldset>';
+
+		echo $locked ? self::locked_wrap( $field ) : $field; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built from escaped parts above.
 	}
 
 	/**
@@ -552,6 +602,85 @@ class EventRatings {
 			esc_html( $average ),
 			esc_html( $count )
 		);
+	}
+
+	/**
+	 * Compact rating badge for event listings (calendar rows on artist,
+	 * venue and city archives). Empty when the event has no ratings.
+	 */
+	public static function render_listing_badge( int $post_id ): string {
+		$summary = self::get_summary( $post_id );
+		if ( $summary['count'] <= 0 ) {
+			return '';
+		}
+
+		$average = number_format_i18n( $summary['average'], 1 );
+		$label   = sprintf(
+			/* translators: 1: average rating, 2: number of ratings. */
+			_n( 'Rated %1$s out of 5 by %2$s person', 'Rated %1$s out of 5 by %2$s people', $summary['count'], 'data-machine-events' ),
+			$average,
+			number_format_i18n( $summary['count'] )
+		);
+
+		return sprintf(
+			'<div class="dme-rating-badge" role="img" aria-label="%1$s"><span class="dme-stars" aria-hidden="true">★</span> <strong aria-hidden="true">%2$s</strong> <span class="dme-rating-badge-count" aria-hidden="true">(%3$s)</span></div>',
+			esc_attr( $label ),
+			esc_html( $average ),
+			esc_html( number_format_i18n( $summary['count'] ) )
+		);
+	}
+
+	/**
+	 * A user's own ratings for a set of events, keyed by event ID. Includes
+	 * pending reviews so the user sees what they submitted.
+	 *
+	 * @param int   $user_id   User ID.
+	 * @param int[] $event_ids Event post IDs.
+	 * @return array<int,int> event_id => rating.
+	 */
+	public static function get_user_ratings( int $user_id, array $event_ids ): array {
+		$event_ids = array_values( array_filter( array_unique( array_map( 'intval', $event_ids ) ) ) );
+		if ( $user_id <= 0 || empty( $event_ids ) ) {
+			return array();
+		}
+
+		$comments = get_comments(
+			array(
+				'post__in' => $event_ids,
+				'user_id'  => $user_id,
+				'type'     => self::COMMENT_TYPE,
+				'status'   => 'all',
+				'parent'   => 0,
+				'orderby'  => 'comment_ID',
+				'order'    => 'ASC',
+			)
+		);
+
+		$ratings = array();
+		foreach ( (array) $comments as $comment ) {
+			if ( ! $comment instanceof \WP_Comment || 'trash' === $comment->comment_approved || 'spam' === $comment->comment_approved ) {
+				continue;
+			}
+			$event_id = (int) $comment->comment_post_ID;
+			if ( isset( $ratings[ $event_id ] ) ) {
+				continue;
+			}
+			$rating = self::get_comment_rating( (int) $comment->comment_ID );
+			if ( $rating > 0 ) {
+				$ratings[ $event_id ] = $rating;
+			}
+		}
+		return $ratings;
+	}
+
+	/**
+	 * Calendar listings embed rating badges, so a rating change must rotate
+	 * their cache generation.
+	 */
+	public static function invalidate_listing_caches(): void {
+		if ( class_exists( \DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator::class ) ) {
+			\DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator::invalidate_all();
+		}
 	}
 
 	/* ------------------------------------------------------------------

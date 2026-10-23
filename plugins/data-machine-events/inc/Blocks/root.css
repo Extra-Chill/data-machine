@@ -255,3 +255,13 @@
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
+
+.dme-rating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+}
+
+.dme-rating-badge-count {
+  opacity: 0.7;
+}

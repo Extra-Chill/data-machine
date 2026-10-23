@@ -77,6 +77,8 @@ if ( $is_affiliate_ticket ) {
 				</div>
 			<?php endif; ?>
 
+			<?php echo \DataMachineEvents\Core\EventRatings::render_listing_badge( (int) $event_post->ID ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in render_listing_badge(). ?>
+
 			<?php if ( $show_performer && ! empty( $performer_name ) ) : ?>
 				<div class="data-machine-event-performer">
 					<span class="dashicons dashicons-admin-users"></span>

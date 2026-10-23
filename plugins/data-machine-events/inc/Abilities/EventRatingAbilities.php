@@ -155,6 +155,50 @@ class EventRatingAbilities {
 					),
 				)
 			);
+
+			wp_register_ability(
+				'data-machine-events/get-my-event-ratings',
+				array(
+					'label'               => __( 'Get My Event Ratings', 'data-machine-events' ),
+					'description'         => __( 'Return the current user\'s own ratings for a batch of events, keyed by event ID. Unrated events are omitted.', 'data-machine-events' ),
+					'category'            => 'datamachine-events-events',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'event_ids' ),
+						'properties' => array(
+							'event_ids' => array(
+								'type'     => 'array',
+								'items'    => array(
+									'type'    => 'integer',
+									'minimum' => 1,
+								),
+								'maxItems' => 100,
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'ratings' => array(
+								'type'                 => 'object',
+								'additionalProperties' => array( 'type' => 'integer' ),
+							),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeGetMine' ),
+					'permission_callback' => static function () {
+						return is_user_logged_in();
+					},
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'    => true,
+							'destructive' => false,
+							'idempotent'  => true,
+						),
+					),
+				)
+			);
 		};
 
 		add_action( 'wp_abilities_api_init', $register_callback );
@@ -191,5 +235,22 @@ class EventRatingAbilities {
 			'reviews'     => EventRatings::get_reviews( $event_id, (int) ( $input['limit'] ?? 50 ), (int) ( $input['offset'] ?? 0 ) ),
 			'user_review' => $user_review ? EventRatings::format_review( $user_review ) : null,
 		);
+	}
+
+	/**
+	 * @param array $input Input.
+	 * @return array{ratings: array<int|string,int>|\stdClass}
+	 */
+	public function executeGetMine( array $input ): array {
+		$ids     = array_slice( (array) ( $input['event_ids'] ?? array() ), 0, 100 );
+		$ratings = EventRatings::get_user_ratings( get_current_user_id(), $ids );
+
+		$out = array();
+		foreach ( $ratings as $event_id => $rating ) {
+			$out[ (string) $event_id ] = $rating;
+		}
+
+		// An empty map must serialize as {} for clients.
+		return array( 'ratings' => empty( $out ) ? new \stdClass() : $out );
 	}
 }

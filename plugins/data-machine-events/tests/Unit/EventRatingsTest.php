@@ -299,4 +299,89 @@ class EventRatingsTest extends WP_UnitTestCase {
 			)
 		);
 	}
+
+	private function renderFormFor( int $user_id, int $event ): string {
+		wp_set_current_user( $user_id );
+		$GLOBALS['post'] = get_post( $event );
+		setup_postdata( $GLOBALS['post'] );
+		ob_start();
+		comment_form( array(), $event );
+		$html = (string) ob_get_clean();
+		wp_reset_postdata();
+		return $html;
+	}
+
+	public function test_gated_user_gets_a_locked_form_that_can_unlock_in_place(): void {
+		$event   = $this->pastEvent();
+		$allowed = $this->user_a;
+		add_filter(
+			'data_machine_events_can_rate_event',
+			static function ( $can, $user_id ) use ( $allowed ) {
+				return $can && $user_id === $allowed;
+			},
+			10,
+			2
+		);
+
+		$locked = $this->renderFormFor( $this->user_b, $event );
+		$this->assertStringContainsString( 'data-dme-rating-gate="' . $event . '"', $locked );
+		$this->assertMatchesRegularExpression( '/data-dme-rating-locked="' . $event . '" hidden><fieldset class="dme-rating-field"/', $locked );
+		$this->assertMatchesRegularExpression( '/data-dme-rating-locked="' . $event . '" hidden>[^<]*<p class="comment-form-comment"/', $locked );
+		$this->assertTrue( wp_script_is( EventRatings::FORM_SCRIPT, 'enqueued' ) );
+
+		$open = $this->renderFormFor( $this->user_a, $event );
+		$this->assertStringNotContainsString( 'data-dme-rating-gate', $open );
+		$this->assertStringNotContainsString( 'data-dme-rating-locked', $open );
+		$this->assertStringContainsString( 'dme-rating-field', $open );
+
+		// Submission is still enforced server-side for the locked user.
+		$this->assertWPError( EventRatings::rate( $this->user_b, $event, 5 ) );
+	}
+
+	public function test_listing_badge_shows_average_and_count(): void {
+		$event = $this->pastEvent();
+		$this->assertSame( '', EventRatings::render_listing_badge( $event ) );
+
+		EventRatings::rate( $this->user_a, $event, 5 );
+		EventRatings::rate( $this->user_b, $event, 4 );
+
+		$badge = EventRatings::render_listing_badge( $event );
+		$this->assertStringContainsString( 'dme-rating-badge', $badge );
+		$this->assertStringContainsString( '<strong aria-hidden="true">4.5</strong>', $badge );
+		$this->assertStringContainsString( '(2)', $badge );
+		$this->assertStringContainsString( 'Rated 4.5 out of 5 by 2 people', $badge );
+	}
+
+	public function test_rating_change_rotates_calendar_cache_generation(): void {
+		$event  = $this->pastEvent();
+		$before = \DataMachineEvents\Blocks\Calendar\Cache\CalendarCache::get_generation();
+		EventRatings::rate( $this->user_a, $event, 3 );
+		$this->assertNotSame( $before, \DataMachineEvents\Blocks\Calendar\Cache\CalendarCache::get_generation() );
+	}
+
+	public function test_get_my_event_ratings_returns_only_the_current_users_ratings(): void {
+		$one   = $this->pastEvent();
+		$two   = $this->pastEvent();
+		$three = $this->pastEvent();
+		EventRatings::rate( $this->user_a, $one, 5 );
+		EventRatings::rate( $this->user_a, $two, 2 );
+		EventRatings::rate( $this->user_b, $three, 4 );
+
+		$ability = wp_get_ability( 'data-machine-events/get-my-event-ratings' );
+		$this->assertNotNull( $ability );
+
+		wp_set_current_user( $this->user_a );
+		$result = $ability->execute( array( 'event_ids' => array( $one, $two, $three ) ) );
+		$this->assertSame(
+			array(
+				(string) $one => 5,
+				(string) $two => 2,
+			),
+			array_map( 'intval', (array) $result['ratings'] )
+		);
+
+		wp_set_current_user( $this->user_b );
+		$empty = $ability->execute( array( 'event_ids' => array( $one ) ) );
+		$this->assertSame( '{}', wp_json_encode( $empty['ratings'] ) );
+	}
 }
