@@ -71,7 +71,7 @@ class BrandTokens {
 	 * @return mixed Callback result.
 	 */
 	public static function with_overrides( array $overrides, callable $render ) {
-		$previous = self::$render_overrides;
+		$previous               = self::$render_overrides;
 		self::$render_overrides = $overrides;
 		try {
 			return $render();
