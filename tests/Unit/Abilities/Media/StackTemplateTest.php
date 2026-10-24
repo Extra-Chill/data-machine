@@ -149,6 +149,94 @@ namespace DataMachine\Tests\Unit\Abilities\Media {
 			$this->assertSame( array(), $t->get_dropped_fields() );
 		}
 
+		public function test_string_list_items_keep_block_styles_and_measurement(): void {
+			$r = ( new GDRenderer() )->create_canvas( 1080, 1350 );
+			$t = new StackTemplate();
+			$items = array( 'First step', 'A longer second step to wrap across the available width' );
+			$box = $t->plan_layout( $r, array( 'blocks' => array( array( 'type' => 'list', 'items' => $items, 'font' => 'heading', 'color' => '#123456', 'marker_color' => '#abcdef' ) ) ) )[0];
+			$gutter = $r->measure_text_width( '2.', 32, 'heading' ) + (int) ceil( 32 * .6 );
+			$this->assertSame( $gutter, $box['gutter'] );
+			$height = 0;
+			foreach ( $items as $i => $text ) {
+				$this->assertSame( array( 'text' => $text, 'font' => 'heading', 'color' => '#123456', 'marker_color' => '#abcdef' ), $box['items'][ $i ] );
+				$height += $r->measure_text_height( $text, 32, 'heading', 952 - $gutter, 1.2 );
+			}
+			$this->assertSame( $height, $box['height'] );
+			$this->assertSame( array(), $t->get_warnings() );
+		}
+
+		public function test_list_item_colors_render_without_leaking_to_other_items(): void {
+			$r = new GDRenderer();
+			$t = new StackTemplate();
+			$data = array(
+				'background' => '#000000',
+				'brand' => array( 'colors' => array( 'accent' => '#ff0000' ) ),
+				'blocks' => array( array(
+					'type' => 'list', 'color' => '#ffffff', 'marker_color' => '#ffffff', 'size' => 64,
+					'items' => array( 'MMMM', array( 'text' => 'MMMM', 'color' => 'accent', 'marker_color' => '#00ff00', 'font' => 'heading' ), 'MMMM' ),
+				) ),
+			);
+			$paths = \DataMachine\Abilities\Media\BrandTokens::with_overrides( $data['brand'], static fn() => $t->render( $data, $r ) );
+			$this->files = array_merge( $this->files, $paths );
+			$box = $t->plan_layout( $r, $data )[0];
+			$line = (int) ( 64 * 1.2 );
+			foreach ( array( 0 => 0xffffff, 1 => 0xff0000, 2 => 0xffffff ) as $i => $expected ) {
+				$colors = array();
+				for ( $y = $box['y'] + $i * $line; $y < $box['y'] + ( $i + 1 ) * $line; ++$y ) {
+					for ( $x = $box['x'] + $box['gutter']; $x < $box['x'] + $box['width']; ++$x ) {
+						$colors[ imagecolorat( $r->get_image(), $x, $y ) & 0xffffff ] = true;
+					}
+				}
+				$this->assertArrayHasKey( $expected, $colors );
+				$this->assertArrayNotHasKey( 1 === $i ? 0xffffff : 0xff0000, $colors );
+			}
+			$green = false;
+			for ( $y = $box['y'] + $line; $y < $box['y'] + 2 * $line; ++$y ) {
+				for ( $x = $box['x']; $x < $box['x'] + $box['gutter']; ++$x ) {
+					$green = $green || 0x00ff00 === ( imagecolorat( $r->get_image(), $x, $y ) & 0xffffff );
+				}
+			}
+			$this->assertTrue( $green, 'The item marker uses its own color.' );
+		}
+
+		public function test_item_font_controls_wrapping_height_and_shared_gutter(): void {
+			$body = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+			$heading = '/usr/share/fonts/truetype/freefont/FreeMono.ttf';
+			if ( ! is_readable( $body ) || ! is_readable( $heading ) ) {
+				$this->markTestSkipped( 'Two distinct test fonts required.' );
+			}
+			$r = ( new GDRenderer() )->create_canvas( 1080, 3000 );
+			$t = new StackTemplate();
+			$text = implode( ' ', array_fill( 0, 30, 'iiiiiiii' ) );
+			$data = array(
+				'brand' => array( 'fonts' => array( 'body' => $body, 'heading' => $heading ) ),
+				'blocks' => array( array( 'type' => 'list', 'items' => array( $text, array( 'text' => $text, 'font' => 'heading' ) ) ) ),
+			);
+			$box = \DataMachine\Abilities\Media\BrandTokens::with_overrides( $data['brand'], static fn() => $t->plan_layout( $r, $data ) )[0];
+			$width = 952 - $box['gutter'];
+			$body_height = $r->measure_text_height( $text, 32, 'body', $width, 1.2 );
+			$heading_height = $r->measure_text_height( $text, 32, 'heading', $width, 1.2 );
+			$this->assertGreaterThan( $body_height, $heading_height );
+			$this->assertSame( $body_height + $heading_height, $box['height'] );
+			foreach ( array( 'body', 'heading' ) as $font ) {
+				$this->assertGreaterThanOrEqual( $r->measure_text_width( '2.', 32, $font ) + (int) ceil( 32 * .6 ), $box['gutter'] );
+			}
+			$data['blocks'][0]['items'][1] = $text;
+			$this->assertLessThan( $box['height'], \DataMachine\Abilities\Media\BrandTokens::with_overrides( $data['brand'], static fn() => $t->plan_layout( $r, $data ) )[0]['height'] );
+			$data['blocks'][0]['style'] = 'plain';
+			$this->assertSame( 0, $t->plan_layout( $r, $data )[0]['gutter'] );
+		}
+
+		public function test_invalid_list_object_reports_original_item_path(): void {
+			$t = new StackTemplate();
+			$box = $t->plan_layout( ( new GDRenderer() )->create_canvas( 1080, 1350 ), array( 'blocks' => array( array(
+				'type' => 'list', 'items' => array( 'First', array( 'color' => 'accent' ), array( 'text' => 'Last' ) ),
+			) ) ) )[0];
+			$this->assertSame( array( 'First', 'Last' ), array_column( $box['items'], 'text' ) );
+			$this->assertSame( array( 'blocks.0.items.1' ), $t->get_dropped_fields() );
+			$this->assertStringContainsString( 'blocks.0.items.1', $t->get_warnings()['blocks.0.items.1'] );
+		}
+
 		public function test_missing_image_is_reported(): void {
 			$t     = new StackTemplate();
 			$boxes = $t->plan_layout(

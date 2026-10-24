@@ -14,8 +14,9 @@
  * - qr: url, size (content-width fraction, default .5), card_color (white),
  *   quiet_modules (1..4, default 4). Provider receives final QR pixel size.
  * - row: items (text/image blocks), gap (16px); centered vertically, one line.
- * - list: items (strings), style (numbered|bullets|plain), marker_color,
- *   font, color, size (32), line_height (1.2).
+ * - list: items (strings or objects with text and optional color, font,
+ *   marker_color overrides), style (numbered|bullets|plain), marker_color,
+ *   font (heading|body|display|brand), color, size (32), line_height (1.2).
  * - divider: width (fraction or px), thickness (2), color.
  * - spacer: height (px), flex (false). Flex spacers receive spare height;
  *   otherwise spare height is distributed between blocks.
@@ -79,7 +80,7 @@ class StackTemplate implements TemplateInterface {
 				'required' => false,
 			),
 			'blocks'     => array(
-				'label'    => 'Ordered blocks; each accepts gap_before (base px). text: text/font/color/size/fit/max_size/wrap/line_height/align; image: path or attachment_id, width (fraction or px), max_height; qr: url/size (fraction)/card_color/quiet_modules; row: items (text/image), gap; list: items/style (numbered|bullets|plain)/marker_color/font/color/size; divider: width/thickness/color; spacer: height/flex. Pixels scale from 1080px. Fonts and colors accept brand tokens; colors also accept hex.',
+				'label'    => 'Ordered blocks; each accepts gap_before (base px). text: text/font/color/size/fit/max_size/wrap/line_height/align; image: path or attachment_id, width (fraction or px), max_height; qr: url/size (fraction)/card_color/quiet_modules; row: items (text/image), gap; list: items (strings or objects with text and optional color/font/marker_color overrides)/style (numbered|bullets|plain)/marker_color/font (heading|body|display|brand)/color/size; divider: width/thickness/color; spacer: height/flex. Pixels scale from 1080px. Fonts and colors accept brand tokens; colors also accept hex.',
 				'type'     => 'array',
 				'required' => true,
 			),
@@ -135,10 +136,31 @@ class StackTemplate implements TemplateInterface {
 			} else {
 				$p['style']        = $b['style'] ?? 'numbered';
 				$p['marker_color'] = $b['marker_color'] ?? 'accent';
-				$p['items']        = array_values( array_filter( (array) ( $b['items'] ?? array() ), 'is_scalar' ) );
-				$p['gutter']       = 'plain' === $p['style'] ? 0 : $r->measure_text_width( (string) count( $p['items'] ) . '.', $p['size'], $p['font'] ) + (int) ceil( $p['size'] * .6 );
+				$p['items']        = array();
+				foreach ( (array) ( $b['items'] ?? array() ) as $i => $item ) {
+					if ( is_scalar( $item ) ) {
+						$item = array( 'text' => (string) $item );
+					} elseif ( ! is_array( $item ) || ! isset( $item['text'] ) || ! is_scalar( $item['text'] ) ) {
+						$this->warn( "$key.items.$i", "$key.items.$i: list item requires scalar text; skipped." );
+						continue;
+					}
+					$p['items'][] = array(
+						'text'         => (string) $item['text'],
+						'font'         => in_array( $item['font'] ?? '', array( 'heading', 'body', 'display', 'brand' ), true ) ? $item['font'] : $p['font'],
+						'color'        => $item['color'] ?? $p['color'],
+						'marker_color' => $item['marker_color'] ?? $p['marker_color'],
+					);
+				}
+				// Reserve one shared gutter, wide enough for every item's font.
+				$p['gutter'] = 0;
+				if ( 'plain' !== $p['style'] ) {
+					$p['gutter'] = $r->measure_text_width( (string) count( $p['items'] ) . '.', $p['size'], $p['font'] ) + (int) ceil( $p['size'] * .6 );
+					foreach ( $p['items'] as $item ) {
+						$p['gutter'] = max( $p['gutter'], $r->measure_text_width( (string) count( $p['items'] ) . '.', $p['size'], $item['font'] ) + (int) ceil( $p['size'] * .6 ) );
+					}
+				}
 				foreach ( $p['items'] as $item ) {
-					$p['height'] += $r->measure_text_height( (string) $item, $p['size'], $p['font'], max( 1, $width - $p['gutter'] ), $p['line_height'] );
+					$p['height'] += $r->measure_text_height( $item['text'], $p['size'], $item['font'], max( 1, $width - $p['gutter'] ), $p['line_height'] );
 				}
 			}
 		} elseif ( 'image' === $type ) {
@@ -290,9 +312,9 @@ class StackTemplate implements TemplateInterface {
 			foreach ( $b['items'] as $i => $item ) {
 				$marker = 'numbered' === $b['style'] ? ( $i + 1 ) . '.' : ( 'bullets' === $b['style'] ? '•' : '' );
 				if ( '' !== $marker ) {
-					$r->draw_text( $marker, $b['size'], $x, $y + $b['size'], $this->color( $r, $b['marker_color'] ), $b['font'] );
+					$r->draw_text( $marker, $b['size'], $x, $y + $b['size'], $this->color( $r, $item['marker_color'] ), $item['font'] );
 				}
-				$y = $r->draw_text_wrapped( (string) $item, $b['size'], $x + $b['gutter'], $y, $this->color( $r, $b['color'] ), $b['font'], max( 1, (int) ( $b['width'] - $b['gutter'] ) ), $b['line_height'] );
+				$y = $r->draw_text_wrapped( $item['text'], $b['size'], $x + $b['gutter'], $y, $this->color( $r, $item['color'] ), $item['font'], max( 1, (int) ( $b['width'] - $b['gutter'] ) ), $b['line_height'] );
 			}
 		} elseif ( 'divider' === $b['type'] ) {
 			$r->filled_rect( $x, $y, $x + $b['width'] - 1, $y + $b['height'] - 1, $this->color( $r, $b['color'] ) );
