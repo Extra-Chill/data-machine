@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.1] - 2026-10-24
+
+### Changed
+- Embed preset DPI in rendered images with optional overrides
+- Support per-item color and font overrides in stack lists
+
 ## [0.198.0] - 2026-10-23
 
 ### Added
