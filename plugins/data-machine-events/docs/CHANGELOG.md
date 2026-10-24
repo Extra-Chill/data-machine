@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.73.8] - 2026-10-24
+
+### Fixed
+- skip sorting taxonomy archive existence queries
+
 ## [0.73.7] - 2026-10-24
 
 ### Fixed
