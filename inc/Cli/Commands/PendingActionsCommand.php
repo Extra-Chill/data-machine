@@ -19,12 +19,38 @@ defined( 'ABSPATH' ) || exit;
  */
 class PendingActionsCommand extends BaseCommand {
 
-	/** Resolve a pending action through the canonical resolver. */
+	/**
+	 * Accept a pending action through the canonical resolver.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <action_id>
+	 * : Pending action ID.
+	 *
+	 * [--operator-wide]
+	 * : Resolve outside the current caller scope (requires manage permissions).
+	 *
+	 * [--format=<format>]
+	 * : Output format. Use json to include the resolver result.
+	 */
 	public function accept( array $args, array $assoc_args ): void {
 		$this->resolve( $args, $assoc_args, 'accepted' );
 	}
 
-	/** Resolve a pending action through the canonical resolver. */
+	/**
+	 * Reject a pending action through the canonical resolver.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <action_id>
+	 * : Pending action ID.
+	 *
+	 * [--operator-wide]
+	 * : Resolve outside the current caller scope (requires manage permissions).
+	 *
+	 * [--format=<format>]
+	 * : Output format. Use json to include the resolver result.
+	 */
 	public function reject( array $args, array $assoc_args ): void {
 		$this->resolve( $args, $assoc_args, 'rejected' );
 	}
@@ -35,10 +61,12 @@ class PendingActionsCommand extends BaseCommand {
 			WP_CLI::error( 'action_id is required.' );
 		}
 		$result = \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::execute( array(
-			'action_id' => $action_id,
-			'decision'  => $decision,
-			'resolver'  => 'cli:' . get_current_user_id(),
-			'context'   => array( 'resolution_transport' => 'cli' ),
+			'action_id'     => $action_id,
+			'decision'      => $decision,
+			// WP-CLI --user is a human resolver; retain CLI transport for auditing.
+			'resolver'      => 'user:' . get_current_user_id(),
+			'context'       => array( 'resolution_transport' => 'cli' ),
+			'operator_wide' => ! empty( $assoc_args['operator-wide'] ),
 		) );
 		if ( is_wp_error( $result ) ) {
 			$result = \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility::error_result( $result );
