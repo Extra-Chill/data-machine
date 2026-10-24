@@ -175,6 +175,9 @@ class ImageCommand extends BaseCommand {
 	 * [--format=<format>]
 	 * : Output image format: png or jpeg (default: png). Note: this controls the image format, not the CLI output format.
 	 *
+	 * [--dpi=<n>]
+	 * : Positive integer output DPI; overrides the platform preset resolution.
+	 *
 	 * [--pipeline_id=<id>]
 	 * : Pipeline ID for file repository storage context.
 	 *
@@ -218,6 +221,15 @@ class ImageCommand extends BaseCommand {
 			'template_id' => $template_id,
 			'data'        => $data,
 		);
+
+		if ( array_key_exists( 'dpi', $assoc_args ) ) {
+			$dpi = filter_var( $assoc_args['dpi'], FILTER_VALIDATE_INT, array( 'options' => array( 'min_range' => 1 ) ) );
+			if ( false === $dpi || is_bool( $assoc_args['dpi'] ) ) {
+				WP_CLI::error( 'Invalid --dpi: expected a positive integer.' );
+				return;
+			}
+			$input['dpi'] = $dpi;
+		}
 
 		if ( isset( $assoc_args['brand'] ) ) {
 			$brand = json_decode( $assoc_args['brand'] );

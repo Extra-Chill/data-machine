@@ -20,7 +20,7 @@ class PlatformPresets {
 	/**
 	 * Default platform dimension presets.
 	 *
-	 * @var array<string, array{width: int, height: int, label: string}>
+	 * @var array<string, array{width: int, height: int, label: string, dpi?: int}>
 	 */
 	private const PRESETS = array(
 		'instagram_feed_portrait' => array(
@@ -67,16 +67,19 @@ class PlatformPresets {
 			'width'  => 1650,
 			'height' => 2550,
 			'label'  => 'Print Tabloid (11x17 @ 150dpi)',
+			'dpi'    => 150,
 		),
 		'print_tabloid_300'       => array(
 			'width'  => 3300,
 			'height' => 5100,
 			'label'  => 'Print Tabloid (11x17 @ 300dpi)',
+			'dpi'    => 300,
 		),
 		'print_pocket_flyer'      => array(
 			'width'  => 1275,
 			'height' => 1650,
 			'label'  => 'Print Pocket Flyer (4.25x5.5 @ 300dpi, 8-up on 11x17)',
+			'dpi'    => 300,
 		),
 	);
 
@@ -84,7 +87,7 @@ class PlatformPresets {
 	 * Get a preset by name.
 	 *
 	 * @param string $name Preset name.
-	 * @return array{width: int, height: int, label: string}|null Preset data or null if not found.
+	 * @return array{width: int, height: int, label: string, dpi?: int}|null Preset data or null if not found.
 	 */
 	public static function get( string $name ): ?array {
 		$presets = self::all();
@@ -94,7 +97,7 @@ class PlatformPresets {
 	/**
 	 * Get all presets.
 	 *
-	 * @return array<string, array{width: int, height: int, label: string}>
+	 * @return array<string, array{width: int, height: int, label: string, dpi?: int}>
 	 */
 	public static function all(): array {
 		/**
