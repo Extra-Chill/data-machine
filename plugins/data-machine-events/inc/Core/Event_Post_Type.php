@@ -253,6 +253,8 @@ class Event_Post_Type {
 				$query->set( 'posts_per_page', 1 );
 				$query->set( 'fields', 'ids' );
 				$query->set( 'no_found_rows', true );
+				// Any match suffices; avoid sorting all matching events by date.
+				$query->set( 'orderby', 'none' );
 
 				// Reset paged to 1 so WordPress doesn't 404 on paginated
 				// requests. The calendar block reads the real page number

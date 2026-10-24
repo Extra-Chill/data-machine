@@ -75,7 +75,11 @@ class TaxonomyArchive404GuardTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $query->is_tax( 'venue' ) );
 		$this->assertSame( Event_Post_Type::POST_TYPE, $query->get( 'post_type' ) );
+		$this->assertSame( 1, (int) $query->get( 'posts_per_page' ) );
 		$this->assertSame( 'ids', $query->get( 'fields' ) );
+		$this->assertTrue( $query->get( 'no_found_rows' ) );
+		$this->assertSame( 'none', $query->get( 'orderby' ) );
 		$this->assertSame( 1, (int) $query->get( 'paged' ) );
+		$this->assertStringNotContainsString( 'ORDER BY', $query->request );
 	}
 }
