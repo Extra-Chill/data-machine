@@ -59,6 +59,12 @@ class GDRenderer {
 	 */
 	private int $height = 0;
 
+	/** Preset resolution for the current canvas, if specified. */
+	private ?int $preset_dpi = null;
+
+	/** Explicit resolution override, retained across canvases in batch renders. */
+	private ?int $dpi_override = null;
+
 	/**
 	 * Resolved font paths cache.
 	 *
@@ -97,7 +103,7 @@ class GDRenderer {
 	 */
 	public function create_canvas( int|string $width_or_preset, int $height = 0 ): self {
 		if ( is_string( $width_or_preset ) ) {
-			$dims = PlatformPresets::dimensions( $width_or_preset );
+			$dims = PlatformPresets::get( $width_or_preset );
 			if ( ! $dims ) {
 				do_action(
 					'datamachine_log',
@@ -106,11 +112,13 @@ class GDRenderer {
 				);
 				return $this;
 			}
-			$this->width  = $dims['width'];
-			$this->height = $dims['height'];
+			$this->width      = $dims['width'];
+			$this->height     = $dims['height'];
+			$this->preset_dpi = $dims['dpi'] ?? null;
 		} else {
-			$this->width  = $width_or_preset;
-			$this->height = $height;
+			$this->width      = $width_or_preset;
+			$this->height     = $height;
+			$this->preset_dpi = null;
 		}
 
 		$this->image  = imagecreatetruecolor( $this->width, $this->height );
@@ -120,6 +128,21 @@ class GDRenderer {
 			do_action( 'datamachine_log', 'error', 'GDRenderer: Failed to create canvas' );
 		}
 
+		return $this;
+	}
+
+	/**
+	 * Override output resolution without changing pixel dimensions.
+	 *
+	 * @param int $dpi Positive dots per inch.
+	 * @return self
+	 * @throws \InvalidArgumentException If DPI is not positive.
+	 */
+	public function set_dpi( int $dpi ): self {
+		if ( $dpi < 1 ) {
+			throw new \InvalidArgumentException( 'dpi must be a positive integer.' );
+		}
+		$this->dpi_override = $dpi;
 		return $this;
 	}
 
@@ -1299,6 +1322,11 @@ class GDRenderer {
 	public function save_temp( string $format = 'png', int $quality = -1 ): ?string {
 		if ( ! $this->image ) {
 			return null;
+		}
+
+		$dpi = $this->dpi_override ?? $this->preset_dpi;
+		if ( null !== $dpi ) {
+			imageresolution( $this->image, $dpi, $dpi );
 		}
 
 		$temp_file = tempnam( sys_get_temp_dir(), 'datamachine_img_' );

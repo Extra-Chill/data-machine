@@ -118,6 +118,11 @@ class ImageTemplateAbilities {
 						'type'        => 'string',
 						'description' => 'Platform preset override (e.g. instagram_feed_portrait)',
 					),
+					'dpi'         => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => 'Output resolution in dots per inch; overrides the preset without resizing pixels.',
+					),
 					'format'      => array(
 						'type'        => 'string',
 						'description' => 'Output format: png or jpeg',
@@ -230,6 +235,10 @@ class ImageTemplateAbilities {
 	 * @return array|\WP_Error Result with local paths and public URLs, or an error.
 	 */
 	public static function renderTemplate( array $input ): array|\WP_Error {
+		if ( array_key_exists( 'dpi', $input ) && ( ! is_int( $input['dpi'] ) || $input['dpi'] < 1 ) ) {
+			return new \WP_Error( 'invalid_dpi', 'dpi must be a positive integer.', array( 'status' => 400 ) );
+		}
+
 		$template_id = $input['template_id'] ?? '';
 		$data        = $input['data'] ?? array();
 		$preset      = $input['preset'] ?? '';
@@ -281,7 +290,10 @@ class ImageTemplateAbilities {
 		}
 
 		$renderer = new GDRenderer();
-		$options  = array(
+		if ( isset( $input['dpi'] ) ) {
+			$renderer->set_dpi( $input['dpi'] );
+		}
+		$options = array(
 			'format' => $format,
 		);
 
