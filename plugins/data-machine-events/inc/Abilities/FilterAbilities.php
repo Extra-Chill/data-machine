@@ -30,6 +30,9 @@ class FilterAbilities {
 	private static bool $registered          = false;
 	private bool $grouped_term_counts_failed = false;
 
+	/** Matched-ID chunk size for fallback term counting. */
+	private const FALLBACK_CHUNK_SIZE = 1000;
+
 	public function __construct() {
 		if ( ! self::$registered ) {
 			$this->registerAbilities();
@@ -455,13 +458,89 @@ class FilterAbilities {
 			return $counts;
 		}
 
-		$terms = wp_get_object_terms( $post_ids, $taxonomy_slug, array( 'fields' => 'all_with_object_id' ) );
-		if ( is_wp_error( $terms ) ) {
-			return $counts;
+		if ( ! $this->grouped_term_counts_failed && ! $this->has_unsupported_term_customization( array( $taxonomy_slug ) ) ) {
+			$direct = $this->count_assignments_for_ids( $post_ids, $taxonomy_slug );
+			if ( is_array( $direct ) ) {
+				return $direct;
+			}
 		}
-		foreach ( $terms as $term ) {
-			$term_id            = (int) $term->term_id;
-			$counts[ $term_id ] = ( $counts[ $term_id ] ?? 0 ) + 1;
+
+		return $this->count_object_terms_for_ids( $post_ids, $taxonomy_slug );
+	}
+
+	/**
+	 * Tally direct term assignments for matched IDs without loading term objects.
+	 *
+	 * Used when the matched ID set comes from a query the grouped SQL cannot
+	 * express (geo, search, scope token) but no term-query customization is
+	 * registered, so assignment rows equal what wp_get_object_terms() returns.
+	 * Memory stays bounded by the number of distinct terms, not assignments.
+	 *
+	 * @param int[]  $post_ids      Matched event IDs.
+	 * @param string $taxonomy_slug Taxonomy to count.
+	 * @return array<int,int>|false Term ID => event count, or false on SQL failure.
+	 */
+	private function count_assignments_for_ids( array $post_ids, string $taxonomy_slug ) {
+		global $wpdb;
+
+		if ( true !== $wpdb->is_mysql ) {
+			return false;
+		}
+
+		$counts = array();
+		foreach ( array_chunk( $post_ids, self::FALLBACK_CHUNK_SIZE ) as $chunk ) {
+			$placeholders = implode( ',', array_fill( 0, count( $chunk ), '%d' ) );
+			$wpdb->flush();
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Bounded aggregate; callers cache the resulting inventory.
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholder list built above.
+					"SELECT tt.term_id, COUNT(*) AS assignment_count FROM {$wpdb->term_relationships} tr INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tt.taxonomy = %s AND tr.object_id IN ({$placeholders}) GROUP BY tt.term_id",
+					array_merge( array( $taxonomy_slug ), $chunk )
+				)
+			);
+			if ( ! is_array( $rows ) || '' !== (string) $wpdb->last_error ) {
+				return false;
+			}
+			foreach ( $rows as $row ) {
+				$term_id            = (int) $row->term_id;
+				$counts[ $term_id ] = ( $counts[ $term_id ] ?? 0 ) + (int) $row->assignment_count;
+			}
+		}
+
+		return $counts;
+	}
+
+	/**
+	 * Tally terms through wp_get_object_terms() so term customizations apply.
+	 *
+	 * Chunked so each term query stays bounded; the full assignment set is
+	 * never materialized in one call.
+	 *
+	 * @param int[]  $post_ids      Matched event IDs.
+	 * @param string $taxonomy_slug Taxonomy to count.
+	 * @return array<int,int> Term ID => event count; empty when any chunk fails.
+	 */
+	private function count_object_terms_for_ids( array $post_ids, string $taxonomy_slug ): array {
+		$counts = array();
+		for ( $offset = 0, $total = count( $post_ids ); $offset < $total; $offset += self::FALLBACK_CHUNK_SIZE ) {
+			$terms = wp_get_object_terms(
+				array_slice( $post_ids, $offset, self::FALLBACK_CHUNK_SIZE ),
+				$taxonomy_slug,
+				array(
+					'fields'                 => 'all_with_object_id',
+					'update_term_meta_cache' => false,
+				)
+			);
+			if ( is_wp_error( $terms ) ) {
+				// Do not expose partial counts if any chunk fails.
+				return array();
+			}
+			foreach ( $terms as $term ) {
+				$term_id            = (int) $term->term_id;
+				$counts[ $term_id ] = ( $counts[ $term_id ] ?? 0 ) + 1;
+			}
+			unset( $term, $terms );
 		}
 
 		return $counts;

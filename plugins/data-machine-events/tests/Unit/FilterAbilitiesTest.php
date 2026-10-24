@@ -88,6 +88,110 @@ class FilterAbilitiesTest extends WP_UnitTestCase {
 		return 0;
 	}
 
+	public function test_fallback_chunks_assignments_and_preserves_customized_counts(): void {
+		$first    = $this->create_term( 'filter_kind' );
+		$second   = $this->create_term( 'filter_kind' );
+		$tomorrow = ( new DateTimeImmutable( current_time( 'mysql' ) ) )->modify( '+1 day' )->format( 'Y-m-d 20:00:00' );
+		$post_ids = array();
+		for ( $i = 0; $i < 1005; ++$i ) {
+			$post_ids[] = $this->seed_event( 'Chunk event', $tomorrow, array( 'filter_kind' => $i % 2 ? array( $first ) : array( $first, $second ) ) );
+		}
+
+		// A real term customization must still run on the fallback path.
+		$customize = static function ( array $terms ): array {
+			return array_values( array_filter( $terms, static fn( $term ): bool => 0 !== (int) $term->object_id % 3 ) );
+		};
+		add_filter( 'wp_get_object_terms', $customize );
+		$chunks = array();
+		$observe = static function ( $terms, $object_ids, $taxonomies, array $args ) use ( &$chunks ) {
+			$chunks[] = count( explode( ',', $object_ids ) );
+			self::assertSame( 'all_with_object_id', $args['fields'] );
+			self::assertFalse( $args['update_term_meta_cache'] );
+			return $terms;
+		};
+		$method = new \ReflectionMethod( FilterAbilities::class, 'get_batch_term_counts' );
+		try {
+			$expected = array();
+			foreach ( wp_get_object_terms( $post_ids, 'filter_kind', array( 'fields' => 'all_with_object_id' ) ) as $term ) {
+				$id = (int) $term->term_id;
+				$expected[ $id ] = ( $expected[ $id ] ?? 0 ) + 1;
+			}
+			add_filter( 'wp_get_object_terms', $observe, 20, 4 );
+			try {
+				$actual = $method->invoke( $this->abilities, 'filter_kind' );
+			} finally {
+				remove_filter( 'wp_get_object_terms', $observe, 20 );
+			}
+			ksort( $expected );
+			ksort( $actual );
+			$this->assertSame( $expected, $actual );
+			$this->assertSame( array( 1000, 5 ), $chunks );
+
+			$calls = 0;
+			$fail = static function ( $terms ) use ( &$calls ) {
+				return 2 === ++$calls ? new \WP_Error( 'chunk_failure' ) : $terms;
+			};
+			add_filter( 'wp_get_object_terms', $fail, 30 );
+			try {
+				$this->assertSame( array(), $method->invoke( $this->abilities, 'filter_kind' ), 'A later failure must discard partial counts.' );
+				$this->assertSame( 2, $calls );
+			} finally {
+				remove_filter( 'wp_get_object_terms', $fail, 30 );
+			}
+		} finally {
+			remove_filter( 'wp_get_object_terms', $customize );
+		}
+	}
+
+	public function test_uncustomized_fallback_counts_assignments_in_bounded_sql_chunks(): void {
+		$first    = $this->create_term( 'filter_kind' );
+		$second   = $this->create_term( 'filter_kind' );
+		$tomorrow = ( new DateTimeImmutable( current_time( 'mysql' ) ) )->modify( '+1 day' )->format( 'Y-m-d 20:00:00' );
+		$post_ids = array();
+		for ( $i = 0; $i < 1005; ++$i ) {
+			$post_ids[] = $this->seed_event( 'Bounded chunk event', $tomorrow, array( 'filter_kind' => $i % 2 ? array( $first ) : array( $first, $second ) ) );
+		}
+		$expected = array();
+		foreach ( wp_get_object_terms( $post_ids, 'filter_kind', array( 'fields' => 'all_with_object_id' ) ) as $term ) {
+			$id              = (int) $term->term_id;
+			$expected[ $id ] = ( $expected[ $id ] ?? 0 ) + 1;
+		}
+
+		$aggregates  = 0;
+		$object_term = 0;
+		$observe_sql = static function ( string $sql ) use ( &$aggregates ): string {
+			if ( false !== strpos( $sql, ' AS assignment_count' ) ) {
+				++$aggregates;
+			}
+			return $sql;
+		};
+		$observe_terms = static function ( $terms ) use ( &$object_term ) {
+			++$object_term;
+			return $terms;
+		};
+		add_filter( 'query', $observe_sql );
+		$method = new \ReflectionMethod( FilterAbilities::class, 'get_batch_term_counts' );
+		try {
+			// Search context cannot use grouped SQL, so this exercises the ID-set fallback.
+			$actual = $method->invoke( $this->abilities, 'filter_kind', array(), array(), null, array( 'event_search' => 'Bounded chunk' ) );
+		} finally {
+			remove_filter( 'query', $observe_sql );
+		}
+		ksort( $expected );
+		ksort( $actual );
+		$this->assertSame( $expected, $actual );
+		$this->assertSame( 2, $aggregates, '1005 matched IDs are counted in two bounded aggregate queries.' );
+
+		// Registering a term customization routes the same request through wp_get_object_terms().
+		add_filter( 'wp_get_object_terms', $observe_terms );
+		try {
+			$method->invoke( $this->abilities, 'filter_kind', array(), array(), null, array( 'event_search' => 'Bounded chunk' ) );
+		} finally {
+			remove_filter( 'wp_get_object_terms', $observe_terms );
+		}
+		$this->assertSame( 2, $object_term );
+	}
+
 	public function test_search_limits_offered_term_counts(): void {
 		$term_id  = $this->create_term( 'filter_kind' );
 		$tomorrow = ( new DateTimeImmutable( current_time( 'mysql' ) ) )->modify( '+1 day' );
