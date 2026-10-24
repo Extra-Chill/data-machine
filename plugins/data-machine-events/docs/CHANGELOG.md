@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.73.7] - 2026-10-24
+
+### Fixed
+- bound get_batch_term_counts fallback memory
+
 ## [0.73.6] - 2026-10-23
 
 ### Fixed
