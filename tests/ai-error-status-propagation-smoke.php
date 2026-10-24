@@ -11,6 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, $value, ...$args ) {
+		return $value;
+	}
+}
+
 function datamachine_empty_action_log(): array {
 	return getenv( 'DATAMACHINE_SMOKE_ACTION_SEED' ) ? array( array( 'hook' => '', 'args' => array() ) ) : array();
 }

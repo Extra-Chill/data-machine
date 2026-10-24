@@ -83,7 +83,8 @@ $root       = dirname( __DIR__ );
 $plugin_src = file_get_contents( $root . '/data-machine.php' ) ?: '';
 $provider_src = file_get_contents( $root . '/inc/Core/Bootstrap/AlwaysOnServiceProvider.php' ) ?: '';
 $group_src  = file_get_contents( $root . '/inc/Core/ActionScheduler/GroupRegistrar.php' ) ?: '';
-$drain_src  = file_get_contents( $root . '/inc/Cli/Commands/DrainCommand.php' ) ?: '';
+// Claiming moved from the CLI command into the shared drain service.
+$drain_src  = file_get_contents( $root . '/inc/Core/ActionScheduler/ScopedDrainService.php' ) ?: '';
 require_once $root . '/inc/Core/ActionScheduler/GroupRegistrar.php';
 
 $assertions = 0;

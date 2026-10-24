@@ -20,6 +20,30 @@ if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
 $GLOBALS['__bundle_upgrade_filters']    = array();
 $GLOBALS['__bundle_upgrade_transients'] = array();
 $GLOBALS['__bundle_upgrade_actions']    = array();
+$GLOBALS['__bundle_upgrade_options']    = array();
+
+// Resolution fences use atomic option insertion, even with transient storage.
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( $key, $value, $deprecated = '', $autoload = true ) {
+		if ( array_key_exists( $key, $GLOBALS['__bundle_upgrade_options'] ) ) {
+			return false;
+		}
+		$GLOBALS['__bundle_upgrade_options'][ $key ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( $key, $default = false ) {
+		return $GLOBALS['__bundle_upgrade_options'][ $key ] ?? $default;
+	}
+}
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( $key ) {
+		$exists = array_key_exists( $key, $GLOBALS['__bundle_upgrade_options'] );
+		unset( $GLOBALS['__bundle_upgrade_options'][ $key ] );
+		return $exists;
+	}
+}
 
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data, $options = 0, $depth = 512 ) {
