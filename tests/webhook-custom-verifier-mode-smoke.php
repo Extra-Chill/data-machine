@@ -84,11 +84,7 @@ namespace {
 		}
 	}
 
-	require_once __DIR__ . '/../inc/Api/WebhookVerificationResult.php';
-	require_once __DIR__ . '/../inc/Api/WebhookVerifier.php';
-	require_once __DIR__ . '/../inc/Api/WebhookAuthResolver.php';
-	require_once __DIR__ . '/../inc/Abilities/Flow/FlowHelpers.php';
-	require_once __DIR__ . '/../inc/Abilities/Flow/WebhookTriggerAbility.php';
+	require_once __DIR__ . '/smoke-bootstrap.php';
 
 	use DataMachine\Abilities\Flow\WebhookTriggerAbility;
 	use DataMachine\Api\WebhookAuthResolver;

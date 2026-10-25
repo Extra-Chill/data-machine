@@ -20,6 +20,7 @@ namespace {
 
 	class DataMachine_External_Login_WPDB_Smoke {
 		public string $prefix = 'wp_';
+		public string $base_prefix = 'wp_';
 		public array $rows = array();
 		public function update( string $table, array $data, array $where, array $formats = array(), array $where_formats = array() ) {
 			unset( $table, $formats, $where_formats );
@@ -97,9 +98,7 @@ namespace DataMachine\Abilities\Chat {
 }
 
 namespace {
-	require_once dirname( __DIR__ ) . '/inc/Core/Auth/ExternalLoginProviderInterface.php';
-	require_once dirname( __DIR__ ) . '/inc/Core/Auth/ExternalLoginRouter.php';
-	require_once dirname( __DIR__ ) . '/inc/Core/Auth/PrincipalSessionPromoter.php';
+	require_once __DIR__ . '/smoke-bootstrap.php';
 
 	$pass = 0;
 	$fail = 0;

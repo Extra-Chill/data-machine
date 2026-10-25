@@ -24,13 +24,7 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
-require_once __DIR__ . '/../inc/Engine/Bundle/BundleValidationException.php';
-require_once __DIR__ . '/../inc/Engine/Bundle/PortableSlug.php';
-require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleSlugTrait.php';
-require_once __DIR__ . '/../inc/Engine/Bundle/BundleEgressTargetRegistry.php';
-require_once __DIR__ . '/../inc/Engine/Bundle/BundleSchema.php';
-require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleManifest.php';
-require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleFlowFile.php';
+require_once __DIR__ . '/smoke-bootstrap.php';
 
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleManifest;

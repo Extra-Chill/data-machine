@@ -52,12 +52,7 @@ $assert = static function ( bool $condition, string $message ) use ( &$failures 
 	}
 };
 
-require_once $root . '/inc/Abilities/AbilityRegistration.php';
-require_once $root . '/inc/Abilities/Media/AltTextAbilities.php';
-require_once $root . '/inc/Abilities/Media/ImageGenerationAbilities.php';
-require_once $root . '/inc/Abilities/Media/BrandTokens.php';
-require_once $root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
-require_once $root . '/inc/Abilities/Media/MediaAbilities.php';
+require_once __DIR__ . '/smoke-bootstrap.php';
 
 new \DataMachine\Abilities\Media\AltTextAbilities();
 new \DataMachine\Abilities\Media\ImageGenerationAbilities();
@@ -104,8 +99,7 @@ foreach ( $removed_abilities as $slug ) {
 	$assert( ! $registered, 'Transferred ability still has a core registration: ' . $slug );
 }
 
-require_once $root . '/inc/Engine/AI/System/Tasks/Retention/RetentionCleanup.php';
-require_once $root . '/inc/Engine/AI/System/SystemAgentServiceProvider.php';
+
 $provider = ( new ReflectionClass( \DataMachine\Engine\AI\System\SystemAgentServiceProvider::class ) )->newInstanceWithoutConstructor();
 $tasks    = $provider->getBuiltInTasks( array() );
 $assert( isset( $tasks['alt_text_generation'] ), 'Retained alt text task is not registered by core' );

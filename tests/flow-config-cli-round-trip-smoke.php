@@ -245,6 +245,14 @@ namespace DataMachine\Abilities\FlowStep {
 	}
 }
 
+namespace DataMachine\Core\Database\Pipelines {
+	class Pipelines {
+		public function get_pipeline( int $pipeline_id ): array {
+			return array( 'pipeline_id' => $pipeline_id, 'agent_id' => 0 );
+		}
+	}
+}
+
 namespace DataMachine\Core\Database\Flows {
 	class Flows {
 		public function get_flow( int $flow_id ): ?array {
@@ -291,10 +299,7 @@ namespace DataMachine\Core\Database\Flows {
 
 namespace {
 
-require_once dirname( __DIR__ ) . '/inc/Cli/JsonInput.php';
-require_once dirname( __DIR__ ) . '/inc/Core/Database/Flows/FlowConfigEscaping.php';
-require_once dirname( __DIR__ ) . '/inc/Cli/Commands/Flows/FlowsCommand.php';
-require_once dirname( __DIR__ ) . '/inc/Cli/Commands/Flows/BulkConfigCommand.php';
+require_once __DIR__ . '/smoke-bootstrap.php';
 
 use DataMachine\Cli\Commands\Flows\BulkConfigCommand;
 use DataMachine\Cli\Commands\Flows\FlowsCommand;
