@@ -29,7 +29,14 @@ $assert( str_contains( $email, "array( \$operation, 'search' )" ), 'batch flag r
 $assert( str_contains( $email, "array( 'delete', 'search' )" ), 'batch delete requires delete and search' );
 $assert( str_contains( $email, "\$headers[] = 'From: ' . \$identity" ) && str_contains( $email, "\$headers[] = 'Reply-To: ' . \$identity" ), 'mailto unsubscribe uses the authorized mailbox identity' );
 $assert( str_contains( $email, "0 === stripos( \$header, 'From:' )" ), 'synthetic Sent copies suppress duplicate From headers' );
-$assert( substr_count( $email, 'self::authRefProperty()' ) >= 10, 'every email ability input schema advertises the auth_ref mailbox selector' );
+// Inspect registered schemas rather than counting helper calls: inboxSchema()
+// supplies the shared selector to all inbox operations.
+require_once __DIR__ . '/fixtures/email-schema-registration.php';
+$assert( 10 === count( $GLOBALS['email_schemas'] ), 'all ten email CRUD abilities register' );
+foreach ( $GLOBALS['email_schemas'] as $name => $schema ) {
+	$selector = $schema['properties']['auth_ref'] ?? array();
+	$assert( 'string' === ( $selector['type'] ?? null ) && 'email_imap:default' === ( $selector['default'] ?? null ), "{$name} advertises the auth_ref mailbox selector" );
+}
 $assert( str_contains( $fetch, "'auth_ref'             => array(" ) && str_contains( $fetch, "'email_imap:default'" ), 'fetch-email ability schema declares auth_ref with the default mailbox' );
 $assert( substr_count( $cli, '[--auth-ref=<ref>]' ) >= 14 && substr_count( $cli, '[--mailbox=<name>]' ) >= 14, 'all email CLI commands document both mailbox selectors' );
 $assert( str_contains( $handler, "'legacy_default_auth'   => (string) ( \$config['_legacy_default_auth'] ?? '' )" ), 'email handler forwards only the persisted legacy marker into trusted execution context' );

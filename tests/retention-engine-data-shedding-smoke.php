@@ -53,6 +53,9 @@ namespace {
 			return $value;
 		}
 	}
+	if ( ! function_exists( 'wp_cache_delete' ) ) {
+		function wp_cache_delete( $key, $group = '' ): bool { return true; }
+	}
 	if ( ! function_exists( 'do_action' ) ) {
 		function do_action( ...$args ) {}
 	}
@@ -112,7 +115,7 @@ namespace {
 		str_contains( $cleanup, "apply_filters( 'datamachine_engine_data_terminal_max_age_days'" )
 	);
 	assert_eds(
-		'shed UPDATE nulls engine_data via id-subquery with LIMIT (batched)',
+		'shed UPDATE nulls engine_data via bounded selected IDs',
 		str_contains( $cleanup, 'UPDATE %i SET engine_data = NULL WHERE job_id IN (' )
 			&& str_contains( $cleanup, 'LIMIT %d' )
 	);
@@ -153,7 +156,7 @@ namespace {
 	);
 	assert_eds(
 		'Jobs promotes handler_slug column + populates it from engine_data',
-		str_contains( $jobs, 'ADD COLUMN handler_slug varchar(100)' )
+		str_contains( $jobs, 'handler_slug varchar(100) NULL DEFAULT NULL' )
 			&& str_contains( $jobs, 'extract_handler_slug' )
 			&& str_contains( $jobs, "\$update_data['handler_slug']" )
 	);
@@ -224,6 +227,15 @@ namespace {
 			return count( $matching );
 		}
 
+		public function get_col( $prepared ): array {
+			return array_keys( array_slice(
+				$this->matching_jobs( $this->extract_cutoff( $prepared['args'] ) ),
+				0,
+				(int) end( $prepared['args'] ),
+				true
+			) );
+		}
+
 		public function query( $prepared ): int {
 			$sql  = $prepared['sql'];
 			$args = $prepared['args'];
@@ -234,15 +246,13 @@ namespace {
 			}
 
 			++$this->update_queries;
-			$cutoff              = $this->extract_cutoff( $args );
-			$limit               = (int) end( $args );
-			$this->batch_sizes[] = $limit;
-
-			$matching = array_slice( $this->matching_jobs( $cutoff ), 0, $limit, true );
-			foreach ( array_keys( $matching ) as $job_id ) {
+			// UPDATE receives the exact ID worklist from the bounded SELECT.
+			$ids = array_slice( $args, 1 );
+			$this->batch_sizes[] = count( $ids );
+			foreach ( $ids as $job_id ) {
 				$this->jobs[ $job_id ]['engine_data'] = null;
 			}
-			return count( $matching );
+			return count( $ids );
 		}
 
 		private function extract_cutoff( array $args ): string {
