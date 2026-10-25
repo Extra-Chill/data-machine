@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.2] - 2026-10-25
+
+### Fixed
+- let operators resolve system-staged actions via --operator-wide
+
 ## [0.198.1] - 2026-10-24
 
 ### Changed
