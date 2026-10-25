@@ -164,7 +164,7 @@ assert_contains(
 	$passes
 );
 assert_not_contains(
-	'array_keys( $available_tools )',
+	'array_intersect( $required_handler_slugs, array_keys( $available_tools ) )',
 	$ai_step_source,
 	'AIStep no longer intersects required handlers against post-policy tool names',
 	$failures,

@@ -99,11 +99,9 @@ require_once dirname( __DIR__ ) . '/inc/Core/Steps/Settings/SettingsHandler.php'
 require_once dirname( __DIR__ ) . '/inc/Core/Steps/SystemTask/SystemTaskSettings.php';
 
 // SystemTaskSettings::getTaskOptions() reads from a TaskRegistry that is
-// not bootstrapped in this smoke. The `task` field is a `select` whose
-// allowed values come from those options; with an empty option list, any
-// provided task slug normalises to the empty-string default. That is fine
-// for this test — the bug we are pinning lives in the `params` JSON field
-// path, not in the `task` select path. We assert on `params` shape only.
+// not bootstrapped in this smoke. The required `task_type` select must be
+// supplied; with an empty option list its value normalises to the default.
+// This test pins the `params` JSON field path, not task selection.
 
 // ─── Test harness ─────────────────────────────────────────────────────
 
@@ -144,7 +142,7 @@ use DataMachine\Core\Steps\SystemTask\SystemTaskSettings;
 echo "\n[1] nested-array params is preserved verbatim:\n";
 
 $raw = array(
-	'task'   => 'dispatch_message',
+	'task_type' => 'dispatch_message',
 	'params' => array(
 		'channel'   => 'example-channel',
 		'recipient' => 'example-recipient',
@@ -175,7 +173,7 @@ smoke_assert_equals(
 echo "\n[2] JSON-string params is decoded into a nested array:\n";
 
 $raw_json_string = array(
-	'task'   => 'dispatch_message',
+	'task_type' => 'dispatch_message',
 	'params' => '{"channel":"json-channel","recipient":"json-recipient","message":"from json"}',
 );
 
@@ -199,26 +197,26 @@ echo "\n[3] params is never a scalar string (regression guard for SystemTaskStep
 
 $cases = array(
 	'nested array'  => array(
-		'task'   => 'dispatch_message',
+		'task_type' => 'dispatch_message',
 		'params' => array( 'a' => 1, 'b' => 2 ),
 	),
 	'JSON string'   => array(
-		'task'   => 'dispatch_message',
+		'task_type' => 'dispatch_message',
 		'params' => '{"a":1,"b":2}',
 	),
 	'missing key'   => array(
-		'task' => 'dispatch_message',
+		'task_type' => 'dispatch_message',
 	),
 	'empty array'   => array(
-		'task'   => 'dispatch_message',
+		'task_type' => 'dispatch_message',
 		'params' => array(),
 	),
 	'invalid JSON'  => array(
-		'task'   => 'dispatch_message',
+		'task_type' => 'dispatch_message',
 		'params' => 'not-json-at-all',
 	),
 	'empty string'  => array(
-		'task'   => 'dispatch_message',
+		'task_type' => 'dispatch_message',
 		'params' => '',
 	),
 );

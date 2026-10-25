@@ -86,7 +86,7 @@ echo "bulk-create-pipeline-workflow-smoke\n";
 $workflow = array(
 	'steps' => array(
 		array(
-			'type'               => 'fetch',
+			'step_type'          => 'fetch',
 			'label'              => 'Fetch Context',
 			'handler_slugs'      => array( 'mcp' ),
 			'handler_configs'    => array( 'mcp' => array( 'provider' => 'github', 'query' => 'repo:Extra-Chill/data-machine' ) ),
@@ -94,7 +94,7 @@ $workflow = array(
 			'queue_mode'         => 'drain',
 		),
 		array(
-			'type'           => 'ai',
+			'step_type'      => 'ai',
 			'label'          => 'Summarize Context',
 			'system_prompt'  => 'Summarize the fetched context.',
 			'user_message'   => 'Use the latest queue item.',
@@ -138,7 +138,7 @@ assert_bulk_workflow_equals( 'Use the latest queue item.', $flow_steps[1]['promp
 $template_workflow = array(
 	'steps' => array(
 		array(
-			'type'            => 'publish',
+			'step_type'       => 'publish',
 			'label'           => 'Template Publish',
 			'handler_slugs'   => array( 'wordpress' ),
 			'handler_configs' => array( 'wordpress' => array( 'post_type' => 'wiki' ) ),
