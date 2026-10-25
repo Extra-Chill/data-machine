@@ -109,6 +109,15 @@ class TimeoutPromptBuilderDouble {
 		}
 	}
 
+	public function with_message_parts( ...$parts ): self {
+		foreach ( $parts as $part ) {
+			if ( $part instanceof \WordPress\AiClient\Messages\DTO\MessagePart ) {
+				$this->prompt .= $part->getText() ?? '';
+			}
+		}
+		return $this;
+	}
+
 	public function using_provider( string $provider ): self {
 		$this->provider = $provider;
 		return $this;
@@ -259,6 +268,9 @@ $result           = RequestBuilder::build(
 );
 
 assert_timeout_smoke( ! is_wp_error( $result ), 'RequestBuilder dispatch succeeds with wp-ai-client test double' );
+if ( is_wp_error( $result ) ) {
+	fwrite( STDERR, $result->get_error_message() . PHP_EOL );
+}
 assert_timeout_smoke( 240.0 === ( TimeoutPromptBuilderDouble::$captured_request['timeout'] ?? null ), 'Data Machine applies scoped wp-ai-client request timeout' );
 assert_timeout_smoke( 180.0 === ( $timeout_context['timeout'] ?? null ), 'Data Machine timeout filter receives configured request timeout default' );
 assert_timeout_smoke( 'pipeline' === ( $timeout_context['mode'] ?? null ), 'Data Machine timeout filter receives execution mode' );

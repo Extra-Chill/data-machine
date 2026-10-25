@@ -55,7 +55,6 @@ $order   = array(
 	'new \\DataMachine\\Engine\\AI\\Tools\\Global\\AgentDailyMemory();',
 	'new \\DataMachine\\Api\\Chat\\Tools\\ConsultAgent();',
 	'\\DataMachine\\Api\\Execute::register();',
-	'\\DataMachine\\Api\\Email::register();',
 	'AbilityServiceProvider::register_full_runtime();',
 );
 $offset  = -1;
@@ -65,10 +64,26 @@ foreach ( $order as $needle ) {
 	$offset = false === $position ? $offset : $position;
 }
 
-$rest_start = strpos( $runtime, '\\DataMachine\\Api\\Execute::register();' );
-$rest_end   = strpos( $runtime, '\\DataMachine\\Api\\Email::register();' );
-$rest       = false !== $rest_start && false !== $rest_end ? substr( $runtime, $rest_start, $rest_end - $rest_start + strlen( '\\DataMachine\\Api\\Email::register();' ) ) : '';
-$assert( 27 === substr_count( $rest, '::register();' ), 'runtime composes all 27 REST controllers' );
+// Discover the current self-registering REST controllers rather than pinning a count.
+$controllers = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root . '/inc/Api', FilesystemIterator::SKIP_DOTS ) );
+$rest_count  = 0;
+foreach ( $controllers as $controller ) {
+	if ( 'php' !== $controller->getExtension() ) {
+		continue;
+	}
+	$source = (string) file_get_contents( $controller->getPathname() );
+	if ( ! preg_match( '/public static function register\s*\(/', $source ) ) {
+		continue;
+	}
+	preg_match( '/namespace\s+([^;]+);/', $source, $namespace );
+	preg_match( '/class\s+(\w+)/', $source, $class );
+	$registration = '\\' . $namespace[1] . '\\' . $class[1] . '::register();';
+	$position     = strpos( $runtime, $registration );
+	$assert( 1 === substr_count( $runtime, $registration ), "runtime registers {$registration} exactly once" );
+	$assert( false !== $position && $position > strpos( $runtime, 'new \\DataMachine\\Api\\Chat\\Tools\\ConsultAgent();' ) && $position < strpos( $runtime, 'AbilityServiceProvider::register_full_runtime();' ), "{$registration} follows tools and precedes abilities" );
+	++$rest_count;
+}
+$assert( $rest_count > 0, 'REST controller discovery is non-empty' );
 $assert( ! is_file( $root . '/inc/Core/Bootstrap/RestServiceProvider.php' ), 'single-caller REST provider is absent' );
 $assert( ! is_file( $root . '/inc/Engine/AI/Tools/ToolServiceProvider.php' ), 'single-caller tool provider is absent' );
 $assert( ! str_contains( $main, '\\DataMachine\\Api\\Execute::register();' ), 'entrypoint no longer composes concrete REST controllers' );

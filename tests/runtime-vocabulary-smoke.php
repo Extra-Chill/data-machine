@@ -67,6 +67,23 @@ function datamachine_runtime_vocab_is_allowed_file( string $relative_path ): boo
 		// Developer/release harness config. Runtime code must remain generic.
 		'.buildignore',
 		'composer.json',
+		'homeboy.json',
+		// Documented release tooling and historical audit evidence, not runtime dependencies.
+		'README.md',
+		'docs/wordpress-org-submission.md',
+		'docs/plugin-check-v01740-reviewer-dossier.md',
+		'docs/plugin-check-v01740-hook-names-dossier.md',
+		'docs/development/plugin-check-v01740-slow-query-audit.md',
+		'docs/development/post-identity-reservations.md',
+		// Explicit host harness contracts and external-schema interoperability fixtures.
+		'tests/ai-concurrency-release-wakeup-smoke.php',
+		'tests/agent-daily-memory-pipeline-scope-smoke.php',
+		'tests/eslint-source-inventory-smoke.sh',
+		'tests/phpunit-file-isolation-smoke.php',
+		'tests/typed-artifact-handler-smoke.php',
+		'tests/fuzz/README.md',
+		'tests/fuzz/pipeline-builder-runtime.json',
+		'tests/fuzz/pipeline-builder-runtime-contract.test.mjs',
 	);
 
 	if ( in_array( $relative_path, $allowed_files, true ) ) {
@@ -116,7 +133,7 @@ foreach ( $iterator as $file ) {
 	foreach ( $host_specific_patterns as $label => $pattern ) {
 		if ( preg_match( $pattern, $contents ) ) {
 			$violations[] = "{$relative_path} contains {$label}";
-			if ( 'codebox' === $label && str_starts_with( $relative_path, 'inc/' ) ) {
+			if ( str_starts_with( $relative_path, 'inc/' ) || 'data-machine.php' === $relative_path || 'uninstall.php' === $relative_path ) {
 				$runtime_source_violations[] = "{$relative_path} contains {$label}";
 			}
 		}
