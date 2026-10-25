@@ -9,8 +9,6 @@
 
 define( 'ABSPATH', __DIR__ );
 
-require_once __DIR__ . '/smoke-wp-stubs.php';
-
 $GLOBALS['handler_registration_idempotency_filters'] = array();
 $GLOBALS['handler_registration_idempotency_actions'] = array();
 
@@ -42,6 +40,8 @@ if ( ! function_exists( 'do_action' ) ) {
 		$GLOBALS['handler_registration_idempotency_actions'][ $hook ][] = $args;
 	}
 }
+
+require_once __DIR__ . '/smoke-wp-stubs.php';
 
 require_once __DIR__ . '/../inc/Core/Steps/HandlerRegistrationTrait.php';
 

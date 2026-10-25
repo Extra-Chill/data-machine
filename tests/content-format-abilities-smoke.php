@@ -524,6 +524,8 @@ namespace {
 		2
 	);
 
+	require_once __DIR__ . '/smoke-wp-stubs.php';
+
 	include_once dirname( __DIR__ ) . '/inc/Core/Content/ContentFormat.php';
 	include_once dirname( __DIR__ ) . '/inc/Core/SourceDate.php';
 	include_once dirname( __DIR__ ) . '/inc/Core/WordPress/PostTracking.php';
