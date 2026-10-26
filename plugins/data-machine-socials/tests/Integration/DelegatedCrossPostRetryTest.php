@@ -115,7 +115,8 @@ final class DelegatedCrossPostRetryTest extends WP_UnitTestCase {
 			$this->assertSame( 1, SocialShareTracker::count_shares( $post_id, 'instagram' ) );
 			$this->assertSame( 1, SocialShareTracker::count_shares( $post_id, 'bluesky' ) );
 
-			$packet_refs = $completed['operation_envelope']['run_result']['packet_refs'];
+			// Data Machine stores packet refs in its canonical envelope metadata.
+			$packet_refs = $completed['operation_envelope']['run_result']['metadata']['datamachine']['packet_refs'];
 			$this->assertCount( 2, $packet_refs );
 			$this->assertSame( array( 'social_share_ref', 'social_share_ref' ), array_column( $packet_refs, 'type' ) );
 			$projected_channels = array_column( $packet_refs, 'source_id' );

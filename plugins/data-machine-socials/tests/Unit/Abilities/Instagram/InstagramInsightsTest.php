@@ -48,7 +48,7 @@ class InstagramInsightsTest extends WP_UnitTestCase {
 			return array( 'response' => array( 'code' => 200 ), 'body' => wp_json_encode( $body ) );
 		}, 10, 3 );
 		$result = $this->ability->execute( array( 'media_id' => 'media-1' ) );
-		parse_str( (string) parse_url( $calls[1], PHP_URL_QUERY ), $query );
+		$query = $this->insights_query( $calls );
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'views,reach,saved,shares,total_interactions,ig_reels_avg_watch_time,ig_reels_video_view_total_time', $query['metric'] );
 	}
@@ -62,8 +62,16 @@ class InstagramInsightsTest extends WP_UnitTestCase {
 			return array( 'response' => array( 'code' => 200 ), 'body' => wp_json_encode( $body ) );
 		}, 10, 3 );
 		$this->ability->execute( array( 'media_id' => 'media-2' ) );
-		parse_str( (string) parse_url( $calls[1], PHP_URL_QUERY ), $query );
+		$query = $this->insights_query( $calls );
 		$this->assertSame( 'views,reach,saved,shares,total_interactions', $query['metric'] );
+	}
+
+	private function insights_query( array $calls ): array {
+		// Token refresh requests can precede the media lookup and insights request.
+		$insights_calls = array_values( array_filter( $calls, static fn( string $url ): bool => str_contains( $url, '/insights?' ) ) );
+		$this->assertCount( 1, $insights_calls );
+		parse_str( (string) parse_url( $insights_calls[0], PHP_URL_QUERY ), $query );
+		return $query;
 	}
 
 	public function test_missing_insights_scope_has_reauth_guidance(): void {
