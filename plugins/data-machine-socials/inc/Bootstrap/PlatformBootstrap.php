@@ -133,7 +133,7 @@ final class PlatformBootstrap {
 			self::provider( 'bluesky', 'Bluesky', array( 'BlueskyPublishAbility', 'BlueskyReadAbility', 'BlueskyUpdateAbility', 'BlueskyDeleteAbility' ), array( 'datamachine/bluesky-publish', 'datamachine/bluesky-account', 'datamachine/bluesky-read', 'datamachine/bluesky-update', 'datamachine/bluesky-delete' ), array( 'PublishBluesky', 'ReadBluesky', 'UpdateBluesky', 'DeleteBluesky' ) ),
 			self::provider( 'mastodon', 'Mastodon', array( 'MastodonPublishAbility', 'MastodonReadAbility', 'MastodonUpdateAbility', 'MastodonDeleteAbility' ), array( 'datamachine/mastodon-publish', 'datamachine/mastodon-account', 'datamachine/mastodon-read', 'datamachine/mastodon-update', 'datamachine/mastodon-delete' ), array() ),
 			self::provider( 'pinterest', 'Pinterest', array( 'PinterestBoardsAbility', 'PinterestPublishAbility', 'PinterestReadAbility', 'PinterestUpdateAbility', 'PinterestDeleteAbility', 'PinterestAnalyticsAbility' ), array( 'datamachine/pinterest-sync-boards', 'datamachine/pinterest-list-boards', 'datamachine/pinterest-status', 'datamachine/pinterest-publish', 'datamachine/pinterest-read', 'datamachine/pinterest-update', 'datamachine/pinterest-delete', 'datamachine/pinterest-analytics' ), array( 'PublishPinterest', 'ReadPinterest', 'UpdatePinterest', 'DeletePinterest' ) ),
-			self::provider( 'instagram', 'Instagram', array( 'InstagramPublishAbility', 'InstagramReadAbility', 'InstagramInsightsAbility', 'InstagramUpdateAbility', 'InstagramDeleteAbility', 'InstagramCommentReplyAbility', 'InstagramMessageSendAbility' ), array( 'datamachine/instagram-publish', 'datamachine/instagram-account', 'datamachine/instagram-read', 'datamachine/instagram-insights', 'datamachine/instagram-update', 'datamachine/instagram-delete', 'datamachine/instagram-comment-reply', 'datamachine/instagram-message-send' ), array( 'ReadInstagram', 'UpdateInstagram', 'ReplyInstagramComment', 'PublishInstagram', 'PublishReelInstagram', 'PublishStoryInstagram', 'DeleteInstagram', 'ReadInstagramMessages', 'SendInstagramMessage' ) ),
+			self::provider( 'instagram', 'Instagram', array( 'FetchInstagramAccountAbility', 'InstagramPublishAbility', 'InstagramReadAbility', 'InstagramInsightsAbility', 'InstagramUpdateAbility', 'InstagramDeleteAbility', 'InstagramCommentReplyAbility', 'InstagramMessageSendAbility' ), array( 'datamachine-socials/fetch-instagram-account', 'datamachine/instagram-publish', 'datamachine/instagram-account', 'datamachine/instagram-read', 'datamachine/instagram-insights', 'datamachine/instagram-update', 'datamachine/instagram-delete', 'datamachine/instagram-comment-reply', 'datamachine/instagram-message-send' ), array( 'ReadInstagram', 'UpdateInstagram', 'ReplyInstagramComment', 'PublishInstagram', 'PublishReelInstagram', 'PublishStoryInstagram', 'DeleteInstagram', 'ReadInstagramMessages', 'SendInstagramMessage' ) ),
 			self::provider( 'tiktok', 'TikTok', array( 'TikTokPublishAbility', 'TikTokReadAbility' ), array( 'datamachine/tiktok-publish', 'datamachine/tiktok-account', 'datamachine/tiktok-read' ), array( 'PublishTikTok' ) ),
 			self::provider( 'linkedin', 'LinkedIn', array( 'LinkedInPublishAbility', 'LinkedInReadAbility', 'LinkedInUpdateAbility', 'LinkedInDeleteAbility' ), array( 'datamachine/linkedin-publish', 'datamachine/linkedin-account', 'datamachine/linkedin-read', 'datamachine/linkedin-update', 'datamachine/linkedin-delete' ), array( 'PublishLinkedIn', 'ReadLinkedIn', 'UpdateLinkedIn', 'DeleteLinkedIn' ) ),
 			self::provider( 'tumblr', 'Tumblr', array( 'TumblrPublishAbility', 'TumblrReadAbility', 'TumblrUpdateAbility', 'TumblrDeleteAbility', 'TumblrEngageAbility' ), array( 'datamachine/tumblr-publish', 'datamachine/tumblr-read', 'datamachine/tumblr-update', 'datamachine/tumblr-delete', 'datamachine/tumblr-engage' ), array( 'PublishTumblr', 'ReadTumblr' ) ),
@@ -171,7 +171,12 @@ final class PlatformBootstrap {
 
 		return new PlatformProvider(
 			$id,
-			array_merge( array( 'DataMachine\\Core\\Steps\\Publish\\Handlers\\PublishHandler' ), $ability_classes, array( $handler_class ) ),
+			array_merge(
+				array( 'DataMachine\\Core\\Steps\\Publish\\Handlers\\PublishHandler' ),
+				$ability_classes,
+				array( $handler_class ),
+				'instagram' === $id ? array( 'DataMachineSocials\\Handlers\\Instagram\\InstagramAccount', 'DataMachine\\Core\\Steps\\Fetch\\FreshCandidateCollector' ) : array()
+			),
 			array(
 				'abilities'    => $ability_slugs,
 				'handler'      => 'reddit' === $id ? 'reddit' : $id . '_publish',
@@ -187,6 +192,9 @@ final class PlatformBootstrap {
 					new $ability_class();
 				}
 				new $handler_class();
+				if ( 'DataMachineSocials\\Handlers\\Instagram\\Instagram' === $handler_class ) {
+					new \DataMachineSocials\Handlers\Instagram\InstagramAccount();
+				}
 			},
 			$tool_classes ? static function () use ( $tool_classes ): bool {
 				if ( ! class_exists( 'DataMachine\\Engine\\AI\\Tools\\BaseTool' ) ) {

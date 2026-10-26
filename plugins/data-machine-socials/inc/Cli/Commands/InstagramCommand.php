@@ -37,6 +37,38 @@ defined( 'ABSPATH' ) || exit;
 class InstagramCommand {
 
 	/**
+	 * Preview recent public Business/Creator posts.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <username>
+	 * : Instagram username or profile URL.
+	 *
+	 * [--limit=<n>]
+	 * : Maximum posts (default 10).
+	 */
+	public function account( $args, $assoc_args ) {
+		$result = ( new \DataMachineSocials\Abilities\Instagram\FetchInstagramAccountAbility() )->execute( array(
+			'username'  => $args[0] ?? '',
+			'max_items' => (int) ( $assoc_args['limit'] ?? 10 ),
+		) );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+		$rows = array();
+		foreach ( $result['items'] as $item ) {
+			$rows[] = array(
+				'timestamp' => $item['data']['metadata']['timestamp'],
+				'type'      => $item['data']['metadata']['media_type'],
+				'caption'   => mb_substr( preg_replace( '/\s+/', ' ', $item['data']['content'] ), 0, 80 ),
+				'permalink' => $item['source_url'],
+			);
+		}
+		\WP_CLI\Utils\format_items( 'table', $rows, array( 'timestamp', 'type', 'caption', 'permalink' ) );
+	}
+
+	/**
 	 * List recent Instagram posts.
 	 *
 	 * ## OPTIONS
