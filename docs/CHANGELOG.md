@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.6] - 2026-10-26
+
+### Changed
+- Remove dead Markdown Database Integration persistence policies
+
 ## [0.198.5] - 2026-10-26
 
 ### Fixed
