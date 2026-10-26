@@ -144,6 +144,12 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
+		// A venue rename must not split an otherwise identical occurrence.
+		$match = self::findByContainedTitleAndExactStart( $title, $startDate, $date_only, $context, $venue_term );
+		if ( $match ) {
+			return $match;
+		}
+
 		// Strategy 2: Venue + date + fuzzy title.
 		if ( ! empty( $venue ) || $venue_term ) {
 			$match = self::findByVenueDateAndFuzzyTitle( $title, $venue, $date_only, $startDate, $venue_term, (string) ( $context['source'] ?? '' ) );
@@ -167,6 +173,48 @@ class EventDuplicateStrategy {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Match venue-independent title expansions only at the identical local start
+	 * and with positive location evidence. Multiple matching posts are ambiguous.
+	 */
+	private static function findByContainedTitleAndExactStart( string $title, string $start, string $date, array $context, ?\WP_Term $venue_term ): ?array {
+		if ( ! self::hasTimeComponent( $start ) ) {
+			return null;
+		}
+		$title   = EventIdentifierGenerator::normalizeBasic( $title );
+		$matches = array();
+		foreach ( self::candidatePagesByDate( $date ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$other = EventIdentifierGenerator::normalizeBasic( $candidate->post_title );
+				// Token boundaries avoid matches such as "Jam" and "Jamboree".
+				if ( '' === $title || '' === $other || ( ! str_contains( ' ' . $title . ' ', ' ' . $other . ' ' ) && ! str_contains( ' ' . $other . ' ', ' ' . $title . ' ' ) ) ) {
+					continue;
+				}
+				$dates = \DataMachineEvents\Core\EventDatesTable::get( (int) $candidate->ID );
+				if ( ! $dates || ! self::isWithinStrictTimeWindow( $start, $dates->start_datetime, 0 ) ) {
+					continue;
+				}
+				$terms = wp_get_post_terms( (int) $candidate->ID, 'venue' );
+				if ( is_wp_error( $terms ) ) {
+					continue;
+				}
+				foreach ( $terms as $term ) {
+					$location = $context;
+					if ( $venue_term ) {
+						foreach ( array( 'city', 'state', 'country' ) as $field ) {
+							$meta_value         = (string) get_term_meta( $venue_term->term_id, '_venue_' . $field, true );
+							$location[ $field ] = '' !== $meta_value ? $meta_value : ( $context[ $field ] ?? '' );
+						}
+					}
+					if ( ( $venue_term && $term->term_id === $venue_term->term_id ) || \DataMachineEvents\Core\Venue_Taxonomy::is_same_event_location( (int) $term->term_id, $location ) ) {
+						$matches[ (int) $candidate->ID ] = true;
+					}
+				}
+			}
+		}
+		return 1 === count( $matches ) ? self::duplicateResult( (int) array_key_first( $matches ), 'exact_start_contained_title_location' ) : null;
 	}
 
 	// -----------------------------------------------------------------------

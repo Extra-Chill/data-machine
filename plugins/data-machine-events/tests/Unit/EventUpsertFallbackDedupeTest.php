@@ -17,6 +17,41 @@ require_once __DIR__ . '/EventUpsertTestCase.php';
 
 class EventUpsertFallbackDedupeTest extends EventUpsertTestCase {
 
+	public function test_barn_jam_upsert_updates_existing_event_without_new_venue(): void {
+		$first = $this->invoke_upsert( array(
+			'title'     => 'Barn Jam',
+			'venue'     => 'Awendaw Green',
+			'startDate' => '2026-10-28',
+			'startTime' => '17:50',
+		) );
+		$this->assertTrue( $first['success'] ?? false, wp_json_encode( $first ) );
+		$post_id = $first['data']['post_id'];
+		$venues  = wp_get_post_terms( $post_id, 'venue' );
+		$this->assertCount( 1, $venues );
+		update_term_meta( $venues[0]->term_id, '_venue_address', '4853 Highway 17, Awendaw, SC 29429' );
+		update_term_meta( $venues[0]->term_id, '_venue_city', 'Awendaw' );
+		$before = wp_count_terms( array(
+			'taxonomy'   => 'venue',
+			'hide_empty' => false,
+		) );
+		$second = $this->invoke_upsert( array(
+			'title'        => 'Barn Jam at Sewee Outpost',
+			'venue'        => 'Sewee Outpost',
+			'startDate'    => '2026-10-28',
+			'startTime'    => '17:50',
+			'venueAddress' => '4853 Highway 17',
+			'venueCity'    => 'Awendaw',
+		) );
+		$this->assertTrue( $second['success'] ?? false, wp_json_encode( $second ) );
+		$this->assertSame( $post_id, $second['data']['post_id'] );
+		$this->assertContains( $second['data']['action'], array( 'updated', 'no_change' ) );
+		$this->assertSame( $before, wp_count_terms( array(
+			'taxonomy'   => 'venue',
+			'hide_empty' => false,
+		) ) );
+		$this->assertSame( array( $venues[0]->term_id ), wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
+	}
+
 	public function test_fallback_reuses_legacy_event_missing_source_identity(): void {
 		$title    = 'Legacy Dinghy Band ' . uniqid();
 		$venue    = 'Fallback Venue A ' . uniqid();
@@ -77,10 +112,16 @@ class EventUpsertFallbackDedupeTest extends EventUpsertTestCase {
 		);
 
 		$first  = $this->invoke_upsert(
-			array_merge( $occasion, array( 'source_type' => 'ticketmaster', 'item_identifier' => 'tm-' . uniqid() ) )
+			array_merge( $occasion, array(
+				'source_type'     => 'ticketmaster',
+				'item_identifier' => 'tm-' . uniqid(),
+			) )
 		);
 		$second = $this->invoke_upsert(
-			array_merge( $occasion, array( 'source_type' => 'ticketweb', 'item_identifier' => 'tw-' . uniqid() ) )
+			array_merge( $occasion, array(
+				'source_type'     => 'ticketweb',
+				'item_identifier' => 'tw-' . uniqid(),
+			) )
 		);
 
 		$this->assertTrue( $first['success'] ?? false, wp_json_encode( $first ) );

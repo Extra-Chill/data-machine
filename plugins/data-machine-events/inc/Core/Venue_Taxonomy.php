@@ -951,6 +951,18 @@ class Venue_Taxonomy {
 			}
 		}
 
+		$geo_match = self::find_venue_by_proximity( $venue_data );
+		if ( $geo_match ) {
+			return array(
+				'term'                 => $geo_match,
+				'term_id'              => (int) $geo_match->term_id,
+				'match_status'         => 'matched',
+				'matched_via'          => 'proximity',
+				'conflicting_term_ids' => array(),
+				'venue_name'           => $venue_name,
+			);
+		}
+
 		$venue_name = apply_filters( 'data_machine_events_normalize_venue_name', $venue_name );
 		$name_match = self::find_venue_by_qualified_name( $venue_name, $venue_data );
 		$term       = $name_match['term'];
@@ -1353,6 +1365,53 @@ class Venue_Taxonomy {
 	 * @param array<string, mixed> $venue_data Incoming venue metadata.
 	 * @return bool
 	 */
+	public static function is_same_event_location( int $term_id, array $venue_data ): bool {
+		// Different streets are allowed for event identity within a city, but
+		// state/country conflicts are not. Venue identity remains stricter.
+		unset( $venue_data['address'] );
+		return ! self::has_geographic_conflict( $term_id, $venue_data )
+			&& self::has_positive_location_evidence( $term_id, $venue_data );
+	}
+
+	/** Reuse only a unique venue within 25m, with no conflicting geography. */
+	private static function find_venue_by_proximity( array $venue_data ): ?\WP_Term {
+		if ( self::is_unverified_field( $venue_data, 'coordinates' ) ) {
+			return null;
+		}
+		$parse = static function ( string $value ): ?array {
+			$parts = explode( ',', $value );
+			if ( 2 !== count( $parts ) || ! is_numeric( trim( $parts[0] ) ) || ! is_numeric( trim( $parts[1] ) ) ) {
+				return null;
+			}
+			$point = array_map( 'floatval', $parts );
+			return abs( $point[0] ) <= 90 && abs( $point[1] ) <= 180 ? $point : null;
+		};
+		$point = $parse( (string) ( $venue_data['coordinates'] ?? '' ) );
+		if ( ! $point ) {
+			return null;
+		}
+		$venues = get_terms( array(
+			'taxonomy'   => 'venue',
+			'hide_empty' => false,
+		) );
+		if ( is_wp_error( $venues ) ) {
+			return null;
+		}
+		$matches = array();
+		foreach ( $venues as $venue ) {
+			$other = $parse( (string) get_term_meta( $venue->term_id, '_venue_coordinates', true ) );
+			if ( ! $other || self::has_geographic_conflict( (int) $venue->term_id, $venue_data ) ) {
+				continue;
+			}
+			$a = sin( deg2rad( $point[0] - $other[0] ) / 2 ) ** 2
+				+ cos( deg2rad( $point[0] ) ) * cos( deg2rad( $other[0] ) ) * sin( deg2rad( $point[1] - $other[1] ) / 2 ) ** 2;
+			if ( 6371000 * 2 * asin( sqrt( min( 1, $a ) ) ) <= 25 ) {
+				$matches[] = $venue;
+			}
+		}
+		return 1 === count( $matches ) ? $matches[0] : null;
+	}
+
 	private static function has_positive_location_evidence( int $term_id, array $venue_data ): bool {
 		foreach ( array( 'address', 'city' ) as $field ) {
 			if ( self::is_unverified_field( $venue_data, $field ) ) {
@@ -2655,7 +2714,9 @@ class Venue_Taxonomy {
 			$venue_normalized_address = self::normalize_address_for_matching( $venue_address );
 			$venue_normalized_city    = strtolower( trim( $venue_city ) );
 
-			if ( $venue_normalized_address === $normalized_address &&
+			if ( self::address_has_street_component( $address ) &&
+				self::address_has_street_component( $venue_address ) &&
+				( $venue_normalized_address === $normalized_address || self::street_identity_key( $address ) === self::street_identity_key( $venue_address ) || self::normalized_address_is_subset( $normalized_address, $venue_normalized_address ) ) &&
 				$venue_normalized_city === $normalized_city &&
 				! self::has_geographic_conflict(
 					$venue->term_id,

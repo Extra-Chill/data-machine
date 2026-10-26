@@ -27,8 +27,8 @@ use DataMachineEvents\Core\DuplicateDetection\PreAIEventDedupGate;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
 use DataMachineEvents\Core\Venue_Taxonomy;
-use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
+use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 
 class EventDuplicateStrategyTest extends WP_UnitTestCase {
 
@@ -47,6 +47,57 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 			EventDatesTable::create_table();
 		}
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+	}
+
+	public function test_barn_jam_venue_rename_matches_only_identical_start_and_city(): void {
+		[ $venue_id, $post_id ] = $this->seedVenueWithEvent( 'Barn Jam', '2026-10-28 17:50:00', 'Awendaw Green' );
+		update_term_meta( $venue_id, '_venue_city', 'Awendaw' );
+		$input = array(
+			'title'   => 'Barn Jam at Sewee Outpost',
+			'context' => array(
+				'venue'     => 'Sewee Outpost',
+				'city'      => 'Awendaw',
+				'startDate' => '2026-10-28 17:50',
+			),
+		);
+		$match = EventDuplicateStrategy::check( $input );
+		$this->assertSame( $post_id, $match['match']['post_id'] );
+		$input['context']['startDate'] = '2026-10-28 18:00';
+		$this->assertNull( EventDuplicateStrategy::check( $input ) );
+		$input['context']['startDate'] = '2026-10-28 17:50';
+		$input['context']['city']      = 'Charleston';
+		$this->assertNull( EventDuplicateStrategy::check( $input ) );
+		$input['context']['city'] = 'Awendaw';
+		$input['title']           = 'Other show at Sewee Outpost';
+		$this->assertNull( EventDuplicateStrategy::check( $input ) );
+	}
+
+	public function test_barn_jam_address_and_geo_reuse_existing_venue(): void {
+		[ $venue_id ] = $this->seedVenueWithEvent( 'Barn Jam', '2026-10-28 17:50:00', 'Awendaw Green' );
+		update_term_meta( $venue_id, '_venue_city', 'Awendaw' );
+		update_term_meta( $venue_id, '_venue_address', '4853 Highway 17, Awendaw, SC 29429' );
+		update_term_meta( $venue_id, '_venue_coordinates', '32.99,-79.66' );
+		$before = wp_count_terms( array(
+			'taxonomy'   => 'venue',
+			'hide_empty' => false,
+		) );
+		$result = Venue_Taxonomy::find_or_create_venue( 'Sewee Outpost', array(
+			'address' => '4853 Highway 17',
+			'city'    => 'Awendaw',
+		) );
+		$this->assertSame( $venue_id, $result['term_id'] );
+		$this->assertFalse( $result['was_created'] );
+		$this->assertSame( $before, wp_count_terms( array(
+			'taxonomy'   => 'venue',
+			'hide_empty' => false,
+		) ) );
+		$geo = Venue_Taxonomy::resolve_venue_identity( 'Sewee Outpost', array( 'coordinates' => '32.99001,-79.66' ) );
+		$this->assertSame( $venue_id, $geo['term_id'] );
+		$far = Venue_Taxonomy::resolve_venue_identity( 'Different Place', array( 'coordinates' => '33.0,-79.66' ) );
+		$this->assertNull( $far['term_id'] );
+		$second = wp_insert_term( 'Adjacent Room', 'venue' );
+		update_term_meta( $second['term_id'], '_venue_coordinates', '32.99,-79.66' );
+		$this->assertNull( Venue_Taxonomy::resolve_venue_identity( 'Sewee Outpost', array( 'coordinates' => '32.99,-79.66' ) )['term_id'] );
 	}
 
 	public function tearDown(): void {
@@ -148,7 +199,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_geographic_conflict_cannot_fall_through_to_name_only_duplicate_match(): void {
-		$venue_name = 'Cross City Duplicate Guard ' . uniqid();
+		$venue_name                     = 'Cross City Duplicate Guard ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Same Night Show',
 			'2026-08-15 20:00:00',
@@ -184,7 +235,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * must treat `conflict` exactly like `ambiguous`.
 	 */
 	public function test_alt_name_geographic_conflict_is_not_a_duplicate(): void {
-		$stored_name = 'Intersection Duplicate Guard ' . uniqid();
+		$stored_name                    = 'Intersection Duplicate Guard ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Same Night Show',
 			'2026-08-15 20:00:00',
@@ -227,13 +278,13 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * resolves the venue authoritatively and passes the term ID (#883).
 	 */
 	public function test_authoritative_venue_term_dedups_when_name_is_ambiguous(): void {
-		$venue_name = 'Ambiguous Twin Venue ' . uniqid();
+		$venue_name                     = 'Ambiguous Twin Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Someday Maybes 7-10pm',
 			'2026-10-02 19:00:00',
 			$venue_name
 		);
-		$twin_id = $this->insertSameNamedVenue( $venue_name, 'Isle of Palms' );
+		$twin_id                        = $this->insertSameNamedVenue( $venue_name, 'Isle of Palms' );
 
 		$identity = Venue_Taxonomy::resolve_venue_identity( $venue_name, array() );
 		$this->assertSame( 'ambiguous', $identity['match_status'], 'Fixture must reproduce the ambiguous name-only resolution.' );
@@ -274,13 +325,13 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * confirmed by venue name (#806 protection survives #883).
 	 */
 	public function test_authoritative_venue_term_never_matches_same_named_other_venue(): void {
-		$venue_name = 'Ambiguous Twin Venue ' . uniqid();
+		$venue_name                     = 'Ambiguous Twin Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Same Night Show',
 			'2026-10-02 20:00:00',
 			$venue_name
 		);
-		$twin_id = $this->insertSameNamedVenue( $venue_name, 'Isle of Palms' );
+		$twin_id                        = $this->insertSameNamedVenue( $venue_name, 'Isle of Palms' );
 
 		$result = EventDuplicateStrategy::check(
 			array(
@@ -325,7 +376,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_equivalent_geography_forms_still_allow_duplicate_match(): void {
-		$venue_name = 'Equivalent Geography Venue ' . uniqid();
+		$venue_name                     = 'Equivalent Geography Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Equivalent Geography Show',
 			'2026-08-16 20:00:00',
@@ -451,7 +502,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_exact_same_venue_name_matches_within_time_window(): void {
-		$venue_name = 'Exact Venue Within Window ' . uniqid();
+		$venue_name                     = 'Exact Venue Within Window ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Showcase',
 			'2026-05-20 18:00:00',
@@ -476,7 +527,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_exact_same_venue_name_is_distinct_outside_time_window(): void {
-		$venue_name = 'Exact Venue Outside Window ' . uniqid();
+		$venue_name                     = 'Exact Venue Outside Window ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Showcase',
 			'2026-05-21 13:30:00',
@@ -519,7 +570,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		$result = $method->invoke(
 			null,
 			'Legacy Caller Title',
-			"Some Other Spelling",
+			'Some Other Spelling',
 			'2026-05-19',
 			'high',
 			$venue_term
@@ -534,7 +585,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_low_confidence_replay_scans_all_same_day_exact_title_candidates(): void {
-		$venue_name = 'Multiple Showcase Venue ' . uniqid();
+		$venue_name                  = 'Multiple Showcase Venue ' . uniqid();
 		[ $term_id, $early_post_id ] = $this->seedVenueWithEvent( 'Showcase', '2026-05-22 13:00:00', $venue_name );
 
 		$late_post_id = wp_insert_post(
@@ -649,7 +700,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * legacy path is deleted. See #423, #1108.
 	 */
 	public function test_recurring_series_same_title_different_date_not_duplicate(): void {
-		$venue_name = 'Recurring Venue ' . uniqid();
+		$venue_name                     = 'Recurring Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Barn Jam',
 			'2026-04-22 21:00:00',
@@ -675,7 +726,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_trashed_event_is_not_recovered_by_broad_duplicate_matching(): void {
-		$venue_name = 'Cancelled Event Venue ' . uniqid();
+		$venue_name            = 'Cancelled Event Venue ' . uniqid();
 		[ $term_id, $post_id ] = $this->seedVenueWithEvent(
 			'Cancelled Event',
 			'2026-04-22 21:00:00',
@@ -711,7 +762,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * candidate query must not be silently discarded by isValidPost().
 	 */
 	public function test_future_status_event_is_still_a_duplicate(): void {
-		$venue_name = 'Scheduled Event Venue ' . uniqid();
+		$venue_name            = 'Scheduled Event Venue ' . uniqid();
 		[ $term_id, $post_id ] = $this->seedVenueWithEvent(
 			'Scheduled Showcase',
 			'2027-04-22 21:00:00',
@@ -757,7 +808,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * 22:30 — 1.5 hours apart, well within the 2-hour tolerance.
 	 */
 	public function test_same_title_venue_date_within_2h_is_duplicate(): void {
-		$venue_name = 'Dupe Venue ' . uniqid();
+		$venue_name                     = 'Dupe Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Barn Jam',
 			'2026-04-22 21:00:00',
@@ -833,8 +884,8 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_exact_ticket_identity_remains_authoritative_across_same_day_times(): void {
-		$venue_name = 'Authoritative Ticket Venue ' . uniqid();
-		$ticket_url = 'https://tickets.example.com/event/stable-' . uniqid();
+		$venue_name                     = 'Authoritative Ticket Venue ' . uniqid();
+		$ticket_url                     = 'https://tickets.example.com/event/stable-' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Authoritative Ticket Show',
 			'2026-04-24 13:30:00',
@@ -861,7 +912,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_pre_ai_gate_allows_exact_venue_late_show(): void {
-		$venue_name = 'Pre AI Exact Venue Late ' . uniqid();
+		$venue_name                     = 'Pre AI Exact Venue Late ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Pre AI Showcase',
 			'2026-05-22 13:30:00',
@@ -880,7 +931,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_pre_ai_gate_skips_unchanged_duplicate(): void {
-		$venue_name = 'Pre AI Exact Venue Within ' . uniqid();
+		$venue_name                     = 'Pre AI Exact Venue Within ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Pre AI Showcase',
 			'2026-05-23 15:00:00',
@@ -912,7 +963,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * same venue and date.
 	 */
 	public function test_venue_date_fuzzy_title_dedups(): void {
-		$venue_name = 'Fuzzy Venue ' . uniqid();
+		$venue_name                     = 'Fuzzy Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Phish at the Pour House',
 			'2026-07-04 20:00:00',
@@ -945,9 +996,9 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 */
 	public function short_title_same_show_provider(): array {
 		return array(
-			'support act appended'  => array( 'The Aces w/ Gatlin', 'The Aces', '2026-10-20 20:00:00', '2026-10-20T20:00:00' ),
-			'co-bill listed'        => array( 'Riff Raff, Jordypurp', 'Riff Raff', '2026-10-21 21:00:00', '2026-10-21T21:00:00' ),
-			'tour name, doors/show' => array( 'The Army, The Navy', 'THE ARMY, THE NAVY - THE FAKE BRAVE TOUR', '2026-10-22 19:00:00', '2026-10-22T20:00:00' ),
+			'support act appended'   => array( 'The Aces w/ Gatlin', 'The Aces', '2026-10-20 20:00:00', '2026-10-20T20:00:00' ),
+			'co-bill listed'         => array( 'Riff Raff, Jordypurp', 'Riff Raff', '2026-10-21 21:00:00', '2026-10-21T21:00:00' ),
+			'tour name, doors/show'  => array( 'The Army, The Navy', 'THE ARMY, THE NAVY - THE FAKE BRAVE TOUR', '2026-10-22 19:00:00', '2026-10-22T20:00:00' ),
 			'full bill vs headliner' => array( 'LIONEER, White Hot Velvet, Alandria , Town of Trees', 'Lioneer', '2026-10-23 19:30:00', '2026-10-23T20:00:00' ),
 		);
 	}
@@ -959,7 +1010,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * @dataProvider short_title_same_show_provider
 	 */
 	public function test_short_title_same_venue_and_time_is_duplicate( string $stored_title, string $incoming_title, string $stored_start, string $incoming_start ): void {
-		$venue_name = 'Short Title Venue ' . uniqid();
+		$venue_name                     = 'Short Title Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent( $stored_title, $stored_start, $venue_name );
 
 		$result = EventDuplicateStrategy::check(
@@ -986,7 +1037,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * low-confidence path needs start times within an hour.
 	 */
 	public function test_short_title_early_and_late_sets_are_distinct(): void {
-		$venue_name = 'Two Set Venue ' . uniqid();
+		$venue_name                     = 'Two Set Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent( 'Cyrille Aimee', '2026-11-04 19:00:00', $venue_name );
 
 		$result = EventDuplicateStrategy::check(
@@ -1010,7 +1061,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * Without an incoming start time a short title is not enough evidence.
 	 */
 	public function test_short_title_without_start_time_is_not_fuzzy_matched(): void {
-		$venue_name = 'No Time Venue ' . uniqid();
+		$venue_name                     = 'No Time Venue ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent( 'The Aces w/ Gatlin', '2026-10-20 20:00:00', $venue_name );
 
 		$result = EventDuplicateStrategy::check(
@@ -1034,7 +1085,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	 * A short title at a different venue on the same night stays distinct.
 	 */
 	public function test_short_title_at_other_venue_is_distinct(): void {
-		$venue_name = 'Short Title Home ' . uniqid();
+		$venue_name                     = 'Short Title Home ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent( 'The Aces w/ Gatlin', '2026-10-20 20:00:00', $venue_name );
 
 		$other = wp_insert_term( 'Short Title Elsewhere ' . uniqid(), 'venue' );
@@ -1059,7 +1110,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_venue_phrase_title_dedups_against_bare_title_at_same_venue(): void {
-		$venue_name = 'Soundwell ' . uniqid();
+		$venue_name                     = 'Soundwell ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Stop Light Observations (21+ Event)',
 			'2026-10-30 20:00:00',
@@ -1094,7 +1145,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_support_act_title_dedups_against_tour_page_title_at_same_venue(): void {
-		$venue_name = 'Fremont Theater ' . uniqid();
+		$venue_name                     = 'Fremont Theater ' . uniqid();
 		[ $term_id, $existing_post_id ] = $this->seedVenueWithEvent(
 			'Little Stranger at ' . $venue_name . ' — San Luis Obispo',
 			'2027-02-04 20:00:00',
@@ -1149,7 +1200,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_cross_source_show_dedups_outside_time_window(): void {
-		$venue_name = 'Agora ' . uniqid();
+		$venue_name            = 'Agora ' . uniqid();
 		[ $term_id, $post_id ] = $this->seedVenueWithEvent( 'Little Stranger w/ Jarv', '2026-12-31 21:30:00', $venue_name );
 		update_post_meta( $post_id, '_datamachine_event_source', 'ticketmaster' );
 
@@ -1163,7 +1214,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_same_source_outside_time_window_stays_distinct(): void {
-		$venue_name = 'Agora ' . uniqid();
+		$venue_name            = 'Agora ' . uniqid();
 		[ $term_id, $post_id ] = $this->seedVenueWithEvent( 'Little Stranger', '2026-12-31 21:30:00', $venue_name );
 		update_post_meta( $post_id, '_datamachine_event_source', 'ticketmaster' );
 
@@ -1174,7 +1225,7 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 	}
 
 	public function test_two_cross_source_sets_outside_window_stay_distinct(): void {
-		$venue_name = 'Agora ' . uniqid();
+		$venue_name          = 'Agora ' . uniqid();
 		[ $term_id, $early ] = $this->seedVenueWithEvent( 'Little Stranger', '2026-12-31 15:00:00', $venue_name );
 		$late                = wp_insert_post(
 			array(
