@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.5] - 2026-10-26
+
+### Fixed
+- resolve PHP 8.2 permission cache and font-dependent PHPUnit failures
+
 ## [0.198.4] - 2026-10-26
 
 ### Changed
