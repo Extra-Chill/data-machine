@@ -70,6 +70,7 @@ class HandlerAbilities {
 		self::$settings_cache      = array();
 		self::$config_fields_cache = array();
 		self::$site_defaults_cache = null;
+		\DataMachine\Core\Steps\Settings\SettingsDisplayService::clearHandlerFieldsCache();
 	}
 
 	private function registerAbilities(): void {

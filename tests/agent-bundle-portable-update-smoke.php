@@ -276,8 +276,10 @@ $normalized_existing_flow_payload = call_bundle_private(
 		3,
 	)
 );
-assert_bundle_update( 'existing stale flow payload normalizes step key', isset( $normalized_existing_flow_payload['flow_config']['3_bundle_step_0_9'] ) );
-assert_bundle_update_equals( 'existing stale flow payload normalizes pipeline metadata', 3, $normalized_existing_flow_payload['flow_config']['3_bundle_step_0_9']['pipeline_id'] ?? null );
+// Artifact comparisons use portable IDs, not installation-specific IDs.
+assert_bundle_update( 'existing stale flow payload uses portable step key', isset( $normalized_existing_flow_payload['flow_config']['bundle_step_0'] ) );
+assert_bundle_update_equals( 'existing stale flow payload uses portable pipeline step ID', 'bundle_step', $normalized_existing_flow_payload['flow_config']['bundle_step_0']['pipeline_step_id'] ?? null );
+assert_bundle_update( 'existing stale flow payload omits installed pipeline metadata', ! array_key_exists( 'pipeline_id', $normalized_existing_flow_payload['flow_config']['bundle_step_0'] ?? array() ) );
 
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';
 $pipelines_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Pipelines/Pipelines.php' ) ?: '';
@@ -300,9 +302,9 @@ assert_bundle_update( 'package CLI does not claim agent list command', ! str_con
 assert_bundle_update( 'package CLI exposes status command', str_contains( $bundle_cli_source, 'function status(' ) );
 assert_bundle_update( 'package CLI exposes diff command', str_contains( $bundle_cli_source, 'function diff(' ) );
 assert_bundle_update( 'package CLI exposes upgrade command', str_contains( $bundle_cli_source, 'function upgrade(' ) );
-assert_bundle_update( 'package CLI stages PendingActions for approval-required upgrades', str_contains( $bundle_cli_source, 'AgentBundleUpgradePendingAction::stage' ) );
-assert_bundle_update( 'package CLI resolves staged apply actions', str_contains( $bundle_cli_source, 'ResolvePendingActionAbility::execute' ) );
-assert_bundle_update( 'package CLI plans target artifacts in installed ID space', str_contains( $bundle_cli_source, 'bundle_artifacts_for_agent' ) );
+assert_bundle_update( 'package CLI delegates upgrades to canonical ability', str_contains( $bundle_cli_source, 'AgentAbilities::applyAgentBundleUpgrade( $input )' ) );
+assert_bundle_update( 'package CLI delegates staged action resolution to canonical ability', str_contains( $bundle_cli_source, 'AgentAbilities::resolveAgentBundleUpgradeAction(' ) );
+assert_bundle_update( 'package CLI projects target artifacts for installed agent', str_contains( $bundle_cli_source, '$this->projection()->target_artifacts( $bundle, $agent )' ) );
 
 $failure_count = is_array( $GLOBALS['failures'] ?? null ) ? count( $GLOBALS['failures'] ) : 0;
 if ( 0 !== $failure_count ) {

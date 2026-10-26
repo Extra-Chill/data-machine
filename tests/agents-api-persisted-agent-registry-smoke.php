@@ -149,7 +149,9 @@ do_action( 'init' );
 $agents       = wp_get_agents();
 $agent        = wp_get_agent( 'wordpress-com-wiki' );
 $roadie_agent = wp_get_agent( 'roadie' );
-	agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki', 'roadie', 'coordinator' ), array_keys( $agents ), 'persisted rows are visible through wp_get_agents()', $failures, $passes );
+$agent_slugs = array_keys( $agents );
+sort( $agent_slugs );
+agents_api_smoke_assert_equals( array( 'coordinator', 'roadie', 'woocommerce-wiki', 'wordpress-com-wiki' ), $agent_slugs, 'persisted rows are visible through wp_get_agents()', $failures, $passes );
 agents_api_smoke_assert_equals( true, $agent instanceof WP_Agent, 'persisted row resolves through wp_get_agent()', $failures, $passes );
 agents_api_smoke_assert_equals( 'WordPress.com Wiki', $agent ? $agent->get_label() : '', 'row agent_name becomes label', $failures, $passes );
 agents_api_smoke_assert_equals( 'Maintains the WordPress.com reference index.', $agent ? $agent->get_description() : '', 'extension description source is surfaced', $failures, $passes );
@@ -191,7 +193,9 @@ add_action(
 do_action( 'init' );
 
 $agents = wp_get_agents();
-	agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki', 'roadie', 'coordinator' ), array_keys( $agents ), 'projection skips duplicate slugs without dropping other rows', $failures, $passes );
+$agent_slugs = array_keys( $agents );
+sort( $agent_slugs );
+agents_api_smoke_assert_equals( array( 'coordinator', 'roadie', 'woocommerce-wiki', 'wordpress-com-wiki' ), $agent_slugs, 'projection skips duplicate slugs without dropping other rows', $failures, $passes );
 agents_api_smoke_assert_equals( 'Declarative Definition', $agents['wordpress-com-wiki']->get_label(), 'first registered definition wins', $failures, $passes );
 agents_api_smoke_assert_equals( array(), $GLOBALS['__agents_api_smoke_wrong'], 'duplicate skip avoids doing-it-wrong notices', $failures, $passes );
 

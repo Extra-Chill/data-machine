@@ -83,7 +83,7 @@ echo "workflow-persistent-install-smoke\n";
 $workflow = array(
 	'steps' => array(
 		array(
-			'type'               => 'fetch',
+			'step_type'          => 'fetch',
 			'label'              => 'Webhook Payload',
 			'handler_slugs'      => array( 'webhook_payload' ),
 			'handler_configs'    => array( 'webhook_payload' => array( 'payload_path' => 'pull_request' ) ),
@@ -91,7 +91,7 @@ $workflow = array(
 			'queue_mode'         => 'drain',
 		),
 		array(
-			'type'           => 'ai',
+			'step_type'      => 'ai',
 			'label'          => 'Review Pull Request',
 			'system_prompt'  => 'Review the PR.',
 			'user_message'   => 'Summarize findings.',
@@ -99,7 +99,7 @@ $workflow = array(
 			'disabled_tools' => array( 'datamachine/delete-flow' ),
 		),
 		array(
-			'type'          => 'ai',
+			'step_type'     => 'ai',
 			'label'         => 'Rotating Prompt',
 			'prompt_queue'  => array(
 				array(
@@ -115,6 +115,10 @@ $workflow = array(
 
 $ephemeral_config = WorkflowConfigFactory::buildEphemeralConfigs( $workflow );
 $ephemeral_steps  = array_values( $ephemeral_config['pipeline_config'] );
+$ephemeral_flow_steps = array_values( $ephemeral_config['flow_config'] );
+
+assert_workflow_equals( array( 'datamachine/get-github-pull-review-context', 'datamachine/upsert-github-pull-review-comment' ), $ephemeral_flow_steps[1]['enabled_tools'] ?? null, 'ephemeral flow preserves AI enabled tools', $failures, $passes );
+assert_workflow_equals( 'Summarize findings.', $ephemeral_flow_steps[1]['prompt_queue'][0]['prompt'] ?? null, 'ephemeral AI user_message becomes prompt queue head', $failures, $passes );
 
 assert_workflow_equals( 3, count( $ephemeral_config['pipeline_config'] ), 'ephemeral pipeline contains every workflow step', $failures, $passes );
 assert_workflow_equals( array( 'fetch', 'ai', 'ai' ), array_column( $ephemeral_steps, 'step_type' ), 'ephemeral pipeline preserves workflow step order', $failures, $passes );

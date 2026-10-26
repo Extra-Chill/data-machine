@@ -21,8 +21,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
-require_once __DIR__ . '/smoke-wp-stubs.php';
-
 // Tiny filter registry — enough for getEligiblePostTypes().
 $GLOBALS['_datamachine_test_filters'] = array();
 
@@ -71,6 +69,8 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 		return preg_replace( '/[^a-z0-9_\-]/', '', $key );
 	}
 }
+
+require_once __DIR__ . '/smoke-wp-stubs.php';
 
 require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
 require_once __DIR__ . '/../inc/Abilities/SEO/MetaDescriptionAbilities.php';

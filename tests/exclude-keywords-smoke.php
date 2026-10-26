@@ -31,8 +31,7 @@ if ( ! function_exists( '__' ) ) {
 		return $text;
 	}
 }
-require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
-require_once __DIR__ . '/../inc/Abilities/Fetch/FetchRssAbility.php';
+require_once __DIR__ . '/smoke-bootstrap.php';
 
 use DataMachine\Abilities\Fetch\FetchRssAbility;
 

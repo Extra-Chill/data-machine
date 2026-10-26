@@ -154,7 +154,9 @@ class ImageCommand extends BaseCommand {
 	 * Render an image from a registered GD template.
 	 *
 	 * Generates deterministic, brand-consistent graphics from structured data
-	 * using server-side GD rendering. No external API calls required.
+	 * using server-side GD rendering. No external API calls required. When the
+	 * template drops fields to make the layout fit (e.g. the poster QR-hero
+	 * fitting order), a warning names the dropped fields.
 	 *
 	 * ## OPTIONS
 	 *
@@ -164,11 +166,17 @@ class ImageCommand extends BaseCommand {
 	 * --data=<json>
 	 * : JSON string of structured data matching the template fields.
 	 *
+	 * [--brand=<json>]
+	 * : Per-render brand tokens: colors, fonts, logo_path, logo_path_inverse, brand_text. Asset values accept readable paths or attachment IDs.
+	 *
 	 * [--preset=<preset>]
 	 * : Platform preset override (e.g. instagram_feed_portrait).
 	 *
 	 * [--format=<format>]
 	 * : Output image format: png or jpeg (default: png). Note: this controls the image format, not the CLI output format.
+	 *
+	 * [--dpi=<n>]
+	 * : Positive integer output DPI; overrides the platform preset resolution.
 	 *
 	 * [--pipeline_id=<id>]
 	 * : Pipeline ID for file repository storage context.
@@ -214,6 +222,24 @@ class ImageCommand extends BaseCommand {
 			'data'        => $data,
 		);
 
+		if ( array_key_exists( 'dpi', $assoc_args ) ) {
+			$dpi = filter_var( $assoc_args['dpi'], FILTER_VALIDATE_INT, array( 'options' => array( 'min_range' => 1 ) ) );
+			if ( false === $dpi || is_bool( $assoc_args['dpi'] ) ) {
+				WP_CLI::error( 'Invalid --dpi: expected a positive integer.' );
+				return;
+			}
+			$input['dpi'] = $dpi;
+		}
+
+		if ( isset( $assoc_args['brand'] ) ) {
+			$brand = json_decode( $assoc_args['brand'] );
+			if ( json_last_error() !== JSON_ERROR_NONE || ! is_object( $brand ) ) {
+				WP_CLI::error( 'Invalid --brand: expected a JSON object.' );
+				return;
+			}
+			$input['brand'] = json_decode( $assoc_args['brand'], true );
+		}
+
 		if ( ! empty( $assoc_args['preset'] ) ) {
 			$input['preset'] = $assoc_args['preset'];
 		}
@@ -246,6 +272,15 @@ class ImageCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] ?? 'Template rendered.' );
+
+		foreach ( $result['warnings'] ?? array() as $warning ) {
+			WP_CLI::warning( $warning );
+		}
+
+		$dropped_fields = $result['dropped_fields'] ?? array();
+		if ( ! empty( $dropped_fields ) ) {
+			WP_CLI::warning( sprintf( 'Dropped fields to fit the layout: %s', implode( ', ', $dropped_fields ) ) );
+		}
 
 		$file_paths = $result['file_paths'] ?? array();
 		$items      = array();

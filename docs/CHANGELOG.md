@@ -2,6 +2,177 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.6] - 2026-10-26
+
+### Changed
+- Remove dead Markdown Database Integration persistence policies
+
+## [0.198.5] - 2026-10-26
+
+### Fixed
+- resolve PHP 8.2 permission cache and font-dependent PHPUnit failures
+
+## [0.198.4] - 2026-10-26
+
+### Changed
+- fix two smokes broken by combining the #3649 repair PRs
+
+## [0.198.3] - 2026-10-26
+
+### Changed
+- repair email, queue, retention and docs contract smokes
+- make host-dependent smokes hermetic and resolve toolchain from Homeboy
+- derive bootstrap/runtime contract smokes from current service composition
+- update workflow/flow smokes to the step_type workflow contract
+- add missing WordPress stubs to shared smoke-wp-stubs
+- load standalone smokes through composer autoload via shared smoke bootstrap
+
+## [0.198.2] - 2026-10-25
+
+### Fixed
+- let operators resolve system-staged actions via --operator-wide
+
+## [0.198.1] - 2026-10-24
+
+### Changed
+- Embed preset DPI in rendered images with optional overrides
+- Support per-item color and font overrides in stack lists
+
+## [0.198.0] - 2026-10-23
+
+### Added
+- composable stack image template
+
+## [0.197.0] - 2026-10-23
+
+### Added
+- per-render brand token overrides for image templates
+
+## [0.196.0] - 2026-10-22
+
+### Added
+- return public file_urls from render-image-template
+
+## [0.195.5] - 2026-10-22
+
+### Fixed
+- release reservations when WordPress deletes the linked post
+
+## [0.195.4] - 2026-10-22
+
+### Fixed
+- treat an unchanged compare-and-swap as success, not a conflict
+
+## [0.195.3] - 2026-10-21
+
+### Fixed
+- read canonical handler_slugs for single-handler flow steps
+
+## [0.195.2] - 2026-10-21
+
+### Fixed
+- bound taxonomy select options and memoize handler field schemas
+
+## [0.195.1] - 2026-10-21
+
+### Fixed
+- don't read disposition_id from non-persisted direct claims
+
+## [0.195.0] - 2026-10-21
+
+### Added
+- announce agent access and chat identity changes
+
+## [0.194.2] - 2026-10-20
+
+### Fixed
+- move PSR-4 test doubles out of the case-colliding tests/Fixtures directory
+
+## [0.194.1] - 2026-10-20
+
+### Changed
+- Allow multiple chat actor IDs per user on the same platform
+
+## [0.194.0] - 2026-10-19
+
+### Added
+- expose image-template abilities to MCP clients via mcp.public
+
+## [0.193.0] - 2026-10-17
+
+### Added
+- add dedicated render_images action for image-template abilities
+
+## [0.192.2] - 2026-10-17
+
+### Fixed
+- replace inlined child envelopes with bounded per-child summaries
+
+## [0.192.1] - 2026-10-17
+
+### Fixed
+- complete alt-text job as skipped when attachment was deleted before it ran
+
+## [0.192.0] - 2026-10-17
+
+### Added
+- display font role for titles
+
+## [0.191.0] - 2026-10-17
+
+### Added
+- tight hero QR card, outside label, numbered list, header co-brand logos
+
+## [0.190.0] - 2026-10-17
+
+### Added
+- report poster fields dropped to fit the QR-hero layout
+
+## [0.189.0] - 2026-10-17
+
+### Added
+- fill hero title width, balance hero spacing, add background_strength
+
+## [0.188.0] - 2026-10-17
+
+### Added
+- poster background options (stripes, grid, dots, halftone, glow, image, …)
+
+## [0.187.1] - 2026-10-17
+
+### Changed
+- restore default memory registrations after registry resets
+
+## [0.187.0] - 2026-10-16
+
+### Added
+- poster QR-hero layout and 300dpi print presets
+
+## [0.186.0] - 2026-10-16
+
+### Added
+- generic composable poster image template in core
+
+## [0.185.2] - 2026-10-15
+
+### Fixed
+- chat-identity takes --target-user, since WP-CLI consumes --user
+
+## [0.185.1] - 2026-10-15
+
+### Fixed
+- honor first_run anchors for recurring system schedules
+
+## [0.185.0] - 2026-10-14
+
+### Added
+- return agent-layer memory for actorless non-turn events and expose convention_path
+
+## [0.184.3] - 2026-10-14
+
+### Fixed
+- stabilize composed file output
+
 ## [0.184.2] - 2026-10-13
 
 ### Fixed

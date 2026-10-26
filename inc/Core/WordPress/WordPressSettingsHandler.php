@@ -70,19 +70,12 @@ class WordPressSettingsHandler {
 				$mode_options[ $key ] = sprintf( $label, $taxonomy_label );
 			}
 
-			// Get terms for this taxonomy as pre-select values.
-			$value_options = array();
-			$terms         = get_terms(
-				array(
-					'taxonomy'   => $taxonomy_slug,
-					'hide_empty' => false,
-				)
-			);
-			if ( ! is_wp_error( $terms ) && ! empty( $terms ) ) {
-				foreach ( $terms as $term ) {
-					$value_options[ $term->term_id ] = $term->name;
-				}
-			}
+			// Get terms for this taxonomy as pre-select values. Large
+			// taxonomies (e.g. 100k artist terms) are not enumerated: a select
+			// with that many options is unusable and building it exhausts
+			// memory on every flow listing. Those taxonomies offer only the
+			// selection modes; saved term IDs still sanitize and apply.
+			$value_options = self::get_bounded_term_options( $taxonomy_slug );
 
 			// Build combined options via SelectionMode.
 			$options = SelectionMode::buildOptions( $mode_options, $value_options );
@@ -104,6 +97,63 @@ class WordPressSettingsHandler {
 		}
 
 		return $taxonomy_fields;
+	}
+
+	/**
+	 * Default maximum number of terms enumerated into a taxonomy select.
+	 */
+	const TAXONOMY_TERM_OPTION_LIMIT = 5000;
+
+	/**
+	 * Get term_id => name options for a taxonomy, or an empty array when the
+	 * taxonomy has more terms than the option limit.
+	 *
+	 * @param string $taxonomy_slug Taxonomy slug.
+	 * @return array<int, string> Term options keyed by term ID.
+	 */
+	public static function get_bounded_term_options( string $taxonomy_slug ): array {
+		/**
+		 * Filter the maximum number of terms enumerated into a taxonomy select field.
+		 *
+		 * Taxonomies with more terms than this offer only selection modes
+		 * (skip / AI decides) to keep handler field schemas bounded.
+		 *
+		 * @param int    $limit         Term option limit.
+		 * @param string $taxonomy_slug Taxonomy slug.
+		 */
+		$limit = (int) apply_filters( 'datamachine_taxonomy_term_option_limit', self::TAXONOMY_TERM_OPTION_LIMIT, $taxonomy_slug );
+		if ( $limit <= 0 ) {
+			return array();
+		}
+
+		$count = wp_count_terms(
+			array(
+				'taxonomy'   => $taxonomy_slug,
+				'hide_empty' => false,
+			)
+		);
+		if ( is_wp_error( $count ) || (int) $count > $limit ) {
+			return array();
+		}
+
+		$terms = get_terms(
+			array(
+				'taxonomy'   => $taxonomy_slug,
+				'hide_empty' => false,
+				'fields'     => 'id=>name',
+				'number'     => $limit,
+			)
+		);
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return array();
+		}
+
+		$options = array();
+		foreach ( $terms as $term_id => $name ) {
+			$options[ (int) $term_id ] = $name;
+		}
+
+		return $options;
 	}
 
 	/**

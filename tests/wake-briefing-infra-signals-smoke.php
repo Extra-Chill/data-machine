@@ -92,6 +92,10 @@ namespace {
 		return $m->invoke( $task, ...$args );
 	};
 
+	$rendered_once = $invoke( 'render', array( array( 'stable signal' ), 24, 'site' ) );
+	$rendered_twice = $invoke( 'render', array( array( 'stable signal' ), 24, 'site' ) );
+	wake_assert( 'render: identical signals produce byte-identical content without a generation timestamp', $rendered_once === $rendered_twice && ! str_contains( $rendered_once, '_Generated at ' ) );
+
 	// -----------------------------------------------------------------------
 	// 1. PHP fatals from debug.log.
 	// -----------------------------------------------------------------------

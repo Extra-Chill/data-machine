@@ -126,6 +126,7 @@ $assert(
 	class_exists( 'DataMachine\\Abilities\\PermissionHelper', false )
 );
 
+require_once $plugin_root . '/inc/Abilities/Media/BrandTokens.php';
 require_once $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
 
 $reset = static function (): void {

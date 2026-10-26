@@ -69,6 +69,8 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
     }
 }
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
 require_once __DIR__ . '/../inc/Core/DataPacket.php';
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';

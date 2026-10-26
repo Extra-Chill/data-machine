@@ -15,6 +15,7 @@ namespace DataMachine\Abilities\Media;
 use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
+use DataMachine\Core\FilesRepository\FileStorage;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -110,11 +111,17 @@ class ImageTemplateAbilities {
 					),
 					'data'        => array(
 						'type'        => 'object',
-						'description' => 'Structured data matching the template fields',
+						'description' => 'Structured data matching the template fields. stack accepts background (hex/token), padding (1080px base), align (center|left), blocks: ordered text (text/font/color/size/fit/max_size/wrap/line_height/align), image (path or attachment_id/width/max_height), qr (url/size/card_color/quiet_modules), row (text/image items, gap), list (items/style/marker_color/font/color/size), divider (width/thickness/color), spacer (height/flex). Every block accepts gap_before. Widths are fractions or base px; QR size is a fraction.',
 					),
+					'brand'       => BrandTokens::override_schema(),
 					'preset'      => array(
 						'type'        => 'string',
 						'description' => 'Platform preset override (e.g. instagram_feed_portrait)',
+					),
+					'dpi'         => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => 'Output resolution in dots per inch; overrides the preset without resizing pixels.',
 					),
 					'format'      => array(
 						'type'        => 'string',
@@ -128,7 +135,7 @@ class ImageTemplateAbilities {
 					),
 					'output'      => array(
 						'type'        => 'string',
-						'description' => 'Output destination: "files" returns file paths (default, requires context for repository or returns temp paths), "cached_file" stores the rendered file under uploads/<bucket>/<key>.<ext> and returns a stable public URL — ideal for OG images and other long-lived public artifacts that should not pollute the media library.',
+						'description' => 'Output destination: "files" returns file paths and public file_urls (default; temporary renders are copied to the file repository), "cached_file" stores the rendered file under uploads/<bucket>/<key>.<ext> and returns a stable public URL — ideal for OG images and other long-lived public artifacts that should not pollute the media library.',
 						'enum'        => array( 'files', 'cached_file' ),
 						'default'     => 'files',
 					),
@@ -151,26 +158,46 @@ class ImageTemplateAbilities {
 			'output_schema'       => array(
 				'type'       => 'object',
 				'properties' => array(
-					'success'      => array( 'type' => 'boolean' ),
-					'file_paths'   => array(
+					'success'        => array( 'type' => 'boolean' ),
+					'file_paths'     => array(
 						'type'  => 'array',
 						'items' => array( 'type' => 'string' ),
 					),
-					'cached_paths' => array(
+					'file_urls'      => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Public image URLs for files output, aligned index-for-index with file_paths. Cached output uses cached_urls.',
+					),
+					'cached_paths'   => array(
 						'type'  => 'array',
 						'items' => array( 'type' => 'string' ),
 					),
-					'cached_urls'  => array(
+					'cached_urls'    => array(
 						'type'  => 'array',
 						'items' => array( 'type' => 'string' ),
 					),
-					'template_id'  => array( 'type' => 'string' ),
-					'message'      => array( 'type' => 'string' ),
+					'template_id'    => array( 'type' => 'string' ),
+					'dropped_fields' => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Field keys the template omitted to make the layout fit. Empty when every field was drawn.',
+					),
+					'warnings'       => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Layout and asset warnings, including unresolved stack overflow. No blocks are removed to fit a stack.',
+					),
+					'message'        => array( 'type' => 'string' ),
 				),
 			),
 			'execute_callback'    => array( self::class, 'renderTemplate' ),
-			'permission_callback' => fn() => PermissionHelper::can_manage(),
-			'meta'                => array( 'show_in_rest' => false ),
+			'permission_callback' => fn() => PermissionHelper::can( 'render_images' ),
+			// Not a REST resource, but a deliberate tool for MCP clients:
+			// the render_images permission is a real user boundary.
+			'meta'                => array(
+				'show_in_rest' => false,
+				'mcp'          => array( 'public' => true ),
+			),
 		);
 	}
 
@@ -191,8 +218,13 @@ class ImageTemplateAbilities {
 				),
 			),
 			'execute_callback'    => array( self::class, 'listTemplates' ),
-			'permission_callback' => fn() => PermissionHelper::can_manage(),
-			'meta'                => array( 'show_in_rest' => false ),
+			'permission_callback' => fn() => PermissionHelper::can( 'render_images' ),
+			// Not a REST resource, but a deliberate tool for MCP clients:
+			// the render_images permission is a real user boundary.
+			'meta'                => array(
+				'show_in_rest' => false,
+				'mcp'          => array( 'public' => true ),
+			),
 		);
 	}
 
@@ -200,9 +232,13 @@ class ImageTemplateAbilities {
 	 * Render an image from a registered template.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with success flag and file paths.
+	 * @return array|\WP_Error Result with local paths and public URLs, or an error.
 	 */
 	public static function renderTemplate( array $input ): array|\WP_Error {
+		if ( array_key_exists( 'dpi', $input ) && ( ! is_int( $input['dpi'] ) || $input['dpi'] < 1 ) ) {
+			return new \WP_Error( 'invalid_dpi', 'dpi must be a positive integer.', array( 'status' => 400 ) );
+		}
+
 		$template_id = $input['template_id'] ?? '';
 		$data        = $input['data'] ?? array();
 		$preset      = $input['preset'] ?? '';
@@ -254,7 +290,10 @@ class ImageTemplateAbilities {
 		}
 
 		$renderer = new GDRenderer();
-		$options  = array(
+		if ( isset( $input['dpi'] ) ) {
+			$renderer->set_dpi( $input['dpi'] );
+		}
+		$options = array(
 			'format' => $format,
 		);
 
@@ -266,19 +305,60 @@ class ImageTemplateAbilities {
 			$options['context'] = $context;
 		}
 
-		$file_paths = $template->render( $data, $renderer, $options );
+		if ( isset( $input['brand'] ) && ! is_array( $input['brand'] ) ) {
+			return new \WP_Error( 'invalid_brand', 'brand must be an object.', array( 'status' => 400 ) );
+		}
+
+		$file_paths = BrandTokens::with_overrides(
+			$input['brand'] ?? array(),
+			fn() => $template->render( $data, $renderer, $options )
+		);
 
 		if ( empty( $file_paths ) ) {
 			return new \WP_Error( 'template_render_empty', sprintf( 'Template "%s" rendered but produced no output', $template_id ), array( 'status' => 500 ) );
 		}
 
-		// Default output mode — return file paths as-is.
+		// Fields the template omitted to make the layout fit (e.g. the poster
+		// QR-hero fitting order) — surfaced so callers can tell a complete
+		// render from one that silently lost copy.
+		$dropped_fields = method_exists( $template, 'get_dropped_fields' )
+			? array_values( array_map( 'strval', (array) $template->get_dropped_fields() ) )
+			: array();
+
+		$warnings = method_exists( $template, 'get_warnings' )
+			? array_values( array_map( 'strval', (array) $template->get_warnings() ) )
+			: array();
+
+		// Keep local paths intact for in-process callers; publish temp renders
+		// through the existing repository for remote callers.
 		if ( 'cached_file' !== $output ) {
+			$storage         = new FileStorage();
+			$uploads         = wp_upload_dir();
+			$repository_root = trailingslashit( wp_normalize_path( $uploads['basedir'] ) ) . 'datamachine-files/';
+			$file_urls       = array();
+
+			foreach ( $file_paths as $index => $file_path ) {
+				$public_path = $file_path;
+				if ( ! str_starts_with( wp_normalize_path( $file_path ), $repository_root ) ) {
+					$filename    = wp_generate_uuid4() . '.' . pathinfo( $file_path, PATHINFO_EXTENSION );
+					$public_path = $storage->store_file( $file_path, $filename, $context );
+				}
+
+				if ( ! $public_path || ! is_file( $public_path ) ) {
+					return new \WP_Error( 'template_storage_failed', 'Failed to publish rendered template output.', array( 'status' => 500 ) );
+				}
+
+				$file_urls[ $index ] = $storage->get_public_url( $public_path );
+			}
+
 			return array(
-				'success'     => true,
-				'file_paths'  => $file_paths,
-				'template_id' => $template_id,
-				'message'     => sprintf( 'Generated %d image(s) using template "%s"', count( $file_paths ), $template_id ),
+				'success'        => true,
+				'file_paths'     => $file_paths,
+				'file_urls'      => $file_urls,
+				'template_id'    => $template_id,
+				'dropped_fields' => $dropped_fields,
+				'warnings'       => $warnings,
+				'message'        => sprintf( 'Generated %d image(s) using template "%s"', count( $file_paths ), $template_id ),
 			);
 		}
 
@@ -291,8 +371,10 @@ class ImageTemplateAbilities {
 
 		return array_merge(
 			array(
-				'success'     => true,
-				'template_id' => $template_id,
+				'success'        => true,
+				'template_id'    => $template_id,
+				'dropped_fields' => $dropped_fields,
+				'warnings'       => $warnings,
 			),
 			$cached_result
 		);

@@ -48,8 +48,7 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
-require_once __DIR__ . '/../inc/Abilities/HandlerAbilities.php';
-require_once __DIR__ . '/../inc/Abilities/AuthAbilities.php';
+require_once __DIR__ . '/smoke-bootstrap.php';
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\HandlerAbilities;

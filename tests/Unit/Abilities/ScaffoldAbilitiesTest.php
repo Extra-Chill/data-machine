@@ -9,9 +9,22 @@ namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\File\ScaffoldAbilities;
 use DataMachine\Core\FilesRepository\FilesystemHelper;
+use DataMachine\Engine\AI\MemoryFileRegistry;
 use WP_UnitTestCase;
 
 class ScaffoldAbilitiesTest extends WP_UnitTestCase {
+
+	public function set_up(): void {
+		parent::set_up();
+
+		// Layer scaffolding resolves its file list from the memory file
+		// registry (WAKE.md, USER_MEMORY.md, ...). Core registrations happen
+		// once per process, so restore them if an earlier test in the same
+		// process reset the registry.
+		if ( ! MemoryFileRegistry::is_registered( 'WAKE.md' ) ) {
+			datamachine_register_default_memory_files();
+		}
+	}
 
 	public function test_existing_file_is_idempotent_but_write_failure_is_error(): void {
 		$directory = get_temp_dir() . 'datamachine-scaffold-' . wp_generate_uuid4();

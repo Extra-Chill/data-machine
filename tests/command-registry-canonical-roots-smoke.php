@@ -30,9 +30,16 @@ if ( array() !== $aliases ) {
 	fwrite( STDERR, 'FAIL: provider exposes non-canonical command aliases.' . PHP_EOL );
 	exit( 1 );
 }
-if ( 31 !== count( $map ) ) {
-	fwrite( STDERR, 'FAIL: provider does not register exactly 31 commands.' . PHP_EOL );
+if ( array() === $map ) {
+	fwrite( STDERR, 'FAIL: provider registered no commands.' . PHP_EOL );
 	exit( 1 );
+}
+foreach ( $map as $command => $class ) {
+	$path = dirname( __DIR__ ) . '/inc/' . str_replace( '\\', '/', substr( $class, strlen( 'DataMachine\\' ) ) ) . '.php';
+	if ( ! str_starts_with( $command, 'datamachine ' ) || ! is_file( $path ) ) {
+		fwrite( STDERR, "FAIL: invalid command registration {$command} => {$class}." . PHP_EOL );
+		exit( 1 );
+	}
 }
 if ( ! isset( $map['datamachine flows'], $map['datamachine agents'] ) ) {
 	fwrite( STDERR, 'FAIL: canonical flow and agent roots are missing.' . PHP_EOL );

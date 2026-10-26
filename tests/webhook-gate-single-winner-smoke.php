@@ -21,9 +21,7 @@ namespace {
 	define( 'ABSPATH', __DIR__ . '/' );
 	define( 'ARRAY_A', 'ARRAY_A' );
 
-	function wp_json_encode( mixed $value ): string|false {
-		return json_encode( $value );
-	}
+	require_once __DIR__ . '/smoke-wp-stubs.php';
 
 	function wp_cache_delete( int $key, string $group ): bool {
 		$GLOBALS['cache_deletes'][] = array( $key, $group );
@@ -33,11 +31,6 @@ namespace {
 	function current_time( string $type, bool $gmt ): string {
 		unset( $type, $gmt );
 		return '2026-08-21 12:00:00';
-	}
-
-	function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
-		unset( $hook, $args );
-		return $value;
 	}
 
 	final class WebhookGateFakeWpdb {
@@ -171,7 +164,7 @@ namespace {
 	$assert( 'gate-step' === $engine['step_input_packets']['next-step'][0]['metadata']['flow_step_id'], 'winner binds payload to the gate step' );
 	$assert( array( 1 ) === $GLOBALS['wpdb']->actions, 'exactly one scheduler action commits' );
 	$assert( ! array_key_exists( 'job_status', $engine ), 'winner clears waiting override' );
-	$assert( 'processing' === $engine[ \DataMachine\Core\RunLifecycleStore::META_KEY ]['status'], 'winner commits the processing lifecycle projection' );
+	$assert( ! array_key_exists( 'status', $engine[ \DataMachine\Core\RunLifecycleStore::META_KEY ] ), 'lifecycle metadata does not mirror the authoritative job row status' );
 	$assert(
 		array(
 			array( 42, 'datamachine_engine_data' ),

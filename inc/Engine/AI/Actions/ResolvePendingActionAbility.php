@@ -138,7 +138,7 @@ class ResolvePendingActionAbility {
 	/**
 	 * Resolve through the canonical Agents API ability.
 	 *
-	 * @param array $input { action_id, decision }.
+	 * @param array $input { action_id, decision, operator_wide?, context? }.
 	 * @return array|\WP_Error
 	 */
 	public static function execute( array $input ): array|\WP_Error {
@@ -150,13 +150,19 @@ class ResolvePendingActionAbility {
 			return new \WP_Error( 'pending_action_input_required', 'action_id, decision, and resolver are required.', array( 'status' => 400 ) );
 		}
 
+		$context = isset( $input['context'] ) && is_array( $input['context'] ) ? $input['context'] : array();
+		if ( ! empty( $input['operator_wide'] ) ) {
+			// The Agents API resolver forwards context, not arbitrary top-level input.
+			$context['operator_wide'] = true;
+		}
+
 		$result = \AgentsAPI\AI\Approvals\agents_resolve_pending_action(
 			array(
 				'action_id' => $action_id,
 				'decision'  => $decision_value,
 				'resolver'  => $resolver,
 				'payload'   => isset( $input['payload'] ) && is_array( $input['payload'] ) ? $input['payload'] : array(),
-				'context'   => isset( $input['context'] ) && is_array( $input['context'] ) ? $input['context'] : array(),
+				'context'   => $context,
 			)
 		);
 
@@ -257,7 +263,12 @@ class ResolvePendingActionAbility {
 			);
 		}
 
-		if ( ! PendingActionScope::can_access_payload( $payload, $input ) ) {
+		$scope_input = $input;
+		if ( ! empty( $input['context']['operator_wide'] ) ) {
+			$scope_input['operator_wide'] = true;
+		}
+		// Operator intent never grants permission by itself; scope checks can_manage().
+		if ( ! PendingActionScope::can_access_payload( $payload, $scope_input ) ) {
 			return array(
 				'success'   => false,
 				'error'     => 'You do not have permission to resolve this pending action.',

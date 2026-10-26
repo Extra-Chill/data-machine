@@ -106,6 +106,10 @@ class FilesystemHelper {
 	 * @return bool True if the file is (or was made) group-writable, false otherwise.
 	 */
 	public static function make_group_writable( string $filepath, int $permissions = self::AGENT_FILE_PERMISSIONS ): bool {
+		// Atomic replacement or another process may have changed the inode or mode.
+		// Permission and ownership decisions must describe the current file.
+		clearstatcache( true, $filepath );
+
 		if ( ! file_exists( $filepath ) ) {
 			return false;
 		}
@@ -127,7 +131,10 @@ class FilesystemHelper {
 
 		// Suppress any residual warning — a failed chmod is non-fatal here.
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod, WordPress.PHP.NoSilencedErrors.Discouraged
-		return @chmod( $filepath, $permissions );
+		$result = @chmod( $filepath, $permissions );
+		// PHP 8.2 can retain the pre-chmod mode for subsequent stat calls.
+		clearstatcache( true, $filepath );
+		return $result;
 	}
 
 	/**

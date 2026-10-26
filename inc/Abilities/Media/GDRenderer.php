@@ -59,6 +59,12 @@ class GDRenderer {
 	 */
 	private int $height = 0;
 
+	/** Preset resolution for the current canvas, if specified. */
+	private ?int $preset_dpi = null;
+
+	/** Explicit resolution override, retained across canvases in batch renders. */
+	private ?int $dpi_override = null;
+
 	/**
 	 * Resolved font paths cache.
 	 *
@@ -97,7 +103,7 @@ class GDRenderer {
 	 */
 	public function create_canvas( int|string $width_or_preset, int $height = 0 ): self {
 		if ( is_string( $width_or_preset ) ) {
-			$dims = PlatformPresets::dimensions( $width_or_preset );
+			$dims = PlatformPresets::get( $width_or_preset );
 			if ( ! $dims ) {
 				do_action(
 					'datamachine_log',
@@ -106,11 +112,13 @@ class GDRenderer {
 				);
 				return $this;
 			}
-			$this->width  = $dims['width'];
-			$this->height = $dims['height'];
+			$this->width      = $dims['width'];
+			$this->height     = $dims['height'];
+			$this->preset_dpi = $dims['dpi'] ?? null;
 		} else {
-			$this->width  = $width_or_preset;
-			$this->height = $height;
+			$this->width      = $width_or_preset;
+			$this->height     = $height;
+			$this->preset_dpi = null;
 		}
 
 		$this->image  = imagecreatetruecolor( $this->width, $this->height );
@@ -120,6 +128,21 @@ class GDRenderer {
 			do_action( 'datamachine_log', 'error', 'GDRenderer: Failed to create canvas' );
 		}
 
+		return $this;
+	}
+
+	/**
+	 * Override output resolution without changing pixel dimensions.
+	 *
+	 * @param int $dpi Positive dots per inch.
+	 * @return self
+	 * @throws \InvalidArgumentException If DPI is not positive.
+	 */
+	public function set_dpi( int $dpi ): self {
+		if ( $dpi < 1 ) {
+			throw new \InvalidArgumentException( 'dpi must be a positive integer.' );
+		}
+		$this->dpi_override = $dpi;
 		return $this;
 	}
 
@@ -850,9 +873,13 @@ class GDRenderer {
 	 * @param int    $width      Destination width (0 = source width).
 	 * @param int    $height     Destination height (0 = source height).
 	 * @param int    $opacity    Opacity percentage (0-100, default 100).
+	 * @param bool   $smooth     Resample smoothly when scaling (default). Pass
+	 *                           false for nearest-neighbor scaling so hard-edged
+	 *                           bitmaps (QR codes) stay crisp instead of being
+	 *                           blurred by bilinear interpolation.
 	 * @return self
 	 */
-	public function overlay_image( string $image_path, int $x, int $y, int $width = 0, int $height = 0, int $opacity = 100 ): self {
+	public function overlay_image( string $image_path, int $x, int $y, int $width = 0, int $height = 0, int $opacity = 100, bool $smooth = true ): self {
 		if ( ! $this->image || ! file_exists( $image_path ) ) {
 			return $this;
 		}
@@ -881,13 +908,93 @@ class GDRenderer {
 
 		if ( $opacity < 100 ) {
 			imagecopymerge( $this->image, $source, $x, $y, 0, 0, $dst_width, $dst_height, $opacity );
-		} else {
+		} elseif ( $smooth ) {
 			imagecopyresampled( $this->image, $source, $x, $y, 0, 0, $dst_width, $dst_height, $src_width, $src_height );
+		} else {
+			imagecopyresized( $this->image, $source, $x, $y, 0, 0, $dst_width, $dst_height, $src_width, $src_height );
 		}
 
 		unset( $source );
 
 		return $this;
+	}
+
+	/**
+	 * Source crop rectangle for cover-fitting an image into a destination.
+	 *
+	 * The source is scaled so it fills the destination completely while
+	 * preserving its aspect ratio; the dimension that overflows is
+	 * center-cropped. The returned rectangle is in source coordinates and
+	 * can be fed straight into imagecopyresampled().
+	 *
+	 * @param int $src_width  Source width in pixels.
+	 * @param int $src_height Source height in pixels.
+	 * @param int $dst_width  Destination width in pixels.
+	 * @param int $dst_height Destination height in pixels.
+	 * @return array{src_x: int, src_y: int, src_w: int, src_h: int}
+	 */
+	public static function cover_crop( int $src_width, int $src_height, int $dst_width, int $dst_height ): array {
+		if ( $src_width < 1 || $src_height < 1 || $dst_width < 1 || $dst_height < 1 ) {
+			return array(
+				'src_x' => 0,
+				'src_y' => 0,
+				'src_w' => max( 1, $src_width ),
+				'src_h' => max( 1, $src_height ),
+			);
+		}
+
+		$scale  = max( $dst_width / $src_width, $dst_height / $src_height );
+		$crop_w = min( $src_width, max( 1, (int) round( $dst_width / $scale ) ) );
+		$crop_h = min( $src_height, max( 1, (int) round( $dst_height / $scale ) ) );
+
+		return array(
+			'src_x' => intdiv( $src_width - $crop_w, 2 ),
+			'src_y' => intdiv( $src_height - $crop_h, 2 ),
+			'src_w' => $crop_w,
+			'src_h' => $crop_h,
+		);
+	}
+
+	/**
+	 * Cover-fit an image file onto a region of the canvas.
+	 *
+	 * The source is scaled to fill the region, its overflow center-cropped
+	 * (see cover_crop()), and resampled at high quality. Supports PNG, JPEG
+	 * and WebP sources; anything else is refused so callers can fall back.
+	 *
+	 * @param string $image_path Path to the source image.
+	 * @param int    $x          Destination X.
+	 * @param int    $y          Destination Y.
+	 * @param int    $width      Destination width.
+	 * @param int    $height     Destination height.
+	 * @return bool Whether the image was drawn.
+	 */
+	public function overlay_image_cover( string $image_path, int $x, int $y, int $width, int $height ): bool {
+		if ( ! $this->image || $width < 1 || $height < 1 || ! is_readable( $image_path ) ) {
+			return false;
+		}
+
+		$info = getimagesize( $image_path );
+		if ( ! $info ) {
+			return false;
+		}
+
+		$source = match ( $info[2] ) {
+			IMAGETYPE_PNG  => imagecreatefrompng( $image_path ),
+			IMAGETYPE_JPEG => imagecreatefromjpeg( $image_path ),
+			IMAGETYPE_WEBP => imagecreatefromwebp( $image_path ),
+			default        => false,
+		};
+
+		if ( ! $source ) {
+			return false;
+		}
+
+		$crop = self::cover_crop( imagesx( $source ), imagesy( $source ), $width, $height );
+		imagecopyresampled( $this->image, $source, $x, $y, $crop['src_x'], $crop['src_y'], $width, $height, $crop['src_w'], $crop['src_h'] );
+		unset( $source );
+
+		return true;
 	}
 
 	// -------------------------------------------------------------------------
@@ -1215,6 +1322,11 @@ class GDRenderer {
 	public function save_temp( string $format = 'png', int $quality = -1 ): ?string {
 		if ( ! $this->image ) {
 			return null;
+		}
+
+		$dpi = $this->dpi_override ?? $this->preset_dpi;
+		if ( null !== $dpi ) {
+			imageresolution( $this->image, $dpi, $dpi );
 		}
 
 		$temp_file = tempnam( sys_get_temp_dir(), 'datamachine_img_' );

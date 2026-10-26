@@ -8,7 +8,9 @@
  * `queue_mode` enum on every queueable step, and replaced the old
  * `PUT /flows/{id}/queue/settings { queue_enabled }` endpoint with
  * `PUT /flows/{id}/queue/mode { mode: "drain" | "loop" | "static" }`.
- * The PR explicitly carved React out of scope (#1300).
+ * The PR explicitly carved React out of scope (#1300). The custom REST
+ * routes have since been retired: React now calls the REST-visible
+ * `datamachine/queue-mode` ability through the core ability runner.
  *
  * #1300 cleans up the React UI to read/write the new shape. Three
  * regressions had to be eliminated:
@@ -88,10 +90,10 @@ assert_react_contract(
 	false !== strpos( $api, 'export const updateFlowQueueMode' )
 );
 
-echo "\n[api.js:2] PUT URL is /queue/mode (not /queue/settings)\n";
+echo "\n[api.js:2] queue mode uses the core ability runner\n";
 assert_react_contract(
-	'PUT URL targets /queue/mode',
-	false !== strpos( $api, '/flows/${ flowId }/queue/mode' )
+	'queue-mode ability is executed',
+	false !== strpos( $api, "executeAbility( 'queue-mode', {" )
 );
 assert_react_contract(
 	'legacy /queue/settings endpoint is gone',
@@ -102,7 +104,7 @@ echo "\n[api.js:3] Request body uses `mode`, not `queue_enabled`\n";
 // The body literal must contain `mode,` (shorthand property) and NOT
 // `queue_enabled`. Match on a tight slice that includes the body
 // object so we don't false-positive against unrelated `mode` strings.
-preg_match( '/queue\/mode`,\s*\{([^}]+)\}/s', $api, $body_match );
+preg_match( "/executeAbility\( 'queue-mode',\s*\{([^}]+)\}/s", $api, $body_match );
 $body_block = $body_match[1] ?? '';
 assert_react_contract(
 	'request body contains `flow_step_id: flowStepId`',
@@ -327,16 +329,17 @@ assert_react_contract(
 );
 
 // ---------------------------------------------------------------
-// SECTION 6: server contract — confirm the React shape matches the REST endpoint.
+// SECTION 6: server contract — confirm React matches the REST-visible ability.
 // ---------------------------------------------------------------
 
-echo "\n[server-contract:1] FlowQueue.php REST surface still matches React\n";
+echo "\n[server-contract:1] QueueAbility surface still matches React\n";
 $rest = (string) file_get_contents(
-	dirname( __DIR__ ) . '/inc/Api/Flows/FlowQueue.php'
+	dirname( __DIR__ ) . '/inc/Abilities/Flow/QueueAbility.php'
 );
 assert_react_contract(
-	'PUT /flows/{id}/queue/mode endpoint is registered',
-	false !== strpos( $rest, '/flows/(?P<flow_id>\d+)/queue/mode' )
+	'queue-mode ability is registered and REST-visible',
+	false !== strpos( $rest, "'datamachine/queue-mode'" )
+		&& false !== strpos( $rest, "'show_in_rest' => true" )
 );
 assert_react_contract(
 	"REST `mode` arg has enum [drain, loop, static]",
@@ -346,8 +349,8 @@ assert_react_contract(
 	)
 );
 assert_react_contract(
-	"GET /queue response includes 'queue_mode' field",
-	false !== strpos( $rest, "'queue_mode'   => \$result['queue_mode']" )
+	"queue ability output declares 'queue_mode' field",
+	false !== strpos( $rest, "'queue_mode'   => array( 'type' => 'string' )" )
 );
 assert_react_contract(
 	'legacy /queue/settings endpoint is gone server-side too',

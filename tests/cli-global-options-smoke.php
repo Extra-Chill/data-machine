@@ -85,7 +85,26 @@ $assert = static function ( bool $condition, string $message ) use ( &$failures,
 };
 
 
-$run = static function ( array $command, array $environment = array() ): array {
+$run = static function ( array $command, array $environment = array() ) use ( $root ): array {
+	// Use the Composer-managed WP-CLI with this PHP interpreter, not a host wrapper.
+	if ( 'wp' === $command[0] ) {
+		// Load Composer before the --require probe defines ABSPATH. Otherwise
+		// WordPress-only dependency bootstraps mistake this for a live site.
+		// The analysis/runtime toolchain lives in Homeboy's WordPress extension
+		// (see composer.json `lint`); a repo-local vendor install is the fallback.
+		$toolchain = getenv( 'HOMEBOY_EXTENSION_PATH' );
+		$wp_cli    = ( $toolchain && is_file( $toolchain . '/vendor/wp-cli/wp-cli/php/boot-fs.php' ) )
+			? $toolchain . '/vendor/wp-cli/wp-cli/php/boot-fs.php'
+			: $root . '/vendor/wp-cli/wp-cli/php/boot-fs.php';
+		if ( ! is_file( $wp_cli ) ) {
+			fwrite( STDERR, "FAIL: needs WP-CLI; set HOMEBOY_EXTENSION_PATH to the Homeboy WordPress extension.\n" );
+			exit( 1 );
+		}
+		$bootstrap = 'require ' . var_export( $root . '/vendor/autoload.php', true ) . '; require '
+			. var_export( $wp_cli, true ) . ';';
+		array_splice( $command, 0, 1, array( PHP_BINARY, '-r', $bootstrap, '--' ) );
+	}
+	$environment += array( 'WP_CLI_ALLOW_ROOT' => '1', 'PAGER' => 'cat', 'WP_CLI_PAGER' => 'cat' );
 	$previous_environment = array();
 	foreach ( $environment as $name => $value ) {
 		$previous_environment[ $name ] = getenv( $name );
@@ -123,8 +142,11 @@ preg_match_all( '/^  --(?:\[no-\])?([a-z0-9-]+)/m', $wp_help, $global_matches );
 $global_options = $global_matches[1];
 
 foreach ( $sources as $command => $source ) {
+	// Optional `[--opt=<v>]` and required `--opt=<v>` declarations alike:
+	// WP-CLI consumes a global name before the command sees it.
 	preg_match_all( '/\[--([a-z0-9-]+)(?:=<[^>]+>)?\]/', $source, $matches );
-	$declared_globals = array_intersect( $global_options, $matches[1] );
+	preg_match_all( '/^\s*\*\s+--([a-z0-9-]+)=<[^>]+>\s*$/m', $source, $required );
+	$declared_globals = array_intersect( $global_options, array_merge( $matches[1], $required[1] ) );
 	$assert( array() === $declared_globals, "registered {$command} command declares no WP-CLI global options" );
 }
 
@@ -132,9 +154,11 @@ $auth   = $sources['Commands\\AuthCommand'];
 $chat   = $sources['Commands\\ChatCommand'];
 $email  = $sources['Commands\\EmailCommand'];
 $memory = $sources['Commands\\MemoryCommand'];
+$identity = $sources['Commands\\ChatIdentityCommand'];
 
 $assert( str_contains( $auth, "\$assoc_args['target-user']" ), 'auth revoke receives --target-user' );
 $assert( str_contains( $chat, "\$assoc_args['owner-user']" ), 'chat commands receive --owner-user' );
+$assert( str_contains( $identity, "\$assoc_args['target-user']" ), 'chat-identity commands receive --target-user' );
 $assert( str_contains( $chat, "\$assoc_args['session-context']" ), 'chat commands receive --session-context' );
 $assert( str_contains( $email, "\$assoc_args['template-context']" ) && str_contains( $email, "\$input['context'] = \$decoded" ), 'queued email maps --template-context to the internal context payload' );
 $assert( ! str_contains( $memory, "get_flag_value( \$assoc_args, 'quiet'" ), 'memory compose relies on WP-CLI global quiet handling' );
@@ -145,6 +169,9 @@ $help_commands = array(
 	'chat list'      => array( '--owner-user=<id>', '--session-context=<type>' ),
 	'chat get'       => array( '--owner-user=<id>' ),
 	'chat create'    => array( '--owner-user=<id>', '--session-context=<type>' ),
+	'chat-identity link'   => array( '--target-user=<user>' ),
+	'chat-identity unlink' => array( '--target-user=<user>' ),
+	'chat-identity list'   => array( '--target-user=<user>' ),
 	'email send-queued' => array( '--template-context=<json>' ),
 	'memory compose' => array( '--agent=<slug>' ),
 );

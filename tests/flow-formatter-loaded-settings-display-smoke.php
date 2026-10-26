@@ -35,33 +35,35 @@ namespace {
 		}
 	}
 
-	if ( ! function_exists( 'apply_filters' ) ) {
-		function apply_filters( string $hook, $value, ...$args ) {
-			if ( 'datamachine_step_types' === $hook ) {
-				return array(
-					'fetch'   => array(
-						'uses_handler'          => true,
-						'multi_handler'         => false,
-						'show_settings_display' => true,
-					),
-					'publish' => array(
-						'uses_handler'          => true,
-						'multi_handler'         => true,
-						'show_settings_display' => true,
-					),
-				);
-			}
-
-			if ( 'datamachine_handler_settings' === $hook ) {
-				$handler_slug = $args[0] ?? '';
-				return array(
-					$handler_slug => new FlowFormatterLoadedConfigSettings(),
-				);
-			}
-
-			return $value;
+	// The shared smoke stubs own apply_filters(); register this smoke's step
+	// types and handler settings through the stubbed filter registry.
+	add_filter(
+		'datamachine_step_types',
+		static function () {
+			return array(
+				'fetch'   => array(
+					'uses_handler'          => true,
+					'multi_handler'         => false,
+					'show_settings_display' => true,
+				),
+				'publish' => array(
+					'uses_handler'          => true,
+					'multi_handler'         => true,
+					'show_settings_display' => true,
+				),
+			);
 		}
-	}
+	);
+	add_filter(
+		'datamachine_handler_settings',
+		static function ( $value, $handler_slug = '' ) {
+			return array(
+				$handler_slug => new FlowFormatterLoadedConfigSettings(),
+			);
+		},
+		10,
+		2
+	);
 
 	if ( ! function_exists( 'get_option' ) ) {
 		function get_option( string $option, $default = false ) {
@@ -82,11 +84,7 @@ namespace {
 		}
 	}
 
-	require_once __DIR__ . '/../inc/Abilities/HandlerAbilities.php';
-	require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
-	require_once __DIR__ . '/../inc/Core/Steps/Settings/SettingsDisplayService.php';
-	require_once __DIR__ . '/../inc/Core/Admin/DateFormatter.php';
-	require_once __DIR__ . '/../inc/Core/Admin/FlowFormatter.php';
+	require_once __DIR__ . '/smoke-bootstrap.php';
 
 	class FlowFormatterLoadedConfigSettings {
 		public static function get_fields(): array {

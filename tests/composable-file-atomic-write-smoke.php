@@ -16,6 +16,12 @@ namespace DataMachine\Core\FilesRepository {
 
 	class FilesystemHelper {
 		public static array $group_writable_paths = array();
+		public static array $inherited_groups = array();
+
+		public static function inherit_shared_group( string $filepath, string $directory ): bool {
+			self::$inherited_groups[] = array( $filepath, $directory, is_file( $filepath ) );
+			return true;
+		}
 
 		public static function make_group_writable( string $filepath ): bool {
 			self::$group_writable_paths[] = $filepath;
@@ -66,6 +72,12 @@ namespace {
 	$filepath  = $directory . '/AGENTS.md';
 	$expected_mode = 'defined' === $mode ? 0640 : 0644;
 	mkdir( $directory, 0700 );
+	register_shutdown_function( static function () use ( $directory ): void {
+		foreach ( new \FilesystemIterator( $directory, \FilesystemIterator::SKIP_DOTS ) as $file ) {
+			unlink( $file->getPathname() );
+		}
+		rmdir( $directory );
+	} );
 	file_put_contents( $filepath, str_repeat( 'old', 10000 ) );
 
 	$method = new \ReflectionMethod( \DataMachine\Engine\AI\ComposableFileGenerator::class, 'write_file' );
@@ -75,10 +87,16 @@ namespace {
 	$permissions = fileperms( $filepath ) & 0777;
 	$temps       = glob( $directory . '/.AGENTS.md.tmp-*' );
 
-	@unlink( $filepath );
-	@rmdir( $directory );
-
-	if ( true !== $result || str_repeat( 'new', 10000 ) . "\n" !== $actual || $expected_mode !== $permissions || array() !== $temps || array( $filepath ) !== \DataMachine\Core\FilesRepository\FilesystemHelper::$group_writable_paths ) {
+	$inherited_groups = \DataMachine\Core\FilesRepository\FilesystemHelper::$inherited_groups;
+	if (
+		true !== ( $result['success'] ?? false )
+		|| 1 !== count( $inherited_groups )
+		|| array( $directory, true ) !== array_slice( $inherited_groups[0], 1 )
+		|| str_repeat( 'new', 10000 ) . "\n" !== $actual
+		|| $expected_mode !== $permissions
+		|| array() !== $temps
+		|| array( $filepath ) !== \DataMachine\Core\FilesRepository\FilesystemHelper::$group_writable_paths
+	) {
 		fwrite( STDERR, "FAIL: composable file write did not preserve atomic replacement, cleanup, mode, and group-writable normalization.\n" );
 		exit( 1 );
 	}

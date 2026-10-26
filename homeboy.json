@@ -1267,5 +1267,8 @@
       "file": "package.json",
       "pattern": "\"version\":\\s*\"([0-9.]+)\""
     }
-  ]
+  ],
+  "release": {
+    "owner": "ci"
+  }
 }

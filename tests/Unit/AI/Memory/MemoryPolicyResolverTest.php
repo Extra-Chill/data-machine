@@ -101,6 +101,14 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	public function tear_down(): void {
 		MemoryFileRegistry::reset();
 		AgentModeRegistry::reset();
+
+		// Re-register the production defaults wiped by reset(). Core files and
+		// modes register once per process (plugins_loaded / init 0), so leaving
+		// the registries empty pollutes every later test in the same process
+		// that depends on SOUL.md, MEMORY.md, USER_MEMORY.md, chat mode, etc.
+		datamachine_register_default_memory_files();
+		\DataMachine\Core\Bootstrap\HostIntegrationServiceProvider::register_agent_modes();
+
 		remove_all_filters( 'datamachine_resolved_memory_files' );
 		remove_all_filters( 'datamachine_resolved_scoped_memory_files' );
 		parent::tear_down();

@@ -15,9 +15,9 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
 use DataMachine\Engine\AI\MemoryFileRegistry;
-use DataMachine\Tests\Fixtures\CountingProvisionAdapter;
-use DataMachine\Tests\Fixtures\DuplicateLoserAgents;
-use DataMachine\Tests\Fixtures\FailingProvisionAdapter;
+use DataMachine\Tests\Doubles\CountingProvisionAdapter;
+use DataMachine\Tests\Doubles\DuplicateLoserAgents;
+use DataMachine\Tests\Doubles\FailingProvisionAdapter;
 use WP_UnitTestCase;
 
 class AgentIdentityStoreAdapterTest extends WP_UnitTestCase {

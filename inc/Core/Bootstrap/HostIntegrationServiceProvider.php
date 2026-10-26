@@ -148,6 +148,8 @@ final class HostIntegrationServiceProvider {
 	/** @param array<string, class-string> $templates Image template classes. */
 	public static function register_image_templates( array $templates ): array {
 		$templates['flow_diagram'] ??= \DataMachine\Abilities\Media\Templates\FlowDiagramTemplate::class;
+		$templates['poster']       ??= \DataMachine\Abilities\Media\Templates\PosterTemplate::class;
+		$templates['stack']        ??= \DataMachine\Abilities\Media\Templates\StackTemplate::class;
 		return $templates;
 	}
 

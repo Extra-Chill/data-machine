@@ -137,45 +137,7 @@ class WP_Abilities_Registry {
 	}
 }
 
-require_once __DIR__ . '/../inc/Core/PluginSettings.php';
-require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Approvals/class-wp-agent-approval-memory-store.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Approvals/class-wp-agent-null-approval-memory-store.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workspace/class-wp-agent-workspace-scope.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Runtime/class-wp-agent-citation-metadata.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-call.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-result.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-action-policy.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-action-policy-provider.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-action-policy-resolver.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-executor.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-execution-core.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy.php';
-require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
-require_once __DIR__ . '/../inc/Core/AbilityResult.php';
-require_once __DIR__ . '/../inc/Core/WordPress/PostTracking.php';
-require_once __DIR__ . '/../inc/Core/Workspace/WordPressWorkspaceScope.php';
-require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
-require_once __DIR__ . '/../inc/Engine/AI/ToolSchemaNormalizer.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/AbilityToolAdapter.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
-require_once __DIR__ . '/../inc/Engine/AI/Actions/DataMachineModeActionPolicyProvider.php';
-require_once __DIR__ . '/../inc/Engine/AI/Actions/ActionPolicyResolver.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/RuntimeToolSource.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AbilityToolSource.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
-require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
+require_once __DIR__ . '/smoke-bootstrap.php';
 
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
@@ -469,7 +431,7 @@ $runtime_tools = resolve_source_tools(
 	new SourcePolicyToolManager(),
 	array(
 		'client_context' => array(
-			'runtime_tools' => array(
+			'runtime_tools' => array( 'declarations' => array(
 				'client/select_block' => array(
 					'description' => 'Select a block in the active editor.',
 					'parameters'  => array(
@@ -481,7 +443,7 @@ $runtime_tools = resolve_source_tools(
 					'executor'    => 'client',
 					'scope'       => 'run',
 				),
-			),
+			) ),
 		),
 	)
 );
@@ -547,7 +509,7 @@ $runtime_policy_tools = resolve_source_tools(
 			'tools' => array( 'client/select_block' ),
 		),
 		'client_context' => array(
-			'runtime_tools' => array(
+			'runtime_tools' => array( 'declarations' => array(
 				'client/select_block' => array(
 					'description' => 'Select a block in the active editor.',
 					'parameters'  => array(
@@ -559,7 +521,7 @@ $runtime_policy_tools = resolve_source_tools(
 					'executor'    => 'client',
 					'scope'       => 'run',
 				),
-			),
+			) ),
 		),
 	)
 );
@@ -571,7 +533,7 @@ $runtime_tools = resolve_source_tools(
 	array(
 		'allow_only'      => array( 'client/select_block' ),
 		'client_context'  => array(
-			'runtime_tools' => array(
+			'runtime_tools' => array( 'declarations' => array(
 				'client/select_block' => array(
 					'description' => 'Select a block in the active editor.',
 					'parameters'  => array(
@@ -587,7 +549,7 @@ $runtime_tools = resolve_source_tools(
 					'description' => 'Invalid missing executor with secret payload super-secret-token.',
 					'scope'       => 'run',
 				),
-			),
+			) ),
 		),
 	)
 );

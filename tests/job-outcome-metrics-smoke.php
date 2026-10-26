@@ -18,10 +18,7 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
-require_once __DIR__ . '/../inc/Core/JobStatus.php';
-require_once __DIR__ . '/../inc/Core/JobArtifactSurfaces.php';
-require_once __DIR__ . '/../inc/Core/StepResult.php';
-require_once __DIR__ . '/../inc/Core/RunMetrics.php';
+require_once __DIR__ . '/smoke-bootstrap.php';
 
 use DataMachine\Core\RunMetrics;
 

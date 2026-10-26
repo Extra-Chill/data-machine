@@ -745,6 +745,81 @@ resolver_smoke_assert( 400 === ( $forged_result->get_error_data()['status'] ?? n
 resolver_smoke_assert( array( 7 ) === $origin_handler_blogs, 'forged origin does not execute the handler', $failures, $passes );
 resolver_smoke_assert( 2 === get_current_blog_id(), 'forged origin denial also restores the caller blog', $failures, $passes );
 
+// Regression #3668: exercise CLI and execute() through the real Agents API hop.
+if ( ! function_exists( 'is_user_logged_in' ) ) {
+	function is_user_logged_in() { return get_current_user_id() > 0; }
+}
+if ( ! function_exists( 'user_can' ) ) {
+	function user_can( $user_id, $capability ) {
+		return ! empty( $GLOBALS['__resolver_manage'] ) && 'manage_options' === $capability;
+	}
+}
+if ( ! class_exists( 'WP_CLI_Command' ) ) {
+	class WP_CLI_Command {}
+}
+if ( ! class_exists( 'WP_CLI' ) ) {
+	class WP_CLI {
+		public static array $lines = array();
+		public static function error( $message ) { throw new RuntimeException( $message ); }
+		public static function success( $message ) { unset( $message ); }
+		public static function line( $message ) { self::$lines[] = $message; }
+	}
+}
+require_once dirname( __DIR__ ) . '/inc/Cli/BaseCommand.php';
+require_once dirname( __DIR__ ) . '/inc/Cli/Commands/PendingActionsCommand.php';
+
+$command = new \DataMachine\Cli\Commands\PendingActionsCommand();
+foreach ( array( 'ability', 'cli' ) as $transport ) {
+	foreach ( array( 'accepted', 'rejected' ) as $decision ) {
+		foreach ( array( 'manager_wide', 'manager_scoped', 'nonmanager_wide', 'nonmanager_context_wide', 'manager_context_wide' ) as $scenario ) {
+			$GLOBALS['__resolver_manage'] = str_starts_with( $scenario, 'manager_' );
+			$wide = str_ends_with( $scenario, '_wide' );
+			$context_wide = str_contains( $scenario, '_context_' );
+			if ( 'cli' === $transport && $context_wide ) {
+				continue;
+			}
+			$expected = $GLOBALS['__resolver_manage'] && $wide;
+			$id = 'act_system_' . $transport . '_' . $decision . '_' . $scenario;
+			PendingActionStore::store( $id, array(
+				'kind' => 'contract_kind',
+				'summary' => 'System-created action regression #3668.',
+				'created_by' => 0,
+				'creator' => null,
+				'agent' => null,
+				'apply_input' => array( 'target' => 'system-action' ),
+			) );
+			$calls_before = count( $handler_calls );
+			if ( 'ability' === $transport ) {
+				$input = array( 'action_id' => $id, 'decision' => $decision );
+				if ( $context_wide ) {
+					$input['context'] = array( 'operator_wide' => $wide );
+				} else {
+					$input['operator_wide'] = $wide;
+				}
+				$result = ResolvePendingActionAbility::execute( $input );
+				$success = ! is_wp_error( $result ) && ! empty( $result['success'] );
+			} else {
+				$success = true;
+				try {
+					$method = 'accepted' === $decision ? 'accept' : 'reject';
+					$command->$method( array( $id ), array( 'operator-wide' => $wide, 'format' => 'json' ) );
+				} catch ( RuntimeException $error ) {
+					$success = false;
+				}
+				if ( $success ) {
+					$json = json_decode( end( WP_CLI::$lines ), true );
+					resolver_smoke_assert( true === ( $json['success'] ?? false ) && $decision === ( $json['decision'] ?? null ), 'CLI JSON reports successful ' . $decision, $failures, $passes );
+				}
+			}
+			resolver_smoke_assert( $expected === $success, "$transport $decision $scenario enforces explicit manager-only system-action resolution", $failures, $passes );
+			if ( ! $expected ) {
+				resolver_smoke_assert( null !== PendingActionStore::get( $id ) && $calls_before === count( $handler_calls ), 'refused resolution leaves action pending and never calls handler', $failures, $passes );
+			}
+		}
+	}
+}
+$GLOBALS['__resolver_manage'] = false;
+
 if ( ! empty( $failures ) ) {
 	echo "\nFailures:\n";
 	foreach ( $failures as $failure ) {

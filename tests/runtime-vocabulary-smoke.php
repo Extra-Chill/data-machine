@@ -67,6 +67,25 @@ function datamachine_runtime_vocab_is_allowed_file( string $relative_path ): boo
 		// Developer/release harness config. Runtime code must remain generic.
 		'.buildignore',
 		'composer.json',
+		'homeboy.json',
+		// Documented release tooling and historical audit evidence, not runtime dependencies.
+		'README.md',
+		'docs/wordpress-org-submission.md',
+		'docs/plugin-check-v01740-reviewer-dossier.md',
+		'docs/plugin-check-v01740-hook-names-dossier.md',
+		'docs/development/plugin-check-v01740-slow-query-audit.md',
+		'docs/development/post-identity-reservations.md',
+		// Explicit host harness contracts and external-schema interoperability fixtures.
+		'tests/ai-concurrency-release-wakeup-smoke.php',
+		'tests/agent-daily-memory-pipeline-scope-smoke.php',
+		'tests/eslint-source-inventory-smoke.sh',
+		'tests/cli-global-options-smoke.php',
+		'tests/email-multi-inbox-forward-smoke.php',
+		'tests/phpunit-file-isolation-smoke.php',
+		'tests/typed-artifact-handler-smoke.php',
+		'tests/fuzz/README.md',
+		'tests/fuzz/pipeline-builder-runtime.json',
+		'tests/fuzz/pipeline-builder-runtime-contract.test.mjs',
 	);
 
 	if ( in_array( $relative_path, $allowed_files, true ) ) {
@@ -76,6 +95,28 @@ function datamachine_runtime_vocab_is_allowed_file( string $relative_path ): boo
 	// CI workflow files are source-control harness config, not runtime logic.
 	return str_starts_with( $relative_path, '.github/workflows/' );
 }
+
+/**
+ * Git-tracked first-party paths, or null when git is unavailable.
+ *
+ * Runners drop untracked files into the checkout (for example `.homeboy-bin/`
+ * and shard plans). Those belong to the host, not to first-party source.
+ *
+ * @param string $root Repository root.
+ * @return array<string, true>|null
+ */
+function datamachine_runtime_vocab_tracked_files( string $root ): ?array {
+	$output = array();
+	$status = 1;
+	exec( 'git -C ' . escapeshellarg( $root ) . ' ls-files 2>/dev/null', $output, $status ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec -- CLI-only smoke reads the git index.
+	if ( 0 !== $status || array() === $output ) {
+		return null;
+	}
+
+	return array_fill_keys( $output, true );
+}
+
+$tracked_files = datamachine_runtime_vocab_tracked_files( $root );
 
 $host_specific_patterns = array(
 	'wp-site-generator' => '/wp-site-generator/i',
@@ -108,6 +149,11 @@ foreach ( $iterator as $file ) {
 		continue;
 	}
 
+	// Vendored Agents API tests are scanned on purpose; other untracked files are runner output.
+	if ( null !== $tracked_files && ! isset( $tracked_files[ $relative_path ] ) && ! str_starts_with( $relative_path, 'vendor/' ) ) {
+		continue;
+	}
+
 	$contents = file_get_contents( $path );
 	if ( false === $contents ) {
 		continue;
@@ -116,7 +162,7 @@ foreach ( $iterator as $file ) {
 	foreach ( $host_specific_patterns as $label => $pattern ) {
 		if ( preg_match( $pattern, $contents ) ) {
 			$violations[] = "{$relative_path} contains {$label}";
-			if ( 'codebox' === $label && str_starts_with( $relative_path, 'inc/' ) ) {
+			if ( str_starts_with( $relative_path, 'inc/' ) || 'data-machine.php' === $relative_path || 'uninstall.php' === $relative_path ) {
 				$runtime_source_violations[] = "{$relative_path} contains {$label}";
 			}
 		}
