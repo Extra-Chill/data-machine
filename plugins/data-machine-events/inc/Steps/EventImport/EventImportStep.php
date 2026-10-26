@@ -39,6 +39,7 @@ class EventImportStep extends Step {
 
 		if ( ! self::$capabilities_registered ) {
 			add_filter( 'datamachine_step_types', array( self::class, 'registerCapabilities' ), 20 );
+			add_filter( 'datamachine_handlers', array( self::class, 'includeFetchHandlers' ), PHP_INT_MAX, 2 );
 			self::$capabilities_registered = true;
 		}
 	}
@@ -63,6 +64,24 @@ class EventImportStep extends Step {
 	}
 
 	/**
+	 * Expose fetch handlers to core's flow validation and step handler lists.
+	 *
+	 * Run after handler registration so native event import definitions win.
+	 * Only event_import queries are expanded; the nested fetch query is unchanged.
+	 *
+	 * @param array       $handlers Registered handlers for the requested type.
+	 * @param string|null $step_type Requested step type, or null for all handlers.
+	 * @return array
+	 */
+	public static function includeFetchHandlers( array $handlers, ?string $step_type = null ): array {
+		if ( 'event_import' !== $step_type ) {
+			return $handlers;
+		}
+
+		return array_replace( apply_filters( 'datamachine_handlers', array(), 'fetch' ), $handlers );
+	}
+
+	/**
 	 * Execute event import step.
 	 *
 	 * @return array Updated data packet array with event data added
@@ -70,8 +89,11 @@ class EventImportStep extends Step {
 	protected function executeStep(): array {
 		$handler_slug = $this->getHandlerSlug();
 
-		// Get handler object from registry
-		$all_handlers = apply_filters( 'datamachine_handlers', array(), 'event_import' );
+		// Native event import handlers take precedence over generic fetch handlers.
+		$all_handlers = array_replace(
+			apply_filters( 'datamachine_handlers', array(), 'fetch' ),
+			apply_filters( 'datamachine_handlers', array(), 'event_import' )
+		);
 		$handler_info = $all_handlers[ $handler_slug ] ?? null;
 
 		if ( ! $handler_info || empty( $handler_info['class'] ) ) {
