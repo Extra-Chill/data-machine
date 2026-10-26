@@ -49,6 +49,8 @@ eval(
 	}'
 );
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
 require_once dirname( __DIR__ ) . '/inc/setup/schema.php';
 
 $failures = 0;

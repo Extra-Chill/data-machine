@@ -11,6 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/wordpress/' );
 }
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
 require_once dirname( __DIR__ ) . '/inc/Core/StepExecutionResult.php';
 
 use DataMachine\Core\StepExecutionResult;

@@ -67,6 +67,13 @@ if ( ! function_exists( 'datamachine_get_file_context' ) ) {
 	}
 }
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
+require_once __DIR__ . '/../inc/Core/JobStatus.php';
+require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
+require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
+require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItemDeferrals.php';
+require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
 require_once __DIR__ . '/../inc/Core/DataPacket.php';
 require_once __DIR__ . '/../inc/Core/EngineData.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
@@ -74,6 +81,7 @@ require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/Step.php';
 require_once __DIR__ . '/../inc/Engine/ExecutionPlan.php';
 require_once __DIR__ . '/../inc/Engine/StepNavigator.php';
+require_once __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/EngineHelpers.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php';
 
@@ -121,7 +129,7 @@ $input_packets = array(
 
 $engine = new EngineData( datamachine_get_engine_data( 100 ), 100 );
 $step   = new DataMachine_Throwing_Test_Step();
-$result = $step->execute(
+$execution_result = $step->execute(
 	array(
 		'job_id'       => 100,
 		'flow_step_id' => 'throwing_step',
@@ -129,6 +137,8 @@ $result = $step->execute(
 		'engine'       => $engine,
 	)
 );
+
+$result = $execution_result['packets'];
 
 echo "\n[1] throwing step returns explicit failure packet\n";
 $assert( 'exception adds a packet instead of returning only original input', 2 === count( $result ) );
@@ -140,6 +150,14 @@ $assert( 'original non-empty input packet is still present after failure packet'
 
 $ability_reflection = new ReflectionClass( ExecuteStepAbility::class );
 $ability            = $ability_reflection->newInstanceWithoutConstructor();
+$jobs               = new class() extends \DataMachine\Core\Database\Jobs\Jobs {
+	public function __construct() {}
+
+	public function get_job( int $job_id ): ?array {
+		return array( 'job_id' => $job_id, 'status' => 'processing' );
+	}
+};
+$ability_reflection->getProperty( 'db_jobs' )->setValue( $ability, $jobs );
 
 $evaluate = $ability_reflection->getMethod( 'evaluateStepSuccess' );
 $step_success = $evaluate->invoke( $ability, $result, 100, 'throwing_step' );

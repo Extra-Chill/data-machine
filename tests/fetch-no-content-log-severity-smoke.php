@@ -42,6 +42,14 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
+// Production registers this capability with the fetch step type.
+add_filter( 'datamachine_step_types', static function ( array $types ): array {
+	$types['fetch']['allows_empty_output'] = true;
+	return $types;
+} );
+
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';

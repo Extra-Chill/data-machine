@@ -64,6 +64,8 @@ if ( ! function_exists( 'wp_get_ability' ) ) {
 	}
 }
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
