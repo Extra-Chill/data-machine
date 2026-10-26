@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.3] - 2026-10-26
+
+### Changed
+- repair email, queue, retention and docs contract smokes
+- make host-dependent smokes hermetic and resolve toolchain from Homeboy
+- derive bootstrap/runtime contract smokes from current service composition
+- update workflow/flow smokes to the step_type workflow contract
+- add missing WordPress stubs to shared smoke-wp-stubs
+- load standalone smokes through composer autoload via shared smoke bootstrap
+
 ## [0.198.2] - 2026-10-25
 
 ### Fixed
