@@ -435,6 +435,21 @@ class EventDateQueryAbilities {
 			}
 		}
 
+		// Bounded windows must scan the date indexes, not all posts matching a
+		// broad location. Keep customized/compound requests on the canonical path.
+		$window_query_args = null;
+		if ( ! $capture_sql && '' !== $date_start && '' !== $date_end ) {
+			$window_query_args = (array) apply_filters( 'data_machine_events_calendar_query_args', $query_args, $input );
+		}
+		global $wpdb;
+		if ( $window_query_args === $query_args && self::supportsIndexedWindowQuery()
+			&& ! $capture_sql && 'publish' === $status && empty( $search ) && empty( $meta_query )
+			&& '' === $date_match && '' !== $date_start && '' !== $date_end
+			&& in_array( $fields, array( 'ids', 'all' ), true )
+			&& ! $this->hasCustomizedMatchingQuery( $input ) ) {
+			return $this->executeWindowQuery( $query_args, $date_start . ' ' . ( $time_start ?: '00:00:00' ), $date_end . ' ' . ( $time_end ?: '23:59:59' ), $fields, $order, $per_page, $page );
+		}
+
 		// Build the posts_clauses filter for date filtering + ordering.
 		$filters = array();
 
@@ -492,7 +507,7 @@ class EventDateQueryAbilities {
 		$prefiltered     = $this->consumePrefilteredQueryArgs();
 		$query_args      = is_array( $prefiltered )
 			? $prefiltered
-			: (array) apply_filters( 'data_machine_events_calendar_query_args', $query_args, $input );
+			: ( $window_query_args ?? (array) apply_filters( 'data_machine_events_calendar_query_args', $query_args, $input ) );
 
 		if ( $query_args === $base_query_args && $this->canUseBoundedTaxonomyCandidates( $input, $tax_filters, $scope, $status, $per_page, $page ) ) {
 			remove_filter( 'posts_clauses', $clauses_filter );
@@ -530,6 +545,76 @@ class EventDateQueryAbilities {
 			'total'      => $total,
 			'post_count' => $query->post_count,
 		);
+	}
+
+	/**
+	 * Whether the database is a real MySQL/MariaDB server. Emulated backends
+	 * (SQLite, Playground/WP Codebox drivers) can report is_mysql without
+	 * honoring index hints or derived-table ordering, so require mysqli.
+	 */
+	public static function supportsIndexedWindowQuery(): bool {
+		global $wpdb;
+		if ( true !== $wpdb->is_mysql || ! ( $wpdb->dbh instanceof \mysqli ) || defined( 'SQLITE_DB_DROPIN_VERSION' ) ) {
+			return false;
+		}
+		foreach ( array( 'DB_ENGINE', 'DATABASE_TYPE' ) as $constant ) {
+			if ( defined( $constant ) && 'sqlite' === strtolower( (string) constant( $constant ) ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Scan two disjoint indexed date ranges, checking canonical posts and each
+	 * taxonomy per candidate. STRAIGHT_JOIN prevents broad terms from making
+	 * posts the driving table. UNION ALL is safe: the start ranges are disjoint
+	 * and event_dates has one row per post. Sort/page only the resulting slice.
+	 */
+	private function executeWindowQuery( array $args, string $start, string $end, string $fields, string $order, int $per_page, int $page ): array {
+		global $wpdb;
+
+		$table = EventDatesTable::table_name();
+		$where = $wpdb->prepare( "p.post_type = %s AND p.post_status = 'publish' AND ed.post_status = 'publish'", Event_Post_Type::POST_TYPE );
+		if ( ! empty( $args['post__not_in'] ) ) {
+			$where .= ' AND ed.post_id NOT IN (' . implode( ',', array_map( 'absint', $args['post__not_in'] ) ) . ')';
+		}
+		$tax_query = new \WP_Tax_Query( $args['tax_query'] ?? array() );
+		// Initialize table aliases, then clean each clause by reference through
+		// WP_Tax_Query (get_sql itself deliberately transforms only a copy).
+		$tax_query->get_sql( $wpdb->posts, 'ID' );
+		foreach ( $tax_query->queries as $clause ) {
+			if ( ! is_array( $clause ) ) {
+				continue;
+			}
+			$parent_query = array( 'relation' => 'AND' );
+			$tax_query->get_sql_for_clause( $clause, $parent_query );
+			if ( is_wp_error( $clause ) || empty( $clause['terms'] ) ) {
+				return array( 'posts' => array(), 'total' => 0, 'post_count' => 0 );
+			}
+			$ids = implode( ',', array_map( 'absint', $clause['terms'] ) );
+			$where .= " AND EXISTS (SELECT 1 FROM {$wpdb->term_relationships} tr WHERE tr.object_id = ed.post_id AND tr.term_taxonomy_id IN ({$ids}))";
+		}
+		$first = $wpdb->prepare( 'ed.start_datetime BETWEEN %s AND %s', $start, $end );
+		// Retain the upper bound even for reversed windows: long-running events
+		// can still match the canonical overlap predicate in that case.
+		$second = $wpdb->prepare( 'ed.end_datetime >= %s AND ed.start_datetime < %s AND ed.start_datetime <= %s', $start, $start, $end );
+		$sql = "SELECT post_id FROM (
+			SELECT ed.post_id, ed.start_datetime FROM {$table} ed FORCE INDEX (status_start)
+			STRAIGHT_JOIN {$wpdb->posts} p ON p.ID = ed.post_id WHERE {$where} AND {$first}
+			UNION ALL
+			SELECT ed.post_id, ed.start_datetime FROM {$table} ed FORCE INDEX (end_datetime)
+			STRAIGHT_JOIN {$wpdb->posts} p ON p.ID = ed.post_id WHERE {$where} AND {$second}
+		) window_events ORDER BY start_datetime {$order}, post_id {$order}";
+		if ( $per_page > 0 ) {
+			$sql .= $wpdb->prepare( ' LIMIT %d OFFSET %d', $per_page, ( $page - 1 ) * $per_page );
+		}
+		$posts = array_map( 'intval', $wpdb->get_col( $sql ) ); // phpcs:ignore WordPress.DB -- Prepared bounds and trusted identifiers.
+		if ( 'all' === $fields && $posts ) {
+			_prime_post_caches( $posts, true, true );
+			$posts = array_map( 'get_post', $posts );
+		}
+		return array( 'posts' => $posts, 'total' => count( $posts ), 'post_count' => count( $posts ) );
 	}
 
 	/**
