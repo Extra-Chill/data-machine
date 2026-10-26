@@ -39,7 +39,10 @@ $assert_contains( "'status'      => 'failed'", $source, 'failures return normali
 $assert_contains( "'timed_out'", $source, 'timeout status is normalized' );
 $assert_not_contains( 'proc_open', $source, 'runtime task ability does not execute local host processes' );
 $assert_not_contains( 'shell_exec', $source, 'runtime task ability does not execute shell commands' );
-$assert_contains( "inc/Abilities/Runtime/RuntimeTaskAbility.php", $root_source, 'runtime task ability file is loaded' );
+// Ability classes are PSR-4 autoloaded, not manually required by the provider.
+$composer = json_decode( file_get_contents( __DIR__ . '/../composer.json' ), true );
+$assert_contains( 'inc/Abilities/', $composer['autoload']['psr-4']['DataMachine\\Abilities\\'] ?? '', 'runtime abilities namespace is autoloaded' );
+$assert_contains( 'class RuntimeTaskAbility', $source, 'runtime task ability class exists at its PSR-4 path' );
 $assert_contains( 'new \\DataMachine\\Abilities\\Runtime\\RuntimeTaskAbility()', $root_source, 'runtime task ability is instantiated' );
 
 if ( $failures ) {
