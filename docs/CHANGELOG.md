@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.4] - 2026-10-26
+
+### Changed
+- fix two smokes broken by combining the #3649 repair PRs
+
 ## [0.198.3] - 2026-10-26
 
 ### Changed
