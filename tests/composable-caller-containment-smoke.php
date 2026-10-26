@@ -13,6 +13,30 @@ if ( ! function_exists( 'pcntl_fork' ) || ! function_exists( 'pcntl_waitpid' ) |
 }
 
 define( 'ABSPATH', __DIR__ );
+
+/**
+ * Whether a process is still running.
+ *
+ * An orphan reparented to a non-reaping subreaper (common under CI runners)
+ * stays a zombie after it exits, and signal 0 still succeeds on zombies.
+ *
+ * @param int $pid Process ID.
+ * @return bool
+ */
+function datamachine_compose_containment_is_running( int $pid ): bool {
+	if ( ! @posix_kill( $pid, 0 ) ) {
+		return false;
+	}
+
+	$stat = @file_get_contents( "/proc/{$pid}/stat" );
+	if ( false === $stat ) {
+		return true;
+	}
+
+	// The state field follows the parenthesized command name.
+	$state = substr( (string) strrchr( $stat, ')' ), 2, 1 );
+	return 'Z' !== $state && 'X' !== $state;
+}
 require_once dirname( __DIR__ ) . '/inc/Cli/CallerLivenessMonitor.php';
 
 use DataMachine\Cli\CallerLivenessMonitor;
@@ -73,7 +97,7 @@ pcntl_waitpid( $caller_pid, $status );
 
 $deadline = microtime( true ) + 4.0;
 do {
-	if ( ! @posix_kill( $compose_pid, 0 ) && ! @posix_kill( $worker_pid, 0 ) ) {
+	if ( ! datamachine_compose_containment_is_running( $compose_pid ) && ! datamachine_compose_containment_is_running( $worker_pid ) ) {
 		@unlink( $state_file );
 		echo "OK (compose process group terminated after caller death)\n";
 		exit( 0 );

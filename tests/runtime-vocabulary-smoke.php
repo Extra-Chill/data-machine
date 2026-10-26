@@ -79,6 +79,8 @@ function datamachine_runtime_vocab_is_allowed_file( string $relative_path ): boo
 		'tests/ai-concurrency-release-wakeup-smoke.php',
 		'tests/agent-daily-memory-pipeline-scope-smoke.php',
 		'tests/eslint-source-inventory-smoke.sh',
+		'tests/cli-global-options-smoke.php',
+		'tests/email-multi-inbox-forward-smoke.php',
 		'tests/phpunit-file-isolation-smoke.php',
 		'tests/typed-artifact-handler-smoke.php',
 		'tests/fuzz/README.md',
@@ -93,6 +95,28 @@ function datamachine_runtime_vocab_is_allowed_file( string $relative_path ): boo
 	// CI workflow files are source-control harness config, not runtime logic.
 	return str_starts_with( $relative_path, '.github/workflows/' );
 }
+
+/**
+ * Git-tracked first-party paths, or null when git is unavailable.
+ *
+ * Runners drop untracked files into the checkout (for example `.homeboy-bin/`
+ * and shard plans). Those belong to the host, not to first-party source.
+ *
+ * @param string $root Repository root.
+ * @return array<string, true>|null
+ */
+function datamachine_runtime_vocab_tracked_files( string $root ): ?array {
+	$output = array();
+	$status = 1;
+	exec( 'git -C ' . escapeshellarg( $root ) . ' ls-files 2>/dev/null', $output, $status ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec -- CLI-only smoke reads the git index.
+	if ( 0 !== $status || array() === $output ) {
+		return null;
+	}
+
+	return array_fill_keys( $output, true );
+}
+
+$tracked_files = datamachine_runtime_vocab_tracked_files( $root );
 
 $host_specific_patterns = array(
 	'wp-site-generator' => '/wp-site-generator/i',
@@ -122,6 +146,11 @@ foreach ( $iterator as $file ) {
 	$relative_path = datamachine_runtime_vocab_relative_path( $root, $path );
 
 	if ( __FILE__ === $path || datamachine_runtime_vocab_is_allowed_file( $relative_path ) ) {
+		continue;
+	}
+
+	// Vendored Agents API tests are scanned on purpose; other untracked files are runner output.
+	if ( null !== $tracked_files && ! isset( $tracked_files[ $relative_path ] ) && ! str_starts_with( $relative_path, 'vendor/' ) ) {
 		continue;
 	}
 
