@@ -82,11 +82,7 @@ namespace {
 		}
 	}
 
-	require_once __DIR__ . '/../inc/Abilities/HandlerAbilities.php';
-	require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
-	require_once __DIR__ . '/../inc/Core/Steps/Settings/SettingsDisplayService.php';
-	require_once __DIR__ . '/../inc/Core/Admin/DateFormatter.php';
-	require_once __DIR__ . '/../inc/Core/Admin/FlowFormatter.php';
+	require_once __DIR__ . '/smoke-bootstrap.php';
 
 	class FlowFormatterLoadedConfigSettings {
 		public static function get_fields(): array {

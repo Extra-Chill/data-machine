@@ -68,12 +68,8 @@ if ( ! function_exists( 'do_action' ) ) {
 	}
 }
 
-require_once __DIR__ . '/../inc/Abilities/StepTypeAbilities.php';
-require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
-require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
-require_once __DIR__ . '/../inc/Core/Steps/WorkflowSpecValidator.php';
-require_once __DIR__ . '/../inc/Core/Steps/WorkflowConfigFactory.php';
-require_once __DIR__ . '/../inc/Abilities/Pipeline/PipelineHelpers.php';
+require_once __DIR__ . '/smoke-wp-stubs.php';
+require_once __DIR__ . '/smoke-bootstrap.php';
 
 use DataMachine\Abilities\Pipeline\PipelineHelpers;
 use DataMachine\Core\Steps\WorkflowConfigFactory;

@@ -97,14 +97,7 @@ if ( ! function_exists( 'update_site_option' ) ) {
 	}
 }
 
-require_once __DIR__ . '/../inc/Engine/Bundle/BundleValidationException.php';
-require_once __DIR__ . '/../inc/Engine/Bundle/AuthRef.php';
-require_once __DIR__ . '/../inc/Core/OAuth/BaseAuthProvider.php';
-require_once __DIR__ . '/../inc/Abilities/AbilityRegistration.php';
-require_once __DIR__ . '/../inc/Abilities/HandlerAbilities.php';
-require_once __DIR__ . '/../inc/Abilities/AuthAbilities.php';
-require_once __DIR__ . '/../inc/Engine/Bundle/AuthRefHandlerConfig.php';
-require_once __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/Email/EmailAuth.php';
+require_once __DIR__ . '/smoke-bootstrap.php';
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\HandlerAbilities;

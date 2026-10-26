@@ -139,11 +139,7 @@ namespace {
 	function current_time( string $type, bool $gmt = false ): string { unset( $type, $gmt ); return gmdate( 'Y-m-d H:i:s' ); }
 	function datamachine_get_engine_data( int $job_id ): array { unset( $job_id ); return $GLOBALS['wpdb']->engine; }
 
-	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
-	require_once __DIR__ . '/../inc/Core/Database/TransactionScope.php';
-	require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItemDeferrals.php';
-	require_once __DIR__ . '/../inc/Core/Database/ProcessedItems/ProcessedItems.php';
-	require_once __DIR__ . '/../inc/Engine/Actions/Handlers/StepLifecycleHandler.php';
+	require_once __DIR__ . '/smoke-bootstrap.php';
 
 	use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 	use DataMachine\Engine\Actions\Handlers\StepLifecycleHandler;
