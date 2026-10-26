@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.74.0] - 2026-10-26
+
+### Added
+- accept generic fetch handlers in event_import steps
+
 ## [0.73.8] - 2026-10-24
 
 ### Fixed
