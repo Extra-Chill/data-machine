@@ -359,6 +359,15 @@ class EventUpsert extends UpsertHandler {
 			$existing_post_id = $duplicate_result;
 		}
 
+		// Only unmatched events are creates. Keep corrections to past events
+		// allowed, including matches found through domain duplicate detection.
+		if ( $existing_post_id <= 0 ) {
+			$rejection = $this->validator->validateForCreate( $startDate );
+			if ( null !== $rejection ) {
+				return $rejection;
+			}
+		}
+
 		// 2. Build event data.
 		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
 		if ( 'source_alias' === ( $venue_resolution['matched_via'] ?? '' ) && $authoritative_venue_id > 0 ) {

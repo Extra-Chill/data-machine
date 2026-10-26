@@ -226,6 +226,35 @@ class EventUpsertValidator {
 	}
 
 	/**
+	 * Reject stale creates only after identity matching has ruled out an update.
+	 *
+	 * The start date has already passed publish validation. Compare calendar
+	 * days in the site timezone, allowing all of today as a grace window even
+	 * when the start time has passed or is unknown.
+	 *
+	 * @param string $start_date Validated event start date or datetime.
+	 * @return array|null Tool rejection, or null when creation is allowed.
+	 */
+	public function validateForCreate( string $start_date ): ?array {
+		$timezone = wp_timezone();
+		$start    = new \DateTimeImmutable( substr( trim( $start_date ), 0, 10 ), $timezone );
+		$today    = new \DateTimeImmutable( 'today', $timezone );
+
+		if ( $start < $today ) {
+			return $this->gateRejection(
+				'Refusing to create an event whose start date is before today in the site timezone; same-day events are allowed. Existing past events may still be updated.',
+				array(
+					'startDate' => $start_date,
+					'timezone'  => $timezone->getName(),
+				),
+				'past_event_create'
+			);
+		}
+
+		return null;
+	}
+
+	/**
 	 * Determine whether an event title is a junk-marker leak.
 	 *
 	 * The AI is meant to call the reject_source disposition tool for non-events
