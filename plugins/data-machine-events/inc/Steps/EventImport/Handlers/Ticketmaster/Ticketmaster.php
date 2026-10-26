@@ -41,6 +41,9 @@ class Ticketmaster extends EventImportHandler {
 
 	const MAX_PAGE = 19;
 
+	/** Maximum attraction IDs in one artist-mode Discovery query. */
+	const ATTRACTION_IDS_PER_QUERY = 25;
+
 	/**
 	 * Bound the default child-job fan-out from one city flow run.
 	 */
@@ -188,8 +191,18 @@ class Ticketmaster extends EventImportHandler {
 			return array();
 		}
 
-		$current_page          = 0;
-		$has_more_pages        = false;
+		// Inventory query shards share eligibility and source identity state.
+		$query_shards = array( $search_params );
+		if ( isset( $search_params['attractionId'] ) ) {
+			$query_shards = array();
+			foreach ( array_chunk( explode( ',', $search_params['attractionId'] ), self::ATTRACTION_IDS_PER_QUERY ) as $ids ) {
+				$shard                 = $search_params;
+				$shard['attractionId'] = implode( ',', $ids );
+				$query_shards[]        = $shard;
+			}
+		}
+
+		$pages_searched        = 0;
 		$eligible_items        = array();
 		$seen_source_ids       = array();
 		$fetched_count         = 0;
@@ -198,137 +211,170 @@ class Ticketmaster extends EventImportHandler {
 		$repeated_source_count = 0;
 		$contended_count       = 0;
 
-		do {
-			$search_params['page'] = $current_page;
-			$result                = $this->fetch_events( $search_params, $context );
-			$raw_events            = $result['events'];
-			$page_info             = $result['page'];
+		foreach ( $query_shards as $search_params ) {
+			$current_page = 0;
+			do {
+				$search_params['page'] = $current_page;
+				$result                = $this->fetch_events( $search_params, $context );
+				$raw_events            = $result['events'];
+				$page_info             = $result['page'];
+				++$pages_searched;
 
-			if ( empty( $raw_events ) ) {
-				if ( 0 === $current_page ) {
-					$context->log( 'info', 'Ticketmaster: No events found from API' );
-				}
-				break;
-			}
-
-			$context->log(
-				'info',
-				'Ticketmaster: Processing events',
-				array(
-					'page'           => $current_page,
-					'events_on_page' => count( $raw_events ),
-					'total_pages'    => $page_info['totalPages'],
-				)
-			);
-
-			foreach ( $raw_events as $raw_event ) {
-				++$fetched_count;
-
-				$event_status = $raw_event['dates']['status']['code'] ?? '';
-				if ( 'onsale' !== $event_status ) {
-					continue;
+				$reachable_count = ( self::MAX_PAGE + 1 ) * (int) $search_params['size'];
+				if ( 0 === $current_page && (int) ( $page_info['totalElements'] ?? 0 ) > $reachable_count ) {
+					$context->log(
+						'warning',
+						'Ticketmaster: Query exceeds pagination cap; events will be truncated',
+						array(
+							'total_elements'  => (int) $page_info['totalElements'],
+							'reachable_count' => $reachable_count,
+							'attraction_ids'  => $search_params['attractionId'] ?? '',
+						)
+					);
 				}
 
-				$standardized_event = $this->map_ticketmaster_event( $raw_event );
-
-				if ( empty( $standardized_event['title'] ) ) {
-					continue;
-				}
-
-				$standardized_event = $this->applyVenueSourceAliases( $standardized_event );
-
-				if ( $this->is_junk_payload( $raw_event, $standardized_event, $context ) ) {
-					continue;
-				}
-
-				if ( $this->shouldSkipEventTitle( $standardized_event['title'] ) ) {
-					continue;
-				}
-
-				$search_text = $standardized_event['title'] . ' ' . ( $standardized_event['description'] ?? '' );
-
-				if ( ! $this->applyKeywordSearch( $search_text, $config['search'] ?? '' ) ) {
-					continue;
-				}
-
-				if ( $this->applyExcludeKeywords( $search_text, $config['exclude_keywords'] ?? '' ) ) {
-					continue;
-				}
-
-				$source_id = trim( (string) ( $raw_event['id'] ?? '' ) );
-				if ( '' !== $source_id && isset( $seen_source_ids[ $source_id ] ) ) {
-					++$pre_fanout_deduped;
-					++$repeated_source_count;
-					continue;
-				}
-
-				if ( '' !== $source_id ) {
-					$seen_source_ids[ $source_id ] = true;
-				}
-
-				$event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
-					$standardized_event['title'],
-					$standardized_event['startDate'] ?? '',
-					$standardized_event['venue'] ?? '',
-					$standardized_event['startTime'] ?? '',
-					$standardized_event['venueTimezone'] ?? ''
-				);
-				$item_identifier  = '' !== $source_id ? $source_id : $event_identifier;
-				$source_revision  = TicketmasterSourceIdentity::revision( $standardized_event );
-
-				if ( TicketmasterSourceIdentity::shouldSkip( $item_identifier, $source_revision, $context ) ) {
-					++$pre_fanout_deduped;
-					++$unchanged_count;
-					continue;
+				if ( empty( $raw_events ) ) {
+					if ( 0 === $current_page ) {
+						$context->log( 'info', 'Ticketmaster: No events found from API' );
+					}
+					break;
 				}
 
 				$context->log(
 					'info',
-					'Ticketmaster: Found eligible event',
+					'Ticketmaster: Processing events',
 					array(
-						'title' => $standardized_event['title'],
-						'date'  => $standardized_event['startDate'],
-						'venue' => $standardized_event['venue'],
-						'page'  => $current_page,
+						'page'           => $current_page,
+						'events_on_page' => count( $raw_events ),
+						'total_pages'    => $page_info['totalPages'],
 					)
 				);
 
-				$venue_metadata                 = $this->extractVenueMetadata( $standardized_event );
-				$engine_data                    = $this->buildEventEngineData( $standardized_event, $venue_metadata );
-				$engine_data['item_identifier'] = $item_identifier;
-				$engine_data['source_type']     = 'ticketmaster';
-				$this->stripVenueMetadataFromEvent( $standardized_event );
+				foreach ( $raw_events as $raw_event ) {
+					++$fetched_count;
 
-				$eligible_items[] = array(
-					'title'    => $standardized_event['title'],
-					'content'  => wp_json_encode(
+					$event_status = $raw_event['dates']['status']['code'] ?? '';
+					if ( 'onsale' !== $event_status ) {
+						continue;
+					}
+
+					$standardized_event = $this->map_ticketmaster_event( $raw_event );
+
+					if ( empty( $standardized_event['title'] ) ) {
+						continue;
+					}
+
+					$standardized_event = $this->applyVenueSourceAliases( $standardized_event );
+
+					if ( $this->is_junk_payload( $raw_event, $standardized_event, $context ) ) {
+						continue;
+					}
+
+					if ( $this->shouldSkipEventTitle( $standardized_event['title'] ) ) {
+						continue;
+					}
+
+					$search_text = $standardized_event['title'] . ' ' . ( $standardized_event['description'] ?? '' );
+
+					if ( ! $this->applyKeywordSearch( $search_text, $config['search'] ?? '' ) ) {
+						continue;
+					}
+
+					if ( $this->applyExcludeKeywords( $search_text, $config['exclude_keywords'] ?? '' ) ) {
+						continue;
+					}
+
+					$source_id = trim( (string) ( $raw_event['id'] ?? '' ) );
+					if ( '' !== $source_id && isset( $seen_source_ids[ $source_id ] ) ) {
+						++$pre_fanout_deduped;
+						++$repeated_source_count;
+						continue;
+					}
+
+					if ( '' !== $source_id ) {
+						$seen_source_ids[ $source_id ] = true;
+					}
+
+					$event_identifier = \DataMachineEvents\Utilities\EventIdentifierGenerator::generate(
+						$standardized_event['title'],
+						$standardized_event['startDate'] ?? '',
+						$standardized_event['venue'] ?? '',
+						$standardized_event['startTime'] ?? '',
+						$standardized_event['venueTimezone'] ?? ''
+					);
+					$item_identifier  = '' !== $source_id ? $source_id : $event_identifier;
+					$source_revision  = TicketmasterSourceIdentity::revision( $standardized_event );
+
+					if ( TicketmasterSourceIdentity::shouldSkip( $item_identifier, $source_revision, $context ) ) {
+							++$pre_fanout_deduped;
+							++$unchanged_count;
+							continue;
+					}
+
+					$context->log(
+						'info',
+						'Ticketmaster: Found eligible event',
 						array(
-							'event'          => $standardized_event,
-							'venue_metadata' => $venue_metadata,
-							'import_source'  => 'ticketmaster',
-						),
-						JSON_PRETTY_PRINT
-					),
-					'metadata' => array(
-						'source_type'      => 'ticketmaster',
-						'pipeline_id'      => $context->getPipelineId(),
-						'flow_id'          => $context->getFlowId(),
-						'original_title'   => $standardized_event['title'],
-						'event_identifier' => $event_identifier,
-						'source_item_id'   => $item_identifier,
-						'source_revision'  => $source_revision,
-						'import_timestamp' => time(),
-						'_engine_data'     => $engine_data,
-					),
-				);
-			}
+							'title' => $standardized_event['title'],
+							'date'  => $standardized_event['startDate'],
+							'venue' => $standardized_event['venue'],
+							'page'  => $current_page,
+						)
+					);
 
-			$has_more_pages = $page_info['number'] < ( $page_info['totalPages'] - 1 )
+					$venue_metadata                 = $this->extractVenueMetadata( $standardized_event );
+					$engine_data                    = $this->buildEventEngineData( $standardized_event, $venue_metadata );
+					$engine_data['item_identifier'] = $item_identifier;
+					$engine_data['source_type']     = 'ticketmaster';
+					$this->stripVenueMetadataFromEvent( $standardized_event );
+
+					$eligible_items[] = array(
+						'title'    => $standardized_event['title'],
+						'content'  => wp_json_encode(
+							array(
+								'event'          => $standardized_event,
+								'venue_metadata' => $venue_metadata,
+								'import_source'  => 'ticketmaster',
+							),
+							JSON_PRETTY_PRINT
+						),
+						'metadata' => array(
+							'source_type'      => 'ticketmaster',
+							'pipeline_id'      => $context->getPipelineId(),
+							'flow_id'          => $context->getFlowId(),
+							'original_title'   => $standardized_event['title'],
+							'event_identifier' => $event_identifier,
+							'source_item_id'   => $item_identifier,
+							'source_revision'  => $source_revision,
+							'import_timestamp' => time(),
+							'_engine_data'     => $engine_data,
+						),
+					);
+				}
+
+				$has_more_pages = $page_info['number'] < ( $page_info['totalPages'] - 1 )
 								&& $current_page < self::MAX_PAGE;
 
-			++$current_page;
+				++$current_page;
 
-		} while ( $has_more_pages );
+			} while ( $has_more_pages );
+		}
+
+		if ( count( $query_shards ) > 1 ) {
+			// Merge API-sorted shards before bounding fan-out so later shards
+			// are not starved by more distant events in the first shard.
+			usort(
+				$eligible_items,
+				static function ( array $a, array $b ): int {
+					$a_event = $a['metadata']['_engine_data'];
+					$b_event = $b['metadata']['_engine_data'];
+					return strcmp(
+						( $a_event['startDate'] ?? '' ) . ' ' . ( $a_event['startTime'] ?? '' ),
+						( $b_event['startDate'] ?? '' ) . ' ' . ( $b_event['startTime'] ?? '' )
+					);
+				}
+			);
+		}
 
 		$fanout_limit   = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
 		$eligible_count = count( $eligible_items );
@@ -418,7 +464,7 @@ class Ticketmaster extends EventImportHandler {
 				'fanout_limit'          => $fanout_limit,
 				'source_claimed'        => count( $eligible_items ),
 				'packets_ready'         => count( $eligible_items ),
-				'pages_searched'        => $current_page,
+				'pages_searched'        => $pages_searched,
 			)
 		);
 
@@ -426,7 +472,7 @@ class Ticketmaster extends EventImportHandler {
 			$context->log(
 				'info',
 				'Ticketmaster: No eligible events found',
-				array( 'pages_searched' => $current_page )
+				array( 'pages_searched' => $pages_searched )
 			);
 			return array();
 		}
@@ -434,7 +480,7 @@ class Ticketmaster extends EventImportHandler {
 		$context->log(
 			'info',
 			sprintf( 'Ticketmaster: Found %d eligible events', count( $eligible_items ) ),
-			array( 'pages_searched' => $current_page )
+			array( 'pages_searched' => $pages_searched )
 		);
 
 		return array( 'items' => $eligible_items );
