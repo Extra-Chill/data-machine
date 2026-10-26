@@ -4,12 +4,15 @@
 namespace {
 	// Homeboy's WordPress test runner exports the resolved core tree as
 	// HOMEBOY_WORDPRESS_CORE_ROOT; WORDPRESS_PATH remains a manual override.
-	$wp = getenv( 'HOMEBOY_WORDPRESS_CORE_ROOT' ) ?: getenv( 'WORDPRESS_PATH' );
-	if ( ! $wp || ! is_file( rtrim( $wp, '/' ) . '/wp-includes/PHPMailer/PHPMailer.php' ) ) {
+	$datamachine_core_root = getenv( 'HOMEBOY_WORDPRESS_CORE_ROOT' );
+	if ( false === $datamachine_core_root || '' === $datamachine_core_root ) {
+		$datamachine_core_root = getenv( 'WORDPRESS_PATH' );
+	}
+	if ( ! $datamachine_core_root || ! is_file( rtrim( $datamachine_core_root, '/' ) . '/wp-includes/PHPMailer/PHPMailer.php' ) ) {
 		fwrite( STDERR, "FAIL: needs WordPress core for the real PHPMailer library; set HOMEBOY_WORDPRESS_CORE_ROOT or WORDPRESS_PATH.\n" );
 		exit( 1 );
 	}
-	define( 'ABSPATH', rtrim( $wp, '/' ) . '/' );
+	define( 'ABSPATH', rtrim( $datamachine_core_root, '/' ) . '/' );
 	define( 'WPINC', 'wp-includes' );
 	foreach ( array( 'Exception', 'PHPMailer', 'SMTP' ) as $class ) {
 		require_once ABSPATH . WPINC . '/PHPMailer/' . $class . '.php';

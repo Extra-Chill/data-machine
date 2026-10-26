@@ -32,8 +32,8 @@ $assert( str_contains( $email, "0 === stripos( \$header, 'From:' )" ), 'syntheti
 // Inspect registered schemas rather than counting helper calls: inboxSchema()
 // supplies the shared selector to all inbox operations.
 require_once __DIR__ . '/fixtures/email-schema-registration.php';
-$assert( 10 === count( $GLOBALS['email_schemas'] ), 'all ten email CRUD abilities register' );
-foreach ( $GLOBALS['email_schemas'] as $name => $schema ) {
+$assert( 10 === count( $GLOBALS['datamachine_email_schemas'] ), 'all ten email CRUD abilities register' );
+foreach ( $GLOBALS['datamachine_email_schemas'] as $name => $schema ) {
 	$selector = $schema['properties']['auth_ref'] ?? array();
 	$assert( 'string' === ( $selector['type'] ?? null ) && 'email_imap:default' === ( $selector['default'] ?? null ), "{$name} advertises the auth_ref mailbox selector" );
 }

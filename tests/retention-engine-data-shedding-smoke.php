@@ -54,7 +54,7 @@ namespace {
 		}
 	}
 	if ( ! function_exists( 'wp_cache_delete' ) ) {
-		function wp_cache_delete( $key, $group = '' ): bool { return true; }
+		function wp_cache_delete( ...$args ): bool { return true; } // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Stub signature.
 	}
 	if ( ! function_exists( 'do_action' ) ) {
 		function do_action( ...$args ) {}
@@ -247,7 +247,7 @@ namespace {
 
 			++$this->update_queries;
 			// UPDATE receives the exact ID worklist from the bounded SELECT.
-			$ids = array_slice( $args, 1 );
+			$ids                 = array_slice( $args, 1 );
 			$this->batch_sizes[] = count( $ids );
 			foreach ( $ids as $job_id ) {
 				$this->jobs[ $job_id ]['engine_data'] = null;
