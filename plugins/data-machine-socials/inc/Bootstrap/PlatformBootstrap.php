@@ -175,7 +175,7 @@ final class PlatformBootstrap {
 				array( 'DataMachine\\Core\\Steps\\Publish\\Handlers\\PublishHandler' ),
 				$ability_classes,
 				array( $handler_class ),
-				'instagram' === $id ? array( 'DataMachineSocials\\Handlers\\Instagram\\InstagramAccount', 'DataMachine\\Core\\Steps\\Fetch\\FreshCandidateCollector' ) : array()
+				'instagram' === $id ? array( 'DataMachineSocials\\Handlers\\Instagram\\InstagramAccount', 'DataMachineSocials\\Handlers\\Instagram\\InstagramMessages', 'DataMachine\\Core\\Steps\\Fetch\\FreshCandidateCollector' ) : array()
 			),
 			array(
 				'abilities'    => $ability_slugs,
@@ -194,6 +194,7 @@ final class PlatformBootstrap {
 				new $handler_class();
 				if ( 'DataMachineSocials\\Handlers\\Instagram\\Instagram' === $handler_class ) {
 					new \DataMachineSocials\Handlers\Instagram\InstagramAccount();
+					new \DataMachineSocials\Handlers\Instagram\InstagramMessages();
 				}
 			},
 			$tool_classes ? static function () use ( $tool_classes ): bool {
