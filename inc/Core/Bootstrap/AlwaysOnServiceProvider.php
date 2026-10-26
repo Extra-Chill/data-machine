@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 final class AlwaysOnServiceProvider {
 
 	/**
-	 * Register Action Scheduler policies and lightweight WordPress hooks.
+	 * Load Action Scheduler and register lightweight WordPress hooks.
 	 */
 	public static function register_scheduler(): void {
 		$plugin_root = dirname( __DIR__, 3 );
@@ -23,9 +23,6 @@ final class AlwaysOnServiceProvider {
 		if ( ! class_exists( 'ActionScheduler' ) ) {
 			require_once $plugin_root . '/vendor/woocommerce/action-scheduler/action-scheduler.php';
 		}
-
-		\DataMachine\Core\ActionScheduler\LogPersistencePolicy::register();
-		\DataMachine\Core\Database\CanonicalPersistencePolicy::register();
 
 		add_action(
 			'action_scheduler_init',
