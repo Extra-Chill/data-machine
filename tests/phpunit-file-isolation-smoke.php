@@ -41,11 +41,20 @@ $check( 'tests/' === ( $psr4['DataMachine\\Tests\\'] ?? null ), 'test namespace 
 $plugin_bootstrap = (string) file_get_contents( $root . '/data-machine.php' );
 $check( str_contains( $plugin_bootstrap, "require_once __DIR__ . '/inc/Engine/AI/conversation-loop.php';" ), 'WordPress plugin bootstrap must load the conversation loop explicitly' );
 
+// PHPUnit and PHPCS come from Homeboy's WordPress extension (composer.json
+// `lint` delegates there); a repo-local vendor install is the fallback.
+$tool = static function ( string $name ) use ( $root ): string {
+	$toolchain = getenv( 'HOMEBOY_EXTENSION_PATH' );
+	if ( $toolchain && is_file( $toolchain . '/vendor/bin/' . $name ) ) {
+		return $toolchain . '/vendor/bin/' . $name;
+	}
+	return $root . '/vendor/bin/' . $name;
+};
 list( $autoload_status, $autoload_output ) = $run( array( PHP_BINARY, '-r', 'require "vendor/autoload.php"; echo "autoload-ok\\n";' ) );
 $check( 0 === $autoload_status && "autoload-ok\n" === $autoload_output, 'Composer autoload must complete outside WordPress' );
-list( $phpunit_status, $phpunit_output ) = $run( array( $root . '/vendor/bin/phpunit', '--version' ) );
+list( $phpunit_status, $phpunit_output ) = $run( array( PHP_BINARY, $tool( 'phpunit' ), '--version' ) );
 $check( 0 === $phpunit_status && str_starts_with( $phpunit_output, 'PHPUnit ' ), 'PHPUnit must start and report its version' );
-list( $phpcs_status, $phpcs_output ) = $run( array( $root . '/vendor/bin/phpcs', '--version' ) );
+list( $phpcs_status, $phpcs_output ) = $run( array( PHP_BINARY, $tool( 'phpcs' ), '--version' ) );
 $check( 0 === $phpcs_status && str_starts_with( $phpcs_output, 'PHP_CodeSniffer version ' ), 'PHPCS must start and report its version' );
 
 $homeboy = json_decode( (string) file_get_contents( $root . '/homeboy.json' ), true );
@@ -68,6 +77,8 @@ $check( str_contains( $phpunit, '<directory suffix="Test.php">tests</directory>'
 $selected_test = $root . '/tests/Unit/Core/Identity/AgentIdentityStoreAdapterTest.php';
 $check( is_file( $selected_test ), 'known identity test must be discoverable in the authoritative suite' );
 
+// ScheduleMutationFailureTest belonged to the removed FlowScheduling stack;
+// the replacement routines adapter is covered by FlowRoutinesTest.
 $clusters = array(
 	'agent context'       => 'tests/Unit/Abilities/AgentContextPropagationTest.php',
 	'bulk config'          => 'tests/Unit/Cli/Commands/Flows/BulkConfigCommandTest.php',
@@ -83,7 +94,6 @@ $clusters = array(
 	'flow atomicity'      => 'tests/Unit/Abilities/FlowCreationAtomicityTest.php',
 	'fail job'            => 'tests/Unit/Abilities/Job/FailJobAbilityTest.php',
 	'item claim'          => 'tests/Unit/Core/ItemClaimLifecycleTest.php',
-	'schedule failure'    => 'tests/Unit/Abilities/ScheduleMutationFailureTest.php',
 	'pipeline config'     => 'tests/Unit/Abilities/PipelineConfigurationAbilitiesTest.php',
 );
 

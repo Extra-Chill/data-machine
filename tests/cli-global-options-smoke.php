@@ -85,7 +85,26 @@ $assert = static function ( bool $condition, string $message ) use ( &$failures,
 };
 
 
-$run = static function ( array $command, array $environment = array() ): array {
+$run = static function ( array $command, array $environment = array() ) use ( $root ): array {
+	// Use the Composer-managed WP-CLI with this PHP interpreter, not a host wrapper.
+	if ( 'wp' === $command[0] ) {
+		// Load Composer before the --require probe defines ABSPATH. Otherwise
+		// WordPress-only dependency bootstraps mistake this for a live site.
+		// The analysis/runtime toolchain lives in Homeboy's WordPress extension
+		// (see composer.json `lint`); a repo-local vendor install is the fallback.
+		$toolchain = getenv( 'HOMEBOY_EXTENSION_PATH' );
+		$wp_cli    = ( $toolchain && is_file( $toolchain . '/vendor/wp-cli/wp-cli/php/boot-fs.php' ) )
+			? $toolchain . '/vendor/wp-cli/wp-cli/php/boot-fs.php'
+			: $root . '/vendor/wp-cli/wp-cli/php/boot-fs.php';
+		if ( ! is_file( $wp_cli ) ) {
+			fwrite( STDERR, "FAIL: needs WP-CLI; set HOMEBOY_EXTENSION_PATH to the Homeboy WordPress extension.\n" );
+			exit( 1 );
+		}
+		$bootstrap = 'require ' . var_export( $root . '/vendor/autoload.php', true ) . '; require '
+			. var_export( $wp_cli, true ) . ';';
+		array_splice( $command, 0, 1, array( PHP_BINARY, '-r', $bootstrap, '--' ) );
+	}
+	$environment += array( 'WP_CLI_ALLOW_ROOT' => '1', 'PAGER' => 'cat', 'WP_CLI_PAGER' => 'cat' );
 	$previous_environment = array();
 	foreach ( $environment as $name => $value ) {
 		$previous_environment[ $name ] = getenv( $name );

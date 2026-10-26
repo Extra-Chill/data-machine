@@ -5,9 +5,22 @@
  * Run with: php tests/test-handler-raw-output-smoke.php
  */
 
-$wordpress_root = getenv( 'WP_ROOT' ) ?: '/var/www/extrachill.com';
 if ( ! defined( 'ABSPATH' ) ) {
-	define( 'ABSPATH', rtrim( $wordpress_root, '/\\' ) . '/' );
+	define( 'ABSPATH', __DIR__ . '/' );
+}
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		public function __construct(
+			private string $code = '',
+			private string $message = '',
+			private mixed $data = null
+		) {}
+
+		public function get_error_code(): string { return $this->code; }
+		public function get_error_message(): string { return $this->message; }
+		public function get_error_data(): mixed { return $this->data; }
+	}
 }
 
 if ( ! function_exists( 'do_action' ) ) {
@@ -15,7 +28,6 @@ if ( ! function_exists( 'do_action' ) ) {
 	}
 }
 
-require_once ABSPATH . 'wp-includes/class-wp-error.php';
 require_once __DIR__ . '/fixtures/test-handler-wp-fn-stubs.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/AbilityRegistration.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/HandlerAbilities.php';

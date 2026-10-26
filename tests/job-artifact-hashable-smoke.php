@@ -95,9 +95,27 @@ if ( ! function_exists( 'WP_Filesystem' ) ) {
 	}
 }
 
+$GLOBALS['job_artifact_smoke_dir'] = sys_get_temp_dir() . '/datamachine-job-artifact-smoke-' . bin2hex( random_bytes( 8 ) );
+mkdir( $GLOBALS['job_artifact_smoke_dir'], 0700 );
+register_shutdown_function( static function (): void {
+	$directory = $GLOBALS['job_artifact_smoke_dir'];
+	$files = new RecursiveIteratorIterator(
+		new RecursiveDirectoryIterator( $directory, FilesystemIterator::SKIP_DOTS ),
+		RecursiveIteratorIterator::CHILD_FIRST
+	);
+	foreach ( $files as $file ) {
+		if ( $file->isDir() ) {
+			rmdir( $file->getPathname() );
+		} else {
+			unlink( $file->getPathname() );
+		}
+	}
+	rmdir( $directory );
+} );
+
 if ( ! function_exists( 'wp_upload_dir' ) ) {
 	function wp_upload_dir(): array {
-		$base = sys_get_temp_dir() . '/datamachine-job-artifact-smoke';
+		$base = $GLOBALS['job_artifact_smoke_dir'];
 		return array(
 			'basedir' => $base,
 			'baseurl' => 'https://example.test/uploads',

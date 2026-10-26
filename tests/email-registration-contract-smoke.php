@@ -1,5 +1,11 @@
 <?php
-/** Compare all existing email registrations against the immutable pre-feature contract. */
+/**
+ * Compare all existing email registrations against the immutable pre-feature contract.
+ *
+ * Fixture captured from inc/Abilities/Email/EmailAbilities.php at
+ * 5a8c7c894547e610164846636e1c43c306466d2d using the registration stub below.
+ * Callback class names are intentionally reduced to method names.
+ */
 
 namespace DataMachine\Abilities {
 	class AbilityRegistration {
@@ -24,14 +30,12 @@ namespace {
 		}
 		return $value;
 	}
-	$baseline = shell_exec( 'git show 5a8c7c894547e610164846636e1c43c306466d2d:inc/Abilities/Email/EmailAbilities.php' );
-	if ( ! is_string( $baseline ) || ! str_starts_with( $baseline, '<?php' ) ) {
-		throw new RuntimeException( 'The immutable pre-feature email contract is unavailable.' );
-	}
-	$baseline = str_replace( 'class EmailAbilities {', 'class BaselineEmailAbilities {', $baseline );
-	eval( substr( $baseline, 5 ) );
-	new \DataMachine\Abilities\Email\BaselineEmailAbilities();
-	$before = normalize_contract( $GLOBALS['email_contracts'] );
+	$before = normalize_contract( json_decode(
+		file_get_contents( __DIR__ . '/fixtures/email-registration-pre-feature.json' ),
+		true,
+		512,
+		JSON_THROW_ON_ERROR
+	) );
 	$GLOBALS['email_contracts'] = array();
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Email/EmailAbilities.php';
 	new \DataMachine\Abilities\Email\EmailAbilities();
