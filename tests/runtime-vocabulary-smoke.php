@@ -79,6 +79,8 @@ function datamachine_runtime_vocab_is_allowed_file( string $relative_path ): boo
 		'tests/ai-concurrency-release-wakeup-smoke.php',
 		'tests/agent-daily-memory-pipeline-scope-smoke.php',
 		'tests/eslint-source-inventory-smoke.sh',
+		'tests/cli-global-options-smoke.php',
+		'tests/email-multi-inbox-forward-smoke.php',
 		'tests/phpunit-file-isolation-smoke.php',
 		'tests/typed-artifact-handler-smoke.php',
 		'tests/fuzz/README.md',
