@@ -178,6 +178,11 @@ namespace DataMachine\Tests\Unit\Abilities\Media {
 			);
 			$paths = \DataMachine\Abilities\Media\BrandTokens::with_overrides( $data['brand'], static fn() => $t->render( $data, $r ) );
 			$this->files = array_merge( $this->files, $paths );
+			foreach ( array( 'body', 'heading' ) as $font ) {
+				if ( ! is_readable( $r->get_font( $font ) ) ) {
+					$this->markTestSkipped( 'Readable body and heading fonts required for pixel assertions.' );
+				}
+			}
 			$box = $t->plan_layout( $r, $data )[0];
 			$line = (int) ( 64 * 1.2 );
 			foreach ( array( 0 => 0xffffff, 1 => 0xff0000, 2 => 0xffffff ) as $i => $expected ) {
