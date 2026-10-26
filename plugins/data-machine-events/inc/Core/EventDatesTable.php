@@ -9,20 +9,20 @@
  * dbDelta(), one-time backfill from legacy postmeta, and helper read/write
  * functions.
  *
-	 * The table includes a denormalized post_status column so that queries
-	 * can filter to published events without joining the posts table (which
-	 * is the primary bottleneck on sites with 30K+ events).
-	 *
-	 * Occurrence-span guard (#199): an end datetime more than
-	 * `data_machine_events_max_event_span_hours` (default 336h) past the
-	 * start is a fabricated series range, not an occurrence end. The row is
-	 * still written — the start is good data — but the end is stored as NULL
-	 * and the strip is logged, so no write path (save_post sync, backfill,
-	 * CLI, REST) can persist a months-long fabricated end.
-	 *
-	 * @package DataMachineEvents\Core
-	 * @since   0.23.0
-	 */
+ * The table includes a denormalized post_status column so that queries
+ * can filter to published events without joining the posts table (which
+ * is the primary bottleneck on sites with 30K+ events).
+ *
+ * Occurrence-span guard (#199): an end datetime more than
+ * `data_machine_events_max_event_span_hours` (default 336h) past the
+ * start is a fabricated series range, not an occurrence end. The row is
+ * still written — the start is good data — but the end is stored as NULL
+ * and the strip is logged, so no write path (save_post sync, backfill,
+ * CLI, REST) can persist a months-long fabricated end.
+ *
+ * @package DataMachineEvents\Core
+ * @since   0.23.0
+ */
 
 namespace DataMachineEvents\Core;
 
@@ -166,6 +166,7 @@ class EventDatesTable {
 
 		$post_status = $post->post_status;
 
+		$before = self::get( $post_id );
 		$result = $wpdb->replace(
 			self::table_name(),
 			array(
@@ -177,6 +178,9 @@ class EventDatesTable {
 			array( '%d', '%s', $end_datetime ? '%s' : null, '%s' )
 		);
 
+		if ( false !== $result ) {
+			do_action( 'datamachine_event_dates_changed', $post_id, $before, self::get( $post_id ) );
+		}
 		return false !== $result;
 	}
 

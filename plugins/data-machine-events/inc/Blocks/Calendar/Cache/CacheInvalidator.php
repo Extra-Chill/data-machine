@@ -12,6 +12,7 @@
 namespace DataMachineEvents\Blocks\Calendar\Cache;
 
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventDatesTable;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -37,7 +38,9 @@ class CacheInvalidator {
 		}
 		self::$initialized = true;
 
-		add_action( 'save_post_' . Event_Post_Type::POST_TYPE, array( __CLASS__, 'invalidate_all' ), 10, 0 );
+		add_action( 'save_post_' . Event_Post_Type::POST_TYPE, array( __CLASS__, 'invalidate_event' ), 10, 1 );
+		add_action( 'datamachine_event_dates_changed', array( __CLASS__, 'on_dates_changed' ), 10, 3 );
+		add_action( 'datamachine_event_dates_deleted', array( __CLASS__, 'invalidate_event' ), 10, 1 );
 		add_action( 'delete_post', array( __CLASS__, 'on_delete_post' ), 10, 1 );
 		add_action( 'trashed_post', array( __CLASS__, 'on_delete_post' ), 10, 1 );
 		add_action( 'untrashed_post', array( __CLASS__, 'on_delete_post' ), 10, 1 );
@@ -67,7 +70,7 @@ class CacheInvalidator {
 	public static function on_delete_post( int $post_id ): void {
 		$post_type = get_post_type( $post_id );
 		if ( Event_Post_Type::POST_TYPE === $post_type ) {
-			self::invalidate_all();
+			self::invalidate_event( $post_id );
 		}
 	}
 
@@ -97,7 +100,7 @@ class CacheInvalidator {
 				return;
 			}
 
-			self::invalidate_all();
+			self::invalidate_event( (int) $post_id );
 			return;
 		}
 
@@ -113,7 +116,7 @@ class CacheInvalidator {
 			return;
 		}
 
-		self::invalidate_all();
+		self::invalidate_event( (int) $post_id );
 	}
 
 	/**
@@ -186,7 +189,7 @@ class CacheInvalidator {
 		}
 
 		if ( Event_Post_Type::POST_TYPE === get_post_type( $post_id ) && ! empty( $removed_ids ) ) {
-			self::invalidate_all();
+			self::invalidate_event( (int) $post_id );
 		}
 	}
 
@@ -207,6 +210,27 @@ class CacheInvalidator {
 		$term_ids = array_values( array_unique( array_map( 'intval', $term_ids ) ) );
 		sort( $term_ids, SORT_NUMERIC );
 		return $term_ids;
+	}
+
+	/** Invalidate past caches only when this event can affect them. */
+	public static function invalidate_event( int $post_id ): void {
+		if ( self::$deferred_invalidations > 0 ) {
+			return;
+		}
+		CalendarCache::invalidate( self::may_be_past( EventDatesTable::get( $post_id ) ) );
+	}
+
+	/** Include the previous dates when an event moves out of the past. */
+	public static function on_dates_changed( int $post_id, ?object $before, ?object $after ): void {
+		if ( self::$deferred_invalidations > 0 ) {
+			return;
+		}
+		CalendarCache::invalidate( self::may_be_past( $before ) || self::may_be_past( $after ) );
+	}
+
+	/** Missing dates are uncertain, so invalidate conservatively. */
+	private static function may_be_past( ?object $dates ): bool {
+		return null === $dates || ( $dates->end_datetime ?: $dates->start_datetime ) < current_time( 'mysql' );
 	}
 
 	/**

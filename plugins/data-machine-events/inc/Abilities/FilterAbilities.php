@@ -549,11 +549,11 @@ class FilterAbilities {
 	/**
 	 * Return request-safe grouped assignment counts, or false for fallback.
 	 *
-	 * @param string[]  $taxonomy_slugs    Taxonomies whose direct assignments are counted.
-	 * @param array     $date_context      Date filtering context.
-	 * @param array     $tax_filters       Canonical cross-filter constraints.
+	 * @param string[]   $taxonomy_slugs    Taxonomies whose direct assignments are counted.
+	 * @param array      $date_context      Date filtering context.
+	 * @param array      $tax_filters       Canonical cross-filter constraints.
 	 * @param array|null $tax_query_override Archive taxonomy constraint.
-	 * @param array     $query_context     Search, geo, and scope-token context.
+	 * @param array      $query_context     Search, geo, and scope-token context.
 	 * @return array<string,array<int,int>>|false
 	 */
 	private function get_grouped_term_counts( array $taxonomy_slugs, array $date_context, array $tax_filters, $tax_query_override, array $query_context ) {
@@ -588,12 +588,14 @@ class FilterAbilities {
 			'time_end'    => $date_context['time_end'] ?? '',
 			'tax_filters' => $tax_filters,
 		);
-		$generation  = CalendarCache::get_generation();
-		$cache_key   = CalendarCache::PREFIX . 'filter_inventory_' . md5(
+		$is_past     = 'past' === $query_input['scope'];
+		$generation  = $is_past ? CalendarCache::get_past_generation() : CalendarCache::get_generation();
+		$cache_key   = ( $is_past ? CalendarCache::PAST_PREFIX : CalendarCache::PREFIX ) . 'filter_inventory_' . md5(
 			(string) wp_json_encode(
 				array(
-					'taxonomies' => $taxonomy_slugs,
-					'query'      => $query_input,
+					'taxonomies'  => $taxonomy_slugs,
+					'query'       => $query_input,
+					'past_bucket' => $is_past ? CalendarCache::past_time_bucket() : '',
 				)
 			)
 		);

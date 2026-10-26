@@ -34,14 +34,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CalendarCache {
 
-	const PREFIX            = 'data-machine_cal_';
-	const FULL_PREFIX       = 'data-machine_cal_full_';
-	const GROUP             = 'data-machine-calendar';
-	const GENERATION_OPTION = 'data_machine_events_calendar_cache_generation';
-	const TTL_DATES         = 30 * MINUTE_IN_SECONDS;
-	const TTL_COUNTS        = 30 * MINUTE_IN_SECONDS;
-	const TTL_FULL_UPCOMING = HOUR_IN_SECONDS;
-	const TTL_FULL_PAST     = 24 * HOUR_IN_SECONDS;
+	const PREFIX                 = 'data-machine_cal_';
+	const PAST_PREFIX            = 'data-machine_cal_past_';
+	const PAST_GENERATION_OPTION = 'data_machine_events_calendar_past_generation';
+	const FULL_PREFIX            = 'data-machine_cal_full_';
+	const GROUP                  = 'data-machine-calendar';
+	const GENERATION_OPTION      = 'data_machine_events_calendar_cache_generation';
+	const TTL_DATES              = 30 * MINUTE_IN_SECONDS;
+	const TTL_COUNTS             = 30 * MINUTE_IN_SECONDS;
+	const TTL_FULL_UPCOMING      = HOUR_IN_SECONDS;
+	const TTL_FULL_PAST          = 24 * HOUR_IN_SECONDS;
 
 	/**
 	 * Get a cached value (transient-backed bucket cache).
@@ -107,7 +109,12 @@ class CalendarCache {
 			'next_transition' => $live_upcoming ? self::next_upcoming_transition() : '',
 		);
 
-		return self::PREFIX . $prefix . '_' . md5( (string) wp_json_encode( $key_data ) );
+		$cache_prefix = ! empty( $params['show_past'] ) ? self::PAST_PREFIX : self::PREFIX;
+		if ( self::PAST_PREFIX === $cache_prefix ) {
+			$key_data['past_bucket'] = self::past_time_bucket();
+		}
+
+		return $cache_prefix . $prefix . '_' . md5( (string) wp_json_encode( $key_data ) );
 	}
 
 	/**
@@ -174,7 +181,12 @@ class CalendarCache {
 			'next_transition'  => $live_upcoming ? self::next_upcoming_transition() : '',
 		);
 
-		return self::FULL_PREFIX . md5( (string) wp_json_encode( $key_data ) );
+		$cache_prefix = ! empty( $envelope['past'] ) ? self::PAST_PREFIX . 'full_' : self::FULL_PREFIX;
+		if ( str_starts_with( $cache_prefix, self::PAST_PREFIX ) ) {
+			$key_data['past_bucket'] = self::past_time_bucket();
+		}
+
+		return $cache_prefix . md5( (string) wp_json_encode( $key_data ) );
 	}
 
 	/**
@@ -229,9 +241,14 @@ class CalendarCache {
 	}
 
 	/**
-	 * Rotate the owner-scoped generation used by every calendar cache layer.
+	 * Rotate the upcoming generation and, by default, the past generation.
+	 *
+	 * @param bool $include_past Whether this mutation can affect past results.
 	 */
-	public static function invalidate(): void {
+	public static function invalidate( bool $include_past = true ): void {
+		if ( $include_past ) {
+			self::invalidate_past();
+		}
 		$generation = wp_generate_uuid4();
 		if ( false !== CalendarGenerationFence::invalidate( $generation ) ) {
 			return;
@@ -249,6 +266,26 @@ class CalendarCache {
 			'Calendar generation fence could not complete immediate invalidation',
 			array( 'site_id' => get_current_blog_id() )
 		);
+	}
+
+	/** Hourly site-time bucket bounds newly-ended event staleness to one hour. */
+	public static function past_time_bucket(): string {
+		return (string) apply_filters( 'datamachine_calendar_past_time_bucket', current_time( 'Y-m-d H' ) );
+	}
+
+	/** Rotate only the past-scope generation. */
+	public static function invalidate_past(): void {
+		update_option( self::PAST_GENERATION_OPTION, wp_generate_uuid4(), false );
+	}
+
+	/** Resolve the independent past-scope generation. */
+	public static function get_past_generation(): string {
+		$generation = get_option( self::PAST_GENERATION_OPTION );
+		if ( false === $generation ) {
+			add_option( self::PAST_GENERATION_OPTION, wp_generate_uuid4(), '', false );
+			$generation = get_option( self::PAST_GENERATION_OPTION );
+		}
+		return (string) $generation;
 	}
 
 	/** Reserve one owner-scoped publication revision. */
@@ -280,14 +317,14 @@ class CalendarCache {
 	 * Resolve a logical calendar key to its current generation.
 	 */
 	private static function storage_key( string $key, ?string $generation = null ): string {
-		return $key . '_' . ( $generation ?? self::get_generation() );
+		return $key . '_' . ( $generation ?? ( str_starts_with( $key, self::PAST_PREFIX ) ? self::get_past_generation() : self::get_generation() ) );
 	}
 
 	/**
 	 * Resolve the appropriate full-response TTL for a request envelope.
 	 *
-	 * Past events are immutable — once a show happened, it happened.
-	 * Cache them aggressively (24h). Upcoming events change as new ones
+	 * Past entries can be retained for 24h, but hourly keys bound visibility
+	 * of newly-ended events to about one hour. Upcoming events change as new ones
 	 * are published, but `CacheInvalidator` busts the entire group on
 	 * any event save / taxonomy edit, so a 1h ceiling is just a safety
 	 * net for missed invalidation paths.
