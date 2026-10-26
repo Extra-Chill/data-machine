@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.74.1] - 2026-10-26
+
+### Fixed
+- catch contained-title same-start duplicates; reuse nearby venues
+- refuse to create events that already happened
+
 ## [0.74.0] - 2026-10-26
 
 ### Added
