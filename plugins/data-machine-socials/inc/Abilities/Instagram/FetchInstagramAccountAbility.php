@@ -25,18 +25,25 @@ class FetchInstagramAccountAbility extends AbstractSocialAbility {
 					'type'       => 'object',
 					'required'   => array( 'username' ),
 					'properties' => array(
-						'username'  => array( 'type' => 'string' ),
-						'max_items' => array(
+						'username'       => array( 'type' => 'string' ),
+						'max_items'      => array(
 							'type'    => 'integer',
 							'minimum' => 1,
 							'maximum' => 500,
 							'default' => 10,
 						),
-						'days_back' => array(
+						'recent_context' => array(
+							'type'        => 'integer',
+							'minimum'     => 0,
+							'maximum'     => 12,
+							'default'     => 0,
+							'description' => 'Other recent posts from the same fetched page, appended as context only; no extra requests.',
+						),
+						'days_back'      => array(
 							'type'    => 'integer',
 							'minimum' => 0,
 						),
-						'search'    => array(
+						'search'         => array(
 							'type'        => 'string',
 							'description' => 'Comma-separated caption keywords; match any.',
 						),
@@ -84,12 +91,13 @@ class FetchInstagramAccountAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'instagram_auth', 'Instagram authentication is missing or expired. Reconnect Instagram.' );
 		}
 
-		$cutoff   = ! empty( $input['days_back'] ) ? time() - max( 0, (int) $input['days_back'] ) * DAY_IN_SECONDS : 0;
-		$keywords = array_filter( array_map( 'trim', explode( ',', $input['search'] ?? '' ) ) );
-		$items    = array();
-		$seen     = array();
-		$cursors  = array();
-		$after    = '';
+		$recent_context = max( 0, min( 12, (int) ( $input['recent_context'] ?? 0 ) ) );
+		$cutoff         = ! empty( $input['days_back'] ) ? time() - max( 0, (int) $input['days_back'] ) * DAY_IN_SECONDS : 0;
+		$keywords       = array_filter( array_map( 'trim', explode( ',', $input['search'] ?? '' ) ) );
+		$items          = array();
+		$seen           = array();
+		$cursors        = array();
+		$after          = '';
 		do {
 			$media    = 'media.limit(50)' . ( $after ? '.after(' . $after . ')' : '' );
 			$fields   = "business_discovery.username({$username}){username,name,followers_count,media_count,{$media}{id,timestamp,media_type,caption,media_url,thumbnail_url,permalink,children{media_url,media_type}}}";
@@ -109,7 +117,8 @@ class FetchInstagramAccountAbility extends AbstractSocialAbility {
 			if ( wp_remote_retrieve_response_code( $response ) !== 200 || ! is_array( $account ) ) {
 				return new \WP_Error( 'instagram_api', 'Invalid Business Discovery response from Instagram.' );
 			}
-			$old = false;
+			$context_posts = $recent_context ? $this->recentPosts( $account['media']['data'] ?? array() ) : array();
+			$old           = false;
 			foreach ( $account['media']['data'] ?? array() as $post ) {
 				$id = (string) ( $post['id'] ?? '' );
 				if ( ! $id || isset( $seen[ $id ] ) ) {
@@ -125,6 +134,9 @@ class FetchInstagramAccountAbility extends AbstractSocialAbility {
 					continue;
 				}
 				$candidate = $this->mapPost( $post, $account, $username );
+				if ( $recent_context ) {
+					$candidate['data']['content'] .= $this->contextSection( $context_posts, $id, $recent_context );
+				}
 				if ( $collector ) {
 					$collector->offer( $id, $candidate );
 				} else {
@@ -146,12 +158,40 @@ class FetchInstagramAccountAbility extends AbstractSocialAbility {
 				break;
 			}
 			$cursors[ $after ] = true;
-			$item_count = count( $items );
+			$item_count        = count( $items );
 		} while ( ! ( $collector ? $collector->isFull() : $item_count >= $limit ) );
 		return array(
 			'success' => true,
 			'items'   => $collector ? $collector->getAccepted() : $items,
 		);
+	}
+
+	/** Sort the already-fetched page independently of candidate filters and collector state. */
+	private function recentPosts( array $posts ): array {
+		$unique = array();
+		foreach ( $posts as $post ) {
+			$id = (string) ( $post['id'] ?? '' );
+			if ( $id && ! isset( $unique[ $id ] ) ) {
+				$unique[ $id ] = $post;
+			}
+		}
+		$posts = array_values( $unique );
+		usort( $posts, static fn( $a, $b ) => (int) strtotime( (string) ( $b['timestamp'] ?? '' ) ) <=> (int) strtotime( (string) ( $a['timestamp'] ?? '' ) ) );
+		return $posts;
+	}
+
+	private function contextSection( array $posts, string $item_id, int $limit ): string {
+		$entries = array();
+		foreach ( $posts as $post ) {
+			if ( (string) $post['id'] === $item_id ) {
+				continue;
+			}
+			$entries[] = 'Timestamp: ' . ( $post['timestamp'] ?? '' ) . "\nPermalink: " . ( $post['permalink'] ?? '' ) . "\nCaption: " . ( $post['caption'] ?? '' );
+			if ( count( $entries ) >= $limit ) {
+				break;
+			}
+		}
+		return $entries ? "\n\nOther recent posts from this account (context only — do not create items from these alone)\n\n" . implode( "\n\n", $entries ) : '';
 	}
 
 	private function mapPost( array $post, array $account, string $username ): array {

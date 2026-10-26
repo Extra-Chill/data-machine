@@ -24,7 +24,15 @@ class InstagramAccountTest extends WP_UnitTestCase {
 		$this->assertStoredItem( false );
 	}
 
-	private function assertStoredItem( bool $download_succeeds ): void {
+	public function test_recent_context_is_appended_without_emitting_or_processing_context_posts(): void {
+		$this->assertStoredItem( true, 3 );
+	}
+
+	public function test_explicit_zero_keeps_original_content(): void {
+		$this->assertStoredItem( true, 0 );
+	}
+
+	private function assertStoredItem( bool $download_succeeds, ?int $recent_context = null ): void {
 		$auth = new InstagramAuth();
 		$auth->save_account( array(
 			'access_token'     => 'test-token',
@@ -36,27 +44,52 @@ class InstagramAccountTest extends WP_UnitTestCase {
 			$providers['instagram'] = $auth;
 			return $providers;
 		} );
-		add_filter( 'pre_http_request', static fn() => array(
-			'response' => array( 'code' => 200 ),
-			'body'     => wp_json_encode( array(
-				'business_discovery' => array(
-					'name'  => 'Venue',
-					'media' => array(
-						'data' => array(
-							array(
-								'id'         => '123',
-								'caption'    => 'Show tonight',
-								'media_type' => 'IMAGE',
-								'media_url'  => 'https://example.org/flyer.jpg',
-								'permalink'  => 'https://instagram.com/p/123',
+		$requests = 0;
+		add_filter( 'pre_http_request', static function ( $pre, $args, $url ) use ( &$requests ) {
+			if ( str_contains( $url, 'fields=' ) ) {
+				++$requests;
+			}
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( array(
+					'business_discovery' => array(
+						'name'  => 'Venue',
+						'media' => array(
+							'data' => array(
+								array(
+									'id'         => '123',
+									'caption'    => 'Show tonight',
+									'timestamp'  => '2026-10-15T00:00:00+00:00',
+									'media_type' => 'IMAGE',
+									'media_url'  => 'https://example.org/flyer.jpg',
+									'permalink'  => 'https://instagram.com/p/123',
+								),
+								array(
+									'id'        => 'context-1',
+									'timestamp' => '2026-10-14T00:00:00+00:00',
+									'permalink' => 'https://instagram.com/p/context-1',
+									'caption'   => 'Doors at 7pm',
+								),
+								array(
+									'id'        => 'context-2',
+									'timestamp' => '2026-10-13T00:00:00+00:00',
+									'permalink' => 'https://instagram.com/p/context-2',
+									'caption'   => 'At the Waverly',
+								),
+								array(
+									'id'        => 'context-3',
+									'timestamp' => '2026-10-12T00:00:00+00:00',
+									'permalink' => 'https://instagram.com/p/context-3',
+									'caption'   => 'Tickets available',
+								),
 							),
 						),
 					),
-				),
-			) ),
-		) );
+				) ),
+			);
+		}, 10, 3 );
 		$context = $this->getMockBuilder( ExecutionContext::class )->disableOriginalConstructor()->onlyMethods( array( 'isItemProcessed', 'isItemClaimed', 'isDirect', 'isStandalone', 'downloadFile', 'log' ) )->getMock();
-		$context->method( 'isItemProcessed' )->willReturn( false );
+		$context->expects( $this->once() )->method( 'isItemProcessed' )->with( '123' )->willReturn( false );
 		$context->method( 'isItemClaimed' )->willReturn( false );
 		$context->method( 'isDirect' )->willReturn( true );
 		$context->method( 'isStandalone' )->willReturn( false );
@@ -70,17 +103,30 @@ class InstagramAccountTest extends WP_UnitTestCase {
 				return $this->executeFetch( $config, $context );
 			}
 		};
-		$result  = $handler->fetchForTest( array(
+		$config  = array(
 			'username'  => 'venue',
 			'max_items' => 1,
-		), $context );
+		);
+		if ( null !== $recent_context ) {
+			$config['recent_context'] = $recent_context;
+		}
+		$result = $handler->fetchForTest( $config, $context );
+		$this->assertSame( 1, $requests );
 		if ( ! $download_succeeds ) {
 			$this->assertSame( array(), $result );
 			return;
 		}
+		$this->assertCount( 1, $result['items'] );
 		$item = $result['items'][0];
 		$this->assertSame( '123', $item['metadata']['item_identifier'] );
-		$this->assertSame( 'Show tonight', $item['content'] );
+		$expected_content = 'Show tonight';
+		if ( $recent_context ) {
+			$expected_content .= "\n\nOther recent posts from this account (context only — do not create items from these alone)\n\n"
+				. "Timestamp: 2026-10-14T00:00:00+00:00\nPermalink: https://instagram.com/p/context-1\nCaption: Doors at 7pm\n\n"
+				. "Timestamp: 2026-10-13T00:00:00+00:00\nPermalink: https://instagram.com/p/context-2\nCaption: At the Waverly\n\n"
+				. "Timestamp: 2026-10-12T00:00:00+00:00\nPermalink: https://instagram.com/p/context-3\nCaption: Tickets available";
+		}
+		$this->assertSame( $expected_content, $item['content'] );
 		$this->assertSame( '/tmp/flyer.jpg', $item['file_info']['file_path'] );
 		$this->assertSame( 'image/jpeg', $item['file_info']['mime_type'] );
 		$this->assertSame( array(

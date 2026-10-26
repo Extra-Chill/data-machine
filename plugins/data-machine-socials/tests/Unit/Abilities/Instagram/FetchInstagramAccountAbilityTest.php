@@ -105,6 +105,63 @@ class FetchInstagramAccountAbilityTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'items', $ability->get_output_schema()['properties'] );
 	}
 
+	public function test_recent_context_settings_bounds(): void {
+		foreach ( array( array( null, 0 ), array( -1, 0 ), array( '3', 3 ), array( 99, 12 ) ) as [ $input, $expected ] ) {
+			$this->assertSame( $expected, InstagramAccountSettings::sanitize( array(
+				'username'       => 'venue',
+				'recent_context' => $input,
+			) )['recent_context'] );
+		}
+		$field = InstagramAccountSettings::get_fields()['recent_context'];
+		$this->assertSame( 0, $field['default'] );
+		$this->assertSame( 12, $field['max'] );
+	}
+
+	public function test_recent_context_uses_newest_unique_posts_and_excludes_each_item(): void {
+		$posts = array();
+		foreach ( array( 1, 4, 2, 3, 5 ) as $day ) {
+			$post              = $this->post( (string) $day );
+			$post['timestamp'] = sprintf( '2026-10-%02dT00:00:00+00:00', $day );
+			$post['caption']   = 'Caption ' . $day;
+			$posts[]           = $post;
+		}
+		$posts[] = $posts[1];
+		$this->pages( array( array( 'data' => $posts ) ), $requests );
+		$ability = new FetchInstagramAccountAbility();
+		$result  = $ability->execute( array(
+			'username'       => 'venue',
+			'recent_context' => 3,
+		) );
+		$this->assertCount( 5, $result['items'] );
+		foreach ( $result['items'] as $item ) {
+			$ids     = array_slice( array_values( array_diff( array( '5', '4', '3', '2', '1' ), array( $item['item_id'] ) ) ), 0, 3 );
+			$content = $item['data']['content'];
+			$this->assertStringStartsWith( 'Caption ' . $item['item_id'] . "\n\nOther recent posts", $content );
+			preg_match_all( '/Caption: Caption (\d)/', $content, $matches );
+			$this->assertSame( $ids, $matches[1] );
+			foreach ( $ids as $id ) {
+				$this->assertStringContainsString( 'Permalink: https://instagram.com/p/' . $id, $content );
+			}
+		}
+		$this->assertSame( 1, $requests );
+	}
+
+	public function test_zero_context_is_byte_identical_to_default(): void {
+		$page = array( 'data' => array( $this->post( '1' ), $this->post( '2' ) ) );
+		$this->pages( array( $page, $page ) );
+		$ability = new FetchInstagramAccountAbility();
+		$default = $ability->execute( array( 'username' => 'venue' ) );
+		// The fixture's second request normally expects pagination; reset for a new fetch.
+		remove_all_filters( 'pre_http_request' );
+		$this->pages( array( $page ) );
+		$zero = $ability->execute( array(
+			'username'       => 'venue',
+			'recent_context' => 0,
+		) );
+		$this->assertSame( $default, $zero );
+		$this->assertSame( 'Live MUSIC tonight', $zero['items'][0]['data']['content'] );
+	}
+
 	public function test_username_normalization(): void {
 		foreach ( array( '@Venue', 'https://www.instagram.com/Venue/?hl=en', 'instagram.com/venue/', ' venue ' ) as $name ) {
 			$this->assertSame( 'venue', InstagramAccountSettings::normalizeUsername( $name ) );
@@ -145,8 +202,12 @@ class FetchInstagramAccountAbilityTest extends WP_UnitTestCase {
 		$context->method( 'isItemClaimed' )->willReturn( false );
 		$context->method( 'isDirect' )->willReturn( true );
 		$context->method( 'isStandalone' )->willReturn( false );
-		$result = ( new FetchInstagramAccountAbility() )->executeWithCollector( array( 'username' => 'venue' ), new FreshCandidateCollector( $context, 2 ) );
+		$result = ( new FetchInstagramAccountAbility() )->executeWithCollector( array(
+			'username'       => 'venue',
+			'recent_context' => 3,
+		), new FreshCandidateCollector( $context, 2 ) );
 		$this->assertSame( array( 'fresh' ), array_column( $result['items'], 'item_id' ) );
+		$this->assertStringContainsString( 'Permalink: https://instagram.com/p/processed', $result['items'][0]['data']['content'] );
 		$this->assertSame( 2, $requests );
 	}
 
