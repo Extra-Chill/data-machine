@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.74.3] - 2026-10-27
+
+### Fixed
+- fail fetches when HTTP retries are exhausted
+
 ## [0.74.2] - 2026-10-27
 
 ### Fixed
