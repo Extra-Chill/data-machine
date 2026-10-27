@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.74.4] - 2026-10-27
+
+### Fixed
+- detect Prekindle API-callback organizer embeds
+
 ## [0.74.3] - 2026-10-27
 
 ### Fixed
