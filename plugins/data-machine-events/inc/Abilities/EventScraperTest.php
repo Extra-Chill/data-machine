@@ -316,7 +316,11 @@ class EventScraperTest {
 		}
 
 		$handler = new UniversalWebScraper();
-		$results = $handler->get_fetch_data( 'direct', $config, null );
+		try {
+			$results = $handler->get_fetch_data( 'direct', $config, null );
+		} catch ( \RuntimeException $e ) {
+			return new \WP_Error( 'scraper_failed', $e->getMessage(), array( 'status' => 502 ) );
+		}
 
 		if ( empty( $results ) ) {
 			$failures         = array_values(

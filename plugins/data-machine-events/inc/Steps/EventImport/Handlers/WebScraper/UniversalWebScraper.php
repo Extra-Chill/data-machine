@@ -304,7 +304,26 @@ class UniversalWebScraper extends EventImportHandler {
 			}
 			$visited_urls[ $url_hash ] = true;
 
-			$html_content = $this->fetch_html( $current_url, $context );
+			$fetch_error = null;
+			try {
+				$html_content = $this->fetch_html( $current_url, $context );
+			} catch ( \RuntimeException $e ) {
+				if ( 1 < $current_page ) {
+					// Keep events from earlier pages; a later page failing ends pagination.
+					$context->log(
+						'warning',
+						'Universal Web Scraper: Pagination request failed, keeping earlier pages',
+						array(
+							'url'   => $current_url,
+							'page'  => $current_page,
+							'error' => $e->getMessage(),
+						)
+					);
+					break;
+				}
+				$fetch_error  = $e;
+				$html_content = '';
+			}
 			if ( empty( $html_content ) ) {
 				if ( 1 === $current_page ) {
 					// If initial page fails, try WordPress API discovery as a last resort
@@ -326,6 +345,9 @@ class UniversalWebScraper extends EventImportHandler {
 								$context
 							) ?? array();
 						}
+					}
+					if ( null !== $fetch_error ) {
+						throw $fetch_error;
 					}
 					return array();
 				}
@@ -760,6 +782,8 @@ class UniversalWebScraper extends EventImportHandler {
 	 *
 	 * Tries with browser spoofing first, then falls back to standard headers
 	 * if it encounters a 403 or a captcha challenge.
+	 *
+	 * @throws \RuntimeException When both HTTP attempts fail.
 	 */
 	private function fetch_html( string $url, ExecutionContext $context ): string {
 		$result = \DataMachine\Core\HttpClient::get(
@@ -822,18 +846,22 @@ class UniversalWebScraper extends EventImportHandler {
 						'reason' => 'dns_unresolvable',
 					)
 				);
-				return '';
+			} else {
+				$context->log(
+					'error',
+					'Universal Web Scraper: HTTP request failed',
+					array(
+						'url'   => $url,
+						'error' => $error_message,
+					)
+				);
 			}
 
-			$context->log(
-				'error',
-				'Universal Web Scraper: HTTP request failed',
-				array(
-					'url'   => $url,
-					'error' => $error_message,
-				)
+			// FetchHandler only accepts array returns. FetchStep converts exceptions
+			// to WP_Error so transport failures cannot become completed_no_items.
+			throw new \RuntimeException(
+				esc_html( sprintf( 'Universal Web Scraper: HTTP request failed for %s: %s', $url, $error_message ) )
 			);
-			return '';
 		}
 
 		if ( empty( $result['data'] ) ) {
