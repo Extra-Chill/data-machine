@@ -65,8 +65,13 @@ class FetchEmailAbility {
 								'description' => __( 'Mail folder to fetch from', 'data-machine' ),
 							),
 							'search_criteria'      => array(
-								'type'        => array( 'string', 'array' ),
-								'items'       => array( 'type' => 'string' ),
+								'anyOf'       => array(
+									array( 'type' => 'string' ),
+									array(
+										'type'  => 'array',
+										'items' => array( 'type' => 'string' ),
+									),
+								),
 								'default'     => 'UNSEEN',
 								'description' => __( 'IMAP search string (UNSEEN, ALL, FROM "x", SINCE "1-Mar-2026"), or a list of strings whose results are merged (OR)', 'data-machine' ),
 							),
@@ -308,7 +313,7 @@ class FetchEmailAbility {
 	/**
 	 * Run one IMAP search per criteria string and merge the UIDs newest first.
 	 *
-	 * @param resource        $connection IMAP connection.
+	 * @param \IMAP\Connection        $connection IMAP connection.
 	 * @param string|string[] $criteria   One criteria string or a list of OR'd alternatives.
 	 * @return int[] Unique UIDs, newest first.
 	 */
@@ -336,7 +341,7 @@ class FetchEmailAbility {
 	 * can, reads the body text (peek, no attachments) only when it must, and
 	 * stops once the requested page is filled or the scan limit is reached.
 	 *
-	 * @param resource $connection IMAP connection.
+	 * @param \IMAP\Connection $connection IMAP connection.
 	 * @param int[]    $uids       Candidate UIDs, newest first.
 	 * @param array    $config     Normalized config.
 	 * @param int      $offset     Page offset.
@@ -394,7 +399,7 @@ class FetchEmailAbility {
 	 *
 	 * Subject first; the body text is only read when the subject cannot decide.
 	 *
-	 * @param resource $connection IMAP connection.
+	 * @param \IMAP\Connection $connection IMAP connection.
 	 * @param int      $uid        Message UID.
 	 * @param string   $include_keywords Comma-separated include keywords (OR).
 	 * @param string   $exclude    Comma-separated exclude keywords.
@@ -427,7 +432,7 @@ class FetchEmailAbility {
 	 * No body parsing, no structure fetching, no attachment scanning.
 	 * Just From, Subject, Date, UID, and basic flags.
 	 *
-	 * @param resource $connection IMAP connection.
+	 * @param \IMAP\Connection $connection IMAP connection.
 	 * @param int      $uid        Message UID.
 	 * @return array|null Header data or null on failure.
 	 */
@@ -487,7 +492,7 @@ class FetchEmailAbility {
 	/**
 	 * Fetch a single message with full body by UID.
 	 *
-	 * @param resource $connection IMAP connection.
+	 * @param \IMAP\Connection $connection IMAP connection.
 	 * @param int      $uid        Message UID.
 	 * @param array    $config     Fetch configuration.
 	 * @return array|null Message data or null on failure.
@@ -600,7 +605,7 @@ class FetchEmailAbility {
 	/**
 	 * Fetch message body, preferring plain text.
 	 *
-	 * @param resource $connection IMAP connection.
+	 * @param \IMAP\Connection $connection IMAP connection.
 	 * @param int      $uid        Message UID.
 	 * @return string Message body text.
 	 */
@@ -614,7 +619,7 @@ class FetchEmailAbility {
 		// Simple single-part message.
 		if ( empty( $structure->parts ) ) {
 			$body = imap_fetchbody( $connection, $uid, '1', $fetch_flags );
-			return $this->decodeBody( $body, $structure->encoding ?? 0 );
+			return $this->decodeBody( (string) $body, $structure->encoding ?? 0 );
 		}
 
 		// Multipart — find text/plain first, then text/html.
@@ -627,7 +632,7 @@ class FetchEmailAbility {
 			if ( 0 === ( $part->type ?? -1 ) ) {
 				$subtype = strtolower( $part->subtype ?? '' );
 				$body    = imap_fetchbody( $connection, $uid, $part_number, $fetch_flags );
-				$decoded = $this->decodeBody( $body, $part->encoding ?? 0 );
+				$decoded = $this->decodeBody( (string) $body, $part->encoding ?? 0 );
 
 				if ( 'plain' === $subtype && empty( $plain_body ) ) {
 					$plain_body = $decoded;
@@ -644,7 +649,7 @@ class FetchEmailAbility {
 					if ( 0 === ( $sub_part->type ?? -1 ) ) {
 						$subtype = strtolower( $sub_part->subtype ?? '' );
 						$body    = imap_fetchbody( $connection, $uid, $sub_number, $fetch_flags );
-						$decoded = $this->decodeBody( $body, $sub_part->encoding ?? 0 );
+						$decoded = $this->decodeBody( (string) $body, $sub_part->encoding ?? 0 );
 
 						if ( 'plain' === $subtype && empty( $plain_body ) ) {
 							$plain_body = $decoded;
@@ -747,7 +752,7 @@ class FetchEmailAbility {
 			return null;
 		}
 
-		$decoded = $this->decodeBody( $body, $attachment_info['encoding'] );
+		$decoded = $this->decodeBody( (string) $body, $attachment_info['encoding'] );
 		if ( empty( $decoded ) ) {
 			return null;
 		}
