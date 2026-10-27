@@ -20,10 +20,16 @@ namespace DataMachine\Abilities\Fetch;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth;
+use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordSearch;
+use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordExclusion;
 
 defined( 'ABSPATH' ) || exit;
 
 class FetchEmailAbility {
+	use HasApplyKeywordSearch;
+	use HasApplyKeywordExclusion;
+
+	private const KEYWORD_SCAN_LIMIT = 500;
 
 	private static bool $registered = false;
 
@@ -59,9 +65,15 @@ class FetchEmailAbility {
 								'description' => __( 'Mail folder to fetch from', 'data-machine' ),
 							),
 							'search_criteria'      => array(
-								'type'        => 'string',
+								'anyOf'       => array(
+									array( 'type' => 'string' ),
+									array(
+										'type'  => 'array',
+										'items' => array( 'type' => 'string' ),
+									),
+								),
 								'default'     => 'UNSEEN',
-								'description' => __( 'IMAP search string (UNSEEN, ALL, FROM "x", SINCE "1-Mar-2026")', 'data-machine' ),
+								'description' => __( 'IMAP search string (UNSEEN, ALL, FROM "x", SINCE "1-Mar-2026"), or a list of strings whose results are merged (OR)', 'data-machine' ),
 							),
 							'max_messages'         => array(
 								'type'        => 'integer',
@@ -72,6 +84,16 @@ class FetchEmailAbility {
 								'type'        => 'integer',
 								'default'     => 0,
 								'description' => __( 'Number of messages to skip (for pagination)', 'data-machine' ),
+							),
+							'search'               => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Comma-separated keywords; a message matches if its subject or body contains any of them', 'data-machine' ),
+							),
+							'exclude_keywords'     => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Comma-separated keywords; a message is skipped if its subject or body contains any of them', 'data-machine' ),
 							),
 							'uid'                  => array(
 								'type'        => 'integer',
@@ -215,10 +237,11 @@ class FetchEmailAbility {
 			);
 		}
 
-		// Search for messages.
-		$message_ids = imap_search( $connection, $config['search_criteria'], SE_UID );
+		// Search for messages. c-client has no OR support, so callers pass
+		// one criteria string per alternative and the UIDs are merged here.
+		$message_ids = $this->searchUids( $connection, $config['search_criteria'] );
 
-		if ( false === $message_ids || empty( $message_ids ) ) {
+		if ( empty( $message_ids ) ) {
 			imap_close( $connection );
 			return array(
 				'success' => true,
@@ -233,36 +256,21 @@ class FetchEmailAbility {
 			);
 		}
 
-		// Most recent first.
-		$message_ids   = array_reverse( $message_ids );
-		$total_matches = count( $message_ids );
-		$offset        = (int) $config['offset'];
-		$max           = (int) $config['max_messages'];
+		$offset    = max( 0, (int) $config['offset'] );
+		$max       = (int) $config['max_messages'];
+		$selection = $this->selectUids( $connection, $message_ids, $config, $offset, $max, $logs );
 
-		// Apply pagination.
-		if ( $offset > 0 ) {
-			$message_ids = array_slice( $message_ids, $offset );
-		}
-		$message_ids = array_slice( $message_ids, 0, $max );
-		$has_more    = ( $offset + count( $message_ids ) ) < $total_matches;
+		$message_ids   = $selection['uids'];
+		$total_matches = $selection['total_matches'];
+		$has_more      = $selection['has_more'];
 
 		$items = array();
-
-		if ( $config['headers_only'] ) {
-			// Fast header-only mode — no body parsing, no structure fetching.
-			foreach ( $message_ids as $uid ) {
-				$item = $this->fetchHeaders( $connection, $uid );
-				if ( null !== $item ) {
-					$items[] = $item;
-				}
-			}
-		} else {
-			// Full mode — bodies + attachments.
-			foreach ( $message_ids as $uid ) {
-				$item = $this->fetchMessage( $connection, $uid, $config );
-				if ( null !== $item ) {
-					$items[] = $item;
-				}
+		foreach ( $message_ids as $uid ) {
+			$item = $config['headers_only']
+				? $this->fetchHeaders( $connection, (int) $uid )
+				: $this->fetchMessage( $connection, (int) $uid, $config );
+			if ( null !== $item ) {
+				$items[] = $item;
 			}
 		}
 
@@ -303,12 +311,128 @@ class FetchEmailAbility {
 	}
 
 	/**
+	 * Run one IMAP search per criteria string and merge the UIDs newest first.
+	 *
+	 * @param \IMAP\Connection        $connection IMAP connection.
+	 * @param string|string[] $criteria   One criteria string or a list of OR'd alternatives.
+	 * @return int[] Unique UIDs, newest first.
+	 */
+	private function searchUids( $connection, string|array $criteria ): array {
+		$uids = array();
+		foreach ( (array) $criteria as $single ) {
+			$found = imap_search( $connection, (string) $single, SE_UID );
+			if ( is_array( $found ) ) {
+				$uids = array_merge( $uids, $found );
+			}
+		}
+
+		$uids = array_values( array_unique( array_map( 'intval', $uids ) ) );
+		// UIDs increase with arrival order within a folder.
+		rsort( $uids, SORT_NUMERIC );
+
+		return $uids;
+	}
+
+	/**
+	 * Pick the page of UIDs to fetch, applying keyword filters before the cap.
+	 *
+	 * Without keywords this is plain pagination and fetches nothing extra.
+	 * With keywords it walks UIDs newest first, decides on the subject when it
+	 * can, reads the body text (peek, no attachments) only when it must, and
+	 * stops once the requested page is filled or the scan limit is reached.
+	 *
+	 * @param \IMAP\Connection $connection IMAP connection.
+	 * @param int[]    $uids       Candidate UIDs, newest first.
+	 * @param array    $config     Normalized config.
+	 * @param int      $offset     Page offset.
+	 * @param int      $max        Page size.
+	 * @param array    $logs       Log entries, appended by reference.
+	 * @return array{uids: int[], total_matches: int, has_more: bool}
+	 */
+	private function selectUids( $connection, array $uids, array $config, int $offset, int $max, array &$logs ): array {
+		$include = trim( (string) ( $config['search'] ?? '' ) );
+		$exclude = trim( (string) ( $config['exclude_keywords'] ?? '' ) );
+
+		if ( '' === $include && '' === $exclude ) {
+			$total = count( $uids );
+			return array(
+				'uids'          => array_slice( $uids, $offset, max( 0, $max ) ),
+				'total_matches' => $total,
+				'has_more'      => ( $offset + $max ) < $total,
+			);
+		}
+
+		$needed  = $offset + max( 1, $max );
+		$limit   = (int) apply_filters( 'datamachine_email_keyword_scan_limit', self::KEYWORD_SCAN_LIMIT );
+		$scanned = 0;
+		$matched = array();
+
+		foreach ( $uids as $uid ) {
+			if ( $scanned >= $limit || count( $matched ) >= $needed ) {
+				break;
+			}
+			++$scanned;
+
+			if ( $this->messageMatchesKeywords( $connection, $uid, $include, $exclude ) ) {
+				$matched[] = $uid;
+			}
+		}
+
+		$unscanned = $scanned < count( $uids );
+		if ( $unscanned && $scanned >= $limit && count( $matched ) < $needed ) {
+			$logs[] = array(
+				'level'   => 'warning',
+				'message' => sprintf( 'Email Fetch: keyword scan stopped at the %d-message limit; narrow the search criteria or timeframe to reach older matches', $limit ),
+			);
+		}
+
+		return array(
+			'uids'          => array_slice( $matched, $offset, max( 0, $max ) ),
+			// Lower bound when the scan stopped early.
+			'total_matches' => count( $matched ),
+			'has_more'      => $unscanned || count( $matched ) > $offset + $max,
+		);
+	}
+
+	/**
+	 * Decide whether one message passes the include/exclude keyword filters.
+	 *
+	 * Subject first; the body text is only read when the subject cannot decide.
+	 *
+	 * @param \IMAP\Connection $connection IMAP connection.
+	 * @param int      $uid        Message UID.
+	 * @param string   $include_keywords Comma-separated include keywords (OR).
+	 * @param string   $exclude    Comma-separated exclude keywords.
+	 * @return bool
+	 */
+	private function messageMatchesKeywords( $connection, int $uid, string $include_keywords, string $exclude ): bool {
+		$headers = $this->fetchHeaders( $connection, $uid );
+		if ( null === $headers ) {
+			return false;
+		}
+
+		$subject = (string) ( $headers['title'] ?? '' );
+		if ( $this->applyKeywordExclusion( $subject, $exclude ) ) {
+			return false;
+		}
+
+		// Subject already includes a keyword and there is no body exclusion to check.
+		if ( '' === $exclude && '' !== $include_keywords && $this->applyKeywordSearch( $subject, $include_keywords ) ) {
+			return true;
+		}
+
+		$text = $subject . ' ' . $this->fetchBody( $connection, $uid, true );
+
+		return $this->applyKeywordSearch( $text, $include_keywords ) && ! $this->applyKeywordExclusion( $text, $exclude );
+	}
+
+	/**
 	 * Fetch headers only for a message (fast list mode).
 	 *
 	 * No body parsing, no structure fetching, no attachment scanning.
 	 * Just From, Subject, Date, UID, and basic flags.
 	 *
-	 * @param resource $connection IMAP connection.
+	 * @param \IMAP\Connection $connection IMAP connection.
 	 * @param int      $uid        Message UID.
 	 * @return array|null Header data or null on failure.
 	 */
@@ -368,7 +492,7 @@ class FetchEmailAbility {
 	/**
 	 * Fetch a single message with full body by UID.
 	 *
-	 * @param resource $connection IMAP connection.
+	 * @param \IMAP\Connection $connection IMAP connection.
 	 * @param int      $uid        Message UID.
 	 * @param array    $config     Fetch configuration.
 	 * @return array|null Message data or null on failure.
@@ -481,7 +605,7 @@ class FetchEmailAbility {
 	/**
 	 * Fetch message body, preferring plain text.
 	 *
-	 * @param resource $connection IMAP connection.
+	 * @param \IMAP\Connection $connection IMAP connection.
 	 * @param int      $uid        Message UID.
 	 * @return string Message body text.
 	 */
@@ -495,7 +619,7 @@ class FetchEmailAbility {
 		// Simple single-part message.
 		if ( empty( $structure->parts ) ) {
 			$body = imap_fetchbody( $connection, $uid, '1', $fetch_flags );
-			return $this->decodeBody( $body, $structure->encoding ?? 0 );
+			return $this->decodeBody( (string) $body, $structure->encoding ?? 0 );
 		}
 
 		// Multipart — find text/plain first, then text/html.
@@ -508,7 +632,7 @@ class FetchEmailAbility {
 			if ( 0 === ( $part->type ?? -1 ) ) {
 				$subtype = strtolower( $part->subtype ?? '' );
 				$body    = imap_fetchbody( $connection, $uid, $part_number, $fetch_flags );
-				$decoded = $this->decodeBody( $body, $part->encoding ?? 0 );
+				$decoded = $this->decodeBody( (string) $body, $part->encoding ?? 0 );
 
 				if ( 'plain' === $subtype && empty( $plain_body ) ) {
 					$plain_body = $decoded;
@@ -525,7 +649,7 @@ class FetchEmailAbility {
 					if ( 0 === ( $sub_part->type ?? -1 ) ) {
 						$subtype = strtolower( $sub_part->subtype ?? '' );
 						$body    = imap_fetchbody( $connection, $uid, $sub_number, $fetch_flags );
-						$decoded = $this->decodeBody( $body, $sub_part->encoding ?? 0 );
+						$decoded = $this->decodeBody( (string) $body, $sub_part->encoding ?? 0 );
 
 						if ( 'plain' === $subtype && empty( $plain_body ) ) {
 							$plain_body = $decoded;
@@ -628,7 +752,7 @@ class FetchEmailAbility {
 			return null;
 		}
 
-		$decoded = $this->decodeBody( $body, $attachment_info['encoding'] );
+		$decoded = $this->decodeBody( (string) $body, $attachment_info['encoding'] );
 		if ( empty( $decoded ) ) {
 			return null;
 		}
@@ -706,6 +830,8 @@ class FetchEmailAbility {
 			'headers_only'         => false,
 			'mark_as_read'         => false,
 			'download_attachments' => false,
+			'search'               => '',
+			'exclude_keywords'     => '',
 		);
 
 		return array_merge( $defaults, $input );

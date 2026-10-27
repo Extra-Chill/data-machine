@@ -44,12 +44,12 @@ class EmailFetchSettings extends FetchHandlerSettings {
 			'from_filter'          => array(
 				'type'        => 'text',
 				'label'       => __( 'From Filter', 'data-machine' ),
-				'description' => __( 'Only fetch emails from this sender address.', 'data-machine' ),
+				'description' => __( 'Only fetch emails from these sender addresses; separate multiple values with commas (OR).', 'data-machine' ),
 			),
 			'subject_filter'       => array(
 				'type'        => 'text',
 				'label'       => __( 'Subject Filter', 'data-machine' ),
-				'description' => __( 'Only fetch emails with this text in the subject.', 'data-machine' ),
+				'description' => __( 'Only fetch emails with any of these subject texts; separate multiple values with commas (OR).', 'data-machine' ),
 			),
 			'mark_as_read'         => array(
 				'type'        => 'checkbox',
