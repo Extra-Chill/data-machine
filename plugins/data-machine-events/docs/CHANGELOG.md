@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.74.2] - 2026-10-27
+
+### Fixed
+- don't demote published events from draft-configured flows
+
 ## [0.74.1] - 2026-10-26
 
 ### Fixed
