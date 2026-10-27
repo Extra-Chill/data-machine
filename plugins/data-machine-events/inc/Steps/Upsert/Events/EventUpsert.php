@@ -422,6 +422,14 @@ class EventUpsert extends UpsertHandler {
 		// 4. Resolve post author and status.
 		$post_author = $this->resolvePostAuthor( $handler_config, $engine );
 		$post_status = WordPressSettingsResolver::getPostStatus( $handler_config );
+		if ( $existing_post_id > 0 ) {
+			$existing_status = get_post_status( $existing_post_id );
+			// Import settings must not demote an already visible or scheduled event.
+			// Drafts may still be promoted; ordinary trash uses the configured status.
+			if ( in_array( $existing_status, array( 'publish', 'future', 'private' ), true ) ) {
+				$post_status = $existing_status;
+			}
+		}
 
 		// 5. Build meta input.
 		$meta_input = $this->buildEventMetaInput( $event_data, $parameters, $engine );
