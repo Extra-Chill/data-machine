@@ -80,6 +80,11 @@ class PrekindleExtractor extends BaseExtractor {
 			return $matches[1];
 		}
 
+		// 4. Check for API-callback embed script URL.
+		if ( preg_match( '/prekindle\.com\/api\/events\/organizer\/(\d+)/', $html, $matches ) ) {
+			return $matches[1];
+		}
+
 		return null;
 	}
 
