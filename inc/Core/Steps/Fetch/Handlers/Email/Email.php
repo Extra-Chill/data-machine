@@ -158,7 +158,7 @@ class Email extends FetchHandler {
 	 * @return string[]
 	 */
 	private function splitFilterValues( string $value ): array {
-		return array_values( array_filter( array_map( 'trim', explode( ',', $value ) ), 'strlen' ) );
+		return array_values( array_filter( array_map( 'trim', explode( ',', $value ) ), static fn( string $value ): bool => '' !== $value ) );
 	}
 
 	/**
