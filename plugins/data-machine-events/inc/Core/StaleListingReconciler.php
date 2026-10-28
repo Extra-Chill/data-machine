@@ -15,12 +15,24 @@
  * against bad/partial scrapes: if the source extraction looks unhealthy
  * relative to the database, no candidates are produced.
  *
- * Matching is by date/slot, not source identity: there is no per-post source
- * item identifier yet (see upstream issues for post provenance), so an event
- * is "still listed" when a source event on the same calendar date has a title
- * that matches through the same title contract dedup uses, or when titles
- * match within the dedup time window (late-night shows that cross midnight
- * on the source side).
+ * Matching is identity-first, then by date/slot. Imported posts carry the
+ * source item identifier they were last upserted from
+ * (`_datamachine_event_source_id`, a hash of title + local start + venue for
+ * scraper items). A post whose stored identifier is still in the extraction
+ * is listed. A post without a stored identifier (legacy imports) is "still
+ * listed" when a source event on the same calendar date has a title that
+ * matches through the same title contract dedup uses, or when titles match
+ * within the dedup time window (late-night shows that cross midnight on the
+ * source side).
+ *
+ * A post whose stored identifier is absent from the extraction falls back to
+ * that same title/slot matching, with one difference: a title match whose
+ * start time differs from the post is a different listing, not this one.
+ * This is the shape a superseded recurring series leaves behind (a venue
+ * splits a weekly series and the replacement lists the same title an hour
+ * earlier): the old occurrences must not be kept alive by the new ones. The
+ * post that owns the replacement listing's identifier, when one exists, is
+ * reported as `superseded_by` so reviewers can see the duplicate pair.
  *
  * No Extra Chill specific behaviour lives here; this class is generic
  * reconciliation logic over Data Machine events.
@@ -76,6 +88,12 @@ class StaleListingReconciler {
 	 * differs (late-night shows crossing midnight).
 	 */
 	public const MATCH_TIME_WINDOW_SECONDS = 7200;
+
+	/**
+	 * Post meta holding the source item identifier an event was last upserted
+	 * from. Mirrors EventUpsert::SOURCE_ID_META_KEY.
+	 */
+	public const SOURCE_ID_META_KEY = '_datamachine_event_source_id';
 
 	/**
 	 * Optional injected flow config loader: fn( int $flow_id ): ?array.
@@ -204,7 +222,12 @@ class StaleListingReconciler {
 	 * event with title/startDate/startTime.
 	 *
 	 * @param array $scraper_config Result of loadVenuePinnedScraperConfig().
-	 * @return array<int, array{title:string,startDate:string,startTime:string}>|\WP_Error Source events or error.
+	 * Each entry also carries `identifiers`: the source item identifiers the
+	 * import pipeline attached to the packet (event_identifier and the
+	 * selected item_identifier), which is what upserted posts persist as
+	 * `_datamachine_event_source_id`.
+	 *
+	 * @return array<int, array{title:string,startDate:string,startTime:string,identifiers:list<string>}>|\WP_Error Source events or error.
 	 */
 	public function fetchSourceEvents( array $scraper_config ) {
 		if ( $this->source_fetcher ) {
@@ -257,10 +280,20 @@ class StaleListingReconciler {
 					continue;
 				}
 
+				$metadata    = is_array( $entry['metadata'] ?? null ) ? $entry['metadata'] : array();
+				$identifiers = array();
+				foreach ( array( 'event_identifier', 'item_identifier' ) as $key ) {
+					$value = trim( (string) ( $metadata[ $key ] ?? '' ) );
+					if ( '' !== $value ) {
+						$identifiers[] = $value;
+					}
+				}
+
 				$events[] = array(
-					'title'     => (string) ( $event['title'] ?? '' ),
-					'startDate' => (string) ( $event['startDate'] ?? '' ),
-					'startTime' => (string) ( $event['startTime'] ?? '' ),
+					'title'       => (string) ( $event['title'] ?? '' ),
+					'startDate'   => (string) ( $event['startDate'] ?? '' ),
+					'startTime'   => (string) ( $event['startTime'] ?? '' ),
+					'identifiers' => array_values( array_unique( $identifiers ) ),
 				);
 			}
 		}
@@ -280,7 +313,7 @@ class StaleListingReconciler {
 	 * @param int   $venue_term_id Venue term ID from the flow's handler config.
 	 * @param array $source_events Source events from fetchSourceEvents().
 	 * @param int   $days_ahead    Lookahead window in days.
-	 * @return array<int, array{candidate_id:string,post_id:int,title:string,start:string,venue:string,source_listed_that_date:string}>|\WP_Error Candidates or error.
+	 * @return array<int, array{candidate_id:string,post_id:int,title:string,start:string,venue:string,source_listed_that_date:string,superseded_by:int}>|\WP_Error Candidates or error.
 	 */
 	public function findStaleCandidates( int $flow_id, int $venue_term_id, array $source_events, int $days_ahead = self::DEFAULT_DAYS_AHEAD ) {
 		$db_events = $this->queryFlowVenueEvents( $flow_id, $venue_term_id, $days_ahead );
@@ -291,7 +324,7 @@ class StaleListingReconciler {
 			return array();
 		}
 
-		$source_slots = $this->buildSourceSlots( $source_events, $days_ahead );
+		$source_slots = $this->buildSourceSlots( $source_events, $days_ahead, (string) ( $db_events[0]['venue'] ?? '' ) );
 
 		if ( 0 === $source_slots['total_extracted'] ) {
 			return new \WP_Error(
@@ -320,10 +353,21 @@ class StaleListingReconciler {
 		$candidates = array();
 
 		foreach ( $db_events as $db_event ) {
-			$matched_source = $this->findMatchingSourceEvent( $db_event, $source_slots );
+			$source_id = $db_event['source_id'];
+
+			if ( '' !== $source_id && isset( $source_slots['identifiers'][ $source_id ] ) ) {
+				continue;
+			}
+
+			$matched_source = $this->findMatchingSourceEvent( $db_event, $source_slots, '' !== $source_id );
+			$superseded_by  = 0;
 
 			if ( null !== $matched_source ) {
-				continue;
+				if ( empty( $matched_source['superseded'] ) ) {
+					continue;
+				}
+
+				$superseded_by = $this->findIdentifierOwner( $matched_source['identifiers'], (int) $db_event['post_id'] );
 			}
 
 			$start = $db_event['start'];
@@ -339,6 +383,7 @@ class StaleListingReconciler {
 				'start'                   => $start,
 				'venue'                   => $venue,
 				'source_listed_that_date' => $this->summarizeSourceTitles( $source_slots['by_date'][ $db_event['date'] ] ?? array() ),
+				'superseded_by'           => $superseded_by,
 			);
 		}
 
@@ -458,7 +503,7 @@ class StaleListingReconciler {
 	 * @param int $flow_id       Flow ID.
 	 * @param int $venue_term_id Venue term ID.
 	 * @param int $days_ahead    Lookahead window in days.
-	 * @return array<int, array{post_id:int,title:string,start:string,date:string,venue:string}>
+	 * @return array<int, array{post_id:int,title:string,start:string,date:string,venue:string,source_id:string}>
 	 */
 	private function queryFlowVenueEvents( int $flow_id, int $venue_term_id, int $days_ahead ): array {
 		$input = array(
@@ -505,11 +550,12 @@ class StaleListingReconciler {
 			}
 
 			$events[] = array(
-				'post_id' => (int) $post->ID,
-				'title'   => (string) $post->post_title,
-				'start'   => $start,
-				'date'    => substr( $start, 0, 10 ),
-				'venue'   => $venue_name,
+				'post_id'   => (int) $post->ID,
+				'title'     => (string) $post->post_title,
+				'start'     => $start,
+				'date'      => substr( $start, 0, 10 ),
+				'venue'     => $venue_name,
+				'source_id' => trim( (string) get_post_meta( $post->ID, self::SOURCE_ID_META_KEY, true ) ),
 			);
 		}
 
@@ -531,19 +577,27 @@ class StaleListingReconciler {
 	/**
 	 * Normalize source events into date-indexed slots.
 	 *
-	 * @param array $source_events Raw source event list.
-	 * @param int   $days_ahead    Lookahead window in days.
-	 * @return array{total_extracted:int,upcoming:list<array{title:string,start:string,date:string}>,by_date:array<string, list<array{title:string,start:string,date:string}>>}
+	 * Every source identifier is indexed (including ones outside the
+	 * lookahead window) so identity matching never depends on the window.
+	 * The legacy date-only identifier is derived from the title, date, and
+	 * pinned venue name, because posts imported before time-aware identity
+	 * persisted that form.
+	 *
+	 * @param array  $source_events Raw source event list.
+	 * @param int    $days_ahead    Lookahead window in days.
+	 * @param string $venue_name    Pinned venue display name.
+	 * @return array{total_extracted:int,upcoming:list<array{title:string,start:string,date:string,identifiers:list<string>}>,by_date:array<string, list<array{title:string,start:string,date:string,identifiers:list<string>}>>,identifiers:array<string,true>}
 	 */
-	private function buildSourceSlots( array $source_events, int $days_ahead ): array {
+	private function buildSourceSlots( array $source_events, int $days_ahead, string $venue_name = '' ): array {
 		$today = substr( current_time( 'mysql' ), 0, 10 );
 		$limit = ( new \DateTimeImmutable( $today ) )
 			->modify( '+' . max( 0, $days_ahead ) . ' days' )
 			->format( 'Y-m-d' );
 
-		$upcoming = array();
-		$by_date  = array();
-		$total    = 0;
+		$upcoming    = array();
+		$by_date     = array();
+		$identifiers = array();
+		$total       = 0;
 
 		foreach ( $source_events as $event ) {
 			if ( ! is_array( $event ) ) {
@@ -561,10 +615,30 @@ class StaleListingReconciler {
 				continue;
 			}
 
+			$slot_identifiers = array();
+			foreach ( (array) ( $event['identifiers'] ?? array() ) as $identifier ) {
+				$identifier = trim( (string) $identifier );
+				if ( '' !== $identifier ) {
+					$slot_identifiers[] = $identifier;
+				}
+			}
+			if ( ! empty( $slot_identifiers ) && '' !== $venue_name ) {
+				$slot_identifiers[] = EventIdentifierGenerator::generateLegacy(
+					(string) ( $event['title'] ?? '' ),
+					(string) ( $event['startDate'] ?? '' ),
+					$venue_name
+				);
+			}
+			$slot_identifiers = array_values( array_unique( $slot_identifiers ) );
+			foreach ( $slot_identifiers as $identifier ) {
+				$identifiers[ $identifier ] = true;
+			}
+
 			$slot = array(
-				'title' => (string) ( $event['title'] ?? '' ),
-				'start' => $start,
-				'date'  => substr( $start, 0, 10 ),
+				'title'       => (string) ( $event['title'] ?? '' ),
+				'start'       => $start,
+				'date'        => substr( $start, 0, 10 ),
+				'identifiers' => $slot_identifiers,
 			);
 
 			if ( $slot['date'] < $today || $slot['date'] > $limit ) {
@@ -579,6 +653,7 @@ class StaleListingReconciler {
 			'total_extracted' => $total,
 			'upcoming'        => $upcoming,
 			'by_date'         => $by_date,
+			'identifiers'     => $identifiers,
 		);
 	}
 
@@ -590,26 +665,99 @@ class StaleListingReconciler {
 	 * published event's calendar date or starts within the dedup time
 	 * window (source-side midnight crossing).
 	 *
-	 * @param array $db_event     Published event row (post_id/title/start/date/venue).
-	 * @param array $source_slots Date-indexed source slots.
-	 * @return array|null Matched source slot or null.
+	 * When the post's stored source identifier is known to be absent from the
+	 * extraction, a title match that also carries its own identifiers and
+	 * starts at a different time is a different listing. It is returned
+	 * flagged `superseded` (unless an exact-start match exists), so the caller
+	 * treats the post as stale. Same-start matches still count as listed: a
+	 * retitled listing keeps its slot and is re-keyed on the next import.
+	 *
+	 * @param array $db_event         Published event row (post_id/title/start/date/venue).
+	 * @param array $source_slots     Date-indexed source slots.
+	 * @param bool  $identity_missing Whether the post has a stored identifier absent from the source.
+	 * @return array|null Matched source slot (with `superseded` flag) or null.
 	 */
-	private function findMatchingSourceEvent( array $db_event, array $source_slots ): ?array {
+	private function findMatchingSourceEvent( array $db_event, array $source_slots, bool $identity_missing = false ): ?array {
+		$superseded = null;
+
 		foreach ( $source_slots['upcoming'] as $slot ) {
 			if ( ! EventIdentifierGenerator::titlesMatch( $db_event['title'], $slot['title'] ) ) {
 				continue;
 			}
 
-			if ( $slot['date'] === $db_event['date'] ) {
-				return $slot;
+			if ( $slot['date'] !== $db_event['date'] && ! $this->isWithinTimeWindow( $db_event['start'], $slot['start'] ) ) {
+				continue;
 			}
 
-			if ( $this->isWithinTimeWindow( $db_event['start'], $slot['start'] ) ) {
-				return $slot;
+			if ( $identity_missing && ! empty( $slot['identifiers'] ) && ! $this->isSameStart( $db_event['start'], $slot['start'] ) ) {
+				$superseded = $superseded ?? $slot;
+				continue;
 			}
+
+			$slot['superseded'] = false;
+			return $slot;
+		}
+
+		if ( null !== $superseded ) {
+			$superseded['superseded'] = true;
+			return $superseded;
 		}
 
 		return null;
+	}
+
+	/**
+	 * Whether two normalized starts describe the same slot.
+	 *
+	 * A date-only side carries no time evidence, so it never proves a move.
+	 *
+	 * @param string $start1 First start (Y-m-d or Y-m-d H:i).
+	 * @param string $start2 Second start (Y-m-d or Y-m-d H:i).
+	 * @return bool True when both share the date and time (or either lacks a time).
+	 */
+	private function isSameStart( string $start1, string $start2 ): bool {
+		if ( ! preg_match( '/\d{2}:\d{2}/', $start1 ) || ! preg_match( '/\d{2}:\d{2}/', $start2 ) ) {
+			return substr( $start1, 0, 10 ) === substr( $start2, 0, 10 );
+		}
+
+		return substr( $start1, 0, 16 ) === substr( $start2, 0, 16 );
+	}
+
+	/**
+	 * Find the event post that owns one of a source listing's identifiers.
+	 *
+	 * @param array $identifiers     Source identifiers for the superseding listing.
+	 * @param int   $exclude_post_id Post being evaluated.
+	 * @return int Owning post ID, or 0 when the listing is not imported (yet).
+	 */
+	private function findIdentifierOwner( array $identifiers, int $exclude_post_id ): int {
+		$identifiers = array_values( array_filter( array_map( 'strval', $identifiers ) ) );
+
+		if ( empty( $identifiers ) ) {
+			return 0;
+		}
+
+		$owners = get_posts(
+			array(
+				'post_type'        => Event_Post_Type::POST_TYPE,
+				'post_status'      => array( 'publish', 'future', 'draft', 'pending', 'private' ),
+				'posts_per_page'   => 1,
+				'fields'           => 'ids',
+				'post__not_in'     => array( $exclude_post_id ),
+				'no_found_rows'    => true,
+				'suppress_filters' => true,
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- bounded review-time lookup.
+				'meta_query'       => array(
+					array(
+						'key'     => self::SOURCE_ID_META_KEY,
+						'value'   => $identifiers,
+						'compare' => 'IN',
+					),
+				),
+			)
+		);
+
+		return empty( $owners ) ? 0 : (int) $owners[0];
 	}
 
 	/**

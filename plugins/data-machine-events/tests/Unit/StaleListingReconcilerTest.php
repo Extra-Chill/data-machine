@@ -296,6 +296,97 @@ class StaleListingReconcilerTest extends WP_UnitTestCase {
 		$this->assertSame( $first[0]['candidate_id'], $second[0]['candidate_id'] );
 	}
 
+	public function test_identity_absent_post_superseded_by_same_title_listing_is_a_candidate(): void {
+		$venue_id = $this->createVenue();
+		$flow_id  = 41;
+		$old      = $this->seedFlowEvent( 'Weekly Residency Night', '+30 days 21:00', $venue_id, $flow_id, 'old-series-identity' );
+		$new      = $this->seedFlowEvent( 'Weekly Residency Night', '+30 days 20:00', $venue_id, $flow_id, 'new-series-identity' );
+
+		$candidates = $this->findCandidates(
+			$flow_id,
+			$venue_id,
+			array(
+				$this->sourceEvent( 'Weekly Residency Night', '+30 days 20:00', array( 'new-series-identity' ) ),
+			)
+		);
+
+		$this->assertNotWPError( $candidates );
+		$this->assertCount( 1, $candidates );
+		$this->assertSame( $old, $candidates[0]['post_id'] );
+		$this->assertSame( $new, $candidates[0]['superseded_by'] );
+	}
+
+	public function test_identity_absent_post_with_unimported_replacement_is_a_candidate(): void {
+		$venue_id = $this->createVenue();
+		$flow_id  = 42;
+		$old      = $this->seedFlowEvent( 'Moved Earlier Night', '+31 days 21:00', $venue_id, $flow_id, 'old-slot-identity' );
+
+		$candidates = $this->findCandidates(
+			$flow_id,
+			$venue_id,
+			array(
+				$this->sourceEvent( 'Moved Earlier Night', '+31 days 20:00', array( 'replacement-identity' ) ),
+			)
+		);
+
+		$this->assertNotWPError( $candidates );
+		$this->assertCount( 1, $candidates );
+		$this->assertSame( $old, $candidates[0]['post_id'] );
+		$this->assertSame( 0, $candidates[0]['superseded_by'] );
+	}
+
+	public function test_post_whose_identity_is_listed_is_not_a_candidate(): void {
+		$venue_id = $this->createVenue();
+		$flow_id  = 43;
+		// Title drifted on the post, but the stored identity is still listed.
+		$this->seedFlowEvent( 'Locally Edited Title', '+32 days 21:00', $venue_id, $flow_id, 'listed-identity' );
+
+		$candidates = $this->findCandidates(
+			$flow_id,
+			$venue_id,
+			array(
+				$this->sourceEvent( 'Original Source Title', '+32 days 21:00', array( 'listed-identity' ) ),
+			)
+		);
+
+		$this->assertNotWPError( $candidates );
+		$this->assertSame( array(), $candidates );
+	}
+
+	public function test_identity_absent_post_retitled_in_same_slot_is_not_a_candidate(): void {
+		$venue_id = $this->createVenue();
+		$flow_id  = 44;
+		$this->seedFlowEvent( 'Retitled Showcase', '+33 days 21:00', $venue_id, $flow_id, 'pre-retitle-identity' );
+
+		$candidates = $this->findCandidates(
+			$flow_id,
+			$venue_id,
+			array(
+				$this->sourceEvent( 'Retitled Showcase', '+33 days 21:00', array( 'post-retitle-identity' ) ),
+			)
+		);
+
+		$this->assertNotWPError( $candidates );
+		$this->assertSame( array(), $candidates );
+	}
+
+	public function test_legacy_post_without_identity_keeps_date_title_matching(): void {
+		$venue_id = $this->createVenue();
+		$flow_id  = 45;
+		$this->seedFlowEvent( 'Legacy Import Night', '+34 days 21:00', $venue_id, $flow_id );
+
+		$candidates = $this->findCandidates(
+			$flow_id,
+			$venue_id,
+			array(
+				$this->sourceEvent( 'Legacy Import Night', '+34 days 20:00', array( 'some-identity' ) ),
+			)
+		);
+
+		$this->assertNotWPError( $candidates );
+		$this->assertSame( array(), $candidates );
+	}
+
 	private function findCandidates( int $flow_id, int $venue_id, array $source_events ) {
 		$reconciler = new StaleListingReconciler(
 			fn() => $this->flowConfig( $flow_id, $venue_id ),
@@ -349,15 +440,21 @@ class StaleListingReconcilerTest extends WP_UnitTestCase {
 		);
 	}
 
-	private function sourceEvent( string $title, string $when ): array {
-		return array(
+	private function sourceEvent( string $title, string $when, array $identifiers = array() ): array {
+		$event = array(
 			'title'     => $title,
 			'startDate' => gmdate( 'Y-m-d', strtotime( $when ) ),
 			'startTime' => gmdate( 'H:i', strtotime( $when ) ),
 		);
+
+		if ( ! empty( $identifiers ) ) {
+			$event['identifiers'] = $identifiers;
+		}
+
+		return $event;
 	}
 
-	private function seedFlowEvent( string $title, string $when, int $venue_id, int $flow_id ): int {
+	private function seedFlowEvent( string $title, string $when, int $venue_id, int $flow_id, string $source_id = '' ): int {
 		$post_id = self::factory()->post->create(
 			array(
 				'post_title'  => $title,
@@ -367,6 +464,9 @@ class StaleListingReconcilerTest extends WP_UnitTestCase {
 		);
 		wp_set_object_terms( $post_id, array( $venue_id ), 'venue' );
 		update_post_meta( $post_id, '_datamachine_post_flow_id', (string) $flow_id );
+		if ( '' !== $source_id ) {
+			update_post_meta( $post_id, StaleListingReconciler::SOURCE_ID_META_KEY, $source_id );
+		}
 		EventDatesTable::upsert( $post_id, gmdate( 'Y-m-d H:i:s', strtotime( $when ) ), null, 'publish' );
 
 		return $post_id;

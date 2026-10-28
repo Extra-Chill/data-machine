@@ -151,7 +151,7 @@ class CheckStaleListingsCommand {
 			$candidates = $selection;
 		}
 
-		\WP_CLI\Utils\format_items( 'table', $candidates, array( 'candidate_id', 'post_id', 'title', 'start', 'venue', 'source_listed_that_date' ) );
+		\WP_CLI\Utils\format_items( 'table', $candidates, array( 'candidate_id', 'post_id', 'title', 'start', 'venue', 'source_listed_that_date', 'superseded_by' ) );
 
 		\WP_CLI::log( '' );
 
