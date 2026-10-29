@@ -1422,6 +1422,7 @@ class EventUpsert extends UpsertHandler {
 		// Persist datetime values from meta as system-level fallbacks
 		$resolved_post_id = $existing_post_id > 0 ? $existing_post_id : ( $engine->get( 'post_id' ) ?? $parameters['post_id'] ?? 0 );
 		if ( ! empty( $resolved_post_id ) ) {
+			$this->preserveKnownTimes( (int) $resolved_post_id, $event_data );
 			$this->hydrateStartDateFromMeta( (int) $resolved_post_id, $event_data );
 			$this->hydrateEndDateFromMeta( (int) $resolved_post_id, $event_data );
 		}
@@ -1461,6 +1462,29 @@ class EventUpsert extends UpsertHandler {
 			),
 			true
 		);
+	}
+
+	/** Keep a known occurrence's times when a date-only reimport has none. */
+	private function preserveKnownTimes( int $post_id, array &$event_data ): void {
+		$dates = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		if ( ! $dates || empty( $event_data['startDate'] ) ) {
+			return;
+		}
+		$start = self::composeIdentityStart( $event_data['startDate'], (string) ( $event_data['startTime'] ?? '' ) );
+		if ( self::extractDateForQuery( $start ) !== substr( $dates->start_datetime, 0, 10 )
+			|| ( preg_match( '/\d{2}:\d{2}/', $start ) && ! preg_match( '/[T ]00:00(?::00)?(?:Z|[+-]\d{2}:?\d{2})?$/', $start ) )
+			|| str_ends_with( $dates->start_datetime, ' 00:00:00' ) ) {
+			return;
+		}
+
+		$event_data['startDate'] = substr( $dates->start_datetime, 0, 10 );
+		$event_data['startTime'] = substr( $dates->start_datetime, 11 );
+		// An all-day end is not evidence that an overnight show now ends earlier.
+		$end_time = (string) ( $event_data['endTime'] ?? '' );
+		if ( '' !== (string) $dates->end_datetime && in_array( $end_time, array( '', '23:59', '23:59:59' ), true ) ) {
+			$event_data['endDate'] = substr( $dates->end_datetime, 0, 10 );
+			$event_data['endTime'] = substr( $dates->end_datetime, 11 );
+		}
 	}
 
 	private function hydrateStartDateFromMeta( int $post_id, array &$event_data ): void {

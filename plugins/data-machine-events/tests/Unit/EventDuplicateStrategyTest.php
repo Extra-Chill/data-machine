@@ -49,6 +49,38 @@ class EventDuplicateStrategyTest extends WP_UnitTestCase {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 	}
 
+	public function test_date_only_and_timed_same_title_and_venue_match_in_both_directions(): void {
+		[ $venue_id, $post_id ] = $this->seedVenueWithEvent( 'Boogieman VI Kick-Off Party w/ The Saint Cecilia', '2026-10-30 21:00:00', 'The Royal American' );
+		$input = array(
+			'title' => 'Boogieman VI Kick-Off Party w/ The Saint Cecilia',
+			'context' => array( 'venue_term_id' => $venue_id, 'startDate' => '2026-10-30' ),
+		);
+		foreach ( array( '2026-10-30', '2026-10-30T00:00:00' ) as $start ) {
+			$input['context']['startDate'] = $start;
+			$this->assertSame( $post_id, EventDuplicateStrategy::check( $input )['match']['post_id'] );
+		}
+		EventDatesTable::upsert( $post_id, '2026-10-30 00:00:00', '2026-10-30 23:59:59' );
+		$input['context']['startDate'] = '2026-10-30T21:00:00';
+		$this->assertSame( $post_id, EventDuplicateStrategy::check( $input )['match']['post_id'] );
+		$input['context']['startDate'] = '2026-10-31';
+		$this->assertNull( EventDuplicateStrategy::check( $input ) );
+	}
+
+	public function test_date_only_update_preserves_known_overnight_times(): void {
+		[ , $post_id ] = $this->seedVenueWithEvent( 'Boogieman VI Kick-Off Party', '2026-10-30 21:00:00' );
+		EventDatesTable::upsert( $post_id, '2026-10-30 21:00:00', '2026-10-31 02:00:00' );
+		$handler = new \DataMachineEvents\Steps\Upsert\Events\EventUpsert();
+		$method = new \ReflectionMethod( $handler, 'preserveKnownTimes' );
+		$method->setAccessible( true );
+		foreach ( array( '', '00:00' ) as $time ) {
+			$data = array( 'startDate' => '2026-10-30', 'startTime' => $time, 'endDate' => '2026-10-30', 'endTime' => '23:59:59' );
+			$method->invokeArgs( $handler, array( $post_id, &$data ) );
+			$this->assertSame( '21:00:00', $data['startTime'] );
+			$this->assertSame( '2026-10-31', $data['endDate'] );
+			$this->assertSame( '02:00:00', $data['endTime'] );
+		}
+	}
+
 	public function test_barn_jam_venue_rename_matches_only_identical_start_and_city(): void {
 		[ $venue_id, $post_id ] = $this->seedVenueWithEvent( 'Barn Jam', '2026-10-28 17:50:00', 'Awendaw Green' );
 		update_term_meta( $venue_id, '_venue_city', 'Awendaw' );

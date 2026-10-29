@@ -49,6 +49,30 @@ class EventUpsertTest extends EventUpsertTestCase {
 
 	}
 
+	public function test_date_only_reimport_updates_existing_post_without_losing_overnight_times(): void {
+		$parameters = array(
+			'title' => 'Boogieman VI Kick-Off Party w/ The Saint Cecilia',
+			'venue' => 'The Royal American',
+			'startDate' => '2026-10-30',
+			'startTime' => '21:00',
+			'endDate' => '2026-10-31',
+			'endTime' => '02:00',
+		);
+		$created = $this->invoke_upsert( $parameters );
+		$this->assertTrue( $created['success'] ?? false, wp_json_encode( $created ) );
+		$post_id = (int) $created['data']['post_id'];
+		$parameters['startTime'] = '';
+		$parameters['endDate'] = '2026-10-30';
+		$parameters['endTime'] = '';
+		$parameters['source_identity'] = 'new-scrape-identity';
+		$updated = $this->invoke_upsert( $parameters );
+		$this->assertTrue( $updated['success'] ?? false, wp_json_encode( $updated ) );
+		$this->assertSame( $post_id, (int) $updated['data']['post_id'] );
+		$dates = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$this->assertSame( '2026-10-30 21:00:00', $dates->start_datetime );
+		$this->assertSame( '2026-10-31 02:00:00', $dates->end_datetime );
+	}
+
 	public function test_reimport_of_merged_duplicate_resolves_to_winner_and_stays_trashed(): void {
 		$suffix = uniqid();
 		$winner = $this->invoke_upsert(

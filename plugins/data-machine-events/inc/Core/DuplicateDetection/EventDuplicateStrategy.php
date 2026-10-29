@@ -144,6 +144,34 @@ class EventDuplicateStrategy {
 			return null;
 		}
 
+		// Date-only imports (including their persisted all-day representation)
+		// carry no start-time evidence. Require exact normalized title and a
+		// confirmed venue, and do not choose arbitrarily between early/late sets.
+		if ( $venue_term ) {
+			$matches = array();
+			foreach ( self::candidatePagesByDate( $date_only, (int) $venue_term->term_id ) as $candidates ) {
+				foreach ( $candidates as $candidate ) {
+					if ( self::computeTitleHash( $title ) !== self::computeTitleHash( $candidate->post_title ) ) {
+						continue;
+					}
+					$dates = \DataMachineEvents\Core\EventDatesTable::get( (int) $candidate->ID );
+					if ( $dates ) {
+						$matches[ (int) $candidate->ID ] = $dates;
+					}
+				}
+			}
+			if ( 1 === count( $matches ) ) {
+				$post_id            = (int) array_key_first( $matches );
+				$dates              = $matches[ $post_id ];
+				$incoming_date_only = ! self::hasTimeComponent( $startDate ) || 1 === preg_match( '/[T ]00:00(?::00)?(?:Z|[+-]\d{2}:?\d{2})?$/', $startDate );
+				$stored_all_day     = str_ends_with( $dates->start_datetime, ' 00:00:00' )
+					&& $dates->end_datetime === $date_only . ' 23:59:59';
+				if ( $incoming_date_only || $stored_all_day ) {
+					return self::duplicateResult( $post_id, 'exact_title_venue_date_unknown_time' );
+				}
+			}
+		}
+
 		// A venue rename must not split an otherwise identical occurrence.
 		$match = self::findByContainedTitleAndExactStart( $title, $startDate, $date_only, $context, $venue_term );
 		if ( $match ) {

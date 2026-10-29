@@ -634,6 +634,17 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 	 * must continue to be detectable (canExtract). Verify the canExtract
 	 * signal stays stable on a real classic Squarespace page.
 	 */
+	public function test_royal_american_html_preserves_boogieman_overnight_times() {
+		$html = file_get_contents( __DIR__ . '/../Fixtures/squarespace-royal-american.html' );
+		$events = $this->extractor->extract( $html, 'https://www.theroyalamerican.com/schedule' );
+		$shows = array_values( array_filter( $events, static fn( $event ) => 'Boogieman VI Kick-Off Party w/ The Saint Cecilia' === $event['title'] ) );
+		$this->assertCount( 1, $shows );
+		$this->assertSame( '2026-10-30', $shows[0]['startDate'] );
+		$this->assertSame( '21:00', $shows[0]['startTime'] );
+		$this->assertSame( '2026-10-31', $shows[0]['endDate'] );
+		$this->assertSame( '02:00', $shows[0]['endTime'] );
+	}
+
 	public function test_regression_royal_american_fixture_is_detected() {
 		$fixture = __DIR__ . '/../Fixtures/squarespace-royal-american.html';
 		if ( ! file_exists( $fixture ) ) {

@@ -142,6 +142,18 @@ class SquarespaceExtractor extends BaseExtractor {
 				$item['startDate'] = $date_matches[1];
 			}
 
+			// Squarespace's datetime attributes are date-only even when the
+			// visible time tags contain a real show time (Royal American, #1013).
+			if ( preg_match_all( '/<time\b[^>]*class="event-time-24hr(?:-start|-end)?"[^>]*datetime="([^"]+)"[^>]*>(.*?)<\/time>/is', $article_html, $time_matches, PREG_SET_ORDER ) ) {
+				foreach ( array_slice( $time_matches, 0, 2 ) as $time_index => $time_match ) {
+					$text = trim( wp_strip_all_tags( $time_match[2] ) );
+					if ( preg_match( '/^(\d{1,2}):(\d{2})$/', $text, $clock ) ) {
+						$edge                   = 0 === $time_index ? 'start' : 'end';
+						$item[ $edge . 'Date' ] = substr( $time_match[1], 0, 10 ) . 'T' . sprintf( '%02d:%s:00', (int) $clock[1], $clock[2] );
+					}
+				}
+			}
+
 			// Image
 			if ( preg_match( '/<img[^>]+data-src="([^"]+)"/i', $article_html, $img_matches ) ) {
 				$item['assetUrl'] = $img_matches[1];
