@@ -481,7 +481,8 @@ class UniversalWebScraper extends EventImportHandler {
 		string $html_content,
 		string $current_url,
 		array $config,
-		ExecutionContext $context
+		ExecutionContext $context,
+		bool $resolve_embeds = true
 	): ?array {
 		foreach ( $this->extractors as $extractor ) {
 			if ( ! $extractor->canExtract( $html_content ) ) {
@@ -516,6 +517,21 @@ class UniversalWebScraper extends EventImportHandler {
 
 			if ( null !== $result ) {
 				return $result;
+			}
+		}
+
+		// Only resolve after the top-level chain fails. Run the same chain on
+		// each embed, retaining the original page URL for processing and provenance.
+		if ( $resolve_embeds ) {
+			$items = array();
+			foreach ( ( new WixEmbedResolver() )->resolve( $html_content ) as $embed_html ) {
+				$result = $this->tryStructuredDataExtraction( $embed_html, $current_url, $config, $context, false );
+				if ( null !== $result ) {
+					$items = array_merge( $items, $result['items'] ?? array( $result ) );
+				}
+			}
+			if ( ! empty( $items ) ) {
+				return array( 'items' => $items );
 			}
 		}
 
