@@ -33,14 +33,15 @@ final class CommandRegistry {
 	 */
 	public static function map(): array {
 		return array(
-			'datamachine indexnow'              => IndexNowCommand::class,
-			'datamachine analytics ga'          => GoogleAnalyticsCommand::class,
-			'datamachine analytics gsc'         => GoogleSearchConsoleCommand::class,
-			'datamachine analytics mediavine'   => MediavineCommand::class,
-			'datamachine analytics bing'        => Commands\BingWebmasterCommand::class,
-			'datamachine analytics pagespeed'   => PageSpeedCommand::class,
-			'datamachine media'                 => MediaHygieneCommand::class,
-			'datamachine cloudflare turnstile'  => Commands\CloudflareTurnstileCommand::class,
+			'datamachine invoice'              => Commands\InvoiceCommand::class,
+			'datamachine indexnow'             => IndexNowCommand::class,
+			'datamachine analytics ga'         => GoogleAnalyticsCommand::class,
+			'datamachine analytics gsc'        => GoogleSearchConsoleCommand::class,
+			'datamachine analytics mediavine'  => MediavineCommand::class,
+			'datamachine analytics bing'       => Commands\BingWebmasterCommand::class,
+			'datamachine analytics pagespeed'  => PageSpeedCommand::class,
+			'datamachine media'                => MediaHygieneCommand::class,
+			'datamachine cloudflare turnstile' => Commands\CloudflareTurnstileCommand::class,
 		);
 	}
 }

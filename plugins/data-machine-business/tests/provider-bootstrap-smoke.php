@@ -110,6 +110,7 @@ $expected_ids   = array(
 	'amazon-affiliate',
 	'media-hygiene',
 	'image-diagnostics',
+	'invoice',
 	'sendy',
 	'cloudflare',
 );
@@ -125,7 +126,7 @@ foreach ( $expected_ids as $provider_id ) {
 	);
 }
 
-$sendy = $actual_modules[15]->capabilities();
+$sendy = $actual_modules[16]->capabilities();
 assert_provider_bootstrap(
 	array(
 		'datamachine/sendy-subscribe',
