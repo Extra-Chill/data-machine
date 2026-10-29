@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.74.6] - 2026-10-29
+
+### Fixed
+- resolve Wix HtmlComponent embeds for all extractors
+
 ## [0.74.5] - 2026-10-28
 
 ### Fixed
