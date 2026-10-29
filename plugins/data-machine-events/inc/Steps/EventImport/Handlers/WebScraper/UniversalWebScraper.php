@@ -98,6 +98,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExt
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WeeblyExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SeatedExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandsintownWidgetExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\VisionExtractionProcessor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\PaginatorInterface;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Paginators\JsonApiPaginator;
@@ -195,6 +196,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new TimelyExtractor(),
 			new ElfsightEventsExtractor(),
 			new SeatedExtractor(),
+			new BandsintownWidgetExtractor(),
 			new EventbriteExtractor(),
 			new JsonLdExtractor(),
 			new GenericHtmlEventsExtractor(),
