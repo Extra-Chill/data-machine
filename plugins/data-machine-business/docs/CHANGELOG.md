@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.19.0] - 2026-10-29
+
+### Added
+- branded HTML email invoices via datamachine_email_templates
+
 ## [0.18.6] - 2026-10-15
 
 ### Fixed
