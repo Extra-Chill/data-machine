@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.74.7] - 2026-10-29
+
+### Fixed
+- match date-only re-imports to timed events; read Squarespace show times
+
 ## [0.74.6] - 2026-10-29
 
 ### Fixed
