@@ -127,6 +127,15 @@ class EventDuplicateStrategy {
 		// confirmed by name, so later strategies get no venue name to compare.
 		$confirm_venue = $authoritative_term ? '' : $venue;
 
+		// Festival contributions must remain taxonomy-only even when another
+		// identity strategy (such as a shared ticket URL) would also match.
+		if ( ! in_array( $venue_identity['match_status'], array( 'ambiguous', 'conflict' ), true ) ) {
+			$match = self::findFestivalMatch( $title, $date_only, $context, $venue_term );
+			if ( $match ) {
+				return $match;
+			}
+		}
+
 		// Strategy 1: Ticket URL + date (most reliable).
 		if ( ! empty( $ticketUrl ) ) {
 			$match = self::findByTicketUrl( $ticketUrl, $date_only );
@@ -201,6 +210,77 @@ class EventDuplicateStrategy {
 		}
 
 		return null;
+	}
+
+	/** Extract conservative festival phrases from canonical and artist titles. */
+	private static function festivalNamesFromTitle( string $title ): array {
+		$names = array();
+		$parts = preg_split( '/\s+(?:at|@)\s+/iu', $title );
+		foreach ( false === $parts ? array( $title ) : $parts as $part ) {
+			if ( preg_match( '/^(?:\d+(?:st|nd|rd|th)\s+)?(?:annual\s+)?(.+?\b(?:festival|fest)\b)/iu', $part, $match ) ) {
+				$names[] = $match[1];
+			}
+		}
+		return $names;
+	}
+
+	/** Match a festival lineup contribution, not an individual show time. */
+	private static function findFestivalMatch( string $title, string $date, array $context, ?\WP_Term $venue ): ?array {
+		if ( ! $venue ) {
+			return null;
+		}
+		// A title that leads with a festival name is the festival listing itself
+		// (including a retitled re-import of it), not an artist's set. Leave it to
+		// the ordinary strategies so its canonical fields keep updating.
+		$leading = preg_split( '/\s+(?:at|@)\s+/iu', $title, 2 );
+		if ( array() !== self::festivalNamesFromTitle( false === $leading ? $title : (string) $leading[0] ) ) {
+			return null;
+		}
+		$location = $context;
+		foreach ( array( 'address', 'city', 'state', 'country' ) as $field ) {
+			$stored             = (string) get_term_meta( $venue->term_id, '_venue_' . $field, true );
+			$location[ $field ] = '' !== $stored ? $stored : ( $context[ $field ] ?? '' );
+		}
+		$parsed           = \DataMachineEvents\Core\Venue_Taxonomy::parse_festival_venue( (string) ( $context['venue'] ?? '' ), $location );
+		$incoming_names   = (array) ( $context['festival'] ?? array() );
+		$incoming_names[] = $parsed['festival'];
+		$incoming_names   = array_merge( $incoming_names, self::festivalNamesFromTitle( $title ) );
+		$incoming         = $title . ' ' . ( $context['venue'] ?? '' ) . ' ' . implode( ' ', $incoming_names );
+		$contains         = static function ( string $text, string $name ): bool {
+			$text = EventIdentifierGenerator::normalizeBasic( $text );
+			$name = EventIdentifierGenerator::normalizeBasic( $name );
+			return '' !== $name && str_contains( ' ' . $text . ' ', ' ' . $name . ' ' );
+		};
+		$matches          = array();
+		foreach ( self::candidatePagesByDate( $date ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$id    = (int) $candidate->ID;
+				$terms = wp_get_post_terms( $id, 'festival', array( 'fields' => 'names' ) );
+				$names = is_wp_error( $terms ) ? array() : $terms;
+				// A title-only festival need not have been tagged yet.
+				$names = array_merge( $names, self::festivalNamesFromTitle( $candidate->post_title ) );
+				$other = $candidate->post_title . ' ' . implode( ' ', $names );
+				foreach ( array_unique( array_merge( $names, $incoming_names ) ) as $name ) {
+					if ( ! $contains( $incoming, $name ) || ! $contains( $other, $name ) ) {
+						continue;
+					}
+					$venues = wp_get_post_terms( $id, 'venue' );
+					foreach ( is_wp_error( $venues ) ? array() : $venues as $term ) {
+						if ( (int) $term->term_id === (int) $venue->term_id || \DataMachineEvents\Core\Venue_Taxonomy::is_same_event_location( (int) $term->term_id, $location ) ) {
+							$matches[ $id ] = $name;
+						}
+					}
+				}
+			}
+		}
+		if ( 1 !== count( $matches ) ) {
+			return null;
+		}
+		$id                            = (int) array_key_first( $matches );
+		$result                        = self::duplicateResult( $id, 'festival_lineup' );
+		$result['match']['merge_mode'] = 'festival_lineup';
+		$result['match']['festival']   = $matches[ $id ];
+		return $result;
 	}
 
 	/**

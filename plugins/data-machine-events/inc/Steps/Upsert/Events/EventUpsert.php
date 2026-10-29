@@ -340,6 +340,17 @@ class EventUpsert extends UpsertHandler {
 		// which returned "clear" and created duplicate events on re-import (#883).
 		$venue_resolution       = $this->taxonomy_assigner->resolveVenue( $parameters, $engine, $handler_config );
 		$authoritative_venue_id = (int) $venue_resolution['term_id'];
+		$festival_venue         = \DataMachineEvents\Core\Venue_Taxonomy::parse_festival_venue( $venue, array(
+			'address' => $venueAddress,
+			'city'    => $venueCity,
+			'state'   => $venueState,
+			'country' => $venueCountry,
+		) );
+		if ( '' !== $festival_venue['festival'] ) {
+			$parameters['festival'] = $festival_venue['festival'];
+		}
+
+		$festival_match = array();
 		if ( $existing_post_id <= 0 ) {
 			$duplicate_result = $this->findExistingEventViaAbility(
 				$title,
@@ -351,12 +362,41 @@ class EventUpsert extends UpsertHandler {
 				$venueState,
 				$venueCountry,
 				'assign' === $venue_resolution['action'] ? $authoritative_venue_id : 0,
-				(string) ( $parameters['source'] ?? '' )
+				(string) ( $parameters['source'] ?? '' ),
+				$engine->get( 'festival' ) ?? $parameters['festival'] ?? '',
+				$festival_match
 			);
 			if ( is_wp_error( $duplicate_result ) ) {
 				return $this->lifecycleErrorResponse( $duplicate_result, $title );
 			}
 			$existing_post_id = $duplicate_result;
+		}
+
+		if ( $existing_post_id > 0 && 'festival_lineup' === ( $festival_match['merge_mode'] ?? '' ) ) {
+			// A set contributes lineup taxonomy only. Never persist incoming event
+			// fields, source identity, or ticket data over the canonical festival.
+			$artists   = $engine->get( 'artist' ) ?: ( $parameters['artist'] ?? '' );
+			$artists   = $artists ?: ( $engine->get( 'performer' ) ?: ( $parameters['performer'] ?? '' ) );
+			$artists   = is_array( $artists ) ? $artists : array_filter( array_map( 'trim', explode( ',', (string) $artists ) ) );
+			$selection = $handler_config['taxonomy_artist_selection'] ?? '';
+			if ( is_numeric( $selection ) ) {
+				$artists[] = (int) $selection;
+			}
+			foreach ( array(
+				'artist'   => $artists,
+				'festival' => array( $festival_match['festival'] ),
+			) as $taxonomy => $names ) {
+				$result = wp_set_object_terms( $existing_post_id, $names, $taxonomy, true );
+				if ( is_wp_error( $result ) ) {
+					return $this->lifecycleErrorResponse( $result, $title );
+				}
+			}
+			do_action( 'datamachine_event_taxonomy_processed', $existing_post_id );
+			return $this->successResponse( array(
+				'post_id'  => $existing_post_id,
+				'post_url' => get_permalink( $existing_post_id ),
+				'action'   => 'updated',
+			) );
 		}
 
 		// Only unmatched events are creates. Keep corrections to past events
@@ -370,7 +410,7 @@ class EventUpsert extends UpsertHandler {
 
 		// 2. Build event data.
 		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
-		if ( 'source_alias' === ( $venue_resolution['matched_via'] ?? '' ) && $authoritative_venue_id > 0 ) {
+		if ( ( '' !== $festival_venue['festival'] || 'source_alias' === ( $venue_resolution['matched_via'] ?? '' ) ) && $authoritative_venue_id > 0 ) {
 			// Import handlers canonicalize aliased venues before the AI step;
 			// this covers items queued before the alias existed (#878).
 			$canonical_venue = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( $authoritative_venue_id );
@@ -828,7 +868,9 @@ class EventUpsert extends UpsertHandler {
 		string $state = '',
 		string $country = '',
 		int $venue_term_id = 0,
-		string $source = ''
+		string $source = '',
+		string|array $festival = '',
+		array &$festival_match = array()
 	): int|\WP_Error {
 		$duplicate_check = wp_has_ability( 'datamachine/check-duplicate' )
 			? wp_get_ability( 'datamachine/check-duplicate' )
@@ -860,6 +902,7 @@ class EventUpsert extends UpsertHandler {
 					'country'       => $country,
 					'venue_term_id' => $venue_term_id,
 					'source'        => $source,
+					'festival'      => $festival,
 				),
 			)
 		);
@@ -875,6 +918,11 @@ class EventUpsert extends UpsertHandler {
 		$post_id = (int) ( $result['match']['post_id'] ?? 0 );
 		if ( $post_id <= 0 ) {
 			return 0;
+		}
+
+		if ( 'festival_lineup' === ( $result['match']['merge_mode'] ?? '' ) ) {
+			$festival_match = $result['match'];
+			return $post_id;
 		}
 
 		// Defensive date guard: EventDuplicateStrategy is date-aware (queries
