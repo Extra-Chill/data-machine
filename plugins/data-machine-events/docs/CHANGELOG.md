@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.74.8] - 2026-10-29
+
+### Fixed
+- artist sets at a festival join the festival listing
+
 ## [0.74.7] - 2026-10-29
 
 ### Fixed
