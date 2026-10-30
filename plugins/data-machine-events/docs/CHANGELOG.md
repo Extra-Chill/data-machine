@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.77.0] - 2026-10-30
+
+### Added
+- extract plain server-rendered gig-list rows
+
+### Fixed
+- extract Bandzoogle Bandsintown tour lists
+- match festival listings re-imported from another source to the festival event
+
 ## [0.76.0] - 2026-10-30
 
 ### Added
