@@ -58,7 +58,7 @@ class MediaAbilities {
 			'datamachine/upload-media',
 			array(
 				'label'               => 'Upload Media',
-				'description'         => 'Upload or fetch a media file (image or video), store it in the repository, and return a reference (path, URL, or media ID). Automatically detects media type from MIME.',
+				'description'         => 'Upload or fetch a media file (image or video), store it in the repository, and return a reference (path, URL, or media ID). Automatically detects media type from MIME. To import an image from a link (e.g. a chat attachment) into the Media Library, pass url with to_media_library true; that mode only needs the upload_files capability and returns media_id for use elsewhere (e.g. an image-template image block attachment_id). file_path and repository storage are operator-only.',
 				'category'            => 'datamachine-media',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -104,8 +104,11 @@ class MediaAbilities {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeUploadMedia' ),
-				'permission_callback' => fn() => PermissionHelper::can_manage(),
-				'meta'                => array( 'show_in_rest' => true ),
+				'permission_callback' => array( self::class, 'canUploadMedia' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'mcp'          => array( 'public' => true ),
+				),
 			)
 		);
 	}
@@ -200,6 +203,36 @@ class MediaAbilities {
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		);
+	}
+
+	// ── Permission callbacks ───────────────────────────────────────────
+
+	/**
+	 * Permission for upload-media.
+	 *
+	 * Importing a remote URL into the Media Library is ordinary content work:
+	 * it needs the upload_media action (core upload_files), the same boundary
+	 * as the Media Library itself. Every other mode stays operator-only:
+	 * file_path reads an arbitrary local file, and repository-only storage
+	 * writes into pipeline/flow file stores.
+	 *
+	 * @param mixed $input Ability input.
+	 * @return bool
+	 */
+	public static function canUploadMedia( $input = null ): bool {
+		if ( PermissionHelper::can_manage() ) {
+			return true;
+		}
+
+		$input = is_array( $input ) ? $input : array();
+
+		$is_library_url_import = ! empty( $input['url'] )
+			&& empty( $input['file_path'] )
+			&& ! empty( $input['to_media_library'] )
+			&& empty( $input['pipeline_id'] )
+			&& empty( $input['flow_id'] );
+
+		return $is_library_url_import && PermissionHelper::can( 'upload_media' );
 	}
 
 	// ── Execute callbacks ──────────────────────────────────────────────
