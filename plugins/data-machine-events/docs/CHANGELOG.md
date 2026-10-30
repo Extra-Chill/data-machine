@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.75.1] - 2026-10-30
+
+### Fixed
+- resolve '& Friends' billings to the existing base artist term
+
 ## [0.75.0] - 2026-10-29
 
 ### Added
