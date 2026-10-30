@@ -204,8 +204,6 @@ class DATAMACHINE_Events {
 	public function init() {
 		$this->init_hooks();
 		$this->register_post_types();
-		// Ratings and reviews on past events (comment-backed primitive).
-		\DataMachineEvents\Core\EventRatings::register();
 		add_action( 'init', array( $this, 'register_taxonomies' ), 20 );
 		add_action( 'init', array( $this, 'register_blocks' ), 15 );
 
@@ -304,7 +302,6 @@ class DATAMACHINE_Events {
 			\DataMachineEvents\Abilities\EventDateQueryAbilities::class,
 			\DataMachineEvents\Abilities\VenueIntervalOverlapAbilities::class,
 			\DataMachineEvents\Abilities\EventsByTermAbilities::class,
-			\DataMachineEvents\Abilities\EventRatingAbilities::class,
 			\DataMachineEvents\Abilities\MergedBillDetectAbilities::class,
 			\DataMachineEvents\Abilities\MergeEventPostsAbilities::class,
 			\DataMachineEvents\Abilities\MergedBillDecideAbilities::class,
