@@ -99,6 +99,40 @@ All publishing follows the Instagram Graph API container pattern:
 ]
 ```
 
+### Per-photo user tags
+
+`datamachine/instagram-publish` accepts `user_tags` for a single image as before.
+For a carousel (explicit `media_kind: carousel` or auto-detected from multiple
+`image_urls`), use `carousel_user_tags`: an array of tag arrays aligned exactly
+to `image_urls`. Include `[]` for every untagged slide; do not omit entries or
+combine this field with nonempty `user_tags`.
+
+```json
+{
+  "content": "This week's shows",
+  "image_urls": ["https://example.com/1.jpg", "https://example.com/2.jpg"],
+  "carousel_user_tags": [
+    [{"username": "venue_account", "x": 0.25, "y": 0.75},
+     {"username": "artist_account", "x": 0.75, "y": 0.75}],
+    []
+  ]
+}
+```
+
+Each photo permits up to **20 tags**, independently of other slides. Every tag
+requires a username and numeric `x`/`y` coordinates in `[0, 1]`. Tags are sent as
+`user_tags` on the corresponding child container (`is_carousel_item=true`),
+never on the carousel parent. Reels and Stories do not accept these fields.
+
+Invalid input is rejected before authentication or container creation. If Graph
+rejects a child, publishing stops without dropping tags or publishing the
+carousel. The error includes the **1-based slide number**, submitted usernames,
+and the API error when available; error data also contains `slide` and
+`usernames`. Graph does not always identify which username failed, so the
+submitted list is context, not a claim that every listed account is invalid.
+Callers can validate those accounts, correct the input, and retry. Containers
+created earlier in a failed attempt remain unpublished.
+
 ### Publish Output
 
 ```php
