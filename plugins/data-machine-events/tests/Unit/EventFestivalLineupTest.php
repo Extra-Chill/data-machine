@@ -128,6 +128,59 @@ class EventFestivalLineupTest extends EventUpsertTestCase {
 		) ) );
 	}
 
+	public function test_festival_listing_matches_despite_year_ordinal_and_time_difference(): void {
+		wp_set_object_terms( $this->festival, 'Boogieman Halloween Festival', 'festival' );
+		$this->assertEmpty( get_post_meta( $this->festival, '_datamachine_event_source_identity', true ) );
+		foreach ( array( 'Boogieman Halloween Festival 2027', 'BOOGIEMAN Halloween Festival 2027' ) as $title ) {
+			$result = EventDuplicateStrategy::check( array(
+				'title' => $title,
+				'context' => array( 'venue_term_id' => $this->venue, 'startDate' => '2027-10-31 19:00:00' ),
+			) );
+			$this->assertSame( $this->festival, $result['match']['post_id'] ?? 0 );
+			$this->assertArrayNotHasKey( 'merge_mode', $result['match'] );
+		}
+		$result = $this->invoke_upsert( array(
+			'title' => 'Boogieman Halloween Festival 2027',
+			'startDate' => '2027-10-31',
+			'startTime' => '19:00',
+			'venue' => 'The Royal American',
+			'venueCity' => 'Charleston',
+			'venueState' => 'SC',
+			'description' => 'Festival listing from an artist feed',
+		) );
+		$this->assertSame( $this->festival, $result['data']['post_id'] ?? 0, wp_json_encode( $result ) );
+	}
+
+	public function test_festival_listing_matches_by_term_when_canonical_title_differs(): void {
+		wp_update_post( array( 'ID' => $this->festival, 'post_title' => 'Halloween Celebration' ) );
+		wp_set_object_terms( $this->festival, 'Boogieman Halloween Festival', 'festival' );
+		$result = EventDuplicateStrategy::check( array(
+			'title' => 'Boogieman Halloween Festival 2027',
+			'context' => array( 'venue_term_id' => $this->venue, 'startDate' => '2027-10-31 19:00:00' ),
+		) );
+		$this->assertSame( $this->festival, $result['match']['post_id'] ?? 0 );
+		$this->assertArrayNotHasKey( 'merge_mode', $result['match'] );
+	}
+
+	public function test_title_only_festival_listing_matches_without_taxonomy(): void {
+		$result = EventDuplicateStrategy::check( array(
+			'title' => 'Boogieman Halloween Festival 2027',
+			'context' => array( 'venue_term_id' => $this->venue, 'startDate' => '2027-10-31 19:00:00' ),
+		) );
+		$this->assertSame( $this->festival, $result['match']['post_id'] ?? 0 );
+		$this->assertArrayNotHasKey( 'merge_mode', $result['match'] );
+	}
+
+	public function test_festival_listing_requires_same_venue_and_date(): void {
+		$other = (int) wp_insert_term( 'Another Venue', 'venue' )['term_id'];
+		foreach ( array( array( $other, '2027-10-31' ), array( $this->venue, '2027-11-01' ) ) as $case ) {
+			$this->assertNull( EventDuplicateStrategy::check( array(
+				'title' => 'Boogieman Halloween Festival 2027',
+				'context' => array( 'venue_term_id' => $case[0], 'startDate' => $case[1] . ' 19:00:00' ),
+			) ) );
+		}
+	}
+
 	public function test_festival_listing_reimport_is_not_a_lineup_merge(): void {
 		foreach ( array( '6th Annual Boogieman Halloween Festival', 'Boogieman Halloween Festival 2027' ) as $title ) {
 			$result = EventDuplicateStrategy::check( array(

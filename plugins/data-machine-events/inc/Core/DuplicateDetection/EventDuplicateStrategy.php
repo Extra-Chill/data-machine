@@ -224,19 +224,18 @@ class EventDuplicateStrategy {
 		return $names;
 	}
 
-	/** Match a festival lineup contribution, not an individual show time. */
+	/** Match a festival listing or lineup contribution, independent of set time. */
 	private static function findFestivalMatch( string $title, string $date, array $context, ?\WP_Term $venue ): ?array {
 		if ( ! $venue ) {
 			return null;
 		}
 		// A title that leads with a festival name is the festival listing itself
-		// (including a retitled re-import of it), not an artist's set. Leave it to
-		// the ordinary strategies so its canonical fields keep updating.
-		$leading = preg_split( '/\s+(?:at|@)\s+/iu', $title, 2 );
-		if ( array() !== self::festivalNamesFromTitle( false === $leading ? $title : (string) $leading[0] ) ) {
-			return null;
-		}
-		$location = $context;
+		// (including a retitled re-import of it), not an artist's set. Match it
+		// without a time window, but keep it on the ordinary update path.
+		$leading       = preg_split( '/\s+(?:at|@)\s+/iu', $title, 2 );
+		$listing_names = self::festivalNamesFromTitle( false === $leading ? $title : (string) $leading[0] );
+		$is_listing    = array() !== $listing_names;
+		$location      = $context;
 		foreach ( array( 'address', 'city', 'state', 'country' ) as $field ) {
 			$stored             = (string) get_term_meta( $venue->term_id, '_venue_' . $field, true );
 			$location[ $field ] = '' !== $stored ? $stored : ( $context[ $field ] ?? '' );
@@ -245,7 +244,7 @@ class EventDuplicateStrategy {
 		$incoming_names   = (array) ( $context['festival'] ?? array() );
 		$incoming_names[] = $parsed['festival'];
 		$incoming_names   = array_merge( $incoming_names, self::festivalNamesFromTitle( $title ) );
-		$incoming         = $title . ' ' . ( $context['venue'] ?? '' ) . ' ' . implode( ' ', $incoming_names );
+		$incoming         = $is_listing ? implode( ' ', $listing_names ) : $title . ' ' . ( $context['venue'] ?? '' ) . ' ' . implode( ' ', $incoming_names );
 		$contains         = static function ( string $text, string $name ): bool {
 			$text = EventIdentifierGenerator::normalizeBasic( $text );
 			$name = EventIdentifierGenerator::normalizeBasic( $name );
@@ -254,7 +253,10 @@ class EventDuplicateStrategy {
 		$matches          = array();
 		foreach ( self::candidatePagesByDate( $date ) as $candidates ) {
 			foreach ( $candidates as $candidate ) {
-				$id    = (int) $candidate->ID;
+				$id = (int) $candidate->ID;
+				if ( $is_listing && 'publish' !== get_post_status( $id ) ) {
+					continue;
+				}
 				$terms = wp_get_post_terms( $id, 'festival', array( 'fields' => 'names' ) );
 				$names = is_wp_error( $terms ) ? array() : $terms;
 				// A title-only festival need not have been tagged yet.
@@ -276,7 +278,10 @@ class EventDuplicateStrategy {
 		if ( 1 !== count( $matches ) ) {
 			return null;
 		}
-		$id                            = (int) array_key_first( $matches );
+		$id = (int) array_key_first( $matches );
+		if ( $is_listing ) {
+			return self::duplicateResult( $id, 'festival_listing' );
+		}
 		$result                        = self::duplicateResult( $id, 'festival_lineup' );
 		$result['match']['merge_mode'] = 'festival_lineup';
 		$result['match']['festival']   = $matches[ $id ];
