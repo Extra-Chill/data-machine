@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.9] - 2026-10-30
+
+### Fixed
+- resolve user-session agent principal for authenticated human REST requests
+
 ## [0.198.8] - 2026-10-30
 
 ### Fixed
