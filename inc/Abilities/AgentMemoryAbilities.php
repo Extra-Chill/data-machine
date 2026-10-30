@@ -555,8 +555,16 @@ class AgentMemoryAbilities {
 		return new AgentMemory( $user_id, $agent_id, $filename );
 	}
 
-	/** Resolve the numeric Data Machine agent represented by an Agents API principal. */
-	private static function resolvePrincipalAgentId( string $effective_agent_id ): int {
+	/**
+	 * Resolve the numeric Data Machine agent represented by an Agents API principal.
+	 *
+	 * Shared with DailyMemoryAbilities so both memory surfaces derive scope
+	 * from the principal the same way.
+	 *
+	 * @param string $effective_agent_id Principal effective agent identifier.
+	 * @return int
+	 */
+	public static function resolvePrincipalAgentId( string $effective_agent_id ): int {
 		if ( str_starts_with( $effective_agent_id, 'agent:' ) ) {
 			$effective_agent_id = substr( $effective_agent_id, 6 );
 		}
