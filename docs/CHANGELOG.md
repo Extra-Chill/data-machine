@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.199.0] - 2026-10-30
+
+### Added
+- grantable datamachine_daily_memory cap for read/append
+
 ## [0.198.9] - 2026-10-30
 
 ### Fixed
