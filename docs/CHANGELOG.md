@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.8] - 2026-10-30
+
+### Fixed
+- scope daily-memory abilities to the execution principal
+
 ## [0.198.7] - 2026-10-30
 
 ### Fixed
