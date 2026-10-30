@@ -23,6 +23,7 @@ use DataMachineEvents\Core\Promoter_Taxonomy;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\VenueSourceAliases;
 use DataMachineEvents\Core\Event_Type_Taxonomy;
+use DataMachineEvents\Core\TextNormalization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,6 +35,39 @@ defined( 'ABSPATH' ) || exit;
  * The assigner itself only resolves the term and assigns it to the post.
  */
 class EventTaxonomyAssigner {
+
+	/**
+	 * Normalize artist identifiers before lookup or creation.
+	 *
+	 * Billing suffixes are aliases only when the base artist already exists.
+	 * Explicit term IDs are preserved, including in festival lineups.
+	 *
+	 * @param string|array $artists Artist names or term IDs.
+	 * @return array Normalized artist identifiers.
+	 */
+	public function normalizeArtists( $artists ): array {
+		$artists = is_array( $artists ) ? $artists : explode( ',', (string) $artists );
+
+		return array_map(
+			function ( $artist ) {
+				if ( is_int( $artist ) ) {
+					return $artist;
+				}
+
+				$name = sanitize_text_field( TextNormalization::decode_entities( (string) $artist ) );
+				$base = trim( preg_replace( '/\s+(?:&|and)\s+(?:friends|(?:his|her|the)\s+band)\s*$/iu', '', $name ) );
+				if ( '' !== $base && $base !== $name ) {
+					$term = get_term_by( 'name', $base, 'artist' );
+					if ( $term ) {
+						return $term->name;
+					}
+				}
+
+				return $name;
+			},
+			$artists
+		);
+	}
 
 	/**
 	 * Process venue taxonomy assignment.
