@@ -24,10 +24,14 @@ namespace DataMachine\Abilities\Publish;
 
 use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionAuthorizationReceipt;
 
 defined( 'ABSPATH' ) || exit;
 
 class SendEmailAbility {
+
+	public const PENDING_KIND = 'send_email';
 
 	private static bool $registered           = false;
 	private static bool $registration_pending = false;
@@ -36,6 +40,7 @@ class SendEmailAbility {
 	public function __construct() {
 		if ( null === self::$instance ) {
 			self::$instance = $this;
+			add_filter( 'datamachine_pending_action_handlers', array( self::class, 'pendingActionHandlers' ) );
 		}
 
 		self::ensure_registered();
@@ -112,6 +117,11 @@ class SendEmailAbility {
 					// continue to work unchanged.
 					'required'   => array( 'to', 'subject' ),
 					'properties' => array(
+						'on_behalf_of' => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => __( 'Optional WordPress user ID. Stage the email for approval; only this user can resolve it.', 'data-machine' ),
+						),
 						'auth_ref'     => array(
 							'type'        => 'string',
 							'description' => __( 'Optional non-secret mailbox auth ref authorizing the sender identity', 'data-machine' ),
@@ -185,6 +195,8 @@ class SendEmailAbility {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
+						'staged'     => array( 'type' => 'boolean' ),
+						'action_id'  => array( 'type' => 'string' ),
 						'success'    => array( 'type' => 'boolean' ),
 						'message'    => array( 'type' => 'string' ),
 						'recipients' => array( 'type' => 'array' ),
@@ -220,6 +232,24 @@ class SendEmailAbility {
 		$queued_context = $this->verifiedMailboxContext( $input );
 		if ( is_wp_error( $queued_context ) ) {
 			return $queued_context;
+		}
+		if ( isset( $input['on_behalf_of'] ) ) {
+			$user_id = filter_var( $input['on_behalf_of'], FILTER_VALIDATE_INT );
+			if ( false === $user_id || $user_id <= 0 || ! get_userdata( $user_id ) ) {
+				return new \WP_Error( 'email_invalid_principal', 'on_behalf_of must identify an existing WordPress user.', array( 'status' => 400 ) );
+			}
+			$input['on_behalf_of'] = $user_id;
+			$envelope              = PendingActionHelper::stage( array(
+				'kind'         => self::PENDING_KIND,
+				'summary'      => sprintf( 'Send email "%s" to %s.', $input['subject'] ?? '', $input['to'] ?? '' ),
+				'user_id'      => $user_id,
+				'apply_input'  => $input,
+				'preview_data' => array_intersect_key( $input, array_flip( array( 'to', 'cc', 'bcc', 'subject', 'body', 'template', 'on_behalf_of' ) ) ),
+			) );
+			if ( empty( $envelope['staged'] ) ) {
+				return new \WP_Error( 'email_stage_failed', $envelope['error'] ?? 'Failed to stage email.', array( 'status' => 500 ) );
+			}
+			return $envelope;
 		}
 		$config = $this->normalizeConfig( $input );
 
@@ -491,6 +521,32 @@ class SendEmailAbility {
 		);
 
 		return new \WP_Error( 'email_send_failed', $error_msg, array( 'status' => 400 ) );
+	}
+
+	/** Register the principal-only email approval handler. */
+	public static function pendingActionHandlers( array $handlers ): array {
+		$handlers[ self::PENDING_KIND ] = array(
+			'apply'       => array( self::class, 'applyPendingAction' ),
+			'can_resolve' => static function ( array $payload, string $decision, int $user_id ): bool {
+				return 0 < $user_id && ( $payload['apply_input']['on_behalf_of'] ?? null ) === $user_id;
+			},
+		);
+		return $handlers;
+	}
+
+	/** Replay an approved send once, without staging it again. */
+	public static function applyPendingAction( array $input, array $payload, array $receipt ): array|\WP_Error {
+		$authorized = PendingActionAuthorizationReceipt::consume(
+			$receipt, self::PENDING_KIND, self::PENDING_KIND, $input, $input,
+			(string) ( $payload['agent'] ?? $payload['creator'] ?? '' ),
+			is_array( $payload['workspace'] ?? null ) ? $payload['workspace'] : array()
+		);
+		if ( is_wp_error( $authorized ) ) {
+			return $authorized;
+		}
+		// Approval does not carry queue-worker credentials into a different principal.
+		unset( $input['on_behalf_of'], $input['_mailbox_grant'] );
+		return ( new self() )->execute( $input );
 	}
 
 	/**

@@ -73,6 +73,10 @@ if ( ! function_exists( 'did_action' ) ) {
 	}
 }
 
+function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+	return add_action( $hook, $callback, $priority, $accepted_args );
+}
+
 if ( ! function_exists( 'add_action' ) ) {
 	function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
 		global $datamachine_2303_state;

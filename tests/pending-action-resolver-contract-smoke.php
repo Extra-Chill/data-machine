@@ -217,6 +217,11 @@ use DataMachine\Engine\AI\Actions\PendingActionHelper;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 
+// Allow related smoke tests to reuse the WordPress/store fixture without running this suite.
+if ( defined( 'DATAMACHINE_RESOLVER_FIXTURE_ONLY' ) && DATAMACHINE_RESOLVER_FIXTURE_ONLY ) {
+	return;
+}
+
 $failures = array();
 $passes   = 0;
 
