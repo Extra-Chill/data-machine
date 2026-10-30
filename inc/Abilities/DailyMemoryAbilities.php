@@ -122,7 +122,7 @@ class DailyMemoryAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'readDaily' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'daily_memory' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -165,7 +165,7 @@ class DailyMemoryAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'writeDaily' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'daily_memory' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -197,7 +197,7 @@ class DailyMemoryAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'listDaily' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'daily_memory' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -252,7 +252,7 @@ class DailyMemoryAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'searchDaily' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'daily_memory' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

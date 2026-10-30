@@ -37,6 +37,7 @@ class PermissionHelper {
 		'view_analytics'   => 'datamachine_view_analytics',
 		'render_images'    => 'datamachine_render_images',
 		'upload_media'     => 'upload_files',
+		'daily_memory'     => 'datamachine_daily_memory',
 		'chat'             => 'datamachine_chat',
 		'use_tools'        => 'datamachine_use_tools',
 		'view_logs'        => 'datamachine_view_logs',
@@ -172,18 +173,22 @@ class PermissionHelper {
 	 * - upload_media: importing a remote file into the Media Library maps to
 	 *   core's upload_files, the same capability that gates the Media
 	 *   Library itself, so editors and authors can bring images in.
+	 * - daily_memory: reading and appending agent daily memory. Content-team
+	 *   members log and recall work through the agent; the dedicated
+	 *   datamachine_daily_memory cap lets sites grant it without flow/agent
+	 *   administration. Deleting daily memory stays behind can_manage().
 	 *
 	 * @since 0.37.0
 	 * @var string[]
 	 */
-	private const IMPLIED_BY_MANAGEMENT = array( 'view_analytics', 'render_images', 'upload_media' );
+	private const IMPLIED_BY_MANAGEMENT = array( 'view_analytics', 'render_images', 'upload_media', 'daily_memory' );
 
 	/**
 	 * Check whether current context can perform an action.
 	 *
 	 * @since 0.37.0
 	 *
-	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, render_images, upload_media, chat, use_tools, view_logs).
+	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, render_images, upload_media, daily_memory, chat, use_tools, view_logs).
 	 * @return bool
 	 */
 	public static function can( string $action ): bool {
