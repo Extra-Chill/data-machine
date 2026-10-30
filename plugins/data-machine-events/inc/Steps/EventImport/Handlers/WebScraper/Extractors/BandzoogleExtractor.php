@@ -32,6 +32,10 @@
  * feature. The individual `event-datetime` markup intentionally omits the
  * year, so we resolve the year from that header (with a sane fallback).
  *
+ * Bandsintown features use the same cards but put the year inline in
+ * `.date`, omit the title link, and use `.event-title` for the venue.
+ * Their `.event-location` is "Venue, City", not a street address.
+ *
  * Detection: Bandzoogle ships everything from `bndzgl.com` (app assets) and
  * `zoogletools.com` (image CDN), plus a `data-event-id` attribute on each
  * event card. Any one of those is enough to call it Bandzoogle.
@@ -225,26 +229,23 @@ class BandzoogleExtractor extends BaseExtractor {
 	 * @return array Normalized event records.
 	 */
 	private function extractEventDetailBlocks( string $html, string $source_url, array $page_venue, int $calendar_year ): array {
-		// Capture each <div class="event-detail" data-event-id="...">...</div> block.
-		// We anchor on the opening tag and consume until the matching closing div by
-		// using a depth-aware split: the next `event-detail` opener (or EOF) bounds it.
-		if ( ! preg_match_all(
-			'/<div\s+class="event-detail"[^>]*data-event-id="(\d+)"[^>]*data-occurrence-id="(\d+)"[^>]*>(.*?)(?=<div\s+class="event-detail"\b|<div class="event-clear">|<\/article>\s*<\/div>\s*<\/section>|<\/section>\s*<\/div>\s*<footer)/si',
-			$html,
-			$matches,
-			PREG_SET_ORDER
-		) ) {
-			return array();
-		}
-
+		// DOM boundaries keep each card isolated, including the final card and
+		// themes without event-clear separators. Feature context is per card,
+		// since a page can contain both native and Bandsintown calendars.
+		$loaded = $this->loadDom( $html );
+		$dom    = $loaded['dom'];
+		$xpath  = $loaded['xpath'];
+		$nodes  = $this->queryElements( $xpath, "//div[contains(concat(' ', normalize-space(@class), ' '), ' event-detail ')][@data-event-id]" );
 		$events = array();
 
-		foreach ( $matches as $match ) {
-			$event_id      = $match[1];
-			$occurrence_id = $match[2];
-			$inner         = $match[3];
-
-			$event = $this->parseEventDetailBlock( $inner, $source_url, $page_venue, $calendar_year, $event_id, $occurrence_id );
+		foreach ( $nodes as $node ) {
+			$inner = $dom->saveHTML( $node );
+			if ( ! is_string( $inner ) ) {
+				continue;
+			}
+			$ancestors      = $xpath->query( "ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' bandsintown_feature ') or starts-with(@id, 'bandsintown_feature_')]", $node );
+			$is_bandsintown = false !== $ancestors && $ancestors->length > 0;
+			$event          = $this->parseEventDetailBlock( $inner, $source_url, $page_venue, $calendar_year, $node->getAttribute( 'data-event-id' ), $node->getAttribute( 'data-occurrence-id' ), $is_bandsintown );
 			if ( ! empty( $event['title'] ) && ! empty( $event['startDate'] ) ) {
 				$events[] = $event;
 			}
@@ -256,7 +257,7 @@ class BandzoogleExtractor extends BaseExtractor {
 	/**
 	 * Parse a single `.event-detail` block.
 	 */
-	private function parseEventDetailBlock( string $html, string $source_url, array $page_venue, int $calendar_year, string $event_id, string $occurrence_id ): array {
+	private function parseEventDetailBlock( string $html, string $source_url, array $page_venue, int $calendar_year, string $event_id, string $occurrence_id, bool $is_bandsintown = false ): array {
 		$event = array(
 			'title'         => '',
 			'description'   => '',
@@ -283,6 +284,15 @@ class BandzoogleExtractor extends BaseExtractor {
 			$event['title']      = $this->sanitizeText( html_entity_decode( wp_strip_all_tags( $m[2] ), ENT_QUOTES, 'UTF-8' ) );
 		}
 
+		if ( $is_bandsintown && preg_match( '/<h2[^>]*class="[^"]*event-title[^"]*"[^>]*>(.*?)<\/h2>/is', $html, $m ) ) {
+			$event['title'] = $this->sanitizeText( html_entity_decode( wp_strip_all_tags( $m[1] ), ENT_QUOTES, 'UTF-8' ) );
+			$event['venue'] = $event['title'];
+			// Tour stops must not inherit another stop's page-level address.
+			foreach ( array( 'venueAddress', 'venueCity', 'venueState', 'venueZip', 'venueCountry', 'venueTimezone' ) as $field ) {
+				$event[ $field ] = '';
+			}
+		}
+
 		// Datetime: parse "Wednesday, May 13" + "6:00PM" inside event-datetime.
 		if ( preg_match( '/<p[^>]*class="[^"]*event-datetime[^"]*"[^>]*>(.*?)<\/p>/is', $html, $dt_match ) ) {
 			$this->parseDatetimeFragment( $event, $dt_match[1], $calendar_year );
@@ -301,7 +311,15 @@ class BandzoogleExtractor extends BaseExtractor {
 		// overrides nothing.
 		if ( preg_match( '/<p[^>]*class="[^"]*event-location[^"]*"[^>]*>(.*?)<\/p>/is', $html, $loc_match ) ) {
 			$loc_text = trim( html_entity_decode( wp_strip_all_tags( $loc_match[1] ), ENT_QUOTES, 'UTF-8' ) );
-			if ( '' !== $loc_text ) {
+			if ( $is_bandsintown ) {
+				// Bandsintown publishes "Venue, City" here, sometimes with a
+				// different venue spelling than the title (Bi Nuu / BI NUU).
+				// Split at the last comma so venue names may contain commas.
+				$comma = strrpos( $loc_text, ',' );
+				if ( false !== $comma ) {
+					$event['venueCity'] = $this->sanitizeText( trim( substr( $loc_text, $comma + 1 ) ) );
+				}
+			} elseif ( '' !== $loc_text ) {
 				$location = $this->parseLocationText( $loc_text );
 
 				if ( '' !== $location['venue'] && ! $this->isSubRoomTimeLabel( $loc_text ) ) {
@@ -431,9 +449,11 @@ class BandzoogleExtractor extends BaseExtractor {
 
 		// Extract month + day from date_text. Day-of-week prefix is optional.
 		$months = '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t)?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
-		if ( preg_match( '/(' . $months . ')\s+(\d{1,2})/i', $date_text, $dm ) ) {
+		if ( preg_match( '/(' . $months . ')\s+(\d{1,2})(?:,?\s+(\d{4}))?/i', $date_text, $dm ) ) {
 			$month_name = $dm[1];
 			$day        = (int) $dm[2];
+			// Inline years are authoritative over headers and inferred years.
+			$calendar_year = isset( $dm[3] ) ? (int) $dm[3] : $calendar_year;
 
 			if ( $calendar_year > 0 ) {
 				try {
@@ -584,6 +604,15 @@ class BandzoogleExtractor extends BaseExtractor {
 	 * regardless of position.
 	 */
 	private function findTicketUrl( string $html, string $source_url ): string {
+		// Prefer the explicit purchase button over reminder or venue links.
+		$loaded = $this->loadDom( $html );
+		foreach ( $this->queryElements( $loaded['xpath'], "//a[contains(concat(' ', normalize-space(@class), ' '), ' tickets ')][@href]" ) as $button ) {
+			$url = $this->resolveUrl( $button->getAttribute( 'href' ), $source_url );
+			if ( preg_match( '#^https?://#i', $url ) ) {
+				return esc_url_raw( $url );
+			}
+		}
+
 		$ticket_domains = array(
 			'eventbrite',
 			'tixr',

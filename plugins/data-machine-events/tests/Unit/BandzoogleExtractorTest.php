@@ -28,6 +28,51 @@ class BandzoogleExtractorTest extends WP_UnitTestCase {
 		$this->fixture_path = __DIR__ . '/../Fixtures/bandzoogle-elephant-room.html';
 	}
 
+	public function test_extracts_bandsintown_feature_tour_snapshot(): void {
+		$html = $this->loadFixture( 'bandzoogle-johnny-delaware-bandsintown-tour.html' );
+		$this->extractor->setNow( new \DateTimeImmutable( '2030-12-01' ) );
+		$this->assertTrue( $this->extractor->canExtract( $html ) );
+
+		$events = $this->extractor->extract( $html, 'https://johnnydelaware.com/tour' );
+		$this->assertCount( 11, $events );
+		$this->assertSame( 'Mijl op Zeven (afternoon spot)', $events[0]['title'] );
+		$this->assertSame( '2027-05-06', $events[0]['startDate'] );
+		$this->assertSame( 'Cinetol', $events[10]['venue'] );
+		$cities = array( 'Ospel', 'Groningen', 'Berlin', 'Budapest', 'Brno', 'Bamberg', 'Zürich', 'Barberaz', 'Montreuil', 'London', 'Amsterdam' );
+		foreach ( $events as $index => $event ) {
+			$this->assertSame( $event['title'], $event['venue'] );
+			$this->assertSame( $cities[ $index ], $event['venueCity'] );
+			$this->assertStringStartsWith( '2027-', $event['startDate'] );
+			$this->assertSame( '20:00', $event['startTime'] );
+			$this->assertSame( '', $event['endDate'], 'Responsive duplicate dates are not end dates.' );
+			$this->assertSame( '', $event['endTime'] );
+			$this->assertSame( '', $event['venueCountry'], 'Do not guess US for international tour stops.' );
+		}
+		$this->assertSame(
+			'https://www.bandsintown.com/t/109011273?app_id=Bandzoogle&came_from=267&utm_medium=api&utm_source=public_api&utm_campaign=ticket',
+			$events[0]['ticketUrl']
+		);
+	}
+
+	public function test_bandsintown_context_does_not_leak_to_native_calendar(): void {
+		$card = '<div class="event-detail" data-event-id="1" data-occurrence-id="1">'
+			. '<h2 class="event-title"><a href="https://example.com/show">Artist</a></h2>'
+			. '<p class="event-datetime"><time class="from"><span class="date">May 6, 2027</span></time></p>'
+			. '<p class="event-location">Real Venue, Austin, TX</p>'
+			. '<a href="https://example.org/reminder">Reminder</a>'
+			. '<a href="/tickets/1" class="tickets button">Tickets</a></div>';
+		$html = '<span class="month-name">May 2026</span>'
+			. '<section id="bandsintown_feature_1">' . $card . '</section>' . $card;
+		$events = $this->extractor->extract( $html, 'https://example.com/tour' );
+		$this->assertCount( 2, $events );
+		$this->assertSame( 'Artist', $events[0]['venue'] );
+		$this->assertSame( 'Real Venue', $events[1]['venue'] );
+		foreach ( $events as $event ) {
+			$this->assertSame( '2027-05-06', $event['startDate'], 'Inline year overrides the calendar header.' );
+			$this->assertSame( 'https://example.com/tickets/1', $event['ticketUrl'] );
+		}
+	}
+
 	/**
 	 * Detect Bandzoogle from the Elephant Room production snapshot.
 	 *
