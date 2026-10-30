@@ -15,11 +15,13 @@ class DailyMemoryAbilitiesTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		add_filter( 'datamachine_daily_memory_storage', array( $this, 'failureStorage' ) );
 	}
 
 	public function tear_down(): void {
 		remove_filter( 'datamachine_daily_memory_storage', array( $this, 'failureStorage' ) );
+		wp_set_current_user( 0 );
 		parent::tear_down();
 	}
 

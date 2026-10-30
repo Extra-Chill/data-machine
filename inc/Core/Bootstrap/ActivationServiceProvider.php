@@ -330,7 +330,7 @@ final class ActivationServiceProvider {
 	 */
 	public static function register_capabilities(): void {
 		$role_capabilities = array(
-			'administrator' => array( 'datamachine_manage_agents', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_view_analytics', 'datamachine_render_images', 'datamachine_chat', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' ),
+			'administrator' => array( 'datamachine_manage_agents', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_view_analytics', 'datamachine_render_images', 'datamachine_daily_memory', 'datamachine_chat', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' ),
 			'editor'        => array( 'datamachine_chat', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' ),
 			'author'        => array( 'datamachine_chat', 'datamachine_use_tools', 'datamachine_create_own_agent' ),
 			'contributor'   => array( 'datamachine_chat', 'datamachine_create_own_agent' ),
@@ -353,7 +353,7 @@ final class ActivationServiceProvider {
 	 * Remove Data Machine capabilities from roles.
 	 */
 	public static function remove_capabilities(): void {
-		$capabilities = array( 'datamachine_manage_agents', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_view_analytics', 'datamachine_render_images', 'datamachine_chat', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' );
+		$capabilities = array( 'datamachine_manage_agents', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_view_analytics', 'datamachine_render_images', 'datamachine_daily_memory', 'datamachine_chat', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' );
 
 		foreach ( array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' ) as $role_name ) {
 			$role = get_role( $role_name );

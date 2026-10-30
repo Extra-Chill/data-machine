@@ -98,8 +98,8 @@ class DailyMemoryAbilities {
 	 * and effective agent), not from caller input. A caller-supplied
 	 * user_id/agent_id that differs from the principal is cross-scope access
 	 * and is denied unless the caller can manage Data Machine. With no
-	 * principal (CLI, cron, operator sessions), the requested scope is used
-	 * as before; those contexts are already operator-gated.
+	 * principal, only operators (CLI, cron, admin sessions) may name a scope;
+	 * everyone else is denied.
 	 *
 	 * @param array $input Ability input.
 	 * @return DailyMemoryStorage|\WP_Error
@@ -125,6 +125,16 @@ class DailyMemoryAbilities {
 		$principal       = PermissionHelper::get_execution_principal();
 
 		if ( null === $principal ) {
+			// Without a principal nothing establishes whose memory this is,
+			// so only operators may name a scope directly.
+			if ( ! PermissionHelper::can_manage() ) {
+				return new \WP_Error(
+					'daily_memory_principal_required',
+					'Daily memory requires an acting agent session or Data Machine management permission.',
+					array( 'status' => 403 )
+				);
+			}
+
 			return array(
 				'user_id'  => $requested_user,
 				'agent_id' => $requested_agent,
@@ -211,7 +221,7 @@ class DailyMemoryAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'readDaily' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'daily_memory' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -254,7 +264,7 @@ class DailyMemoryAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'writeDaily' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'daily_memory' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -286,7 +296,7 @@ class DailyMemoryAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'listDaily' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'daily_memory' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -341,7 +351,7 @@ class DailyMemoryAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'searchDaily' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'daily_memory' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
