@@ -78,6 +78,7 @@ class PluginSettings {
 	 */
 	public static function getDefaults(): array {
 		return array(
+			'default_agent'                           => '',
 			'max_turns'                               => self::DEFAULT_MAX_TURNS,
 			'pipeline_ai_concurrency_limit'           => self::DEFAULT_PIPELINE_AI_CONCURRENCY_LIMIT,
 			'pipeline_ai_throttle_delay'              => self::DEFAULT_PIPELINE_AI_THROTTLE_DELAY,

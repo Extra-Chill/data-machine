@@ -131,6 +131,7 @@ final class RuntimeServiceProvider {
 		\DataMachine\Api\Analytics::register();
 
 		new \DataMachine\Core\Auth\AgentAuthMiddleware();
+		new \DataMachine\Core\Auth\UserSessionAgentContext();
 		new \DataMachine\Core\Auth\AgentAuthorize();
 		new \DataMachine\Core\Auth\AgentAuthCallback();
 		\DataMachine\Core\Auth\ExternalLoginRouter::register();
