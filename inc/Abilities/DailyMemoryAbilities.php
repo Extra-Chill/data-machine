@@ -90,6 +90,95 @@ class DailyMemoryAbilities {
 		return $storage;
 	}
 
+	/**
+	 * Resolve daily-memory storage for the caller's real scope.
+	 *
+	 * Mirrors AgentMemoryAbilities::resolveMemory(): when an execution
+	 * principal is present, the scope comes from the principal (acting user
+	 * and effective agent), not from caller input. A caller-supplied
+	 * user_id/agent_id that differs from the principal is cross-scope access
+	 * and is denied unless the caller can manage Data Machine. With no
+	 * principal (CLI, cron, operator sessions), the requested scope is used
+	 * as before; those contexts are already operator-gated.
+	 *
+	 * @param array $input Ability input.
+	 * @return DailyMemoryStorage|\WP_Error
+	 */
+	private static function resolveScopedStorage( array $input ): DailyMemoryStorage|\WP_Error {
+		$scope = self::resolveScope( $input );
+		if ( is_wp_error( $scope ) ) {
+			return $scope;
+		}
+
+		return self::resolveStorage( $scope['user_id'], $scope['agent_id'] );
+	}
+
+	/**
+	 * Resolve the daily-memory scope for the current caller.
+	 *
+	 * @param array $input Ability input.
+	 * @return array{user_id: int, agent_id: int}|\WP_Error
+	 */
+	public static function resolveScope( array $input ): array|\WP_Error {
+		$requested_user  = (int) ( $input['user_id'] ?? 0 );
+		$requested_agent = (int) ( $input['agent_id'] ?? 0 );
+		$principal       = PermissionHelper::get_execution_principal();
+
+		if ( null === $principal ) {
+			return array(
+				'user_id'  => $requested_user,
+				'agent_id' => $requested_agent,
+			);
+		}
+
+		$user_id  = (int) $principal->acting_user_id;
+		$agent_id = AgentMemoryAbilities::resolvePrincipalAgentId( (string) $principal->effective_agent_id );
+
+		$cross_user  = $requested_user > 0 && $requested_user !== $user_id;
+		$cross_agent = $requested_agent > 0 && $requested_agent !== $agent_id;
+
+		if ( $cross_user || $cross_agent ) {
+			if ( ! PermissionHelper::can_manage() ) {
+				return new \WP_Error(
+					'daily_memory_scope_denied',
+					'Daily memory can only be accessed for the acting user and agent.',
+					array( 'status' => 403 )
+				);
+			}
+
+			return array(
+				'user_id'  => $cross_user ? $requested_user : $user_id,
+				'agent_id' => $cross_agent ? $requested_agent : $agent_id,
+			);
+		}
+
+		return array(
+			'user_id'  => $user_id,
+			'agent_id' => $agent_id,
+		);
+	}
+
+	/**
+	 * Deny destructive daily-memory operations to non-operators.
+	 *
+	 * Replacing a day's file (mode=write) or deleting it stays operator-only
+	 * no matter how the ability's permission gate evolves.
+	 *
+	 * @param string $operation Operation label for the error message.
+	 * @return \WP_Error|null Error when denied, null when allowed.
+	 */
+	private static function requireOperatorFor( string $operation ): ?\WP_Error {
+		if ( PermissionHelper::can_manage() ) {
+			return null;
+		}
+
+		return new \WP_Error(
+			'daily_memory_operator_only',
+			sprintf( 'Daily memory %s requires Data Machine management permission.', $operation ),
+			array( 'status' => 403 )
+		);
+	}
+
 	private function registerAbilities(): void {
 		$register_callback = function () {
 			wp_register_ability(
@@ -315,9 +404,10 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$storage  = self::resolveStorage( $user_id, $agent_id );
+		$storage = self::resolveScopedStorage( $input );
+		if ( is_wp_error( $storage ) ) {
+			return $storage;
+		}
 
 		return self::dailyResult( $storage->read( $parts['year'], $parts['month'], $parts['day'] ), 'daily_memory_read_failed', $date );
 	}
@@ -337,6 +427,13 @@ class DailyMemoryAbilities {
 		$content = $input['content'];
 		$mode    = $input['mode'] ?? 'append';
 
+		if ( 'write' === $mode ) {
+			$denied = self::requireOperatorFor( 'overwrite' );
+			if ( null !== $denied ) {
+				return $denied;
+			}
+		}
+
 		$parts = DailyMemory::parse_date( $date );
 		if ( ! $parts ) {
 			return new \WP_Error(
@@ -349,9 +446,10 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$storage  = self::resolveStorage( $user_id, $agent_id );
+		$storage = self::resolveScopedStorage( $input );
+		if ( is_wp_error( $storage ) ) {
+			return $storage;
+		}
 
 		if ( 'write' === $mode ) {
 			return self::dailyResult( $storage->write( $parts['year'], $parts['month'], $parts['day'], $content ), 'daily_memory_write_failed', $date );
@@ -367,9 +465,10 @@ class DailyMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function listDaily( array $input ): array|\WP_Error {
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$storage  = self::resolveStorage( $user_id, $agent_id );
+		$storage = self::resolveScopedStorage( $input );
+		if ( is_wp_error( $storage ) ) {
+			return $storage;
+		}
 
 		return self::dailyResult( $storage->list_all(), 'daily_memory_list_failed' );
 	}
@@ -381,9 +480,10 @@ class DailyMemoryAbilities {
 	 * @return array Search results.
 	 */
 	public static function searchDaily( array $input ): array|\WP_Error {
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$storage  = self::resolveStorage( $user_id, $agent_id );
+		$storage = self::resolveScopedStorage( $input );
+		if ( is_wp_error( $storage ) ) {
+			return $storage;
+		}
 
 		$query = $input['query'];
 		$from  = $input['from'] ?? null;
@@ -405,6 +505,11 @@ class DailyMemoryAbilities {
 			return new \WP_Error( 'daily_memory_disabled', 'Daily memory is disabled. Enable it in Agent > Configuration.', array( 'status' => 403 ) );
 		}
 
+		$denied = self::requireOperatorFor( 'delete' );
+		if ( null !== $denied ) {
+			return $denied;
+		}
+
 		$date = $input['date'] ?? gmdate( 'Y-m-d' );
 
 		$parts = DailyMemory::parse_date( $date );
@@ -419,9 +524,10 @@ class DailyMemoryAbilities {
 			);
 		}
 
-		$user_id  = (int) ( $input['user_id'] ?? 0 );
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$storage  = self::resolveStorage( $user_id, $agent_id );
+		$storage = self::resolveScopedStorage( $input );
+		if ( is_wp_error( $storage ) ) {
+			return $storage;
+		}
 
 		return self::dailyResult( $storage->delete( $parts['year'], $parts['month'], $parts['day'] ), 'daily_memory_delete_failed', $date );
 	}
