@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.75.2] - 2026-10-30
+
+### Fixed
+- keep existing artist and festival terms when re-importing an event
+
 ## [0.75.1] - 2026-10-30
 
 ### Fixed
