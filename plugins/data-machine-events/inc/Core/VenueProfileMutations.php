@@ -25,7 +25,7 @@ class VenueProfileMutations {
 	private const LOCK_TIMEOUT = 10;
 
 	/** @var string[] */
-	private const EDITABLE_FIELDS = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'ticketing_url', 'capacity', 'logo_attachment_id' );
+	private const EDITABLE_FIELDS = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'instagram', 'ticketing_url', 'capacity', 'logo_attachment_id' );
 
 	/** @var string[] */
 	private const ADDRESS_FIELDS = array( 'address', 'city', 'state', 'zip', 'country' );
@@ -459,6 +459,14 @@ class VenueProfileMutations {
 	private static function normalizeChanges( array $changes ): array|\WP_Error {
 		$normalized = array();
 		foreach ( $changes as $field => $value ) {
+			if ( 'instagram' === $field ) {
+				$handle = InstagramHandle::normalize( $value );
+				if ( is_wp_error( $handle ) ) {
+					return $handle;
+				}
+				$normalized[ $field ] = $handle;
+				continue;
+			}
 			if ( 'logo_attachment_id' === $field ) {
 				$logo = self::normalizeLogoAttachmentId( $value );
 				if ( is_wp_error( $logo ) ) {

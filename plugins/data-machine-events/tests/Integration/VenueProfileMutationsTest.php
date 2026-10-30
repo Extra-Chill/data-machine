@@ -59,6 +59,22 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		parent::tearDown();
 	}
 
+	public function test_instagram_profile_persistence_and_validation(): void {
+		$term_id = $this->venue( 'Instagram Venue' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'instagram' => 'https://www.instagram.com/MusicFarm/' ), $profile['revision'] );
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'musicfarm', get_term_meta( $term_id, '_venue_instagram', true ) );
+		$this->assertSame( 'musicfarm', $result['profile']['instagram'] );
+		$this->assertSame( 'musicfarm', Venue_Taxonomy::get_venue_data( $term_id )['instagram'] );
+		$this->assertNotSame( $profile['revision'], $result['revision'] );
+		$invalid = VenueProfileMutations::updateSystem( $term_id, array( 'instagram' => 'bad-name' ) );
+		$this->assertWPError( $invalid );
+		$this->assertSame( 'musicfarm', get_term_meta( $term_id, '_venue_instagram', true ) );
+		$this->assertNotWPError( VenueProfileMutations::updateSystem( $term_id, array( 'instagram' => '' ) ) );
+		$this->assertSame( '', VenueProfileMutations::read( $term_id )['instagram'] );
+	}
+
 	public function test_stale_profile_write_detects_another_canonical_writer(): void {
 		$term_id = $this->venue( 'Competing Writer' );
 		$profile = VenueProfileMutations::read( $term_id );

@@ -45,6 +45,7 @@ class VenueAbilities {
 		$register_callback = function () {
 			$this->registerHealthCheckAbility();
 			$this->registerUpdateVenueAbility();
+			$this->registerSetTermInstagramAbility();
 			$this->registerUpdateVenueSourceAliasesAbility();
 			$this->registerGetVenueAbility();
 			$this->registerCheckDuplicateAbility();
@@ -125,6 +126,66 @@ class VenueAbilities {
 		);
 	}
 
+	private function registerSetTermInstagramAbility(): void {
+		wp_register_ability(
+			'data-machine-events/set-term-instagram',
+			array(
+				'label'               => 'Set Term Instagram',
+				'description'         => 'Set or clear a venue or artist Instagram handle.',
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'taxonomy', 'term_id', 'instagram' ),
+					'properties' => array(
+						'taxonomy'  => array(
+							'type' => 'string',
+							'enum' => array( 'venue', 'artist' ),
+						),
+						'term_id'   => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+						'instagram' => array( 'type' => 'string' ),
+					),
+				),
+				'output_schema'       => array( 'type' => 'object' ),
+				'execute_callback'    => array( $this, 'executeSetTermInstagram' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	public function executeSetTermInstagram( array $input ): array|\WP_Error {
+		$taxonomy = $input['taxonomy'] ?? '';
+		if ( ! in_array( $taxonomy, array( 'venue', 'artist' ), true ) ) {
+			return new \WP_Error( 'invalid_taxonomy', 'Expected venue or artist.', array( 'status' => 400 ) );
+		}
+		$term_id = absint( $input['term_id'] ?? 0 );
+		$term    = get_term( $term_id, $taxonomy );
+		if ( ! $term || is_wp_error( $term ) ) {
+			return new \WP_Error( 'term_not_found', 'Term not found.', array( 'status' => 404 ) );
+		}
+		$handle = \DataMachineEvents\Core\InstagramHandle::normalize( $input['instagram'] ?? null );
+		if ( is_wp_error( $handle ) ) {
+			return $handle;
+		}
+		if ( 'venue' === $taxonomy ) {
+			return \DataMachineEvents\Core\VenueProfileMutations::updateSystem( $term_id, array( 'instagram' => $handle ) );
+		}
+		$result = update_term_meta( $term_id, 'instagram', $handle );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		if ( false === $result && get_term_meta( $term_id, 'instagram', true ) !== $handle ) {
+			return new \WP_Error( 'instagram_save_failed', 'Could not persist Instagram handle.', array( 'status' => 500 ) );
+		}
+		return array(
+			'term_id'   => $term_id,
+			'instagram' => $handle,
+		);
+	}
+
 	private function registerUpdateVenueAbility(): void {
 		wp_register_ability(
 			'data-machine-events/update-venue',
@@ -171,6 +232,10 @@ class VenueAbilities {
 						'phone'         => array(
 							'type'        => 'string',
 							'description' => 'Phone number',
+						),
+						'instagram'     => array(
+							'type'        => 'string',
+							'description' => 'Instagram username or profile URL; empty string clears it.',
 						),
 						'website'       => array(
 							'type'        => 'string',
@@ -287,6 +352,7 @@ class VenueAbilities {
 						'country'        => array( 'type' => 'string' ),
 						'phone'          => array( 'type' => 'string' ),
 						'website'        => array( 'type' => 'string' ),
+						'instagram'      => array( 'type' => 'string' ),
 						'ticketing_url'  => array( 'type' => 'string' ),
 						'capacity'       => array( 'type' => 'string' ),
 						'coordinates'    => array( 'type' => 'string' ),
@@ -500,7 +566,7 @@ class VenueAbilities {
 			return new \WP_Error( 'venue_not_found', "Venue '{$venue_identifier}' not found", array( 'status' => 404 ) );
 		}
 
-		$meta_keys = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'ticketing_url', 'capacity', 'coordinates', 'timezone' );
+		$meta_keys = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'instagram', 'ticketing_url', 'capacity', 'coordinates', 'timezone' );
 		$changes   = array();
 
 		foreach ( array_merge( array( 'name', 'description' ), $meta_keys ) as $key ) {

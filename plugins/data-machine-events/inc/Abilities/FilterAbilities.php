@@ -736,6 +736,10 @@ class FilterAbilities {
 					'children'    => array(),
 				);
 
+				if ( in_array( $term->taxonomy, array( 'artist', 'venue' ), true ) ) {
+					$term_data['instagram'] = \DataMachineEvents\Core\InstagramHandle::read( (int) $term->term_id, $term->taxonomy );
+				}
+
 				$children = self::build_hierarchy_tree( $terms, $term->term_id, $level + 1 );
 				if ( ! empty( $children ) ) {
 					$term_data['children'] = $children;

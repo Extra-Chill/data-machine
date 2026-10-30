@@ -155,6 +155,7 @@ class Venue_Taxonomy {
 		'country'            => '_venue_country',
 		'phone'              => '_venue_phone',
 		'website'            => '_venue_website',
+		'instagram'          => '_venue_instagram',
 		'ticketing_url'      => '_venue_ticketing_url',
 		'capacity'           => '_venue_capacity',
 		'tier'               => self::TIER_META_KEY,

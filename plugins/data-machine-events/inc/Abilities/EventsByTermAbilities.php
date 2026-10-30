@@ -84,6 +84,7 @@ class EventsByTermAbilities {
 							'taxonomy'  => array( 'type' => 'string' ),
 							'term_id'   => array( 'type' => 'integer' ),
 							'term_slug' => array( 'type' => 'string' ),
+							'instagram' => array( 'type' => 'string' ),
 							'found'     => array( 'type' => 'boolean' ),
 							'upcoming'  => array(
 								'type'  => 'array',
@@ -270,6 +271,10 @@ class EventsByTermAbilities {
 			'upcoming'  => array(),
 			'past'      => array(),
 		);
+
+		if ( in_array( $taxonomy, array( 'artist', 'venue' ), true ) ) {
+			$result['instagram'] = \DataMachineEvents\Core\InstagramHandle::read( (int) $term->term_id, $taxonomy );
+		}
 
 		if ( 'past' !== $scope ) {
 			$result['upcoming'] = $this->queryScope( (int) $term->term_id, $taxonomy, 'upcoming', $limit );
