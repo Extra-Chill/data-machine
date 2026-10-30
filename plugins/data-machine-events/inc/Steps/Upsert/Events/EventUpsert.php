@@ -622,14 +622,43 @@ class EventUpsert extends UpsertHandler {
 			// above), never by the generic pass — regardless of whether a value
 			// was declared. See #792.
 			$handler_config_for_tax[ 'taxonomy_' . \DataMachineEvents\Core\Event_Type_Taxonomy::TAXONOMY . '_selection' ] = 'skip';
+			// Lineups accumulate across venue imports, artist feeds, and manual edits.
+			// Core replaces terms, so retain these multi-valued event taxonomies on
+			// updates and no_change repairs without changing fresh-create semantics.
+			$retained_terms = array();
+			if ( 'created' !== $action ) {
+				foreach ( array( 'artist', 'festival' ) as $taxonomy ) {
+					if ( ! taxonomy_exists( $taxonomy ) ) {
+						continue;
+					}
+					$term_ids = wp_get_object_terms( $post_id, $taxonomy, array( 'fields' => 'ids' ) );
+					if ( is_wp_error( $term_ids ) ) {
+						$lifecycle_result = $term_ids;
+						return $this->lifecycleErrorResponse( $term_ids, $title );
+					}
+					$retained_terms[ $taxonomy ] = array_map( 'intval', $term_ids );
+				}
+			}
+
 			$engine_data_array = $engine->all();
 			// Normalize the actual generic-pass input, including its engine fallback.
 			$parameters['artist'] = $this->taxonomy_assigner->normalizeArtists( ! empty( $parameters['artist'] ) ? $parameters['artist'] : ( $engine_data_array['artist'] ?? '' ) );
-			$artist_selection = $handler_config_for_tax['taxonomy_artist_selection'] ?? 'skip';
+			$artist_selection     = $handler_config_for_tax['taxonomy_artist_selection'] ?? 'skip';
 			if ( ! is_numeric( $artist_selection ) && ! in_array( $artist_selection, array( 'skip', 'ai_decides' ), true ) ) {
 				$handler_config_for_tax['taxonomy_artist_selection'] = $this->taxonomy_assigner->normalizeArtists( array( $artist_selection ) )[0];
 			}
 			$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
+
+			foreach ( $retained_terms as $taxonomy => $term_ids ) {
+				if ( empty( $term_ids ) ) {
+					continue;
+				}
+				$term_result = wp_set_object_terms( $post_id, $term_ids, $taxonomy, true );
+				if ( is_wp_error( $term_result ) ) {
+					$lifecycle_result = $term_result;
+					return $this->lifecycleErrorResponse( $term_result, $title );
+				}
+			}
 
 			do_action( 'datamachine_event_taxonomy_processed', $post_id );
 
