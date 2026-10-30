@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.198.7] - 2026-10-30
+
+### Fixed
+- let upload_files holders import a URL into the Media Library
+
 ## [0.198.6] - 2026-10-26
 
 ### Changed
