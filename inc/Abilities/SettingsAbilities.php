@@ -151,6 +151,10 @@ class SettingsAbilities {
 						'wake_briefing_scope'            => array( 'type' => 'string' ),
 						'default_provider'               => array( 'type' => 'string' ),
 						'default_model'                  => array( 'type' => 'string' ),
+						'default_agent'                  => array(
+							'type'        => 'string',
+							'description' => 'Default agent slug or ID for authenticated human REST requests. Requires operator access. Empty disables the default; X-Datamachine-Agent overrides it.',
+						),
 						'system_agent_slug'              => array(
 							'type'        => 'string',
 							'description' => 'Explicit agent slug that owns attribution for system/ability-triggered tasks (alt text, meta descriptions, internal linking). Overrides the owner active-agent/single-agent fallback chain. Empty string clears the override.',
@@ -424,6 +428,7 @@ class SettingsAbilities {
 				'wake_briefing_scope'                     => $settings['wake_briefing_scope'] ?? 'site',
 				'default_provider'                        => $settings['default_provider'] ?? '',
 				'default_model'                           => $settings['default_model'] ?? '',
+				'default_agent'                           => $settings['default_agent'] ?? '',
 				'system_agent_slug'                       => $settings['system_agent_slug'] ?? '',
 				'mode_models'                             => $settings['mode_models'] ?? array(),
 				'max_turns'                               => $settings['max_turns'] ?? $defaults['max_turns'],
@@ -524,6 +529,11 @@ class SettingsAbilities {
 		if ( isset( $input['default_model'] ) ) {
 			$all_settings['default_model'] = sanitize_text_field( $input['default_model'] );
 			$handled_keys[]                = 'default_model';
+		}
+
+		if ( isset( $input['default_agent'] ) ) {
+			$all_settings['default_agent'] = trim( sanitize_text_field( $input['default_agent'] ) );
+			$handled_keys[]                = 'default_agent';
 		}
 
 		if ( isset( $input['system_agent_slug'] ) ) {

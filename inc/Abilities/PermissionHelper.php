@@ -461,9 +461,9 @@ class PermissionHelper {
 	 *
 	 * @param WP_Agent_Execution_Principal $principal Execution principal.
 	 */
-	public static function set_execution_principal( WP_Agent_Execution_Principal $principal ): void {
+	public static function set_execution_principal( ?WP_Agent_Execution_Principal $principal ): void {
 		self::$execution_principal = $principal;
-		if ( $principal->capability_ceiling instanceof \WP_Agent_Capability_Ceiling ) {
+		if ( null !== $principal && $principal->capability_ceiling instanceof \WP_Agent_Capability_Ceiling ) {
 			self::$capability_ceiling = $principal->capability_ceiling;
 		}
 	}
@@ -526,7 +526,11 @@ class PermissionHelper {
 	 * @return int|null Agent ID or null if not in agent context.
 	 */
 	public static function get_acting_agent_id(): ?int {
-		return self::$acting_agent_id;
+		// Human session principals supply storage scope only. Keep them out of
+		// the token context fields used by can(), acting_user_id(), and ceilings.
+		return self::$acting_agent_id ?? ( isset( self::$execution_principal->effective_agent_id ) && ctype_digit( self::$execution_principal->effective_agent_id )
+			? (int) self::$execution_principal->effective_agent_id
+			: null );
 	}
 
 	/**
