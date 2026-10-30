@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.76.0] - 2026-10-30
+
+### Added
+- per-flow title venue prefixes for multi-room calendars
+
 ## [0.75.2] - 2026-10-30
 
 ### Fixed
