@@ -48,7 +48,10 @@ class StructuredDataProcessor {
 		$eligible_items = array();
 
 		foreach ( $events as $raw_event ) {
-			$event = $raw_event;
+			$event_config = $config;
+			$event        = TitleVenuePrefixNormalizer::normalize( $raw_event, $event_config );
+			// The AI also sees raw_source: do not reintroduce room names there.
+			$raw_event = $event;
 
 			if ( empty( $event['title'] ) ) {
 				continue;
@@ -70,9 +73,9 @@ class StructuredDataProcessor {
 				continue;
 			}
 
-			$this->applyVenueConfigOverride( $event, $config );
+			$this->applyVenueConfigOverride( $event, $event_config );
 			$event = $this->handler->applyVenueSourceAliases( $event );
-			$event = EventTimeLocalizer::localize( $event, EventTimeLocalizer::venueTimezone( $event, $config ) );
+			$event = EventTimeLocalizer::localize( $event, EventTimeLocalizer::venueTimezone( $event, $event_config ) );
 
 			$source_identity  = EventSourceIdentity::resolve( $event, $context );
 			$event_identifier = $source_identity['event_identifier'];

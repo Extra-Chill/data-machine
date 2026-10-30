@@ -43,6 +43,12 @@ class UniversalWebScraperSettings {
 				'placeholder' => __( 'concert, live music, band', 'data-machine-events' ),
 				'required'    => false,
 			),
+			'title_venue_prefixes' => array(
+				'type'        => 'textarea',
+				'label'       => __( 'Title Venue Prefixes', 'data-machine-events' ),
+				'description' => __( 'One prefix per line: Prefix => venue term ID or name. Omit the mapping to strip only. Matches a prefix followed by a colon at the start of a title.', 'data-machine-events' ),
+				'required'    => false,
+			),
 			'exclude_keywords' => array(
 				'type'        => 'text',
 				'label'       => __( 'Exclude Keywords', 'data-machine-events' ),
@@ -65,6 +71,7 @@ class UniversalWebScraperSettings {
 	 */
 	public static function sanitize( array $raw_settings ): array {
 		$handler_settings = array(
+			'title_venue_prefixes' => sanitize_textarea_field( $raw_settings['title_venue_prefixes'] ?? '' ),
 			'source_url'       => esc_url_raw( $raw_settings['source_url'] ?? '' ),
 			'search'           => sanitize_text_field( $raw_settings['search'] ?? '' ),
 			'exclude_keywords' => sanitize_text_field( $raw_settings['exclude_keywords'] ?? '' ),
@@ -94,6 +101,7 @@ class UniversalWebScraperSettings {
 	 */
 	public static function get_defaults(): array {
 		$handler_defaults = array(
+			'title_venue_prefixes' => '',
 			'source_url'       => '',
 			'search'           => '',
 			'exclude_keywords' => '',
