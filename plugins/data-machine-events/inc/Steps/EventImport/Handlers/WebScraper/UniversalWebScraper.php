@@ -33,6 +33,7 @@
  * 20b. Seated tour widget (cdn.seated.com/api/tour API — artist tour pages)
  * 21. Eventbrite (organizer pages, individual event pages)
  * 22. Schema.org JSON-LD
+ * 22b. Semantic HTML event cards
  * 23. WordPress (Tribe Events, WP REST)
  * 24. WordPress Generic (non-Tribe WP: REST CPT discovery + theme listing fallback)
  * 25. Prekindle ticketing
@@ -93,6 +94,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowareEx
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowtimeExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GenericHtmlEventsExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\PlainGigListExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SofarSoundsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
@@ -209,6 +211,8 @@ class UniversalWebScraper extends EventImportHandler {
 			new RhpEventsExtractor(),
 			new OpenDateExtractor(),
 			new MicrodataExtractor(),
+			// Most generic heuristic: only after every platform extractor declines.
+			new PlainGigListExtractor(),
 		);
 	}
 
