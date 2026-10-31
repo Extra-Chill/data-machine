@@ -58,6 +58,7 @@ function datamachine_uninstall_site() {
 	delete_option( 'datamachine_post_identity_reservations_schema' );
 	delete_option( 'datamachine_schema_fingerprint' );
 	delete_option( 'datamachine_as_group_verified' );
+	delete_option( 'datamachine_agents_reconciled' );
 
 	// Unified auth data.
 	delete_option( 'datamachine_auth_data' );
@@ -185,6 +186,7 @@ function datamachine_uninstall_network_options() {
 		'datamachine_gsc_config',
 		'datamachine_search_config',
 		'datamachine_auth_data',
+		'datamachine_agents_generation',
 		\DataMachine\Core\NetworkSettings::OPTION_NAME,
 	);
 

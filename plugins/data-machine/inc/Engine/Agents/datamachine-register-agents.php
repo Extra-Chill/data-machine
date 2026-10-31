@@ -38,9 +38,31 @@ function datamachine_reconcile_registered_agents(): array {
 	return AgentMaterializer::reconcile( $definitions );
 }
 
+/**
+ * Per-request reconcile: skip when definitions and agent rows are unchanged.
+ *
+ * @return array|null Reconcile summary, or null when nothing changed.
+ */
+function datamachine_maybe_reconcile_registered_agents(): ?array {
+	$definitions = array_map(
+		static fn( \WP_Agent $agent ): array => $agent->to_array(),
+		// @phpstan-ignore-next-line Bundled Agents API functions are absent from the WordPress stubs.
+		wp_get_agents()
+	);
+
+	if ( AgentMaterializer::is_reconciled( $definitions ) ) {
+		return null;
+	}
+
+	$summary = datamachine_reconcile_registered_agents();
+	AgentMaterializer::record_reconciled( $definitions, $summary );
+
+	return $summary;
+}
+
 add_action(
 	'init',
-	'datamachine_reconcile_registered_agents',
+	'datamachine_maybe_reconcile_registered_agents',
 	15
 );
 

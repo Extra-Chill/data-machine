@@ -450,6 +450,9 @@ class Agents extends BaseRepository {
 			array( '%d' )
 		);
 
+		// A renamed row no longer satisfies its registered definition.
+		\DataMachine\Engine\Agents\AgentMaterializer::invalidate();
+
 		return false !== $result;
 	}
 
