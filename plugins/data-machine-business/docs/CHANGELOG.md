@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.19.1] - 2026-10-31
+
+### Changed
+- Internal improvements
+
 ## [0.19.0] - 2026-10-29
 
 ### Added
