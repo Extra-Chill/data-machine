@@ -286,6 +286,7 @@ class DATAMACHINE_Events {
 			\DataMachineEvents\Abilities\VenueAbilities::class,
 			\DataMachineEvents\Abilities\VenueMapAbilities::class,
 			\DataMachineEvents\Abilities\CalendarAbilities::class,
+			\DataMachineEvents\Abilities\GetEventAbilities::class,
 			\DataMachineEvents\Abilities\TicketUrlResyncAbilities::class,
 			\DataMachineEvents\Abilities\AffiliateRedirectRepairAbilities::class,
 			\DataMachineEvents\Abilities\ResolveTicketDestinationAbilities::class,
@@ -435,6 +436,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueMapAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueMapAbilities.php';
 			new \DataMachineEvents\Abilities\VenueMapAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/GetEventAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/GetEventAbilities.php';
+			new \DataMachineEvents\Abilities\GetEventAbilities();
 		}
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/CalendarAbilities.php' ) ) {
