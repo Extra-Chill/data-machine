@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.200.0] - 2026-10-31
+
+### Added
+- stage on-behalf-of sends as principal-only pending actions
+
 ## [0.199.0] - 2026-10-30
 
 ### Added
