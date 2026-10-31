@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.78.2] - 2026-10-31
+
+### Fixed
+- shard artist queries before bounded fan-out
+
 ## [0.78.1] - 2026-10-31
 
 ### Changed
