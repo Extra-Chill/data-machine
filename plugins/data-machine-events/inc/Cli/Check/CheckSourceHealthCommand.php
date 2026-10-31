@@ -25,7 +25,7 @@ class CheckSourceHealthCommand {
 	 * ---
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		$format = $assoc_args['format'] ?? 'table';
+		$format   = $assoc_args['format'] ?? 'table';
 		$statuses = isset( $assoc_args['status'] ) ? explode( ',', $assoc_args['status'] ) : array();
 		if ( ! in_array( $format, array( 'table', 'json', 'csv' ), true ) || array_diff( $statuses, SourceHealth::STATUSES ) || ( isset( $assoc_args['pipeline'] ) && ! preg_match( '/^[1-9][0-9]*$/', (string) $assoc_args['pipeline'] ) ) || isset( $assoc_args['apply'] ) ) {
 			\WP_CLI::error( 'Invalid source-health options. Use a positive pipeline, known statuses, and table|json|csv; this command is read-only.' );

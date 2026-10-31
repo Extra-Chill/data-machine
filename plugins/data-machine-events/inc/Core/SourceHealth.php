@@ -18,19 +18,19 @@ class SourceHealth {
 
 	/** Missing telemetry is deliberately not interpreted as a zero-item source. */
 	public static function classify( array $row, array $engine = array(), array $children = array() ): array {
-		$failure = self::failure_class( $row['exception'] ?? '' );
-		$reason = self::rejection_reason( $engine );
+		$failure      = self::failure_class( $row['exception'] ?? '' );
+		$reason       = self::rejection_reason( $engine );
 		$materialized = null;
-		$skipped = 0;
+		$skipped      = 0;
 		foreach ( $engine['step_results'] ?? array() as $step ) {
 			if ( isset( $step['fetch_stages']['source_materialized'] ) ) {
 				$materialized = ( $materialized ?? 0 ) + (int) $step['fetch_stages']['source_materialized'];
-				$skipped += (int) ( $step['fetch_stages']['processed_skipped'] ?? 0 );
+				$skipped     += (int) ( $step['fetch_stages']['processed_skipped'] ?? 0 );
 			}
 		}
-		$counts = $engine['run_metrics']['counts'] ?? array();
+		$counts    = $engine['run_metrics']['counts'] ?? array();
 		$published = 'completed' === ( $row['latest_status'] ?? '' ) ? 1 : (int) ( $counts['published'] ?? 0 );
-		$status = '';
+		$status    = '';
 		if ( str_starts_with( $row['latest_status'] ?? '', 'failed' ) ) {
 			$status = 'http_403' === $failure ? 'blocked' : ( in_array( $failure, array( 'http_404', 'http_410' ), true ) ? 'broken_url' : 'failing' );
 		} elseif ( ! $published && $materialized > 0 && $children && count( array_filter( $children, static fn( $child ) => ( 'source_rejected' === $child['status'] || str_contains( str_replace( '_', '-', $child['status'] ), 'source-rejected' ) ) && self::is_content_rejection( $child['reason'] ) ) ) === count( $children ) ) {
@@ -53,7 +53,13 @@ class SourceHealth {
 		} else {
 			$status = empty( $row['lifetime_count'] ) ? 'never_produced' : 'dark';
 		}
-		return array( 'status' => $status, 'failure_class' => $failure, 'rejection_reason' => (string) $reason, 'source_materialized' => $materialized, 'needs_attention' => in_array( $status, array( 'blocked', 'broken_url', 'failing', 'extraction_incomplete' ), true ) || ( 'empty_source' === $status && str_contains( $row['handlers'] ?? '', 'universal_web_scraper' ) ) );
+		return array(
+			'status'              => $status,
+			'failure_class'       => $failure,
+			'rejection_reason'    => (string) $reason,
+			'source_materialized' => $materialized,
+			'needs_attention'     => in_array( $status, array( 'blocked', 'broken_url', 'failing', 'extraction_incomplete' ), true ) || ( 'empty_source' === $status && str_contains( $row['handlers'] ?? '', 'universal_web_scraper' ) ),
+		);
 	}
 
 	/** A rejection on content grounds (not music), as opposed to missing data. */
@@ -88,13 +94,16 @@ class SourceHealth {
 	/** Fixed number of set queries; hydrate only the latest root/its children per flow. */
 	public function report( int $pipeline = 0, array $statuses = array() ): array {
 		global $wpdb;
-		$p = $wpdb->prefix;
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery -- Table names come from $wpdb->prefix; IN lists are integer IDs read from the database. Read-only report.
+		$p     = $wpdb->prefix;
 		$flows = $wpdb->get_results( $wpdb->prepare( "SELECT f.flow_id, f.flow_name, f.pipeline_id, f.flow_config, p.pipeline_name FROM {$p}datamachine_flows f LEFT JOIN {$p}datamachine_pipelines p ON p.pipeline_id=f.pipeline_id WHERE (%d=0 OR f.pipeline_id=%d)", $pipeline, $pipeline ), ARRAY_A );
-		$rows = array();
+		$rows  = array();
 		foreach ( $flows as $flow ) {
-			$handlers = $urls = array();
+			$handlers     = array();
+			$urls         = array();
 			$event_import = false;
-			foreach ( json_decode( $flow['flow_config'], true ) ?: array() as $step ) {
+			$config       = json_decode( $flow['flow_config'], true );
+			foreach ( is_array( $config ) ? $config : array() as $step ) {
 				if ( 'event_import' !== ( $step['step_type'] ?? '' ) || empty( $step['enabled'] ) ) {
 					continue;
 				}
@@ -104,7 +113,7 @@ class SourceHealth {
 						continue;
 					}
 					$handlers[] = $slug;
-					$url = $config['source_url'] ?? $config['url'] ?? '';
+					$url        = $config['source_url'] ?? $config['url'] ?? '';
 					if ( $url ) {
 						$urls[] = $url;
 					}
@@ -114,7 +123,19 @@ class SourceHealth {
 				continue;
 			}
 			unset( $flow['flow_config'] );
-			$rows[ (int) $flow['flow_id'] ] = array_merge( $flow, array( 'handlers' => implode( ',', array_unique( $handlers ) ), 'source_url' => implode( ',', array_unique( $urls ) ), 'last_published' => null, 'lifetime_count' => 0, 'upcoming_count' => 0, 'total' => 0, 'with_items' => 0, 'no_items' => 0, 'failed' => 0, 'latest_status' => '', 'exception' => '' ) );
+			$rows[ (int) $flow['flow_id'] ] = array_merge( $flow, array(
+				'handlers'       => implode( ',', array_unique( $handlers ) ),
+				'source_url'     => implode( ',', array_unique( $urls ) ),
+				'last_published' => null,
+				'lifetime_count' => 0,
+				'upcoming_count' => 0,
+				'total'          => 0,
+				'with_items'     => 0,
+				'no_items'       => 0,
+				'failed'         => 0,
+				'latest_status'  => '',
+				'exception'      => '',
+			) );
 		}
 		if ( ! $rows ) {
 			return self::result( array(), $statuses );
@@ -136,24 +157,29 @@ class SourceHealth {
 				$rows[ (int) $post['flow_id'] ]['upcoming_count'] = $post['upcoming_count'];
 			}
 		}
-		$jobs = "{$p}datamachine_jobs";
-		$runs = $wpdb->get_results( "SELECT flow_id, COUNT(*) total, SUM(status='completed') with_items, SUM(status LIKE 'completed_no_items%') no_items, SUM(status LIKE 'failed%') failed, MAX(job_id) latest_id FROM $jobs WHERE flow_id IN ($ids) AND (parent_job_id IS NULL OR parent_job_id=0) GROUP BY flow_id", ARRAY_A );
+		$jobs       = "{$p}datamachine_jobs";
+		$runs       = $wpdb->get_results( "SELECT flow_id, COUNT(*) total, SUM(status='completed') with_items, SUM(status LIKE 'completed_no_items%') no_items, SUM(status LIKE 'failed%') failed, MAX(job_id) latest_id FROM $jobs WHERE flow_id IN ($ids) AND (parent_job_id IS NULL OR parent_job_id=0) GROUP BY flow_id", ARRAY_A );
 		$latest_ids = array();
 		foreach ( $runs as $run ) {
 			$rows[ (int) $run['flow_id'] ] = array_merge( $rows[ (int) $run['flow_id'] ], $run );
-			$latest_ids[] = (int) $run['latest_id'];
+			$latest_ids[]                  = (int) $run['latest_id'];
 		}
-		$engines = $children = array();
+		$engines  = array();
+		$children = array();
 		if ( $latest_ids ) {
 			$latest = implode( ',', $latest_ids );
 			foreach ( $wpdb->get_results( "SELECT job_id, flow_id, parent_job_id, status, status_reason, engine_data FROM $jobs WHERE job_id IN ($latest) OR parent_job_id IN ($latest)", ARRAY_A ) as $job ) {
-				$engine = json_decode( $job['engine_data'] ?? '', true ) ?: array();
+				$engine = json_decode( $job['engine_data'] ?? '', true );
+				$engine = is_array( $engine ) ? $engine : array();
 				if ( empty( $job['parent_job_id'] ) ) {
-					$engines[ $job['flow_id'] ] = $engine;
+					$engines[ $job['flow_id'] ]               = $engine;
 					$rows[ $job['flow_id'] ]['latest_status'] = $job['status'];
 				} else {
-					$reason = self::rejection_reason( $engine );
-					$children[ $job['flow_id'] ][] = array( 'status' => $job['status'] . ':' . ( $job['status_reason'] ?? '' ), 'reason' => $reason );
+					$reason                        = self::rejection_reason( $engine );
+					$children[ $job['flow_id'] ][] = array(
+						'status' => $job['status'] . ':' . ( $job['status_reason'] ?? '' ),
+						'reason' => $reason,
+					);
 				}
 			}
 			// Latest retained root failure per flow. Classification still checks the latest run,
@@ -174,6 +200,7 @@ class SourceHealth {
 			unset( $row['latest_id'] );
 		}
 		unset( $row );
+		// phpcs:enable
 		return self::result( array_values( $rows ), $statuses );
 	}
 
@@ -183,7 +210,10 @@ class SourceHealth {
 			++$summary[ $row['status'] ];
 		}
 		$rows = array_values( array_filter( $rows, static fn( $row ) => ! $statuses || in_array( $row['status'], $statuses, true ) ) );
-		usort( $rows, static fn( $a, $b ) => ( array_search( $a['status'], self::STATUSES, true ) <=> array_search( $b['status'], self::STATUSES, true ) ) ?: ( (int) $a['flow_id'] <=> (int) $b['flow_id'] ) );
-		return array( 'summary' => $summary, 'flows' => $rows );
+		usort( $rows, static fn( $a, $b ) => array( array_search( $a['status'], self::STATUSES, true ), (int) $a['flow_id'] ) <=> array( array_search( $b['status'], self::STATUSES, true ), (int) $b['flow_id'] ) );
+		return array(
+			'summary' => $summary,
+			'flows'   => $rows,
+		);
 	}
 }
