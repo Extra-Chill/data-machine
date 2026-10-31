@@ -64,7 +64,6 @@ namespace {
 
 	$GLOBALS['wpdb'] = new FingerprintGateWpdb();
 	function do_action( string $hook, ...$args ): void { unset( $hook, $args ); }
-	function wp_json_encode( $value, $flags = 0, $depth = 512 ) { return json_encode( $value, $flags, $depth ); }
 	function get_option( string $key, $default = false ) { return $GLOBALS['options'][ $key ] ?? $default; }
 	function update_option( string $key, $value, $autoload = null ): bool { unset( $autoload ); $GLOBALS['options'][ $key ] = $value; return true; }
 	function delete_option( string $key ): bool { unset( $GLOBALS['options'][ $key ] ); return true; }

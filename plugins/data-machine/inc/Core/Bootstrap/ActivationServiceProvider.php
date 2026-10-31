@@ -191,9 +191,12 @@ final class ActivationServiceProvider {
 	 * its own fingerprint, and any network-table change invalidates every site.
 	 */
 	public static function schema_fingerprint(): string {
-		$version = defined( 'DATAMACHINE_VERSION' ) ? (string) DATAMACHINE_VERSION : '';
+		$parts = array( defined( 'DATAMACHINE_VERSION' ) ? (string) DATAMACHINE_VERSION : '' );
+		foreach ( self::current_schema_requirements() as $table_name => $required ) {
+			$parts[] = $table_name . ':' . implode( ',', $required['columns'] ) . ':' . implode( ',', $required['indexes'] );
+		}
 
-		return md5( $version . '|' . (string) wp_json_encode( self::current_schema_requirements() ) );
+		return md5( implode( '|', $parts ) );
 	}
 
 	/**
