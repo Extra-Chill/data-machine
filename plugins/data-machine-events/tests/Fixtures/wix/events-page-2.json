@@ -1,0 +1,22 @@
+{
+	"total": 101,
+	"offset": 100,
+	"limit": 100,
+	"events": [
+		{
+			"id": "event-two",
+			"title": "Second Fixture Show",
+			"status": "SCHEDULED",
+			"scheduling": {
+				"config": {
+					"startDate": "2099-08-02T01:30:00.000Z",
+					"timeZoneId": "America/New_York"
+				}
+			},
+			"location": {
+				"name": "Fixture Room",
+				"address": "100 Example Street"
+			}
+		}
+	]
+}

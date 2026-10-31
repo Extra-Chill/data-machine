@@ -1,0 +1,26 @@
+{
+  "collection": {
+    "id": "events-collection",
+    "typeName": "events",
+    "fullUrl": "/live-shows"
+  },
+  "items": [
+    {
+      "id": "event-1",
+      "recordType": 12,
+      "title": "Fixture Show One",
+      "startDate": "2099-07-01T20:00:00+00:00",
+      "fullUrl": "/live-shows/fixture-show-one"
+    },
+    {
+      "id": "blog-1",
+      "recordType": 1,
+      "title": "Venue News",
+      "fullUrl": "/news/venue-news"
+    }
+  ],
+  "pagination": {
+    "nextPage": true,
+    "nextPageUrl": "/live-shows?offset=2"
+  }
+}

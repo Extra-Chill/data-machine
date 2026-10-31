@@ -1,0 +1,303 @@
+<?php
+/**
+ * Dynamic venue parameter generation for AI tool definitions.
+ *
+ * Provides venue field parameters to AI tools when no static venue is configured.
+ * Single source of truth for venue tool parameter schema, working alongside
+ * Venue_Taxonomy (storage) and VenueService (operations).
+ *
+ * @package DataMachineEvents\Core
+ */
+
+namespace DataMachineEvents\Core;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class VenueParameterProvider {
+	use DynamicToolParametersTrait;
+
+	private const TOOL_PARAMETERS = array(
+		'venue'             => array(
+			'type'        => 'string',
+			'description' => 'Venue name where the event takes place',
+		),
+		'venueAddress'      => array(
+			'type'        => 'string',
+			'description' => 'Street address of the venue',
+		),
+		'venueCity'         => array(
+			'type'        => 'string',
+			'description' => 'City where the venue is located',
+		),
+		'venueState'        => array(
+			'type'        => 'string',
+			'description' => 'State/province where the venue is located',
+		),
+		'venueZip'          => array(
+			'type'        => 'string',
+			'description' => 'Postal/zip code of the venue',
+		),
+		'venueCountry'      => array(
+			'type'        => 'string',
+			'description' => 'Country where the venue is located',
+		),
+		'venuePhone'        => array(
+			'type'        => 'string',
+			'description' => 'Phone number of the venue',
+		),
+		'venueWebsite'      => array(
+			'type'        => 'string',
+			'description' => 'Official website URL of the venue',
+		),
+		'venueTicketingUrl' => array(
+			'type'        => 'string',
+			'description' => 'Public ticketing destination URL for the venue',
+		),
+		'venueCoordinates'  => array(
+			'type'        => 'string',
+			'description' => 'GPS coordinates (latitude,longitude format)',
+		),
+		'venueCapacity'     => array(
+			'type'        => 'string',
+			'description' => 'Maximum venue capacity',
+		),
+		'venueTimezone'     => array(
+			'type'        => 'string',
+			'description' => 'IANA timezone identifier (e.g., America/Chicago, America/Los_Angeles)',
+		),
+	);
+
+	private const PARAMETER_TO_META_MAP = array(
+		'venue'             => 'name',
+		'venueAddress'      => 'address',
+		'venueCity'         => 'city',
+		'venueState'        => 'state',
+		'venueZip'          => 'zip',
+		'venueCountry'      => 'country',
+		'venuePhone'        => 'phone',
+		'venueWebsite'      => 'website',
+		'venueTicketingUrl' => 'ticketing_url',
+		'venueCoordinates'  => 'coordinates',
+		'venueCapacity'     => 'capacity',
+		'venueTimezone'     => 'timezone',
+	);
+
+	/**
+	 * Get all possible venue tool parameters as a canonical fragment.
+	 *
+	 * No venue parameter is required at the schema level — venue presence
+	 * is enforced upstream via engine data / handler config, not via the
+	 * tool schema.
+	 *
+	 * @return array Canonical fragment with `properties`.
+	 */
+	protected static function getAllParameters(): array {
+		return array( 'properties' => self::TOOL_PARAMETERS );
+	}
+
+	/**
+	 * Get parameter keys that should check engine data.
+	 *
+	 * @return array List of parameter keys that are engine-aware
+	 */
+	protected static function getEngineAwareKeys(): array {
+		return array_keys( self::TOOL_PARAMETERS );
+	}
+
+	/**
+	 * Get AI tool parameters for venue fields when AI should decide.
+	 * Excludes parameters that already have values in engine data.
+	 *
+	 * Overrides trait method to add early-exit when venue is pre-configured.
+	 *
+	 * @param array $handler_config Handler configuration
+	 * @param array $engine_data Engine data snapshot
+	 * @return array Canonical fragment, or empty array when venue is pre-configured.
+	 */
+	public static function getToolParameters( array $handler_config, array $engine_data = array() ): array {
+		// A venue pinned in handler config is fully known; the model never
+		// needs venue parameters. A scraper that found only a venue *name* is
+		// not the same thing: the model must still be able to supply the
+		// city/country/timezone the page lacked, otherwise the venue is created
+		// blank and can never resolve a timezone (#782). filterByEngineData()
+		// already drops just the keys the scraper did populate.
+		if ( self::isVenuePinnedByConfig( $handler_config ) ) {
+			return array();
+		}
+		return static::filterByEngineData( array( 'properties' => self::TOOL_PARAMETERS ), $engine_data );
+	}
+
+	/**
+	 * Whether the flow's handler config fixes the venue to a known term.
+	 *
+	 * @param array $handler_config Handler configuration.
+	 * @return bool True when a venue term is pre-selected in config.
+	 */
+	public static function isVenuePinnedByConfig( array $handler_config ): bool {
+		if ( ! empty( $handler_config['universal_web_scraper']['venue'] ) ) {
+			return true;
+		}
+
+		if ( ! empty( $handler_config['venue'] ) && is_numeric( $handler_config['venue'] ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if venue data is available from any source.
+	 *
+	 * @param array $handler_config Handler configuration
+	 * @param array $engine_data Engine data snapshot
+	 * @return bool True if venue data is available
+	 */
+	public static function hasVenueData( array $handler_config, array $engine_data = array() ): bool {
+		if ( ! empty( $engine_data['venue'] ) ) {
+			return true;
+		}
+
+		return self::isVenuePinnedByConfig( $handler_config );
+	}
+
+	/**
+	 * Get all venue parameter keys (for tool params).
+	 *
+	 * @return array List of venue parameter names
+	 */
+	public static function getParameterKeys(): array {
+		return array_keys( self::TOOL_PARAMETERS );
+	}
+
+	/**
+	 * Get venue meta field keys (for storage operations).
+	 * Maps tool parameter names to Venue_Taxonomy meta field keys.
+	 *
+	 * @return array Mapping of param name => meta field key
+	 */
+	public static function getParameterToMetaKeyMap(): array {
+		return self::PARAMETER_TO_META_MAP;
+	}
+
+	/**
+	 * Extract venue data from AI tool parameters.
+	 * Returns data keyed by Venue_Taxonomy meta field names.
+	 *
+	 * @param array $parameters AI tool call parameters
+	 * @return array Venue data keyed by meta field names (address, city, etc.)
+	 */
+	public static function extractFromParameters( array $parameters ): array {
+		$venue_data = array();
+
+		foreach ( self::PARAMETER_TO_META_MAP as $param_key => $meta_key ) {
+			if ( ! empty( $parameters[ $param_key ] ) ) {
+				$venue_data[ $meta_key ] = $parameters[ $param_key ];
+			}
+		}
+
+		if ( ! empty( $venue_data['website'] ) && VenueService::is_ticketing_url( (string) $venue_data['website'] ) ) {
+			$venue_data['ticketing_url'] = $venue_data['ticketing_url'] ?? $venue_data['website'];
+			unset( $venue_data['website'] );
+		}
+
+		return $venue_data;
+	}
+
+	/**
+	 * Merge scraper (engine) venue fields over AI tool parameters.
+	 *
+	 * Scraper data is authoritative when it actually found a value; an empty
+	 * scraper field must not shadow a value the AI step supplied. Engine data
+	 * always carries every venue* key (EventEngineData::buildEngineData()),
+	 * so a plain array_merge() would wipe AI-supplied city/country whenever
+	 * the source page lacked them — which then leaves the venue without
+	 * enough evidence to resolve a timezone. See #782.
+	 *
+	 * @param array $parameters AI tool call parameters.
+	 * @param array $engine     Engine data (EngineData::all() or equivalent).
+	 * @return array Parameters with non-empty engine venue fields applied on top.
+	 */
+	public static function mergeEngineOverParameters( array $parameters, array $engine ): array {
+		$merged = $parameters;
+
+		foreach ( array_keys( self::PARAMETER_TO_META_MAP ) as $param_key ) {
+			if ( ! array_key_exists( $param_key, $engine ) ) {
+				continue;
+			}
+			$value = $engine[ $param_key ];
+			if ( null === $value || '' === $value || array() === $value ) {
+				continue;
+			}
+			$merged[ $param_key ] = $value;
+		}
+
+		return $merged;
+	}
+
+	/**
+	 * Resolve one venue field with scraper-first, AI-fallback precedence.
+	 *
+	 * Resolved values are entity-decoded (issue #844): venue names and
+	 * geography feed advisory-lock keys, dedup, taxonomy term names, and
+	 * block attributes, so the resolved string must be canonical decoded
+	 * text. Only free-text venue fields flow through this resolver; URL /
+	 * coordinate / timezone fields use their own handling.
+	 *
+	 * @param string $param_key  Venue parameter name (e.g. venueCountry).
+	 * @param array  $parameters AI tool call parameters.
+	 * @param array  $engine     Engine data.
+	 * @return string Resolved value, or '' when neither side has one.
+	 */
+	public static function resolveField( string $param_key, array $parameters, array $engine ): string {
+		$engine_value = $engine[ $param_key ] ?? null;
+		if ( null !== $engine_value && '' !== $engine_value ) {
+			return TextNormalization::decode_entities( (string) $engine_value );
+		}
+
+		$param_value = $parameters[ $param_key ] ?? null;
+		if ( null !== $param_value && '' !== $param_value ) {
+			return TextNormalization::decode_entities( (string) $param_value );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Extract venue metadata from event data array.
+	 * Used by EventImportHandler subclasses.
+	 *
+	 * @param array $event Event data array with venueAddress, venueCity, etc.
+	 * @return array Venue metadata keyed by parameter names
+	 */
+	public static function extractFromEventData( array $event ): array {
+		$metadata = array();
+
+		foreach ( self::getParameterKeys() as $key ) {
+			if ( 'venue' === $key ) {
+				continue;
+			}
+			$metadata[ $key ] = $event[ $key ] ?? '';
+		}
+
+		return $metadata;
+	}
+
+	/**
+	 * Strip venue metadata fields from event data array.
+	 *
+	 * @param array &$event Event data array (modified in place)
+	 */
+	public static function stripFromEventData( array &$event ): void {
+		foreach ( self::getParameterKeys() as $key ) {
+			if ( 'venue' === $key || 'venueTimezone' === $key ) {
+				continue;
+			}
+			unset( $event[ $key ] );
+		}
+
+		// Routing metadata for venue resolution; engine data carries it.
+		unset( $event[ VenueSourceAliases::EVENT_FIELD ] );
+	}
+}

@@ -1,0 +1,128 @@
+/**
+ * Events Map Block Styles (shared: editor + frontend)
+ *
+ * Uses data-machine-* design tokens from root.css for theme agnosticism.
+ *
+ * @package DataMachineEvents
+ * @since 0.13.0
+ */
+
+.data-machine-events-map-block {
+	margin-bottom: 1.5rem;
+}
+
+.data-machine-events-map {
+	width: 100%;
+	border-radius: var(--data-machine-border-radius, 8px);
+	overflow: hidden;
+	z-index: 1;
+}
+
+.data-machine-events-map .emoji-marker {
+	background: none;
+	border: none;
+}
+
+/* Emoji pin sizing must be self-contained, not dependent on ambient CSS.
+   The marker is an L.divIcon whose glyph size comes from an inline
+   `font-size` on its inner <span>. WordPress core's emoji feature rewrites
+   the literal 📍 into an <img class="emoji">, and themes that don't ship
+   the core `img.emoji { width: 1em; height: 1em }` clamp (or that load it
+   in a context the dynamically-injected Leaflet marker never inherits) let
+   that <img> render at its intrinsic size — a giant pin. Pin the glyph box
+   to the divIcon's iconSize (28px) here so the marker is correct regardless
+   of theme, emoji replacement, or wrapper layout. */
+.data-machine-events-map .emoji-marker span {
+	display: block;
+	width: 28px;
+	height: 28px;
+	font-size: 28px;
+	line-height: 1;
+}
+
+.data-machine-events-map .emoji-marker img {
+	width: 28px;
+	height: 28px;
+	max-width: none;
+	margin: 0;
+	vertical-align: top;
+}
+
+/* ---------- Collapsible (opt-in) ---------- */
+
+/* The collapsible wrapper exists only when the block opts in via the
+   `collapsible` attribute. Default-off blocks never emit this markup. */
+.data-machine-events-map-collapsible {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+/* Toggle is a real <button> — keyboard operable, accessible. Styled as a
+   slim bar; collapsed state gets an accent tint + pin glyph so "Show map"
+   reads as an intentional affordance (the map itself stays fully hidden). */
+.data-machine-events-map-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	align-self: flex-start;
+	padding: 0.5rem 0.875rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	cursor: pointer;
+	border: 1px solid var(--data-machine-border-default, #d1d5db);
+	border-radius: var(--data-machine-border-radius, 8px);
+	background: var(--data-machine-background-light, #f3f4f6);
+	color: var(--data-machine-text-primary, #111827);
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+.data-machine-events-map-toggle:hover {
+	background: var(--data-machine-background-hover, #e5e7eb);
+	color: var(--data-machine-text-accent, #2563eb);
+}
+
+.data-machine-events-map-toggle:focus-visible {
+	outline: 2px solid var(--data-machine-border-focus, #2563eb);
+	outline-offset: 2px;
+}
+
+/* A small disclosure caret that rotates with state. */
+.data-machine-events-map-toggle::before {
+	content: "";
+	width: 0;
+	height: 0;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 6px solid currentColor;
+	transition: transform 0.2s ease;
+}
+
+.data-machine-events-map-collapsible.is-collapsed .data-machine-events-map-toggle::before {
+	transform: rotate(-90deg);
+}
+
+/* A map-pin glyph after the label so the toggle reads as a clear "there's a
+   map here" affordance — no asset, stays vendor-neutral. */
+.data-machine-events-map-toggle::after {
+	content: "\1F4CD"; /* 📍 */
+	font-size: 0.9375em;
+	line-height: 1;
+}
+
+/* Collapsed state: tint the bar with the accent color so the "Show map"
+   control reads as an intentional, tappable affordance rather than a bare
+   button. Kept fully hidden (no live map sliver) so collapsed = zero Leaflet
+   work. */
+.data-machine-events-map-collapsible.is-collapsed .data-machine-events-map-toggle {
+	border-color: var(--data-machine-border-focus, #2563eb);
+	background: var(--data-machine-background-accent-soft, rgba(37, 99, 235, 0.08));
+	color: var(--data-machine-text-accent, #2563eb);
+}
+
+/* The collapsible region. When collapsed it is hidden via the [hidden]
+   attribute (set by render.php and toggled by the frontend), which keeps the
+   map out of the layout so Leaflet doesn't init in a zero-height box. */
+.data-machine-events-map-region[hidden] {
+	display: none;
+}

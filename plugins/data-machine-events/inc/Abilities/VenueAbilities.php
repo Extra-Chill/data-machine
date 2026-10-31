@@ -1,0 +1,887 @@
+<?php
+/**
+ * Venue Abilities
+ *
+ * Provides abilities for venue management: health checks, updates, retrieval,
+ * and duplicate detection. Chat tools and REST controllers delegate to these
+ * abilities for business logic.
+ *
+ * @package DataMachineEvents\Abilities
+ */
+
+namespace DataMachineEvents\Abilities;
+
+use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Core\VenueSourceAliases;
+use DataMachineEvents\Core\VenueService;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class VenueAbilities {
+
+	private const DEFAULT_LIMIT = 25;
+
+	private const SUSPICIOUS_PATH_PATTERNS = array(
+		'/event/',
+		'/events/',
+		'/e/',
+		'/tickets/',
+		'/shows/',
+		'/tour/',
+	);
+
+	private static bool $registered = false;
+
+	public function __construct() {
+		if ( ! self::$registered ) {
+			$this->registerAbilities();
+			self::$registered = true;
+		}
+	}
+
+	private function registerAbilities(): void {
+		$register_callback = function () {
+			$this->registerHealthCheckAbility();
+			$this->registerUpdateVenueAbility();
+			$this->registerSetTermInstagramAbility();
+			$this->registerUpdateVenueSourceAliasesAbility();
+			$this->registerGetVenueAbility();
+			$this->registerCheckDuplicateAbility();
+		};
+
+		add_action( 'wp_abilities_api_init', $register_callback );
+	}
+
+	private function registerHealthCheckAbility(): void {
+		wp_register_ability(
+			'data-machine-events/venue-health-check',
+			array(
+				'label'               => __( 'Venue Health Check', 'data-machine-events' ),
+				'description'         => __( 'Scan venues for data quality issues: missing address, coordinates, timezone, or website. Also detects suspicious websites where a ticket URL was mistakenly stored as venue website.', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'limit' => array(
+							'type'        => 'integer',
+							'description' => 'Max venues to return per issue category (default: 25)',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'total_venues'         => array( 'type' => 'integer' ),
+						'missing_address'      => array(
+							'type'       => 'object',
+							'properties' => array(
+								'count'  => array( 'type' => 'integer' ),
+								'venues' => array( 'type' => 'array' ),
+							),
+						),
+						'missing_coordinates'  => array(
+							'type'       => 'object',
+							'properties' => array(
+								'count'  => array( 'type' => 'integer' ),
+								'venues' => array( 'type' => 'array' ),
+							),
+						),
+						'missing_timezone'     => array(
+							'type'       => 'object',
+							'properties' => array(
+								'count'  => array( 'type' => 'integer' ),
+								'venues' => array( 'type' => 'array' ),
+							),
+						),
+						'missing_website'      => array(
+							'type'       => 'object',
+							'properties' => array(
+								'count'  => array( 'type' => 'integer' ),
+								'venues' => array( 'type' => 'array' ),
+							),
+						),
+						'suspicious_website'   => array(
+							'type'       => 'object',
+							'properties' => array(
+								'count'  => array( 'type' => 'integer' ),
+								'venues' => array( 'type' => 'array' ),
+							),
+						),
+						'ticketing_host_flows' => array(
+							'type'       => 'object',
+							'properties' => array(
+								'count' => array( 'type' => 'integer' ),
+								'flows' => array( 'type' => 'array' ),
+							),
+						),
+						'message'              => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeHealthCheck' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerSetTermInstagramAbility(): void {
+		wp_register_ability(
+			'data-machine-events/set-term-instagram',
+			array(
+				'label'               => 'Set Term Instagram',
+				'description'         => 'Set or clear a venue or artist Instagram handle.',
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'taxonomy', 'term_id', 'instagram' ),
+					'properties' => array(
+						'taxonomy'  => array(
+							'type' => 'string',
+							'enum' => array( 'venue', 'artist' ),
+						),
+						'term_id'   => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+						'instagram' => array( 'type' => 'string' ),
+					),
+				),
+				'output_schema'       => array( 'type' => 'object' ),
+				'execute_callback'    => array( $this, 'executeSetTermInstagram' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	public function executeSetTermInstagram( array $input ): array|\WP_Error {
+		$taxonomy = $input['taxonomy'] ?? '';
+		if ( ! in_array( $taxonomy, array( 'venue', 'artist' ), true ) ) {
+			return new \WP_Error( 'invalid_taxonomy', 'Expected venue or artist.', array( 'status' => 400 ) );
+		}
+		$term_id = absint( $input['term_id'] ?? 0 );
+		$term    = get_term( $term_id, $taxonomy );
+		if ( ! $term || is_wp_error( $term ) ) {
+			return new \WP_Error( 'term_not_found', 'Term not found.', array( 'status' => 404 ) );
+		}
+		$handle = \DataMachineEvents\Core\InstagramHandle::normalize( $input['instagram'] ?? null );
+		if ( is_wp_error( $handle ) ) {
+			return $handle;
+		}
+		if ( 'venue' === $taxonomy ) {
+			return \DataMachineEvents\Core\VenueProfileMutations::updateSystem( $term_id, array( 'instagram' => $handle ) );
+		}
+		$result = update_term_meta( $term_id, 'instagram', $handle );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		if ( false === $result && get_term_meta( $term_id, 'instagram', true ) !== $handle ) {
+			return new \WP_Error( 'instagram_save_failed', 'Could not persist Instagram handle.', array( 'status' => 500 ) );
+		}
+		return array(
+			'term_id'   => $term_id,
+			'instagram' => $handle,
+		);
+	}
+
+	private function registerUpdateVenueAbility(): void {
+		wp_register_ability(
+			'data-machine-events/update-venue',
+			array(
+				'label'               => __( 'Update Venue', 'data-machine-events' ),
+				'description'         => __( 'Update a venue name and/or meta fields. Address changes trigger automatic geocoding.', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'venue' ),
+					'properties' => array(
+						'venue'         => array(
+							'type'        => 'string',
+							'description' => 'Venue identifier (term ID, name, or slug)',
+						),
+						'name'          => array(
+							'type'        => 'string',
+							'description' => 'New venue name',
+						),
+						'description'   => array(
+							'type'        => 'string',
+							'description' => 'Venue description',
+						),
+						'address'       => array(
+							'type'        => 'string',
+							'description' => 'Street address',
+						),
+						'city'          => array(
+							'type'        => 'string',
+							'description' => 'City',
+						),
+						'state'         => array(
+							'type'        => 'string',
+							'description' => 'State/region',
+						),
+						'zip'           => array(
+							'type'        => 'string',
+							'description' => 'Postal/ZIP code',
+						),
+						'country'       => array(
+							'type'        => 'string',
+							'description' => 'Country',
+						),
+						'phone'         => array(
+							'type'        => 'string',
+							'description' => 'Phone number',
+						),
+						'instagram'     => array(
+							'type'        => 'string',
+							'description' => 'Instagram username or profile URL; empty string clears it.',
+						),
+						'website'       => array(
+							'type'        => 'string',
+							'description' => 'Official venue website URL',
+						),
+						'ticketing_url' => array(
+							'type'        => 'string',
+							'description' => 'Public venue ticketing destination URL',
+						),
+						'capacity'      => array(
+							'type'        => 'string',
+							'description' => 'Venue capacity',
+						),
+						'coordinates'   => array(
+							'type'        => 'string',
+							'description' => 'GPS coordinates as "lat,lng"',
+						),
+						'timezone'      => array(
+							'type'        => 'string',
+							'description' => 'IANA timezone identifier (e.g., America/New_York)',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'term_id'        => array( 'type' => 'integer' ),
+						'name'           => array( 'type' => 'string' ),
+						'updated_fields' => array( 'type' => 'array' ),
+						'venue_data'     => array( 'type' => 'object' ),
+						'message'        => array( 'type' => 'string' ),
+						'error'          => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeUpdateVenue' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerUpdateVenueSourceAliasesAbility(): void {
+		wp_register_ability(
+			'data-machine-events/update-venue-source-aliases',
+			array(
+				'label'               => __( 'Update Venue Source Aliases', 'data-machine-events' ),
+				'description'         => __( 'Add or remove source aliases that pin a source\'s venue to this canonical venue. Imports resolve aliases before address and name matching and never merge the aliased source\'s venue data. Aliases look like "ticketmaster:<venue id>" or "fingerprint:<source venue name>|<source street address>".', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'venue' ),
+					'properties' => array(
+						'venue'  => array(
+							'type'        => 'string',
+							'description' => 'Canonical venue identifier (term ID, name, or slug)',
+						),
+						'add'    => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Aliases to add. Adding an alias owned by another venue fails.',
+						),
+						'remove' => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Aliases to remove.',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'term_id'        => array( 'type' => 'integer' ),
+						'name'           => array( 'type' => 'string' ),
+						'added'          => array( 'type' => 'array' ),
+						'removed'        => array( 'type' => 'array' ),
+						'source_aliases' => array( 'type' => 'array' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeUpdateVenueSourceAliases' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerGetVenueAbility(): void {
+		wp_register_ability(
+			'data-machine-events/get-venue',
+			array(
+				'label'               => __( 'Get Venue', 'data-machine-events' ),
+				'description'         => __( 'Get venue details by term ID', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'id' ),
+					'properties' => array(
+						'id' => array(
+							'type'        => 'integer',
+							'description' => 'Venue term ID',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'name'           => array( 'type' => 'string' ),
+						'term_id'        => array( 'type' => 'integer' ),
+						'slug'           => array( 'type' => 'string' ),
+						'description'    => array( 'type' => 'string' ),
+						'address'        => array( 'type' => 'string' ),
+						'city'           => array( 'type' => 'string' ),
+						'state'          => array( 'type' => 'string' ),
+						'zip'            => array( 'type' => 'string' ),
+						'country'        => array( 'type' => 'string' ),
+						'phone'          => array( 'type' => 'string' ),
+						'website'        => array( 'type' => 'string' ),
+						'instagram'      => array( 'type' => 'string' ),
+						'ticketing_url'  => array( 'type' => 'string' ),
+						'capacity'       => array( 'type' => 'string' ),
+						'coordinates'    => array( 'type' => 'string' ),
+						'timezone'       => array( 'type' => 'string' ),
+						'source_aliases' => array( 'type' => 'array' ),
+						'error'          => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeGetVenue' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerCheckDuplicateAbility(): void {
+		wp_register_ability(
+			'data-machine-events/check-duplicate-venue',
+			array(
+				'label'               => __( 'Check Duplicate Venue', 'data-machine-events' ),
+				'description'         => __( 'Check if a venue with the given name already exists', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'name' ),
+					'properties' => array(
+						'name'    => array(
+							'type'        => 'string',
+							'description' => 'Venue name to check',
+						),
+						'address' => array(
+							'type'        => 'string',
+							'description' => 'Optional address for more accurate matching',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'is_duplicate'        => array( 'type' => 'boolean' ),
+						'existing_term_id'    => array( 'type' => 'integer' ),
+						'existing_venue_name' => array( 'type' => 'string' ),
+						'message'             => array( 'type' => 'string' ),
+						'error'               => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeCheckDuplicate' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Execute venue health check.
+	 *
+	 * @param array $input Input parameters with optional 'limit'
+	 * @return array|\WP_Error Health check results with category counts and venue lists
+	 */
+	public function executeHealthCheck( array $input ): array|\WP_Error {
+		$limit = (int) ( $input['limit'] ?? self::DEFAULT_LIMIT );
+		if ( $limit <= 0 ) {
+			$limit = self::DEFAULT_LIMIT;
+		}
+
+		$venues = get_terms(
+			array(
+				'taxonomy'   => 'venue',
+				'hide_empty' => false,
+			)
+		);
+
+		if ( is_wp_error( $venues ) ) {
+			return new \WP_Error( 'query_failed', 'Failed to query venues: ' . $venues->get_error_message(), array( 'status' => 500 ) );
+		}
+
+		$ticketing_host_flows = self::findTicketingHostFlows();
+
+		if ( empty( $venues ) ) {
+			return array(
+				'total_venues'         => 0,
+				'ticketing_host_flows' => array(
+					'count' => count( $ticketing_host_flows ),
+					'flows' => array_slice( $ticketing_host_flows, 0, $limit ),
+				),
+				'message'              => 'No venues found in the system.',
+			);
+		}
+
+		$missing_address     = array();
+		$missing_coordinates = array();
+		$missing_timezone    = array();
+		$missing_website     = array();
+		$suspicious_website  = array();
+
+		foreach ( $venues as $venue ) {
+			$address     = get_term_meta( $venue->term_id, '_venue_address', true );
+			$city        = get_term_meta( $venue->term_id, '_venue_city', true );
+			$coordinates = get_term_meta( $venue->term_id, '_venue_coordinates', true );
+			$timezone    = get_term_meta( $venue->term_id, '_venue_timezone', true );
+
+			$venue_info = array(
+				'term_id'     => $venue->term_id,
+				'name'        => $venue->name,
+				'event_count' => $venue->count,
+			);
+
+			if ( empty( $address ) && empty( $city ) ) {
+				$missing_address[] = $venue_info;
+			}
+
+			if ( empty( $coordinates ) ) {
+				$missing_coordinates[] = $venue_info;
+			}
+
+			if ( ! empty( $coordinates ) && empty( $timezone ) ) {
+				$missing_timezone[] = $venue_info;
+			}
+
+			$website = get_term_meta( $venue->term_id, '_venue_website', true );
+
+			if ( empty( $website ) ) {
+				$missing_website[] = $venue_info;
+			} else {
+				$suspicion = self::checkSuspiciousWebsite( $website );
+				if ( $suspicion ) {
+					$venue_info['website']          = $website;
+					$venue_info['suspicion_reason'] = $suspicion;
+					$suspicious_website[]           = $venue_info;
+				}
+			}
+		}
+
+		$total = count( $venues );
+
+		$sort_by_events = fn( $a, $b ) => $b['event_count'] <=> $a['event_count'];
+		usort( $missing_address, $sort_by_events );
+		usort( $missing_coordinates, $sort_by_events );
+		usort( $missing_timezone, $sort_by_events );
+		usort( $missing_website, $sort_by_events );
+		usort( $suspicious_website, $sort_by_events );
+
+		$message_parts = array();
+		if ( ! empty( $missing_address ) ) {
+			$message_parts[] = count( $missing_address ) . ' missing address';
+		}
+		if ( ! empty( $missing_coordinates ) ) {
+			$message_parts[] = count( $missing_coordinates ) . ' missing coordinates';
+		}
+		if ( ! empty( $missing_timezone ) ) {
+			$message_parts[] = count( $missing_timezone ) . ' missing timezone';
+		}
+		if ( ! empty( $missing_website ) ) {
+			$message_parts[] = count( $missing_website ) . ' missing website';
+		}
+		if ( ! empty( $suspicious_website ) ) {
+			$message_parts[] = count( $suspicious_website ) . ' suspicious website (possible ticket URL)';
+		}
+
+		if ( empty( $message_parts ) ) {
+			$message = "All {$total} venues have complete data.";
+		} else {
+			$message = 'Found issues: ' . implode( ', ', $message_parts ) . '. Use update_venue tool to fix.';
+		}
+
+		return array(
+			'total_venues'         => $total,
+			'missing_address'      => array(
+				'count'  => count( $missing_address ),
+				'venues' => array_slice( $missing_address, 0, $limit ),
+			),
+			'missing_coordinates'  => array(
+				'count'  => count( $missing_coordinates ),
+				'venues' => array_slice( $missing_coordinates, 0, $limit ),
+			),
+			'missing_timezone'     => array(
+				'count'  => count( $missing_timezone ),
+				'venues' => array_slice( $missing_timezone, 0, $limit ),
+			),
+			'missing_website'      => array(
+				'count'  => count( $missing_website ),
+				'venues' => array_slice( $missing_website, 0, $limit ),
+			),
+			'suspicious_website'   => array(
+				'count'  => count( $suspicious_website ),
+				'venues' => array_slice( $suspicious_website, 0, $limit ),
+			),
+			'ticketing_host_flows' => array(
+				'count' => count( $ticketing_host_flows ),
+				'flows' => array_slice( $ticketing_host_flows, 0, $limit ),
+			),
+			'message'              => $message,
+		);
+	}
+
+	/**
+	 * Execute venue update.
+	 *
+	 * @param array $input Input parameters with 'venue' identifier and optional fields
+	 * @return array|\WP_Error Update result with venue data or error
+	 */
+	public function executeUpdateVenue( array $input ): array|\WP_Error {
+		$venue_identifier = $input['venue'] ?? null;
+
+		if ( empty( $venue_identifier ) ) {
+			return new \WP_Error( 'missing_venue', 'venue parameter is required', array( 'status' => 400 ) );
+		}
+
+		$term = $this->resolveVenue( $venue_identifier );
+		if ( ! $term ) {
+			return new \WP_Error( 'venue_not_found', "Venue '{$venue_identifier}' not found", array( 'status' => 404 ) );
+		}
+
+		$meta_keys = array( 'address', 'city', 'state', 'zip', 'country', 'phone', 'website', 'instagram', 'ticketing_url', 'capacity', 'coordinates', 'timezone' );
+		$changes   = array();
+
+		foreach ( array_merge( array( 'name', 'description' ), $meta_keys ) as $key ) {
+			if ( array_key_exists( $key, $input ) && null !== $input[ $key ] ) {
+				$changes[ $key ] = $input[ $key ];
+			}
+		}
+
+		if ( empty( $changes ) ) {
+			return new \WP_Error( 'no_fields', 'No fields provided to update', array( 'status' => 400 ) );
+		}
+		$result = \DataMachineEvents\Core\VenueProfileMutations::updateSystem( (int) $term->term_id, $changes );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$updated_term = get_term( $term->term_id, 'venue' );
+		$updated_name = $updated_term instanceof \WP_Term ? $updated_term->name : $term->name;
+		$venue_data   = Venue_Taxonomy::get_venue_data( $term->term_id );
+
+		return array(
+			'term_id'        => $term->term_id,
+			'name'           => $updated_name,
+			'updated_fields' => $result['updated_fields'],
+			'venue_data'     => $venue_data,
+			'message'        => "Updated venue '{$updated_name}': " . implode( ', ', $result['updated_fields'] ),
+		);
+	}
+
+	/**
+	 * Execute get venue.
+	 *
+	 * @param array $input Input parameters with 'id'
+	 * @return array|\WP_Error Venue data or error
+	 */
+	public function executeGetVenue( array $input ): array|\WP_Error {
+		$term_id = $input['id'] ?? null;
+
+		if ( empty( $term_id ) ) {
+			return new \WP_Error( 'missing_venue_id', 'Venue ID is required', array( 'status' => 400 ) );
+		}
+
+		$venue_data = Venue_Taxonomy::get_venue_data( $term_id );
+
+		if ( empty( $venue_data ) ) {
+			return new \WP_Error( 'venue_not_found', 'Venue not found', array( 'status' => 404 ) );
+		}
+
+		$venue_data['source_aliases'] = VenueSourceAliases::get( (int) $term_id );
+
+		return $venue_data;
+	}
+
+	/**
+	 * Execute update venue source aliases.
+	 *
+	 * Validates every alias before writing any, so a bad or conflicting alias
+	 * leaves the venue unchanged.
+	 *
+	 * @param array $input Input with 'venue' and optional 'add' / 'remove' lists.
+	 * @return array|\WP_Error
+	 */
+	public function executeUpdateVenueSourceAliases( array $input ): array|\WP_Error {
+		$venue_identifier = (string) ( $input['venue'] ?? '' );
+		if ( '' === $venue_identifier ) {
+			return new \WP_Error( 'missing_venue', 'venue parameter is required', array( 'status' => 400 ) );
+		}
+
+		$term = $this->resolveVenue( $venue_identifier );
+		if ( ! $term ) {
+			return new \WP_Error( 'venue_not_found', "Venue '{$venue_identifier}' not found", array( 'status' => 404 ) );
+		}
+		$term_id = (int) $term->term_id;
+
+		$to_add    = array_map( 'strval', (array) ( $input['add'] ?? array() ) );
+		$to_remove = array_map( 'strval', (array) ( $input['remove'] ?? array() ) );
+		if ( empty( $to_add ) && empty( $to_remove ) ) {
+			return new \WP_Error( 'no_fields', 'Provide aliases to add or remove', array( 'status' => 400 ) );
+		}
+
+		foreach ( $to_add as $alias ) {
+			$normalized = VenueSourceAliases::normalize( $alias );
+			if ( is_wp_error( $normalized ) ) {
+				return $normalized;
+			}
+			$owner = VenueSourceAliases::find_term( array( $normalized ) );
+			if ( $owner && (int) $owner->term_id !== $term_id ) {
+				return new \WP_Error(
+					'venue_alias_conflict',
+					sprintf( 'Alias "%s" already belongs to venue %d (%s).', $normalized, (int) $owner->term_id, $owner->name ),
+					array(
+						'status'  => 409,
+						'term_id' => (int) $owner->term_id,
+					)
+				);
+			}
+		}
+		foreach ( $to_remove as $alias ) {
+			$normalized = VenueSourceAliases::normalize( $alias );
+			if ( is_wp_error( $normalized ) ) {
+				return $normalized;
+			}
+		}
+
+		$added = array();
+		foreach ( $to_add as $alias ) {
+			$result = VenueSourceAliases::add( $term_id, $alias );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+			$added[] = $result;
+		}
+
+		$removed = array();
+		foreach ( $to_remove as $alias ) {
+			$normalized = VenueSourceAliases::normalize( $alias );
+			if ( is_wp_error( $normalized ) ) {
+				return $normalized;
+			}
+			$result = VenueSourceAliases::remove( $term_id, $normalized );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+			if ( $result ) {
+				$removed[] = $normalized;
+			}
+		}
+
+		return array(
+			'term_id'        => $term_id,
+			'name'           => $term->name,
+			'added'          => array_values( array_unique( $added ) ),
+			'removed'        => $removed,
+			'source_aliases' => VenueSourceAliases::get( $term_id ),
+		);
+	}
+
+	/**
+	 * Execute check duplicate venue.
+	 *
+	 * @param array $input Input parameters with 'name' and optional 'address'
+	 * @return array|\WP_Error Duplicate check result
+	 */
+	public function executeCheckDuplicate( array $input ): array|\WP_Error {
+		$venue_name    = $input['name'] ?? null;
+		$venue_address = $input['address'] ?? '';
+
+		if ( empty( $venue_name ) ) {
+			return new \WP_Error( 'missing_venue_name', 'Venue name is required', array( 'status' => 400 ) );
+		}
+
+		$existing_term = get_term_by( 'name', $venue_name, 'venue' );
+
+		if ( ! $existing_term ) {
+			return array(
+				'is_duplicate' => false,
+				'message'      => '',
+			);
+		}
+
+		if ( ! empty( $venue_address ) ) {
+			$existing_address = get_term_meta( $existing_term->term_id, '_venue_address', true );
+
+			$normalized_new      = strtolower( trim( $venue_address ) );
+			$normalized_existing = strtolower( trim( $existing_address ) );
+
+			if ( $normalized_new === $normalized_existing ) {
+				return array(
+					'is_duplicate'        => true,
+					'existing_term_id'    => $existing_term->term_id,
+					'existing_venue_name' => $existing_term->name,
+					'message'             => sprintf(
+						/* translators: %s: venue name */
+						__( 'A venue named "%s" with this address already exists.', 'data-machine-events' ),
+						esc_html( $existing_term->name )
+					),
+				);
+			}
+		}
+
+		return array(
+			'is_duplicate'        => true,
+			'existing_term_id'    => $existing_term->term_id,
+			'existing_venue_name' => $existing_term->name,
+			'message'             => sprintf(
+				/* translators: %s: venue name */
+				__( 'A venue named "%s" already exists. Consider using a more specific name or check if this is the same venue.', 'data-machine-events' ),
+				esc_html( $existing_term->name )
+			),
+		);
+	}
+
+	/**
+	 * Resolve venue by ID, name, or slug.
+	 *
+	 * @param string $identifier Venue identifier
+	 * @return \WP_Term|null Term object or null if not found
+	 */
+	private function resolveVenue( string $identifier ): ?\WP_Term {
+		if ( is_numeric( $identifier ) ) {
+			$term = get_term( (int) $identifier, 'venue' );
+			if ( $term && ! is_wp_error( $term ) ) {
+				return $term;
+			}
+		}
+
+		$term = get_term_by( 'name', $identifier, 'venue' );
+		if ( $term ) {
+			return $term;
+		}
+
+		$term = get_term_by( 'slug', $identifier, 'venue' );
+		if ( $term ) {
+			return $term;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Check if a URL looks like a ticket/event URL rather than a venue website.
+	 *
+	 * @param string $url Website URL to check
+	 * @return string|null Suspicion reason, or null if URL looks legitimate
+	 */
+	private static function checkSuspiciousWebsite( string $url ): ?string {
+		if ( empty( $url ) ) {
+			return null;
+		}
+
+		$parsed = wp_parse_url( $url );
+		if ( empty( $parsed['host'] ) ) {
+			return null;
+		}
+
+		$host = strtolower( $parsed['host'] );
+
+		if ( VenueService::is_ticketing_url( $url ) ) {
+			return 'ticket_platform_domain';
+		}
+
+		$path = strtolower( $parsed['path'] ?? '' );
+		foreach ( self::SUSPICIOUS_PATH_PATTERNS as $pattern ) {
+			if ( str_contains( $path, $pattern ) ) {
+				return 'event_url_path';
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Inventory scheduled flow configuration values on known ticketing hosts.
+	 *
+	 * Ticketing source URLs are valid; reporting them makes affected import
+	 * paths visible during migration without mutating or disabling flows.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function findTicketingHostFlows(): array {
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_flows';
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+			return array();
+		}
+		if ( null === $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table, 'scheduling_config' ) ) ) {
+			return array();
+		}
+
+		$rows  = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT flow_id, flow_name, flow_config FROM %i
+				 WHERE scheduling_config NOT IN ('', '[]', '{}')",
+				$table
+			)
+		);
+		$flows = array();
+		foreach ( $rows as $row ) {
+			$config = json_decode( (string) $row->flow_config, true );
+			if ( ! is_array( $config ) ) {
+				continue;
+			}
+			$urls = array();
+			self::collectTicketingHostValues( $config, $urls );
+			if ( empty( $urls ) ) {
+				continue;
+			}
+			$flows[] = array(
+				'flow_id'   => (int) $row->flow_id,
+				'flow_name' => (string) $row->flow_name,
+				'urls'      => $urls,
+			);
+		}
+
+		return $flows;
+	}
+
+	/**
+	 * Collect source and configured venue URLs on known ticketing hosts.
+	 */
+	private static function collectTicketingHostValues( array $node, array &$urls ): void {
+		foreach ( $node as $key => $value ) {
+			if ( is_array( $value ) ) {
+				self::collectTicketingHostValues( $value, $urls );
+				continue;
+			}
+			if ( ! in_array( $key, array( 'source_url', 'venue_website', 'venue_ticketing_url' ), true ) || ! is_string( $value ) ) {
+				continue;
+			}
+			if ( VenueService::is_ticketing_url( $value ) ) {
+				$urls[] = array(
+					'field' => $key,
+					'url'   => $value,
+				);
+			}
+		}
+	}
+}

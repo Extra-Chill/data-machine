@@ -1,0 +1,763 @@
+<?php
+/**
+ * Canonical venue profile mutation integration coverage.
+ *
+ * @package DataMachineEvents\Tests\Integration
+ */
+
+namespace DataMachineEvents\Tests\Integration;
+
+use DataMachineEvents\Admin\Settings_Page;
+use DataMachineEvents\Core\VenueProfileMutations;
+use DataMachineEvents\Core\Venue_Taxonomy;
+use WP_UnitTestCase;
+
+class VenueProfileMutationsTest extends WP_UnitTestCase {
+	/** @var int[] */
+	private array $term_ids = array();
+
+	/** @var int[] */
+	private array $blog_ids = array();
+
+	/** @var int[] */
+	private array $attachment_ids = array();
+
+	private bool $had_settings = false;
+	private mixed $settings_before = null;
+
+	public function setUp(): void {
+		parent::setUp();
+		global $wpdb;
+		$wpdb->query( 'COMMIT' );
+		$wpdb->query( 'SET autocommit = 1' );
+		$this->had_settings    = false !== get_option( Settings_Page::OPTION_KEY, false );
+		$this->settings_before = get_option( Settings_Page::OPTION_KEY, null );
+		Venue_Taxonomy::register();
+	}
+
+	public function tearDown(): void {
+		global $wpdb;
+		while ( function_exists( 'ms_is_switched' ) && ms_is_switched() ) {
+			restore_current_blog();
+		}
+		foreach ( array_reverse( $this->term_ids ) as $term_id ) {
+			wp_delete_term( $term_id, 'venue' );
+		}
+		foreach ( array_reverse( $this->attachment_ids ) as $attachment_id ) {
+			wp_delete_attachment( $attachment_id, true );
+		}
+		foreach ( array_reverse( $this->blog_ids ) as $blog_id ) {
+			wpmu_delete_blog( $blog_id, true );
+		}
+		if ( $this->had_settings ) {
+			update_option( Settings_Page::OPTION_KEY, $this->settings_before );
+		} else {
+			delete_option( Settings_Page::OPTION_KEY );
+		}
+		$wpdb->query( 'SET autocommit = 0' );
+		$wpdb->query( 'START TRANSACTION' );
+		parent::tearDown();
+	}
+
+	public function test_instagram_profile_persistence_and_validation(): void {
+		$term_id = $this->venue( 'Instagram Venue' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'instagram' => 'https://www.instagram.com/MusicFarm/' ), $profile['revision'] );
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'musicfarm', get_term_meta( $term_id, '_venue_instagram', true ) );
+		$this->assertSame( 'musicfarm', $result['profile']['instagram'] );
+		$this->assertSame( 'musicfarm', Venue_Taxonomy::get_venue_data( $term_id )['instagram'] );
+		$this->assertNotSame( $profile['revision'], $result['revision'] );
+		$invalid = VenueProfileMutations::updateSystem( $term_id, array( 'instagram' => 'bad-name' ) );
+		$this->assertWPError( $invalid );
+		$this->assertSame( 'musicfarm', get_term_meta( $term_id, '_venue_instagram', true ) );
+		$this->assertNotWPError( VenueProfileMutations::updateSystem( $term_id, array( 'instagram' => '' ) ) );
+		$this->assertSame( '', VenueProfileMutations::read( $term_id )['instagram'] );
+	}
+
+	public function test_stale_profile_write_detects_another_canonical_writer(): void {
+		$term_id = $this->venue( 'Competing Writer' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$this->assertNotWPError( $profile );
+
+		$system = VenueProfileMutations::updateSystem( $term_id, array( 'phone' => '843-555-0100' ) );
+		$this->assertNotWPError( $system );
+
+		$stale = VenueProfileMutations::updateProfile( $term_id, array( 'website' => 'https://venue.example' ), $profile['revision'] );
+		$this->assertWPError( $stale );
+		$this->assertSame( 'venue_revision_conflict', $stale->get_error_code() );
+		$this->assertSame( '', get_term_meta( $term_id, '_venue_website', true ) );
+	}
+
+	public function test_website_and_ticketing_url_are_independently_editable_and_nullable(): void {
+		$term_id = $this->venue( 'Independent Venue URLs' );
+		$profile = VenueProfileMutations::read( $term_id );
+
+		$result = VenueProfileMutations::updateProfile(
+			$term_id,
+			array(
+				'website'       => 'https://venue.example/about',
+				'ticketing_url' => 'https://tickets.example/venue',
+			),
+			$profile['revision']
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'https://venue.example/about', $result['profile']['website'] );
+		$this->assertSame( 'https://tickets.example/venue', $result['profile']['ticketing_url'] );
+
+		$cleared = VenueProfileMutations::updateProfile(
+			$term_id,
+			array( 'website' => '' ),
+			$result['revision']
+		);
+
+		$this->assertNotWPError( $cleared );
+		$this->assertSame( '', $cleared['profile']['website'] );
+		$this->assertSame( 'https://tickets.example/venue', $cleared['profile']['ticketing_url'] );
+	}
+
+	public function test_profile_and_public_data_have_a_stable_absent_logo_shape(): void {
+		$term_id = $this->venue( 'No Logo' );
+
+		$profile = VenueProfileMutations::read( $term_id );
+		$data    = Venue_Taxonomy::get_venue_data( $term_id );
+
+		$this->assertNotWPError( $profile );
+		$this->assertSame( 0, $profile['logo_attachment_id'] );
+		$this->assertNull( $profile['logo'] );
+		$this->assertSame( 0, $data['logo_attachment_id'] );
+		$this->assertNull( $data['logo'] );
+	}
+
+	public function test_valid_current_site_image_is_revisioned_and_publicly_resolved(): void {
+		$term_id      = $this->venue( 'Logo Venue' );
+		$attachment_id = $this->attachment( 'image/png', 'venue-logo.png' );
+		update_post_meta( $attachment_id, '_wp_attachment_image_alt', 'Logo Venue mark' );
+		update_post_meta(
+			$attachment_id,
+			'_wp_attachment_metadata',
+			array(
+				'width'  => 640,
+				'height' => 320,
+			)
+		);
+		$profile = VenueProfileMutations::read( $term_id );
+
+		$result = data_machine_events_update_venue_profile(
+			$term_id,
+			array( 'logo_attachment_id' => $attachment_id ),
+			$profile['revision']
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( array( 'logo_attachment_id' ), $result['updated_fields'] );
+		$this->assertNotSame( $profile['revision'], $result['revision'] );
+		$this->assertSame( $attachment_id, $result['profile']['logo_attachment_id'] );
+		$this->assertSame(
+			array(
+				'attachment_id' => $attachment_id,
+				'site_id'       => get_current_blog_id(),
+				'url'           => wp_get_attachment_url( $attachment_id ),
+				'alt'           => 'Logo Venue mark',
+				'mime_type'     => 'image/png',
+				'width'         => 640,
+				'height'        => 320,
+			),
+			$result['profile']['logo']
+		);
+		$this->assertSame( $result['profile'], data_machine_events_get_venue_profile( $term_id ) );
+		$this->assertSame( $result['profile']['logo'], data_machine_events_get_venue_data( $term_id )['logo'] );
+	}
+
+	public function test_logo_no_op_preserves_revision_and_reports_no_updated_fields(): void {
+		$term_id       = $this->venue( 'Logo No-op' );
+		$attachment_id = $this->attachment( 'image/jpeg', 'venue-logo.jpg' );
+		$profile       = VenueProfileMutations::read( $term_id );
+		$first         = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => $attachment_id ), $profile['revision'] );
+
+		$this->assertNotWPError( $first );
+		$second = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => (string) $attachment_id ), $first['revision'] );
+
+		$this->assertNotWPError( $second );
+		$this->assertSame( array(), $second['updated_fields'] );
+		$this->assertSame( $first['revision'], $second['revision'] );
+	}
+
+	public function test_logo_removal_detaches_reference_without_deleting_attachment(): void {
+		$term_id       = $this->venue( 'Logo Removal' );
+		$attachment_id = $this->attachment( 'image/webp', 'venue-logo.webp' );
+		update_term_meta( $term_id, '_venue_logo_attachment_id', $attachment_id );
+		$profile = VenueProfileMutations::read( $term_id );
+
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => null ), $profile['revision'] );
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( array( 'logo_attachment_id' ), $result['updated_fields'] );
+		$this->assertFalse( metadata_exists( 'term', $term_id, '_venue_logo_attachment_id' ) );
+		$this->assertInstanceOf( \WP_Post::class, get_post( $attachment_id ) );
+		$this->assertSame( 0, $result['profile']['logo_attachment_id'] );
+		$this->assertNull( $result['profile']['logo'] );
+	}
+
+	public function test_deleted_stored_logo_keeps_reference_but_resolves_no_public_data(): void {
+		$term_id       = $this->venue( 'Deleted Stored Logo' );
+		$attachment_id = $this->attachment( 'image/png', 'stored-deleted-logo.png' );
+		update_term_meta( $term_id, '_venue_logo_attachment_id', $attachment_id );
+		wp_delete_attachment( $attachment_id, true );
+		$this->attachment_ids = array_values( array_diff( $this->attachment_ids, array( $attachment_id ) ) );
+
+		$profile = VenueProfileMutations::read( $term_id );
+
+		$this->assertNotWPError( $profile );
+		$this->assertSame( $attachment_id, $profile['logo_attachment_id'] );
+		$this->assertNull( $profile['logo'] );
+	}
+
+	public function test_failed_logo_removal_rolls_back_and_preserves_reference(): void {
+		$term_id       = $this->venue( 'Logo Removal Rollback' );
+		$attachment_id = $this->attachment( 'image/png', 'preserved-logo.png' );
+		update_term_meta( $term_id, '_venue_logo_attachment_id', $attachment_id );
+		$profile = VenueProfileMutations::read( $term_id );
+		$block   = static function ( $check, $object_id, $meta_key ) use ( $term_id ) {
+			return $term_id === (int) $object_id && '_venue_logo_attachment_id' === $meta_key ? false : $check;
+		};
+		add_filter( 'delete_term_metadata', $block, 10, 3 );
+
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => 0 ), $profile['revision'] );
+
+		remove_filter( 'delete_term_metadata', $block, 10 );
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_meta_delete_failed', $result->get_error_code() );
+		$this->assertSame( (string) $attachment_id, get_term_meta( $term_id, '_venue_logo_attachment_id', true ) );
+	}
+
+	public function test_invalid_deleted_non_image_and_malformed_logo_references_are_rejected(): void {
+		$term_id       = $this->venue( 'Logo Validation' );
+		$non_image_id  = $this->attachment( 'application/pdf', 'venue.pdf' );
+		$deleted_id    = $this->attachment( 'image/png', 'deleted-logo.png' );
+		$profile       = VenueProfileMutations::read( $term_id );
+		wp_delete_attachment( $deleted_id, true );
+		$this->attachment_ids = array_values( array_diff( $this->attachment_ids, array( $deleted_id ) ) );
+
+		$cases = array(
+			array( array( 'id' => $non_image_id ), 'venue_logo_invalid_reference' ),
+			array( $non_image_id, 'venue_logo_not_image' ),
+			array( $deleted_id, 'venue_logo_not_found' ),
+			array( 999999999, 'venue_logo_not_found' ),
+		);
+		foreach ( $cases as $case ) {
+			list( $reference, $expected_code ) = $case;
+			$result = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => $reference ), $profile['revision'] );
+			$this->assertWPError( $result );
+			$this->assertSame( $expected_code, $result->get_error_code() );
+		}
+		$this->assertFalse( metadata_exists( 'term', $term_id, '_venue_logo_attachment_id' ) );
+	}
+
+	public function test_foreign_site_attachment_is_rejected(): void {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Site affinity requires the multisite WordPress test suite.' );
+		}
+		$term_id = $this->venue( 'Site Affinity' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$blog_id = self::factory()->blog->create();
+		$this->blog_ids[] = $blog_id;
+		switch_to_blog( $blog_id );
+		$foreign_id = $this->attachment( 'image/png', 'foreign-logo.png', 987654321 );
+		array_pop( $this->attachment_ids );
+		restore_current_blog();
+
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'logo_attachment_id' => $foreign_id ), $profile['revision'] );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_logo_not_found', $result->get_error_code() );
+		$this->assertFalse( metadata_exists( 'term', $term_id, '_venue_logo_attachment_id' ) );
+	}
+
+	public function test_logo_failure_rolls_back_other_profile_fields(): void {
+		$term_id       = $this->venue( 'Logo Rollback' );
+		$attachment_id = $this->attachment( 'image/png', 'rollback-logo.png' );
+		update_term_meta( $term_id, '_venue_phone', 'before' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$block   = static function ( $check, $object_id, $meta_key ) use ( $term_id ) {
+			return $term_id === (int) $object_id && '_venue_logo_attachment_id' === $meta_key ? false : $check;
+		};
+		add_filter( 'update_term_metadata', $block, 10, 3 );
+
+		$result = VenueProfileMutations::updateProfile(
+			$term_id,
+			array(
+				'phone'              => 'after',
+				'logo_attachment_id' => $attachment_id,
+			),
+			$profile['revision']
+		);
+
+		remove_filter( 'update_term_metadata', $block, 10 );
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_meta_update_failed', $result->get_error_code() );
+		$this->assertSame( 'before', get_term_meta( $term_id, '_venue_phone', true ) );
+		$this->assertFalse( metadata_exists( 'term', $term_id, '_venue_logo_attachment_id' ) );
+	}
+
+	public function test_profile_boundary_excludes_and_ignores_system_fields(): void {
+		$term_id = $this->venue( 'Bounded Profile' );
+		update_term_meta( $term_id, '_venue_coordinates', '32.7765,-79.9311' );
+		update_term_meta( $term_id, '_venue_timezone', 'America/New_York' );
+		$profile = VenueProfileMutations::read( $term_id );
+
+		$this->assertArrayNotHasKey( 'coordinates', $profile );
+		$this->assertArrayNotHasKey( 'timezone', $profile );
+		$result = VenueProfileMutations::updateProfile(
+			$term_id,
+			array(
+				'phone'       => '843-555-0101',
+				'coordinates' => '1,2',
+				'timezone'    => 'UTC',
+			),
+			$profile['revision']
+		);
+		$this->assertNotWPError( $result );
+		$this->assertSame( '32.7765,-79.9311', get_term_meta( $term_id, '_venue_coordinates', true ) );
+		$this->assertSame( 'America/New_York', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_system_write_drops_raw_utc_offset_timezone(): void {
+		$term_id = $this->venue( 'Offset Import' );
+
+		$result = VenueProfileMutations::updateSystem(
+			$term_id,
+			array(
+				'phone'    => '843-555-0164',
+				'timezone' => '-08:00',
+			),
+			VenueProfileMutations::STRATEGY_FILL_EMPTY
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertNotContains( 'timezone', $result['updated_fields'] );
+		$this->assertSame( '843-555-0164', get_term_meta( $term_id, '_venue_phone', true ) );
+		$this->assertSame( '', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_system_overwrite_with_offset_preserves_existing_iana_timezone(): void {
+		$term_id = $this->venue( 'Offset Overwrite' );
+		update_term_meta( $term_id, '_venue_timezone', 'America/New_York' );
+
+		$result = VenueProfileMutations::updateSystem( $term_id, array( 'timezone' => '-04:00' ) );
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'America/New_York', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_system_write_accepts_iana_timezone(): void {
+		$term_id = $this->venue( 'IANA Import' );
+
+		$result = VenueProfileMutations::updateSystem( $term_id, array( 'timezone' => 'America/Chicago' ) );
+
+		$this->assertNotWPError( $result );
+		$this->assertContains( 'timezone', $result['updated_fields'] );
+		$this->assertSame( 'America/Chicago', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_derive_timezone_replaces_legacy_offset_value(): void {
+		$term_id = $this->venue( 'Legacy Offset' );
+		update_term_meta( $term_id, '_venue_state', 'SC' );
+		update_term_meta( $term_id, '_venue_country', 'US' );
+		update_term_meta( $term_id, '_venue_coordinates', '32.8697033,-79.9727527' );
+		update_term_meta( $term_id, '_venue_timezone', '-08:00' );
+		delete_option( Settings_Page::OPTION_KEY );
+
+		$block_http = static fn() => new \WP_Error( 'http_blocked', 'No network in tests.' );
+		add_filter( 'pre_http_request', $block_http );
+		$derived = Venue_Taxonomy::maybe_derive_timezone( $term_id );
+		remove_filter( 'pre_http_request', $block_http );
+
+		$this->assertTrue( $derived );
+		$this->assertSame( 'America/New_York', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_derive_timezone_keeps_existing_iana_value(): void {
+		$term_id = $this->venue( 'Existing IANA' );
+		update_term_meta( $term_id, '_venue_state', 'SC' );
+		update_term_meta( $term_id, '_venue_country', 'US' );
+		update_term_meta( $term_id, '_venue_timezone', 'America/Chicago' );
+
+		$this->assertFalse( Venue_Taxonomy::maybe_derive_timezone( $term_id ) );
+		$this->assertSame( 'America/Chicago', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_duplicate_meta_is_canonicalized_and_owner_hook_fires_once(): void {
+		$term_id = $this->venue( 'Duplicate Meta' );
+		$this->assertIsInt( add_term_meta( $term_id, '_venue_phone', 'canonical' ) );
+		$this->assertIsInt( add_term_meta( $term_id, '_venue_phone', 'stale' ) );
+		get_term_meta( $term_id );
+		$profile = VenueProfileMutations::read( $term_id );
+		$mutated = 0;
+
+		$owner_hook = static function () use ( &$mutated ): void {
+			++$mutated;
+		};
+		add_action( 'data_machine_events_venue_mutated', $owner_hook );
+
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'phone' => 'canonical' ), $profile['revision'] );
+
+		remove_action( 'data_machine_events_venue_mutated', $owner_hook );
+		$this->assertNotWPError( $result );
+		$this->assertSame( 1, $mutated, 'The durable owner hook must fire exactly once.' );
+		$this->assertSame( array( 'canonical', 'canonical' ), get_term_meta( $term_id, '_venue_phone', false ) );
+		$this->assertSame( 'canonical', get_term_meta( $term_id, '_venue_phone', true ) );
+	}
+
+	public function test_preexisting_transaction_is_rejected_before_lock_acquisition(): void {
+		global $wpdb;
+		$term_id = $this->venue( 'Transaction Ordering' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$wpdb->query( 'START TRANSACTION' );
+		$wpdb->get_var( $wpdb->prepare( "SELECT term_id FROM {$wpdb->terms} WHERE term_id = %d FOR UPDATE", $term_id ) );
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'phone' => 'blocked' ), $profile['revision'] );
+		$wpdb->query( 'ROLLBACK' );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_transaction_unsupported', $result->get_error_code() );
+		$this->assertSame( '', get_term_meta( $term_id, '_venue_phone', true ) );
+	}
+
+	public function test_same_venue_hook_reentrancy_is_rejected(): void {
+		$term_id = $this->venue( 'Reentrant Mutation' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$nested  = null;
+		$hook    = static function ( $check, $object_id, $meta_key ) use ( $term_id, &$nested ) {
+			if ( $term_id === (int) $object_id && '_venue_phone' === $meta_key && null === $nested ) {
+				$nested = VenueProfileMutations::updateSystem( $term_id, array( 'website' => 'https://nested.example' ) );
+			}
+			return $check;
+		};
+		add_filter( 'update_term_metadata', $hook, 10, 3 );
+		$result = VenueProfileMutations::updateProfile( $term_id, array( 'phone' => 'outer' ), $profile['revision'] );
+		remove_filter( 'update_term_metadata', $hook, 10 );
+
+		$this->assertNotWPError( $result );
+		$this->assertWPError( $nested );
+		$this->assertSame( 'venue_mutation_reentrant', $nested->get_error_code() );
+		$this->assertSame( '', get_term_meta( $term_id, '_venue_website', true ) );
+	}
+
+	public function test_address_relocation_replaces_coordinates_and_timezone_atomically(): void {
+		$term_id = $this->venue( 'Relocation' );
+		update_term_meta( $term_id, '_venue_address', '100 King Street' );
+		update_term_meta( $term_id, '_venue_city', 'Charleston' );
+		update_term_meta( $term_id, '_venue_state', 'SC' );
+		update_term_meta( $term_id, '_venue_coordinates', '32.7765,-79.9311' );
+		update_term_meta( $term_id, '_venue_timezone', 'America/New_York' );
+		update_option( Settings_Page::OPTION_KEY, array( 'geonames_username' => 'integration-test' ) );
+
+		$http = static function ( $preempt, $args, $url ) {
+			if ( str_contains( $url, 'nominatim.openstreetmap.org' ) ) {
+				return self::httpResponse( array( array( 'lat' => '34.0522', 'lon' => '-118.2437' ) ) );
+			}
+			if ( str_contains( $url, 'geonames.org' ) ) {
+				return self::httpResponse( array( 'timezoneId' => 'America/Los_Angeles' ) );
+			}
+			return $preempt;
+		};
+		add_filter( 'pre_http_request', $http, 10, 3 );
+		$profile = VenueProfileMutations::read( $term_id );
+		$result  = VenueProfileMutations::updateProfile(
+			$term_id,
+			array(
+				'address' => '800 West Olympic Boulevard',
+				'city'    => 'Los Angeles',
+				'state'   => 'CA',
+			),
+			$profile['revision']
+		);
+		remove_filter( 'pre_http_request', $http, 10 );
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( '34.0522,-118.2437', get_term_meta( $term_id, '_venue_coordinates', true ) );
+		$this->assertSame( 'America/Los_Angeles', get_term_meta( $term_id, '_venue_timezone', true ) );
+	}
+
+	public function test_failed_meta_filter_rolls_back_all_fields_and_suppresses_owner_hook(): void {
+		$term_id = $this->venue( 'Rollback' );
+		update_term_meta( $term_id, '_venue_phone', 'before' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$mutated = 0;
+		$block   = static function ( $check, $object_id, $meta_key ) use ( $term_id ) {
+			return $term_id === (int) $object_id && '_venue_website' === $meta_key ? false : $check;
+		};
+		$owner_hook = static function () use ( &$mutated ): void {
+			++$mutated;
+		};
+		add_filter( 'update_term_metadata', $block, 10, 3 );
+		add_action( 'data_machine_events_venue_mutated', $owner_hook );
+
+		$result = VenueProfileMutations::updateProfile(
+			$term_id,
+			array(
+				'phone'   => 'after',
+				'website' => 'https://blocked.example',
+			),
+			$profile['revision']
+		);
+
+		remove_filter( 'update_term_metadata', $block, 10 );
+		remove_action( 'data_machine_events_venue_mutated', $owner_hook );
+		$this->assertWPError( $result );
+		$this->assertSame( 'before', get_term_meta( $term_id, '_venue_phone', true ) );
+		$this->assertSame( '', get_term_meta( $term_id, '_venue_website', true ) );
+		$this->assertSame( 0, $mutated );
+	}
+
+	public function test_multisite_lock_and_revision_scope_are_blog_specific(): void {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Multisite scope requires the multisite WordPress test suite.' );
+		}
+		global $wpdb;
+		$first_id = $this->venue( 'First Multisite Venue' );
+		update_term_meta( $first_id, '_venue_phone', 'same-value' );
+		$first    = VenueProfileMutations::read( $first_id );
+		$blog_id  = self::factory()->blog->create();
+		$this->blog_ids[] = $blog_id;
+		$first_lock = VenueProfileMutations::lockName( $first_id );
+		switch_to_blog( $blog_id );
+		$this->assertSame( $blog_id, get_current_blog_id() );
+		wp_cache_flush();
+		Venue_Taxonomy::register();
+		$second_id   = $this->venue( 'Second Multisite Venue' );
+		update_term_meta( $second_id, '_venue_phone', 'same-value' );
+		$second      = VenueProfileMutations::read( $second_id );
+		$second_lock = VenueProfileMutations::lockName( $second_id );
+		$this->assertNotSame( $first_lock, $second_lock );
+
+		$owner  = $this->independentConnection();
+		$waiter = $this->independentConnection();
+		$this->assertSame( 1, $this->namedLock( $owner, 'GET_LOCK', $first_lock ) );
+		$this->assertSame( 1, $this->namedLock( $waiter, 'GET_LOCK', $second_lock ) );
+		$this->assertSame( 0, $this->namedLock( $waiter, 'GET_LOCK', $first_lock ) );
+		$this->assertSame( 1, $this->namedLock( $waiter, 'RELEASE_LOCK', $second_lock ) );
+		$this->assertSame( 1, $this->namedLock( $owner, 'RELEASE_LOCK', $first_lock ) );
+		$owner->close();
+		$waiter->close();
+		wp_delete_term( $second_id, 'venue' );
+		restore_current_blog();
+		wp_cache_flush();
+
+		$this->assertNotSame( $first['revision'], $second['revision'] );
+	}
+
+	public function test_waiting_fill_empty_writer_rechecks_after_operator_edit(): void {
+		if ( ! function_exists( 'pcntl_fork' ) ) {
+			$this->markTestSkipped( 'Cross-process venue concurrency coverage requires pcntl.' );
+		}
+		global $wpdb, $table_prefix;
+		$term_id  = $this->venue( 'Fill Empty Race' );
+		$lock_key = VenueProfileMutations::lockName( $term_id );
+		$owner    = $this->independentConnection();
+		$this->assertSame( 1, $this->namedLock( $owner, 'GET_LOCK', $lock_key ) );
+
+		$result_file = tempnam( sys_get_temp_dir(), 'dme-venue-race-' );
+		$pid         = pcntl_fork();
+		$this->assertNotSame( -1, $pid );
+		if ( 0 === $pid ) {
+			global $wpdb;
+			$wpdb = $this->independentConnection();
+			$wpdb->set_prefix( $table_prefix );
+			$result = VenueProfileMutations::updateSystem(
+				$term_id,
+				array( 'phone' => 'stale-ingestion-value' ),
+				VenueProfileMutations::STRATEGY_FILL_EMPTY
+			);
+			file_put_contents( $result_file, wp_json_encode( is_wp_error( $result ) ? array( 'error' => $result->get_error_code() ) : $result ) );
+			exit( 0 );
+		}
+
+		usleep( 300000 );
+		update_term_meta( $term_id, '_venue_phone', 'operator-value' );
+		$this->assertSame( 1, $this->namedLock( $owner, 'RELEASE_LOCK', $lock_key ) );
+		pcntl_waitpid( $pid, $status );
+		$result = json_decode( (string) file_get_contents( $result_file ), true );
+		unlink( $result_file );
+		$owner->close();
+
+		wp_cache_delete( $term_id, 'term_meta' );
+		$this->assertTrue( pcntl_wifexited( $status ) );
+		$this->assertArrayNotHasKey( 'error', $result );
+		$this->assertSame( 'operator-value', get_term_meta( $term_id, '_venue_phone', true ) );
+		$this->assertNotContains( 'phone', $result['updated_fields'] );
+	}
+
+	public function test_native_wordpress_edit_fails_when_serialization_is_unavailable(): void {
+		$term_id  = $this->venue( 'Native Lock Failure' );
+		$original = get_term( $term_id, 'venue' )->name;
+		$lock_key = VenueProfileMutations::lockName( $term_id );
+		$owner    = $this->independentConnection();
+		$this->assertSame( 1, $this->namedLock( $owner, 'GET_LOCK', $lock_key ) );
+		add_filter( 'data_machine_events_venue_lock_timeout', '__return_zero' );
+		$rejected = false;
+		try {
+			wp_update_term( $term_id, 'venue', array( 'name' => 'Should Not Persist' ) );
+		} catch ( \WPDieException ) {
+			$rejected = true;
+		} finally {
+			remove_filter( 'data_machine_events_venue_lock_timeout', '__return_zero' );
+			$this->namedLock( $owner, 'RELEASE_LOCK', $lock_key );
+			$owner->close();
+		}
+		$this->assertTrue( $rejected );
+		$this->assertSame( $original, get_term( $term_id, 'venue' )->name );
+	}
+
+	public function test_native_wordpress_edit_releases_serialization_after_saved_hooks(): void {
+		$term_id  = $this->venue( 'Native Lock Success' );
+		$lock_key = VenueProfileMutations::lockName( $term_id );
+		$observer = $this->independentConnection();
+
+		try {
+			$result = wp_update_term( $term_id, 'venue', array( 'name' => 'Native Lock Persisted' ) );
+
+			$this->assertNotWPError( $result );
+			$this->assertSame( 'Native Lock Persisted', get_term( $term_id, 'venue' )->name );
+			$this->assertSame( 1, $this->namedLock( $observer, 'GET_LOCK', $lock_key ), 'saved_venue must release the native edit lock.' );
+		} finally {
+			$this->namedLock( $observer, 'RELEASE_LOCK', $lock_key );
+			$observer->close();
+		}
+	}
+
+	public function test_uncertain_commit_requires_a_fresh_read(): void {
+		$term_id = $this->venue( 'Commit Uncertain' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$result  = VenueProfileCommitUncertain::updateProfile( $term_id, array( 'phone' => 'committed-or-not' ), $profile['revision'] );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_commit_uncertain', $result->get_error_code() );
+		$this->assertTrue( $result->get_error_data()['connection_closed'] );
+		$this->assertTrue( $result->get_error_data()['connection_recovered'] );
+		$this->assertNotWPError( VenueProfileMutations::read( $term_id ) );
+	}
+
+	public function test_uncertain_rollback_reports_the_original_failure_code(): void {
+		$term_id = $this->venue( 'Rollback Uncertain' );
+		$profile = VenueProfileMutations::read( $term_id );
+		$block   = static function ( $check, $object_id, $meta_key ) use ( $term_id ) {
+			return $term_id === (int) $object_id && '_venue_phone' === $meta_key ? false : $check;
+		};
+		add_filter( 'update_term_metadata', $block, 10, 3 );
+		$result = VenueProfileRollbackUncertain::updateProfile( $term_id, array( 'phone' => 'blocked' ), $profile['revision'] );
+		remove_filter( 'update_term_metadata', $block, 10 );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_rollback_uncertain', $result->get_error_code() );
+		$this->assertSame( 'venue_meta_update_failed', $result->get_error_data()['original_error'] );
+		$this->assertTrue( $result->get_error_data()['connection_closed'] );
+	}
+
+	public function test_shared_term_is_rejected_before_mutation(): void {
+		global $wpdb;
+		$split_finished = get_option( 'finished_splitting_shared_terms' );
+		update_option( 'finished_splitting_shared_terms', false );
+		$term_id = $this->venue( 'Shared Term' );
+		register_taxonomy( 'venue_shadow', 'post' );
+		$wpdb->insert(
+			$wpdb->term_taxonomy,
+			array(
+				'term_id'     => $term_id,
+				'taxonomy'    => 'venue_shadow',
+				'description' => '',
+				'parent'      => 0,
+				'count'       => 0,
+			)
+		);
+		try {
+			$this->assertTrue( wp_term_is_shared( $term_id ) );
+			$result = VenueProfileMutations::updateSystem( $term_id, array( 'phone' => 'blocked' ) );
+		} finally {
+			$wpdb->delete( $wpdb->term_taxonomy, array( 'term_id' => $term_id, 'taxonomy' => 'venue_shadow' ) );
+			update_option( 'finished_splitting_shared_terms', $split_finished );
+		}
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'venue_shared_term_unsupported', $result->get_error_code() );
+		$this->assertSame( '', get_term_meta( $term_id, '_venue_phone', true ) );
+	}
+
+	private function venue( string $prefix, bool $unique = true ): int {
+		$result = wp_insert_term( $prefix . ( $unique ? ' ' . uniqid() : '' ), 'venue' );
+		$this->assertNotWPError( $result );
+		$term_id          = (int) $result['term_id'];
+		$this->term_ids[] = $term_id;
+		return $term_id;
+	}
+
+	private function attachment( string $mime_type, string $file, int $import_id = 0 ): int {
+		$attachment_id = wp_insert_attachment(
+			array(
+				'import_id'      => $import_id,
+				'post_title'     => $file,
+				'post_status'    => 'inherit',
+				'post_mime_type' => $mime_type,
+			),
+			$file,
+			0,
+			true
+		);
+		$this->assertNotWPError( $attachment_id );
+		$attachment_id       = (int) $attachment_id;
+		$this->attachment_ids[] = $attachment_id;
+		return $attachment_id;
+	}
+
+	/**
+	 * Open a second, independent database connection with its own lock ownership.
+	 *
+	 * Stock MySQL wpdb: a new connection. A driver that is not a mysqli client
+	 * (e.g. a pure-PHP SQL engine) exposes open_connection() for the same purpose.
+	 */
+	private function independentConnection(): \wpdb {
+		global $wpdb;
+		if ( method_exists( $wpdb, 'open_connection' ) ) {
+			return $wpdb->open_connection();
+		}
+		return new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+	}
+
+	private function namedLock( \wpdb $connection, string $operation, string $key ): int {
+		$sql = 'GET_LOCK' === $operation ? 'SELECT GET_LOCK(%s, 0)' : 'SELECT RELEASE_LOCK(%s)';
+		return (int) $connection->get_var( $connection->prepare( $sql, $key ) );
+	}
+
+	private static function httpResponse( array $body ): array {
+		return array(
+			'headers'  => array(),
+			'body'     => wp_json_encode( $body ),
+			'response' => array( 'code' => 200, 'message' => 'OK' ),
+			'cookies'  => array(),
+			'filename' => null,
+		);
+	}
+}
+
+class VenueProfileCommitUncertain extends VenueProfileMutations {
+	protected static function query( string $sql ): int|bool {
+		if ( 'COMMIT' === $sql ) {
+			global $wpdb;
+			$wpdb->close();
+			return false;
+		}
+		return parent::query( $sql );
+	}
+}
+
+class VenueProfileRollbackUncertain extends VenueProfileMutations {
+	protected static function query( string $sql ): int|bool {
+		if ( 'ROLLBACK' === $sql ) {
+			global $wpdb;
+			$wpdb->close();
+			return false;
+		}
+		return parent::query( $sql );
+	}
+}

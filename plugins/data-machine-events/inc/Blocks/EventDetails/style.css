@@ -1,0 +1,60 @@
+/**
+ * Event Details Block Editor Styles
+ *
+ * These styles are loaded in the block editor only.
+ * Frontend styles are in src/frontend.css (compiled to build/frontend.css)
+ *
+ * @package DataMachineEvents
+ * @since 1.0.0
+ */
+
+/* Editor Styles */
+.data-machine-event-details-editor {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.data-machine-event-details-editor h4 {
+    margin: 0 0 1rem 0;
+    color: #333;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.data-machine-event-details-editor .event-dates,
+.data-machine-event-details-editor .event-location,
+.data-machine-event-details-editor .event-details {
+    margin-bottom: 1.5rem;
+}
+
+.data-machine-event-details-editor .date-time-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.data-machine-event-details-editor .date-time-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.data-machine-event-details-editor .date-time-field label {
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #555;
+}
+
+.data-machine-event-details-editor .date-time-field input {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+/* Dark Mode Support for Editor */
+@media (prefers-color-scheme: dark) {
+    .data-machine-event-details-editor {
+        background: #1a202c;
+    }
+}

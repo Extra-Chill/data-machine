@@ -1,0 +1,102 @@
+[
+ {
+  "id": 669,
+  "title": "King of Pops",
+  "description": "At King of Pops, we serve handmade popsicles made with all-natural ingredients. We take up very little space (only a 3x3 cart and chalkboard), require no electricity, and pride ourselves on bringing a positive and fun energy to events across the Charleston area! ",
+  "eventDate": "2026-10-16T16:30:00.000Z",
+  "endDate": "2026-10-16T19:30:00.000Z",
+  "locationId": 2,
+  "imageUrl": null,
+  "eventType": "food_truck",
+  "source": "vendor_booking",
+  "locationName": "The Garden",
+  "locationSlug": "the-garden",
+  "customLinks": [],
+  "vendor": {
+   "id": 157,
+   "businessName": "King of Pops",
+   "website": "https://www.instagram.com/kop_charleston/",
+   "photos": [
+    {
+     "url": "/objects/uploads/e8ab32ef-c11f-4c50-a350-501ca1705e5c",
+     "category": "logo"
+    }
+   ]
+  }
+ },
+ {
+  "id": 120,
+  "title": "Big Tent Pizza",
+  "description": "Food Trucks at The Garden",
+  "eventDate": "2026-10-16T17:00:00.000Z",
+  "endDate": "2026-10-16T20:00:00.000Z",
+  "locationId": 2,
+  "imageUrl": null,
+  "eventType": "food_truck",
+  "source": "vendor_booking",
+  "locationName": "The Garden",
+  "locationSlug": "the-garden",
+  "customLinks": [],
+  "vendor": {
+   "id": 141,
+   "businessName": "Big Tent Pizza",
+   "website": null,
+   "photos": [
+    {
+     "url": "/objects/uploads/94bd7185-438d-4aef-9b72-473f74baba7f",
+     "category": "logo"
+    }
+   ]
+  }
+ },
+ {
+  "id": 358,
+  "title": "Duo Fitness",
+  "description": "Kelly and Sav bring over 10 years of combined experience in the fitness industry, with backgrounds in circuit training, HIIT, plyometrics, kickboxing, and more. They've blended their favorite styles to create Duo Fitness\u2014a dynamic fusion of strength, endurance, and community-driven training. With a ",
+  "eventDate": "2026-10-17T11:00:00.000Z",
+  "endDate": "2026-10-17T12:00:00.000Z",
+  "locationId": 2,
+  "imageUrl": null,
+  "eventType": "vendor",
+  "source": "vendor_booking",
+  "locationName": "The Garden",
+  "locationSlug": "the-garden",
+  "customLinks": [],
+  "vendor": {
+   "id": 149,
+   "businessName": "Duo Fitness",
+   "website": "https://www.eventbrite.com/o/duo-fitness-120334559511",
+   "photos": [
+    {
+     "url": "/objects/uploads/f7ff35bd-958e-4579-8f8d-9e065e3522b9",
+     "category": "logo"
+    }
+   ]
+  }
+ },
+ {
+  "id": 386,
+  "title": "Yous Guys Sandwich Shop",
+  "description": "Food Trucks at James Island",
+  "eventDate": "2026-10-17T12:00:00.000Z",
+  "endDate": "2026-10-17T20:00:00.000Z",
+  "locationId": 3,
+  "imageUrl": null,
+  "eventType": "food_truck",
+  "source": "vendor_booking",
+  "locationName": "James Island",
+  "locationSlug": "james-island",
+  "customLinks": [],
+  "vendor": {
+   "id": 186,
+   "businessName": "Yous Guys Sandwich Shop",
+   "website": null,
+   "photos": [
+    {
+     "url": "/objects/uploads/8546867d-9798-4711-91cd-07c3b0623ff7",
+     "category": "other"
+    }
+   ]
+  }
+ }
+]

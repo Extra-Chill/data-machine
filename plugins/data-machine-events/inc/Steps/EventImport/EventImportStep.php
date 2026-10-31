@@ -1,0 +1,204 @@
+<?php
+/**
+ * Event import step for Data Machine pipeline with handler discovery
+ *
+ * @package DataMachineEvents\Steps\EventImport
+ */
+
+namespace DataMachineEvents\Steps\EventImport;
+
+use DataMachine\Core\Steps\Step;
+use DataMachine\Core\Steps\StepTypeRegistrationTrait;
+use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Event import step for Data Machine pipeline with handler discovery
+ */
+class EventImportStep extends Step {
+
+	use StepTypeRegistrationTrait;
+
+	private static bool $capabilities_registered = false;
+
+	public function __construct() {
+		parent::__construct( 'event_import' );
+
+		self::registerStepType(
+			slug: 'event_import',
+			label: 'Event Import',
+			description: 'Import events from venues and ticketing platforms',
+			class_name: self::class,
+			position: 25,
+			usesHandler: true,
+			hasPipelineConfig: false
+		);
+
+		if ( ! self::$capabilities_registered ) {
+			add_filter( 'datamachine_step_types', array( self::class, 'registerCapabilities' ), 20 );
+			add_filter( 'datamachine_handlers', array( self::class, 'includeFetchHandlers' ), PHP_INT_MAX, 2 );
+			self::$capabilities_registered = true;
+		}
+	}
+
+	/**
+	 * Declare source-step behavior owned by the event import type.
+	 *
+	 * @param array $step_types Registered step types.
+	 * @return array
+	 */
+	public static function registerCapabilities( array $step_types ): array {
+		if ( ! isset( $step_types['event_import'] ) ) {
+			return $step_types;
+		}
+
+		$step_types['event_import']['source_ingestion']          = true;
+		$step_types['event_import']['allows_empty_output']       = true;
+		$step_types['event_import']['supports_item_disposition'] = true;
+		$step_types['event_import']['handler_category']          = 'source';
+
+		return $step_types;
+	}
+
+	/**
+	 * Expose fetch handlers to core's flow validation and step handler lists.
+	 *
+	 * Run after handler registration so native event import definitions win.
+	 * Only event_import queries are expanded; the nested fetch query is unchanged.
+	 *
+	 * @param array       $handlers Registered handlers for the requested type.
+	 * @param string|null $step_type Requested step type, or null for all handlers.
+	 * @return array
+	 */
+	public static function includeFetchHandlers( array $handlers, ?string $step_type = null ): array {
+		if ( 'event_import' !== $step_type ) {
+			return $handlers;
+		}
+
+		return array_replace( apply_filters( 'datamachine_handlers', array(), 'fetch' ), $handlers );
+	}
+
+	/**
+	 * Execute event import step.
+	 *
+	 * @return array Updated data packet array with event data added
+	 */
+	protected function executeStep(): array {
+		$handler_slug = $this->getHandlerSlug();
+
+		// Native event import handlers take precedence over generic fetch handlers.
+		$all_handlers = array_replace(
+			apply_filters( 'datamachine_handlers', array(), 'fetch' ),
+			apply_filters( 'datamachine_handlers', array(), 'event_import' )
+		);
+		$handler_info = $all_handlers[ $handler_slug ] ?? null;
+
+		if ( ! $handler_info || empty( $handler_info['class'] ) ) {
+			$this->logConfigurationError(
+				'Handler not found in registry',
+				array(
+					'handler_slug' => $handler_slug,
+				)
+			);
+			return $this->dataPackets;
+		}
+
+		// Instantiate handler
+		$class_name = $handler_info['class'];
+		if ( ! class_exists( $class_name ) ) {
+			$this->logConfigurationError(
+				'Handler class not found',
+				array(
+					'handler_slug' => $handler_slug,
+					'class_name'   => $class_name,
+				)
+			);
+			return $this->dataPackets;
+		}
+
+		$handler = new $class_name();
+
+		// Check if handler extends FetchHandler (New Architecture)
+		if ( $handler instanceof FetchHandler ) {
+			$pipeline_id = (int) ( $this->flow_step_config['pipeline_id'] ?? 0 );
+
+			// Prepare config with required IDs
+			$handler_config = array_merge(
+				$this->getHandlerConfig(),
+				array(
+					'flow_step_id' => $this->flow_step_id,
+					'flow_id'      => $this->flow_step_config['flow_id'] ?? 0,
+					'pipeline_id'  => $pipeline_id,
+				)
+			);
+
+			$this->log(
+				'debug',
+				'Event Import Step: Executing FetchHandler',
+				array(
+					'handler_class' => $class_name,
+					'pipeline_id'   => $pipeline_id,
+				)
+			);
+
+			$result = $handler->get_fetch_data( $pipeline_id, $handler_config, (string) $this->job_id );
+
+			// Handle both processed_items format and direct DataPacket arrays.
+			// Upstream get_fetch_data() can deliver either shape; its phpdoc does
+			// not capture the union, so the payload is validated as mixed.
+			/** @var mixed $processed_items */
+			$processed_items = $result['processed_items'] ?? null;
+			if ( is_array( $processed_items ) ) {
+				// Process items from processed_items format
+				foreach ( $processed_items as $item ) {
+					if ( $item instanceof \DataMachine\Core\DataPacket ) {
+						$this->dataPackets = $item->addTo( $this->dataPackets );
+					}
+				}
+				return $this->dataPackets;
+			} elseif ( is_array( $result ) ) {
+				// Process direct DataPacket arrays (new standardized format)
+				foreach ( $result as $item ) {
+					$this->dataPackets = $item->addTo( $this->dataPackets );
+				}
+				return $this->dataPackets;
+			}
+		}
+
+		// Legacy Handler Support (execute method)
+		if ( method_exists( $handler, 'execute' ) ) {
+			$this->log(
+				'debug',
+				'Event Import Step: Executing legacy handler',
+				array(
+					'handler_class' => $class_name,
+				)
+			);
+
+			// Reconstruct legacy payload
+			$legacy_payload = array(
+				'job_id'           => $this->job_id,
+				'flow_step_id'     => $this->flow_step_id,
+				'data'             => $this->dataPackets,
+				'flow_step_config' => $this->flow_step_config,
+				'engine'           => $this->engine,
+			);
+
+			$result = $handler->execute( $legacy_payload );
+
+			return is_array( $result ) ? $result : $this->dataPackets;
+		}
+
+		$this->logConfigurationError(
+			'Handler does not implement required interface',
+			array(
+				'handler_class' => $class_name,
+			)
+		);
+
+		return $this->dataPackets;
+	}
+}

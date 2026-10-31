@@ -1,0 +1,139 @@
+<?php
+/**
+ * WP-CLI command for venue geocoding
+ *
+ * Thin wrapper that delegates to geocoding abilities.
+ *
+ * @package DataMachineEvents\Cli
+ */
+
+namespace DataMachineEvents\Cli;
+
+use DataMachineEvents\Abilities\GeocodingAbilities;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class GeocodeVenuesCommand {
+
+	/**
+	 * Batch geocode venues missing coordinates.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--venue-id=<id>]
+	 * : Geocode a specific venue by term ID.
+	 *
+	 * [--force]
+	 * : Re-geocode even if coordinates already exist.
+	 *
+	 * [--dry-run]
+	 * : Show what would be geocoded without doing it.
+	 *
+	 * [--limit=<number>]
+	 * : Max venues to process (default: 50).
+	 *
+	 * [--timezones]
+	 * : Only derive missing venue timezones from existing coordinates, country,
+	 * : and state. Does not call Nominatim. Uses GeoNames when configured,
+	 * : otherwise offline country / US-state / nearest-zone rules.
+	 *
+	 * [--format=<format>]
+	 * : Output format (table or json). Default: table.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Geocode all venues missing coordinates
+	 *     wp data-machine-events geocode-venues
+	 *
+	 *     # Geocode a specific venue
+	 *     wp data-machine-events geocode-venues --venue-id=3597
+	 *
+	 *     # Dry run to see what would be processed
+	 *     wp data-machine-events geocode-venues --dry-run
+	 *
+	 *     # Force re-geocode all venues
+	 *     wp data-machine-events geocode-venues --force --limit=10
+	 *
+	 *     # Backfill missing venue timezones without hitting Nominatim
+	 *     wp data-machine-events geocode-venues --timezones --limit=500
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 */
+	public function __invoke( array $args, array $assoc_args ): void {
+		$format = $assoc_args['format'] ?? 'table';
+
+		$input = array(
+			'force'          => isset( $assoc_args['force'] ),
+			'dry_run'        => isset( $assoc_args['dry-run'] ),
+			'timezones_only' => isset( $assoc_args['timezones'] ),
+		);
+
+		if ( isset( $assoc_args['venue-id'] ) ) {
+			$input['venue_id'] = (int) $assoc_args['venue-id'];
+		}
+
+		if ( isset( $assoc_args['limit'] ) ) {
+			$input['limit'] = (int) $assoc_args['limit'];
+		}
+
+		$abilities = new GeocodingAbilities();
+		$result    = $abilities->executeGeocodeVenues( $input );
+
+		if ( is_wp_error( $result ) ) {
+			\WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+
+		if ( isset( $result['error'] ) ) {
+			\WP_CLI::error( (string) $result['error'] );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			\WP_CLI::log( (string) wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		// Table output.
+		$results = $result['results'] ?? array();
+
+		if ( empty( $results ) ) {
+			\WP_CLI::success( 'No venues to process. ' . ( $result['message'] ?? '' ) );
+			return;
+		}
+
+		$table_data = array();
+		foreach ( $results as $item ) {
+			$row = array(
+				'ID'      => $item['term_id'],
+				'Name'    => mb_substr( $item['name'], 0, 35 ),
+				'Address' => mb_substr( $item['address'] ?? '', 0, 40 ),
+				'Action'  => $item['action'],
+			);
+
+			if ( $input['timezones_only'] ) {
+				$row['Timezone'] = $item['timezone'] ?? '';
+				$row['Source']   = $item['source'] ?? '';
+			} elseif ( ! $input['dry_run'] ) {
+				$row['Coordinates'] = $item['coordinates'] ?? '';
+			}
+
+			$table_data[] = $row;
+		}
+
+		$columns = array( 'ID', 'Name', 'Address', 'Action' );
+		if ( $input['timezones_only'] ) {
+			$columns[] = 'Timezone';
+			$columns[] = 'Source';
+		} elseif ( ! $input['dry_run'] ) {
+			$columns[] = 'Coordinates';
+		}
+
+		\WP_CLI\Utils\format_items( 'table', $table_data, $columns );
+		\WP_CLI::log( '' );
+		\WP_CLI::success( $result['message'] );
+	}
+}

@@ -1,0 +1,859 @@
+<?php
+/**
+ * EventTaxonomyAssigner Tests
+ *
+ * Direct unit tests for the venue/promoter taxonomy assignment collaborator
+ * extracted from EventUpsert in #425.
+ *
+ * @package DataMachineEvents\Tests\Unit
+ */
+
+namespace DataMachineEvents\Tests\Unit;
+
+use WP_UnitTestCase;
+use DataMachineEvents\Steps\Upsert\Events\EventTaxonomyAssigner;
+use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\Promoter_Taxonomy;
+use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
+
+class EventTaxonomyAssignerTest extends WP_UnitTestCase {
+
+	private EventTaxonomyAssigner $assigner;
+
+	public function setUp(): void {
+		parent::setUp();
+		global $wpdb;
+		$wpdb->query( 'COMMIT' );
+		$wpdb->query( 'SET autocommit = 1' );
+
+		if ( ! post_type_exists( 'data_machine_events' ) ) {
+			Event_Post_Type::register();
+		}
+		if ( ! taxonomy_exists( 'venue' ) ) {
+			Venue_Taxonomy::register();
+		}
+		if ( ! taxonomy_exists( 'location' ) ) {
+			// The `location` taxonomy is owned by the consumer layer, not this
+			// substrate. Register a minimal hierarchical instance for tests.
+			register_taxonomy(
+				'location',
+				'data_machine_events',
+				array(
+					'hierarchical' => true,
+					'public'       => true,
+					'show_in_rest' => true,
+				)
+			);
+		}
+		$this->assertTrue( register_taxonomy_for_object_type( 'location', Event_Post_Type::POST_TYPE ) );
+		if ( ! taxonomy_exists( 'artist' ) ) {
+			register_taxonomy( 'artist', 'data_machine_events' );
+		}
+		if ( ! taxonomy_exists( 'promoter' ) ) {
+			Promoter_Taxonomy::register();
+		}
+
+		// Promoter assignment resolves terms through datamachine/resolve-term
+		// and datamachine/merge-term-meta, both permission-gated on
+		// PermissionHelper::can_manage(). Production callers reach this path
+		// authenticated (an agent/REST context, or Action Scheduler's
+		// background-processing bypass); this direct collaborator test has
+		// neither, so it must authenticate explicitly or every ability call
+		// silently permission-denies and no-ops. Mirrors
+		// EventUpsertAbilitiesTest's setUp().
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$this->assigner = new EventTaxonomyAssigner();
+	}
+
+	public function tearDown(): void {
+		global $wpdb;
+		$wpdb->query( 'SET autocommit = 0' );
+		$wpdb->query( 'START TRANSACTION' );
+		wp_set_current_user( 0 );
+		parent::tearDown();
+	}
+
+	public function test_assigner_instantiation() {
+		$this->assertInstanceOf( EventTaxonomyAssigner::class, $this->assigner );
+	}
+
+	public function test_process_venue_assigns_venue_term() {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Venue Assign Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+
+		$venue_name = 'Test Assigner Venue ' . uniqid();
+		$engine     = new \DataMachine\Core\EngineData( array( 'venue' => $venue_name ), 0 );
+
+		$result = $this->assigner->processVenue( $post_id, array(), $engine );
+
+		$this->assertTrue( $result['success'] );
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'processVenue must assign exactly one venue term.' );
+		$this->assertSame( $venue_name, $terms[0]->name );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $terms[0]->term_id, 'venue' );
+	}
+
+	/**
+	 * Empty scraper venue fields must not erase AI-supplied city/country (#782).
+	 *
+	 * EventEngineData always emits every venue* key, as '' when the source
+	 * page lacked it. A plain array_merge( $parameters, $engine ) therefore
+	 * wiped the AI's values, the venue was created blank, and the timezone
+	 * guard refused publication.
+	 */
+	public function test_process_venue_keeps_ai_city_and_country_when_scraper_fields_are_empty(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Venue Precedence Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+
+		$venue_name = 'Baggelycke Gard ' . uniqid();
+		$engine     = new \DataMachine\Core\EngineData(
+			array(
+				'venue'        => $venue_name,
+				'venueAddress' => '',
+				'venueCity'    => '',
+				'venueState'   => '',
+				'venueZip'     => '',
+				'venueCountry' => '',
+				'venueTimezone' => '',
+			),
+			0
+		);
+		$parameters = array(
+			'venue'        => $venue_name,
+			'venueCity'    => 'Vadstena',
+			'venueCountry' => 'Sweden',
+		);
+
+		// Keep geocoding offline so the timezone must come from the country rule.
+		$block_http = static fn() => new \WP_Error( 'blocked', 'No network in tests.' );
+		add_filter( 'pre_http_request', $block_http );
+		$result = $this->assigner->processVenue( $post_id, $parameters, $engine );
+		remove_filter( 'pre_http_request', $block_http );
+		$this->assertTrue( $result['success'] );
+
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms );
+		$term_id = (int) $terms[0]->term_id;
+
+		$this->assertSame( 'Vadstena', get_term_meta( $term_id, '_venue_city', true ) );
+		$this->assertSame( 'Sweden', get_term_meta( $term_id, '_venue_country', true ) );
+		$this->assertSame(
+			'Europe/Stockholm',
+			get_term_meta( $term_id, '_venue_timezone', true ),
+			'Single-zone country supplied by the AI must be enough to resolve a timezone offline.'
+		);
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $term_id, 'venue' );
+	}
+
+	/**
+	 * Populated scraper venue fields still win over AI parameters (#782).
+	 */
+	public function test_process_venue_prefers_populated_scraper_fields_over_ai_parameters(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Venue Precedence Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+
+		$venue_name = 'Scraper Wins Venue ' . uniqid();
+		$engine     = new \DataMachine\Core\EngineData(
+			array(
+				'venue'        => $venue_name,
+				'venueCity'    => 'Charleston',
+				'venueState'   => 'SC',
+				'venueCountry' => 'US',
+			),
+			0
+		);
+		$parameters = array(
+			'venue'        => $venue_name,
+			'venueCity'    => 'Somewhere Else',
+			'venueState'   => 'TX',
+			'venueCountry' => 'Sweden',
+		);
+
+		$result = $this->assigner->processVenue( $post_id, $parameters, $engine );
+		$this->assertTrue( $result['success'] );
+
+		$terms   = wp_get_object_terms( $post_id, 'venue' );
+		$term_id = (int) $terms[0]->term_id;
+
+		$this->assertSame( 'Charleston', get_term_meta( $term_id, '_venue_city', true ) );
+		$this->assertSame( 'SC', get_term_meta( $term_id, '_venue_state', true ) );
+		$this->assertSame( 'US', get_term_meta( $term_id, '_venue_country', true ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $term_id, 'venue' );
+	}
+
+	/**
+	 * An AI-guessed street must not split a venue the feed named (Dice.fm).
+	 */
+	public function test_process_venue_ai_guessed_street_reuses_named_venue(): void {
+		$venue_name = 'Dice Guess Venue ' . uniqid();
+		$existing   = wp_insert_term( $venue_name, 'venue' );
+		$this->assertNotWPError( $existing );
+		$existing_id = (int) $existing['term_id'];
+		update_term_meta( $existing_id, '_venue_address', '96-98 Pentonville Rd' );
+		update_term_meta( $existing_id, '_venue_city', 'London' );
+		update_term_meta( $existing_id, '_venue_country', 'United Kingdom' );
+
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Dice Guess Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$engine     = new \DataMachine\Core\EngineData(
+			array(
+				'venue'        => $venue_name,
+				'venueAddress' => '',
+				'venueCity'    => 'London',
+				'venueCountry' => 'United Kingdom',
+			),
+			0
+		);
+		$parameters = array(
+			'venue'        => $venue_name,
+			'venueAddress' => '310 Uxbridge Rd',
+		);
+
+		$result = $this->assigner->processVenue( $post_id, $parameters, $engine );
+		$this->assertTrue( $result['success'] );
+
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertCount( 1, $terms );
+		$this->assertSame( $existing_id, (int) $terms[0]->term_id, 'A guessed street must not create a second venue.' );
+		$this->assertSame( '96-98 Pentonville Rd', get_term_meta( $existing_id, '_venue_address', true ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $existing_id, 'venue' );
+	}
+
+	public function test_lofi_eventbrite_url_cannot_replace_canonical_official_website(): void {
+		$source_url = 'https://www.eventbrite.com/o/lo-fi-brewing-14959647606';
+		$ticket_url = 'https://www.eventbrite.com/e/lo-fi-test-event-123';
+		$json       = array(
+			'@context'  => 'https://schema.org',
+			'@type'     => 'Event',
+			'name'      => 'Lo-Fi Regression Event',
+			'startDate' => '2026-08-01T20:00:00-04:00',
+			'url'       => $ticket_url,
+			'organizer' => array(
+				'@type' => 'Organization',
+				'name'  => 'Lo-Fi Brewing',
+				'url'   => $source_url,
+			),
+			'location'  => array(
+				'@type' => 'Place',
+				'name'  => 'Lo-Fi Brewing',
+				'url'   => $source_url,
+			),
+		);
+		$html       = '<script type="application/ld+json">' . wp_json_encode( $json ) . '</script>';
+		$events     = ( new EventbriteExtractor() )->extract( $html, $source_url );
+
+		$this->assertCount( 1, $events );
+		$this->assertArrayNotHasKey( 'venueWebsite', $events[0] );
+		$this->assertSame( $source_url, $events[0]['venueTicketingUrl'] );
+		$this->assertSame( $source_url, $events[0]['organizerUrl'] );
+		$this->assertSame( $ticket_url, $events[0]['ticketUrl'] );
+
+		$venue = wp_insert_term( 'Lo-Fi Brewing', 'venue' );
+		$this->assertNotWPError( $venue );
+		update_term_meta( $venue['term_id'], '_venue_website', 'https://lofibrewing.com' );
+		$post_id = $this->make_event_post();
+		$result  = $this->assigner->processVenue( $post_id, array(), new \DataMachine\Core\EngineData( $events[0], 0 ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'https://lofibrewing.com', get_term_meta( $venue['term_id'], '_venue_website', true ) );
+		$this->assertSame( $source_url, get_term_meta( $venue['term_id'], '_venue_ticketing_url', true ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+	}
+
+	public function test_ticket_host_website_input_cannot_fill_empty_official_website(): void {
+		$ticketing_url = 'https://www.eventbrite.com/o/lo-fi-brewing-14959647606';
+		$venue_name    = 'Empty Website Guard ' . uniqid();
+		$venue         = wp_insert_term( $venue_name, 'venue' );
+		$this->assertNotWPError( $venue );
+		$post_id = $this->make_event_post();
+		$engine  = new \DataMachine\Core\EngineData(
+			array(
+				'venue'        => $venue_name,
+				'venueWebsite' => $ticketing_url,
+			),
+			0
+		);
+
+		$result = $this->assigner->processVenue( $post_id, array(), $engine );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( '', get_term_meta( $venue['term_id'], '_venue_website', true ) );
+		$this->assertSame( $ticketing_url, get_term_meta( $venue['term_id'], '_venue_ticketing_url', true ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+	}
+
+	/**
+	 * An explicitly chosen venue term is assigned as-is (extrachill-events#965).
+	 *
+	 * The submitter picked "Recovery Room Tavern" but the venue string that
+	 * reached upsert was the typo "Recoery Room Tavern". The chosen term wins,
+	 * no new venue term is created, and the chosen term's data is untouched.
+	 */
+	public function test_process_venue_assigns_explicit_venue_term_over_typo_name(): void {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Explicit Venue Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'pending',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+
+		$suffix = uniqid();
+		$chosen = wp_insert_term( 'Recovery Room Tavern ' . $suffix, 'venue' );
+		$this->assertNotWPError( $chosen );
+		$chosen_id = (int) $chosen['term_id'];
+		update_term_meta( $chosen_id, '_venue_address', '685 King Street' );
+
+		$typo_name = 'Recoery Room Tavern ' . $suffix;
+		$engine    = new \DataMachine\Core\EngineData(
+			array(
+				'venue'         => $typo_name,
+				'venueAddress'  => '1 Wrong Street',
+				'venue_term_id' => $chosen_id,
+			),
+			0
+		);
+
+		$resolution = $this->assigner->resolveVenue( array( 'venue' => $typo_name ), $engine );
+		$this->assertSame( $chosen_id, $resolution['term_id'] );
+		$this->assertSame( 'assign', $resolution['action'] );
+		$this->assertSame( 'explicit_term', $resolution['matched_via'] );
+
+		$result = $this->assigner->processVenue( $post_id, array( 'venue' => $typo_name ), $engine );
+		$this->assertTrue( $result['success'] );
+
+		$terms = wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+		$this->assertSame( array( $chosen_id ), array_map( 'intval', $terms ) );
+		$this->assertEmpty( term_exists( $typo_name, 'venue' ), 'A typo must not create a venue term when one was chosen.' );
+		$this->assertSame( '685 King Street', get_term_meta( $chosen_id, '_venue_address', true ), 'Extracted venue fields must not overwrite the chosen venue.' );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $chosen_id, 'venue' );
+	}
+
+	public function test_invalid_explicit_venue_term_falls_back_to_name_resolution(): void {
+		$not_a_venue = wp_insert_term( 'Not A Venue ' . uniqid(), 'promoter' );
+		$this->assertNotWPError( $not_a_venue );
+
+		$venue_name = 'Fallback Venue ' . uniqid();
+		$engine     = new \DataMachine\Core\EngineData(
+			array(
+				'venue'         => $venue_name,
+				'venue_term_id' => (int) $not_a_venue['term_id'],
+			),
+			0
+		);
+
+		$resolution = $this->assigner->resolveVenue( array(), $engine );
+
+		$this->assertNotSame( 'explicit_term', $resolution['matched_via'] ?? '' );
+		$this->assertNotSame( (int) $not_a_venue['term_id'], $resolution['term_id'] );
+		$created = get_term( $resolution['term_id'], 'venue' );
+		$this->assertInstanceOf( \WP_Term::class, $created );
+		$this->assertSame( $venue_name, $created->name );
+
+		wp_delete_term( $resolution['term_id'], 'venue' );
+		wp_delete_term( (int) $not_a_venue['term_id'], 'promoter' );
+	}
+
+	public function test_venue_city_and_state_are_read_only_rest_meta(): void {
+		// WP_UnitTestCase resets registered meta between tests; register again.
+		Venue_Taxonomy::register();
+		$registered = get_registered_meta_keys( 'term', 'venue' );
+
+		foreach ( array( '_venue_city', '_venue_state' ) as $key ) {
+			$this->assertArrayHasKey( $key, $registered );
+			$this->assertNotEmpty( $registered[ $key ]['show_in_rest'], "$key must be readable on wp/v2/venue." );
+			$this->assertTrue( is_protected_meta( $key, 'term' ), "$key must stay protected so REST cannot write it." );
+		}
+		$this->assertArrayNotHasKey( '_venue_address', $registered, 'Only city and state are exposed.' );
+	}
+
+	public function test_process_venue_skips_when_no_venue() {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'No Venue Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+
+		// No venue in engine data or parameters.
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$result = $this->assigner->processVenue( $post_id, array(), $engine );
+
+		$this->assertTrue( $result['success'] );
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 0, $terms, 'processVenue must not assign a venue when none is provided.' );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_venue_repairs_missing_taxonomy_without_changing_content(): void {
+		$post_id = $this->make_event_post();
+		$content = get_post_field( 'post_content', $post_id );
+		$venue   = 'Taxonomy Repair Venue ' . uniqid();
+		$engine  = new \DataMachine\Core\EngineData( array( 'venue' => $venue ), 0 );
+
+		$this->assigner->processVenue( $post_id, array(), $engine );
+
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'An unchanged event must repair its missing venue relationship.' );
+		$this->assertSame( $venue, $terms[0]->name );
+		$this->assertSame( $content, get_post_field( 'post_content', $post_id ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $terms[0]->term_id, 'venue' );
+	}
+
+	public function test_process_venue_is_idempotent_when_assignment_is_already_correct(): void {
+		$post_id = $this->make_event_post();
+		$venue   = 'Idempotent Venue ' . uniqid();
+		$engine  = new \DataMachine\Core\EngineData( array( 'venue' => $venue ), 0 );
+
+		$this->assigner->processVenue( $post_id, array(), $engine );
+		$this->assigner->processVenue( $post_id, array(), $engine );
+
+		$terms = wp_get_object_terms( $post_id, 'venue' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'Repeated reconciliation must not duplicate venue relationships.' );
+		$this->assertSame( $venue, $terms[0]->name );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $terms[0]->term_id, 'venue' );
+	}
+
+	public function test_process_venue_removes_stale_assignment_when_source_venue_is_empty(): void {
+		$post_id = $this->make_event_post();
+		$venue   = wp_insert_term( 'Removed Upsert Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$result = $this->assigner->processVenue( $post_id, array(), new \DataMachine\Core\EngineData( array(), 0 ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( array(), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+	}
+
+	public function test_process_venue_artist_name_skip_preserves_existing_assignment(): void {
+		$post_id = $this->make_event_post();
+		$venue   = wp_insert_term( 'Preserved Artist Skip Venue ' . uniqid(), 'venue' );
+		$artist  = wp_insert_term( 'Matching Artist ' . uniqid(), 'artist' );
+		$this->assertNotWPError( $venue );
+		$this->assertNotWPError( $artist );
+		wp_set_post_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$result = $this->assigner->processVenue(
+			$post_id,
+			array(),
+			new \DataMachine\Core\EngineData( array( 'venue' => get_term( $artist['term_id'], 'artist' )->name ), 0 ),
+			array( 'taxonomy_artist_selection' => (string) $artist['term_id'] )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertTrue( $result['skipped'] );
+		$this->assertSame( array( $venue['term_id'] ), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
+	}
+
+	public function test_process_venue_failed_resolution_skips_without_mutation(): void {
+		$post_id = $this->make_event_post();
+		$venue   = wp_insert_term( 'Preserved Failed Resolution Venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $venue );
+		wp_set_post_terms( $post_id, array( $venue['term_id'] ), 'venue' );
+
+		$result = $this->assigner->processVenue(
+			$post_id,
+			array(),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array(),
+			array( 'term_id' => 0, 'action' => 'skip' )
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertTrue( $result['skipped'] );
+		$this->assertSame( array( $venue['term_id'] ), wp_get_object_terms( $post_id, 'venue', array( 'fields' => 'ids' ) ) );
+	}
+
+	public function test_process_venue_assignment_failure_returns_error_array(): void {
+		$result = $this->assigner->processVenue(
+			$this->make_event_post(),
+			array(),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array(),
+			array( 'term_id' => PHP_INT_MAX, 'action' => 'assign' )
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'Venue term does not exist', $result['error'] );
+	}
+
+	public function test_process_promoter_skips_when_selection_is_skip() {
+		$post_id = $this->make_event_post();
+		$engine  = new \DataMachine\Core\EngineData( array( 'organizer' => 'Test Promoter' ), 0 );
+
+		$this->assigner->processPromoter(
+			$post_id,
+			array( 'organizer' => 'Test Promoter' ),
+			$engine,
+			array( 'taxonomy_promoter_selection' => 'skip' )
+		);
+
+		$terms = wp_get_object_terms( $post_id, 'promoter' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 0, $terms, 'processPromoter must not assign when selection is skip.' );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_promoter_empty_config_does_not_assign_organizer() {
+		$post_id = $this->make_event_post();
+
+		$this->assigner->processPromoter(
+			$post_id,
+			array(
+				'organizer'     => 'Default Skip Promoter ' . uniqid(),
+				'organizerType' => 'Organization',
+				'organizerUrl'  => 'https://promoter.example/default-skip',
+			),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array()
+		);
+
+		$terms = wp_get_object_terms( $post_id, 'promoter' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 0, $terms, 'Empty handler config must keep the default skip selection.' );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_promoter_ai_decides_creates_and_assigns_from_organizer() {
+		$post_id        = $this->make_event_post();
+		$organizer_name = 'AI Decides Promoter ' . uniqid();
+
+		$this->assigner->processPromoter(
+			$post_id,
+			array(
+				'organizer'     => $organizer_name,
+				'organizerType' => 'Person',
+				'organizerUrl'  => 'https://promoter.example/ai-decides',
+			),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array( 'taxonomy_promoter_selection' => 'ai_decides' )
+		);
+
+		$terms = wp_get_object_terms( $post_id, 'promoter' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'AI_DECIDES selection must assign a promoter term from organizer data.' );
+		$this->assertSame( $organizer_name, $terms[0]->name );
+		$this->assertSame( 'https://promoter.example/ai-decides', get_term_meta( $terms[0]->term_id, '_promoter_url', true ) );
+		$this->assertSame( 'Person', get_term_meta( $terms[0]->term_id, '_promoter_type', true ) );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_promoter_pre_selected_term_id_assigns_that_term() {
+		$post_id = $this->make_event_post();
+		$term_id = wp_insert_term( 'Configured Promoter ' . uniqid(), 'promoter' );
+		$this->assertNotWPError( $term_id );
+
+		$this->assigner->processPromoter(
+			$post_id,
+			array(),
+			new \DataMachine\Core\EngineData(
+				array( 'organizer' => 'Different Organizer ' . uniqid() ),
+				0
+			),
+			array( 'taxonomy_promoter_selection' => (string) $term_id['term_id'] )
+		);
+
+		$terms = wp_get_object_terms( $post_id, 'promoter', array( 'fields' => 'ids' ) );
+		$this->assertNotWPError( $terms );
+		$this->assertSame( array( (int) $term_id['term_id'] ), array_map( 'intval', $terms ), 'A pre-selected promoter term ID must be assigned verbatim.' );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_promoter_explicit_organizer_bypasses_skip_selection() {
+		$post_id        = $this->make_event_post();
+		$organizer_name = 'Explicit Promoter ' . uniqid();
+
+		$this->assigner->processPromoter(
+			$post_id,
+			array(
+				'organizer'     => $organizer_name,
+				'organizerType' => 'Organization',
+				'organizerUrl'  => 'https://promoter.example/explicit',
+			),
+			new \DataMachine\Core\EngineData( array(), 0 ),
+			array( 'promoter_explicit_organizer' => true )
+		);
+
+		$terms = wp_get_object_terms( $post_id, 'promoter' );
+		$this->assertNotWPError( $terms );
+		$this->assertCount( 1, $terms, 'An explicit caller-supplied organizer must bypass the selection gate.' );
+		$this->assertSame( $organizer_name, $terms[0]->name );
+		$this->assertSame( 'https://promoter.example/explicit', get_term_meta( $terms[0]->term_id, '_promoter_url', true ) );
+		$this->assertSame( 'Organization', get_term_meta( $terms[0]->term_id, '_promoter_type', true ) );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_location_returns_false_for_skip_mode() {
+		$post_id = $this->make_event_post();
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$handled = $this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => 'skip' )
+		);
+
+		$this->assertFalse( $handled, 'processLocation must not take ownership for SKIP mode.' );
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_process_location_returns_false_for_ai_decides_mode() {
+		$post_id = $this->make_event_post();
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$handled = $this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => 'ai_decides' )
+		);
+
+		$this->assertFalse( $handled, 'processLocation must defer AI_DECIDES to the generic taxonomy pass.' );
+		wp_delete_post( $post_id, true );
+	}
+
+	/**
+	 * The core #379 bug: a Houston venue fetched inside a Galveston-centered
+	 * 50mi sweep must NOT inherit the pipeline's Galveston location term — it
+	 * must carry Houston, derived from the venue's own city.
+	 */
+	public function test_process_location_derives_term_from_venue_city_not_pipeline_center() {
+		$suffix    = uniqid();
+		$galveston = wp_insert_term( 'Galveston ' . $suffix, 'location' );
+		$houston   = wp_insert_term( 'Houston ' . $suffix, 'location' );
+		$this->assertNotWPError( $galveston );
+		$this->assertNotWPError( $houston );
+
+		$post_id = $this->make_event_post();
+
+		// Attach a venue term whose city is Houston (the event's actual city).
+		$venue = wp_insert_term( 'Toyota Center', 'venue' );
+		$this->assertNotWPError( $venue );
+		$this->set_venue_city( (int) $venue['term_id'], 'Houston ' . $suffix );
+		$this->assertNotWPError( wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' ) );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$handled = $this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => (string) $galveston['term_id'] ) // pipeline center = Galveston
+		);
+
+		$this->assertTrue( $handled, 'processLocation must take ownership for PRE_SELECTED mode.' );
+
+		$assigned = wp_get_object_terms( $post_id, 'location' );
+		$this->assertNotWPError( $assigned );
+		$this->assertCount( 1, $assigned, 'Exactly one location term must be assigned.' );
+		$this->assertSame( 'Houston ' . $suffix, $assigned[0]->name, 'Venue-city term must override the pipeline-center term.' );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+		wp_delete_term( $houston['term_id'], 'location' );
+		wp_delete_term( $galveston['term_id'], 'location' );
+	}
+
+	/**
+	 * When the venue city is the pipeline's own city, the assignment is
+	 * unchanged — the fix must not regress the normal in-city case.
+	 */
+	public function test_process_location_keeps_pipeline_term_when_venue_is_in_that_city() {
+		$city      = 'Galveston ' . uniqid();
+		$galveston = wp_insert_term( $city, 'location' );
+		$this->assertNotWPError( $galveston );
+
+		$post_id = $this->make_event_post();
+
+		$venue = wp_insert_term( 'The Grand 1894 Opera House', 'venue' );
+		$this->assertNotWPError( $venue );
+		$this->set_venue_city( (int) $venue['term_id'], $city );
+		$this->assertNotWPError( wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' ) );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => (string) $galveston['term_id'] )
+		);
+
+		$assigned = wp_get_object_terms( $post_id, 'location' );
+		$this->assertNotWPError( $assigned );
+		$this->assertCount( 1, $assigned );
+		$this->assertSame( $city, $assigned[0]->name );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+		wp_delete_term( $galveston['term_id'], 'location' );
+	}
+
+	/**
+	 * When the venue city has no matching location term (e.g. an unmapped
+	 * suburb), the pipeline's configured term is kept as a conservative
+	 * fallback rather than dropping the event from the location archive.
+	 */
+	public function test_process_location_falls_back_to_pipeline_term_when_venue_city_unresolved() {
+		$city      = 'Galveston ' . uniqid();
+		$galveston = wp_insert_term( $city, 'location' );
+		$this->assertNotWPError( $galveston );
+
+		$post_id = $this->make_event_post();
+
+		// Venue in "Tinyburg" — no matching location term exists.
+		$venue = wp_insert_term( 'Tinyburg Hall', 'venue' );
+		$this->assertNotWPError( $venue );
+		$this->set_venue_city( (int) $venue['term_id'], 'Tinyburg ' . uniqid() );
+		$this->assertNotWPError( wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' ) );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		$this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => (string) $galveston['term_id'] )
+		);
+
+		$assigned = wp_get_object_terms( $post_id, 'location' );
+		$this->assertNotWPError( $assigned );
+		$this->assertCount( 1, $assigned );
+		$this->assertSame( $city, $assigned[0]->name, 'Unresolved venue city must fall back to the pipeline term.' );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+		wp_delete_term( $galveston['term_id'], 'location' );
+	}
+
+	/**
+	 * The data_machine_events_resolve_event_location_term filter lets a
+	 * consumer layer supply a richer resolver (e.g. suburb→market rollup).
+	 */
+	public function test_process_location_honors_consumer_filter_override() {
+		$suffix    = uniqid();
+		$galveston = wp_insert_term( 'Galveston ' . $suffix, 'location' );
+		$houston   = wp_insert_term( 'Houston ' . $suffix, 'location' );
+		$this->assertNotWPError( $galveston );
+		$this->assertNotWPError( $houston );
+
+		$post_id = $this->make_event_post();
+
+		// Venue in "Sugar Land" (a Houston suburb with no direct location term).
+		$venue = wp_insert_term( 'Smart Financial Centre', 'venue' );
+		$this->assertNotWPError( $venue );
+		$this->set_venue_city( (int) $venue['term_id'], 'Sugar Land ' . $suffix );
+		$this->assertNotWPError( wp_set_object_terms( $post_id, array( $venue['term_id'] ), 'venue' ) );
+
+		$engine = new \DataMachine\Core\EngineData( array(), 0 );
+
+		// Consumer filter rolls "Sugar Land" up to the Houston market.
+		$callback = function () use ( $houston ) {
+			return get_term( $houston['term_id'], 'location' );
+		};
+		add_filter( 'data_machine_events_resolve_event_location_term', $callback );
+
+		$this->assigner->processLocation(
+			$post_id,
+			array(),
+			$engine,
+			array( 'taxonomy_location_selection' => (string) $galveston['term_id'] )
+		);
+
+		remove_filter( 'data_machine_events_resolve_event_location_term', $callback );
+
+		$assigned = wp_get_object_terms( $post_id, 'location' );
+		$this->assertNotWPError( $assigned );
+		$this->assertCount( 1, $assigned );
+		$this->assertSame( 'Houston ' . $suffix, $assigned[0]->name, 'Consumer filter override must win.' );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $venue['term_id'], 'venue' );
+		wp_delete_term( $houston['term_id'], 'location' );
+		wp_delete_term( $galveston['term_id'], 'location' );
+	}
+
+	private function make_event_post(): int {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'Location Test ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertGreaterThan( 0, $post_id );
+		return $post_id;
+	}
+
+	private function set_venue_city( int $term_id, string $city ): void {
+		$result = update_term_meta( $term_id, '_venue_city', $city );
+		$this->assertNotFalse( $result, 'Canonical venue city fixture must persist.' );
+		$this->assertSame( $city, get_term_meta( $term_id, '_venue_city', true ) );
+	}
+}

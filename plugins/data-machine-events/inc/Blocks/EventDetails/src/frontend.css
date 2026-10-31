@@ -1,0 +1,417 @@
+/**
+ * Event Details Block Frontend Styles
+ *
+ * These styles are loaded on the frontend only via webpack build process.
+ * Imported by frontend.js and extracted to build/frontend.css
+ * 
+ * Uses CSS custom properties from root.css for theme consistency.
+ *
+ * @package DataMachineEvents
+ * @since 1.0.0
+ */
+
+/* Event Info Grid Base Styles */
+.event-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.event-date-time,
+.event-venue,
+.event-artist,
+.event-price {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.event-price:empty {
+    display: none;
+}
+
+.event-info-grid .icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.event-info-grid .icon.dashicons {
+    width: 1.2rem;
+    height: 1.2rem;
+    font-size: 1.2rem;
+    color: var(--data-machine-text-secondary);
+}
+
+.event-info-grid .text {
+    line-height: 1.4;
+}
+
+.event-info-grid .text small {
+    color: var(--data-machine-text-secondary);
+    font-size: 0.85rem;
+}
+
+/* Ticket Button
+ *
+ * Token-first with fallbacks so the button never renders with an
+ * unresolved background on themes that don't define `--data-machine-*`
+ * (the toggle and ticket button both rely on this). Consumers that map
+ * these buttons onto their own button system (via
+ * `data_machine_events_ticket_button_classes` /
+ * `data_machine_events_add_to_calendar_button_classes`) override this
+ * entirely. */
+.ticket-button {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--data-machine-text-accent, #2271b1);
+    color: #fff;
+    text-decoration: none;
+    border-radius: var(--data-machine-border-radius, 4px);
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.ticket-button:hover {
+    background: var(--data-machine-border-focus, #135e96);
+    color: #fff;
+}
+
+/* Compact Layout - inherits base styles, minimal overrides */
+.event-details-compact {
+    /* Base styles from .event-info-grid apply automatically */
+}
+
+/* Detailed Layout */
+.event-details-detailed {
+    display: grid;
+    gap: 2rem;
+}
+
+.event-details-detailed h3 {
+    margin: 0 0 1rem 0;
+    color: var(--data-machine-text-primary);
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-bottom: 2px solid var(--data-machine-text-accent);
+    padding-bottom: 0.5rem;
+}
+
+.event-details-detailed .datetime-info {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.event-details-detailed .start-datetime,
+.event-details-detailed .end-datetime {
+    padding: 0.75rem;
+    background: var(--data-machine-background-light);
+    border-radius: var(--data-machine-border-radius);
+    border-left: 3px solid var(--data-machine-text-accent);
+}
+
+.event-details-detailed .venue-name {
+    font-weight: 600;
+    color: var(--data-machine-text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.event-details-detailed .venue-address {
+    color: var(--data-machine-text-secondary);
+    font-size: 0.9rem;
+}
+
+.event-details-detailed .artist-name {
+    font-weight: 600;
+    color: var(--data-machine-text-primary);
+}
+
+.event-details-detailed .price-amount {
+    font-weight: 600;
+    color: #28a745;
+    font-size: 1.1rem;
+}
+
+.event-details-detailed .ticket-link {
+    display: inline-block;
+    padding: 1rem 2rem;
+    background: #28a745;
+    color: #fff;
+    text-decoration: none;
+    border-radius: var(--data-machine-border-radius);
+    font-weight: 600;
+    text-align: center;
+    transition: background-color 0.2s;
+}
+
+.event-details-detailed .ticket-link:hover {
+    background: #218838;
+    color: #fff;
+}
+
+/* Minimal Layout */
+.event-details-minimal {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.event-details-minimal .event-date {
+    font-weight: 600;
+    color: var(--data-machine-text-primary);
+}
+
+.event-details-minimal .event-venue {
+    color: var(--data-machine-text-secondary);
+    text-align: right;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .event-details-compact .event-info-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .event-details-detailed {
+        gap: 1.5rem;
+    }
+
+    .event-details-minimal {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .event-details-minimal .event-venue {
+        text-align: left;
+    }
+}
+
+/* Alignment Support */
+.data-machine-event-details.alignwide {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.data-machine-event-details.alignfull {
+    max-width: none;
+}
+
+/* Venue Map Section */
+.data-machine-venue-map-section {
+    margin-top: 30px;
+    width: 100%;
+}
+
+.venue-map-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: var(--data-machine-text-primary);
+}
+
+.data-machine-venue-map {
+    display: none;
+    width: 100%;
+    height: 400px;
+    border-radius: var(--data-machine-border-radius);
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.data-machine-venue-map.map-initialized {
+    display: block;
+}
+
+.venue-map-fallback {
+    display: flex;
+    min-height: 250px;
+    box-sizing: border-box;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    text-align: center;
+    background: var(--data-machine-background-secondary);
+    color: var(--data-machine-text-primary);
+}
+
+.venue-map-fallback span {
+    color: var(--data-machine-text-secondary);
+}
+
+.venue-map-fallback a {
+    color: var(--data-machine-text-accent);
+}
+
+.data-machine-venue-map.map-initialized + .venue-map-fallback {
+    display: none;
+}
+
+/* Custom emoji marker styling */
+.emoji-marker {
+    background: none;
+    border: none;
+    text-align: center;
+    line-height: 1;
+}
+
+.venue-map-attribution {
+    margin-top: 10px;
+    text-align: right;
+    font-size: 12px;
+    color: var(--data-machine-text-secondary);
+}
+
+.venue-map-attribution a {
+    color: var(--data-machine-text-accent);
+    text-decoration: none;
+}
+
+.venue-map-attribution a:hover {
+    text-decoration: underline;
+}
+
+/* Popup styling inside map */
+.venue-popup {
+    text-align: center;
+    padding: 5px;
+}
+
+.venue-popup strong {
+    display: block;
+    margin-bottom: 3px;
+}
+
+/* Responsive Map Sizing */
+@media screen and (max-width: 782px) {
+    .data-machine-venue-map {
+        height: 300px;
+    }
+
+    .venue-map-title {
+        font-size: 16px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .data-machine-venue-map {
+        height: 250px;
+        border-radius: 4px;
+    }
+}
+
+/* Dark Mode Support - inherits from root.css :root dark mode overrides */
+@media (prefers-color-scheme: dark) {
+    .event-details-detailed .start-datetime,
+    .event-details-detailed .end-datetime {
+        background: var(--data-machine-background-secondary);
+    }
+}
+
+/* -----------------------------------------------------------------------
+ * Add to Calendar dropdown
+ *
+ * Server-rendered button + menu (see add-to-calendar-button.php). Vanilla
+ * JS (src/add-to-calendar.js) toggles `[hidden]` and `aria-expanded`.
+ * ----------------------------------------------------------------------- */
+
+.dm-events-add-to-calendar {
+    position: relative;
+    display: inline-block;
+}
+
+.dm-events-add-to-calendar-toggle {
+    /* Inherit ticket-button styling so the three action buttons match.
+       Consumers may override `.ticket-button` to restyle all action buttons
+       at once. */
+    cursor: pointer;
+    border: 0;
+    font: inherit;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.dm-events-add-to-calendar-toggle .dashicons {
+    line-height: 1;
+}
+
+.dm-events-add-to-calendar-toggle[aria-expanded="true"] {
+    /* Slight visual cue when open. */
+    filter: brightness(0.95);
+}
+
+.dm-events-add-to-calendar-menu {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    z-index: 50;
+    min-width: 220px;
+    margin: 0;
+    padding: 0.25rem 0;
+    list-style: none;
+    background: var(--data-machine-background-light, #fff);
+    border: 1px solid var(--data-machine-border-color, rgba(0, 0, 0, 0.12));
+    border-radius: var(--data-machine-border-radius, 4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.dm-events-add-to-calendar-menu[hidden] {
+    display: none;
+}
+
+.dm-events-add-to-calendar-menu.is-right-aligned {
+    left: auto;
+    right: 0;
+}
+
+.dm-events-add-to-calendar-menu li {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dm-events-add-to-calendar-menu a {
+    display: block;
+    padding: 0.6rem 1rem;
+    color: var(--data-machine-text-primary, inherit);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.dm-events-add-to-calendar-menu a:hover,
+.dm-events-add-to-calendar-menu a:focus {
+    background: var(--data-machine-background-secondary, rgba(0, 0, 0, 0.05));
+    color: var(--data-machine-text-accent, inherit);
+    outline: none;
+}
+
+.dm-events-add-to-calendar-menu a:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--data-machine-text-accent, #2271b1);
+}
+
+@media (max-width: 480px) {
+    .dm-events-add-to-calendar-menu {
+        min-width: 200px;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .dm-events-add-to-calendar-menu {
+        background: var(--data-machine-background-secondary, #1f2937);
+        border-color: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .dm-events-add-to-calendar-menu a:hover,
+    .dm-events-add-to-calendar-menu a:focus {
+        background: rgba(255, 255, 255, 0.08);
+    }
+}

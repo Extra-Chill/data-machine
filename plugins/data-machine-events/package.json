@@ -1,0 +1,8 @@
+{
+  "name": "data-machine-events",
+  "private": true,
+  "devDependencies": {
+    "@wordpress/eslint-plugin": "^25.7.0",
+    "eslint": "^9.0.0"
+  }
+}

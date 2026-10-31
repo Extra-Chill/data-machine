@@ -1,0 +1,56 @@
+name: Homeboy
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: homeboy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  homeboy:
+    name: Homeboy (${{ matrix.command }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [review lint, review test]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.HOMEBOY_APP_ID }}
+          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
+
+      - name: Prepare Data Machine validation dependency
+        run: |
+          git clone --depth 1 https://github.com/Extra-Chill/data-machine.git /tmp/data-machine
+          composer install --working-dir=/tmp/data-machine --no-dev --no-interaction --no-progress --prefer-dist --classmap-authoritative
+
+      - name: Run Homeboy ${{ matrix.command }}
+        env:
+          HOMEBOY_SETTINGS_JSON: '{"database_type":"mdi-native","wp_codebox_multisite":true,"wp_codebox_phpunit_bootstrap_mode":"managed","wp_codebox_prepare_steps":[{"command":"npm","args":["ci"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventsMap"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventsMap"}]}'
+          HOMEBOY_WORDPRESS_DEPENDENCY_PATHS: /tmp/data-machine
+          HOMEBOY_WORDPRESS_MULTISITE: '1'
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          commands: ${{ matrix.command }}
+          scope: ${{ matrix.command == 'review test' && 'full' || 'auto' }}
+          app-token: ${{ steps.app-token.outputs.token || '' }}
+          autofix: 'false'

@@ -1,0 +1,30 @@
+[
+  {
+    "id": 101,
+    "slug": "weekly-show-july-30",
+    "link": "https://example.com/event/weekly-show-july-30/",
+    "title": { "rendered": "Weekly Show" },
+    "content": { "rendered": "<p>First occurrence.</p>" },
+    "meta": {
+      "_EventStartDate": "2026-07-30 21:00:00",
+      "_EventEndDate": "2026-07-31 01:00:00",
+      "_VenueName": "Example Room",
+      "_VenueCity": "Example City",
+      "_VenueState": "CA"
+    }
+  },
+  {
+    "id": 102,
+    "slug": "weekly-show-august-6",
+    "link": "https://example.com/event/weekly-show-august-6/",
+    "title": { "rendered": "Weekly Show" },
+    "content": { "rendered": "<p>Second occurrence.</p>" },
+    "meta": {
+      "_EventStartDate": "2026-08-06 21:00:00",
+      "_EventEndDate": "2026-08-07 01:00:00",
+      "_VenueName": "Example Room",
+      "_VenueCity": "Example City",
+      "_VenueState": "CA"
+    }
+  }
+]

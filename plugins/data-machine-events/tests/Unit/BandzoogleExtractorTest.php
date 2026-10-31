@@ -1,0 +1,392 @@
+<?php
+/**
+ * Bandzoogle Extractor Tests
+ *
+ * Covers detection of Bandzoogle CMS pages and extraction of events from the
+ * modern `event-detail` list view, using a real production snapshot of the
+ * Elephant Room (Austin, TX) calendar as the fixture.
+ *
+ * @package DataMachineEvents\Tests\Unit
+ * @since   0.15.x
+ */
+
+namespace DataMachineEvents\Tests\Unit;
+
+use WP_UnitTestCase;
+use DataMachine\Core\ExecutionContext;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Enrichers\DetailPageEnricher;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandzoogleExtractor;
+
+class BandzoogleExtractorTest extends WP_UnitTestCase {
+
+	private BandzoogleExtractor $extractor;
+	private string $fixture_path;
+
+	public function setUp(): void {
+		parent::setUp();
+		$this->extractor    = new BandzoogleExtractor();
+		$this->fixture_path = __DIR__ . '/../Fixtures/bandzoogle-elephant-room.html';
+	}
+
+	public function test_extracts_bandsintown_feature_tour_snapshot(): void {
+		$html = $this->loadFixture( 'bandzoogle-johnny-delaware-bandsintown-tour.html' );
+		$this->extractor->setNow( new \DateTimeImmutable( '2030-12-01' ) );
+		$this->assertTrue( $this->extractor->canExtract( $html ) );
+
+		$events = $this->extractor->extract( $html, 'https://johnnydelaware.com/tour' );
+		$this->assertCount( 11, $events );
+		$this->assertSame( 'Mijl op Zeven (afternoon spot)', $events[0]['title'] );
+		$this->assertSame( '2027-05-06', $events[0]['startDate'] );
+		$this->assertSame( 'Cinetol', $events[10]['venue'] );
+		$cities = array( 'Ospel', 'Groningen', 'Berlin', 'Budapest', 'Brno', 'Bamberg', 'Zürich', 'Barberaz', 'Montreuil', 'London', 'Amsterdam' );
+		foreach ( $events as $index => $event ) {
+			$this->assertSame( $event['title'], $event['venue'] );
+			$this->assertSame( $cities[ $index ], $event['venueCity'] );
+			$this->assertStringStartsWith( '2027-', $event['startDate'] );
+			$this->assertSame( '20:00', $event['startTime'] );
+			$this->assertSame( '', $event['endDate'], 'Responsive duplicate dates are not end dates.' );
+			$this->assertSame( '', $event['endTime'] );
+			$this->assertSame( '', $event['venueCountry'], 'Do not guess US for international tour stops.' );
+		}
+		$this->assertSame(
+			'https://www.bandsintown.com/t/109011273?app_id=Bandzoogle&came_from=267&utm_medium=api&utm_source=public_api&utm_campaign=ticket',
+			$events[0]['ticketUrl']
+		);
+	}
+
+	public function test_bandsintown_context_does_not_leak_to_native_calendar(): void {
+		$card = '<div class="event-detail" data-event-id="1" data-occurrence-id="1">'
+			. '<h2 class="event-title"><a href="https://example.com/show">Artist</a></h2>'
+			. '<p class="event-datetime"><time class="from"><span class="date">May 6, 2027</span></time></p>'
+			. '<p class="event-location">Real Venue, Austin, TX</p>'
+			. '<a href="https://example.org/reminder">Reminder</a>'
+			. '<a href="/tickets/1" class="tickets button">Tickets</a></div>';
+		$html = '<span class="month-name">May 2026</span>'
+			. '<section id="bandsintown_feature_1">' . $card . '</section>' . $card;
+		$events = $this->extractor->extract( $html, 'https://example.com/tour' );
+		$this->assertCount( 2, $events );
+		$this->assertSame( 'Artist', $events[0]['venue'] );
+		$this->assertSame( 'Real Venue', $events[1]['venue'] );
+		foreach ( $events as $event ) {
+			$this->assertSame( '2027-05-06', $event['startDate'], 'Inline year overrides the calendar header.' );
+			$this->assertSame( 'https://example.com/tickets/1', $event['ticketUrl'] );
+		}
+	}
+
+	/**
+	 * Detect Bandzoogle from the Elephant Room production snapshot.
+	 *
+	 * The fixture contains `bndzgl.com` / `zoogletools.com` asset URLs and
+	 * `data-event-id` attributes on `.event-detail` blocks — any one of
+	 * those is sufficient.
+	 */
+	public function test_canExtract_detects_bandzoogle_fixture() {
+		if ( ! file_exists( $this->fixture_path ) ) {
+			$this->markTestSkipped( 'Bandzoogle fixture not present.' );
+		}
+
+		$html = file_get_contents( $this->fixture_path );
+		$this->assertTrue(
+			$this->extractor->canExtract( $html ),
+			'Should detect Bandzoogle from real Elephant Room calendar markup.'
+		);
+	}
+
+	/**
+	 * Reject non-Bandzoogle HTML.
+	 */
+	public function test_canExtract_rejects_non_bandzoogle() {
+		$html = '<html><head><title>Not a venue</title></head><body><p>Plain HTML, no platform fingerprint.</p></body></html>';
+		$this->assertFalse(
+			$this->extractor->canExtract( $html ),
+			'Plain HTML should not match Bandzoogle detection markers.'
+		);
+	}
+
+	/**
+	 * Empty input is rejected.
+	 */
+	public function test_canExtract_rejects_empty_string() {
+		$this->assertFalse( $this->extractor->canExtract( '' ) );
+	}
+
+	/**
+	 * Pull at least 5 events from the Elephant Room snapshot.
+	 *
+	 * The captured page shows ~20 events for the current month, so this
+	 * threshold is well below the real yield while leaving headroom for
+	 * future snapshot refreshes that may have a slower month.
+	 */
+	public function test_extract_returns_events_from_elephant_room_fixture() {
+		if ( ! file_exists( $this->fixture_path ) ) {
+			$this->markTestSkipped( 'Bandzoogle fixture not present.' );
+		}
+
+		$html   = file_get_contents( $this->fixture_path );
+		$events = $this->extractor->extract( $html, 'https://elephantroom.com/calendar' );
+
+		$this->assertGreaterThanOrEqual(
+			5,
+			count( $events ),
+			'Real Bandzoogle calendars should yield at least 5 extracted events.'
+		);
+	}
+
+	/**
+	 * Each extracted event has the fields downstream pipelines require.
+	 */
+	public function test_extract_event_has_required_fields() {
+		if ( ! file_exists( $this->fixture_path ) ) {
+			$this->markTestSkipped( 'Bandzoogle fixture not present.' );
+		}
+
+		$html   = file_get_contents( $this->fixture_path );
+		$events = $this->extractor->extract( $html, 'https://elephantroom.com/calendar' );
+
+		$this->assertNotEmpty( $events, 'Need at least one event to inspect.' );
+
+		$event = $events[0];
+
+		$this->assertNotEmpty( $event['title'], 'Event must have a non-empty title.' );
+		$this->assertMatchesRegularExpression(
+			'/^\d{4}-\d{2}-\d{2}$/',
+			$event['startDate'],
+			'startDate must be a YYYY-MM-DD string.'
+		);
+		// Bandzoogle's event-detail page always exists — fallback ensures ticketUrl is set.
+		$this->assertNotEmpty(
+			$event['ticketUrl'],
+			'ticketUrl must be populated (external vendor or event detail page fallback).'
+		);
+		// imageUrl populated for nearly every Bandzoogle event card.
+		$this->assertNotEmpty( $event['imageUrl'], 'imageUrl should be populated from event-image block.' );
+		$this->assertSame( 'bandzoogle', $this->extractor->getMethod() );
+	}
+
+	/**
+	 * Synthetic legacy `.gig-info` block without a `<time datetime>` attr.
+	 *
+	 * Confirms the legacy parser either yields a useful date (from time text)
+	 * or skips the event without throwing.
+	 */
+	public function test_extract_handles_missing_datetime_attr_gracefully() {
+		// Note the `bandzoogle.com` footer credit so detection passes.
+		$html = '<html><body>'
+			. '<div class="gig-info">'
+			. '<time>Wednesday, May 13 at 8:00 PM</time>'
+			. '<span class="gig-artist">Test Artist</span>'
+			. '</div>'
+			. '<p>powered by bandzoogle.com</p>'
+			. '</body></html>';
+
+		// Should not throw.
+		$events = $this->extractor->extract( $html, 'https://example.com/calendar' );
+		$this->assertIsArray( $events, 'extract() must always return an array, even with malformed markup.' );
+
+		// Either the legacy parser produces a usable event, or it skips it —
+		// both are acceptable. We just need NO fatal errors and a stable shape.
+		foreach ( $events as $event ) {
+			$this->assertArrayHasKey( 'title', $event );
+			$this->assertArrayHasKey( 'startDate', $event );
+		}
+	}
+
+	/**
+	 * Direct unit test against the legacy `.gig-info` parser with an
+	 * `<time datetime="...">` attribute (ISO 8601).
+	 *
+	 * Even though our production sample uses the newer markup, the issue
+	 * (#261) explicitly called out the legacy shape, so it gets a regression
+	 * test here.
+	 */
+	public function test_extract_parses_legacy_gig_info_with_iso_datetime() {
+		$html = '<html><body>'
+			. '<section class="gigs">'
+			. '<div class="gig-info">'
+			. '<time datetime="2026-05-20T20:00:00-05:00">Wed May 20</time>'
+			. '<span class="gig-artist">Brownout</span>'
+			. '<div class="gig-tickets"><a href="https://example.com/tickets/brownout">Tickets</a></div>'
+			. '</div>'
+			. '</section>'
+			. '<p>powered by bandzoogle.com</p>'
+			. '</body></html>';
+
+		$this->assertTrue( $this->extractor->canExtract( $html ) );
+
+		$events = $this->extractor->extract( $html, 'https://example.com/calendar' );
+		$this->assertNotEmpty( $events, 'Legacy gig-info block with ISO datetime should yield an event.' );
+
+		$event = $events[0];
+		$this->assertSame( 'Brownout', $event['title'] );
+		$this->assertSame( '2026-05-20', $event['startDate'] );
+		$this->assertSame( '20:00', $event['startTime'] );
+		$this->assertSame( 'https://example.com/tickets/brownout', $event['ticketUrl'] );
+	}
+
+	/**
+	 * Artist tour page (Johnny Delaware): per-event locations are the real
+	 * venues and must not be dropped in favor of the title-derived page
+	 * venue ("Tour"). The fixture has no calendar year header or ?year=
+	 * pagination, so dates fall back to inference against an injected
+	 * "now" of 2026-09-07 (#770).
+	 */
+	public function test_extract_artist_tour_page_uses_per_event_venue_names() {
+		$html = $this->loadFixture( 'bandzoogle-johnny-delaware-tour.html' );
+		$this->extractor->setNow( new \DateTimeImmutable( '2026-09-07 12:00:00' ) );
+
+		$events = $this->extractor->extract( $html, 'https://johnnydelaware.com/tour' );
+
+		$this->assertCount( 5, $events, 'The tour fixture contains 5 event-detail blocks.' );
+
+		$first = $events[0];
+		$this->assertSame( 'Visby, SWE', $first['title'] );
+		$this->assertSame( '2026-09-09', $first['startDate'] );
+		$this->assertSame( 'Rootsy Visby', $first['venue'] );
+
+		$this->assertSame( 'Gripsholms värdshus', $events[1]['venue'] );
+		$this->assertSame( 'MS Blidösund', $events[2]['venue'] );
+
+		foreach ( $events as $event ) {
+			$this->assertNotSame(
+				'US',
+				$event['venueCountry'],
+				'Tour stops in Sweden must not inherit the US country default.'
+			);
+		}
+	}
+
+	/**
+	 * Artist show list (Mel Washington): a comma-separated per-event
+	 * location splits into venue name + street + city/state/zip, and a
+	 * date only one day in the past (Sep 6 vs injected now Sep 7) keeps
+	 * the current year instead of rolling into 2027 (#770).
+	 */
+	public function test_extract_artist_show_page_splits_location_address() {
+		$html = $this->loadFixture( 'bandzoogle-mel-washington-shows.html' );
+		$this->extractor->setNow( new \DateTimeImmutable( '2026-09-07 12:00:00' ) );
+
+		$events = $this->extractor->extract( $html, 'https://melwashington.com/shows' );
+
+		$this->assertCount( 10, $events, 'The shows fixture contains 10 event-detail blocks.' );
+
+		$first = $events[0];
+		$this->assertSame( 'Island Cabana Bar', $first['venue'] );
+		$this->assertStringContainsString( '50 Immigration St', $first['venueAddress'] );
+		$this->assertSame( 'Charleston', $first['venueCity'] );
+		$this->assertSame( 'SC', $first['venueState'] );
+		$this->assertSame( '29403', $first['venueZip'] );
+		$this->assertSame( '2026-09-06', $first['startDate'], 'A date 1 day in the past must keep the current year.' );
+		$this->assertSame( '13:00', $first['startTime'] );
+		$this->assertSame( '16:00', $first['endTime'], 'End time must survive a to-block that carries time only.' );
+	}
+
+	/**
+	 * Venue site (Elephant Room): event-location holds sub-room labels
+	 * ("🐘6pm", "🐘7pm Show") that must never replace the page-level
+	 * venue name (#770).
+	 */
+	public function test_extract_venue_site_keeps_page_venue_over_sub_room_labels() {
+		$html   = $this->loadFixture( 'bandzoogle-elephant-room.html' );
+		$events = $this->extractor->extract( $html, 'https://elephantroom.com/calendar' );
+
+		$this->assertNotEmpty( $events );
+
+		foreach ( $events as $event ) {
+			$this->assertSame(
+				'Elephant Room',
+				$event['venue'],
+				'Sub-room labels in event-location must not replace the venue name.'
+			);
+		}
+	}
+
+	/**
+	 * The extractor opts into second-hop enrichment for start time only.
+	 */
+	public function test_needs_detail_enrichment_declares_start_time() {
+		$this->assertSame( array( 'startTime' ), $this->extractor->needsDetailEnrichment() );
+	}
+
+	/**
+	 * Second-hop enrichment fills missing start times from the ticket/detail
+	 * pages the tour page links to (#776).
+	 *
+	 * Fake fetcher maps the Johnny Delaware tour ticket URLs to the real
+	 * captured detail pages:
+	 *   - Vadstena → tickster event page ("Startar 12 sep 20:00") → 20:00
+	 *   - Hultsfred → hotellhulingen.se ("På scen kl. 20:00") → 20:00
+	 *   - Mariefred → Bandzoogle event-detail page with no time → ''
+	 *   - Visby → no ticket link, detail page not mapped → ''
+	 */
+	public function test_enrichment_fills_start_times_from_ticket_pages() {
+		$html = $this->loadFixture( 'bandzoogle-johnny-delaware-tour.html' );
+		$this->extractor->setNow( new \DateTimeImmutable( '2026-09-07 12:00:00' ) );
+
+		$tickster_vadstena = 'https://www.tickster.com/se/sv/events/45x2dppenfkku5v/2026-09-12/down-on-the-farm-johnny-delaware';
+		$hotell_hulingen   = 'https://www.hotellhulingen.se/evenemang/e/873/johnny-delaware/';
+		$mariefred_detail  = 'https://johnnydelaware.com/event/6669310/772840026/mariefred-swe';
+
+		$pages = array(
+			$tickster_vadstena => $this->loadDetailFixture( 'tickster-vadstena-johnny-delaware.html' ),
+			$hotell_hulingen   => $this->loadDetailFixture( 'hotellhulingen-hultsfred-johnny-delaware.html' ),
+			$mariefred_detail  => $this->loadDetailFixture( 'bandzoogle-mariefred-event-detail.html' ),
+		);
+
+		$events = $this->extractor->extract( $html, 'https://johnnydelaware.com/tour' );
+
+		$enricher = new DetailPageEnricher(
+			static fn( string $url ): ?string => $pages[ $url ] ?? null
+		);
+		$context  = ExecutionContext::direct( 'universal_web_scraper' );
+		$enriched = $enricher->run( $events, $this->extractor->needsDetailEnrichment(), 'https://johnnydelaware.com/tour', $context );
+
+		$by_title = array_column( $enriched, null, 'title' );
+
+		$this->assertSame( '20:00', $by_title['Vadstena, SWE']['startTime'], 'Tickster page must fill the Vadstena start time.' );
+		$this->assertSame( '20:00', $by_title['Hultsfred, SWE']['startTime'], 'Hotell Hulingen page must fill the Hultsfred start time.' );
+		$this->assertSame( '', $by_title['Visby, SWE']['startTime'], 'Visby has no ticket link and stays empty.' );
+		$this->assertSame( '', $by_title['Mariefred, SWE']['startTime'], 'Mariefred detail page has no time and stays empty.' );
+
+		$this->assertSame(
+			array(
+				'value'  => '20:00',
+				'source' => 'time_text',
+				'url'    => $tickster_vadstena,
+			),
+			$by_title['Vadstena, SWE']['enrichment']['startTime'],
+			'Provenance must record the filled value, source method, and followed URL.'
+		);
+		$this->assertSame( array( 'time_text' ), $enricher->getLastRunSources() );
+	}
+
+	/**
+	 * Load a detail-page fixture relative to tests/Fixtures/detail-pages.
+	 */
+	private function loadDetailFixture( string $filename ): string {
+		$path = __DIR__ . '/../Fixtures/detail-pages/' . $filename;
+		if ( ! file_exists( $path ) ) {
+			$this->markTestSkipped( 'Fixture not present: ' . $filename );
+		}
+
+		$html = file_get_contents( $path );
+		$this->assertNotFalse( $html, 'Fixture must be readable: ' . $filename );
+
+		return $html;
+	}
+
+	/**
+	 * Load a fixture relative to tests/Fixtures.
+	 */
+	private function loadFixture( string $filename ): string {
+		$path = __DIR__ . '/../Fixtures/' . $filename;
+		if ( ! file_exists( $path ) ) {
+			$this->markTestSkipped( 'Fixture not present: ' . $filename );
+		}
+
+		$html = file_get_contents( $path );
+		$this->assertNotFalse( $html, 'Fixture must be readable: ' . $filename );
+		$this->assertTrue( $this->extractor->canExtract( $html ), 'Fixture should match Bandzoogle detection: ' . $filename );
+
+		return $html;
+	}
+}

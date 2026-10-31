@@ -1,0 +1,159 @@
+<?php
+// phpcs:disable Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+/**
+ * Ticketmaster Event Import Handler Settings
+ *
+ * Defines settings fields and sanitization for Ticketmaster event import handler.
+ * Part of the modular handler architecture for Data Machine integration.
+ *
+ * @package DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster
+ * @since 1.0.0
+ */
+
+namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
+
+// Prevent direct access
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * TicketmasterSettings class
+ *
+ * Provides configuration fields for Ticketmaster Discovery API integration
+ * including location, classification, and API parameter settings.
+ *
+ * @since 1.0.0
+ */
+class TicketmasterSettings {
+
+	/**
+	 * Constructor
+	 * Pure filter-based architecture - no dependencies.
+	 */
+	public function __construct() {
+		// No constructor dependencies - all services accessed via filters
+	}
+
+	/**
+	 * Get settings fields for Ticketmaster event import handler
+	 *
+	 * @param array $current_config Current configuration values for this handler
+	 * @return array Associative array defining the settings fields
+	 */
+	public static function get_fields( array $current_config = array() ): array {
+		return array(
+			'classification_type' => array(
+				'type'        => 'select',
+				'label'       => __( 'Event Type', 'data-machine-events' ),
+				'description' => __( 'Select the type of events to import. Options are fetched dynamically from Ticketmaster API.', 'data-machine-events' ),
+				'options'     => array_merge(
+					array( '' => __( 'Select an event type...', 'data-machine-events' ) ),
+					Ticketmaster::get_classifications_for_dropdown( $current_config )
+				),
+			),
+			'location'            => array(
+				'type'        => 'text',
+				'label'       => __( 'Location Coordinates', 'data-machine-events' ),
+				'description' => __( 'Enter coordinates as "latitude,longitude" (e.g., "32.7765,-79.9311"). To get coordinates: Go to maps.google.com, find your location, right-click, and copy the numbers.', 'data-machine-events' ),
+				'placeholder' => __( '32.7765,-79.9311', 'data-machine-events' ),
+			),
+			'radius'              => array(
+				'type'        => 'text',
+				'label'       => __( 'Search Radius (Miles)', 'data-machine-events' ),
+				'description' => __( 'Search radius in miles around the specified location. Default is 50 miles.', 'data-machine-events' ),
+				'placeholder' => __( '50', 'data-machine-events' ),
+			),
+			'genre'               => array(
+				'type'        => 'text',
+				'label'       => __( 'Genre ID (Advanced)', 'data-machine-events' ),
+				'description' => __( 'Optional: Specific Ticketmaster Genre ID for sub-filtering within the selected event type (e.g., KnvZfZ7vAeA for Rock music). Leave empty for all genres within the event type.', 'data-machine-events' ),
+				'placeholder' => __( 'KnvZfZ7vAeA', 'data-machine-events' ),
+			),
+			'venue_id'            => array(
+				'type'        => 'text',
+				'label'       => __( 'Venue ID', 'data-machine-events' ),
+				'description' => __( 'Specific Ticketmaster Venue ID to search. Leave empty to search all venues.', 'data-machine-events' ),
+				'placeholder' => __( 'KovZpZAJledA', 'data-machine-events' ),
+			),
+			'attraction_ids'      => array(
+				'type'        => 'text',
+				'label'       => __( 'Artist (Attraction) IDs', 'data-machine-events' ),
+				'description' => __( 'Optional: comma-separated Ticketmaster attraction IDs. When set, the flow imports every upcoming show for these artists nationwide and ignores the location and radius settings.', 'data-machine-events' ),
+				'placeholder' => __( 'K8vZ9171FAV, K8vZ9174G2V', 'data-machine-events' ),
+				'required'    => false,
+			),
+			'search'              => array(
+				'type'        => 'text',
+				'label'       => __( 'Include Keywords', 'data-machine-events' ),
+				'description' => __( 'Only import events containing any of these keywords (comma-separated). Leave empty to import all.', 'data-machine-events' ),
+				'placeholder' => __( 'concert, live music, band', 'data-machine-events' ),
+				'required'    => false,
+			),
+			'exclude_keywords'    => array(
+				'type'        => 'text',
+				'label'       => __( 'Exclude Keywords', 'data-machine-events' ),
+				'description' => __( 'Skip events containing any of these keywords (comma-separated).', 'data-machine-events' ),
+				'placeholder' => __( 'trivia, karaoke, brunch, bingo', 'data-machine-events' ),
+				'required'    => false,
+			),
+			'max_items'           => array(
+				'type'        => 'number',
+				'label'       => __( 'Max Items Per Run', 'data-machine-events' ),
+				'description' => __( 'Maximum Ticketmaster events selected for child-job fan-out per run. Items beyond the bound remain eligible for later runs.', 'data-machine-events' ),
+				'default'     => Ticketmaster::DEFAULT_MAX_ITEMS,
+				'min'         => 1,
+				'max'         => Ticketmaster::DEFAULT_MAX_ITEMS,
+			),
+		);
+	}
+
+	/**
+	 * Sanitize Ticketmaster handler settings.
+	 *
+	 * @param array $raw_settings Raw settings input.
+	 * @return array Sanitized settings.
+	 */
+	public static function sanitize( array $raw_settings ): array {
+		return array(
+			'classification_type' => sanitize_text_field( $raw_settings['classification_type'] ?? '' ),
+			'location'            => sanitize_text_field( $raw_settings['location'] ?? '' ),
+			'radius'              => sanitize_text_field( $raw_settings['radius'] ?? '50' ),
+			'genre'               => sanitize_text_field( $raw_settings['genre'] ?? '' ),
+			'venue_id'            => sanitize_text_field( $raw_settings['venue_id'] ?? '' ),
+			'attraction_ids'      => Ticketmaster::normalize_attraction_ids( (string) ( $raw_settings['attraction_ids'] ?? '' ) ),
+			'search'              => sanitize_text_field( $raw_settings['search'] ?? '' ),
+			'exclude_keywords'    => sanitize_text_field( $raw_settings['exclude_keywords'] ?? '' ),
+			'max_items'           => max( 1, min( Ticketmaster::DEFAULT_MAX_ITEMS, absint( $raw_settings['max_items'] ?? Ticketmaster::DEFAULT_MAX_ITEMS ) ) ),
+		);
+	}
+
+	/**
+	 * Determine if authentication is required.
+	 *
+	 * @param array $current_config Current configuration values.
+	 * @return bool True if authentication is required.
+	 */
+	public static function requires_authentication( array $current_config = array() ): bool {
+		return true; // Ticketmaster requires API key authentication
+	}
+
+	/**
+	 * Get default values for all settings.
+	 *
+	 * @return array Default values.
+	 */
+	public static function get_defaults(): array {
+		return array(
+			'classification_type' => 'music',
+			'location'            => '32.7765,-79.9311',
+			'radius'              => '50',
+			'genre'               => '',
+			'venue_id'            => '',
+			'attraction_ids'      => '',
+			'search'              => '',
+			'exclude_keywords'    => '',
+			'max_items'           => Ticketmaster::DEFAULT_MAX_ITEMS,
+		);
+	}
+}

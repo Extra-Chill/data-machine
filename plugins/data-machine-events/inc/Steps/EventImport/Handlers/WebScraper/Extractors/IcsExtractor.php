@@ -1,0 +1,458 @@
+<?php
+/**
+ * ICS Feed Extractor
+ *
+ * Parses direct ICS/iCal feed content (not HTML pages with embedded calendars).
+ * Supports Tockify, Google Calendar, Apple Calendar, Outlook, and any standard ICS feed.
+ * Venue overrides and timezone handling applied by StructuredDataProcessor.
+ *
+ * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors
+ */
+
+namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
+
+use DataMachineEvents\Core\DateTimeParser;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class IcsExtractor extends BaseExtractor {
+
+	public function canExtract( string $content ): bool {
+		if ( ! class_exists( 'ICal\ICal' ) ) {
+			return false;
+		}
+
+		$content = trim( $content );
+
+		if ( empty( $content ) ) {
+			return false;
+		}
+
+		return preg_match( '/^BEGIN:VCALENDAR/im', $content ) === 1;
+	}
+
+	public function extract( string $content, string $source_url ): array {
+		if ( ! class_exists( 'ICal\ICal' ) ) {
+			return array();
+		}
+
+		try {
+			$ical = new \ICal\ICal(
+				false,
+				array(
+					'defaultSpan'           => 2,
+					'defaultTimeZone'       => 'UTC',
+					'defaultWeekStart'      => 'MO',
+					'skipRecurrence'        => false,
+					'useTimeZoneWithRRules' => false,
+					'filterDaysBefore'      => 1,
+				)
+			);
+
+			$ical->initString( $content );
+
+			$events = $ical->events();
+
+			if ( empty( $events ) ) {
+				return array();
+			}
+
+			$events = $this->constrainRecurrenceHorizon(
+				$events,
+				array(
+					'source_url' => $source_url,
+					'method'     => $this->getMethod(),
+				)
+			);
+
+			$calendar_timezone = $ical->calendarTimeZone() ?? '';
+
+			// Fallback: extract timezone from X-WR-TIMEZONE when the library returned UTC.
+			// Handles two cases:
+			// 1. Non-standard syntax: "X-WR-TIMEZONE;VALUE=TEXT;US/Mountain" (semicolons, no colon value)
+			// 2. Standard syntax with deprecated tz: "X-WR-TIMEZONE:US/Mountain" (library can't resolve)
+			if ( empty( $calendar_timezone ) || 'UTC' === $calendar_timezone ) {
+				$calendar_timezone = $this->extractTimezoneFromRawContent( $content, $calendar_timezone );
+			}
+
+			$normalized = array();
+			foreach ( $events as $ical_event ) {
+				$event = $this->normalizeEvent( $ical_event, $calendar_timezone );
+
+				if ( ! empty( $event['title'] ) ) {
+					$normalized[] = $event;
+				}
+			}
+
+			return $normalized;
+
+		} catch ( \Exception $e ) {
+			return array();
+		}
+	}
+
+	/**
+	 * Build a stable per-occurrence identity for one normalized event.
+	 *
+	 * `UID` is the only feed-authored identity an ICS event carries, and RFC
+	 * 5545 requires it to persist across edits to the same event — which is
+	 * exactly what a consumer wants for `source_id`, so a venue editing a title
+	 * or moving a start time updates in place instead of creating a duplicate.
+	 *
+	 * **A UID alone is not unique per returned item.** `skipRecurrence` is
+	 * false, so a recurring rule is expanded into one entry per occurrence and
+	 * every expansion carries the parent's UID. Verified against the bundled
+	 * parser: an `RRULE:FREQ=WEEKLY;COUNT=3` yields three items all reporting
+	 * the same UID, differing only by `dtstart`. Keying on UID alone would
+	 * collapse an entire series into a single event.
+	 *
+	 * Identity is therefore UID plus the occurrence discriminator:
+	 *
+	 * - `RECURRENCE-ID` when present. A modified instance is published as a
+	 *   separate VEVENT pointing at the occurrence it replaces, and is the
+	 *   authoritative discriminator for that instance.
+	 * - Otherwise the occurrence start date, which is what actually varies
+	 *   across expansions of the same rule.
+	 *
+	 * Returns an empty string when the source omits `UID`. Callers must treat
+	 * that as "no stable identity available" and fall back to their own
+	 * matching; a synthesized identity would be worse than none, because it
+	 * would look stable while changing whenever the content it was derived
+	 * from changed.
+	 *
+	 * @param string $uid           Feed-authored UID.
+	 * @param string $recurrence_id Occurrence override id, when present.
+	 * @param string $start_date    Occurrence start date.
+	 * @return string Stable occurrence identity, or empty string.
+	 */
+	private function buildOccurrenceIdentity( string $uid, string $recurrence_id, string $start_date ): string {
+		if ( '' === $uid ) {
+			return '';
+		}
+
+		$discriminator = '' !== $recurrence_id ? $recurrence_id : $start_date;
+
+		return '' !== $discriminator ? $uid . '::' . $discriminator : $uid;
+	}
+
+	public function getMethod(): string {
+		return 'ics_feed';
+	}
+
+	private function normalizeEvent( $ical_event, string $calendar_timezone ): array {
+		$event_timezone = $calendar_timezone ? $calendar_timezone : $this->extractEventTimezone( $ical_event );
+
+		$event = array(
+			'title'         => sanitize_text_field( $ical_event->summary ?? '' ),
+			'description'   => sanitize_textarea_field( $ical_event->description ?? '' ),
+			'startDate'     => '',
+			'endDate'       => '',
+			'startTime'     => '',
+			'endTime'       => '',
+			'venue'         => '',
+			'venueAddress'  => '',
+			'venueCity'     => '',
+			'venueState'    => '',
+			'venueZip'      => '',
+			'venueCountry'  => '',
+			'venueTimezone' => $event_timezone,
+			'ticketUrl'     => esc_url_raw( $ical_event->url ?? '' ),
+			'image'         => '',
+			'price'         => '',
+			'performer'     => '',
+			'organizer'     => sanitize_text_field( $ical_event->organizer ?? '' ),
+			'source_url'    => esc_url_raw( $ical_event->url ?? '' ),
+			'uid'           => sanitize_text_field( $ical_event->uid ?? '' ),
+			'recurrenceId'  => sanitize_text_field( $ical_event->recurrence_id ?? '' ),
+			'sequence'      => sanitize_text_field( $ical_event->sequence ?? '' ),
+			'lastModified'  => sanitize_text_field( $ical_event->last_modified ?? '' ),
+			// RFC 5545 privacy and confirmation signals, passed through as
+			// authored. A consumer cannot tell a public show from a private
+			// diary entry without these; deciding what to do about PRIVATE or
+			// TENTATIVE is the consumer's policy, not this extractor's.
+			'class'         => sanitize_text_field( $ical_event->class ?? '' ),
+			'eventStatus'   => sanitize_text_field( $ical_event->status ?? '' ),
+			'transparency'  => sanitize_text_field( $ical_event->transp ?? '' ),
+		);
+
+		$this->parseStartDateTime( $event, $ical_event, $calendar_timezone, $event_timezone );
+		$this->parseEndDateTime( $event, $ical_event, $calendar_timezone, $event_timezone );
+		$this->parseLocation( $event, $ical_event );
+
+		$event['occurrenceIdentity'] = $this->buildOccurrenceIdentity(
+			(string) $event['uid'],
+			(string) $event['recurrenceId'],
+			(string) $event['startDate']
+		);
+
+		return $event;
+	}
+
+	private function extractEventTimezone( $ical_event ): string {
+		if ( ! empty( $ical_event->dtstart_tz ) ) {
+			return $ical_event->dtstart_tz;
+		}
+
+		if ( ! empty( $ical_event->dtstart ) && $ical_event->dtstart instanceof \DateTime ) {
+			$tz_name = $ical_event->dtstart->getTimezone()->getName();
+			if ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
+				return $tz_name;
+			}
+		}
+
+		return '';
+	}
+
+	private function parseStartDateTime( array &$event, $ical_event, string $calendar_timezone, string $event_timezone ): void {
+		if ( ! empty( $ical_event->dtstart ) ) {
+			$start_datetime = $ical_event->dtstart;
+
+			$dtstart_array = $ical_event->dtstart_array ?? array();
+			$is_date_only  = isset( $dtstart_array[0]['VALUE'] ) && 'DATE' === $dtstart_array[0]['VALUE'];
+
+			if ( $start_datetime instanceof \DateTime ) {
+				$tz_name = $start_datetime->getTimezone()->getName();
+
+				$is_explicit_utc = $this->hasUtcMarker( $dtstart_array );
+				$is_floating     = ! $is_explicit_utc && ! $this->hasExplicitTimezone( $dtstart_array );
+
+				$explicit_tzid = $this->getExplicitTimezone( $dtstart_array );
+				if ( ! empty( $explicit_tzid ) ) {
+					$local_dt = $this->parseFloatingTime( $dtstart_array, $explicit_tzid );
+					if ( $local_dt ) {
+						$event['startDate']     = $local_dt->format( 'Y-m-d' );
+						$event['startTime']     = $local_dt->format( 'H:i' );
+						$event['venueTimezone'] = $explicit_tzid;
+					} else {
+						$event['startDate']     = $start_datetime->format( 'Y-m-d' );
+						$event['startTime']     = $start_datetime->format( 'H:i' );
+						$event['venueTimezone'] = $explicit_tzid;
+					}
+				} elseif ( $is_floating && ! empty( $event_timezone ) ) {
+					$local_dt = $this->parseFloatingTime( $dtstart_array, $event_timezone );
+					if ( $local_dt ) {
+						$event['startDate']     = $local_dt->format( 'Y-m-d' );
+						$event['startTime']     = $local_dt->format( 'H:i' );
+						$event['venueTimezone'] = $event_timezone;
+					} else {
+						$event['startDate']     = $start_datetime->format( 'Y-m-d' );
+						$event['startTime']     = $start_datetime->format( 'H:i' );
+						$event['venueTimezone'] = $event_timezone;
+					}
+				} elseif ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
+					$event['startDate']     = $start_datetime->format( 'Y-m-d' );
+					$event['venueTimezone'] = $tz_name;
+					$event['startTime']     = $start_datetime->format( 'H:i' );
+				} elseif ( $is_explicit_utc && ! empty( $event_timezone ) ) {
+					$event['venueTimezone'] = $event_timezone;
+					$start_datetime->setTimezone( new \DateTimeZone( $event_timezone ) );
+					$event['startDate'] = $start_datetime->format( 'Y-m-d' );
+					$event['startTime'] = $start_datetime->format( 'H:i' );
+				} else {
+					$event['startDate'] = $start_datetime->format( 'Y-m-d' );
+					$event['startTime'] = $start_datetime->format( 'H:i' );
+					if ( ! empty( $event_timezone ) ) {
+						$event['venueTimezone'] = $event_timezone;
+					}
+				}
+			} elseif ( is_string( $start_datetime ) ) {
+				$parsed                 = DateTimeParser::parseIcs( $start_datetime, $calendar_timezone );
+				$event['startDate']     = $parsed['date'];
+				$event['startTime']     = $parsed['time'];
+				$event['venueTimezone'] = $parsed['timezone'];
+			}
+
+			// For date-only events, leave time empty so agent can parse from title
+			if ( $is_date_only && '00:00' === $event['startTime'] ) {
+				$event['startTime'] = '';
+			}
+		}
+	}
+
+	private function parseEndDateTime( array &$event, $ical_event, string $calendar_timezone, string $event_timezone ): void {
+		if ( ! empty( $ical_event->dtend ) ) {
+			$end_datetime = $ical_event->dtend;
+
+			$dtend_array  = $ical_event->dtend_array ?? array();
+			$is_date_only = isset( $dtend_array[0]['VALUE'] ) && 'DATE' === $dtend_array[0]['VALUE'];
+
+			if ( $end_datetime instanceof \DateTime ) {
+				$tz_name = $end_datetime->getTimezone()->getName();
+
+				$is_explicit_utc = $this->hasUtcMarker( $dtend_array );
+				$is_floating     = ! $is_explicit_utc && ! $this->hasExplicitTimezone( $dtend_array );
+
+				$explicit_tzid = $this->getExplicitTimezone( $dtend_array );
+				if ( ! empty( $explicit_tzid ) ) {
+					$local_dt = $this->parseFloatingTime( $dtend_array, $explicit_tzid );
+					if ( $local_dt ) {
+						$event['endDate']       = $local_dt->format( 'Y-m-d' );
+						$event['endTime']       = $local_dt->format( 'H:i' );
+						$event['venueTimezone'] = $explicit_tzid;
+					} else {
+						$event['endDate']       = $end_datetime->format( 'Y-m-d' );
+						$event['endTime']       = $end_datetime->format( 'H:i' );
+						$event['venueTimezone'] = $explicit_tzid;
+					}
+				} elseif ( $is_floating && ! empty( $event_timezone ) ) {
+					$local_dt = $this->parseFloatingTime( $dtend_array, $event_timezone );
+					if ( $local_dt ) {
+						$event['endDate']       = $local_dt->format( 'Y-m-d' );
+						$event['endTime']       = $local_dt->format( 'H:i' );
+						$event['venueTimezone'] = $event_timezone;
+					} else {
+						$event['endDate'] = $end_datetime->format( 'Y-m-d' );
+						$event['endTime'] = $end_datetime->format( 'H:i' );
+					}
+				} elseif ( 'UTC' !== $tz_name && 'Z' !== $tz_name ) {
+					$event['endDate']       = $end_datetime->format( 'Y-m-d' );
+					$event['venueTimezone'] = $tz_name;
+					$event['endTime']       = $end_datetime->format( 'H:i' );
+				} elseif ( $is_explicit_utc && ! empty( $event_timezone ) ) {
+					$event['venueTimezone'] = $event_timezone;
+					$end_datetime->setTimezone( new \DateTimeZone( $event_timezone ) );
+					$event['endDate'] = $end_datetime->format( 'Y-m-d' );
+					$event['endTime'] = $end_datetime->format( 'H:i' );
+				} else {
+					$event['endDate'] = $end_datetime->format( 'Y-m-d' );
+					$event['endTime'] = $end_datetime->format( 'H:i' );
+				}
+			} elseif ( is_string( $end_datetime ) ) {
+				$parsed           = DateTimeParser::parseIcs( $end_datetime, $calendar_timezone );
+				$event['endDate'] = $parsed['date'];
+				$event['endTime'] = $parsed['time'];
+			}
+
+			// For date-only events, leave time empty so agent can parse from title
+			if ( $is_date_only && '00:00' === $event['endTime'] ) {
+				$event['endTime'] = '';
+			}
+		}
+	}
+
+	private function parseLocation( array &$event, $ical_event ): void {
+		$location = $ical_event->location ?? '';
+
+		if ( ! empty( $location ) ) {
+			$location_parts = explode( ',', $location, 2 );
+			$event['venue'] = sanitize_text_field( trim( $location_parts[0] ) );
+
+			if ( isset( $location_parts[1] ) ) {
+				$event['venueAddress'] = sanitize_text_field( trim( $location_parts[1] ) );
+			} else {
+				$event['venueAddress'] = sanitize_text_field( $location );
+			}
+		}
+	}
+
+	private function hasUtcMarker( array $dtarray ): bool {
+		$raw_value = $dtarray[1] ?? '';
+		return str_ends_with( $raw_value, 'Z' );
+	}
+
+	private function hasExplicitTimezone( array $dtarray ): bool {
+		$params = $dtarray[0] ?? array();
+		return ! empty( $params['TZID'] );
+	}
+
+	private function getExplicitTimezone( array $dtarray ): string {
+		$params = $dtarray[0] ?? array();
+		return $params['TZID'] ?? '';
+	}
+
+	private function parseFloatingTime( array $dtarray, string $timezone ): ?\DateTime {
+		$raw_value = $dtarray[1] ?? '';
+
+		if ( ! preg_match( '/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?)?$/', $raw_value, $m ) ) {
+			return null;
+		}
+
+		$date_str = sprintf( '%s-%s-%s', $m[1], $m[2], $m[3] );
+		$time_str = isset( $m[4] ) ? sprintf( '%s:%s:%s', $m[4], $m[5] ?? '', $m[6] ?? '00' ) : '00:00:00';
+
+		try {
+			return new \DateTime( $date_str . ' ' . $time_str, new \DateTimeZone( $timezone ) );
+		} catch ( \Exception $e ) {
+			return null;
+		}
+	}
+
+	/**
+	 * Extract timezone from raw ICS content when the library fails.
+	 *
+	 * Parses the X-WR-TIMEZONE line directly from raw content, handling both
+	 * standard ("X-WR-TIMEZONE:US/Mountain") and non-standard
+	 * ("X-WR-TIMEZONE;VALUE=TEXT;US/Mountain") syntax.
+	 *
+	 * @param string $content           Raw ICS content.
+	 * @param string $current_timezone  Current timezone value to fall back to.
+	 * @return string Resolved timezone, or $current_timezone if extraction fails.
+	 */
+	private function extractTimezoneFromRawContent( string $content, string $current_timezone ): string {
+		// Match the X-WR-TIMEZONE line and capture everything after the property name.
+		if ( ! preg_match( '/^X-WR-TIMEZONE[;:](.+)$/im', $content, $line_match ) ) {
+			return $current_timezone;
+		}
+
+		$line_value = trim( $line_match[1] );
+
+		// Extract the last segment — the actual timezone identifier.
+		// Standard: "America/Chicago" (value after colon)
+		// Non-standard: "VALUE=TEXT;US/Mountain" (timezone is the last ;-delimited segment)
+		$segments = preg_split( '/[;:]/', $line_value );
+		if ( false === $segments || empty( $segments ) ) {
+			return $current_timezone;
+		}
+		$raw_tz = trim( end( $segments ) );
+
+		if ( empty( $raw_tz ) ) {
+			return $current_timezone;
+		}
+
+		$resolved = self::resolveTimezoneAlias( $raw_tz );
+
+		if ( DateTimeParser::isValidTimezone( $resolved ) ) {
+			return $resolved;
+		}
+
+		return $current_timezone;
+	}
+
+	/**
+	 * Resolve deprecated/non-standard timezone identifiers to IANA names.
+	 *
+	 * ICS feeds may use old-style identifiers like "US/Mountain" or "US/Eastern"
+	 * which are not recognized by PHP's DateTimeZone on all systems.
+	 *
+	 * @param string $timezone Raw timezone identifier.
+	 * @return string Resolved IANA timezone identifier, or original if no alias found.
+	 */
+	private static function resolveTimezoneAlias( string $timezone ): string {
+		static $aliases = array(
+			'US/Eastern'          => 'America/New_York',
+			'US/Central'          => 'America/Chicago',
+			'US/Mountain'         => 'America/Denver',
+			'US/Pacific'          => 'America/Los_Angeles',
+			'US/Arizona'          => 'America/Phoenix',
+			'US/Alaska'           => 'America/Anchorage',
+			'US/Hawaii'           => 'Pacific/Honolulu',
+			'US/Samoa'            => 'Pacific/Pago_Pago',
+			'US/Aleutian'         => 'America/Adak',
+			'US/East-Indiana'     => 'America/Indiana/Indianapolis',
+			'US/Indiana-Starke'   => 'America/Indiana/Knox',
+			'US/Michigan'         => 'America/Detroit',
+			'Canada/Eastern'      => 'America/Toronto',
+			'Canada/Central'      => 'America/Winnipeg',
+			'Canada/Mountain'     => 'America/Edmonton',
+			'Canada/Pacific'      => 'America/Vancouver',
+			'Canada/Atlantic'     => 'America/Halifax',
+			'Canada/Newfoundland' => 'America/St_Johns',
+			'GB'                  => 'Europe/London',
+			'Etc/GMT'             => 'UTC',
+		);
+
+		return $aliases[ $timezone ] ?? $timezone;
+	}
+}
