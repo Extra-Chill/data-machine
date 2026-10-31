@@ -33,6 +33,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EventDatesTable {
 
 	/**
+	 * Object cache group for per-post event date rows.
+	 */
+	public const CACHE_GROUP = 'datamachine_event_dates';
+
+
+	/**
 	 * Get the full table name for the current site.
 	 *
 	 * @return string
@@ -177,6 +183,7 @@ class EventDatesTable {
 			),
 			array( '%d', '%s', $end_datetime ? '%s' : null, '%s' )
 		);
+		self::flush_cache( $post_id );
 
 		if ( false !== $result ) {
 			do_action( 'datamachine_event_dates_changed', $post_id, $before, self::get( $post_id ) );
@@ -224,6 +231,7 @@ class EventDatesTable {
 			array( '%s' ),
 			array( '%d' )
 		);
+		self::flush_cache( $post_id );
 
 		return false !== $result;
 	}
@@ -242,6 +250,7 @@ class EventDatesTable {
 			array( 'post_id' => $post_id ),
 			array( '%d' )
 		);
+		self::flush_cache( $post_id );
 
 		if ( false !== $result ) {
 			do_action( 'datamachine_event_dates_deleted', $post_id );
@@ -260,6 +269,15 @@ class EventDatesTable {
 	public static function get( int $post_id ): ?object {
 		global $wpdb;
 
+		// Read-through object cache. One event page asks for the same post's
+		// dates from the title tag, OG card, ratings, and related events.
+		$found  = false;
+		$cached = wp_cache_get( (string) $post_id, self::CACHE_GROUP, false, $found );
+		if ( $found ) {
+			/** @var object{start_datetime:string,end_datetime:string|null,post_status:string}|string $cached Row written below, or the '' miss sentinel. */
+			return is_object( $cached ) ? $cached : null;
+		}
+
 		$table = self::table_name();
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated internally by table_name(); query contains no request values.
@@ -268,7 +286,21 @@ class EventDatesTable {
 			$wpdb->prepare( "SELECT start_datetime, end_datetime, post_status FROM {$table} WHERE post_id = %d", $post_id )
 		);
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Subsequent queries use the same internally generated table identifier.
-		return $row ?: null;
+		if ( '' === $wpdb->last_error ) {
+			// Cache misses too ('' sentinel) so non-event posts don't requery.
+			wp_cache_set( (string) $post_id, $row ? $row : '', self::CACHE_GROUP );
+		}
+
+		return $row ? $row : null;
+	}
+
+	/**
+	 * Drop the cached dates for one post. Every write path calls this.
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	public static function flush_cache( int $post_id ): void {
+		wp_cache_delete( (string) $post_id, self::CACHE_GROUP );
 	}
 
 	/**
