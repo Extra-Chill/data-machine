@@ -16,6 +16,39 @@ namespace {
 	$GLOBALS['__agent_materializer_hooks']   = array();
 	$GLOBALS['__agent_materializer_current'] = array();
 	$GLOBALS['__agent_materializer_done']    = array();
+	$GLOBALS['__agent_materializer_lookups'] = 0;
+	$GLOBALS['__agent_materializer_options'] = array();
+	$GLOBALS['__agent_materializer_site']    = array();
+
+	function get_option( string $name, $default_value = false ) {
+		return $GLOBALS['__agent_materializer_options'][ $name ] ?? $default_value;
+	}
+
+	function update_option( string $name, $value, $autoload = null ): bool {
+		unset( $autoload );
+		$GLOBALS['__agent_materializer_options'][ $name ] = $value;
+		return true;
+	}
+
+	function delete_option( string $name ): bool {
+		unset( $GLOBALS['__agent_materializer_options'][ $name ] );
+		return true;
+	}
+
+	if ( ! function_exists( 'wp_json_encode' ) ) {
+		function wp_json_encode( $value ) {
+			return json_encode( $value );
+		}
+	}
+
+	function get_site_option( string $name, $default_value = false ) {
+		return $GLOBALS['__agent_materializer_site'][ $name ] ?? $default_value;
+	}
+
+	function update_site_option( string $name, $value ): bool {
+		$GLOBALS['__agent_materializer_site'][ $name ] = $value;
+		return true;
+	}
 
 	if ( ! function_exists( 'sanitize_title' ) ) {
 		function sanitize_title( string $value ): string {
@@ -113,6 +146,7 @@ namespace DataMachine\Core\Database\Agents {
 		}
 
 		public function get_by_identity_scope( string $agent_slug, int $owner_id, string $instance_key = 'default' ): ?array {
+			++$GLOBALS['__agent_materializer_lookups'];
 			return self::$rows[ "{$agent_slug}:{$owner_id}:{$instance_key}" ] ?? null;
 		}
 
@@ -437,6 +471,62 @@ namespace {
 	assert_agent_materializer_equals( 'runtime-bundle-agent', $result['agent_slug'] ?? '', 'runtime import result passes through reconciliation', $failures, $passes );
 	assert_agent_materializer_equals( 31, Agents::$rows['runtime-bundle-agent:31:default']['owner_id'] ?? 0, 'runtime bundle definitions retain default materialization', $failures, $passes );
 	assert_agent_materializer_equals( false, isset( Agents::$rows['definition-only-agent:19:default'] ), 'bundle reconciliation does not materialize definition-only defaults', $failures, $passes );
+
+	echo "\n[4b] per-request reconcile gate (#3710):\n";
+	reset_agent_materializer_smoke();
+	$GLOBALS['__agent_materializer_options'] = array();
+	add_action(
+		'wp_agents_api_init',
+		static function (): void {
+			wp_register_agent( 'gated-agent', array( 'label' => 'Gated Agent', 'owner_resolver' => static fn() => 41 ) );
+		}
+	);
+	do_action( 'init' );
+	$summary = datamachine_maybe_reconcile_registered_agents();
+	assert_agent_materializer_equals( array( 'gated-agent' ), $summary['created'] ?? null, 'first request reconciles and creates the row', $failures, $passes );
+
+	$GLOBALS['__agent_materializer_lookups'] = 0;
+	$repeat_a = datamachine_maybe_reconcile_registered_agents();
+	$repeat_b = datamachine_maybe_reconcile_registered_agents();
+	assert_agent_materializer_equals( array( null, null, 0 ), array( $repeat_a, $repeat_b, $GLOBALS['__agent_materializer_lookups'] ), 'matching fingerprint skips reconcile with zero identity lookups', $failures, $passes );
+
+	unset( Agents::$rows['gated-agent:41:default'] );
+	\DataMachine\Engine\Agents\AgentMaterializer::invalidate();
+	$summary = datamachine_maybe_reconcile_registered_agents();
+	assert_agent_materializer_equals( array( 'gated-agent' ), $summary['created'] ?? null, 'a deleted row is re-created after invalidation', $failures, $passes );
+
+	unset( Agents::$rows['gated-agent:41:default'] );
+	$recorded       = get_option( \DataMachine\Engine\Agents\AgentMaterializer::RECONCILED_OPTION );
+	$recorded['at'] = time() - \DataMachine\Engine\Agents\AgentMaterializer::RECONCILE_TTL - 1;
+	update_option( \DataMachine\Engine\Agents\AgentMaterializer::RECONCILED_OPTION, $recorded );
+	$summary = datamachine_maybe_reconcile_registered_agents();
+	assert_agent_materializer_equals( array( 'gated-agent' ), $summary['created'] ?? null, 'an out-of-band delete is repaired once the TTL lapses', $failures, $passes );
+
+	add_action(
+		'wp_agents_api_init',
+		static function (): void {
+			wp_register_agent( 'gated-agent-two', array( 'label' => 'Second Gated Agent', 'owner_resolver' => static fn() => 41 ) );
+		}
+	);
+	\WP_Agents_Registry::reset_for_tests();
+	do_action( 'init' );
+	$summary = datamachine_maybe_reconcile_registered_agents();
+	assert_agent_materializer_equals( array( 'gated-agent-two' ), $summary['created'] ?? null, 'a changed definition set reconciles', $failures, $passes );
+
+	add_action(
+		'wp_agents_api_init',
+		static function (): void {
+			wp_register_agent( 'ownerless-agent', array( 'label' => 'Ownerless', 'owner_resolver' => static fn() => 0 ) );
+		}
+	);
+	\WP_Agents_Registry::reset_for_tests();
+	$default_owner                     = DirectoryManager::$default_user_id;
+	DirectoryManager::$default_user_id = 0;
+	do_action( 'init' );
+	$summary = datamachine_maybe_reconcile_registered_agents();
+	assert_agent_materializer_equals( array( 'ownerless-agent' ), $summary['skipped'] ?? null, 'an unresolved owner is skipped', $failures, $passes );
+	assert_agent_materializer_equals( false, get_option( \DataMachine\Engine\Agents\AgentMaterializer::RECONCILED_OPTION, false ), 'a skipped definition is not recorded, so it retries', $failures, $passes );
+	DirectoryManager::$default_user_id = $default_owner;
 
 	echo "\n[5] materializer owns Data Machine side-effect dependencies:\n";
 	$materializer_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentMaterializer.php' );

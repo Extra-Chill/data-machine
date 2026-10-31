@@ -1998,6 +1998,7 @@ class AgentBundler {
 			$agents_table = $wpdb->base_prefix . 'datamachine_agents';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->delete( $agents_table, array( 'agent_id' => (int) $created_agent_id ), array( '%d' ) );
+			\DataMachine\Engine\Agents\AgentMaterializer::invalidate();
 		}
 	}
 

@@ -3212,6 +3212,7 @@ class AgentAbilities {
 		$agents_table = $wpdb->base_prefix . 'datamachine_agents';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->delete( $agents_table, array( 'agent_id' => $agent_id ) );
+		\DataMachine\Engine\Agents\AgentMaterializer::invalidate();
 
 		if ( false === $deleted ) {
 			return new \WP_Error(
