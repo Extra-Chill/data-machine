@@ -4,9 +4,10 @@
   "extensions": {
     "wordpress": {
       "php": "8.2",
-      "release_latest_branch": "release-latest",
       "settings": {
-        "validation_dependencies": "data-machine",
+        "validation_dependencies": [
+          "../data-machine"
+        ],
         "wordpress_test_paths": [
           "tests/data-machine-http-client-contract-smoke.php",
           "tests/google-analytics-aggregate-schema-smoke.php",
@@ -31,5 +32,8 @@
       "file": "composer.json",
       "pattern": "\"version\":\\s*\"([0-9.]+)\""
     }
-  ]
+  ],
+  "github": {
+    "release_latest": false
+  }
 }
