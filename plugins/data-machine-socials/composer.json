@@ -1,0 +1,21 @@
+{
+  "name": "extra-chill/data-machine-socials",
+  "description": "Social media publishing extension for Data Machine",
+  "version": "0.1.0",
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "php": ">=8.2",
+    "abraham/twitteroauth": "^8.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "DataMachineSocials\\": "inc/"
+    }
+  },
+  "authors": [
+    {
+      "name": "Chris Huber",
+      "email": "chris@chubes.net"
+    }
+  ]
+}

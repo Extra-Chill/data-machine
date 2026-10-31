@@ -1,0 +1,903 @@
+<?php
+/**
+ * Instagram Publish Ability
+ *
+ * Primitive ability for publishing content to Instagram with support for
+ * single images, carousels (up to 10 images), and Reels (video).
+ * Uses async container creation pattern from Instagram Graph API.
+ *
+ * Ported from post-to-instagram plugin.
+ *
+ * @package DataMachineSocials\Abilities\Instagram
+ * @since 0.2.0
+ */
+
+namespace DataMachineSocials\Abilities\Instagram;
+
+use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Instagram Publish Ability
+ */
+class InstagramPublishAbility extends AbstractSocialAbility {
+
+	/**
+	 * Whether the ability has been registered.
+	 *
+	 * @var bool
+	 */
+	protected static bool $registered = false;
+
+	/**
+	 * Instagram Graph API base URL.
+	 *
+	 * Uses Facebook Graph API because our OAuth flow issues FB-flavored tokens
+	 * via Facebook Login. graph.instagram.com rejects these with "Cannot parse
+	 * access token" (code 190). graph.facebook.com accepts both FB-flavored and
+	 * legacy IG Basic Display tokens for all Instagram Content Publishing endpoints.
+	 *
+	 * @see InstagramAuth — same reasoning as the v0.12.1 username lookup fix.
+	 */
+	const GRAPH_API_URL = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
+
+	/**
+	 * Maximum images per carousel
+	 */
+	const MAX_CAROUSEL_IMAGES = 10;
+
+	const MAX_COLLABORATORS = 3;
+
+	const MAX_USER_TAGS = 20;
+
+	/**
+	 * Maximum characters for caption
+	 */
+	const MAX_CAPTION_LENGTH = 2200;
+
+	/**
+	 * Maximum retries for video container processing.
+	 * Videos take longer than images to process.
+	 */
+	const VIDEO_POLL_MAX_RETRIES = 30;
+
+	/**
+	 * Seconds to sleep between video container status polls.
+	 */
+	const VIDEO_POLL_INTERVAL = 2;
+
+	/**
+	 * Constructor.
+	 */
+	public function __construct() {
+		$this->registerAbility( $this->registerCallback() );
+	}
+
+	private function registerCallback(): callable {
+		return function () {
+			wp_register_ability(
+				'datamachine/instagram-publish',
+				array(
+					'label'               => __( 'Publish to Instagram', 'data-machine-socials' ),
+					'description'         => __( 'Post content to Instagram — supports single image, carousel (up to 10 images), Reel (video), and Story (image or video)', 'data-machine-socials' ),
+					'category'            => 'datamachine-socials',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'content' ),
+						'properties' => array(
+							'content'            => array(
+								'type'        => 'string',
+								'description' => 'Post caption text (max 2200 characters)',
+								'maxLength'   => 2200,
+							),
+							'media_kind'         => array(
+								'type'        => 'string',
+								'description' => 'Type of media to publish: image (default), carousel, reel, or story',
+								'enum'        => array( 'image', 'carousel', 'reel', 'story' ),
+								'default'     => 'image',
+							),
+							'image_urls'         => array(
+								'type'        => 'array',
+								'description' => 'Array of image URLs to post (1-10 for carousel, 1 for single image)',
+								'items'       => array(
+									'type'   => 'string',
+									'format' => 'uri',
+								),
+								'maxItems'    => 10,
+							),
+							'video_url'          => array(
+								'type'        => 'string',
+								'description' => 'Public video URL for Reel or Story publishing',
+								'format'      => 'uri',
+							),
+							'cover_url'          => array(
+								'type'        => 'string',
+								'description' => 'Optional cover image URL for Reel',
+								'format'      => 'uri',
+							),
+							'share_to_feed'      => array(
+								'type'        => 'boolean',
+								'description' => 'Whether to share the Reel to the main feed (default true)',
+								'default'     => true,
+							),
+							'story_image_url'    => array(
+								'type'        => 'string',
+								'description' => 'Image URL for Story publishing (use this or video_url for stories)',
+								'format'      => 'uri',
+							),
+							'aspect_ratio'       => array(
+								'type'        => 'string',
+								'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1',
+								'enum'        => array( '1:1', '4:5', '3:4', '1.91:1' ),
+								'default'     => '4:5',
+							),
+							'source_url'         => array(
+								'type'        => 'string',
+								'description' => 'Source URL to include in caption',
+								'format'      => 'uri',
+							),
+							'collaborators'      => array(
+								'type'        => 'array',
+								'description' => 'Instagram usernames to invite as collaborators (up to 3)',
+								'maxItems'    => 3,
+								'items'       => array( 'type' => 'string' ),
+							),
+							'location_id'        => array(
+								'type'        => 'string',
+								'description' => 'Facebook Page ID of a place to tag as the post location (image, carousel, or reel). Stories do not support locations.',
+								'pattern'     => '^[0-9]+$',
+							),
+							'carousel_user_tags' => array(
+								'type'        => 'array',
+								'description' => 'Per-slide tag arrays aligned exactly to image_urls (2-10 images). Use an empty array for an untagged slide. Do not combine with user_tags.',
+								'minItems'    => 2,
+								'maxItems'    => self::MAX_CAROUSEL_IMAGES,
+								'items'       => array(
+									'type'     => 'array',
+									'maxItems' => self::MAX_USER_TAGS,
+									'items'    => array(
+										'type'       => 'object',
+										'required'   => array( 'username', 'x', 'y' ),
+										'properties' => array(
+											'username' => array( 'type' => 'string' ),
+											'x'        => array(
+												'type'    => 'number',
+												'minimum' => 0,
+												'maximum' => 1,
+											),
+											'y'        => array(
+												'type'    => 'number',
+												'minimum' => 0,
+												'maximum' => 1,
+											),
+										),
+									),
+								),
+							),
+							'user_tags'          => array(
+								'type'        => 'array',
+								'description' => 'People to tag in a single image, each with username, x, and y coordinates',
+								'maxItems'    => self::MAX_USER_TAGS,
+								'items'       => array(
+									'type'       => 'object',
+									'required'   => array( 'username', 'x', 'y' ),
+									'properties' => array(
+										'username' => array( 'type' => 'string' ),
+										'x'        => array(
+											'type'    => 'number',
+											'minimum' => 0,
+											'maximum' => 1,
+										),
+										'y'        => array(
+											'type'    => 'number',
+											'minimum' => 0,
+											'maximum' => 1,
+										),
+									),
+								),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'media_id'   => array( 'type' => 'string' ),
+							'media_kind' => array( 'type' => 'string' ),
+							'permalink'  => array(
+								'type'   => 'string',
+								'format' => 'uri',
+							),
+							'error'      => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'execute_publish' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_publish' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Get account ability
+			wp_register_ability(
+				'datamachine/instagram-account',
+				array(
+					'label'               => __( 'Instagram Account Info', 'data-machine-socials' ),
+					'description'         => __( 'Get authenticated Instagram account details', 'data-machine-socials' ),
+					'category'            => 'datamachine-socials',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'       => array( 'type' => 'boolean' ),
+							'user_id'       => array( 'type' => 'string' ),
+							'username'      => array( 'type' => 'string' ),
+							'authenticated' => array( 'type' => 'boolean' ),
+							'error'         => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'get_account' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_edit' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+	}
+
+	/**
+	 * Execute Instagram publish.
+	 *
+	 * Routes to the appropriate publishing flow based on media_kind:
+	 * - image (default): single image post
+	 * - carousel: multi-image carousel (auto-detected from image_urls count)
+	 * - reel: video Reel via container flow
+	 * - story: ephemeral Story (image or video, 24h lifespan)
+	 *
+	 * @param array $input Ability input with publish parameters.
+	 * @return array Response with post details or error.
+	 */
+	public static function execute_publish( array $input ): array|\WP_Error {
+		$content       = $input['content'] ?? '';
+		$media_kind    = $input['media_kind'] ?? 'image';
+		$source_url    = $input['source_url'] ?? '';
+		$collaborators = $input['collaborators'] ?? array();
+		if ( ! is_array( $collaborators ) || count( $collaborators ) > self::MAX_COLLABORATORS ) {
+			return new \WP_Error( 'invalid_collaborators', 'A maximum of 3 collaborators is allowed', array( 'status' => 400 ) );
+		}
+		foreach ( $collaborators as &$collaborator ) {
+			$collaborator = ltrim( trim( (string) $collaborator ), '@' );
+			if ( ! preg_match( '/^[A-Za-z0-9._]{1,30}$/', $collaborator ) ) {
+				return new \WP_Error( 'invalid_collaborators', 'Collaborators must be valid Instagram usernames', array( 'status' => 400 ) );
+			}
+		}
+		unset( $collaborator );
+		$input['collaborators'] = $collaborators;
+		if ( 'story' === $media_kind && ! empty( $collaborators ) ) {
+			return new \WP_Error( 'unsupported_collaborators', 'Instagram Stories do not support collaborators', array( 'status' => 400 ) );
+		}
+		$location_id = trim( (string) ( $input['location_id'] ?? '' ) );
+		if ( '' !== $location_id ) {
+			if ( ! preg_match( '/^[0-9]+$/', $location_id ) ) {
+				return new \WP_Error( 'invalid_location', 'location_id must be a numeric Facebook Page ID', array( 'status' => 400 ) );
+			}
+			if ( 'story' === $media_kind ) {
+				return new \WP_Error( 'unsupported_location', 'Instagram Stories do not support location tags', array( 'status' => 400 ) );
+			}
+		}
+		$input['location_id'] = $location_id;
+		$tag_validation       = self::validate_user_tags( $input, $media_kind );
+		if ( is_wp_error( $tag_validation ) ) {
+			return $tag_validation;
+		}
+
+		if ( empty( $content ) ) {
+			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
+		}
+
+		// Validate all feed images before auth/token refresh or any publishing API call.
+		if ( ! in_array( $media_kind, array( 'reel', 'story' ), true ) ) {
+			$image_urls = $input['image_urls'] ?? array();
+			if ( count( $image_urls ) > self::MAX_CAROUSEL_IMAGES ) {
+				return new \WP_Error( 'missing_param', sprintf( 'Maximum %d images allowed for Instagram carousel', self::MAX_CAROUSEL_IMAGES ), array( 'status' => 400 ) );
+			}
+
+			foreach ( $image_urls as $url ) {
+				if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+					return new \WP_Error( 'missing_param', 'Invalid image URL: ' . $url, array( 'status' => 400 ) );
+				}
+				$extension = strtolower( pathinfo( (string) wp_parse_url( $url, PHP_URL_PATH ), PATHINFO_EXTENSION ) );
+				if ( ! in_array( $extension, array( 'jpg', 'jpeg' ), true ) ) {
+					return new \WP_Error( 'unsupported_image_format', 'Instagram feed and carousel images must be JPEG (.jpg or .jpeg). Unsupported image URL: ' . $url, array( 'status' => 400 ) );
+				}
+			}
+		}
+
+		// Auth check.
+		$auth = new AuthAbilities();
+		/** @var \DataMachineSocials\Handlers\Instagram\InstagramAuth|null $provider */
+		$provider = $auth->getProvider( 'instagram' );
+
+		if ( ! $provider || ! $provider->is_authenticated() ) {
+			return new \WP_Error( 'missing_auth', 'Instagram not authenticated', array( 'status' => 401 ) );
+		}
+
+		$user_id      = $provider->get_user_id();
+		$access_token = $provider->get_valid_access_token();
+
+		if ( empty( $user_id ) || empty( $access_token ) ) {
+			return new \WP_Error( 'missing_auth', 'Instagram credentials not available', array( 'status' => 401 ) );
+		}
+
+		// Build caption with source URL if provided.
+		$caption = $content;
+		if ( ! empty( $source_url ) ) {
+			$caption .= "\n\n" . $source_url;
+		}
+
+		// Truncate to max caption length.
+		if ( mb_strlen( $caption ) > self::MAX_CAPTION_LENGTH ) {
+			$caption = mb_substr( $caption, 0, self::MAX_CAPTION_LENGTH - 3 ) . '...';
+		}
+
+		// Route to appropriate publish flow.
+		if ( 'reel' === $media_kind ) {
+			return self::publish_reel( $input, $user_id, $access_token, $caption );
+		}
+
+		if ( 'story' === $media_kind ) {
+			return self::publish_story( $input, $user_id, $access_token );
+		}
+
+		return self::publish_image( $input, $user_id, $access_token, $caption );
+	}
+
+	/**
+	 * Validate tag shape and per-photo limits before auth or publishing side effects.
+	 *
+	 * @return true|\WP_Error
+	 */
+	private static function validate_user_tags( array $input, string $media_kind ): bool|\WP_Error {
+		$single_tags  = $input['user_tags'] ?? array();
+		$has_carousel = array_key_exists( 'carousel_user_tags', $input );
+		$image_urls   = $input['image_urls'] ?? array();
+		$image_count  = is_array( $image_urls ) ? count( $image_urls ) : 0;
+
+		if ( ! empty( $single_tags ) && ( 'image' !== $media_kind || 1 !== $image_count ) ) {
+			return new \WP_Error( 'unsupported_user_tags', 'user_tags is only supported for single-image posts; use carousel_user_tags for carousels', array( 'status' => 400 ) );
+		}
+		if ( $has_carousel && ( ! in_array( $media_kind, array( 'image', 'carousel' ), true ) || $image_count < 2 ) ) {
+			return new \WP_Error( 'unsupported_user_tags', 'carousel_user_tags requires a carousel with at least two images', array( 'status' => 400 ) );
+		}
+		if ( $has_carousel && ! empty( $single_tags ) ) {
+			return new \WP_Error( 'invalid_user_tags', 'Do not combine user_tags and carousel_user_tags', array( 'status' => 400 ) );
+		}
+
+		$slides = $has_carousel ? $input['carousel_user_tags'] : array( $single_tags );
+		if ( ! is_array( $slides ) || ! array_is_list( $slides ) || ( $has_carousel && ( ! array_is_list( $image_urls ) || count( $slides ) !== $image_count ) ) ) {
+			return new \WP_Error( 'invalid_user_tags', 'carousel_user_tags must contain one tag array per image_urls entry, in the same order (use [] for untagged slides)', array( 'status' => 400 ) );
+		}
+		foreach ( $slides as $index => $tags ) {
+			$slide = $index + 1;
+			if ( ! is_array( $tags ) || ! array_is_list( $tags ) || count( $tags ) > self::MAX_USER_TAGS ) {
+				return new \WP_Error(
+					'invalid_user_tags',
+					sprintf( 'Slide %d tags must be an array of at most %d user tags', $slide, self::MAX_USER_TAGS ),
+					array(
+						'status' => 400,
+						'slide'  => $slide,
+					)
+				);
+			}
+			foreach ( $tags as $tag ) {
+				if ( ! is_array( $tag ) || ! isset( $tag['username'] ) || ! is_string( $tag['username'] ) || '' === trim( $tag['username'] ) ) {
+					return new \WP_Error(
+						'invalid_user_tags',
+						sprintf( 'Slide %d user tags require a username', $slide ),
+						array(
+							'status' => 400,
+							'slide'  => $slide,
+						)
+					);
+				}
+				foreach ( array( 'x', 'y' ) as $coordinate ) {
+					$value = $tag[ $coordinate ] ?? null;
+					if ( ! ( is_int( $value ) || is_float( $value ) ) || ! is_finite( (float) $value ) || $value < 0 || $value > 1 ) {
+						return new \WP_Error(
+							'invalid_user_tags',
+							sprintf( 'Slide %d tag @%s requires numeric x/y coordinates between 0 and 1', $slide, $tag['username'] ),
+							array(
+								'status'   => 400,
+								'slide'    => $slide,
+								'username' => $tag['username'],
+							)
+						);
+					}
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Publish an image or carousel to Instagram.
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $user_id      Instagram user ID.
+	 * @param string $access_token Valid access token.
+	 * @param string $caption      Prepared caption text.
+	 * @return array Result.
+	 */
+	private static function publish_image( array $input, string $user_id, string $access_token, string $caption ): array|\WP_Error {
+		$image_urls = $input['image_urls'] ?? array();
+
+		// Create media containers for each image.
+		$is_carousel   = count( $image_urls ) > 1;
+		$container_ids = array();
+
+		foreach ( $image_urls as $image_index => $image_url ) {
+			$container_body = array(
+				'image_url'    => $image_url,
+				'access_token' => $access_token,
+			);
+
+			/*
+			 * For single images, include caption.
+			 * For carousel items, omit caption (goes on carousel container).
+			 */
+			$tags = $is_carousel ? ( $input['carousel_user_tags'][ $image_index ] ?? array() ) : ( $input['user_tags'] ?? array() );
+			if ( ! empty( $tags ) ) {
+				$container_body['user_tags'] = wp_json_encode( $tags );
+			}
+			// Include all submitted usernames: Graph may not identify the rejected one.
+			$tag_context = empty( $tags ) ? '' : sprintf( ' (slide %d; submitted user tags: @%s)', $image_index + 1, implode( ', @', array_column( $tags, 'username' ) ) );
+			$error_data  = array(
+				'status'    => 500,
+				'slide'     => $image_index + 1,
+				'usernames' => array_column( $tags, 'username' ),
+			);
+
+			if ( $is_carousel ) {
+				$container_body['is_carousel_item'] = 'true';
+			} else {
+				$container_body['caption'] = $caption;
+				if ( ! empty( $input['collaborators'] ) ) {
+					$container_body['collaborators'] = implode( ',', $input['collaborators'] );
+				}
+				if ( ! empty( $input['location_id'] ) ) {
+					$container_body['location_id'] = $input['location_id'];
+				}
+			}
+
+			$result = HttpClient::post(
+				self::GRAPH_API_URL . "/{$user_id}/media",
+				array(
+					'context' => 'Instagram Media Container',
+					'body'    => $container_body,
+					'timeout' => 40,
+				)
+			);
+
+			if ( empty( $result['success'] ) ) {
+				return new \WP_Error( 'api_error', 'Error creating media container' . $tag_context . ': ' . ( $result['error'] ?? 'unknown error' ), $error_data );
+			}
+
+			$body = json_decode( $result['data'], true );
+
+			if ( empty( $body['id'] ) ) {
+				$error_msg = 'No container ID returned for image';
+				if ( isset( $body['error']['message'] ) ) {
+					$error_msg .= ': ' . $body['error']['message'];
+				}
+				return new \WP_Error( 'api_error', $error_msg . $tag_context, $error_data );
+			}
+
+			$container_id = $body['id'];
+
+			// Check initial status.
+			$status_result = HttpClient::get(
+				self::GRAPH_API_URL . "/{$container_id}?fields=status_code&access_token={$access_token}",
+				array(
+					'context' => 'Instagram Container Status',
+					'timeout' => 40,
+				)
+			);
+
+			$status = 'IN_PROGRESS';
+			if ( ! empty( $status_result['success'] ) ) {
+				$status_body = json_decode( $status_result['data'], true );
+				if ( ! empty( $status_body['status_code'] ) ) {
+					$status = $status_body['status_code'];
+				}
+			}
+
+			if ( 'ERROR' === $status || 'EXPIRED' === $status ) {
+				return new \WP_Error( 'api_error', 'Container status error' . $tag_context . ': ' . $status, $error_data );
+			}
+
+			$container_ids[] = $container_id;
+
+			// If not finished, wait for processing.
+			if ( 'FINISHED' !== $status ) {
+				$ready = self::wait_for_container( $access_token, $container_id );
+				if ( ! $ready ) {
+					return new \WP_Error( 'api_error', 'Media processing failed for container' . $tag_context . ': ' . $container_id, $error_data );
+				}
+			}
+		}
+
+		// Create main container (carousel or single).
+		$main_container_id = null;
+		$media_kind        = 'image';
+		if ( $is_carousel && count( $container_ids ) > 1 ) {
+			$children        = implode( ',', $container_ids );
+			$carousel_result = HttpClient::post(
+				self::GRAPH_API_URL . "/{$user_id}/media",
+				array(
+					'context' => 'Instagram Carousel Container',
+					'body'    => array_merge(
+						array(
+							'media_type'   => 'CAROUSEL',
+							'children'     => $children,
+							'caption'      => $caption,
+							'access_token' => $access_token,
+						),
+						! empty( $input['collaborators'] ) ? array( 'collaborators' => implode( ',', $input['collaborators'] ) ) : array(),
+						! empty( $input['location_id'] ) ? array( 'location_id' => $input['location_id'] ) : array()
+					),
+					'timeout' => 40,
+				)
+			);
+
+			if ( empty( $carousel_result['success'] ) ) {
+				return new \WP_Error( 'api_error', 'Error creating carousel container: ' . ( $carousel_result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
+			}
+
+			$carousel_body = json_decode( $carousel_result['data'], true );
+			if ( empty( $carousel_body['id'] ) ) {
+				$error_msg = 'No carousel container ID returned';
+				if ( isset( $carousel_body['error']['message'] ) ) {
+					$error_msg .= ': ' . $carousel_body['error']['message'];
+				}
+				return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
+			}
+
+			$main_container_id = $carousel_body['id'];
+			$media_kind        = 'carousel';
+		} elseif ( count( $container_ids ) === 1 ) {
+			$main_container_id = $container_ids[0];
+		} else {
+			// No images - Instagram requires at least one image.
+			return new \WP_Error( 'missing_param', 'At least one image is required for Instagram posts', array( 'status' => 400 ) );
+		}
+
+		return self::publish_container( $user_id, $access_token, $main_container_id, $media_kind );
+	}
+
+	/**
+	 * Publish a Reel (video) to Instagram.
+	 *
+	 * Uses the Instagram Graph API container flow:
+	 * 1. POST /{user_id}/media with media_type=REELS and video_url
+	 * 2. Poll container status until FINISHED (video processing)
+	 * 3. POST /{user_id}/media_publish with creation_id
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $user_id      Instagram user ID.
+	 * @param string $access_token Valid access token.
+	 * @param string $caption      Prepared caption text.
+	 * @return array Result.
+	 */
+	private static function publish_reel( array $input, string $user_id, string $access_token, string $caption ): array|\WP_Error {
+		$video_url     = $input['video_url'] ?? '';
+		$cover_url     = $input['cover_url'] ?? '';
+		$share_to_feed = $input['share_to_feed'] ?? true;
+
+		if ( empty( $video_url ) ) {
+			return new \WP_Error( 'missing_param', 'video_url is required for Reel publishing', array( 'status' => 400 ) );
+		}
+
+		if ( ! filter_var( $video_url, FILTER_VALIDATE_URL ) ) {
+			return new \WP_Error( 'missing_param', 'Invalid video URL: ' . $video_url, array( 'status' => 400 ) );
+		}
+
+		// Pre-publish validation via core video-metadata if local path is available.
+		$video_file_path = $input['video_file_path'] ?? '';
+		if ( ! empty( $video_file_path ) && file_exists( $video_file_path ) ) {
+			$metadata = \DataMachine\Core\FilesRepository\VideoMetadata::extract( $video_file_path );
+
+			// Instagram Reels: max 15 min, H.264 codec recommended.
+			if ( ! empty( $metadata['duration'] ) && $metadata['duration'] > 900 ) {
+				return new \WP_Error( 'missing_param', sprintf( 'Video duration (%.0fs) exceeds Instagram Reels maximum (900s)', $metadata['duration'] ), array( 'status' => 400 ) );
+			}
+		}
+
+		// Build the container request body.
+		$container_body = array(
+			'media_type'    => 'REELS',
+			'video_url'     => $video_url,
+			'caption'       => $caption,
+			'share_to_feed' => $share_to_feed ? 'true' : 'false',
+			'access_token'  => $access_token,
+		);
+		if ( ! empty( $input['collaborators'] ) ) {
+			$container_body['collaborators'] = implode( ',', $input['collaborators'] );
+		}
+		if ( ! empty( $input['location_id'] ) ) {
+			$container_body['location_id'] = $input['location_id'];
+		}
+
+		if ( ! empty( $cover_url ) ) {
+			if ( ! filter_var( $cover_url, FILTER_VALIDATE_URL ) ) {
+				return new \WP_Error( 'missing_param', 'Invalid cover URL: ' . $cover_url, array( 'status' => 400 ) );
+			}
+			$container_body['cover_url'] = $cover_url;
+		}
+
+		// Step 1: Create the Reel container.
+		$result = HttpClient::post(
+			self::GRAPH_API_URL . "/{$user_id}/media",
+			array(
+				'context' => 'Instagram Reel Container',
+				'body'    => $container_body,
+				'timeout' => 60,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', 'Error creating Reel container: ' . ( $result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
+		}
+
+		$body = json_decode( $result['data'], true );
+
+		if ( empty( $body['id'] ) ) {
+			$error_msg = 'No container ID returned for Reel';
+			if ( isset( $body['error']['message'] ) ) {
+				$error_msg .= ': ' . $body['error']['message'];
+			}
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
+		}
+
+		$container_id = $body['id'];
+
+		// Step 2: Wait for video processing (longer timeout than images).
+		$ready = self::wait_for_container(
+			$access_token,
+			$container_id,
+			self::VIDEO_POLL_MAX_RETRIES,
+			self::VIDEO_POLL_INTERVAL
+		);
+
+		if ( ! $ready ) {
+			return new \WP_Error( 'api_error', 'Reel video processing failed or timed out for container: ' . $container_id, array( 'status' => 500 ) );
+		}
+
+		// Step 3: Publish.
+		return self::publish_container( $user_id, $access_token, $container_id, 'reel' );
+	}
+
+	/**
+	 * Publish a Story to Instagram.
+	 *
+	 * Stories support a single image or video and are ephemeral (24h lifespan).
+	 * Uses the Instagram Graph API container flow with media_type=STORIES.
+	 *
+	 * Note: Stories do not support captions via the API. The content param is
+	 * accepted but not sent to the API (logged for tracking purposes only).
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $user_id      Instagram user ID.
+	 * @param string $access_token Valid access token.
+	 * @return array Result.
+	 */
+	private static function publish_story( array $input, string $user_id, string $access_token ): array|\WP_Error {
+		$story_image_url = $input['story_image_url'] ?? '';
+		$video_url       = $input['video_url'] ?? '';
+
+		// Stories require exactly one media source: image or video.
+		if ( empty( $story_image_url ) && empty( $video_url ) ) {
+			return new \WP_Error( 'missing_param', 'story_image_url or video_url is required for Story publishing', array( 'status' => 400 ) );
+		}
+
+		// Build the container request body.
+		$container_body = array(
+			'media_type'   => 'STORIES',
+			'access_token' => $access_token,
+		);
+
+		if ( ! empty( $video_url ) ) {
+			if ( ! filter_var( $video_url, FILTER_VALIDATE_URL ) ) {
+				return new \WP_Error( 'missing_param', 'Invalid video URL: ' . $video_url, array( 'status' => 400 ) );
+			}
+			$container_body['video_url'] = $video_url;
+		} else {
+			if ( ! filter_var( $story_image_url, FILTER_VALIDATE_URL ) ) {
+				return new \WP_Error( 'missing_param', 'Invalid story image URL: ' . $story_image_url, array( 'status' => 400 ) );
+			}
+			$container_body['image_url'] = $story_image_url;
+		}
+
+		// Step 1: Create the Story container.
+		$result = HttpClient::post(
+			self::GRAPH_API_URL . "/{$user_id}/media",
+			array(
+				'context' => 'Instagram Story Container',
+				'body'    => $container_body,
+				'timeout' => 60,
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', 'Error creating Story container: ' . ( $result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
+		}
+
+		$body = json_decode( $result['data'], true );
+
+		if ( empty( $body['id'] ) ) {
+			$error_msg = 'No container ID returned for Story';
+			if ( isset( $body['error']['message'] ) ) {
+				$error_msg .= ': ' . $body['error']['message'];
+			}
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
+		}
+
+		$container_id = $body['id'];
+
+		/*
+		 * Step 2: Wait for processing.
+		 * Video stories need longer polling; image stories are usually instant.
+		 */
+				$max_retries = ! empty( $video_url ) ? self::VIDEO_POLL_MAX_RETRIES : 10;
+		$interval            = ! empty( $video_url ) ? self::VIDEO_POLL_INTERVAL : 1;
+
+		$ready = self::wait_for_container( $access_token, $container_id, $max_retries, $interval );
+		if ( ! $ready ) {
+			return new \WP_Error( 'api_error', 'Story media processing failed or timed out for container: ' . $container_id, array( 'status' => 500 ) );
+		}
+
+		// Step 3: Publish.
+		return self::publish_container( $user_id, $access_token, $container_id, 'story' );
+	}
+
+	/**
+	 * Publish a prepared container to Instagram and fetch the permalink.
+	 *
+	 * Shared final step for image, carousel, reel, and story flows.
+	 *
+	 * @param string $user_id        Instagram user ID.
+	 * @param string $access_token   Valid access token.
+	 * @param string $container_id   Container ID from media creation.
+	 * @param string $media_kind     Media kind identifier (image, carousel, reel, story).
+	 * @return array Result with success, media_id, media_kind, permalink.
+	 */
+	private static function publish_container( string $user_id, string $access_token, string $container_id, string $media_kind ): array|\WP_Error {
+		$publish_result = HttpClient::post(
+			self::GRAPH_API_URL . "/{$user_id}/media_publish",
+			array(
+				'context' => 'Instagram Media Publish',
+				'body'    => array(
+					'creation_id'  => $container_id,
+					'access_token' => $access_token,
+				),
+				'timeout' => 40,
+			)
+		);
+
+		/*
+		 * Failures at this step use `publish_unconfirmed`: the request may have
+		 * reached Instagram (e.g. a timeout), so callers must not blindly retry
+		 * and risk a duplicate post.
+		 */
+		if ( empty( $publish_result['success'] ) ) {
+			return new \WP_Error( 'publish_unconfirmed', 'Error publishing to Instagram: ' . ( $publish_result['error'] ?? 'unknown error' ), array( 'status' => 500 ) );
+		}
+
+		$publish_body = json_decode( $publish_result['data'], true );
+		if ( empty( $publish_body['id'] ) ) {
+			$error_msg = 'No media ID returned after publishing';
+			if ( isset( $publish_body['error']['message'] ) ) {
+				$error_msg .= ': ' . $publish_body['error']['message'];
+			}
+			return new \WP_Error( 'publish_unconfirmed', $error_msg, array( 'status' => 500 ) );
+		}
+
+		$media_id = $publish_body['id'];
+
+		// Fetch permalink.
+		$permalink        = null;
+		$permalink_result = HttpClient::get(
+			self::GRAPH_API_URL . "/{$media_id}?fields=id,permalink&access_token={$access_token}",
+			array(
+				'context' => 'Instagram Permalink',
+				'timeout' => 40,
+			)
+		);
+
+		if ( ! empty( $permalink_result['success'] ) ) {
+			$permalink_body = json_decode( $permalink_result['data'], true );
+			if ( isset( $permalink_body['permalink'] ) ) {
+				$permalink = $permalink_body['permalink'];
+			}
+		}
+
+		return array(
+			'success'    => true,
+			'media_id'   => $media_id,
+			'media_kind' => $media_kind,
+			'permalink'  => $permalink,
+		);
+	}
+
+	/**
+	 * Wait for media container to be processed.
+	 *
+	 * @param string $access_token Access token.
+	 * @param string $container_id Container ID.
+	 * @param int    $max_retries  Maximum poll attempts (default 10 for images).
+	 * @param int    $interval     Seconds between polls (default 1 for images).
+	 * @return bool True if container is ready.
+	 */
+	private static function wait_for_container( string $access_token, string $container_id, int $max_retries = 10, int $interval = 1 ): bool {
+		$url = self::GRAPH_API_URL . "/{$container_id}?fields=status_code&access_token={$access_token}";
+
+		for ( $i = 0; $i < $max_retries; $i++ ) {
+			$result = HttpClient::get(
+				$url,
+				array(
+					'context' => 'Instagram Container Status',
+					'timeout' => 10,
+				)
+			);
+
+			if ( empty( $result['success'] ) ) {
+				return false;
+			}
+
+			$body = json_decode( $result['data'], true );
+
+			if ( isset( $body['status_code'] ) && 'FINISHED' === $body['status_code'] ) {
+				return true;
+			}
+
+			if ( isset( $body['status_code'] ) && ( 'ERROR' === $body['status_code'] || 'EXPIRED' === $body['status_code'] ) ) {
+				return false;
+			}
+
+			sleep( $interval );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get Instagram account details.
+	 *
+	 * @param array $input Ability input.
+	 * @return array Account details or error.
+	 */
+	public static function get_account( array $input ): array|\WP_Error { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- ability callback signature.
+		unset( $input );
+		$auth = new AuthAbilities();
+		/** @var \DataMachineSocials\Handlers\Instagram\InstagramAuth|null $provider */
+		$provider = $auth->getProvider( 'instagram' );
+
+		if ( ! $provider || ! $provider->is_authenticated() ) {
+			return new \WP_Error( 'missing_auth', 'Instagram not authenticated', array( 'status' => 401 ) );
+		}
+
+		return array(
+			'success'       => true,
+			'authenticated' => true,
+			'user_id'       => $provider->get_user_id() ?? '',
+			'username'      => $provider->get_username() ?? '',
+		);
+	}
+}

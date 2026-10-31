@@ -1,0 +1,170 @@
+<?php
+/**
+* Modular Facebook publish handler.
+*
+* Posts content to a specified Facebook Page using the self-contained
+* FacebookAuth class for authentication. This modular approach separates
+* concerns between main handler logic and authentication functionality.
+*
+* @package Data_Machine_Socials
+* @subpackage Handlers\Facebook
+* @since 0.1.0
+*/
+
+namespace DataMachineSocials\Handlers\Facebook;
+
+use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Core\EngineData;
+use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
+use DataMachineSocials\Abilities\Facebook\FacebookPublishAbility;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly
+}
+
+class Facebook extends PublishHandler {
+
+	use HandlerRegistrationTrait;
+
+	/**
+	* @var FacebookAuth Authentication handler instance
+	*/
+	private $auth;
+
+	public function __construct() {
+		parent::__construct( 'facebook' );
+
+		// Self-register with filters
+		self::registerHandler(
+			'facebook_publish',
+			'publish',
+			self::class,
+			'Facebook',
+			'Post content to Facebook Pages',
+			true,
+			FacebookAuth::class,
+			FacebookSettings::class,
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
+				return array(
+					'facebook_publish' => array(
+						'class'                   => self::class,
+						'client_context_bindings' => array( 'job_id' ),
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post content to a Facebook Page. Supports text and images.',
+						'parameters'              => array(
+							'type'       => 'object',
+							'properties' => array(
+								'content' => array(
+									'type'        => 'string',
+									'description' => 'The text content to post to Facebook',
+								),
+							),
+							'required'   => array( 'content' ),
+						),
+					),
+				);
+			},
+			'facebook',
+			array(
+				'charLimit'          => 63206,
+				'maxImages'          => 10,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => true,
+				'composer'           => array(
+					'crossPostCompatible' => true,
+					'mediaKinds'          => array( 'image' ),
+				),
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+					array(
+						'slug'  => 'comments',
+						'label' => 'Comments',
+					),
+				),
+				'preview'            => array(
+					'aspectRatio'     => 'native',
+					'captionPosition' => 'above',
+					'previewSurface'  => 'card',
+				),
+			)
+		);
+	}
+
+	/**
+	* Lazy-load auth provider when needed.
+	*
+	* @return FacebookAuth|null Auth provider instance or null if unavailable
+	*/
+	private function get_auth() {
+		if ( null === $this->auth ) {
+			$auth_abilities = new AuthAbilities();
+			$this->auth     = $auth_abilities->getProvider( 'facebook' );
+
+			if ( null === $this->auth ) {
+				$this->log(
+					'error',
+					'Facebook Handler: Authentication service not available',
+					array(
+						'handler'             => 'facebook',
+						'missing_service'     => 'facebook',
+						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
+					)
+				);
+			}
+		}
+		return $this->auth;
+	}
+
+	protected function executePublish( array $parameters, array $handler_config ): array {
+		$engine = $parameters['engine'] ?? null;
+		if ( ! $engine instanceof EngineData ) {
+			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
+		}
+
+		$media     = $this->resolveMediaUrls( $engine );
+		$image_url = $media['image_url'];
+		$video_url = $media['video_url'];
+
+		$publish_input = array(
+			'title'         => $parameters['title'] ?? '',
+			'content'       => $parameters['content'] ?? '',
+			'image_url'     => $image_url,
+			'source_url'    => $engine->getSourceUrl(),
+			'link_handling' => $handler_config['link_handling'] ?? 'append',
+		);
+
+		if ( ! empty( $video_url ) ) {
+			$publish_input['video_url'] = $video_url;
+		}
+
+		$result = FacebookPublishAbility::execute_publish( $publish_input );
+
+		if ( $result['success'] ) {
+			return $this->successResponse(
+			array(
+				'post_id'     => $result['post_id'] ?? '',
+				'post_url'    => $result['post_url'] ?? '',
+				'content'     => $parameters['content'] ?? '',
+				'comment_id'  => $result['comment_id'] ?? null,
+				'comment_url' => $result['comment_url'] ?? null,
+			)
+			);
+		}
+
+		return $this->errorResponse(
+		$result['error'] ?? 'Facebook publish failed',
+		array(),
+		'critical'
+		);
+	}
+
+	public static function get_label(): string {
+		return __( 'Facebook', 'data-machine-socials' );
+	}
+}

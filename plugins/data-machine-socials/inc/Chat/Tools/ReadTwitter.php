@@ -1,0 +1,94 @@
+<?php
+/**
+ * Read Twitter Chat Tool
+ *
+ * @package    DataMachineSocials
+ * @subpackage Chat\Tools
+ * @since      0.3.0
+ */
+
+namespace DataMachineSocials\Chat\Tools;
+
+defined( 'ABSPATH' ) || exit;
+
+class ReadTwitter extends AbstractSocialTool {
+
+	protected string $tool_name = 'read_twitter';
+
+	protected string $platform = 'twitter';
+
+	protected string $platform_label = 'Twitter';
+
+	public function getToolDefinition(): array {
+		return array(
+			'class'       => self::class,
+			'method'      => 'handle_tool_call',
+			'description' => 'Read tweets from Twitter/X. List recent tweets, get a specific tweet, or view mentions. Requires Twitter OAuth to be configured.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'action'           => array(
+						'type'        => 'string',
+						'description' => 'Action: "list" (user timeline), "get" (single tweet), "mentions" (user mentions). Defaults to "list".',
+						'enum'        => array( 'list', 'get', 'mentions' ),
+					),
+					'tweet_id'         => array(
+						'type'        => 'string',
+						'description' => 'Tweet ID. Required for "get" action.',
+					),
+					'limit'            => array(
+						'type'        => 'integer',
+						'description' => 'Number of tweets to return (min 5, max 100). Defaults to 25.',
+					),
+					'pagination_token' => array(
+						'type'        => 'string',
+						'description' => 'Pagination token for next page.',
+					),
+				),
+			),
+		);
+	}
+
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		$tool_name = 'read_twitter';
+		$action    = $parameters['action'] ?? 'list';
+
+		if ( 'get' === $action && empty( $parameters['tweet_id'] ) ) {
+			return $this->buildErrorResponse( 'tweet_id is required for the get action', $tool_name );
+		}
+
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
+		}
+
+		$ability = wp_get_ability( 'datamachine/twitter-read' );
+		if ( ! $ability ) {
+			return $this->buildErrorResponse( 'datamachine/twitter-read ability not registered', $tool_name );
+		}
+		$ability_instance = $ability;
+		$input            = array( 'action' => sanitize_text_field( $action ) );
+
+		if ( ! empty( $parameters['tweet_id'] ) ) {
+			$input['tweet_id'] = sanitize_text_field( $parameters['tweet_id'] );
+		}
+		if ( ! empty( $parameters['limit'] ) ) {
+			$input['limit'] = absint( $parameters['limit'] );
+		}
+		if ( ! empty( $parameters['pagination_token'] ) ) {
+			$input['pagination_token'] = sanitize_text_field( $parameters['pagination_token'] );
+		}
+
+		$result = $ability_instance->execute( $input );
+
+		if ( is_wp_error( $result ) || ! $this->isAbilitySuccess( $result ) ) {
+			return $this->buildErrorResponse( is_wp_error( $result ) ? $result->get_error_message() : $this->getAbilityError( $result, 'Failed to read from Twitter' ), $tool_name );
+		}
+
+		return array(
+			'success'   => true,
+			'data'      => $result['data'] ?? array(),
+			'tool_name' => $tool_name,
+		);
+	}
+}

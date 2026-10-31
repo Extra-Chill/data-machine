@@ -1,0 +1,161 @@
+<?php
+/**
+* Bluesky publisher with AT Protocol authentication
+*/
+
+namespace DataMachineSocials\Handlers\Bluesky;
+
+use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Core\EngineData;
+use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
+use DataMachineSocials\Abilities\Bluesky\BlueskyPublishAbility;
+use WP_Error;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class Bluesky extends PublishHandler {
+
+	use HandlerRegistrationTrait;
+
+	private $auth;
+
+	public function __construct() {
+		parent::__construct( 'bluesky' );
+
+		// Self-register with filters
+		self::registerHandler(
+			'bluesky_publish',
+			'publish',
+			self::class,
+			'Bluesky',
+			'Post content to Bluesky social network',
+			true,
+			BlueskyAuth::class,
+			BlueskySettings::class,
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
+				return array(
+					'bluesky_publish' => array(
+						'class'                   => self::class,
+						'client_context_bindings' => array( 'job_id' ),
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post content to Bluesky. Supports text and images.',
+						'parameters'              => array(
+							'type'       => 'object',
+							'properties' => array(
+								'content' => array(
+									'type'        => 'string',
+									'description' => 'The text content to post to Bluesky',
+								),
+							),
+							'required'   => array( 'content' ),
+						),
+					),
+				);
+			},
+			'bluesky',
+			array(
+				'charLimit'          => 300,
+				'maxImages'          => 4,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => false,
+				'composer'           => array(
+					'crossPostCompatible' => true,
+					'mediaKinds'          => array( 'image' ),
+				),
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+				),
+				'preview'            => array(
+					'aspectRatio'     => '16:9',
+					'captionPosition' => 'above',
+					'previewSurface'  => 'feed',
+				),
+			)
+		);
+	}
+
+	/**
+	* Lazy-load auth provider when needed.
+	*
+	* @return BlueskyAuth|null Auth provider instance or null if unavailable
+	*/
+	private function get_auth() {
+		if ( null === $this->auth ) {
+			$auth_abilities = new AuthAbilities();
+			$this->auth     = $auth_abilities->getProvider( 'bluesky' );
+
+			if ( null === $this->auth ) {
+				$this->log(
+					'error',
+					'Bluesky Handler: Authentication service not available',
+					array(
+						'handler'             => 'bluesky',
+						'missing_service'     => 'bluesky',
+						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
+					)
+				);
+			}
+		}
+		return $this->auth;
+	}
+
+	protected function executePublish( array $parameters, array $handler_config ): array {
+		$handler_config;
+		$engine = $parameters['engine'] ?? null;
+		if ( ! $engine instanceof EngineData ) {
+			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
+		}
+
+		$media     = $this->resolveMediaUrls( $engine );
+		$image_url = $media['image_url'];
+		$video_url = $media['video_url'];
+
+		$publish_input = array(
+			'title'      => $parameters['title'] ?? '',
+			'content'    => $parameters['content'] ?? '',
+			'image_url'  => $image_url,
+			'source_url' => $engine->getSourceUrl(),
+		);
+
+		if ( ! empty( $video_url ) ) {
+			$publish_input['video_url'] = $video_url;
+		}
+
+		$result = BlueskyPublishAbility::execute_publish( $publish_input );
+
+		if ( $result['success'] ) {
+			return $this->successResponse(
+			array(
+				'post_uri' => $result['post_id'] ?? '',
+				'post_url' => $result['post_url'] ?? '',
+				'content'  => $parameters['content'] ?? '',
+			)
+			);
+		}
+
+		return $this->errorResponse(
+		$result['error'] ?? 'Bluesky publish failed',
+		array(),
+		'critical'
+		);
+	}
+
+
+	/**
+	Returns the user-friendly label for this publish handler.
+
+	@return string The label.
+*/
+	public static function get_label(): string {
+		return __( 'Post to Bluesky', 'data-machine-socials' );
+	}
+}

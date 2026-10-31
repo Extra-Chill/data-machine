@@ -1,0 +1,1415 @@
+<?php
+/**
+ * WP-CLI Reddit Command
+ *
+ * Provides CLI access to Reddit fetch operations, subreddit discovery,
+ * and account management. Wraps the FetchRedditAbility and RedditAuth
+ * providers, plus direct Reddit API calls for discovery commands.
+ *
+ * @package    DataMachineSocials
+ * @subpackage Cli\Commands
+ * @since      0.3.0
+ */
+
+namespace DataMachineSocials\Cli\Commands;
+
+use WP_CLI;
+use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Core\HttpClient;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Manage Reddit integration for Data Machine Socials.
+ *
+ * ## EXAMPLES
+ *
+ *     # Fetch a post from a subreddit
+ *     wp datamachine-socials reddit fetch jambands
+ *
+ *     # Get subreddit info
+ *     wp datamachine-socials reddit info bonnaroo
+ *
+ *     # Search for subreddits
+ *     wp datamachine-socials reddit search "music festivals"
+ *
+ *     # List posts with scores
+ *     wp datamachine-socials reddit posts sxsw --sort=top --limit=20
+ *
+ *     # Browse trending subreddits
+ *     wp datamachine-socials reddit trending --limit=10
+ *
+ *     # Check Reddit auth status
+ *     wp datamachine-socials reddit status
+ *
+ *     # Reply to a post or comment
+ *     wp datamachine-socials reddit reply t3_abc123 "Great post!"
+ *
+ *     # Submit a new text post
+ *     wp datamachine-socials reddit submit test --title="Hello World" --text="This is a test post"
+ *
+ *     # Submit a link post
+ *     wp datamachine-socials reddit submit test --title="Check this out" --url="https://example.com"
+ *
+ *     # Upvote a post
+ *     wp datamachine-socials reddit vote t3_abc123 --up
+ *
+ *     # Report posts that mention a domain
+ *     wp datamachine-socials reddit mentions example.com --owner=example_user
+ */
+class RedditCommand {
+
+	/**
+	 * Reddit OAuth API base URL.
+	 */
+	private const API_BASE = 'https://oauth.reddit.com';
+
+	/**
+	 * Get subreddit information and statistics.
+	 *
+	 * Returns subscriber count, description, creation date, and activity
+	 * metrics for a subreddit. Use this to understand a subreddit's size
+	 * and set appropriate thresholds for flow configuration.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <subreddit>
+	 * : The subreddit name (without "r/").
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit info bonnaroo
+	 *     wp datamachine-socials reddit info festivals --format=json
+	 *     wp datamachine-socials reddit info jambands --format=yaml
+	 *
+	 * @subcommand info
+	 */
+	public function info( $args, $assoc_args ) {
+		$subreddit = $args[0];
+		$format    = $assoc_args['format'] ?? 'table';
+
+		WP_CLI::log( "Fetching info for r/{$subreddit}..." );
+
+		$result = $this->reddit_api_get( "/r/{$subreddit}/about" );
+		$data   = $result['data'] ?? array();
+
+		$info = array(
+			'name'           => $data['display_name'] ?? $subreddit,
+			'title'          => $data['title'] ?? '',
+			'description'    => $data['public_description'] ?? '',
+			'subscribers'    => $data['subscribers'] ?? 0,
+			'active_users'   => $data['accounts_active'] ?? 0,
+			'created'        => ! empty( $data['created_utc'] ) ? wp_date( 'Y-m-d', intval( $data['created_utc'] ) ) : 'unknown',
+			'over_18'        => ! empty( $data['over18'] ) ? 'yes' : 'no',
+			'subreddit_type' => $data['subreddit_type'] ?? 'unknown',
+			'url'            => 'https://www.reddit.com/r/' . ( $data['display_name'] ?? $subreddit ),
+		);
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$this->output_yaml( $info );
+			return;
+		}
+
+		// Table format.
+		WP_CLI::success( "r/{$subreddit}" );
+		WP_CLI::log( '' );
+		WP_CLI::log( 'Name:         ' . $info['name'] );
+		WP_CLI::log( 'Title:        ' . $info['title'] );
+		WP_CLI::log( 'Subscribers:  ' . number_format( $info['subscribers'] ) );
+		WP_CLI::log( 'Active now:   ' . number_format( $info['active_users'] ) );
+		WP_CLI::log( 'Created:      ' . $info['created'] );
+		WP_CLI::log( 'Type:         ' . $info['subreddit_type'] );
+		WP_CLI::log( 'NSFW:         ' . $info['over_18'] );
+		WP_CLI::log( 'URL:          ' . $info['url'] );
+
+		if ( ! empty( $info['description'] ) ) {
+			WP_CLI::log( '' );
+			WP_CLI::log( 'Description:' );
+			WP_CLI::log( $info['description'] );
+		}
+	}
+
+	/**
+	 * Search for subreddits by keyword.
+	 *
+	 * Find subreddits matching a search query. Returns name, subscriber
+	 * count, and description for each match. Useful for discovering new
+	 * data sources for flows.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <query>
+	 * : Search query to find subreddits.
+	 *
+	 * [--limit=<limit>]
+	 * : Maximum number of results.
+	 * ---
+	 * default: 10
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit search "music festivals"
+	 *     wp datamachine-socials reddit search "jam bands" --limit=20
+	 *     wp datamachine-socials reddit search "electronic music" --format=json
+	 */
+	public function search( $args, $assoc_args ) {
+		$query  = $args[0];
+		$limit  = absint( $assoc_args['limit'] ?? 10 );
+		$format = $assoc_args['format'] ?? 'table';
+
+		WP_CLI::log( "Searching subreddits for \"{$query}\"..." );
+
+		$result   = $this->reddit_api_get( '/subreddits/search', array(
+			'q'     => $query,
+			'limit' => min( $limit, 100 ),
+			'sort'  => 'relevance',
+			'type'  => 'sr',
+		) );
+		$children = $result['data']['children'] ?? array();
+
+		if ( empty( $children ) ) {
+			WP_CLI::warning( 'No subreddits found for "' . $query . '".' );
+			return;
+		}
+
+		$rows = array();
+		foreach ( $children as $child ) {
+			$sub    = $child['data'] ?? array();
+			$rows[] = array(
+				'subreddit'   => 'r/' . ( $sub['display_name'] ?? '' ),
+				'subscribers' => $sub['subscribers'] ?? 0,
+				'active'      => $sub['accounts_active'] ?? 0,
+				'nsfw'        => ! empty( $sub['over18'] ) ? 'yes' : 'no',
+				'description' => mb_substr( $sub['public_description'] ?? '', 0, 80 ),
+			);
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$this->output_yaml( $rows );
+			return;
+		}
+
+		WP_CLI::success( count( $rows ) . ' subreddits found for "' . $query . '"' );
+		WP_CLI\Utils\format_items( 'table', $rows, array( 'subreddit', 'subscribers', 'active', 'nsfw', 'description' ) );
+	}
+
+	/**
+	 * List posts from a subreddit with scores.
+	 *
+	 * Unlike `fetch` which returns a single processed post, `posts` returns
+	 * a table of multiple posts with their scores, comment counts, and ages.
+	 * Use this to understand a subreddit's score distribution and set
+	 * appropriate min_upvotes thresholds.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <subreddit>
+	 * : The subreddit name (without "r/").
+	 *
+	 * [--sort=<sort>]
+	 * : Sort order for posts.
+	 * ---
+	 * default: top
+	 * options:
+	 *   - hot
+	 *   - new
+	 *   - top
+	 *   - rising
+	 *   - controversial
+	 * ---
+	 *
+	 * [--timeframe=<timeframe>]
+	 * : Time period for top/controversial sort.
+	 * ---
+	 * default: week
+	 * options:
+	 *   - hour
+	 *   - day
+	 *   - week
+	 *   - month
+	 *   - year
+	 *   - all
+	 * ---
+	 *
+	 * [--limit=<limit>]
+	 * : Number of posts to return.
+	 * ---
+	 * default: 25
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 *   - csv
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit posts bonnaroo
+	 *     wp datamachine-socials reddit posts sxsw --sort=top --timeframe=month
+	 *     wp datamachine-socials reddit posts festivals --limit=50 --format=json
+	 *     wp datamachine-socials reddit posts jambands --sort=hot
+	 */
+	public function posts( $args, $assoc_args ) {
+		$subreddit = $args[0];
+		$sort      = $assoc_args['sort'] ?? 'top';
+		$timeframe = $assoc_args['timeframe'] ?? 'week';
+		$limit     = absint( $assoc_args['limit'] ?? 25 );
+		$format    = $assoc_args['format'] ?? 'table';
+
+		WP_CLI::log( "Listing posts from r/{$subreddit} (sort: {$sort}, timeframe: {$timeframe})..." );
+
+		$params = array(
+			'limit' => min( $limit, 100 ),
+		);
+
+		// Reddit only uses the 't' parameter for top and controversial sorts.
+		if ( in_array( $sort, array( 'top', 'controversial' ), true ) ) {
+			$params['t'] = $timeframe;
+		}
+
+		$result   = $this->reddit_api_get( "/r/{$subreddit}/{$sort}", $params );
+		$children = $result['data']['children'] ?? array();
+
+		if ( empty( $children ) ) {
+			WP_CLI::warning( "No posts found in r/{$subreddit}." );
+			return;
+		}
+
+		$rows = array();
+		foreach ( $children as $child ) {
+			$post = $child['data'] ?? array();
+
+			// Skip stickied/pinned mod posts.
+			if ( ! empty( $post['stickied'] ) || ! empty( $post['pinned'] ) ) {
+				continue;
+			}
+
+			$age_hours = ! empty( $post['created_utc'] ) ? round( ( time() - $post['created_utc'] ) / 3600 ) : 0;
+			if ( $age_hours >= 24 ) {
+				$age = round( $age_hours / 24 ) . 'd';
+			} else {
+				$age = $age_hours . 'h';
+			}
+
+			$rows[] = array(
+				'score'    => $post['score'] ?? 0,
+				'comments' => $post['num_comments'] ?? 0,
+				'age'      => $age,
+				'author'   => $post['author'] ?? '[deleted]',
+				'title'    => mb_substr( $post['title'] ?? '', 0, 70 ),
+			);
+		}
+
+		if ( empty( $rows ) ) {
+			WP_CLI::warning( "No non-stickied posts found in r/{$subreddit}." );
+			return;
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$this->output_yaml( $rows );
+			return;
+		}
+
+		// Show score distribution summary before table.
+		$scores = array_column( $rows, 'score' );
+		sort( $scores );
+		$count  = count( $scores );
+		$median = 0 === $count % 2
+			? ( $scores[ $count / 2 - 1 ] + $scores[ $count / 2 ] ) / 2
+			: $scores[ intval( $count / 2 ) ];
+
+		WP_CLI::success( count( $rows ) . " posts from r/{$subreddit}" );
+		WP_CLI::log( sprintf(
+			'Score distribution: min=%d, median=%s, max=%d, avg=%d',
+			min( $scores ),
+			$median,
+			max( $scores ),
+			round( array_sum( $scores ) / $count )
+		) );
+		WP_CLI::log( '' );
+		WP_CLI\Utils\format_items( $format, $rows, array( 'score', 'comments', 'age', 'author', 'title' ) );
+	}
+
+	/**
+	 * Browse trending and popular subreddits.
+	 *
+	 * Lists popular subreddits sorted by subscriber count. Use --search
+	 * to filter by category or topic. Useful for discovering new sources.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--limit=<limit>]
+	 * : Number of subreddits to show.
+	 * ---
+	 * default: 25
+	 * ---
+	 *
+	 * [--new]
+	 * : Show new subreddits instead of popular ones.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 *   - csv
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit trending
+	 *     wp datamachine-socials reddit trending --limit=50
+	 *     wp datamachine-socials reddit trending --new
+	 *     wp datamachine-socials reddit trending --format=json
+	 */
+	public function trending( $args, $assoc_args ) {
+		$limit    = absint( $assoc_args['limit'] ?? 25 );
+		$format   = $assoc_args['format'] ?? 'table';
+		$endpoint = isset( $assoc_args['new'] ) ? '/subreddits/new' : '/subreddits/popular';
+		$label    = isset( $assoc_args['new'] ) ? 'new' : 'popular';
+
+		WP_CLI::log( "Fetching {$label} subreddits..." );
+
+		$result   = $this->reddit_api_get( $endpoint, array(
+			'limit' => min( $limit, 100 ),
+		) );
+		$children = $result['data']['children'] ?? array();
+
+		if ( empty( $children ) ) {
+			WP_CLI::warning( "No {$label} subreddits returned." );
+			return;
+		}
+
+		$rows = array();
+		foreach ( $children as $child ) {
+			$sub    = $child['data'] ?? array();
+			$rows[] = array(
+				'subreddit'   => 'r/' . ( $sub['display_name'] ?? '' ),
+				'subscribers' => $sub['subscribers'] ?? 0,
+				'active'      => $sub['accounts_active'] ?? 0,
+				'nsfw'        => ! empty( $sub['over18'] ) ? 'yes' : 'no',
+				'description' => mb_substr( $sub['public_description'] ?? '', 0, 60 ),
+			);
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$this->output_yaml( $rows );
+			return;
+		}
+
+		WP_CLI::success( count( $rows ) . " {$label} subreddits" );
+		WP_CLI\Utils\format_items( $format, $rows, array( 'subreddit', 'subscribers', 'active', 'nsfw', 'description' ) );
+	}
+
+	/**
+	 * Fetch posts from Reddit.
+	 *
+	 * Fetches from a specific subreddit, or searches across all of Reddit
+	 * when --query is provided without a subreddit. Uses the
+	 * datamachine/fetch-reddit ability with all configured filters.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [<subreddit>]
+	 * : The subreddit name (without "r/"). Optional when --query is used.
+	 *
+	 * [--query=<query>]
+	 * : Search query. Without a subreddit, searches all of Reddit.
+	 *   With a subreddit, searches within that subreddit.
+	 *
+	 * [--sort=<sort>]
+	 * : Sort order for posts.
+	 * ---
+	 * default: hot
+	 * options:
+	 *   - hot
+	 *   - new
+	 *   - top
+	 *   - rising
+	 *   - controversial
+	 *   - relevance
+	 *   - comments
+	 * ---
+	 *
+	 * [--timeframe=<timeframe>]
+	 * : Timeframe filter.
+	 * ---
+	 * default: all_time
+	 * options:
+	 *   - all_time
+	 *   - 24_hours
+	 *   - 72_hours
+	 *   - 7_days
+	 *   - 30_days
+	 *   - 90_days
+	 *   - 6_months
+	 *   - 1_year
+	 * ---
+	 *
+	 * [--min-upvotes=<min_upvotes>]
+	 * : Minimum upvotes required.
+	 * ---
+	 * default: 0
+	 * ---
+	 *
+	 * [--min-comments=<min_comments>]
+	 * : Minimum comment count required.
+	 * ---
+	 * default: 0
+	 * ---
+	 *
+	 * [--comments=<comments>]
+	 * : Number of top comments to fetch per post.
+	 * ---
+	 * default: 0
+	 * ---
+	 *
+	 * [--search=<search>]
+	 * : Comma-separated search terms to filter posts locally (client-side).
+	 *
+	 * [--limit=<count>]
+	 * : Maximum eligible posts to return. Must be between 1 and 500.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Fetch from a subreddit
+	 *     wp datamachine-socials reddit fetch jambands
+	 *     wp datamachine-socials reddit fetch festivals --sort=top --min-upvotes=50 --limit=25
+	 *     wp datamachine-socials reddit fetch bonnaroo --timeframe=7_days --comments=5
+	 *
+	 *     # Global search across all of Reddit
+	 *     wp datamachine-socials reddit fetch --query="best live music calendar" --sort=relevance --timeframe=30_days --limit=10
+	 *     wp datamachine-socials reddit fetch --query="concert events near me" --min-upvotes=5 --comments=3
+	 *
+	 *     # Search within a specific subreddit
+	 *     wp datamachine-socials reddit fetch Austin --query="live music tonight"
+	 */
+	public function fetch( $args, $assoc_args ) {
+		$subreddit = $args[0] ?? '';
+		$query     = $assoc_args['query'] ?? '';
+
+		// Validate: must have at least one of subreddit or query.
+		if ( empty( $subreddit ) && empty( $query ) ) {
+			WP_CLI::error( 'Provide a subreddit name or --query (or both).' );
+		}
+
+		try {
+			$limit_input = $this->applyFetchLimit( array(), $assoc_args );
+		} catch ( \InvalidArgumentException $exception ) {
+			WP_CLI::error( $exception->getMessage() );
+		}
+
+		$access_token = $this->get_access_token();
+
+		// Default sort to 'relevance' for search queries.
+		$default_sort = ! empty( $query ) ? 'relevance' : 'hot';
+
+		// Build ability input.
+		$input = array(
+			'subreddit'         => $subreddit,
+			'query'             => $query,
+			'access_token'      => $access_token,
+			'sort_by'           => $assoc_args['sort'] ?? $default_sort,
+			'timeframe_limit'   => $assoc_args['timeframe'] ?? 'all_time',
+			'min_upvotes'       => absint( $assoc_args['min-upvotes'] ?? 0 ),
+			'min_comment_count' => absint( $assoc_args['min-comments'] ?? 0 ),
+			'comment_count'     => absint( $assoc_args['comments'] ?? 0 ),
+			'search'            => $assoc_args['search'] ?? '',
+			'fetch_batch_size'  => 100,
+			'max_pages'         => 5,
+			'download_images'   => false, // CLI doesn't download images by default.
+		);
+		$input = array_merge( $input, $limit_input );
+
+		if ( ! empty( $subreddit ) && ! empty( $query ) ) {
+			WP_CLI::log( "Searching r/{$subreddit} for \"{$query}\" (sort: {$input['sort_by']})..." );
+		} elseif ( ! empty( $query ) ) {
+			WP_CLI::log( "Searching all of Reddit for \"{$query}\" (sort: {$input['sort_by']})..." );
+		} else {
+			WP_CLI::log( "Fetching from r/{$subreddit} (sort: {$input['sort_by']})..." );
+		}
+
+		$ability = wp_get_ability( 'datamachine/fetch-reddit' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/fetch-reddit ability not registered.' );
+		}
+
+		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit fetch failed.' ) );
+		}
+
+		// The ability returns 'items' array for multiple results.
+		$items = $result['items'] ?? array();
+
+		if ( empty( $items ) ) {
+			WP_CLI::warning( 'No eligible posts found with the given filters.' );
+			return;
+		}
+
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$this->output_yaml( $items );
+			return;
+		}
+
+		// Table format: show all results.
+		$rows = array();
+		foreach ( $items as $item ) {
+			$data     = $item['data'] ?? array();
+			$metadata = $data['metadata'] ?? array();
+			$rows[]   = array(
+				'score'     => $metadata['upvotes'] ?? 0,
+				'comments'  => $metadata['comment_count'] ?? 0,
+				'subreddit' => 'r/' . ( $metadata['subreddit'] ?? '' ),
+				'author'    => $metadata['author'] ?? '[deleted]',
+				'title'     => mb_substr( $data['title'] ?? '', 0, 60 ),
+				'url'       => $item['source_url'] ?? '',
+			);
+		}
+
+		WP_CLI::success( count( $rows ) . ' posts found' );
+		WP_CLI\Utils\format_items( 'table', $rows, array( 'score', 'comments', 'subreddit', 'author', 'title' ) );
+	}
+
+	/**
+	 * Report Reddit posts that link to or mention a domain.
+	 *
+	 * The report uses Reddit post search and does not claim comment coverage.
+	 * Owner usernames classify rows as owned; every other author is organic.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <domain>
+	 * : Domain or root URL to report.
+	 *
+	 * [--owner=<username>]
+	 * : Known owner usernames as a comma-separated list.
+	 *
+	 * [--timeframe=<timeframe>]
+	 * : Fetch timeframe (all_time, 24_hours, 72_hours, 7_days, 30_days, 90_days, 6_months, 1_year).
+	 * ---
+	 * default: all_time
+	 * ---
+	 *
+	 * [--limit=<count>]
+	 * : Maximum deduplicated rows (1-500).
+	 * ---
+	 * default: 100
+	 * ---
+	 *
+	 * [--max-pages=<count>]
+	 * : Maximum Reddit pages fetched per query variant (1-10).
+	 * ---
+	 * default: 5
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit mentions example.com
+	 *     wp datamachine-socials reddit mentions https://example.com/ --owner=account_one,account_two --format=json
+	 *
+	 * @subcommand mentions
+	 */
+	public function mentions( $args, $assoc_args ) {
+		$domain    = $args[0] ?? '';
+		$format    = $assoc_args['format'] ?? 'table';
+		$limit     = $this->parseBoundedInteger( $assoc_args['limit'] ?? '100', '--limit', 1, 500 );
+		$max_pages = $this->parseBoundedInteger( $assoc_args['max-pages'] ?? '5', '--max-pages', 1, 10 );
+		$owners    = $this->parseOwners( $assoc_args['owner'] ?? array() );
+
+		$ability = wp_get_ability( 'datamachine/reddit-domain-mentions' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reddit-domain-mentions ability not registered.' );
+		}
+
+		$result = $ability->execute(
+			array(
+				'domain'          => $domain,
+				'owners'          => $owners,
+				'timeframe_limit' => $assoc_args['timeframe'] ?? 'all_time',
+				'limit'           => $limit,
+				'max_pages'       => $max_pages,
+			)
+		);
+
+		if ( is_wp_error( $result ) || empty( $result['success'] ) ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit domain mentions report failed.' ) );
+		}
+
+		$report = $result['report'];
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		WP_CLI::log( sprintf( 'Domain: %s', $report['domain'] ) );
+		WP_CLI::log( sprintf( 'Total: %d | Owned: %d | Organic: %d', $report['totals']['total'], $report['totals']['owned'], $report['totals']['organic'] ) );
+		WP_CLI::log( 'Truncated: ' . ( $report['truncated'] ? 'yes' : 'no' ) );
+		WP_CLI::log( $report['coverage'] );
+
+		$rows = array_map(
+			static function ( array $row ): array {
+				return array(
+					'date'       => substr( $row['timestamp'], 0, 10 ),
+					'ownership'  => $row['ownership'],
+					'type'       => $row['match_type'],
+					'author'     => $row['author'],
+					'subreddit'  => 'r/' . $row['subreddit'],
+					'host'       => $row['matched_host'],
+					'score'      => $row['score'],
+					'comments'   => $row['comment_count'],
+					'title'      => mb_substr( $row['title'], 0, 55 ),
+					'target_url' => $row['matched_target_url'],
+					'permalink'  => $row['reddit_permalink'],
+				);
+			},
+			$report['rows']
+		);
+
+		if ( empty( $rows ) ) {
+			WP_CLI::warning( 'No matching Reddit posts found.' );
+			return;
+		}
+
+		WP_CLI\Utils\format_items( 'table', $rows, array( 'date', 'ownership', 'type', 'author', 'subreddit', 'host', 'score', 'comments', 'title', 'target_url', 'permalink' ) );
+	}
+
+	private function parseOwners( mixed $input ): array {
+		$values = is_array( $input ) ? $input : array( $input );
+		$owners = array();
+		foreach ( $values as $value ) {
+			$owners = array_merge( $owners, array_map( 'trim', explode( ',', (string) $value ) ) );
+		}
+		return array_values( array_filter( $owners, static fn( string $owner ): bool => '' !== $owner ) );
+	}
+
+	private function parseBoundedInteger( mixed $input, string $option, int $minimum, int $maximum ): int {
+		if ( ! is_scalar( $input ) || ! preg_match( '/^[1-9][0-9]*$/', (string) $input ) ) {
+			WP_CLI::error( sprintf( '%s must be a whole number between %d and %d.', $option, $minimum, $maximum ) );
+		}
+		$value = (int) $input;
+		if ( $value < $minimum || $value > $maximum ) {
+			WP_CLI::error( sprintf( '%s must be a whole number between %d and %d.', $option, $minimum, $maximum ) );
+		}
+		return $value;
+	}
+
+	/**
+	 * Poll bounded subreddit comment streams for configured domains.
+	 *
+	 * This is incremental monitoring of explicit subreddit scopes. It is not a
+	 * global or comprehensive historical Reddit comment search.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --domains=<domains>
+	 * : Comma-separated domains to monitor.
+	 *
+	 * --subreddits=<subreddits>
+	 * : Comma-separated subreddit scopes.
+	 *
+	 * [--include-subdomains]
+	 * : Match child hosts in addition to each exact domain.
+	 *
+	 * [--owners=<usernames>]
+	 * : Comma-separated known owner usernames, classified separately from organic mentions.
+	 *
+	 * [--page-size=<count>]
+	 * : Comments per Reddit page, 1-100. Default 100.
+	 *
+	 * [--max-pages=<count>]
+	 * : Maximum pages per scope and invocation, 1-10. Default 5.
+	 *
+	 * [--format=<format>]
+	 * : Output format: table or json. Default table.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit monitor-comments --domains=example.com --subreddits=music,festivals
+	 *     wp datamachine-socials reddit monitor-comments --domains=example.com --subreddits=music --include-subdomains --owners=account_name --format=json
+	 *
+	 * @subcommand monitor-comments
+	 */
+	public function monitor_comments( $args, $assoc_args ) {
+		$args;
+		$domains    = $this->csv_values( (string) ( $assoc_args['domains'] ?? '' ) );
+		$subreddits = $this->csv_values( (string) ( $assoc_args['subreddits'] ?? '' ) );
+		if ( empty( $domains ) || empty( $subreddits ) ) {
+			WP_CLI::error( '--domains and --subreddits are required comma-separated lists.' );
+		}
+
+		$page_size = $this->bounded_integer_arg( $assoc_args, 'page-size', 100, 1, 100 );
+		$max_pages = $this->bounded_integer_arg( $assoc_args, 'max-pages', 5, 1, 10 );
+		$format    = $this->format_arg( $assoc_args, array( 'table', 'json' ) );
+		$ability   = wp_get_ability( 'datamachine/reddit-comment-mentions-poll' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reddit-comment-mentions-poll ability not registered.' );
+		}
+		$result = $ability->execute(
+			array(
+				'domains'            => $domains,
+				'subreddits'         => $subreddits,
+				'include_subdomains' => isset( $assoc_args['include-subdomains'] ),
+				'known_owners'       => $this->csv_values( (string) ( $assoc_args['owners'] ?? '' ) ),
+				'page_size'          => $page_size,
+				'max_pages'          => $max_pages,
+			)
+		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		$rows = array();
+		foreach ( $result['data']['scopes'] ?? array() as $subreddit => $scope ) {
+			$rows[] = array(
+				'subreddit'    => 'r/' . $subreddit,
+				'checked'      => $scope['checked'],
+				'inserted'     => $scope['inserted'],
+				'updated'      => $scope['updated'],
+				'pages'        => $scope['pages'],
+				'truncated'    => $scope['truncated'] ? 'yes' : 'no',
+				'checkpoint'   => $scope['checkpoint'],
+				'continuation' => $scope['continuation'],
+			);
+		}
+		if ( ! empty( $rows ) ) {
+			WP_CLI\Utils\format_items( 'table', $rows, array( 'subreddit', 'checked', 'inserted', 'updated', 'pages', 'truncated', 'checkpoint', 'continuation' ) );
+		}
+		foreach ( $result['data']['errors'] ?? array() as $subreddit => $error ) {
+			WP_CLI::warning( sprintf( 'r/%s: %s', $subreddit, $error['message'] ) );
+		}
+		WP_CLI::log( 'Coverage: bounded incremental subreddit comment streams only; not all Reddit comments or historical global search.' );
+	}
+
+	/**
+	 * Report retained bounded Reddit comment-domain observations.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--domain=<domain>]
+	 * : Filter by monitored domain.
+	 *
+	 * [--subreddit=<subreddit>]
+	 * : Filter by subreddit.
+	 *
+	 * [--from=<date>]
+	 * : Earliest comment date or timestamp.
+	 *
+	 * [--to=<date>]
+	 * : Latest comment date or timestamp.
+	 *
+	 * [--ownership=<ownership>]
+	 * : all, known_owner, or organic. Default all.
+	 *
+	 * [--owners=<usernames>]
+	 * : Reclassify against comma-separated known owner usernames at report time.
+	 *
+	 * [--min-score=<score>]
+	 * : Minimum current observed score.
+	 *
+	 * [--limit=<count>]
+	 * : Maximum rows, 1-500. Default 100.
+	 *
+	 * [--format=<format>]
+	 * : Output format: table, json, or csv. Default table.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit comment-mentions --domain=example.com --ownership=organic
+	 *     wp datamachine-socials reddit comment-mentions --subreddit=music --from=2026-07-01 --format=json
+	 *
+	 * @subcommand comment-mentions
+	 */
+	public function comment_mentions( $args, $assoc_args ) {
+		$args;
+		$format    = $this->format_arg( $assoc_args, array( 'table', 'json', 'csv' ) );
+		$limit     = $this->bounded_integer_arg( $assoc_args, 'limit', 100, 1, 500 );
+		$min_score = $this->signed_integer_arg( $assoc_args, 'min-score', PHP_INT_MIN );
+		$ability   = wp_get_ability( 'datamachine/reddit-comment-mentions-report' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reddit-comment-mentions-report ability not registered.' );
+		}
+		$result = $ability->execute(
+			array(
+				'domain'       => (string) ( $assoc_args['domain'] ?? '' ),
+				'subreddit'    => (string) ( $assoc_args['subreddit'] ?? '' ),
+				'date_from'    => (string) ( $assoc_args['from'] ?? '' ),
+				'date_to'      => (string) ( $assoc_args['to'] ?? '' ),
+				'ownership'    => (string) ( $assoc_args['ownership'] ?? 'all' ),
+				'known_owners' => $this->csv_values( (string) ( $assoc_args['owners'] ?? '' ) ),
+				'min_score'    => $min_score,
+				'limit'        => $limit,
+			)
+		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+		$rows = array_map(
+			static fn( array $record ): array => array(
+				'date'        => gmdate( 'Y-m-d H:i:s', (int) $record['comment_created_utc'] ),
+				'domain'      => $record['domain'],
+				'subreddit'   => 'r/' . $record['subreddit'],
+				'author'      => $record['author'],
+				'ownership'   => $record['known_owner'] ? 'known_owner' : 'organic',
+				'score'       => $record['score'],
+				'matched_url' => $record['matched_url'],
+				'permalink'   => $record['permalink'],
+			),
+			$result['data']['matches'] ?? array()
+		);
+		if ( ! empty( $rows ) ) {
+			WP_CLI\Utils\format_items( $format, $rows, array( 'date', 'domain', 'subreddit', 'author', 'ownership', 'score', 'matched_url', 'permalink' ) );
+		} else {
+			WP_CLI::warning( 'No retained observations matched the filters.' );
+		}
+		WP_CLI::log( 'Coverage: bounded incremental subreddit comment streams only; not all Reddit comments or historical global search.' );
+		if ( ! empty( $result['coverage']['truncated'] ) ) {
+			WP_CLI::warning( 'One or more configured scopes is truncated, pending, or has a cursor gap/error.' );
+		}
+	}
+
+	/**
+	 * Apply Reddit comment observation retention immediately.
+	 *
+	 * @subcommand cleanup-comment-mentions
+	 */
+	public function cleanup_comment_mentions( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
+		$ability = wp_get_ability( 'datamachine/reddit-comment-mentions-cleanup' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reddit-comment-mentions-cleanup ability not registered.' );
+		}
+		$result = $ability->execute( array() );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+		WP_CLI::success( sprintf( 'Deleted %d observations; %d retained (%d-day retention, %d-record cap).', $result['data']['deleted'], $result['data']['retained'], $result['data']['retention_days'], $result['data']['max_records'] ) );
+	}
+
+	/**
+	 * Validate and map the optional CLI limit to the direct ability contract.
+	 */
+	private function applyFetchLimit( array $input, array $assoc_args ): array {
+		if ( ! array_key_exists( 'limit', $assoc_args ) ) {
+			return $input;
+		}
+
+		$limit = $assoc_args['limit'];
+		if ( ! is_string( $limit ) || ! preg_match( '/^[1-9][0-9]*$/', $limit ) || (int) $limit > 500 ) {
+			throw new \InvalidArgumentException( '--limit must be a whole number between 1 and 500.' );
+		}
+
+		$input['max_items'] = (int) $limit;
+		return $input;
+	}
+
+	/** Parse a comma-separated CLI list. */
+	private function csv_values( string $value ): array {
+		return array_values( array_filter( array_map( 'trim', explode( ',', $value ) ), static fn( string $item ): bool => '' !== $item ) );
+	}
+
+	/** Validate a bounded whole-number option. */
+	private function bounded_integer_arg( array $assoc_args, string $name, int $default_value, int $minimum, int $maximum ): int {
+		if ( ! array_key_exists( $name, $assoc_args ) ) {
+			return $default_value;
+		}
+		$value = $assoc_args[ $name ];
+		if ( ! is_string( $value ) || ! preg_match( '/^[0-9]+$/', $value ) || (int) $value < $minimum || (int) $value > $maximum ) {
+			WP_CLI::error( sprintf( '--%s must be a whole number between %d and %d.', $name, $minimum, $maximum ) );
+		}
+		return (int) $value;
+	}
+
+	/** Validate a signed whole-number option. */
+	private function signed_integer_arg( array $assoc_args, string $name, int $default_value ): int {
+		if ( ! array_key_exists( $name, $assoc_args ) ) {
+			return $default_value;
+		}
+		$value = $assoc_args[ $name ];
+		if ( ! is_string( $value ) || ! preg_match( '/^-?[0-9]+$/', $value ) ) {
+			WP_CLI::error( sprintf( '--%s must be a whole number.', $name ) );
+		}
+		return (int) $value;
+	}
+
+	/** Validate a command output format. */
+	private function format_arg( array $assoc_args, array $allowed ): string {
+		$format = (string) ( $assoc_args['format'] ?? 'table' );
+		if ( ! in_array( $format, $allowed, true ) ) {
+			WP_CLI::error( sprintf( '--format must be one of: %s.', implode( ', ', $allowed ) ) );
+		}
+		return $format;
+	}
+
+	/**
+	 * Show Reddit authentication status.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit status
+	 */
+	public function status( $args, $assoc_args ) {
+		$args;
+		$assoc_args;
+		$auth_abilities = new AuthAbilities();
+		$provider       = $auth_abilities->getProvider( 'reddit' );
+
+		WP_CLI::log( 'Reddit Integration Status' );
+		WP_CLI::log( '---' );
+
+		if ( ! $provider ) {
+			WP_CLI::log( 'Provider:      Not found' );
+			WP_CLI::log( 'Authenticated: No' );
+			return;
+		}
+
+		$authenticated = $provider->is_authenticated();
+		$details       = $provider->get_account_details();
+
+		WP_CLI::log( 'Authenticated: ' . ( $authenticated ? 'Yes' : 'No' ) );
+
+		if ( $details ) {
+			WP_CLI::log( 'Username:      ' . ( $details['username'] ?? 'unknown' ) );
+			WP_CLI::log( 'Scope:         ' . ( $details['scope'] ?? 'unknown' ) );
+
+			if ( ! empty( $details['token_expires_at'] ) ) {
+				$expires_at = intval( $details['token_expires_at'] );
+				$remaining  = $expires_at - time();
+
+				if ( $remaining > 0 ) {
+					$minutes = round( $remaining / 60 );
+					WP_CLI::log( "Token expires: in {$minutes} minutes" );
+				} else {
+					WP_CLI::log( 'Token expires: EXPIRED (will auto-refresh)' );
+				}
+			}
+
+			if ( ! empty( $details['last_refreshed_at'] ) ) {
+				WP_CLI::log( 'Last refresh:  ' . wp_date( 'Y-m-d H:i:s', intval( $details['last_refreshed_at'] ) ) );
+			}
+
+			$next_cron = wp_next_scheduled( 'datamachine_refresh_token_reddit' );
+			if ( $next_cron ) {
+				WP_CLI::log( 'Next cron:     ' . wp_date( 'Y-m-d H:i:s', $next_cron ) );
+			}
+		}
+	}
+
+	/**
+	 * Reply to a Reddit post or comment.
+	 *
+	 * Posts a comment in reply to a post or another comment. The thing_id
+	 * must be a Reddit fullname: t3_xxx for posts, t1_xxx for comments.
+	 * You can find these IDs in the URL or via the `fetch` and `posts` commands.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <thing_id>
+	 * : Reddit fullname of the post (t3_xxx) or comment (t1_xxx) to reply to.
+	 *
+	 * <text>
+	 * : Reply text. Supports Reddit markdown.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit reply t3_abc123 "Great post! Check out events.extrachill.com for more."
+	 *     wp datamachine-socials reddit reply t1_def456 "Totally agree with this."
+	 *     wp datamachine-socials reddit reply t3_abc123 "Here's a [link](https://example.com)" --format=json
+	 */
+	public function reply( $args, $assoc_args ) {
+		$thing_id     = $args[0];
+		$text         = $args[1];
+		$format       = $assoc_args['format'] ?? 'table';
+		$access_token = $this->get_access_token();
+
+		$type_label = str_starts_with( $thing_id, 't3_' ) ? 'post' : 'comment';
+		WP_CLI::log( "Replying to {$type_label} {$thing_id}..." );
+
+		$ability = wp_get_ability( 'datamachine/reply-reddit' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/reply-reddit ability not registered.' );
+		}
+
+		$result = $ability->execute( array(
+			'thing_id'     => $thing_id,
+			'text'         => $text,
+			'access_token' => $access_token,
+		) );
+
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit reply failed.' ) );
+		}
+
+		$data = $result['data'] ?? array();
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$this->output_yaml( $data );
+			return;
+		}
+
+		WP_CLI::success( "Reply posted to {$type_label} {$thing_id}" );
+		if ( ! empty( $data['comment_url'] ) ) {
+			WP_CLI::log( 'URL:    ' . $data['comment_url'] );
+		}
+		if ( ! empty( $data['comment_id'] ) ) {
+			WP_CLI::log( 'ID:     ' . $data['comment_id'] );
+		}
+		WP_CLI::log( 'Author: ' . ( $data['author'] ?? 'unknown' ) );
+	}
+
+	/**
+	 * Submit a new post to a subreddit.
+	 *
+	 * Creates a self (text) post or link post in the specified subreddit.
+	 * Provide --text for a self post, or --url for a link post.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <subreddit>
+	 * : The subreddit name (without "r/").
+	 *
+	 * --title=<title>
+	 * : Post title (max 300 characters).
+	 *
+	 * [--text=<text>]
+	 * : Self-post body text (markdown). Creates a text post.
+	 *
+	 * [--url=<url>]
+	 * : URL for link posts. Cannot be combined with --text.
+	 *
+	 * [--flair-id=<flair_id>]
+	 * : Flair template ID (if required by subreddit).
+	 *
+	 * [--flair-text=<flair_text>]
+	 * : Flair text.
+	 *
+	 * [--nsfw]
+	 * : Mark as NSFW.
+	 *
+	 * [--spoiler]
+	 * : Mark as spoiler.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit submit test --title="Hello World" --text="Testing from WP-CLI"
+	 *     wp datamachine-socials reddit submit music --title="Check this out" --url="https://example.com/song"
+	 *     wp datamachine-socials reddit submit festivals --title="Festival Guide" --text="Here's our guide..." --format=json
+	 */
+	public function submit( $args, $assoc_args ) {
+		$subreddit    = $args[0];
+		$title        = $assoc_args['title'] ?? '';
+		$text         = $assoc_args['text'] ?? '';
+		$url          = $assoc_args['url'] ?? '';
+		$format       = $assoc_args['format'] ?? 'table';
+		$access_token = $this->get_access_token();
+
+		if ( empty( $title ) ) {
+			WP_CLI::error( '--title is required.' );
+		}
+
+		if ( ! empty( $text ) && ! empty( $url ) ) {
+			WP_CLI::error( 'Cannot combine --text and --url. Use one or the other.' );
+		}
+
+		$kind = ! empty( $url ) ? 'link' : 'self';
+		WP_CLI::log( "Submitting {$kind} post to r/{$subreddit}..." );
+
+		$ability = wp_get_ability( 'datamachine/submit-reddit' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/submit-reddit ability not registered.' );
+		}
+
+		$result = $ability->execute( array(
+			'subreddit'    => $subreddit,
+			'title'        => $title,
+			'text'         => $text,
+			'url'          => $url,
+			'flair_id'     => $assoc_args['flair-id'] ?? '',
+			'flair_text'   => $assoc_args['flair-text'] ?? '',
+			'nsfw'         => isset( $assoc_args['nsfw'] ),
+			'spoiler'      => isset( $assoc_args['spoiler'] ),
+			'access_token' => $access_token,
+		) );
+
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit submit failed.' ) );
+		}
+
+		$data = $result['data'] ?? array();
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$this->output_yaml( $data );
+			return;
+		}
+
+		WP_CLI::success( "Post submitted to r/{$subreddit}" );
+		WP_CLI::log( 'Title: ' . ( $data['title'] ?? '' ) );
+		WP_CLI::log( 'Type:  ' . ( $data['kind'] ?? '' ) );
+		if ( ! empty( $data['post_url'] ) ) {
+			WP_CLI::log( 'URL:   ' . $data['post_url'] );
+		}
+		if ( ! empty( $data['post_name'] ) ) {
+			WP_CLI::log( 'Name:  ' . $data['post_name'] );
+		}
+	}
+
+	/**
+	 * Vote on a Reddit post or comment.
+	 *
+	 * Upvote, downvote, or remove your vote from a post or comment.
+	 * Default is upvote. Use --down to downvote or --unvote to remove.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <thing_id>
+	 * : Reddit fullname of the post (t3_xxx) or comment (t1_xxx).
+	 *
+	 * [--up]
+	 * : Upvote (default).
+	 *
+	 * [--down]
+	 * : Downvote.
+	 *
+	 * [--unvote]
+	 * : Remove existing vote.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine-socials reddit vote t3_abc123
+	 *     wp datamachine-socials reddit vote t3_abc123 --up
+	 *     wp datamachine-socials reddit vote t3_abc123 --down
+	 *     wp datamachine-socials reddit vote t1_def456 --unvote
+	 */
+	public function vote( $args, $assoc_args ) {
+		$thing_id     = $args[0];
+		$access_token = $this->get_access_token();
+
+		// Determine direction.
+		if ( isset( $assoc_args['down'] ) ) {
+			$direction = -1;
+			$label     = 'Downvoting';
+		} elseif ( isset( $assoc_args['unvote'] ) ) {
+			$direction = 0;
+			$label     = 'Removing vote from';
+		} else {
+			$direction = 1;
+			$label     = 'Upvoting';
+		}
+
+		WP_CLI::log( "{$label} {$thing_id}..." );
+
+		$ability = wp_get_ability( 'datamachine/vote-reddit' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/vote-reddit ability not registered.' );
+		}
+
+		$result = $ability->execute( array(
+			'thing_id'     => $thing_id,
+			'direction'    => $direction,
+			'access_token' => $access_token,
+		) );
+
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : ( $result['error'] ?? 'Reddit vote failed.' ) );
+		}
+
+		$action = $result['data']['action'] ?? 'voted';
+		WP_CLI::success( "Successfully {$action} {$thing_id}" );
+	}
+
+	/**
+	 * Get a valid Reddit access token or exit with error.
+	 *
+	 * @return string Access token.
+	 */
+	private function get_access_token(): string {
+		$auth_abilities = new AuthAbilities();
+		$provider       = $auth_abilities->getProvider( 'reddit' );
+
+		if ( ! $provider ) {
+			WP_CLI::error( 'Reddit auth provider not found. Is data-machine-socials active?' );
+		}
+
+		if ( ! $provider->is_authenticated() ) {
+			WP_CLI::error( 'Reddit is not authenticated. Connect via Settings > Data Machine > Auth.' );
+		}
+
+		$access_token = $provider->get_valid_access_token();
+		if ( empty( $access_token ) ) {
+			WP_CLI::error( 'Failed to obtain a valid Reddit access token (expired and refresh failed).' );
+		}
+
+		return $access_token;
+	}
+
+	/**
+	 * Make an authenticated GET request to the Reddit OAuth API.
+	 *
+	 * @param string $endpoint API endpoint path (e.g. "/r/bonnaroo/about").
+	 * @param array  $params   Optional query parameters.
+	 * @return array Decoded JSON response data.
+	 */
+	private function reddit_api_get( string $endpoint, array $params = array() ): array {
+		$access_token = $this->get_access_token();
+
+		$url = self::API_BASE . $endpoint . '.json';
+		if ( ! empty( $params ) ) {
+			$url .= '?' . http_build_query( $params );
+		}
+
+		$result = HttpClient::get( $url, array(
+			'headers' => array(
+				'Authorization' => 'Bearer ' . $access_token,
+				'User-Agent'    => 'php:DataMachineWPPlugin:v' . DATAMACHINE_VERSION . ' (by Data Machine)',
+			),
+			'context' => 'Reddit CLI',
+		) );
+
+		if ( ! $result['success'] || 200 !== ( $result['status_code'] ?? 0 ) ) {
+			$status = $result['status_code'] ?? 'unknown';
+			WP_CLI::error( "Reddit API request failed (HTTP {$status}): {$endpoint}" );
+		}
+
+		$decoded = json_decode( $result['data'] ?? '', true );
+		if ( ! is_array( $decoded ) ) {
+			WP_CLI::error( "Reddit API returned invalid JSON for {$endpoint}" );
+		}
+
+		return $decoded;
+	}
+
+	/**
+	 * Output data as YAML-like format.
+	 *
+	 * @param array $data Data to output.
+	 */
+	private function output_yaml( array $data, int $indent = 0 ): void {
+		$prefix = str_repeat( '  ', $indent );
+		foreach ( $data as $key => $value ) {
+			if ( is_array( $value ) ) {
+				WP_CLI::log( "{$prefix}{$key}:" );
+				$this->output_yaml( $value, $indent + 1 );
+			} else {
+				$display = is_bool( $value ) ? ( $value ? 'true' : 'false' ) : (string) $value;
+				WP_CLI::log( "{$prefix}{$key}: {$display}" );
+			}
+		}
+	}
+}
