@@ -13,6 +13,7 @@ $GLOBALS['setup_schema_succeeds']  = true;
 $GLOBALS['identity_schema_valid']  = false;
 $GLOBALS['identity_create_calls']  = 0;
 $GLOBALS['identity_create_works']  = true;
+$GLOBALS['identity_validate_calls'] = 0;
 
 function get_option( $key, $default = false ) { return $GLOBALS['setup_options'][ $key ] ?? $default; }
 function update_option( $key, $value, $autoload = null ) { $GLOBALS['setup_options'][ $key ] = $value; return true; }
@@ -41,7 +42,7 @@ eval(
 	'namespace DataMachine\Core\Database\PostIdentityReservations;
 	class PostIdentityReservations {
 		public const SCHEMA_VERSION = 1;
-		public function validate_schema() { return $GLOBALS["identity_schema_valid"]; }
+		public function validate_schema() { ++$GLOBALS["identity_validate_calls"]; return $GLOBALS["identity_schema_valid"]; }
 		public static function create_table(): void {
 			++$GLOBALS["identity_create_calls"];
 			if ($GLOBALS["identity_create_works"]) { $GLOBALS["identity_schema_valid"] = true; }
@@ -83,9 +84,17 @@ $GLOBALS['setup_options']['datamachine_db_version']  = 'next-deploy';
 datamachine_maybe_ensure_current_schema();
 $assert( array( 'operator' => true ) === $GLOBALS['setup_options']['datamachine_settings'], 'rerun preserves operator defaults' );
 
-$GLOBALS['identity_schema_valid'] = false;
-$GLOBALS['identity_create_works'] = false;
+$GLOBALS['identity_schema_valid']   = false;
+$GLOBALS['identity_validate_calls'] = 0;
 $GLOBALS['setup_options']['datamachine_post_identity_reservations_schema'] = 1;
+datamachine_maybe_install_post_identity_reservations();
+$assert( 0 === $GLOBALS['identity_validate_calls'], 'verified identity reservation marker skips schema validation' );
+$assert( 0 === $GLOBALS['identity_create_calls'], 'verified identity reservation marker skips repair' );
+
+// A reservation database error clears the marker (log_failure); the next
+// request revalidates and repairs.
+$GLOBALS['identity_create_works'] = false;
+$GLOBALS['setup_options']['datamachine_post_identity_reservations_schema'] = 0;
 datamachine_maybe_install_post_identity_reservations();
 $assert( 0 === $GLOBALS['setup_options']['datamachine_post_identity_reservations_schema'], 'failed identity reservation repair resets marker' );
 
@@ -93,6 +102,11 @@ $GLOBALS['identity_create_works'] = true;
 datamachine_maybe_install_post_identity_reservations();
 $assert( 1 === $GLOBALS['setup_options']['datamachine_post_identity_reservations_schema'], 'verified identity reservation repair advances marker' );
 $assert( 2 === $GLOBALS['identity_create_calls'], 'identity reservation repair retries after failure' );
+
+$GLOBALS['identity_create_calls'] = 0;
+$GLOBALS['setup_options']['datamachine_post_identity_reservations_schema'] = 0;
+datamachine_maybe_install_post_identity_reservations();
+$assert( 1 === $GLOBALS['setup_options']['datamachine_post_identity_reservations_schema'] && 0 === $GLOBALS['identity_create_calls'], 'missing marker with a valid table records the marker without repair' );
 
 $schema_hook = array_values( array_filter( $GLOBALS['setup_actions'], static fn( array $hook ): bool => 'datamachine_maybe_ensure_current_schema' === $hook['callback'] ) );
 $assert( 5 === ( $schema_hook[0]['priority'] ?? null ), 'canonical setup runs before runtime bootstrap' );

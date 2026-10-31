@@ -32,15 +32,23 @@ function datamachine_ensure_current_schema(): bool {
  * site, so its rollout does not depend on the general plugin version gate.
  */
 function datamachine_maybe_install_post_identity_reservations(): void {
-	$version    = \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::SCHEMA_VERSION;
-	$repository = new \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations();
-	$validation = $repository->validate_schema();
-	if ( (int) get_option( 'datamachine_post_identity_reservations_schema', 0 ) === $version && true === $validation ) {
+	$version = \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::SCHEMA_VERSION;
+
+	// Cheap path: the marker records a verified schema. Any reservation
+	// database error clears it (PostIdentityReservations::log_failure), so a
+	// table that disappears is revalidated and repaired on the next request
+	// while the failing write itself still fails closed.
+	if ( (int) get_option( 'datamachine_post_identity_reservations_schema', 0 ) === $version ) {
 		return;
 	}
-	if ( true !== $validation ) {
-		update_option( 'datamachine_post_identity_reservations_schema', 0, true );
+
+	$repository = new \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations();
+	$validation = $repository->validate_schema();
+	if ( true === $validation ) {
+		update_option( 'datamachine_post_identity_reservations_schema', $version, true );
+		return;
 	}
+	update_option( 'datamachine_post_identity_reservations_schema', 0, true );
 
 	\DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::create_table();
 	$repository = new \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations();

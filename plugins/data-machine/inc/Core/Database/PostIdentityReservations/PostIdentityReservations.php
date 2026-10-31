@@ -931,6 +931,12 @@ class PostIdentityReservations extends BaseRepository {
 		}
 		$error = preg_replace( '/\b[a-f0-9]{64}\b/i', '[redacted]', $error );
 
+		// A failed reservation operation may mean the table or a column is gone.
+		// Clear the verified-schema marker so the next request revalidates.
+		if ( 'error' === $level && function_exists( 'update_option' ) ) {
+			update_option( 'datamachine_post_identity_reservations_schema', 0, true );
+		}
+
 		do_action(
 			'datamachine_log',
 			$level,
