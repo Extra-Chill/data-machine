@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.78.4] - 2026-10-31
+
+### Changed
+- cache EventDatesTable::get and gate the merged-bill schedule check
+
 ## [0.78.3] - 2026-10-31
 
 ### Changed
