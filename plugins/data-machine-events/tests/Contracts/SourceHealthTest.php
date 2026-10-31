@@ -37,8 +37,32 @@ final class SourceHealthTest extends TestCase {
 		$engine = $this->engine( 2, 0, array( 'source_rejected' => 2 ) );
 		$children = array( array( 'status' => 'completed_no_items:source-rejected', 'reason' => 'non-music event: cocktail competition' ) );
 		$this->assertSame( 'filtered_non_music', SourceHealth::classify( array(), $engine, $children )['status'] );
+		$children[] = array( 'status' => 'source_rejected', 'reason' => 'not a music event: surf film and art festival' );
+		$this->assertSame( 'filtered_non_music', SourceHealth::classify( array(), $engine, $children )['status'] );
 		$children[] = array( 'status' => 'source_rejected', 'reason' => 'missing date' );
 		$this->assertSame( 'extraction_incomplete', SourceHealth::classify( array(), $engine, $children )['status'] );
+	}
+
+	public function test_root_only_non_music_rejection_is_filtered_not_incomplete(): void {
+		$engine = $this->engine( 1, 0, array( 'source_rejected' => 1 ) );
+		$engine['step_results']['fetch']['source_rejection_reason'] = 'non-music event: author meet-and-greet';
+		$this->assertSame( 'filtered_non_music', SourceHealth::classify( array(), $engine )['status'] );
+		$engine['step_results']['fetch']['source_rejection_reason'] = 'no start time and missing year';
+		$this->assertSame( 'extraction_incomplete', SourceHealth::classify( array(), $engine )['status'] );
+	}
+
+	public function test_rejection_reason_ignores_lifecycle_tokens(): void {
+		$engine = $this->engine( 1, 0, array( 'source_rejected' => 1 ) );
+		$engine['step_results'] = array(
+			'fetch' => array( 'reason' => 'completed', 'source_rejection_reason' => 'missing start time and year', 'fetch_stages' => array( 'source_materialized' => 1 ) ),
+			'ai'    => array( 'reason' => 'completed', 'diagnostic_reason' => '' ),
+		);
+		$this->assertSame( 'missing start time and year', SourceHealth::classify( array(), $engine )['rejection_reason'] );
+
+		$deferred = $this->engine( 1, 0, array( 'item_deferred' => 1 ) );
+		$deferred['step_results']['ai'] = array( 'reason' => 'step_exception' );
+		$deferred['tool_execution_summary'] = array( array( 'trace' => array( 'arguments_redacted' => array( 'reason' => 'no event date' ) ) ) );
+		$this->assertSame( 'no event date', SourceHealth::classify( array(), $deferred )['rejection_reason'] );
 	}
 
 	/** @dataProvider exceptions */

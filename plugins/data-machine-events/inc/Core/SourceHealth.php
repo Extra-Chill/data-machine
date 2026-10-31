@@ -19,7 +19,7 @@ class SourceHealth {
 	/** Missing telemetry is deliberately not interpreted as a zero-item source. */
 	public static function classify( array $row, array $engine = array(), array $children = array() ): array {
 		$failure = self::failure_class( $row['exception'] ?? '' );
-		$reason = (string) ( $engine['source_rejection']['reason'] ?? '' );
+		$reason = self::rejection_reason( $engine );
 		$materialized = null;
 		$skipped = 0;
 		foreach ( $engine['step_results'] ?? array() as $step ) {
@@ -27,16 +27,17 @@ class SourceHealth {
 				$materialized = ( $materialized ?? 0 ) + (int) $step['fetch_stages']['source_materialized'];
 				$skipped += (int) ( $step['fetch_stages']['processed_skipped'] ?? 0 );
 			}
-			$reason = $step['source_rejection_reason'] ?? $step['diagnostic_reason'] ?? $step['reason'] ?? $reason;
 		}
 		$counts = $engine['run_metrics']['counts'] ?? array();
 		$published = 'completed' === ( $row['latest_status'] ?? '' ) ? 1 : (int) ( $counts['published'] ?? 0 );
 		$status = '';
 		if ( str_starts_with( $row['latest_status'] ?? '', 'failed' ) ) {
 			$status = 'http_403' === $failure ? 'blocked' : ( in_array( $failure, array( 'http_404', 'http_410' ), true ) ? 'broken_url' : 'failing' );
-		} elseif ( ! $published && $materialized > 0 && $children && count( array_filter( $children, static fn( $child ) => ( 'source_rejected' === $child['status'] || str_contains( str_replace( '_', '-', $child['status'] ), 'source-rejected' ) ) && preg_match( '/non[- ]music/i', $child['reason'] ) ) ) === count( $children ) ) {
+		} elseif ( ! $published && $materialized > 0 && $children && count( array_filter( $children, static fn( $child ) => ( 'source_rejected' === $child['status'] || str_contains( str_replace( '_', '-', $child['status'] ), 'source-rejected' ) ) && self::is_content_rejection( $child['reason'] ) ) ) === count( $children ) ) {
 			$status = 'filtered_non_music';
 			$reason = implode( '; ', array_unique( array_column( $children, 'reason' ) ) );
+		} elseif ( ! $published && $materialized > 0 && ! $children && ! empty( $counts['source_rejected'] ) && self::is_content_rejection( $reason ) ) {
+			$status = 'filtered_non_music';
 		} elseif ( ! $published && $materialized > 0 && ( ! empty( $counts['source_rejected'] ) || ! empty( $counts['item_deferred'] ) ) ) {
 			$status = 'extraction_incomplete';
 		} elseif ( $materialized > 0 && $skipped === $materialized ) {
@@ -53,6 +54,35 @@ class SourceHealth {
 			$status = empty( $row['lifetime_count'] ) ? 'never_produced' : 'dark';
 		}
 		return array( 'status' => $status, 'failure_class' => $failure, 'rejection_reason' => (string) $reason, 'source_materialized' => $materialized, 'needs_attention' => in_array( $status, array( 'blocked', 'broken_url', 'failing', 'extraction_incomplete' ), true ) || ( 'empty_source' === $status && str_contains( $row['handlers'] ?? '', 'universal_web_scraper' ) ) );
+	}
+
+	/** A rejection on content grounds (not music), as opposed to missing data. */
+	public static function is_content_rejection( string $reason ): bool {
+		return (bool) preg_match( '/non[- ]?music|not (?:a )?music/i', $reason );
+	}
+
+	/**
+	 * Most specific rejection/defer reason recorded on a run.
+	 *
+	 * Step-level `reason` holds lifecycle tokens ("completed", "step_exception"),
+	 * so it is never treated as a rejection reason.
+	 */
+	public static function rejection_reason( array $engine ): string {
+		foreach ( $engine['step_results'] ?? array() as $step ) {
+			foreach ( array( 'source_rejection_reason', 'item_deferred_reason', 'diagnostic_reason' ) as $key ) {
+				if ( ! empty( $step[ $key ] ) && is_string( $step[ $key ] ) ) {
+					return $step[ $key ];
+				}
+			}
+		}
+		// Deferrals record their reason only on the tool trace.
+		foreach ( $engine['tool_execution_summary'] ?? array() as $tool ) {
+			$reason = $tool['trace']['arguments_redacted']['reason'] ?? '';
+			if ( $reason && is_string( $reason ) ) {
+				return $reason;
+			}
+		}
+		return (string) ( $engine['source_rejection']['reason'] ?? '' );
 	}
 
 	/** Fixed number of set queries; hydrate only the latest root/its children per flow. */
@@ -90,9 +120,21 @@ class SourceHealth {
 			return self::result( array(), $statuses );
 		}
 		$ids = implode( ',', array_keys( $rows ) ); // IDs are integers from the database, never raw CLI input.
-		$posts = $wpdb->get_results( "SELECT m.meta_value flow_id, COUNT(DISTINCT p.ID) lifetime_count, MAX(p.post_date) last_published, COUNT(DISTINCT CASE WHEN d.start_datetime >= NOW() THEN p.ID END) upcoming_count FROM {$wpdb->posts} p JOIN {$wpdb->postmeta} m ON m.post_id=p.ID AND m.meta_key='_datamachine_post_flow_id' LEFT JOIN {$p}datamachine_event_dates d ON d.post_id=p.ID WHERE p.post_status='publish' AND p.post_type='data_machine_events' AND m.meta_value IN ($ids) GROUP BY m.meta_value", ARRAY_A );
+		// Lifetime and upcoming are separate set queries (one LEFT JOIN with
+		// COUNT(DISTINCT) over every event took ~25s on a 765-flow production
+		// site). Neither filters on the flow-id list: `meta_value IN (...)` pulls
+		// the optimizer off the event_dates range scan, so rows are matched in PHP.
+		$posts = $wpdb->get_results( "SELECT m.meta_value flow_id, COUNT(*) lifetime_count, MAX(p.post_date) last_published FROM {$wpdb->postmeta} m JOIN {$wpdb->posts} p ON p.ID=m.post_id AND p.post_status='publish' AND p.post_type='data_machine_events' WHERE m.meta_key='_datamachine_post_flow_id' GROUP BY m.meta_value", ARRAY_A );
 		foreach ( $posts as $post ) {
-			$rows[ (int) $post['flow_id'] ] = array_merge( $rows[ (int) $post['flow_id'] ], $post );
+			if ( isset( $rows[ (int) $post['flow_id'] ] ) ) {
+				$rows[ (int) $post['flow_id'] ] = array_merge( $rows[ (int) $post['flow_id'] ], $post );
+			}
+		}
+		$upcoming = $wpdb->get_results( "SELECT m.meta_value flow_id, COUNT(DISTINCT d.post_id) upcoming_count FROM {$p}datamachine_event_dates d JOIN {$wpdb->postmeta} m ON m.post_id=d.post_id AND m.meta_key='_datamachine_post_flow_id' WHERE d.post_status='publish' AND d.start_datetime >= NOW() GROUP BY m.meta_value", ARRAY_A );
+		foreach ( $upcoming as $post ) {
+			if ( isset( $rows[ (int) $post['flow_id'] ] ) ) {
+				$rows[ (int) $post['flow_id'] ]['upcoming_count'] = $post['upcoming_count'];
+			}
 		}
 		$jobs = "{$p}datamachine_jobs";
 		$runs = $wpdb->get_results( "SELECT flow_id, COUNT(*) total, SUM(status='completed') with_items, SUM(status LIKE 'completed_no_items%') no_items, SUM(status LIKE 'failed%') failed, MAX(job_id) latest_id FROM $jobs WHERE flow_id IN ($ids) AND (parent_job_id IS NULL OR parent_job_id=0) GROUP BY flow_id", ARRAY_A );
@@ -110,10 +152,7 @@ class SourceHealth {
 					$engines[ $job['flow_id'] ] = $engine;
 					$rows[ $job['flow_id'] ]['latest_status'] = $job['status'];
 				} else {
-					$reason = (string) ( $engine['source_rejection']['reason'] ?? '' );
-					foreach ( $engine['step_results'] ?? array() as $step ) {
-						$reason = $step['source_rejection_reason'] ?? $step['diagnostic_reason'] ?? $step['reason'] ?? $reason;
-					}
+					$reason = self::rejection_reason( $engine );
 					$children[ $job['flow_id'] ][] = array( 'status' => $job['status'] . ':' . ( $job['status_reason'] ?? '' ), 'reason' => $reason );
 				}
 			}

@@ -39,7 +39,7 @@ final class SourceHealthQueryTest extends TestCase {
 				'CREATE TABLE wp_datamachine_pipelines(pipeline_id INTEGER, pipeline_name TEXT)',
 				'CREATE TABLE wp_posts(ID INTEGER, post_date TEXT, post_status TEXT, post_type TEXT)',
 				'CREATE TABLE wp_postmeta(post_id INTEGER, meta_key TEXT, meta_value TEXT)',
-				'CREATE TABLE wp_datamachine_event_dates(post_id INTEGER, start_datetime TEXT)',
+				'CREATE TABLE wp_datamachine_event_dates(post_id INTEGER, start_datetime TEXT, post_status TEXT)',
 				'CREATE TABLE wp_datamachine_jobs(job_id INTEGER, flow_id INTEGER, parent_job_id INTEGER, status TEXT, status_reason TEXT, engine_data TEXT)',
 				'CREATE TABLE wp_datamachine_logs(id INTEGER, context TEXT)',
 				"INSERT INTO wp_datamachine_pipelines VALUES(1, 'Test City')",
@@ -55,12 +55,12 @@ final class SourceHealthQueryTest extends TestCase {
 			$stmt->execute( array( 10, 1, null, 'failed', '{}' ) );
 			$stmt->execute( array( 11, 2, null, 'completed_no_items', $engine ) );
 			$stmt->execute( array( 12, 2, 11, 'completed_no_items', '{}' ) );
-			$db->db->exec( "INSERT INTO wp_posts VALUES(1, '2020-01-01', 'publish', 'data_machine_events'); INSERT INTO wp_postmeta VALUES(1, '_datamachine_post_flow_id', '2'); INSERT INTO wp_datamachine_event_dates VALUES(1, '2099-01-01')" );
+			$db->db->exec( "INSERT INTO wp_posts VALUES(1, '2020-01-01', 'publish', 'data_machine_events'); INSERT INTO wp_postmeta VALUES(1, '_datamachine_post_flow_id', '2'); INSERT INTO wp_datamachine_event_dates VALUES(1, '2099-01-01', 'publish')" );
 			$stmt = $db->db->prepare( 'INSERT INTO wp_datamachine_logs VALUES(?, ?)' );
 			$stmt->execute( array( 1, json_encode( array( 'job_id' => 10, 'flow_id' => 1, 'exception' => 'HTTP 404' ) ) ) );
 			$stmt->execute( array( 2, json_encode( array( 'job_id' => 10, 'flow_id' => 1, 'exception' => 'HTTP 403' ) ) ) );
 			$result = ( new SourceHealth() )->report( 1 );
-			$this->assertSame( 5, $db->queries );
+			$this->assertSame( 6, $db->queries );
 			$this->assertSame( array( 'blocked', 'extraction_incomplete' ), array_column( $result['flows'], 'status' ) );
 			$this->assertSame( 'https://venue.invalid/events', $result['flows'][0]['source_url'] );
 			$this->assertSame( 1, (int) $result['flows'][1]['total'] ); // Child must not inflate totals.
