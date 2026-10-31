@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.78.3] - 2026-10-31
+
+### Changed
+- scope past-archive cache invalidation and bound staleness hourly
+- drive bounded event windows through date indexes
+
 ## [0.78.2] - 2026-10-31
 
 ### Fixed
