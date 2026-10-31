@@ -1139,6 +1139,127 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_artist_queries_chunk_normalized_ids_and_deduplicate_across_paginated_shards(): void {
+		$ids = array_map( static fn( int $i ): string => sprintf( 'artist%03d', $i ), range( 1, 51 ) );
+		$config = $this->handlerConfig( '32.7765,-79.9311', 'artist-shards' );
+		$config['attraction_ids'] = implode( ', ', $ids ) . ',artist001,invalid!';
+		$queries = array();
+		$http = function ( $pre, $args, $url ) use ( &$queries ): array {
+			parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
+			$queries[] = $query;
+			$events = array( $this->ticketmasterEvent( 'shared-shard-event', 'Shared Concert' ) );
+			if ( 1 === (int) $query['page'] ) {
+				$events[] = $this->ticketmasterEvent( 'event-' . explode( ',', $query['attractionId'] )[0], 'Unique Concert' );
+			}
+			return $this->ticketmasterHttpResponse( $events, (int) $query['page'], 2, 51 );
+		};
+		add_filter( 'pre_http_request', $http, 10, 3 );
+		try {
+			$packets = ( new TicketmasterHttpTestDouble() )->get_fetch_data( 1, $config, '1801' );
+		} finally {
+			remove_filter( 'pre_http_request', $http, 10 );
+		}
+		$this->assertCount( 4, $packets );
+		$this->assertCount( 6, $queries );
+		foreach ( array_chunk( $ids, Ticketmaster::ATTRACTION_IDS_PER_QUERY ) as $index => $chunk ) {
+			foreach ( array( 0, 1 ) as $page ) {
+				$query = $queries[ $index * 2 + $page ];
+				$this->assertSame( implode( ',', $chunk ), $query['attractionId'] );
+				$this->assertSame( (string) $page, $query['page'] );
+				$this->assertSame( '50', $query['size'] );
+				$this->assertSame( 'date,asc', $query['sort'] );
+				$this->assertArrayNotHasKey( 'geoPoint', $query );
+				$this->assertArrayNotHasKey( 'radius', $query );
+			}
+		}
+	}
+
+	public function test_artist_fanout_prefers_soonest_event_across_shards_and_drains_backlog(): void {
+		$config = $this->handlerConfig( '32.7765,-79.9311', 'artist-order', 1 );
+		$config['attraction_ids'] = implode( ',', array_map( static fn( int $i ): string => sprintf( 'artist%03d', $i ), range( 1, 26 ) ) );
+		$http = function ( $pre, $args, $url ): array {
+			parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
+			$is_later_shard = 'artist026' === $query['attractionId'];
+			$event = $this->ticketmasterEvent( $is_later_shard ? 'soon-event' : 'distant-event', 'Tour Concert' );
+			$event['dates']['start']['localDate'] = $is_later_shard ? '2099-01-01' : '2099-12-01';
+			return $this->ticketmasterHttpResponse( array( $event ) );
+		};
+		add_filter( 'pre_http_request', $http, 10, 3 );
+		try {
+			$first = ( new TicketmasterHttpTestDouble() )->get_fetch_data( 1, $config, '1802' );
+			$this->assertCount( 1, $first );
+			$this->assertSame( 'soon-event', $first[0]->addTo( array() )[0]['metadata']['source_item_id'] );
+			$this->completePacket( $first[0]->addTo( array() )[0], 1802 );
+			$second = ( new TicketmasterHttpTestDouble() )->get_fetch_data( 1, $config, '1803' );
+			$this->assertCount( 1, $second );
+			$this->assertSame( 'distant-event', $second[0]->addTo( array() )[0]['metadata']['source_item_id'] );
+		} finally {
+			remove_filter( 'pre_http_request', $http, 10 );
+		}
+	}
+
+	/** @dataProvider truncatedQueryModes */
+	public function test_query_truncation_is_visible_and_geo_pagination_is_unchanged( bool $artist_mode ): void {
+		$config = $this->handlerConfig( '32.7765,-79.9311', 'truncated-query' );
+		$config['radius'] = '75';
+		if ( $artist_mode ) {
+			$config['attraction_ids'] = 'artist001';
+		}
+		$queries = array();
+		$warnings = array();
+		$http = function ( $pre, $args, $url ) use ( &$queries ): array {
+			parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
+			$queries[] = $query;
+			return $this->ticketmasterHttpResponse( array( $this->ticketmasterEvent( 'truncated-event', 'Truncated Concert' ) ), (int) $query['page'], 22, 1067 );
+		};
+		$logger = static function ( string $level, string $message, array $context ) use ( &$warnings ): void {
+			if ( 'warning' === $level && false !== strpos( $message, 'pagination cap' ) ) {
+				$warnings[] = $context;
+			}
+		};
+		add_filter( 'pre_http_request', $http, 10, 3 );
+		add_action( 'datamachine_log', $logger, 10, 3 );
+		try {
+			$packets = ( new TicketmasterHttpTestDouble() )->get_fetch_data( 1, $config, '1804' );
+		} finally {
+			remove_filter( 'pre_http_request', $http, 10 );
+			remove_action( 'datamachine_log', $logger, 10 );
+		}
+		$this->assertCount( 1, $packets );
+		$this->assertCount( 20, $queries );
+		$this->assertSame( range( 0, 19 ), array_map( 'intval', array_column( $queries, 'page' ) ) );
+		$this->assertCount( 1, $warnings );
+		$this->assertSame( 1067, $warnings[0]['total_elements'] );
+		$this->assertSame( 1000, $warnings[0]['reachable_count'] );
+		foreach ( $queries as $query ) {
+			$this->assertSame( '50', $query['size'] );
+			$this->assertSame( 'date,asc', $query['sort'] );
+			if ( ! $artist_mode ) {
+				$this->assertArrayNotHasKey( 'attractionId', $query );
+				$this->assertSame( '32.7765,-79.9311', $query['geoPoint'] );
+				$this->assertSame( '75', $query['radius'] );
+				$this->assertSame( 'miles', $query['unit'] );
+			}
+		}
+	}
+
+	public static function truncatedQueryModes(): array {
+		return array( 'artist' => array( true ), 'geo' => array( false ) );
+	}
+
+	private function ticketmasterHttpResponse( array $events, int $page = 0, int $total_pages = 1, int $total = 1 ): array {
+		return array(
+			'headers' => array( 'content-type' => 'application/json' ),
+			'response' => array( 'code' => 200, 'message' => 'OK' ),
+			'body' => wp_json_encode(
+				array(
+					'_embedded' => array( 'events' => $events ),
+					'page' => array( 'number' => $page, 'totalPages' => $total_pages, 'totalElements' => $total ),
+				)
+			),
+		);
+	}
+
 	private function handlerConfig( string $location, string $flow_step_id, int $max_items = Ticketmaster::DEFAULT_MAX_ITEMS ): array {
 		return array(
 			'pipeline_id'        => 1,
@@ -1386,6 +1507,18 @@ class TicketmasterHandlerTestDouble extends Ticketmaster {
 				'totalPages' => 0,
 			),
 		);
+	}
+}
+
+/** Use real HTTP pagination with only credentials stubbed. */
+class TicketmasterHttpTestDouble extends Ticketmaster {
+
+	protected function getAuthProvider( string $provider_key ): ?object {
+		return new class() {
+			public function get_account(): array {
+				return array( 'api_key' => 'test-key' );
+			}
+		};
 	}
 }
 
