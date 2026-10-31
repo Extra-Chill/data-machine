@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.200.1] - 2026-10-31
+
+### Fixed
+- remove prose Safety block from Data Machine section
+
 ## [0.200.0] - 2026-10-31
 
 ### Added
