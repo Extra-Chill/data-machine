@@ -1004,6 +1004,7 @@ class EventUpdateAbilities {
 		}
 		clean_post_cache( $post_id );
 		clean_object_term_cache( $post_id, Event_Post_Type::POST_TYPE );
+		\DataMachineEvents\Core\EventDatesTable::flush_cache( $post_id );
 		return true;
 	}
 
