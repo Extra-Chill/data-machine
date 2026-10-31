@@ -33,7 +33,7 @@ class CheckSourceHealthCommand {
 		}
 		$result = $this->health()->report( (int) ( $assoc_args['pipeline'] ?? 0 ), $statuses );
 		if ( 'json' === $format ) {
-			\WP_CLI::line( wp_json_encode( $result ) );
+			\WP_CLI::line( (string) wp_json_encode( $result ) );
 			return;
 		}
 		\WP_CLI\Utils\format_items( $format, $result['flows'], self::FIELDS );
