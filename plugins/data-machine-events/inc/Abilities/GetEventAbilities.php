@@ -39,7 +39,7 @@ class GetEventAbilities {
 					'required'   => array( 'event_id' ),
 					'properties' => array(
 						'event_id' => array(
-							'type' => 'integer',
+							'type'    => 'integer',
 							'minimum' => 1,
 						),
 					),
@@ -94,9 +94,9 @@ class GetEventAbilities {
 		$groups = DateGrouper::group_events_by_date(
 			array(
 				array(
-					'post' => $post,
+					'post'       => $post,
 					'event_data' => $data,
-					'datetime' => $datetime,
+					'datetime'   => $datetime,
 				),
 			),
 			true
@@ -107,7 +107,7 @@ class GetEventAbilities {
 		if ( ! $group ) {
 			return $this->notFound();
 		}
-		$entry = array(
+		$entry      = array(
 			'post_id'         => $post->ID,
 			'title'           => get_the_title( $post ),
 			'event_data'      => $data,

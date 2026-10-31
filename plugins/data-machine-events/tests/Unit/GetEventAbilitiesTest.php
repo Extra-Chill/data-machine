@@ -39,12 +39,12 @@ class GetEventAbilitiesTest extends \WP_UnitTestCase {
 		$post = get_post( $id );
 		$data = EventHydrator::parse_event_data( $post );
 		$this->assertNotNull( $data );
-		$groups = DateGrouper::group_events_by_date(
+		$groups   = DateGrouper::group_events_by_date(
 			array(
 				array(
-					'post' => $post,
+					'post'       => $post,
 					'event_data' => $data,
-					'datetime' => new \DateTime( '2099-07-21 19:30:00' ),
+					'datetime'   => new \DateTime( '2099-07-21 19:30:00' ),
 				),
 			),
 			true
@@ -52,9 +52,9 @@ class GetEventAbilitiesTest extends \WP_UnitTestCase {
 		$group    = reset( $groups );
 		$expected = ( new Calendar() )->serialize_contract_occurrence(
 			array(
-				'post_id' => $id,
-				'title' => get_the_title( $id ),
-				'event_data' => $data,
+				'post_id'         => $id,
+				'title'           => get_the_title( $id ),
+				'event_data'      => $data,
 				'display_context' => $group['events'][0]['display_context'],
 			)
 		);
@@ -85,7 +85,7 @@ class GetEventAbilitiesTest extends \WP_UnitTestCase {
 	public function test_password_protected_event_is_not_public_detail(): void {
 		$id = $this->seed();
 		wp_update_post( array(
-			'ID' => $id,
+			'ID'            => $id,
 			'post_password' => 'secret',
 		) );
 		$this->assertWPError( ( new GetEventAbilities() )->executeGetEvent( array( 'event_id' => $id ) ) );
