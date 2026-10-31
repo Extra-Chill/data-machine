@@ -44,7 +44,7 @@ while read -r repo path; do
   src="${work}/${repo}"
   git clone --quiet "https://github.com/${ORG}/${repo}.git" "${src}"
   imported_tree="$(git rev-parse "HEAD:${path}")"
-  base="$(git -C "${src}" log --format='%H %T' | awk -v t="${imported_tree}" '$2 == t {print $1; exit}')"
+  base="$(git -C "${src}" log --format='%H %T' | awk -v t="${imported_tree}" '$2 == t && !found {print $1; found = 1}')"
   if [ -z "${base}" ]; then
     echo "${repo}: no source commit matches the imported ${path} tree (local edits under ${path}?)" >&2
     exit 1
