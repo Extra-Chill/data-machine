@@ -108,7 +108,7 @@ class AgentMaterializer {
 		$normalized = self::normalize_for_fingerprint( $definitions );
 
 		return md5(
-			serialize(
+			(string) wp_json_encode(
 				array(
 					(int) get_site_option( self::GENERATION_OPTION, 0 ),
 					$normalized,
@@ -190,13 +190,14 @@ class AgentMaterializer {
 				continue;
 			}
 
+			// @phpstan-ignore-next-line Bundled Agents API functions are absent from the WordPress stubs.
 			$agent = \wp_get_agent( $slug );
 			if ( ! $agent instanceof \WP_Agent ) {
 				$summary['skipped'][] = $slug;
 				continue;
 			}
 
-			$identity = $store->materialize(
+			$store->materialize(
 				$scope,
 				$agent->get_default_config(),
 				array_merge(
@@ -207,11 +208,6 @@ class AgentMaterializer {
 					)
 				)
 			);
-
-			if ( ! $identity instanceof \AgentsAPI\Core\Identity\WP_Agent_Materialized_Identity ) {
-				$summary['skipped'][] = $slug;
-				continue;
-			}
 
 			$summary['created'][] = $slug;
 		}

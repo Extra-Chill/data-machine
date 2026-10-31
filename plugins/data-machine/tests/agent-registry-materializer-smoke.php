@@ -35,6 +35,12 @@ namespace {
 		return true;
 	}
 
+	if ( ! function_exists( 'wp_json_encode' ) ) {
+		function wp_json_encode( $value ) {
+			return json_encode( $value );
+		}
+	}
+
 	function get_site_option( string $name, $default_value = false ) {
 		return $GLOBALS['__agent_materializer_site'][ $name ] ?? $default_value;
 	}

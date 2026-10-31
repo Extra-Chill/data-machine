@@ -167,7 +167,7 @@ class Agents extends BaseRepository {
 			return;
 		}
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Column and definition are private schema constants, while the table identifier is prepared.
-		self::query_or_throw( $wpdb, $wpdb->prepare( "ALTER TABLE %i ADD COLUMN {$column} {$definition}", $table_name ), "add agent identity column {$column}" );
+		self::query_or_throw( $wpdb, $wpdb->prepare( "ALTER TABLE %i ADD COLUMN {$column} {$definition}", $table_name ), "add agent identity column {$column}" ); // @phpstan-ignore argument.type (column and definition are private schema constants)
 	}
 
 	private static function query_or_throw( \wpdb $wpdb, string $sql, string $operation ): void {
