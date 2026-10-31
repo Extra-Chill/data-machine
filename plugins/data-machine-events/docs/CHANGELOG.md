@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.78.1] - 2026-10-31
+
+### Changed
+- Internal improvements
+
 ## [0.78.0] - 2026-10-30
 
 ### Added
