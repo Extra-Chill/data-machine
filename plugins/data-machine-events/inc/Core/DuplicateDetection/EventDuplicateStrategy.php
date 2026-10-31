@@ -1,0 +1,957 @@
+<?php
+// phpcs:disable PSR12.Files.FileHeader.IncorrectOrder -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+/**
+ * Event Duplicate Detection Strategy
+ *
+ * Registered via the `datamachine_duplicate_strategies` filter in DM core.
+ * Replaces the 4-method cascade in EventUpsert with date-scoped event queries.
+ *
+ * Strategy cascade (same order as the old EventUpsert::findExistingEvent):
+ * 1. Ticket URL + date (most reliable — stable platform identifier)
+ * 2. Venue + date + fuzzy title (venue-scoped matching)
+ * 3. Exact title + date (with venue confirmation)
+ * 4. Date + fuzzy title fallback (venue-agnostic last resort)
+ *
+ * Candidate discovery uses the event-owned date table and WordPress taxonomy
+ * and metadata APIs. Data Machine invokes this strategy through the public
+ * datamachine/check-duplicate ability contract.
+ *
+ * Date-awareness: every strategy scopes its date query by date_only
+ * (extracted from startDate in context). This means recurring series —
+ * same title and venue but a different calendar date — are never matched
+ * as duplicates. The same title + venue + date within a 2-hour time
+ * window IS a duplicate. See #423.
+ *
+ * @package DataMachineEvents\Core\DuplicateDetection
+ * @since   0.18.0
+ */
+
+namespace DataMachineEvents\Core\DuplicateDetection;
+
+use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
+use DataMachineEvents\Core\Event_Post_Type;
+use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
+use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
+use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
+
+defined( 'ABSPATH' ) || exit;
+
+class EventDuplicateStrategy {
+	private const CANDIDATE_PAGE_SIZE = 100;
+
+	/**
+	 * Maximum start-time gap (seconds) for matching a low-confidence title.
+	 *
+	 * Covers doors-vs-show listings of one show. Early and late sets are
+	 * normally further apart and stay distinct.
+	 */
+	private const LOW_CONFIDENCE_TIME_WINDOW = 3600;
+
+	/**
+	 * Register this strategy with DM core's duplicate detection system.
+	 */
+	public static function register(): void {
+		add_filter( 'datamachine_duplicate_strategies', array( static::class, 'addStrategy' ) );
+	}
+
+	/**
+	 * Add event dedup strategy to the registry.
+	 *
+	 * @param array $strategies Existing strategies.
+	 * @return array Strategies with event strategy added.
+	 */
+	public static function addStrategy( array $strategies ): array {
+		$strategies[] = array(
+			'id'        => 'event_identity_index',
+			'post_type' => Event_Post_Type::POST_TYPE,
+			'callback'  => array( static::class, 'check' ),
+			'priority'  => 5, // Run before core strategies.
+		);
+		return $strategies;
+	}
+
+	/**
+	 * Execute the event duplicate check against the identity index.
+	 *
+	 * Called by DuplicateCheckAbility when the post_type matches.
+	 *
+	 * @param array $input {
+	 *     @type string $title      Event title.
+	 *     @type string $post_type  Post type (data_machine_events).
+	 *     @type array  $context    { venue, startDate, ticketUrl, address, city, state, country }
+	 * }
+	 * @return array|null Duplicate result or null if clear.
+	 */
+	public static function check( array $input ): ?array {
+		$title     = $input['title'] ?? '';
+		$context   = $input['context'] ?? array();
+		$venue     = $context['venue'] ?? '';
+		$startDate = $context['startDate'] ?? '';
+		$ticketUrl = $context['ticketUrl'] ?? '';
+		$address   = $context['address'] ?? '';
+		$city      = $context['city'] ?? '';
+		$state     = $context['state'] ?? '';
+		$country   = $context['country'] ?? '';
+
+		if ( empty( $title ) || empty( $startDate ) ) {
+			return null;
+		}
+
+		$date_only           = self::extractDateOnly( $startDate );
+		$identity_confidence = EventIdentifierGenerator::getIdentityConfidence( $title, $startDate, $venue );
+
+		// Prefer the venue term the upsert path already resolved (#883). It was
+		// resolved with full venue metadata and source identity, so it is the
+		// term persistence will assign. Re-resolving by name here is ambiguous
+		// whenever two venue terms share a name, which used to return "clear"
+		// and create duplicate events.
+		$authoritative_term = self::authoritativeVenueTerm( absint( $context['venue_term_id'] ?? 0 ) );
+
+		if ( $authoritative_term ) {
+			$venue_identity = array(
+				'term'         => $authoritative_term,
+				'match_status' => 'matched',
+			);
+		} else {
+			// Resolve the incoming venue once via the same cascade used by
+			// Venue_Taxonomy::find_or_create_venue (address-first, then name).
+			// Reused across strategies so dedup matches the canonicalization
+			// that the upsert path will perform.
+			$venue_identity = self::resolveVenueIdentity( $venue, $address, $city, $state, $country );
+		}
+		$venue_term = $venue_identity['term'];
+
+		// With an authoritative term, venue confirmation is by term ID only.
+		// A same-named but distinct venue (#806 conflict term) must never be
+		// confirmed by name, so later strategies get no venue name to compare.
+		$confirm_venue = $authoritative_term ? '' : $venue;
+
+		// Festival contributions must remain taxonomy-only even when another
+		// identity strategy (such as a shared ticket URL) would also match.
+		if ( ! in_array( $venue_identity['match_status'], array( 'ambiguous', 'conflict' ), true ) ) {
+			$match = self::findFestivalMatch( $title, $date_only, $context, $venue_term );
+			if ( $match ) {
+				return $match;
+			}
+		}
+
+		// Strategy 1: Ticket URL + date (most reliable).
+		if ( ! empty( $ticketUrl ) ) {
+			$match = self::findByTicketUrl( $ticketUrl, $date_only );
+			if ( $match ) {
+				return $match;
+			}
+		}
+
+		// An ambiguous or geographically conflicting venue name must not fall
+		// through to the later name-only confirmations. Ticket identity remains
+		// authoritative, but a different venue is never a duplicate by name —
+		// conflict candidates belong to a distinct venue that the upsert path
+		// will create (#806).
+		if ( in_array( $venue_identity['match_status'], array( 'ambiguous', 'conflict' ), true ) ) {
+			return null;
+		}
+
+		// Date-only imports (including their persisted all-day representation)
+		// carry no start-time evidence. Require exact normalized title and a
+		// confirmed venue, and do not choose arbitrarily between early/late sets.
+		if ( $venue_term ) {
+			$matches = array();
+			foreach ( self::candidatePagesByDate( $date_only, (int) $venue_term->term_id ) as $candidates ) {
+				foreach ( $candidates as $candidate ) {
+					if ( self::computeTitleHash( $title ) !== self::computeTitleHash( $candidate->post_title ) ) {
+						continue;
+					}
+					$dates = \DataMachineEvents\Core\EventDatesTable::get( (int) $candidate->ID );
+					if ( $dates ) {
+						$matches[ (int) $candidate->ID ] = $dates;
+					}
+				}
+			}
+			if ( 1 === count( $matches ) ) {
+				$post_id            = (int) array_key_first( $matches );
+				$dates              = $matches[ $post_id ];
+				$incoming_date_only = ! self::hasTimeComponent( $startDate ) || 1 === preg_match( '/[T ]00:00(?::00)?(?:Z|[+-]\d{2}:?\d{2})?$/', $startDate );
+				$stored_all_day     = str_ends_with( $dates->start_datetime, ' 00:00:00' )
+					&& $dates->end_datetime === $date_only . ' 23:59:59';
+				if ( $incoming_date_only || $stored_all_day ) {
+					return self::duplicateResult( $post_id, 'exact_title_venue_date_unknown_time' );
+				}
+			}
+		}
+
+		// A venue rename must not split an otherwise identical occurrence.
+		$match = self::findByContainedTitleAndExactStart( $title, $startDate, $date_only, $context, $venue_term );
+		if ( $match ) {
+			return $match;
+		}
+
+		// Strategy 2: Venue + date + fuzzy title.
+		if ( ! empty( $venue ) || $venue_term ) {
+			$match = self::findByVenueDateAndFuzzyTitle( $title, $venue, $date_only, $startDate, $venue_term, (string) ( $context['source'] ?? '' ) );
+			if ( $match ) {
+				return $match;
+			}
+		}
+
+		// Strategy 3: Exact title + date (with venue confirmation).
+		$match = self::findByExactTitle( $title, $confirm_venue, $date_only, $identity_confidence, $venue_term, $startDate );
+		if ( $match ) {
+			return $match;
+		}
+
+		// Strategy 4: Date + fuzzy title fallback (venue-agnostic).
+		if ( 'low' !== $identity_confidence ) {
+			$match = self::findByDateAndFuzzyTitle( $title, $date_only, $startDate, $confirm_venue, $venue_term );
+			if ( $match ) {
+				return $match;
+			}
+		}
+
+		return null;
+	}
+
+	/** Extract conservative festival phrases from canonical and artist titles. */
+	private static function festivalNamesFromTitle( string $title ): array {
+		$names = array();
+		$parts = preg_split( '/\s+(?:at|@)\s+/iu', $title );
+		foreach ( false === $parts ? array( $title ) : $parts as $part ) {
+			if ( preg_match( '/^(?:\d+(?:st|nd|rd|th)\s+)?(?:annual\s+)?(.+?\b(?:festival|fest)\b)/iu', $part, $match ) ) {
+				$names[] = $match[1];
+			}
+		}
+		return $names;
+	}
+
+	/** Match a festival listing or lineup contribution, independent of set time. */
+	private static function findFestivalMatch( string $title, string $date, array $context, ?\WP_Term $venue ): ?array {
+		if ( ! $venue ) {
+			return null;
+		}
+		// A title that leads with a festival name is the festival listing itself
+		// (including a retitled re-import of it), not an artist's set. Match it
+		// without a time window, but keep it on the ordinary update path.
+		$leading       = preg_split( '/\s+(?:at|@)\s+/iu', $title, 2 );
+		$listing_names = self::festivalNamesFromTitle( false === $leading ? $title : (string) $leading[0] );
+		$is_listing    = array() !== $listing_names;
+		$location      = $context;
+		foreach ( array( 'address', 'city', 'state', 'country' ) as $field ) {
+			$stored             = (string) get_term_meta( $venue->term_id, '_venue_' . $field, true );
+			$location[ $field ] = '' !== $stored ? $stored : ( $context[ $field ] ?? '' );
+		}
+		$parsed           = \DataMachineEvents\Core\Venue_Taxonomy::parse_festival_venue( (string) ( $context['venue'] ?? '' ), $location );
+		$incoming_names   = (array) ( $context['festival'] ?? array() );
+		$incoming_names[] = $parsed['festival'];
+		$incoming_names   = array_merge( $incoming_names, self::festivalNamesFromTitle( $title ) );
+		$incoming         = $is_listing ? implode( ' ', $listing_names ) : $title . ' ' . ( $context['venue'] ?? '' ) . ' ' . implode( ' ', $incoming_names );
+		$contains         = static function ( string $text, string $name ): bool {
+			$text = EventIdentifierGenerator::normalizeBasic( $text );
+			$name = EventIdentifierGenerator::normalizeBasic( $name );
+			return '' !== $name && str_contains( ' ' . $text . ' ', ' ' . $name . ' ' );
+		};
+		$matches          = array();
+		foreach ( self::candidatePagesByDate( $date ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$id = (int) $candidate->ID;
+				if ( $is_listing && 'publish' !== get_post_status( $id ) ) {
+					continue;
+				}
+				$terms = wp_get_post_terms( $id, 'festival', array( 'fields' => 'names' ) );
+				$names = is_wp_error( $terms ) ? array() : $terms;
+				// A title-only festival need not have been tagged yet.
+				$names = array_merge( $names, self::festivalNamesFromTitle( $candidate->post_title ) );
+				$other = $candidate->post_title . ' ' . implode( ' ', $names );
+				foreach ( array_unique( array_merge( $names, $incoming_names ) ) as $name ) {
+					if ( ! $contains( $incoming, $name ) || ! $contains( $other, $name ) ) {
+						continue;
+					}
+					$venues = wp_get_post_terms( $id, 'venue' );
+					foreach ( is_wp_error( $venues ) ? array() : $venues as $term ) {
+						if ( (int) $term->term_id === (int) $venue->term_id || \DataMachineEvents\Core\Venue_Taxonomy::is_same_event_location( (int) $term->term_id, $location ) ) {
+							$matches[ $id ] = $name;
+						}
+					}
+				}
+			}
+		}
+		if ( 1 !== count( $matches ) ) {
+			return null;
+		}
+		$id = (int) array_key_first( $matches );
+		if ( $is_listing ) {
+			return self::duplicateResult( $id, 'festival_listing' );
+		}
+		$result                        = self::duplicateResult( $id, 'festival_lineup' );
+		$result['match']['merge_mode'] = 'festival_lineup';
+		$result['match']['festival']   = $matches[ $id ];
+		return $result;
+	}
+
+	/**
+	 * Match venue-independent title expansions only at the identical local start
+	 * and with positive location evidence. Multiple matching posts are ambiguous.
+	 */
+	private static function findByContainedTitleAndExactStart( string $title, string $start, string $date, array $context, ?\WP_Term $venue_term ): ?array {
+		if ( ! self::hasTimeComponent( $start ) ) {
+			return null;
+		}
+		$title   = EventIdentifierGenerator::normalizeBasic( $title );
+		$matches = array();
+		foreach ( self::candidatePagesByDate( $date ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$other = EventIdentifierGenerator::normalizeBasic( $candidate->post_title );
+				// Token boundaries avoid matches such as "Jam" and "Jamboree".
+				if ( '' === $title || '' === $other || ( ! str_contains( ' ' . $title . ' ', ' ' . $other . ' ' ) && ! str_contains( ' ' . $other . ' ', ' ' . $title . ' ' ) ) ) {
+					continue;
+				}
+				$dates = \DataMachineEvents\Core\EventDatesTable::get( (int) $candidate->ID );
+				if ( ! $dates || ! self::isWithinStrictTimeWindow( $start, $dates->start_datetime, 0 ) ) {
+					continue;
+				}
+				$terms = wp_get_post_terms( (int) $candidate->ID, 'venue' );
+				if ( is_wp_error( $terms ) ) {
+					continue;
+				}
+				foreach ( $terms as $term ) {
+					$location = $context;
+					if ( $venue_term ) {
+						foreach ( array( 'city', 'state', 'country' ) as $field ) {
+							$meta_value         = (string) get_term_meta( $venue_term->term_id, '_venue_' . $field, true );
+							$location[ $field ] = '' !== $meta_value ? $meta_value : ( $context[ $field ] ?? '' );
+						}
+					}
+					if ( ( $venue_term && $term->term_id === $venue_term->term_id ) || \DataMachineEvents\Core\Venue_Taxonomy::is_same_event_location( (int) $term->term_id, $location ) ) {
+						$matches[ (int) $candidate->ID ] = true;
+					}
+				}
+			}
+		}
+		return 1 === count( $matches ) ? self::duplicateResult( (int) array_key_first( $matches ), 'exact_start_contained_title_location' ) : null;
+	}
+
+	// -----------------------------------------------------------------------
+	// Strategy 1: Ticket URL matching
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Find event by ticket URL on the same date.
+	 *
+	 * Strategy A: exact normalized URL match.
+	 * Strategy B: canonical ticket identity comparison (unwraps affiliate links).
+	 *
+	 * @param string $ticketUrl Ticket URL.
+	 * @param string $date_only Date in YYYY-MM-DD.
+	 * @return array|null Duplicate result or null.
+	 */
+	private static function findByTicketUrl( string $ticketUrl, string $date_only ): ?array {
+		$normalized_url = datamachine_normalize_ticket_url( $ticketUrl );
+		if ( empty( $normalized_url ) ) {
+			return null;
+		}
+
+		$canonical_identity = datamachine_extract_ticket_identity( $ticketUrl );
+		foreach ( self::candidatePagesByDate( $date_only ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$post_id              = (int) $candidate->ID;
+				$candidate_ticket_url = (string) get_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, true );
+				if ( '' === $candidate_ticket_url ) {
+					continue;
+				}
+
+				if ( datamachine_normalize_ticket_url( $candidate_ticket_url ) === $normalized_url ) {
+					return self::duplicateResult( $post_id, 'ticket_url_exact' );
+				}
+
+				if ( '' !== $canonical_identity && datamachine_extract_ticket_identity( $candidate_ticket_url ) === $canonical_identity ) {
+					return self::duplicateResult( $post_id, 'ticket_url_canonical' );
+				}
+			}
+		}
+
+		return null;
+	}
+
+	// -----------------------------------------------------------------------
+	// Strategy 2: Venue + date + fuzzy title
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Find event by venue, date, and fuzzy title match.
+	 *
+	 * Queries the event date table for events at the same venue on the same date,
+	 * then compares titles through the public title-match contract and checks time windows.
+	 *
+	 * @param string        $title      Event title.
+	 * @param string        $venue      Venue name.
+	 * @param string        $date_only  Date in YYYY-MM-DD.
+	 * @param string        $startDate  Full datetime for time window comparison.
+	 * Short headliner titles ("The Aces", "Riff Raff") are low-confidence on
+	 * their own, so a bare fuzzy match is not trusted. They are still the same
+	 * show when a resolved venue term, the same date, and a start time within
+	 * LOW_CONFIDENCE_TIME_WINDOW all agree. Ticketing sources routinely list
+	 * one show as "The Aces" and "The Aces w/ Gatlin", or with doors and show
+	 * times 30-60 minutes apart, and skipping those created duplicates (#931).
+	 * Early and late sets at the same venue are usually 2+ hours apart, so
+	 * they stay distinct.
+	 *
+	 * @param \WP_Term|null $venue_term Optional pre-resolved venue term (address-aware).
+	 *                                  When null, falls back to a name-only cascade.
+	 * @return array|null Duplicate result or null.
+	 */
+	private static function findByVenueDateAndFuzzyTitle( string $title, string $venue, string $date_only, string $startDate, ?\WP_Term $venue_term = null, string $source = '' ): ?array {
+		$low_confidence = EventIdentifierGenerator::isLowConfidenceTitle( $title );
+		if ( $low_confidence && ! self::hasTimeComponent( $startDate ) ) {
+			return null;
+		}
+
+		// Use the pre-resolved venue term when available (address-aware).
+		// Otherwise fall back to a name-only cascade: exact → slug → normalized.
+		if ( ! $venue_term ) {
+			$venue_term = self::resolveVenueTerm( $venue );
+		}
+		if ( ! $venue_term ) {
+			return null;
+		}
+
+		$cross_source        = array();
+		$same_source_outside = false;
+		foreach ( self::candidatePagesByDate( $date_only, (int) $venue_term->term_id ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$post_id = (int) $candidate->ID;
+				if ( ! self::isValidPost( $post_id ) ) {
+					continue;
+				}
+				if ( ! self::titlesMatchAtVenue( $title, (string) $candidate->post_title, (string) $venue_term->name ) ) {
+					continue;
+				}
+
+				// Check time window.
+				$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+				$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
+				if ( $low_confidence ) {
+					if ( ! self::isWithinStrictTimeWindow( $startDate, $existing_datetime, self::LOW_CONFIDENCE_TIME_WINDOW ) ) {
+						continue;
+					}
+
+					return self::duplicateResult( $post_id, 'venue_date_time_fuzzy_short_title' );
+				}
+				if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
+					if ( self::isCrossSourceCandidate( $post_id, $source ) ) {
+						$cross_source[ $post_id ] = true;
+					} else {
+						$same_source_outside = true;
+					}
+					continue;
+				}
+
+				return self::duplicateResult( $post_id, 'venue_date_fuzzy_title' );
+			}
+		}
+
+		// Different sources often disagree on the time of one show (doors vs
+		// set time, e.g. 19:00 on an artist's tour page and 21:30 on
+		// Ticketmaster). When nothing matched in-window, accept a single
+		// cross-source title match at the same confirmed venue and date. Two
+		// candidates, or a same-source one, means early/late sets: stay apart.
+		if ( 1 === count( $cross_source ) && ! $same_source_outside ) {
+			return self::duplicateResult( (int) array_key_first( $cross_source ), 'venue_date_fuzzy_title_cross_source' );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Whether a stored event came from a different, known import source.
+	 *
+	 * @param int    $post_id Candidate event post ID.
+	 * @param string $source  Incoming import source slug.
+	 * @return bool
+	 */
+	private static function isCrossSourceCandidate( int $post_id, string $source ): bool {
+		if ( '' === $source ) {
+			return false;
+		}
+
+		$stored = (string) get_post_meta( $post_id, '_datamachine_event_source', true );
+
+		return '' !== $stored && $stored !== $source;
+	}
+
+	/**
+	 * Fuzzy title match for two listings already confirmed at one venue.
+	 *
+	 * Import titles often name the place ("Artist at Venue — City") while
+	 * older or venue-sourced listings do not ("Artist (21+ Event)"). Once the
+	 * venue term is confirmed, the "at Venue — City" phrase carries no identity,
+	 * so it is stripped from both sides before comparing.
+	 *
+	 * @param string $title      Incoming title.
+	 * @param string $candidate  Stored candidate title.
+	 * @param string $venue_name Confirmed venue term name.
+	 * @return bool
+	 */
+	public static function titlesMatchAtVenue( string $title, string $candidate, string $venue_name ): bool {
+		if ( EventIdentifierGenerator::titlesMatch( $title, $candidate ) ) {
+			return true;
+		}
+
+		$stripped_title     = self::stripSupportClause( self::stripVenuePhrase( $title, $venue_name ) );
+		$stripped_candidate = self::stripSupportClause( self::stripVenuePhrase( $candidate, $venue_name ) );
+		if ( $stripped_title === $title && $stripped_candidate === $candidate ) {
+			return false;
+		}
+
+		return EventIdentifierGenerator::titlesMatch( $stripped_title, $stripped_candidate );
+	}
+
+	/**
+	 * Remove a trailing "at <venue>[ — <city>]" phrase from a title.
+	 *
+	 * @param string $title      Event title.
+	 * @param string $venue_name Venue name.
+	 * @return string Title without the venue phrase, or the original title.
+	 */
+	public static function stripVenuePhrase( string $title, string $venue_name ): string {
+		$venue = trim( (string) preg_replace( '/^the\s+/iu', '', trim( $venue_name ) ) );
+		if ( '' === $venue ) {
+			return $title;
+		}
+
+		$pattern  = '/\s+(?:live\s+)?(?:at|@)\s+(?:the\s+)?' . preg_quote( $venue, '/' ) . '(?:\s*(?:[,:;\x{2013}\x{2014}|]|\s-\s|\()\s*.*)?\.?$/iu';
+		$stripped = trim( (string) preg_replace( $pattern, '', $title ) );
+
+		return '' === $stripped ? $title : $stripped;
+	}
+
+	/**
+	 * Remove a trailing support-act clause from a title.
+	 *
+	 * Ticketing sources append openers ("Little Stranger w/ Shwayze",
+	 * "Kenyon Dixon feat. X", "Band with special guest Y") while artist tour
+	 * pages list the headliner alone. Only explicit support markers are
+	 * stripped: a bare "with" is left alone so "An Evening with A" and
+	 * "An Evening with B" never collapse to the same title. Callers use this
+	 * only once venue and date are already confirmed.
+	 *
+	 * @param string $title Event title.
+	 * @return string Title without the support clause, or the original title.
+	 */
+	public static function stripSupportClause( string $title ): string {
+		$pattern  = '/\s+(?:w\/|with\s+(?:very\s+)?special\s+guests?|with\s+support(?:\s+from)?|feat\.?|ft\.|featuring|\+\s*special\s+guests?)\s+.*$/iu';
+		$stripped = trim( (string) preg_replace( $pattern, '', $title ) );
+
+		return mb_strlen( $stripped ) < 3 ? $title : $stripped;
+	}
+
+	// -----------------------------------------------------------------------
+	// Strategy 3: Exact title + date with venue confirmation
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Find event by exact title and date, with optional venue confirmation.
+	 *
+	 * Uses the title_hash index for fast exact-title lookup.
+	 *
+	 * @param string        $title               Event title.
+	 * @param string        $venue               Venue name.
+	 * @param string        $date_only           Date in YYYY-MM-DD.
+	 * @param string        $identity_confidence Identity confidence level.
+	 * @param \WP_Term|null $venue_term          Optional pre-resolved venue term
+	 *                                           (address-aware). When provided, the
+	 *                                           candidate's venue term_ids are
+	 *                                           compared directly — bypassing the
+	 *                                           name-string compare so dedup still
+	 *                                           fires when the incoming venue
+	 *                                           string differs from the canonical
+	 *                                           term name.
+	 * @param string        $startDate           Full datetime (YYYY-MM-DDTHH:MM or
+	 *                                           similar) used to enforce a 2-hour
+	 *                                           window for every exact-title
+	 *                                           confirmation. When either side
+	 *                                           lacks a time, matching retains the
+	 *                                           legacy date-only behavior.
+	 * @return array|null Duplicate result or null.
+	 */
+	private static function findByExactTitle( string $title, string $venue, string $date_only, string $identity_confidence, ?\WP_Term $venue_term = null, string $startDate = '' ): ?array {
+		if ( empty( $date_only ) ) {
+			return null;
+		}
+
+		$title_hash = self::computeTitleHash( $title );
+		foreach ( self::candidatePagesByDate( $date_only ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				if ( self::computeTitleHash( $candidate->post_title ) !== $title_hash ) {
+					continue;
+				}
+				$post_id = (int) $candidate->ID;
+				if ( ! self::isValidPost( $post_id ) ) {
+					continue;
+				}
+
+				$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+				$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
+				if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
+					continue;
+				}
+
+				if ( empty( $venue ) && ! $venue_term ) {
+					if ( 'low' !== $identity_confidence ) {
+						return self::duplicateResult( $post_id, 'exact_title_no_venue' );
+					}
+					continue;
+				}
+
+				if ( $venue_term ) {
+					$candidate_term_ids = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+					if ( ! is_wp_error( $candidate_term_ids ) && ! empty( $candidate_term_ids )
+						&& in_array( (int) $venue_term->term_id, array_map( 'intval', $candidate_term_ids ), true ) ) {
+						return self::duplicateResult( $post_id, 'exact_title_venue_term_id_match' );
+					}
+				}
+
+				$venue_terms = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
+				if ( empty( $venue_terms ) || is_wp_error( $venue_terms ) ) {
+					if ( 'low' !== $identity_confidence ) {
+						return self::duplicateResult( $post_id, 'exact_title_no_existing_venue' );
+					}
+					continue;
+				}
+
+				foreach ( $venue_terms as $existing_venue ) {
+					if ( $venue === $existing_venue || EventIdentifierGenerator::venuesMatch( $venue, $existing_venue ) ) {
+						return self::duplicateResult( $post_id, 'exact_title_venue_confirmed' );
+					}
+				}
+			}
+		}
+
+		return null;
+	}
+
+	// -----------------------------------------------------------------------
+	// Strategy 4: Date + fuzzy title fallback
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Last-resort venue-agnostic fuzzy search.
+	 *
+	 * Queries all events on the date and compares titles.
+	 * When both sides have venue data, venue match is required.
+	 *
+	 * @param string        $title      Event title.
+	 * @param string        $date_only  Date in YYYY-MM-DD.
+	 * @param string        $startDate  Full datetime for time window.
+	 * @param string        $venue      Incoming venue for confirmation.
+	 * @param \WP_Term|null $venue_term Optional pre-resolved venue term
+	 *                                  (address-aware). When provided, the
+	 *                                  candidate's venue term_ids are compared
+	 *                                  first — bypassing the name-string
+	 *                                  compare so dupes where the incoming
+	 *                                  venue string differs from the canonical
+	 *                                  term name still match.
+	 * @return array|null Duplicate result or null.
+	 */
+	private static function findByDateAndFuzzyTitle( string $title, string $date_only, string $startDate, string $venue = '', ?\WP_Term $venue_term = null ): ?array {
+		if ( EventIdentifierGenerator::isLowConfidenceTitle( $title ) ) {
+			return null;
+		}
+
+		foreach ( self::candidatePagesByDate( $date_only ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$post_id = (int) $candidate->ID;
+				if ( ! self::isValidPost( $post_id ) ) {
+					continue;
+				}
+				if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
+					continue;
+				}
+
+				$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+				$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
+				if ( ! self::isWithinTimeWindow( $startDate, $existing_datetime ) ) {
+					continue;
+				}
+
+				// When both sides have venue data, require venue match to avoid
+				// false positives on generic titles at different venues.
+				if ( ! empty( $venue ) || $venue_term ) {
+					// Term-id-aware short-circuit: when the incoming venue resolved
+					// to a term, accept the match if the candidate is tagged with
+					// that same term — regardless of how the venue is spelled in
+					// either post's content.
+					if ( $venue_term ) {
+						$candidate_term_ids = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+						if ( ! is_wp_error( $candidate_term_ids ) && ! empty( $candidate_term_ids )
+							&& in_array( (int) $venue_term->term_id, array_map( 'intval', $candidate_term_ids ), true ) ) {
+							return self::duplicateResult( $post_id, 'date_fuzzy_title_venue_term_id_match' );
+						}
+					}
+
+					if ( '' !== $venue ) {
+						$candidate_venues = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
+						$candidate_venue  = ( ! is_wp_error( $candidate_venues ) && ! empty( $candidate_venues ) ) ? $candidate_venues[0] : '';
+
+						if ( ! empty( $candidate_venue ) && ! EventIdentifierGenerator::venuesMatch( $venue, $candidate_venue ) ) {
+							continue;
+						}
+					} elseif ( $venue_term ) {
+						// Incoming side has a resolved term but the candidate
+						// doesn't share it; skip to avoid cross-venue false
+						// positives on generic titles.
+						continue;
+					}
+				}
+
+				return self::duplicateResult( $post_id, 'date_fuzzy_title' );
+			}
+		}
+
+		return null;
+	}
+
+	// -----------------------------------------------------------------------
+	// Helpers
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Extract date-only portion from a datetime string.
+	 *
+	 * @param string $datetime Datetime string.
+	 * @return string Date in YYYY-MM-DD format.
+	 */
+	private static function extractDateOnly( string $datetime ): string {
+		if ( preg_match( '/^(\d{4}-\d{2}-\d{2})/', $datetime, $matches ) ) {
+			return $matches[1];
+		}
+		return $datetime;
+	}
+
+	/**
+	 * Compute a title hash for exact-match lookups.
+	 *
+	 * Uses the event-owned stable identity normalizer.
+	 *
+	 * @param string $title Event title.
+	 * @return string MD5 hash of normalized title.
+	 */
+	public static function computeTitleHash( string $title ): string {
+		$normalized = EventIdentifierGenerator::normalizeBasic( $title );
+		return md5( $normalized );
+	}
+
+	/**
+	 * Find event candidates through the event-owned date query contract.
+	 *
+	 * Each query is hard-bounded while the generator continues through every
+	 * deterministic page, preserving duplicate detection for crowded dates.
+	 *
+	 * @param string   $date_only     Date in YYYY-MM-DD format.
+	 * @param int|null $venue_term_id Optional venue term constraint.
+	 * @return \Generator<int, \WP_Post[]>
+	 */
+	private static function candidatePagesByDate( string $date_only, ?int $venue_term_id = null ): \Generator {
+		$page = 1;
+		do {
+			$input = array(
+				'date_match' => $date_only,
+				'per_page'   => self::CANDIDATE_PAGE_SIZE,
+				'page'       => $page,
+				'order'      => 'ASC',
+				'scope'      => 'all',
+				'status'     => array( 'publish', 'future', 'draft', 'pending', 'private' ),
+			);
+			if ( null !== $venue_term_id ) {
+				$input['tax_filters'] = array( 'venue' => array( $venue_term_id ) );
+			}
+
+			$result     = ( new EventDateQueryAbilities() )->executeQueryEvents( $input );
+			$candidates = array_values(
+				array_filter(
+					$result['posts'] ?? array(),
+					static fn( $post ): bool => $post instanceof \WP_Post && self::isValidPost( (int) $post->ID )
+				)
+			);
+			if ( ! empty( $candidates ) ) {
+				yield $candidates;
+			}
+			++$page;
+		} while ( (int) ( $result['post_count'] ?? 0 ) === self::CANDIDATE_PAGE_SIZE );
+	}
+
+	/**
+	 * Whether a datetime string carries an HH:MM time component.
+	 *
+	 * @param string $datetime Datetime string.
+	 * @return bool True when a time is present.
+	 */
+	private static function hasTimeComponent( string $datetime ): bool {
+		return 1 === preg_match( '/\d{2}:\d{2}/', $datetime );
+	}
+
+	/**
+	 * Check that both datetimes carry a time and fall within $window seconds.
+	 *
+	 * Unlike isWithinTimeWindow(), a missing time on either side is NOT a
+	 * match. Low-confidence titles need the start time as positive evidence.
+	 *
+	 * @param string $datetime1 First datetime.
+	 * @param string $datetime2 Second datetime.
+	 * @param int    $window    Maximum gap in seconds.
+	 * @return bool True when both have times within the window.
+	 */
+	private static function isWithinStrictTimeWindow( string $datetime1, string $datetime2, int $window ): bool {
+		if ( ! self::hasTimeComponent( $datetime1 ) || ! self::hasTimeComponent( $datetime2 ) ) {
+			return false;
+		}
+
+		$time1 = strtotime( $datetime1 );
+		$time2 = strtotime( $datetime2 );
+		if ( false === $time1 || false === $time2 ) {
+			return false;
+		}
+
+		return abs( $time1 - $time2 ) <= $window;
+	}
+
+	/**
+	 * Check if two datetimes are within a 2-hour window.
+	 *
+	 * Preserves the same logic as EventUpsert::isWithinTimeWindow().
+	 *
+	 * @param string $datetime1 First datetime.
+	 * @param string $datetime2 Second datetime.
+	 * @return bool True if within 2 hours or if either lacks time component.
+	 */
+	private static function isWithinTimeWindow( string $datetime1, string $datetime2 ): bool {
+		// If either lacks a time component, allow the match.
+		if ( ! preg_match( '/\d{2}:\d{2}/', $datetime1 ) || ! preg_match( '/\d{2}:\d{2}/', $datetime2 ) ) {
+			return true;
+		}
+
+		$time1 = strtotime( $datetime1 );
+		$time2 = strtotime( $datetime2 );
+
+		if ( false === $time1 || false === $time2 ) {
+			return true;
+		}
+
+		return abs( $time1 - $time2 ) <= 7200; // 2 hours
+	}
+
+	/**
+	 * Check if a post exists and has a valid status.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return bool True if valid.
+	 */
+	private static function isValidPost( int $post_id ): bool {
+		$status = get_post_status( $post_id );
+		return $status && in_array( $status, array( 'publish', 'future', 'draft', 'pending', 'private' ), true );
+	}
+
+	/**
+	 * Resolve a venue using the venue taxonomy's canonical identity rules.
+	 *
+	 * @param string $venue   Venue name from import source.
+	 * @param string $address Optional street address (enables address-first lookup).
+	 * @param string $city    Optional city name (required alongside address).
+	 * @param string $state   Optional state or region.
+	 * @param string $country Optional country.
+	 * @return \WP_Term|null Resolved venue term or null.
+	 */
+	private static function resolveVenueTerm(
+		string $venue,
+		string $address = '',
+		string $city = '',
+		string $state = '',
+		string $country = ''
+	): ?\WP_Term {
+		$identity = self::resolveVenueIdentity( $venue, $address, $city, $state, $country );
+
+		return $identity['term'];
+	}
+
+	/**
+	 * Load a caller-supplied, already-resolved venue term.
+	 *
+	 * @param int $term_id Venue term ID from the upsert path (0 when absent).
+	 * @return \WP_Term|null Venue term, or null when absent or invalid.
+	 */
+	private static function authoritativeVenueTerm( int $term_id ): ?\WP_Term {
+		if ( $term_id <= 0 ) {
+			return null;
+		}
+
+		$term = get_term( $term_id, 'venue' );
+
+		return $term instanceof \WP_Term ? $term : null;
+	}
+
+	/**
+	 * Resolve a venue while retaining ambiguity for duplicate-check control flow.
+	 *
+	 * @param string $venue   Venue name from import source.
+	 * @param string $address Optional street address.
+	 * @param string $city    Optional city.
+	 * @param string $state   Optional state or region.
+	 * @param string $country Optional country.
+	 * @return array{term: \WP_Term|null, term_id: int|null, match_status: string, conflicting_term_ids: int[], venue_name: string}
+	 */
+	private static function resolveVenueIdentity(
+		string $venue,
+		string $address = '',
+		string $city = '',
+		string $state = '',
+		string $country = ''
+	): array {
+		return \DataMachineEvents\Core\Venue_Taxonomy::resolve_venue_identity(
+			$venue,
+			array(
+				'address' => $address,
+				'city'    => $city,
+				'state'   => $state,
+				'country' => $country,
+			)
+		);
+	}
+
+	/**
+	 * Build a standard duplicate result array.
+	 *
+	 * @param int    $post_id  Matched post ID.
+	 * @param string $strategy Strategy that matched.
+	 * @return array Duplicate result.
+	 */
+	private static function duplicateResult( int $post_id, string $strategy ): array {
+		$title = get_the_title( $post_id );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'EventDuplicateStrategy: matched existing event',
+			array(
+				'post_id'  => $post_id,
+				'title'    => $title,
+				'strategy' => $strategy,
+			)
+		);
+
+		return array(
+			'verdict'  => 'duplicate',
+			'source'   => 'event_dates',
+			'match'    => array(
+				'post_id' => $post_id,
+				'title'   => $title,
+				'url'     => get_permalink( $post_id ),
+			),
+			'reason'   => sprintf(
+				'Matched existing event "%s" (ID %d) via %s.',
+				$title,
+				$post_id,
+				$strategy
+			),
+			'strategy' => 'event_date_query',
+		);
+	}
+}

@@ -1,0 +1,218 @@
+<?php
+/**
+ * Bluesky Update Ability
+ *
+ * Abilities API primitive for updating Bluesky posts.
+ * Supports deleting posts and liking/unliking posts.
+ *
+ * @package    DataMachineSocials
+ * @subpackage Abilities\Bluesky
+ * @since      0.3.0
+ */
+
+namespace DataMachineSocials\Abilities\Bluesky;
+
+use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Bluesky\BlueskyAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
+
+defined( 'ABSPATH' ) || exit;
+
+class BlueskyUpdateAbility extends AbstractSocialAbility {
+
+	protected static bool $registered = false;
+
+	public function __construct() {
+		$this->registerAbility( $this->registerCallback(), true );
+	}
+
+	private function registerCallback(): callable {
+		return function () {
+			wp_register_ability(
+				'datamachine/bluesky-update',
+				array(
+					'label'               => __( 'Update Bluesky Posts', 'data-machine-socials' ),
+					'description'         => __( 'Delete posts or like/unlike posts on Bluesky', 'data-machine-socials' ),
+					'category'            => 'datamachine-socials',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'action'   => array(
+								'type'        => 'string',
+								'enum'        => array( 'delete', 'like', 'unlike' ),
+								'description' => __( 'Action: delete, like, unlike', 'data-machine-socials' ),
+							),
+							'post_uri' => array(
+								'type'        => 'string',
+								'description' => __( 'Bluesky post URI (at://...)', 'data-machine-socials' ),
+							),
+						),
+						'required'   => array( 'action', 'post_uri' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'data'    => array( 'type' => 'object' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'execute' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+	}
+
+	public function checkPermission(): bool {
+		return PublishAuthorization::can_publish();
+	}
+
+	public function execute( array $input ): array|\WP_Error {
+		$action = $input['action'] ?? '';
+
+		$auth = $this->getAuthProvider();
+		if ( ! $auth ) {
+			return new \WP_Error( 'missing_auth', 'Bluesky auth provider not available', array( 'status' => 401 ) );
+		}
+
+		$session = $auth->get_session();
+		if ( empty( $session['accessJwt'] ) ) {
+			return new \WP_Error( 'missing_auth', 'Bluesky session not available', array( 'status' => 401 ) );
+		}
+
+		if ( empty( $input['post_uri'] ) ) {
+			return new \WP_Error( 'missing_param', 'post_uri is required', array( 'status' => 400 ) );
+		}
+
+		$post_uri = $input['post_uri'];
+
+		switch ( $action ) {
+			case 'delete':
+				return $this->deletePost( $session, $post_uri );
+
+			case 'like':
+				return $this->likePost( $session, $post_uri );
+
+			case 'unlike':
+				return $this->unlikePost( $session);
+
+			default:
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete, like, or unlike.", array( 'status' => 500 ) );
+		}
+	}
+
+	private function getAuthProvider(): ?BlueskyAuth {
+		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
+			return null;
+		}
+
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
+		$provider = $auth->getProvider( 'bluesky' );
+
+		if ( ! $provider instanceof BlueskyAuth ) {
+			return null;
+		}
+
+		return $provider;
+	}
+
+	private function deletePost( array $session, string $post_uri ): array|\WP_Error {
+		$pds_url = $session['pds_url'];
+		$did     = $session['did'];
+
+		// Extract the record key from URI: at://did/rkey
+		$parts = wp_parse_url( $post_uri );
+		$path  = ltrim( $parts['path'], '/' );
+		$rkey  = basename( $path );
+
+		$url    = $pds_url . '/xrpc/app.bsky.feed.post';
+		$params = array(
+			'repo'       => $did,
+			'collection' => 'app.bsky.feed.post',
+			'rkey'       => $rkey,
+		);
+
+		$result = HttpClient::delete(
+			$url,
+			array(
+				'context' => 'Bluesky Delete',
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $session['accessJwt'],
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $params ),
+			)
+		);
+
+		if ( ! empty( $result['success'] ) ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'post_uri' => $post_uri,
+					'deleted'  => true,
+				),
+			);
+		}
+
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to delete post', array( 'status' => 500 ) );
+	}
+
+	private function likePost( array $session, string $post_uri ): array|\WP_Error {
+		$pds_url = $session['pds_url'];
+		$did     = $session['did'];
+
+		$url = $pds_url . '/xrpc/app.bsky.feed.like';
+
+		$result = HttpClient::post(
+			$url,
+			array(
+				'context' => 'Bluesky Like',
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $session['accessJwt'],
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( array(
+					'repo'       => $did,
+					'collection' => 'app.bsky.feed.like',
+					'record'     => array(
+						'subject'   => array(
+							'uri' => $post_uri,
+							'cid' => '',
+						),
+						'createdAt' => gmdate( 'c' ),
+					),
+				) ),
+			)
+		);
+
+		if ( ! empty( $result['success'] ) ) {
+			$body = json_decode( $result['data'], true );
+			return array(
+				'success' => true,
+				'data'    => array(
+					'post_uri' => $post_uri,
+					'liked'    => true,
+					'uri'      => $body['uri'] ?? '',
+				),
+			);
+		}
+
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to like post', array( 'status' => 500 ) );
+	}
+
+	private function unlikePost( array $session): array|\WP_Error {
+		$pds_url = $session['pds_url'];
+		$did     = $session['did'];
+
+		/*
+		 * Unlike requires the like URI which we don't have stored.
+		 * This is a limitation - user would need to query likes first.
+		 */
+				return new \WP_Error( 'api_error', 'Unlike requires the like URI. Query likes first to get the like record to delete.', array( 'status' => 500 ) );
+	}
+}

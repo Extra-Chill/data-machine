@@ -1,0 +1,343 @@
+<?php
+/**
+ * Public canonical event upsert ability.
+ *
+ * @package DataMachineEvents\Abilities
+ */
+
+namespace DataMachineEvents\Abilities;
+
+use DataMachineEvents\Core\Event_Type_Taxonomy;
+use DataMachineEvents\Core\VenueParameterProvider;
+use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
+
+defined( 'ABSPATH' ) || exit;
+
+class EventUpsertAbilities {
+
+	public const ABILITY_NAME = 'data-machine-events/upsert-event';
+
+	private static bool $registered = false;
+
+	public function __construct() {
+		if ( self::$registered ) {
+			return;
+		}
+
+		add_action( 'wp_abilities_api_init', array( $this, 'registerAbility' ) );
+		self::$registered = true;
+	}
+
+	/**
+	 * Register the public ability contract.
+	 */
+	public function registerAbility(): void {
+		wp_register_ability(
+			self::ABILITY_NAME,
+			array(
+				'label'               => __( 'Upsert Event', 'data-machine-events' ),
+				'description'         => __( 'Deterministically create or update a canonical event from a stable caller-supplied source identity.', 'data-machine-events' ),
+				'category'            => AbilityCategories::EVENTS,
+				'input_schema'        => $this->getInputSchema(),
+				'output_schema'       => $this->getOutputSchema(),
+				'execute_callback'    => array( $this, 'executeUpsertEvent' ),
+				'permission_callback' => array( $this, 'canUpsertEvent' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'mcp'          => array( 'public' => true ),
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Check access to the canonical event upsert boundary.
+	 *
+	 * The ability keeps the shared write gate as its default. Consumers may
+	 * narrowly grant or deny this one operation from the validated ability
+	 * input without changing permissions for unrelated event mutations.
+	 *
+	 * @param array $input Validated ability input.
+	 * @return bool
+	 */
+	public function canUpsertEvent( array $input = array() ): bool {
+		$can_write = AbilityPermissions::canWrite();
+		$allowed   = (bool) $can_write();
+
+		/**
+		 * Filter permission for the canonical event upsert ability only.
+		 *
+		 * @param bool  $allowed Shared DME write-gate decision.
+		 * @param array $input   Validated event-upsert input.
+		 */
+		return (bool) apply_filters( 'datamachine_events_upsert_event_permission', $allowed, $input );
+	}
+
+	/**
+	 * Execute a canonical event upsert.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error Normalized event result or validation failure.
+	 */
+	public function executeUpsertEvent( array $input ): array|\WP_Error {
+		$source    = trim( sanitize_text_field( (string) ( $input['source'] ?? '' ) ) );
+		$source_id = trim( sanitize_text_field( (string) ( $input['source_id'] ?? '' ) ) );
+		$event     = is_array( $input['event'] ?? null ) ? $input['event'] : array();
+		$event_id  = is_int( $input['event_id'] ?? null ) ? $input['event_id'] : 0;
+
+		if ( '' === $source || '' === $source_id ) {
+			return new \WP_Error( 'missing_source_identity', 'Both source and source_id are required.', array( 'status' => 400 ) );
+		}
+
+		if ( empty( $event ) ) {
+			return new \WP_Error( 'missing_event', 'The event object is required.', array( 'status' => 400 ) );
+		}
+
+		if ( array_key_exists( 'event_id', $input ) && ( ! is_int( $input['event_id'] ) || $event_id <= 0 ) ) {
+			return new \WP_Error( 'invalid_event_candidate', 'event_id must be a positive event ID.', array( 'status' => 400 ) );
+		}
+
+		$venue_error = $this->validateVenueIdentity( $event );
+		if ( $venue_error ) {
+			return $venue_error;
+		}
+
+		$event['source']          = $source;
+		$event['source_id']       = $source_id;
+		$event['source_identity'] = hash( 'sha256', $source . "\0" . $source_id );
+		if ( $event_id > 0 ) {
+			$event['event_id'] = $event_id;
+		}
+
+		$config = array(
+			'post_status'    => sanitize_key( (string) ( $input['post_status'] ?? 'publish' ) ),
+			'post_author'    => absint( $input['post_author'] ?? 0 ),
+			'include_images' => false,
+		);
+
+		// Explicit organizer is caller intent, not an AI guess (#849).
+		if ( '' !== trim( (string) ( $event['organizer'] ?? '' ) ) ) {
+			$config['promoter_explicit_organizer'] = true;
+		}
+		if ( ! in_array( $config['post_status'], array( 'draft', 'publish', 'pending', 'private' ), true ) ) {
+			return new \WP_Error( 'invalid_post_status', 'post_status must be draft, publish, pending, or private.', array( 'status' => 400 ) );
+		}
+
+		$result = ( new EventUpsert() )->upsertCanonicalEvent( $event, $config );
+		if ( empty( $result['success'] ) ) {
+			$retryable               = ! empty( $result['retryable'] );
+			$error_code              = (string) ( $result['error_code'] ?? $result['rule'] ?? 'event_upsert_failed' );
+			$status                  = (int) ( $result['status'] ?? ( $retryable ? 503 : 400 ) );
+			$error_data              = is_array( $result['error_data'] ?? null ) ? $result['error_data'] : array();
+			$error_data['status']    = $status;
+			$error_data['rule']      = $result['rule'] ?? ( $error_data['rule'] ?? null );
+			$error_data['retryable'] = $retryable;
+			$error_data['transient'] = ! empty( $result['transient'] ) || $retryable;
+			return new \WP_Error(
+				$error_code,
+				(string) ( $result['error'] ?? 'Event upsert failed.' ),
+				$error_data
+			);
+		}
+
+		$post_id     = (int) $result['data']['post_id'];
+		$venue_terms = wp_get_object_terms( $post_id, 'venue' );
+		$venue_term  = ! is_wp_error( $venue_terms ) && ! empty( $venue_terms ) ? $venue_terms[0] : null;
+		$post        = get_post( $post_id );
+		$dates       = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$fingerprint = EventUpdateAbilities::fingerprintForEvent( $post_id, $source, $source_id, $event['source_identity'] );
+		if ( is_wp_error( $fingerprint ) ) {
+			return $fingerprint;
+		}
+
+		return array(
+			'success'     => true,
+			'event_id'    => $post_id,
+			'event_url'   => (string) ( $result['data']['post_url'] ?? get_permalink( $post_id ) ),
+			'action'      => (string) $result['data']['action'],
+			'fingerprint' => $fingerprint,
+			'source'      => array(
+				'name'     => $source,
+				'id'       => $source_id,
+				'identity' => $event['source_identity'],
+			),
+			'normalized'  => array(
+				'title'          => $post instanceof \WP_Post ? $post->post_title : (string) ( $event['title'] ?? '' ),
+				'post_status'    => $post instanceof \WP_Post ? $post->post_status : $config['post_status'],
+				'start_datetime' => $dates ? (string) $dates->start_datetime : '',
+				'end_datetime'   => $dates ? (string) $dates->end_datetime : '',
+				'venue'          => $venue_term instanceof \WP_Term ? $venue_term->name : '',
+				'venue_id'       => $venue_term instanceof \WP_Term ? (int) $venue_term->term_id : 0,
+			),
+		);
+	}
+
+	/**
+	 * Reject geographically ambiguous existing venue identities before writes.
+	 *
+	 * @param array $event Canonical event fields.
+	 * @return \WP_Error|null Venue conflict error, or null when safe.
+	 */
+	private function validateVenueIdentity( array $event ): ?\WP_Error {
+		$venue_name = trim( (string) ( $event['venue'] ?? '' ) );
+		if ( '' === $venue_name ) {
+			return null;
+		}
+
+		$identity = Venue_Taxonomy::resolve_venue_identity(
+			$venue_name,
+			VenueParameterProvider::extractFromParameters( $event )
+		);
+		if ( 'ambiguous' !== $identity['match_status'] ) {
+			return null;
+		}
+
+		return new \WP_Error(
+			'ambiguous_venue',
+			'The venue name conflicts with existing geographic identity and cannot be resolved safely.',
+			array(
+				'status' => 409,
+				'venue'  => $venue_name,
+			)
+		);
+	}
+
+	private function getInputSchema(): array {
+		$string = array( 'type' => 'string' );
+
+		return array(
+			'type'       => 'object',
+			'required'   => array( 'source', 'source_id', 'event' ),
+			'properties' => array(
+				'source'      => array(
+					'type'        => 'string',
+					'minLength'   => 1,
+					'description' => 'Stable caller/source namespace.',
+				),
+				'source_id'   => array(
+					'type'        => 'string',
+					'minLength'   => 1,
+					'description' => 'Stable item ID within the source namespace.',
+				),
+				'post_status' => array(
+					'type'    => 'string',
+					'enum'    => array( 'draft', 'publish', 'pending', 'private' ),
+					'default' => 'publish',
+				),
+				'post_author' => array(
+					'type'    => 'integer',
+					'minimum' => 1,
+				),
+				'event_id'    => array(
+					'type'        => 'integer',
+					'minimum'     => 1,
+					'description' => 'Existing canonical event candidate to adopt for this source identity.',
+				),
+				'event'       => array(
+					'type'       => 'object',
+					'required'   => array( 'title', 'startDate' ),
+					'properties' => array(
+						'title'             => $string,
+						'description'       => $string,
+						'startDate'         => $string,
+						'startTime'         => $string,
+						'endDate'           => $string,
+						'endTime'           => $string,
+						'occurrenceDates'   => array(
+							'type'  => 'array',
+							'items' => $string,
+						),
+						'venue'             => $string,
+						'venueAddress'      => $string,
+						'venueCity'         => $string,
+						'venueState'        => $string,
+						'venueZip'          => $string,
+						'venueCountry'      => $string,
+						'venuePhone'        => $string,
+						'venueWebsite'      => $string,
+						'venueTicketingUrl' => $string,
+						'venueCoordinates'  => $string,
+						'venueCapacity'     => $string,
+						'venueTimezone'     => $string,
+						'price'             => $string,
+						'priceCurrency'     => $string,
+						'ticketUrl'         => array(
+							'type'   => 'string',
+							'format' => 'uri',
+						),
+						'offerAvailability' => $string,
+						'validFrom'         => array(
+							'type'   => 'string',
+							'format' => 'date-time',
+						),
+						'performer'         => $string,
+						'performerType'     => $string,
+						'organizer'         => array(
+							'type'        => 'string',
+							'description' => 'Organizer/promoter name. An explicitly supplied value creates and assigns a promoter term.',
+						),
+						'organizerType'     => array(
+							'type'        => 'string',
+							'description' => 'Schema.org organizer type, stored as promoter term meta when organizer is supplied.',
+						),
+						'organizerUrl'      => array(
+							'type'        => 'string',
+							'format'      => 'uri',
+							'description' => 'Organizer URL, stored as promoter term meta when organizer is supplied.',
+						),
+						'eventStatus'       => $string,
+						'previousStartDate' => $string,
+						'eventType'         => array(
+							'type' => 'string',
+							'enum' => Event_Type_Taxonomy::get_vocabulary_names(),
+						),
+					),
+				),
+			),
+		);
+	}
+
+	private function getOutputSchema(): array {
+		return array(
+			'type'       => 'object',
+			'required'   => array( 'success', 'event_id', 'event_url', 'action', 'fingerprint', 'source', 'normalized' ),
+			'properties' => array(
+				'success'     => array( 'type' => 'boolean' ),
+				'event_id'    => array( 'type' => 'integer' ),
+				'event_url'   => array( 'type' => 'string' ),
+				'action'      => array(
+					'type' => 'string',
+					'enum' => array( 'created', 'updated', 'no_change' ),
+				),
+				'fingerprint' => array( 'type' => 'string' ),
+				'source'      => array(
+					'type'       => 'object',
+					'required'   => array( 'name', 'id', 'identity' ),
+					'properties' => array(
+						'name'     => array( 'type' => 'string' ),
+						'id'       => array( 'type' => 'string' ),
+						'identity' => array( 'type' => 'string' ),
+					),
+				),
+				'normalized'  => array(
+					'type'       => 'object',
+					'required'   => array( 'title', 'post_status', 'start_datetime', 'end_datetime', 'venue', 'venue_id' ),
+					'properties' => array(
+						'title'          => array( 'type' => 'string' ),
+						'post_status'    => array( 'type' => 'string' ),
+						'start_datetime' => array( 'type' => 'string' ),
+						'end_datetime'   => array( 'type' => 'string' ),
+						'venue'          => array( 'type' => 'string' ),
+						'venue_id'       => array( 'type' => 'integer' ),
+					),
+				),
+			),
+		);
+	}
+}

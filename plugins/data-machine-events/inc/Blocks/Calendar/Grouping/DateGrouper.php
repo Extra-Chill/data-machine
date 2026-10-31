@@ -1,0 +1,316 @@
+<?php
+// phpcs:disable Generic.CodeAnalysis.EmptyStatement.DetectedCatch -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+/**
+ * Date Grouper
+ *
+ * Groups events by date, expanding multi-day events across their date
+ * range and handling occurrence dates for recurring events. Long spans
+ * are resolved by MultiDayResolver::get_display_dates() so recurring
+ * series with a leaked series end do not blanket the calendar (#199).
+ *
+ * @package DataMachineEvents\Blocks\Calendar\Grouping
+ * @since   0.14.0
+ */
+
+namespace DataMachineEvents\Blocks\Calendar\Grouping;
+
+use DateTime;
+use DateTimeZone;
+use WP_Query;
+use DataMachineEvents\Blocks\Calendar\Data\EventHydrator;
+use DataMachineEvents\Core\DateTimeParser;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class DateGrouper {
+
+	/**
+	 * Build paged events array from WP_Query.
+	 *
+	 * @param WP_Query $query Events query.
+	 * @return array Array of event items with post, datetime, and event_data.
+	 */
+	public static function build_paged_events( WP_Query $query ): array {
+		$paged_events = array();
+
+		if ( ! $query->have_posts() ) {
+			return $paged_events;
+		}
+
+		while ( $query->have_posts() ) {
+			$query->the_post();
+			$event_post = get_post();
+			$event_data = EventHydrator::parse_event_data( $event_post );
+
+			if ( $event_data ) {
+				$start_time     = $event_data['startTime'] ?? '00:00:00';
+				$event_tz       = self::get_event_timezone( $event_data );
+				$event_datetime = DateTimeParser::safeCreate(
+					( $event_data['startDate'] ?? '' ) . ' ' . $start_time,
+					$event_tz
+				);
+
+				// A malformed/placeholder startDate that slipped into storage
+				// before the prevention layers existed cannot be rendered.
+				// Skip it rather than fataling the whole calendar. See #394.
+				if ( null === $event_datetime ) {
+					continue;
+				}
+
+				$paged_events[] = array(
+					'post'       => $event_post,
+					'datetime'   => $event_datetime,
+					'event_data' => $event_data,
+				);
+			}
+		}
+
+		wp_reset_postdata();
+
+		return $paged_events;
+	}
+
+	/**
+	 * Group events by date, expanding multi-day events across their date range.
+	 *
+	 * @param array  $paged_events Array of event items.
+	 * @param bool   $show_past    Whether showing past events (affects sort order).
+	 * @param string $date_start   Optional start date boundary (Y-m-d).
+	 * @param string $date_end     Optional end date boundary (Y-m-d).
+	 * @return array Date-grouped events.
+	 */
+	public static function group_events_by_date( array $paged_events, bool $show_past = false, string $date_start = '', string $date_end = '' ): array {
+		$date_groups = array();
+
+		foreach ( $paged_events as $event_item ) {
+			$event_data = $event_item['event_data'];
+			$start_date = $event_data['startDate'] ?? '';
+			$end_date   = $event_data['endDate'] ?? $start_date;
+
+			if ( empty( $start_date ) ) {
+				continue;
+			}
+
+			$event_tz     = self::get_event_timezone( $event_data );
+			$is_multi_day = MultiDayResolver::is_multi_day( $event_data );
+
+			// Use explicit occurrence dates if provided; otherwise let the
+			// resolver decide between continuous expansion (genuine multi-day
+			// events), derived weekly occurrences (long same-weekday spans —
+			// recurring series with a leaked series end, #199), and a bounded
+			// truncation window (long spans of unknowable shape).
+			$occurrence_dates     = $event_data['occurrenceDates'] ?? array();
+			$has_occurrence_dates = ! empty( $occurrence_dates ) && is_array( $occurrence_dates );
+
+			// effective_start_date is what we treat as the event's grouping
+			// "start" — same as $start_date in normal cases, but shifted back
+			// one day for late-night events. Used downstream for the
+			// is_continuation / is_start_day flags so the cutoff doesn't
+			// confuse the calendar's continuation rendering.
+			$effective_start_date = $start_date;
+
+			$is_derived_weekly = false;
+
+			if ( $has_occurrence_dates ) {
+				$event_dates = $occurrence_dates;
+			} elseif ( $is_multi_day ) {
+				$is_derived_weekly = MultiDayResolver::is_likely_weekly_recurrence( $start_date, $end_date );
+				$event_dates       = MultiDayResolver::get_display_dates( $start_date, $end_date, $event_tz );
+			} else {
+				// Single-day events get a late-night cutoff shift: a 1am show
+				// belongs to the previous night for human-friendly grouping.
+				// The underlying start_datetime stays untouched.
+				//
+				// MultiDayResolver::is_multi_day() has already returned false
+				// here, so the event is a single NIGHT: an end on the next
+				// calendar date before the cutoff (a 9 PM → 2 AM bar show,
+				// #833) or a start after midnight (1 AM → 2 AM). List it once
+				// under the cutoff-shifted display date and never force-expand
+				// it into a multi-day continuation — the old end_date >
+				// effective_start_date re-check overrode the resolver's verdict
+				// and produced "through <date>" badges plus ghost "Ongoing"
+				// entries on the following day.
+				$effective_start_date = LateNightCutoff::display_date_from_strings(
+					$start_date,
+					$event_data['startTime'] ?? ''
+				);
+				$event_dates          = array( $effective_start_date );
+			}
+
+			// Filter out past dates when show_past is false.
+			if ( ! $show_past && ( $has_occurrence_dates || $is_multi_day ) ) {
+				$current_date = current_time( 'Y-m-d' );
+				$event_dates  = array_filter(
+					$event_dates,
+					function ( $date ) use ( $current_date ) {
+						return $date >= $current_date;
+					}
+				);
+			}
+
+			// Filter to page date boundaries if provided.
+			if ( $date_start || $date_end ) {
+				$event_dates = array_filter(
+					$event_dates,
+					function ( $date ) use ( $date_start, $date_end ) {
+						if ( $date_start && $date < $date_start ) {
+							return false;
+						}
+						if ( $date_end && $date > $date_end ) {
+							return false;
+						}
+						return true;
+					}
+				);
+			}
+
+			foreach ( $event_dates as $index => $date_key ) {
+				$display_datetime_obj = DateTimeParser::safeCreate( $date_key . ' 00:00:00', $event_tz );
+
+				// Defensive: a malformed date key cannot anchor a day group.
+				if ( null === $display_datetime_obj ) {
+					continue;
+				}
+
+				if ( ! isset( $date_groups[ $date_key ] ) ) {
+					$date_groups[ $date_key ] = array(
+						'date_obj' => $display_datetime_obj,
+						'events'   => array(),
+					);
+				}
+
+				// Occurrence-shaped listings — explicit occurrenceDates and
+				// derived weekly recurrences (#199) alike — are standalone
+				// nights, never continuations of the previous night. For
+				// non-occurrence events the "start" we compare against is
+				// the effective (cutoff-shifted) start so a 1am show on its
+				// own bucket is still flagged as the start day, not a
+				// continuation of the previous night.
+				$is_occurrence_mode = $has_occurrence_dates || $is_derived_weekly;
+				$is_continuation    = $is_occurrence_mode ? false : ( $date_key !== $effective_start_date );
+
+				$display_item                    = $event_item;
+				$display_item['display_context'] = array(
+					'is_multi_day'        => $is_occurrence_mode ? false : $is_multi_day,
+					'is_start_day'        => $is_occurrence_mode ? true : ( $date_key === $effective_start_date ),
+					'is_end_day'          => $is_occurrence_mode ? true : ( $date_key === $end_date ),
+					'is_continuation'     => $is_continuation,
+					'display_date'        => $date_key,
+					'original_start_date' => $start_date,
+					'original_end_date'   => $end_date,
+					'day_number'          => $index + 1,
+					'total_days'          => count( $event_dates ),
+				);
+
+				$date_groups[ $date_key ]['events'][] = $display_item;
+			}
+		}
+
+		// Default sort: continuation events (multi-day events on non-start days)
+		// sort after non-continuation events within each day group. This ensures
+		// events actually starting today appear before ongoing multi-day events.
+		foreach ( $date_groups as $date_key => &$date_group ) {
+			usort(
+				$date_group['events'],
+				function ( $a, $b ) {
+					$a_continuation = ! empty( $a['display_context']['is_continuation'] );
+					$b_continuation = ! empty( $b['display_context']['is_continuation'] );
+
+					if ( $a_continuation !== $b_continuation ) {
+						return $a_continuation ? 1 : -1;
+					}
+
+					// Within the same tier, maintain datetime order.
+					$a_time = $a['datetime'] ?? null;
+					$b_time = $b['datetime'] ?? null;
+
+					if ( $a_time && $b_time ) {
+						return $a_time <=> $b_time;
+					}
+
+					return 0;
+				}
+			);
+		}
+		unset( $date_group );
+
+		// Allow reordering events within each day group.
+		foreach ( $date_groups as $date_key => &$date_group ) {
+			$date_group['events'] = apply_filters(
+				'data_machine_events_day_group_events',
+				$date_group['events'],
+				$date_key,
+				array(
+					'date_obj'  => $date_group['date_obj'],
+					'show_past' => $show_past,
+				)
+			);
+		}
+		unset( $date_group );
+
+		uksort(
+			$date_groups,
+			function ( $a, $b ) use ( $show_past ) {
+				return $show_past ? strcmp( $b, $a ) : strcmp( $a, $b );
+			}
+		);
+
+		return $date_groups;
+	}
+
+	/**
+	 * Detect time gaps between date groups for carousel mode.
+	 *
+	 * @param array $date_groups Date-grouped events.
+	 * @return array Map of date_key => gap_days for gaps >= 2 days.
+	 */
+	public static function detect_time_gaps( array $date_groups ): array {
+		$gaps          = array();
+		$previous_date = null;
+
+		foreach ( $date_groups as $date_key => $date_group ) {
+			$current_date = DateTimeParser::safeCreate( $date_key, wp_timezone() );
+
+			// A malformed group key can't participate in gap math; skip it
+			// without throwing or resetting the previous-date cursor.
+			if ( null === $current_date ) {
+				continue;
+			}
+
+			if ( null !== $previous_date ) {
+				$days_diff = $current_date->diff( $previous_date )->days;
+
+				if ( $days_diff > 1 ) {
+					$gaps[ $date_key ] = $days_diff;
+				}
+			}
+			$previous_date = $current_date;
+		}
+
+		return $gaps;
+	}
+
+	/**
+	 * Get DateTimeZone for an event.
+	 *
+	 * Uses venue timezone if available, falls back to WordPress site timezone.
+	 *
+	 * @param array $event_data Event data array.
+	 * @return DateTimeZone Timezone for the event.
+	 */
+	public static function get_event_timezone( array $event_data ): DateTimeZone {
+		$tz_string = $event_data['venueTimezone'] ?? '';
+
+		if ( ! empty( $tz_string ) ) {
+			try {
+				return new DateTimeZone( $tz_string );
+			} catch ( \Exception $e ) {
+				// Invalid timezone, fall through to default.
+			}
+		}
+
+		return wp_timezone();
+	}
+}

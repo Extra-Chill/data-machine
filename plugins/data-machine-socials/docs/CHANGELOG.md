@@ -1,0 +1,397 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [0.31.0] - 2026-10-30
+
+### Added
+- per-slide user_tags on carousels
+
+## [0.30.0] - 2026-10-26
+
+### Added
+- instagram_messages fetch handler (inbound DMs as flow items)
+
+## [0.29.0] - 2026-10-26
+
+### Added
+- optional recent_context for instagram_account fetch
+
+## [0.28.1] - 2026-10-26
+
+### Changed
+- locate insights request by URL and read packet refs from Data Machine envelope metadata
+
+## [0.28.0] - 2026-10-26
+
+### Added
+- public account fetch handler via Business Discovery
+
+### Changed
+- drop removed 'homeboy audit' command and use homeboy-action defaults
+
+## [0.27.3] - 2026-10-20
+
+### Fixed
+- repeated --image flags publish a carousel; reject non-JPEG feed images
+
+## [0.27.2] - 2026-10-18
+
+### Fixed
+- say 'Scheduling' instead of 'Publishing' when --publish-at is set
+
+## [0.27.1] - 2026-10-18
+
+### Fixed
+- route account read/reply/update/delete abilities through PublishAuthorization
+
+## [0.27.0] - 2026-10-17
+
+### Added
+- location tagging and scheduled social publishing
+
+## [0.26.0] - 2026-10-12
+
+### Added
+- detailed campaign report and default UTM url_tags
+
+## [0.25.0] - 2026-10-11
+
+### Added
+- edit live promotions through the approval gate; exact interest matching
+
+## [0.24.0] - 2026-10-11
+
+### Added
+- paid Meta promotion with mandatory human approval and hard spend caps
+
+### Fixed
+- storage callbacks return save_account() result
+
+## [0.23.0] - 2026-10-04
+
+### Added
+- add media insights read ability
+
+## [0.22.0] - 2026-10-04
+
+### Added
+- support collaborators and user tags when publishing
+
+## [0.21.5] - 2026-09-22
+
+### Fixed
+- grant id-token so the shared release workflow can start
+
+## [0.21.4] - 2026-09-22
+
+### Fixed
+- disclose Instagram post-list staleness instead of returning it silently
+
+## [0.21.3] - 2026-09-21
+
+### Changed
+- add continuous release pipeline
+
+## [0.21.2] - 2026-09-20
+
+### Fixed
+- phrase socials AGENTS.md safety as confirm-then-run
+
+## [0.21.1] - 2026-09-16
+
+### Changed
+- satisfy release lint gate on Instagram messaging changes
+
+### Fixed
+- degrade Instagram conversations read to limit=1 cursor walk with retry
+- request pages_messaging and subscribe the app to the Page during Instagram OAuth
+
+## [0.21.0] - 2026-09-12
+
+### Added
+- Instagram direct messaging — conversations, messages, send
+- add Facebook comment reply ability for unified comments reply
+
+### Changed
+- pass explicit messages action in SocialMessagesAbility echo-flag test
+
+### Fixed
+- clear phpcs findings blocking release lint gate
+- use non-expiring Instagram Page token; repair FB-flavored token refresh
+
+## [0.20.2] - 2026-08-25
+
+### Changed
+- register delegated retry step directly
+
+### Fixed
+- resolve delegated media at delivery time
+- replace delegated retry result packets
+- enforce owner policy for Instagram reads
+
+## [0.20.1] - 2026-08-23
+
+### Fixed
+- clear release validation baseline
+
+## [0.20.0] - 2026-08-23
+
+### Added
+- separate delegated share attribution owner
+- expose retryable social publish deliveries
+- add recent social comments inbox contract
+
+### Changed
+- use canonical Data Machine providers
+- isolate social platform bootstrap
+
+### Fixed
+- expose delegated social attribution
+- preserve standalone social publishing
+- scope cross-posts to canonical site
+- unify social publish authorization
+- remove unsupported Homeboy input
+- declare social publish composer contracts
+- scope social publish assets to network sites
+- preserve cross-user delegated identity
+
+## [0.19.1] - 2026-07-27
+
+### Fixed
+- preserve Reddit monitor lock refreshes
+
+## [0.19.0] - 2026-07-27
+
+### Added
+- add Reddit domain mentions report
+- monitor bounded Reddit comment mentions
+
+### Fixed
+- enforce delegated cross-post effect boundaries
+
+## [0.18.0] - 2026-07-27
+
+### Added
+- add bounded delegated cross-posting
+
+### Changed
+- make Socials agent guidance intent-based
+
+### Fixed
+- reconcile delegated cross-post retries
+
+## [0.17.0] - 2026-07-26
+
+### Added
+- add explicit Reddit fetch result limit
+- add official YouTube integration
+- add instance-agnostic Mastodon support
+- add official TikTok publishing integration
+- add Tumblr publishing and discovery
+
+### Changed
+- route write-path abilities through shared HttpClient
+
+### Fixed
+- preserve Reddit queries across search sorts
+- preserve Reddit fetch API errors
+- scrub Extra Chill brand defaults from QuoteCard template
+
+## [0.16.0] - 2026-06-18
+
+### Added
+- add datamachine_socials_user_can permission filter
+
+## [0.15.0] - 2026-06-16
+
+### Added
+- register reflected AGENTS.md section for the socials CLI surface
+
+## [0.14.1] - 2026-06-15
+
+### Fixed
+- guard ability category registration against double-fire _doing_it_wrong notice
+- untrack build/ artifacts so stale zips can never ship as release assets
+
+## [0.14.0] - 2026-06-06
+
+### Added
+- declare preview shape on SocialPlatformConfig (#140)
+
+### Changed
+- extract AbstractSocialAbility + AbstractSocialTool (closes #149)
+- centralize Meta Graph API version (closes #150)
+- add WP Codebox crop-modal interaction smoke test
+- modernize to React 19 @wordpress/* release train
+
+### Fixed
+- bind job_id context to social publish tools (#2560)
+- drop /wp-json/ prefix from REST_BASE so apiFetch paths resolve
+
+## [0.13.2] - 2026-05-09
+
+### Changed
+- use core fresh candidates for Reddit fetches
+
+### Fixed
+- canonical JSON Schema for chat tools (#138)
+- use Facebook Graph API for Instagram media operations
+- correct ability slug for job status endpoint
+
+## [0.13.1] - 2026-04-26
+
+### Added
+- add datamachine_socials_platform_priority filter to pin platform slugs to top of /platforms response
+
+## [0.13.0] - 2026-04-26
+
+### Changed
+- return /platforms as ordered array with slug, filter fetch handlers, sort authenticated-first
+
+## [0.12.1] - 2026-04-26
+
+### Changed
+- disable homeboy autofix
+
+### Fixed
+- resolve Instagram username via Facebook Graph API instead of graph.instagram.com, which rejects FB Login tokens with 'Cannot parse access token' and silently stored empty usernames
+- return save_account result from OAuth storage callback
+- resolve Instagram user ID from Facebook token and support fb_exchange_token
+- use Facebook graph endpoint for token exchange
+- use Facebook Login dialog for Instagram Graph API publishing
+
+## [0.12.0] - 2026-04-22
+
+### Added
+- async social publishing via DM Jobs + Publisher utility
+
+## [0.11.1] - 2026-04-22
+
+### Fixed
+- register datamachine-socials ability category and update all abilities
+
+## [0.11.0] - 2026-04-21
+
+### Added
+- migrate SocialCrossPostTask to executeTask() contract
+
+## [0.10.0] - 2026-04-21
+
+### Added
+- broaden social ability permissions from can_manage to use_tools (refs #110)
+
+### Changed
+- Revert "docs(changelog): add Unreleased section for 0.9.1 → next release"
+- migrate aiToolCallback to new datamachine_tools signature
+- restrict homeboy to audit-only (no refactor/autofix)
+- Revert "Merge pull request #108 from Extra-Chill/ci/autofix/data-machine-socials/main"
+
+## [0.9.1] - 2026-04-03
+
+### Added
+- add capabilities metadata to all social platform handlers
+
+### Changed
+- migrate REST namespace from datamachine-socials/v1 to datamachine/v1/socials
+
+## [0.9.0] - 2026-04-02
+
+### Added
+- add SocialCrossPostTask for async cross-posting via DM Task System
+
+### Changed
+- Migrate all 293 ability error returns to WP_Error, remove 57 function_exists guards
+- Add generic comments API with normalized SocialComment shape
+- clean break — drop all legacy username keys from auth providers
+- add concurrency group to cancel stale PR runs
+- Add VoteReddit chat tool and BlueskySettings handler config
+- drop cron schedule — push to main covers release
+
+### Fixed
+- normalize username storage across all social auth providers
+- Fix missing check_edit_permission method and Pinterest class reference
+
+## [0.8.1] - 2026-03-21
+
+### Fixed
+- remove duplicate get_auth_status and get_platforms methods in RestApi
+
+## [0.8.0] - 2026-03-21
+
+### Added
+- add Reddit write commands (reply, submit, vote)
+
+## [0.7.0] - 2026-03-21
+
+### Added
+- add global search to Reddit fetch ability, CLI, and chat tool
+
+## [0.6.1] - 2026-03-21
+
+### Changed
+- replace hardcoded platform arrays with handler $meta registry
+
+## [0.6.0] - 2026-03-21
+
+### Added
+- fold auth status into /platforms response, add LinkedIn
+
+## [0.5.0] - 2026-03-21
+
+### Added
+- add cron and manual dispatch triggers for automated releases
+- add homeboy-action v2 CI pipeline
+- add fullstack LinkedIn integration with OAuth 2.0, CRUD posts, CLI, and chat tools
+- add publish chat tools for all platforms and CLI publish commands for Facebook, Threads, Pinterest
+
+### Fixed
+- resolve merge conflict with main
+- restore homeboy component identity
+
+## [0.4.0] - 2026-03-16
+
+### Added
+- use core media primitives for video support across all handlers
+- add SocialShareTracker for cross-platform share history
+- add Instagram Story publishing support
+- add Instagram Reel publishing + fix delete ability
+
+### Changed
+- use core PublishHandler::resolveMediaUrls() instead of per-handler duplication
+- route all wrapper layers through wp_get_ability() registry
+
+### Fixed
+- sync DATAMACHINE_SOCIALS_VERSION to 0.3.0 and add constant to homeboy version targets
+
+## [0.3.0] - 2026-03-11
+
+### Added
+- add Instagram comment reply primitive
+- add Pinterest analytics ability
+
+### Changed
+- add Homeboy config for socials plugin
+
+## [0.2.1] - 2026-03-09
+
+### Fixed
+- Update all 19 chat tool `registerTool()` calls for Data Machine 0.39.0 compatibility
+
+## [0.1.0] - 2025-02-21
+
+### Added
+
+- Initial release
+- Extract social handlers from Data Machine core plugin
+- Support for Twitter/X publishing with OAuth 1.0a
+- Support for Facebook Pages publishing with OAuth 2.0
+- Support for Bluesky publishing with app password authentication
+- Support for Meta Threads publishing with OAuth 2.0
+- Support for Pinterest pinning with bearer token authentication
+- Handler documentation for all platforms
+- Composer dependencies for abraham/twitteroauth
+
+[0.1.0]: https://github.com/Extra-Chill/data-machine-socials/releases/tag/v0.1.0

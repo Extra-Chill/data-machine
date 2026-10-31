@@ -1,0 +1,284 @@
+<?php
+// phpcs:disable WordPress.DateTime.CurrentTimeTimestamp.Requested -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+/**
+ * Scope Resolver
+ *
+ * Resolves named time scopes (today, tonight, this-weekend, this-week)
+ * into concrete date_start/date_end values for calendar queries.
+ *
+ * Returns null for unrecognized or default scopes, allowing the caller
+ * to fall through to existing behavior.
+ *
+ * @package DataMachineEvents\Blocks\Calendar\Query
+ * @since   0.15.0
+ */
+
+namespace DataMachineEvents\Blocks\Calendar\Query;
+
+use DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class ScopeResolver {
+
+	/**
+	 * Valid scope identifiers.
+	 *
+	 * @var string[]
+	 */
+	const VALID_SCOPES = array( 'today', 'tonight', 'this-weekend', 'this-week' );
+
+	/**
+	 * Resolve the human-readable, translated label for a scope slug.
+	 *
+	 * Single source of truth for chip / control labels so the PHP template,
+	 * any future server-rendered surface, and tests never drift on copy.
+	 * The empty / 'current' scope resolves to the generic "All" label.
+	 *
+	 * @param string $scope The scope identifier.
+	 * @return string Translated label, or the raw slug for unknown scopes.
+	 */
+	public static function label( string $scope ): string {
+		$scope = sanitize_key( $scope );
+
+		switch ( $scope ) {
+			case '':
+			case 'current':
+				return __( 'All', 'data-machine-events' );
+			case 'today':
+				return __( 'Today', 'data-machine-events' );
+			case 'tonight':
+				return __( 'Tonight', 'data-machine-events' );
+			case 'this-weekend':
+				return __( 'This Weekend', 'data-machine-events' );
+			case 'this-week':
+				return __( 'This Week', 'data-machine-events' );
+			default:
+				return $scope;
+		}
+	}
+
+	/**
+	 * Build the ordered list of scope slugs to surface as preset controls.
+	 *
+	 * Generic, consumer-agnostic: the optional `$preset_slugs` argument (a
+	 * block attribute) subsets and/or reorders {@see VALID_SCOPES}. Unknown
+	 * slugs are dropped and duplicates are collapsed. An empty/invalid list
+	 * falls back to all valid scopes in declaration order.
+	 *
+	 * The returned list never includes the empty "All" scope — callers
+	 * render that chip separately so its position (typically first) stays a
+	 * presentation concern.
+	 *
+	 * @param string[] $preset_slugs Optional subset/order of scope slugs.
+	 * @return string[] Ordered, validated, de-duplicated scope slugs.
+	 */
+	public static function preset_scopes( array $preset_slugs = array() ): array {
+		$preset_slugs = array_values(
+			array_filter(
+				array_map( 'sanitize_key', $preset_slugs ),
+				static function ( string $slug ): bool {
+					return in_array( $slug, self::VALID_SCOPES, true );
+				}
+			)
+		);
+
+		$preset_slugs = array_values( array_unique( $preset_slugs ) );
+
+		if ( empty( $preset_slugs ) ) {
+			return self::VALID_SCOPES;
+		}
+
+		return $preset_slugs;
+	}
+
+	/**
+	 * Resolve a scope name to concrete date boundaries.
+	 *
+	 * Returns null for 'current' (the default) or unrecognized scopes,
+	 * which signals the caller to use existing unscoped behavior.
+	 *
+	 * @param string   $scope The scope identifier.
+	 * @param int|null $now   Current site-local timestamp. Null uses the current time.
+	 * @return array|null Array with 'date_start', 'date_end', and optionally
+	 *                    'time_start', 'time_end' for sub-day precision. Null if no scope.
+	 */
+	public static function resolve( string $scope, ?int $now = null ): ?array {
+		$scope = sanitize_key( $scope );
+
+		if ( 'current' === $scope || '' === $scope ) {
+			return null;
+		}
+		$now         = $now ?? current_time( 'timestamp' );
+		$literal_day = gmdate( 'Y-m-d', $now );
+		$time        = gmdate( 'H:i:s', $now );
+		$display_day = LateNightCutoff::display_date_from_strings( $literal_day, $time );
+
+		switch ( $scope ) {
+			case 'today':
+				return self::resolve_display_day( $display_day );
+
+			case 'tonight':
+				return self::resolve_tonight( $now, $display_day );
+
+			case 'this-weekend':
+				return self::resolve_this_weekend( $now, $literal_day );
+
+			case 'this-week':
+				return self::resolve_this_week( $now, $literal_day );
+
+			default:
+				return null;
+		}
+	}
+
+	/**
+	 * Check whether a scope string is valid.
+	 *
+	 * @param string $scope The scope to check.
+	 * @return bool
+	 */
+	public static function is_valid( string $scope ): bool {
+		return 'current' === $scope || '' === $scope || in_array( $scope, self::VALID_SCOPES, true );
+	}
+
+	/**
+	 * Intersect inclusive date windows, preserving one-sided constraints.
+	 *
+	 * An empty intersection intentionally returns a lower bound after the upper
+	 * bound so the canonical event-date query returns zero rows.
+	 *
+	 * @param array $windows Date windows with optional date_start/date_end keys.
+	 * @return array{date_start:string,date_end:string}
+	 */
+	public static function intersect_date_bounds( array $windows ): array {
+		$starts = array();
+		$ends   = array();
+
+		foreach ( $windows as $window ) {
+			if ( ! is_array( $window ) ) {
+				continue;
+			}
+			$start = (string) ( $window['date_start'] ?? '' );
+			$end   = (string) ( $window['date_end'] ?? '' );
+			if ( '' !== $start ) {
+				$starts[] = $start;
+			}
+			if ( '' !== $end ) {
+				$ends[] = $end;
+			}
+		}
+
+		return array(
+			'date_start' => $starts ? max( $starts ) : '',
+			'date_end'   => $ends ? min( $ends ) : '',
+		);
+	}
+
+	/**
+	 * Resolve the raw datetime bounds for one nightlife display day.
+	 *
+	 * When late-night bucketing is enabled, the display day starts at the
+	 * configured cutoff and ends just before that cutoff on the following
+	 * literal day. This ensures date filters select exactly the events grouped
+	 * under the same display-day heading. With bucketing disabled, the display
+	 * day remains the literal calendar day.
+	 *
+	 * @param string $display_day Display date in Y-m-d format.
+	 * @return array Resolved date boundaries with time precision when enabled.
+	 */
+	private static function resolve_display_day( string $display_day ): array {
+		$cutoff = LateNightCutoff::cutoff_hour();
+
+		if ( $cutoff <= 0 ) {
+			return array(
+				'date_start' => $display_day,
+				'date_end'   => $display_day,
+			);
+		}
+
+		$next_day_ts = strtotime( $display_day . ' +1 day' );
+		return array(
+			'date_start' => $display_day,
+			'date_end'   => false !== $next_day_ts ? gmdate( 'Y-m-d', $next_day_ts ) : $display_day,
+			'time_start' => sprintf( '%02d:00:00', $cutoff ),
+			'time_end'   => sprintf( '%02d:59:59', $cutoff - 1 ),
+		);
+	}
+
+	/**
+	 * Resolve "tonight" — events starting from 5 PM on the active display day
+	 * through the configured late-night cutoff on its following literal day.
+	 *
+	 * Before 5 PM, tonight starts at 5 PM. After 5 PM, it starts now.
+	 *
+	 * @param int    $now   Current timestamp (site timezone).
+	 * @param string $display_day Active nightlife display date in Y-m-d format.
+	 * @return array Resolved date boundaries with time precision.
+	 */
+	private static function resolve_tonight( int $now, string $display_day ): array {
+		$current_hour       = (int) gmdate( 'G', $now );
+		$display_day_bounds = self::resolve_display_day( $display_day );
+
+		// Before 5 PM: show from 5 PM today onward.
+		// After 5 PM: show from now onward (events already in progress or starting soon).
+		$time_start = $current_hour < 17 ? '17:00:00' : gmdate( 'H:i:s', $now );
+
+		return array(
+			'date_start' => $display_day,
+			'date_end'   => $display_day_bounds['date_end'],
+			'time_start' => $time_start,
+			'time_end'   => $display_day_bounds['time_end'] ?? '23:59:59',
+		);
+	}
+
+	/**
+	 * Resolve "this-weekend" — Friday through Sunday.
+	 *
+	 * If today is Mon–Thu, returns the upcoming Fri–Sun.
+	 * If today is Fri–Sun, returns the current Fri–Sun (starting from today).
+	 *
+	 * @param int    $now   Current timestamp (site timezone).
+	 * @param string $today Today's date in Y-m-d format.
+	 * @return array Resolved date boundaries.
+	 */
+	private static function resolve_this_weekend( int $now, string $today ): array {
+		$day_of_week = (int) gmdate( 'N', $now ); // 1 = Monday, 7 = Sunday.
+
+		if ( $day_of_week >= 5 ) {
+			// Already Fri/Sat/Sun — start from today, end on Sunday.
+			$days_until_sunday = 7 - $day_of_week;
+			$date_start        = $today;
+			$date_end          = gmdate( 'Y-m-d', $now + ( $days_until_sunday * DAY_IN_SECONDS ) );
+		} else {
+			// Mon–Thu — jump to upcoming Friday.
+			$days_until_friday = 5 - $day_of_week;
+			$friday            = $now + ( $days_until_friday * DAY_IN_SECONDS );
+			$date_start        = gmdate( 'Y-m-d', $friday );
+			$date_end          = gmdate( 'Y-m-d', $friday + ( 2 * DAY_IN_SECONDS ) ); // Sunday.
+		}
+
+		return array(
+			'date_start' => $date_start,
+			'date_end'   => $date_end,
+		);
+	}
+
+	/**
+	 * Resolve "this-week" — today through 6 days from now (7-day window).
+	 *
+	 * @param int    $now   Current timestamp (site timezone).
+	 * @param string $today Today's date in Y-m-d format.
+	 * @return array Resolved date boundaries.
+	 */
+	private static function resolve_this_week( int $now, string $today ): array {
+		$end_date = gmdate( 'Y-m-d', $now + ( 6 * DAY_IN_SECONDS ) );
+
+		return array(
+			'date_start' => $today,
+			'date_end'   => $end_date,
+		);
+	}
+}

@@ -1,0 +1,159 @@
+<?php
+// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
+/**
+ * Calendar Filter Bar Template
+ *
+ * Renders the complete filter bar with search, date range, and dynamic taxonomy filters.
+ *
+ * @var array $attributes Block attributes
+ * @var array $used_taxonomies Available taxonomies for filtering (future use)
+ */
+
+// Prevent direct access
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+$show_search = $attributes['showSearch'] ?? true;
+
+if ( ! $show_search ) {
+	return;
+}
+
+$instance_id   = $instance_id ?? uniqid( 'data-machine-calendar-' );
+$search_id     = 'data-machine-events-search-' . $instance_id;
+$search_value  = isset( $search_query ) ? $search_query : '';
+$date_range_id = 'data-machine-events-date-range-' . $instance_id;
+$modal_id      = 'data-machine-taxonomy-filter-modal-' . $instance_id;
+
+$archive_context     = $archive_context ?? array(
+	'taxonomy'  => '',
+	'term_id'   => 0,
+	'term_name' => '',
+);
+$has_archive_context = ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_id'] );
+
+$date_start = $date_start ?? '';
+$date_end   = $date_end ?? '';
+
+$hide_filter_button_when_inactive = $hide_filter_button_when_inactive ?? false;
+$hide_filter_button_attr          = $hide_filter_button_when_inactive ? ' hidden data-hide-when-inactive="1"' : '';
+
+// #373: optional in-block time-scope preset chips. These surface the
+// block's existing ScopeResolver/scope round-trip as generic filter-bar
+// controls. They are IN-BLOCK FILTER CHIPS (buttons that re-filter this
+// calendar) — NOT links to other pages. Any SEO-landing-page behavior is
+// a consumer concern that stays out of this generic layer. Default OFF so
+// existing consumers are byte-identical.
+$show_scope_presets = ! empty( $attributes['showScopePresets'] );
+$active_scope       = isset( $scope ) ? (string) $scope : '';
+if ( '' === $active_scope || 'current' === $active_scope ) {
+	$active_scope = '';
+}
+$scope_preset_slugs = $show_scope_presets
+	? \DataMachineEvents\Blocks\Calendar\Query\ScopeResolver::preset_scopes(
+		isset( $attributes['scopePresets'] ) && is_array( $attributes['scopePresets'] )
+			? $attributes['scopePresets']
+			: array()
+	)
+	: array();
+?>
+
+<div class="data-machine-events-filter-bar">
+	<div class="data-machine-events-filter-row">
+		<div class="data-machine-events-search">
+			<label class="screen-reader-text" for="<?php echo esc_attr( $search_id ); ?>"><?php esc_html_e( 'Search events', 'data-machine-events' ); ?></label>
+			<input type="text" 
+					id="<?php echo esc_attr( $search_id ); ?>" 
+					value="<?php echo esc_attr( $search_value ); ?>"
+					placeholder="<?php esc_html_e( 'Search events...', 'data-machine-events' ); ?>" 
+					class="data-machine-events-search-input">
+			<button type="button" class="data-machine-events-search-btn" aria-label="<?php esc_attr_e( 'Search events', 'data-machine-events' ); ?>">
+				<span class="dashicons dashicons-search" aria-hidden="true"></span>
+			</button>
+		</div>
+		
+		<div class="data-machine-events-date-filter">
+			<div class="data-machine-events-date-range-wrapper">
+				<label class="screen-reader-text" for="<?php echo esc_attr( $date_range_id ); ?>"><?php esc_html_e( 'Filter by date range', 'data-machine-events' ); ?></label>
+				<input type="text" 
+						id="<?php echo esc_attr( $date_range_id ); ?>"
+						class="data-machine-events-date-range-input" data-date-start="<?php echo esc_attr( $date_start ); ?>" data-date-end="<?php echo esc_attr( $date_end ); ?>" 
+						placeholder="<?php esc_html_e( 'Select date range...', 'data-machine-events' ); ?>" 
+						readonly />
+				<button type="button" 
+						class="data-machine-events-date-clear-btn" 
+						title="<?php esc_html_e( 'Clear date filter', 'data-machine-events' ); ?>">
+					✕
+				</button>
+			</div>
+		</div>
+		
+		<div class="data-machine-events-taxonomy-filter">
+			<button<?php echo $hide_filter_button_attr; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed boolean attribute fragment assembled by the renderer. ?> type="button" class="data-machine-events-filter-btn data-machine-taxonomy-modal-trigger<?php echo ( ! empty( $tax_filters ) ? ' data-machine-filters-active' : '' ); ?>" data-modal-id="<?php echo esc_attr( $modal_id ); ?>" aria-controls="<?php echo esc_attr( $modal_id ); ?>" aria-expanded="<?php echo ( ! empty( $tax_filters ) ? 'true' : 'false' ); ?>">
+				<span class="data-machine-filter-count" aria-hidden="true"><?php echo esc_html( (string) ( ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : '' ) ); ?></span>
+				<span class="dashicons dashicons-filter"></span>
+				<?php esc_html_e( 'Filter', 'data-machine-events' ); ?>
+			</button>
+		</div>
+	</div>
+
+	<?php if ( $show_scope_presets ) : ?>
+		<div class="data-machine-events-scope-presets" role="group" aria-label="<?php esc_attr_e( 'Time scope', 'data-machine-events' ); ?>">
+			<button type="button"
+					class="data-machine-events-scope-chip<?php echo ( '' === $active_scope ? ' data-machine-events-scope-chip-active' : '' ); ?>"
+					data-scope=""
+					aria-pressed="<?php echo ( '' === $active_scope ? 'true' : 'false' ); ?>">
+				<?php echo esc_html( \DataMachineEvents\Blocks\Calendar\Query\ScopeResolver::label( '' ) ); ?>
+			</button>
+			<?php foreach ( $scope_preset_slugs as $scope_slug ) : ?>
+				<?php $is_active_chip = ( $scope_slug === $active_scope ); ?>
+				<button type="button"
+						class="data-machine-events-scope-chip<?php echo ( $is_active_chip ? ' data-machine-events-scope-chip-active' : '' ); ?>"
+						data-scope="<?php echo esc_attr( $scope_slug ); ?>"
+						aria-pressed="<?php echo ( $is_active_chip ? 'true' : 'false' ); ?>">
+					<?php echo esc_html( \DataMachineEvents\Blocks\Calendar\Query\ScopeResolver::label( $scope_slug ) ); ?>
+				</button>
+			<?php endforeach; ?>
+		</div>
+	<?php endif; ?>
+
+	<!-- Taxonomy Filter Modal -->
+	<div id="<?php echo esc_attr( $modal_id ); ?>" class="data-machine-taxonomy-modal" aria-labelledby="<?php echo esc_attr( $modal_id . '-title' ); ?>"
+	<?php
+	if ( $has_archive_context ) :
+		?>
+		data-archive-taxonomy="<?php echo esc_attr( $archive_context['taxonomy'] ); ?>" data-archive-term-id="<?php echo esc_attr( $archive_context['term_id'] ); ?>" data-archive-term-name="<?php echo esc_attr( $archive_context['term_name'] ); ?>"<?php endif; ?>>
+		<div class="data-machine-taxonomy-modal-overlay"></div>
+		<div class="data-machine-taxonomy-modal-container">
+			<div class="data-machine-taxonomy-modal-header">
+				<h2 id="<?php echo esc_attr( $modal_id . '-title' ); ?>" class="data-machine-taxonomy-modal-title"><?php esc_html_e( 'Event Display Filters', 'data-machine-events' ); ?></h2>
+				<button type="button" class="data-machine-taxonomy-modal-close" aria-label="<?php esc_attr_e( 'Close', 'data-machine-events' ); ?>">
+					<span aria-hidden="true">&times;</span>
+				</button>
+			</div>
+			<div class="data-machine-taxonomy-modal-body">
+				<?php
+				require __DIR__ . '/modal/taxonomy-filter.php';
+				?>
+			</div>
+			<div class="data-machine-taxonomy-modal-footer">
+				<div class="data-machine-modal-actions">
+					<div class="data-machine-modal-actions-left">
+						<button type="button" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_modal_button_classes', array( 'data-machine-button', 'data-machine-clear-all-filters' ), 'secondary' ) ) ); ?>">
+							<?php esc_html_e( 'Clear All Filters', 'data-machine-events' ); ?>
+						</button>
+					</div>
+					<div class="data-machine-modal-actions-right">
+						<button type="button" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_modal_button_classes', array( 'data-machine-button', 'data-machine-button-primary', 'data-machine-apply-filters' ), 'primary' ) ) ); ?>">
+							<?php esc_html_e( 'Apply Filters', 'data-machine-events' ); ?>
+						</button>
+						<button type="button" class="<?php echo esc_attr( implode( ' ', apply_filters( 'data_machine_events_modal_button_classes', array( 'data-machine-button', 'data-machine-modal-close' ), 'secondary' ) ) ); ?>">
+							<?php esc_html_e( 'Cancel', 'data-machine-events' ); ?>
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>

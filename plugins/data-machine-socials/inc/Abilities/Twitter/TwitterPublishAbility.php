@@ -1,0 +1,495 @@
+<?php
+/**
+ * Twitter Publish Ability
+ *
+ * Primitive ability for publishing content to Twitter/X.
+ *
+ * @package DataMachineSocials\Abilities\Twitter
+ * @since 0.1.0
+ */
+
+namespace DataMachineSocials\Abilities\Twitter;
+
+use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Core\EngineData;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Twitter Publish Ability
+ *
+ * Self-contained ability class for Twitter publishing.
+ */
+class TwitterPublishAbility extends AbstractSocialAbility {
+	private const MAX_REMOTE_MEDIA_BYTES = 15 * MB_IN_BYTES;
+
+	/**
+	 * Whether the ability has been registered.
+	 *
+	 * @var bool
+	 */
+	protected static bool $registered = false;
+
+	/**
+	 * Constructor.
+	 */
+	public function __construct() {
+		$this->registerAbility( $this->registerCallback() );
+	}
+
+	private function registerCallback(): callable {
+		return function () {
+			wp_register_ability(
+				'datamachine/twitter-publish',
+				array(
+					'label'               => __( 'Publish to Twitter', 'data-machine-socials' ),
+					'description'         => __( 'Post content to Twitter/X with optional media', 'data-machine-socials' ),
+					'category'            => 'datamachine-socials',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'content' ),
+						'properties' => array(
+							'content'       => array(
+								'type'        => 'string',
+								'description' => 'Tweet content (max 280 characters)',
+								'maxLength'   => 280,
+							),
+							'image_path'    => array(
+								'type'        => 'string',
+								'description' => 'Path to image file for upload',
+							),
+							'image_urls'    => array(
+								'type'        => 'array',
+								'description' => 'Public image URLs to download and upload (maximum 4)',
+								'items'       => array(
+									'type'   => 'string',
+									'format' => 'uri',
+								),
+								'maxItems'    => 4,
+							),
+							'media_kind'    => array(
+								'type' => 'string',
+								'enum' => array( 'image', 'carousel' ),
+							),
+							'source_url'    => array(
+								'type'        => 'string',
+								'description' => 'Source URL to append/reply with',
+								'format'      => 'uri',
+							),
+							'link_handling' => array(
+								'type'        => 'string',
+								'enum'        => array( 'none', 'append', 'reply' ),
+								'description' => 'How to handle source URL',
+								'default'     => 'append',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'         => array( 'type' => 'boolean' ),
+							'tweet_id'        => array( 'type' => 'string' ),
+							'tweet_url'       => array(
+								'type'   => 'string',
+								'format' => 'uri',
+							),
+							'reply_tweet_id'  => array( 'type' => 'string' ),
+							'reply_tweet_url' => array(
+								'type'   => 'string',
+								'format' => 'uri',
+							),
+							'error'           => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'execute_publish' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_publish' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			// Get account details ability
+			wp_register_ability(
+				'datamachine/twitter-account',
+				array(
+					'label'               => __( 'Twitter Account Info', 'data-machine-socials' ),
+					'description'         => __( 'Get authenticated Twitter account details', 'data-machine-socials' ),
+					'category'            => 'datamachine-socials',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'  => array( 'type' => 'boolean' ),
+							'username' => array( 'type' => 'string' ),
+							'user_id'  => array( 'type' => 'string' ),
+							'error'    => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'get_account' ),
+					'permission_callback' => array( PublishAuthorization::class, 'can_edit' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+	}
+
+	/**
+	 * Execute Twitter publish.
+	 *
+	 * @param array $input Ability input with publish parameters.
+	 * @return array Response with tweet details or error.
+	 */
+	public static function execute_publish( array $input ): array|\WP_Error {
+		$content       = $input['content'] ?? '';
+		$media_path    = $input['media_path'] ?? $input['image_path'] ?? '';
+		$image_limit   = empty( $media_path ) ? 4 : 3;
+		$image_urls    = is_array( $input['image_urls'] ?? null ) ? array_slice( $input['image_urls'], 0, $image_limit ) : array();
+		$media_kind    = $input['media_kind'] ?? '';
+		$source_url    = $input['source_url'] ?? '';
+		$link_handling = $input['link_handling'] ?? 'append';
+
+		if ( empty( $content ) ) {
+			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
+		}
+		if ( in_array( $media_kind, array( 'image', 'carousel' ), true ) && empty( $media_path ) && empty( $image_urls ) ) {
+			return new \WP_Error( 'missing_param', 'Media is required for image publishing', array( 'status' => 400 ) );
+		}
+		if ( in_array( $media_kind, array( 'image', 'carousel' ), true ) && ! empty( $media_path ) && ! file_exists( $media_path ) ) {
+			return new \WP_Error( 'invalid_media_url', 'The required media file is unavailable', array( 'status' => 400 ) );
+		}
+
+		$auth     = new AuthAbilities();
+		$provider = $auth->getProvider( 'twitter' );
+
+		if ( ! $provider || ! $provider->is_authenticated() ) {
+			return new \WP_Error( 'missing_auth', 'Twitter not authenticated', array( 'status' => 401 ) );
+		}
+
+		$connection = $provider->get_connection();
+		if ( is_wp_error( $connection ) ) {
+			return new \WP_Error( 'api_error', $connection->get_error_message(), array( 'status' => 500 ) );
+		}
+
+		// Format tweet text with link handling
+		$tweet_text = self::format_tweet_text( $content, $source_url, $link_handling );
+
+		try {
+			$connection->setApiVersion( '2' );
+
+			$v2_payload  = array( 'text' => $tweet_text );
+			$media_paths = array();
+			$temporary   = array();
+			$media_ids   = array();
+
+			// Handle media upload if provided — supports images and video via core validation.
+			if ( ! empty( $media_path ) && file_exists( $media_path ) ) {
+				$media_paths[] = $media_path;
+			}
+			foreach ( $image_urls as $image_url ) {
+				$downloaded = self::download_media( (string) $image_url );
+				if ( is_wp_error( $downloaded ) ) {
+					return $downloaded;
+				}
+				$media_paths[] = $downloaded;
+				$temporary[]   = $downloaded;
+			}
+
+			foreach ( $media_paths as $path ) {
+				$media_id = self::upload_media( $connection, $path );
+				if ( ! $media_id ) {
+					return new \WP_Error( 'media_upload_failed', 'Failed to upload media', array( 'status' => 502 ) );
+				}
+				$media_ids[] = $media_id;
+			}
+
+			if ( ! empty( $media_ids ) ) {
+				$v2_payload['media'] = array( 'media_ids' => $media_ids );
+			}
+
+			$response  = $connection->post( 'tweets', $v2_payload, array( 'json' => true ) );
+			$http_code = $connection->getLastHttpCode();
+
+			if ( 201 === $http_code && isset( $response->data->id ) ) {
+				$tweet_id  = $response->data->id;
+				$username  = $provider->get_username() ?? 'twitter';
+				$tweet_url = "https://twitter.com/{$username}/status/{$tweet_id}";
+
+				$result = array(
+					'success'   => true,
+					'tweet_id'  => $tweet_id,
+					'tweet_url' => $tweet_url,
+				);
+
+				// Handle reply tweet for source URL
+				if ( 'reply' === $link_handling && ! empty( $source_url ) ) {
+					$reply = self::post_reply( $connection, $tweet_id, $source_url, $username );
+					if ( $reply['success'] ) {
+						$result['reply_tweet_id']  = $reply['reply_tweet_id'];
+						$result['reply_tweet_url'] = $reply['reply_tweet_url'];
+					}
+				}
+
+				return $result;
+			}
+
+			$error_msg = 'Twitter API error';
+			if ( isset( $response->title ) ) {
+				$error_msg = $response->title;
+			}
+
+			return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
+		} catch ( \Exception $e ) {
+			return new \WP_Error( 'api_error', $e->getMessage(), array( 'status' => 500 ) );
+		} finally {
+			foreach ( $temporary ?? array() as $temporary_path ) {
+				wp_delete_file( $temporary_path );
+			}
+		}
+	}
+
+	/**
+	 * Download one public media URL to a temporary local file.
+	 *
+	 * @param string $url Public media URL.
+	 * @return string|\WP_Error Temporary path or download failure.
+	 */
+	private static function download_media( string $url ): string|\WP_Error {
+		if ( ! wp_http_validate_url( $url ) ) {
+			return new \WP_Error( 'invalid_media_url', 'Media URL must be a public HTTP URL', array( 'status' => 400 ) );
+		}
+		if ( ! function_exists( 'wp_tempnam' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+		$temporary_path = wp_tempnam( $url );
+		if ( ! is_string( $temporary_path ) || '' === $temporary_path ) {
+			return new \WP_Error( 'media_download_failed', 'Could not allocate temporary media storage', array( 'status' => 500 ) );
+		}
+
+		$response = wp_safe_remote_get(
+			$url,
+			array(
+				'timeout'             => 30,
+				'stream'              => true,
+				'filename'            => $temporary_path,
+				'limit_response_size' => self::MAX_REMOTE_MEDIA_BYTES + 1,
+			)
+		);
+		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) || filesize( $temporary_path ) > self::MAX_REMOTE_MEDIA_BYTES ) {
+			wp_delete_file( $temporary_path );
+			return new \WP_Error( 'media_download_failed', 'Twitter media download failed or exceeded the 15 MB limit', array( 'status' => 400 ) );
+		}
+
+		return $temporary_path;
+	}
+
+	/**
+	 * Get Twitter account details.
+	 *
+	 * @param array $input Ability input.
+	 * @return array Account details or error.
+	 */
+	public static function get_account( array $input ): array|\WP_Error {
+		$input;
+		$auth     = new AuthAbilities();
+		$provider = $auth->getProvider( 'twitter' );
+
+		if ( ! $provider || ! $provider->is_authenticated() ) {
+			return new \WP_Error( 'missing_auth', 'Twitter not authenticated', array( 'status' => 401 ) );
+		}
+
+		$account = $provider->get_account_details();
+
+		return array(
+			'success'  => true,
+			'username' => $provider->get_username() ?? '',
+			'user_id'  => $account['user_id'] ?? '',
+		);
+	}
+
+	/**
+	 * Format tweet text with link handling.
+	 *
+	 * @param string $content Original content.
+	 * @param string $source_url Source URL.
+	 * @param string $link_handling How to handle URL.
+	 * @return string Formatted tweet text.
+	 */
+	private static function format_tweet_text( string $content, string $source_url, string $link_handling ): string {
+		$ellipsis     = '…';
+		$ellipsis_len = mb_strlen( $ellipsis, 'UTF-8' );
+
+		$should_append_url = 'append' === $link_handling && ! empty( $source_url ) && filter_var( $source_url, FILTER_VALIDATE_URL );
+		$link              = $should_append_url ? ' ' . $source_url : '';
+		$link_length       = $link ? 24 : 0;
+		$available_chars   = 280 - $link_length;
+
+		$tweet_text = $content;
+
+		if ( $available_chars < $ellipsis_len ) {
+			$tweet_text = mb_substr( $link, 0, 280 );
+		} else {
+			if ( mb_strlen( $tweet_text, 'UTF-8' ) > $available_chars ) {
+				$tweet_text = mb_substr( $tweet_text, 0, $available_chars - $ellipsis_len ) . $ellipsis;
+			}
+			$tweet_text .= $link;
+		}
+
+		return trim( $tweet_text );
+	}
+
+	/**
+	 * Upload media to Twitter.
+	 *
+	 * Validates the file using core MediaValidator (ImageValidator or VideoValidator)
+	 * and uploads via Twitter's chunked media upload API. Supports both images and video.
+	 *
+	 * @param object $connection TwitterOAuth connection.
+	 * @param string $media_path Path to media file (image or video).
+	 * @return string|null Media ID or null on failure.
+	 */
+	private static function upload_media( $connection, string $media_path ): ?string {
+		if ( ! file_exists( $media_path ) ) {
+			return null;
+		}
+
+		// Use core MediaValidator for MIME type and file validation.
+		$is_video  = \DataMachine\Core\FilesRepository\VideoValidator::is_video_extension( $media_path );
+		$validator = $is_video
+			? new \DataMachine\Core\FilesRepository\VideoValidator()
+			: new \DataMachine\Core\FilesRepository\ImageValidator();
+
+		$validation = $validator->validate_repository_file( $media_path );
+		if ( ! $validation['valid'] ) {
+			return null;
+		}
+
+		$mime_type      = $validation['mime_type'];
+		$file_size      = $validation['size'];
+		$media_category = $is_video ? 'tweet_video' : 'tweet_image';
+
+		// INIT
+		$connection->setApiVersion( '1.1' );
+		$init_response = $connection->post(
+			'media/upload',
+			array(
+				'command'        => 'INIT',
+				'media_type'     => $mime_type,
+				'media_category' => $media_category,
+				'total_bytes'    => $file_size,
+			)
+		);
+
+		if ( ! isset( $init_response->media_id_string ) ) {
+			return null;
+		}
+
+		$media_id = $init_response->media_id_string;
+
+		// APPEND
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Twitter's chunked upload requires a streaming file handle.
+		$handle        = fopen( $media_path, 'rb' );
+		$segment_index = 0;
+		$chunk_size    = 1048576; // 1MB
+
+		while ( ! feof( $handle ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- Read bounded chunks from the validated local file.
+			$chunk = fread( $handle, $chunk_size );
+			$connection->post(
+				'media/upload',
+				array(
+					'command'       => 'APPEND',
+					'media_id'      => $media_id,
+					'segment_index' => $segment_index,
+					// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions -- Required for API authentication, not obfuscation.
+					'media_data'    => base64_encode( $chunk ),
+				)
+			);
+			++$segment_index;
+		}
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Close the streaming upload handle opened above.
+		fclose( $handle );
+
+		// FINALIZE
+		$finalize_response = $connection->post(
+			'media/upload',
+			array(
+				'command'  => 'FINALIZE',
+				'media_id' => $media_id,
+			)
+		);
+
+		if ( ! isset( $finalize_response->media_id_string ) ) {
+			return null;
+		}
+
+		// Video requires async processing — poll STATUS until complete.
+		if ( $is_video && isset( $finalize_response->processing_info ) ) {
+			$processing = $finalize_response->processing_info;
+			while ( isset( $processing->state ) && 'succeeded' !== $processing->state ) {
+				if ( 'failed' === $processing->state ) {
+					return null;
+				}
+				$wait = $processing->check_after_secs ?? 5;
+				sleep( $wait );
+
+				$status_response = $connection->get(
+					'media/upload',
+					array(
+						'command'  => 'STATUS',
+						'media_id' => $media_id,
+					)
+				);
+
+				$processing = $status_response->processing_info ?? null;
+				if ( null === $processing ) {
+					break; // No more processing info — assume done.
+				}
+			}
+		}
+
+		$connection->setApiVersion( '2' );
+		return $finalize_response->media_id_string;
+	}
+
+	/**
+	 * Post reply tweet with source URL.
+	 *
+	 * @param object $connection TwitterOAuth connection.
+	 * @param string $original_tweet_id Tweet to reply to.
+	 * @param string $source_url URL to post.
+	 * @param string $screen_name Twitter screen name.
+	 * @return array Reply tweet details.
+	 */
+	private static function post_reply( $connection, string $original_tweet_id, string $source_url, string $screen_name ): array|\WP_Error {
+		try {
+			$reply_payload = array(
+				'text'  => $source_url,
+				'reply' => array(
+					'in_reply_to_tweet_id' => $original_tweet_id,
+				),
+			);
+
+			$response  = $connection->post( 'tweets', $reply_payload, array( 'json' => true ) );
+			$http_code = $connection->getLastHttpCode();
+
+			if ( 201 === $http_code && isset( $response->data->id ) ) {
+				$reply_tweet_id  = $response->data->id;
+				$reply_tweet_url = "https://twitter.com/{$screen_name}/status/{$reply_tweet_id}";
+
+				return array(
+					'success'         => true,
+					'reply_tweet_id'  => $reply_tweet_id,
+					'reply_tweet_url' => $reply_tweet_url,
+				);
+			}
+
+			return new \WP_Error( 'api_error', 'Failed to post reply', array( 'status' => 500 ) );
+		} catch ( \Exception $e ) {
+			return new \WP_Error( 'api_error', $e->getMessage(), array( 'status' => 500 ) );
+		}
+	}
+}

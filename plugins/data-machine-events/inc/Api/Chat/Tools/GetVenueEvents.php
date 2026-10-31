@@ -1,0 +1,86 @@
+<?php
+/**
+ * Get Venue Events Tool
+ *
+ * Chat tool wrapper for EventQueryAbilities. Get events attached to a specific
+ * venue - useful for investigating venue terms before merging or cleanup.
+ *
+ * @package DataMachineEvents\Api\Chat\Tools
+ */
+
+namespace DataMachineEvents\Api\Chat\Tools;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachineEvents\Abilities\EventQueryAbilities;
+
+class GetVenueEvents extends BaseTool {
+
+	public function __construct() {
+		$this->registerTool( 'get_venue_events', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'data-machine-events/get-venue-events' ) );
+	}
+
+	public function getToolDefinition(): array {
+		return array(
+			'class'       => self::class,
+			'method'      => 'handle_tool_call',
+			'description' => 'Get events attached to a specific venue. Useful for investigating venue terms before merging or cleanup.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'venue'            => array(
+						'type'        => 'string',
+						'description' => 'Venue identifier (term ID, name, or slug)',
+					),
+					'limit'            => array(
+						'type'        => 'integer',
+						'description' => 'Maximum events to return (default: 25, max: 100)',
+					),
+					'status'           => array(
+						'type'        => 'string',
+						'description' => 'Post status filter: any, publish, future, draft (default: any)',
+					),
+					'published_before' => array(
+						'type'        => 'string',
+						'description' => 'Only return events published before this date (YYYY-MM-DD format)',
+					),
+					'published_after'  => array(
+						'type'        => 'string',
+						'description' => 'Only return events published after this date (YYYY-MM-DD format)',
+					),
+				),
+				'required'   => array( 'venue' ),
+			),
+		);
+	}
+
+	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		$abilities = new EventQueryAbilities();
+		$result    = $abilities->executeGetVenueEvents( $parameters );
+
+		if ( $result instanceof \WP_Error ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'tool_name' => 'get_venue_events',
+			);
+		}
+
+		if ( isset( $result['error'] ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result['error'],
+				'tool_name' => 'get_venue_events',
+			);
+		}
+
+		return array(
+			'success'   => true,
+			'data'      => $result,
+			'tool_name' => 'get_venue_events',
+		);
+	}
+}

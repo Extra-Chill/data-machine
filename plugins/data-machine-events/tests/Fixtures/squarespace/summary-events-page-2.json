@@ -1,0 +1,19 @@
+{
+  "collection": {
+    "id": "events-collection",
+    "typeName": "events",
+    "fullUrl": "/live-shows"
+  },
+  "items": [
+    {
+      "id": "event-2",
+      "recordType": 12,
+      "title": "Fixture Show Two",
+      "startDate": "2099-07-08T20:00:00+00:00",
+      "fullUrl": "/live-shows/fixture-show-two"
+    }
+  ],
+  "pagination": {
+    "nextPage": false
+  }
+}

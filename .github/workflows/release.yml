@@ -1,37 +1,35 @@
-# Continuous release pipeline.
-#
-# Triggers on every push to main. Homeboy derives the version from the
-# conventional commits since the last tag (fix: -> patch, feat: -> minor,
-# BREAKING CHANGE -> major; chore:/ci:/docs:/test: -> no release), runs the
-# repository quality gates, then tags, generates the changelog, creates the
-# GitHub Release and attaches the built artifact.
-#
-# The whole pipeline lives in the reusable workflow — releasable-commit
-# detection, dry-run version prediction, failed-SHA retry protection, and
-# GitHub App token handling are inherited, not re-implemented here.
-
 name: Release
 
 permissions:
   contents: write
   issues: write
   pull-requests: write
-  # A reusable workflow cannot request more than its caller grants. The shared
-  # release workflow declares id-token: write from homeboy-action v2.20.0 so
-  # release.publish can use npm trusted publishing (OIDC) instead of a token.
-  # Without this line the run is rejected before any job starts, with a bare
-  # startup_failure and no log to explain it.
   id-token: write
 
+# Monorepo releases (homeboy-action#555): every merge releases each plugin
+# with unreleased commits since its own `<id>-vX.Y.Z` tag, serially in one job,
+# each with its own version bump, changelog, GitHub Release and zip. Plugins
+# with nothing to release are skipped, and a plugin missed by one run is picked
+# up by the next. Only data-machine claims GitHub's "Latest" release
+# (`github.release_latest` in each homeboy.json), so
+# releases/latest/download/data-machine.zip keeps pointing at core.
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
       dry-run:
-        description: 'Preview the release without making changes'
+        description: 'Preview the releases without making changes'
         type: boolean
         default: false
+      component:
+        description: 'Release only the plugin at this path (e.g. plugins/data-machine-events). Empty releases every changed plugin.'
+        type: string
+        default: ''
+      bump:
+        description: 'Explicit bump for that plugin: major, minor, patch or X.Y.Z. Needed when breaking commits are held back with major-requires-flag.'
+        type: string
+        default: ''
 
 concurrency:
   group: release
@@ -41,5 +39,8 @@ jobs:
   release:
     uses: Extra-Chill/homeboy-action/.github/workflows/release.yml@v2
     with:
+      components: ${{ inputs.component == '' && 'all' || '' }}
+      component: ${{ inputs.component }}
+      args: ${{ inputs.component && inputs.bump && format('--bump {0} --force-lower-bump', inputs.bump) || '' }}
       dry-run: ${{ inputs.dry-run || false }}
     secrets: inherit

@@ -1,0 +1,261 @@
+<?php
+/**
+ * Facebook Update Ability
+ *
+ * Abilities API primitive for updating Facebook Page posts.
+ * Supports editing post message, hiding/unhiding posts, and deleting posts.
+ *
+ * @package    DataMachineSocials
+ * @subpackage Abilities\Facebook
+ * @since      0.3.0
+ */
+
+namespace DataMachineSocials\Abilities\Facebook;
+
+use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
+
+defined( 'ABSPATH' ) || exit;
+
+class FacebookUpdateAbility extends AbstractSocialAbility {
+
+	protected static bool $registered = false;
+
+	const GRAPH_API_URL = FacebookAuth::GRAPH_API_URL;
+
+	public function __construct() {
+		$this->registerAbility( $this->registerCallback(), true );
+	}
+
+	private function registerCallback(): callable {
+		return function () {
+			wp_register_ability(
+				'datamachine/facebook-update',
+				array(
+					'label'               => __( 'Update Facebook Page Posts', 'data-machine-socials' ),
+					'description'         => __( 'Edit post message, hide/unhide posts, or delete posts from a Facebook Page', 'data-machine-socials' ),
+					'category'            => 'datamachine-socials',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'action'  => array(
+								'type'        => 'string',
+								'enum'        => array( 'edit', 'hide', 'unhide', 'delete' ),
+								'description' => __( 'Action: edit (update message), hide, unhide, delete', 'data-machine-socials' ),
+							),
+							'post_id' => array(
+								'type'        => 'string',
+								'description' => __( 'Facebook post ID', 'data-machine-socials' ),
+							),
+							'message' => array(
+								'type'        => 'string',
+								'description' => __( 'New post message (for edit action)', 'data-machine-socials' ),
+							),
+						),
+						'required'   => array( 'action', 'post_id' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'data'    => array( 'type' => 'object' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'execute' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+	}
+
+	/**
+	 * Permission callback.
+	 *
+	 * @return bool
+	 */
+	public function checkPermission(): bool {
+		return PublishAuthorization::can_publish();
+	}
+
+	/**
+	 * Execute the update ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result.
+	 */
+	public function execute( array $input ): array|\WP_Error {
+		$action = $input['action'] ?? '';
+
+		// Get auth provider.
+		$auth = $this->getAuthProvider();
+		if ( ! $auth ) {
+			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
+		}
+
+		$access_token = $auth->get_page_access_token();
+		if ( empty( $access_token ) ) {
+			return new \WP_Error( 'missing_auth', 'Facebook page access token unavailable', array( 'status' => 401 ) );
+		}
+
+		if ( empty( $input['post_id'] ) ) {
+			return new \WP_Error( 'missing_param', 'post_id is required', array( 'status' => 400 ) );
+		}
+
+		$post_id = $input['post_id'];
+
+		switch ( $action ) {
+			case 'edit':
+				if ( empty( $input['message'] ) ) {
+					return new \WP_Error( 'missing_param', 'message is required for edit action', array( 'status' => 400 ) );
+				}
+				return $this->editPost( $access_token, $post_id, $input['message'] );
+
+			case 'hide':
+				return $this->hidePost( $access_token, $post_id, true );
+
+			case 'unhide':
+				return $this->hidePost( $access_token, $post_id, false );
+
+			case 'delete':
+				return $this->deletePost( $access_token, $post_id );
+
+			default:
+				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use edit, hide, unhide, or delete.", array( 'status' => 500 ) );
+		}
+	}
+
+	/**
+	 * Get auth provider.
+	 *
+	 * @return FacebookAuth|null
+	 */
+	private function getAuthProvider(): ?FacebookAuth {
+		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
+			return null;
+		}
+
+		$auth     = new \DataMachine\Abilities\AuthAbilities();
+		$provider = $auth->getProvider( 'facebook' );
+
+		if ( ! $provider instanceof FacebookAuth ) {
+			return null;
+		}
+
+		return $provider;
+	}
+
+	/**
+	 * Edit a post's message.
+	 *
+	 * @param string $access_token Page access token.
+	 * @param string $post_id      Post ID.
+	 * @param string $message      New message.
+	 * @return array Result.
+	 */
+	private function editPost( string $access_token, string $post_id, string $message ): array|\WP_Error {
+		$url = self::GRAPH_API_URL . '/' . rawurlencode( $post_id );
+
+		$result = HttpClient::post(
+			$url,
+			array(
+				'context' => 'Facebook Edit',
+				'timeout' => 30,
+				'body'    => array(
+					'access_token' => $access_token,
+					'message'      => $message,
+				),
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to edit post', array( 'status' => 500 ) );
+		}
+
+		$body = json_decode( $result['data'], true );
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'post_id' => $body['id'] ?? $post_id,
+				'message' => $message,
+			),
+		);
+	}
+
+	/**
+	 * Hide or unhide a post.
+	 *
+	 * @param string $access_token Page access token.
+	 * @param string $post_id      Post ID.
+	 * @param bool   $hide         Whether to hide (true) or unhide (false).
+	 * @return array Result.
+	 */
+	private function hidePost( string $access_token, string $post_id, bool $hide ): array|\WP_Error {
+		$url = self::GRAPH_API_URL . '/' . rawurlencode( $post_id );
+
+		$result = HttpClient::post(
+			$url,
+			array(
+				'context' => 'Facebook Visibility',
+				'timeout' => 30,
+				'body'    => array(
+					'access_token' => $access_token,
+					'is_hidden'    => $hide ? 'true' : 'false',
+				),
+			)
+		);
+
+		if ( empty( $result['success'] ) ) {
+			return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to update post visibility', array( 'status' => 500 ) );
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'post_id' => $post_id,
+				'hidden'  => $hide,
+			),
+		);
+	}
+
+	/**
+	 * Delete a post.
+	 *
+	 * @param string $access_token Page access token.
+	 * @param string $post_id      Post ID.
+	 * @return array Result.
+	 */
+	private function deletePost( string $access_token, string $post_id ): array|\WP_Error {
+		$url = self::GRAPH_API_URL . '/' . rawurlencode( $post_id );
+
+		$result = HttpClient::post(
+			$url,
+			array(
+				'context' => 'Facebook Delete',
+				'timeout' => 30,
+				'body'    => array(
+					'access_token' => $access_token,
+					'method'       => 'DELETE',
+				),
+			)
+		);
+
+		$body = ! empty( $result['success'] ) ? json_decode( $result['data'], true ) : null;
+
+		if ( ! empty( $result['success'] ) || ( isset( $body['success'] ) && $body['success'] ) ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'post_id' => $post_id,
+					'deleted' => true,
+				),
+			);
+		}
+
+		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to delete post', array( 'status' => 500 ) );
+	}
+}

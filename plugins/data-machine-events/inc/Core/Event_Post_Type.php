@@ -1,0 +1,516 @@
+<?php
+// phpcs:disable Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed,WordPress.Security.NonceVerification.Recommended,Generic.CodeAnalysis.UnusedFunctionParameter.Found,Universal.Operators.DisallowShortTernary.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+/**
+ * Event Post Type Registration
+ *
+ * Handles registration of the data_machine_events custom post type with selective taxonomy menu control
+ * and custom admin columns for event date display and sorting.
+ *
+ * @package DataMachineEvents
+ * @subpackage Core
+ */
+
+namespace DataMachineEvents\Core;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Event Post Type registration and configuration
+ */
+class Event_Post_Type {
+
+	const POST_TYPE = 'data_machine_events';
+
+	/**
+	 * Canonical block name for the Event Details block.
+	 *
+	 * New code should reference this constant instead of the raw
+	 * `'data-machine-events/event-details'` string literal. Several
+	 * existing ability classes (DeleteEventAbilities, EncodingFixAbilities,
+	 * BatchTimeFixAbilities, EventUpdateAbilities, TicketUrlResyncAbilities)
+	 * each carry their own private copy of this same literal predating this
+	 * constant; consolidating those is a separate cleanup, not done here to
+	 * avoid touching unrelated files mid-flight.
+	 *
+	 * @since 0.62.0
+	 */
+	const EVENT_DETAILS_BLOCK_NAME = 'data-machine-events/event-details';
+
+	public static function register() {
+		$labels = array(
+			'name'                  => _x( 'Events', 'Post type general name', 'data-machine-events' ),
+			'singular_name'         => _x( 'Event', 'Post type singular name', 'data-machine-events' ),
+			'menu_name'             => _x( 'Events', 'Admin Menu text', 'data-machine-events' ),
+			'name_admin_bar'        => _x( 'Event', 'Add New on Toolbar', 'data-machine-events' ),
+			'add_new'               => __( 'Add New', 'data-machine-events' ),
+			'add_new_item'          => __( 'Add New Event', 'data-machine-events' ),
+			'new_item'              => __( 'New Event', 'data-machine-events' ),
+			'edit_item'             => __( 'Edit Event', 'data-machine-events' ),
+			'view_item'             => __( 'View Event', 'data-machine-events' ),
+			'all_items'             => __( 'All Events', 'data-machine-events' ),
+			'search_items'          => __( 'Search Events', 'data-machine-events' ),
+			'parent_item_colon'     => __( 'Parent Events:', 'data-machine-events' ),
+			'not_found'             => __( 'No events found.', 'data-machine-events' ),
+			'not_found_in_trash'    => __( 'No events found in Trash.', 'data-machine-events' ),
+			'featured_image'        => _x( 'Event Image', 'Overrides the "Featured Image" phrase', 'data-machine-events' ),
+			'set_featured_image'    => _x( 'Set event image', 'Overrides the "Set featured image" phrase', 'data-machine-events' ),
+			'remove_featured_image' => _x( 'Remove event image', 'Overrides the "Remove featured image" phrase', 'data-machine-events' ),
+			'use_featured_image'    => _x( 'Use as event image', 'Overrides the "Use as featured image" phrase', 'data-machine-events' ),
+			'archives'              => _x( 'Event archives', 'The post type archive label', 'data-machine-events' ),
+			'insert_into_item'      => _x( 'Insert into event', 'Overrides the "Insert into post" phrase', 'data-machine-events' ),
+			'uploaded_to_this_item' => _x( 'Uploaded to this event', 'Overrides the "Uploaded to this post" phrase', 'data-machine-events' ),
+			'filter_items_list'     => _x( 'Filter events list', 'Screen reader text for the filter links', 'data-machine-events' ),
+			'items_list_navigation' => _x( 'Events list navigation', 'Screen reader text for the pagination', 'data-machine-events' ),
+			'items_list'            => _x( 'Events list', 'Screen reader text for the items list', 'data-machine-events' ),
+		);
+
+		$args = array(
+			'labels'                => $labels,
+			'public'                => true,
+			'publicly_queryable'    => true,
+			'show_ui'               => true,
+			'show_in_menu'          => true,
+			'show_in_nav_menus'     => true,
+			'show_in_admin_bar'     => true,
+			'query_var'             => true,
+			'rewrite'               => array(
+				'slug'       => 'events',
+				'with_front' => false,
+			),
+			'capability_type'       => 'post',
+			'has_archive'           => true,
+			'hierarchical'          => false,
+			'menu_position'         => 5,
+			'menu_icon'             => 'dashicons-calendar-alt',
+			'supports'              => array(
+				'title',
+				'editor',
+				'excerpt',
+				'thumbnail',
+				'custom-fields',
+				'revisions',
+				'author',
+				'page-attributes',
+				'editor-styles',
+				'wp-block-styles',
+				'align-wide',
+			),
+			'show_in_rest'          => true,
+			'rest_base'             => 'data_machine_events',
+			'rest_controller_class' => 'WP_REST_Posts_Controller',
+			'taxonomies'            => array(),
+		);
+
+		register_post_type( self::POST_TYPE, $args );
+
+		// Limit revisions to prevent unbounded table growth. Events are
+		// machine-generated and frequently updated by pipelines, so unlimited
+		// revisions cause the posts table to bloat (e.g. 114K revisions for
+		// 23K events). Two revisions provides a safety net for rollback
+		// without the storage cost.
+		add_filter( 'wp_revisions_to_keep', array( __CLASS__, 'limit_event_revisions' ), 10, 2 );
+
+		// Prevent WordPress core from stamping a 404 status on paginated XML
+		// sitemap pages. See prevent_sitemap_404() for the full explanation.
+		add_filter( 'pre_handle_404', array( __CLASS__, 'prevent_sitemap_404' ), 10, 2 );
+
+		self::setup_admin_menu_control();
+	}
+
+	/**
+	 * Prevent WordPress core from returning a 404 status on paginated XML
+	 * sitemap pages.
+	 *
+	 * The event post type advertises far more sub-sitemap pages
+	 * (`wp-sitemap-posts-data_machine_events-N.xml`) than the site has pages
+	 * of regular blog posts. During a sitemap request WordPress still builds a
+	 * "main" query that defaults to the `post` post type with the site's
+	 * `posts_per_page`. WP_Sitemaps renders the correct event XML on
+	 * `template_redirect` from its own provider query, but `WP::handle_404()`
+	 * runs earlier (on the `wp` action) against that dummy main query. Once the
+	 * requested `paged` value exceeds the number of regular blog-post pages,
+	 * the main query returns zero posts and core flags `is_404()` —
+	 * stamping a 404 status header on a response whose body is valid event XML.
+	 *
+	 * Net effect: every advertised sitemap page beyond the blog's page count
+	 * (e.g. pages 6–40 of 40) returns HTTP 404 to crawlers despite carrying a
+	 * full, valid `<urlset>`, so Google discards them and most events never get
+	 * indexed.
+	 *
+	 * Fix: short-circuit `handle_404()` for any WP core sitemap request. The
+	 * sitemap renderer remains fully responsible for the response, including
+	 * issuing its own legitimate 404 when a page genuinely has no URLs
+	 * (see WP_Sitemaps::render_sitemaps()).
+	 *
+	 * @since 0.25.0
+	 *
+	 * @param bool      $preempt  Whether to short-circuit default 404 handling.
+	 * @param \WP_Query $wp_query The main query (unused; kept for signature parity).
+	 * @return bool True to bypass core 404 handling on sitemap requests, otherwise the original value.
+	 */
+	public static function prevent_sitemap_404( $preempt, $wp_query ) {
+		// Only intervene on WP core XML sitemap routes. The `sitemap` query var
+		// is set exclusively by WP_Sitemaps rewrite rules
+		// (wp-sitemap*.xml / .xsl), so this never affects normal front-end
+		// requests.
+		if ( get_query_var( 'sitemap' ) || get_query_var( 'sitemap-stylesheet' ) ) {
+			return true;
+		}
+
+		return $preempt;
+	}
+
+	/**
+	 * Limit the number of revisions kept for event posts.
+	 *
+	 * @since 0.24.0
+	 *
+	 * @param int      $num  Number of revisions to keep.
+	 * @param \WP_Post $post The post object.
+	 * @return int Filtered revision count.
+	 */
+	public static function limit_event_revisions( int $num, \WP_Post $post ): int {
+		if ( self::POST_TYPE === $post->post_type ) {
+			return 2;
+		}
+		return $num;
+	}
+
+	private static function setup_admin_menu_control() {
+		add_action( 'admin_menu', array( __CLASS__, 'control_taxonomy_menus' ), 999 );
+
+		add_filter( 'parent_file', array( __CLASS__, 'filter_parent_file' ) );
+
+		add_filter( 'submenu_file', array( __CLASS__, 'filter_submenu_file' ) );
+
+		self::setup_admin_columns();
+	}
+
+	private static function setup_admin_columns() {
+		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns', array( __CLASS__, 'add_event_date_column' ) );
+		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( __CLASS__, 'render_event_date_column' ), 10, 2 );
+		add_filter( 'manage_edit-' . self::POST_TYPE . '_sortable_columns', array( __CLASS__, 'sortable_event_date_column' ) );
+		add_action( 'pre_get_posts', array( __CLASS__, 'sort_by_event_date' ) );
+		add_action( 'pre_get_posts', array( __CLASS__, 'prevent_taxonomy_archive_404' ) );
+		add_filter( 'redirect_canonical', array( __CLASS__, 'prevent_paged_canonical_redirect' ), 10, 2 );
+		add_action( 'wp', array( __CLASS__, 'fix_taxonomy_archive_404' ) );
+	}
+
+	/**
+	 * Prevent WordPress from returning 404 on paginated taxonomy archives.
+	 *
+	 * Shared taxonomies (e.g. artist, registered on both 'post' and
+	 * 'data_machine_events') cause WordPress's main query to default to the
+	 * 'post' post type. With 0 blog posts matching that artist, WP finds no
+	 * results on page 2+ and returns 404 before the calendar block renders.
+	 *
+	 * Fix: force the post type to events and use a minimal query so the
+	 * main query finds at least one result and doesn't prematurely 404.
+	 * The calendar block does its own independent query for display.
+	 *
+	 * @param \WP_Query $query The main query.
+	 */
+	public static function prevent_taxonomy_archive_404( $query ) {
+		if ( is_admin() || ! $query->is_main_query() ) {
+			return;
+		}
+
+		// Never touch feed requests. Forcing fields=ids on a feed query makes
+		// $wp_query->posts hold scalar IDs instead of WP_Post objects, which
+		// breaks WordPress core's get_feed_build_date(): wp_list_pluck() emits
+		// a "values must be objects or arrays" notice and the subsequent
+		// max( $modified_times ) throws a ValueError on an empty array
+		// (feed.php). The 404-prevention logic below only matters for HTML
+		// archive pagination, never for feeds.
+		if ( $query->is_feed() ) {
+			return;
+		}
+
+		// Never touch singular requests. A page or post URL can carry a
+		// taxonomy query var (e.g. /submit/?venue=Foo, #927); core still
+		// resolves it as the page (parse_query has already run, so
+		// is_singular() is reliable here). Rewriting it into a fields=ids
+		// events archive renders the calendar instead of the page and leaves
+		// $wp_query->post as an int, which floods core templates with
+		// "Attempt to read property on int" warnings.
+		if ( $query->is_singular() ) {
+			return;
+		}
+
+		// Check query vars directly — conditional tags like is_tax() aren't
+		// reliable inside pre_get_posts because the query hasn't executed yet.
+		$event_taxonomies = get_object_taxonomies( self::POST_TYPE );
+		foreach ( $event_taxonomies as $taxonomy ) {
+			if ( $query->get( $taxonomy ) ) {
+				// Force post type to events so shared taxonomies query the
+				// correct post type instead of defaulting to 'post'.
+				$query->set( 'post_type', self::POST_TYPE );
+
+				// Minimal query — we only need ≥1 result to prevent the 404.
+				// The calendar block runs its own query for actual display.
+				$query->set( 'posts_per_page', 1 );
+				$query->set( 'fields', 'ids' );
+				$query->set( 'no_found_rows', true );
+				// Any match suffices; avoid sorting all matching events by date.
+				$query->set( 'orderby', 'none' );
+
+				// Reset paged to 1 so WordPress doesn't 404 on paginated
+				// requests. The calendar block reads the real page number
+				// from $_GET['paged'] independently.
+				$query->set( 'paged', 1 );
+				return;
+			}
+		}
+	}
+
+	/**
+	 * Prevent canonical redirect from stripping ?paged on event taxonomy archives.
+	 *
+	 * WordPress's redirect_canonical() sees that the main query resolved to
+	 * page 1 (because prevent_taxonomy_archive_404 resets paged) and tries
+	 * to strip the ?paged parameter. But the Calendar block needs ?paged to
+	 * know which page to display. Disable the redirect when paged is set on
+	 * an event taxonomy archive.
+	 *
+	 * @param string $redirect_url  The URL WordPress wants to redirect to.
+	 * @param string $requested_url The original requested URL.
+	 * @return string|false The redirect URL, or false to cancel the redirect.
+	 */
+	public static function prevent_paged_canonical_redirect( $redirect_url, $requested_url ) {
+		if ( is_admin() ) {
+			return $redirect_url;
+		}
+
+		// Only intervene when paged is present in the request.
+		if ( empty( $_GET['paged'] ) ) {
+			return $redirect_url;
+		}
+
+		// Check if this is an event taxonomy archive.
+		$event_taxonomies = get_object_taxonomies( self::POST_TYPE );
+		foreach ( $event_taxonomies as $taxonomy ) {
+			if ( get_query_var( $taxonomy ) ) {
+				return false;
+			}
+		}
+
+		return $redirect_url;
+	}
+
+	/**
+	 * Override false 404s on event taxonomy archive pagination.
+	 *
+	 * Even after pre_get_posts sets post_type and posts_per_page, WordPress
+	 * may still flag the page as 404 (e.g., when handle_404 runs its own
+	 * checks). This hook fires after the main query and corrects the status.
+	 *
+	 * @param \WP $wp The WordPress environment object.
+	 */
+	public static function fix_taxonomy_archive_404( $wp ) {
+		if ( is_admin() ) {
+			return;
+		}
+
+		global $wp_query;
+
+		if ( ! $wp_query instanceof \WP_Query || ! $wp_query->is_404() ) {
+			return;
+		}
+
+		// Only fix 404s for event taxonomy archives.
+		$event_taxonomies = get_object_taxonomies( self::POST_TYPE );
+		foreach ( $event_taxonomies as $taxonomy ) {
+			if ( ! empty( $wp_query->query[ $taxonomy ] ) ) {
+				// Verify the term actually exists.
+				// For hierarchical taxonomies the query var contains the
+				// full path (e.g. usa/texas/houston) but the DB slug is
+				// just the leaf segment (houston). Use basename() to
+				// extract the leaf slug for lookup.
+				$slug = basename( $wp_query->query[ $taxonomy ] );
+				$term = get_term_by( 'slug', $slug, $taxonomy );
+				if ( $term instanceof \WP_Term ) {
+					$wp_query->is_404     = false;
+					$wp_query->is_tax     = true;
+					$wp_query->is_archive = true;
+					status_header( 200 );
+				}
+				return;
+			}
+		}
+	}
+
+	public static function add_event_date_column( $columns ) {
+		$new_columns = array();
+
+		foreach ( $columns as $key => $value ) {
+			$new_columns[ $key ] = $value;
+
+			if ( 'title' === $key ) {
+				$new_columns['event_date'] = __( 'Event Date', 'data-machine-events' );
+			}
+		}
+
+		return $new_columns;
+	}
+
+	public static function render_event_date_column( $column, $post_id ) {
+		if ( 'event_date' !== $column ) {
+			return;
+		}
+
+		$dates          = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$event_datetime = $dates ? $dates->start_datetime : '';
+
+		if ( ! $event_datetime ) {
+			echo '<span class="datamachine-no-date">' . esc_html__( 'No date set', 'data-machine-events' ) . '</span>';
+			return;
+		}
+
+		try {
+			$date           = new \DateTime( $event_datetime );
+			$formatted_date = $date->format( 'M j, Y' );
+			$formatted_time = $date->format( 'g:i a' );
+
+			printf(
+				'<span class="datamachine-event-date"><strong>%s</strong><br>%s</span>',
+				esc_html( $formatted_date ),
+				esc_html( $formatted_time )
+			);
+		} catch ( \Exception $e ) {
+			echo '<span class="datamachine-invalid-date">' . esc_html__( 'Invalid date', 'data-machine-events' ) . '</span>';
+		}
+	}
+
+	public static function sortable_event_date_column( $columns ) {
+		$columns['event_date'] = 'event_date';
+		return $columns;
+	}
+
+	public static function sort_by_event_date( $query ) {
+		if ( ! is_admin() || ! $query->is_main_query() ) {
+			return;
+		}
+
+		$screen = get_current_screen();
+		if ( ! $screen || self::POST_TYPE !== $screen->post_type ) {
+			return;
+		}
+
+		$orderby = $query->get( 'orderby' );
+
+		if ( 'event_date' === $orderby ) {
+			$sort_direction = $query->get( 'order' ) ?: 'ASC';
+			add_filter(
+				'posts_clauses',
+				function ( $clauses ) use ( $sort_direction ) {
+					global $wpdb;
+					$table = \DataMachineEvents\Core\EventDatesTable::table_name();
+					if ( strpos( $clauses['join'], $table ) === false ) {
+						$clauses['join'] .= " LEFT JOIN {$table} AS ed ON {$wpdb->posts}.ID = ed.post_id";
+					}
+					$clauses['orderby'] = 'ed.start_datetime ' . $sort_direction;
+					return $clauses;
+				}
+			);
+		}
+	}
+
+	public static function control_taxonomy_menus() {
+		global $submenu;
+
+		$post_type_menu = 'edit.php?post_type=' . self::POST_TYPE;
+
+		$allowed_items = apply_filters(
+			'data_machine_events_post_type_menu_items',
+			array(
+				'venue'      => true,
+				'promoter'   => true,
+				'event_type' => true,
+				'settings'   => true,
+			)
+		);
+
+		if ( isset( $submenu[ $post_type_menu ] ) ) {
+			foreach ( $submenu[ $post_type_menu ] as $key => $menu_item ) {
+				if ( strpos( $menu_item[2], 'taxonomy=' ) !== false ) {
+					$menu_query = wp_parse_url( $menu_item[2], PHP_URL_QUERY );
+					if ( ! is_string( $menu_query ) ) {
+						continue;
+					}
+					parse_str( $menu_query, $query_vars );
+					$taxonomy = $query_vars['taxonomy'] ?? '';
+
+					if ( $taxonomy && ! isset( $allowed_items[ $taxonomy ] ) ) {
+						unset( $submenu[ $post_type_menu ][ $key ] );
+					}
+				}
+			}
+		}
+
+		foreach ( $allowed_items as $item_key => $item_config ) {
+			if ( is_array( $item_config ) && isset( $item_config['type'] ) && 'submenu' === $item_config['type'] ) {
+				if ( isset( $item_config['callback'] ) && is_callable( $item_config['callback'] ) ) {
+					call_user_func( $item_config['callback'] );
+				}
+			}
+		}
+	}
+
+	/**
+	 * Ensures proper menu highlighting by filtering parent file for disallowed taxonomies
+	 */
+	public static function filter_parent_file( $parent_file ) {
+		global $current_screen;
+
+		if ( ! $current_screen || self::POST_TYPE !== $current_screen->post_type ) {
+			return $parent_file;
+		}
+
+		$allowed_items = apply_filters(
+			'data_machine_events_post_type_menu_items',
+			array(
+				'venue'      => true,
+				'promoter'   => true,
+				'event_type' => true,
+				'settings'   => true,
+			)
+		);
+
+		if ( $current_screen->taxonomy && ! isset( $allowed_items[ $current_screen->taxonomy ] ) ) {
+			return 'edit.php?post_type=' . self::POST_TYPE;
+		}
+
+		return $parent_file;
+	}
+
+	/**
+	 * Ensures proper submenu highlighting for allowed taxonomies
+	 */
+	public static function filter_submenu_file( $submenu_file ) {
+		global $current_screen;
+
+		if ( ! $current_screen || self::POST_TYPE !== $current_screen->post_type ) {
+			return $submenu_file;
+		}
+
+		if ( $current_screen->taxonomy ) {
+			$allowed_items = apply_filters(
+				'data_machine_events_post_type_menu_items',
+				array(
+					'venue'      => true,
+					'promoter'   => true,
+					'event_type' => true,
+					'settings'   => true,
+				)
+			);
+
+			if ( isset( $allowed_items[ $current_screen->taxonomy ] ) ) {
+				return "edit-tags.php?taxonomy={$current_screen->taxonomy}&post_type=" . self::POST_TYPE;
+			}
+		}
+
+		return $submenu_file;
+	}
+}

@@ -1,0 +1,1069 @@
+<?php
+/**
+ * Fetch Reddit Ability
+ *
+ * Abilities API primitive for fetching Reddit posts.
+ * Centralizes Reddit API interaction, pagination, and data extraction.
+ *
+ * Migrated from data-machine core to data-machine-socials.
+ *
+ * @package    DataMachineSocials
+ * @subpackage Abilities\Reddit
+ * @since      0.3.0
+ */
+
+namespace DataMachineSocials\Abilities\Reddit;
+
+use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\PublishAuthorization;
+
+defined( 'ABSPATH' ) || exit;
+
+class FetchRedditAbility extends AbstractSocialAbility {
+
+	protected static bool $registered = false;
+
+	public function __construct() {
+		$this->registerAbility( $this->registerCallback(), true );
+	}
+
+	private function registerCallback(): callable {
+		return function () {
+			wp_register_ability(
+				'datamachine/fetch-reddit',
+				array(
+					'label'               => __( 'Fetch Reddit Posts', 'data-machine-socials' ),
+					'description'         => __( 'Fetch posts from Reddit subreddits with filtering and pagination', 'data-machine-socials' ),
+					'category'            => 'datamachine-socials',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'access_token' ),
+						'properties' => array(
+							'subreddit'         => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Subreddit name to fetch from. Optional when query is provided for global search.', 'data-machine-socials' ),
+							),
+							'query'             => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Search query for Reddit global search. When provided without subreddit, searches across all of Reddit. Can also be combined with subreddit to search within it.', 'data-machine-socials' ),
+							),
+							'access_token'      => array(
+								'type'        => 'string',
+								'description' => __( 'Reddit OAuth access token', 'data-machine-socials' ),
+							),
+							'sort_by'           => array(
+								'type'        => 'string',
+								'enum'        => array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance', 'comments' ),
+								'default'     => 'hot',
+								'description' => __( 'Sort order for posts. Search supports relevance, hot, top, new, and comments.', 'data-machine-socials' ),
+							),
+							'timeframe_limit'   => array(
+								'type'        => 'string',
+								'default'     => 'all_time',
+								'description' => __( 'Timeframe filter (all_time, 24_hours, 7_days, 30_days)', 'data-machine-socials' ),
+							),
+							'min_upvotes'       => array(
+								'type'        => 'integer',
+								'default'     => 0,
+								'description' => __( 'Minimum upvotes required', 'data-machine-socials' ),
+							),
+							'min_comment_count' => array(
+								'type'        => 'integer',
+								'default'     => 0,
+								'description' => __( 'Minimum comment count required', 'data-machine-socials' ),
+							),
+							'comment_count'     => array(
+								'type'        => 'integer',
+								'default'     => 0,
+								'description' => __( 'Number of top comments to fetch per post', 'data-machine-socials' ),
+							),
+							'search'            => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Search term to filter posts', 'data-machine-socials' ),
+							),
+							'fetch_batch_size'  => array(
+								'type'        => 'integer',
+								'default'     => 100,
+								'description' => __( 'Number of posts per API page', 'data-machine-socials' ),
+							),
+							'max_pages'         => array(
+								'type'        => 'integer',
+								'default'     => 5,
+								'description' => __( 'Maximum number of pages to fetch', 'data-machine-socials' ),
+							),
+							'max_items'         => array(
+								'type'        => 'integer',
+								'minimum'     => 1,
+								'maximum'     => 500,
+								'description' => __( 'Maximum eligible posts to return for direct ability calls', 'data-machine-socials' ),
+							),
+							'download_images'   => array(
+								'type'        => 'boolean',
+								'default'     => true,
+								'description' => __( 'Whether to download post images', 'data-machine-socials' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'required'   => array( 'success', 'pagination', 'logs' ),
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'data'       => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'object' ),
+							),
+							'items'      => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'required'   => array( 'data', 'source_url', 'item_id' ),
+									'properties' => array(
+										'data'       => array(
+											'type'       => 'object',
+											'required'   => array( 'title', 'content', 'metadata' ),
+											'properties' => array(
+												'title'    => array( 'type' => 'string' ),
+												'content'  => array( 'type' => 'string' ),
+												'metadata' => array(
+													'type' => 'object',
+													'required' => array( 'source_type', 'item_identifier_to_log', 'original_id', 'original_title', 'original_date_gmt', 'subreddit', 'upvotes', 'comment_count', 'author', 'is_self_post', 'target_url' ),
+													'properties' => array(
+														'source_type'            => array( 'type' => 'string' ),
+														'item_identifier_to_log' => array( 'type' => 'string' ),
+														'original_id'            => array( 'type' => 'string' ),
+														'original_title'         => array( 'type' => 'string' ),
+														'original_date_gmt'      => array( 'type' => 'string' ),
+														'subreddit'              => array( 'type' => 'string' ),
+														'upvotes'                => array( 'type' => 'integer' ),
+														'comment_count'          => array( 'type' => 'integer' ),
+														'author'                 => array( 'type' => 'string' ),
+														'is_self_post'           => array( 'type' => 'boolean' ),
+														'target_url'             => array( 'type' => 'string' ),
+													),
+												),
+											),
+										),
+										'source_url' => array( 'type' => 'string' ),
+										'item_id'    => array( 'type' => 'string' ),
+									),
+								),
+							),
+							'pagination' => array(
+								'type'       => 'object',
+								'required'   => array( 'pages_fetched', 'truncated' ),
+								'properties' => array(
+									'pages_fetched' => array( 'type' => 'integer' ),
+									'truncated'     => array( 'type' => 'boolean' ),
+								),
+							),
+							'error'      => array( 'type' => 'string' ),
+							'logs'       => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'object' ),
+							),
+						),
+					),
+					'execute_callback'    => array( $this, 'execute' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+	}
+
+	/**
+	 * Permission callback for ability.
+	 *
+	 * @return bool True if user has permission.
+	 */
+	public function checkPermission(): bool {
+		// Stricter gate: the site's socials policy AND Data Machine tool access.
+		return PublishAuthorization::can_edit() && PermissionHelper::can( 'use_tools' );
+	}
+
+	/**
+	 * Execute Reddit fetch ability without selection-time eligibility filtering.
+	 *
+	 * Used for direct ability invocations (REST, MCP, ad-hoc PHP calls) where
+	 * there is no Data Machine pipeline context to consult for processed/claim
+	 * state. Returns every Reddit-side eligible post the pagination loop
+	 * surfaces, optionally capped by `max_items`, plus `max_pages` and Reddit's
+	 * natural pagination.
+	 *
+	 * Pipeline-driven fetches go through `executeWithCollector()` so that the
+	 * Data Machine core `FreshCandidateCollector` owns processed/claimed/
+	 * reprocess eligibility decisions and pagination keeps scanning until the
+	 * collector fills up or the source is exhausted.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array|\WP_Error Result with fetched data or error.
+	 */
+	public function execute( array $input ): array|\WP_Error {
+		return $this->runFetch( $input, null );
+	}
+
+	/**
+	 * Execute Reddit fetch ability with a Data Machine fresh-candidate collector.
+	 *
+	 * The collector receives every Reddit-side eligible candidate as we paginate,
+	 * and decides processed/claimed/reprocess eligibility using
+	 * `ExecutionContext::isItemProcessed()` / `isItemClaimed()` (so the
+	 * `datamachine_should_reprocess_item` filter applies consistently with the
+	 * authoritative `FetchHandler::get_fetch_data()` final dedupe). Pagination
+	 * continues until the collector is full or Reddit pagination terminates.
+	 *
+	 * @param array                   $input     Input parameters.
+	 * @param FreshCandidateCollector $collector Selection-time collector.
+	 * @return array|\WP_Error Result with fetched data or error.
+	 */
+	public function executeWithCollector( array $input, FreshCandidateCollector $collector ): array|\WP_Error {
+		return $this->runFetch( $input, $collector );
+	}
+
+	/**
+	 * Internal pagination loop shared by `execute()` and `executeWithCollector()`.
+	 *
+	 * @param array                        $input     Input parameters.
+	 * @param FreshCandidateCollector|null $collector Optional core fresh-candidate
+	 *                                                collector. When provided,
+	 *                                                pagination stops once the
+	 *                                                collector is full and the
+	 *                                                returned `items` come from
+	 *                                                `$collector->getAccepted()`.
+	 *                                                When null, every Reddit-side
+	 *                                                eligible candidate is returned.
+	 */
+	private function runFetch( array $input, ?FreshCandidateCollector $collector ): array|\WP_Error {
+		$logs   = array();
+		$config = $this->normalizeConfig( $input );
+
+		$subreddit             = $config['subreddit'];
+		$query                 = $config['query'];
+		$access_token          = $config['access_token'];
+		$sort                  = $config['sort_by'];
+		$timeframe_limit       = $config['timeframe_limit'];
+		$min_upvotes           = $config['min_upvotes'];
+		$min_comment_count     = $config['min_comment_count'];
+		$comment_count_setting = $config['comment_count'];
+		$search_term           = $config['search'];
+		$fetch_batch_size      = $config['fetch_batch_size'];
+		$max_pages             = $config['max_pages'];
+		$max_items             = null === $collector ? $config['max_items'] : null;
+		$download_images       = $config['download_images'];
+
+		if ( null !== $max_items && ( ! is_int( $max_items ) || $max_items < 1 || $max_items > 500 ) ) {
+			return new \WP_Error(
+				'invalid_param',
+				'max_items must be an integer between 1 and 500',
+				array( 'status' => 400 )
+			);
+		}
+
+		// Determine mode: global search vs subreddit fetch.
+		$is_global_search    = ! empty( $query ) && empty( $subreddit );
+		$is_subreddit_search = ! empty( $query ) && ! empty( $subreddit );
+
+		// Validate: must have either subreddit or query.
+		if ( empty( $subreddit ) && empty( $query ) ) {
+			$logs[] = array(
+				'level'   => 'error',
+				'message' => 'Reddit: Either subreddit or query must be provided.',
+			);
+			return new \WP_Error(
+				'missing_param',
+				'Either subreddit or query must be provided',
+				array(
+					'status' => 400,
+					'logs'   => $logs,
+				)
+			);
+		}
+
+		if ( ! empty( $subreddit ) && ! preg_match( '/^[a-zA-Z0-9_]+$/', $subreddit ) ) {
+			$logs[] = array(
+				'level'   => 'error',
+				'message' => 'Reddit: Invalid subreddit name format.',
+				'data'    => array( 'subreddit' => $subreddit ),
+			);
+			return new \WP_Error(
+				'missing_param',
+				'Invalid subreddit name format',
+				array(
+					'status' => 400,
+					'logs'   => $logs,
+				)
+			);
+		}
+
+		$valid_sorts = ! empty( $query )
+			? array( 'relevance', 'hot', 'top', 'new', 'comments' )
+			: array( 'hot', 'new', 'top', 'rising', 'controversial' );
+		if ( ! in_array( $sort, $valid_sorts, true ) ) {
+			$logs[] = array(
+				'level'   => 'error',
+				'message' => 'Reddit: Invalid sort parameter.',
+				'data'    => array(
+					'invalid_sort' => $sort,
+					'valid_sorts'  => $valid_sorts,
+				),
+			);
+			return new \WP_Error(
+				'missing_param',
+				'Invalid sort parameter',
+				array(
+					'status' => 400,
+					'logs'   => $logs,
+				)
+			);
+		}
+
+		$mode_label = $is_global_search ? 'global search' : ( $is_subreddit_search ? "r/{$subreddit} search" : "r/{$subreddit}" );
+		$logs[]     = array(
+			'level'   => 'info',
+			'message' => sprintf( 'Reddit: Starting fetch (%s, sort: %s).', $mode_label, $sort ),
+			'data'    => array(
+				'subreddit'        => $subreddit,
+				'query'            => $query,
+				'is_global_search' => $is_global_search,
+			),
+		);
+
+		$after_param    = null;
+		$total_checked  = 0;
+		$pages_fetched  = 0;
+		$eligible_items = array();
+		$truncated      = false;
+
+		while ( $pages_fetched < $max_pages ) {
+			++$pages_fetched;
+
+			$reddit_url = $this->buildApiUrl(
+				$subreddit,
+				$query,
+				$sort,
+				$timeframe_limit,
+				$fetch_batch_size,
+				$after_param,
+				$logs
+			);
+
+			$headers = array(
+				'Authorization' => 'Bearer ' . $access_token,
+			);
+
+			$log_headers                  = $headers;
+			$log_headers['Authorization'] = preg_replace( '/(Bearer )(.{4}).+(.{4})/', '$1$2...$3', $log_headers['Authorization'] );
+			$logs[]                       = array(
+				'level'   => 'debug',
+				'message' => 'Reddit: Making API call.',
+				'data'    => array(
+					'page'    => $pages_fetched,
+					'url'     => $reddit_url,
+					'headers' => $log_headers,
+				),
+			);
+
+			$result = $this->httpGet(
+				$reddit_url,
+				array(
+					'headers' => $headers,
+					'context' => 'Reddit API',
+				)
+			);
+
+			if ( is_wp_error( $result ) ) {
+				if ( 1 === $pages_fetched ) {
+					$error_message = $result->get_error_message();
+
+					$logs[] = array(
+						'level'   => 'error',
+						'message' => 'Reddit: API request failed.',
+						'data'    => array( 'error' => $error_message ),
+					);
+
+					$error_data         = $result->get_error_data();
+					$error_data         = is_array( $error_data ) ? $error_data : array();
+					$error_data['logs'] = $logs;
+					$result->add_data( $error_data );
+
+					return $result;
+				} else {
+					$truncated = true;
+					break;
+				}
+			}
+
+			$body   = $result['data'];
+			$logs[] = array(
+				'level'   => 'debug',
+				'message' => 'Reddit: API Response Code',
+				'data'    => array(
+					'code' => $result['status_code'],
+					'url'  => $reddit_url,
+				),
+			);
+
+			$response_data = json_decode( $body, true );
+			if ( JSON_ERROR_NONE !== json_last_error() ) {
+				$error_message = sprintf(
+					/* translators: %s: JSON error message */
+					__( 'Invalid JSON from Reddit API: %s', 'data-machine-socials' ),
+					json_last_error_msg()
+				);
+				if ( 1 === $pages_fetched ) {
+					$logs[] = array(
+						'level'   => 'error',
+						'message' => 'Reddit: Invalid JSON response.',
+						'data'    => array( 'error' => $error_message ),
+					);
+					return new \WP_Error(
+						'api_error',
+						$error_message,
+						array(
+							'status' => 500,
+							'logs'   => $logs,
+						)
+					);
+				} else {
+					$truncated = true;
+					break;
+				}
+			}
+
+			if ( empty( $response_data['data']['children'] ) || ! is_array( $response_data['data']['children'] ) ) {
+				$logs[] = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: No more posts found or invalid data structure.',
+					'data'    => array( 'url' => $reddit_url ),
+				);
+				break;
+			}
+
+			$post_wrappers = $response_data['data']['children'];
+			foreach ( $post_wrappers as $post_index => $post_wrapper ) {
+				++$total_checked;
+				if ( empty( $post_wrapper['data'] ) || empty( $post_wrapper['data']['id'] ) || empty( $post_wrapper['kind'] ) ) {
+					$logs[] = array(
+						'level'   => 'warning',
+						'message' => 'Reddit: Skipping post with missing data.',
+						'data'    => array( 'context' => $mode_label ),
+					);
+					continue;
+				}
+				$item_data       = $post_wrapper['data'];
+				$current_item_id = $item_data['id'];
+
+				if ( ( $item_data['stickied'] ?? false ) || ( $item_data['pinned'] ?? false ) ) {
+					$logs[] = array(
+						'level'   => 'debug',
+						'message' => 'Reddit: Skipping pinned/stickied post.',
+						'data'    => array( 'item_id' => $current_item_id ),
+					);
+					continue;
+				}
+
+				$item_timestamp = (int) ( $item_data['created_utc'] ?? 0 );
+				if ( ! $this->applyTimeframeFilter( $item_timestamp, $timeframe_limit ) ) {
+					continue;
+				}
+
+				if ( $min_upvotes > 0 ) {
+					if ( ! isset( $item_data['score'] ) || $item_data['score'] < $min_upvotes ) {
+						$logs[] = array(
+							'level'   => 'debug',
+							'message' => 'Reddit: Skipping item (min upvotes).',
+							'data'    => array(
+								'item_id'      => $current_item_id,
+								'score'        => $item_data['score'] ?? 'N/A',
+								'min_required' => $min_upvotes,
+							),
+						);
+						continue;
+					}
+				}
+
+				if ( $min_comment_count > 0 ) {
+					if ( ! isset( $item_data['num_comments'] ) || $item_data['num_comments'] < $min_comment_count ) {
+						$logs[] = array(
+							'level'   => 'debug',
+							'message' => 'Reddit: Skipping item (min comment count).',
+							'data'    => array(
+								'item_id'      => $current_item_id,
+								'comments'     => $item_data['num_comments'] ?? 'N/A',
+								'min_required' => $min_comment_count,
+							),
+						);
+						continue;
+					}
+				}
+
+				$title_to_check    = $item_data['title'] ?? '';
+				$selftext_to_check = $item_data['selftext'] ?? '';
+				$text_to_search    = $title_to_check . ' ' . $selftext_to_check;
+				if ( ! $this->applyKeywordSearch( $text_to_search, $search_term ) ) {
+					$logs[] = array(
+						'level'   => 'debug',
+						'message' => 'Reddit: Skipping item (search filter).',
+						'data'    => array( 'item_id' => $current_item_id ),
+					);
+					continue;
+				}
+
+				$title     = $item_data['title'] ?? '';
+				$selftext  = $item_data['selftext'] ?? '';
+				$post_body = $item_data['body'] ?? '';
+
+				$content_data = array(
+					'title'   => trim( $title ),
+					'content' => ! empty( $selftext ) ? trim( $selftext ) : ( ! empty( $post_body ) ? trim( $post_body ) : '' ),
+				);
+
+				$comments_array = array();
+				if ( $comment_count_setting > 0 && ! empty( $item_data['permalink'] ) ) {
+					$comments_array = $this->fetchComments( $item_data['permalink'], $access_token, $comment_count_setting );
+				}
+
+				$image_info = null;
+				if ( $download_images ) {
+					$image_info = $this->extractImageInfo( $item_data );
+				}
+
+				// Use the post's own subreddit (important for global search results).
+				$post_subreddit = $item_data['subreddit'] ?? $subreddit;
+
+				$metadata = array(
+					'source_type'            => 'reddit',
+					'item_identifier_to_log' => (string) $current_item_id,
+					'original_id'            => $current_item_id,
+					'original_title'         => $title,
+					'original_date_gmt'      => gmdate( 'Y-m-d\TH:i:s\Z', (int) ( $item_data['created_utc'] ?? time() ) ),
+					'subreddit'              => $post_subreddit,
+					'upvotes'                => $item_data['score'] ?? 0,
+					'comment_count'          => $item_data['num_comments'] ?? 0,
+					'author'                 => $item_data['author'] ?? '[deleted]',
+					'is_self_post'           => $item_data['is_self'] ?? false,
+					'target_url'             => $item_data['url'] ?? '',
+				);
+
+				if ( ! empty( $comments_array ) ) {
+					$content_data['comments'] = $comments_array;
+				}
+
+				$raw_data = array(
+					'title'    => $content_data['title'],
+					'content'  => $content_data['content'],
+					'metadata' => $metadata,
+				);
+
+				if ( ! empty( $content_data['comments'] ) ) {
+					$raw_data['content'] .= "\n\nComments:\n" . implode(
+						"\n",
+						array_map(
+							function ( $comment ) {
+								return "- {$comment['author']}: {$comment['body']}";
+							},
+							$content_data['comments']
+						)
+					);
+				}
+
+				if ( $image_info ) {
+					$raw_data['image_info'] = $image_info;
+				}
+
+				$source_url = $item_data['permalink'] ? 'https://www.reddit.com' . $item_data['permalink'] : '';
+
+				$logs[] = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: Found eligible post',
+					'data'    => array(
+						'source_type'      => 'reddit',
+						'item_id'          => $current_item_id,
+						'has_image'        => ! empty( $image_info ),
+						'image_url_domain' => ! empty( $image_info['url'] ) ? wp_parse_url( $image_info['url'], PHP_URL_HOST ) : null,
+						'content_length'   => strlen( $title . ' ' . $selftext . ' ' . $post_body ),
+					),
+				);
+
+				$candidate = array(
+					'data'       => $raw_data,
+					'source_url' => $source_url,
+					'item_id'    => $current_item_id,
+				);
+
+				if ( null === $collector ) {
+					/*
+					 * Direct REST/MCP/ad-hoc invocation — no DM core eligibility
+					 * surface to consult; honor only the direct-call result cap.
+					 */
+										$eligible_items[] = $candidate;
+					if ( null !== $max_items && count( $eligible_items ) >= $max_items ) {
+						$truncated = $post_index < count( $post_wrappers ) - 1 || ! empty( $response_data['data']['after'] );
+						break;
+					}
+					continue;
+				}
+
+				/*
+				 * Pipeline-driven fetch: defer processed/claimed/reprocess
+				 * decisions to the core fresh-candidate collector. The
+				 * collector also de-duplicates within this scan, so we don't
+				 * need to track seen IDs ourselves.
+				 */
+				if ( ! $collector->offer( (string) $current_item_id, $candidate ) ) {
+					if ( $collector->isFull() ) {
+						break;
+					}
+					continue;
+				}
+
+				if ( $collector->isFull() ) {
+					break;
+				}
+			}
+
+			if ( null === $collector && null !== $max_items && count( $eligible_items ) >= $max_items ) {
+				$logs[] = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: Direct result limit reached, ending pagination.',
+					'data'    => array( 'page' => $pages_fetched ),
+				);
+				break;
+			}
+
+			if ( null !== $collector && $collector->isFull() ) {
+				$logs[] = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: Fresh-candidate collector full, ending pagination.',
+					'data'    => array( 'page' => $pages_fetched ),
+				);
+				break;
+			}
+
+			$after_param = $response_data['data']['after'] ?? null;
+			if ( ! $after_param ) {
+				if ( null !== $collector ) {
+					$collector->markExhausted();
+				}
+				$logs[] = array(
+					'level'   => 'debug',
+					'message' => "Reddit: No 'after' parameter found, ending pagination.",
+				);
+				break;
+			}
+		}
+
+		/*
+		 * If we exited the pagination loop because we hit `max_pages` without
+		 * either filling the collector or running out of Reddit `after`
+		 * cursors, that is "scan budget exhausted", not source exhaustion —
+		 * leave `source_exhausted=false` so callers can distinguish the two.
+		 */
+								$truncated = $truncated || ( $pages_fetched >= $max_pages && ! empty( $after_param ) );
+
+		/*
+		 * Pipeline path: emit collector accepted set as the result so handler
+		 * post-processing iterates only the items the core primitive blessed.
+		 */
+		if ( null !== $collector ) {
+			$eligible_items = $collector->getAccepted();
+		}
+
+		if ( empty( $eligible_items ) ) {
+			$logs[] = array(
+				'level'   => 'debug',
+				'message' => 'Reddit: No eligible items found.',
+				'data'    => array(
+					'total_checked' => $total_checked,
+					'pages_fetched' => $pages_fetched,
+				),
+			);
+
+			return array(
+				'success'    => true,
+				'data'       => array(),
+				'pagination' => array(
+					'pages_fetched' => $pages_fetched,
+					'truncated'     => $truncated,
+				),
+				'logs'       => $logs,
+			);
+		}
+
+		$logs[] = array(
+			'level'   => 'info',
+			'message' => sprintf( 'Reddit: Found %d eligible posts', count( $eligible_items ) ),
+			'data'    => array(
+				'total_checked' => $total_checked,
+				'pages_fetched' => $pages_fetched,
+			),
+		);
+
+		return array(
+			'success'    => true,
+			'items'      => $eligible_items,
+			'pagination' => array(
+				'pages_fetched' => $pages_fetched,
+				'truncated'     => $truncated,
+			),
+			'logs'       => $logs,
+		);
+	}
+
+	/**
+	 * Normalize input configuration with defaults.
+	 */
+	private function normalizeConfig( array $input ): array|\WP_Error {
+		$defaults = array(
+			'subreddit'         => '',
+			'query'             => '',
+			'access_token'      => '',
+			'sort_by'           => 'hot',
+			'timeframe_limit'   => 'all_time',
+			'min_upvotes'       => 0,
+			'min_comment_count' => 0,
+			'comment_count'     => 0,
+			'search'            => '',
+			'fetch_batch_size'  => 100,
+			'max_pages'         => 5,
+			'max_items'         => null,
+			'download_images'   => true,
+		);
+
+		return array_merge( $defaults, $input );
+	}
+
+	/**
+	 * Build the Reddit API URL based on mode (subreddit browse, subreddit search, or global search).
+	 *
+	 * @param string      $subreddit           Subreddit name (empty for global search).
+	 * @param string      $query               Search query (empty for subreddit browse).
+	 * @param string      $sort                Sort order.
+	 * @param string      $timeframe_limit     Timeframe filter.
+	 * @param int         $fetch_batch_size    Number of posts per page.
+	 * @param string|null $after_param         Pagination cursor.
+	 * @param array       &$logs               Log entries array (passed by reference).
+	 * @return string The full Reddit API URL.
+	 */
+	private function buildApiUrl(
+		string $subreddit,
+		string $query,
+		string $sort,
+		string $timeframe_limit,
+		int $fetch_batch_size,
+		?string $after_param,
+		array &$logs
+	): string {
+		$base = 'https://oauth.reddit.com';
+
+		// Map our timeframe values to Reddit's native 't' parameter.
+		$reddit_time_map = array(
+			'24_hours' => 'day',
+			'72_hours' => 'week',
+			'7_days'   => 'week',
+			'30_days'  => 'month',
+			'90_days'  => 'year',
+			'6_months' => 'year',
+			'1_year'   => 'year',
+		);
+
+		if ( ! empty( $query ) ) {
+			// Search endpoint: /search.json or /r/{subreddit}/search.json
+			$params = array(
+				'q'     => $query,
+				'type'  => 'link',
+				'sort'  => $sort,
+				'limit' => $fetch_batch_size,
+			);
+
+			// Reddit search uses 't' for time filtering on all sort types.
+			if ( 'all_time' !== $timeframe_limit && isset( $reddit_time_map[ $timeframe_limit ] ) ) {
+				$params['t'] = $reddit_time_map[ $timeframe_limit ];
+				$logs[]      = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: Using native search time filtering.',
+					'data'    => array(
+						'timeframe_limit'   => $timeframe_limit,
+						'reddit_time_param' => $reddit_time_map[ $timeframe_limit ],
+					),
+				);
+			}
+
+			if ( ! empty( $subreddit ) ) {
+				$params['restrict_sr'] = 'on';
+				$endpoint              = "/r/{$subreddit}/search.json";
+			} else {
+				$endpoint = '/search.json';
+			}
+
+			if ( $after_param ) {
+				$params['after'] = $after_param;
+			}
+
+			return $base . $endpoint . '?' . http_build_query( $params );
+		}
+
+		// Subreddit browse: /r/{subreddit}/{sort}.json
+		$time_param = '';
+		if ( in_array( $sort, array( 'top', 'controversial' ), true ) && 'all_time' !== $timeframe_limit ) {
+			if ( isset( $reddit_time_map[ $timeframe_limit ] ) ) {
+				$time_param = '&t=' . $reddit_time_map[ $timeframe_limit ];
+				$logs[]     = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: Using native API time filtering.',
+					'data'    => array(
+						'sort'              => $sort,
+						'timeframe_limit'   => $timeframe_limit,
+						'reddit_time_param' => $reddit_time_map[ $timeframe_limit ],
+					),
+				);
+			}
+		}
+
+		return sprintf(
+			'%s/r/%s/%s.json?limit=%d%s%s',
+			$base,
+			esc_attr( $subreddit ),
+			esc_attr( $sort ),
+			$fetch_batch_size,
+			$after_param ? '&after=' . rawurlencode( $after_param ) : '',
+			$time_param
+		);
+	}
+
+	/**
+	 * Make HTTP GET request.
+	 */
+	private function httpGet( string $url, array $options ): array|\WP_Error {
+		$args = array(
+			'timeout' => $options['timeout'] ?? 30,
+			'headers' => $options['headers'] ?? array(),
+		);
+
+		$response = wp_remote_get( $url, $args );
+
+		if ( is_wp_error( $response ) ) {
+			return new \WP_Error(
+				'api_error',
+				sprintf( 'Reddit API request failed: %s', $response->get_error_message() ),
+				array(
+					'status'        => 500,
+					'upstream_code' => $response->get_error_code(),
+				)
+			);
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		$body        = wp_remote_retrieve_body( $response );
+		if ( $status_code < 200 || $status_code >= 300 ) {
+			$response_data    = json_decode( $body, true );
+			$response_data    = is_array( $response_data ) ? $response_data : array();
+			$upstream_error   = $response_data['error'] ?? null;
+			$upstream_code    = is_array( $upstream_error ) ? ( $upstream_error['code'] ?? null ) : $upstream_error;
+			$upstream_message = is_array( $upstream_error ) ? ( $upstream_error['message'] ?? '' ) : '';
+			$upstream_message = $response_data['message'] ?? $response_data['error_description'] ?? $response_data['reason'] ?? $upstream_message;
+
+			if ( ! is_scalar( $upstream_message ) || '' === trim( (string) $upstream_message ) ) {
+				$upstream_message = wp_remote_retrieve_response_message( $response );
+			}
+			if ( '' === trim( (string) $upstream_message ) && is_scalar( $upstream_code ) ) {
+				$upstream_message = (string) $upstream_code;
+			}
+			if ( '' === trim( (string) $upstream_message ) ) {
+				$upstream_message = 'Reddit API request failed';
+			}
+
+			$error_context = sprintf( 'HTTP %d', $status_code );
+			if ( is_scalar( $upstream_code ) && '' !== trim( (string) $upstream_code ) && (string) $status_code !== (string) $upstream_code ) {
+				$error_context .= sprintf( ', code %s', (string) $upstream_code );
+			}
+
+			$error_data = array(
+				'status'           => $status_code > 0 ? $status_code : 500,
+				'upstream_message' => (string) $upstream_message,
+			);
+			if ( is_scalar( $upstream_code ) && '' !== trim( (string) $upstream_code ) ) {
+				$error_data['upstream_code'] = $upstream_code;
+			}
+
+			$rate_limit_headers = array(
+				'retry_after' => wp_remote_retrieve_header( $response, 'retry-after' ),
+				'remaining'   => wp_remote_retrieve_header( $response, 'x-ratelimit-remaining' ),
+				'used'        => wp_remote_retrieve_header( $response, 'x-ratelimit-used' ),
+				'reset'       => wp_remote_retrieve_header( $response, 'x-ratelimit-reset' ),
+			);
+			$rate_limit_headers = array_filter( $rate_limit_headers, static fn( $value ): bool => '' !== (string) $value );
+			if ( ! empty( $rate_limit_headers ) ) {
+				$error_data['rate_limit'] = $rate_limit_headers;
+			}
+
+			return new \WP_Error(
+				'api_error',
+				sprintf( 'Reddit API request failed (%s): %s', $error_context, (string) $upstream_message ),
+				$error_data
+			);
+		}
+
+		return array(
+			'success'     => true,
+			'status_code' => $status_code,
+			'data'        => $body,
+		);
+	}
+
+	/**
+	 * Fetch comments for a Reddit post.
+	 */
+	private function fetchComments( string $permalink, string $access_token, int $comment_count ): array|\WP_Error {
+		$comments_array  = array();
+		$comments_url    = 'https://oauth.reddit.com' . $permalink . '.json?limit=' . $comment_count . '&sort=top';
+		$comments_result = $this->httpGet(
+			$comments_url,
+			array(
+				'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
+				'context' => 'Reddit API',
+			)
+		);
+
+		if ( ! is_wp_error( $comments_result ) && $comments_result['success'] ) {
+			$comments_data = json_decode( $comments_result['data'], true );
+			if ( json_last_error() === JSON_ERROR_NONE ) {
+				if ( is_array( $comments_data ) && isset( $comments_data[1]['data']['children'] ) ) {
+					$top_comments = array_slice( $comments_data[1]['data']['children'], 0, $comment_count );
+					foreach ( $top_comments as $comment_wrapper ) {
+						if ( isset( $comment_wrapper['data']['body'] ) && ! $comment_wrapper['data']['stickied'] ) {
+							$comment_author = $comment_wrapper['data']['author'] ?? '[deleted]';
+							$comment_body   = trim( $comment_wrapper['data']['body'] );
+							if ( '' !== $comment_body ) {
+								$comments_array[] = array(
+									'author' => $comment_author,
+									'body'   => $comment_body,
+								);
+							}
+						}
+						if ( count( $comments_array ) >= $comment_count ) {
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		return $comments_array;
+	}
+
+	/**
+	 * Extract image information from Reddit post data.
+	 */
+	private function extractImageInfo( array $item_data ): ?array {
+		$url      = $item_data['url'] ?? '';
+		$is_imgur = preg_match( '#^https?://(www\.)?imgur\.com/([^./]+)$#i', $url, $imgur_matches );
+
+		if ( ! empty( $item_data['is_gallery'] ) && ! empty( $item_data['media_metadata'] ) && is_array( $item_data['media_metadata'] ) ) {
+			$first_media = reset( $item_data['media_metadata'] );
+			if ( ! empty( $first_media['s']['u'] ) ) {
+				$direct_url = html_entity_decode( $first_media['s']['u'] );
+				return array(
+					'url'       => $direct_url,
+					'mime_type' => 'image/jpeg',
+				);
+			}
+		} elseif (
+			! empty( $url ) &&
+			(
+				( isset( $item_data['post_hint'] ) && 'image' === $item_data['post_hint'] ) ||
+				preg_match( '/\.(jpg|jpeg|png|webp|gif)$/i', $url ) ||
+				$is_imgur
+			)
+		) {
+			if ( $is_imgur ) {
+				$direct_url = $url . '.jpg';
+				$mime_type  = 'image/jpeg';
+			} else {
+				$direct_url = $url;
+				$ext        = strtolower( pathinfo( wp_parse_url( $url, PHP_URL_PATH ), PATHINFO_EXTENSION ) );
+				$mime_map   = array(
+					'jpg'  => 'image/jpeg',
+					'jpeg' => 'image/jpeg',
+					'png'  => 'image/png',
+					'webp' => 'image/webp',
+					'gif'  => 'image/gif',
+				);
+				$mime_type  = $mime_map[ $ext ] ?? 'application/octet-stream';
+			}
+			return array(
+				'url'       => $direct_url,
+				'mime_type' => $mime_type,
+			);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Apply timeframe filter to item timestamp.
+	 */
+	private function applyTimeframeFilter( int $item_timestamp, string $timeframe_limit ): bool {
+		if ( 'all_time' === $timeframe_limit ) {
+			return true;
+		}
+
+		$now    = time();
+		$cutoff = 0;
+
+		switch ( $timeframe_limit ) {
+			case '24_hours':
+				$cutoff = $now - DAY_IN_SECONDS;
+				break;
+			case '72_hours':
+				$cutoff = $now - ( 3 * DAY_IN_SECONDS );
+				break;
+			case '7_days':
+				$cutoff = $now - ( 7 * DAY_IN_SECONDS );
+				break;
+			case '30_days':
+				$cutoff = $now - ( 30 * DAY_IN_SECONDS );
+				break;
+			case '90_days':
+				$cutoff = $now - ( 90 * DAY_IN_SECONDS );
+				break;
+			case '6_months':
+				$cutoff = $now - ( 180 * DAY_IN_SECONDS );
+				break;
+			case '1_year':
+				$cutoff = $now - YEAR_IN_SECONDS;
+				break;
+		}
+
+		return $item_timestamp >= $cutoff;
+	}
+
+	/**
+	 * Apply keyword search filter.
+	 */
+	private function applyKeywordSearch( string $text, string $search_term ): bool {
+		if ( empty( $search_term ) ) {
+			return true;
+		}
+
+		$terms      = array_map( 'trim', explode( ',', $search_term ) );
+		$text_lower = strtolower( $text );
+
+		foreach ( $terms as $term ) {
+			if ( empty( $term ) ) {
+				continue;
+			}
+			if ( strpos( $text_lower, strtolower( $term ) ) !== false ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+}

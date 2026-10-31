@@ -1,0 +1,8 @@
+# Core files that referenced an extension when the monorepo was created.
+# tools/check-boundaries.sh fails on any core file that is not listed here, and
+# on any listed file that no longer needs to be. Pay this list down; never add to it.
+plugins/data-machine/inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php
+plugins/data-machine/inc/Engine/AI/Tools/ability-tool-projections.php
+plugins/data-machine/tests/Unit/Events/UniversalWebScraperFlowTest.php
+plugins/data-machine/tests/fixtures/global-ability-tool-projections.php
+plugins/data-machine/tests/lazy-runtime-ability-registration-smoke.php

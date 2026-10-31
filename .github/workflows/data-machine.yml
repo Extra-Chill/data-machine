@@ -1,0 +1,50 @@
+name: data-machine
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'plugins/data-machine/**'
+      - '.github/workflows/data-machine.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/data-machine/**'
+      - '.github/workflows/data-machine.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: data-machine-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # This audit is repository policy, so run it directly instead of relying on Homeboy test discovery.
+  prefix-policy:
+    name: Prefix policy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/data-machine
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - name: Audit WordPress identifier prefixes
+        run: php tests/prefix-policy-audit.php
+      - name: Audit tracked path casing
+        run: php tests/path-case-audit.php
+
+  homeboy-quality:
+    if: ${{ github.event_name != 'push' }}
+    uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
+    with:
+      component: plugins/data-machine
+      commands: review lint
+      comment-key: data-machine-lint
+    secrets: inherit

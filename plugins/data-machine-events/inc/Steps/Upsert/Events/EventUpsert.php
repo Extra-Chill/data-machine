@@ -1,0 +1,1656 @@
+<?php
+// phpcs:disable PSR12.Files.FileHeader.IncorrectOrder,PSR12.Files.FileHeader.IncorrectGrouping,Universal.Operators.DisallowShortTernary.Found -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+/**
+ * Event Upsert Handler
+ *
+ * Intelligently creates or updates event posts based on event identity.
+ * Searches for existing events by (title, venue, startDate) and updates if found,
+ * creates if new, or skips if data unchanged.
+ *
+ * Thin orchestrator: fetch normalized data → validate → dedup (via
+ * EventDuplicateStrategy) → build content → assign taxonomy → write.
+ * Validation, block-content assembly, and venue/promoter taxonomy assignment
+ * are delegated to focused collaborators (see #425):
+ *  - EventUpsertValidator       — pre-publish validation gate.
+ *  - EventBlockContentBuilder   — event-details block / description assembly.
+ *  - EventTaxonomyAssigner      — venue/promoter/location taxonomy assignment.
+ *
+ * @package DataMachineEvents\Steps\Upsert\Events
+ * @since   0.2.0
+ */
+
+namespace DataMachineEvents\Steps\Upsert\Events;
+
+use DataMachine\Core\AbilityResult;
+use DataMachine\Core\EngineData;
+use DataMachine\Core\PluginSettings;
+use DataMachineEvents\Core\TextNormalization;
+use DataMachineEvents\Core\EventTitleCleaner;
+use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
+use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
+use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\VenueParameterProvider;
+use DataMachineEvents\Core\EventSchemaProvider;
+use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
+use function DataMachineEvents\Core\datamachine_extract_ticket_identity;
+use DataMachine\Core\Steps\Upsert\Handlers\UpsertHandler;
+use DataMachine\Core\WordPress\TaxonomyHandler;
+use DataMachine\Core\WordPress\WordPressSettingsResolver;
+use DataMachine\Core\WordPress\WordPressPublishHelper;
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
+use DataMachineEvents\Tasks\CalendarGenerationPublisher;
+
+defined( 'ABSPATH' ) || exit;
+
+class EventUpsert extends UpsertHandler {
+
+	public const SOURCE_IDENTITY_META_KEY = '_datamachine_event_source_identity';
+	public const SOURCE_NAME_META_KEY     = '_datamachine_event_source';
+	public const SOURCE_ID_META_KEY       = '_datamachine_event_source_id';
+
+	protected TaxonomyHandler $taxonomy_handler;
+
+	/**
+	 * Pre-publish validation gate (title, junk markers, dates, junk payload).
+	 *
+	 * @var EventUpsertValidator
+	 */
+	private EventUpsertValidator $validator;
+
+	/**
+	 * Event-details block / description content assembly.
+	 *
+	 * @var EventBlockContentBuilder
+	 */
+	private EventBlockContentBuilder $content_builder;
+
+	/**
+	 * Venue/promoter/location taxonomy assignment.
+	 *
+	 * @var EventTaxonomyAssigner
+	 */
+	private EventTaxonomyAssigner $taxonomy_assigner;
+
+	public function __construct() {
+		$this->taxonomy_handler = new TaxonomyHandler();
+
+		$this->validator         = new EventUpsertValidator( new JunkPayloadFilter(), static::class );
+		$this->content_builder   = new EventBlockContentBuilder();
+		$this->taxonomy_assigner = new EventTaxonomyAssigner();
+
+		// Register custom handler for venue taxonomy
+		TaxonomyHandler::addCustomHandler( 'venue', array( $this->taxonomy_assigner, 'assignVenueTaxonomy' ) );
+		// Register custom handler for promoter taxonomy
+		TaxonomyHandler::addCustomHandler( 'promoter', array( $this->taxonomy_assigner, 'assignPromoterTaxonomy' ) );
+	}
+
+	/**
+	 * Run the canonical event upsert without workflow/job context.
+	 *
+	 * This is the supported entry point for the public event upsert ability.
+	 * Workflow handlers continue to use handle_tool_call() and executeUpsert().
+	 *
+	 * @param array $event          Canonical event fields.
+	 * @param array $handler_config Post and taxonomy settings.
+	 * @return array Canonical handler result.
+	 */
+	public function upsertCanonicalEvent( array $event, array $handler_config = array() ): array {
+		$event['engine'] = new EngineData( $event, 0 );
+		$event['job_id'] = 0;
+
+		return $this->executeUpsert( $event, $handler_config );
+	}
+
+	/**
+	 * Execute event upsert (create or update)
+	 *
+	 * @param array $parameters Event data from AI tool call
+	 * @param array $handler_config Handler configuration
+	 * @return array Tool call result with action: created|updated|no_change
+	 */
+	protected function executeUpsert( array $parameters, array $handler_config ): array {
+		// Get engine data FIRST (before validation)
+		$job_id = (int) ( $parameters['job_id'] ?? 0 );
+		$engine = $parameters['engine'] ?? null;
+		if ( ! $engine instanceof EngineData ) {
+			$engine_snapshot = $job_id ? $this->getEngineData( $job_id ) : array();
+			$engine          = new EngineData( $engine_snapshot, $job_id );
+		}
+
+		// Workflow imports carry source context in engine data, while direct
+		// ability callers provide these canonical fields explicitly. Normalize
+		// both paths before locking and matching so stable upstream IDs own the
+		// event across revisions instead of falling back to fuzzy identity.
+		$source    = trim( (string) ( $parameters['source'] ?? $engine->get( 'source_type' ) ?? '' ) );
+		$source_id = trim( (string) ( $parameters['source_id'] ?? $engine->get( 'item_identifier' ) ?? '' ) );
+		if ( '' !== $source && '' !== $source_id ) {
+			$parameters['source']    = $source;
+			$parameters['source_id'] = $source_id;
+			if ( empty( $parameters['source_identity'] ) ) {
+				$parameters['source_identity'] = hash( 'sha256', $source . "\0" . $source_id );
+			}
+		}
+
+		// Extract event identity fields (AI title takes precedence, engine data fallback for other fields)
+		// The title is decoded BEFORE sanitization (issue #844): source feeds
+		// deliver HTML-entity-encoded titles ("Foo &amp; Bar"), and storing
+		// them verbatim pushes entities onto every non-HTML consumer. Decoding
+		// first also exposes markup hidden behind entities so the sanitizer
+		// strips it. The decoded title is written back onto $parameters so
+		// every downstream consumer (validation gate, advisory-lock keys,
+		// duplicate detection, buildEventData) keys on the same canonical form.
+		$title               = sanitize_text_field( TextNormalization::decode_entities( (string) ( $parameters['title'] ?? $engine->get( 'title' ) ?? '' ) ) );
+		$title               = $this->cleanTitleNoise( $title, $parameters, $engine );
+		$parameters['title'] = $title;
+		$venue               = VenueParameterProvider::resolveField( 'venue', $parameters, $engine->all() );
+		$startDate           = $engine->get( 'startDate' ) ?? $parameters['startDate'] ?? '';
+		$ticketUrl           = $engine->get( 'ticketUrl' ) ?? $parameters['ticketUrl'] ?? '';
+
+		// Run the consolidated pre-publish validation gate before any write.
+		//
+		// Every fetch handler (web scraper, Ticketmaster, Dice, …) funnels
+		// through this single boundary, so a minimum quality bar is enforced
+		// uniformly regardless of source. Rejected items are SKIP + LOG:
+		// nothing is published, nothing is drafted, and each rejection is
+		// logged so upstream parsers and the junk pattern table can be tuned.
+		// The gate consolidates the prior scattered guards (empty startDate
+		// #415, junk-marker title #349/#367, junk/test payload #416) instead
+		// of duplicating them. See issue #417.
+		$start_time  = trim( (string) ( $engine->get( 'startTime' ) ?? $parameters['startTime'] ?? '' ) );
+		$source_type = (string) ( $engine->get( 'source_type' ) ?? $parameters['source_type'] ?? '' );
+		$artist      = sanitize_text_field( TextNormalization::decode_entities( (string) ( $engine->get( 'performer' ) ?? $parameters['performer'] ?? $parameters['artist'] ?? '' ) ) );
+
+		$rejection = $this->validateForPublish(
+			array(
+				'title'       => $title,
+				'venue'       => $venue,
+				'startDate'   => $startDate,
+				'startTime'   => $start_time,
+				'source_type' => $source_type,
+				'artist'      => $artist,
+			),
+			$parameters,
+			$engine
+		);
+
+		if ( null !== $rejection ) {
+			return $rejection;
+		}
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			'Event Upsert: Processing event',
+			array(
+				'title'     => $title,
+				'venue'     => $venue,
+				'startDate' => $startDate,
+				'ticketUrl' => $ticketUrl,
+			)
+		);
+
+		$identity_start = self::composeIdentityStart( $startDate, $start_time );
+		$lock_keys      = $this->acquireUpsertLocks(
+			$title,
+			$venue,
+			$identity_start,
+			(string) ( $parameters['source_identity'] ?? '' ),
+			array(
+				'address' => VenueParameterProvider::resolveField( 'venueAddress', $parameters, $engine->all() ),
+				'city'    => VenueParameterProvider::resolveField( 'venueCity', $parameters, $engine->all() ),
+				'state'   => VenueParameterProvider::resolveField( 'venueState', $parameters, $engine->all() ),
+				'country' => VenueParameterProvider::resolveField( 'venueCountry', $parameters, $engine->all() ),
+			),
+			absint( $parameters['event_id'] ?? 0 )
+		);
+		if ( null === $lock_keys ) {
+			return array(
+				'success'    => false,
+				'error'      => 'Event upsert lock unavailable; retry the event.',
+				'error_code' => 'event_upsert_lock_unavailable',
+				'retryable'  => true,
+				'tool_name'  => static::class,
+			);
+		}
+
+		$job_context        = $engine->get( 'job' );
+		$batch_parent_id    = is_array( $job_context ) ? absint( $job_context['parent_job_id'] ?? 0 ) : 0;
+		$defer_invalidation = CalendarGenerationPublisher::deferBatch( $batch_parent_id );
+		if ( $defer_invalidation ) {
+			CacheInvalidator::defer();
+		}
+
+		try {
+			return $this->executeUpsertWithinLock( $title, $venue, $identity_start, $ticketUrl, $parameters, $handler_config, $engine );
+		} finally {
+			if ( $defer_invalidation ) {
+				CacheInvalidator::resume();
+			}
+			$this->releaseUpsertLocks( $lock_keys );
+		}
+	}
+
+	/**
+	 * Pre-publish validation gate. Delegates to EventUpsertValidator.
+	 *
+	 * Kept as a thin delegator so the upsert path and existing reflection-based
+	 * tests resolve against EventUpsert; the gate logic lives in
+	 * EventUpsertValidator (extracted in #425).
+	 *
+	 * @param array      $evidence Pre-extracted event fields.
+	 * @param array      $parameters Full tool parameters.
+	 * @param EngineData $engine Engine data.
+	 * @return array|null Null on pass; rejection array on fail.
+	 */
+	private function validateForPublish( array $evidence, array $parameters, EngineData $engine ): ?array {
+		return $this->validator->validateForPublish( $evidence, $parameters, $engine );
+	}
+
+	/**
+	 * Junk-marker title check. Delegates to EventUpsertValidator.
+	 *
+	 * @param string $title Event title.
+	 * @return bool True if the title is a junk-marker leak.
+	 */
+	protected function isJunkTitle( string $title ): bool {
+		return $this->validator->isJunkTitle( $title );
+	}
+
+	/**
+	 * Datetime confidence. Delegates to EventUpsertValidator.
+	 *
+	 * @param array $parameters Event parameters.
+	 * @param EngineData $engine Engine data helper.
+	 * @return string One of full|date_only|none.
+	 */
+	protected function getDateTimeConfidence( array $parameters, EngineData $engine ): string {
+		return $this->validator->getDateTimeConfidence( $parameters, $engine );
+	}
+
+	/**
+	 * Execute the find-or-create logic within an advisory lock.
+	 *
+	 * Separated from executeUpsert() so the lock boundary is clear:
+	 * the lock is held from before findExistingEventViaAbility() through the
+	 * completion of the DM core upsert and post-processing.
+	 *
+	 * Domain-specific identity resolution (fuzzy title/venue/date matching,
+	 * ticket URL canonical matching) is kept here. The actual create/update/no_change
+	 * decision is delegated to datamachine/upsert-post, which handles content hash
+	 * comparison and provenance stamping.
+	 *
+	 * @param string     $title         Event title.
+	 * @param string     $venue         Venue name.
+	 * @param string     $startDate     Start date.
+	 * @param string     $ticketUrl     Ticket URL.
+	 * @param array      $parameters    Full tool parameters.
+	 * @param array      $handler_config Handler configuration.
+	 * @param EngineData $engine        Engine data.
+	 * @return array Tool call result.
+	 */
+	private function executeUpsertWithinLock(
+		string $title,
+		string $venue,
+		string $startDate,
+		string $ticketUrl,
+		array $parameters,
+		array $handler_config,
+		EngineData $engine
+	): array {
+		// 1. Find existing event via domain-specific duplicate detection.
+		// Pass complete venue geography so dedup can resolve the incoming venue
+		// via the same address-first cascade the upsert path uses
+		// (Venue_Taxonomy::find_or_create_venue). Without this, dupes slip
+		// through whenever the incoming venue string differs from the
+		// canonical taxonomy term name. See issue #252.
+		// A missing duplicate contract is retryable; it must never become a create.
+		$venueAddress     = VenueParameterProvider::resolveField( 'venueAddress', $parameters, $engine->all() );
+		$venueCity        = VenueParameterProvider::resolveField( 'venueCity', $parameters, $engine->all() );
+		$venueState       = VenueParameterProvider::resolveField( 'venueState', $parameters, $engine->all() );
+		$venueCountry     = VenueParameterProvider::resolveField( 'venueCountry', $parameters, $engine->all() );
+		$source_identity  = (string) ( $parameters['source_identity'] ?? '' );
+		$existing_post_id = $this->resolveExistingEventCandidate(
+			$source_identity,
+			absint( $parameters['event_id'] ?? 0 ),
+			(string) ( $parameters['source'] ?? '' ),
+			(string) ( $parameters['source_id'] ?? '' )
+		);
+		if ( is_wp_error( $existing_post_id ) ) {
+			return $this->lifecycleErrorResponse( $existing_post_id, $title );
+		}
+		// A source whose event was merged into another canonical event must
+		// not republish the trashed duplicate. Ordinary trash still restores
+		// on re-import (#591); only merge losers carry a winner pointer.
+		if ( $existing_post_id > 0 && 'trash' === get_post_status( $existing_post_id ) ) {
+			$merged_winner_id = \DataMachineEvents\Core\DuplicateDetection\EventMergeHelper::resolveMergedWinner( $existing_post_id );
+			if ( $merged_winner_id > 0 ) {
+				return $this->successResponse(
+					array(
+						'post_id'     => $merged_winner_id,
+						'post_url'    => get_permalink( $merged_winner_id ),
+						'action'      => 'no_change',
+						'merged_from' => $existing_post_id,
+					)
+				);
+			}
+		}
+		// Resolve the venue once, before duplicate detection, so dedup sees the
+		// same term persistence will assign. Name-only re-resolution inside the
+		// duplicate strategy is ambiguous whenever two venue terms share a name,
+		// which returned "clear" and created duplicate events on re-import (#883).
+		$venue_resolution       = $this->taxonomy_assigner->resolveVenue( $parameters, $engine, $handler_config );
+		$authoritative_venue_id = (int) $venue_resolution['term_id'];
+		$festival_venue         = \DataMachineEvents\Core\Venue_Taxonomy::parse_festival_venue( $venue, array(
+			'address' => $venueAddress,
+			'city'    => $venueCity,
+			'state'   => $venueState,
+			'country' => $venueCountry,
+		) );
+		if ( '' !== $festival_venue['festival'] ) {
+			$parameters['festival'] = $festival_venue['festival'];
+		}
+
+		$festival_match = array();
+		if ( $existing_post_id <= 0 ) {
+			$duplicate_result = $this->findExistingEventViaAbility(
+				$title,
+				$venue,
+				$startDate,
+				$ticketUrl,
+				$venueAddress,
+				$venueCity,
+				$venueState,
+				$venueCountry,
+				'assign' === $venue_resolution['action'] ? $authoritative_venue_id : 0,
+				(string) ( $parameters['source'] ?? '' ),
+				$engine->get( 'festival' ) ?? $parameters['festival'] ?? '',
+				$festival_match
+			);
+			if ( is_wp_error( $duplicate_result ) ) {
+				return $this->lifecycleErrorResponse( $duplicate_result, $title );
+			}
+			$existing_post_id = $duplicate_result;
+		}
+
+		if ( $existing_post_id > 0 && 'festival_lineup' === ( $festival_match['merge_mode'] ?? '' ) ) {
+			// A set contributes lineup taxonomy only. Never persist incoming event
+			// fields, source identity, or ticket data over the canonical festival.
+			$artists   = $engine->get( 'artist' ) ?: ( $parameters['artist'] ?? '' );
+			$artists   = $artists ?: ( $engine->get( 'performer' ) ?: ( $parameters['performer'] ?? '' ) );
+			$artists   = array_filter( $this->taxonomy_assigner->normalizeArtists( $artists ) );
+			$selection = $handler_config['taxonomy_artist_selection'] ?? '';
+			if ( is_numeric( $selection ) ) {
+				$artists[] = (int) $selection;
+			}
+			foreach ( array(
+				'artist'   => $artists,
+				'festival' => array( $festival_match['festival'] ),
+			) as $taxonomy => $names ) {
+				$result = wp_set_object_terms( $existing_post_id, $names, $taxonomy, true );
+				if ( is_wp_error( $result ) ) {
+					return $this->lifecycleErrorResponse( $result, $title );
+				}
+			}
+			do_action( 'datamachine_event_taxonomy_processed', $existing_post_id );
+			return $this->successResponse( array(
+				'post_id'  => $existing_post_id,
+				'post_url' => get_permalink( $existing_post_id ),
+				'action'   => 'updated',
+			) );
+		}
+
+		// Only unmatched events are creates. Keep corrections to past events
+		// allowed, including matches found through domain duplicate detection.
+		if ( $existing_post_id <= 0 ) {
+			$rejection = $this->validator->validateForCreate( $startDate );
+			if ( null !== $rejection ) {
+				return $rejection;
+			}
+		}
+
+		// 2. Build event data.
+		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
+		if ( ( '' !== $festival_venue['festival'] || 'source_alias' === ( $venue_resolution['matched_via'] ?? '' ) ) && $authoritative_venue_id > 0 ) {
+			// Import handlers canonicalize aliased venues before the AI step;
+			// this covers items queued before the alias existed (#878).
+			$canonical_venue = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( $authoritative_venue_id );
+			if ( ! empty( $canonical_venue['name'] ) ) {
+				$event_data['venue']        = (string) $canonical_venue['name'];
+				$event_data['venueAddress'] = (string) ( $canonical_venue['address'] ?? '' );
+				$parameters['venue']        = $event_data['venue'];
+				$parameters['venueAddress'] = $event_data['venueAddress'];
+			}
+		}
+		if ( 'skip' === $venue_resolution['action'] && $existing_post_id > 0 ) {
+			$existing_venues = wp_get_object_terms( $existing_post_id, 'venue', array( 'fields' => 'ids' ) );
+			if ( is_wp_error( $existing_venues ) ) {
+				return $this->lifecycleErrorResponse(
+					new \WP_Error(
+						'event_retained_venue_read_failed',
+						'The existing event venue could not be read safely.',
+						array(
+							'status'    => 503,
+							'retryable' => true,
+						)
+					),
+					$title
+				);
+			}
+			$existing_venues = array_values( array_unique( array_filter( array_map( 'absint', $existing_venues ) ) ) );
+			if ( count( $existing_venues ) > 1 ) {
+				return $this->lifecycleErrorResponse(
+					new \WP_Error(
+						'event_retained_venue_ambiguous',
+						'The existing event has multiple venue assignments and cannot be updated safely.',
+						array(
+							'status'    => 409,
+							'venue_ids' => $existing_venues,
+						)
+					),
+					$title
+				);
+			}
+			if ( 1 === count( $existing_venues ) ) {
+				$authoritative_venue_id = (int) reset( $existing_venues );
+			}
+		}
+
+		// 3. Generate block content and compute hash for idempotency.
+		$block_content = $this->content_builder->generate_event_block_content( $event_data, $parameters );
+		$content_hash  = md5( $block_content );
+
+		// 4. Resolve post author and status.
+		$post_author = $this->resolvePostAuthor( $handler_config, $engine );
+		$post_status = WordPressSettingsResolver::getPostStatus( $handler_config );
+		if ( $existing_post_id > 0 ) {
+			$existing_status = get_post_status( $existing_post_id );
+			// Import settings must not demote an already visible or scheduled event.
+			// Drafts may still be promoted; ordinary trash uses the configured status.
+			if ( in_array( $existing_status, array( 'publish', 'future', 'private' ), true ) ) {
+				$post_status = $existing_status;
+			}
+		}
+
+		// 5. Build meta input.
+		$meta_input = $this->buildEventMetaInput( $event_data, $parameters, $engine );
+
+		// 6. Delegate to DM core upsert ability.
+		// DME's sorted lock set is acquired before Data Machine's identity lock.
+		// Both waits are bounded, so any cross-layer inversion fails retryably
+		// rather than deadlocking; changing that ownership belongs upstream.
+		$upsert_input = array(
+			'post_type'    => Event_Post_Type::POST_TYPE,
+			'title'        => $event_data['title'],
+			'content'      => $block_content,
+			'content_hash' => $content_hash,
+			'post_status'  => $post_status,
+			'meta_input'   => $meta_input,
+		);
+
+		if ( '' !== $source_identity ) {
+			$upsert_input['identity_meta'] = array(
+				'key'   => self::SOURCE_IDENTITY_META_KEY,
+				'value' => $source_identity,
+			);
+		}
+
+		if ( $existing_post_id > 0 ) {
+			$upsert_input['post_id'] = $existing_post_id;
+		} else {
+			$upsert_input['post_author'] = $post_author;
+		}
+
+		$ability = wp_get_ability( 'datamachine/upsert-post' );
+		if ( ! $ability ) {
+			return $this->errorResponse( 'datamachine/upsert-post ability not available' );
+		}
+
+		$context          = array(
+			'invocation_id'    => wp_generate_uuid4(),
+			'venue_term_id'    => $authoritative_venue_id,
+			'event'            => $event_data,
+			'post_status'      => $post_status,
+			'existing_post_id' => $existing_post_id,
+			'source'           => (string) ( $parameters['source'] ?? '' ),
+			'source_id'        => (string) ( $parameters['source_id'] ?? '' ),
+			'source_identity'  => $source_identity,
+		);
+		$post_id          = 0;
+		$lifecycle_result = null;
+		$warnings         = array();
+
+		try {
+			/**
+			 * Filters whether an event may cross the canonical persistence boundary.
+			 *
+			 * @param bool|\WP_Error $preflight True to continue, or an error to abort.
+			 * @param array          $context   Normalized event persistence context.
+			 */
+			$preflight = apply_filters( 'datamachine_events_before_event_upsert_persistence', true, $context );
+			if ( false === $preflight ) {
+				$preflight = new \WP_Error(
+					'event_upsert_persistence_denied',
+					'Event persistence was denied.',
+					array( 'status' => 403 )
+				);
+			}
+			if ( is_wp_error( $preflight ) ) {
+				$lifecycle_result = $preflight;
+				return $this->lifecycleErrorResponse( $preflight, $title );
+			}
+
+			// The kses save filters re-encode every bare "&" to "&amp;" for
+			// writing contexts without unfiltered_html (multisite authors,
+			// wp-cron with no user), which would re-create the #844 defect on
+			// the way into the database. Ingestion titles are already
+			// tag-free (sanitized above), so suspending kses on this bounded
+			// write removes a re-encoding side effect, not a sanitization
+			// layer; the exact prior filter state is restored afterwards.
+			$result = TextNormalization::with_kses_suspended(
+				static fn(): array => AbilityResult::normalize( $ability->execute( $upsert_input ) )
+			);
+
+			if ( empty( $result['success'] ) ) {
+				$error_data = $result['error_data'] ?? $result['wp_error_data'] ?? array();
+				$error_data = is_array( $error_data ) ? $error_data : array();
+				foreach ( array( 'status', 'retryable', 'transient', 'rule', 'cause' ) as $field ) {
+					if ( array_key_exists( $field, $result ) ) {
+						$error_data[ $field ] = $result[ $field ];
+					}
+				}
+				$error_data['status'] = (int) ( $error_data['status'] ?? ( ! empty( $error_data['retryable'] ) || ! empty( $error_data['transient'] ) ? 503 : 400 ) );
+				$lifecycle_result     = new \WP_Error(
+					(string) ( $result['error_code'] ?? $result['wp_error_code'] ?? 'event_upsert_persistence_failed' ),
+					(string) ( $result['error'] ?? 'Event upsert failed' ),
+					$error_data
+				);
+				return $this->lifecycleErrorResponse( $lifecycle_result, $title );
+			}
+
+			$post_id = (int) $result['post_id'];
+			$action  = $result['action'];
+			if ( '' !== $source_identity ) {
+				update_post_meta( $post_id, self::SOURCE_IDENTITY_META_KEY, $source_identity );
+				update_post_meta( $post_id, self::SOURCE_NAME_META_KEY, sanitize_text_field( (string) ( $parameters['source'] ?? '' ) ) );
+				update_post_meta( $post_id, self::SOURCE_ID_META_KEY, sanitize_text_field( (string) ( $parameters['source_id'] ?? '' ) ) );
+			}
+
+			// 7. Content idempotency does not imply taxonomy or identity integrity.
+			// Skip image work for unchanged content, but always reconcile indexed state.
+			if ( 'no_change' !== $action ) {
+				$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
+			}
+			$venue_assignment = $this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine, $handler_config, $venue_resolution );
+			if ( empty( $venue_assignment['success'] ) ) {
+				$warnings[] = (string) ( $venue_assignment['error'] ?? 'Venue assignment failed.' );
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event upsert completed without venue assignment',
+					array(
+						'post_id' => $post_id,
+						'warning' => end( $warnings ),
+					)
+				);
+			}
+			$this->taxonomy_assigner->processPromoter( $post_id, $parameters, $engine, $handler_config );
+
+			// Derive location from the event's actual venue city rather than the
+			// pipeline's ingest center. processLocation returns true when it took
+			// ownership of the location term (PRE_SELECTED mode), in which case the
+			// generic taxonomy pass below must skip location so it doesn't
+			// re-stamp the pipeline-center term. See data-machine-events#379.
+			$location_handled = $this->taxonomy_assigner->processLocation( $post_id, $parameters, $engine, $handler_config );
+
+			// Resolve the canonical eventType against the closed `event_type`
+			// vocabulary. This owns the assignment; the generic taxonomy pass
+			// below is always blocked for event_type. See #761, #792.
+			$this->taxonomy_assigner->processEventType( $post_id, $parameters, $engine );
+
+			// Map performer to artist taxonomy if not explicitly provided.
+			if ( empty( $parameters['artist'] ) && ! empty( $event_data['performer'] ) ) {
+				$parameters['artist'] = $event_data['performer'];
+			}
+
+			$handler_config_for_tax                                = $handler_config;
+			$handler_config_for_tax['taxonomy_venue_selection']    = 'skip';
+			$handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
+			if ( $location_handled ) {
+				$handler_config_for_tax['taxonomy_location_selection'] = 'skip';
+			}
+			// event_type is owned by the eventType parameter (processEventType
+			// above), never by the generic pass — regardless of whether a value
+			// was declared. See #792.
+			$handler_config_for_tax[ 'taxonomy_' . \DataMachineEvents\Core\Event_Type_Taxonomy::TAXONOMY . '_selection' ] = 'skip';
+			// Lineups accumulate across venue imports, artist feeds, and manual edits.
+			// Core replaces terms, so retain these multi-valued event taxonomies on
+			// updates and no_change repairs without changing fresh-create semantics.
+			$retained_terms = array();
+			if ( 'created' !== $action ) {
+				foreach ( array( 'artist', 'festival' ) as $taxonomy ) {
+					if ( ! taxonomy_exists( $taxonomy ) ) {
+						continue;
+					}
+					$term_ids = wp_get_object_terms( $post_id, $taxonomy, array( 'fields' => 'ids' ) );
+					if ( is_wp_error( $term_ids ) ) {
+						$lifecycle_result = $term_ids;
+						return $this->lifecycleErrorResponse( $term_ids, $title );
+					}
+					$retained_terms[ $taxonomy ] = array_map( 'intval', $term_ids );
+				}
+			}
+
+			$engine_data_array = $engine->all();
+			// Normalize the actual generic-pass input, including its engine fallback.
+			$parameters['artist'] = $this->taxonomy_assigner->normalizeArtists( ! empty( $parameters['artist'] ) ? $parameters['artist'] : ( $engine_data_array['artist'] ?? '' ) );
+			$artist_selection     = $handler_config_for_tax['taxonomy_artist_selection'] ?? 'skip';
+			if ( ! is_numeric( $artist_selection ) && ! in_array( $artist_selection, array( 'skip', 'ai_decides' ), true ) ) {
+				$handler_config_for_tax['taxonomy_artist_selection'] = $this->taxonomy_assigner->normalizeArtists( array( $artist_selection ) )[0];
+			}
+			$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
+
+			foreach ( $retained_terms as $taxonomy => $term_ids ) {
+				if ( empty( $term_ids ) ) {
+					continue;
+				}
+				$term_result = wp_set_object_terms( $post_id, $term_ids, $taxonomy, true );
+				if ( is_wp_error( $term_result ) ) {
+					$lifecycle_result = $term_result;
+					return $this->lifecycleErrorResponse( $term_result, $title );
+				}
+			}
+
+			do_action( 'datamachine_event_taxonomy_processed', $post_id );
+
+			if ( 'no_change' === $action ) {
+				$lifecycle_result             = $this->successResponse(
+					array(
+						'post_id'  => $post_id,
+						'post_url' => get_permalink( $post_id ),
+						'action'   => 'no_change',
+					)
+				);
+				$lifecycle_result['warnings'] = $warnings;
+				return $lifecycle_result;
+			}
+
+			// 9. Sync engine data for pipeline continuation (create path only).
+			$job_id = (int) ( $parameters['job_id'] ?? 0 );
+			if ( 'created' === $action && $job_id ) {
+				datamachine_merge_engine_data(
+					$job_id,
+					array(
+						'event_id'  => $post_id,
+						'event_url' => get_permalink( $post_id ),
+					)
+				);
+			}
+
+			// 10. Log and return.
+			$log_level = 'created' === $action ? 'info' : 'info';
+			$log_msg   = 'created' === $action ? 'Created new event' : 'Updated existing event';
+			do_action(
+				'datamachine_log',
+				$log_level,
+				"Event Upsert: {$log_msg}",
+				array(
+					'post_id' => $post_id,
+					'title'   => $title,
+				)
+			);
+
+			$lifecycle_result             = $this->successResponse(
+				array(
+					'post_id'  => $post_id,
+					'post_url' => get_permalink( $post_id ),
+					'action'   => $action,
+				)
+			);
+			$lifecycle_result['warnings'] = $warnings;
+			return $lifecycle_result;
+		} catch ( \Throwable $throwable ) {
+			$lifecycle_result = new \WP_Error( 'event_upsert_persistence_exception', 'Event persistence failed unexpectedly.', array( 'exception' => get_class( $throwable ) ) );
+			throw $throwable;
+		} finally {
+			/**
+			 * Fires after the canonical event persistence lifecycle completes.
+			 *
+			 * @param array                $context Event persistence context.
+			 * @param int                  $post_id Persisted post ID, or zero before persistence.
+			 * @param array|\WP_Error|null $result  Success response, failure, or null on an unexpected abort.
+			 */
+			do_action( 'datamachine_events_after_event_upsert_persistence', $context, $post_id, $lifecycle_result );
+		}
+	}
+
+	/** Preserve a lifecycle WP_Error while retaining the handler array contract. */
+	private function lifecycleErrorResponse( \WP_Error $error, string $title ): array {
+		$response               = $this->errorResponse( $error->get_error_message(), array( 'title' => $title ) );
+		$data                   = $error->get_error_data();
+		$data                   = is_array( $data ) ? $data : array();
+		$response['error_code'] = $error->get_error_code();
+		$response['error_data'] = $data;
+		$response['status']     = (int) ( $data['status'] ?? 400 );
+		$response['retryable']  = ! empty( $data['retryable'] ) || ! empty( $data['transient'] ) || $response['status'] >= 500;
+		$response['transient']  = ! empty( $data['transient'] ) || $response['retryable'];
+		$response['rule']       = $data['rule'] ?? null;
+		return $response;
+	}
+
+	/**
+	 * Resolve a caller-supplied source identity before domain deduplication.
+	 *
+	 * @param string $source_identity Stable hashed source identity.
+	 * @return int|\WP_Error Matching event ID, zero, or an ambiguous claimant conflict.
+	 */
+	private function findExistingEventBySourceIdentity( string $source_identity ): int|\WP_Error {
+		if ( '' === $source_identity ) {
+			return 0;
+		}
+
+		$query = new \WP_Query(
+			array(
+				'post_type'      => Event_Post_Type::POST_TYPE,
+				'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private', 'trash' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_query'     => array(
+					array(
+						'key'   => self::SOURCE_IDENTITY_META_KEY,
+						'value' => $source_identity,
+					),
+				),
+			)
+		);
+
+		if ( empty( $query->posts ) ) {
+			return 0;
+		}
+
+		$claimant_ids = array_values(
+			array_unique(
+				array_map(
+					static fn( $post ): int => absint( $post instanceof \WP_Post ? $post->ID : $post ),
+					$query->posts
+				)
+			)
+		);
+		if ( count( $claimant_ids ) > 1 ) {
+			sort( $claimant_ids, SORT_NUMERIC );
+			return new \WP_Error(
+				'event_source_claimant_ambiguous',
+				'Multiple canonical events claim the source identity.',
+				array(
+					'status'       => 409,
+					'claimant_ids' => $claimant_ids,
+				)
+			);
+		}
+
+		return (int) reset( $claimant_ids );
+	}
+
+	/**
+	 * Reconcile an explicit event candidate with the stable source claimant.
+	 *
+	 * This runs under the source advisory lock, immediately before canonical
+	 * duplicate detection and persistence.
+	 *
+	 * @param string $source_identity Stable hashed source identity.
+	 * @param int    $candidate_id    Existing canonical event candidate.
+	 * @param string $source          Stable source namespace.
+	 * @param string $source_id       Stable item ID within the source.
+	 * @return int|\WP_Error Resolved event ID, zero, or a typed conflict.
+	 */
+	private function resolveExistingEventCandidate( string $source_identity, int $candidate_id, string $source, string $source_id ): int|\WP_Error {
+		$claimant_id = $this->findExistingEventBySourceIdentity( $source_identity );
+		if ( is_wp_error( $claimant_id ) ) {
+			return $claimant_id;
+		}
+		if ( $candidate_id <= 0 ) {
+			return $claimant_id;
+		}
+
+		$candidate = get_post( $candidate_id );
+		if ( ! $candidate instanceof \WP_Post ) {
+			return new \WP_Error(
+				'event_candidate_not_found',
+				'The existing event candidate was not found.',
+				array( 'status' => 404 )
+			);
+		}
+		if ( Event_Post_Type::POST_TYPE !== $candidate->post_type ) {
+			return new \WP_Error(
+				'event_candidate_wrong_post_type',
+				'The existing event candidate has the wrong post type.',
+				array( 'status' => 409 )
+			);
+		}
+		if ( $claimant_id > 0 && $claimant_id !== $candidate_id ) {
+			return new \WP_Error(
+				'event_source_claimant_conflict',
+				'The source identity is already claimed by a different canonical event.',
+				array(
+					'status'       => 409,
+					'claimant_id'  => $claimant_id,
+					'candidate_id' => $candidate_id,
+				)
+			);
+		}
+
+		$expected_meta = array(
+			self::SOURCE_IDENTITY_META_KEY => $source_identity,
+			self::SOURCE_NAME_META_KEY     => $source,
+			self::SOURCE_ID_META_KEY       => $source_id,
+		);
+		foreach ( $expected_meta as $meta_key => $expected_value ) {
+			foreach ( get_post_meta( $candidate_id, $meta_key, false ) as $stored_value ) {
+				$stored_value = (string) $stored_value;
+				if ( '' !== $stored_value && $stored_value !== $expected_value ) {
+					return new \WP_Error(
+						'event_candidate_source_metadata_conflict',
+						'The existing event candidate has conflicting canonical source metadata.',
+						array(
+							'status'   => 409,
+							'meta_key' => $meta_key,
+						)
+					);
+				}
+			}
+		}
+
+		return $candidate_id;
+	}
+
+	/**
+	 * Find existing event using DM core's duplicate detection system.
+	 *
+	 * Calls the `datamachine/check-duplicate` ability which delegates to
+	 * the registered EventDuplicateStrategy using event-owned date queries.
+	 *
+	 * The indexed strategy is date-aware: every query scopes by date_only,
+	 * so recurring series (same title/venue, different date) are never
+	 * falsely matched. See #423.
+	 *
+	 * The geographic context fields let EventDuplicateStrategy
+	 * resolve the incoming venue via the same address-first cascade the
+	 * upsert path uses (Venue_Taxonomy::find_or_create_venue). See #252.
+	 *
+	 * @param string $title     Event title.
+	 * @param string $venue     Venue name.
+	 * @param string $startDate Start date.
+	 * @param string $ticketUrl Ticket URL.
+	 * @param string $address   Venue street address (for address-aware venue resolution).
+	 * @param string $city      Venue city (required alongside address).
+	 * @param string $state     Venue state or region.
+	 * @param string $country   Venue country.
+	 * @param int    $venue_term_id Venue term already resolved by the upsert
+	 *                              path (0 when unresolved). When set, dedup
+	 *                              matches by this term instead of re-resolving
+	 *                              the venue by name (#883).
+	 * @param string $source        Import source slug (e.g. ticketmaster),
+	 *                              used for the cross-source venue fallback.
+	 * @return int|\WP_Error Post ID, zero when clear, or a contract error.
+	 */
+	private function findExistingEventViaAbility(
+		string $title,
+		string $venue,
+		string $startDate,
+		string $ticketUrl,
+		string $address = '',
+		string $city = '',
+		string $state = '',
+		string $country = '',
+		int $venue_term_id = 0,
+		string $source = '',
+		string|array $festival = '',
+		array &$festival_match = array()
+	): int|\WP_Error {
+		$duplicate_check = wp_has_ability( 'datamachine/check-duplicate' )
+			? wp_get_ability( 'datamachine/check-duplicate' )
+			: null;
+
+		if ( ! $duplicate_check ) {
+			return new \WP_Error(
+				'datamachine_duplicate_contract_unavailable',
+				'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.',
+				array(
+					'status'    => 503,
+					'retryable' => true,
+				)
+			);
+		}
+
+		$result = $duplicate_check->execute(
+			array(
+				'title'     => $title,
+				'post_type' => Event_Post_Type::POST_TYPE,
+				'scope'     => 'published',
+				'context'   => array(
+					'venue'         => $venue,
+					'startDate'     => $startDate,
+					'ticketUrl'     => $ticketUrl,
+					'address'       => $address,
+					'city'          => $city,
+					'state'         => $state,
+					'country'       => $country,
+					'venue_term_id' => $venue_term_id,
+					'source'        => $source,
+					'festival'      => $festival,
+				),
+			)
+		);
+
+		if (
+			! is_array( $result )
+			|| 'duplicate' !== ( $result['verdict'] ?? '' )
+			|| 'event_identity_index' !== ( $result['strategy'] ?? '' )
+		) {
+			return 0;
+		}
+
+		$post_id = (int) ( $result['match']['post_id'] ?? 0 );
+		if ( $post_id <= 0 ) {
+			return 0;
+		}
+
+		if ( 'festival_lineup' === ( $result['match']['merge_mode'] ?? '' ) ) {
+			$festival_match = $result['match'];
+			return $post_id;
+		}
+
+		// Defensive date guard: EventDuplicateStrategy is date-aware (queries
+		// by date_only), so its own matches are always date-correct. However
+		// DM core may run additional strategies that match on title alone.
+		// If such a strategy returned this match and the existing event is
+		// on a genuinely different calendar date, treat it as a distinct
+		// recurring-series event rather than a duplicate.
+		// See: https://github.com/Extra-Chill/data-machine/issues/1108
+		if ( ! empty( $startDate ) ) {
+			$existing_data      = $this->extractEventData( $post_id );
+			$existing_startDate = $existing_data['startDate'] ?? '';
+
+			if ( ! empty( $existing_startDate ) ) {
+				$existing_date_only = self::extractDateForQuery( $existing_startDate );
+				$incoming_date_only = self::extractDateForQuery( $startDate );
+
+				if ( $existing_date_only !== $incoming_date_only ) {
+					do_action(
+						'datamachine_log',
+						'info',
+						'Event Upsert: Ability matched title but date differs — treating as new event (recurring series)',
+						array(
+							'title'            => $title,
+							'venue'            => $venue,
+							'incoming_date'    => $incoming_date_only,
+							'existing_date'    => $existing_date_only,
+							'existing_post_id' => $post_id,
+						)
+					);
+
+					return 0;
+				}
+
+				$existing_identity_start = self::composeIdentityStart( $existing_startDate, (string) ( $existing_data['startTime'] ?? '' ) );
+				$existing_timestamp      = strtotime( $existing_identity_start );
+				$incoming_timestamp      = strtotime( $startDate );
+				if ( preg_match( '/\d{2}:\d{2}/', $existing_identity_start )
+					&& preg_match( '/\d{2}:\d{2}/', $startDate )
+					&& false !== $existing_timestamp
+					&& false !== $incoming_timestamp
+					&& abs( $existing_timestamp - $incoming_timestamp ) > 7200
+				) {
+					return 0;
+				}
+			}
+		}
+
+		return $post_id;
+	}
+
+	/**
+	 * Acquire deterministic MySQL advisory locks for an event identity.
+	 *
+	 * A concrete source lock serializes updates even when source data changes its
+	 * title, date, or venue. Canonical venue/time locks serialize different feeds
+	 * whose fuzzy titles can resolve to the same event. Keys are globally sorted
+	 * before acquisition so overlapping key sets cannot deadlock each other.
+	 *
+	 * MySQL advisory locks are:
+	 * - Per-connection (each PHP-FPM worker has its own connection)
+	 * - Automatically released on connection close (no leak risk)
+	 * - Non-blocking for unrelated events (different lock keys)
+	 *
+	 * @since 0.17.3
+	 * @param string $title           Event title.
+	 * @param string $venue           Event venue.
+	 * @param string $startDate       Event start date or datetime.
+	 * @param string $source_identity Optional stable source identity.
+	 * @param array  $venue_context   Venue address geography.
+	 * @param int    $candidate_id    Existing canonical event candidate.
+	 * @return array|null The acquired lock keys, or null on timeout/error.
+	 */
+	private function acquireUpsertLocks( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array(), int $candidate_id = 0 ): ?array {
+		global $wpdb;
+
+		$lock_keys = $this->buildUpsertLockKeys( $title, $venue, $startDate, $source_identity, $venue_context, $candidate_id );
+		$acquired  = array();
+		$deadline  = microtime( true ) + 10;
+		$complete  = false;
+
+		try {
+			foreach ( $lock_keys as $lock_key ) {
+				$timeout = max( 0, (int) ceil( $deadline - microtime( true ) ) );
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_key, $timeout ) );
+
+				if ( '1' === (string) $result ) {
+					$acquired[] = $lock_key;
+					continue;
+				}
+
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event Upsert: Advisory lock unavailable; returning retryable failure',
+					array(
+						'lock_key'  => $lock_key,
+						'lock_keys' => $lock_keys,
+						'title'     => $title,
+						'startDate' => $startDate,
+						'result'    => null === $result ? 'error' : 'timeout',
+					)
+				);
+
+				return null;
+			}
+
+			$complete = true;
+
+			return $acquired;
+		} catch ( \Throwable $throwable ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Event Upsert: Advisory lock acquisition failed; returning retryable failure',
+				array(
+					'lock_keys' => $lock_keys,
+					'acquired'  => $acquired,
+					'title'     => $title,
+					'startDate' => $startDate,
+					'exception' => $throwable->getMessage(),
+				)
+			);
+
+			return null;
+		} finally {
+			if ( ! $complete ) {
+				$this->releaseUpsertLocks( $acquired );
+			}
+		}
+	}
+
+	/**
+	 * Build globally ordered source and canonical collision-domain lock keys.
+	 *
+	 * Known times acquire their own two-hour bucket and its predecessor. This is a
+	 * conservative adjacent-bucket collision domain, not an exact two-hour range:
+	 * starts beyond 120 minutes can briefly serialize when their bucket sets overlap.
+	 * Fuzzy equivalence has no exact narrow key, so that bounded false contention is
+	 * the correctness tradeoff. Different venue/geography scopes and distant bucket
+	 * sets remain parallel. An unknown time acquires 12 venue/day buckets so it
+	 * overlaps any time-aware equivalent. Unknown venues include a stable title
+	 * prefix fingerprint so venue-less events remain bounded.
+	 *
+	 * @param string $title           Event title.
+	 * @param string $venue           Event venue.
+	 * @param string $startDate       Event start date or datetime.
+	 * @param string $source_identity Optional stable source identity.
+	 * @param array  $venue_context   Venue address geography.
+	 * @param int    $candidate_id    Existing canonical event candidate.
+	 * @return array Ordered advisory lock keys.
+	 */
+	private function buildUpsertLockKeys( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array(), int $candidate_id = 0 ): array {
+		$blog_id   = get_current_blog_id();
+		$date_only = self::extractDateForQuery( $startDate );
+		$identity  = \DataMachineEvents\Core\Venue_Taxonomy::resolve_venue_identity( $venue, $venue_context );
+
+		if ( ! empty( $identity['term_id'] ) ) {
+			$venue_scopes = array( 'term:' . (int) $identity['term_id'] );
+		} elseif ( '' !== trim( $venue ) ) {
+			$venue_scopes = array( 'name:' . EventIdentifierGenerator::normalizeBasic( $venue ) );
+		} else {
+			$normalized_title = EventIdentifierGenerator::normalizeTitle( $title );
+			$title_tokens     = array_slice( array_filter( explode( ' ', $normalized_title ) ), 0, 3 );
+			$venue_scopes     = array( 'unknown:' . implode( ' ', $title_tokens ) );
+		}
+
+		$normalized_address = \DataMachineEvents\Core\Venue_Taxonomy::normalize_address_for_matching(
+			(string) ( $venue_context['address'] ?? '' )
+		);
+		if ( '' !== $normalized_address ) {
+			// Address is intentionally independent of optional city/state/country.
+			// Partial source geography must still converge on the same physical key.
+			$venue_scopes[] = 'geo:address:' . $normalized_address;
+		}
+		$venue_scopes = array_values( array_unique( $venue_scopes ) );
+
+		$domains = array();
+		if ( '' !== $source_identity ) {
+			$domains[] = 'source|' . $blog_id . '|' . $source_identity;
+		}
+		if ( $candidate_id > 0 ) {
+			$domains[] = 'candidate|' . $blog_id . '|' . $candidate_id;
+		}
+
+		if ( preg_match( '/\b(\d{1,2}):(\d{2})/', $startDate, $matches ) ) {
+			$minutes = ( (int) $matches[1] * 60 ) + (int) $matches[2];
+			$bucket  = (int) floor( $minutes / 120 );
+			foreach ( $venue_scopes as $venue_scope ) {
+				foreach ( array( $bucket - 1, $bucket ) as $time_bucket ) {
+					$domains[] = 'canonical|' . $blog_id . '|' . $date_only . '|' . $venue_scope . '|time:' . $time_bucket;
+				}
+			}
+		} else {
+			foreach ( $venue_scopes as $venue_scope ) {
+				foreach ( range( 0, 11 ) as $time_bucket ) {
+					$domains[] = 'canonical|' . $blog_id . '|' . $date_only . '|' . $venue_scope . '|time:' . $time_bucket;
+				}
+			}
+		}
+
+		$lock_keys = array_map(
+			static fn( string $domain ): string => 'dme:' . md5( $domain ),
+			array_unique( $domains )
+		);
+		sort( $lock_keys, SORT_STRING );
+
+		return $lock_keys;
+	}
+
+	/**
+	 * Release acquired MySQL advisory locks.
+	 *
+	 * @since 0.17.3
+	 * @param array $lock_keys Lock keys to release.
+	 */
+	private function releaseUpsertLocks( array $lock_keys ): void {
+		global $wpdb;
+
+		foreach ( array_reverse( $lock_keys ) as $lock_key ) {
+			try {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_key ) );
+			} catch ( \Throwable $throwable ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event Upsert: Advisory lock release failed',
+					array(
+						'lock_key'  => $lock_key,
+						'exception' => $throwable->getMessage(),
+					)
+				);
+			}
+		}
+	}
+
+	/**
+	 * Extract just the date portion (YYYY-MM-DD) from a datetime string.
+	 *
+	 * Used for date-scoped queries and advisory-lock key derivation.
+	 *
+	 * @param string $datetime Datetime or date string.
+	 * @return string Date portion only (YYYY-MM-DD).
+	 */
+	private static function extractDateForQuery( string $datetime ): string {
+		// Handle both "2026-03-20" and "2026-03-20 21:00:00" and "2026-03-20T21:00:00"
+		if ( preg_match( '/^(\d{4}-\d{2}-\d{2})/', $datetime, $matches ) ) {
+			return $matches[1];
+		}
+		return $datetime;
+	}
+
+	/**
+	 * Compose the time-aware identity used by duplicate detection.
+	 *
+	 * @param string $start_date Event start date or datetime.
+	 * @param string $start_time Event start time when stored separately.
+	 * @return string Date or datetime suitable for duplicate comparison.
+	 */
+	private static function composeIdentityStart( string $start_date, string $start_time ): string {
+		if ( '' === $start_time || preg_match( '/\d{2}:\d{2}/', $start_date ) ) {
+			return $start_date;
+		}
+
+		return trim( $start_date ) . ' ' . trim( $start_time );
+	}
+
+	/**
+	 * Extract event data from existing post
+	 *
+	 * @param int $post_id Post ID
+	 * @return array Event attributes from event-details block
+	 */
+	private function extractEventData( int $post_id ): array {
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return array();
+		}
+
+		$blocks = parse_blocks( $post->post_content );
+
+		foreach ( $blocks as $block ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
+				return $block['attrs'];
+			}
+		}
+
+		return array();
+	}
+
+	/**
+	 * Resolve post author for event creation.
+	 *
+	 * When an event is submitted by a user, their user_id is stored in
+	 * initial_data['submission']['user_id'] and takes priority over handler
+	 * config defaults so submitted events are attributed to the submitter.
+	 *
+	 * For genuine automation (no submission context), the author resolves to:
+	 *   1. An explicitly-configured author (system-wide default_author_id, then
+	 *      per-handler post_author) — respected when set.
+	 *   2. A consumer-provided fallback author via
+	 *      `data_machine_events_fallback_author_id`.
+	 *   3. WordPressSettingsResolver (logged-in user / first admin) — last
+	 *      resort when no fallback policy provides an author.
+	 *
+	 * @param array      $handler_config Handler configuration.
+	 * @param EngineData $engine         Engine snapshot helper.
+	 * @return int Post author ID.
+	 */
+	private function resolvePostAuthor( array $handler_config, EngineData $engine ): int {
+		// 1. Submission user_id (human submitter) — highest priority.
+		$submission = $engine->get( 'submission' );
+
+		if ( is_array( $submission ) && ! empty( $submission['user_id'] ) ) {
+			$submitter_id = (int) $submission['user_id'];
+			if ( $submitter_id > 0 && get_userdata( $submitter_id ) ) {
+				return $submitter_id;
+			}
+		}
+
+		// 2. Explicit author configuration (system default, then handler
+		//    override). Per-flow post_author wins over the bot default so an
+		//    operator can still pin a specific author on a flow.
+		$explicit = $this->resolve_explicit_author_id( $handler_config );
+		if ( $explicit > 0 ) {
+			return $explicit;
+		}
+
+		/**
+		 * Filter the fallback post author for automated event imports.
+		 *
+		 * Return a positive user ID to apply a consumer-specific authorship
+		 * policy. The default of 0 leaves WordPress to resolve its usual
+		 * logged-in-user or first-administrator fallback.
+		 *
+		 * @param int        $author_id     Fallback author ID. Default 0.
+		 * @param array      $handler_config Handler configuration.
+		 * @param EngineData $engine        Engine snapshot helper.
+		 */
+		$fallback_author_id = (int) apply_filters( 'data_machine_events_fallback_author_id', 0, $handler_config, $engine );
+		if ( $fallback_author_id > 0 ) {
+			return $fallback_author_id;
+		}
+
+		// 4. Last resort: generic resolver (logged-in user / first admin).
+		return WordPressSettingsResolver::getPostAuthor( $handler_config );
+	}
+
+	/**
+	 * Resolve an explicitly-configured author id, if any.
+	 *
+	 * Mirrors the config-first portion of WordPressSettingsResolver::getPostAuthor():
+	 * system-wide default_author_id, then handler-specific post_author. Returns 0
+	 * when neither is set. Extracted so resolvePostAuthor() can apply a fallback
+	 * policy without re-running the resolver's first-admin fallback.
+	 *
+	 * @param array $handler_config Handler configuration.
+	 * @return int Explicitly-configured author id, or 0 if none.
+	 */
+	private function resolve_explicit_author_id( array $handler_config ): int {
+		$wp_settings = PluginSettings::get( 'wordpress_settings', array() );
+		$default     = (int) ( $wp_settings['default_author_id'] ?? 0 );
+		if ( $default > 0 ) {
+			return $default;
+		}
+
+		return (int) ( $handler_config['post_author'] ?? 0 );
+	}
+
+	/**
+	 * Build meta_input array for the DM core upsert ability.
+	 *
+	 * Currently handles submission metadata only. Event-specific meta
+	 * (datetimes, ticket URL) is managed by event-dates-sync hooks.
+	 *
+	 * @param array      $event_data Event data.
+	 * @param array      $parameters Tool parameters.
+	 * @param EngineData $engine     Engine data.
+	 * @return array Meta key/value pairs.
+	 */
+	private function buildEventMetaInput( array $event_data, array $parameters, EngineData $engine ): array {
+		$meta_input      = array();
+		$source_identity = (string) ( $parameters['source_identity'] ?? '' );
+
+		if ( '' !== $source_identity ) {
+			$meta_input[ self::SOURCE_IDENTITY_META_KEY ] = $source_identity;
+			$meta_input[ self::SOURCE_NAME_META_KEY ]     = sanitize_text_field( (string) ( $parameters['source'] ?? '' ) );
+			$meta_input[ self::SOURCE_ID_META_KEY ]       = sanitize_text_field( (string) ( $parameters['source_id'] ?? '' ) );
+		}
+
+		$submission = $engine->get( 'submission' );
+		if ( is_array( $submission ) ) {
+			if ( ! empty( $submission['user_id'] ) ) {
+				$meta_input['_datamachine_submitted_by'] = (int) $submission['user_id'];
+			}
+			if ( ! empty( $submission['contact_name'] ) ) {
+				$meta_input['_datamachine_submitter_name'] = sanitize_text_field( $submission['contact_name'] );
+			}
+			if ( ! empty( $submission['contact_email'] ) ) {
+				$meta_input['_datamachine_submitter_email'] = sanitize_email( $submission['contact_email'] );
+			}
+		}
+
+		return $meta_input;
+	}
+
+	/**
+	 * Strip schedule/price noise from a title and keep what it carried.
+	 *
+	 * "Sean Smith 6-9pm" becomes "Sean Smith" with endTime 21:00. "David
+	 * Peterson $20" becomes "David Peterson" with price $20. Recovered values
+	 * only fill fields the source left empty. An end time is only used when
+	 * it falls later on the same day as a known start time, because a
+	 * "10pm-1am" range has no endDate to carry the rollover. Runs before
+	 * identity, locking, and duplicate detection so every consumer keys on
+	 * the clean title. See issue #932.
+	 *
+	 * @param string     $title      Decoded, sanitized title.
+	 * @param array      $parameters AI parameters (filled by reference).
+	 * @param EngineData $engine     Engine data.
+	 * @return string Clean title.
+	 */
+	private function cleanTitleNoise( string $title, array &$parameters, EngineData $engine ): string {
+		$cleaned = EventTitleCleaner::clean( $title );
+		if ( ! $cleaned['changed'] ) {
+			return $title;
+		}
+
+		$has_value = static function ( string $field ) use ( $parameters, $engine ): bool {
+			$value = $engine->get( $field ) ?? $parameters[ $field ] ?? '';
+			return '' !== trim( (string) $value );
+		};
+
+		if ( '' !== $cleaned['price'] && ! $has_value( 'price' ) ) {
+			$parameters['price'] = $cleaned['price'];
+		}
+
+		$start_time = trim( (string) ( $engine->get( 'startTime' ) ?? $parameters['startTime'] ?? '' ) );
+		$end_date   = trim( (string) ( $engine->get( 'endDate' ) ?? $parameters['endDate'] ?? '' ) );
+		if ( '' !== $cleaned['end_time'] && '' !== $start_time && '' === $end_date && ! $has_value( 'endTime' )
+			&& strtotime( '1970-01-01 ' . $cleaned['end_time'] ) > strtotime( '1970-01-01 ' . $start_time ) ) {
+			$parameters['endTime'] = $cleaned['end_time'];
+		}
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			'Event title schedule/price noise removed',
+			array(
+				'original' => $title,
+				'cleaned'  => $cleaned['title'],
+				'end_time' => $parameters['endTime'] ?? '',
+				'price'    => $parameters['price'] ?? '',
+			)
+		);
+
+		return $cleaned['title'];
+	}
+
+	/**
+	 * Build event data by merging engine data with AI parameters.
+	 *
+	 * Engine data takes precedence since AI only received parameters
+	 * for fields not already in engine data (filtered at definition time).
+	 *
+	 * @param array $parameters AI-provided parameters
+	 * @param array $handler_config Handler configuration
+	 * @param EngineData $engine Engine data helper
+	 * @return array Merged event data
+	 */
+	private function buildEventData( array $parameters, array $handler_config, EngineData $engine, int $existing_post_id = 0 ): array {
+		$event_data = array(
+			'title'       => sanitize_text_field( TextNormalization::decode_entities( (string) ( $parameters['title'] ?? $engine->get( 'title' ) ?? '' ) ) ),
+			'description' => $parameters['description'] ?? '',
+		);
+
+		// Engine data takes precedence - use schema providers as single source of truth
+		$schema_fields     = EventSchemaProvider::getFieldKeys();
+		$venue_fields      = VenueParameterProvider::getParameterKeys();
+		$all_engine_fields = array_unique( array_merge( $schema_fields, $venue_fields ) );
+
+		foreach ( $all_engine_fields as $field ) {
+			// The AI-written title is the one identity and dedup were keyed
+			// on; the raw source title only fills in when the AI gave none.
+			if ( 'title' === $field && '' !== $event_data['title'] ) {
+				continue;
+			}
+			$value = $engine->get( $field );
+			if ( null !== $value && '' !== $value ) {
+				// Free-text fields carry the same entity-encoding risk as the
+				// title (issue #844); dates, enums, and URLs must not be
+				// decoded.
+				$event_data[ $field ] = self::is_decodable_text_field( $field )
+					? TextNormalization::decode_entities( (string) $value )
+					: $value;
+			}
+		}
+
+		// AI parameters fill in remaining fields
+		$array_fields = EventSchemaProvider::getArrayFieldKeys();
+		foreach ( $schema_fields as $field ) {
+			if ( ! isset( $event_data[ $field ] ) && ! empty( $parameters[ $field ] ) ) {
+				if ( 'ticketUrl' === $field ) {
+					$event_data[ $field ] = trim( $parameters[ $field ] );
+				} elseif ( in_array( $field, $array_fields, true ) ) {
+					// Array-typed schema fields must never reach the scalar
+					// path below: `(string) array( '2026-01-01' )` yields the
+					// literal "Array", so the value was destroyed before it
+					// was ever stored. Sanitise each member instead.
+					$value                = $parameters[ $field ];
+					$event_data[ $field ] = is_array( $value )
+						? array_values(
+							array_filter(
+								array_map(
+									static fn( $item ) => sanitize_text_field( TextNormalization::decode_entities( (string) $item ) ),
+									$value
+								),
+								static fn( $item ) => '' !== $item
+							)
+						)
+						: array();
+				} else {
+					// Decode before sanitizing so entity-hidden markup is
+					// stripped rather than stored (issue #844).
+					$event_data[ $field ] = sanitize_text_field( TextNormalization::decode_entities( (string) $parameters[ $field ] ) );
+				}
+			}
+		}
+
+		// The engine loop above can overwrite the title with the raw source
+		// value. Re-apply the same sanitize + noise cleaning executeUpsert()
+		// used for identity, so the stored title matches the deduped one
+		// (issue #932).
+		if ( isset( $event_data['title'] ) ) {
+			$event_data['title'] = EventTitleCleaner::clean( sanitize_text_field( TextNormalization::decode_entities( (string) $event_data['title'] ) ) )['title'];
+		}
+
+		// Handler config venue override (highest priority)
+		if ( ! empty( $handler_config['venue'] ) ) {
+			$event_data['venue'] = $handler_config['venue'];
+		}
+
+		// Persist datetime values from meta as system-level fallbacks
+		$resolved_post_id = $existing_post_id > 0 ? $existing_post_id : ( $engine->get( 'post_id' ) ?? $parameters['post_id'] ?? 0 );
+		if ( ! empty( $resolved_post_id ) ) {
+			$this->preserveKnownTimes( (int) $resolved_post_id, $event_data );
+			$this->hydrateStartDateFromMeta( (int) $resolved_post_id, $event_data );
+			$this->hydrateEndDateFromMeta( (int) $resolved_post_id, $event_data );
+		}
+
+		return $event_data;
+	}
+
+	/**
+	 * Whether an event field is free text that may carry HTML entities.
+	 *
+	 * Deliberately excludes URLs (decoding "&amp;" in a query string changes
+	 * the URL), dates/times (digits only), enums and closed vocabularies
+	 * (eventStatus, performerType, eventType, …), arrays (occurrenceDates),
+	 * and coordinate/timezone identifiers. Decoding is a byte-level no-op for
+	 * entity-free text, but the allowlist documents intent and keeps future
+	 * fields from being silently decoded.
+	 *
+	 * @param string $field Event or venue field key.
+	 * @return bool True when the field is decodable free text.
+	 */
+	private static function is_decodable_text_field( string $field ): bool {
+		return in_array(
+			$field,
+			array(
+				'title',
+				'venue',
+				'venueAddress',
+				'venueCity',
+				'venueState',
+				'venueZip',
+				'venueCountry',
+				'venuePhone',
+				'venueCapacity',
+				'performer',
+				'organizer',
+				'price',
+			),
+			true
+		);
+	}
+
+	/** Keep a known occurrence's times when a date-only reimport has none. */
+	private function preserveKnownTimes( int $post_id, array &$event_data ): void {
+		$dates = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		if ( ! $dates || empty( $event_data['startDate'] ) ) {
+			return;
+		}
+		$start = self::composeIdentityStart( $event_data['startDate'], (string) ( $event_data['startTime'] ?? '' ) );
+		if ( self::extractDateForQuery( $start ) !== substr( $dates->start_datetime, 0, 10 )
+			|| ( preg_match( '/\d{2}:\d{2}/', $start ) && ! preg_match( '/[T ]00:00(?::00)?(?:Z|[+-]\d{2}:?\d{2})?$/', $start ) )
+			|| str_ends_with( $dates->start_datetime, ' 00:00:00' ) ) {
+			return;
+		}
+
+		$event_data['startDate'] = substr( $dates->start_datetime, 0, 10 );
+		$event_data['startTime'] = substr( $dates->start_datetime, 11 );
+		// An all-day end is not evidence that an overnight show now ends earlier.
+		$end_time = (string) ( $event_data['endTime'] ?? '' );
+		if ( '' !== (string) $dates->end_datetime && in_array( $end_time, array( '', '23:59', '23:59:59' ), true ) ) {
+			$event_data['endDate'] = substr( $dates->end_datetime, 0, 10 );
+			$event_data['endTime'] = substr( $dates->end_datetime, 11 );
+		}
+	}
+
+	private function hydrateStartDateFromMeta( int $post_id, array &$event_data ): void {
+		if ( ! empty( $event_data['startDate'] ) && array_key_exists( 'startTime', $event_data ) ) {
+			return;
+		}
+
+		$dates          = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$start_datetime = $dates ? $dates->start_datetime : '';
+		if ( empty( $start_datetime ) ) {
+			return;
+		}
+
+		$date_obj = date_create( $start_datetime );
+		if ( ! $date_obj ) {
+			return;
+		}
+
+		if ( empty( $event_data['startDate'] ) ) {
+			$event_data['startDate'] = $date_obj->format( 'Y-m-d' );
+		}
+
+		if ( ! array_key_exists( 'startTime', $event_data ) ) {
+			$time = $date_obj->format( 'H:i:s' );
+			if ( '00:00:00' !== $time ) {
+				$event_data['startTime'] = $time;
+			}
+		}
+	}
+
+	private function hydrateEndDateFromMeta( int $post_id, array &$event_data ): void {
+		if ( ! empty( $event_data['endDate'] ) && array_key_exists( 'endTime', $event_data ) ) {
+			return;
+		}
+
+		$dates        = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$end_datetime = $dates ? $dates->end_datetime : '';
+		if ( empty( $end_datetime ) ) {
+			return;
+		}
+
+		$date_obj = date_create( $end_datetime );
+		if ( ! $date_obj ) {
+			return;
+		}
+
+		if ( empty( $event_data['endDate'] ) ) {
+			$event_data['endDate'] = $date_obj->format( 'Y-m-d' );
+		}
+
+		if ( ! array_key_exists( 'endTime', $event_data ) ) {
+			$time = $date_obj->format( 'H:i:s' );
+			if ( '00:00:00' !== $time && ( $event_data['startTime'] ?? '' ) !== $time ) {
+				$event_data['endTime'] = $time;
+			}
+		}
+	}
+
+	/**
+	 * Process featured image with EngineData context and handler fallbacks.
+	 */
+	private function processEventFeaturedImage( int $post_id, array $handler_config, EngineData $engine ): void {
+		if ( empty( $handler_config['include_images'] ) ) {
+			return;
+		}
+
+		$image_path = $engine->getImagePath();
+
+		if ( ! empty( $image_path ) ) {
+			WordPressPublishHelper::attachImageToPost( $post_id, $image_path, $handler_config );
+		} elseif ( ! empty( $handler_config['eventImage'] ) ) {
+			WordPressPublishHelper::attachImageToPost( $post_id, $handler_config['eventImage'], $handler_config );
+		}
+	}
+
+	/**
+	 * Success response wrapper
+	 */
+	protected function successResponse( array $data ): array {
+		return array(
+			'success'   => true,
+			'data'      => $data,
+			'tool_name' => 'data_machine_events',
+		);
+	}
+}

@@ -1,0 +1,65 @@
+name: data-machine-events
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'plugins/data-machine-events/**'
+      # Extensions run against the in-tree core, so a core change re-checks them.
+      - 'plugins/data-machine/**'
+      - '.github/workflows/data-machine-events.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/data-machine-events/**'
+      # Extensions run against the in-tree core, so a core change re-checks them.
+      - 'plugins/data-machine/**'
+      - '.github/workflows/data-machine-events.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: data-machine-events-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  homeboy:
+    name: Homeboy (${{ matrix.command }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [review lint, review test]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.HOMEBOY_APP_ID }}
+          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
+
+      - name: Prepare in-tree Data Machine core
+        run: composer install --working-dir=plugins/data-machine --no-dev --no-interaction --no-progress --prefer-dist --classmap-authoritative
+
+      - name: Run Homeboy ${{ matrix.command }}
+        env:
+          HOMEBOY_SETTINGS_JSON: '{"database_type":"mdi-native","wp_codebox_multisite":true,"wp_codebox_phpunit_bootstrap_mode":"managed","wp_codebox_prepare_steps":[{"command":"npm","args":["ci"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/Calendar"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventDetails"},{"command":"npm","args":["ci"],"cwd":"inc/Blocks/EventsMap"},{"command":"npm","args":["run","build"],"cwd":"inc/Blocks/EventsMap"}]}'
+          HOMEBOY_WORDPRESS_DEPENDENCY_PATHS: ${{ github.workspace }}/plugins/data-machine
+          HOMEBOY_WORDPRESS_MULTISITE: '1'
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          component: plugins/data-machine-events
+          comment-key: data-machine-events
+          commands: ${{ matrix.command }}
+          scope: ${{ matrix.command == 'review test' && 'full' || 'auto' }}
+          app-token: ${{ steps.app-token.outputs.token || '' }}
+          autofix: 'false'

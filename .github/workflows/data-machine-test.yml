@@ -1,0 +1,40 @@
+name: data-machine test
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'plugins/data-machine/**'
+      - '.github/workflows/data-machine-test.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: data-machine-test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  homeboy-test:
+    uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
+    with:
+      # v2.14.2 keeps raw candidate evidence neutral; this reconciled Test gate
+      # alone decides whether the full-suite candidate regresses from main.
+      component: plugins/data-machine
+      comment-key: data-machine-test
+      commands: 'review test'
+      # PR CI is the authoritative complete MySQL suite. Repository defaults
+      # remain Docker-free SQLite for local and release-preflight parity.
+      args: '--setting database_type=mysql --setting wp_codebox_phpunit_config=/wordpress/wp-content/plugins/data-machine/phpunit.xml.dist'
+      scope: full
+      differential-gating: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+      baseline-commands: ${{ github.event_name == 'pull_request' && 'review test' || 'none' }}
+      execution-timeout-seconds: '3600'
+      test-timeout-seconds: '3300'
+      # Sharding is off until homeboy-action can place the test inventory at a
+      # subdirectory component's root (Homeboy only accepts it there; ci.yml
+      # requests it at the repository root). Unsharded, the suite is ~20 min.
+    secrets: inherit

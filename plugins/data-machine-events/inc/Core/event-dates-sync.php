@@ -1,0 +1,652 @@
+<?php
+// phpcs:disable Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+/**
+ * Event Dates Sync
+ *
+ * Syncs event dates from Event Details block attributes to the
+ * datamachine_event_dates table on save_post. The block attribute is the
+ * authoring source of truth; the datamachine_event_dates table is the query
+ * source of truth. Also handles ticket URL normalization for duplicate
+ * detection and post_status denormalization.
+ *
+ * @package DataMachine_Events
+ */
+
+namespace DataMachineEvents\Core;
+
+const EVENT_TICKET_URL_META_KEY = '_datamachine_ticket_url';
+
+/**
+ * Normalize ticket URL for consistent duplicate detection
+ *
+ * Strips tracking query parameters (UTM, etc.) while preserving identity
+ * parameters that contain unique ticket identifiers (affiliate redirect URLs).
+ *
+ * Identity parameters preserved:
+ * - 'u' = redirect URL (Ticketmaster affiliate via evyy.net)
+ * - 'e' = event ID (DoStuff, some redirect services)
+ *
+ * The `_datamachine_ticket_url` meta this writes (`EVENT_TICKET_URL_META_KEY`)
+ * is a DEDUP COMPARISON KEY, not a redirect-safe canonical URL — every
+ * existing consumer of that meta only ever compares/matches it, never sends
+ * a real visitor to it. Do not read that meta expecting the complete,
+ * as-authored ticket URL (query string and all); parse the Event Details
+ * block's `ticketUrl` attribute directly instead. See
+ * https://github.com/Extra-Chill/data-machine-events/issues/816 (the bug
+ * this exact confusion caused) and
+ * https://github.com/Extra-Chill/data-machine-events/issues/821 (tracking
+ * the footgun this meta key's name/shape presents to future consumers).
+ *
+ * @since 0.8.39  Original implementation (stripped all query params - bug)
+ * @since 0.10.11 Fixed to preserve identity parameters for affiliate URLs
+ *
+ * @param string $url Raw ticket URL
+ * @return string Normalized URL (scheme + host + path + identity params) — a
+ *                comparison key, not a URL to redirect a visitor to.
+ */
+function datamachine_normalize_ticket_url( string $url ): string {
+	if ( empty( $url ) ) {
+		return '';
+	}
+
+	$parsed = wp_parse_url( $url );
+	if ( ! $parsed || empty( $parsed['host'] ) ) {
+		return esc_url_raw( $url );
+	}
+
+	$scheme     = $parsed['scheme'] ?? 'https';
+	$normalized = $scheme . '://' . $parsed['host'];
+
+	if ( ! empty( $parsed['path'] ) ) {
+		$normalized .= $parsed['path'];
+	}
+
+	// Preserve identity parameters for affiliate/redirect URLs
+	// These contain the actual unique ticket identifier
+	if ( ! empty( $parsed['query'] ) ) {
+		parse_str( $parsed['query'], $query_params );
+		$identity_params = array();
+
+		// 'u' = redirect URL (Ticketmaster affiliate, evyy.net)
+		if ( ! empty( $query_params['u'] ) ) {
+			$identity_params['u'] = $query_params['u'];
+		}
+		// 'e' = event ID (DoStuff, some redirect services)
+		if ( ! empty( $query_params['e'] ) ) {
+			$identity_params['e'] = $query_params['e'];
+		}
+
+		if ( ! empty( $identity_params ) ) {
+			$normalized .= '?' . http_build_query( $identity_params );
+		}
+	}
+
+	return rtrim( $normalized, '/' );
+}
+
+/**
+ * Extract the canonical ticket identifier URL for dedup comparison.
+ *
+ * Unlike datamachine_normalize_ticket_url() which preserves affiliate links
+ * for storage, this function unwraps affiliate/redirect wrappers to extract
+ * the underlying ticket platform URL. This allows matching:
+ * - ticketmaster.evyy.net/c/.../4272?u=<ticketmaster_url>  (affiliate)
+ * - www.ticketmaster.com/event/...                          (direct)
+ *
+ * Provider URLs with stable event IDs return an opaque provider identity so
+ * source-generated title or lineup slugs do not fragment the same event. Other
+ * URLs fall back to normalized scheme + host + path comparison.
+ *
+ * @param string $url Ticket URL (may be affiliate-wrapped or direct)
+ * @return string Canonical ticket identity for dedup comparison
+ */
+function datamachine_extract_ticket_identity( string $url ): string {
+	if ( empty( $url ) ) {
+		return '';
+	}
+
+	// Unwrap affiliate redirect URLs to get the canonical ticket URL.
+	$canonical = datamachine_unwrap_affiliate_url( $url );
+
+	// Normalize to scheme + host + path (strip query params for comparison)
+	$parsed = wp_parse_url( $canonical );
+	if ( ! $parsed || empty( $parsed['host'] ) ) {
+		return '';
+	}
+
+	$host = strtolower( preg_replace( '/^www\./', '', $parsed['host'] ) );
+	$path = $parsed['path'] ?? '';
+
+	// Ticketmaster embeds the stable event ID after /event/, while the
+	// preceding path is generated from the current source title.
+	if ( ( 'ticketmaster.com' === $host || str_ends_with( $host, '.ticketmaster.com' ) )
+		&& preg_match( '#/event/([^/]+)#i', $path, $matches )
+	) {
+		return 'ticketmaster:event:' . strtolower( rawurldecode( $matches[1] ) );
+	}
+
+	// Etix embeds its stable numeric event ID after /ticket/p/ and follows it
+	// with a source-generated lineup slug that can drift between feeds.
+	if ( ( 'etix.com' === $host || str_ends_with( $host, '.etix.com' ) )
+		&& preg_match( '#/ticket/p/([a-z0-9_-]+)#i', $path, $matches )
+	) {
+		return 'etix:event:' . strtolower( rawurldecode( $matches[1] ) );
+	}
+
+	$scheme     = $parsed['scheme'] ?? 'https';
+	$normalized = $scheme . '://' . $parsed['host'];
+
+	if ( ! empty( $parsed['path'] ) ) {
+		$normalized .= $parsed['path'];
+	}
+
+	return rtrim( $normalized, '/' );
+}
+
+/**
+ * Find the first present affiliate redirect parameter in a URL's query string.
+ *
+ * Shared extraction primitive for everything that needs to look inside an
+ * affiliate wrapper's redirect parameter: `datamachine_unwrap_affiliate_url()`
+ * and `datamachine_unwrap_affiliate_url_faithful()` both consume it for
+ * unwrapping, and the corrupted-redirect detector (`AffiliateRedirectShape`,
+ * see issue #823) consumes it to inspect the value when unwrapping refuses.
+ * There is one redirect-parameter scanner and this is it — do not grow a
+ * second param-name list elsewhere.
+ *
+ * Decode depth is the ONE axis that legitimately differs between callers
+ * (issue #824): `wp_parse_url()` + `parse_str()` already percent-decodes the
+ * query string once, so `$single_decode` controls whether a caller wants
+ * that single decode pass (byte-faithful — safe for redirect/display
+ * destinations, including nested-encoded inner URLs) or the additional
+ * `urldecode()` pass this function has always applied on top (aggressive —
+ * intentionally over-decodes for dedup comparison, collapsing
+ * differently-encoded forms of the same identity onto one string). The
+ * param-name list itself never changes with `$single_decode`; only the
+ * decode count does.
+ *
+ * @since 0.63.0 Extracted from `datamachine_unwrap_affiliate_url()` so the
+ *              detector can reuse the same param scan (issue #823).
+ * @since 0.65.1 Added `$single_decode` so a faithful (redirect/display)
+ *              extraction and the aggressive (dedup comparison) extraction
+ *              can share this one scanner instead of forking it (issue #824).
+ *
+ * @param string $url           URL whose query string is scanned.
+ * @param bool   $single_decode When true, return the value exactly as
+ *                              `parse_str()` decoded it (one decode pass —
+ *                              byte-faithful, preserves nested percent-
+ *                              encoding). When false (default, unchanged
+ *                              from prior versions), apply an additional
+ *                              `urldecode()` pass on top (two decodes total —
+ *                              the aggressive form every existing dedup
+ *                              caller depends on; do not change this default).
+ * @return array{param:string, value:string}|null Array of parameter name and
+ *                                                decoded value for the first
+ *                                                present known redirect
+ *                                                parameter, or null when none
+ *                                                is present.
+ */
+function datamachine_find_affiliate_redirect_param( string $url, bool $single_decode = false ): ?array {
+	$parsed = wp_parse_url( $url );
+	if ( ! $parsed || empty( $parsed['query'] ) ) {
+		return null;
+	}
+
+	parse_str( $parsed['query'], $query_params );
+
+	// Try common redirect parameter names
+	foreach ( array( 'u', 'url', 'murl', 'destination' ) as $param ) {
+		if ( ! empty( $query_params[ $param ] ) && is_string( $query_params[ $param ] ) ) {
+			$value = $query_params[ $param ];
+			if ( ! $single_decode ) {
+				$value = urldecode( $value );
+			}
+
+			return array(
+				'param' => $param,
+				'value' => $value,
+			);
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Unwrap affiliate/redirect URLs to extract the canonical ticket URL for
+ * DUPLICATE-DETECTION COMPARISON.
+ *
+ * COMPARISON-ORIENTED — do not use this for a redirect/display destination.
+ * This double-decodes the redirect parameter (`parse_str()`'s implicit
+ * decode, plus an explicit `urldecode()` on top via
+ * `datamachine_find_affiliate_redirect_param()`'s default), which is
+ * harmless-to-helpful for comparison — it aggressively normalizes so
+ * differently-encoded forms of the same inner URL collapse to one identity
+ * — but is LOSSY for a wrapper whose inner URL itself carries nested
+ * percent-encoding (e.g. an Impact Radius-wrapped SeatGeek destination
+ * carrying its own `dd_referrer=https%253A%252F%252F...` query param): the
+ * nested encoding is decoded away and cannot be reproduced byte-for-byte.
+ * See issue #824.
+ *
+ * This function's output feeds `datamachine_extract_ticket_identity()`,
+ * which is duplicate-detection identity across the WHOLE event corpus.
+ * Do not change this function's decode behavior — that would silently
+ * change which events are considered duplicates. A redirect/display
+ * consumer that needs the complete, byte-faithful inner URL must call
+ * `datamachine_unwrap_affiliate_url_faithful()` instead.
+ *
+ * Delegates the "is this an affiliate wrapper?" question to
+ * `data_machine_events_is_affiliate_ticket_url()` (see affiliate-links.php) —
+ * the single source of truth for the affiliate host list, shared with the
+ * ticket-link JS-gating surface. This function only owns the ?u=-style
+ * redirect-parameter unwrapping, not the host match.
+ *
+ * @since 0.62.0 Host list extracted to `data_machine_events_is_affiliate_ticket_url()`.
+ * @since 0.63.0 Redirect-parameter scan delegated to
+ *              `datamachine_find_affiliate_redirect_param()`. Behavior change
+ *              in one pathological case only: when an earlier redirect param
+ *              is present but invalid and a later one is valid, this now
+ *              returns the original URL instead of silently unwrapping to the
+ *              later param — masking a corrupt first param was the wrong
+ *              default (issue #823).
+ * @since 0.65.1 Docblock hardened to name this COMPARISON-ORIENTED and point
+ *              redirect/display callers at the new faithful sibling (issue
+ *              #824). No behavior change.
+ *
+ * @param string $url Possibly wrapped URL
+ * @return string Unwrapped URL, or original if not an affiliate wrapper.
+ *                A comparison key, not necessarily byte-identical to the
+ *                originally stored inner URL.
+ */
+function datamachine_unwrap_affiliate_url( string $url ): string {
+	if ( ! data_machine_events_is_affiliate_ticket_url( $url ) ) {
+		return $url;
+	}
+
+	$redirect = datamachine_find_affiliate_redirect_param( $url );
+	if ( null === $redirect ) {
+		return $url;
+	}
+
+	// Validate it looks like a URL
+	if ( filter_var( $redirect['value'], FILTER_VALIDATE_URL ) ) {
+		return $redirect['value'];
+	}
+
+	return $url;
+}
+
+/**
+ * Unwrap affiliate/redirect URLs to extract the canonical ticket URL for a
+ * REDIRECT/DISPLAY destination.
+ *
+ * FAITHFUL sibling of `datamachine_unwrap_affiliate_url()` (issue #824):
+ * decodes the redirect parameter exactly ONCE (`parse_str()`'s implicit
+ * decode only — no additional `urldecode()` pass), so nested percent-
+ * encoding inside the inner URL (e.g. an Impact Radius-wrapped SeatGeek
+ * destination's own `dd_referrer=https%253A%252F%252F...` query param)
+ * survives intact. `rawurlencode()`-ing this function's return value
+ * reproduces the originally stored redirect-parameter bytes exactly for
+ * every wrapper shape observed in production, including nested-encoded
+ * ones — the property `datamachine_unwrap_affiliate_url()` cannot offer.
+ *
+ * Use this for anything that sends a real visitor to the returned URL, or
+ * displays/emits it verbatim (a redirect endpoint, a JSON-LD `offers.url`,
+ * a canonical-URL migration/backfill). Use the comparison sibling instead
+ * for duplicate-detection identity — the two must never be swapped; see
+ * `datamachine_unwrap_affiliate_url()`'s docblock.
+ *
+ * @since 0.65.1
+ *
+ * @param string $url Possibly wrapped URL.
+ * @return string Byte-faithful unwrapped destination URL, or the original
+ *                `$url` unchanged when it isn't an affiliate wrapper, its
+ *                redirect parameter can't be recovered, or the extracted
+ *                value doesn't validate as a URL.
+ */
+function datamachine_unwrap_affiliate_url_faithful( string $url ): string {
+	if ( ! data_machine_events_is_affiliate_ticket_url( $url ) ) {
+		return $url;
+	}
+
+	$redirect = datamachine_find_affiliate_redirect_param( $url, true );
+	if ( null === $redirect ) {
+		return $url;
+	}
+
+	if ( filter_var( $redirect['value'], FILTER_VALIDATE_URL ) ) {
+		return $redirect['value'];
+	}
+
+	return $url;
+}
+
+/**
+ * Reverse the storage artifacts a stored ticket/organizer URL can carry.
+ *
+ * Two known artifact layers accumulate on values authored into
+ * `post_content`:
+ *
+ * 1. A literal six-character `\u0026` JSON-escape sequence inside the URL
+ *    string itself (double-JSON-encoded at import time) rather than an
+ *    actual ampersand. `wp_specialchars_decode()` does not recognize it.
+ * 2. HTML-entity encoding (`&amp;` etc.) from `esc_html()`/`esc_attr()`-
+ *    family authoring — correct for `href` embedding, wrong for values
+ *    assembled into HTTP `Location` headers or re-parsed as query strings.
+ *
+ * This is the same normalization
+ * `ResolveTicketDestinationAbilities::normalizeResolvedUrl()` applies before
+ * using a stored URL as a redirect destination. Any consumer that re-parses
+ * a stored URL (rather than handing it to a browser) must normalize through
+ * this helper first, or `&amp;utm_medium` parses as an `amp;utm_medium`
+ * parameter and `\u0026` splits the value at the wrong boundary. Kept in
+ * sync with that method; see issue #823.
+ *
+ * @since 0.63.0
+ *
+ * @param string $url Raw URL as stored.
+ * @return string URL with storage artifacts reversed.
+ */
+function datamachine_decode_stored_url_artifacts( string $url ): string {
+	if ( '' === $url ) {
+		return $url;
+	}
+
+	// Normalize the literal \u0026 sequence to an ampersand first;
+	// wp_specialchars_decode() does not recognize it.
+	$url = str_replace( '\u0026', '&', $url );
+
+	return wp_specialchars_decode( $url, ENT_QUOTES );
+}
+
+/**
+ * Sync event datetime to the datamachine_event_dates table on save.
+ *
+ * Parses the Event Details block attributes (the authoring source of truth)
+ * and writes the computed datetime to the datamachine_event_dates table (the
+ * query source of truth). Ticket URL meta is also synced for dedup queries.
+ *
+ * @param int      $post_id Post ID.
+ * @param \WP_Post $post    Post object.
+ * @param bool     $update  Whether this is an update.
+ */
+function data_machine_events_sync_datetime_meta( $post_id, $post, $update ) {
+	// Only for data_machine_events post type.
+	if ( Event_Post_Type::POST_TYPE !== $post->post_type ) {
+		return;
+	}
+
+	// Avoid infinite loops during autosave.
+	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+		return;
+	}
+	$delete_dates = static function ( int $event_id ): void {
+		if ( EventDatesTable::delete( $event_id ) ) {
+			return;
+		}
+		do_action(
+			'datamachine_event_dates_sync_failed',
+			new \WP_Error(
+				'event_dates_delete_failed',
+				'The derived event dates could not be deleted.',
+				array(
+					'status'    => 503,
+					'retryable' => true,
+				)
+			),
+			$event_id
+		);
+	};
+
+	// Parse blocks to extract event details from Event Details block.
+	$blocks              = parse_blocks( $post->post_content );
+	$event_details_found = false;
+
+	foreach ( $blocks as $block ) {
+		if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
+			$event_details_found = true;
+			$start_date          = $block['attrs']['startDate'] ?? '';
+			$start_time          = $block['attrs']['startTime'] ?? '';
+			$end_date            = $block['attrs']['endDate'] ?? '';
+			$end_time            = $block['attrs']['endTime'] ?? '';
+
+			$start_time_parts = $start_time ? explode( ':', $start_time ) : array();
+			if ( $start_time && count( $start_time_parts ) === 2 ) {
+				$start_time .= ':00';
+			}
+
+			$end_time_parts = explode( ':', $end_time );
+			if ( $end_time && count( $end_time_parts ) === 2 ) {
+				$end_time .= ':00';
+			}
+
+			// Universal write chokepoint: never let a malformed/placeholder date
+			// (e.g. "2026-07-??") be concatenated into a DATETIME and written to
+			// the event_dates table. On non-strict sql_mode MySQL silently
+			// coerces these to "0000-00-00 00:00:00", which then detonates on the
+			// render path. Every write path (AI, manual, CLI, backfill) funnels
+			// through save_post, so guarding here protects all of them. Skip the
+			// datetime sync cleanly rather than throwing or writing a junk row.
+			// See issue #394.
+			$has_valid_start = $start_date && DateTimeParser::isValidYmd( $start_date );
+			$has_invalid_end = $end_date && ! DateTimeParser::isValidYmd( $end_date );
+
+			if ( $start_date && ( ! $has_valid_start || $has_invalid_end ) ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event date sync skipped: malformed startDate/endDate would write an invalid DATETIME',
+					array(
+						'post_id'   => $post_id,
+						'startDate' => $start_date,
+						'endDate'   => $end_date,
+					)
+				);
+
+				// Still keep the ticket URL meta in sync, then stop before the
+				// datetime write. Do not fall through to the EventDatesTable::delete()
+				// branch — that is reserved for the genuinely date-less case.
+				$ticket_url = $block['attrs']['ticketUrl'] ?? '';
+				if ( $ticket_url ) {
+					update_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, datamachine_normalize_ticket_url( $ticket_url ) );
+				} else {
+					delete_post_meta( $post_id, EVENT_TICKET_URL_META_KEY );
+				}
+
+				break;
+			}
+
+			if ( $start_date ) {
+				$effective_start_time = $start_time ? $start_time : '00:00:00';
+				$datetime             = $start_date . ' ' . $effective_start_time;
+
+				if ( $end_date ) {
+					$effective_end_time = $end_time ? $end_time : '23:59:59';
+					$end_datetime_val   = $end_date . ' ' . $effective_end_time;
+
+					if ( $end_datetime_val < $datetime ) {
+						do_action(
+							'datamachine_log',
+							'warning',
+							'Event date sync preserved an explicit end datetime before its start datetime',
+							array(
+								'post_id'        => $post_id,
+								'start_datetime' => $datetime,
+								'end_datetime'   => $end_datetime_val,
+							)
+						);
+					}
+				} elseif ( $end_time ) {
+					$end_datetime_val = $start_date . ' ' . $end_time;
+
+					// A time-only end before the start is an implicit overnight event.
+					if ( $end_datetime_val < $datetime ) {
+						$overnight_ts = strtotime( $end_datetime_val . ' +1 day' );
+						if ( false !== $overnight_ts ) {
+							$end_datetime_val = gmdate( 'Y-m-d H:i:s', $overnight_ts );
+						}
+					}
+				} else {
+					$end_datetime_val = null;
+				}
+
+				// Occurrence-span guard (issue #199): a derived end more than a
+				// sane maximum past the start is a fabricated series range (the
+				// series' final occurrence stamped onto this one), not a real
+				// end. Prefer no end over an invented one — the calendar already
+				// renders a missing end — so strip it and log loudly instead of
+				// persisting the leak.
+				if ( null !== $end_datetime_val
+					&& ! EventSpanGuard::is_end_plausible( $datetime, $end_datetime_val ) ) {
+					do_action(
+						'datamachine_log',
+						'warning',
+						'Event date sync stripped an end datetime exceeding the maximum plausible occurrence span (probable series range leaked onto a single occurrence)',
+						array(
+							'post_id'        => $post_id,
+							'start_datetime' => $datetime,
+							'stripped_end'   => $end_datetime_val,
+							'max_span_hours' => EventSpanGuard::max_span_hours(),
+						)
+					);
+
+					/**
+					 * Fires when a derived end datetime is stripped for exceeding
+					 * the maximum plausible occurrence span.
+					 *
+					 * @param int    $post_id        Post ID.
+					 * @param string $start_datetime Start datetime.
+					 * @param string $end_datetime   Stripped end datetime.
+					 */
+					do_action( 'datamachine_event_dates_end_span_stripped', $post_id, $datetime, $end_datetime_val );
+
+					$end_datetime_val = null;
+				}
+
+				if ( EventDatesTable::upsert( $post_id, $datetime, $end_datetime_val ) ) {
+					/**
+					 * Fires after event dates are written to the event_dates table.
+					 *
+					 * Replaces the `updated_post_meta`/`added_post_meta` hooks that
+					 * previously fired from update_post_meta() calls.
+					 *
+					 * @param int         $post_id        Post ID.
+					 * @param string      $start_datetime Start datetime.
+					 * @param string|null $end_datetime   End datetime or null.
+					 */
+					do_action( 'datamachine_event_dates_updated', $post_id, $datetime, $end_datetime_val );
+				} else {
+					do_action(
+						'datamachine_event_dates_sync_failed',
+						new \WP_Error(
+							'event_dates_write_failed',
+							'The derived event dates could not be persisted.',
+							array(
+								'status'    => 503,
+								'retryable' => true,
+							)
+						),
+						$post_id
+					);
+				}
+			} else {
+				$delete_dates( $post_id );
+			}
+
+			// Sync ticket URL for duplicate detection queries.
+			$ticket_url = $block['attrs']['ticketUrl'] ?? '';
+			if ( $ticket_url ) {
+				update_post_meta( $post_id, EVENT_TICKET_URL_META_KEY, datamachine_normalize_ticket_url( $ticket_url ) );
+			} else {
+				delete_post_meta( $post_id, EVENT_TICKET_URL_META_KEY );
+			}
+
+			break;
+		}
+	}
+
+	if ( ! $event_details_found ) {
+		$delete_dates( $post_id );
+		delete_post_meta( $post_id, EVENT_TICKET_URL_META_KEY );
+	}
+}
+add_action( 'save_post', __NAMESPACE__ . '\\data_machine_events_sync_datetime_meta', 10, 3 );
+
+/**
+ * Sync post_status to event_dates table on status transitions.
+ *
+ * Keeps the denormalized post_status column in sync so that date queries
+ * can filter by status without joining the full posts table.
+ *
+ * @param string   $new_status New post status.
+ * @param string   $old_status Old post status.
+ * @param \WP_Post $post       Post object.
+ */
+function data_machine_events_sync_status( $new_status, $old_status, $post ) {
+	if ( Event_Post_Type::POST_TYPE !== $post->post_type ) {
+		return;
+	}
+
+	EventDatesTable::update_status( $post->ID, $new_status );
+}
+add_action( 'transition_post_status', __NAMESPACE__ . '\\data_machine_events_sync_status', 10, 3 );
+
+/**
+ * Remove an event-date row after its canonical event is permanently deleted.
+ *
+ * Trash and untrash remain status transitions; only permanent deletion removes
+ * the derived row.
+ *
+ * @param int      $post_id Deleted post ID.
+ * @param \WP_Post $post    Deleted post object.
+ */
+function data_machine_events_delete_dates( $post_id, $post ) {
+	if ( Event_Post_Type::POST_TYPE === $post->post_type ) {
+		EventDatesTable::delete( (int) $post_id );
+	}
+}
+add_action( 'deleted_post', __NAMESPACE__ . '\\data_machine_events_delete_dates', 10, 2 );
+
+/**
+ * Get event dates from the dedicated event_dates table.
+ *
+ * @param int $post_id Post ID.
+ * @return object|null Object with start_datetime and end_datetime properties, or null.
+ */
+function datamachine_get_event_dates( int $post_id ): ?object {
+	return EventDatesTable::get( $post_id );
+}
+
+/**
+ * Get event timing state for a single event.
+ *
+ * Applies the same logic as UpcomingFilter (the SQL-level source of truth)
+ * to a single event for runtime checks:
+ *   upcoming = start >= now
+ *   ongoing  = start < now AND end >= now
+ *   past     = start < now AND (end < now OR end IS NULL)
+ *
+ * @param int $post_id Event post ID.
+ * @return string 'upcoming' | 'ongoing' | 'past'
+ */
+function datamachine_get_event_timing( int $post_id ): string {
+	$dates = datamachine_get_event_dates( $post_id );
+
+	if ( ! $dates || empty( $dates->start_datetime ) ) {
+		return 'past';
+	}
+
+	$now         = current_time( 'mysql' );
+	$event_start = $dates->start_datetime;
+	$event_end   = $dates->end_datetime ?? null;
+
+	if ( $event_start >= $now ) {
+		return 'upcoming';
+	}
+
+	if ( $event_end && $event_end >= $now ) {
+		return 'ongoing';
+	}
+
+	return 'past';
+}
