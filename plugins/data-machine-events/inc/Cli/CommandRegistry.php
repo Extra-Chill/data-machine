@@ -127,6 +127,10 @@ class CommandRegistry {
 				'file'  => $cli . 'Check/CheckEventDateStatusCommand.php',
 				'class' => Check\CheckEventDateStatusCommand::class,
 			),
+			'data-machine-events check source-health'     => array(
+				'file'  => $cli . 'Check/CheckSourceHealthCommand.php',
+				'class' => Check\CheckSourceHealthCommand::class,
+			),
 			'data-machine-events check stale-listings'    => array(
 				'file'  => $cli . 'Check/CheckStaleListingsCommand.php',
 				'class' => Check\CheckStaleListingsCommand::class,
