@@ -56,6 +56,7 @@ function datamachine_uninstall_site() {
 	delete_option( 'datamachine_agent_ping_callback_token' );
 	delete_option( 'datamachine_page_hook_suffixes' );
 	delete_option( 'datamachine_post_identity_reservations_schema' );
+	delete_option( 'datamachine_schema_fingerprint' );
 
 	// Unified auth data.
 	delete_option( 'datamachine_auth_data' );

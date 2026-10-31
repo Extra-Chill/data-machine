@@ -15,6 +15,11 @@ defined( 'ABSPATH' ) || exit;
 final class ActivationServiceProvider {
 
 	/**
+	 * Site option holding the fingerprint of the last successfully converged schema.
+	 */
+	public const SCHEMA_FINGERPRINT_OPTION = 'datamachine_schema_fingerprint';
+
+	/**
 	 * Register lifecycle hooks in their established order.
 	 *
 	 * @param string $plugin_file Main plugin file.
@@ -178,9 +183,57 @@ final class ActivationServiceProvider {
 	}
 
 	/**
+	 * Fingerprint of the schema this code expects for the current site.
+	 *
+	 * Combines the plugin version (covers column type or definition changes that
+	 * keep the same names) with the required tables, columns, and indexes. The
+	 * requirements include the site and network table prefixes, so each site gets
+	 * its own fingerprint, and any network-table change invalidates every site.
+	 */
+	public static function schema_fingerprint(): string {
+		$version = defined( 'DATAMACHINE_VERSION' ) ? (string) DATAMACHINE_VERSION : '';
+
+		return md5( $version . '|' . (string) wp_json_encode( self::current_schema_requirements() ) );
+	}
+
+	/**
+	 * Converge the schema only when it can have changed since the last success.
+	 *
+	 * The per-request path: one autoloaded option read when the stored
+	 * fingerprint matches. Activation, new-site setup, version-bump convergence,
+	 * and operator paths call ensure_all_tables() directly and always converge.
+	 */
+	public static function ensure_all_tables_if_needed(): bool {
+		if ( self::schema_fingerprint() === get_option( self::SCHEMA_FINGERPRINT_OPTION, '' ) ) {
+			return true;
+		}
+
+		return self::ensure_all_tables();
+	}
+
+	/**
 	 * Create or update every Data Machine database table.
+	 *
+	 * Records the schema fingerprint on success so ensure_all_tables_if_needed()
+	 * can skip later requests. A failed convergence clears it, so the next
+	 * request retries.
 	 */
 	public static function ensure_all_tables(): bool {
+		$converged = self::converge_all_tables();
+
+		if ( $converged ) {
+			update_option( self::SCHEMA_FINGERPRINT_OPTION, self::schema_fingerprint(), true );
+		} else {
+			delete_option( self::SCHEMA_FINGERPRINT_OPTION );
+		}
+
+		return $converged;
+	}
+
+	/**
+	 * Run every table ensure, then validate the resulting schema.
+	 */
+	private static function converge_all_tables(): bool {
 		try {
 			\DataMachine\Core\Database\Logs\LogRepository::create_table();
 			self::create_network_agent_tables();

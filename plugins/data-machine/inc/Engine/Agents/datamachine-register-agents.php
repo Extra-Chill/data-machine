@@ -24,7 +24,9 @@ defined( 'ABSPATH' ) || exit;
  */
 function datamachine_reconcile_registered_agents(): array {
 	if ( class_exists( \DataMachine\Core\Bootstrap\ActivationServiceProvider::class ) ) {
-		\DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
+		// Gated: a stored schema fingerprint makes this one option read per
+		// request; tables are converged only when the expected schema changed.
+		\DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables_if_needed();
 	}
 
 	$definitions = array_map(

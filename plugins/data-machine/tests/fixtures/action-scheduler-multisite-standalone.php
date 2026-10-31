@@ -198,6 +198,10 @@ namespace {
 		return true;
 	}
 
+	function wp_json_encode( $value, $flags = 0, $depth = 512 ) {
+		return json_encode( $value, $flags, $depth );
+	}
+
 	function switch_to_blog( int $blog_id ): bool {
 		$GLOBALS['datamachine_test_blog_stack'][] = $GLOBALS['datamachine_test_blog_id'];
 		$GLOBALS['datamachine_test_blog_id']       = $blog_id;
