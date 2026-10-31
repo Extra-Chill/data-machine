@@ -1,0 +1,56 @@
+name: data-machine-socials
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'plugins/data-machine-socials/**'
+      # Extensions run against the in-tree core, so a core change re-checks them.
+      - 'plugins/data-machine/**'
+      - '.github/workflows/data-machine-socials.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/data-machine-socials/**'
+      # Extensions run against the in-tree core, so a core change re-checks them.
+      - 'plugins/data-machine/**'
+      - '.github/workflows/data-machine-socials.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: data-machine-socials-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  homeboy:
+    name: Homeboy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.HOMEBOY_APP_ID }}
+          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
+
+      - name: Prepare in-tree Data Machine core
+        run: composer install --working-dir=plugins/data-machine --no-dev --no-interaction --no-progress --prefer-dist --classmap-authoritative
+
+      - name: Run Homeboy
+        env:
+          HOMEBOY_WORDPRESS_DEPENDENCY_PATHS: ${{ github.workspace }}/plugins/data-machine
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          component: plugins/data-machine-socials
+          comment-key: data-machine-socials
+          app-token: ${{ steps.app-token.outputs.token || '' }}

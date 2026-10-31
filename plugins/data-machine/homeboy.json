@@ -1270,5 +1270,8 @@
   ],
   "release": {
     "owner": "ci"
+  },
+  "github": {
+    "release_latest": true
   }
 }

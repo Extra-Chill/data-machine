@@ -80,7 +80,7 @@ No. Data Machine does not include telemetry or require a Data Machine-hosted Saa
 
 = Where is the documentation? =
 
-Documentation and architecture references are maintained at https://github.com/Extra-Chill/data-machine/tree/main/docs.
+Documentation and architecture references are maintained at https://github.com/Extra-Chill/data-machine/tree/main/plugins/data-machine/docs.
 
 == External Services ==
 
@@ -120,7 +120,7 @@ Release notes and the complete changelog are maintained at https://github.com/Ex
 
 == Links ==
 
-* Documentation: https://github.com/Extra-Chill/data-machine/tree/main/docs
+* Documentation: https://github.com/Extra-Chill/data-machine/tree/main/plugins/data-machine/docs
 * Source: https://github.com/Extra-Chill/data-machine
 * Issues and support: https://github.com/Extra-Chill/data-machine/issues
 * Agents API: https://github.com/Automattic/agents-api

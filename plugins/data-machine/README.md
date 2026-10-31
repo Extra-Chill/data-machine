@@ -2,7 +2,7 @@
 
 Agentic workflow automation for WordPress.
 
-[![Try Data Machine in WordPress Playground](https://img.shields.io/badge/Try_Data_Machine_in-WordPress_Playground-3858e9?style=for-the-badge&logo=wordpress&logoColor=white)](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/Extra-Chill/data-machine/main/blueprints/playground.json)
+[![Try Data Machine in WordPress Playground](https://img.shields.io/badge/Try_Data_Machine_in-WordPress_Playground-3858e9?style=for-the-badge&logo=wordpress&logoColor=white)](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/Extra-Chill/data-machine/main/plugins/data-machine/blueprints/playground.json)
 
 Click the badge to open a fresh Data Machine in a browser-only WordPress instance. The Playground boots WordPress, installs Data Machine plus its substrate (Agents API and the WordPress AI Provider for OpenAI), and drops you into the Data Machine admin. Add your own OpenAI key in Settings to start chatting with an agent or running a pipeline. Nothing persists once the tab closes.
 
@@ -266,12 +266,12 @@ Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-jso
 | Plugin | Description |
 |--------|-------------|
 | [data-machine-code](https://github.com/Extra-Chill/data-machine-code) | Workspace management, GitHub integration, git operations |
-| [data-machine-socials](https://github.com/Extra-Chill/data-machine-socials) | Publish to Instagram (images, carousels, Reels, Stories), Twitter (text + media + video), Facebook, Threads, Bluesky, Pinterest (image + video pins). Reddit fetch. |
-| [data-machine-business](https://github.com/Extra-Chill/data-machine-business) | Google Sheets (fetch + publish), Slack, Discord integrations |
+| [data-machine-socials](../data-machine-socials) | Publish to Instagram (images, carousels, Reels, Stories), Twitter (text + media + video), Facebook, Threads, Bluesky, Pinterest (image + video pins). Reddit fetch. |
+| [data-machine-business](../data-machine-business) | Google Sheets (fetch + publish), Slack, Discord integrations |
 | [data-machine-editor](https://github.com/Extra-Chill/data-machine-editor) | Gutenberg inline diff visualization, accept/reject review, editor sidebar |
 | [data-machine-frontend-chat](https://github.com/Extra-Chill/data-machine-frontend-chat) | Floating agent chat widget for any WordPress site |
 | [data-machine-chat-bridge](https://github.com/Extra-Chill/data-machine-chat-bridge) | Message queue, webhook delivery, and REST API for external chat clients |
-| [data-machine-events](https://github.com/Extra-Chill/data-machine-events) | Event calendar automation with AI + Gutenberg blocks |
+| [data-machine-events](../data-machine-events) | Event calendar automation with AI + Gutenberg blocks |
 | [datamachine-recipes](https://github.com/Sarai-Chinwag/datamachine-recipes) | Recipe content extraction and schema processing |
 | [data-machine-quiz](https://github.com/Sarai-Chinwag/data-machine-quiz) | Quiz creation and management tools |
 
