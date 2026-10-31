@@ -37,7 +37,12 @@ class GetEventAbilities {
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'event_id' ),
-					'properties' => array( 'event_id' => array( 'type' => 'integer', 'minimum' => 1 ) ),
+					'properties' => array(
+						'event_id' => array(
+							'type' => 'integer',
+							'minimum' => 1,
+						),
+					),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
@@ -87,7 +92,13 @@ class GetEventAbilities {
 			return $this->notFound();
 		}
 		$groups = DateGrouper::group_events_by_date(
-			array( array( 'post' => $post, 'event_data' => $data, 'datetime' => $datetime ) ),
+			array(
+				array(
+					'post' => $post,
+					'event_data' => $data,
+					'datetime' => $datetime,
+				),
+			),
 			true
 		);
 		// Grouping sorts past dates in reverse order; detail always uses the first occurrence.
@@ -125,12 +136,12 @@ class GetEventAbilities {
 	private function renderContent( \WP_Post $event ): string {
 		global $post;
 		$previous = $post;
-		$post     = $event;
+		$post     = $event; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- dynamic event blocks read the global post; restored in finally.
 		setup_postdata( $post );
 		try {
 			return (string) apply_filters( 'the_content', $event->post_content );
 		} finally {
-			$post = $previous;
+			$post = $previous; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- restores the caller's global post.
 			if ( $post instanceof \WP_Post ) {
 				setup_postdata( $post );
 			} else {
