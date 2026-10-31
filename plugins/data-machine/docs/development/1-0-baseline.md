@@ -1,6 +1,6 @@
 # Data Machine 1.0 Baseline
 
-Data Machine 1.0 supports one current schema and one current runtime contract. Fresh installs and deploy-in-place updates run the idempotent schema bootstrap in `inc/setup/schema.php`; activation and that bootstrap both converge through `ActivationServiceProvider::ensure_all_tables()`.
+Data Machine 1.0 supports one current schema and one current runtime contract. Fresh installs and deploy-in-place updates run the idempotent schema bootstrap in `inc/setup/schema.php`; activation and that bootstrap both converge through `ActivationServiceProvider::ensure_all_tables()`. A successful convergence stores a schema fingerprint (plugin version plus `current_schema_requirements()`) in the `datamachine_schema_fingerprint` site option; ordinary requests call `ActivationServiceProvider::ensure_all_tables_if_needed()`, which is a single option read until that fingerprint changes.
 
 ## Upgrade Boundary
 
