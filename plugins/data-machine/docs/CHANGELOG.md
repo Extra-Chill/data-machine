@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.200.4] - 2026-10-31
+
+### Changed
+- skip per-request agent reconcile when definitions are unchanged
+
 ## [0.200.3] - 2026-10-31
 
 ### Changed
