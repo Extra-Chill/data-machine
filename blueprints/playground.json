@@ -1,0 +1,37 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "preferredVersions": {
+    "php": "latest",
+    "wp": "beta"
+  },
+  "landingPage": "/wp-admin/admin.php?page=datamachine-agent",
+  "login": true,
+  "steps": [
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "git:directory",
+        "url": "https://github.com/WordPress/ai-provider-for-openai",
+        "ref": "trunk",
+        "refType": "branch"
+      },
+      "options": {
+        "activate": true,
+        "targetFolderName": "ai-provider-for-openai"
+      }
+    },
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "git:directory",
+        "url": "https://github.com/Extra-Chill/data-machine",
+        "ref": "release-latest",
+        "refType": "branch"
+      },
+      "options": {
+        "activate": true,
+        "targetFolderName": "data-machine"
+      }
+    }
+  ]
+}
