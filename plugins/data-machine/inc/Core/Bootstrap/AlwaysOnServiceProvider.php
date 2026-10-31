@@ -26,7 +26,7 @@ final class AlwaysOnServiceProvider {
 
 		add_action(
 			'action_scheduler_init',
-			array( \DataMachine\Core\ActionScheduler\GroupRegistrar::class, 'ensureDataMachineGroup' ),
+			array( \DataMachine\Core\ActionScheduler\GroupRegistrar::class, 'ensureDataMachineGroupIfStale' ),
 			0
 		);
 

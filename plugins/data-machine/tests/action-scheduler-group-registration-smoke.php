@@ -21,6 +21,8 @@ class ActionSchedulerGroupRegistrationWpdb {
 	public string $actionscheduler_groups = 'wp_actionscheduler_groups';
 	public bool $group_exists = false;
 	public array $inserted = array();
+	public int $queries    = 0;
+	public bool $table_missing = false;
 
 	public function prepare( string $query, ...$args ) {
 		return array(
@@ -30,9 +32,10 @@ class ActionSchedulerGroupRegistrationWpdb {
 	}
 
 	public function get_var( $prepared ) {
+		++$this->queries;
 		$query = is_array( $prepared ) ? (string) $prepared['query'] : (string) $prepared;
 		if ( false !== strpos( $query, 'SHOW TABLES LIKE' ) ) {
-			return $this->actionscheduler_groups;
+			return $this->table_missing ? null : $this->actionscheduler_groups;
 		}
 
 		if ( false !== strpos( $query, 'SELECT group_id' ) ) {
@@ -76,6 +79,21 @@ if ( ! function_exists( 'wp_insert_term' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( string $option, $default_value = false ) {
+		return $GLOBALS['action_scheduler_group_options'][ $option ] ?? $default_value;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( string $option, $value, $autoload = null ): bool {
+		unset( $autoload );
+		$GLOBALS['action_scheduler_group_options'][ $option ] = $value;
+		return true;
+	}
+}
+
+$GLOBALS['action_scheduler_group_options'] = array();
 $GLOBALS['wpdb']                         = new ActionSchedulerGroupRegistrationWpdb();
 $GLOBALS['action_scheduler_group_terms'] = array();
 
@@ -137,5 +155,30 @@ assert_action_scheduler_group_true(
 	$insert_count === count( $GLOBALS['wpdb']->inserted ),
 	'group registrar does not duplicate the custom-table group row'
 );
+
+// Per-request gate (#3711): the AS init hook uses the TTL-gated entry point.
+assert_action_scheduler_group_contains( "'ensureDataMachineGroupIfStale'", $provider_src, 'AS init hook uses the TTL-gated group check' );
+
+$registrar = \DataMachine\Core\ActionScheduler\GroupRegistrar::class;
+$GLOBALS['wpdb']->queries = 0;
+$registrar::ensureDataMachineGroupIfStale();
+assert_action_scheduler_group_true( 2 === $GLOBALS['wpdb']->queries, 'stale gate probes the groups table' );
+assert_action_scheduler_group_true( (int) get_option( $registrar::GROUP_VERIFIED_OPTION, 0 ) > 0, 'confirmed group records the verification time' );
+
+$GLOBALS['wpdb']->queries = 0;
+$registrar::ensureDataMachineGroupIfStale();
+$registrar::ensureDataMachineGroupIfStale();
+assert_action_scheduler_group_true( 0 === $GLOBALS['wpdb']->queries, 'fresh gate skips the groups probe' );
+
+update_option( $registrar::GROUP_VERIFIED_OPTION, time() - $registrar::VERIFY_TTL - 1 );
+$registrar::ensureDataMachineGroupIfStale();
+assert_action_scheduler_group_true( 2 === $GLOBALS['wpdb']->queries, 'expired gate probes again' );
+
+$GLOBALS['action_scheduler_group_options'] = array();
+$GLOBALS['wpdb']->group_exists = false;
+$GLOBALS['wpdb']->table_missing = true;
+$registrar::ensureDataMachineGroupIfStale();
+assert_action_scheduler_group_true( 0 === (int) get_option( $registrar::GROUP_VERIFIED_OPTION, 0 ), 'unconfirmed group is not recorded as verified' );
+$GLOBALS['wpdb']->table_missing = false;
 
 echo "OK ({$assertions} assertions)\n";
