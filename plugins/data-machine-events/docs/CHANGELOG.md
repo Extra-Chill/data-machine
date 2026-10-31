@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.79.0] - 2026-10-31
+
+### Added
+- REST-visible get-event by ID for native clients
+
 ## [0.78.4] - 2026-10-31
 
 ### Changed
