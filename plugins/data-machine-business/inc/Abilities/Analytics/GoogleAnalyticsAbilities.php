@@ -1,0 +1,2213 @@
+<?php
+/**
+ * Google Analytics (GA4) Abilities
+ *
+ * Primitive ability for Google Analytics Data API (GA4).
+ * All GA4 data — tools, CLI, REST, chat — flows through this ability.
+ *
+ * Uses the GA4 Data API v1beta to fetch visitor analytics:
+ * page performance, traffic sources, daily trends, real-time data,
+ * top events, and user demographics.
+ *
+ * Authentication uses the same service account JWT flow as Google Search Console.
+ *
+ * @package DataMachineBusiness\Abilities\Analytics
+ * @since 0.31.0
+ */
+
+namespace DataMachineBusiness\Abilities\Analytics;
+
+use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\HttpClient;
+use DataMachineBusiness\OAuth\Providers\GoogleServiceAccountAuth;
+
+defined( 'ABSPATH' ) || exit;
+
+class GoogleAnalyticsAbilities {
+
+	/**
+	 * Option key for storing GA configuration.
+	 *
+	 * @var string
+	 */
+	const CONFIG_OPTION = 'datamachine_ga_config';
+
+	/** OAuth scope this ability requests. */
+	const SCOPE = 'https://www.googleapis.com/auth/analytics.readonly';
+
+
+	/**
+	 * GA4 Data API base URL.
+	 *
+	 * @var string
+	 */
+	const API_BASE = 'https://analyticsdata.googleapis.com/v1beta/properties/';
+
+	/**
+	 * GA4 Data API v1alpha base URL.
+	 *
+	 * The funnel report surface (runFunnelReport) — the only Data API method that
+	 * expresses ordered, session-scoped steps — is alpha-only. See path_sequence.
+	 *
+	 * @var string
+	 */
+	const API_BASE_ALPHA = 'https://analyticsdata.googleapis.com/v1alpha/properties/';
+
+	/**
+	 * Default number of hostnames to fan out into path_sequence funnels.
+	 *
+	 * path_sequence runs one runFunnelReport per ORDERED host pair, so cost grows
+	 * ~N*(N-1). The default keeps a full run inside a normal CLI/HTTP timeout
+	 * while still covering a typical small multisite network; callers can raise
+	 * it with the `limit` input (clamped to PATH_SEQUENCE_MAX_HOSTS).
+	 *
+	 * @var int
+	 */
+	const PATH_SEQUENCE_DEFAULT_HOSTS = 6;
+
+	/**
+	 * Hard ceiling on path_sequence host fan-out.
+	 *
+	 * Bounds worst-case API usage regardless of the `limit` input — N hosts cost
+	 * up to N*(N-1) funnel calls, so this caps the blast radius.
+	 *
+	 * @var int
+	 */
+	const PATH_SEQUENCE_MAX_HOSTS = 12;
+
+	/**
+	 * Default result limit.
+	 *
+	 * @var int
+	 */
+	const DEFAULT_LIMIT = 25;
+
+	/**
+	 * Maximum result limit.
+	 *
+	 * @var int
+	 */
+	const MAX_LIMIT = 10000;
+
+	const AGGREGATE_MAX_DATE_RANGE_DAYS  = 400;
+	const AGGREGATE_MAX_ROWS             = 100;
+	const AGGREGATE_MAX_RESPONSE_BYTES   = 4194304;
+	const AGGREGATE_BATCH_RESPONSE_KIND  = 'analyticsData#batchRunReports';
+	const AGGREGATE_REPORT_RESPONSE_KIND = 'analyticsData#runReport';
+	const AGGREGATE_DIMENSIONS           = array( 'browser', 'country', 'countryId', 'date', 'deviceCategory', 'eventName', 'firstUserDefaultChannelGroup', 'firstUserMedium', 'firstUserSource', 'hostName', 'landingPage', 'month', 'newVsReturning', 'operatingSystem', 'pagePath', 'pageTitle', 'region', 'sessionCampaignName', 'sessionDefaultChannelGroup', 'sessionMedium', 'sessionSource', 'week' );
+	const AGGREGATE_METRICS              = array( 'activeUsers', 'averageSessionDuration', 'bounceRate', 'engagedSessions', 'engagementRate', 'eventCount', 'eventsPerSession', 'keyEvents', 'newUsers', 'screenPageViews', 'screenPageViewsPerSession', 'sessionKeyEventRate', 'sessions', 'sessionsPerUser', 'totalUsers', 'userKeyEventRate' );
+
+	/**
+	 * ISO-3166-1 alpha-2 country code pattern used to validate --country cohorts.
+	 *
+	 * GA4's `country` dimension returns full English names ("United States"),
+	 * not codes — `countryId` is the ISO-alpha-2-coded dimension and the only
+	 * one that supports an exact-match --country=<code> filter.
+	 *
+	 * @var string
+	 */
+	const COUNTRY_CODE_PATTERN = '/^[A-Z]{2}$/';
+
+	/**
+	 * Share at which unknown landing-page coverage is material to analysis.
+	 *
+	 * @var float
+	 */
+	const UNKNOWN_LANDING_PAGE_MATERIAL_SHARE = 0.05;
+
+	/**
+	 * Action-to-report configuration mapping.
+	 *
+	 * Each action defines the dimensions and metrics for its GA4 report request.
+	 *
+	 * @var array
+	 */
+	const ACTION_REPORTS = array(
+		'page_stats'               => array(
+			// hostName is prepended (not replacing pagePath) so existing pagePath-keyed
+			// consumers keep working while cross-site rows become distinguishable — on a
+			// multisite GA4 property two sites otherwise both collapse to pagePath "/".
+			'dimensions' => array( 'hostName', 'pagePath', 'pageTitle' ),
+			'metrics'    => array( 'screenPageViews', 'sessions', 'bounceRate', 'averageSessionDuration', 'activeUsers' ),
+		),
+		'network_density'          => array(
+			// Cross-site journey proxy: current host x previous URL. Bucket pageReferrer's
+			// host into in-network vs external to compute "% of sessions per site whose
+			// referrer was another EC site". Approximation only — see action description.
+			'dimensions' => array( 'hostName', 'pageReferrer' ),
+			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews' ),
+		),
+		'traffic_sources'          => array(
+			'dimensions' => array( 'sessionSource', 'sessionMedium' ),
+			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews', 'bounceRate' ),
+		),
+		'date_stats'               => array(
+			'dimensions' => array( 'date' ),
+			'metrics'    => array( 'sessions', 'screenPageViews', 'activeUsers', 'bounceRate', 'averageSessionDuration' ),
+		),
+		'top_events'               => array(
+			'dimensions' => array( 'eventName' ),
+			'metrics'    => array( 'eventCount', 'eventCountPerUser' ),
+		),
+		'user_demographics'        => array(
+			'dimensions' => array( 'country', 'deviceCategory' ),
+			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews' ),
+		),
+		'landing_pages'            => array(
+			'dimensions' => array( 'landingPage' ),
+			'metrics'    => array( 'sessions', 'activeUsers', 'bounceRate', 'averageSessionDuration', 'engagementRate' ),
+		),
+		'landing_page_acquisition' => array(
+			// Session-entry semantics: acquisition is attributed to the page where
+			// the session began, not every page subsequently touched.
+			'dimensions' => array( 'landingPage', 'sessionSource', 'sessionMedium' ),
+			'metrics'    => array( 'sessions', 'activeUsers', 'engagedSessions', 'engagementRate' ),
+		),
+		'page_acquisition'         => array(
+			// Touched-page semantics: pagePath includes any matching page viewed
+			// during sessions attributed to the returned source and medium.
+			'dimensions' => array( 'pagePath', 'sessionSource', 'sessionMedium' ),
+			'metrics'    => array( 'screenPageViews', 'sessions', 'activeUsers', 'engagedSessions' ),
+		),
+		'page_audience'            => array(
+			'dimensions' => array( 'pagePath', 'country', 'deviceCategory' ),
+			'metrics'    => array( 'screenPageViews', 'sessions', 'activeUsers' ),
+		),
+		'engagement'               => array(
+			'dimensions' => array( 'pagePath', 'pageTitle' ),
+			'metrics'    => array( 'engagementRate', 'averageSessionDuration', 'engagedSessions', 'sessionsPerUser', 'screenPageViewsPerSession', 'userEngagementDuration' ),
+		),
+		'new_vs_returning'         => array(
+			'dimensions' => array( 'newVsReturning' ),
+			'metrics'    => array( 'sessions', 'activeUsers', 'engagementRate', 'screenPageViewsPerSession', 'averageSessionDuration' ),
+		),
+	);
+
+	private static bool $registered = false;
+
+	public function __construct() {
+		if ( self::$registered ) {
+			return;
+		}
+
+		$this->registerAbilities();
+		self::$registered = true;
+	}
+
+	private function registerAbilities(): void {
+		$register_callback = function () {
+			$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence', 'aggregate_report' ) );
+
+			wp_register_ability(
+				'datamachine/google-analytics',
+				array(
+					'label'               => 'Google Analytics',
+					'description'         => 'Fetch visitor analytics data from Google Analytics (GA4) Data API',
+					'category'            => 'datamachine-analytics',
+					'input_schema'        => self::inputSchema( $valid_actions ),
+					'output_schema'       => self::outputSchema(),
+					'execute_callback'    => array( self::class, 'fetchStats' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => false ),
+				)
+			);
+		};
+
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/**
+	 * Ability output schema.
+	 *
+	 * @return array
+	 */
+	public static function outputSchema(): array {
+		$coverage_period = array(
+			'type'       => 'object',
+			'properties' => array(
+				'status'                     => array(
+					'type' => 'string',
+					'enum' => array( 'complete', 'partial' ),
+				),
+				'unknown_sessions'           => array( 'type' => array( 'integer', 'null' ) ),
+				'observed_unknown_sessions'  => array( 'type' => 'integer' ),
+				'observed_fetched_sessions'  => array( 'type' => 'integer' ),
+				'total_sessions'             => array( 'type' => array( 'integer', 'null' ) ),
+				'share'                      => array( 'type' => array( 'number', 'null' ) ),
+				'observed_share_lower_bound' => array( 'type' => array( 'number', 'null' ) ),
+				'engaged_sessions'           => array( 'type' => array( 'integer', 'null' ) ),
+				'engagement_rate'            => array( 'type' => array( 'number', 'null' ) ),
+				'materiality'                => array(
+					'type' => 'string',
+					'enum' => array( 'absent', 'small', 'material', 'unknown' ),
+				),
+			),
+		);
+
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'success'                    => array( 'type' => 'boolean' ),
+				'action'                     => array( 'type' => 'string' ),
+				'results_count'              => array( 'type' => 'integer' ),
+				'results'                    => array( 'type' => 'array' ),
+				'pagination'                 => array( 'type' => 'object' ),
+				'unknown_dimension_coverage' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'dimension'                => array( 'type' => 'string' ),
+						'unknown_value'            => array( 'type' => 'string' ),
+						'interpretation'           => array( 'type' => 'string' ),
+						'material_share_threshold' => array( 'type' => 'number' ),
+						'current_period'           => $coverage_period,
+						'comparison_period'        => array(
+							'type'       => array( 'object', 'null' ),
+							'properties' => $coverage_period['properties'],
+						),
+					),
+				),
+				'error'                      => array( 'type' => 'string' ),
+				'reports'                    => array(
+					'type'     => 'array',
+					'maxItems' => 2,
+					'items'    => self::aggregateReportOutputSchema(),
+				),
+				'dimensions'                 => array(
+					'type'  => 'array',
+					'items' => array(
+						'type' => 'string',
+						'enum' => self::AGGREGATE_DIMENSIONS,
+					),
+				),
+				'metrics'                    => array(
+					'type'  => 'array',
+					'items' => array(
+						'type' => 'string',
+						'enum' => self::AGGREGATE_METRICS,
+					),
+				),
+				'filters'                    => array(
+					'type'  => 'array',
+					'items' => self::aggregateFilterSchema(),
+				),
+			),
+		);
+	}
+
+	public static function aggregateInputSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'action', 'date_range', 'metrics' ),
+			'properties'           => array(
+				'action'                => array(
+					'type' => 'string',
+					'enum' => array( 'aggregate_report' ),
+				),
+				'property_id'           => array(
+					'type'    => 'string',
+					'pattern' => '^\\d{6,20}$',
+				),
+				'date_range'            => self::aggregateDateRangeSchema(),
+				'comparison_date_range' => self::aggregateDateRangeSchema(),
+				'dimensions'            => array(
+					'type'        => 'array',
+					'items'       => array(
+						'type' => 'string',
+						'enum' => self::AGGREGATE_DIMENSIONS,
+					),
+					'maxItems'    => 3,
+					'uniqueItems' => true,
+				),
+				'metrics'               => array(
+					'type'        => 'array',
+					'items'       => array(
+						'type' => 'string',
+						'enum' => self::AGGREGATE_METRICS,
+					),
+					'minItems'    => 1,
+					'maxItems'    => 8,
+					'uniqueItems' => true,
+				),
+				'filters'               => array(
+					'type'     => 'array',
+					'maxItems' => 4,
+					'items'    => self::aggregateFilterSchema(),
+				),
+				'order_by'              => array(
+					'type'     => 'array',
+					'maxItems' => 2,
+					'items'    => self::aggregateOrderSchema(),
+				),
+				'limit'                 => array(
+					'type'    => 'integer',
+					'minimum' => 1,
+					'maximum' => self::AGGREGATE_MAX_ROWS,
+				),
+				'country'               => array(
+					'type'      => 'string',
+					'maxLength' => 200,
+				),
+			),
+		);
+	}
+
+	/** Closed action-specific schemas keep aggregate bounds visible to consumers. */
+	public static function inputSchema( array $valid_actions = array() ): array {
+		$legacy_actions = array_diff( $valid_actions ? $valid_actions : array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence' ) ), array( 'aggregate_report' ) );
+		$aggregate      = self::aggregateInputSchema();
+		$legacy_fields  = array(
+			'action'      => array(
+				'type' => 'string',
+				'enum' => array_values( $legacy_actions ),
+			),
+			'property_id' => array( 'type' => 'string' ),
+			'start_date'  => array( 'type' => 'string' ),
+			'end_date'    => array( 'type' => 'string' ),
+			'limit'       => array(
+				'type'    => 'integer',
+				'minimum' => 1,
+				'maximum' => self::MAX_LIMIT,
+			),
+			'page_filter' => array( 'type' => 'string' ),
+			'hostname'    => array( 'type' => 'string' ),
+			'country'     => array(
+				'type'      => 'string',
+				'maxLength' => 200,
+			),
+			'sort_by'     => array( 'type' => 'string' ),
+			'order'       => array(
+				'type' => 'string',
+				'enum' => array( 'asc', 'desc' ),
+			),
+			'compare'     => array( 'type' => 'boolean' ),
+		);
+		return array(
+			'oneOf' => array(
+				array(
+					'type'       => 'object',
+					'required'   => array( 'action' ),
+					'properties' => $legacy_fields,
+				),
+				$aggregate,
+			),
+		);
+	}
+
+	public static function aggregateDateRangeSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'start_date', 'end_date' ),
+			'properties'           => array(
+				'start_date' => array(
+					'type'    => 'string',
+					'pattern' => '^\\d{4}-\\d{2}-\\d{2}$',
+				),
+				'end_date'   => array(
+					'type'    => 'string',
+					'pattern' => '^\\d{4}-\\d{2}-\\d{2}$',
+				),
+			),
+		);
+	}
+
+	public static function aggregateFilterSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'field_name', 'match_type', 'value' ),
+			'properties'           => array(
+				'field_name'     => array(
+					'type' => 'string',
+					'enum' => self::AGGREGATE_DIMENSIONS,
+				),
+				'match_type'     => array(
+					'type' => 'string',
+					'enum' => array( 'EXACT', 'CONTAINS', 'BEGINS_WITH', 'ENDS_WITH' ),
+				),
+				'value'          => array(
+					'type'      => 'string',
+					'minLength' => 1,
+					'maxLength' => 200,
+				),
+				'case_sensitive' => array( 'type' => 'boolean' ),
+				'exclude'        => array( 'type' => 'boolean' ),
+			),
+		);
+	}
+
+	public static function aggregateOrderSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'type', 'name' ),
+			'properties'           => array(
+				'type'       => array(
+					'type' => 'string',
+					'enum' => array( 'dimension', 'metric' ),
+				),
+				'name'       => array( 'type' => 'string' ),
+				'descending' => array( 'type' => 'boolean' ),
+			),
+		);
+	}
+
+	private static function aggregateReportOutputSchema(): array {
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'required'             => array( 'label', 'date_range', 'rows', 'totals', 'returned_row_count', 'row_count', 'quota_remaining', 'coverage_limits' ),
+			'properties'           => array(
+				'label'              => array(
+					'type' => 'string',
+					'enum' => array( 'primary', 'comparison' ),
+				),
+				'date_range'         => self::aggregateDateRangeSchema(),
+				'rows'               => array(
+					'type'     => 'array',
+					'maxItems' => self::AGGREGATE_MAX_ROWS,
+					'items'    => array(
+						'type'                 => 'object',
+						'additionalProperties' => false,
+						'required'             => array( 'dimensions', 'metrics' ),
+						'properties'           => array(
+							'dimensions' => self::aggregateOutputRecordSchema( self::AGGREGATE_DIMENSIONS, 3, 2000 ),
+							'metrics'    => self::aggregateOutputRecordSchema( self::AGGREGATE_METRICS, 8, 200 ),
+						),
+					),
+				),
+				'totals'             => self::aggregateOutputRecordSchema( self::AGGREGATE_METRICS, 8, 200 ),
+				'returned_row_count' => array( 'type' => 'integer' ),
+				'row_count'          => array( 'type' => 'integer' ),
+				'quota_remaining'    => array(
+					'type'                 => 'object',
+					'maxProperties'        => 10,
+					'additionalProperties' => array(
+						'type'    => 'integer',
+						'minimum' => 0,
+					),
+				),
+				'coverage_limits'    => array(
+					'type'     => 'array',
+					'maxItems' => 10,
+					'items'    => array(
+						'type'      => 'string',
+						'maxLength' => 300,
+					),
+				),
+				'time_zone'          => array(
+					'type'      => 'string',
+					'maxLength' => 100,
+				),
+				'currency_code'      => array(
+					'type'      => 'string',
+					'maxLength' => 20,
+				),
+			),
+		);
+	}
+
+	private static function aggregateOutputRecordSchema( array $names, int $max_items, int $max_length ): array {
+		$properties = array();
+		foreach ( $names as $name ) {
+			$properties[ $name ] = array(
+				'type'      => 'string',
+				'maxLength' => $max_length,
+			);
+		}
+		return array(
+			'type'                 => 'object',
+			'additionalProperties' => false,
+			'maxProperties'        => $max_items,
+			'properties'           => $properties,
+		);
+	}
+
+	/**
+	 * Apply the configured default country cohort when the caller did not pass
+	 * --country at all.
+	 *
+	 * An explicit --country (including "all", the opt-out) always wins over the
+	 * configured default; see sanitizeCountryCodes(). Both preset actions
+	 * (buildReportRequestBody) and aggregate_report (buildAggregateReportRequestBody)
+	 * consume the resulting $input['country'] downstream, so resolving it once
+	 * here — before fetchStats() routes to either — covers every GA4 query
+	 * surface with one default. Public for unit testing.
+	 *
+	 * @param array $input  Ability input, as received by fetchStats().
+	 * @param array $config Resolved GA config (see get_config()); reads
+	 *                      default_country_cohort.
+	 * @return array $input with 'country' set to the default when it was unset
+	 *               or blank and a default is configured; otherwise unchanged.
+	 */
+	public static function applyDefaultCountryCohort( array $input, array $config ): array {
+		if ( isset( $input['country'] ) && '' !== trim( (string) $input['country'] ) ) {
+			return $input;
+		}
+		$default_cohort = is_string( $config['default_country_cohort'] ?? null ) ? trim( $config['default_country_cohort'] ) : '';
+		if ( '' !== $default_cohort ) {
+			$input['country'] = $default_cohort;
+		}
+		return $input;
+	}
+
+	/**
+	 * Parse and sanitize a --country cohort string into validated ISO codes.
+	 *
+	 * Accepts a comma-separated list of ISO-3166-1 alpha-2 codes (case-insensitive,
+	 * whitespace-tolerant) or the literal "all". Invalid entries are dropped
+	 * silently rather than rejecting the whole request — a typo'd extra code in
+	 * an otherwise valid cohort shouldn't fail the entire query. Returns an empty
+	 * array both when every code was invalid and when the input is "all"; both
+	 * mean "apply no country filter."
+	 *
+	 * @param string $raw Raw --country value.
+	 * @return array<int,string> Validated, deduped, uppercased ISO alpha-2 codes.
+	 */
+	private static function sanitizeCountryCodes( string $raw ): array {
+		if ( 'all' === strtolower( trim( $raw ) ) ) {
+			return array();
+		}
+		$codes = array();
+		foreach ( explode( ',', $raw ) as $code ) {
+			$code = strtoupper( trim( $code ) );
+			if ( 1 === preg_match( self::COUNTRY_CODE_PATTERN, $code ) && ! in_array( $code, $codes, true ) ) {
+				$codes[] = $code;
+			}
+		}
+		return $codes;
+	}
+
+	/**
+	 * Build a countryId dimensionFilter expression for a cohort of ISO codes.
+	 *
+	 * countryId — not GA4's `country` dimension, which returns full English
+	 * names ("United States") and cannot exact-match a code — verified live
+	 * against this install's GA4 property. A single code becomes one EXACT
+	 * filter; multiple codes become an orGroup, mirroring the network_density
+	 * in-network-host orGroup pattern below.
+	 *
+	 * @param array<int,string> $codes Non-empty list of validated ISO alpha-2 codes.
+	 * @return array Filter or orGroup expression.
+	 */
+	private static function buildCountryFilterExpression( array $codes ): array {
+		$expressions = array_map(
+			static fn( string $code ): array => array(
+				'filter' => array(
+					'fieldName'    => 'countryId',
+					'stringFilter' => array(
+						'matchType' => 'EXACT',
+						'value'     => $code,
+					),
+				),
+			),
+			$codes
+		);
+		return 1 === count( $expressions )
+			? $expressions[0]
+			: array( 'orGroup' => array( 'expressions' => $expressions ) );
+	}
+
+	/** Build one bounded batchRunReports request body or return an error message. */
+	public static function buildAggregateReportRequestBody( array $input ) {
+		$error = self::validateAggregateInput( $input );
+		if ( null !== $error ) {
+			return new \WP_Error( 'invalid_ga_aggregate_request', $error );
+		}
+
+		$build_expression = static function ( array $filter ): array {
+			$expression = array(
+				'filter' => array(
+					'fieldName'    => $filter['field_name'],
+					'stringFilter' => array(
+						'matchType'     => $filter['match_type'],
+						'value'         => $filter['value'],
+						'caseSensitive' => ! empty( $filter['case_sensitive'] ),
+					),
+				),
+			);
+			return ! empty( $filter['exclude'] ) ? array( 'notExpression' => $expression ) : $expression;
+		};
+		$body             = array(
+			'dateRanges'          => array(
+				array(
+					'startDate' => $input['date_range']['start_date'],
+					'endDate'   => $input['date_range']['end_date'],
+				),
+			),
+			'dimensions'          => array_map( static fn( string $name ): array => array( 'name' => $name ), $input['dimensions'] ?? array() ),
+			'metrics'             => array_map( static fn( string $name ): array => array( 'name' => $name ), $input['metrics'] ),
+			'limit'               => (int) ( $input['limit'] ?? 25 ),
+			'keepEmptyRows'       => false,
+			'metricAggregations'  => array( 'TOTAL' ),
+			'returnPropertyQuota' => true,
+		);
+		// Explicit filters (up to 4, validated) AND the resolved country cohort
+		// (explicit --country or the configured default; see fetchStats())
+		// combine into the same andGroup shape aggregate_report has always used
+		// — unlike buildReportRequestBody's legacy-action filters, a single
+		// aggregate_report filter is not unwrapped; see
+		// test_aggregate_request_is_bounded_and_uses_total_quota_batch_shape.
+		$expressions = array_map( $build_expression, $input['filters'] ?? array() );
+		if ( ! empty( $input['country'] ) ) {
+			$country_codes = self::sanitizeCountryCodes( (string) $input['country'] );
+			if ( ! empty( $country_codes ) ) {
+				$expressions[] = self::buildCountryFilterExpression( $country_codes );
+			}
+		}
+		if ( ! empty( $expressions ) ) {
+			$body['dimensionFilter'] = array( 'andGroup' => array( 'expressions' => $expressions ) );
+		}
+		if ( ! empty( $input['order_by'] ) ) {
+			$body['orderBys'] = array_map(
+				static fn( array $order ): array => array_merge( 'metric' === $order['type'] ? array( 'metric' => array( 'metricName' => $order['name'] ) ) : array( 'dimension' => array( 'dimensionName' => $order['name'] ) ), array( 'desc' => ! array_key_exists( 'descending', $order ) || $order['descending'] ) ),
+				$input['order_by']
+			);
+		}
+		return $body;
+	}
+
+	private static function validateAggregateInput( array $input ): ?string {
+		$allowed = array( 'action', 'property_id', 'date_range', 'comparison_date_range', 'dimensions', 'metrics', 'filters', 'order_by', 'limit', 'country' );
+		if ( array_diff( array_keys( $input ), $allowed ) ) {
+			return 'aggregate_report accepts only its documented fields.'; }
+		foreach ( array( 'date_range', 'metrics' ) as $required ) {
+			if ( ! array_key_exists( $required, $input ) ) {
+				return "aggregate_report requires {$required}."; }
+		}
+		foreach ( array( 'date_range', 'comparison_date_range' ) as $key ) {
+			if ( ! isset( $input[ $key ] ) ) {
+				continue; }
+			$range = $input[ $key ];
+			if ( ! is_array( $range ) || array_diff( array_keys( $range ), array( 'start_date', 'end_date' ) ) || ! isset( $range['start_date'], $range['end_date'] ) || ! self::isValidAggregateDate( $range['start_date'] ) || ! self::isValidAggregateDate( $range['end_date'] ) ) {
+				return "{$key} must contain exact start_date and end_date values in YYYY-MM-DD format."; }
+			$days = (int) ( ( strtotime( $range['end_date'] . ' UTC' ) - strtotime( $range['start_date'] . ' UTC' ) ) / DAY_IN_SECONDS ) + 1;
+			if ( $days < 1 || $days > self::AGGREGATE_MAX_DATE_RANGE_DAYS ) {
+				return "{$key} must be between 1 and " . self::AGGREGATE_MAX_DATE_RANGE_DAYS . ' inclusive days.'; }
+		}
+		$dimensions = $input['dimensions'] ?? array();
+		$metrics    = $input['metrics'];
+		if ( ! is_array( $dimensions ) || count( $dimensions ) > 3 || count( $dimensions ) !== count( array_filter( $dimensions, 'is_string' ) ) || count( $dimensions ) !== count( array_unique( $dimensions ) ) || array_diff( $dimensions, self::AGGREGATE_DIMENSIONS ) ) {
+			return 'dimensions must contain up to three unique approved dimensions.'; }
+		if ( ! is_array( $metrics ) || count( $metrics ) < 1 || count( $metrics ) > 8 || count( $metrics ) !== count( array_filter( $metrics, 'is_string' ) ) || count( $metrics ) !== count( array_unique( $metrics ) ) || array_diff( $metrics, self::AGGREGATE_METRICS ) ) {
+			return 'metrics must contain one to eight unique approved metrics.'; }
+		if ( ! isset( $input['limit'] ) ) {
+			$input['limit'] = 25; }
+		if ( ( ! is_int( $input['limit'] ) && ! ctype_digit( (string) $input['limit'] ) ) || (int) $input['limit'] < 1 || (int) $input['limit'] > self::AGGREGATE_MAX_ROWS ) {
+			return 'limit must be an integer from 1 to 100.'; }
+		if ( ! is_array( $input['filters'] ?? array() ) || count( $input['filters'] ?? array() ) > 4 ) {
+			return 'filters supports at most four entries.'; }
+		if ( isset( $input['country'] ) && ( ! is_string( $input['country'] ) || strlen( $input['country'] ) > 200 ) ) {
+			return 'country must be a comma-separated list of ISO-3166-1 alpha-2 codes, or "all".'; }
+		foreach ( $input['filters'] ?? array() as $filter ) {
+			if ( ! is_array( $filter ) || array_diff( array_keys( $filter ), array( 'field_name', 'match_type', 'value', 'case_sensitive', 'exclude' ) ) || ! in_array( $filter['field_name'] ?? '', self::AGGREGATE_DIMENSIONS, true ) || ! in_array( $filter['match_type'] ?? '', array( 'EXACT', 'CONTAINS', 'BEGINS_WITH', 'ENDS_WITH' ), true ) || ! is_string( $filter['value'] ?? null ) || '' === $filter['value'] || strlen( $filter['value'] ) > 200 || ( isset( $filter['case_sensitive'] ) && ! is_bool( $filter['case_sensitive'] ) ) || ( isset( $filter['exclude'] ) && ! is_bool( $filter['exclude'] ) ) ) {
+				return 'filters must contain approved bounded string dimension filters.'; }
+		}
+		if ( ! is_array( $input['order_by'] ?? array() ) || count( $input['order_by'] ?? array() ) > 2 ) {
+			return 'order_by supports at most two entries.'; }
+		foreach ( $input['order_by'] ?? array() as $order ) {
+			if ( ! is_array( $order ) ) {
+				return 'Each ordering must select a requested dimension or metric.';
+			}
+			$order_type = isset( $order['type'] ) ? $order['type'] : '';
+			if ( array_diff( array_keys( $order ), array( 'type', 'name', 'descending' ) ) || ! in_array( $order_type, array( 'dimension', 'metric' ), true ) || ! in_array( $order['name'] ?? '', 'dimension' === $order_type ? $dimensions : $metrics, true ) || ( isset( $order['descending'] ) && ! is_bool( $order['descending'] ) ) ) {
+				return 'Each ordering must select a requested dimension or metric.'; }
+		}
+		return null;
+	}
+
+	private static function isValidAggregateDate( $date ): bool {
+		$timestamp = is_string( $date ) ? strtotime( $date . ' UTC' ) : false;
+		return is_string( $date ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) && false !== $timestamp && gmdate( 'Y-m-d', $timestamp ) === $date;
+	}
+
+	/** Resolve the configured default or an explicit aggregate property ID. */
+	public static function resolveAggregatePropertyId( array $input, array $config ) {
+		$property_id = ! empty( $input['property_id'] ) ? sanitize_text_field( $input['property_id'] ) : ( $config['property_id'] ?? '' );
+		if ( ! is_string( $property_id ) || ! preg_match( '/^\d{6,20}$/', $property_id ) ) {
+			return new \WP_Error( 'invalid_ga_aggregate_property', 'GA4 property ID must be numeric.' );
+		}
+		return $property_id;
+	}
+
+	private static function fetchAggregateReport( array $input, string $access_token, string $property_id ): array {
+		$batch = self::buildAggregateBatchRequest( $input, $property_id, $access_token );
+		if ( is_wp_error( $batch ) ) {
+			return array(
+				'success' => false,
+				'error'   => $batch->get_error_message(),
+			); }
+		$result = HttpClient::post( $batch['url'], $batch['options'] );
+		if ( ! $result['success'] ) {
+			return array(
+				'success' => false,
+				'error'   => self::formatAggregateHttpError( $result ),
+			); }
+		$data = json_decode( $result['data'], true );
+		if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $data ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Google Analytics returned an unexpected aggregate report response.',
+			); }
+		if ( array_key_exists( 'error', $data ) ) {
+			$error = self::formatAggregateApiError( $data['error'] );
+			return array(
+				'success' => false,
+				'error'   => $error ?? 'Google Analytics returned an unexpected aggregate report response.',
+			);
+		}
+		if ( array_diff( array_keys( $data ), array( 'reports', 'kind' ) ) || ! isset( $data['kind'] ) || self::AGGREGATE_BATCH_RESPONSE_KIND !== $data['kind'] || ! isset( $data['reports'] ) || ! is_array( $data['reports'] ) || ! array_is_list( $data['reports'] ) || count( $data['reports'] ) !== count( $batch['ranges'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Google Analytics returned an unexpected aggregate report response.',
+			); }
+		$reports = array();
+		foreach ( $data['reports'] as $index => $report ) {
+			$normalized = self::normalizeAggregateReport( $report, $batch['ranges'][ $index ], $input['dimensions'] ?? array(), $input['metrics'] );
+			if ( is_wp_error( $normalized ) ) {
+				return array(
+					'success' => false,
+					'error'   => $normalized->get_error_message(),
+				); }
+			$normalized['label'] = 0 === $index ? 'primary' : 'comparison';
+			$reports[]           = $normalized;
+		}
+		return array(
+			'success'    => true,
+			'action'     => 'aggregate_report',
+			'dimensions' => $input['dimensions'] ?? array(),
+			'metrics'    => $input['metrics'],
+			'filters'    => $input['filters'] ?? array(),
+			'reports'    => $reports,
+		);
+	}
+
+	/** Return a canonical GA4 error without exposing a provider response body. */
+	private static function formatAggregateHttpError( array $result ): string {
+		$status_code = $result['status_code'] ?? 0;
+		$body        = $result['data'] ?? '';
+		if ( is_int( $status_code ) && is_string( $body ) && strlen( $body ) <= self::AGGREGATE_MAX_RESPONSE_BYTES ) {
+			$data = json_decode( $body, true );
+			if ( JSON_ERROR_NONE === json_last_error() && is_array( $data ) && array_keys( $data ) === array( 'error' ) ) {
+				$error = self::formatAggregateApiError( $data['error'], $status_code );
+				if ( null !== $error ) {
+					return $error;
+				}
+			}
+		}
+
+		return is_int( $status_code ) && $status_code >= 100 && $status_code <= 599
+			? "GA4 request failed with HTTP {$status_code}."
+			: 'GA4 request failed before a response was received.';
+	}
+
+	/** Validate the bounded Google error envelope and return its safe canonical message. */
+	private static function formatAggregateApiError( $error, ?int $http_status = null ): ?string {
+		if ( ! is_array( $error ) || array_diff( array_keys( $error ), array( 'code', 'message', 'status', 'details' ) ) || ! isset( $error['code'], $error['message'], $error['status'] ) || ! is_int( $error['code'] ) || ! is_string( $error['message'] ) || '' === $error['message'] || strlen( $error['message'] ) > 1000 || ! is_string( $error['status'] ) || ! preg_match( '/^[A-Z_]{3,64}$/', $error['status'] ) || ( null !== $http_status && $error['code'] !== $http_status ) ) {
+			return null;
+		}
+
+		$messages = array(
+			'PERMISSION_DENIED'   => 'Permission denied.',
+			'UNAUTHENTICATED'     => 'Authentication failed.',
+			'INVALID_ARGUMENT'    => 'The aggregate report request was rejected.',
+			'NOT_FOUND'           => 'The requested GA4 property was not found.',
+			'RESOURCE_EXHAUSTED'  => 'GA4 quota is exhausted.',
+			'FAILED_PRECONDITION' => 'The GA4 property is not ready for this request.',
+			'UNAVAILABLE'         => 'GA4 is temporarily unavailable.',
+			'INTERNAL'            => 'GA4 encountered an internal error.',
+		);
+		return 'GA4 API error (' . $error['code'] . ' ' . $error['status'] . '): ' . ( $messages[ $error['status'] ] ?? 'The GA4 request failed.' );
+	}
+
+	/** Build the single bounded HTTP batch request without exposing credentials. */
+	public static function buildAggregateBatchRequest( array $input, string $property_id, string $access_token ) {
+		$primary = self::buildAggregateReportRequestBody( $input );
+		if ( is_wp_error( $primary ) ) {
+			return $primary; }
+		$requests = array( $primary );
+		$ranges   = array( $input['date_range'] );
+		if ( isset( $input['comparison_date_range'] ) ) {
+			$comparison               = $input;
+			$comparison['date_range'] = $input['comparison_date_range'];
+			unset( $comparison['comparison_date_range'] );
+			$requests[] = self::buildAggregateReportRequestBody( $comparison );
+			if ( is_wp_error( $requests[1] ) ) {
+				return $requests[1]; }
+			$ranges[] = $input['comparison_date_range'];
+		}
+		return array(
+			'url'     => self::API_BASE . $property_id . ':batchRunReports',
+			'options' => array(
+				'timeout'                   => 30,
+				'limit_response_size'       => self::AGGREGATE_MAX_RESPONSE_BYTES,
+				'log_response_body_preview' => false,
+				'headers'                   => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				),
+				'body'                      => wp_json_encode( array( 'requests' => $requests ) ),
+				'context'                   => 'Google Analytics Data API aggregate report',
+			),
+			'ranges'  => $ranges,
+		);
+	}
+
+	/**
+	 * GA4's fixed placeholder dimension value for a batchRunReports totals row.
+	 *
+	 * Whenever a runReport request includes one or more dimensions, GA4 always
+	 * echoes this single placeholder as the totals row's dimensionValues (its
+	 * metricValues carry the real aggregate). A zero-dimension request's totals
+	 * row omits dimensionValues entirely. See normalizeAggregateReport().
+	 *
+	 * @var string
+	 */
+	const AGGREGATE_TOTALS_RESERVED_DIMENSION_VALUE = 'RESERVED_TOTAL';
+
+	/** Input keys only aggregate_report honors; fixed actions reject them (#148). */
+	const AGGREGATE_ONLY_INPUT_KEYS = array( 'date_range', 'comparison_date_range', 'dimensions', 'metrics', 'filters', 'order_by' );
+
+	/** Normalize a single batch report without inventing coverage guarantees. */
+	public static function normalizeAggregateReport( array $report, array $date_range, array $expected_dimensions = array(), array $expected_metrics = array() ) {
+		$invalid = static fn( string $reason ): \WP_Error => new \WP_Error( 'invalid_ga_aggregate_response', "Google Analytics returned a malformed aggregate report ({$reason})." );
+		if ( ! isset( $report['kind'] ) || self::AGGREGATE_REPORT_RESPONSE_KIND !== $report['kind'] ) {
+			return $invalid( 'kind_mismatch' ); }
+		unset( $report['kind'] );
+		$dimension_headers = $report['dimensionHeaders'] ?? array();
+		$metric_headers    = $report['metricHeaders'] ?? array();
+		$raw_rows          = $report['rows'] ?? array();
+		$raw_totals        = $report['totals'] ?? array();
+		if ( ! is_array( $dimension_headers ) || ! is_array( $metric_headers ) || ! is_array( $raw_rows ) || ! is_array( $raw_totals ) || ! array_is_list( $dimension_headers ) || ! array_is_list( $metric_headers ) || ! array_is_list( $raw_rows ) || ! array_is_list( $raw_totals ) || count( $raw_rows ) > self::AGGREGATE_MAX_ROWS ) {
+			return $invalid( 'envelope_shape' ); }
+		$headers    = static function ( array $items ) { $names = array();
+			foreach ( $items as $item ) {
+				if ( ! is_array( $item ) || array_diff( array_keys( $item ), array( 'name', 'type' ) ) || ! isset( $item['name'] ) || ! is_string( $item['name'] ) || '' === $item['name'] || strlen( $item['name'] ) > 100 || ( isset( $item['type'] ) && ( ! is_string( $item['type'] ) || strlen( $item['type'] ) > 100 ) ) ) {
+					return false;
+				} $names[] = $item['name'];
+			} return $names;
+		};
+		$dimensions = $headers( $dimension_headers );
+		$metrics    = $headers( $metric_headers );
+		if ( false === $dimensions || false === $metrics ) {
+			return $invalid( 'header_format' ); }
+		if ( ( ! empty( $raw_rows ) && ( $dimensions !== $expected_dimensions || $metrics !== $expected_metrics ) ) || ( ! empty( $raw_totals ) && $metrics !== $expected_metrics ) || ( empty( $raw_rows ) && empty( $raw_totals ) && ( ( ! empty( $dimensions ) && $dimensions !== $expected_dimensions ) || ( ! empty( $metrics ) && $metrics !== $expected_metrics ) ) ) ) {
+			return $invalid( 'dimension_metric_mismatch' ); }
+		$dimensions = empty( $dimensions ) ? $expected_dimensions : $dimensions;
+		$metrics    = empty( $metrics ) ? $expected_metrics : $metrics;
+		$record     = static function ( array $headers, array $values, int $max_length ) { if ( ! array_is_list( $values ) || count( $values ) !== count( $headers ) ) {
+				return false;
+		} $out = array();
+		foreach ( $headers as $index => $name ) {
+			$value = $values[ $index ] ?? null;
+			if ( ! is_array( $value ) || array_keys( $value ) !== array( 'value' ) || ! is_string( $value['value'] ) || strlen( $value['value'] ) > $max_length ) {
+				return false;
+			} $out[ $name ] = $value['value'];
+		} return $out;
+		};
+		$rows       = array();
+		foreach ( $raw_rows as $row ) {
+			if ( ! is_array( $row ) || array_diff( array_keys( $row ), array( 'dimensionValues', 'metricValues' ) ) || ! isset( $row['dimensionValues'], $row['metricValues'] ) ) {
+				return $invalid( 'row_keys' ); }
+			$dimension_values = $record( $dimensions, $row['dimensionValues'], 2000 );
+			$metric_values    = $record( $metrics, $row['metricValues'], 200 );
+			if ( false === $dimension_values || false === $metric_values ) {
+				return $invalid( 'row_values' ); }
+			$rows[] = array(
+				'dimensions' => $dimension_values,
+				'metrics'    => $metric_values,
+			);
+		}
+		$limits   = array();
+		$metadata = $report['metadata'] ?? array();
+		if ( ! is_array( $metadata ) || array_diff( array_keys( $metadata ), array( 'dataLossFromOtherRow', 'subjectToThresholding', 'samplingMetadatas', 'timeZone', 'currencyCode', 'emptyReason', 'schemaRestrictionResponse' ) ) || ( isset( $metadata['dataLossFromOtherRow'] ) && ! is_bool( $metadata['dataLossFromOtherRow'] ) ) || ( isset( $metadata['subjectToThresholding'] ) && ! is_bool( $metadata['subjectToThresholding'] ) ) || ( isset( $metadata['timeZone'] ) && ( ! is_string( $metadata['timeZone'] ) || strlen( $metadata['timeZone'] ) > 100 ) ) || ( isset( $metadata['currencyCode'] ) && ( ! is_string( $metadata['currencyCode'] ) || strlen( $metadata['currencyCode'] ) > 20 ) ) || ( isset( $metadata['emptyReason'] ) && ( ! is_string( $metadata['emptyReason'] ) || '' === $metadata['emptyReason'] || strlen( $metadata['emptyReason'] ) > 100 ) ) ) {
+			return $invalid( 'metadata_shape' ); }
+		if ( ! empty( $metadata['dataLossFromOtherRow'] ) ) {
+			$limits[] = 'Some dimension values were grouped into an other row, so the returned breakdown is incomplete.'; }
+		if ( ! empty( $metadata['subjectToThresholding'] ) ) {
+			$limits[] = 'Google Analytics applied a privacy threshold to this report.'; }
+		if ( isset( $metadata['emptyReason'] ) ) {
+			$limits[] = 'Google Analytics reported an empty result for this report.'; }
+		if ( isset( $metadata['schemaRestrictionResponse'] ) ) {
+			$restriction = $metadata['schemaRestrictionResponse'];
+			if ( ! is_array( $restriction ) || array_keys( $restriction ) !== array( 'activeMetricRestrictions' ) || ! is_array( $restriction['activeMetricRestrictions'] ) || ! array_is_list( $restriction['activeMetricRestrictions'] ) || count( $restriction['activeMetricRestrictions'] ) > count( $expected_metrics ) ) {
+				return $invalid( 'schema_restriction_shape' ); }
+			foreach ( $restriction['activeMetricRestrictions'] as $metric_restriction ) {
+				if ( ! is_array( $metric_restriction ) || count( $metric_restriction ) !== 2 || array_diff( array_keys( $metric_restriction ), array( 'metricName', 'restrictedMetricTypes' ) ) || ! isset( $metric_restriction['metricName'], $metric_restriction['restrictedMetricTypes'] ) || ! is_string( $metric_restriction['metricName'] ) || '' === $metric_restriction['metricName'] || strlen( $metric_restriction['metricName'] ) > 100 || ! in_array( $metric_restriction['metricName'], $expected_metrics, true ) || ! is_array( $metric_restriction['restrictedMetricTypes'] ) || ! array_is_list( $metric_restriction['restrictedMetricTypes'] ) || count( $metric_restriction['restrictedMetricTypes'] ) < 1 || count( $metric_restriction['restrictedMetricTypes'] ) > 2 || count( $metric_restriction['restrictedMetricTypes'] ) !== count( array_unique( $metric_restriction['restrictedMetricTypes'] ) ) || array_diff( $metric_restriction['restrictedMetricTypes'], array( 'RESTRICTED_METRIC_TYPE_UNSPECIFIED', 'COST_DATA', 'REVENUE_DATA' ) ) ) {
+					return $invalid( 'schema_restriction_entry' ); }
+			}
+			if ( ! empty( $restriction['activeMetricRestrictions'] ) ) {
+				$limits[] = 'Google Analytics restricted one or more requested metrics.'; }
+		}
+		if ( isset( $metadata['samplingMetadatas'] ) && ( ! is_array( $metadata['samplingMetadatas'] ) || ! array_is_list( $metadata['samplingMetadatas'] ) || count( $metadata['samplingMetadatas'] ) > 5 ) ) {
+			return $invalid( 'sampling_metadata_shape' ); }
+		foreach ( $metadata['samplingMetadatas'] ?? array() as $sampling ) {
+			if ( ! is_array( $sampling ) || array_diff( array_keys( $sampling ), array( 'samplesReadCount', 'samplingSpaceSize' ) ) || ( isset( $sampling['samplesReadCount'] ) && ( ! is_string( $sampling['samplesReadCount'] ) || ! ctype_digit( $sampling['samplesReadCount'] ) ) ) || ( isset( $sampling['samplingSpaceSize'] ) && ( ! is_string( $sampling['samplingSpaceSize'] ) || ! ctype_digit( $sampling['samplingSpaceSize'] ) ) ) ) {
+				return $invalid( 'sampling_metadata_entry' );
+			} $limits[] = 'Google Analytics sampled ' . ( $sampling['samplesReadCount'] ?? 'an unknown number of' ) . ' records from ' . ( $sampling['samplingSpaceSize'] ?? 'an unknown sampling space' ) . '.'; }
+		if ( isset( $report['rowCount'] ) && ( ! is_int( $report['rowCount'] ) || $report['rowCount'] < 0 ) ) {
+			return $invalid( 'row_count' ); }
+		$row_count = $report['rowCount'] ?? count( $rows );
+		if ( $row_count > count( $rows ) ) {
+			$limits[] = 'The result is truncated to ' . count( $rows ) . ' of ' . $row_count . ' matching rows.'; }
+		if ( empty( $rows ) ) {
+			$limits[] = 'No rows matched the requested report.'; }
+		// GA4 echoes one RESERVED_TOTAL placeholder dimension value per requested
+		// dimension on the totals row — proven live against this install's GA4
+		// property (batchRunReports): dimensions ["country"] gave
+		// {"dimensionValues":[{"value":"RESERVED_TOTAL"}],...} and dimensions
+		// ["hostName","landingPage"] gave two RESERVED_TOTAL entries (#147). A
+		// zero-dimension request's totals row omits dimensionValues entirely. Both
+		// shapes are legitimate; anything else is a real malformation.
+		$totals_row              = $raw_totals[0] ?? null;
+		$totals_row_keys         = is_array( $totals_row ) ? array_keys( $totals_row ) : null;
+		$reserved_dimension_vals = array_fill( 0, max( 1, count( $dimension_headers ) ), array( 'value' => self::AGGREGATE_TOTALS_RESERVED_DIMENSION_VALUE ) );
+		$totals_reserved_wrapper = array( 'dimensionValues', 'metricValues' ) === $totals_row_keys
+			&& ( $totals_row['dimensionValues'] ?? null ) === $reserved_dimension_vals;
+		if ( count( $raw_totals ) > 1 || ( 1 === count( $raw_totals ) && ( null === $totals_row_keys || ( array( 'metricValues' ) !== $totals_row_keys && ! $totals_reserved_wrapper ) ) ) ) {
+			return $invalid( 'totals_shape' ); }
+		$totals = empty( $raw_totals ) ? array_fill_keys( $metrics, '' ) : $record( $metrics, $raw_totals[0]['metricValues'], 200 );
+		if ( false === $totals ) {
+			return $invalid( 'totals_values' ); }
+		if ( isset( $report['propertyQuota'] ) && ! is_array( $report['propertyQuota'] ) ) {
+			return $invalid( 'property_quota_shape' ); }
+		$quota = array();
+		foreach ( $report['propertyQuota'] ?? array() as $name => $value ) {
+			if ( ! is_string( $name ) || ! is_array( $value ) || array_diff( array_keys( $value ), array( 'consumed', 'remaining' ) ) || ( isset( $value['consumed'] ) && ( ! is_int( $value['consumed'] ) || $value['consumed'] < 0 ) ) || ( isset( $value['remaining'] ) && ( ! is_int( $value['remaining'] ) || $value['remaining'] < 0 ) ) ) {
+				return $invalid( 'property_quota_entry' );
+			} if ( isset( $value['remaining'] ) ) {
+				$quota[ $name ] = $value['remaining']; }
+		}
+		return array(
+			'date_range'         => $date_range,
+			'rows'               => $rows,
+			'totals'             => $totals,
+			'returned_row_count' => count( $rows ),
+			'row_count'          => $row_count,
+			'time_zone'          => $metadata['timeZone'] ?? '',
+			'currency_code'      => $metadata['currencyCode'] ?? '',
+			'quota_remaining'    => $quota,
+			'coverage_limits'    => $limits,
+		);
+	}
+
+	/**
+	 * Fetch stats from Google Analytics Data API.
+	 *
+	 * @param array $input Ability input.
+	 * @return array Ability response.
+	 */
+	public static function fetchStats( array $input ): array {
+		$action = sanitize_text_field( $input['action'] ?? '' );
+
+		// Fixed actions use preset dimensions and support no filtering. The
+		// legacy schema stays open for consumer context keys, so aggregate-only
+		// keys would otherwise be dropped silently and the caller would read
+		// unfiltered data as filtered (#148).
+		$present_keys   = array_keys( array_filter( $input, static fn( $value ) => ! in_array( $value, array( null, '', array() ), true ) ) );
+		$aggregate_only = array();
+		if ( 'aggregate_report' !== $action ) {
+			$aggregate_only = array_values( array_intersect( self::AGGREGATE_ONLY_INPUT_KEYS, $present_keys ) );
+		}
+		if ( ! empty( $aggregate_only ) ) {
+			$single = 1 === count( $aggregate_only );
+			return array(
+				'success' => false,
+				'error'   => sprintf(
+					'%s only %s to action aggregate_report; "%s" uses fixed dimensions and would ignore %s. Use action aggregate_report with date_range, dimensions, metrics, and filters.',
+					implode( ', ', $aggregate_only ),
+					$single ? 'applies' : 'apply',
+					$action,
+					$single ? 'it' : 'them'
+				),
+			);
+		}
+
+		$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence', 'aggregate_report' ) );
+		if ( empty( $action ) || ! in_array( $action, $valid_actions, true ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid action. Must be one of: ' . implode( ', ', $valid_actions ),
+			);
+		}
+
+		$access_token = ( new GoogleServiceAccountAuth() )->get_access_token( self::SCOPE );
+
+		if ( is_wp_error( $access_token ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to authenticate: ' . $access_token->get_error_message(),
+			);
+		}
+
+		$config      = self::get_config();
+		$property_id = ! empty( $input['property_id'] ) ? sanitize_text_field( $input['property_id'] ) : ( $config['property_id'] ?? '' );
+		$input       = self::applyDefaultCountryCohort( $input, $config );
+
+		if ( empty( $property_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'No GA4 property ID configured or provided.',
+			);
+		}
+		if ( 'aggregate_report' === $action ) {
+			$aggregate_property_id = self::resolveAggregatePropertyId( $input, $config );
+			if ( is_wp_error( $aggregate_property_id ) ) {
+				return array(
+					'success' => false,
+					'error'   => $aggregate_property_id->get_error_message(),
+				);
+			}
+			return self::fetchAggregateReport( $input, $access_token, $aggregate_property_id );
+		}
+
+		// Route to realtime handler.
+		if ( 'realtime' === $action ) {
+			return self::fetchRealtime( $access_token, $property_id );
+		}
+
+		// Route to path_sequence handler (ordered, session-scoped host journeys
+		// via the v1alpha funnel report — a different endpoint and shape).
+		if ( 'path_sequence' === $action ) {
+			return self::fetchPathSequence( $input, $access_token, $property_id );
+		}
+
+		return self::fetchReport( $input, $action, $access_token, $property_id );
+	}
+
+	/**
+	 * Build the GA4 runReport request body from ability input.
+	 *
+	 * Public for unit testing — request body construction is the testable surface
+	 * for filter / sort / pagination behavior without needing an HTTP round-trip.
+	 *
+	 * @param array  $input  Ability input.
+	 * @param string $action Report action (must be a key in self::ACTION_REPORTS).
+	 * @return array Request body for the GA4 runReport endpoint.
+	 */
+	public static function buildReportRequestBody( array $input, string $action ): array {
+		$report_config = self::ACTION_REPORTS[ $action ];
+
+		$start_date = ! empty( $input['start_date'] ) ? sanitize_text_field( $input['start_date'] ) : gmdate( 'Y-m-d', strtotime( '-28 days' ) );
+		$end_date   = ! empty( $input['end_date'] ) ? sanitize_text_field( $input['end_date'] ) : gmdate( 'Y-m-d', strtotime( '-1 day' ) );
+		$limit      = ! empty( $input['limit'] ) ? max( 1, min( (int) $input['limit'], self::MAX_LIMIT ) ) : self::DEFAULT_LIMIT;
+		$compare    = ! empty( $input['compare'] );
+
+		$dimensions = array_map(
+			function ( $dim ) {
+				return array( 'name' => $dim );
+			},
+			$report_config['dimensions']
+		);
+
+		$metrics = array_map(
+			function ( $met ) {
+				return array( 'name' => $met );
+			},
+			$report_config['metrics']
+		);
+
+		// Build date ranges — add comparison period if requested.
+		$date_ranges = array(
+			array(
+				'startDate' => $start_date,
+				'endDate'   => $end_date,
+			),
+		);
+
+		if ( $compare ) {
+			$period_length    = (int) ( ( strtotime( $end_date ) - strtotime( $start_date ) ) / 86400 );
+			$compare_end_ts   = strtotime( $start_date ) - 86400;
+			$compare_start_ts = $compare_end_ts - ( $period_length * 86400 );
+			$date_ranges[]    = array(
+				'startDate' => gmdate( 'Y-m-d', $compare_start_ts ),
+				'endDate'   => gmdate( 'Y-m-d', $compare_end_ts ),
+			);
+		}
+
+		$request_body = array(
+			'dateRanges' => $date_ranges,
+			'dimensions' => $dimensions,
+			'metrics'    => $metrics,
+			// Comparison rows are reconciled after the API response. Fetch the full
+			// supported key set so a prior row outside the final display limit is
+			// not incorrectly classified as new.
+			'limit'      => $compare ? self::MAX_LIMIT : $limit,
+		);
+
+		if ( 'landing_page_acquisition' === $action ) {
+			$request_body['metricAggregations'] = array( 'TOTAL' );
+		}
+
+		// Build dimension filters.
+		$filters = array();
+
+		// Page path filter. GA4 supports pagePath/landingPage as filter dimensions
+		// even when they aren't part of the report's dimensions array, so the filter
+		// applies to every action — not just those that group by page.
+		if ( ! empty( $input['page_filter'] ) ) {
+			// Prefer landingPage when the report groups by it (so the filter matches
+			// the dimension being returned); otherwise filter by pagePath, which
+			// scopes any action (date_stats, traffic_sources, top_events, etc.) to
+			// hits/sessions that touched matching paths.
+			$path_dim = in_array( 'landingPage', $report_config['dimensions'], true )
+				? 'landingPage'
+				: 'pagePath';
+
+			$filters[] = array(
+				'filter' => array(
+					'fieldName'    => $path_dim,
+					'stringFilter' => array(
+						'matchType' => 'CONTAINS',
+						'value'     => sanitize_text_field( $input['page_filter'] ),
+					),
+				),
+			);
+		}
+
+		// Hostname filter for multisite properties.
+		if ( ! empty( $input['hostname'] ) ) {
+			$filters[] = array(
+				'filter' => array(
+					'fieldName'    => 'hostName',
+					'stringFilter' => array(
+						'matchType' => 'EXACT',
+						'value'     => sanitize_text_field( $input['hostname'] ),
+					),
+				),
+			);
+		}
+
+		// Country cohort filter, applied to every action regardless of its own
+		// dimensions — same unconditional pattern as the hostname filter above.
+		// Filters on countryId (ISO-3166-1 alpha-2), not GA4's `country`
+		// dimension, which returns full English names ("United States") and
+		// cannot exact-match a code. "all" or an empty/invalid cohort applies no
+		// filter. See sanitizeCountryCodes() and fetchStats()'s default-cohort
+		// resolution.
+		if ( ! empty( $input['country'] ) ) {
+			$country_codes = self::sanitizeCountryCodes( (string) $input['country'] );
+			if ( ! empty( $country_codes ) ) {
+				$filters[] = self::buildCountryFilterExpression( $country_codes );
+			}
+		}
+
+		// In-network referrer filter for network_density.
+		//
+		// network_density groups by hostName x pageReferrer. pageReferrer is a
+		// near-unbounded, high-cardinality dimension, so the single-page GA4 row
+		// cap fills with the largest external/"(other)" referrer buckets and the
+		// small in-network referrer rows fall off the end — silently
+		// under-counting in-network referrals. Constrain pageReferrer to the
+		// configured in-network hosts server-side so GA4 only returns in-network
+		// rows BEFORE the cap applies, keeping it one cheap API call (there are
+		// far fewer than the row cap of distinct in-network referrer buckets) and
+		// making the result volume-independent.
+		if ( 'network_density' === $action ) {
+			/**
+			 * Filter the set of in-network hosts used to constrain the
+			 * network_density referrer query.
+			 *
+			 * Generic Data Machine layers ship with no site baked in. A consumer
+			 * plugin registers its own network's hostnames here. With no consumer
+			 * configured this defaults to an empty list and no referrer
+			 * constraint is applied.
+			 *
+			 * @param array $network_hosts List of in-network hostnames. Empty by default.
+			 */
+			$network_hosts = apply_filters(
+				'datamachine_network_density_hosts',
+				array()
+			);
+
+			$host_expressions = array();
+			foreach ( (array) $network_hosts as $host ) {
+				$host = sanitize_text_field( $host );
+				if ( '' === $host ) {
+					continue;
+				}
+				// CONTAINS covers the apex host and every subdomain
+				// (e.g. "example.com" matches both "example.com" and
+				// "sub.example.com"), so wildcard subdomains are
+				// implicit and do not need separate patterns.
+				$host_expressions[] = array(
+					'filter' => array(
+						'fieldName'    => 'pageReferrer',
+						'stringFilter' => array(
+							'matchType' => 'CONTAINS',
+							'value'     => $host,
+						),
+					),
+				);
+			}
+
+			if ( ! empty( $host_expressions ) ) {
+				// A single OR group of pageReferrer CONTAINS expressions is one
+				// filter expression, so it composes with any hostname filter via
+				// the existing 1-vs-andGroup path below.
+				$filters[] = count( $host_expressions ) === 1
+					? $host_expressions[0]
+					: array(
+						'orGroup' => array(
+							'expressions' => $host_expressions,
+						),
+					);
+			}
+		}
+
+		if ( count( $filters ) === 1 ) {
+			$request_body['dimensionFilter'] = $filters[0];
+		} elseif ( count( $filters ) > 1 ) {
+			$request_body['dimensionFilter'] = array(
+				'andGroup' => array(
+					'expressions' => $filters,
+				),
+			);
+		}
+
+		// Sort order.
+		if ( ! empty( $input['sort_by'] ) ) {
+			$sort_field  = sanitize_text_field( $input['sort_by'] );
+			$sort_order  = 'asc' === strtolower( $input['order'] ?? 'desc' ) ? 'ASCENDING' : 'DESCENDING';
+			$all_metrics = $report_config['metrics'];
+			$all_dims    = $report_config['dimensions'];
+
+			if ( in_array( $sort_field, $all_metrics, true ) ) {
+				$request_body['orderBys'] = array(
+					array(
+						'metric' => array( 'metricName' => $sort_field ),
+						'desc'   => 'DESCENDING' === $sort_order,
+					),
+				);
+			} elseif ( in_array( $sort_field, $all_dims, true ) ) {
+				$request_body['orderBys'] = array(
+					array(
+						'dimension' => array(
+							'dimensionName' => $sort_field,
+							'orderType'     => 'ALPHANUMERIC',
+						),
+						'desc'      => 'DESCENDING' === $sort_order,
+					),
+				);
+			}
+		}
+
+		return $request_body;
+	}
+
+	/**
+	 * Fetch a standard GA4 report.
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $action       Report action.
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $property_id  GA4 property ID.
+	 * @return array
+	 */
+	private static function fetchReport( array $input, string $action, string $access_token, string $property_id ): array {
+		$request_body = self::buildReportRequestBody( $input, $action );
+
+		// Pull values needed for response shaping back out of the request body
+		// so we don't have to recompute defaults / comparison logic in two places.
+		$compare     = ! empty( $input['compare'] );
+		$date_ranges = $request_body['dateRanges'];
+		$start_date  = $date_ranges[0]['startDate'];
+		$end_date    = $date_ranges[0]['endDate'];
+
+		$api_url = self::API_BASE . $property_id . ':runReport';
+
+		$result = HttpClient::post(
+			$api_url,
+			array(
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $request_body ),
+				'context' => 'Google Analytics Data API',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to connect to Google Analytics API: ' . ( $result['error'] ?? 'Unknown error' ),
+			);
+		}
+
+		$data = json_decode( $result['data'], true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to parse Google Analytics API response.',
+			);
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			$error_message = $data['error']['message'] ?? 'Unknown API error';
+			return array(
+				'success' => false,
+				'error'   => 'GA4 API error: ' . $error_message,
+			);
+		}
+
+		$limit = ! empty( $input['limit'] ) ? max( 1, min( (int) $input['limit'], self::MAX_LIMIT ) ) : self::DEFAULT_LIMIT;
+		$rows  = $compare
+			? self::formatComparisonRows( $data, $limit )
+			: self::formatReportRows( $data );
+
+		$response = array(
+			'success'       => true,
+			'action'        => $action,
+			'date_range'    => array(
+				'start_date' => $start_date,
+				'end_date'   => $end_date,
+			),
+			'results_count' => count( $rows ),
+			'results'       => $rows,
+			'pagination'    => self::buildPaginationMetadata( $data, $limit, count( $rows ), $compare ),
+		);
+
+		if ( 'landing_page_acquisition' === $action ) {
+			$response['unknown_dimension_coverage'] = self::buildUnknownDimensionCoverage( $data, $compare );
+		}
+
+		if ( $compare ) {
+			$response['compare_date_range'] = array(
+				'start_date' => $date_ranges[1]['startDate'],
+				'end_date'   => $date_ranges[1]['endDate'],
+			);
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Quantify GA4's unknown landing-page cohort without altering report rows.
+	 *
+	 * GA documents landingPage as the first page_view in a session and `(not set)`
+	 * as a session with no page_view. The report cannot identify the collection
+	 * path that caused an individual gap, so the interpretation stays bounded.
+	 *
+	 * @param array $data    Raw GA4 API response.
+	 * @param bool  $compare Whether two date ranges were requested.
+	 * @return array
+	 */
+	public static function buildUnknownDimensionCoverage( array $data, bool $compare ): array {
+		$fetched_rows = count( $data['rows'] ?? array() );
+		$complete     = isset( $data['rowCount'] ) && (int) $data['rowCount'] <= $fetched_rows;
+
+		return array(
+			'dimension'                => 'landingPage',
+			'unknown_value'            => '(not set)',
+			'interpretation'           => 'GA4 did not associate a first page_view with these sessions. This report cannot identify the collection cause.',
+			'material_share_threshold' => self::UNKNOWN_LANDING_PAGE_MATERIAL_SHARE,
+			'current_period'           => self::buildUnknownCoveragePeriod( $data, 'date_range_0', $complete ),
+			'comparison_period'        => $compare ? self::buildUnknownCoveragePeriod( $data, 'date_range_1', $complete ) : null,
+		);
+	}
+
+	/**
+	 * Build one date range's unknown landing-page coverage.
+	 *
+	 * @param array  $data       Raw GA4 API response.
+	 * @param string $date_range GA4 synthetic date range value.
+	 * @param bool   $complete   Whether all dimensional rows were fetched.
+	 * @return array
+	 */
+	private static function buildUnknownCoveragePeriod( array $data, string $date_range, bool $complete ): array {
+		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
+		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
+		$landing_index     = array_search( 'landingPage', $dimension_headers, true );
+		$date_range_index  = array_search( 'dateRange', $dimension_headers, true );
+		$sessions_index    = array_search( 'sessions', $metric_headers, true );
+		$engaged_index     = array_search( 'engagedSessions', $metric_headers, true );
+		$unknown_sessions  = 0;
+		$engaged_sessions  = 0;
+		$fetched_sessions  = 0;
+
+		foreach ( ( $data['rows'] ?? array() ) as $row ) {
+			$dimensions = wp_list_pluck( $row['dimensionValues'] ?? array(), 'value' );
+			$row_range  = false !== $date_range_index ? ( $dimensions[ $date_range_index ] ?? 'date_range_0' ) : 'date_range_0';
+			if ( $date_range !== $row_range ) {
+				continue;
+			}
+
+			$metrics           = wp_list_pluck( $row['metricValues'] ?? array(), 'value' );
+			$fetched_sessions += false !== $sessions_index ? (int) ( $metrics[ $sessions_index ] ?? 0 ) : 0;
+			if ( false === $landing_index || '(not set)' !== ( $dimensions[ $landing_index ] ?? '' ) ) {
+				continue;
+			}
+
+			$unknown_sessions += false !== $sessions_index ? (int) ( $metrics[ $sessions_index ] ?? 0 ) : 0;
+			$engaged_sessions += false !== $engaged_index ? (int) ( $metrics[ $engaged_index ] ?? 0 ) : 0;
+		}
+
+		$total_sessions = self::extractTotalSessions( $data, $date_range );
+		if ( null === $total_sessions && $complete && false !== $sessions_index ) {
+			$total_sessions = $fetched_sessions;
+		}
+
+		$observed_share = null !== $total_sessions && $total_sessions > 0 ? $unknown_sessions / $total_sessions : null;
+		$share          = $complete ? $observed_share : null;
+		$materiality    = 'unknown';
+		if ( $complete ) {
+			if ( 0 === $unknown_sessions ) {
+				$materiality = 'absent';
+			} elseif ( null !== $share ) {
+				$materiality = $share >= self::UNKNOWN_LANDING_PAGE_MATERIAL_SHARE ? 'material' : 'small';
+			}
+		} elseif ( null !== $observed_share && $observed_share >= self::UNKNOWN_LANDING_PAGE_MATERIAL_SHARE ) {
+			$materiality = 'material';
+		}
+
+		return array(
+			'status'                     => $complete ? 'complete' : 'partial',
+			'unknown_sessions'           => $complete ? $unknown_sessions : null,
+			'observed_unknown_sessions'  => $unknown_sessions,
+			'observed_fetched_sessions'  => $fetched_sessions,
+			'total_sessions'             => $total_sessions,
+			'share'                      => $share,
+			'observed_share_lower_bound' => $complete ? null : $observed_share,
+			'engaged_sessions'           => $complete ? $engaged_sessions : null,
+			'engagement_rate'            => $complete && $unknown_sessions > 0 ? $engaged_sessions / $unknown_sessions : null,
+			'materiality'                => $materiality,
+		);
+	}
+
+	/**
+	 * Read GA4's requested TOTAL sessions aggregation for one date range.
+	 *
+	 * @param array  $data       Raw GA4 API response.
+	 * @param string $date_range GA4 synthetic date range value.
+	 * @return int|null
+	 */
+	private static function extractTotalSessions( array $data, string $date_range ): ?int {
+		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
+		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
+		$date_range_index  = array_search( 'dateRange', $dimension_headers, true );
+		$sessions_index    = array_search( 'sessions', $metric_headers, true );
+
+		if ( false === $sessions_index ) {
+			return null;
+		}
+
+		foreach ( ( $data['totals'] ?? array() ) as $index => $row ) {
+			$dimensions = wp_list_pluck( $row['dimensionValues'] ?? array(), 'value' );
+			$row_range  = false !== $date_range_index ? ( $dimensions[ $date_range_index ] ?? '' ) : ( 0 === $index ? 'date_range_0' : 'date_range_1' );
+			if ( $date_range !== $row_range ) {
+				continue;
+			}
+
+			$metrics = wp_list_pluck( $row['metricValues'] ?? array(), 'value' );
+			return (int) ( $metrics[ $sessions_index ] ?? 0 );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Describe GA4 and display-level row limiting for a standard report.
+	 *
+	 * @param array $data           Raw GA4 API response.
+	 * @param int   $limit          Requested display limit.
+	 * @param int   $returned_rows  Number of formatted rows returned.
+	 * @param bool  $compare        Whether two date ranges were requested.
+	 * @return array Pagination metadata.
+	 */
+	private static function buildPaginationMetadata( array $data, int $limit, int $returned_rows, bool $compare ): array {
+		$fetched_rows   = count( $data['rows'] ?? array() );
+		$api_row_count  = isset( $data['rowCount'] ) ? (int) $data['rowCount'] : $fetched_rows;
+		$available_rows = $fetched_rows;
+
+		if ( $compare ) {
+			$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
+			$date_range_index  = array_search( 'dateRange', $dimension_headers, true );
+			$available_rows    = 0;
+
+			foreach ( ( $data['rows'] ?? array() ) as $row ) {
+				$range = false !== $date_range_index
+					? ( $row['dimensionValues'][ $date_range_index ]['value'] ?? 'date_range_0' )
+					: 'date_range_0';
+				if ( 'date_range_0' === $range ) {
+					++$available_rows;
+				}
+			}
+		}
+
+		return array(
+			'limit'         => $limit,
+			'returned_rows' => $returned_rows,
+			'api_row_count' => $api_row_count,
+			'fetched_rows'  => $fetched_rows,
+			'truncated'     => $api_row_count > $fetched_rows || $available_rows > $returned_rows,
+		);
+	}
+
+	/**
+	 * Fetch real-time analytics data.
+	 *
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $property_id  GA4 property ID.
+	 * @return array
+	 */
+	private static function fetchRealtime( string $access_token, string $property_id ): array {
+		$request_body = array(
+			'dimensions' => array(
+				array( 'name' => 'unifiedScreenName' ),
+			),
+			'metrics'    => array(
+				array( 'name' => 'activeUsers' ),
+				array( 'name' => 'screenPageViews' ),
+			),
+			'limit'      => 25,
+		);
+
+		$api_url = self::API_BASE . $property_id . ':runRealtimeReport';
+
+		$result = HttpClient::post(
+			$api_url,
+			array(
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $request_body ),
+				'context' => 'Google Analytics Realtime API',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to connect to Google Analytics Realtime API: ' . ( $result['error'] ?? 'Unknown error' ),
+			);
+		}
+
+		$data = json_decode( $result['data'], true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to parse Google Analytics Realtime response.',
+			);
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'GA4 Realtime API error: ' . ( $data['error']['message'] ?? 'Unknown' ),
+			);
+		}
+
+		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
+		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
+
+		$total_active_users = 0;
+		$total_page_views   = 0;
+		$pages              = array();
+
+		foreach ( ( $data['rows'] ?? array() ) as $row ) {
+			$dim_values    = wp_list_pluck( $row['dimensionValues'] ?? array(), 'value' );
+			$metric_values = wp_list_pluck( $row['metricValues'] ?? array(), 'value' );
+
+			$page_data = array();
+			foreach ( $dimension_headers as $i => $name ) {
+				$page_data[ $name ] = $dim_values[ $i ] ?? '';
+			}
+			foreach ( $metric_headers as $i => $name ) {
+				$page_data[ $name ] = (int) ( $metric_values[ $i ] ?? 0 );
+			}
+
+			$total_active_users += $page_data['activeUsers'] ?? 0;
+			$total_page_views   += $page_data['screenPageViews'] ?? 0;
+
+			$pages[] = $page_data;
+		}
+
+		return array(
+			'success'            => true,
+			'action'             => 'realtime',
+			'total_active_users' => $total_active_users,
+			'total_page_views'   => $total_page_views,
+			'results_count'      => count( $pages ),
+			'results'            => $pages,
+		);
+	}
+
+	/**
+	 * Fetch ordered, within-journey cross-host path sequences.
+	 *
+	 * DATA SOURCE: GA4 Data API v1alpha funnel report (runFunnelReport). This is
+	 * the ONLY Data API surface that expresses ORDERED, sequential steps — the
+	 * standard v1beta runReport cannot emit intra-session/journey ordering at all
+	 * (its sole cross-site signal is pageReferrer, the immediately-preceding URL:
+	 * a single hop, not an ordered path, and subject to referrer-policy stripping
+	 * and high-cardinality "(other)" bucketing — that is the network_density
+	 * proxy, deliberately distinct from this action).
+	 *
+	 * HOW IT WORKS (generic, no hostnames hardcoded):
+	 *   1. Discover the hosts present in the property/date range via a hostName
+	 *      runReport (top PATH_SEQUENCE_MAX_HOSTS by sessions).
+	 *   2. For each ORDERED pair of distinct hosts (A, B), run a 2-step CLOSED
+	 *      funnel: step 1 = "hostName EXACT A", step 2 = "hostName EXACT B".
+	 *      In a closed funnel users must enter at step 1, so step 2's activeUsers
+	 *      = users who reached B AFTER A in order — a true ordered A -> B
+	 *      transition, not a referrer guess. (funnelNextAction cannot be used
+	 *      here: GA4 restricts nextActionDimension to eventName / page / screen
+	 *      dimensions and rejects hostName, so explicit ordered step pairs are
+	 *      the correct construction.)
+	 *   3. Aggregate per entry host: entry_users (step-1 activeUsers), the ranked
+	 *      ordered next-host transitions (A -> B with users), and onward_users
+	 *      (the max single-hop B, a lower bound on users who left A for another
+	 *      host). A consumer can then compute "% of each host's users reaching
+	 *      >=1 other site" and rank the top ordered cross-site paths.
+	 *
+	 * IN-NETWORK BUCKETING IS THE CONSUMER'S JOB: this action stays generic and
+	 * does not know which hosts belong to a given network. It returns every
+	 * ordered host-to-host transition; the calling agent decides which hosts are
+	 * "in network" and computes density from the raw transitions.
+	 *
+	 * CAVEATS (remaining, even on the funnel surface):
+	 *   - v1alpha: runFunnelReport is an alpha API and may change.
+	 *   - USER-SCOPED metric: funnels count activeUsers, not sessions (the funnel
+	 *     surface exposes no sessions metric). "Ordered" means the user reached B
+	 *     after A; without withinDurationFromPriorStep it may span sessions.
+	 *   - SAMPLING: funnel reports are subject to GA4 sampling on large ranges.
+	 *   - 2-HOP transitions: each pair funnel yields an ordered A -> B hop. Deeper
+	 *     chains (A -> B -> C) are composed by the consumer from the matrix.
+	 *   - HOST CAP: only the top PATH_SEQUENCE_MAX_HOSTS hosts are paired, so the
+	 *     fan-out is bounded (N hosts => up to N*(N-1) funnel calls).
+	 *
+	 * LONG-TERM TARGET (fully accurate): a BigQuery export tap. With the GA4
+	 * property's events exported to BigQuery, a session-level query (events
+	 * nested per session, ordered by event_timestamp, hostname per hit) yields
+	 * exact, unsampled, arbitrary-depth ordered host paths. That is the only
+	 * fully-accurate source of truth and is the intended replacement for this
+	 * Data-API approximation once BigQuery credentials/config exist (none are
+	 * configured today, so this action implements the best Data-API option).
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $property_id  GA4 property ID.
+	 * @return array
+	 */
+	private static function fetchPathSequence( array $input, string $access_token, string $property_id ): array {
+		$start_date = ! empty( $input['start_date'] ) ? sanitize_text_field( $input['start_date'] ) : gmdate( 'Y-m-d', strtotime( '-28 days' ) );
+		$end_date   = ! empty( $input['end_date'] ) ? sanitize_text_field( $input['end_date'] ) : gmdate( 'Y-m-d', strtotime( '-1 day' ) );
+
+		// `limit` selects how many top hosts to pair. Default keeps a full run
+		// inside a normal timeout; clamp to the hard ceiling to bound fan-out.
+		$max_hosts = ! empty( $input['limit'] )
+			? max( 2, min( (int) $input['limit'], self::PATH_SEQUENCE_MAX_HOSTS ) )
+			: self::PATH_SEQUENCE_DEFAULT_HOSTS;
+
+		$hosts = self::discoverHosts( $access_token, $property_id, $start_date, $end_date, $max_hosts );
+
+		if ( is_wp_error( $hosts ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to discover hosts for path sequence: ' . $hosts->get_error_message(),
+			);
+		}
+
+		$base_response = array(
+			'success'     => true,
+			'action'      => 'path_sequence',
+			'data_source' => 'ga4_data_api_v1alpha_funnel',
+			'metric'      => 'activeUsers',
+			'date_range'  => array(
+				'start_date' => $start_date,
+				'end_date'   => $end_date,
+			),
+		);
+
+		if ( count( $hosts ) < 2 ) {
+			// Need at least two hosts to have any cross-host transition.
+			return array_merge(
+				$base_response,
+				array(
+					'results_count' => 0,
+					'results'       => array(),
+				)
+			);
+		}
+
+		$host_names = wp_list_pluck( $hosts, 'hostName' );
+
+		$results = self::collectPathSequenceResults(
+			$host_names,
+			static fn( string $entry_host, string $next_host ) => self::fetchOrderedPairTransition(
+				$access_token,
+				$property_id,
+				$start_date,
+				$end_date,
+				$entry_host,
+				$next_host
+			)
+		);
+
+		if ( is_wp_error( $results ) ) {
+			return array(
+				'success' => false,
+				'error'   => $results->get_error_message(),
+			);
+		}
+
+		return array_merge(
+			$base_response,
+			array(
+				'results_count' => count( $results ),
+				'results'       => $results,
+			)
+		);
+	}
+
+	/**
+	 * Query and aggregate every ordered direction among a bounded host list.
+	 *
+	 * @param array    $host_names       Hostnames to pair.
+	 * @param callable $fetch_transition Callback receiving entry and next host.
+	 * @return array|\WP_Error Aggregated host results or the first request error.
+	 */
+	private static function collectPathSequenceResults( array $host_names, callable $fetch_transition ) {
+		$transitions_by_host = array();
+		$entry_users_by_host = array();
+		foreach ( $host_names as $host_name ) {
+			$transitions_by_host[ $host_name ] = array();
+			$entry_users_by_host[ $host_name ] = null;
+		}
+
+		$count = count( $host_names );
+		for ( $i = 0; $i < $count; $i++ ) {
+			for ( $j = $i + 1; $j < $count; $j++ ) {
+				$a = $host_names[ $i ];
+				$b = $host_names[ $j ];
+
+				foreach ( array( array( $a, $b ), array( $b, $a ) ) as $direction ) {
+					list( $entry_host, $next_host ) = $direction;
+					$transition                     = $fetch_transition( $entry_host, $next_host );
+
+					if ( is_wp_error( $transition ) ) {
+						return new \WP_Error(
+							'ga_path_sequence_pair_failed',
+							'Failed to fetch path sequence for ' . $entry_host . ' -> ' . $next_host . ': ' . $transition->get_error_message()
+						);
+					}
+
+					if ( null === $entry_users_by_host[ $entry_host ] ) {
+						$entry_users_by_host[ $entry_host ] = $transition['entry_users'];
+					}
+
+					if ( $transition['next_users'] > 0 ) {
+						$transitions_by_host[ $entry_host ][] = array(
+							'next_host' => $next_host,
+							'users'     => $transition['next_users'],
+						);
+					}
+				}
+			}
+		}
+
+		$results = array();
+		foreach ( $host_names as $entry_host ) {
+			$transitions = $transitions_by_host[ $entry_host ];
+
+			usort(
+				$transitions,
+				static function ( $a, $b ) {
+					return $b['users'] <=> $a['users'];
+				}
+			);
+
+			$results[] = array(
+				'hostName'     => $entry_host,
+				// Users whose journey touched this host (funnel step-1 activeUsers).
+				'entry_users'  => (int) ( $entry_users_by_host[ $entry_host ] ?? 0 ),
+				// Lower bound on users who, after this host, went on to another
+				// host: the largest single ordered next-hop. (Per-destination
+				// funnels can't be summed without double-counting users who
+				// reached multiple other hosts, so the max is the safe floor for
+				// "% reaching >=1 other site".)
+				'onward_users' => empty( $transitions ) ? 0 : (int) $transitions[0]['users'],
+				// Ordered next-host transitions (this host -> next_host), with
+				// activeUsers, descending. Raw material for top cross-site paths.
+				'next_hosts'   => $transitions,
+			);
+		}
+
+		return $results;
+	}
+
+	/**
+	 * Discover the hostnames present in the property for a date range.
+	 *
+	 * Uses the standard runReport (hostName x sessions) so path_sequence stays
+	 * property-agnostic — it learns the hosts from the data instead of having
+	 * any host list baked in.
+	 *
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $property_id  GA4 property ID.
+	 * @param string $start_date   Start date (YYYY-MM-DD).
+	 * @param string $end_date     End date (YYYY-MM-DD).
+	 * @param int    $max_hosts    Max hosts to return (top by sessions).
+	 * @return array|\WP_Error Array of array{hostName,sessions} or error.
+	 */
+	private static function discoverHosts( string $access_token, string $property_id, string $start_date, string $end_date, int $max_hosts ) {
+		$request_body = array(
+			'dateRanges' => array(
+				array(
+					'startDate' => $start_date,
+					'endDate'   => $end_date,
+				),
+			),
+			'dimensions' => array( array( 'name' => 'hostName' ) ),
+			'metrics'    => array( array( 'name' => 'sessions' ) ),
+			'orderBys'   => array(
+				array(
+					'metric' => array( 'metricName' => 'sessions' ),
+					'desc'   => true,
+				),
+			),
+			'limit'      => $max_hosts,
+		);
+
+		$result = HttpClient::post(
+			self::API_BASE . $property_id . ':runReport',
+			array(
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $request_body ),
+				'context' => 'Google Analytics Data API (path_sequence host discovery)',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'ga_path_sequence_hosts_failed', $result['error'] ?? 'Unknown error' );
+		}
+
+		$data = json_decode( $result['data'], true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return new \WP_Error( 'ga_path_sequence_hosts_parse', 'Failed to parse host discovery response.' );
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			return new \WP_Error( 'ga_path_sequence_hosts_api', $data['error']['message'] ?? 'Unknown API error' );
+		}
+
+		$hosts = array();
+		foreach ( ( $data['rows'] ?? array() ) as $row ) {
+			$host = $row['dimensionValues'][0]['value'] ?? '';
+			if ( '' === $host || '(not set)' === $host ) {
+				continue;
+			}
+			$hosts[] = array(
+				'hostName' => $host,
+				'sessions' => (int) ( $row['metricValues'][0]['value'] ?? 0 ),
+			);
+		}
+
+		return $hosts;
+	}
+
+	/**
+	 * Fetch one ordered host transition (entry_host -> next_host).
+	 *
+	 * Runs a 2-step CLOSED funnel: step 1 = hostName EXACT entry_host, step 2 =
+	 * hostName EXACT next_host. Returns the step-1 activeUsers (entry_users) and
+	 * step-2 activeUsers (next_users = users who reached next_host after
+	 * entry_host, in order).
+	 *
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $property_id  GA4 property ID.
+	 * @param string $start_date   Start date (YYYY-MM-DD).
+	 * @param string $end_date     End date (YYYY-MM-DD).
+	 * @param string $entry_host   First-step hostname.
+	 * @param string $next_host    Second-step hostname.
+	 * @return array|\WP_Error array{entry_users:int,next_users:int} or error.
+	 */
+	private static function fetchOrderedPairTransition( string $access_token, string $property_id, string $start_date, string $end_date, string $entry_host, string $next_host ) {
+		$request_body = array(
+			'dateRanges' => array(
+				array(
+					'startDate' => $start_date,
+					'endDate'   => $end_date,
+				),
+			),
+			'funnel'     => array(
+				// Closed funnel: users must enter at step 1, so step 2 counts only
+				// users who reached next_host AFTER entry_host (ordered).
+				'isOpenFunnel' => false,
+				'steps'        => array(
+					self::buildHostFunnelStep( 'entry', $entry_host ),
+					self::buildHostFunnelStep( 'next', $next_host ),
+				),
+			),
+		);
+
+		$result = HttpClient::post(
+			self::API_BASE_ALPHA . $property_id . ':runFunnelReport',
+			array(
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $request_body ),
+				'context' => 'Google Analytics Data API (path_sequence funnel)',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'ga_path_sequence_funnel_failed', $result['error'] ?? 'Unknown error' );
+		}
+
+		$data = json_decode( $result['data'], true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return new \WP_Error( 'ga_path_sequence_funnel_parse', 'Failed to parse funnel response.' );
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			return new \WP_Error( 'ga_path_sequence_funnel_api', $data['error']['message'] ?? 'Unknown API error' );
+		}
+
+		return self::extractFunnelStepUsers( $data );
+	}
+
+	/**
+	 * Build a single hostName-EXACT funnel step.
+	 *
+	 * Public-by-extraction so the request shape is unit-testable without an HTTP
+	 * round-trip (mirrors buildReportRequestBody's testing rationale).
+	 *
+	 * @param string $name Funnel step name.
+	 * @param string $host Exact hostname to match.
+	 * @return array Funnel step definition.
+	 */
+	public static function buildHostFunnelStep( string $name, string $host ): array {
+		return array(
+			'name'             => $name,
+			'filterExpression' => array(
+				'funnelFieldFilter' => array(
+					'fieldName'    => 'hostName',
+					'stringFilter' => array(
+						'matchType' => 'EXACT',
+						'value'     => $host,
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Pull step-1 and step-2 activeUsers out of a 2-step funnelTable response.
+	 *
+	 * The funnelTable returns one row per step (dimension funnelStepName like
+	 * "1. entry", "2. next") and an activeUsers metric column. We read step 1 and
+	 * step 2 activeUsers by their ordinal step prefix, robust to extra metric
+	 * columns (completionRate, abandonments, abandonmentRate).
+	 *
+	 * @param array $data Raw runFunnelReport response.
+	 * @return array array{entry_users:int,next_users:int}
+	 */
+	private static function extractFunnelStepUsers( array $data ): array {
+		$table          = $data['funnelTable'] ?? array();
+		$metric_headers = wp_list_pluck( $table['metricHeaders'] ?? array(), 'name' );
+
+		$users_col = array_search( 'activeUsers', $metric_headers, true );
+		if ( false === $users_col ) {
+			$users_col = 0;
+		}
+
+		$entry_users = 0;
+		$next_users  = 0;
+
+		foreach ( ( $table['rows'] ?? array() ) as $row ) {
+			$step  = $row['dimensionValues'][0]['value'] ?? '';
+			$value = (int) ( $row['metricValues'][ $users_col ]['value'] ?? 0 );
+
+			// Step rows are prefixed with their ordinal: "1. entry", "2. next".
+			if ( 0 === strpos( $step, '1.' ) ) {
+				$entry_users = $value;
+			} elseif ( 0 === strpos( $step, '2.' ) ) {
+				$next_users = $value;
+			}
+		}
+
+		return array(
+			'entry_users' => $entry_users,
+			'next_users'  => $next_users,
+		);
+	}
+
+	/**
+	 * Format GA4 report rows into a flat, readable structure.
+	 *
+	 * @param array $data          Raw GA4 API response.
+	 * @return array Formatted rows.
+	 */
+	private static function formatReportRows( array $data ): array {
+		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
+		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
+
+		$rows = array();
+
+		foreach ( ( $data['rows'] ?? array() ) as $row ) {
+			$dim_values    = wp_list_pluck( $row['dimensionValues'] ?? array(), 'value' );
+			$metric_values = wp_list_pluck( $row['metricValues'] ?? array(), 'value' );
+
+			$formatted = array();
+			foreach ( $dimension_headers as $i => $name ) {
+				$formatted[ $name ] = $dim_values[ $i ] ?? '';
+			}
+			foreach ( $metric_headers as $i => $name ) {
+				$value = $metric_values[ $i ] ?? '0';
+				// Cast numeric strings to appropriate types.
+				if ( is_numeric( $value ) ) {
+					$formatted[ $name ] = strpos( (string) $value, '.' ) !== false ? (float) $value : (int) $value;
+				} else {
+					$formatted[ $name ] = $value;
+				}
+			}
+
+			$rows[] = $formatted;
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Format GA4 comparison rows with delta columns.
+	 *
+	 * GA returns a separate row for each date range and adds a synthetic
+	 * dateRange dimension. Reconcile those rows by the complete report dimension
+	 * tuple, preserving current-period order and omitting prior-only rows.
+	 *
+	 * @param array $data  Raw GA4 API response.
+	 * @param int   $limit Final reconciled row limit.
+	 * @return array Formatted rows with delta columns.
+	 */
+	private static function formatComparisonRows( array $data, int $limit ): array {
+		$dimension_headers = wp_list_pluck( $data['dimensionHeaders'] ?? array(), 'name' );
+		$metric_headers    = wp_list_pluck( $data['metricHeaders'] ?? array(), 'name' );
+		$date_range_index  = array_search( 'dateRange', $dimension_headers, true );
+		$current_rows      = array();
+		$previous_rows     = array();
+
+		foreach ( ( $data['rows'] ?? array() ) as $row ) {
+			$dim_values    = wp_list_pluck( $row['dimensionValues'] ?? array(), 'value' );
+			$metric_values = wp_list_pluck( $row['metricValues'] ?? array(), 'value' );
+			$dimensions    = array();
+			foreach ( $dimension_headers as $i => $name ) {
+				if ( 'dateRange' === $name ) {
+					continue;
+				}
+				$dimensions[ $name ] = $dim_values[ $i ] ?? '';
+			}
+
+			$key         = wp_json_encode( array_values( $dimensions ) );
+			$range       = false !== $date_range_index ? ( $dim_values[ $date_range_index ] ?? 'date_range_0' ) : 'date_range_0';
+			$formatted   = $dimensions;
+			$raw_metrics = array();
+			foreach ( $metric_headers as $i => $name ) {
+				$value                = $metric_values[ $i ] ?? '0';
+				$raw_metrics[ $name ] = $value;
+				$formatted[ $name ]   = is_numeric( $value )
+					? ( strpos( (string) $value, '.' ) !== false ? (float) $value : (int) $value )
+					: $value;
+			}
+
+			$entry = array(
+				'formatted' => $formatted,
+				'metrics'   => $raw_metrics,
+			);
+
+			if ( 'date_range_1' === $range ) {
+				$previous_rows[ $key ] = $entry;
+			} else {
+				$current_rows[ $key ] = $entry;
+			}
+		}
+
+		$rows = array();
+		foreach ( $current_rows as $key => $current_row ) {
+			$formatted    = $current_row['formatted'];
+			$has_previous = isset( $previous_rows[ $key ] );
+
+			foreach ( $metric_headers as $name ) {
+				$current      = $current_row['metrics'][ $name ] ?? '0';
+				$current_num  = is_numeric( $current ) ? (float) $current : 0;
+				$delta_column = "\xCE\x94 " . $name;
+
+				if ( ! $has_previous ) {
+					$formatted[ $delta_column ] = 'new';
+					continue;
+				}
+
+				$previous     = $previous_rows[ $key ]['metrics'][ $name ] ?? '0';
+				$previous_num = is_numeric( $previous ) ? (float) $previous : 0;
+				if ( 0.0 !== $previous_num ) {
+					$delta                      = ( ( $current_num - $previous_num ) / $previous_num ) * 100;
+					$sign                       = $delta >= 0 ? '+' : '';
+					$formatted[ $delta_column ] = $sign . round( $delta, 1 ) . '%';
+				} else {
+					$formatted[ $delta_column ] = '-';
+				}
+			}
+
+			$rows[] = $formatted;
+			if ( count( $rows ) >= $limit ) {
+				break;
+			}
+		}
+
+		return $rows;
+	}
+
+
+
+	/**
+	 * Check if Google Analytics is configured.
+	 *
+	 * @return bool
+	 */
+	public static function is_configured(): bool {
+		$config = self::get_config();
+		return ! empty( $config['service_account_json'] ) && ! empty( $config['property_id'] );
+	}
+
+	/**
+	 * Get stored configuration.
+	 *
+	 * Same site-option-plus-filter shape as SendyAbilities::get_campaign_config()
+	 * — deployments may override any key (including default_country_cohort)
+	 * through the filter instead of persisting it in the network option.
+	 *
+	 * @return array Keys include service_account_json, property_id, and the
+	 *               optional default_country_cohort — a comma-separated
+	 *               ISO-3166-1 alpha-2 cohort (e.g. "US,CA,GB") applied to every
+	 *               GA query unless --country explicitly overrides or opts out
+	 *               with "all". See fetchStats().
+	 */
+	public static function get_config(): array {
+		$config = get_site_option( self::CONFIG_OPTION, array() );
+		$config = is_array( $config ) ? $config : array();
+
+		/**
+		 * Filter the canonical Google Analytics configuration.
+		 *
+		 * @param array $config Keys: service_account_json, property_id, and
+		 *                      optional default_country_cohort.
+		 */
+		return apply_filters( 'datamachine_ga_config', $config );
+	}
+}

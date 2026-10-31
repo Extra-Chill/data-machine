@@ -1,0 +1,18 @@
+{
+  "create": {
+    "code": 200,
+    "body": "Campaign created"
+  },
+  "create_numeric": {
+    "code": 200,
+    "body": "654"
+  },
+  "rejected": {
+    "code": 200,
+    "body": "From email not passed"
+  },
+  "remote_error": {
+    "code": 500,
+    "body": "Remote failure containing api-secret and db-secret"
+  }
+}
