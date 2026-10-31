@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.200.2] - 2026-10-31
+
+### Changed
+- gate per-request schema convergence behind a stored fingerprint
+
 ## [0.200.1] - 2026-10-31
 
 ### Fixed
