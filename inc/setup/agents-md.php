@@ -169,9 +169,6 @@ function datamachine_agents_md_render_datamachine_section(): string {
 		. "- Content and media operations: `{$wp} datamachine posts --help`, `{$wp} datamachine blocks --help`, or `{$wp} datamachine image --help`\n"
 		. "- Communication and approval queues: `{$wp} datamachine email --help` and `{$wp} datamachine pending-actions --help`\n"
 		. "- Agent and system configuration: `{$wp} datamachine agents --help` and `{$wp} datamachine system --help`\n\n"
-		. "**Safety**\n"
-		. "- Send agent-written correspondence to people through `{$wp} datamachine email send` (`datamachine/send-email`), not ad-hoc `wp_mail()` or eval scripts that bypass approval and audit.\n"
-		. "- When sending on a specific person's behalf, pass `--on-behalf-of=<user>`. The email is held until that person accepts it through `{$wp} datamachine pending-actions`.\n\n"
 		. "**Discovery**\n"
 		. "Use `{$wp} datamachine --help` for the live command map and `{$wp} datamachine <command> --help` for the current options and subcommands.";
 }
