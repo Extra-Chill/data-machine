@@ -1,0 +1,212 @@
+/**
+ * Data Machine Core Modal System CSS
+ *
+ * Universal modal styles for the entire plugin. This provides the foundational
+ * modal structure and animations that can be used by any admin page component.
+ *
+ * Modal content styling should remain in component-specific CSS files.
+ *
+ * @package DataMachine\Core\Admin\Modal
+ * @since 1.0.0
+ */
+
+/* ===== UNIVERSAL MODAL STRUCTURE ===== */
+
+.datamachine-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+}
+
+.datamachine-modal.datamachine-modal-active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.datamachine-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.datamachine-modal-container {
+    position: relative;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    max-width: 800px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+}
+
+.datamachine-modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.datamachine-modal-title {
+    margin: 0;
+    font-size: 20px;
+    color: #333;
+}
+
+
+.datamachine-modal-body {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* ===== MODAL ANIMATIONS ===== */
+
+.datamachine-modal {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.datamachine-modal.datamachine-modal-active {
+    opacity: 1;
+}
+
+.datamachine-modal-container {
+    transform: translateY(-50px);
+    transition: transform 0.3s ease;
+}
+
+.datamachine-modal.datamachine-modal-active .datamachine-modal-container {
+    transform: translateY(0);
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+
+@media (max-width: 768px) {
+    .datamachine-modal-container {
+        width: 95%;
+        max-height: 90vh;
+    }
+    
+    .datamachine-modal-header {
+        padding: 15px;
+    }
+    
+    .datamachine-modal-body {
+        padding: 15px;
+        max-height: 70vh;
+    }
+    
+    .datamachine-modal-title {
+        font-size: 18px;
+    }
+}
+
+/* ===== ACCESSIBILITY ===== */
+
+.datamachine-modal[aria-hidden="true"] {
+    display: none;
+}
+
+.datamachine-modal-container {
+    outline: none;
+}
+
+.datamachine-modal-close:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+/* ===== LOADING STATE ===== */
+
+.datamachine-modal-loading .datamachine-modal-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+}
+
+.datamachine-modal-loading .datamachine-modal-body::before {
+    content: "";
+    width: 32px;
+    height: 32px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #0073aa;
+    border-radius: 50%;
+    animation: datamachine-modal-spin 1s linear infinite;
+}
+
+@keyframes datamachine-modal-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ===== MODAL NOTICE SYSTEM ===== */
+
+.datamachine-modal-notice {
+    padding: 12px 20px;
+    margin: 0;
+    border-left: 4px solid;
+    font-size: 14px;
+    line-height: 1.4;
+    position: relative;
+    animation: datamachine-modal-notice-slide-in 0.3s ease-out;
+}
+
+.datamachine-modal-notice--success {
+    border-color: #46b450;
+    background: #ecf7ed;
+    color: #155724;
+}
+
+.datamachine-modal-notice--error {
+    border-color: #dc3232;
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.datamachine-modal-notice--warning {
+    border-color: #ffb900;
+    background: #fff3cd;
+    color: #856404;
+}
+
+.datamachine-modal-notice--info {
+    border-color: #0073aa;
+    background: #e6f3ff;
+    color: #0c5460;
+}
+
+/* Modal error message styling */
+.datamachine-modal-error-message {
+    color: #d63638;
+    margin: 20px 0;
+}
+
+@keyframes datamachine-modal-notice-slide-in {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===== FORM FIELD STYLING ===== */
+
+/* Readonly field styling */
+.datamachine-readonly-field {
+    background-color: #f9f9f9;
+    color: #666;
+}
