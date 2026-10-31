@@ -85,7 +85,7 @@ class MergedBillResolverFlow {
 		// in the persistent object cache, so steady-state requests skip the
 		// Action Scheduler lookup; a deleted action is recreated within an hour.
 		$checked_key = 'datamachine_events_merged_bill_scan_checked';
-		if ( (string) $interval === (string) get_transient( $checked_key ) ) {
+		if ( (string) get_transient( $checked_key ) === (string) $interval ) {
 			return;
 		}
 

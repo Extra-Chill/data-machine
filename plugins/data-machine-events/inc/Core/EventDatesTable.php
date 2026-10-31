@@ -270,6 +270,7 @@ class EventDatesTable {
 		$found  = false;
 		$cached = wp_cache_get( (string) $post_id, self::CACHE_GROUP, false, $found );
 		if ( $found ) {
+			/** @var object{start_datetime:string,end_datetime:string|null,post_status:string}|string $cached Row written below, or the '' miss sentinel. */
 			return is_object( $cached ) ? $cached : null;
 		}
 
