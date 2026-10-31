@@ -119,6 +119,9 @@ class EmailCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--on-behalf-of=<user>]
+	 * : WordPress user ID whose approval is required before sending.
+	 *
 	 * [--auth-ref=<ref>]
 	 * : Authorized mailbox ref. Required for non-management callers.
 	 *
@@ -185,6 +188,10 @@ class EmailCommand extends BaseCommand {
 			'attachments'  => array(),
 		);
 
+		if ( isset( $assoc_args['on-behalf-of'] ) ) {
+			$input['on_behalf_of'] = (int) $assoc_args['on-behalf-of'];
+		}
+
 		if ( ! empty( $assoc_args['attachments'] ) ) {
 			$input['attachments'] = array_map( 'trim', explode( ',', $assoc_args['attachments'] ) );
 		}
@@ -195,7 +202,9 @@ class EmailCommand extends BaseCommand {
 			WP_CLI::error( $result->get_error_message() );
 		}
 
-		if ( $result['success'] ?? false ) {
+		if ( ! empty( $result['staged'] ) ) {
+			WP_CLI::success( sprintf( 'Email staged for approval (action_id=%s)', $result['action_id'] ) );
+		} elseif ( $result['success'] ?? false ) {
 			WP_CLI::success( $result['message'] ?? 'Email sent.' );
 		} else {
 			WP_CLI::error( $result['error'] ?? 'Email send failed.' );

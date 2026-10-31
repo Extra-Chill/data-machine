@@ -27,7 +27,7 @@ Message operations take `auth_ref`, a non-secret mailbox handle such as `email_i
 
 | Ability slug | Purpose |
 | --- | --- |
-| `datamachine/send-email` | Send an email (`to`, `subject`, `body`, optional `cc`, `bcc`, `from_name`, `from_email`, `reply_to`, `content_type`, `attachments`). Subject supports `{month}`, `{year}`, `{site_name}`, and `{date}` placeholders. |
+| `datamachine/send-email` | Send an email (`to`, `subject`, `body`, optional `cc`, `bcc`, `from_name`, `from_email`, `reply_to`, `content_type`, `attachments`, `on_behalf_of`). Subject supports `{month}`, `{year}`, `{site_name}`, and `{date}` placeholders. |
 | `datamachine/send-email-queued` | Queue an email for delivery via Action Scheduler (`send_at`, `priority`). |
 | `datamachine/fetch-email` | Fetch messages (`folder`, `search_criteria`, `max_messages`, `offset`, `headers_only`, `mark_as_read`, `download_attachments`) or read one by `uid`. |
 | `datamachine/email-reply` | Reply with threading headers (`in_reply_to`, optional `references`). |
@@ -44,6 +44,18 @@ Message operations take `auth_ref`, a non-secret mailbox handle such as `email_i
 | `datamachine/email-mailbox-connect` | Connect or update one inbox (`name`, `credentials`) owned by the current principal. |
 | `datamachine/email-mailbox-grant` | Delegate explicit `operations` on an owned inbox to `agent_id`. |
 | `datamachine/email-forward` | Forward an original message by `uid` from `auth_ref` to `to`, with optional `folder` and introductory `body`. Includes every attachment and an `original.eml` copy. |
+
+## Approval before sending
+
+Pass `on_behalf_of` as an existing positive WordPress user ID to `datamachine/send-email` to stage, rather than send, the email. The result is the canonical `approval_required` envelope with top-level `staged: true` and `action_id`. No mail is sent while staging.
+
+Only that user may accept or reject the `send_email` pending action through the pending-action resolver (`action_id`, `decision: accepted` or `rejected`). Other users, including administrators requesting operator-wide access, cannot resolve it. Acceptance consumes the one-time authorization receipt and replays the original send with `on_behalf_of` removed, preventing re-staging. Normal mailbox/sender authorization is checked again as the approving user; approval does not delegate mailbox access. Rejection sends nothing.
+
+```sh
+wp datamachine email send --to=recipient@example.com --subject="Review" --body="Message" --on-behalf-of=42
+```
+
+The CLI prints the staged action ID. Omitting `on_behalf_of` preserves immediate delivery and the existing result shape.
 
 ## Multiple inboxes per user
 

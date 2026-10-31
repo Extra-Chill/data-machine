@@ -6,6 +6,10 @@
 
 define( 'ABSPATH', __DIR__ );
 
+function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+	return add_action( $hook, $callback, $priority, $accepted_args );
+}
+
 $datamachine_test_actions       = array();
 $datamachine_test_doing_actions = array();
 $datamachine_test_did_actions   = array();
