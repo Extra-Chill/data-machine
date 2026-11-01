@@ -34,7 +34,5 @@ jobs:
       baseline-commands: ${{ github.event_name == 'pull_request' && 'review test' || 'none' }}
       execution-timeout-seconds: '3600'
       test-timeout-seconds: '3300'
-      # Sharding is off until homeboy-action can place the test inventory at a
-      # subdirectory component's root (Homeboy only accepts it there; ci.yml
-      # requests it at the repository root). Unsharded, the suite is ~20 min.
+      test-shards: '4'
     secrets: inherit
