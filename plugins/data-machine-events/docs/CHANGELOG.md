@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.80.2] - 2026-11-01
+
+### Fixed
+- keep imports inside the configured radius
+
 ## [0.80.1] - 2026-11-01
 
 ### Fixed
