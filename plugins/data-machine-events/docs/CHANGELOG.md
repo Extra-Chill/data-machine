@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.80.1] - 2026-11-01
+
+### Fixed
+- follow detail pages for HTML-section cards, split index sections, skip chrome and non-flyer images
+
 ## [0.80.0] - 2026-11-01
 
 ### Added
