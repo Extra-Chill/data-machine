@@ -45,14 +45,16 @@ class DetailPageFetcher extends BaseExtractor {
 	/**
 	 * Fetch a detail/ticket page for enrichment.
 	 *
-	 * Single attempt, browser-mode UA, 15s timeout — matching the bounded
-	 * follow policy owned by DetailPageEnricher.
+	 * Browser-mode UA first, 15s timeout. Some servers drop or challenge
+	 * browser-shaped requests while answering a plain one, so a failed or
+	 * captcha response is retried once in standard mode — the same policy
+	 * UniversalWebScraper::fetch_html() applies to listing pages.
 	 *
 	 * @param string $url URL to fetch.
 	 * @return string|null Response body, or null on failure.
 	 */
 	public function fetch( string $url ): ?string {
-		return $this->fetchUrl(
+		$body = $this->fetchUrl(
 			$url,
 			array(
 				'timeout'      => 15,
@@ -60,5 +62,35 @@ class DetailPageFetcher extends BaseExtractor {
 			),
 			'DetailPageEnricher'
 		);
+
+		if ( null !== $body && ! self::isChallengePage( $body ) ) {
+			return $body;
+		}
+
+		$fallback = $this->fetchUrl(
+			$url,
+			array(
+				'timeout'      => 15,
+				'browser_mode' => false,
+			),
+			'DetailPageEnricher (standard mode)'
+		);
+
+		if ( null === $fallback || self::isChallengePage( $fallback ) ) {
+			return null;
+		}
+
+		return $fallback;
+	}
+
+	/**
+	 * Whether a response body is a bot challenge rather than page content.
+	 *
+	 * @param string $body Response body.
+	 */
+	public static function isChallengePage( string $body ): bool {
+		return false !== strpos( $body, 'sgcaptcha' )
+			|| false !== strpos( $body, 'cloudflare-challenge' )
+			|| false !== strpos( $body, 'Checking your browser' );
 	}
 }

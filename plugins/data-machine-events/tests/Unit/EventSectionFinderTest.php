@@ -71,4 +71,17 @@ class EventSectionFinderTest extends WP_UnitTestCase {
 			$collector->getDiagnostics()
 		);
 	}
+
+	public function test_junk_fragments_are_skipped_but_short_titled_cards_are_kept(): void {
+		$context = ExecutionContext::direct( 'universal_web_scraper' );
+		$finder  = new EventSectionFinder( new FreshCandidateCollector( $context ), fn( $html ) => $html, fn( $date ) => false );
+		$html    = '<html><body><div class="calendar-header"><div class="event-day-label" data-day="sunday">SUN</div></div>'
+			. '<div class="event-spacer" data-placeholder="true">&nbsp;</div>'
+			. '<div class="event-meta-row" data-age="18">18+ Doors 7:30PM Show 8:00PM</div>'
+			. '<div class="event-card" data-id="42">Jazz Night<br>Dec 12</div></body></html>';
+		$section = $finder->find_first_eligible_section( $html, 'https://example.com/calendar', $context );
+		$this->assertNotNull( $section );
+		$this->assertStringContainsString( 'Jazz Night', $section['raw_html'] );
+		$this->assertNull( $finder->find_first_eligible_section( $html, 'https://example.com/calendar', $context ) );
+	}
 }
