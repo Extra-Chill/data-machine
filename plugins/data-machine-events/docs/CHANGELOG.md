@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.81.0] - 2026-11-01
+
+### Changed
+- remove public show ratings and reviews
+
 ## [0.80.2] - 2026-11-01
 
 ### Fixed
