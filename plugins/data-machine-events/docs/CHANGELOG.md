@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.80.0] - 2026-11-01
+
+### Added
+- source-health check for dark, blocked, and broken import flows
+
 ## [0.79.0] - 2026-10-31
 
 ### Added
