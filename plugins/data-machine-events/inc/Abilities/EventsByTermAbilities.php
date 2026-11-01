@@ -388,8 +388,6 @@ class EventsByTermAbilities {
 			$time_display = date_i18n( get_option( 'time_format' ), $timestamp );
 		}
 
-		$rating = \DataMachineEvents\Core\EventRatings::get_summary( $post_id );
-
 		return array(
 			'event_id'     => $post_id,
 			'title'        => html_entity_decode( get_the_title( $post_id ), ENT_QUOTES, 'UTF-8' ),
@@ -399,8 +397,6 @@ class EventsByTermAbilities {
 			'date_display' => $date_display,
 			'time_display' => $time_display,
 			'timing'       => $timing,
-			'rating_avg'   => $rating['average'],
-			'rating_count' => $rating['count'],
 		);
 	}
 }
