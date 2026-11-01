@@ -565,7 +565,8 @@ class Ticketmaster extends EventImportHandler {
 		$bit            = 0;
 		$longitude_turn = true;
 
-		while ( strlen( $hash ) < $precision ) {
+		$length = 0;
+		while ( $length < $precision ) {
 			$range    = $longitude_turn ? $lng_range : $lat_range;
 			$value    = $longitude_turn ? $longitude : $latitude;
 			$midpoint = ( $range[0] + $range[1] ) / 2;
@@ -584,8 +585,9 @@ class Ticketmaster extends EventImportHandler {
 			$longitude_turn = ! $longitude_turn;
 			if ( 5 === ++$bit ) {
 				$hash .= $alphabet[ $bits ];
-				$bit   = 0;
-				$bits  = 0;
+				++$length;
+				$bit  = 0;
+				$bits = 0;
 			}
 		}
 
