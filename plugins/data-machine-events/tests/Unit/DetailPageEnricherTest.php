@@ -30,6 +30,17 @@ class DetailPageEnricherTest extends WP_UnitTestCase {
 	 * Empty fields are filled from the followed page; non-empty fields are
 	 * never overwritten.
 	 */
+	public function test_html_section_follows_share_budget_and_do_not_retry(): void {
+		$calls = array();
+		$enricher = new DetailPageEnricher( function ( $url ) use ( &$calls ) {
+			$calls[] = $url;
+			return null;
+		}, array(), 1 );
+		$this->assertNull( $enricher->fetchSectionDetail( 'https://example.com/event/one', $this->context ) );
+		$this->assertNull( $enricher->fetchSectionDetail( 'https://example.com/event/two', $this->context ) );
+		$this->assertCount( 1, $calls );
+	}
+
 	public function test_fills_only_empty_fields(): void {
 		$pages = array(
 			'https://venue.example/show/1' => '<html><body><p>Startar 20:00</p></body></html>',

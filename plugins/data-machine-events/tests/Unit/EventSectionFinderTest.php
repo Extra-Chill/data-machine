@@ -14,6 +14,21 @@ use WP_UnitTestCase;
 
 class EventSectionFinderTest extends WP_UnitTestCase {
 
+	public function test_filter_chrome_is_skipped_and_index_is_split(): void {
+		$context = ExecutionContext::direct( 'universal_web_scraper' );
+		$finder = new EventSectionFinder( new FreshCandidateCollector( $context ), fn( $html ) => $html, fn( $date ) => false );
+		$html = '<html><body><div class="event-item event-filter"><form><select><option>All venues and categories</option></select></form></div>'
+			. '<div class="event-listing"><article><a href="/event/first/">First concert</a><p>December 12, 2099</p></article>'
+			. '<article><a href="/event/second/">Second concert</a><p>December 13, 2099</p></article></div></body></html>';
+		$first = $finder->find_first_eligible_section( $html, 'https://example.com', $context );
+		$second = $finder->find_first_eligible_section( $html, 'https://example.com', $context );
+		$this->assertStringContainsString( 'First concert', $first['raw_html'] );
+		$this->assertStringNotContainsString( 'Second concert', $first['raw_html'] );
+		$this->assertStringContainsString( 'Second concert', $second['raw_html'] );
+		$this->assertNotSame( $first['identifier'], $second['identifier'] );
+		$this->assertNull( $finder->find_first_eligible_section( $html, 'https://example.com', $context ) );
+	}
+
 	public function test_processed_first_section_does_not_stop_scan_for_later_fresh_section(): void {
 		$context = $this->createMock( ExecutionContext::class );
 		$context->method( 'isDirect' )->willReturn( true );

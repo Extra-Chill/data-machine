@@ -667,6 +667,25 @@ class UniversalWebScraper extends EventImportHandler {
 				)
 			);
 
+			$detail_data = array();
+			if ( ! EventSectionDetails::hasDateAndTime( $raw_html_data ) ) {
+				$dom = new \DOMDocument();
+				libxml_use_internal_errors( true );
+				$dom->loadHTML( '<html><body>' . $raw_html_data . '</body></html>' );
+				libxml_clear_errors();
+				$links = EventSectionDetails::links( $dom->documentElement, $current_url );
+				if ( 1 === count( $links ) ) {
+					$detail_url = array_key_first( $links );
+					$detail_html = $this->detail_enricher->fetchSectionDetail( $detail_url, $context );
+					if ( ! empty( $detail_html ) ) {
+						$detail_data = array(
+							'detail_url' => $detail_url,
+							'detail_html' => $this->extract_raw_html_section( $detail_html, $detail_url, $context, $config ),
+						);
+					}
+				}
+			}
+
 			return array(
 				'title'    => 'Raw HTML Event Section',
 				'content'  => wp_json_encode(
@@ -675,7 +694,7 @@ class UniversalWebScraper extends EventImportHandler {
 						'source_url'         => $current_url,
 						'import_source'      => 'universal_web_scraper',
 						'section_identifier' => $event_section['identifier'],
-					),
+					) + $detail_data,
 					JSON_PRETTY_PRINT
 				),
 				'metadata' => array(

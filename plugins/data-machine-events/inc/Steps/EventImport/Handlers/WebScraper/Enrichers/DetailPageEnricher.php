@@ -118,6 +118,20 @@ class DetailPageEnricher implements EnricherInterface {
 	}
 
 	/**
+	 * Fetch one HTML-section detail page using the shared per-run budget.
+	 * No ticket fallback or retries: a teaser follows at most one URL.
+	 */
+	public function fetchSectionDetail( string $url, ExecutionContext $context ): ?string {
+		if ( $this->remaining_follows <= 0 ) {
+			return null;
+		}
+		--$this->remaining_follows;
+		$html = call_user_func( $this->fetcher, $url );
+		$context->log( 'debug', 'Detail Page Enricher: HTML section follow', array( 'url' => $url, 'status' => empty( $html ) ? 'fetch_failed' : 'ok' ) );
+		return $html;
+	}
+
+	/**
 	 * Source methods that filled at least one field during the last run().
 	 *
 	 * Used to extend extraction_method provenance

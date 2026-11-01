@@ -72,7 +72,26 @@ final class EventSectionFinder {
 				continue;
 			}
 
+			// Broad selectors can match an entire index. Keep the largest branch
+			// containing only one distinct event URL, preserving card dates/images.
+			$candidates = array();
 			foreach ( $nodes as $node ) {
+				$links = EventSectionDetails::links( $node, $url );
+				if ( count( $links ) <= 1 ) {
+					$candidates[] = $node;
+					continue;
+				}
+				foreach ( $links as $link ) {
+					$card = $link;
+					while ( $card->parentNode instanceof \DOMElement && $card->parentNode !== $node
+						&& count( EventSectionDetails::links( $card->parentNode, $url ) ) === 1 ) {
+						$card = $card->parentNode;
+					}
+					$candidates[] = $card;
+				}
+			}
+
+			foreach ( $candidates as $node ) {
 				$tag_name = strtolower( $node->nodeName );
 				if ( in_array( $tag_name, array( 'body', 'header', 'footer', 'nav', 'aside', 'main' ), true ) ) {
 					continue;
@@ -135,8 +154,16 @@ final class EventSectionFinder {
 					continue;
 				}
 
+				$detail_links = EventSectionDetails::links( $node, $url );
+				if ( empty( $detail_links ) && ! EventSectionDetails::hasDate( $raw_html )
+					&& ( preg_match( '/(?:nav|menu|filter|form)/i', $node->getAttribute( 'class' ) . ' ' . $node->getAttribute( 'id' ) . ' ' . $node->getAttribute( 'role' ) )
+						|| $xpath->query( 'ancestor-or-self::nav | ancestor-or-self::form | .//select | .//form', $node )->length > 0 ) ) {
+					continue;
+				}
+
 				$content_hash     = md5( $raw_html );
-				$event_identifier = md5( $url . $content_hash );
+				// URL identity also deduplicates image/title links and nested selectors.
+				$event_identifier = 1 === count( $detail_links ) ? md5( $url . array_key_first( $detail_links ) ) : md5( $url . $content_hash );
 
 				$cleaned_html = call_user_func( $this->clean_html_for_ai, $raw_html );
 				if ( empty( $cleaned_html ) || strlen( $cleaned_html ) < 30 ) {
