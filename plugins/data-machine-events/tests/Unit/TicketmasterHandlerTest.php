@@ -63,7 +63,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		( new TrackedItems() )->create_table();
 		$this->tracked_completion_filter = static fn( array $handlers ): array => TrackedItems::registerClaimCompletionHandler( $handlers );
 		add_filter( 'datamachine_item_claim_completion_handlers', $this->tracked_completion_filter );
-		$this->handler = new Ticketmaster();
+		$this->handler                   = new Ticketmaster();
 		set_transient( 'data_machine_events_ticketmaster_classifications', array( 'music' => 'Music' ) );
 	}
 
@@ -89,6 +89,28 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 
 	public function test_settings_class_exists() {
 		$this->assertTrue( class_exists( TicketmasterSettings::class ) );
+	}
+
+	public function test_geohash_encodes_charleston_coordinates(): void {
+		$this->assertSame( 'djz4mn', Ticketmaster::encodeGeohash( 32.7765, -79.9311 ) );
+	}
+
+	public function test_configured_radius_filters_distant_ticketmaster_venue_but_keeps_nearby_and_unlocated_events(): void {
+		$charleston = array(
+			'lat' => 32.7765,
+			'lng' => -79.9311,
+		);
+		$nearby     = array(
+			'lat' => 32.8,
+			'lng' => -79.9,
+		);
+		$ballwin    = array(
+			'lat' => 38.5951,
+			'lng' => -90.5462,
+		);
+		$this->assertLessThanOrEqual( 50, Ticketmaster::distanceMiles( $charleston, $nearby ) );
+		$this->assertGreaterThan( 50, Ticketmaster::distanceMiles( $charleston, $ballwin ) );
+		$this->assertArrayNotHasKey( 'venueCoordinates', $this->ticketmasterEvent( 'without-coordinates', 'Unlocated event' )['_embedded']['venues'][0] );
 	}
 
 	public function test_map_event_returns_array() {
@@ -206,7 +228,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			}
 			return $handlers;
 		};
-		$tools_filter = static function ( array $tools ): array {
+		$tools_filter   = static function ( array $tools ): array {
 			$tools['__handler_tools_ticketmaster_test_upsert'] = array(
 				'_handler_callable' => static fn( string $slug, array $config ): array => array(
 					'ticketmaster_test_upsert' => array(
@@ -234,18 +256,18 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		add_filter( 'datamachine_tools', $tools_filter );
 		HandlerAbilities::clearCache();
 		ToolManager::clearCache();
-		$fixture  = $this->createExecutionFixture( 'ticketmaster_test_upsert' );
-		$item_id  = 'TM-inline-' . uniqid();
-		$job_id   = $this->createJob( 'Ticketmaster inline lifecycle', 0, $fixture );
-		$engine   = $this->executionEngine( $job_id, $fixture );
-		$config   = $this->handlerConfig( '32.7765,-79.9311', 'source-step' );
+		$fixture               = $this->createExecutionFixture( 'ticketmaster_test_upsert' );
+		$item_id               = 'TM-inline-' . uniqid();
+		$job_id                = $this->createJob( 'Ticketmaster inline lifecycle', 0, $fixture );
+		$engine                = $this->executionEngine( $job_id, $fixture );
+		$config                = $this->handlerConfig( '32.7765,-79.9311', 'source-step' );
 		$config['pipeline_id'] = $fixture['pipeline_id'];
 		$config['flow_id']     = $fixture['flow_id'];
 		$this->assertTrue( datamachine_set_engine_data( $job_id, $engine ) );
 		$packets = ( new TicketmasterHandlerTestDouble( array( 0 => $this->ticketmasterPage( array( $this->ticketmasterEvent( $item_id, 'Inline Resume Event' ) ) ) ) ) )
 			->get_fetch_data( $fixture['pipeline_id'], $config, (string) $job_id );
-		$packet = $packets[0]->addTo( array() )[0];
-		$claim  = $packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ];
+		$packet  = $packets[0]->addTo( array() )[0];
+		$claim   = $packet['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ];
 		$this->assertSame( 'inline_continuation', $this->routeSourcePackets( $job_id, $fixture, array( $packet ) )['outcome'] );
 
 		global $wpdb;
@@ -274,7 +296,10 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			)
 		);
 		PluginSettings::clearCache();
-		$blocker = PipelineAIConcurrencyLimiter::acquire( 'fake_provider', array( 'job_id' => 999999, 'flow_step_id' => 'blocker' ) );
+		$blocker = PipelineAIConcurrencyLimiter::acquire( 'fake_provider', array(
+			'job_id'       => 999999,
+			'flow_step_id' => 'blocker',
+		) );
 		$this->assertTrue( $blocker['acquired'] );
 
 		$scheduled_packets = array();
@@ -299,7 +324,11 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 							),
 						),
 					),
-					'usage'      => array( 'prompt_tokens' => 10, 'completion_tokens' => 5, 'total_tokens' => 15 ),
+					'usage'      => array(
+						'prompt_tokens'     => 10,
+						'completion_tokens' => 5,
+						'total_tokens'      => 15,
+					),
 				),
 			)
 		);
@@ -314,7 +343,10 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 				$owners->setValue( null, $original_owners );
 			}
 			$this->assertNotNull( wp_get_ability( 'datamachine/execute-step' ) );
-			$first    = $executor->execute( array( 'job_id' => $job_id, 'flow_step_id' => 'ai-step' ) );
+			$first = $executor->execute( array(
+				'job_id'       => $job_id,
+				'flow_step_id' => 'ai-step',
+			) );
 			$this->assertSame( 'blocked', $first['outcome'] );
 			$after_first = datamachine_get_engine_data( $job_id );
 			$this->assertSame( 1, $after_first['ai_concurrency_throttle']['resume_generation'] );
@@ -336,7 +368,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			$resumed = $executor->execute(
 				array(
 					'job_id'               => $job_id,
-					'flow_step_id'          => 'ai-step',
+					'flow_step_id'         => 'ai-step',
 					'ai_resume_generation' => 2,
 				)
 			);
@@ -354,7 +386,10 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			$this->assertCount( 1, $scheduled_packets );
 			$this->assertSame( $claim, $scheduled_packets[0]['metadata'][ ProcessedItems::CLAIM_METADATA_KEY ] );
 			$this->assertSame( $claim['disposition_id'], $scheduled_packets[0]['metadata'][ ProcessedItems::DISPOSITION_ID_METADATA_KEY ] );
-			$this->assertSame( 'completed', $executor->execute( array( 'job_id' => $job_id, 'flow_step_id' => 'upsert-step' ) )['outcome'] );
+			$this->assertSame( 'completed', $executor->execute( array(
+				'job_id'       => $job_id,
+				'flow_step_id' => 'upsert-step',
+			) )['outcome'] );
 		} finally {
 			$blocker['lease']->release();
 			remove_action( 'datamachine_schedule_next_step', $schedule_capture, 1 );
@@ -437,8 +472,8 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			$this->assertTrue( $replay['already_dispositioned'] );
 
 			$packet['metadata']['packet_disposition'] = $disposition;
-			$reconciled = StepLifecycleHandler::reconcileStepOutput( $job_id, array( 'step_type' => 'ai' ), array( $packet ), true );
-			$replayed   = StepLifecycleHandler::reconcileStepOutput( $job_id, array( 'step_type' => 'ai' ), array( $packet ), true );
+			$reconciled                               = StepLifecycleHandler::reconcileStepOutput( $job_id, array( 'step_type' => 'ai' ), array( $packet ), true );
+			$replayed                                 = StepLifecycleHandler::reconcileStepOutput( $job_id, array( 'step_type' => 'ai' ), array( $packet ), true );
 			$this->assertTrue( $reconciled['success'] );
 			$this->assertTrue( $replayed['success'] );
 			$tracked = ( new TrackedItems() )->get( TicketmasterSourceIdentity::TRACK_NAMESPACE, $item_id );
@@ -457,7 +492,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			$job_id  = $this->createJob( 'Ticketmaster failed ' . $step_type );
 			$packets = ( new TicketmasterHandlerTestDouble( array( 0 => $this->ticketmasterPage( array( $this->ticketmasterEvent( $item_id, 'Failed Event' ) ) ) ) ) )
 				->get_fetch_data( 1, $this->handlerConfig( '32.7765,-79.9311', $step_type . '-failure-fetch' ), (string) $job_id );
-			$packet = $packets[0]->addTo( array() )[0];
+			$packet  = $packets[0]->addTo( array() )[0];
 			$this->assertTrue( StepLifecycleHandler::handleInlineContinuation( $job_id, array( 'step_type' => 'event_import' ), array( $packet ) ) );
 			$this->assertTrue( StepLifecycleHandler::reconcileStepOutput( $job_id, array( 'step_type' => $step_type ), array(), false )['success'] );
 			$this->assertFalse( ( new ProcessedItems() )->has_active_claim( TicketmasterSourceIdentity::CLAIM_SCOPE, 'ticketmaster', $item_id ) );
@@ -471,14 +506,14 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$engine    = $this->executionEngine( $parent_id, $fixture );
 		$this->assertTrue( ( new Jobs() )->start_job( $parent_id ) );
 		$this->assertTrue( datamachine_set_engine_data( $parent_id, $engine ) );
-		$events    = array(
+		$events                = array(
 			$this->ticketmasterEvent( 'TM-fanout-a-' . uniqid(), 'Fanout A' ),
 			$this->ticketmasterEvent( 'TM-fanout-b-' . uniqid(), 'Fanout B' ),
 		);
-		$config = $this->handlerConfig( '32.7765,-79.9311', 'source-step' );
+		$config                = $this->handlerConfig( '32.7765,-79.9311', 'source-step' );
 		$config['pipeline_id'] = $fixture['pipeline_id'];
 		$config['flow_id']     = $fixture['flow_id'];
-		$packets = ( new TicketmasterHandlerTestDouble( array( 0 => $this->ticketmasterPage( $events ) ) ) )
+		$packets               = ( new TicketmasterHandlerTestDouble( array( 0 => $this->ticketmasterPage( $events ) ) ) )
 			->get_fetch_data( $fixture['pipeline_id'], $config, (string) $parent_id );
 		$this->assertCount( 2, $packets );
 		$packet_arrays = array_map( static fn( $packet ): array => $packet->addTo( array() )[0], $packets );
@@ -587,7 +622,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 				$wpdb->prefix . ProcessedItems::TABLE_NAME,
 				array( 'claim_token' => 'replacement-token' ),
 				array(
-					'job_id'           => $job_id,
+					'job_id'          => $job_id,
 					'item_identifier' => $context['item_identifier'],
 				),
 				array( '%s' ),
@@ -673,14 +708,18 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $first );
 		$this->completePacket( $first[0]->addTo( array() )[0], 1201 );
 
-		$changed                                      = $initial;
-		$changed['name']                              = 'Updated Title';
-		$changed['url']                               = 'https://www.ticketmaster.com/event/' . $item_id . '-updated';
-		$changed['dates']['start']['localDate']       = '2099-08-16';
-		$changed['dates']['start']['localTime']       = '21:30:00';
-		$changed['_embedded']['venues'][0]['name']    = 'Updated Arena';
-		$changed['priceRanges'][0]                    = array( 'min' => 45, 'max' => 60, 'currency' => 'USD' );
-		$second = ( new TicketmasterHandlerTestDouble( array( 0 => $this->ticketmasterPage( array( $changed ) ) ) ) )
+		$changed                                   = $initial;
+		$changed['name']                           = 'Updated Title';
+		$changed['url']                            = 'https://www.ticketmaster.com/event/' . $item_id . '-updated';
+		$changed['dates']['start']['localDate']    = '2099-08-16';
+		$changed['dates']['start']['localTime']    = '21:30:00';
+		$changed['_embedded']['venues'][0]['name'] = 'Updated Arena';
+		$changed['priceRanges'][0]                 = array(
+			'min'      => 45,
+			'max'      => 60,
+			'currency' => 'USD',
+		);
+		$second                                    = ( new TicketmasterHandlerTestDouble( array( 0 => $this->ticketmasterPage( array( $changed ) ) ) ) )
 			->get_fetch_data( 1, $this->handlerConfig( '37.8044,-122.2712', 'mutable-update' ), '1202' );
 
 		$this->assertCount( 1, $second, 'A changed source revision must reach EventUpsert.' );
@@ -693,10 +732,10 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 	}
 
 	public function test_failure_after_identity_insertion_releases_claim_for_retry(): void {
-		$item_id    = 'TM-retry-' . uniqid();
-		$title      = 'Interrupted Import ' . uniqid();
-		$ticket_url = 'https://www.ticketmaster.com/event/' . $item_id;
-		$raw_event  = $this->ticketmasterEvent( $item_id, $title, $ticket_url );
+		$item_id               = 'TM-retry-' . uniqid();
+		$title                 = 'Interrupted Import ' . uniqid();
+		$ticket_url            = 'https://www.ticketmaster.com/event/' . $item_id;
+		$raw_event             = $this->ticketmasterEvent( $item_id, $title, $ticket_url );
 		[ $post_id, $term_id ] = $this->seedImportedEvent( $title, $ticket_url );
 
 		$first = ( new TicketmasterHandlerTestDouble( array( 0 => $this->ticketmasterPage( array( $raw_event ) ) ) ) )
@@ -778,12 +817,19 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$method  = new \ReflectionMethod( $handler, 'build_search_params' );
 		$context = ExecutionContext::direct( 'ticketmaster' );
 
-		$artist = $method->invoke( $handler, array( 'classification_type' => 'music', 'location' => '32.7765,-79.9311', 'attraction_ids' => 'K8vZ9171FAV, K8vZ9174G2V' ), 'key', $context );
+		$artist = $method->invoke( $handler, array(
+			'classification_type' => 'music',
+			'location'            => '32.7765,-79.9311',
+			'attraction_ids'      => 'K8vZ9171FAV, K8vZ9174G2V',
+		), 'key', $context );
 		$this->assertSame( 'K8vZ9171FAV,K8vZ9174G2V', $artist['attractionId'] );
 		$this->assertArrayNotHasKey( 'geoPoint', $artist );
 		$this->assertArrayNotHasKey( 'radius', $artist );
 
-		$geo = $method->invoke( $handler, array( 'classification_type' => 'music', 'location' => '32.7765,-79.9311' ), 'key', $context );
+		$geo = $method->invoke( $handler, array(
+			'classification_type' => 'music',
+			'location'            => '32.7765,-79.9311',
+		), 'key', $context );
 		$this->assertArrayNotHasKey( 'attractionId', $geo );
 		$this->assertArrayHasKey( 'geoPoint', $geo );
 	}
@@ -831,8 +877,8 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$method    = $this->getProtectedMethod( 'map_ticketmaster_event' );
 		$canonical = 'https://www.ticketmaster.com/event/Z7r9jZ1A7JFo-';
 
-		$api_event                  = $this->ticketmasterEvent( 'TM818', 'Canonical Storage Event' );
-		$api_event['url']           = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=' . rawurlencode( $canonical ) . '&utm_medium=affiliate';
+		$api_event        = $this->ticketmasterEvent( 'TM818', 'Canonical Storage Event' );
+		$api_event['url'] = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=' . rawurlencode( $canonical ) . '&utm_medium=affiliate';
 
 		$result = $method->invoke( $this->handler, $api_event );
 
@@ -1080,7 +1126,10 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 	}
 
 	public function test_register_junk_patterns_ignores_other_sources() {
-		$empty = array( 'id' => array(), 'title' => array() );
+		$empty  = array(
+			'id'    => array(),
+			'title' => array(),
+		);
 		$result = $this->handler->register_junk_patterns( $empty, 'dice' );
 
 		$this->assertSame( $empty, $result );
@@ -1140,14 +1189,14 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 	}
 
 	public function test_artist_queries_chunk_normalized_ids_and_deduplicate_across_paginated_shards(): void {
-		$ids = array_map( static fn( int $i ): string => sprintf( 'artist%03d', $i ), range( 1, 51 ) );
-		$config = $this->handlerConfig( '32.7765,-79.9311', 'artist-shards' );
+		$ids                      = array_map( static fn( int $i ): string => sprintf( 'artist%03d', $i ), range( 1, 51 ) );
+		$config                   = $this->handlerConfig( '32.7765,-79.9311', 'artist-shards' );
 		$config['attraction_ids'] = implode( ', ', $ids ) . ',artist001,invalid!';
-		$queries = array();
-		$http = function ( $pre, $args, $url ) use ( &$queries ): array {
+		$queries                  = array();
+		$http                     = function ( $pre, $args, $url ) use ( &$queries ): array {
 			parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
 			$queries[] = $query;
-			$events = array( $this->ticketmasterEvent( 'shared-shard-event', 'Shared Concert' ) );
+			$events    = array( $this->ticketmasterEvent( 'shared-shard-event', 'Shared Concert' ) );
 			if ( 1 === (int) $query['page'] ) {
 				$events[] = $this->ticketmasterEvent( 'event-' . explode( ',', $query['attractionId'] )[0], 'Unique Concert' );
 			}
@@ -1175,12 +1224,12 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 	}
 
 	public function test_artist_fanout_prefers_soonest_event_across_shards_and_drains_backlog(): void {
-		$config = $this->handlerConfig( '32.7765,-79.9311', 'artist-order', 1 );
+		$config                   = $this->handlerConfig( '32.7765,-79.9311', 'artist-order', 1 );
 		$config['attraction_ids'] = implode( ',', array_map( static fn( int $i ): string => sprintf( 'artist%03d', $i ), range( 1, 26 ) ) );
-		$http = function ( $pre, $args, $url ): array {
+		$http                     = function ( $pre, $args, $url ): array {
 			parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
-			$is_later_shard = 'artist026' === $query['attractionId'];
-			$event = $this->ticketmasterEvent( $is_later_shard ? 'soon-event' : 'distant-event', 'Tour Concert' );
+			$is_later_shard                       = 'artist026' === $query['attractionId'];
+			$event                                = $this->ticketmasterEvent( $is_later_shard ? 'soon-event' : 'distant-event', 'Tour Concert' );
 			$event['dates']['start']['localDate'] = $is_later_shard ? '2099-01-01' : '2099-12-01';
 			return $this->ticketmasterHttpResponse( array( $event ) );
 		};
@@ -1200,19 +1249,19 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 
 	/** @dataProvider truncatedQueryModes */
 	public function test_query_truncation_is_visible_and_geo_pagination_is_unchanged( bool $artist_mode ): void {
-		$config = $this->handlerConfig( '32.7765,-79.9311', 'truncated-query' );
+		$config           = $this->handlerConfig( '32.7765,-79.9311', 'truncated-query' );
 		$config['radius'] = '75';
 		if ( $artist_mode ) {
 			$config['attraction_ids'] = 'artist001';
 		}
-		$queries = array();
+		$queries  = array();
 		$warnings = array();
-		$http = function ( $pre, $args, $url ) use ( &$queries ): array {
+		$http     = function ( $pre, $args, $url ) use ( &$queries ): array {
 			parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
 			$queries[] = $query;
 			return $this->ticketmasterHttpResponse( array( $this->ticketmasterEvent( 'truncated-event', 'Truncated Concert' ) ), (int) $query['page'], 22, 1067 );
 		};
-		$logger = static function ( string $level, string $message, array $context ) use ( &$warnings ): void {
+		$logger   = static function ( string $level, string $message, array $context ) use ( &$warnings ): void {
 			if ( 'warning' === $level && false !== strpos( $message, 'pagination cap' ) ) {
 				$warnings[] = $context;
 			}
@@ -1244,17 +1293,27 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 	}
 
 	public static function truncatedQueryModes(): array {
-		return array( 'artist' => array( true ), 'geo' => array( false ) );
+		return array(
+			'artist' => array( true ),
+			'geo'    => array( false ),
+		);
 	}
 
 	private function ticketmasterHttpResponse( array $events, int $page = 0, int $total_pages = 1, int $total = 1 ): array {
 		return array(
-			'headers' => array( 'content-type' => 'application/json' ),
-			'response' => array( 'code' => 200, 'message' => 'OK' ),
-			'body' => wp_json_encode(
+			'headers'  => array( 'content-type' => 'application/json' ),
+			'response' => array(
+				'code'    => 200,
+				'message' => 'OK',
+			),
+			'body'     => wp_json_encode(
 				array(
 					'_embedded' => array( 'events' => $events ),
-					'page' => array( 'number' => $page, 'totalPages' => $total_pages, 'totalElements' => $total ),
+					'page'      => array(
+						'number'        => $page,
+						'totalPages'    => $total_pages,
+						'totalElements' => $total,
+					),
 				)
 			),
 		);
@@ -1262,12 +1321,12 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 
 	private function handlerConfig( string $location, string $flow_step_id, int $max_items = Ticketmaster::DEFAULT_MAX_ITEMS ): array {
 		return array(
-			'pipeline_id'        => 1,
-			'flow_id'            => abs( crc32( $flow_step_id ) ),
-			'flow_step_id'       => $flow_step_id,
+			'pipeline_id'         => 1,
+			'flow_id'             => abs( crc32( $flow_step_id ) ),
+			'flow_step_id'        => $flow_step_id,
 			'classification_type' => 'music',
-			'location'           => $location,
-			'max_items'          => $max_items,
+			'location'            => $location,
+			'max_items'           => $max_items,
 		);
 	}
 
@@ -1298,7 +1357,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		datamachine_register_capabilities();
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
-		$agent_id = ( new Agents() )->create_if_missing( 'ticketmaster-claims-' . uniqid(), 'Ticketmaster Claim Test Agent', $user_id );
+		$agent_id    = ( new Agents() )->create_if_missing( 'ticketmaster-claims-' . uniqid(), 'Ticketmaster Claim Test Agent', $user_id );
 		$pipeline_id = ( new Pipelines() )->create_pipeline(
 			array(
 				'pipeline_name'   => 'Ticketmaster Claim Lifecycle',
@@ -1320,7 +1379,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		);
 		$this->assertIsInt( $flow_id );
 
-		$flow_config = array(
+		$flow_config     = array(
 			'source-step' => FlowStepConfigFactory::build(
 				array(
 					'flow_step_id'     => 'source-step',
@@ -1411,10 +1470,10 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 
 	private function ticketmasterEvent( string $id, string $title, string $ticket_url = '' ): array {
 		return array(
-			'id'    => $id,
-			'name'  => $title,
-			'url'   => '' !== $ticket_url ? $ticket_url : 'https://www.ticketmaster.com/event/' . rawurlencode( $id ),
-			'dates' => array(
+			'id'        => $id,
+			'name'      => $title,
+			'url'       => '' !== $ticket_url ? $ticket_url : 'https://www.ticketmaster.com/event/' . rawurlencode( $id ),
+			'dates'     => array(
 				'status' => array( 'code' => 'onsale' ),
 				'start'  => array(
 					'localDate' => '2099-08-15',
