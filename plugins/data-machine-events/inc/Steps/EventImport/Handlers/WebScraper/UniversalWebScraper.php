@@ -675,11 +675,11 @@ class UniversalWebScraper extends EventImportHandler {
 				libxml_clear_errors();
 				$links = EventSectionDetails::links( $dom->documentElement, $current_url );
 				if ( 1 === count( $links ) ) {
-					$detail_url = array_key_first( $links );
+					$detail_url  = array_key_first( $links );
 					$detail_html = $this->detail_enricher->fetchSectionDetail( $detail_url, $context );
 					if ( ! empty( $detail_html ) ) {
 						$detail_data = array(
-							'detail_url' => $detail_url,
+							'detail_url'  => $detail_url,
 							'detail_html' => $this->extract_raw_html_section( $detail_html, $detail_url, $context, $config ),
 						);
 					}

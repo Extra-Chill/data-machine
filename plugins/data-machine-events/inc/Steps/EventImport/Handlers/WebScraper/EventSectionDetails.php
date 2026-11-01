@@ -17,18 +17,24 @@ final class EventSectionDetails {
 
 	/** Same-site event detail links, keyed by resolved URL (not ticket or index links). */
 	public static function links( \DOMNode $node, string $listing_url ): array {
-		$xpath = new \DOMXPath( $node->ownerDocument );
-		$links = array();
+		$xpath   = new \DOMXPath( $node->ownerDocument );
+		$links   = array();
 		$anchors = $xpath->query( 'descendant-or-self::a[@href]', $node );
+		if ( false === $anchors ) {
+			return $links;
+		}
 		foreach ( $anchors as $anchor ) {
+			if ( ! $anchor instanceof \DOMElement ) {
+				continue;
+			}
 			$href = trim( $anchor->getAttribute( 'href' ) );
 			if ( '' === $href || preg_match( '/^(?:#|javascript:|mailto:|tel:)/i', $href ) ) {
 				continue;
 			}
-			$url = preg_replace( '/#.*$/', '', WP_Http::make_absolute_url( $href, $listing_url ) );
-			$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+			$url         = preg_replace( '/#.*$/', '', WP_Http::make_absolute_url( $href, $listing_url ) );
+			$host        = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
 			$source_host = strtolower( (string) wp_parse_url( $listing_url, PHP_URL_HOST ) );
-			$path = (string) wp_parse_url( $url, PHP_URL_PATH );
+			$path        = (string) wp_parse_url( $url, PHP_URL_PATH );
 			if ( ! in_array( wp_parse_url( $url, PHP_URL_SCHEME ), array( 'http', 'https' ), true )
 				|| preg_replace( '/^www\./', '', $host ) !== preg_replace( '/^www\./', '', $source_host )
 				|| ! preg_match( '~/(?:events?|shows?|concerts?|performances?)/[^/]+~i', $path )

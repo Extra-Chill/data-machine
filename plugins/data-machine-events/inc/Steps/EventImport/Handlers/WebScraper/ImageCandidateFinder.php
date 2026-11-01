@@ -57,7 +57,7 @@ final class ImageCandidateFinder {
 			}
 
 			// Hard exclusions cannot be outweighed by event-container bonuses.
-			$width = $this->extractDimension( $img, 'width' );
+			$width  = $this->extractDimension( $img, 'width' );
 			$height = $this->extractDimension( $img, 'height' );
 			$labels = $src . ' ' . $img->getAttribute( 'alt' ) . ' ' . $img->getAttribute( 'class' );
 			if ( ( $width > 0 && $width < 150 ) || ( $height > 0 && $height < 150 )

@@ -83,8 +83,11 @@ final class EventSectionFinder {
 				}
 				foreach ( $links as $link ) {
 					$card = $link;
-					while ( $card->parentNode instanceof \DOMElement && $card->parentNode !== $node
-						&& count( EventSectionDetails::links( $card->parentNode, $url ) ) === 1 ) {
+					while ( $card->parentNode instanceof \DOMElement && $card->parentNode !== $node ) {
+						$parent_links = EventSectionDetails::links( $card->parentNode, $url );
+						if ( 1 !== count( $parent_links ) ) {
+							break;
+						}
 						$card = $card->parentNode;
 					}
 					$candidates[] = $card;
@@ -156,12 +159,12 @@ final class EventSectionFinder {
 
 				$detail_links = EventSectionDetails::links( $node, $url );
 				if ( empty( $detail_links ) && ! EventSectionDetails::hasDate( $raw_html )
-					&& ( preg_match( '/(?:nav|menu|filter|form)/i', $node->getAttribute( 'class' ) . ' ' . $node->getAttribute( 'id' ) . ' ' . $node->getAttribute( 'role' ) )
-						|| $xpath->query( 'ancestor-or-self::nav | ancestor-or-self::form | .//select | .//form', $node )->length > 0 ) ) {
+					&& ( ( $node instanceof \DOMElement && preg_match( '/(?:nav|menu|filter|form)/i', $node->getAttribute( 'class' ) . ' ' . $node->getAttribute( 'id' ) . ' ' . $node->getAttribute( 'role' ) ) )
+						|| self::hasChromeAncestorOrControl( $xpath, $node ) ) ) {
 					continue;
 				}
 
-				$content_hash     = md5( $raw_html );
+				$content_hash = md5( $raw_html );
 				// URL identity also deduplicates image/title links and nested selectors.
 				$event_identifier = 1 === count( $detail_links ) ? md5( $url . array_key_first( $detail_links ) ) : md5( $url . $content_hash );
 
@@ -185,6 +188,12 @@ final class EventSectionFinder {
 		}
 
 		return null;
+	}
+
+	/** Navigation/filter chrome: inside nav or form markup, or containing form controls. */
+	private static function hasChromeAncestorOrControl( \DOMXPath $xpath, \DOMNode $node ): bool {
+		$matches = $xpath->query( 'ancestor-or-self::nav | ancestor-or-self::form | .//select | .//form', $node );
+		return false !== $matches && $matches->length > 0;
 	}
 
 	private function is_table_header_row( \DOMXPath $xpath, \DOMNode $row ): bool {

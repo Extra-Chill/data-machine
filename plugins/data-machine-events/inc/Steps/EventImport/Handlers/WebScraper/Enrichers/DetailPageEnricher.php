@@ -127,7 +127,10 @@ class DetailPageEnricher implements EnricherInterface {
 		}
 		--$this->remaining_follows;
 		$html = call_user_func( $this->fetcher, $url );
-		$context->log( 'debug', 'Detail Page Enricher: HTML section follow', array( 'url' => $url, 'status' => empty( $html ) ? 'fetch_failed' : 'ok' ) );
+		$context->log( 'debug', 'Detail Page Enricher: HTML section follow', array(
+			'url'    => $url,
+			'status' => empty( $html ) ? 'fetch_failed' : 'ok',
+		) );
 		return $html;
 	}
 
