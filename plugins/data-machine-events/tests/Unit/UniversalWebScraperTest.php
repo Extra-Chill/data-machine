@@ -182,6 +182,26 @@ HTML;
 		$this->assertEquals( 'The Test Band', $event['performer'] ?? '' );
 	}
 
+	public function test_html_teaser_packet_includes_detail_page(): void {
+		$class = \DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraper::class;
+		$scraper = ( new \ReflectionClass( $class ) )->newInstanceWithoutConstructor();
+		$calls = array();
+		$enricher = new \DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Enrichers\DetailPageEnricher(
+			function ( $url ) use ( &$calls ) {
+				$calls[] = $url;
+				return '<main><h1>David Sedaris</h1><p>December 12, 2099 at 7:30pm</p></main>';
+			}, array()
+		);
+		( new \ReflectionProperty( $class, 'detail_enricher' ) )->setValue( $scraper, $enricher );
+		$method = new \ReflectionMethod( $class, 'tryHtmlSectionExtraction' );
+		$html = '<div class="events"><ul><li class="glide__slide"><div><a href="/event/david-sedaris/"><img src="sedaris.jpg" alt="David Sedaris"></a></div></li></ul></div>';
+		$packet = $method->invoke( $scraper, $html, 'https://www.kogercenterforthearts.com', array(), \DataMachine\Core\ExecutionContext::direct( 'universal_web_scraper' ), 1 );
+		$data = json_decode( $packet['content'], true );
+		$this->assertSame( array( 'https://www.kogercenterforthearts.com/event/david-sedaris/' ), $calls );
+		$this->assertStringContainsString( '2099 at 7:30pm', $data['detail_html'] );
+		$this->assertStringContainsString( 'glide__slide', $data['raw_html'] );
+	}
+
 	public function test_extraction_method_is_jsonld() {
 		$this->assertSame( 'jsonld', $this->extractor->getMethod() );
 	}

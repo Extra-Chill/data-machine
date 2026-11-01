@@ -56,6 +56,15 @@ final class ImageCandidateFinder {
 				continue;
 			}
 
+			// Hard exclusions cannot be outweighed by event-container bonuses.
+			$width  = $this->extractDimension( $img, 'width' );
+			$height = $this->extractDimension( $img, 'height' );
+			$labels = $src . ' ' . $img->getAttribute( 'alt' ) . ' ' . $img->getAttribute( 'class' );
+			if ( ( $width > 0 && $width < 150 ) || ( $height > 0 && $height < 150 )
+				|| preg_match( '/(?:^|[^a-z])(?:logo|icons?|social|facebook|instagram|twitter|tiktok|youtube)(?:[^a-z]|$)/i', $labels ) ) {
+				continue;
+			}
+
 			$score = $this->scoreImage( $img, $xpath, $absolute_url );
 
 			if ( $score >= self::MIN_SCORE_THRESHOLD ) {

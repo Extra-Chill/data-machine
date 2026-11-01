@@ -72,7 +72,29 @@ final class EventSectionFinder {
 				continue;
 			}
 
+			// Broad selectors can match an entire index. Keep the largest branch
+			// containing only one distinct event URL, preserving card dates/images.
+			$candidates = array();
 			foreach ( $nodes as $node ) {
+				$links = EventSectionDetails::links( $node, $url );
+				if ( count( $links ) <= 1 ) {
+					$candidates[] = $node;
+					continue;
+				}
+				foreach ( $links as $link ) {
+					$card = $link;
+					while ( $card->parentNode instanceof \DOMElement && $card->parentNode !== $node ) {
+						$parent_links = EventSectionDetails::links( $card->parentNode, $url );
+						if ( 1 !== count( $parent_links ) ) {
+							break;
+						}
+						$card = $card->parentNode;
+					}
+					$candidates[] = $card;
+				}
+			}
+
+			foreach ( $candidates as $node ) {
 				$tag_name = strtolower( $node->nodeName );
 				if ( in_array( $tag_name, array( 'body', 'header', 'footer', 'nav', 'aside', 'main' ), true ) ) {
 					continue;
@@ -135,8 +157,16 @@ final class EventSectionFinder {
 					continue;
 				}
 
-				$content_hash     = md5( $raw_html );
-				$event_identifier = md5( $url . $content_hash );
+				$detail_links = EventSectionDetails::links( $node, $url );
+				if ( empty( $detail_links ) && ! EventSectionDetails::hasDate( $raw_html )
+					&& ( ( $node instanceof \DOMElement && preg_match( '/(?:nav|menu|filter|form)/i', $node->getAttribute( 'class' ) . ' ' . $node->getAttribute( 'id' ) . ' ' . $node->getAttribute( 'role' ) ) )
+						|| self::hasChromeAncestorOrControl( $xpath, $node ) ) ) {
+					continue;
+				}
+
+				$content_hash = md5( $raw_html );
+				// URL identity also deduplicates image/title links and nested selectors.
+				$event_identifier = 1 === count( $detail_links ) ? md5( $url . array_key_first( $detail_links ) ) : md5( $url . $content_hash );
 
 				$cleaned_html = call_user_func( $this->clean_html_for_ai, $raw_html );
 				if ( empty( $cleaned_html ) || strlen( $cleaned_html ) < 30 ) {
@@ -158,6 +188,12 @@ final class EventSectionFinder {
 		}
 
 		return null;
+	}
+
+	/** Navigation/filter chrome: inside nav or form markup, or containing form controls. */
+	private static function hasChromeAncestorOrControl( \DOMXPath $xpath, \DOMNode $node ): bool {
+		$matches = $xpath->query( 'ancestor-or-self::nav | ancestor-or-self::form | .//select | .//form', $node );
+		return false !== $matches && $matches->length > 0;
 	}
 
 	private function is_table_header_row( \DOMXPath $xpath, \DOMNode $row ): bool {
