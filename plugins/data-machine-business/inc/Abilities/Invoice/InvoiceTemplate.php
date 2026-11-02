@@ -176,6 +176,12 @@ class InvoiceTemplate {
 <tr><td align="right" style="padding:18px 16px 0 0;font-size:14px;">Total due (<?php echo esc_html( $context['currency'] ); ?>)</td><td align="right" style="padding-top:18px;font-size:22px;font-weight:bold;color:<?php echo esc_attr( $c['accent'] ); ?>;white-space:nowrap;"><?php echo esc_html( $sym . $context['total'] ); ?></td></tr>
 </table>
 </td></tr>
+		<?php if ( ! empty( $context['payment_url'] ) ) : ?>
+<tr><td align="center" style="padding:28px 28px 0;">
+<a href="<?php echo esc_url( $context['payment_url'] ); ?>" style="display:inline-block;background:<?php echo esc_attr( $c['header_bg'] ); ?>;color:<?php echo esc_attr( $c['text_inverse'] ); ?>;font-size:16px;font-weight:bold;text-decoration:none;padding:14px 28px;border-radius:6px;"><?php echo esc_html( ! empty( $context['payment_label'] ) ? $context['payment_label'] : 'Pay now' ); ?></a>
+<div style="padding-top:10px;font-size:12px;line-height:1.5;color:<?php echo esc_attr( $c['text_muted'] ); ?>;word-break:break-all;"><?php echo esc_html( $context['payment_url'] ); ?></div>
+</td></tr>
+		<?php endif; ?>
 		<?php if ( ! empty( $context['payment_instructions'] ) ) : ?>
 <tr><td style="padding:28px 28px 0;">
 <div style="background:<?php echo esc_attr( $c['surface'] ); ?>;border-left:4px solid <?php echo esc_attr( $c['accent'] ); ?>;border-radius:6px;padding:14px 16px;font-size:14px;line-height:1.55;"><div style="<?php echo esc_attr( $label ); ?>margin-bottom:4px;">Payment</div><?php echo nl2br( esc_html( $context['payment_instructions'] ) ); ?></div>

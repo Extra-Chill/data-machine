@@ -56,7 +56,7 @@ class CreateInvoiceAbility {
 			'type'       => 'object',
 			'properties' => array_fill_keys( array( 'name', 'attn', 'email', 'address', 'url', 'note' ), array( 'type' => 'string' ) ),
 		);
-		$props = array_fill_keys( array( 'due', 'payment_instructions', 'notes', 'contact', 'invoice_number', 'to', 'cc' ), array( 'type' => 'string' ) );
+		$props = array_fill_keys( array( 'due', 'payment_instructions', 'payment_label', 'notes', 'contact', 'invoice_number', 'to', 'cc' ), array( 'type' => 'string' ) );
 		$props = array_merge(
 			$props,
 			array(
@@ -67,6 +67,11 @@ class CreateInvoiceAbility {
 					'type'    => 'string',
 					'default' => 'USD',
 					'pattern' => '^[A-Z]{3}$',
+				),
+				'payment_url' => array(
+					'type'        => 'string',
+					'format'      => 'uri',
+					'description' => 'Optional HTTPS payment page, such as a Stripe Payment Link (https://buy.stripe.com/...). Rendered as a pay button.',
 				),
 				'issued_date' => array(
 					'type'   => 'string',
@@ -147,6 +152,15 @@ class CreateInvoiceAbility {
 		}
 		if ( empty( $input['bill_to'] ) || ! is_array( $input['bill_to'] ) ) {
 			return new \WP_Error( 'invoice_bill_to_required', 'Bill to is required.' );
+		}
+		if ( isset( $input['payment_url'] ) && '' !== $input['payment_url'] ) {
+			$payment_url = self::validate_payment_url( $input['payment_url'] );
+			if ( is_wp_error( $payment_url ) ) {
+				return $payment_url;
+			}
+			$input['payment_url'] = $payment_url;
+		} else {
+			unset( $input['payment_url'] );
 		}
 		$context               = $input;
 		$context['line_items'] = array();
@@ -232,5 +246,23 @@ class CreateInvoiceAbility {
 				delete_option( self::COUNTER_OPTION . '_lock' );
 			}
 		}
+	}
+
+	/**
+	 * Accept only absolute HTTPS URLs with a host, so the pay button can never
+	 * carry javascript:, data:, mailto: or plain-HTTP links.
+	 *
+	 * @param mixed $url Candidate payment URL.
+	 * @return string|\WP_Error
+	 */
+	public static function validate_payment_url( $url ) {
+		if ( ! is_string( $url ) || strlen( $url ) > 2048 || preg_match( '/[\s\x00-\x1F\x7F]/', $url ) ) {
+			return new \WP_Error( 'invoice_invalid_payment_url', 'payment_url must be a single HTTPS URL.' );
+		}
+		$parts = wp_parse_url( $url );
+		if ( ! is_array( $parts ) || 'https' !== strtolower( $parts['scheme'] ?? '' ) || empty( $parts['host'] ) || isset( $parts['user'] ) || isset( $parts['pass'] ) ) {
+			return new \WP_Error( 'invoice_invalid_payment_url', 'payment_url must be an absolute HTTPS URL, for example a Stripe Payment Link.' );
+		}
+		return $url;
 	}
 }

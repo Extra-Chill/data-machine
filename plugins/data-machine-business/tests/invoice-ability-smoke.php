@@ -60,7 +60,13 @@ namespace {
 	};
 
 	class WP_Error {
-		public function __construct( $code, $message ) {}
+		private $code;
+		public function __construct( $code, $message ) {
+			$this->code = $code;
+		}
+		public function get_error_code() {
+			return $this->code;
+		}
 	}
 	function is_wp_error( $value ) {
 		return $value instanceof WP_Error;
@@ -154,6 +160,10 @@ namespace {
 	}
 	function esc_url( $text ) {
 		return esc_html( $text );
+	}
+	function wp_parse_url( $url, $component = -1 ) {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- Test double for wp_parse_url.
+		return parse_url( $url, $component );
 	}
 	function invoice_assert( $condition, $message ) {
 		if ( ! $condition ) {
@@ -260,6 +270,27 @@ namespace {
 	invoice_assert( str_contains( $ability->execute( $input )['html'], 'https://example.org/wp-content/themes/example/logo.png' ), 'Theme logo converted to public URL' );
 	$GLOBALS['logo_path'] = '/private/secret.png';
 	invoice_assert( ! str_contains( $ability->execute( $input )['html'], '<img' ), 'Unmappable logo falls back to site name' );
+	// Payment URL: rendered as a pay button, HTTPS only.
+	invoice_assert( ! str_contains( $ability->execute( $input )['html'], 'Pay now' ), 'No pay button without payment_url' );
+	$paid                = $input;
+	$paid['payment_url'] = 'https://buy.stripe.com/test_abc123?prefilled_email=a%40example.org';
+	$html                = $ability->execute( $paid )['html'];
+	invoice_assert( str_contains( $html, 'href="https://buy.stripe.com/test_abc123?prefilled_email=a%40example.org"' ) && str_contains( $html, '>Pay now</a>' ), 'Payment URL renders as a pay button' );
+	invoice_assert( str_contains( $html, 'Zelle the winner' ), 'Payment instructions still render alongside the button' );
+	$paid['payment_label'] = '<b>Pay $50</b>';
+	invoice_assert( str_contains( $ability->execute( $paid )['html'], '&lt;b&gt;Pay $50&lt;/b&gt;</a>' ), 'Custom pay label is escaped' );
+	foreach ( array( 'javascript:alert(1)', 'http://buy.stripe.com/x', 'data:text/html,hi', '//buy.stripe.com/x', 'https://', 'https://user:pass@evil.example/', "https://buy.stripe.com/x\n<script>", 'mailto:a@example.org', array( 'https://x.example' ) ) as $bad ) {
+		$bad_input                = $input;
+		$bad_input['payment_url'] = $bad;
+		$rejected                 = $ability->execute( $bad_input );
+		invoice_assert( is_wp_error( $rejected ) && 'invoice_invalid_payment_url' === $rejected->get_error_code(), 'Rejects payment_url ' . wp_json_encode( $bad ) );
+	}
+	$paid['send'] = true;
+	$before       = $options[ $counter ];
+	$ability->execute( $paid );
+	$sent = end( $mailer->calls );
+	invoice_assert( 'https://buy.stripe.com/test_abc123?prefilled_email=a%40example.org' === $sent['context']['payment_url'] && str_contains( $templates['invoice']( $sent['context'] ), '>&lt;b&gt;Pay $50&lt;/b&gt;</a>' ), 'Sent invoice carries the pay button' );
+	$options[ $counter ] = $before;
 	require_once dirname( __DIR__ ) . '/inc/Cli/Commands/InvoiceCommand.php';
 	$command = new \DataMachineBusiness\Cli\Commands\InvoiceCommand();
 	$file    = sys_get_temp_dir() . '/invoice-test-' . uniqid() . '.html';
