@@ -87,7 +87,7 @@ class StripePaymentLinkCommand extends BaseCommand {
 			return;
 		}
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_PRESERVE_ZERO_FRACTION ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_PRESERVE_ZERO_FRACTION ) );
 			return;
 		}
 		WP_CLI::success( $result['summary'] . ' — staged for approval.' );
