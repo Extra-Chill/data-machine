@@ -57,6 +57,7 @@ Data Machine Business owns analytics, revenue, performance, and media-maintenanc
 - Traffic and audience analytics: `{$wp} datamachine analytics ga <action>`
 - Search performance and indexing: `{$wp} datamachine analytics gsc <action>` or `{$wp} datamachine analytics bing <action>`
 - Publisher revenue reporting: `{$wp} datamachine analytics mediavine <action>`
+- Read-only Stripe revenue and billing reports: `{$wp} datamachine analytics stripe <action>`
 - Web performance diagnostics: `{$wp} datamachine analytics pagespeed <action>`
 - Media diagnostics and cleanup: `{$wp} datamachine media <action>`
 

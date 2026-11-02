@@ -33,6 +33,7 @@ Data Machine Business connects WordPress automation, agents, and pipelines to an
 | Amazon Associates | Search products and generate Creators API affiliate links | AI tool |
 | Sendy | Subscribe users, create or update campaigns, and read email-funnel metrics | Abilities |
 | Mediavine | Fetch page, aggregate, device, country, normalized-source, and ad-unit publisher revenue reports | Ability, WP-CLI |
+| [Stripe](docs/stripe.md) | Read-only subscriptions, MRR, renewals, past-due invoices/subscriptions, charges, and payouts | Ability, WP-CLI |
 | Content analytics | Category-level engagement audits, editorial triage flags, and GSC opportunity ranking | Abilities |
 | Media hygiene | Detect and safely remove orphan files and unreferenced attachments | Ability, WP-CLI |
 | Cloudflare Turnstile | List and inspect Turnstile widgets; add/remove allowed hostnames with a dry-run-by-default, read-modify-write update | Abilities, WP-CLI |
@@ -52,6 +53,7 @@ The plugin registers the following WordPress abilities. Management-oriented abil
 | `datamachine/bing-webmaster` | Query Bing search, traffic, page, and crawl statistics |
 | `datamachine/pagespeed` | Run full, performance-focused, or opportunity-focused PageSpeed audits |
 | `datamachine/mediavine-reports` | Fetch page reports, aggregate summaries, multi-period backfills, and bounded device/country/source/ad-unit reports with source provenance |
+| `datamachine/stripe-reports` | Bounded read-only Stripe billing and revenue reports with restricted-key authentication and source provenance |
 | `datamachine/content-performance` | Rank posts within a category by GA4 engagement while accounting for traffic and sample size |
 | `datamachine/content-flags` | Produce an outcome-based editorial triage screen with confidence and query-intent caveats |
 

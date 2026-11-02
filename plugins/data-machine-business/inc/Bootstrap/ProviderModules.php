@@ -53,6 +53,12 @@ final class ProviderModules {
 				static fn() => new \DataMachineBusiness\Abilities\Analytics\MediavineReportsAbilities()
 			),
 			new ProviderModule(
+				'stripe',
+				$abilities,
+				array( 'datamachine/stripe-reports' ),
+				static fn() => new \DataMachineBusiness\Abilities\Analytics\StripeReportsAbilities()
+			),
+			new ProviderModule(
 				'content-insights',
 				$abilities,
 				array( 'datamachine/content-performance', 'datamachine/content-flags' ),

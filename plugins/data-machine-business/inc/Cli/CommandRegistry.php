@@ -38,6 +38,7 @@ final class CommandRegistry {
 			'datamachine analytics ga'         => GoogleAnalyticsCommand::class,
 			'datamachine analytics gsc'        => GoogleSearchConsoleCommand::class,
 			'datamachine analytics mediavine'  => MediavineCommand::class,
+			'datamachine analytics stripe'     => StripeCommand::class,
 			'datamachine analytics bing'       => Commands\BingWebmasterCommand::class,
 			'datamachine analytics pagespeed'  => PageSpeedCommand::class,
 			'datamachine media'                => MediaHygieneCommand::class,
