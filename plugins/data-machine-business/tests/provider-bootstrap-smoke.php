@@ -98,6 +98,7 @@ $expected_ids   = array(
 	'indexnow',
 	'google-analytics',
 	'mediavine',
+	'stripe',
 	'content-insights',
 	'google-sheets',
 	'google-drive',
@@ -126,7 +127,7 @@ foreach ( $expected_ids as $provider_id ) {
 	);
 }
 
-$sendy = $actual_modules[16]->capabilities();
+$sendy = $actual_modules[17]->capabilities();
 assert_provider_bootstrap(
 	array(
 		'datamachine/sendy-subscribe',
