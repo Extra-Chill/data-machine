@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.81.2] - 2026-11-02
+
+### Fixed
+- give event-import AI today's date and the year-inference rule
+- widen scraper detail follow to more venues
+
 ## [0.81.1] - 2026-11-02
 
 ### Fixed
