@@ -329,10 +329,7 @@ class StripeReportsAbilities {
 	}
 
 	private static function major( $amount, string $currency ): float {
-		$zero     = array( 'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf' );
-		$three    = array( 'bhd', 'jod', 'kwd', 'omr', 'tnd' );
-		$currency = strtolower( $currency );
-		return (float) $amount / ( in_array( $currency, $zero, true ) ? 1 : ( in_array( $currency, $three, true ) ? 1000 : 100 ) );
+		return \DataMachineBusiness\Abilities\Stripe\StripeMoney::major( $amount, $currency );
 	}
 
 	private static function redact( $value, string $key ) {

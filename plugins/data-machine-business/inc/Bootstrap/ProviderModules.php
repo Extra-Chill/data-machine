@@ -59,6 +59,12 @@ final class ProviderModules {
 				static fn() => new \DataMachineBusiness\Abilities\Analytics\StripeReportsAbilities()
 			),
 			new ProviderModule(
+				'stripe-payment-links',
+				$abilities,
+				array( 'datamachine/stripe-stage-payment-link' ),
+				static fn() => new \DataMachineBusiness\Abilities\Stripe\StripePaymentLinkAbility()
+			),
+			new ProviderModule(
 				'content-insights',
 				$abilities,
 				array( 'datamachine/content-performance', 'datamachine/content-flags' ),

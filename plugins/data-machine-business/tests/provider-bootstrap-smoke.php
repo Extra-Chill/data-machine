@@ -99,6 +99,7 @@ $expected_ids   = array(
 	'google-analytics',
 	'mediavine',
 	'stripe',
+	'stripe-payment-links',
 	'content-insights',
 	'google-sheets',
 	'google-drive',
@@ -127,7 +128,7 @@ foreach ( $expected_ids as $provider_id ) {
 	);
 }
 
-$sendy = $actual_modules[17]->capabilities();
+$sendy = $actual_modules[18]->capabilities();
 assert_provider_bootstrap(
 	array(
 		'datamachine/sendy-subscribe',

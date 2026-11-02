@@ -28,6 +28,7 @@ namespace {
 	function get_option( $name, $default = array() ) { return $GLOBALS['config'] ?? $default; }
 	function wp_register_ability( $name, $args ) { $GLOBALS['ability'] = array( $name, $args ); }
 	function wp_json_encode( $v, $flags = 0 ) { return json_encode( $v, $flags ); }
+	require dirname( __DIR__ ) . '/inc/Abilities/Stripe/StripeMoney.php';
 	require dirname( __DIR__ ) . '/inc/Abilities/Analytics/StripeReportsAbilities.php';
 	require dirname( __DIR__ ) . '/inc/Cli/StripeCommand.php';
 	require dirname( __DIR__ ) . '/inc/Cli/CommandRegistry.php';
