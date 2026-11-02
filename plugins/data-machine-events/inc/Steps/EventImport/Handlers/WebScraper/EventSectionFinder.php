@@ -164,6 +164,12 @@ final class EventSectionFinder {
 					continue;
 				}
 
+				// Fragments such as a lone weekday, an entity, or bare door/show
+				// times carry no event identity and no follow target.
+				if ( empty( $detail_links ) && ! EventSectionDetails::hasTitleText( $raw_html ) ) {
+					continue;
+				}
+
 				$content_hash = md5( $raw_html );
 				// URL identity also deduplicates image/title links and nested selectors.
 				$event_identifier = 1 === count( $detail_links ) ? md5( $url . array_key_first( $detail_links ) ) : md5( $url . $content_hash );
