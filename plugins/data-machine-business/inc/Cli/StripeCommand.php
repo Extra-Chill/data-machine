@@ -43,7 +43,7 @@ class StripeCommand extends BaseCommand {
 	public function __invoke( array $args, array $assoc_args ): void {
 		$action = $args[0] ?? '';
 		if ( 'config' === $action ) {
-			$key = (string) ( $assoc_args['api-key'] ?? '' );
+			$key   = (string) ( $assoc_args['api-key'] ?? '' );
 			$valid = StripeReportsAbilities::validateKey( $key );
 			if ( is_wp_error( $valid ) ) {
 				WP_CLI::error( $valid->get_error_message() );
@@ -86,7 +86,7 @@ class StripeCommand extends BaseCommand {
 			return;
 		}
 		$fields = self::tableFields( $action );
-		$rows = array_map( static fn( $row ) => array_merge( array_fill_keys( $fields, null ), $row ), $result['results'] );
+		$rows   = array_map( static fn( $row ) => array_merge( array_fill_keys( $fields, null ), $row ), $result['results'] );
 		$this->format_items( $rows, $fields, $assoc_args );
 	}
 
