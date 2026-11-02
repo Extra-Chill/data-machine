@@ -32,6 +32,16 @@ The CLI's `--send` flag controls delivery regardless of a `send` field in JSON.
 - `currency`: three uppercase letters, default `USD`. Amounts use two decimals.
 - `issued_date`: `YYYY-MM-DD`, defaults to today in the site timezone.
 - `due`, `payment_instructions`, `notes`, `contact`: plain text strings.
+- `payment_url`: optional absolute **HTTPS** URL to a hosted payment page, such as a
+  Stripe Payment Link (`https://buy.stripe.com/...`). Rendered as a pay button with the
+  URL printed underneath for mail clients that strip buttons. `javascript:`, `data:`,
+  plain `http:`, protocol-relative, credentialed and whitespace-containing URLs are
+  rejected with `invoice_invalid_payment_url`. It can be combined with `payment_instructions`.
+- `payment_label`: optional button text, default `Pay now`.
+
+This ability never calls Stripe. Create the Payment Link in the Stripe dashboard (or a
+future approval-gated ability) and pass its URL; for a monthly charge, make the link's
+price recurring and the customer is billed automatically after their first payment.
   Contact defaults to the site administrator email.
 - `invoice_number`: optional explicit number.
 - `send`: boolean, default false. `to` defaults to `bill_to.email`; `cc` is optional.
