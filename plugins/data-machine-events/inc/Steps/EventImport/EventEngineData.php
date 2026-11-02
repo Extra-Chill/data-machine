@@ -270,6 +270,16 @@ class EventEngineData {
 			$payload['title'] = $title;
 		}
 
+		// Source-provided bill (headliner + support acts). Upsert merges it into
+		// the artist taxonomy so support acts never depend on the AI copying
+		// them from the packet.
+		if ( ! empty( $event_data['lineup'] ) && is_array( $event_data['lineup'] ) ) {
+			$lineup = array_values( array_filter( array_map( 'strval', $event_data['lineup'] ), static fn( string $name ): bool => '' !== trim( $name ) ) );
+			if ( ! empty( $lineup ) ) {
+				$payload['lineup'] = $lineup;
+			}
+		}
+
 		// Core event fields.
 		$core_fields = array(
 			'startDate' => $event_data['startDate'] ?? '',
