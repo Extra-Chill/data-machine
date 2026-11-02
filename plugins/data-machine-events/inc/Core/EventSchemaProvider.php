@@ -87,7 +87,7 @@ class EventSchemaProvider {
 		'startDate'       => array(
 			'type'            => 'string',
 			'required'        => false,
-			'description'     => 'Event start date (YYYY-MM-DD format)',
+			'description'     => 'Event start date (YYYY-MM-DD format). When the source omits the year, infer it with the event date context rule; do not defer for a missing year alone.',
 			'schema_property' => 'startDate',
 		),
 		'endDate'         => array(
