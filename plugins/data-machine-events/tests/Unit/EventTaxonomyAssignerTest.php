@@ -856,4 +856,16 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		$this->assertNotFalse( $result, 'Canonical venue city fixture must persist.' );
 		$this->assertSame( $city, get_term_meta( $term_id, '_venue_city', true ) );
 	}
+
+	public function test_merge_lineup_appends_support_acts_without_duplicates(): void {
+		$this->assertSame(
+			array( 'Vacations', 42, 'TWEN' ),
+			$this->assigner->mergeLineup( array( 'Vacations', 42 ), array( 'vacations', 'TWEN', '', 'twen' ) )
+		);
+	}
+
+	public function test_merge_lineup_ignores_missing_lineup(): void {
+		$this->assertSame( array( 'Vacations' ), $this->assigner->mergeLineup( array( 'Vacations' ), null ) );
+		$this->assertSame( array( 'Vacations' ), $this->assigner->mergeLineup( array( 'Vacations' ), 'TWEN' ) );
+	}
 }

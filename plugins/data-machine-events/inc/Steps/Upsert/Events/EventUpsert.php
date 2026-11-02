@@ -377,7 +377,7 @@ class EventUpsert extends UpsertHandler {
 			// fields, source identity, or ticket data over the canonical festival.
 			$artists   = $engine->get( 'artist' ) ?: ( $parameters['artist'] ?? '' );
 			$artists   = $artists ?: ( $engine->get( 'performer' ) ?: ( $parameters['performer'] ?? '' ) );
-			$artists   = array_filter( $this->taxonomy_assigner->normalizeArtists( $artists ) );
+			$artists   = $this->taxonomy_assigner->mergeLineup( array_values( array_filter( $this->taxonomy_assigner->normalizeArtists( $artists ) ) ), $engine->get( 'lineup' ) );
 			$selection = $handler_config['taxonomy_artist_selection'] ?? '';
 			if ( is_numeric( $selection ) ) {
 				$artists[] = (int) $selection;
@@ -643,6 +643,7 @@ class EventUpsert extends UpsertHandler {
 			$engine_data_array = $engine->all();
 			// Normalize the actual generic-pass input, including its engine fallback.
 			$parameters['artist'] = $this->taxonomy_assigner->normalizeArtists( ! empty( $parameters['artist'] ) ? $parameters['artist'] : ( $engine_data_array['artist'] ?? '' ) );
+			$parameters['artist'] = $this->taxonomy_assigner->mergeLineup( array_values( array_filter( $parameters['artist'], static fn( $artist ) => '' !== $artist ) ), $engine_data_array['lineup'] ?? null );
 			$artist_selection     = $handler_config_for_tax['taxonomy_artist_selection'] ?? 'skip';
 			if ( ! is_numeric( $artist_selection ) && ! in_array( $artist_selection, array( 'skip', 'ai_decides' ), true ) ) {
 				$handler_config_for_tax['taxonomy_artist_selection'] = $this->taxonomy_assigner->normalizeArtists( array( $artist_selection ) )[0];

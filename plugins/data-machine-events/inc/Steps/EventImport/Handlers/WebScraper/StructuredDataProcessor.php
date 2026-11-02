@@ -65,7 +65,7 @@ class StructuredDataProcessor {
 				continue;
 			}
 
-			$search_text = ( $event['title'] ?? '' ) . ' ' . ( $event['description'] ?? '' );
+			$search_text = $event['title'] . ' ' . ( $event['description'] ?? '' );
 			if ( ! $this->handler->applyKeywordSearch( $search_text, $config['search'] ?? '' ) ) {
 				continue;
 			}
@@ -92,6 +92,22 @@ class StructuredDataProcessor {
 						'startDate'         => $event['startDate'] ?? '',
 					)
 				);
+			}
+
+			// Extractors that read a structured bill (Bandsintown, DoStuff)
+			// emit `artists` as [{title}]; carry it as the source lineup so
+			// upsert tags every act instead of relying on the AI step.
+			if ( empty( $event['lineup'] ) && ! empty( $event['artists'] ) && is_array( $event['artists'] ) ) {
+				$lineup = array();
+				foreach ( $event['artists'] as $act ) {
+					$name = trim( (string) ( is_array( $act ) ? ( $act['title'] ?? $act['name'] ?? '' ) : $act ) );
+					if ( '' !== $name ) {
+						$lineup[] = $name;
+					}
+				}
+				if ( ! empty( $lineup ) ) {
+					$event['lineup'] = $lineup;
+				}
 			}
 
 			$venue_metadata = $this->handler->extractVenueMetadata( $event );

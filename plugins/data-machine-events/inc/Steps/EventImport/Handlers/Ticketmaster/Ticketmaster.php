@@ -1027,7 +1027,8 @@ class Ticketmaster extends EventImportHandler {
 			}
 		}
 
-		$artist = $tm_event['_embedded']['attractions'][0]['name'] ?? '';
+		$lineup = self::lineupFromEvent( $tm_event );
+		$artist = $lineup[0] ?? ( $tm_event['_embedded']['attractions'][0]['name'] ?? '' );
 
 		$organizer = '';
 		if ( ! empty( $tm_event['promoter']['name'] ) ) {
@@ -1094,7 +1095,7 @@ class Ticketmaster extends EventImportHandler {
 			);
 		}
 
-		return array(
+		$event = array(
 			'title'                         => $this->sanitizeText( $title ),
 			'startDate'                     => $start_parsed['date'],
 			'endDate'                       => '',
@@ -1117,5 +1118,45 @@ class Ticketmaster extends EventImportHandler {
 			'venueTimezone'                 => $this->sanitizeText( $venue_timezone ),
 			VenueSourceAliases::EVENT_FIELD => $venue_source_id,
 		);
+
+		// Only multi-act bills carry a lineup. Single-act events keep their
+		// existing payload, so their source revision (and import cost) is
+		// unchanged; bills with support acts get a new revision once and are
+		// re-upserted with the full lineup.
+		if ( count( $lineup ) > 1 ) {
+			$event['lineup'] = array_map( array( $this, 'sanitizeText' ), $lineup );
+		}
+
+		return $event;
+	}
+
+	/**
+	 * Every music act on a Ticketmaster event, headliner first.
+	 *
+	 * The Discovery API lists the full bill in `_embedded.attractions`;
+	 * support acts are not repeated in the event name. Attractions whose
+	 * segment is not Music (parking passes, packages, tours) are skipped;
+	 * unclassified attractions are kept.
+	 *
+	 * @param array $tm_event Raw Discovery API event.
+	 * @return array<int, string> Unique act names in billing order.
+	 */
+	public static function lineupFromEvent( array $tm_event ): array {
+		$lineup = array();
+		foreach ( (array) ( $tm_event['_embedded']['attractions'] ?? array() ) as $attraction ) {
+			if ( ! is_array( $attraction ) ) {
+				continue;
+			}
+			$name    = trim( (string) ( $attraction['name'] ?? '' ) );
+			$segment = (string) ( $attraction['classifications'][0]['segment']['name'] ?? '' );
+			if ( '' === $name || ( '' !== $segment && 'music' !== strtolower( $segment ) ) ) {
+				continue;
+			}
+			$key = strtolower( $name );
+			if ( ! isset( $lineup[ $key ] ) ) {
+				$lineup[ $key ] = $name;
+			}
+		}
+		return array_values( $lineup );
 	}
 }

@@ -70,6 +70,40 @@ class EventTaxonomyAssigner {
 	}
 
 	/**
+	 * Merge a source-provided lineup into normalized artists.
+	 *
+	 * Order is preserved (existing artists first), duplicates are dropped
+	 * case-insensitively, and term IDs pass through untouched.
+	 *
+	 * @param array $artists Normalized artist identifiers.
+	 * @param mixed $lineup  Source lineup (array of names); anything else is ignored.
+	 * @return array Merged artist identifiers.
+	 */
+	public function mergeLineup( array $artists, $lineup ): array {
+		if ( ! is_array( $lineup ) || empty( $lineup ) ) {
+			return $artists;
+		}
+
+		$merged = array();
+		foreach ( array_merge( $artists, $this->normalizeArtists( array_values( $lineup ) ) ) as $artist ) {
+			if ( is_int( $artist ) ) {
+				$merged[ 'id:' . $artist ] = $artist;
+				continue;
+			}
+			$name = trim( (string) $artist );
+			if ( '' === $name ) {
+				continue;
+			}
+			$key = 'name:' . strtolower( $name );
+			if ( ! isset( $merged[ $key ] ) ) {
+				$merged[ $key ] = $name;
+			}
+		}
+
+		return array_values( $merged );
+	}
+
+	/**
 	 * Process venue taxonomy assignment.
 	 * Engine data takes precedence over AI-provided values.
 	 *

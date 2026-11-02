@@ -159,6 +159,56 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertEquals( '19:30', $result['startTime'] );
 	}
 
+	public function test_lineup_keeps_support_acts_and_skips_non_music_attractions(): void {
+		$attraction = static fn( string $name, string $segment ): array => array(
+			'name'            => $name,
+			'classifications' => array( array( 'segment' => array( 'name' => $segment ) ) ),
+		);
+		$tm_event   = array(
+			'name'      => 'Vacations - Pursuit of Anything Tour',
+			'dates'     => array( 'start' => array( 'localDate' => '2099-03-05' ) ),
+			'_embedded' => array(
+				'attractions' => array(
+					$attraction( 'Vacations', 'Music' ),
+					$attraction( 'TWEN', 'Music' ),
+					$attraction( 'Premium Parking', 'Miscellaneous' ),
+					$attraction( 'twen', 'Music' ),
+					array( 'name' => 'Unclassified Opener' ),
+				),
+			),
+		);
+
+		$this->assertSame( array( 'Vacations', 'TWEN', 'Unclassified Opener' ), Ticketmaster::lineupFromEvent( $tm_event ) );
+
+		$result = $this->getProtectedMethod( 'map_ticketmaster_event' )->invoke( $this->handler, $tm_event );
+		$this->assertSame( 'Vacations', $result['artist'] );
+		$this->assertSame( array( 'Vacations', 'TWEN', 'Unclassified Opener' ), $result['lineup'] );
+	}
+
+	public function test_single_act_event_has_no_lineup_so_revision_is_unchanged(): void {
+		$tm_event = array(
+			'name'      => 'Vacations',
+			'dates'     => array( 'start' => array( 'localDate' => '2099-03-05' ) ),
+			'_embedded' => array( 'attractions' => array( array( 'name' => 'Vacations' ) ) ),
+		);
+
+		$result = $this->getProtectedMethod( 'map_ticketmaster_event' )->invoke( $this->handler, $tm_event );
+		$this->assertSame( 'Vacations', $result['artist'] );
+		$this->assertArrayNotHasKey( 'lineup', $result );
+	}
+
+	public function test_engine_data_carries_lineup(): void {
+		$engine = \DataMachineEvents\Steps\EventImport\EventEngineData::buildEngineData(
+			array(
+				'title'     => 'Vacations',
+				'startDate' => '2099-03-05',
+				'lineup'    => array( 'Vacations', 'TWEN', '' ),
+			),
+			array()
+		);
+		$this->assertSame( array( 'Vacations', 'TWEN' ), $engine['lineup'] );
+	}
+
 	public function test_map_event_does_not_store_box_office_line_as_venue_phone(): void {
 		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 
