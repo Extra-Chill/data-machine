@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.81.1] - 2026-11-02
+
+### Fixed
+- tag every act on the bill, not just the headliner
+
 ## [0.81.0] - 2026-11-01
 
 ### Changed
