@@ -470,26 +470,62 @@ through the same lane.
 
 ### `datamachine_pending_action_handlers`
 
-**Purpose**: Register the apply + permission callbacks for a pending-action
-kind.
+**Purpose**: Filter the `kind => handler configuration` map. The filter receives
+`$handlers` (array) and must return the modified map.
+
+For callable handlers, each entry has this contract:
 
 ```php
-add_filter( 'datamachine_pending_action_handlers', function ( $handlers ) {
-    $handlers['my_kind'] = array(
-        'apply'       => array( MyAbility::class, 'execute' ),
-        'can_resolve' => function ( array $payload, string $decision, int $user_id ) {
-            // Return true, false, or a WP_Error. Optional — defaults to
-            // "any user who can call resolve_pending_action".
-            return current_user_can( 'edit_posts' );
-        },
-    );
-    return $handlers;
-} );
+$handlers['my_kind'] = array(
+    'can_resolve' => function ( array $payload, string $decision, int $user_id, array $context ) {
+        // Optional: return exactly true to allow, or false/WP_Error to deny.
+        return user_can( $user_id, 'manage_options' );
+    },
+    'apply' => function ( array $apply_input, array $payload, array $receipt ) {
+        return MyMutator::apply_pending_action( $apply_input, $payload, $receipt );
+    },
+);
 ```
 
-`apply` receives the stored `apply_input` array and must return either a
-value (which is wrapped into the resolver response) or a `WP_Error` to
-surface failure.
+- Optional `can_resolve( $payload, $decision, $user_id, $context )` receives the
+  stored payload, `accepted` or `rejected`, the current WordPress user ID, and
+  resolver context. It must return exactly `true`; `WP_Error` or any other
+  return value denies resolution. `$context` carries transport metadata
+  such as `resolution_transport` (`signed_url`, `cli`, etc.) and the resolver
+  audit identifier (`$context['resolver']`). The resolver forwards the supplied
+  context; it does not populate every transport itself. Signed-token resolution
+  sets `signed_url` after token verification. Do not accept an untrusted caller's
+  transport label as proof of a verified token. For a registered callable handler,
+  the permission callback runs for either decision, after scope and grant checks.
+  Omitting it adds no kind-specific permission check; it does **not** bypass
+  those earlier checks.
+- `apply` is required for acceptance and receives **all three arguments**:
+  `($apply_input, $payload, $receipt)`. Callables must declare at least three
+  parameters (or be variadic). Rejection does not invoke `apply`. A returned
+  successful value is included in the resolver response under `result` (non-array
+  values are wrapped as `array( 'value' => $result )`). `WP_Error` reports its
+  message under `error`; an array with `success => false` is included under
+  `result` with an `error`. Both failure forms complete the claim as `failed`.
+- Mutating handlers **must call `PendingActionAuthorizationReceipt::consume()`
+  before mutation**, returning its `WP_Error` on failure. `validate()` alone
+  does not consume the receipt and permits replay while the claim remains live.
+
+Source: `plugins/data-machine/inc/Engine/AI/Actions/ResolvePendingActionAbility.php`
+(`getKindHandlers()`, `resolve_with_datamachine_handlers()`, `isApplyHandler()`,
+`applyHandler()`),
+`plugins/data-machine/inc/Engine/AI/Actions/PendingActionAuthorizationReceipt.php`
+(`validate()`, `consume()`), and
+`plugins/data-machine/inc/Engine/AI/Actions/SignPendingActionResolutionAbility.php`
+(`resolve_token()`). The CLI transport is set in
+`plugins/data-machine/inc/Cli/Commands/PendingActionsCommand.php`.
+
+See [Pending Actions: staging and authorization](../../core-system/pending-actions.md#staging-and-authorization)
+for `PendingActionHelper::stage()` arguments and return shape, receipt binding
+(defaults: operation = kind, target = apply_input, subject = agent ?? creator,
+workspace from payload), operator versus agent resolver grants, and a complete
+mutating handler example. Keep the full staging/mutation recipe there rather
+than implementing a single-argument replay callback. Agents API handler objects use their interface methods instead
+of these callable signatures; see [Available Agents API Contracts](../../core-system/pending-actions.md#available-agents-api-contracts).
 
 ## Content Format Filters
 
