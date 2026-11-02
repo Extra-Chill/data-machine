@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.200.5] - 2026-11-02
+
+### Fixed
+- keep a flow's recurring schedule when adding a delayed run
+
 ## [0.200.4] - 2026-10-31
 
 ### Changed
