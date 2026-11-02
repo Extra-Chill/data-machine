@@ -153,14 +153,42 @@ class ScheduleFlowAbility {
 	 * @return array Result.
 	 */
 	private function scheduleOneTime( int $flow_id, int $timestamp ): array|\WP_Error {
-		$result = FlowRoutines::sync(
-			$flow_id,
-			array(
-				'interval'  => 'one_time',
-				'timestamp' => $timestamp,
-			),
-			true
-		);
+		$scheduling = $this->db_flows->get_flow_scheduling( $flow_id );
+		if ( null === $scheduling ) {
+			return new \WP_Error( 'flow_not_found', "Flow {$flow_id} not found", array( 'status' => 404 ) );
+		}
+
+		// Timestamp requests are extra runs, not edits to a recurring schedule.
+		$preserve_schedule = ! in_array( $scheduling['interval'] ?? 'manual', array( '', 'manual', 'one_time' ), true );
+		$action_id         = null;
+		if ( $preserve_schedule ) {
+			$result = FlowRoutines::enqueue_one_time( $flow_id, $timestamp );
+			if ( ! is_wp_error( $result ) ) {
+				$action_id = $result;
+			}
+		} else {
+			$result = FlowRoutines::sync(
+				$flow_id,
+				array(
+					'interval'  => 'one_time',
+					'timestamp' => $timestamp,
+				),
+				true
+			);
+			if ( ! is_wp_error( $result ) ) {
+				$ids = as_get_scheduled_actions(
+					array(
+						'hook'     => FlowRoutines::ONE_TIME_HOOK,
+						'args'     => array( 'flow_id' => $flow_id ),
+						'group'    => FlowRoutines::LEGACY_GROUP,
+						'status'   => 'pending',
+						'per_page' => 1,
+					),
+					'ids'
+				);
+				$action_id = empty( $ids ) ? null : (int) reset( $ids );
+			}
+		}
 		if ( is_wp_error( $result ) ) {
 			return $this->scheduleError( $result );
 		}
@@ -168,7 +196,7 @@ class ScheduleFlowAbility {
 		do_action(
 			'datamachine_log',
 			'info',
-			'Flow scheduled for one-time execution',
+			$preserve_schedule ? 'Flow scheduled for one-time execution; recurring schedule preserved' : 'Flow scheduled for one-time execution',
 			array(
 				'flow_id'        => $flow_id,
 				'timestamp'      => $timestamp,
@@ -180,7 +208,7 @@ class ScheduleFlowAbility {
 			'success'        => true,
 			'flow_id'        => $flow_id,
 			'schedule_type'  => 'one_time',
-			'action_id'      => null,
+			'action_id'      => $action_id,
 			'scheduled_time' => wp_date( 'c', $timestamp ),
 		);
 	}

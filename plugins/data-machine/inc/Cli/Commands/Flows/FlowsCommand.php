@@ -89,7 +89,7 @@ class FlowsCommand extends BaseCommand {
 	 * ---
 	 *
 	 * [--timestamp=<unix>]
-	 * : Unix timestamp for delayed execution (future time required).
+	 * : Add a single delayed run, keeping any recurring schedule (future Unix timestamp required).
 	 *
 	 * [--[no-]drain]
 	 * : Drain due Data Machine batch chunk and step actions after an immediate run.
