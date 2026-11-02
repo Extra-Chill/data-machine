@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.20.0] - 2026-11-02
+
+### Added
+- payment_url renders a pay button (HTTPS only)
+- read-only Stripe reports ability (#3888 phase 1)
+
 ## [0.19.1] - 2026-10-31
 
 ### Changed
