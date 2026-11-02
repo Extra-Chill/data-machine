@@ -75,7 +75,7 @@ class StripeCommand extends BaseCommand {
 			return;
 		}
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_PRESERVE_ZERO_FRACTION ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_PRESERVE_ZERO_FRACTION ) );
 			return;
 		}
 		if ( ! $result['provenance']['complete'] ) {
