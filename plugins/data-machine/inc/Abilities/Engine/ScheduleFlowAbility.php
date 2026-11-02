@@ -176,7 +176,7 @@ class ScheduleFlowAbility {
 				true
 			);
 			if ( ! is_wp_error( $result ) ) {
-				$ids = as_get_scheduled_actions(
+				$ids       = as_get_scheduled_actions(
 					array(
 						'hook'     => FlowRoutines::ONE_TIME_HOOK,
 						'args'     => array( 'flow_id' => $flow_id ),

@@ -1170,7 +1170,10 @@ final class FlowRoutines {
 			return new \WP_Error( 'invalid_schedule', 'A one-time schedule requires a positive timestamp.', array( 'status' => 400 ) );
 		}
 		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return new \WP_Error( 'routines_unavailable', 'Action Scheduler is unavailable.', array( 'status' => 503, 'retryable' => true ) );
+			return new \WP_Error( 'routines_unavailable', 'Action Scheduler is unavailable.', array(
+				'status'    => 503,
+				'retryable' => true,
+			) );
 		}
 
 		$action_id = as_schedule_single_action(
@@ -1180,7 +1183,10 @@ final class FlowRoutines {
 			self::LEGACY_GROUP
 		);
 		if ( ! $action_id ) {
-			return new \WP_Error( 'schedule_failed', 'The one-time run could not be scheduled.', array( 'status' => 503, 'retryable' => true ) );
+			return new \WP_Error( 'schedule_failed', 'The one-time run could not be scheduled.', array(
+				'status'    => 503,
+				'retryable' => true,
+			) );
 		}
 
 		return (int) $action_id;
