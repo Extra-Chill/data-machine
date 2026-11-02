@@ -1155,14 +1155,41 @@ final class FlowRoutines {
 		}
 
 		self::cancel_one_time( $flow_id );
-		as_schedule_single_action(
-			(int) $timestamp,
+		$result = self::enqueue_one_time( $flow_id, (int) $timestamp );
+
+		return is_wp_error( $result ) ? $result : true;
+	}
+
+	/**
+	 * Enqueue an additional run without changing desired state or existing actions.
+	 *
+	 * @return int|\WP_Error Newly created Action Scheduler action ID.
+	 */
+	public static function enqueue_one_time( int $flow_id, int $timestamp ): int|\WP_Error {
+		if ( $timestamp <= 0 ) {
+			return new \WP_Error( 'invalid_schedule', 'A one-time schedule requires a positive timestamp.', array( 'status' => 400 ) );
+		}
+		if ( ! function_exists( 'as_schedule_single_action' ) ) {
+			return new \WP_Error( 'routines_unavailable', 'Action Scheduler is unavailable.', array(
+				'status'    => 503,
+				'retryable' => true,
+			) );
+		}
+
+		$action_id = as_schedule_single_action(
+			$timestamp,
 			self::ONE_TIME_HOOK,
 			array( 'flow_id' => $flow_id ),
 			self::LEGACY_GROUP
 		);
+		if ( ! $action_id ) {
+			return new \WP_Error( 'schedule_failed', 'The one-time run could not be scheduled.', array(
+				'status'    => 503,
+				'retryable' => true,
+			) );
+		}
 
-		return true;
+		return (int) $action_id;
 	}
 
 	/**
