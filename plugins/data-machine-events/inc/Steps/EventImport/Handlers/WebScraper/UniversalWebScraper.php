@@ -135,6 +135,8 @@ class UniversalWebScraper extends EventImportHandler {
 	 */
 	private DetailPageEnricher $detail_enricher;
 
+	private LinkedEventPages $linked_event_pages;
+
 	public function __construct() {
 		parent::__construct( 'universal_web_scraper' );
 
@@ -142,6 +144,7 @@ class UniversalWebScraper extends EventImportHandler {
 		$this->extractors      = $this->getExtractors();
 		$this->paginators      = $this->getPaginators();
 		$this->detail_enricher = new DetailPageEnricher();
+		$this->linked_event_pages = new LinkedEventPages();
 
 		self::registerHandler(
 			'universal_web_scraper',
@@ -255,6 +258,7 @@ class UniversalWebScraper extends EventImportHandler {
 
 		// The detail-page enrichment budget spans the whole fetch cycle.
 		$this->detail_enricher->resetBudget();
+		$this->linked_event_pages->resetBudget();
 
 		$context->log(
 			'info',
@@ -367,6 +371,21 @@ class UniversalWebScraper extends EventImportHandler {
 				$config,
 				$context
 			);
+
+			// Structured extractors containing only past/filtered events return null.
+			// Before AI fallbacks, look for Event JSON-LD on linked detail pages.
+			if ( null === $structured_result ) {
+				$linked_events = $this->linked_event_pages->extract( $html_content, $current_url );
+				if ( ! empty( $linked_events ) ) {
+					$structured_result = $this->processor->process(
+						$linked_events,
+						'linked_event_pages+jsonld',
+						$current_url,
+						$config,
+						$context
+					);
+				}
+			}
 
 			if ( null !== $structured_result ) {
 				// Accumulate items from structured extraction and continue
