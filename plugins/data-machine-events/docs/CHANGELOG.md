@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.83.0] - 2026-11-04
+
+### Added
+- follow linked event pages with Event JSON-LD
+
 ## [0.82.0] - 2026-11-04
 
 ### Added
