@@ -347,14 +347,14 @@ class EventIdentifierGenerator {
 	 * do not. Compare against the full existing name, not another stripped name.
 	 */
 	public static function hasLeadingVenueName( string $qualified, string $existing ): bool {
-		$text = self::normalizeDashes( html_entity_decode( $qualified, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		$text  = self::normalizeDashes( html_entity_decode( $qualified, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 		$parts = preg_split( '/\s+(?:at|@|-)\s+/i', $text, 2 );
-		if ( 2 !== count( $parts ) || '' === trim( $parts[1] ) ) {
+		if ( false === $parts || 2 !== count( $parts ) || '' === trim( $parts[1] ) ) {
 			return false;
 		}
 
 		$leading = self::normalize_venue( $parts[0] );
-		return strlen( $leading ) >= 3 && $leading === self::normalize_venue( $existing );
+		return 3 <= strlen( $leading ) && self::normalize_venue( $existing ) === $leading;
 	}
 
 	/**
