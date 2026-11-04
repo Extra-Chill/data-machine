@@ -35,6 +35,82 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 		parent::tearDown();
 	}
 
+	public function test_listing_fields_update_past_event_and_batch(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		register_taxonomy( 'artist', Event_Post_Type::POST_TYPE );
+		$artist = self::factory()->term->create( array( 'taxonomy' => 'artist' ) );
+		$old_artist = self::factory()->term->create( array( 'taxonomy' => 'artist' ) );
+		$image = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$event = $this->makeEvent();
+		wp_set_object_terms( $event, array( $old_artist ), 'artist' );
+		$this->ability->executeUpdateEvent( array( 'event' => $event, 'startDate' => '2020-01-01', 'endDate' => '2020-01-01' ) );
+		$changes = array( 'event' => $event, 'title' => "Wednesday's lineup", 'featuredImage' => $image, 'artists' => array( $artist ) );
+		$result = $this->ability->executeUpdateEvent( $changes );
+		$this->assertSame( 'updated', $result['results'][0]['status'] );
+		$this->assertSame( "Wednesday's lineup", get_post( $event )->post_title );
+		$this->assertSame( $image, (int) get_post_thumbnail_id( $event ) );
+		$this->assertSame( array( $artist ), wp_get_object_terms( $event, 'artist', array( 'fields' => 'ids' ) ) );
+		$this->assertContains( 'title', $result['results'][0]['updated_fields'] );
+		$this->assertContains( 'featuredImage', $result['results'][0]['updated_fields'] );
+		$this->assertContains( 'artists', $result['results'][0]['updated_fields'] );
+
+		$second = $this->makeEvent();
+		$changes['event'] = $second;
+		$result = $this->ability->executeUpdateEvent( array( 'events' => array( $changes ) ) );
+		$this->assertSame( 'updated', $result['results'][0]['status'] );
+		$this->assertSame( $changes['title'], get_post( $second )->post_title );
+		$this->assertSame( $image, (int) get_post_thumbnail_id( $second ) );
+		$this->assertSame( array( $artist ), wp_get_object_terms( $second, 'artist', array( 'fields' => 'ids' ) ) );
+		$this->ability->executeUpdateEvent( array( 'event' => $second, 'artists' => array() ) );
+		$this->assertSame( array(), wp_get_object_terms( $second, 'artist', array( 'fields' => 'ids' ) ) );
+	}
+
+	public function test_listing_fields_work_individually_and_image_requires_read_access(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		register_taxonomy( 'artist', Event_Post_Type::POST_TYPE );
+		$event = $this->makeEvent();
+		$image = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$artist = self::factory()->term->create( array( 'taxonomy' => 'artist' ) );
+		foreach ( array( 'title' => 'New title', 'featuredImage' => $image, 'artists' => array( $artist ) ) as $field => $value ) {
+			$result = $this->ability->executeUpdateEvent( array( 'event' => $event, $field => $value ) );
+			$this->assertSame( 'updated', $result['results'][0]['status'] );
+			$this->assertSame( array( $field ), $result['results'][0]['updated_fields'] );
+		}
+		$deny_image = static function ( $caps, $cap, $user_id, $args ) use ( $image ) {
+			return 'read_post' === $cap && $image === ( $args[0] ?? null ) ? array( 'do_not_allow' ) : $caps;
+		};
+		add_filter( 'map_meta_cap', $deny_image, 10, 4 );
+		try {
+			$result = $this->ability->executeUpdateEvent( array( 'event' => $event, 'featuredImage' => $image ) );
+			$this->assertSame( 'featured_image_forbidden', $result['results'][0]['error_code'] );
+		} finally {
+			remove_filter( 'map_meta_cap', $deny_image, 10 );
+		}
+	}
+
+	public function test_invalid_listing_fields_do_not_change_title(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		register_taxonomy( 'artist', Event_Post_Type::POST_TYPE );
+		$event = $this->makeEvent();
+		$title = get_post( $event )->post_title;
+		foreach ( array(
+			array( 'featuredImage' => PHP_INT_MAX ),
+			array( 'featuredImage' => $event ),
+			array( 'artists' => array( PHP_INT_MAX ) ),
+		) as $invalid ) {
+			$result = $this->ability->executeUpdateEvent( array_merge( array( 'event' => $event, 'title' => 'Must not save' ), $invalid ) );
+			$this->assertSame( 'failed', $result['results'][0]['status'] );
+			$this->assertSame( $title, get_post( $event )->post_title );
+		}
+	}
+
+	public function test_listing_fields_require_event_edit_permission(): void {
+		$event = $this->makeEvent();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
+		$result = $this->ability->executeUpdateEvent( array( 'event' => $event, 'title' => 'Denied' ) );
+		$this->assertSame( 'event_update_forbidden', $result['results'][0]['error_code'] );
+	}
+
 	public function test_source_update_requires_narrow_delegated_permission(): void {
 		$event_id = $this->makeSourceEvent();
 		$result   = $this->ability->executeUpdateSourceEvent( $this->sourceInput( $event_id, array( 'startTime' => '21:00' ) ) );

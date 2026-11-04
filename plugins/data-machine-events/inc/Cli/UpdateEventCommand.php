@@ -37,6 +37,15 @@ class UpdateEventCommand {
 	 * <event_ids>
 	 * : One or more event IDs (comma-separated).
 	 *
+	 * [--title=<title>]
+	 * : New event post title.
+	 *
+	 * [--featured-image=<id>]
+	 * : Existing readable image attachment ID.
+	 *
+	 * [--artists=<json>]
+	 * : JSON array of existing artist term IDs (replaces assigned artists).
+	 *
 	 * [--start-date=<date>]
 	 * : New start date (any parseable format, normalized to YYYY-MM-DD).
 	 *
@@ -207,7 +216,7 @@ class UpdateEventCommand {
 			$value = $assoc_args[ $flag ];
 
 			// Parse JSON for array fields
-			if ( 'occurrenceDates' === $field && is_string( $value ) ) {
+			if ( in_array( $field, array( 'occurrenceDates', 'artists' ), true ) && is_string( $value ) ) {
 				$decoded = json_decode( $value, true );
 				if ( is_array( $decoded ) ) {
 					$value = $decoded;
