@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.82.0] - 2026-11-04
+
+### Added
+- update-event supports title, featuredImage, and artists
+
+### Fixed
+- match "<Venue> at <Place>" to the existing venue
+
 ## [0.81.2] - 2026-11-02
 
 ### Fixed
