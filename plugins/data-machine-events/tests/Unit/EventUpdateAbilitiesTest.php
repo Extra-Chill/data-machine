@@ -40,7 +40,7 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 		register_taxonomy( 'artist', Event_Post_Type::POST_TYPE );
 		$artist = self::factory()->term->create( array( 'taxonomy' => 'artist' ) );
 		$old_artist = self::factory()->term->create( array( 'taxonomy' => 'artist' ) );
-		$image = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$image = $this->makeImage();
 		$event = $this->makeEvent();
 		wp_set_object_terms( $event, array( $old_artist ), 'artist' );
 		$this->ability->executeUpdateEvent( array( 'event' => $event, 'startDate' => '2020-01-01', 'endDate' => '2020-01-01' ) );
@@ -69,7 +69,7 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		register_taxonomy( 'artist', Event_Post_Type::POST_TYPE );
 		$event = $this->makeEvent();
-		$image = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$image = $this->makeImage();
 		$artist = self::factory()->term->create( array( 'taxonomy' => 'artist' ) );
 		foreach ( array( 'title' => 'New title', 'featuredImage' => $image, 'artists' => array( $artist ) ) as $field => $value ) {
 			$result = $this->ability->executeUpdateEvent( array( 'event' => $event, $field => $value ) );
@@ -792,5 +792,17 @@ class EventUpdateAbilitiesTest extends WP_UnitTestCase {
 		if ( ! taxonomy_exists( 'venue' ) ) {
 			Venue_Taxonomy::register();
 		}
+	}
+
+	private function makeImage(): int {
+		$image = self::factory()->attachment->create_object(
+			array(
+				'file'           => 'flyer.jpg',
+				'post_mime_type' => 'image/jpeg',
+				'post_title'     => 'Flyer',
+			)
+		);
+		update_attached_file( $image, 'flyer.jpg' );
+		return (int) $image;
 	}
 }

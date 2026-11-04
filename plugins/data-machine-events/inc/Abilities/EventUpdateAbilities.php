@@ -92,7 +92,10 @@ class EventUpdateAbilities {
 							),
 							'artists'         => array(
 								'type'        => 'array',
-								'items'       => array( 'type' => 'integer', 'minimum' => 1 ),
+								'items'       => array(
+									'type'    => 'integer',
+									'minimum' => 1,
+								),
 								'description' => 'Existing artist term IDs, replacing all assigned artists; an empty array clears them',
 							),
 							'startDate'       => array(
@@ -476,7 +479,7 @@ class EventUpdateAbilities {
 		if ( isset( $event_update['title'] ) && $event_update['title'] !== $post->post_title ) {
 			$updated_fields[] = 'title';
 		}
-		if ( isset( $event_update['featuredImage'] ) && $event_update['featuredImage'] !== (int) get_post_thumbnail_id( $post_id ) ) {
+		if ( isset( $event_update['featuredImage'] ) && (int) get_post_thumbnail_id( $post_id ) !== $event_update['featuredImage'] ) {
 			$updated_fields[] = 'featuredImage';
 		}
 		if ( array_key_exists( 'artists', $event_update ) ) {
@@ -592,8 +595,8 @@ class EventUpdateAbilities {
 					$update_result = wp_update_post(
 						array(
 							'ID'           => $post_id,
-							'post_content' => wp_slash( $new_content ),
-							'post_title'   => wp_slash( $event_update['title'] ?? $post->post_title ),
+							'post_content' => (string) wp_slash( $new_content ),
+							'post_title'   => (string) wp_slash( (string) ( $event_update['title'] ?? $post->post_title ) ),
 						),
 						true
 					);
