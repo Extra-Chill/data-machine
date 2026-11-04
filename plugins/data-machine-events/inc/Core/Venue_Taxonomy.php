@@ -1146,7 +1146,8 @@ class Venue_Taxonomy {
 	 * Catalyst Club"). Neither is a typo, so the fuzzy tier misses them and a
 	 * second venue term splits the venue's events. This tier compares names
 	 * with a trailing state code (only when it equals the venue's own state)
-	 * and a trailing "club"/"nightclub" removed.
+	 * and a trailing "club"/"nightclub" removed. It also accepts the complete
+	 * stored name followed by an explicit "at", "@", or dash place qualifier.
 	 *
 	 * Like the fuzzy tier it runs only when no exact, article-toggle, or
 	 * normalized candidate exists, and a candidate needs positive location
@@ -1174,7 +1175,8 @@ class Venue_Taxonomy {
 		$compatible = array();
 		foreach ( $venues as $venue ) {
 			$state = (string) get_term_meta( (int) $venue->term_id, self::$meta_fields['state'], true );
-			if ( self::core_venue_name( $venue->name, $state ) !== $incoming ) {
+			if ( self::core_venue_name( $venue->name, $state ) !== $incoming
+				&& ! \DataMachineEvents\Utilities\EventIdentifierGenerator::hasLeadingVenueName( $venue_name, $venue->name ) ) {
 				continue;
 			}
 			if ( self::has_geographic_conflict( (int) $venue->term_id, $venue_data ) ) {

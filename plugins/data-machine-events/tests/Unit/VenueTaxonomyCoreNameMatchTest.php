@@ -74,6 +74,41 @@ class VenueTaxonomyCoreNameMatchTest extends WP_UnitTestCase {
 		$this->assertNotSame( $term_id, $result['term_id'] );
 	}
 
+	public function test_place_qualifiers_reuse_burgundy_lounge(): void {
+		$term_id = $this->venue( 'Burgundy Lounge', 'Charleston', 'SC' );
+		foreach ( array( ' at ', ' @ ', ' - ' ) as $separator ) {
+			$result = Venue_Taxonomy::find_or_create_venue(
+				'Burgundy Lounge' . $separator . 'Starlight Motor Inn',
+				array( 'city' => 'Charleston', 'state' => 'SC' )
+			);
+			$this->assertSame( $term_id, $result['term_id'] );
+			$this->assertFalse( $result['was_created'] );
+		}
+	}
+
+	public function test_place_qualifiers_require_agreeing_location(): void {
+		$this->venue( 'Burgundy Lounge', 'Charleston', 'SC' );
+		foreach ( array( array(), array( 'city' => 'Austin', 'state' => 'TX' ), array( 'city' => 'Charleston', 'state' => 'WV' ) ) as $data ) {
+			$result = Venue_Taxonomy::resolve_venue_identity( 'Burgundy Lounge at Starlight Motor Inn', $data );
+			$this->assertNull( $result['term_id'] );
+		}
+	}
+
+	public function test_shared_starlight_word_is_not_a_venue_match(): void {
+		$term_id = $this->venue( 'The Starlight Motor Inn', 'Charleston', 'SC' );
+		$result  = Venue_Taxonomy::find_or_create_venue( 'Starlight Theatre', array( 'city' => 'Charleston', 'state' => 'SC' ) );
+		$this->assertNotSame( $term_id, $result['term_id'] );
+		$this->assertTrue( $result['was_created'] );
+	}
+
+	public function test_qualified_name_with_multiple_location_matches_is_ambiguous(): void {
+		$this->venue( 'Burgundy Lounge', 'Charleston', 'SC' );
+		$this->venue( 'The Burgundy Lounge', 'Charleston', 'SC' );
+		$result = Venue_Taxonomy::resolve_venue_identity( 'Burgundy Lounge at Starlight Motor Inn', array( 'city' => 'Charleston', 'state' => 'SC' ) );
+		$this->assertSame( 'ambiguous', $result['match_status'] );
+		$this->assertNull( $result['term_id'] );
+	}
+
 	public function test_core_venue_name_strips_only_matching_state_and_club(): void {
 		$this->assertSame( 'catalyst', Venue_Taxonomy::core_venue_name( 'The Catalyst-CA', 'CA' ) );
 		$this->assertSame( 'catalyst', Venue_Taxonomy::core_venue_name( 'The Catalyst Club', 'CA' ) );
