@@ -117,6 +117,9 @@ class UpdateEventCommandTest extends WP_UnitTestCase {
 	public function test_field_map_derives_kebab_case_flags_from_ability_schema(): void {
 		$this->assertSame(
 			array(
+				'title'            => 'title',
+				'featured-image'   => 'featuredImage',
+				'artists'          => 'artists',
 				'start-date'       => 'startDate',
 				'start-time'       => 'startTime',
 				'end-date'         => 'endDate',
@@ -141,6 +144,9 @@ class UpdateEventCommandTest extends WP_UnitTestCase {
 		$reflection->setAccessible( true );
 
 		$assoc_args = array(
+			'title'            => 'New lineup',
+			'featured-image'   => '123',
+			'artists'          => '[10,20]',
 			'start-date'       => '2026-01-01',
 			'start-time'       => '20:00',
 			'end-date'         => '2026-01-02',
@@ -160,6 +166,9 @@ class UpdateEventCommandTest extends WP_UnitTestCase {
 
 		$this->assertSame(
 			array(
+				'title'           => 'New lineup',
+				'featuredImage'   => '123',
+				'artists'         => array( 10, 20 ),
 				'startDate'       => '2026-01-01',
 				'startTime'       => '20:00',
 				'endDate'         => '2026-01-02',

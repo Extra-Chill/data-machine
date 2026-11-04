@@ -81,6 +81,23 @@ class EventUpdateAbilities {
 								'type'        => 'array',
 								'description' => 'Array of event updates. Each item must have "event" (post ID) plus fields to update.',
 							),
+							'title'           => array(
+								'type'        => 'string',
+								'description' => 'New event post title',
+							),
+							'featuredImage'   => array(
+								'type'        => 'integer',
+								'minimum'     => 1,
+								'description' => 'Existing readable image attachment ID to use as the featured image',
+							),
+							'artists'         => array(
+								'type'        => 'array',
+								'items'       => array(
+									'type'    => 'integer',
+									'minimum' => 1,
+								),
+								'description' => 'Existing artist term IDs, replacing all assigned artists; an empty array clears them',
+							),
 							'startDate'       => array(
 								'type'        => 'string',
 								'description' => 'Start date (any parseable format, normalized to YYYY-MM-DD)',
@@ -366,7 +383,7 @@ class EventUpdateAbilities {
 		if ( ! empty( $parameters['event'] ) ) {
 			$single_update = array( 'event' => (int) $parameters['event'] );
 
-			foreach ( self::UPDATABLE_FIELDS as $field ) {
+			foreach ( array_merge( self::UPDATABLE_FIELDS, array( 'title', 'featuredImage', 'artists' ) ) as $field ) {
 				if ( array_key_exists( $field, $parameters ) ) {
 					$single_update[ $field ] = $parameters[ $field ];
 				}
@@ -412,6 +429,39 @@ class EventUpdateAbilities {
 			);
 		}
 
+		// Validate post-level changes before any persistence, including in batch updates.
+		$post_fields = array_intersect( array( 'title', 'featuredImage', 'artists' ), array_keys( $event_update ) );
+		if ( $post_fields && ! current_user_can( 'edit_post', $post_id ) ) {
+			return $this->updateErrorResult( $post, new \WP_Error( 'event_update_forbidden', 'You cannot edit this event.', array( 'status' => 403 ) ) );
+		}
+		if ( array_key_exists( 'title', $event_update ) ) {
+			if ( ! is_string( $event_update['title'] ) || '' === trim( sanitize_text_field( $event_update['title'] ) ) ) {
+				return $this->updateErrorResult( $post, new \WP_Error( 'invalid_event_title', 'Title must be a non-empty string.', array( 'status' => 400 ) ) );
+			}
+			$event_update['title'] = sanitize_text_field( $event_update['title'] );
+		}
+		if ( array_key_exists( 'featuredImage', $event_update ) ) {
+			$image_id = filter_var( $event_update['featuredImage'], FILTER_VALIDATE_INT );
+			$image    = $image_id ? get_post( $image_id ) : null;
+			if ( ! $image || 'attachment' !== $image->post_type || ! wp_attachment_is_image( $image_id ) ) {
+				return $this->updateErrorResult( $post, new \WP_Error( 'invalid_featured_image', 'Featured image must be an existing image attachment.', array( 'status' => 400 ) ) );
+			}
+			if ( ! current_user_can( 'read_post', $image_id ) ) {
+				return $this->updateErrorResult( $post, new \WP_Error( 'featured_image_forbidden', 'You cannot read this attachment.', array( 'status' => 403 ) ) );
+			}
+			$event_update['featuredImage'] = (int) $image_id;
+		}
+		if ( array_key_exists( 'artists', $event_update ) ) {
+			if ( ! is_array( $event_update['artists'] ) ) {
+				return $this->updateErrorResult( $post, new \WP_Error( 'invalid_artists', 'Artists must be an array of existing artist term IDs.', array( 'status' => 400 ) ) );
+			}
+			foreach ( $event_update['artists'] as $artist_id ) {
+				if ( ! is_int( $artist_id ) || $artist_id <= 0 || ! term_exists( $artist_id, 'artist' ) ) {
+					return $this->updateErrorResult( $post, new \WP_Error( 'invalid_artist', 'Every artist must be an existing artist term ID.', array( 'status' => 400 ) ) );
+				}
+			}
+		}
+
 		$venue_requested = array_key_exists( 'venue', $event_update );
 		if ( ! is_array( $this->source_context ) && $venue_requested && count( $event_update ) > 2 ) {
 			return $this->updateErrorResult(
@@ -426,6 +476,15 @@ class EventUpdateAbilities {
 
 		$updated_fields = array();
 		$warnings       = array();
+		if ( isset( $event_update['title'] ) && $event_update['title'] !== $post->post_title ) {
+			$updated_fields[] = 'title';
+		}
+		if ( isset( $event_update['featuredImage'] ) && (int) get_post_thumbnail_id( $post_id ) !== $event_update['featuredImage'] ) {
+			$updated_fields[] = 'featuredImage';
+		}
+		if ( array_key_exists( 'artists', $event_update ) ) {
+			$updated_fields[] = 'artists';
+		}
 
 		$blocks      = parse_blocks( $post->post_content );
 		$block_index = $this->findEventBlockIndex( $blocks );
@@ -521,7 +580,7 @@ class EventUpdateAbilities {
 				$updated_fields[] = 'venue';
 			}
 
-			if ( ! empty( array_diff( $updated_fields, array( 'venue' ) ) ) ) {
+			if ( ! empty( array_diff( $updated_fields, array( 'venue', 'featuredImage', 'artists' ) ) ) ) {
 				$blocks[ $block_index ]['attrs'] = $new_attrs;
 				/** @var array<int, array{blockName: string|null, attrs: array<string,mixed>, innerBlocks: array<int,array>, innerHTML: string, innerContent: array<int,string|null>}> $blocks Same shape parse_blocks() returns; restated because the by-reference inner-block and attrs writes above lose the element shape to static analysis (runtime shape is unchanged). */
 				$new_content         = serialize_blocks( $blocks );
@@ -536,7 +595,8 @@ class EventUpdateAbilities {
 					$update_result = wp_update_post(
 						array(
 							'ID'           => $post_id,
-							'post_content' => $new_content,
+							'post_content' => (string) wp_slash( $new_content ),
+							'post_title'   => (string) wp_slash( (string) ( $event_update['title'] ?? $post->post_title ) ),
 						),
 						true
 					);
@@ -551,6 +611,18 @@ class EventUpdateAbilities {
 				if ( $dates_error instanceof \WP_Error ) {
 					$lifecycle_result = $this->updateErrorResult( $post, $dates_error );
 					return $this->rollbackSourceResult( $post_id, $lifecycle_result );
+				}
+			}
+
+			if ( in_array( 'featuredImage', $updated_fields, true ) && ! set_post_thumbnail( $post_id, $event_update['featuredImage'] ) ) {
+				$lifecycle_result = $this->updateErrorResult( $post, new \WP_Error( 'featured_image_update_failed', 'Failed to set the featured image.' ) );
+				return $lifecycle_result;
+			}
+			if ( in_array( 'artists', $updated_fields, true ) ) {
+				$assigned = wp_set_object_terms( $post_id, array_values( array_unique( $event_update['artists'] ) ), 'artist', false );
+				if ( is_wp_error( $assigned ) ) {
+					$lifecycle_result = $this->updateErrorResult( $post, $assigned );
+					return $lifecycle_result;
 				}
 			}
 
@@ -569,7 +641,7 @@ class EventUpdateAbilities {
 
 			$lifecycle_result = array(
 				'post_id'        => $post_id,
-				'title'          => $post->post_title,
+				'title'          => get_the_title( $post_id ),
 				'status'         => empty( $updated_fields ) ? 'no_change' : 'updated',
 				'updated_fields' => $updated_fields,
 				'warnings'       => $warnings,
