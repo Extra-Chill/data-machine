@@ -140,10 +140,10 @@ class UniversalWebScraper extends EventImportHandler {
 	public function __construct() {
 		parent::__construct( 'universal_web_scraper' );
 
-		$this->processor       = new StructuredDataProcessor( $this );
-		$this->extractors      = $this->getExtractors();
-		$this->paginators      = $this->getPaginators();
-		$this->detail_enricher = new DetailPageEnricher();
+		$this->processor          = new StructuredDataProcessor( $this );
+		$this->extractors         = $this->getExtractors();
+		$this->paginators         = $this->getPaginators();
+		$this->detail_enricher    = new DetailPageEnricher();
 		$this->linked_event_pages = new LinkedEventPages();
 
 		self::registerHandler(

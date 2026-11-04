@@ -70,7 +70,15 @@ class LinkedEventPages {
 		$xpath = new \DOMXPath( $dom );
 		$urls  = array();
 
-		foreach ( $xpath->query( '//a[@href][not(ancestor::nav or ancestor::header or ancestor::footer)]' ) as $link ) {
+		$links = $xpath->query( '//a[@href][not(ancestor::nav or ancestor::header or ancestor::footer)]' );
+		if ( false === $links ) {
+			return array();
+		}
+
+		foreach ( $links as $link ) {
+			if ( ! $link instanceof \DOMElement ) {
+				continue;
+			}
 			$url = trim( $link->getAttribute( 'href' ) );
 			if ( ! preg_match( '~^https?://~i', $url ) ) {
 				continue;
@@ -78,7 +86,7 @@ class LinkedEventPages {
 			// Fragments do not identify separate detail pages.
 			$url   = explode( '#', $url, 2 )[0];
 			$parts = wp_parse_url( $url );
-			if ( empty( $parts['host'] ) || isset( $parts['user'] ) || isset( $parts['pass'] ) || $url === explode( '#', $source_url, 2 )[0] ) {
+			if ( empty( $parts['host'] ) || isset( $parts['user'] ) || isset( $parts['pass'] ) || explode( '#', $source_url, 2 )[0] === $url ) {
 				continue;
 			}
 			$host = strtolower( $parts['host'] );
