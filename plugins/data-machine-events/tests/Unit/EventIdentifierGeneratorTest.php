@@ -230,6 +230,17 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 	/**
 	 * Test venue matching basics
 	 */
+	public function test_venues_match_leading_name_with_place_qualifier(): void {
+		foreach ( array( ' at ', ' @ ', ' - ' ) as $separator ) {
+			$qualified = 'Burgundy Lounge' . $separator . 'Starlight Motor Inn';
+			$this->assertTrue( EventIdentifierGenerator::venuesMatch( 'Burgundy Lounge', $qualified ) );
+			$this->assertTrue( EventIdentifierGenerator::venuesMatch( $qualified, 'Burgundy Lounge' ) );
+		}
+		$this->assertFalse( EventIdentifierGenerator::venuesMatch( 'Starlight Theatre', 'The Starlight Motor Inn' ) );
+		$this->assertFalse( EventIdentifierGenerator::venuesMatch( 'Burgundy Lounge East', 'Burgundy Lounge at Starlight Motor Inn' ) );
+		$this->assertFalse( EventIdentifierGenerator::venuesMatch( 'Starlight Motor Inn', 'Burgundy Lounge at Starlight Motor Inn' ) );
+	}
+
 	public function test_venues_match_exact(): void {
 		$this->assertTrue(
 			EventIdentifierGenerator::venuesMatch( 'The Parish', 'The Parish' )
