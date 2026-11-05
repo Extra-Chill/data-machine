@@ -30,8 +30,15 @@ class FilterAbilities {
 	private static bool $registered          = false;
 	private bool $grouped_term_counts_failed = false;
 
-	/** Matched-ID chunk size for fallback term counting. */
-	private const FALLBACK_CHUNK_SIZE = 1000;
+	/**
+	 * Matched-ID chunk size for fallback term counting.
+	 *
+	 * A static property rather than a constant so tests can exercise the
+	 * chunk boundary without seeding a thousand events (#3901).
+	 *
+	 * @var int
+	 */
+	private static $fallback_chunk_size = 1000;
 
 	public function __construct() {
 		if ( ! self::$registered ) {
@@ -488,7 +495,7 @@ class FilterAbilities {
 		}
 
 		$counts = array();
-		foreach ( array_chunk( $post_ids, self::FALLBACK_CHUNK_SIZE ) as $chunk ) {
+		foreach ( array_chunk( $post_ids, self::$fallback_chunk_size ) as $chunk ) {
 			$placeholders = implode( ',', array_fill( 0, count( $chunk ), '%d' ) );
 			$wpdb->flush();
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Bounded aggregate; callers cache the resulting inventory.
@@ -523,9 +530,9 @@ class FilterAbilities {
 	 */
 	private function count_object_terms_for_ids( array $post_ids, string $taxonomy_slug ): array {
 		$counts = array();
-		for ( $offset = 0, $total = count( $post_ids ); $offset < $total; $offset += self::FALLBACK_CHUNK_SIZE ) {
+		for ( $offset = 0, $total = count( $post_ids ); $offset < $total; $offset += self::$fallback_chunk_size ) {
 			$terms = wp_get_object_terms(
-				array_slice( $post_ids, $offset, self::FALLBACK_CHUNK_SIZE ),
+				array_slice( $post_ids, $offset, self::$fallback_chunk_size ),
 				$taxonomy_slug,
 				array(
 					'fields'                 => 'all_with_object_id',
