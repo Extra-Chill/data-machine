@@ -35,7 +35,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 		try {
 			$method = new \ReflectionMethod( $this->handler, 'findExistingEventViaAbility' );
 			$method->setAccessible( true );
-			$result = $method->invoke( $this->handler, 'Contract Test', 'Test Venue', '2026-10-10', '' );
+			$result = $method->invoke( $this->handler, 'Contract Test', 'Test Venue', self::future_year() . '-10-10', '' );
 
 			$this->assertWPError( $result );
 			$this->assertSame( 'datamachine_duplicate_contract_unavailable', $result->get_error_code() );
@@ -53,24 +53,24 @@ class EventUpsertTest extends EventUpsertTestCase {
 		$parameters = array(
 			'title' => 'Boogieman VI Kick-Off Party w/ The Saint Cecilia',
 			'venue' => 'The Royal American',
-			'startDate' => '2026-10-30',
+			'startDate' => self::future_year() . '-10-30',
 			'startTime' => '21:00',
-			'endDate' => '2026-10-31',
+			'endDate' => self::future_year() . '-10-31',
 			'endTime' => '02:00',
 		);
 		$created = $this->invoke_upsert( $parameters );
 		$this->assertTrue( $created['success'] ?? false, wp_json_encode( $created ) );
 		$post_id = (int) $created['data']['post_id'];
 		$parameters['startTime'] = '';
-		$parameters['endDate'] = '2026-10-30';
+		$parameters['endDate'] = self::future_year() . '-10-30';
 		$parameters['endTime'] = '';
 		$parameters['source_identity'] = 'new-scrape-identity';
 		$updated = $this->invoke_upsert( $parameters );
 		$this->assertTrue( $updated['success'] ?? false, wp_json_encode( $updated ) );
 		$this->assertSame( $post_id, (int) $updated['data']['post_id'] );
 		$dates = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
-		$this->assertSame( '2026-10-30 21:00:00', $dates->start_datetime );
-		$this->assertSame( '2026-10-31 02:00:00', $dates->end_datetime );
+		$this->assertSame( self::future_year() . '-10-30 21:00:00', $dates->start_datetime );
+		$this->assertSame( self::future_year() . '-10-31 02:00:00', $dates->end_datetime );
 	}
 
 	public function test_reimport_of_merged_duplicate_resolves_to_winner_and_stays_trashed(): void {
@@ -79,7 +79,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'           => 'Merge Winner ' . $suffix,
 				'venue'           => 'Merge Venue A ' . $suffix,
-				'startDate'       => '2026-11-21',
+				'startDate'       => self::future_year() . '-11-21',
 				'startTime'       => '20:00',
 				'source_identity' => 'source:winner-' . $suffix,
 			)
@@ -87,7 +87,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 		$loser_parameters = array(
 			'title'           => 'Merge Loser ' . $suffix,
 			'venue'           => 'Merge Venue B ' . $suffix,
-			'startDate'       => '2026-11-22',
+			'startDate'       => self::future_year() . '-11-22',
 			'startTime'       => '21:00',
 			'source_identity' => 'source:loser-' . $suffix,
 		);
@@ -114,7 +114,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'           => 'Gone Winner ' . $suffix,
 				'venue'           => 'Gone Venue A ' . $suffix,
-				'startDate'       => '2026-11-23',
+				'startDate'       => self::future_year() . '-11-23',
 				'startTime'       => '20:00',
 				'source_identity' => 'source:gone-winner-' . $suffix,
 			)
@@ -122,7 +122,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 		$loser_parameters = array(
 			'title'           => 'Surviving Loser ' . $suffix,
 			'venue'           => 'Gone Venue B ' . $suffix,
-			'startDate'       => '2026-11-24',
+			'startDate'       => self::future_year() . '-11-24',
 			'startTime'       => '21:00',
 			'source_identity' => 'source:gone-loser-' . $suffix,
 		);
@@ -144,7 +144,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 		$parameters = array(
 			'title'           => 'Exact Source Trash Replay ' . uniqid(),
 			'venue'           => 'Exact Source Venue ' . uniqid(),
-			'startDate'       => '2026-11-20',
+			'startDate'       => self::future_year() . '-11-20',
 			'startTime'       => '20:00',
 			'description'     => 'Stable content for an exact source replay.',
 			'source_identity' => 'source:event-' . uniqid(),
@@ -251,7 +251,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			)
 		);
 
-		$datetime = '2026-06-15 19:30:00';
+		$datetime = self::future_year() . '-06-15 19:30:00';
 		EventDatesTable::upsert( $post_id, $datetime );
 
 		$stored = EventDatesTable::get( $post_id );
@@ -270,9 +270,9 @@ class EventUpsertTest extends EventUpsertTestCase {
 	 * @see https://github.com/Extra-Chill/data-machine-events/issues/424
 	 */
 	public function test_save_post_populates_table_from_block(): void {
-		$start_date = '2026-08-15';
+		$start_date = self::future_year() . '-08-15';
 		$start_time = '20:00';
-		$end_date   = '2026-08-15';
+		$end_date   = self::future_year() . '-08-15';
 		$end_time   = '23:00';
 
 		$post_id = wp_insert_post(
@@ -294,16 +294,16 @@ class EventUpsertTest extends EventUpsertTestCase {
 
 		$dates = EventDatesTable::get( $post_id );
 		$this->assertNotNull( $dates, 'save_post should have written a row to the event_dates table.' );
-		$this->assertEquals( '2026-08-15 20:00:00', $dates->start_datetime );
-		$this->assertEquals( '2026-08-15 23:00:00', $dates->end_datetime );
+		$this->assertEquals( self::future_year() . '-08-15 20:00:00', $dates->start_datetime );
+		$this->assertEquals( self::future_year() . '-08-15 23:00:00', $dates->end_datetime );
 
 		// Calendar hydration (EventHydrator) must read the same values from the table.
 		$post = get_post( $post_id );
 		$data = \DataMachineEvents\Blocks\Calendar\Data\EventHydrator::parse_event_data( $post );
 		$this->assertNotNull( $data );
-		$this->assertEquals( '2026-08-15', $data['startDate'] );
+		$this->assertEquals( self::future_year() . '-08-15', $data['startDate'] );
 		$this->assertEquals( '20:00:00', $data['startTime'] );
-		$this->assertEquals( '2026-08-15', $data['endDate'] );
+		$this->assertEquals( self::future_year() . '-08-15', $data['endDate'] );
 		$this->assertEquals( '23:00:00', $data['endTime'] );
 
 		// Cleanup
@@ -316,7 +316,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 				'post_title'   => 'Block Removal Sync Test ' . uniqid(),
 				'post_type'    => 'data_machine_events',
 				'post_status'  => 'publish',
-				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2026-08-15","startTime":"20:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"' . self::future_year() . '-08-15","startTime":"20:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
 			)
 		);
 
@@ -344,7 +344,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 		$parameters = array(
 			'title'       => $title,
 			'venue'       => $venue_name,
-			'startDate'   => '2026-10-15',
+			'startDate'   => self::future_year() . '-10-15',
 			'startTime'   => '20:00',
 			'description' => 'Integration coverage for unchanged event reconciliation.',
 			'engine'      => $engine,
@@ -425,7 +425,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 					'post_title'   => $title,
 					'post_type'    => Event_Post_Type::POST_TYPE,
 					'post_status'  => 'publish',
-					'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2026-11-14","startTime":"20:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
+					'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"' . self::future_year() . '-11-14","startTime":"20:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
 				)
 			);
 			wp_set_object_terms( $winner_id, array( $venue['term_id'] ), 'venue' );
@@ -439,7 +439,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'           => $title,
 				'venue'           => $venue_name,
-				'startDate'       => '2026-11-14',
+				'startDate'       => self::future_year() . '-11-14',
 				'startTime'       => '20:00',
 				'description'     => 'The losing concurrent writer must update or reuse the winner.',
 				'source_identity' => 'venue-direct:event-123',
@@ -488,7 +488,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 					'post_title'   => $title,
 					'post_type'    => Event_Post_Type::POST_TYPE,
 					'post_status'  => 'publish',
-					'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2026-11-14","startTime":"20:00"} --><div></div><!-- /wp:data-machine-events/event-details -->',
+					'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"' . self::future_year() . '-11-14","startTime":"20:00"} --><div></div><!-- /wp:data-machine-events/event-details -->',
 				)
 			);
 			wp_set_object_terms( $winner_id, array( $term['term_id'] ), 'venue' );
@@ -505,7 +505,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 					'venue'        => $incoming_name,
 					'venueAddress' => '3010 Minnehaha Street Suite 420',
 					'venueCity'    => 'Minneapolis',
-					'startDate'    => '2026-11-14',
+					'startDate'    => self::future_year() . '-11-14',
 					'startTime'    => '20:00',
 				)
 			);
@@ -533,19 +533,19 @@ class EventUpsertTest extends EventUpsertTestCase {
 		$method = new \ReflectionMethod( $this->handler, 'buildUpsertLockKeys' );
 		$method->setAccessible( true );
 
-		$source_before = $method->invoke( $this->handler, 'Original Billing', 'Shared Venue', '2026-11-14 20:00', 'stable-source' );
-		$source_after  = $method->invoke( $this->handler, 'Corrected Billing', 'Moved Venue', '2026-11-15 21:00', 'stable-source' );
+		$source_before = $method->invoke( $this->handler, 'Original Billing', 'Shared Venue', self::future_year() . '-11-14 20:00', 'stable-source' );
+		$source_after  = $method->invoke( $this->handler, 'Corrected Billing', 'Moved Venue', self::future_year() . '-11-15 21:00', 'stable-source' );
 		$this->assertNotEmpty( array_intersect( $source_before, $source_after ), 'A concrete source identity must serialize updates when canonical fields change.' );
-		$candidate_a = $method->invoke( $this->handler, 'First Source', 'First Venue', '2026-11-14 20:00', 'source-a', array(), 481 );
-		$candidate_b = $method->invoke( $this->handler, 'Second Source', 'Second Venue', '2026-11-15 21:00', 'source-b', array(), 481 );
+		$candidate_a = $method->invoke( $this->handler, 'First Source', 'First Venue', self::future_year() . '-11-14 20:00', 'source-a', array(), 481 );
+		$candidate_b = $method->invoke( $this->handler, 'Second Source', 'Second Venue', self::future_year() . '-11-15 21:00', 'source-b', array(), 481 );
 		$this->assertNotEmpty( array_intersect( $candidate_a, $candidate_b ), 'Different source identities targeting one candidate must serialize.' );
 
-		$fuzzy_a = $method->invoke( $this->handler, 'The Falling Spikes Live', 'Shared Venue', '2026-11-14 19:59' );
-		$fuzzy_b = $method->invoke( $this->handler, 'Falling Spikes', 'Shared Venue', '2026-11-14 21:58' );
+		$fuzzy_a = $method->invoke( $this->handler, 'The Falling Spikes Live', 'Shared Venue', self::future_year() . '-11-14 19:59' );
+		$fuzzy_b = $method->invoke( $this->handler, 'Falling Spikes', 'Shared Venue', self::future_year() . '-11-14 21:58' );
 		$this->assertNotEmpty( array_intersect( $fuzzy_a, $fuzzy_b ), 'Likely equivalents within two hours must share a canonical collision lock despite title variation.' );
 
-		$alias_a = $method->invoke( $this->handler, 'Alias Show', 'Monks', '2026-11-14 20:00', '', array( 'address' => '3010 Minnehaha Street', 'city' => 'Minneapolis' ) );
-		$alias_b = $method->invoke( $this->handler, 'Alias Show', 'Monks Jazz', '2026-11-14 20:00', '', array( 'address' => '3010 Minnehaha St' ) );
+		$alias_a = $method->invoke( $this->handler, 'Alias Show', 'Monks', self::future_year() . '-11-14 20:00', '', array( 'address' => '3010 Minnehaha Street', 'city' => 'Minneapolis' ) );
+		$alias_b = $method->invoke( $this->handler, 'Alias Show', 'Monks Jazz', self::future_year() . '-11-14 20:00', '', array( 'address' => '3010 Minnehaha St' ) );
 		$this->assertNotEmpty( array_intersect( $alias_a, $alias_b ), 'Venue aliases must share an address-derived lock even when one source has only partial geography.' );
 		$this->assertSame( $fuzzy_a, array_values( $fuzzy_a ) );
 		$sorted = $fuzzy_a;
@@ -560,18 +560,18 @@ class EventUpsertTest extends EventUpsertTestCase {
 		$method = new \ReflectionMethod( $this->handler, 'buildUpsertLockKeys' );
 		$method->setAccessible( true );
 
-		$early = $method->invoke( $this->handler, 'Same Day Residency', 'Two Stage Venue', '2026-11-16 13:00' );
-		$late  = $method->invoke( $this->handler, 'Same Day Residency', 'Two Stage Venue', '2026-11-16 21:00' );
+		$early = $method->invoke( $this->handler, 'Same Day Residency', 'Two Stage Venue', self::future_year() . '-11-16 13:00' );
+		$late  = $method->invoke( $this->handler, 'Same Day Residency', 'Two Stage Venue', self::future_year() . '-11-16 21:00' );
 		$this->assertSame( array(), array_intersect( $early, $late ), 'Known shows outside the duplicate time window must not contend.' );
-		$conservative_overlap = $method->invoke( $this->handler, 'Different Billing', 'Two Stage Venue', '2026-11-16 15:01' );
-		$distant             = $method->invoke( $this->handler, 'Another Billing', 'Two Stage Venue', '2026-11-16 17:01' );
+		$conservative_overlap = $method->invoke( $this->handler, 'Different Billing', 'Two Stage Venue', self::future_year() . '-11-16 15:01' );
+		$distant             = $method->invoke( $this->handler, 'Another Billing', 'Two Stage Venue', self::future_year() . '-11-16 17:01' );
 		$this->assertNotEmpty( array_intersect( $early, $conservative_overlap ), 'Adjacent two-hour buckets deliberately allow conservative overlap at 121 minutes.' );
 		$this->assertSame( array(), array_intersect( $early, $distant ), 'Distant non-overlapping bucket sets must remain parallel.' );
-		$unknown_time = $method->invoke( $this->handler, 'Same Day Residency', 'Two Stage Venue', '2026-11-16' );
+		$unknown_time = $method->invoke( $this->handler, 'Same Day Residency', 'Two Stage Venue', self::future_year() . '-11-16' );
 		$this->assertNotEmpty( array_intersect( $early, $unknown_time ), 'A date-only source must serialize with a time-aware equivalent at the same venue.' );
 
-		$unknown_a = $method->invoke( $this->handler, 'Acoustic Matinee Session', '', '2026-11-16 13:00' );
-		$unknown_b = $method->invoke( $this->handler, 'Electronic Night Session', '', '2026-11-16 13:00' );
+		$unknown_a = $method->invoke( $this->handler, 'Acoustic Matinee Session', '', self::future_year() . '-11-16 13:00' );
+		$unknown_b = $method->invoke( $this->handler, 'Electronic Night Session', '', self::future_year() . '-11-16 13:00' );
 		$this->assertSame( array(), array_intersect( $unknown_a, $unknown_b ), 'Unknown venues must be bounded by a stable title fingerprint.' );
 	}
 
@@ -591,7 +591,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'           => $title,
 				'venue'           => 'Contended Venue',
-				'startDate'       => '2026-11-15',
+				'startDate'       => self::future_year() . '-11-15',
 				'startTime'       => '21:00',
 				'source_identity' => 'ticketmaster:event-456',
 			)
@@ -643,7 +643,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 				array(
 					'title'     => $title,
 					'venue'     => 'Exception Lock Venue',
-					'startDate' => '2026-10-12',
+					'startDate' => self::future_year() . '-10-12',
 					'startTime' => '20:00',
 				)
 			);
@@ -689,7 +689,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'     => $title,
 				'venue'     => $venue_name,
-				'startDate' => '2026-11-16',
+				'startDate' => self::future_year() . '-11-16',
 				'startTime' => '13:00',
 			),
 			$config
@@ -698,7 +698,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'     => $title,
 				'venue'     => $venue_name,
-				'startDate' => '2026-11-16',
+				'startDate' => self::future_year() . '-11-16',
 				'startTime' => '21:00',
 			),
 			$config
@@ -717,7 +717,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'           => 'Stable Source Original ' . uniqid(),
 				'venue'           => 'Stable Source Venue ' . uniqid(),
-				'startDate'       => '2026-11-18',
+				'startDate'       => self::future_year() . '-11-18',
 				'startTime'       => '19:00',
 				'source_type'     => 'ticketmaster',
 				'item_identifier' => $source_id,
@@ -727,7 +727,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'           => 'Stable Source Revised ' . uniqid(),
 				'venue'           => 'Stable Source Revised Venue ' . uniqid(),
-				'startDate'       => '2026-11-19',
+				'startDate'       => self::future_year() . '-11-19',
 				'startTime'       => '20:30',
 				'source_type'     => 'ticketmaster',
 				'item_identifier' => $source_id,
@@ -753,7 +753,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'           => $title,
 				'venue'           => $venue,
-				'startDate'       => '2026-11-20',
+				'startDate'       => self::future_year() . '-11-20',
 				'startTime'       => '19:00',
 				'source_type'     => 'ticketmaster',
 				'item_identifier' => 'early-' . uniqid(),
@@ -763,7 +763,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'           => $title,
 				'venue'           => $venue,
-				'startDate'       => '2026-11-20',
+				'startDate'       => self::future_year() . '-11-20',
 				'startTime'       => '21:30',
 				'source_type'     => 'ticketmaster',
 				'item_identifier' => 'late-' . uniqid(),
@@ -787,18 +787,18 @@ class EventUpsertTest extends EventUpsertTestCase {
 				'post_title'   => 'Implicit Overnight Sync Test ' . uniqid(),
 				'post_type'    => 'data_machine_events',
 				'post_status'  => 'publish',
-				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2026-08-15","startTime":"23:00","endTime":"02:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"' . self::future_year() . '-08-15","startTime":"23:00","endTime":"02:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
 			)
 		);
 
 		$dates = EventDatesTable::get( $post_id );
 		$this->assertNotNull( $dates );
-		$this->assertSame( '2026-08-15 23:00:00', $dates->start_datetime );
-		$this->assertSame( '2026-08-16 02:00:00', $dates->end_datetime );
+		$this->assertSame( self::future_year() . '-08-15 23:00:00', $dates->start_datetime );
+		$this->assertSame( self::future_year() . '-08-16 02:00:00', $dates->end_datetime );
 
 		global $wpdb;
 		$table      = EventDatesTable::table_name();
-		$comparison = '2026-08-16 01:00:00';
+		$comparison = self::future_year() . '-08-16 01:00:00';
 		$visible    = (int) $wpdb->get_var(
 			$wpdb->prepare( "SELECT COUNT(*) FROM {$table} ed WHERE ed.post_id = %d AND " . UpcomingFilter::upcoming_where( $comparison ), $post_id )
 		);
@@ -811,13 +811,13 @@ class EventUpsertTest extends EventUpsertTestCase {
 				'post_title'   => 'Explicit Contradiction Sync Test ' . uniqid(),
 				'post_type'    => 'data_machine_events',
 				'post_status'  => 'publish',
-				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2026-08-15","startTime":"23:00","endDate":"2026-08-15","endTime":"02:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"' . self::future_year() . '-08-15","startTime":"23:00","endDate":"' . self::future_year() . '-08-15","endTime":"02:00"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
 			)
 		);
 
 		$dates = EventDatesTable::get( $post_id );
 		$this->assertNotNull( $dates );
-		$this->assertSame( '2026-08-15 02:00:00', $dates->end_datetime );
+		$this->assertSame( self::future_year() . '-08-15 02:00:00', $dates->end_datetime );
 	}
 
 	public function test_event_with_venue_assignment() {
@@ -890,7 +890,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			$this->handler,
 			array(
 				'title'     => 'Date Only Event',
-				'startDate' => '2026-03-20',
+				'startDate' => self::future_year() . '-03-20',
 			),
 			$engine
 		);
@@ -908,7 +908,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			$this->handler,
 			array(
 				'title'     => 'Full Event',
-				'startDate' => '2026-07-05',
+				'startDate' => self::future_year() . '-07-05',
 				'startTime' => '20:00',
 			),
 			$engine
@@ -988,7 +988,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 
 		$engine = new \DataMachine\Core\EngineData(
 			array(
-				'startDate' => '2026-13-99',
+				'startDate' => self::future_year() . '-13-99',
 			),
 			0
 		);
@@ -997,7 +997,7 @@ class EventUpsertTest extends EventUpsertTestCase {
 			$this->handler,
 			array(
 				'title'     => 'Bad Date Event ' . uniqid(),
-				'startDate' => '2026-13-99',
+				'startDate' => self::future_year() . '-13-99',
 				'engine'    => $engine,
 				'job_id'    => 0,
 			),
@@ -1226,14 +1226,14 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'       => 'Eggy at Charleston Pour House',
 				'venue'       => 'Charleston Pour House',
-				'startDate'   => '2026-08-01',
+				'startDate'   => self::future_year() . '-08-01',
 				'startTime'   => '20:00',
 				'source_type' => '',
 				'artist'      => 'Eggy',
 			),
 			array(
 				'title'     => 'Eggy at Charleston Pour House',
-				'startDate' => '2026-08-01',
+				'startDate' => self::future_year() . '-08-01',
 				'startTime' => '20:00',
 			)
 		);
@@ -1276,14 +1276,14 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'       => 'Test Event',
 				'venue'       => 'Some Venue',
-				'startDate'   => '2026-08-01',
+				'startDate'   => self::future_year() . '-08-01',
 				'startTime'   => '20:00',
 				'source_type' => 'universal_web_scraper',
 				'artist'      => '',
 			),
 			array(
 				'title'     => 'Test Event',
-				'startDate' => '2026-08-01',
+				'startDate' => self::future_year() . '-08-01',
 				'startTime' => '20:00',
 			)
 		);
@@ -1303,14 +1303,14 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'       => '?',
 				'venue'       => 'Some Venue',
-				'startDate'   => '2026-08-01',
+				'startDate'   => self::future_year() . '-08-01',
 				'startTime'   => '',
 				'source_type' => '',
 				'artist'      => '',
 			),
 			array(
 				'title'     => '?',
-				'startDate' => '2026-08-01',
+				'startDate' => self::future_year() . '-08-01',
 			)
 		);
 
@@ -1346,14 +1346,14 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'       => 'QA Sandbox Preview Night',
 				'venue'       => 'Dice Venue',
-				'startDate'   => '2026-09-01',
+				'startDate'   => self::future_year() . '-09-01',
 				'startTime'   => '21:00',
 				'source_type' => 'dice',
 				'artist'      => '',
 			),
 			array(
 				'title'     => 'QA Sandbox Preview Night',
-				'startDate' => '2026-09-01',
+				'startDate' => self::future_year() . '-09-01',
 				'startTime' => '21:00',
 			),
 			array( 'source_type' => 'dice' )
@@ -1383,14 +1383,14 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'       => 'Placeholder Concert',
 				'venue'       => 'Some Venue',
-				'startDate'   => '2026-08-01',
+				'startDate'   => self::future_year() . '-08-01',
 				'startTime'   => '',
 				'source_type' => '',
 				'artist'      => '',
 			),
 			array(
 				'title'     => 'Placeholder Concert',
-				'startDate' => '2026-08-01',
+				'startDate' => self::future_year() . '-08-01',
 			)
 		);
 
@@ -1413,14 +1413,14 @@ class EventUpsertTest extends EventUpsertTestCase {
 			array(
 				'title'       => 'Upcoming Event Featuring Phish',
 				'venue'       => 'Some Venue',
-				'startDate'   => '2026-08-01',
+				'startDate'   => self::future_year() . '-08-01',
 				'startTime'   => '',
 				'source_type' => '',
 				'artist'      => 'Phish',
 			),
 			array(
 				'title'     => 'Upcoming Event Featuring Phish',
-				'startDate' => '2026-08-01',
+				'startDate' => self::future_year() . '-08-01',
 			)
 		);
 

@@ -21,7 +21,7 @@ class EventUpsertFallbackDedupeTest extends EventUpsertTestCase {
 		$first = $this->invoke_upsert( array(
 			'title'     => 'Barn Jam',
 			'venue'     => 'Awendaw Green',
-			'startDate' => '2026-10-28',
+			'startDate' => self::future_year() . '-10-28',
 			'startTime' => '17:50',
 		) );
 		$this->assertTrue( $first['success'] ?? false, wp_json_encode( $first ) );
@@ -37,7 +37,7 @@ class EventUpsertFallbackDedupeTest extends EventUpsertTestCase {
 		$second = $this->invoke_upsert( array(
 			'title'        => 'Barn Jam at Sewee Outpost',
 			'venue'        => 'Sewee Outpost',
-			'startDate'    => '2026-10-28',
+			'startDate'    => self::future_year() . '-10-28',
 			'startTime'    => '17:50',
 			'venueAddress' => '4853 Highway 17',
 			'venueCity'    => 'Awendaw',
@@ -58,7 +58,7 @@ class EventUpsertFallbackDedupeTest extends EventUpsertTestCase {
 		$occasion = array(
 			'title'     => $title,
 			'venue'     => $venue,
-			'startDate' => '2026-10-21',
+			'startDate' => self::future_year() . '-10-21',
 			'startTime' => '18:00',
 		);
 
@@ -87,7 +87,7 @@ class EventUpsertFallbackDedupeTest extends EventUpsertTestCase {
 		$occasion = array(
 			'title'       => $title,
 			'venue'       => $venue,
-			'startDate'   => '2026-09-23',
+			'startDate'   => self::future_year() . '-09-23',
 			'startTime'   => '19:30',
 			'source_type' => 'ticketmaster',
 		);
@@ -107,7 +107,7 @@ class EventUpsertFallbackDedupeTest extends EventUpsertTestCase {
 		$occasion = array(
 			'title'     => $title,
 			'venue'     => $venue,
-			'startDate' => '2026-11-11',
+			'startDate' => self::future_year() . '-11-11',
 			'startTime' => '19:00',
 		);
 
@@ -136,7 +136,7 @@ class EventUpsertFallbackDedupeTest extends EventUpsertTestCase {
 		$venue_b  = 'Distinct Venue Beta ' . uniqid();
 		$occasion = array(
 			'title'     => $title,
-			'startDate' => '2026-12-12',
+			'startDate' => self::future_year() . '-12-12',
 			'startTime' => '15:00',
 		);
 

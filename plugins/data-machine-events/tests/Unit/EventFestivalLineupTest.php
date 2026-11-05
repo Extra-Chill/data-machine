@@ -153,6 +153,9 @@ class EventFestivalLineupTest extends EventUpsertTestCase {
 
 	public function test_festival_listing_matches_by_term_when_canonical_title_differs(): void {
 		wp_update_post( array( 'ID' => $this->festival, 'post_title' => 'Halloween Celebration' ) );
+		// Saving a post without an event-details block clears its date row by
+		// design (event-dates-sync.php), so restore the fixture's schedule.
+		EventDatesTable::upsert( $this->festival, '2027-10-31 13:00:00', '2027-10-31 18:00:00' );
 		wp_set_object_terms( $this->festival, 'Boogieman Halloween Festival', 'festival' );
 		$result = EventDuplicateStrategy::check( array(
 			'title' => 'Boogieman Halloween Festival 2027',
