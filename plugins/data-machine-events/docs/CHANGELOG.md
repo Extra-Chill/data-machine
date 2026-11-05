@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.83.4] - 2026-11-05
+
+### Changed
+- repair stale tests hidden by the #3901 hang
+
 ## [0.83.3] - 2026-11-05
 
 ### Changed
