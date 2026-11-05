@@ -36,7 +36,7 @@ class FilterAbilities {
 	 * A static property rather than a constant so tests can exercise the
 	 * chunk boundary without seeding a thousand events (#3901).
 	 *
-	 * @var int
+	 * @var int<1, max>
 	 */
 	private static $fallback_chunk_size = 1000;
 
