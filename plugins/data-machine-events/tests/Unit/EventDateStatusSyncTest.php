@@ -51,6 +51,8 @@ class EventDateStatusSyncTest extends WP_UnitTestCase {
 			array( '%s' ),
 			array( '%d' )
 		);
+		// This deliberate out-of-band write must invalidate the read-through cache.
+		EventDatesTable::flush_cache( $post_id );
 	}
 
 	public function test_canonical_status_is_propagated_across_transitions_and_same_status_saves(): void {
