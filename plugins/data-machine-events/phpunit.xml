@@ -1,10 +1,14 @@
 <phpunit
+	bootstrap="tests/offline-bootstrap.php"
 	backupGlobals="false"
 	colors="true"
 	convertErrorsToExceptions="true"
 	convertNoticesToExceptions="true"
 	convertWarningsToExceptions="true"
 >
+	<php>
+		<const name="WP_HTTP_BLOCK_EXTERNAL" value="true"/>
+	</php>
 	<testsuites>
 		<testsuite name="Data Machine Events">
 			<directory suffix="Test.php">tests/Unit</directory>

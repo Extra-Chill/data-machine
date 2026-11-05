@@ -10,6 +10,7 @@
         "validation_dependencies": ["../data-machine"],
         "wp_codebox_multisite": true,
         "wp_codebox_phpunit_bootstrap_mode": "managed",
+        "wp_codebox_phpunit_preload_files": ["/wordpress/wp-content/plugins/data-machine-events/tests/offline-bootstrap.php"],
         "wp_codebox_prepare_steps": [
           {"command": "npm", "args": ["ci"], "cwd": "inc/Blocks/Calendar"},
           {"command": "npm", "args": ["run", "build"], "cwd": "inc/Blocks/Calendar"},
