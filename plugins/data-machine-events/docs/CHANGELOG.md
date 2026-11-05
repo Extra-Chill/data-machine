@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.83.2] - 2026-11-05
+
+### Changed
+- cross FilterAbilities chunk boundary without seeding 1000+ events
+
 ## [0.83.1] - 2026-11-05
 
 ### Fixed
