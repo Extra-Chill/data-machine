@@ -962,7 +962,8 @@ class Venue_Taxonomy {
 			self::is_unverified_field( $venue_data, 'address' ) ? '' : ( $venue_data['address'] ?? '' ),
 			$venue_data['city'] ?? '',
 			$venue_data['state'] ?? '',
-			$venue_data['country'] ?? ''
+			$venue_data['country'] ?? '',
+			self::is_unverified_field( $venue_data, 'zip' ) ? '' : ( $venue_data['zip'] ?? '' )
 		);
 
 		if ( $address_match ) {
@@ -1467,6 +1468,26 @@ class Venue_Taxonomy {
 	}
 
 	/**
+	 * Strong street and postal evidence can reconcile differing city labels.
+	 * State and country conflicts are still checked independently.
+	 */
+	private static function has_matching_street_and_postal_code( int $term_id, array $venue_data ): bool {
+		if ( self::is_unverified_field( $venue_data, 'address' ) || self::is_unverified_field( $venue_data, 'zip' ) ) {
+			return false;
+		}
+
+		$address        = trim( (string) ( $venue_data['address'] ?? '' ) );
+		$stored_address = (string) get_term_meta( $term_id, self::$meta_fields['address'], true );
+		$zip            = trim( (string) ( $venue_data['zip'] ?? '' ) );
+		$stored_zip     = trim( (string) get_term_meta( $term_id, self::$meta_fields['zip'], true ) );
+
+		return '' !== $zip && $zip === $stored_zip
+			&& self::address_has_street_component( $address )
+			&& self::address_has_street_component( $stored_address )
+			&& self::street_identity_key( $address ) === self::street_identity_key( $stored_address );
+	}
+
+	/**
 	 * Whether a venue-data field was supplied by the AI step, not the source.
 	 *
 	 * @param array  $venue_data Incoming venue metadata.
@@ -1493,7 +1514,13 @@ class Venue_Taxonomy {
 	 * @return bool
 	 */
 	private static function has_geographic_conflict( int $term_id, array $venue_data ): bool {
+		$street_and_postal_match = self::has_matching_street_and_postal_code( $term_id, $venue_data );
+
 		foreach ( array( 'address', 'city', 'state', 'country' ) as $field ) {
+			if ( 'city' === $field && $street_and_postal_match ) {
+				continue;
+			}
+
 			// A value the source never supplied is a guess, not evidence.
 			$incoming = self::is_unverified_field( $venue_data, $field ) ? '' : ( $venue_data[ $field ] ?? '' );
 			$stored   = get_term_meta( $term_id, self::$meta_fields[ $field ], true );
@@ -2699,13 +2726,15 @@ class Venue_Taxonomy {
 	 * @param string $city City name.
 	 * @param string $state State or region, when supplied.
 	 * @param string $country Country, when supplied.
+	 * @param string $zip Postal code; equal street and postal evidence permits differing cities.
 	 * @return int|null Term ID if found, null otherwise
 	 */
 	public static function find_venue_by_address(
 		string $address,
 		string $city,
 		string $state = '',
-		string $country = ''
+		string $country = '',
+		string $zip = ''
 	): ?int {
 		if ( empty( $address ) || empty( $city ) ) {
 			return null;
@@ -2741,21 +2770,24 @@ class Venue_Taxonomy {
 				continue;
 			}
 
+			$venue_data               = array(
+				'address' => $address,
+				'city'    => $city,
+				'state'   => $state,
+				'country' => $country,
+				'zip'     => $zip,
+			);
+			$street_and_postal_match  = self::has_matching_street_and_postal_code( (int) $venue->term_id, $venue_data );
 			$venue_normalized_address = self::normalize_address_for_matching( $venue_address );
 			$venue_normalized_city    = strtolower( trim( $venue_city ) );
 
 			if ( self::address_has_street_component( $address ) &&
 				self::address_has_street_component( $venue_address ) &&
 				( $venue_normalized_address === $normalized_address || self::street_identity_key( $address ) === self::street_identity_key( $venue_address ) || self::normalized_address_is_subset( $normalized_address, $venue_normalized_address ) ) &&
-				$venue_normalized_city === $normalized_city &&
+				( $venue_normalized_city === $normalized_city || $street_and_postal_match ) &&
 				! self::has_geographic_conflict(
 					$venue->term_id,
-					array(
-						'address' => $address,
-						'city'    => $city,
-						'state'   => $state,
-						'country' => $country,
-					)
+					$venue_data
 				) ) {
 				$matches[] = $venue->term_id;
 			}
