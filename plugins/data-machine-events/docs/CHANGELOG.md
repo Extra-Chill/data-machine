@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.83.1] - 2026-11-05
+
+### Fixed
+- match venues on street + postal code across city labels
+
 ## [0.83.0] - 2026-11-04
 
 ### Added
