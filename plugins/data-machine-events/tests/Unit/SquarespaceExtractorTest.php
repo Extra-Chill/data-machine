@@ -636,7 +636,15 @@ class SquarespaceExtractorTest extends WP_UnitTestCase {
 	 */
 	public function test_royal_american_html_preserves_boogieman_overnight_times() {
 		$html = file_get_contents( __DIR__ . '/../Fixtures/squarespace-royal-american.html' );
-		$events = $this->extractor->extract( $html, 'https://www.theroyalamerican.com/schedule' );
+		// Keep the test hermetic: the live ?format=json feed drops past shows,
+		// so parse the snapshot instead of whatever the venue lists today.
+		$offline = static fn() => new \WP_Error( 'http_request_failed', 'offline fixture' );
+		add_filter( 'pre_http_request', $offline );
+		try {
+			$events = $this->extractor->extract( $html, 'https://www.theroyalamerican.com/schedule' );
+		} finally {
+			remove_filter( 'pre_http_request', $offline );
+		}
 		$shows = array_values( array_filter( $events, static fn( $event ) => 'Boogieman VI Kick-Off Party w/ The Saint Cecilia' === $event['title'] ) );
 		$this->assertCount( 1, $shows );
 		$this->assertSame( '2026-10-30', $shows[0]['startDate'] );

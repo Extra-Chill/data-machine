@@ -42,7 +42,7 @@ class EventArtistBillingTest extends EventUpsertTestCase {
 		$base = wp_insert_term( $name, 'artist' );
 		$this->assertNotWPError( $base );
 		$this->assert_artist_upsert( $name . ' &amp; Friends', $name );
-		$this->assertFalse( term_exists( $name . ' & Friends', 'artist' ) );
+		$this->assertEmpty( term_exists( $name . ' & Friends', 'artist' ) );
 	}
 
 	public function test_only_trailing_billing_suffixes_are_removed(): void {

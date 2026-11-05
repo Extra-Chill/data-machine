@@ -100,11 +100,11 @@ class BandsintownWidgetExtractorTest extends WP_UnitTestCase {
 	}
 
 	/** Test the GoDaddy iframe srcdoc embed resolves the same widget request. */
-	public function test_iframe_srcdoc_widget_falls_back_to_page_hostname(): void {
+	public function test_iframe_srcdoc_widget_uses_its_embedded_app_id(): void {
 		$events = $this->extract(
 			$this->fixture( 'lightwatch-srcdoc.html' ),
 			$this->fixture( 'lightwatch.json' ),
-			'https://rest.bandsintown.com/V4/artists/id_15528341/events/?app_id=js_www.lightwatchband.com'
+			'https://rest.bandsintown.com/V4/artists/id_15528341/events/?app_id=cac850fdfc2241e6a81d4a05f29f6514'
 		);
 		$this->assertCount( 2, $events );
 		$this->assertSame( '108764928', $events[1]['sourceId'] );

@@ -24,6 +24,14 @@ use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 abstract class EventUpsertTestCase extends WP_UnitTestCase {
 
 	protected EventUpsert $handler;
+
+	/**
+	 * Year used for fixture event dates: always next year, so creates pass the
+	 * past-event guard no matter when the suite runs (#3907).
+	 */
+	protected static function future_year(): string {
+		return (string) ( (int) gmdate( 'Y' ) + 1 );
+	}
 	protected \Closure $lock_query_filter;
 
 	public function setUp(): void {

@@ -1335,7 +1335,8 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 			$this->assertSame( 'date,asc', $query['sort'] );
 			if ( ! $artist_mode ) {
 				$this->assertArrayNotHasKey( 'attractionId', $query );
-				$this->assertSame( '32.7765,-79.9311', $query['geoPoint'] );
+				// Discovery API geoPoint is a geohash since #3707.
+				$this->assertSame( 'djz4mn', $query['geoPoint'] );
 				$this->assertSame( '75', $query['radius'] );
 				$this->assertSame( 'miles', $query['unit'] );
 			}

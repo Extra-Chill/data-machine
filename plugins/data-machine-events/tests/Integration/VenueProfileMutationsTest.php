@@ -515,6 +515,7 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 		if ( ! is_multisite() ) {
 			$this->markTestSkipped( 'Multisite scope requires the multisite WordPress test suite.' );
 		}
+		$this->requireIndependentNamedLocks();
 		global $wpdb;
 		$first_id = $this->venue( 'First Multisite Venue' );
 		update_term_meta( $first_id, '_venue_phone', 'same-value' );
@@ -590,6 +591,7 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_native_wordpress_edit_fails_when_serialization_is_unavailable(): void {
+		$this->requireIndependentNamedLocks();
 		$term_id  = $this->venue( 'Native Lock Failure' );
 		$original = get_term( $term_id, 'venue' )->name;
 		$lock_key = VenueProfileMutations::lockName( $term_id );
@@ -611,6 +613,7 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 	}
 
 	public function test_native_wordpress_edit_releases_serialization_after_saved_hooks(): void {
+		$this->requireIndependentNamedLocks();
 		$term_id  = $this->venue( 'Native Lock Success' );
 		$lock_key = VenueProfileMutations::lockName( $term_id );
 		$observer = $this->independentConnection();
@@ -722,6 +725,25 @@ class VenueProfileMutationsTest extends WP_UnitTestCase {
 			return $wpdb->open_connection();
 		}
 		return new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+	}
+
+	/**
+	 * Skip unless a second database connection can hold MySQL named locks.
+	 * Some sandboxed SQL backends accept GET_LOCK but never grant it to an
+	 * independent connection, which makes cross-connection serialization
+	 * coverage meaningless there.
+	 */
+	private function requireIndependentNamedLocks(): void {
+		$probe = $this->independentConnection();
+		$key   = 'dme-venue-lock-probe-' . wp_generate_password( 12, false );
+		$held  = 1 === $this->namedLock( $probe, 'GET_LOCK', $key );
+		if ( $held ) {
+			$this->namedLock( $probe, 'RELEASE_LOCK', $key );
+		}
+		$probe->close();
+		if ( ! $held ) {
+			$this->markTestSkipped( 'Cross-connection venue serialization requires MySQL named locks on independent connections.' );
+		}
 	}
 
 	private function namedLock( \wpdb $connection, string $operation, string $key ): int {
