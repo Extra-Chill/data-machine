@@ -2770,14 +2770,14 @@ class Venue_Taxonomy {
 				continue;
 			}
 
-			$venue_data = array(
+			$venue_data               = array(
 				'address' => $address,
 				'city'    => $city,
 				'state'   => $state,
 				'country' => $country,
 				'zip'     => $zip,
 			);
-			$street_and_postal_match = self::has_matching_street_and_postal_code( (int) $venue->term_id, $venue_data );
+			$street_and_postal_match  = self::has_matching_street_and_postal_code( (int) $venue->term_id, $venue_data );
 			$venue_normalized_address = self::normalize_address_for_matching( $venue_address );
 			$venue_normalized_city    = strtolower( trim( $venue_city ) );
 
