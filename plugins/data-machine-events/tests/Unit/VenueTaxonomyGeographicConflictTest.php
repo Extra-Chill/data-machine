@@ -85,6 +85,62 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 	// Part A: has_geographic_conflict semantics via resolve_venue_identity
 	// ---------------------------------------------------------------------
 
+	/**
+	 * @dataProvider city_label_evidence_provider
+	 */
+	public function test_city_label_requires_equal_street_and_postal_evidence( array $incoming, bool $matches ): void {
+		$name = 'Postal Evidence Venue ' . uniqid();
+		$term_id = $this->create_venue_with_meta(
+			$name,
+			array(
+				'address' => '2301 Noisette Blvd',
+				'city'    => 'North Charleston',
+				'state'   => 'SC',
+				'country' => 'US',
+				'zip'     => '29405',
+			)
+		);
+		$incoming = array_merge( array( 'city' => 'Charleston', 'state' => 'SC', 'country' => 'US' ), $incoming );
+
+		$conflict = new \ReflectionMethod( Venue_Taxonomy::class, 'has_geographic_conflict' );
+		$this->assertSame( ! $matches, $conflict->invoke( null, $term_id, $incoming ) );
+
+		$this->assertSame(
+			$matches ? $term_id : null,
+			Venue_Taxonomy::find_venue_by_address(
+				$incoming['address'] ?? '', $incoming['city'], $incoming['state'], $incoming['country'], $incoming['zip'] ?? ''
+			)
+		);
+		$identity = Venue_Taxonomy::resolve_venue_identity( $name, $incoming );
+		$this->assertSame( $matches ? 'matched' : 'conflict', $identity['match_status'] );
+		$this->assertSame( $matches ? 'address' : '', $identity['matched_via'] );
+		$this->assertSame( $matches ? $term_id : null, $identity['term_id'] );
+
+		$before = (int) wp_count_terms( array( 'taxonomy' => 'venue', 'hide_empty' => false ) );
+		$result = Venue_Taxonomy::find_or_create_venue( $name, $incoming );
+		$this->assertSame( ! $matches, $result['was_created'] );
+		if ( $matches ) {
+			$this->assertSame( $term_id, $result['term_id'] );
+		} else {
+			$this->assertNotSame( $term_id, $result['term_id'] );
+			$this->assertNotNull( $result['term_id'] );
+		}
+		$this->assertSame( $before + ( $matches ? 0 : 1 ), (int) wp_count_terms( array( 'taxonomy' => 'venue', 'hide_empty' => false ) ) );
+	}
+
+	public static function city_label_evidence_provider(): array {
+		return array(
+			'same street and postal code' => array( array( 'address' => '2301 Noisette Blvd', 'zip' => '29405' ), true ),
+			'normalized street identity' => array( array( 'address' => '2301 Noisette Boulevard', 'zip' => '29405' ), true ),
+			'no street or postal evidence' => array( array(), false ),
+			'different postal code' => array( array( 'address' => '2301 Noisette Blvd', 'zip' => '29406' ), false ),
+			'missing postal code' => array( array( 'address' => '2301 Noisette Blvd' ), false ),
+			'different street' => array( array( 'address' => '2400 Noisette Blvd', 'zip' => '29405' ), false ),
+			'different state' => array( array( 'address' => '2301 Noisette Blvd', 'zip' => '29405', 'state' => 'GA' ), false ),
+			'different country' => array( array( 'address' => '2301 Noisette Blvd', 'zip' => '29405', 'country' => 'CA' ), false ),
+		);
+	}
+
 	public function test_partial_incoming_address_matches_exact_name(): void {
 		$name   = 'Partial Address Venue ' . uniqid();
 		$term_id = $this->create_venue_with_meta(
