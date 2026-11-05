@@ -455,3 +455,43 @@ if ( ! function_exists( 'datamachine_unwrap_affiliate_url' ) ) {
 		return \DataMachineEvents\Core\datamachine_unwrap_affiliate_url_faithful( $url );
 	}
 }
+
+if ( ! function_exists( 'data_machine_events_is_human_owned_event' ) ) {
+	/**
+	 * Whether an event is human-owned.
+	 *
+	 * Imports that match a human-owned event only fill its empty fields; they
+	 * never replace its title, content, featured image, or venue, promoter,
+	 * location, and event-type terms. Filterable through
+	 * `datamachine_events_is_human_owned_event`.
+	 *
+	 * @param int $post_id Event post ID.
+	 * @return bool
+	 */
+	function data_machine_events_is_human_owned_event( int $post_id ): bool {
+		if ( ! class_exists( '\DataMachineEvents\Core\EventOwnership' ) ) {
+			return false;
+		}
+
+		return \DataMachineEvents\Core\EventOwnership::isHumanOwned( $post_id );
+	}
+}
+
+if ( ! function_exists( 'data_machine_events_mark_event_human_owned' ) ) {
+	/**
+	 * Record that a person owns an event.
+	 *
+	 * For consumers that create or edit events on a person's behalf outside
+	 * the editor (for example their own forms). Imports never call this.
+	 *
+	 * @param int $post_id Event post ID.
+	 * @param int $user_id User who owns the event; 0 when not attributable.
+	 */
+	function data_machine_events_mark_event_human_owned( int $post_id, int $user_id = 0 ): void {
+		if ( ! class_exists( '\DataMachineEvents\Core\EventOwnership' ) ) {
+			return;
+		}
+
+		\DataMachineEvents\Core\EventOwnership::markHumanOwned( $post_id, $user_id );
+	}
+}

@@ -145,6 +145,10 @@ class CommandRegistry {
 				'file'  => $cli . 'UpdateEventCommand.php',
 				'class' => UpdateEventCommand::class,
 			),
+			'data-machine-events event-ownership'         => array(
+				'file'  => $cli . 'EventOwnershipCommand.php',
+				'class' => EventOwnershipCommand::class,
+			),
 			'data-machine-events batch-time-fix'          => array(
 				'file'  => $cli . 'BatchTimeFixCommand.php',
 				'class' => BatchTimeFixCommand::class,

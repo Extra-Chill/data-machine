@@ -15,6 +15,7 @@ namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Core\DateTimeParser;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventOwnership;
 use DataMachineEvents\Core\EventSchemaProvider;
 use DataMachineEvents\Core\Event_Type_Taxonomy;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
@@ -266,6 +267,8 @@ class EventUpdateAbilities {
 			'source_identity'      => $verified['source_identity'],
 			'expected_fingerprint' => $verified['fingerprint'],
 		);
+		// Source-owned updates are synchronization, not a person's edit (#3910).
+		EventOwnership::enterPipelineWrite();
 		try {
 			$result = $this->updateSingleEvent( $update );
 		} catch ( \Throwable $throwable ) {
@@ -293,6 +296,7 @@ class EventUpdateAbilities {
 				'error_data'   => (array) $error->get_error_data(),
 			);
 		} finally {
+			EventOwnership::exitPipelineWrite();
 			if ( $this->source_transaction_active ) {
 				$this->rollbackSourceTransaction( $verified['event_id'] );
 			}
@@ -350,6 +354,11 @@ class EventUpdateAbilities {
 
 			if ( 'updated' === $result['status'] ) {
 				++$updated_count;
+				// A person editing an event takes ownership of it: later imports
+				// that match it only fill empty fields (#3910).
+				if ( ! empty( $result['post_id'] ) && EventOwnership::isActingHuman() ) {
+					EventOwnership::markHumanOwned( (int) $result['post_id'], get_current_user_id() );
+				}
 			} else {
 				++$failed_count;
 			}
