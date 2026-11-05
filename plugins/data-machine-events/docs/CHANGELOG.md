@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.83.3] - 2026-11-05
+
+### Changed
+- flush event-dates cache after out-of-band index write
+
 ## [0.83.2] - 2026-11-05
 
 ### Changed
