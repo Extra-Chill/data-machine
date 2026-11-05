@@ -47,14 +47,26 @@ class FilterAbilitiesTest extends WP_UnitTestCase {
 		}
 
 		$this->abilities = new FilterAbilities();
+		$this->set_fallback_chunk_size( 10 );
 	}
 
 	public function tearDown(): void {
 		global $wpdb;
 
+		$this->set_fallback_chunk_size( 1000 );
 		wp_cache_flush();
 		$wpdb->last_error = '';
 		parent::tearDown();
+	}
+
+	/**
+	 * Shrink the fallback chunk so the boundary is crossed with a handful of
+	 * events. Seeding 1000+ events timed the suite out in WP Codebox (#3901).
+	 */
+	private function set_fallback_chunk_size( int $size ): void {
+		$property = new \ReflectionProperty( FilterAbilities::class, 'fallback_chunk_size' );
+		$property->setAccessible( true );
+		$property->setValue( null, $size );
 	}
 
 	private function seed_event( string $title, string $start, array $terms ): int {
@@ -93,7 +105,7 @@ class FilterAbilitiesTest extends WP_UnitTestCase {
 		$second   = $this->create_term( 'filter_kind' );
 		$tomorrow = ( new DateTimeImmutable( current_time( 'mysql' ) ) )->modify( '+1 day' )->format( 'Y-m-d 20:00:00' );
 		$post_ids = array();
-		for ( $i = 0; $i < 1005; ++$i ) {
+		for ( $i = 0; $i < 15; ++$i ) {
 			$post_ids[] = $this->seed_event( 'Chunk event', $tomorrow, array( 'filter_kind' => $i % 2 ? array( $first ) : array( $first, $second ) ) );
 		}
 
@@ -125,7 +137,7 @@ class FilterAbilitiesTest extends WP_UnitTestCase {
 			ksort( $expected );
 			ksort( $actual );
 			$this->assertSame( $expected, $actual );
-			$this->assertSame( array( 1000, 5 ), $chunks );
+			$this->assertSame( array( 10, 5 ), $chunks );
 
 			$calls = 0;
 			$fail = static function ( $terms ) use ( &$calls ) {
@@ -148,7 +160,7 @@ class FilterAbilitiesTest extends WP_UnitTestCase {
 		$second   = $this->create_term( 'filter_kind' );
 		$tomorrow = ( new DateTimeImmutable( current_time( 'mysql' ) ) )->modify( '+1 day' )->format( 'Y-m-d 20:00:00' );
 		$post_ids = array();
-		for ( $i = 0; $i < 1005; ++$i ) {
+		for ( $i = 0; $i < 15; ++$i ) {
 			$post_ids[] = $this->seed_event( 'Bounded chunk event', $tomorrow, array( 'filter_kind' => $i % 2 ? array( $first ) : array( $first, $second ) ) );
 		}
 		$expected = array();
@@ -180,7 +192,7 @@ class FilterAbilitiesTest extends WP_UnitTestCase {
 		ksort( $expected );
 		ksort( $actual );
 		$this->assertSame( $expected, $actual );
-		$this->assertSame( 2, $aggregates, '1005 matched IDs are counted in two bounded aggregate queries.' );
+		$this->assertSame( 2, $aggregates, '15 matched IDs are counted in two bounded aggregate queries.' );
 
 		// Registering a term customization routes the same request through wp_get_object_terms().
 		add_filter( 'wp_get_object_terms', $observe_terms );
