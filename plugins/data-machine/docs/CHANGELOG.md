@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.200.6] - 2026-11-06
+
+### Fixed
+- let logged-in readers run local-search
+
 ## [0.200.5] - 2026-11-02
 
 ### Fixed
