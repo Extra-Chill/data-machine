@@ -71,7 +71,8 @@ class LocalSearchAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeLocalSearch' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					/* Results are published posts only, so any logged-in reader may search. */
+					'permission_callback' => fn() => PermissionHelper::can( 'search_content' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
