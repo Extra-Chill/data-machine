@@ -1,0 +1,371 @@
+{
+    "schema": "blocks-engine/php-transformer/core-block-attributes/v1",
+    "source": "WordPress/wordpress-develop@7.1",
+    "block_count": 115,
+    "blocks": {
+        "core/accordion": [],
+        "core/accordion-heading": {
+            "title": {
+                "source": "rich-text"
+            }
+        },
+        "core/accordion-item": [],
+        "core/accordion-panel": [],
+        "core/archives": [],
+        "core/audio": {
+            "blob": {
+                "role": "local"
+            },
+            "src": {
+                "source": "attribute"
+            },
+            "caption": {
+                "source": "rich-text"
+            },
+            "autoplay": {
+                "source": "attribute"
+            },
+            "loop": {
+                "source": "attribute"
+            },
+            "preload": {
+                "source": "attribute"
+            }
+        },
+        "core/avatar": [],
+        "core/block": [],
+        "core/breadcrumbs": [],
+        "core/button": {
+            "url": {
+                "source": "attribute"
+            },
+            "title": {
+                "source": "attribute"
+            },
+            "text": {
+                "source": "rich-text"
+            },
+            "linkTarget": {
+                "source": "attribute"
+            },
+            "rel": {
+                "source": "attribute"
+            }
+        },
+        "core/buttons": [],
+        "core/calendar": [],
+        "core/categories": [],
+        "core/code": {
+            "content": {
+                "source": "rich-text"
+            }
+        },
+        "core/column": [],
+        "core/columns": [],
+        "core/comment-author-name": [],
+        "core/comment-content": [],
+        "core/comment-date": [],
+        "core/comment-edit-link": [],
+        "core/comment-reply-link": [],
+        "core/comment-template": [],
+        "core/comments": [],
+        "core/comments-pagination": [],
+        "core/comments-pagination-next": [],
+        "core/comments-pagination-numbers": [],
+        "core/comments-pagination-previous": [],
+        "core/comments-title": [],
+        "core/cover": {
+            "poster": {
+                "source": "attribute"
+            }
+        },
+        "core/details": {
+            "summary": {
+                "source": "rich-text"
+            },
+            "name": {
+                "source": "attribute"
+            }
+        },
+        "core/embed": {
+            "caption": {
+                "source": "rich-text"
+            }
+        },
+        "core/file": {
+            "blob": {
+                "role": "local"
+            },
+            "fileId": {
+                "source": "attribute"
+            },
+            "fileName": {
+                "source": "rich-text"
+            },
+            "textLinkHref": {
+                "source": "attribute"
+            },
+            "textLinkTarget": {
+                "source": "attribute"
+            },
+            "downloadButtonText": {
+                "source": "rich-text"
+            }
+        },
+        "core/footnotes": [],
+        "core/freeform": {
+            "content": {
+                "source": "raw"
+            }
+        },
+        "core/gallery": {
+            "images": {
+                "source": "query"
+            },
+            "caption": {
+                "source": "rich-text"
+            }
+        },
+        "core/group": [],
+        "core/heading": {
+            "content": {
+                "source": "rich-text"
+            }
+        },
+        "core/home-link": [],
+        "core/html": {
+            "content": {
+                "role": "local"
+            }
+        },
+        "core/icon": [],
+        "core/image": {
+            "blob": {
+                "role": "local"
+            },
+            "url": {
+                "source": "attribute"
+            },
+            "alt": {
+                "source": "attribute"
+            },
+            "caption": {
+                "source": "rich-text"
+            },
+            "title": {
+                "source": "attribute"
+            },
+            "href": {
+                "source": "attribute"
+            },
+            "rel": {
+                "source": "attribute"
+            },
+            "linkClass": {
+                "source": "attribute"
+            },
+            "linkTarget": {
+                "source": "attribute"
+            }
+        },
+        "core/latest-comments": [],
+        "core/latest-posts": [],
+        "core/legacy-widget": [],
+        "core/list": {
+            "values": {
+                "source": "html"
+            }
+        },
+        "core/list-item": {
+            "content": {
+                "source": "rich-text"
+            }
+        },
+        "core/loginout": [],
+        "core/math": {
+            "mathML": {
+                "source": "html"
+            }
+        },
+        "core/media-text": {
+            "mediaAlt": {
+                "source": "attribute"
+            },
+            "mediaUrl": {
+                "source": "attribute"
+            },
+            "linkTarget": {
+                "source": "attribute"
+            },
+            "href": {
+                "source": "attribute"
+            },
+            "rel": {
+                "source": "attribute"
+            },
+            "linkClass": {
+                "source": "attribute"
+            }
+        },
+        "core/missing": {
+            "originalContent": {
+                "source": "raw"
+            }
+        },
+        "core/more": [],
+        "core/navigation": [],
+        "core/navigation-link": [],
+        "core/navigation-overlay-close": [],
+        "core/navigation-submenu": [],
+        "core/nextpage": [],
+        "core/page-list": [],
+        "core/page-list-item": [],
+        "core/paragraph": {
+            "content": {
+                "source": "rich-text"
+            }
+        },
+        "core/pattern": [],
+        "core/playlist": [],
+        "core/playlist-track": {
+            "blob": {
+                "role": "local"
+            }
+        },
+        "core/post-author": [],
+        "core/post-author-biography": [],
+        "core/post-author-name": [],
+        "core/post-comments-count": [],
+        "core/post-comments-form": [],
+        "core/post-comments-link": [],
+        "core/post-content": [],
+        "core/post-date": [],
+        "core/post-excerpt": [],
+        "core/post-featured-image": [],
+        "core/post-navigation-link": [],
+        "core/post-template": [],
+        "core/post-terms": [],
+        "core/post-time-to-read": [],
+        "core/post-title": [],
+        "core/preformatted": {
+            "content": {
+                "source": "rich-text"
+            }
+        },
+        "core/pullquote": {
+            "value": {
+                "source": "rich-text"
+            },
+            "citation": {
+                "source": "rich-text"
+            }
+        },
+        "core/query": [],
+        "core/query-no-results": [],
+        "core/query-pagination": [],
+        "core/query-pagination-next": [],
+        "core/query-pagination-numbers": [],
+        "core/query-pagination-previous": [],
+        "core/query-title": [],
+        "core/query-total": [],
+        "core/quote": {
+            "value": {
+                "source": "html"
+            },
+            "citation": {
+                "source": "rich-text"
+            }
+        },
+        "core/read-more": [],
+        "core/rss": [],
+        "core/search": [],
+        "core/separator": [],
+        "core/shortcode": {
+            "text": {
+                "source": "raw"
+            }
+        },
+        "core/site-logo": [],
+        "core/site-tagline": [],
+        "core/site-title": [],
+        "core/social-link": [],
+        "core/social-links": [],
+        "core/spacer": [],
+        "core/tab-list": {
+            "tabs": {
+                "source": "query"
+            }
+        },
+        "core/tab-panel": [],
+        "core/tab-panels": [],
+        "core/table": {
+            "caption": {
+                "source": "rich-text"
+            },
+            "head": {
+                "source": "query"
+            },
+            "body": {
+                "source": "query"
+            },
+            "foot": {
+                "source": "query"
+            }
+        },
+        "core/tabs": {
+            "editorActiveTabIndex": {
+                "role": "local"
+            }
+        },
+        "core/tag-cloud": [],
+        "core/template-part": [],
+        "core/term-count": [],
+        "core/term-description": [],
+        "core/term-name": [],
+        "core/term-template": [],
+        "core/terms-query": [],
+        "core/text-columns": {
+            "content": {
+                "source": "query"
+            }
+        },
+        "core/verse": {
+            "content": {
+                "source": "rich-text"
+            }
+        },
+        "core/video": {
+            "autoplay": {
+                "source": "attribute"
+            },
+            "caption": {
+                "source": "rich-text"
+            },
+            "controls": {
+                "source": "attribute"
+            },
+            "loop": {
+                "source": "attribute"
+            },
+            "muted": {
+                "source": "attribute"
+            },
+            "poster": {
+                "source": "attribute"
+            },
+            "preload": {
+                "source": "attribute"
+            },
+            "blob": {
+                "role": "local"
+            },
+            "src": {
+                "source": "attribute"
+            },
+            "playsInline": {
+                "source": "attribute"
+            }
+        },
+        "core/widget-group": []
+    }
+}

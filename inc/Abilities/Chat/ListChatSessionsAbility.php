@@ -1,0 +1,137 @@
+<?php
+/**
+ * List Chat Sessions Ability
+ *
+	 * Lists chat sessions for a given user with pagination and mode filtering.
+ *
+ * @package DataMachine\Abilities\Chat
+ * @since 0.31.0
+ */
+
+namespace DataMachine\Abilities\Chat;
+
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
+
+defined( 'ABSPATH' ) || exit;
+
+class ListChatSessionsAbility {
+
+	use ChatSessionHelpers;
+
+	public function __construct() {
+		$this->initDatabase();
+
+		$this->registerAbility();
+	}
+
+	/**
+	 * Register the datamachine/list-chat-sessions ability.
+	 */
+	private function registerAbility(): void {
+		$register_callback = function () {
+			wp_register_ability(
+				'datamachine/list-chat-sessions',
+				array(
+					'label'               => __( 'List Chat Sessions', 'data-machine' ),
+					'description'         => __( 'List chat sessions for a user with pagination and mode filtering.', 'data-machine' ),
+					'category'            => 'datamachine-chat',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'user_id'  => array(
+								'type'        => 'integer',
+								'description' => __( 'User ID to list sessions for.', 'data-machine' ),
+							),
+							'agent_id' => array(
+								'anyOf'       => array( array( 'type' => 'integer' ), array( 'type' => 'null' ) ),
+								'description' => __( 'Agent ID to filter sessions by. Null or omitted returns all agents.', 'data-machine' ),
+							),
+							'limit'    => array(
+								'type'        => 'integer',
+								'default'     => 20,
+								'description' => __( 'Maximum sessions to return (1-100).', 'data-machine' ),
+							),
+							'offset'   => array(
+								'type'        => 'integer',
+								'default'     => 0,
+								'description' => __( 'Pagination offset.', 'data-machine' ),
+							),
+							'mode'     => array(
+								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
+								'description' => __( 'Mode filter (chat, pipeline, system). Null returns all modes.', 'data-machine' ),
+							),
+						),
+						'required'   => array( 'user_id' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'  => array( 'type' => 'boolean' ),
+							'sessions' => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'object' ),
+							),
+							'total'    => array( 'type' => 'integer' ),
+							'limit'    => array( 'type' => 'integer' ),
+							'offset'   => array( 'type' => 'integer' ),
+							'mode'     => array( 'anyOf' => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ) ),
+							'error'    => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'execute' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
+				)
+			);
+		};
+
+		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
+	}
+
+	/**
+	 * Execute list-chat-sessions ability.
+	 *
+	 * @param array $input Input parameters with user_id, optional limit, offset, mode.
+	 *
+	 * @return array|\WP_Error Result with sessions list and total count.
+	 */
+	public function execute( array $input ): array|\WP_Error {
+		if ( empty( $input['user_id'] ) || ! is_numeric( $input['user_id'] ) ) {
+			return new \WP_Error( 'invalid_user_id', __( 'user_id is required and must be a positive integer.', 'data-machine' ), array( 'status' => 400 ) );
+		}
+
+		$user_id = (int) $input['user_id'];
+		$owner   = $this->resolve_transcript_owner( $input, $user_id );
+		if ( is_wp_error( $owner ) ) {
+			return $owner;
+		}
+
+		if ( ! $this->can_access_user_sessions( $user_id ) ) {
+			return new \WP_Error( 'session_access_denied', __( 'You do not have access to this user\'s chat sessions.', 'data-machine' ), array( 'status' => 403 ) );
+		}
+
+		$limit    = min( 100, max( 1, (int) ( $input['limit'] ?? 20 ) ) );
+		$offset   = max( 0, (int) ( $input['offset'] ?? 0 ) );
+		$mode     = ! empty( $input['mode'] ) ? sanitize_text_field( $input['mode'] ) : null;
+		$agent_id = isset( $input['agent_id'] ) && is_numeric( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
+
+		$workspace = WordPressWorkspaceScope::current();
+		$sessions  = $this->chat_db->get_user_sessions_for_workspace( $workspace, $user_id, $limit, $offset, $mode, $agent_id, $owner );
+		$total     = $this->chat_db->get_user_session_count_for_workspace( $workspace, $user_id, $mode, $agent_id, $owner );
+
+		return array(
+			'success'  => true,
+			'sessions' => $sessions,
+			'total'    => $total,
+			'limit'    => $limit,
+			'offset'   => $offset,
+			'mode'     => $mode,
+		);
+	}
+}
