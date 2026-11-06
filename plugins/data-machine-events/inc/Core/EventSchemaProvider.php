@@ -500,8 +500,25 @@ class EventSchemaProvider {
 			$schema['image'] = $images;
 		}
 
+		$offers = array();
 		if ( ! empty( $event_data['ticketUrl'] ) || ! empty( $event_data['price'] ) || ! empty( $event_data['validFrom'] ) ) {
-			$schema['offers'] = self::buildOffersSchema( $event_data, $post_id );
+			$offers = self::buildOffersSchema( $event_data, $post_id );
+		}
+
+		/**
+		 * Filter the Event's schema.org Offer.
+		 *
+		 * Runs for every event, so a site that sells an event's tickets itself
+		 * can replace the imported vendor offer or add one where none exists.
+		 * Return an empty array to omit `offers`.
+		 *
+		 * @param array $offers     Built Offer, or an empty array when the event has no ticket fields.
+		 * @param int   $post_id    Event post ID.
+		 * @param array $event_data Event Details block attributes.
+		 */
+		$offers = (array) apply_filters( 'data_machine_events_offer_schema', $offers, $post_id, $event_data );
+		if ( ! empty( $offers['@type'] ) ) {
+			$schema['offers'] = $offers;
 		}
 
 		$status                = $event_data['eventStatus'] ?? 'EventScheduled';

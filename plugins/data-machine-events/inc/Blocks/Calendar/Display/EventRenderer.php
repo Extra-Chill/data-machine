@@ -104,7 +104,7 @@ class EventRenderer {
 					$post = $event_post;
 					setup_postdata( $post );
 
-					$display_vars = DisplayVars::build( $event_data, $display_context );
+					$display_vars = DisplayVars::build( $event_data, $display_context, (int) $event_post->ID );
 
 					if ( $event_index < self::LAZY_RENDER_THRESHOLD ) {
 						Template_Loader::include_template(
@@ -214,6 +214,10 @@ class EventRenderer {
 		if ( ! empty( $display_vars['is_affiliate_ticket'] ) ) {
 			unset( $event_data['ticketUrl'] );
 			wp_enqueue_script( 'data-machine-events-ticket-link-gate' );
+		}
+		if ( isset( $display_vars['show_ticket_link'] ) && ! $display_vars['show_ticket_link'] ) {
+			// A filtered-off ticket link must not survive in the raw payload.
+			unset( $event_data['ticketUrl'] );
 		}
 
 		$placeholder_data = array(
