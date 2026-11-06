@@ -14,7 +14,7 @@ $checks = array(
 	'provider module instantiates Google Search tool' => str_contains( $providers_file, 'new \\DataMachineBusiness\\Tools\\GoogleSearch()' ),
 	'tool registers google_search slug'      => str_contains( $tool_file, "registerTool( 'google_search'" ),
 	'tool keeps existing config option'      => str_contains( $tool_file, "get_site_option( 'datamachine_search_config'" ),
-	'tool uses Custom Search API endpoint'   => str_contains( $tool_file, 'https://www.googleapis.com/customsearch/v1' ),
+	'ability uses Custom Search API endpoint' => str_contains( (string) file_get_contents( $root . '/inc/Abilities/Search/GoogleSearchAbility.php' ), 'https://www.googleapis.com/customsearch/v1' ),
 );
 
 $failures = array();

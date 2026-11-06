@@ -108,9 +108,12 @@ final class ProviderModules {
 			),
 			new ProviderModule(
 				'google-search',
-				$tools,
-				array( 'tool:google_search' ),
-				static fn() => new \DataMachineBusiness\Tools\GoogleSearch()
+				array_merge( $abilities, $tools ),
+				array( 'datamachine/google-search', 'tool:google_search' ),
+				static function (): void {
+					new \DataMachineBusiness\Abilities\Search\GoogleSearchAbility();
+					new \DataMachineBusiness\Tools\GoogleSearch();
+				}
 			),
 			new ProviderModule(
 				'google-search-console',
