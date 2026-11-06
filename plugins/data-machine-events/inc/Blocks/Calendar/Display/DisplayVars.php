@@ -31,9 +31,12 @@ class DisplayVars {
 	 *
 	 * @param array $event_data      Event data from block attributes.
 	 * @param array $display_context Optional display context for multi-day events.
+	 * @param int   $post_id         Optional event post ID. When provided, the
+	 *                               `data_machine_events_show_ticket_button`
+	 *                               filter decides the card's ticket link too.
 	 * @return array Display variables.
 	 */
-	public static function build( array $event_data, array $display_context = array() ): array {
+	public static function build( array $event_data, array $display_context = array(), int $post_id = 0 ): array {
 		$start_date = $event_data['startDate'] ?? '';
 		$start_time = $event_data['startTime'] ?? '';
 		$end_date   = $event_data['endDate'] ?? '';
@@ -98,6 +101,24 @@ class DisplayVars {
 			}
 		}
 
+		$show_ticket_link = (bool) ( $event_data['showTicketLink'] ?? true );
+		if ( $post_id > 0 && has_filter( 'data_machine_events_show_ticket_button' ) ) {
+			// Same decision as the Event Details ticket button, so a site that
+			// takes over an event's ticketing controls every surface at once.
+			// The default stays the card's own setting: cards keep their
+			// existing behavior unless a site filters it.
+			$show_ticket_link = (bool) apply_filters(
+				'data_machine_events_show_ticket_button',
+				$show_ticket_link,
+				$post_id,
+				data_machine_events_get_timing( $post_id )
+			);
+		}
+		if ( ! $show_ticket_link ) {
+			$raw_ticket_url      = '';
+			$is_affiliate_ticket = false;
+		}
+
 		return array(
 			'formatted_time_display' => $formatted_time_display,
 			'venue_name'             => self::decode_unicode( $event_data['venue'] ?? '' ),
@@ -105,7 +126,7 @@ class DisplayVars {
 			'iso_start_date'         => $iso_start_date,
 			'show_performer'         => false,
 			'show_price'             => $event_data['showPrice'] ?? true,
-			'show_ticket_link'       => $event_data['showTicketLink'] ?? true,
+			'show_ticket_link'       => $show_ticket_link,
 			'ticket_url'             => $is_affiliate_ticket ? '' : $raw_ticket_url,
 			'is_affiliate_ticket'    => $is_affiliate_ticket,
 			'multi_day_label'        => $multi_day_label,

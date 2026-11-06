@@ -311,12 +311,22 @@ class Calendar {
 		$event_data      = $event_entry['event_data'] ?? array();
 		$display_context = $event_entry['display_context'] ?? array();
 
+		$event   = $this->serialize_event( $post_id, $event_entry );
+		$display = $this->serialize_display( $event_data, $display_context, $post_id );
+		if ( ! $display['show_ticket_link'] ) {
+			// A hidden ticket link carries no URL or gated ref either.
+			$event['ticket'] = array(
+				'url'          => '',
+				'is_affiliate' => false,
+			);
+		}
+
 		return array(
-			'event'      => $this->serialize_event( $post_id, $event_entry ),
+			'event'      => $event,
 			'occurrence' => array(
 				'post_id'         => $post_id,
 				'display_context' => $display_context,
-				'display'         => $this->serialize_display( $event_data, $display_context ),
+				'display'         => $display,
 			),
 		);
 	}
@@ -448,10 +458,11 @@ class Calendar {
 	 *
 	 * @param array $event_data      Hydrated event_data array for the event.
 	 * @param array $display_context Per-occurrence context (is_multi_day / is_continuation / ...).
+	 * @param int   $post_id         Event post ID.
 	 * @return array<string,mixed>
 	 */
-	private function serialize_display( array $event_data, array $display_context ): array {
-		$vars = DisplayVars::build( $event_data, $display_context );
+	private function serialize_display( array $event_data, array $display_context, int $post_id = 0 ): array {
+		$vars = DisplayVars::build( $event_data, $display_context, $post_id );
 
 		return array(
 			'formatted_time_display' => (string) ( $vars['formatted_time_display'] ?? '' ),
