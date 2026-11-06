@@ -61,6 +61,12 @@ class YouTubeAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'required'    => true,
 				'description' => __( 'Your Google OAuth Client Secret from console.cloud.google.com.', 'data-machine-socials' ),
 			),
+			'api_key'       => array(
+				'label'       => __( 'API Key (optional)', 'data-machine-socials' ),
+				'type'        => 'text',
+				'required'    => false,
+				'description' => __( 'A YouTube Data API v3 key. Lets read-only search work without connecting a channel.', 'data-machine-socials' ),
+			),
 		);
 	}
 

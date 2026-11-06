@@ -19,7 +19,6 @@ namespace DataMachineSocials\Abilities\YouTube;
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
-use DataMachineSocials\Handlers\YouTube\YouTubeAuth;
 use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
@@ -109,14 +108,9 @@ class YouTubeSearchAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'A search query is required', array( 'status' => 400 ) );
 		}
 
-		$provider = self::resolve_auth_provider();
-		if ( is_wp_error( $provider ) ) {
-			return $provider;
-		}
-
-		$access_token = $provider->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'YouTube access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
+		$credentials = self::resolve_credentials();
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
 		$type  = in_array( $input['type'] ?? '', array( 'video', 'channel', 'playlist', 'any' ), true ) ? $input['type'] : 'video';
@@ -131,12 +125,12 @@ class YouTubeSearchAbility extends AbstractSocialAbility {
 			'order'      => $order,
 		);
 
-		$url = self::API_BASE . '/search?' . http_build_query( $params );
+		$request = self::build_request( $params, $credentials );
 
 		$result = HttpClient::get(
-			$url,
+			$request['url'],
 			array(
-				'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
+				'headers' => $request['headers'],
 				'context' => 'YouTube Search',
 			)
 		);
@@ -206,18 +200,68 @@ class YouTubeSearchAbility extends AbstractSocialAbility {
 	}
 
 	/**
-	 * Resolve and authenticate the YouTube provider.
+	 * Resolve credentials for search.list.
 	 *
-	 * @return YouTubeAuth|\WP_Error
+	 * A connected channel (OAuth) wins. Without one, search.list only needs
+	 * an API key: the provider's optional api_key setting, or the
+	 * DATAMACHINE_YOUTUBE_API_KEY constant, filterable through
+	 * datamachine_youtube_api_key.
+	 *
+	 * @return array{type:string,value:string}|\WP_Error
 	 */
-	private static function resolve_auth_provider() {
+	public static function resolve_credentials(): array|\WP_Error {
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'youtube' );
 
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'YouTube not authenticated', array( 'status' => 401 ) );
+		if ( $provider && $provider->is_authenticated() ) {
+			$access_token = $provider->get_valid_access_token();
+			if ( ! empty( $access_token ) ) {
+				return array(
+					'type'  => 'oauth',
+					'value' => (string) $access_token,
+				);
+			}
 		}
 
-		return $provider;
+		$config  = $provider ? (array) $provider->get_config() : array();
+		$api_key = (string) ( $config['api_key'] ?? '' );
+		if ( '' === $api_key && defined( 'DATAMACHINE_YOUTUBE_API_KEY' ) ) {
+			$api_key = (string) constant( 'DATAMACHINE_YOUTUBE_API_KEY' );
+		}
+		$api_key = trim( (string) apply_filters( 'datamachine_youtube_api_key', $api_key ) );
+
+		if ( '' !== $api_key ) {
+			return array(
+				'type'  => 'api_key',
+				'value' => $api_key,
+			);
+		}
+
+		return new \WP_Error(
+			'youtube_not_configured',
+			'YouTube search is not configured on this site. A site operator needs to add a YouTube Data API key (Data Machine > Settings > Auth providers > YouTube > API Key, or the DATAMACHINE_YOUTUBE_API_KEY constant) or connect a YouTube channel.',
+			array( 'status' => 503 )
+		);
+	}
+
+	/**
+	 * Build the search.list request URL and headers for the given credentials.
+	 *
+	 * @param array                            $params      Query parameters.
+	 * @param array{type:string,value:string} $credentials Resolved credentials.
+	 * @return array{url:string,headers:array<string,string>}
+	 */
+	public static function build_request( array $params, array $credentials ): array {
+		$headers = array();
+		if ( 'api_key' === $credentials['type'] ) {
+			$params['key'] = $credentials['value'];
+		} else {
+			$headers['Authorization'] = 'Bearer ' . $credentials['value'];
+		}
+
+		return array(
+			'url'     => self::API_BASE . '/search?' . http_build_query( $params ),
+			'headers' => $headers,
+		);
 	}
 }
