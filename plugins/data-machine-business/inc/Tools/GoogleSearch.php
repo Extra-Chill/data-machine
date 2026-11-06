@@ -9,7 +9,7 @@ namespace DataMachineBusiness\Tools;
 
 defined( 'ABSPATH' ) || exit;
 
-use DataMachine\Core\HttpClient;
+use DataMachineBusiness\Abilities\Search\GoogleSearchAbility;
 use DataMachine\Engine\AI\Tools\BaseTool;
 
 class GoogleSearch extends BaseTool {
@@ -20,112 +20,30 @@ class GoogleSearch extends BaseTool {
 	}
 
 	/**
-	 * Execute Google search with site restrictions and result limiting.
+	 * Execute a Google search through the shared ability implementation.
 	 *
 	 * @param array $parameters Contains 'query' and optional 'site_restrict'.
 	 * @param array $tool_def Tool definition (unused).
 	 * @return array Search results with success status.
 	 */
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
+		$result = GoogleSearchAbility::search( (string) ( $parameters['query'] ?? '' ), (string) ( $parameters['site_restrict'] ?? '' ) );
 
-		if ( empty( $parameters['query'] ) ) {
+		if ( is_wp_error( $result ) ) {
 			return array(
 				'success'   => false,
-				'error'     => 'Google Search tool call missing required query parameter',
+				'error'     => $result->get_error_message(),
 				'tool_name' => 'google_search',
 			);
 		}
 
-		$config        = get_site_option( 'datamachine_search_config', array() );
-		$google_config = $config['google_search'] ?? array();
-
-		if ( empty( $google_config['api_key'] ) || empty( $google_config['search_engine_id'] ) ) {
-			return array(
-				'success'   => false,
-				'error'     => 'Google Search tool not configured. Please configure API key and Search Engine ID.',
-				'tool_name' => 'google_search',
-			);
-		}
-
-		$query         = sanitize_text_field( $parameters['query'] );
-		$max_results   = 10;
-		$site_restrict = ! empty( $parameters['site_restrict'] ) ? sanitize_text_field( $parameters['site_restrict'] ) : '';
-
-		$search_url    = 'https://www.googleapis.com/customsearch/v1';
-		$search_params = array(
-			'key'  => $google_config['api_key'],
-			'cx'   => $google_config['search_engine_id'],
-			'q'    => $query,
-			'num'  => $max_results,
-			'safe' => 'active',
-		);
-
-		if ( $site_restrict ) {
-			$search_params['siteSearch'] = $site_restrict;
-		}
-
-		$request_url = add_query_arg( $search_params, $search_url );
-
-		$result = HttpClient::get(
-			$request_url,
-			array(
-				'timeout' => 10,
-				'headers' => array(
-					'Accept' => 'application/json',
-				),
-				'context' => 'Google Search Tool',
-			)
-		);
-
-		if ( ! $result['success'] ) {
-			return array(
-				'success'   => false,
-				'error'     => 'Failed to connect to Google Search API: ' . ( $result['error'] ?? 'Unknown error' ),
-				'tool_name' => 'google_search',
-			);
-		}
-
-		$search_data = json_decode( $result['data'], true );
-
-		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			return array(
-				'success'   => false,
-				'error'     => 'Failed to parse Google Search API response',
-				'tool_name' => 'google_search',
-			);
-		}
-
-		$results = array();
-		if ( ! empty( $search_data['items'] ) ) {
-			foreach ( $search_data['items'] as $item ) {
-				$results[] = array(
-					'title'       => $item['title'] ?? '',
-					'link'        => $item['link'] ?? '',
-					'snippet'     => $item['snippet'] ?? '',
-					'displayLink' => $item['displayLink'] ?? '',
-				);
-			}
-		}
-
-		$search_info   = $search_data['searchInformation'] ?? array();
-		$total_results = $search_info['totalResults'] ?? '0';
-		$search_time   = $search_info['searchTime'] ?? 0;
-
-		$result_count = count( $results );
-		$message      = $result_count > 0
-			? "SEARCH COMPLETE: Found {$result_count} results for \"{$query}\".\nSearch Results:"
-			: "SEARCH COMPLETE: No results found for \"{$query}\".";
+		$result['message'] = $result['results_count'] > 0
+			? "SEARCH COMPLETE: Found {$result['results_count']} results for \"{$result['query']}\".\nSearch Results:"
+			: "SEARCH COMPLETE: No results found for \"{$result['query']}\".";
 
 		return array(
 			'success'   => true,
-			'data'      => array(
-				'message'         => $message,
-				'query'           => $query,
-				'results_count'   => $result_count,
-				'total_available' => $total_results,
-				'search_time'     => $search_time,
-				'results'         => $results,
-			),
+			'data'      => $result,
 			'tool_name' => 'google_search',
 		);
 	}
