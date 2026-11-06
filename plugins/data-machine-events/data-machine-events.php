@@ -209,6 +209,8 @@ class DATAMACHINE_Events {
 	public function init() {
 		$this->init_hooks();
 		$this->register_post_types();
+		// Record human edits so imports only fill empty fields (#3910).
+		\DataMachineEvents\Core\EventOwnership::register();
 		add_action( 'init', array( $this, 'register_taxonomies' ), 20 );
 		add_action( 'init', array( $this, 'register_blocks' ), 15 );
 
@@ -281,6 +283,7 @@ class DATAMACHINE_Events {
 			\DataMachineEvents\Abilities\EventQueryAbilities::class,
 			\DataMachineEvents\Abilities\EventHealthAbilities::class,
 			\DataMachineEvents\Abilities\EventUpdateAbilities::class,
+			\DataMachineEvents\Abilities\EventOwnershipAbilities::class,
 			\DataMachineEvents\Abilities\EventUpsertAbilities::class,
 			\DataMachineEvents\Abilities\MoveEventAbilities::class,
 			\DataMachineEvents\Abilities\DeleteEventAbilities::class,

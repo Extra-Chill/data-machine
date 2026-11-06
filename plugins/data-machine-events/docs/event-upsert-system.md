@@ -110,6 +110,52 @@ Updates existing event posts with changed data.
 4. Reassign taxonomies
 5. Maintain existing relationships
 
+## Human-Owned Events
+
+Imports must not overwrite events a person created or edited. When an import
+matches a **human-owned** event, the upsert runs **fill-only**:
+
+- Title, post content, and featured image are kept. Empty `event-details`
+  attributes are filled from the import, and a description is added only when
+  the event has none.
+- Venue, promoter, location, and event-type terms are set only when the event
+  has none; every other taxonomy (artists, festivals) is append-only.
+- Status is never changed. A person's draft or pending event is not published,
+  and a trashed one is not restored.
+- No import provenance is written: no content hash, `_datamachine_event_source*`
+  fields, or submission meta.
+
+An event is human-owned when:
+
+1. `_datamachine_event_ownership` is `human`. This is set when a logged-in
+   user saves the event in the block editor or REST API, the classic editor,
+   or quick edit, or changes it through `data-machine-events/update-event`.
+   It is never set during an import, by source-owned updates, or in cron,
+   WP-CLI, agent, system, or pre-authenticated contexts.
+2. Or it carries submission provenance (`_datamachine_submitted_by`,
+   `_datamachine_submitter_email`, `_datamachine_submitter_name`), unless
+   `_datamachine_event_ownership` is `import`.
+
+The `datamachine_events_is_human_owned_event( bool $owned, int $post_id )`
+filter has the final say. Public helpers:
+`data_machine_events_is_human_owned_event()` and
+`data_machine_events_mark_event_human_owned()`.
+
+A submitter's own resubmission still updates the event as before. This is an
+upsert with submission context that resolves through the event's primary
+source identity.
+
+**Matching.** A fill-only import records its source identity as a secondary
+link in the multi-valued `_datamachine_event_linked_source_identity` meta and
+leaves the primary `_datamachine_event_source_identity` untouched. Source
+matching reads both keys, so re-imports keep resolving to the same post
+without creating duplicates and without the importer claiming it.
+
+**Operators.** `wp data-machine-events event-ownership <id>` shows ownership.
+Add `--set=import` to hand an event back to the importer, `--set=human` to
+protect it, or `--set=auto` to clear the explicit state. The ability is
+`data-machine-events/event-ownership`.
+
 ## Taxonomy Handlers
 
 ### Venue Taxonomy Handler

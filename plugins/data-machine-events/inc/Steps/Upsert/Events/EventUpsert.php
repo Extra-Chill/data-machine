@@ -29,6 +29,7 @@ use DataMachineEvents\Core\EventTitleCleaner;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventOwnership;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\EventSchemaProvider;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
@@ -220,9 +221,13 @@ class EventUpsert extends UpsertHandler {
 			CacheInvalidator::defer();
 		}
 
+		// Everything this import writes is pipeline-owned: no hook it triggers
+		// may record the event as human-edited (#3910).
+		EventOwnership::enterPipelineWrite();
 		try {
 			return $this->executeUpsertWithinLock( $title, $venue, $identity_start, $ticketUrl, $parameters, $handler_config, $engine );
 		} finally {
+			EventOwnership::exitPipelineWrite();
 			if ( $defer_invalidation ) {
 				CacheInvalidator::resume();
 			}
@@ -399,6 +404,24 @@ class EventUpsert extends UpsertHandler {
 			) );
 		}
 
+		// A match against a human-owned event runs fill-only (#3910): the
+		// person's title, content, image, and single-valued terms are kept and
+		// only empty fields are filled. The import is recorded as a linked
+		// source so re-imports keep resolving to this post.
+		$fill_only = $existing_post_id > 0 && $this->isFillOnlyMatch( $existing_post_id, $source_identity, $engine );
+		if ( $fill_only && 'trash' === get_post_status( $existing_post_id ) ) {
+			// A person trashed this event; an import must not resurrect it.
+			EventOwnership::linkSourceIdentity( $existing_post_id, $source_identity );
+			return $this->successResponse(
+				array(
+					'post_id'   => $existing_post_id,
+					'post_url'  => get_permalink( $existing_post_id ),
+					'action'    => 'no_change',
+					'fill_only' => true,
+				)
+			);
+		}
+
 		// Only unmatched events are creates. Keep corrections to past events
 		// allowed, including matches found through domain duplicate detection.
 		if ( $existing_post_id <= 0 ) {
@@ -409,7 +432,9 @@ class EventUpsert extends UpsertHandler {
 		}
 
 		// 2. Build event data.
-		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
+		// Fill-only candidates come from the import alone, never from values
+		// hydrated back out of the human event's own date index.
+		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $fill_only ? 0 : $existing_post_id );
 		if ( ( '' !== $festival_venue['festival'] || 'source_alias' === ( $venue_resolution['matched_via'] ?? '' ) ) && $authoritative_venue_id > 0 ) {
 			// Import handlers canonicalize aliased venues before the AI step;
 			// this covers items queued before the alias existed (#878).
@@ -458,6 +483,18 @@ class EventUpsert extends UpsertHandler {
 		// 3. Generate block content and compute hash for idempotency.
 		$block_content = $this->content_builder->generate_event_block_content( $event_data, $parameters );
 		$content_hash  = md5( $block_content );
+		$post_title    = $event_data['title'];
+		$fill_merge    = null;
+		if ( $fill_only ) {
+			// Keep the person's content; fill only empty event-details fields.
+			// No content hash: the hash is import provenance, and the stored
+			// one describes the importer's last write, not this content.
+			$human_post    = get_post( $existing_post_id );
+			$fill_merge    = HumanOwnedEventMerge::merge( $human_post ? $human_post->post_content : '', $block_content, $event_data );
+			$block_content = $fill_merge['content'];
+			$content_hash  = '';
+			$post_title    = $human_post ? $human_post->post_title : $post_title;
+		}
 
 		// 4. Resolve post author and status.
 		$post_author = $this->resolvePostAuthor( $handler_config, $engine );
@@ -466,13 +503,14 @@ class EventUpsert extends UpsertHandler {
 			$existing_status = get_post_status( $existing_post_id );
 			// Import settings must not demote an already visible or scheduled event.
 			// Drafts may still be promoted; ordinary trash uses the configured status.
-			if ( in_array( $existing_status, array( 'publish', 'future', 'private' ), true ) ) {
+			if ( $fill_only || in_array( $existing_status, array( 'publish', 'future', 'private' ), true ) ) {
+				// A person's draft or pending event is never published by an import.
 				$post_status = $existing_status;
 			}
 		}
 
-		// 5. Build meta input.
-		$meta_input = $this->buildEventMetaInput( $event_data, $parameters, $engine );
+		// 5. Build meta input. Fill-only writes stamp no import provenance.
+		$meta_input = $fill_only ? array() : $this->buildEventMetaInput( $event_data, $parameters, $engine );
 
 		// 6. Delegate to DM core upsert ability.
 		// DME's sorted lock set is acquired before Data Machine's identity lock.
@@ -480,14 +518,14 @@ class EventUpsert extends UpsertHandler {
 		// rather than deadlocking; changing that ownership belongs upstream.
 		$upsert_input = array(
 			'post_type'    => Event_Post_Type::POST_TYPE,
-			'title'        => $event_data['title'],
+			'title'        => $post_title,
 			'content'      => $block_content,
 			'content_hash' => $content_hash,
 			'post_status'  => $post_status,
 			'meta_input'   => $meta_input,
 		);
 
-		if ( '' !== $source_identity ) {
+		if ( '' !== $source_identity && ! $fill_only ) {
 			$upsert_input['identity_meta'] = array(
 				'key'   => self::SOURCE_IDENTITY_META_KEY,
 				'value' => $source_identity,
@@ -514,6 +552,7 @@ class EventUpsert extends UpsertHandler {
 			'source'           => (string) ( $parameters['source'] ?? '' ),
 			'source_id'        => (string) ( $parameters['source_id'] ?? '' ),
 			'source_identity'  => $source_identity,
+			'fill_only'        => $fill_only,
 		);
 		$post_id          = 0;
 		$lifecycle_result = null;
@@ -546,9 +585,15 @@ class EventUpsert extends UpsertHandler {
 			// tag-free (sanitized above), so suspending kses on this bounded
 			// write removes a re-encoding side effect, not a sanitization
 			// layer; the exact prior filter state is restored afterwards.
-			$result = TextNormalization::with_kses_suspended(
-				static fn(): array => AbilityResult::normalize( $ability->execute( $upsert_input ) )
-			);
+			$result = $fill_only && ! $fill_merge['changed']
+				? array(
+					'success' => true,
+					'post_id' => $existing_post_id,
+					'action'  => 'no_change',
+				)
+				: TextNormalization::with_kses_suspended(
+					static fn(): array => AbilityResult::normalize( $ability->execute( $upsert_input ) )
+				);
 
 			if ( empty( $result['success'] ) ) {
 				$error_data = $result['error_data'] ?? $result['wp_error_data'] ?? array();
@@ -569,7 +614,9 @@ class EventUpsert extends UpsertHandler {
 
 			$post_id = (int) $result['post_id'];
 			$action  = $result['action'];
-			if ( '' !== $source_identity ) {
+			if ( $fill_only ) {
+				EventOwnership::linkSourceIdentity( $post_id, $source_identity );
+			} elseif ( '' !== $source_identity ) {
 				update_post_meta( $post_id, self::SOURCE_IDENTITY_META_KEY, $source_identity );
 				update_post_meta( $post_id, self::SOURCE_NAME_META_KEY, sanitize_text_field( (string) ( $parameters['source'] ?? '' ) ) );
 				update_post_meta( $post_id, self::SOURCE_ID_META_KEY, sanitize_text_field( (string) ( $parameters['source_id'] ?? '' ) ) );
@@ -577,10 +624,13 @@ class EventUpsert extends UpsertHandler {
 
 			// 7. Content idempotency does not imply taxonomy or identity integrity.
 			// Skip image work for unchanged content, but always reconcile indexed state.
-			if ( 'no_change' !== $action ) {
+			// Fill-only: a person's featured image and single-valued terms stay;
+			// they are only set when currently empty.
+			if ( $fill_only ? ! has_post_thumbnail( $post_id ) : 'no_change' !== $action ) {
 				$this->processEventFeaturedImage( $post_id, $handler_config, $engine );
 			}
-			$venue_assignment = $this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine, $handler_config, $venue_resolution );
+			$keep_terms       = static fn( string $taxonomy ): bool => $fill_only && taxonomy_exists( $taxonomy ) && ! empty( wp_get_object_terms( $post_id, $taxonomy, array( 'fields' => 'ids' ) ) );
+			$venue_assignment = $keep_terms( 'venue' ) ? array( 'success' => true ) : $this->taxonomy_assigner->processVenue( $post_id, $parameters, $engine, $handler_config, $venue_resolution );
 			if ( empty( $venue_assignment['success'] ) ) {
 				$warnings[] = (string) ( $venue_assignment['error'] ?? 'Venue assignment failed.' );
 				do_action(
@@ -593,19 +643,23 @@ class EventUpsert extends UpsertHandler {
 					)
 				);
 			}
-			$this->taxonomy_assigner->processPromoter( $post_id, $parameters, $engine, $handler_config );
+			if ( ! $keep_terms( 'promoter' ) ) {
+				$this->taxonomy_assigner->processPromoter( $post_id, $parameters, $engine, $handler_config );
+			}
 
 			// Derive location from the event's actual venue city rather than the
 			// pipeline's ingest center. processLocation returns true when it took
 			// ownership of the location term (PRE_SELECTED mode), in which case the
 			// generic taxonomy pass below must skip location so it doesn't
 			// re-stamp the pipeline-center term. See data-machine-events#379.
-			$location_handled = $this->taxonomy_assigner->processLocation( $post_id, $parameters, $engine, $handler_config );
+			$location_handled = $keep_terms( 'location' ) || $this->taxonomy_assigner->processLocation( $post_id, $parameters, $engine, $handler_config );
 
 			// Resolve the canonical eventType against the closed `event_type`
 			// vocabulary. This owns the assignment; the generic taxonomy pass
 			// below is always blocked for event_type. See #761, #792.
-			$this->taxonomy_assigner->processEventType( $post_id, $parameters, $engine );
+			if ( ! $keep_terms( \DataMachineEvents\Core\Event_Type_Taxonomy::TAXONOMY ) ) {
+				$this->taxonomy_assigner->processEventType( $post_id, $parameters, $engine );
+			}
 
 			// Map performer to artist taxonomy if not explicitly provided.
 			if ( empty( $parameters['artist'] ) && ! empty( $event_data['performer'] ) ) {
@@ -625,9 +679,10 @@ class EventUpsert extends UpsertHandler {
 			// Lineups accumulate across venue imports, artist feeds, and manual edits.
 			// Core replaces terms, so retain these multi-valued event taxonomies on
 			// updates and no_change repairs without changing fresh-create semantics.
+			// Fill-only imports are append-only for every taxonomy.
 			$retained_terms = array();
 			if ( 'created' !== $action ) {
-				foreach ( array( 'artist', 'festival' ) as $taxonomy ) {
+				foreach ( $fill_only ? get_object_taxonomies( Event_Post_Type::POST_TYPE ) : array( 'artist', 'festival' ) as $taxonomy ) {
 					if ( ! taxonomy_exists( $taxonomy ) ) {
 						continue;
 					}
@@ -669,7 +724,7 @@ class EventUpsert extends UpsertHandler {
 						'post_id'  => $post_id,
 						'post_url' => get_permalink( $post_id ),
 						'action'   => 'no_change',
-					)
+					) + ( $fill_only ? array( 'fill_only' => true ) : array() )
 				);
 				$lifecycle_result['warnings'] = $warnings;
 				return $lifecycle_result;
@@ -705,7 +760,10 @@ class EventUpsert extends UpsertHandler {
 					'post_id'  => $post_id,
 					'post_url' => get_permalink( $post_id ),
 					'action'   => $action,
-				)
+				) + ( $fill_only ? array(
+					'fill_only'     => true,
+					'filled_fields' => $fill_merge['filled'],
+				) : array() )
 			);
 			$lifecycle_result['warnings'] = $warnings;
 			return $lifecycle_result;
@@ -749,23 +807,30 @@ class EventUpsert extends UpsertHandler {
 			return 0;
 		}
 
-		$query = new \WP_Query(
-			array(
-				'post_type'      => Event_Post_Type::POST_TYPE,
-				'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private', 'trash' ),
-				'posts_per_page' => -1,
-				'fields'         => 'ids',
-				'no_found_rows'  => true,
-				'meta_query'     => array(
-					array(
-						'key'   => self::SOURCE_IDENTITY_META_KEY,
-						'value' => $source_identity,
+		// Primary claims, plus secondary links recorded by fill-only imports of
+		// human-owned events (#3910). Separate queries keep each lookup on a
+		// single meta key.
+		$posts = array();
+		foreach ( array( self::SOURCE_IDENTITY_META_KEY, EventOwnership::LINKED_SOURCE_IDENTITY_META_KEY ) as $meta_key ) {
+			$query = new \WP_Query(
+				array(
+					'post_type'      => Event_Post_Type::POST_TYPE,
+					'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private', 'trash' ),
+					'posts_per_page' => -1,
+					'fields'         => 'ids',
+					'no_found_rows'  => true,
+					'meta_query'     => array(
+						array(
+							'key'   => $meta_key,
+							'value' => $source_identity,
+						),
 					),
-				),
-			)
-		);
+				)
+			);
+			$posts = array_merge( $posts, $query->posts );
+		}
 
-		if ( empty( $query->posts ) ) {
+		if ( empty( $posts ) ) {
 			return 0;
 		}
 
@@ -773,7 +838,7 @@ class EventUpsert extends UpsertHandler {
 			array_unique(
 				array_map(
 					static fn( $post ): int => absint( $post instanceof \WP_Post ? $post->ID : $post ),
-					$query->posts
+					$posts
 				)
 			)
 		);
@@ -840,6 +905,12 @@ class EventUpsert extends UpsertHandler {
 			);
 		}
 
+		// A human-owned candidate keeps its own primary source fields; the
+		// import only links to it, so a differing primary source is no conflict.
+		if ( EventOwnership::linksSourceIdentity( $candidate_id, $source_identity ) || EventOwnership::isHumanOwned( $candidate_id ) ) {
+			return $candidate_id;
+		}
+
 		$expected_meta = array(
 			self::SOURCE_IDENTITY_META_KEY => $source_identity,
 			self::SOURCE_NAME_META_KEY     => $source,
@@ -862,6 +933,29 @@ class EventUpsert extends UpsertHandler {
 		}
 
 		return $candidate_id;
+	}
+
+	/**
+	 * Whether an import matching an existing event must run fill-only.
+	 *
+	 * Human-owned events are fill-only, except a submitter's own resubmission:
+	 * an upsert carrying submission context that resolved through the event's
+	 * own primary source identity keeps full-update semantics so a person can
+	 * correct what they submitted.
+	 *
+	 * @param int        $post_id         Matched event ID.
+	 * @param string     $source_identity Incoming source identity.
+	 * @param EngineData $engine          Engine data.
+	 * @return bool
+	 */
+	private function isFillOnlyMatch( int $post_id, string $source_identity, EngineData $engine ): bool {
+		if ( ! EventOwnership::isHumanOwned( $post_id ) ) {
+			return false;
+		}
+
+		return ! ( is_array( $engine->get( 'submission' ) )
+			&& '' !== $source_identity
+			&& (string) get_post_meta( $post_id, self::SOURCE_IDENTITY_META_KEY, true ) === $source_identity );
 	}
 
 	/**
