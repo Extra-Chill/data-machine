@@ -43,6 +43,7 @@ class PermissionHelper {
 		'use_tools'        => 'datamachine_use_tools',
 		'view_logs'        => 'datamachine_view_logs',
 		'create_own_agent' => 'datamachine_create_own_agent',
+		'web_fetch'        => 'publish_posts',
 	);
 
 	/**
@@ -179,11 +180,13 @@ class PermissionHelper {
 	 * - daily_memory: reading and appending the acting agent's daily memory.
 	 *   Scope comes from the execution principal; overwrite and delete stay
 	 *   behind can_manage() inside DailyMemoryAbilities.
+	 * - web_fetch: reading a public web page as text maps to publish_posts,
+	 *   the same author level the web_fetch chat tool already requires.
 	 *
 	 * @since 0.37.0
 	 * @var string[]
 	 */
-	private const IMPLIED_BY_MANAGEMENT = array( 'view_analytics', 'render_images', 'upload_media', 'daily_memory', 'search_content' );
+	private const IMPLIED_BY_MANAGEMENT = array( 'view_analytics', 'render_images', 'upload_media', 'daily_memory', 'search_content', 'web_fetch' );
 
 	/**
 	 * Check whether current context can perform an action.

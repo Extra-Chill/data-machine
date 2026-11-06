@@ -96,6 +96,7 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\HandlerAbilities();
 		new \DataMachine\Abilities\StepTypeAbilities();
 		new \DataMachine\Abilities\LocalSearchAbilities();
+		new \DataMachine\Abilities\WebFetchAbilities();
 		new \DataMachine\Abilities\SourceAggregateAbility();
 		new \DataMachine\Abilities\SourceInventoryAbility();
 		new \DataMachine\Abilities\SystemAbilities();
