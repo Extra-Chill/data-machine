@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.84.0] - 2026-11-06
+
+### Added
+- let sites override ticket offers in event schema and calendar cards
+
 ## [0.83.5] - 2026-11-06
 
 ### Fixed
