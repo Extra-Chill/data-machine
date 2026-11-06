@@ -43,4 +43,7 @@ jobs:
       component: ${{ inputs.component }}
       args: ${{ inputs.component && inputs.bump && format('--bump {0} --force-lower-bump', inputs.bump) || '' }}
       dry-run: ${{ inputs.dry-run || false }}
+      # Deploy on release instead of waiting for the poller (Extra-Chill/extrachill#1092).
+      dispatch-repo: Extra-Chill/extrachill
+      dispatch-event: component-released
     secrets: inherit
