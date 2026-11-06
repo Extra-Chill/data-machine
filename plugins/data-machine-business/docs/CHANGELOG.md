@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.22.0] - 2026-11-06
+
+### Added
+- add datamachine/google-search with a clear not-configured error
+
 ## [0.21.0] - 2026-11-02
 
 ### Added
