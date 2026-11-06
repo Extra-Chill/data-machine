@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.31.2] - 2026-11-06
+
+### Fixed
+- let youtube-search use an API key and return a clear not-configured error
+
 ## [0.31.1] - 2026-10-31
 
 ### Changed
