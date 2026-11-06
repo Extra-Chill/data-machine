@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.83.5] - 2026-11-06
+
+### Fixed
+- protect human-owned events from import overwrites
+
 ## [0.83.4] - 2026-11-05
 
 ### Changed
