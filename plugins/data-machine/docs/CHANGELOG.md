@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.201.0] - 2026-11-06
+
+### Added
+- add datamachine/web-fetch for public pages
+
 ## [0.200.6] - 2026-11-06
 
 ### Fixed
