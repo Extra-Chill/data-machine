@@ -365,9 +365,11 @@ class WebFetchAbilities {
 		}
 
 		$parts  = wp_parse_url( $base );
-		$origin = $parts['scheme'] . '://' . $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' );
+		$parts  = is_array( $parts ) ? $parts : array();
+		$scheme = (string) ( $parts['scheme'] ?? 'https' );
+		$origin = $scheme . '://' . (string) ( $parts['host'] ?? '' ) . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' );
 		if ( str_starts_with( $location, '//' ) ) {
-			return $parts['scheme'] . ':' . $location;
+			return $scheme . ':' . $location;
 		}
 		if ( str_starts_with( $location, '/' ) ) {
 			return $origin . $location;
