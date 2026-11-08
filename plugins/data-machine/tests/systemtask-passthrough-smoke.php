@@ -384,7 +384,7 @@ assert_passthrough(
 	)
 );
 
-echo "\n[source:4] No other SystemTask subclass needs to opt in today\n";
+echo "\n[source:4] Only reviewed SystemTask subclasses opt in\n";
 // Walk every concrete task file; if any declares the passthrough methods,
 // the smoke either needs updating OR the new task should be reviewed.
 $task_dir = dirname( __DIR__ ) . '/inc/Engine/AI/System/Tasks';
@@ -392,7 +392,9 @@ $entries  = glob( $task_dir . '/*.php' );
 $opted_in = array();
 foreach ( $entries as $file ) {
 	$base = basename( $file );
-	if ( 'SystemTask.php' === $base || 'AgentCallTask.php' === $base ) {
+	// DispatchMessageTask opts into pipeline context to resolve {{...}}
+	// placeholders from upstream DataPackets (data-machine#3924).
+	if ( in_array( $base, array( 'SystemTask.php', 'AgentCallTask.php', 'DispatchMessageTask.php' ), true ) ) {
 		continue;
 	}
 	$src = (string) file_get_contents( $file );
@@ -404,7 +406,7 @@ foreach ( $entries as $file ) {
 	}
 }
 assert_passthrough(
-	'AgentCallTask is the only task that opts into passthrough today',
+	'Only AgentCallTask and DispatchMessageTask opt into passthrough today',
 	array() === $opted_in
 );
 
