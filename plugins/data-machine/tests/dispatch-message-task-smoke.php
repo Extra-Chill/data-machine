@@ -88,6 +88,12 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_json_encode' ) ) {
+		function wp_json_encode( $value, int $flags = 0 ) {
+			return json_encode( $value, $flags );
+		}
+	}
+
 	if ( ! function_exists( 'current_time' ) ) {
 		function current_time( string $type ): string {
 			return 'mysql' === $type ? '2000-01-01 00:00:00' : (string) time();
@@ -381,6 +387,90 @@ namespace {
 	dispatch_assert_equals( 'flat body', $flat_forwarded['message'] ?? null, 'flat shape: message forwarded' );
 	dispatch_assert_true( ! array_key_exists( 'task', $flat_forwarded ), 'flat shape: task scaffolding stripped' );
 	dispatch_assert_true( ! array_key_exists( 'task_type', $flat_forwarded ), 'flat shape: task_type scaffolding stripped' );
+
+	echo "\n[6] placeholders resolve from the latest upstream DataPacket (#3924):\n";
+	$base::resetCalls();
+	$tpl_ability = new DispatchMessageTask_FakeAbility(
+		static function ( array $input ) {
+			return array( 'sent' => true, 'channel' => $input['channel'], 'recipient' => $input['recipient'], 'message_id' => null, 'metadata' => array() );
+		}
+	);
+	$GLOBALS['dispatch_message_ability_resolver'] = static function ( string $slug ) use ( $tpl_ability ) {
+		return 'agents/dispatch-message' === $slug ? $tpl_ability : null;
+	};
+	dispatch_assert_true( $task->needsPipelineContext(), 'task opts into pipeline context' );
+
+	$newest = array(
+		'type'     => 'fetch',
+		'data'     => array( 'title' => 'Nightly failed', 'body' => "- Journey a: failure" ),
+		'metadata' => array( 'run_url' => 'https://example.test/runs/9', 'nested' => array( 'sha' => 'abc123' ), 'count' => 3, 'list' => array( 1, 2 ) ),
+	);
+	$older  = array( 'type' => 'fetch', 'data' => array( 'title' => 'OLD', 'body' => 'OLD' ), 'metadata' => array() );
+
+	// Flat shape, exactly as SystemTaskStep builds it.
+	$task->executeTask(
+		601,
+		array(
+			'channel'          => 'chan',
+			'recipient'        => '{{metadata.room}}fixed',
+			'message'          => "{{title}} | {{ content }} | {{body}} | {{metadata.run_url}} | {{metadata.nested.sha}} | {{metadata.count}} | {{metadata.list}} | [{{metadata.missing.path}}] | [{{nope}}]",
+			'conversation_id'  => 'run-{{metadata.nested.sha}}',
+			'task_type'        => 'dispatch_message',
+			'pipeline_job_id'  => 600,
+			'pipeline_step_id' => 'step_1',
+			'scheduled_at'     => '2000-01-01 00:00:00',
+			'agent_id'         => 1,
+			'user_id'          => 1,
+			'job'              => array( 'job_id' => 601 ),
+			'flow_id'          => 7,
+			'flow_step_id'     => 'step_1_7',
+			'data_packets'     => array( $newest, $older ),
+			'engine_data'      => array( 'x' => 1 ),
+			'job_id'           => 600,
+			'pipeline_id'      => 7,
+		)
+	);
+	$tpl = $tpl_ability->invocations[0] ?? array();
+	dispatch_assert_equals( 1, count( $base::$completed ), 'placeholders: job completed' );
+	dispatch_assert_equals(
+		'Nightly failed | - Journey a: failure | - Journey a: failure | https://example.test/runs/9 | abc123 | 3 | [1,2] | [] | []',
+		$tpl['message'] ?? null,
+		'placeholders: title/content/body/metadata resolved, missing paths empty'
+	);
+	dispatch_assert_equals( 'fixed', $tpl['recipient'] ?? null, 'placeholders: recipient templated, missing path empty' );
+	dispatch_assert_equals( 'run-abc123', $tpl['conversation_id'] ?? null, 'placeholders: conversation_id templated' );
+	dispatch_assert_equals( 'chan', $tpl['channel'] ?? null, 'placeholders: channel untouched' );
+	foreach ( array( 'task_type', 'pipeline_job_id', 'pipeline_step_id', 'scheduled_at', 'agent_id', 'user_id', 'job', 'flow_id', 'flow_step_id', 'data_packets', 'engine_data', 'job_id', 'pipeline_id' ) as $leak ) {
+		dispatch_assert_true( ! array_key_exists( $leak, $tpl ), "placeholders: pipeline context key {$leak} stripped from ability input" );
+	}
+
+	echo "\n[7] no upstream packet leaves static params unchanged:\n";
+	$base::resetCalls();
+	$tpl_ability->invocations = array();
+	$task->executeTask(
+		602,
+		array(
+			'channel'   => 'chan',
+			'recipient' => 'room',
+			'message'   => 'static {{title}} stays literal',
+		)
+	);
+	$static = $tpl_ability->invocations[0] ?? array();
+	dispatch_assert_equals( 'static {{title}} stays literal', $static['message'] ?? null, 'no packet: message forwarded verbatim' );
+	dispatch_assert_equals( 'room', $static['recipient'] ?? null, 'no packet: recipient forwarded verbatim' );
+
+	$task->executeTask(
+		603,
+		array(
+			'channel'      => 'chan',
+			'recipient'    => 'room',
+			'message'      => 'empty {{title}}',
+			'data_packets' => array(),
+		)
+	);
+	$empty = $tpl_ability->invocations[1] ?? array();
+	dispatch_assert_equals( 'empty {{title}}', $empty['message'] ?? null, 'empty packet list: message forwarded verbatim' );
+	dispatch_assert_true( ! array_key_exists( 'data_packets', $empty ), 'empty packet list: data_packets stripped' );
 
 	echo "\n------------------------------------\n";
 	$total = $GLOBALS['__dispatch_passes'] + count( $GLOBALS['__dispatch_failures'] );
