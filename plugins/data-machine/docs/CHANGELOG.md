@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.202.0] - 2026-11-08
+
+### Added
+- resolve {{placeholders}} from the upstream DataPacket
+
 ## [0.201.0] - 2026-11-06
 
 ### Added
