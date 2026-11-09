@@ -148,10 +148,6 @@ GRAPHQL;
 
 		$events = array();
 		foreach ( $raw_events as $raw_event ) {
-			if ( ! empty( $raw_event['cancelled'] ) ) {
-				continue;
-			}
-
 			$normalized = $this->normalizeEvent( $raw_event );
 			if ( ! empty( $normalized['title'] ) && ! empty( $normalized['startDate'] ) ) {
 				$events[] = $normalized;
@@ -256,7 +252,7 @@ GRAPHQL;
 					'city'             => $city_slug,
 					'upcoming'         => true,
 					'published'        => true,
-					'excludeCancelled' => true,
+					'excludeCancelled' => false,
 					'perPage'          => self::PER_PAGE,
 					'page'             => $page,
 				),
@@ -372,6 +368,7 @@ GRAPHQL;
 		$description = $this->buildDescription( $event, $city_title );
 
 		return array(
+			'eventStatus'      => ! empty( $event['cancelled'] ) ? 'EventCancelled' : 'EventScheduled',
 			'title'            => $title,
 			'description'      => $description,
 			'startDate'        => $start_parsed['date'],

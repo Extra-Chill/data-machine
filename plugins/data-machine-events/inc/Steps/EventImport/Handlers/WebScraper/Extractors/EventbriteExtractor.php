@@ -170,7 +170,7 @@ class EventbriteExtractor extends BaseExtractor {
 
 		$events = array();
 		foreach ( $raw_events as $raw_event ) {
-			if ( ! is_array( $raw_event ) || ! empty( $raw_event['is_cancelled'] ) || ! empty( $raw_event['is_protected_event'] ) ) {
+			if ( ! is_array( $raw_event ) || ! empty( $raw_event['is_protected_event'] ) ) {
 				continue;
 			}
 
@@ -216,6 +216,10 @@ class EventbriteExtractor extends BaseExtractor {
 			'venueZip'      => $address['postal_code'] ?? '',
 			'venueCountry'  => $address['country'] ?? '',
 		);
+
+		if ( ! empty( $raw_event['is_cancelled'] ) ) {
+			$event['eventStatus'] = 'EventCancelled';
+		}
 
 		if ( ! empty( $address['latitude'] ) && ! empty( $address['longitude'] ) ) {
 			$event['venueCoordinates'] = $address['latitude'] . ',' . $address['longitude'];

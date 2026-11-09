@@ -280,6 +280,14 @@ class EventEngineData {
 			}
 		}
 
+		// Source lifecycle status. Carried as routing data so cancellations reach
+		// the upsert without depending on the AI copying the field. Only schema
+		// values pass; raw feed values (e.g. ICS CONFIRMED) stay out.
+		$event_status = (string) ( $event_data['eventStatus'] ?? '' );
+		if ( in_array( $event_status, \DataMachineEvents\Core\EventSchemaProvider::EVENT_STATUSES, true ) ) {
+			$payload['eventStatus'] = $event_status;
+		}
+
 		// Core event fields.
 		$core_fields = array(
 			'startDate' => $event_data['startDate'] ?? '',

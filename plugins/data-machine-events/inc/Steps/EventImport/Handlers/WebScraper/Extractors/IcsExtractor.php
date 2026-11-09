@@ -173,7 +173,9 @@ class IcsExtractor extends BaseExtractor {
 			// diary entry without these; deciding what to do about PRIVATE or
 			// TENTATIVE is the consumer's policy, not this extractor's.
 			'class'         => sanitize_text_field( $ical_event->class ?? '' ),
-			'eventStatus'   => sanitize_text_field( $ical_event->status ?? '' ),
+			'eventStatus'   => 'CANCELLED' === strtoupper( trim( $ical_event->status ?? '' ) )
+				? 'EventCancelled'
+				: sanitize_text_field( $ical_event->status ?? '' ),
 			'transparency'  => sanitize_text_field( $ical_event->transp ?? '' ),
 		);
 

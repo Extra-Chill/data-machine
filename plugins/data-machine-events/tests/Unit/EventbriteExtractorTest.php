@@ -26,6 +26,17 @@ class EventbriteExtractorTest extends WP_UnitTestCase {
 		parent::tearDown();
 	}
 
+	public function test_cancelled_organizer_event_is_retained(): void {
+		$method = new \ReflectionMethod( EventbriteExtractor::class, 'parseOrganizerListingEvent' );
+		$method->setAccessible( true );
+		$event = $method->invoke( $this->extractor, array(
+			'name'         => 'Cancelled Concert',
+			'start_date'   => '2099-08-02',
+			'is_cancelled' => true,
+		), array() );
+		$this->assertSame( 'EventCancelled', $event['eventStatus'] );
+	}
+
 	public function test_extracts_public_organizer_next_data(): void {
 		$html   = $this->fixture( 'organizer.html' );
 		$events = $this->extractor->extract( $html, 'https://www.eventbrite.com/o/example-room-123456789' );

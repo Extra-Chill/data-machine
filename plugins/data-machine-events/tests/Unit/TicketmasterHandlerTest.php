@@ -113,6 +113,20 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'venueCoordinates', $this->ticketmasterEvent( 'without-coordinates', 'Unlocated event' )['_embedded']['venues'][0] );
 	}
 
+	public function test_maps_explicit_source_statuses(): void {
+		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
+		foreach ( array(
+			'cancelled'   => 'EventCancelled',
+			'postponed'   => 'EventPostponed',
+			'rescheduled' => 'EventRescheduled',
+		) as $status => $expected ) {
+			$raw = $this->ticketmasterEvent( 'status-test', 'Status Test Concert' );
+			$raw['dates']['status']['code'] = $status;
+			$event = $method->invoke( $this->handler, $raw );
+			$this->assertSame( $expected, $event['eventStatus'] );
+		}
+	}
+
 	public function test_map_event_returns_array() {
 		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 
