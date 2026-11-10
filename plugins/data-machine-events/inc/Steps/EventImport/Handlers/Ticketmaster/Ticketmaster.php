@@ -254,7 +254,7 @@ class Ticketmaster extends EventImportHandler {
 					++$fetched_count;
 
 					$event_status = $raw_event['dates']['status']['code'] ?? '';
-					if ( 'onsale' !== $event_status ) {
+					if ( ! in_array( $event_status, array( 'onsale', 'cancelled', 'postponed', 'rescheduled' ), true ) ) {
 						continue;
 					}
 
@@ -1118,6 +1118,16 @@ class Ticketmaster extends EventImportHandler {
 			'venueTimezone'                 => $this->sanitizeText( $venue_timezone ),
 			VenueSourceAliases::EVENT_FIELD => $venue_source_id,
 		);
+
+		$status_map = array(
+			'cancelled'   => 'EventCancelled',
+			'postponed'   => 'EventPostponed',
+			'rescheduled' => 'EventRescheduled',
+		);
+		$status     = $tm_event['dates']['status']['code'] ?? '';
+		if ( isset( $status_map[ $status ] ) ) {
+			$event['eventStatus'] = $status_map[ $status ];
+		}
 
 		// Only multi-act bills carry a lineup. Single-act events keep their
 		// existing payload, so their source revision (and import cost) is

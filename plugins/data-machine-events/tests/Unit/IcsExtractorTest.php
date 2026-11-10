@@ -430,7 +430,7 @@ ICS;
 			'confidential' => array( 'CLASS:CONFIDENTIAL', 'CONFIDENTIAL', '' ),
 			'public'       => array( 'CLASS:PUBLIC', 'PUBLIC', '' ),
 			'tentative'    => array( 'STATUS:TENTATIVE', '', 'TENTATIVE' ),
-			'cancelled'    => array( 'STATUS:CANCELLED', '', 'CANCELLED' ),
+			'cancelled'    => array( 'STATUS:CANCELLED', '', 'EventCancelled' ),
 			'confirmed'    => array( 'STATUS:CONFIRMED', '', 'CONFIRMED' ),
 		);
 	}

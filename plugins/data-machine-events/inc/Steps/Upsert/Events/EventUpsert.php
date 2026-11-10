@@ -425,7 +425,11 @@ class EventUpsert extends UpsertHandler {
 		// Only unmatched events are creates. Keep corrections to past events
 		// allowed, including matches found through domain duplicate detection.
 		if ( $existing_post_id <= 0 ) {
-			$rejection = $this->validator->validateForCreate( $startDate );
+			$event_status = $engine->get( 'eventStatus' );
+			if ( null === $event_status || '' === $event_status ) {
+				$event_status = $parameters['eventStatus'] ?? '';
+			}
+			$rejection = $this->validator->validateForCreate( $startDate, (string) $event_status );
 			if ( null !== $rejection ) {
 				return $rejection;
 			}

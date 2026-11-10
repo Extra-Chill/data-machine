@@ -225,7 +225,7 @@ class WixEventsExtractor extends BaseExtractor {
 	// ────────────────────────────────────────────────────────────────────────────
 
 	/**
-	 * Normalize an array of raw Wix event objects, filtering out canceled events.
+	 * Normalize raw Wix events, retaining explicit cancellation signals.
 	 *
 	 * @param array $raw_events Array of raw event objects from warmup data or API.
 	 * @return array Normalized event data.
@@ -234,12 +234,6 @@ class WixEventsExtractor extends BaseExtractor {
 		$events = array();
 
 		foreach ( $raw_events as $raw_event ) {
-			// Skip canceled events.
-			$status = $raw_event['status'] ?? '';
-			if ( 'CANCELED' === $status ) {
-				continue;
-			}
-
 			$normalized = $this->normalizeEvent( $raw_event );
 			if ( ! empty( $normalized['title'] ) ) {
 				$events[] = $normalized;
@@ -291,6 +285,10 @@ class WixEventsExtractor extends BaseExtractor {
 			'title'       => $this->sanitizeText( $wix_event['title'] ?? '' ),
 			'description' => $this->cleanHtml( $wix_event['description'] ?? $wix_event['about'] ?? '' ),
 		);
+
+		if ( 'CANCELED' === ( $wix_event['status'] ?? '' ) ) {
+			$event['eventStatus'] = 'EventCancelled';
+		}
 
 		$this->parseScheduling( $event, $wix_event );
 		$this->parseLocation( $event, $wix_event );

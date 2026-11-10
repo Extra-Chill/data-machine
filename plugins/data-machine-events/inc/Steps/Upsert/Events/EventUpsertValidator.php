@@ -233,9 +233,20 @@ class EventUpsertValidator {
 	 * when the start time has passed or is unknown.
 	 *
 	 * @param string $start_date Validated event start date or datetime.
+	 * @param string $event_status Normalized source event status.
 	 * @return array|null Tool rejection, or null when creation is allowed.
 	 */
-	public function validateForCreate( string $start_date ): ?array {
+	public function validateForCreate( string $start_date, string $event_status = '' ): ?array {
+		// Cancelled and postponed source items exist to update a listing we
+		// already have; on their own they are not a show to publish.
+		if ( in_array( $event_status, array( 'EventCancelled', 'EventPostponed' ), true ) ) {
+			return $this->gateRejection(
+				'Refusing to create a cancelled or postponed event. Existing events may still be updated.',
+				array( 'eventStatus' => $event_status ),
+				'cancelled_event_create'
+			);
+		}
+
 		$timezone = wp_timezone();
 		$start    = new \DateTimeImmutable( substr( trim( $start_date ), 0, 10 ), $timezone );
 		$today    = new \DateTimeImmutable( 'today', $timezone );
