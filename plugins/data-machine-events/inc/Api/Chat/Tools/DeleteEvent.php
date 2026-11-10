@@ -35,20 +35,25 @@ class DeleteEvent extends BaseTool {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',
-			'description' => 'Soft-delete (trash) one or more event posts. Use when a duplicate event exists at the wrong venue, or when an event was cancelled. Events go to the WordPress trash (recoverable from wp-admin), NOT a hard delete. Accepts a single post ID via "event" or multiple via "events". Returns deleted[] with id/title/venue_name/start_date snapshots so you can confirm to the user which posts were removed.',
+			'description' => 'Soft-delete (trash) one or more event posts. Use when a duplicate event exists at the wrong venue, or when an event was cancelled (set reason_type="cancelled" to prevent re-import). Events go to the WordPress trash (recoverable from wp-admin), NOT a hard delete. Accepts a single post ID via "event" or multiple via "events". Returns deleted[] with id/title/venue_name/start_date snapshots so you can confirm to the user which posts were removed.',
 			'parameters'  => array(
 				'type'       => 'object',
 				'properties' => array(
-					'event'  => array(
+					'event'       => array(
 						'type'        => 'integer',
 						'description' => 'Single event post ID to trash.',
 					),
-					'events' => array(
+					'events'      => array(
 						'type'        => 'array',
 						'description' => 'Array of event post IDs to trash.',
 						'items'       => array( 'type' => 'integer' ),
 					),
-					'reason' => array(
+					'reason_type' => array(
+						'type'        => 'string',
+						'enum'        => array( 'cancelled', 'duplicate', 'other' ),
+						'description' => 'Use cancelled for cancelled shows: protects against importer resurrection. Defaults to other (ordinary trash).',
+					),
+					'reason'      => array(
 						'type'        => 'string',
 						'description' => 'Free-form reason recorded in the audit log (e.g., "duplicate at wrong venue", "show cancelled").',
 					),

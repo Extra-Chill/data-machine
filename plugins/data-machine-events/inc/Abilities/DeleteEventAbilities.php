@@ -22,6 +22,8 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventOwnership;
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -44,21 +46,27 @@ class DeleteEventAbilities {
 				'data-machine-events/delete-event',
 				array(
 					'label'               => __( 'Delete event', 'data-machine-events' ),
-					'description'         => __( 'Soft-delete (trash) one or more event posts. Use for wrong-venue duplicates or cancelled events; not a hard delete.', 'data-machine-events' ),
+					'description'         => __( 'Soft-delete (trash) one or more event posts. Use reason_type=cancelled to protect cancelled events from re-import; duplicate/other keep ordinary trash behavior. Not a hard delete.', 'data-machine-events' ),
 					'category'            => 'datamachine-events-events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'event'  => array(
+							'event'       => array(
 								'type'        => 'integer',
 								'description' => 'Single event post ID to trash.',
 							),
-							'events' => array(
+							'events'      => array(
 								'type'        => 'array',
 								'items'       => array( 'type' => 'integer' ),
 								'description' => 'Array of event post IDs to trash.',
 							),
-							'reason' => array(
+							'reason_type' => array(
+								'type'        => 'string',
+								'enum'        => array( 'cancelled', 'duplicate', 'other' ),
+								'default'     => 'other',
+								'description' => 'Use cancelled to prevent the importer from restoring or recreating the event.',
+							),
+							'reason'      => array(
 								'type'        => 'string',
 								'description' => 'Free-form reason recorded in the audit log and echoed back in the response.',
 							),
@@ -67,7 +75,7 @@ class DeleteEventAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'deleted' => array(
+							'deleted'     => array(
 								'type'  => 'array',
 								'items' => array(
 									'type'       => 'object',
@@ -79,7 +87,7 @@ class DeleteEventAbilities {
 									),
 								),
 							),
-							'skipped' => array(
+							'skipped'     => array(
 								'type'  => 'array',
 								'items' => array(
 									'type'       => 'object',
@@ -89,8 +97,9 @@ class DeleteEventAbilities {
 									),
 								),
 							),
-							'reason'  => array( 'type' => 'string' ),
-							'summary' => array(
+							'reason_type' => array( 'type' => 'string' ),
+							'reason'      => array( 'type' => 'string' ),
+							'summary'     => array(
 								'type'       => 'object',
 								'properties' => array(
 									'deleted' => array( 'type' => 'integer' ),
@@ -98,7 +107,7 @@ class DeleteEventAbilities {
 									'total'   => array( 'type' => 'integer' ),
 								),
 							),
-							'message' => array( 'type' => 'string' ),
+							'message'     => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -118,12 +127,18 @@ class DeleteEventAbilities {
 	 *     @type int      $event  Single event post ID (alternative to events[]).
 	 *     @type int[]    $events Array of event post IDs.
 	 *     @type string   $reason Free-form audit reason.
+	 *     @type string   $reason_type cancelled, duplicate, or other (default).
 	 * }
 	 * @return array|\WP_Error
 	 */
 	public function execute( array $input ): array|\WP_Error {
-		$ids    = $this->normalizeIds( $input );
-		$reason = trim( (string) ( $input['reason'] ?? '' ) );
+		$ids         = $this->normalizeIds( $input );
+		$reason      = trim( (string) ( $input['reason'] ?? '' ) );
+		$reason_type = (string) ( $input['reason_type'] ?? 'other' );
+
+		if ( ! in_array( $reason_type, array( 'cancelled', 'duplicate', 'other' ), true ) ) {
+			return new \WP_Error( 'invalid_reason_type', 'reason_type must be cancelled, duplicate, or other.', array( 'status' => 400 ) );
+		}
 
 		if ( empty( $ids ) ) {
 			return new \WP_Error(
@@ -137,7 +152,7 @@ class DeleteEventAbilities {
 		$skipped = array();
 
 		foreach ( $ids as $post_id ) {
-			$result = $this->trashSingle( $post_id, $reason );
+			$result = $this->trashSingle( $post_id, $reason, $reason_type );
 			if ( isset( $result['deleted'] ) ) {
 				$deleted[] = $result['deleted'];
 			} else {
@@ -152,11 +167,12 @@ class DeleteEventAbilities {
 		);
 
 		return array(
-			'deleted' => $deleted,
-			'skipped' => $skipped,
-			'reason'  => $reason,
-			'summary' => $summary,
-			'message' => $this->buildSummaryMessage( $summary['deleted'], $summary['skipped'] ),
+			'deleted'     => $deleted,
+			'skipped'     => $skipped,
+			'reason_type' => $reason_type,
+			'reason'      => $reason,
+			'summary'     => $summary,
+			'message'     => $this->buildSummaryMessage( $summary['deleted'], $summary['skipped'] ),
 		);
 	}
 
@@ -193,9 +209,10 @@ class DeleteEventAbilities {
 	 *
 	 * @param int    $post_id Post ID.
 	 * @param string $reason  Audit reason.
+	 * @param string $reason_type Deletion intent.
 	 * @return array{deleted?: array, skipped?: array}
 	 */
-	private function trashSingle( int $post_id, string $reason ): array {
+	private function trashSingle( int $post_id, string $reason, string $reason_type ): array {
 		$post = get_post( $post_id );
 
 		if ( ! $post ) {
@@ -216,7 +233,7 @@ class DeleteEventAbilities {
 			);
 		}
 
-		if ( 'trash' === $post->post_status ) {
+		if ( 'trash' === $post->post_status && 'cancelled' !== $reason_type ) {
 			return array(
 				'skipped' => array(
 					'id'     => $post_id,
@@ -230,7 +247,8 @@ class DeleteEventAbilities {
 		$venue_name = $this->lookupVenueName( $post_id );
 		$start_date = $this->lookupStartDate( $post );
 
-		$trashed = wp_trash_post( $post_id );
+		// An already-trashed event can still be upgraded to a protected cancellation.
+		$trashed = 'trash' === $post->post_status ? $post : wp_trash_post( $post_id );
 
 		if ( ! $trashed ) {
 			return array(
@@ -241,6 +259,10 @@ class DeleteEventAbilities {
 			);
 		}
 
+		if ( 'cancelled' === $reason_type ) {
+			$this->protectCancellation( $post, $venue_name );
+		}
+
 		// Mirror the audit pattern used by MergeEventPostsAbilities — emit a
 		// datamachine_log entry and fire a dedicated action so future audit
 		// primitives can subscribe without us having to invent storage here.
@@ -249,12 +271,13 @@ class DeleteEventAbilities {
 			'info',
 			'Trashed event post.',
 			array(
-				'post_id'    => $post_id,
-				'title'      => $title,
-				'venue_name' => $venue_name,
-				'start_date' => $start_date,
-				'reason'     => $reason,
-				'source'     => 'delete-event-ability',
+				'post_id'     => $post_id,
+				'title'       => $title,
+				'venue_name'  => $venue_name,
+				'start_date'  => $start_date,
+				'reason'      => $reason,
+				'reason_type' => $reason_type,
+				'source'      => 'delete-event-ability',
 			)
 		);
 
@@ -283,6 +306,44 @@ class DeleteEventAbilities {
 				'start_date' => $start_date,
 			),
 		);
+	}
+
+	/**
+	 * Protect a cancellation using the existing fill-only trash guard.
+	 *
+	 * Historical imports have no source metadata. Link both identifier versions
+	 * for each title/date/venue-based importer so they resolve even from trash.
+	 * Primary and previously linked identities are deliberately left intact.
+	 *
+	 * @param \WP_Post $post Event snapshot before trashing.
+	 * @param string   $venue_name Assigned venue name.
+	 */
+	private function protectCancellation( \WP_Post $post, string $venue_name ): void {
+		EventOwnership::markHumanOwned( (int) $post->ID, get_current_user_id() );
+
+		foreach ( parse_blocks( $post->post_content ) as $block ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME !== ( $block['blockName'] ?? '' ) ) {
+				continue;
+			}
+			$attrs = $block['attrs'];
+			$date  = (string) ( $attrs['startDate'] ?? '' );
+			$venue = '' !== $venue_name ? $venue_name : (string) ( $attrs['venue'] ?? '' );
+			if ( '' === $date || '' === $venue || '' === $post->post_title ) {
+				return;
+			}
+			$identifiers = array_unique(
+				array(
+					EventIdentifierGenerator::generate( $post->post_title, $date, $venue, (string) ( $attrs['startTime'] ?? '' ), (string) ( $attrs['venueTimezone'] ?? '' ) ),
+					EventIdentifierGenerator::generateLegacy( $post->post_title, $date, $venue ),
+				)
+			);
+			foreach ( array( 'dice_fm', 'universal_web_scraper', 'single_recurring', 'event_flyer', 'ticketmaster' ) as $source ) {
+				foreach ( $identifiers as $identifier ) {
+					EventOwnership::linkSourceIdentity( (int) $post->ID, hash( 'sha256', $source . "\0" . $identifier ) );
+				}
+			}
+			return;
+		}
 	}
 
 	/**
