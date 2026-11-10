@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.84.1] - 2026-11-10
+
+### Fixed
+- cancel already-imported events when the source reports cancellation
+- protect cancelled events from re-import in delete-event
+
 ## [0.84.0] - 2026-11-06
 
 ### Added
