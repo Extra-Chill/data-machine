@@ -696,7 +696,10 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 	}
 
 	public function test_preallocated_shell_preserves_create_defaults_but_uses_update_hooks(): void {
-		$user_id = self::factory()->user->create( array( 'role' => 'author' ) );
+		// The `_source` identity key is protected meta, which requires
+		// edit_others_posts. Use the least-privileged role that holds it so the
+		// shell author still proves the acting (non-admin) user is preserved.
+		$user_id = self::factory()->user->create( array( 'role' => 'editor' ) );
 		wp_set_current_user( $user_id );
 		$expected_comment = get_default_comment_status( 'post' );
 		$expected_ping    = get_default_comment_status( 'post', 'pingback' );
