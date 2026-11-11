@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.84.2] - 2026-11-11
+
+### Fixed
+- emit bounded Cache-Control expiry for calendar pages instead of DONOTCACHEPAGE
+
 ## [0.84.1] - 2026-11-10
 
 ### Fixed
