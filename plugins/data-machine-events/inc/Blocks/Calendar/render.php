@@ -24,13 +24,6 @@ if ( wp_is_json_request() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 	return '';
 }
 
-// Upcoming eligibility changes as event start/end boundaries pass. A generic
-// full-page cache cannot know those boundaries, while the calendar's own
-// response and bucket caches can expire precisely at the next transition.
-if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-	define( 'DONOTCACHEPAGE', true );
-}
-
 $show_search = $attributes['showSearch'] ?? true;
 
 // Resolve archive term context first so the value object can pick it up.
@@ -157,6 +150,19 @@ $query_args = (array) apply_filters(
 );
 
 $request = CalendarRequest::fromQueryArgs( $query_args, $archive_term );
+
+// Upcoming eligibility changes as event start/end boundaries pass. Advertise
+// that boundary as a bounded HTTP expiry so the page can be cached until the
+// next transition, the same instant the calendar's own caches expire.
+// Consumer-scoped renders (opaque scope token) may be per-visitor, so they
+// stay out of shared page caches.
+if ( '' !== $request->scopeToken() ) {
+	if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+		define( 'DONOTCACHEPAGE', true );
+	}
+} else {
+	\DataMachineEvents\Blocks\Calendar\Cache\PageExpiry::emit();
+}
 
 // Local aliases used by template includes / data attrs further down.
 $current_page    = $request->paged();

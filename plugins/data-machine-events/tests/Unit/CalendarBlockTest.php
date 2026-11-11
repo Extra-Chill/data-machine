@@ -13,6 +13,7 @@ namespace DataMachineEvents\Tests\Unit;
 use WP_UnitTestCase;
 use DataMachineEvents\Blocks\Calendar\Pagination\Renderer as Pagination;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Blocks\Calendar\Cache\PageExpiry;
 use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 
 class CalendarBlockTest extends WP_UnitTestCase {
@@ -38,10 +39,14 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$this->assertNotNull( $block->render_callback, 'Block should have render callback' );
 	}
 
-	public function test_server_rendered_calendar_disables_generic_page_caching(): void {
+	public function test_server_rendered_calendar_records_bounded_page_expiry(): void {
+		PageExpiry::reset();
 		$this->render_calendar();
 
-		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) && DONOTCACHEPAGE );
+		$max_age = PageExpiry::current();
+		$this->assertNotNull( $max_age, 'Rendering a calendar should record a page expiry.' );
+		$this->assertGreaterThanOrEqual( PageExpiry::FLOOR, $max_age );
+		$this->assertLessThanOrEqual( PageExpiry::CEILING, $max_age );
 	}
 
 	public function test_pagination_exposes_sanitized_public_arguments(): void {
