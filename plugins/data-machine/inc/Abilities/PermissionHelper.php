@@ -238,6 +238,107 @@ class PermissionHelper {
 	}
 
 	/**
+	 * Check a concrete WordPress capability (primitive or meta) for the acting principal.
+	 *
+	 * Use this for object-level authorization (edit_post, publish_posts,
+	 * assign_terms, ...) that the Data Machine action map cannot express. The
+	 * trusted-context rules mirror can():
+	 *
+	 * - WP-CLI (subject to datamachine_cli_bypass_permissions) and Action
+	 *   Scheduler queue runs are trusted.
+	 * - Agent token context checks the agent owner's capabilities, bounded by
+	 *   the token's capability ceiling: every primitive capability the meta
+	 *   capability maps to must be allowed by the ceiling.
+	 * - Pre-authenticated context checks the acting user; without an acting
+	 *   user (system context) it is trusted.
+	 * - Otherwise the logged-in user must hold the capability.
+	 *
+	 * Unlike user_can() via can(), manage_options is NOT treated as a blanket
+	 * grant here; WordPress capability mapping already decides what
+	 * administrators may do with an object.
+	 *
+	 * @param string $capability WordPress capability or meta capability.
+	 * @param mixed  ...$args    Optional object arguments (e.g. post ID).
+	 * @return bool
+	 */
+	public static function can_wp_capability( string $capability, ...$args ): bool {
+		$capability = trim( $capability );
+		if ( '' === $capability ) {
+			return false;
+		}
+
+		if ( defined( 'WP_CLI' ) && WP_CLI && apply_filters( 'datamachine_cli_bypass_permissions', true ) ) {
+			return true;
+		}
+
+		if ( doing_action( 'action_scheduler_run_queue' ) ) {
+			return true;
+		}
+
+		if ( null !== self::$acting_agent_id ) {
+			if ( self::$agent_owner_id <= 0 ) {
+				return false;
+			}
+
+			return self::ceiling_allows_mapped_capability( self::$agent_owner_id, $capability, $args )
+				&& user_can( self::$agent_owner_id, $capability, ...$args );
+		}
+
+		if ( self::$authenticated_context ) {
+			if ( self::$authenticated_user_id > 0 ) {
+				return self::ceiling_allows_mapped_capability( self::$authenticated_user_id, $capability, $args )
+					&& user_can( self::$authenticated_user_id, $capability, ...$args );
+			}
+
+			return true;
+		}
+
+		if ( ! is_user_logged_in() ) {
+			return false;
+		}
+
+		$user_id = get_current_user_id();
+		return self::ceiling_allows_mapped_capability( $user_id, $capability, $args )
+			&& user_can( $user_id, $capability, ...$args );
+	}
+
+	/**
+	 * Whether the active capability ceiling (if any) allows a capability.
+	 *
+	 * Meta capabilities are resolved through map_meta_cap() for the given
+	 * user so a ceiling expressed in primitive capabilities (edit_posts,
+	 * publish_posts, edit_others_posts, ...) bounds object-level checks too.
+	 *
+	 * @param int    $user_id    User whose capabilities are being mapped.
+	 * @param string $capability Requested capability.
+	 * @param array  $args       Object arguments.
+	 * @return bool
+	 */
+	private static function ceiling_allows_mapped_capability( int $user_id, string $capability, array $args ): bool {
+		$ceiling = self::$capability_ceiling;
+		if ( ! $ceiling instanceof \WP_Agent_Capability_Ceiling ) {
+			return true;
+		}
+
+		if ( $ceiling->allows_capability( $capability ) ) {
+			return true;
+		}
+
+		$primitives = map_meta_cap( $capability, $user_id, ...$args );
+		if ( empty( $primitives ) ) {
+			return false;
+		}
+
+		foreach ( $primitives as $primitive ) {
+			if ( 'do_not_allow' === $primitive || ! $ceiling->allows_capability( (string) $primitive ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * Get current acting user ID for permission-bounded execution.
 	 *
 	 * @since 0.37.0

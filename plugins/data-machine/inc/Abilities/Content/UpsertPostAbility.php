@@ -174,7 +174,7 @@ class UpsertPostAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+					'permission_callback' => array( self::class, 'check_permission' ),
 					'meta'                => array(
 						'show_in_rest' => true,
 						'mcp'          => array( 'public' => true ),
@@ -337,6 +337,13 @@ class UpsertPostAbility {
 			return new \WP_Error( 'invalid_upsert_input', 'post_type and title are required.', array( 'status' => 400 ) );
 		}
 
+		// Authorize the requested operation before anything is written: parent
+		// stub creation and identity reservation both allocate posts.
+		$authorized = self::authorize_request( $input );
+		if ( is_wp_error( $authorized ) ) {
+			return $authorized;
+		}
+
 		if ( $add_source_attribution && '' !== $source_url ) {
 			$content = WordPressPublishHelper::applySourceAttribution(
 				(string) $content,
@@ -444,6 +451,144 @@ class UpsertPostAbility {
 		}
 
 		return self::callback_result( self::execute_resolved_write( $write_context, (int) $existing_id ) );
+	}
+
+	/**
+	 * Ability permission callback.
+	 *
+	 * Requires the chat action plus WordPress object capabilities for the
+	 * requested write. Targets resolved later (slug, identity meta) are
+	 * re-checked at write time by execute().
+	 *
+	 * @param mixed $input Ability input.
+	 * @return bool|\WP_Error
+	 */
+	public static function check_permission( $input = null ): bool|\WP_Error {
+		if ( ! PermissionHelper::can( 'chat' ) ) {
+			return false;
+		}
+
+		$input = is_array( $input ) ? $input : array();
+		if ( '' === sanitize_key( (string) ( $input['post_type'] ?? '' ) ) ) {
+			// Let input validation report the missing post type.
+			return true;
+		}
+
+		$authorized = self::authorize_request( $input );
+		if ( is_wp_error( $authorized ) ) {
+			return $authorized;
+		}
+
+		$post_id = absint( $input['post_id'] ?? 0 );
+		if ( $post_id > 0 && get_post( $post_id ) instanceof \WP_Post ) {
+			return self::authorize_existing_post( $post_id, sanitize_key( (string) ( $input['post_status'] ?? 'publish' ) ) );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Authorize the post-type level capabilities a request needs.
+	 *
+	 * - create_posts for the post type (an upsert may always create).
+	 * - publish_posts when the requested status is publish, future, or
+	 *   private, or when missing parent stubs would be created (stubs publish).
+	 * - edit_others_posts when assigning a different author or setting
+	 *   protected meta (meta_input keys or the identity_meta key).
+	 * - assign_terms for each requested taxonomy.
+	 *
+	 * @param array $input Raw ability input.
+	 * @return true|\WP_Error
+	 */
+	private static function authorize_request( array $input ): bool|\WP_Error {
+		$post_type   = sanitize_key( (string) ( $input['post_type'] ?? '' ) );
+		$post_status = sanitize_key( (string) ( $input['post_status'] ?? 'publish' ) );
+		$post_author = absint( $input['post_author'] ?? 0 );
+		$taxonomies  = $input['taxonomies'] ?? array();
+
+		$type_object = get_post_type_object( $post_type );
+		if ( ! $type_object instanceof \WP_Post_Type ) {
+			// Unregistered post types have no capability mapping; only fully
+			// trusted contexts and site administrators may write them.
+			if ( PermissionHelper::can_wp_capability( 'manage_options' ) ) {
+				return true;
+			}
+			return self::forbidden( sprintf( 'Post type "%s" is not registered.', $post_type ) );
+		}
+
+		$caps = $type_object->cap;
+
+		if ( ! PermissionHelper::can_wp_capability( $caps->create_posts ) ) {
+			return self::forbidden( sprintf( 'You are not allowed to create %s posts.', $post_type ) );
+		}
+
+		$needs_publish = in_array( $post_status, array( 'publish', 'future', 'private' ), true )
+			|| ( ! empty( $input['create_stubs'] ) && '' !== trim( (string) ( $input['parent_path'] ?? '' ) ) );
+		if ( $needs_publish && ! PermissionHelper::can_wp_capability( $caps->publish_posts ) ) {
+			return self::forbidden( sprintf( 'You are not allowed to publish %s posts.', $post_type ) );
+		}
+
+		if ( $post_author > 0 && PermissionHelper::acting_user_id() !== $post_author
+			&& ! PermissionHelper::can_wp_capability( $caps->edit_others_posts ) ) {
+			return self::forbidden( 'You are not allowed to create posts as another user.' );
+		}
+
+		// Protected (underscore-prefixed) meta is internal plugin/core state.
+		// Only principals trusted to edit any post of this type may set it.
+		$meta_keys = is_array( $input['meta_input'] ?? null ) ? array_map( 'strval', array_keys( $input['meta_input'] ) ) : array();
+		if ( self::has_usable_identity_meta( $input['identity_meta'] ?? null ) ) {
+			$meta_keys[] = sanitize_key( (string) $input['identity_meta']['key'] );
+		}
+		foreach ( $meta_keys as $meta_key ) {
+			if ( is_protected_meta( $meta_key, 'post' ) && ! PermissionHelper::can_wp_capability( $caps->edit_others_posts ) ) {
+				return self::forbidden( sprintf( 'You are not allowed to set protected meta "%s".', $meta_key ) );
+			}
+		}
+
+		if ( is_array( $taxonomies ) ) {
+			foreach ( array_keys( $taxonomies ) as $taxonomy ) {
+				$tax_object = get_taxonomy( (string) $taxonomy );
+				if ( ! $tax_object instanceof \WP_Taxonomy ) {
+					continue;
+				}
+				if ( ! PermissionHelper::can_wp_capability( $tax_object->cap->assign_terms ) ) {
+					return self::forbidden( sprintf( 'You are not allowed to assign %s terms.', $taxonomy ) );
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Authorize an update of an existing post.
+	 *
+	 * @param int    $post_id     Existing post ID.
+	 * @param string $post_status Requested status.
+	 * @return true|\WP_Error
+	 */
+	private static function authorize_existing_post( int $post_id, string $post_status ): bool|\WP_Error {
+		if ( ! PermissionHelper::can_wp_capability( 'edit_post', $post_id ) ) {
+			return self::forbidden( sprintf( 'You are not allowed to edit post #%d.', $post_id ) );
+		}
+
+		if ( 'trash' === $post_status && 'trash' !== get_post_status( $post_id )
+			&& ! PermissionHelper::can_wp_capability( 'delete_post', $post_id ) ) {
+			return self::forbidden( sprintf( 'You are not allowed to trash post #%d.', $post_id ) );
+		}
+
+		return true;
+	}
+
+	/** Whether the acting principal may create new terms in a taxonomy. */
+	private static function can_create_terms( string $taxonomy ): bool {
+		$tax_object = get_taxonomy( $taxonomy );
+		return $tax_object instanceof \WP_Taxonomy && PermissionHelper::can_wp_capability( $tax_object->cap->edit_terms );
+	}
+
+	/** Build a 403 authorization error. */
+	private static function forbidden( string $message ): \WP_Error {
+		return new \WP_Error( 'upsert_post_forbidden', $message, array( 'status' => 403 ) );
 	}
 
 	/**
@@ -618,6 +763,22 @@ class UpsertPostAbility {
 		$has_reservation   = null !== $reservation && $reservations instanceof PostIdentityReservations;
 		$post              = $existing_id > 0 ? get_post( $existing_id ) : null;
 
+		// A shell allocated by this request's own reservation is a create, which
+		// authorize_request() already covered. Every other resolved post is an
+		// update and must be editable by the acting principal.
+		$is_own_allocation = $has_reservation && ! empty( $reservation['allocated'] );
+		if ( $existing_id > 0 && ! $is_own_allocation ) {
+			$authorized = self::authorize_existing_post( $existing_id, $post_status );
+			if ( is_wp_error( $authorized ) ) {
+				return array(
+					'success'    => false,
+					'error'      => $authorized->get_error_message(),
+					'error_code' => $authorized->get_error_code(),
+					'error_data' => $authorized->get_error_data(),
+				);
+			}
+		}
+
 		// Idempotency check. Parent/slug/status changes still need a write even
 		// when the content hash is unchanged.
 		if ( $existing_id > 0 && '' !== $content_hash ) {
@@ -790,7 +951,7 @@ class UpsertPostAbility {
 						}
 						if ( $existing instanceof \WP_Term ) {
 							$term_ids[] = (int) $existing->term_id;
-						} else {
+						} elseif ( self::can_create_terms( $taxonomy ) ) {
 							// Create term if not found.
 							$result = wp_insert_term( $term, $taxonomy );
 							if ( is_array( $result ) ) {

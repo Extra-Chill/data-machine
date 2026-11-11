@@ -156,6 +156,18 @@ final class SignPendingActionResolutionAbility {
 			);
 		}
 
+		// A signed URL carries the resolution authority on its own, so only a
+		// caller already allowed to resolve this action may mint one. Managers
+		// keep operator-wide reach, matching the resolve surface.
+		$scope_input = PermissionHelper::can_manage() ? array( 'operator_wide' => true ) : array();
+		if ( ! PendingActionScope::can_access_payload( $action, $scope_input ) ) {
+			return array(
+				'success'   => false,
+				'error'     => 'Pending action not found or already resolved.',
+				'action_id' => $action_id,
+			);
+		}
+
 		$lifetime   = self::normalize_lifetime( $input['lifetime'] ?? self::DEFAULT_LIFETIME );
 		$expires_at = time() + $lifetime;
 		$resolver   = isset( $input['resolver'] ) ? sanitize_text_field( (string) $input['resolver'] ) : self::DEFAULT_RESOLVER;

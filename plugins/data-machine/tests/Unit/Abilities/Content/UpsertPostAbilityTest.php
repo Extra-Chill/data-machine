@@ -22,6 +22,14 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 
 		global $wpdb;
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $this->repository->get_table_name() ) );
+
+		// Writes are authorized against the acting user's object capabilities.
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+	}
+
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
 	}
 
 	public function test_identity_less_create_behavior_is_unchanged(): void {
