@@ -22,6 +22,14 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 
 		global $wpdb;
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $this->repository->get_table_name() ) );
+
+		// Writes are authorized against the acting user's object capabilities.
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+	}
+
+	public function tear_down(): void {
+		wp_set_current_user( 0 );
+		parent::tear_down();
 	}
 
 	public function test_identity_less_create_behavior_is_unchanged(): void {
@@ -688,7 +696,10 @@ class UpsertPostAbilityTest extends WP_UnitTestCase {
 	}
 
 	public function test_preallocated_shell_preserves_create_defaults_but_uses_update_hooks(): void {
-		$user_id = self::factory()->user->create( array( 'role' => 'author' ) );
+		// The `_source` identity key is protected meta, which requires
+		// edit_others_posts. Use the least-privileged role that holds it so the
+		// shell author still proves the acting (non-admin) user is preserved.
+		$user_id = self::factory()->user->create( array( 'role' => 'editor' ) );
 		wp_set_current_user( $user_id );
 		$expected_comment = get_default_comment_status( 'post' );
 		$expected_ping    = get_default_comment_status( 'post', 'pingback' );

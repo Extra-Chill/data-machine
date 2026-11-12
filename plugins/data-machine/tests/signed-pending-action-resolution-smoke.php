@@ -60,7 +60,22 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 }
 if ( ! function_exists( 'get_current_user_id' ) ) {
 	function get_current_user_id() {
-		return 0;
+		return (int) ( $GLOBALS['__signed_current_user'] ?? 0 );
+	}
+}
+if ( ! function_exists( 'is_user_logged_in' ) ) {
+	function is_user_logged_in() {
+		return get_current_user_id() > 0;
+	}
+}
+if ( ! function_exists( 'user_can' ) ) {
+	function user_can( $user, $capability ) {
+		return false;
+	}
+}
+if ( ! function_exists( 'current_user_can' ) ) {
+	function current_user_can( $capability ) {
+		return false;
 	}
 }
 if ( ! function_exists( 'get_option' ) ) {
@@ -367,6 +382,26 @@ $mismatch_result  = $signed_apply( array( 'value' => 41 ), $mismatch_claim, $mis
 datamachine_signed_assert( false === ( $mismatch_result['success'] ?? true ), 'production handler rejects mismatched input', $failures, $passes );
 datamachine_signed_assert( 0 === $GLOBALS['__signed_applies'], 'mismatched receipt causes zero side effects', $failures, $passes );
 datamachine_signed_assert( false === \DataMachine\Engine\AI\Actions\PendingActionStore::complete_claim( $mismatch_action_id, (string) $mismatch_claim['receipt_nonce'], 'accepted' ), 'accepted completion requires prior mutator consumption', $failures, $passes );
+
+// A caller outside the action's owner scope must not mint resolution URLs.
+\DataMachine\Engine\AI\Actions\PendingActionStore::store(
+	'act_foreign_owner',
+	array(
+		'kind'        => 'signed_smoke',
+		'summary'     => 'Action owned by another user',
+		'apply_input' => array( 'value' => 1 ),
+		'created_by'  => 5,
+		'agent_id'    => 0,
+		'context'     => array(),
+	)
+);
+$GLOBALS['__signed_current_user'] = 7;
+$foreign_signed = \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::execute( array( 'action_id' => 'act_foreign_owner' ) );
+datamachine_signed_assert( false === ( $foreign_signed['success'] ?? true ) && empty( $foreign_signed['approve_url'] ), 'signing is refused for a pending action outside the caller scope', $failures, $passes );
+$GLOBALS['__signed_current_user'] = 5;
+$owner_signed = \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::execute( array( 'action_id' => 'act_foreign_owner' ) );
+datamachine_signed_assert( true === ( $owner_signed['success'] ?? false ), 'the action owner can still sign its pending action', $failures, $passes );
+$GLOBALS['__signed_current_user'] = 0;
 
 $signed = \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility::execute(
 	array(

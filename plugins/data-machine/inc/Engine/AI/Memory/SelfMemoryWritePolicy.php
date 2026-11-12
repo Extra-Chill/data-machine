@@ -10,6 +10,7 @@ namespace DataMachine\Engine\AI\Memory;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Engine\AI\DataMachineAgentConsentPolicy;
+use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -67,13 +68,23 @@ final class SelfMemoryWritePolicy {
 			return self::deny( sprintf( 'Section type "%s" is not allowed for self-memory writes.', $section_type ), 'section_type_denied' );
 		}
 
-		$file    = (string) ( $input['file'] ?? 'MEMORY.md' );
+		$file    = self::normalize_filename( (string) ( $input['file'] ?? 'MEMORY.md' ) );
 		$section = trim( (string) ( $input['section'] ?? '' ) );
 		$content = (string) ( $input['content'] ?? '' );
 		$mode    = 'set' === ( $input['mode'] ?? 'append' ) ? 'set' : 'append';
 
 		if ( '' === $section || '' === trim( $content ) ) {
 			return self::deny( 'section and content are required.', 'missing_required_input' );
+		}
+
+		// Self-memory must honor the same editability contract as the
+		// regular memory write surface: registered read-only, composable,
+		// or capability-gated files (e.g. site-wide rules) stay protected.
+		if ( '' === $file ) {
+			return self::deny( 'A memory file is required.', 'missing_required_input' );
+		}
+		if ( 'MEMORY.md' !== $file && ! MemoryFileRegistry::is_editable( $file, PermissionHelper::acting_user_id() ) ) {
+			return self::deny( sprintf( 'File %s is not editable through self-memory writes.', $file ), 'memory_file_not_editable' );
 		}
 
 		$artifact = self::memory_section_artifact( $target_agent_id, $file, $section, $section_type, $input );
@@ -138,6 +149,19 @@ final class SelfMemoryWritePolicy {
 			'reason'       => (string) ( $input['reason'] ?? '' ),
 			'source'       => $source,
 		);
+	}
+
+	/**
+	 * Normalize a requested memory filename exactly like AgentMemory does,
+	 * so the editability check runs against the file that will be written.
+	 */
+	private static function normalize_filename( string $filename ): string {
+		$segments = array_filter( explode( '/', $filename ), static fn( string $segment ): bool => '' !== $segment );
+		$clean    = array();
+		foreach ( $segments as $segment ) {
+			$clean[] = preg_replace( '/[^a-zA-Z0-9._-]/', '', basename( $segment ) );
+		}
+		return implode( '/', $clean );
 	}
 
 	private static function deny( string $message, string $code ): array {

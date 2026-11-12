@@ -7,6 +7,23 @@
  * @package DataMachine\Tests
  */
 
+namespace DataMachine\Abilities {
+	// Authorization is covered by UpsertPostPermissionTest; this smoke runs as
+	// a trusted principal so it can focus on storage formats.
+	if ( ! class_exists( PermissionHelper::class ) ) {
+		class PermissionHelper {
+			public static function can_wp_capability( string $capability, ...$args ): bool {
+				unset( $capability, $args );
+				return true;
+			}
+
+			public static function acting_user_id(): int {
+				return 0;
+			}
+		}
+	}
+}
+
 namespace DataMachine\Core\WordPress {
 	class ResolvePostByPath {
 
@@ -117,6 +134,13 @@ namespace {
 	if ( ! function_exists( 'get_current_blog_id' ) ) {
 		function get_current_blog_id(): int {
 			return 1;
+		}
+	}
+
+	if ( ! function_exists( 'get_post_type_object' ) ) {
+		function get_post_type_object( $post_type ) {
+			unset( $post_type );
+			return null;
 		}
 	}
 

@@ -14,6 +14,8 @@ namespace {
 	function user_can( $user, $cap ) { return 1 === $user; }
 	function current_user_can( $cap ) { return user_can( get_current_user_id(), $cap ); }
 	function doing_action( $name ) { return false; }
+	function do_action( $name, ...$args ) {}
+	function sanitize_file_name( $value ) { return preg_replace( '/[^a-zA-Z0-9._-]/', '', (string) $value ); }
 	function absint( $value ) { return abs( (int) $value ); }
 	function esc_html( $value ) { return htmlspecialchars( $value ); }
 	function sanitize_title( $value ) { return strtolower( trim( $value ) ); }
@@ -68,6 +70,9 @@ namespace {
 	require __DIR__ . '/../inc/Engine/AI/Memory/SelfMemoryWritePolicy.php';
 	require __DIR__ . '/../inc/Engine/AI/Memory/MemorySectionArtifact.php';
 
+	\DataMachine\Engine\AI\MemoryFileRegistry::register( 'RULES.md', 15, array( 'layer' => 'shared', 'protected' => true, 'editable' => 'manage_options' ) );
+	\DataMachine\Engine\AI\MemoryFileRegistry::register( 'WAKE.md', 35, array( 'layer' => 'agent', 'protected' => true, 'editable' => false ) );
+
 	use DataMachine\Abilities\PermissionHelper as P;
 	use DataMachine\Core\Auth\UserSessionAgentContext;
 	use DataMachine\Core\PluginSettings;
@@ -96,6 +101,10 @@ namespace {
 		check( 'cross_agent_denied' === Policy::execute( array_merge( $input, array( 'agent_id' => 2 ) ) )['error_code'], 'cross-agent denied' );
 		check( 'durable_fact_denied' === Policy::execute( array_merge( $input, array( 'file' => 'MEMORY.md', 'section_type' => 'fact' ) ) )['error_code'], 'shared durable facts denied' );
 		check( Policy::execute( array_merge( $input, array( 'file' => 'MEMORY.md' ) ) )['success'], 'shared operational note permitted' );
+		foreach ( array( 'RULES.md', '/RULES.md', 'RULES .md', 'WAKE.md' ) as $protected_file ) {
+			$writes_before = count( AgentMemory::$writes );
+			check( 'memory_file_not_editable' === Policy::execute( array_merge( $input, array( 'file' => $protected_file ) ) )['error_code'] && count( AgentMemory::$writes ) === $writes_before, "protected memory file {$protected_file} denied" );
+		}
 		apply_filters( 'rest_request_after_callbacks', null, array(), $request );
 		check( null === P::get_execution_principal() && null === P::get_acting_agent_id(), 'scope cleaned after dispatch' );
 	}
