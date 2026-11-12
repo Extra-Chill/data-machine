@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.202.1] - 2026-11-12
+
+### Fixed
+- enforce per-object post capabilities in upsert-post
+
 ## [0.202.0] - 2026-11-08
 
 ### Added
