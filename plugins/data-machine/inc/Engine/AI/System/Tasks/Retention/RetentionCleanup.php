@@ -1099,7 +1099,7 @@ class RetentionCleanup {
 	 * would be deleted from each table (actions vs logs) under the combined
 	 * per-hook + global retention windows.
 	 *
-	 * @return array{actions: int, logs: int, total: int}
+	 * @return array{actions: int, logs: int, groups: int, total: int}
 	 */
 	public static function countActionSchedulerBreakdown(): array {
 		global $wpdb;
