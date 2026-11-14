@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.84.3] - 2026-11-14
+
+### Changed
+- fix stale dates and privacy-page ID collision in upsert tests
+
 ## [0.84.2] - 2026-11-11
 
 ### Fixed
