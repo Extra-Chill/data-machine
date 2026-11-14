@@ -47,7 +47,22 @@ class DataPacketStore {
 			return false;
 		}
 
-		if ( ! file_exists( $file_path ) ) {
+		// Dedupe hit: refresh mtime so it records the most recent write that
+		// referenced this packet. PacketStoreCleanup ages files by mtime, so
+		// a shared packet stays protected for as long as new jobs keep
+		// pointing at it (Extra-Chill/data-machine#3938).
+		$needs_write = true;
+		if ( file_exists( $file_path ) ) {
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_system_operations_touch -- Metadata-only refresh; failure falls through to the rewrite below.
+			@touch( $file_path );
+			clearstatcache( true, $file_path );
+			// If retention unlinked the file between the existence check and
+			// the touch, touch() recreated it empty: rewrite it rather than
+			// return a dangling ref.
+			$needs_write = ! file_exists( $file_path ) || 0 === (int) @filesize( $file_path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- File may vanish concurrently.
+		}
+
+		if ( $needs_write ) {
 			$envelope    = array(
 				'schema_version' => self::SCHEMA_VERSION,
 				'hash_algorithm' => self::HASH_ALGORITHM,
